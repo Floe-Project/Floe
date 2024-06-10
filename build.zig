@@ -48,9 +48,8 @@ fn cacheDir(b: *std.Build) []const u8 {
     return b.cache_root.path.?;
 }
 
-fn concatCompileCommands(step: *std.Build.Step, prog_node: *std.Progress.Node) !void {
+fn tryConcatCompileCommands(step: *std.Build.Step) !void {
     const self: *ConcatCompileCommandsStep = @fieldParentPtr("step", step);
-    _ = prog_node;
 
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
@@ -187,6 +186,14 @@ fn concatCompileCommands(step: *std.Build.Step, prog_node: *std.Progress.Node) !
 
         try std.fs.copyFileAbsolute(out_path, generic_out_path, .{ .override_mode = null });
     }
+}
+
+fn concatCompileCommands(step: *std.Build.Step, prog_node: *std.Progress.Node) !void {
+    _ = prog_node;
+
+    tryConcatCompileCommands(step) catch |err| {
+        std.debug.print("failed to concatenate compile commands: {any}\n", .{err});
+    };
 }
 
 const PostInstallStep = struct {

@@ -3,6 +3,8 @@ SPDX-FileCopyrightText: 2018-2024 Sam Windell
 SPDX-License-Identifier: CC0-1.0
 -->
 
+![Tests](https://github.com/floe-synth/floe/actions/workflows/tests.yaml/badge.svg)
+
 # Floe
 ### Sample-based synthesiser plugin
 _Large-scale changes are underway, many things are missing and broken for now._

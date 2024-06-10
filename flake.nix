@@ -202,20 +202,15 @@
           shellHook = ''
             export MACOSX_SDK_SYSROOT="${macosx-sdks}"
 
-            echo "Setting up git hooks..."
-            mkdir -p ".git/hooks"
-            echo "a"
-
-            preCommit=".git/hooks/pre-commit"
-            echo "b"
-            echo "#!/bin/sh" > ''${preCommit}
-            echo "c"
-            echo "echo 'Running format-all...'" >> ''${preCommit}
-            echo "d"
-            echo "format-all" >> ''${preCommit}
-            echo "e"
-            chmod +x ''${preCommit}
-            echo "f"
+            # echo "Setting up git hooks..."
+            # mkdir -p ".git/hooks"
+            # echo "a"
+            #
+            # preCommit=".git/hooks/pre-commit"
+            # echo "#!/bin/sh" > ''${preCommit}
+            # echo "echo 'Running format-all...'" >> ''${preCommit}
+            # echo "format-all" >> ''${preCommit}
+            # chmod +x ''${preCommit}
           '';
         };
       });

@@ -165,10 +165,12 @@ jobs:
         run: ${{ matrix.command }}
 
       - if: matrix.command == 'kcov'
+        working-directory: zig-out/x86-linux
         name: Run kcov
         run: kcov kcov-output ./tests
 
       - if: matrix.command == 'kcov'
+        working-directory: zig-out/x86-linux
         name: Upload coverage reports
         uses: codecov/codecov-action@v4
         with:

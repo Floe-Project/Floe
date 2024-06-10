@@ -142,7 +142,7 @@
             '')
 
             (pkgs.writeShellScriptBin "check-format-all" ''
-              ${pkgs.fd}/bin/fd . -e .mm -e .cpp -e .hpp -e .h src | xargs ${pkgs.llvmPackages_17.clang-unwrapped}/bin/clang-format clang-format --dry-run --Werror
+              ${pkgs.fd}/bin/fd . -e .mm -e .cpp -e .hpp -e .h src | xargs ${pkgs.llvmPackages_17.clang-unwrapped}/bin/clang-format --dry-run --Werror
             '')
 
             (pkgs.writeShellScriptBin "clang-tidy-all" ''
@@ -201,16 +201,6 @@
           ];
           shellHook = ''
             export MACOSX_SDK_SYSROOT="${macosx-sdks}"
-
-            # echo "Setting up git hooks..."
-            # mkdir -p ".git/hooks"
-            # echo "a"
-            #
-            # preCommit=".git/hooks/pre-commit"
-            # echo "#!/bin/sh" > ''${preCommit}
-            # echo "echo 'Running format-all...'" >> ''${preCommit}
-            # echo "format-all" >> ''${preCommit}
-            # chmod +x ''${preCommit}
           '';
         };
       });

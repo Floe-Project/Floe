@@ -6,7 +6,7 @@ SPDX-License-Identifier: CC0-1.0
 
 # Floe
 
-![Tests](https://github.com/Floe-Synth/Floe/actions/workflows/tests.yml/badge.svg)
+![CI](https://github.com/Floe-Synth/Floe/actions/workflows/ci.yml/badge.svg)
 
 ### Sample-based synthesiser plugin
 _Large-scale changes are underway, many things are missing and broken for now._

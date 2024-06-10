@@ -1,11 +1,12 @@
 # Copyright 2024 Sam Windell
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-name: Tests
+name: CI
 
 on:
   workflow_dispatch:
   push:
+  pull_request:
 
 jobs:
   compile:
@@ -86,7 +87,7 @@ jobs:
             zig-out/x86-windows/tests.exe
             zig-out/x86-windows/VST3-Validator.exe
 
-  tests:
+  test:
     strategy:
       fail-fast: false # run even if others in this matrix failed
       matrix:
@@ -136,6 +137,9 @@ jobs:
           path: ${{ matrix.system.log-root-dir }}/FrozenPlain/floe.log
 
   static-analysis:
+    strategy:
+      matrix:
+        command: [ cppcheck-all, clang-tidy-all, kcov ]
     name: Static Analysis
     runs-on: ubuntu-latest
     steps:
@@ -155,11 +159,22 @@ jobs:
       - name: Compile
         run: zig build compile -Dtargets=linux
 
-      - name: cppcheck
-        run: cppcheck-all
+      - if: matrix.command != 'kcov'
+        name: Run Static Analysis
+        run: ${{ matrix.command }}
 
-      - name: clang-tidy
-        run: clang-tidy-all
+      - if: matrix.command == 'kcov'
+        name: Run kcov
+        run: kcov kcov-output ./tests
+
+      - if: matrix.command == 'kcov'
+        name: Upload coverage reports
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          directory: ./kcov-outout/tests
+          verbose: true
+          fail_ci_if_error: true
 
   reuse-compliance:
     runs-on: ubuntu-latest

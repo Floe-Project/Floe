@@ -21,7 +21,7 @@ const floe_version_string = "3.0.0-Beta.1";
 const floe_description = "Sample-based synth plugin";
 const floe_copyright = "Sam Windell";
 const floe_vendor = "Floe";
-const floe_url = "https://frozenplain.com";
+const floe_url = "https://github.com/Floe-Synth/Floe";
 
 const rootdir = struct {
     fn getSrcDir() []const u8 {

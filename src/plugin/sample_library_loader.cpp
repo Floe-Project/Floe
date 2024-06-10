@@ -512,7 +512,7 @@ static void AddAsyncJob(LibrariesAsyncContext& async_ctx,
                         return k_success;
                     };
 
-                    // TODO: had a crash here: invalid memory when doing a memcpy
+                    // TODO: had a crash here: invalid memory when doing a memcpy. Happened twice now
                     j.result.outcome = try_job();
                 } else {
                     j.result.outcome = k_success;

@@ -12,7 +12,7 @@ on:
 jobs:
   analyze:
     name: Analyze (c-cpp)
-    runs-on: 'ubuntu-latest'
+    runs-on: ubuntu-latest
     timeout-minutes: 360 
     permissions:
       security-events: write
@@ -42,8 +42,7 @@ jobs:
     - name: Setup Zig Cache
       uses: Hanaasagi/zig-action-cache@master
 
-    - name: Compile Linux
-      id: compile_linux
+    - name: Compile
       run: zig build compile -Dtargets=linux
 
     - name: Perform CodeQL Analysis

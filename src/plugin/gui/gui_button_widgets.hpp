@@ -147,12 +147,7 @@ void FakeButton(Gui* g, Rect r, String str, Style const& style);
 // LayID
 bool Button(Gui* g, imgui::Id id, LayID lay_id, String str, Style const& style);
 bool Toggle(Gui* g, imgui::Id id, LayID lay_id, bool& state, String str, Style const& style);
-bool Popup(Gui* g,
-           imgui::Id button_id,
-           imgui::Id popup_id,
-           LayID lay_id,
-           String str,
-           Style const& style);
+bool Popup(Gui* g, imgui::Id button_id, imgui::Id popup_id, LayID lay_id, String str, Style const& style);
 
 bool Button(Gui* g, LayID lay_id, String str, Style const& style);
 bool Toggle(Gui* g, LayID lay_id, bool& state, String str, Style const& style);

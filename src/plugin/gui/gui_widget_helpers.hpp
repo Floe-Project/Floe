@@ -26,10 +26,7 @@ void DoTooltipText(Gui* g, String str, Rect r, bool rect_is_window_pos = false);
 bool Tooltip(Gui* g, imgui::Id id, Rect r, String str, bool rect_is_window_pos = false);
 
 void DoParameterTooltipIfNeeded(Gui* g, Parameter const& param, imgui::Id imgui_id, Rect param_rect);
-void DoParameterTooltipIfNeeded(Gui* g,
-                                Span<Parameter const*> param,
-                                imgui::Id imgui_id,
-                                Rect param_rect);
+void DoParameterTooltipIfNeeded(Gui* g, Span<Parameter const*> param, imgui::Id imgui_id, Rect param_rect);
 void ParameterValuePopup(Gui* g, Parameter const& param, imgui::Id id, Rect r);
 void ParameterValuePopup(Gui* g, Span<Parameter const*> params, imgui::Id id, Rect r);
 

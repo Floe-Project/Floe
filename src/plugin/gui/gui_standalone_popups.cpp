@@ -78,8 +78,7 @@ void DoStandaloneErrorGUI(Gui* g) {
     auto& plugin = g->plugin;
 
     auto const host = plugin.host;
-    auto const floe_ext =
-        (FloeClapExtensionHost const*)host.get_extension(&host, k_floe_clap_extension_id);
+    auto const floe_ext = (FloeClapExtensionHost const*)host.get_extension(&host, k_floe_clap_extension_id);
     if (!floe_ext) return;
 
     g->gui_platform.graphics_ctx->PushFont(g->roboto_small);
@@ -600,9 +599,9 @@ void DoSettingsStandalone(Gui* g) {
                     imgui.PushID(pos);
                     DEFER { imgui.PopID(); };
                     const auto path_r = Rect {box_r.x,
-                                               box_r.y + ((f32)pos * path_gui_height),
-                                               right_col_width,
-                                               path_gui_height};
+                                              box_r.y + ((f32)pos * path_gui_height),
+                                              right_col_width,
+                                              path_gui_height};
                     auto reduced_path_r = path_r.ReducedHorizontally(path_gui_spacing);
 
                     if (paths.data == extra_paths.data) {

@@ -216,9 +216,9 @@ void GUIDoEnvelope(Gui* g,
         release_x_range.max = get_x_coord_at_percent(1);
 
         Rect grabber {sustain_point.x,
-                       0,
-                       max_release_percent * padded_width + handle_size / 2,
-                       imgui.Height()};
+                      0,
+                      max_release_percent * padded_width + handle_size / 2,
+                      imgui.Height()};
         auto const grabber_unregistered = grabber;
 
         MidiLearnMenu(g, release_param_id, grabber_unregistered);

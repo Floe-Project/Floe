@@ -15,9 +15,9 @@ static constexpr bool k_editor_enabled = FLOE_EDITOR_ENABLED;
 #if FLOE_IS_BETA
 #define PRODUCT_NAME "Floe Beta"
 constexpr Version k_floe_version {FLOE_MAJOR_VERSION,
-                                   FLOE_MINOR_VERSION,
-                                   FLOE_PATCH_VERSION,
-                                   (u8)FLOE_BETA_VERSION};
+                                  FLOE_MINOR_VERSION,
+                                  FLOE_PATCH_VERSION,
+                                  (u8)FLOE_BETA_VERSION};
 #else
 #define PRODUCT_NAME "Floe"
 SemanticVersion const k_floe_version {FLOE_MAJOR_VERSION, FLOE_MINOR_VERSION, FLOE_PATCH_VERSION};

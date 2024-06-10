@@ -418,8 +418,7 @@ static void DrawIconOrText(Gui* g,
                                  using_icon_font ? style.icon_scaling : style.text_scaling);
 }
 
-static void
-DrawIconAndTextButton(Gui* g, Style const& style, Rect r, imgui::Id id, String str, bool state) {
+static void DrawIconAndTextButton(Gui* g, Style const& style, Rect r, imgui::Id id, String str, bool state) {
     auto& s = g->imgui;
 
     auto const icon_col = GetCol(g, style, style.main_cols, id, state);
@@ -606,12 +605,7 @@ bool Button(Gui* g, imgui::Id id, LayID lay_id, String str, Style const& style) 
 bool Toggle(Gui* g, imgui::Id id, LayID lay_id, bool& state, String str, Style const& style) {
     return Toggle(g, id, g->layout.GetRect(lay_id), state, str, style);
 }
-bool Popup(Gui* g,
-           imgui::Id button_id,
-           imgui::Id popup_id,
-           LayID lay_id,
-           String str,
-           Style const& style) {
+bool Popup(Gui* g, imgui::Id button_id, imgui::Id popup_id, LayID lay_id, String str, Style const& style) {
     return Popup(g, button_id, popup_id, g->layout.GetRect(lay_id), str, style);
 }
 

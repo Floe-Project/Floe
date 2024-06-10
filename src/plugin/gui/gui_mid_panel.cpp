@@ -128,9 +128,9 @@ void MidPanel(Gui* g) {
         // do the title
         {
             Rect title_r {editor::GetSize(imgui, UiSizeId::MidPanelTitleMarginLeft),
-                           0,
-                           imgui.Width(),
-                           mid_panel_title_height};
+                          0,
+                          imgui.Width(),
+                          mid_panel_title_height};
             imgui.RegisterAndConvertRect(&title_r);
             imgui.graphics->AddTextJustified(title_r,
                                              "Layers",
@@ -246,9 +246,9 @@ void MidPanel(Gui* g) {
         // do the title
         {
             Rect title_r {editor::GetSize(imgui, UiSizeId::MidPanelTitleMarginLeft),
-                           0,
-                           imgui.Width(),
-                           mid_panel_title_height};
+                          0,
+                          imgui.Width(),
+                          mid_panel_title_height};
             imgui.RegisterAndConvertRect(&title_r);
             imgui.graphics->AddTextJustified(title_r,
                                              "Effects",

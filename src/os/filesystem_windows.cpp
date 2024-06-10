@@ -737,13 +737,13 @@ static ErrorCodeOr<WatchedDirectory*> WatchDirectory(DirectoryWatcher::WatchedDi
     watch->overlapped.hEvent = CreateEventW(nullptr, FALSE, 0, nullptr);
 
     auto const succeeded = ReadDirectoryChangesW(handle,
-                                                  watch->buffer.data,
-                                                  (DWORD)watch->buffer.size,
-                                                  dir.recursive,
-                                                  k_directory_changes_filter,
-                                                  nullptr,
-                                                  &watch->overlapped,
-                                                  nullptr);
+                                                 watch->buffer.data,
+                                                 (DWORD)watch->buffer.size,
+                                                 dir.recursive,
+                                                 k_directory_changes_filter,
+                                                 nullptr,
+                                                 &watch->overlapped,
+                                                 nullptr);
     if (!succeeded) {
         UnwatchDirectory(watch);
         auto const error = GetLastError();
@@ -877,13 +877,13 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
         }
 
         auto const succeeded = ReadDirectoryChangesW(watch.handle,
-                                                      watch.buffer.data,
-                                                      (DWORD)watch.buffer.size,
-                                                      dir.recursive,
-                                                      k_directory_changes_filter,
-                                                      nullptr,
-                                                      &watch.overlapped,
-                                                      nullptr);
+                                                     watch.buffer.data,
+                                                     (DWORD)watch.buffer.size,
+                                                     dir.recursive,
+                                                     k_directory_changes_filter,
+                                                     nullptr,
+                                                     &watch.overlapped,
+                                                     nullptr);
 
         if (!succeeded) {
             auto const error = GetLastError();

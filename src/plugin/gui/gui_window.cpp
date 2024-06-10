@@ -43,7 +43,7 @@ imgui::WindowSettings StandalonePopupSettings(imgui::Context const& imgui) {
 
 imgui::WindowSettings
 FloeWindowSettings(imgui::Context const& imgui,
-                    TrivialFixedSizeFunction<48, void(IMGUI_DRAW_WINDOW_BG_ARGS)> const& draw) {
+                   TrivialFixedSizeFunction<48, void(IMGUI_DRAW_WINDOW_BG_ARGS)> const& draw) {
     auto wnd_settings = imgui::DefWindow();
     wnd_settings.draw_routine_window_background = draw;
     wnd_settings.pad_top_left = {0, 0};

@@ -132,6 +132,7 @@
             pluginval
             clang-build-analyzer
             pkgs.zip
+            pkgs.kcov
             pkgs.llvmPackages_17.bintools-unwrapped # llvm-lipo, llvm-addr2line, dsymutil
             pkgs.llvmPackages_17.clang-unwrapped # clangd, clang-tidy, clang-format
             pkgs.cppcheck

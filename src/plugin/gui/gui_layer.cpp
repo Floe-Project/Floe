@@ -608,10 +608,10 @@ void Draw(Gui* g,
     // level meter
     {
         Rect const peak_meter_r {volume_knob_r.Centre().x - LayerPeakMeterWidth / 2,
-                                  volume_knob_r.y +
-                                      (volume_knob_r.h - (LayerPeakMeterHeight + LayerPeakMeterBottomGap)),
-                                  LayerPeakMeterWidth,
-                                  LayerPeakMeterHeight - LayerPeakMeterBottomGap};
+                                 volume_knob_r.y +
+                                     (volume_knob_r.h - (LayerPeakMeterHeight + LayerPeakMeterBottomGap)),
+                                 LayerPeakMeterWidth,
+                                 LayerPeakMeterHeight - LayerPeakMeterBottomGap};
         auto const& processor = plugin->processor.layer_processors[(usize)layer->index];
         peak_meters::PeakMeter(g, peak_meter_r, processor.peak_meter, false);
     }
@@ -621,9 +621,9 @@ void Draw(Gui* g,
         auto const volume_name_h = lay.GetRect(c.knob1.label).h;
         auto const volume_name_y_gap = LayerVolumeNameGapY;
         Rect const volume_name_r {volume_knob_r.x,
-                                   volume_knob_r.Bottom() - volume_name_h + volume_name_y_gap,
-                                   volume_knob_r.w,
-                                   volume_name_h};
+                                  volume_knob_r.Bottom() - volume_name_h + volume_name_y_gap,
+                                  volume_knob_r.w,
+                                  volume_name_h};
 
         KnobAndLabel(g,
                      layer->processor.params[ToInt(LayerParamIndex::Volume)],
@@ -637,9 +637,9 @@ void Draw(Gui* g,
         auto mute_solo_r = lay.GetRect(c.mute_solo);
         Rect const mute_r = {mute_solo_r.x, mute_solo_r.y, mute_solo_r.w / 2, mute_solo_r.h};
         Rect const solo_r = {mute_solo_r.x + mute_solo_r.w / 2,
-                              mute_solo_r.y,
-                              mute_solo_r.w / 2,
-                              mute_solo_r.h};
+                             mute_solo_r.y,
+                             mute_solo_r.w / 2,
+                             mute_solo_r.h};
 
         auto const col_border = GMC(LayerMuteSoloBorder);
         auto const col_background = GMC(LayerMuteSoloBackground);
@@ -867,9 +867,9 @@ void Draw(Gui* g,
                     auto imgui_id = imgui.GetID(layer_gui::k_velo_btn_tooltips[(usize)btn_ind]);
 
                     Rect btn_r {whole_velo_r.x + (whole_velo_r.w / 3) * (btn_ind % 3),
-                                 whole_velo_r.y + (whole_velo_r.h / 2) * (f32)(int)(btn_ind / 3),
-                                 whole_velo_r.w / 3,
-                                 whole_velo_r.h / 2};
+                                whole_velo_r.y + (whole_velo_r.h / 2) * (f32)(int)(btn_ind / 3),
+                                whole_velo_r.w / 3,
+                                whole_velo_r.h / 2};
 
                     btn_r.x += btn_gap * (btn_ind % 3);
                     btn_r.y += btn_gap * (f32)(int)(btn_ind / 3);
@@ -966,9 +966,9 @@ void Draw(Gui* g,
             labels::Label(g, *rate_param, rate_name_r, labels::ParameterCentred(greyed_out));
 
             Rect const sync_r {rate_name_r.x + rate_name_r.w / 2 - LFO_SyncSwitchWidth / 2,
-                                rate_name_r.Bottom() + LFO_SyncSwitchGapY,
-                                LFO_SyncSwitchWidth,
-                                LFO_SyncSwitchHeight};
+                               rate_name_r.Bottom() + LFO_SyncSwitchGapY,
+                               LFO_SyncSwitchWidth,
+                               LFO_SyncSwitchHeight};
             buttons::Toggle(g,
                             layer->processor.params[ToInt(LayerParamIndex::LfoSyncSwitch)],
                             sync_r,

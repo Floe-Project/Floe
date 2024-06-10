@@ -19,14 +19,14 @@
     X(RegisterutilsTests)                                                                                    \
     X(RegisterAudioUtilsTests)                                                                               \
     X(RegisterVolumeFadeTests)                                                                               \
-    X(FloeStateCodingTests)                                                                                 \
-    X(FloeAudioFormatTests)                                                                                 \
-    X(FloePresetTests)                                                                                      \
-    X(FloeLibraryLuaTests)                                                                                  \
-    X(FloeLibraryTests)                                                                                     \
-    X(FloeAssetLoaderTests)                                                                                 \
-    X(FloePresetDatabaseTests)                                                                              \
-    X(FloeParamStringConversionTests)                                                                       \
+    X(FloeStateCodingTests)                                                                                  \
+    X(FloeAudioFormatTests)                                                                                  \
+    X(FloePresetTests)                                                                                       \
+    X(FloeLibraryLuaTests)                                                                                   \
+    X(FloeLibraryTests)                                                                                      \
+    X(FloeAssetLoaderTests)                                                                                  \
+    X(FloePresetDatabaseTests)                                                                               \
+    X(FloeParamStringConversionTests)                                                                        \
     X(FloeSettingsFileTests)
 
 #define WINDOWS_FP_TEST_REGISTER_FUNCTIONS X(RegisterWindowsPlatformTests)

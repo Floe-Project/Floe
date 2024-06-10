@@ -286,7 +286,7 @@ static void GUIDoSampleWaveformOverlay(Gui* g, PluginInstance::Layer* layer, Rec
         {
             loop_region_r =
                 Rect::FromMinMax({waveform_r.x + Min(loop_start_pos, loop_end_pos), waveform_r.y},
-                                  {waveform_r.x + Max(loop_start_pos, loop_end_pos), waveform_r.Bottom()});
+                                 {waveform_r.x + Max(loop_start_pos, loop_end_pos), waveform_r.Bottom()});
 
             if (!(loop_start == 0 && loop_end == 1)) {
                 ParamIndex const params[] = {start_param_id, end_param_id, xfade_param_id};

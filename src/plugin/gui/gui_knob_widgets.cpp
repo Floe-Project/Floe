@@ -171,9 +171,7 @@ bool Knob(Gui* g, imgui::Id id, Rect r, f32& percent, f32 default_percent, Style
     return g->imgui.Slider(KnobSettings(g, style), r, id, percent, default_percent);
 }
 
-bool Knob(Gui* g, Parameter const& param, Rect r, Style const& style) {
-    return Knob(g, 0, param, r, style);
-}
+bool Knob(Gui* g, Parameter const& param, Rect r, Style const& style) { return Knob(g, 0, param, r, style); }
 
 bool Knob(Gui* g, imgui::Id id, Parameter const& param, Rect r, Style const& style) {
     id = BeginParameterGUI(g, param, r, id ? Optional<imgui::Id>(id) : nullopt);

@@ -33,7 +33,7 @@ PUBLIC constexpr UiSize ExpandChecked(UiSize size, UiSize expansion) {
 
 // NOTE: we have to be a bit careful with naming here. The name 'Rectangle' conflicts with a GDI
 // header on Windows, and 'Rect' conflicts with an header on macOS
-struct Rect { 
+struct Rect {
     Rect(f32x2 _pos, f32 _w, f32 _h) : pos(_pos), w(_w), h(_h) {}
     Rect(f32 _x, f32 _y, f32x2 _size) : pos {_x, _y}, size(_size) {}
     Rect(f32x2 _pos, f32x2 _size) : pos(_pos), size(_size) {}

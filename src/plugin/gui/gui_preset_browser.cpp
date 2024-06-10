@@ -17,9 +17,7 @@
 #include "icons-fa/IconsFontAwesome5.h"
 #include "presets_folder.hpp"
 
-PresetBrowser::PresetBrowser(Gui* g,
-                             PresetBrowserPersistentData& persistent_data,
-                             bool force_listing_fetch)
+PresetBrowser::PresetBrowser(Gui* g, PresetBrowserPersistentData& persistent_data, bool force_listing_fetch)
     : persistent_data(persistent_data)
     , imgui(g->imgui)
     , g(g) {
@@ -144,7 +142,7 @@ PresetBrowser::DoPresetFolderRecurse(DirectoryListing::Entry const* f, f32& ypos
 
 static bool IsOnScreen(imgui::Context& imgui, Rect const& r) {
     return Rect::DoRectsIntersect(imgui.GetRegisteredAndConvertedRect(r),
-                                   imgui.CurrentWindow()->clipping_rect);
+                                  imgui.CurrentWindow()->clipping_rect);
 }
 
 static DynamicArray<char> TrimPath(Allocator& a, String path) {
@@ -208,9 +206,9 @@ DirectoryListing::Entry const* PresetBrowser::DoPresetFilesRecurse(DirectoryList
 
                     auto const starting_y = ypos;
                     Rect const r {0,
-                                   ypos,
-                                   imgui.Width(),
-                                   editor::GetSize(imgui, UiSizeId::PresetFilesFolderHeadingHeight)};
+                                  ypos,
+                                  imgui.Width(),
+                                  editor::GetSize(imgui, UiSizeId::PresetFilesFolderHeadingHeight)};
                     ypos += r.h + editor::GetSize(imgui, UiSizeId::PresetFilesFolderHeadingPadBelow);
 
                     if (IsOnScreen(imgui, r)) {

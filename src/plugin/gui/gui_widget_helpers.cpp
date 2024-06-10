@@ -373,10 +373,7 @@ void DoParameterTooltipIfNeeded(Gui* g, Parameter const& param, imgui::Id imgui_
     DoParameterTooltipIfNeeded(g, {&param_ptr, 1}, imgui_id, param_rect);
 }
 
-void DoParameterTooltipIfNeeded(Gui* g,
-                                Span<Parameter const*> params,
-                                imgui::Id imgui_id,
-                                Rect param_rect) {
+void DoParameterTooltipIfNeeded(Gui* g, Span<Parameter const*> params, imgui::Id imgui_id, Rect param_rect) {
     DynamicArray<char> buf {g->scratch_arena};
     for (auto param : params) {
         auto const str = param->info.LinearValueToString(param->LinearValue());

@@ -132,11 +132,7 @@ bool KnobAndLabel(Gui* g,
     return changed;
 }
 
-bool KnobAndLabel(Gui* g,
-                  Parameter const& param,
-                  LayIDPair ids,
-                  knobs::Style const& style,
-                  bool greyed_out) {
+bool KnobAndLabel(Gui* g, Parameter const& param, LayIDPair ids, knobs::Style const& style, bool greyed_out) {
     return KnobAndLabel(g,
                         param,
                         g->layout.GetRect(ids.control),

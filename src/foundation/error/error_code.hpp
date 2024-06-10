@@ -68,9 +68,9 @@ struct [[nodiscard]] ErrorCode {
     SourceLocation source_location;
 };
 
-// An ErrorCodeOr is a tagged union of an ErrorCode and a given type. It supports moving/destructors etc. Later
-// on we might want to just make this for trivial types because that's normally what we are using and it's
-// simple.
+// An ErrorCodeOr is a tagged union of an ErrorCode and a given type. It supports moving/destructors etc.
+// Later on we might want to just make this for trivial types because that's normally what we are using and
+// it's simple.
 template <typename Type>
 class [[nodiscard]] ErrorCodeOr {
   public:

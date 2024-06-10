@@ -170,12 +170,11 @@ jobs:
         run: kcov kcov-output ./tests
 
       - if: matrix.command == 'kcov'
-        working-directory: zig-out/x86-linux
         name: Upload coverage reports
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          directory: ./kcov-outout/tests
+          directory: zig-out/x86-linux/kcov-outout/tests
           verbose: true
           fail_ci_if_error: true
 

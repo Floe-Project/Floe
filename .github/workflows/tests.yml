@@ -40,18 +40,6 @@ jobs:
         continue-on-error: true
         run: zig build compile -Dtargets=mac_ub
 
-      # # TODO: enable this when we have more CI minutes
-      # - name: Clang Tidy
-      #   if: steps.compile_linux.outcome == 'success'
-      #   continue-on-error: true
-      #   run: clang-tidy-all
-
-      # # TODO: enable this when we have more CI minutes
-      # - name: Cppcheck
-      #   if: steps.compile_linux.outcome == 'success'
-      #   continue-on-error: true
-      #   run: cppcheck-all
-
       # IMPORTANT(upload-artifact): 
       #  1. If multiple paths are provided as input, the least common ancestor of all the search paths will be used as the 
       #     root directory of the artifact. 
@@ -146,3 +134,36 @@ jobs:
           name: log-${{ matrix.system.os }}-${{ matrix.test }}
           if-no-files-found: ignore
           path: ${{ matrix.system.log-root-dir }}/FrozenPlain/floe.log
+
+  static-analysis:
+    name: Static Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+
+      - name: Nix Develop Action
+        uses: nicknovitski/nix-develop@v1.1.0
+
+      - name: Setup Zig Cache
+        uses: Hanaasagi/zig-action-cache@master
+
+      - name: Compile
+        run: zig build compile -Dtargets=linux
+
+      - name: cppcheck
+        run: cppcheck-all
+
+      - name: clang-tidy
+        run: clang-tidy-all
+
+  reuse-compliance:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: REUSE Compliance Check
+      uses: fsfe/reuse-action@v3

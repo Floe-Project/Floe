@@ -65,8 +65,8 @@ jobs:
           if-no-files-found: error
           retention-days: 2
           path: |
-            zig-out/x86-linux/Flint.vst3
-            zig-out/x86-linux/Flint.clap
+            zig-out/x86-linux/Floe.vst3
+            zig-out/x86-linux/Floe.clap
             zig-out/x86-linux/tests
             zig-out/x86-linux/VST3-Validator
 
@@ -78,8 +78,8 @@ jobs:
           if-no-files-found: error
           retention-days: 2
           path: |
-            zig-out/universal-macos/Flint.vst3
-            zig-out/universal-macos/Flint.clap
+            zig-out/universal-macos/Floe.vst3
+            zig-out/universal-macos/Floe.clap
             zig-out/universal-macos/tests
             zig-out/universal-macos/tests.dSYM
             zig-out/universal-macos/VST3-Validator
@@ -93,8 +93,8 @@ jobs:
           if-no-files-found: error
           retention-days: 2
           path: |
-            zig-out/x86-windows/Flint.vst3
-            zig-out/x86-windows/Flint.clap
+            zig-out/x86-windows/Floe.vst3
+            zig-out/x86-windows/Floe.clap
             zig-out/x86-windows/tests.exe
             zig-out/x86-windows/VST3-Validator.exe
 
@@ -145,4 +145,4 @@ jobs:
         with:
           name: log-${{ matrix.system.os }}-${{ matrix.test }}
           if-no-files-found: ignore
-          path: ${{ matrix.system.log-root-dir }}/FrozenPlain/flint.log
+          path: ${{ matrix.system.log-root-dir }}/FrozenPlain/floe.log

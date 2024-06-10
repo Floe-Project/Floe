@@ -1,0 +1,148 @@
+# Copyright 2024 Sam Windell
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+name: Tests
+
+on:
+  workflow_dispatch:
+  push:
+
+jobs:
+  compile:
+    name: Compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+
+      - name: Nix Develop Action
+        uses: nicknovitski/nix-develop@v1.1.0
+
+      - name: Setup Zig Cache
+        uses: Hanaasagi/zig-action-cache@master
+
+      - name: Compile Linux
+        id: compile_linux
+        continue-on-error: true
+        run: zig build compile -Dtargets=linux
+
+      - name: Compile Windows
+        id: compile_windows
+        continue-on-error: true
+        run: zig build compile -Dtargets=windows
+
+      - name: Compile Mac
+        id: compile_mac
+        continue-on-error: true
+        run: zig build compile -Dtargets=mac_ub
+
+      # # TODO: enable this when we have more CI minutes
+      # - name: Clang Tidy
+      #   if: steps.compile_linux.outcome == 'success'
+      #   continue-on-error: true
+      #   run: clang-tidy-all
+
+      # # TODO: enable this when we have more CI minutes
+      # - name: Cppcheck
+      #   if: steps.compile_linux.outcome == 'success'
+      #   continue-on-error: true
+      #   run: cppcheck-all
+
+      # IMPORTANT(upload-artifact): 
+      #  1. If multiple paths are provided as input, the least common ancestor of all the search paths will be used as the 
+      #     root directory of the artifact. 
+      #  2. All file permissions are removed when uploading.
+
+      - name: Upload Linux binaries
+        if: steps.compile_linux.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries-ubuntu
+          if-no-files-found: error
+          retention-days: 2
+          path: |
+            zig-out/x86-linux/Flint.vst3
+            zig-out/x86-linux/Flint.clap
+            zig-out/x86-linux/tests
+            zig-out/x86-linux/VST3-Validator
+
+      - name: Upload Mac binaries
+        if: steps.compile_mac.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries-macos
+          if-no-files-found: error
+          retention-days: 2
+          path: |
+            zig-out/universal-macos/Flint.vst3
+            zig-out/universal-macos/Flint.clap
+            zig-out/universal-macos/tests
+            zig-out/universal-macos/tests.dSYM
+            zig-out/universal-macos/VST3-Validator
+            zig-out/universal-macos/VST3-Validator.dSYM
+
+      - name: Upload Windows binaries
+        if: steps.compile_windows.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries-windows
+          if-no-files-found: error
+          retention-days: 2
+          path: |
+            zig-out/x86-windows/Flint.vst3
+            zig-out/x86-windows/Flint.clap
+            zig-out/x86-windows/tests.exe
+            zig-out/x86-windows/VST3-Validator.exe
+
+  tests:
+    strategy:
+      fail-fast: false # run even if others in this matrix failed
+      matrix:
+        system: [
+          {os: windows, log-root-dir: "C:/Users/runner/AppData/Local" },
+          {os: ubuntu, log-root-dir: "/home/runner/.local/state" },
+          {os: macos, log-root-dir: "/Users/runner/Library/Logs" }
+        ]
+        test: [ unit, vst3val, pluginval, clapval ]
+    name: ${{ matrix.system.os }}-${{ matrix.test }}
+    runs-on: ${{ matrix.system.os }}-latest
+    needs: compile
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            test_files
+            .github
+
+      # The artifact will be installed to ${{ github.workspace }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: binaries-${{ matrix.system.os }}
+
+      - if: matrix.system.os != 'windows'
+        shell: bash
+        name: ${{ matrix.test }}
+        run: |
+          find . 
+          chmod +x ./.github/scripts/run-test.sh
+          ./.github/scripts/run-test.sh ${{ matrix.test }} "${{ github.workspace }}"
+
+      - if: matrix.system.os == 'windows'
+        shell: pwsh
+        name: ${{ matrix.test }}
+        run: |
+          tree /F 
+          powershell -ExecutionPolicy Bypass -File .github\scripts\run-test.ps1 -test_type ${{ matrix.test }} -binaries_dir "${{ github.workspace }}"
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: log-${{ matrix.system.os }}-${{ matrix.test }}
+          if-no-files-found: ignore
+          path: ${{ matrix.system.log-root-dir }}/FrozenPlain/flint.log

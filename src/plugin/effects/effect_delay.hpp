@@ -1,0 +1,146 @@
+// Copyright 2018-2024 Sam Windell
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+#pragma once
+#include <vitfx/wrapper.hpp>
+
+#include "effects/effect.hpp"
+#include "processing/synced_timings.hpp"
+
+class Delay final : public Effect {
+  public:
+    Delay(FloeSmoothedValueSystem& s) : Effect(s, EffectType::NewDelay), delay(vitfx::delay::Create()) {}
+    ~Delay() override { vitfx::delay::Destroy(delay); }
+
+    inline void ResetInternal() override { vitfx::delay::HardReset(*delay); }
+
+    virtual void PrepareToPlay(AudioProcessingContext const& context) override {
+        vitfx::delay::SetSampleRate(*delay, (int)context.sample_rate);
+    }
+
+    bool ProcessBlock(Span<StereoAudioFrame> io_frames,
+                      ScratchBuffers scratch_buffers,
+                      AudioProcessingContext const&) override {
+        if (!ShouldProcessBlock()) return false;
+
+        auto wet = scratch_buffers.buf1.Interleaved();
+        wet.size = io_frames.size;
+        CopyMemory(wet.data, io_frames.data, io_frames.size * sizeof(StereoAudioFrame));
+
+        auto num_frames = (u32)io_frames.size;
+        u32 pos = 0;
+        while (num_frames) {
+            u32 const chunk_size = Min(num_frames, 64u);
+
+            vitfx::delay::ProcessDelayArgs args {
+                .num_frames = (int)chunk_size,
+                .in_interleaved = (f32*)(io_frames.data + pos),
+                .out_interleaved = (f32*)(wet.data + pos),
+            };
+            CopyMemory(args.params, params, sizeof(params));
+
+            vitfx::delay::Process(*delay, args);
+
+            num_frames -= chunk_size;
+            pos += chunk_size;
+        }
+
+        for (auto const frame_index : Range((u32)io_frames.size))
+            io_frames[frame_index] = MixOnOffSmoothing(wet[frame_index], io_frames[frame_index], frame_index);
+
+        return true;
+    }
+
+    static SyncedTimes ToSyncedTime(param_values::DelaySyncedTime t) {
+        // Remapping enum values like this allows us to separate values that cannot change (the
+        // parameter value), with values that we have more control over (DSP code)
+        switch (t) {
+            case param_values::DelaySyncedTime::_1_64T: return SyncedTimes::_1_64T;
+            case param_values::DelaySyncedTime::_1_64: return SyncedTimes::_1_64;
+            case param_values::DelaySyncedTime::_1_64D: return SyncedTimes::_1_64D;
+            case param_values::DelaySyncedTime::_1_32T: return SyncedTimes::_1_32T;
+            case param_values::DelaySyncedTime::_1_32: return SyncedTimes::_1_32;
+            case param_values::DelaySyncedTime::_1_32D: return SyncedTimes::_1_32D;
+            case param_values::DelaySyncedTime::_1_16T: return SyncedTimes::_1_16T;
+            case param_values::DelaySyncedTime::_1_16: return SyncedTimes::_1_16;
+            case param_values::DelaySyncedTime::_1_16D: return SyncedTimes::_1_16D;
+            case param_values::DelaySyncedTime::_1_8T: return SyncedTimes::_1_8T;
+            case param_values::DelaySyncedTime::_1_8: return SyncedTimes::_1_8;
+            case param_values::DelaySyncedTime::_1_8D: return SyncedTimes::_1_8D;
+            case param_values::DelaySyncedTime::_1_4T: return SyncedTimes::_1_4T;
+            case param_values::DelaySyncedTime::_1_4: return SyncedTimes::_1_4;
+            case param_values::DelaySyncedTime::_1_4D: return SyncedTimes::_1_4D;
+            case param_values::DelaySyncedTime::_1_2T: return SyncedTimes::_1_2T;
+            case param_values::DelaySyncedTime::_1_2: return SyncedTimes::_1_2;
+            case param_values::DelaySyncedTime::_1_2D: return SyncedTimes::_1_2D;
+            case param_values::DelaySyncedTime::_1_1T: return SyncedTimes::_1_1T;
+            case param_values::DelaySyncedTime::_1_1: return SyncedTimes::_1_1;
+            case param_values::DelaySyncedTime::_1_1D: return SyncedTimes::_1_1D;
+            case param_values::DelaySyncedTime::Count: break;
+        }
+        PanicIfReached();
+        return {};
+    }
+
+    void OnParamChangeInternal(ChangedParams changed_params, AudioProcessingContext const& context) override {
+        using namespace vitfx::delay;
+        bool update_time_l = false;
+        bool update_time_r = false;
+
+        if (auto p = changed_params.Param(ParamIndex::NewDelayTimeSyncSwitch)) is_synced = p->ValueAsBool();
+
+        if (auto p = changed_params.Param(ParamIndex::NewDelayFeedback))
+            params[ToInt(Params::Feedback)] = p->ProjectedValue();
+
+        if (auto p = changed_params.Param(ParamIndex::NewDelayTimeSyncedL)) {
+            synced_time_l = ToSyncedTime(p->ValueAsInt<param_values::DelaySyncedTime>());
+            update_time_l = true;
+        }
+
+        if (auto p = changed_params.Param(ParamIndex::NewDelayTimeSyncedR)) {
+            synced_time_r = ToSyncedTime(p->ValueAsInt<param_values::DelaySyncedTime>());
+            update_time_r = true;
+        }
+
+        if (auto p = changed_params.Param(ParamIndex::NewDelayTimeLMs)) {
+            free_time_hz_l = MsToHz(p->ProjectedValue());
+            update_time_l = true;
+        }
+
+        if (auto p = changed_params.Param(ParamIndex::NewDelayTimeRMs)) {
+            free_time_hz_r = MsToHz(p->ProjectedValue());
+            update_time_r = true;
+        }
+
+        if (auto p = changed_params.Param(ParamIndex::NewDelayMode)) {
+            auto mode = p->ValueAsInt<param_values::NewDelayMode>();
+            params[ToInt(Params::Mode)] = (f32)mode;
+        }
+
+        if (auto p = changed_params.Param(ParamIndex::NewDelayFilterCutoffSemitones))
+            params[ToInt(Params::FilterCutoffSemitones)] = p->ProjectedValue();
+        if (auto p = changed_params.Param(ParamIndex::NewDelayFilterSpread))
+            params[ToInt(Params::FilterSpread)] = p->ProjectedValue();
+        if (auto p = changed_params.Param(ParamIndex::NewDelayMix))
+            params[ToInt(Params::Mix)] = p->ProjectedValue();
+        if (auto p = changed_params.Param(ParamIndex::NewDelayFeedback))
+            params[ToInt(Params::Feedback)] = p->ProjectedValue();
+
+        if (update_time_l) {
+            params[ToInt(Params::TimeLeftHz)] =
+                is_synced ? (f32)SyncedTimeToHz(context.tempo, synced_time_l) : free_time_hz_l;
+        }
+        if (update_time_r) {
+            params[ToInt(Params::TimeRightHz)] =
+                is_synced ? (f32)SyncedTimeToHz(context.tempo, synced_time_r) : free_time_hz_r;
+        }
+    }
+
+    vitfx::delay::Delay* delay {};
+    SyncedTimes synced_time_l {};
+    SyncedTimes synced_time_r {};
+    f32 free_time_hz_l {};
+    f32 free_time_hz_r {};
+    bool is_synced = false;
+    f32 params[ToInt(vitfx::delay::Params::Count)] {};
+};

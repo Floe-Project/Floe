@@ -1,0 +1,227 @@
+// Copyright 2018-2024 Sam Windell
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+#include "gui_knob_widgets.hpp"
+
+#include "foundation/foundation.hpp"
+
+#include "gui.hpp"
+#include "gui_editor_ui_style.hpp"
+#include "gui_widget_helpers.hpp"
+
+namespace knobs {
+
+Style DefaultKnob(Optional<u32> _highlight_col) {
+    Style s {};
+    s.highlight_col = _highlight_col ? *_highlight_col : GMC(KnobOuterArcBright);
+    s.line_col = _highlight_col ? GMC(FXKnobLine) : GMC(KnobLine);
+    return s;
+}
+
+Style BidirectionalKnob(Optional<u32> _highlight_col) {
+    auto s = DefaultKnob(_highlight_col);
+    s.bidirectional = true;
+    return s;
+}
+
+Style FakeKnobStyle() {
+    auto s = DefaultKnob();
+    s.is_fake = true;
+    return s;
+}
+
+static void DrawKnob(Gui* g, imgui::Id id, Rect r, f32 percent, Style const& style) {
+    auto const& s = g->imgui;
+    auto const c = f32x2 {r.CentreX(), r.y + r.w / 2};
+    auto const start_radians = (3 * maths::k_pi<>) / 4;
+    auto const end_radians = maths::k_tau<> + maths::k_pi<> / 4;
+    auto const delta = end_radians - start_radians;
+    auto const angle = start_radians + (1 - percent) * delta;
+    auto const angle2 = start_radians + percent * delta;
+    ASSERT(percent >= 0 && percent <= 1);
+    ASSERT(angle >= start_radians && angle <= end_radians);
+
+    auto inner_arc_col = GMC(KnobInnerArc);
+    auto bright_arc_col = style.highlight_col;
+    if (style.greyed_out) {
+        bright_arc_col = GMC(KnobOuterArcGreyedOut);
+        inner_arc_col = GMC(KnobInnerArcGreyedOut);
+    }
+    auto line_col = style.line_col;
+    if (s.IsHot(id) || s.IsActive(id)) {
+        inner_arc_col = GMC(KnobInnerArcHover);
+        line_col = GMC(KnobLineHover);
+    }
+
+    // outer arc
+    auto const outer_arc_thickness = editor::GetSize(s, UiSizeId::KnobOuterArcWeight);
+    auto const outer_arc_radius_mid = r.w * 0.5f;
+    if (!style.overload_position) {
+        s.graphics->PathArcTo(c,
+                              outer_arc_radius_mid - outer_arc_thickness / 2,
+                              start_radians,
+                              end_radians,
+                              32);
+        s.graphics->PathStroke(GMC(KnobOuterArcEmpty), false, outer_arc_thickness);
+    } else {
+        auto const overload_radians = start_radians + delta * *style.overload_position;
+        auto const radians_per_px = maths::k_tau<> * r.w / 2;
+        auto const desired_px_width = 15;
+        auto const overload_radians_end = overload_radians + desired_px_width / radians_per_px;
+
+        {
+            s.graphics->PathArcTo(c,
+                                  outer_arc_radius_mid - outer_arc_thickness / 2,
+                                  start_radians,
+                                  overload_radians,
+                                  32);
+            s.graphics->PathStroke(GMC(KnobOuterArcEmpty), false, outer_arc_thickness);
+        }
+
+        if constexpr (0) {
+            auto const gain_thickness = outer_arc_thickness * 1.6f;
+            s.graphics->PathArcTo(c,
+                                  outer_arc_radius_mid - (gain_thickness / 2) +
+                                      (gain_thickness - outer_arc_thickness),
+                                  overload_radians,
+                                  overload_radians_end,
+                                  32);
+            s.graphics->PathStroke(GMC(KnobOuterArcOverload), false, gain_thickness);
+        }
+
+        {
+            auto const gain_thickness = outer_arc_thickness;
+            s.graphics->PathArcTo(c,
+                                  outer_arc_radius_mid - (gain_thickness / 2) +
+                                      (gain_thickness - outer_arc_thickness),
+                                  overload_radians_end,
+                                  end_radians,
+                                  32);
+            s.graphics->PathStroke(GMC(KnobOuterArcOverload), false, gain_thickness);
+        }
+
+        if constexpr (0) {
+            auto const line_weight = editor::GetSize(s, UiSizeId::KnobLineWeight);
+            auto const line_height = outer_arc_thickness * 1.4f;
+
+            auto const arc_radius_outer = outer_arc_radius_mid + line_height / 2;
+            auto const arc_radius_inner = outer_arc_radius_mid - outer_arc_thickness / 2;
+
+            // NOTE: the x is using cos and y is using sin, I'm just following what PathArcTo() does. I don't
+            // know why PathToArc() does it that way.
+            f32x2 offset;
+            offset.x = Cos(overload_radians);
+            offset.y = Sin(overload_radians);
+            auto const outer_point = c + (offset * f32x2 {arc_radius_outer, arc_radius_outer});
+            auto const inner_point = c + (offset * f32x2 {arc_radius_inner, arc_radius_inner});
+
+            s.graphics->AddLine(inner_point, outer_point, GMC(KnobOuterArcOverload), line_weight);
+        }
+    }
+
+    if (!style.is_fake) {
+        if (!style.bidirectional) {
+            s.graphics->PathArcTo(c,
+                                  outer_arc_radius_mid - outer_arc_thickness / 2,
+                                  start_radians,
+                                  angle2,
+                                  32);
+        } else {
+            auto const mid_radians = start_radians + delta / 2;
+            s.graphics->PathArcTo(c,
+                                  outer_arc_radius_mid - outer_arc_thickness / 2,
+                                  Min(mid_radians, angle2),
+                                  Max(mid_radians, angle2),
+                                  32);
+        }
+        s.graphics->PathStroke(bright_arc_col, false, outer_arc_thickness);
+    }
+
+    // inner arc
+    auto inner_arc_radius_mid = outer_arc_radius_mid - editor::GetSize(s, UiSizeId::KnobInnerArc);
+    auto inner_arc_thickness = editor::GetSize(s, UiSizeId::KnobInnerArcWeight);
+    s.graphics->PathArcTo(c, inner_arc_radius_mid, start_radians, end_radians, 32);
+    s.graphics->PathStroke(inner_arc_col, false, inner_arc_thickness);
+
+    // cursor
+    if (!style.is_fake) {
+        auto const line_weight = editor::GetSize(s, UiSizeId::KnobLineWeight);
+
+        auto const inner_arc_radius_outer = inner_arc_radius_mid + inner_arc_thickness / 2;
+        auto const inner_arc_radius_inner = inner_arc_radius_mid - inner_arc_thickness / 2;
+
+        f32x2 offset;
+        offset.x = Sin(angle - maths::k_pi<> / 2);
+        offset.y = Cos(angle - maths::k_pi<> / 2);
+        auto const outer_point = c + (offset * f32x2 {inner_arc_radius_outer, inner_arc_radius_outer});
+        auto const inner_point = c + (offset * f32x2 {inner_arc_radius_inner, inner_arc_radius_inner});
+
+        s.graphics->AddLine(inner_point, outer_point, line_col, line_weight);
+    }
+}
+
+static imgui::SliderSettings KnobSettings(Gui* g, Style const& style) {
+    auto settings = imgui::DefSlider();
+    settings.flags = {.slower_with_shift = true, .default_on_ctrl = true};
+    settings.draw = [g, &style](IMGUI_DRAW_SLIDER_ARGS) { DrawKnob(g, id, r, percent, style); };
+    return settings;
+}
+
+bool Knob(Gui* g, imgui::Id id, Rect r, f32& percent, f32 default_percent, Style const& style) {
+    return g->imgui.Slider(KnobSettings(g, style), r, id, percent, default_percent);
+}
+
+bool Knob(Gui* g, Parameter const& param, Rect r, Style const& style) {
+    return Knob(g, 0, param, r, style);
+}
+
+bool Knob(Gui* g, imgui::Id id, Parameter const& param, Rect r, Style const& style) {
+    id = BeginParameterGUI(g, param, r, id ? Optional<imgui::Id>(id) : nullopt);
+    Optional<f32> new_val {};
+    f32 val = param.LinearValue();
+
+    auto settings = imgui::DefTextInputDraggerFloat();
+    settings.slider_settings = KnobSettings(g, style);
+    settings.text_input_settings = GetParameterTextInputSettings();
+
+    auto const display_string = param.info.LinearValueToString(val).ReleaseValueOr({});
+
+    if (g->param_text_editor_to_open && *g->param_text_editor_to_open == param.info.index) {
+        g->param_text_editor_to_open.Clear();
+        g->imgui.SetTextInputFocus(id, display_string);
+    }
+
+    auto const result = g->imgui.TextInputDraggerCustom(settings,
+                                                        r,
+                                                        id,
+                                                        display_string,
+                                                        param.info.linear_range.min,
+                                                        param.info.linear_range.max,
+                                                        val,
+                                                        param.DefaultLinearValue());
+    if (result.new_string_value) {
+        if (auto v = param.info.StringToLinearValue(*result.new_string_value)) new_val = v;
+    }
+
+    if (result.value_changed) new_val = val;
+
+    EndParameterGUI(g, id, param, r, new_val);
+    return new_val.HasValue();
+}
+
+bool Knob(Gui* g, imgui::Id id, LayID lay_id, f32& percent, f32 default_percent, Style const& style) {
+    return Knob(g, id, g->layout.GetRect(lay_id), percent, default_percent, style);
+}
+bool Knob(Gui* g, Parameter const& param, LayID lay_id, Style const& style) {
+    return Knob(g, 0, param, g->layout.GetRect(lay_id), style);
+}
+bool Knob(Gui* g, imgui::Id id, Parameter const& param, LayID lay_id, Style const& style) {
+    return Knob(g, id, param, g->layout.GetRect(lay_id), style);
+}
+
+void FakeKnob(Gui* g, Rect r) {
+    g->imgui.RegisterAndConvertRect(&r);
+    DrawKnob(g, 99, r, 0, FakeKnobStyle());
+}
+
+} // namespace knobs

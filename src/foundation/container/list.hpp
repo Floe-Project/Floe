@@ -1,0 +1,83 @@
+// Copyright 2018-2024 Sam Windell
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+#pragma once
+#include "foundation/memory/allocators.hpp"
+#include "foundation/utils/linked_list.hpp"
+
+template <typename Type>
+struct List {
+    List(Allocator& a) : arena(a) {}
+
+    ~List() { ASSERT(first == nullptr); }
+
+    List(List&& other)
+        : arena(Move(other.arena))
+        , first(Exchange(other.first, nullptr))
+        , free_list(Exchange(other.free_list, nullptr)) {}
+
+    struct Node {
+        Type data;
+        Node* next {};
+    };
+
+    using Iterator = SinglyLinkedListIterator<Node, Type>;
+
+    Node* AllocateNodeUninitialised() {
+        if (free_list) {
+            auto result = free_list;
+            free_list = free_list->next;
+            return result;
+        }
+
+        return arena.NewUninitialised<Node>();
+    }
+
+    void PrependNode(Node* node) {
+        node->next = first;
+        first = node;
+    }
+
+    template <typename... Args>
+    void Prepend(Args&&... args) {
+        auto ptr = PrependUninitialised();
+        PLACEMENT_NEW(ptr) Type {Forward<Args>(args)...};
+    }
+
+    void Delete(Node* node) {
+        node->data.~Type();
+        node->next = free_list;
+        free_list = node;
+    }
+
+    // call placement-new on the result
+    Type* PrependUninitialised() {
+        if (free_list) {
+            auto result = free_list;
+            free_list = free_list->next;
+            PrependNode(result);
+            return &result->data;
+        }
+
+        auto new_node = arena.NewUninitialised<Node>();
+        PrependNode(new_node);
+        return &new_node->data;
+    }
+
+    template <typename FunctionType>
+    void RemoveIf(FunctionType&& should_remove_value) {
+        SinglyLinkedListRemoveIf(
+            first,
+            [&should_remove_value](Node const& i) { return should_remove_value(i.data); },
+            [this](Node* i) { Delete(i); });
+    }
+
+    bool Empty() const { return first == nullptr; }
+
+    Iterator begin() { return Iterator {first}; }
+    Iterator end() { return Iterator {nullptr}; }
+
+    ArenaAllocator arena;
+    Node* first {};
+    Node* free_list {};
+};

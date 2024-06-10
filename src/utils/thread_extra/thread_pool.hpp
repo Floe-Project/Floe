@@ -1,0 +1,66 @@
+// Copyright 2018-2024 Sam Windell
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+#pragma once
+#include "foundation/foundation.hpp"
+#include "os/misc.hpp"
+#include "os/threading.hpp"
+
+struct ThreadPool {
+    using FunctionType = FunctionQueue<>::Function;
+
+    ~ThreadPool() { StopAllThreads(); }
+
+    void Init(String pool_name, Optional<u32> num_threads) {
+        ASSERT(m_workers.size == 0);
+        if (!num_threads) num_threads = Min(Max(GetSystemStats().num_logical_cpus / 2u, 1u), 4u);
+
+        dyn::Resize(m_workers, *num_threads);
+        for (auto [i, w] : Enumerate(m_workers)) {
+            auto const name = fmt::FormatInline<100>("{}: {}", pool_name, i);
+            w.Start([this]() { WorkerProc(this); }, name, {});
+        }
+    }
+
+    void StopAllThreads() {
+        m_thread_stop_requested.Store(true);
+        m_cond_var.WakeAll();
+        for (auto& t : m_workers)
+            if (t.Joinable()) t.Join();
+        dyn::Clear(m_workers);
+        m_thread_stop_requested.Store(false);
+    }
+
+    void AddJob(FunctionType f) {
+        ASSERT(f);
+        {
+            ScopedMutexLock const lock(m_mutex);
+            m_job_queue.Push(f);
+        }
+        m_cond_var.WakeOne();
+    }
+
+  private:
+    static void WorkerProc(ThreadPool* thread_pool) {
+        ArenaAllocatorWithInlineStorage<4000> scratch_arena {};
+        while (true) {
+            Optional<FunctionQueue<>::Function> f {};
+            {
+                ScopedMutexLock lock(thread_pool->m_mutex);
+                while (thread_pool->m_job_queue.Empty() && !thread_pool->m_thread_stop_requested.Load())
+                    thread_pool->m_cond_var.Wait(lock);
+                f = thread_pool->m_job_queue.TryPop(scratch_arena);
+            }
+            if (f) (*f)();
+
+            if (thread_pool->m_thread_stop_requested.Load()) return;
+            scratch_arena.ResetCursorAndConsolidateRegions();
+        }
+    }
+
+    DynamicArray<Thread> m_workers {PageAllocator::Instance()};
+    Atomic<bool> m_thread_stop_requested {};
+    Mutex m_mutex {};
+    ConditionVariable m_cond_var {};
+    FunctionQueue<> m_job_queue {.arena = PageAllocator::Instance()};
+};

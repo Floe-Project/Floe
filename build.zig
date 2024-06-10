@@ -163,6 +163,8 @@ fn tryConcatCompileCommands(step: *std.Build.Step) !void {
             var buffered_writer: std.io.BufferedWriter(20 * 1024, @TypeOf(out_f.writer())) = .{ .unbuffered_writer = out_f.writer() };
             const writer = buffered_writer.writer();
 
+            // At this point, we have the complete list of files that were compiled and so we can create a clang-tidy command.
+            // Unfortunately, clang-tidy can't read a compile_commands.json itself.
             try writer.writeAll(
                 \\#!/bin/sh
                 \\echo "Running clang-tidy on all Floe source files..."

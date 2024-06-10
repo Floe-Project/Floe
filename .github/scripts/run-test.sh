@@ -15,7 +15,7 @@ case $test_type in
         ;;
     "vst3val")
         chmod +x $binaries_dir/VST3-Validator
-        $binaries_dir/VST3-Validator $binaries_dir/Mirage.vst3
+        $binaries_dir/VST3-Validator $binaries_dir/Floe.vst3
         ;;
     "pluginval")
         filename="pluginval_Linux.zip"
@@ -26,9 +26,9 @@ case $test_type in
         
         unzip pluginval.zip
         if [ "$(uname)" == "Darwin" ]; then
-            ./pluginval.app/Contents/MacOS/pluginval $binaries_dir/Mirage.vst3 
+            ./pluginval.app/Contents/MacOS/pluginval $binaries_dir/Floe.vst3 
         else
-            ./pluginval $binaries_dir/Mirage.vst3 
+            ./pluginval $binaries_dir/Floe.vst3 
         fi
         ;;
     "clapval")
@@ -40,9 +40,9 @@ case $test_type in
         curl -L "https://github.com/free-audio/clap-validator/releases/download/${release_tag}/${filename}" -o clapval.tar.gz
         tar -xf clapval.tar.gz
         if [ "$(uname)" == "Darwin" ]; then
-            ./binaries/clap-validator validate $binaries_dir/Mirage.clap
+            ./binaries/clap-validator validate $binaries_dir/Floe.clap
         else
-            ./clap-validator validate --in-process $binaries_dir/Mirage.clap
+            ./clap-validator validate --in-process $binaries_dir/Floe.clap
         fi
         ;;
     *)

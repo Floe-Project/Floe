@@ -138,6 +138,7 @@ jobs:
 
   static-analysis:
     strategy:
+      fail-fast: false # run even if others in this matrix failed
       matrix:
         command: [ cppcheck-all, clang-tidy-all, kcov ]
     name: Static Analysis

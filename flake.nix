@@ -136,6 +136,8 @@
             pkgs.llvmPackages_17.bintools-unwrapped # llvm-lipo, llvm-addr2line, dsymutil
             pkgs.llvmPackages_17.clang-unwrapped # clangd, clang-tidy, clang-format
             pkgs.cppcheck
+            pkgs.codespell
+            pkgs.parallel
 
             (pkgs.writeShellScriptBin "format-all" ''
               ${pkgs.fd}/bin/fd . -e .mm -e .cpp -e .hpp -e .h src | xargs ${pkgs.llvmPackages_17.clang-unwrapped}/bin/clang-format -i

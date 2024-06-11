@@ -34,6 +34,31 @@
           '';
         };
 
+        pluginval-windows = pkgs.stdenv.mkDerivation {
+          pname = "pluginval-windows";
+          version = "1.0.3";
+
+          src = builtins.fetchurl {
+            url = "https://github.com/Tracktion/pluginval/releases/download/v1.0.3/pluginval_Windows.zip";
+            sha256 = "sha256:1b93hldf7b9z23d85sw828cd96hiqzqdk9hcxi94vbzb3bibv0sd";
+          };
+
+          buildInputs = [ pkgs.unzip ];
+
+          unpackPhase = ''
+            unzip $src
+          '';
+
+          buildPhase = ''
+            mkdir -p $out/bin
+          '';
+
+          installPhase = ''
+            mkdir -p $out/bin
+            cp -R . $out/bin
+          '';
+        };
+
         clang-build-analyzer = pkgs.stdenv.mkDerivation rec {
           pname = "clang-build-analyzer";
           version = "1.5.0";
@@ -138,6 +163,10 @@
             pkgs.cppcheck
             pkgs.codespell
             pkgs.parallel
+            pkgs.miller
+            pkgs.gnused
+            pkgs.coreutils
+            pkgs.jq
 
             (pkgs.writeShellScriptBin "format-all" ''
               ${pkgs.fd}/bin/fd . -e .mm -e .cpp -e .hpp -e .h src | xargs ${pkgs.llvmPackages_18.clang-unwrapped}/bin/clang-format -i

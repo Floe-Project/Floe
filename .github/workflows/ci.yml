@@ -25,6 +25,8 @@ jobs:
 
       - name: Setup Zig Cache
         uses: Hanaasagi/zig-action-cache@master
+        with:
+          cache-directories: ".zig-cache"
 
       - name: Compile Linux
         id: compile_linux

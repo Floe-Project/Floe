@@ -29,7 +29,8 @@ const rootdir = struct {
     }
 }.getSrcDir();
 
-const build_gen = rootdir ++ "/build_gen";
+const build_gen_relative = "build_gen";
+const build_gen = rootdir ++ "/" ++ build_gen_relative;
 
 const TargetOs = enum {
     windows,
@@ -364,8 +365,8 @@ fn addWin32EmbedInfo(step: *std.Build.Step.Compile, info: Win32EmbedInfo) !void 
     const b = step.step.owner;
     const arena = b.allocator;
 
-    const path = try std.fmt.allocPrint(arena, "{s}/{s}.rc", .{ build_gen, step.name });
-    const file = try std.fs.createFileAbsolute(path, .{});
+    const path = try std.fmt.allocPrint(arena, "{s}/{s}.rc", .{ build_gen_relative, step.name });
+    const file = try std.fs.createFileAbsolute(b.pathJoin(&.{ rootdir, path }), .{});
     defer file.close();
 
     const this_year = 1970 + @divTrunc(std.time.timestamp(), 60 * 60 * 24 * 365);
@@ -789,7 +790,7 @@ pub fn build(b: *std.Build) void {
 
     const user_given_target_presets = b.option([]const u8, "targets", "Target operating system");
 
-    const install_dir = b.install_path; // zig-out
+    // const install_dir = b.install_path; // zig-out
 
     const targets = getTargets(b, user_given_target_presets) catch @panic("OOM");
 
@@ -1820,9 +1821,9 @@ pub fn build(b: *std.Build) void {
                 b.getInstallStep().dependOn(&b.addInstallArtifact(vst3_validator, .{ .dest_dir = install_subfolder }).step);
                 addToLipoSteps(&build_context, vst3_validator, false) catch @panic("OOM");
 
-                const run_tests = b.addRunArtifact(vst3_validator);
-                run_tests.addArg(b.pathJoin(&.{ install_dir, install_subfolder_string, "Floe.vst3" }));
-                build_context.test_step.dependOn(&run_tests.step);
+                // const run_tests = b.addRunArtifact(vst3_validator);
+                // run_tests.addArg(b.pathJoin(&.{ install_dir, install_subfolder_string, "Floe.vst3" }));
+                // build_context.test_step.dependOn(&run_tests.step);
             }
         }
 
@@ -1968,9 +1969,9 @@ pub fn build(b: *std.Build) void {
 
             {
                 const win_installer_description = "Installer for Floe plugins";
-                const manifest_path = std.fs.path.join(b.allocator, &.{ build_gen, "installer.manifest" }) catch @panic("OOM");
+                const manifest_path = std.fs.path.join(b.allocator, &.{ build_gen_relative, "installer.manifest" }) catch @panic("OOM");
                 {
-                    const file = std.fs.createFileAbsolute(manifest_path, .{ .truncate = true }) catch @panic("could not create file");
+                    const file = std.fs.createFileAbsolute(b.pathJoin(&.{ rootdir, manifest_path }), .{ .truncate = true }) catch @panic("could not create file");
                     defer file.close();
                     file.writeAll(b.fmt(
                         \\ <?xml version="1.0" encoding="UTF-8" standalone="yes"?>

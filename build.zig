@@ -29,6 +29,8 @@ const rootdir = struct {
     }
 }.getSrcDir();
 
+const build_gen = rootdir ++ "/build_gen";
+
 const TargetOs = enum {
     windows,
     linux,
@@ -40,12 +42,8 @@ const ConcatCompileCommandsStep = struct {
     target: std.Build.ResolvedTarget,
 };
 
-fn compileCommandsDir(alloc: std.mem.Allocator, target: std.Target, cache_dir: []const u8) ![]u8 {
-    return std.fmt.allocPrint(alloc, "{s}/compile_commands_{s}", .{ cache_dir, try target.zigTriple(alloc) });
-}
-
-fn cacheDir(b: *std.Build) []const u8 {
-    return b.cache_root.path.?;
+fn compileCommandsDir(alloc: std.mem.Allocator, target: std.Target) ![]u8 {
+    return std.fmt.allocPrint(alloc, "{s}/compile_commands_{s}", .{ build_gen, try target.zigTriple(alloc) });
 }
 
 fn tryConcatCompileCommands(step: *std.Build.Step) !void {
@@ -61,10 +59,8 @@ fn tryConcatCompileCommands(step: *std.Build.Step) !void {
         arguments: [][]u8,
     };
 
-    const cache_dir = cacheDir(step.owner);
-
     var compile_commands = std.ArrayList(CompileFragment).init(arena.allocator());
-    const compile_commands_dir = try compileCommandsDir(arena.allocator(), self.target.result, cache_dir);
+    const compile_commands_dir = try compileCommandsDir(arena.allocator(), self.target.result);
 
     {
         const maybe_dir = std.fs.openDirAbsolute(compile_commands_dir, .{ .iterate = true });
@@ -129,8 +125,8 @@ fn tryConcatCompileCommands(step: *std.Build.Step) !void {
     }
 
     if (compile_commands.items.len != 0) {
-        const out_path = try std.fmt.allocPrint(arena.allocator(), "{s}/compile_commands_{s}.json", .{ cache_dir, try self.target.result.zigTriple(arena.allocator()) });
-        const generic_out_path = step.owner.pathJoin(&.{ cache_dir, "compile_commands.json" });
+        const out_path = try std.fmt.allocPrint(arena.allocator(), "{s}/compile_commands_{s}.json", .{ build_gen, try self.target.result.zigTriple(arena.allocator()) });
+        const generic_out_path = step.owner.pathJoin(&.{ build_gen, "compile_commands.json" });
 
         const maybe_file = std.fs.openFileAbsolute(out_path, .{});
         if (maybe_file != std.fs.File.OpenError.FileNotFound) {
@@ -158,7 +154,7 @@ fn tryConcatCompileCommands(step: *std.Build.Step) !void {
         }
 
         {
-            var out_f = try std.fs.createFileAbsolute(step.owner.pathJoin(&.{ cache_dir, "clang-tidy-cmd.sh" }), .{});
+            var out_f = try std.fs.createFileAbsolute(step.owner.pathJoin(&.{ build_gen, "clang-tidy-cmd.sh" }), .{});
             defer out_f.close();
             var buffered_writer: std.io.BufferedWriter(20 * 1024, @TypeOf(out_f.writer())) = .{ .unbuffered_writer = out_f.writer() };
             const writer = buffered_writer.writer();
@@ -190,7 +186,7 @@ fn tryConcatCompileCommands(step: *std.Build.Step) !void {
     }
 }
 
-fn concatCompileCommands(step: *std.Build.Step, prog_node: *std.Progress.Node) !void {
+fn concatCompileCommands(step: *std.Build.Step, prog_node: std.Progress.Node) !void {
     _ = prog_node;
 
     tryConcatCompileCommands(step) catch |err| {
@@ -331,7 +327,7 @@ fn addToLipoSteps(context: *BuildContext, step: *std.Build.Step.Compile, make_ma
     }
 }
 
-fn doLipoStep(step: *std.Build.Step, prog_node: *std.Progress.Node) !void {
+fn doLipoStep(step: *std.Build.Step, prog_node: std.Progress.Node) !void {
     const self: *LipoStep = @fieldParentPtr("step", step);
     _ = prog_node;
 
@@ -368,7 +364,7 @@ fn addWin32EmbedInfo(step: *std.Build.Step.Compile, info: Win32EmbedInfo) !void 
     const b = step.step.owner;
     const arena = b.allocator;
 
-    const path = try std.fmt.allocPrint(arena, "{s}/{s}.rc", .{ cacheDir(b), step.name });
+    const path = try std.fmt.allocPrint(arena, "{s}/{s}.rc", .{ build_gen, step.name });
     const file = try std.fs.createFileAbsolute(path, .{});
     defer file.close();
 
@@ -412,10 +408,10 @@ fn addWin32EmbedInfo(step: *std.Build.Step.Compile, info: Win32EmbedInfo) !void 
     if (info.icon_path) |p|
         try std.fmt.format(file.writer(), "icon_id ICON \"{s}\"\n", .{p});
 
-    step.addWin32ResourceFile(.{ .file = .{ .path = path } });
+    step.addWin32ResourceFile(.{ .file = b.path(path) });
 }
 
-fn performPostInstallConfig(step: *std.Build.Step, prog_node: *std.Progress.Node) !void {
+fn performPostInstallConfig(step: *std.Build.Step, prog_node: std.Progress.Node) !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
 
@@ -589,6 +585,7 @@ fn objcppFlags(b: *std.Build, cpp_flags: [][]const u8, extra_flags: []const []co
 }
 
 fn applyUniversalSettings(context: *BuildContext, step: *std.Build.Step.Compile) void {
+    var b = context.b;
     if (!step.rootModuleTarget().isDarwin()) {
         // TODO: try LTO on mac again
         // LTO doesn't seem like it's supported on mac
@@ -597,17 +594,16 @@ fn applyUniversalSettings(context: *BuildContext, step: *std.Build.Step.Compile)
     step.rdynamic = context.build_mode != .production;
     step.linkLibC();
 
-    step.addIncludePath(.{ .path = rootdir });
-    step.addIncludePath(.{ .path = "src" });
-    step.addIncludePath(.{ .path = "third_party_libs" });
-    step.addIncludePath(.{ .path = "third_party_libs/clap/include" });
-    step.addIncludePath(.{ .path = "third_party_libs/tracy/public" });
-    step.addIncludePath(.{ .path = "third_party_libs/pugl/include" });
-    step.addIncludePath(.{ .path = "third_party_libs/flac/include" });
-    step.addIncludePath(.{ .path = "third_party_libs/portmidi/pm_common" });
+    step.addIncludePath(b.path("."));
+    step.addIncludePath(b.path("src"));
+    step.addIncludePath(b.path("third_party_libs"));
+    step.addIncludePath(b.path("third_party_libs/clap/include"));
+    step.addIncludePath(b.path("third_party_libs/tracy/public"));
+    step.addIncludePath(b.path("third_party_libs/pugl/include"));
+    step.addIncludePath(b.path("third_party_libs/flac/include"));
+    step.addIncludePath(b.path("third_party_libs/portmidi/pm_common"));
 
     if (step.rootModuleTarget().isDarwin()) {
-        var b = step.step.owner;
         const sdk_root = b.graph.env_map.get("MACOSX_SDK_SYSROOT");
         if (sdk_root == null) {
             // This environment variable should be set and should be a path containing the macOS SDKS.
@@ -618,14 +614,14 @@ fn applyUniversalSettings(context: *BuildContext, step: *std.Build.Step.Compile)
         }
         b.sysroot = sdk_root;
 
-        step.addSystemIncludePath(.{ .path = b.pathJoin(&.{ sdk_root.?, "/usr/include" }) });
-        step.addLibraryPath(.{ .path = b.pathJoin(&.{ sdk_root.?, "/usr/lib" }) });
-        step.addFrameworkPath(.{ .path = b.pathJoin(&.{ sdk_root.?, "/System/Library/Frameworks" }) });
+        step.addSystemIncludePath(b.path(b.pathJoin(&.{ sdk_root.?, "/usr/include" })));
+        step.addLibraryPath(b.path(b.pathJoin(&.{ sdk_root.?, "/usr/lib" })));
+        step.addFrameworkPath(b.path(b.pathJoin(&.{ sdk_root.?, "/System/Library/Frameworks" })));
     }
 }
 
 fn getGitCommit(b: *std.Build) []const u8 {
-    const result = std.ChildProcess.run(.{
+    const result = std.process.Child.run(.{
         .allocator = b.allocator,
         .argv = &.{ "git", "rev-parse", "HEAD" },
     }) catch @panic("can't run git");
@@ -643,7 +639,7 @@ fn buildLua(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.built
 
     const lua_dir = "third_party_libs/lua";
 
-    lib.addIncludePath(.{ .path = lua_dir });
+    lib.addIncludePath(b.path(lua_dir));
 
     const flags = [_][]const u8{
         switch (target.result.os.tag) {
@@ -656,7 +652,7 @@ fn buildLua(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.built
     };
 
     // compile as C++ so as to use exceptions
-    lib.addCSourceFile(.{ .file = .{ .path = b.pathJoin(&.{ lua_dir, "onelua.cpp" }) }, .flags = &flags });
+    lib.addCSourceFile(.{ .file = b.path(b.pathJoin(&.{ lua_dir, "onelua.cpp" })), .flags = &flags });
     lib.linkLibC();
 
     return lib;
@@ -826,7 +822,7 @@ pub fn build(b: *std.Build) void {
         const generic_flags = genericFlags(&build_context, target, &.{}) catch unreachable;
         const generic_fp_flags = genericFlags(&build_context, target, &.{
             "-gen-cdb-fragment-path",
-            compileCommandsDir(b.allocator, target.result, cacheDir(b)) catch unreachable, // IMPROVE: will this error if the path contains a space?
+            compileCommandsDir(b.allocator, target.result) catch unreachable, // IMPROVE: will this error if the path contains a space?
             "-Werror",
             "-Wconversion",
             "-Wexit-time-destructors",
@@ -841,6 +837,7 @@ pub fn build(b: *std.Build) void {
             "-Wcast-align",
             "-Wdouble-promotion",
             "-Woverloaded-virtual",
+            "-Wno-missing-field-initializers",
             b.fmt("-DOBJC_NAME_PREFIX=FpFloe{d}{d}{d}", .{ floe_version.major, floe_version.minor, floe_version.patch }),
             "-DFLAC__NO_DLL",
             "-DPUGL_DISABLE_DEPRECATED",
@@ -896,7 +893,7 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = build_context.optimise,
         });
-        stb_sprintf.addCSourceFile(.{ .file = .{ .path = "third_party_libs/stb/stb_sprintf.c" } });
+        stb_sprintf.addCSourceFile(.{ .file = b.path("third_party_libs/stb/stb_sprintf.c") });
         stb_sprintf.linkLibC();
 
         var xxhash = b.addObject(.{
@@ -904,7 +901,7 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = build_context.optimise,
         });
-        xxhash.addCSourceFile(.{ .file = .{ .path = "third_party_libs/xxhash/xxhash.c" } });
+        xxhash.addCSourceFile(.{ .file = b.path("third_party_libs/xxhash/xxhash.c") });
         xxhash.linkLibC();
 
         const tracy = b.addStaticLibrary(.{
@@ -963,11 +960,11 @@ pub fn build(b: *std.Build) void {
                 },
                 .flags = cpp_flags,
             });
-            vitfx.addIncludePath(.{ .path = vitfx_path ++ "/src/synthesis" });
-            vitfx.addIncludePath(.{ .path = vitfx_path ++ "/src/synthesis/framework" });
-            vitfx.addIncludePath(.{ .path = vitfx_path ++ "/src/synthesis/filters" });
-            vitfx.addIncludePath(.{ .path = vitfx_path ++ "/src/synthesis/lookups" });
-            vitfx.addIncludePath(.{ .path = vitfx_path ++ "/src/common" });
+            vitfx.addIncludePath(b.path(vitfx_path ++ "/src/synthesis"));
+            vitfx.addIncludePath(b.path(vitfx_path ++ "/src/synthesis/framework"));
+            vitfx.addIncludePath(b.path(vitfx_path ++ "/src/synthesis/filters"));
+            vitfx.addIncludePath(b.path(vitfx_path ++ "/src/synthesis/lookups"));
+            vitfx.addIncludePath(b.path(vitfx_path ++ "/src/common"));
             vitfx.linkLibCpp();
 
             b.getInstallStep().dependOn(&b.addInstallArtifact(vitfx, .{ .dest_dir = install_subfolder }).step);
@@ -1251,7 +1248,7 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = build_context.optimise,
         });
-        stb_image.addCSourceFile(.{ .file = .{ .path = "third_party_libs/stb/stb_image_impls.c" } });
+        stb_image.addCSourceFile(.{ .file = b.path("third_party_libs/stb/stb_image_impls.c") });
         stb_image.linkLibC();
 
         var miniz = b.addObject(.{
@@ -1259,7 +1256,7 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = build_context.optimise,
         });
-        miniz.addCSourceFile(.{ .file = .{ .path = "third_party_libs/miniz/miniz.c" } });
+        miniz.addCSourceFile(.{ .file = b.path("third_party_libs/miniz/miniz.c") });
         miniz.linkLibC();
 
         var sqlite = b.addStaticLibrary(.{
@@ -1268,7 +1265,7 @@ pub fn build(b: *std.Build) void {
             .optimize = build_context.optimise,
         });
         sqlite.addCSourceFile(.{
-            .file = .{ .path = "third_party_libs/sqlite/sqlite3.c" },
+            .file = b.path("third_party_libs/sqlite/sqlite3.c"),
             .flags = &.{"-DSQLITE_DEFAULT_FOREIGN_KEYS=1"},
         });
         sqlite.linkLibC();
@@ -1278,7 +1275,7 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = build_context.optimise,
         });
-        dr_wav.addCSourceFile(.{ .file = .{ .path = "third_party_libs/dr_wav/dr_wav_implementation.c" } });
+        dr_wav.addCSourceFile(.{ .file = b.path("third_party_libs/dr_wav/dr_wav_implementation.c") });
         dr_wav.linkLibC();
 
         const flac = b.addStaticLibrary(.{ .name = "flac", .target = target, .optimize = build_context.optimise });
@@ -1322,7 +1319,7 @@ pub fn build(b: *std.Build) void {
 
             const config_header = b.addConfigHeader(
                 .{
-                    .style = .{ .cmake = .{ .path = flac_path ++ "config.cmake.h.in" } },
+                    .style = .{ .cmake = b.path(flac_path ++ "config.cmake.h.in") },
                     .include_path = "config.h",
                 },
                 .{
@@ -1349,8 +1346,8 @@ pub fn build(b: *std.Build) void {
             flac.linkLibC();
             flac.defineCMacro("HAVE_CONFIG_H", null);
             flac.addConfigHeader(config_header);
-            flac.addIncludePath(.{ .path = flac_path ++ "include" });
-            flac.addIncludePath(.{ .path = flac_path ++ "src/libFLAC/include" });
+            flac.addIncludePath(b.path(flac_path ++ "include"));
+            flac.addIncludePath(b.path(flac_path ++ "src/libFLAC/include"));
             flac.addCSourceFiles(.{ .files = sources, .flags = &.{} });
             if (target.result.os.tag == .windows) {
                 flac.defineCMacro("FLAC__NO_DLL", null);
@@ -1462,21 +1459,21 @@ pub fn build(b: *std.Build) void {
             });
             plugin.addConfigHeader(licences_header);
 
-            plugin.addIncludePath(.{ .path = "src/plugin" });
-            plugin.addIncludePath(.{ .path = "src" });
+            plugin.addIncludePath(b.path("src/plugin"));
+            plugin.addIncludePath(b.path("src"));
             plugin.addConfigHeader(build_config_step);
             plugin.linkLibrary(sqlite);
             plugin.linkLibrary(library);
             plugin.linkLibrary(fft_convolver);
             const embedded_files = b.addObject(.{
                 .name = "embedded_files",
-                .root_source_file = .{ .path = "build_resources/embedded_files.zig" },
+                .root_source_file = b.path("build_resources/embedded_files.zig"),
                 .target = target,
                 .optimize = build_context.optimise,
                 .pic = true,
             });
             embedded_files.linkLibC();
-            embedded_files.addIncludePath(.{ .path = "build_resources" });
+            embedded_files.addIncludePath(b.path("build_resources"));
             plugin.addObject(embedded_files);
             plugin.linkLibrary(tracy);
             plugin.linkLibrary(pugl);
@@ -1497,8 +1494,8 @@ pub fn build(b: *std.Build) void {
                 gen_docs_path ++ "/gen_param_docs_html_main.cpp",
             }, .flags = cpp_fp_flags });
             gen_docs.linkLibrary(plugin);
-            gen_docs.addIncludePath(.{ .path = "src" });
-            gen_docs.addIncludePath(.{ .path = "src/plugin" });
+            gen_docs.addIncludePath(b.path("src"));
+            gen_docs.addIncludePath(b.path("src/plugin"));
             gen_docs.addConfigHeader(build_config_step);
             join_compile_commands.step.dependOn(&gen_docs.step);
             applyUniversalSettings(&build_context, gen_docs);
@@ -1519,7 +1516,7 @@ pub fn build(b: *std.Build) void {
             });
             clap.addCSourceFiles(.{ .files = &.{"src/plugin/plugin_clap_entry.cpp"}, .flags = cpp_fp_flags });
             clap.addConfigHeader(build_config_step);
-            clap.addIncludePath(.{ .path = "src" });
+            clap.addIncludePath(b.path("src"));
             clap.linkLibrary(plugin);
             const clap_install_artifact_step = b.addInstallArtifact(clap, .{ .dest_dir = install_subfolder });
             b.getInstallStep().dependOn(&clap_install_artifact_step.step);
@@ -1622,8 +1619,8 @@ pub fn build(b: *std.Build) void {
                 }
 
                 portmidi.linkLibC();
-                portmidi.addIncludePath(.{ .path = "third_party_libs/portmidi/porttime" });
-                portmidi.addIncludePath(.{ .path = "third_party_libs/portmidi/pm_common" });
+                portmidi.addIncludePath(b.path("third_party_libs/portmidi/porttime"));
+                portmidi.addIncludePath(b.path("third_party_libs/portmidi/pm_common"));
             }
 
             const floe_standalone = b.addExecutable(.{
@@ -1642,7 +1639,7 @@ pub fn build(b: *std.Build) void {
             });
 
             floe_standalone.addConfigHeader(build_config_step);
-            floe_standalone.addIncludePath(.{ .path = "src" });
+            floe_standalone.addIncludePath(b.path("src"));
             floe_standalone.linkLibrary(portmidi);
             floe_standalone.linkLibrary(miniaudio);
             floe_standalone.linkLibrary(plugin);
@@ -1728,7 +1725,7 @@ pub fn build(b: *std.Build) void {
                     else => {},
                 }
 
-                vst3_sdk.addIncludePath(.{ .path = vst3_path });
+                vst3_sdk.addIncludePath(b.path(vst3_path));
                 vst3_sdk.linkLibCpp();
                 applyUniversalSettings(&build_context, vst3_sdk);
             }
@@ -1815,7 +1812,7 @@ pub fn build(b: *std.Build) void {
                     else => {},
                 }
 
-                vst3_validator.addIncludePath(.{ .path = vst3_path });
+                vst3_validator.addIncludePath(b.path(vst3_path));
                 vst3_validator.linkLibCpp();
                 vst3_validator.linkLibrary(vst3_sdk);
                 vst3_validator.linkLibrary(library); // for ubsan runtime
@@ -1912,17 +1909,17 @@ pub fn build(b: *std.Build) void {
                 else => {},
             }
 
-            vst3.addIncludePath(.{ .path = "third_party_libs/clap/include" });
-            vst3.addIncludePath(.{ .path = "third_party_libs/clap-wrapper/include" });
-            vst3.addIncludePath(.{ .path = "third_party_libs/vst3" });
-            vst3.addIncludePath(.{ .path = "third_party_libs/clap-wrapper/libs/fmt" });
+            vst3.addIncludePath(b.path("third_party_libs/clap/include"));
+            vst3.addIncludePath(b.path("third_party_libs/clap-wrapper/include"));
+            vst3.addIncludePath(b.path("third_party_libs/vst3"));
+            vst3.addIncludePath(b.path("third_party_libs/clap-wrapper/libs/fmt"));
             vst3.linkLibCpp();
 
             vst3.linkLibrary(plugin);
             vst3.linkLibrary(vst3_sdk);
 
             vst3.addConfigHeader(build_config_step);
-            vst3.addIncludePath(.{ .path = "src" });
+            vst3.addIncludePath(b.path("src"));
 
             const vst3_install_artifact_step = b.addInstallArtifact(vst3, .{ .dest_dir = install_subfolder });
             b.getInstallStep().dependOn(&vst3_install_artifact_step.step);
@@ -1971,7 +1968,7 @@ pub fn build(b: *std.Build) void {
 
             {
                 const win_installer_description = "Installer for Floe plugins";
-                const manifest_path = std.fs.path.join(b.allocator, &.{ cacheDir(b), "installer.manifest" }) catch @panic("OOM");
+                const manifest_path = std.fs.path.join(b.allocator, &.{ build_gen, "installer.manifest" }) catch @panic("OOM");
                 {
                     const file = std.fs.createFileAbsolute(manifest_path, .{ .truncate = true }) catch @panic("could not create file");
                     defer file.close();
@@ -2036,7 +2033,7 @@ pub fn build(b: *std.Build) void {
                     .target = target,
                     .optimize = build_context.optimise,
                     .version = floe_version,
-                    .win32_manifest = .{ .path = manifest_path },
+                    .win32_manifest = b.path(manifest_path),
                 });
                 var flags = std.ArrayList([]const u8).init(b.allocator);
 
@@ -2049,7 +2046,7 @@ pub fn build(b: *std.Build) void {
                     // IMPROVE: it's slow to zip this every time
                     // NOTE: we enter the library folder and build the zip from there. This way, the zip contains only the contents of the Core Library folder, not the folder itself. Additionally, we exclude the .git folder.
                     const zip_core = b.addSystemCommand(&.{ "zip", "-x", ".git/*", "-r", b.pathJoin(&.{ rootdir, core_library_zip_path_relative }), "." });
-                    zip_core.setCwd(.{ .path = core_library_path });
+                    zip_core.setCwd(b.path(core_library_path));
                     win_installer.step.dependOn(&zip_core.step);
                     flags.append(b.fmt("-DCORE_LIBRARY_ZIP_PATH=\"{s}\"", .{core_library_zip_path_relative})) catch unreachable;
                 } else {
@@ -2062,7 +2059,7 @@ pub fn build(b: *std.Build) void {
                 flags.append("-DCLAP_PLUGIN_PATH=\"zig-out/x86-windows/Floe.clap\"") catch unreachable;
                 flags.append("-DVST3_PLUGIN_PATH=\"zig-out/x86-windows/Floe.vst3\"") catch unreachable;
                 win_installer.addWin32ResourceFile(.{
-                    .file = .{ .path = installer_path ++ "/resources.rc" },
+                    .file = b.path(installer_path ++ "/resources.rc"),
                     .flags = flags.items,
                 });
                 flags.appendSlice(cpp_fp_flags) catch unreachable;
@@ -2085,7 +2082,7 @@ pub fn build(b: *std.Build) void {
                     .icon_path = logo_path_relative,
                 }) catch @panic("OOM");
                 win_installer.addConfigHeader(build_config_step);
-                win_installer.addIncludePath(.{ .path = "src" });
+                win_installer.addIncludePath(b.path("src"));
                 win_installer.addObject(stb_image);
                 win_installer.linkLibrary(library);
                 win_installer.addObject(miniz);

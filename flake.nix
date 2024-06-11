@@ -3,7 +3,7 @@
 
 {
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-23.11";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-24.05";
     flake-utils.url = "github:numtide/flake-utils";
     zig.url = "github:mitchellh/zig-overlay";
   };
@@ -127,35 +127,35 @@
           packages = [
             # If you change the zig version you probably also want to change the ZLS version. 
             # For me, that's done my home-manager setup at the moment.
-            zigpkgs.master-2024-04-25
+            zigpkgs."0.13.0"
             clap-val
             pluginval
             clang-build-analyzer
             pkgs.zip
             pkgs.kcov
-            pkgs.llvmPackages_17.bintools-unwrapped # llvm-lipo, llvm-addr2line, dsymutil
-            pkgs.llvmPackages_17.clang-unwrapped # clangd, clang-tidy, clang-format
+            pkgs.llvmPackages_18.bintools-unwrapped # llvm-lipo, llvm-addr2line, dsymutil
+            pkgs.llvmPackages_18.clang-unwrapped # clangd, clang-tidy, clang-format
             pkgs.cppcheck
             pkgs.codespell
             pkgs.parallel
 
             (pkgs.writeShellScriptBin "format-all" ''
-              ${pkgs.fd}/bin/fd . -e .mm -e .cpp -e .hpp -e .h src | xargs ${pkgs.llvmPackages_17.clang-unwrapped}/bin/clang-format -i
+              ${pkgs.fd}/bin/fd . -e .mm -e .cpp -e .hpp -e .h src | xargs ${pkgs.llvmPackages_18.clang-unwrapped}/bin/clang-format -i
             '')
 
             (pkgs.writeShellScriptBin "check-format-all" ''
-              ${pkgs.fd}/bin/fd . -e .mm -e .cpp -e .hpp -e .h src | xargs ${pkgs.llvmPackages_17.clang-unwrapped}/bin/clang-format --dry-run --Werror
+              ${pkgs.fd}/bin/fd . -e .mm -e .cpp -e .hpp -e .h src | xargs ${pkgs.llvmPackages_18.clang-unwrapped}/bin/clang-format --dry-run --Werror
             '')
 
             (pkgs.writeShellScriptBin "clang-tidy-all" ''
               echo "NOTE: Our clang-tidy command is generated after a successful compilation using our Zig build system"
-              sh zig-cache/clang-tidy-cmd.sh
+              sh build_gen/clang-tidy-cmd.sh
             '')
 
             # --enable=constVariable ?
             (pkgs.writeShellScriptBin "cppcheck-all" ''
               echo "NOTE: Our cppcheck command depends on a successful compilation using our Zig build system"
-              ${pkgs.cppcheck}/bin/cppcheck --project=$PWD/zig-cache/compile_commands.json --cppcheck-build-dir=$PWD/zig-cache --enable=unusedFunction
+              ${pkgs.cppcheck}/bin/cppcheck --project=$PWD/build_gen/compile_commands.json --cppcheck-build-dir=$PWD/build_gen --enable=unusedFunction
             '')
 
             # IMPROVE: Add a test for running auval on our AUv2
@@ -177,8 +177,8 @@
             '')
 
             (pkgs.writeShellScriptBin "analyzed-build" ''
-              artifactDir=zig-cache/tmp
-              reportFile=zig-cache/build-report
+              artifactDir=build_gen/tmp
+              reportFile=build_gen/build-report
               mkdir -p ''${artifactDir}
               ${clang-build-analyzer}/bin/ClangBuildAnalyzer --start ''${artifactDir}
               "$@"

@@ -5,4 +5,4 @@ Diagnostics:
   UnusedIncludes: Strict
   Suppress: [ "unused-function" ]
 CompileFlags:
-  CompilationDatabase: zig-cache/  # Extra search path for compile_commands.json
+  CompilationDatabase: build_gen/  # Extra search path for compile_commands.json

@@ -30,7 +30,7 @@ static constexpr ErrorCodeCategory k_errno_category {
 };
 
 ErrorCode ErrnoErrorCode(s64 error_code, char const* extra_debug_info, SourceLocation loc) {
-    return ErrorCode {k_errno_category, (s64)error_code, extra_debug_info, loc};
+    return ErrorCode {k_errno_category, error_code, extra_debug_info, loc};
 }
 
 Mutex& StdStreamMutex(StdStream stream) {

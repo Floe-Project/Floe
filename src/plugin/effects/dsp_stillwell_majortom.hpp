@@ -100,7 +100,7 @@ struct StillwellMajorTom {
     f32 runmax {};
     f32 runave {};
 
-    inline void Process(f32 srate, f32 spl0, f32 spl1, f32& out_spl0, f32& out_spl1) {
+    void Process(f32 srate, f32 spl0, f32 spl1, f32& out_spl0, f32& out_spl1) {
         if constexpr (k_slider_detection_source) {
             ospl = ospl0 * ospl0 + ospl1 * ospl1;
             if (ospl > runospl)

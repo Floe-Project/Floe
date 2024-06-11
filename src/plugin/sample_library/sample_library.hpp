@@ -160,7 +160,7 @@ struct TryHelpersOutcomeToError {
     TRY_HELPER_INHERIT(IsError, TryHelpers)
     TRY_HELPER_INHERIT(ExtractValue, TryHelpers)
     template <typename T>
-    static inline sample_lib::Error ExtractError(ErrorCodeOr<T> const& o) {
+    static sample_lib::Error ExtractError(ErrorCodeOr<T> const& o) {
         return {o.Error(), ""_s};
     }
 };

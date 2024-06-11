@@ -44,9 +44,9 @@ class UninitialisedGlobalObj {
         m_has_value = false;
     }
 
-    constexpr inline Type& Value() { return *(Type*)m_storage; }
+    constexpr Type& Value() { return *(Type*)m_storage; }
 
-    constexpr inline bool HasValue() const { return m_has_value; }
+    constexpr bool HasValue() const { return m_has_value; }
     constexpr explicit operator bool() const { return HasValue(); }
 
     constexpr Type* operator->() { return &Value(); }

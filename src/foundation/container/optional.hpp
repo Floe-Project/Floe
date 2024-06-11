@@ -167,7 +167,7 @@ class [[nodiscard]] Optional<Type> {
 
     constexpr ~Optional() { Clear(); }
 
-    constexpr inline bool HasValue() const { return m_has_value; }
+    constexpr bool HasValue() const { return m_has_value; }
 
     constexpr Type* operator->() { return &Value(); }
     constexpr Type& operator*() { return Value(); }
@@ -186,42 +186,42 @@ class [[nodiscard]] Optional<Type> {
 
     constexpr Optional Clone(Allocator& a) const;
 
-    constexpr inline Type& Value() {
+    constexpr Type& Value() {
         ASSERT(HasValue());
         return *(Type*)m_storage;
     }
-    constexpr inline Type const& Value() const {
+    constexpr Type const& Value() const {
         ASSERT(HasValue());
         return *(Type const*)m_storage;
     }
-    constexpr inline Type ValueOr(Type fallback) {
+    constexpr Type ValueOr(Type fallback) {
         if (HasValue()) return Value();
         return fallback;
     }
-    constexpr inline Type* NullableValue() {
+    constexpr Type* NullableValue() {
         if (HasValue()) return &Value();
         return nullptr;
     }
-    constexpr inline Type const* NullableValue() const {
+    constexpr Type const* NullableValue() const {
         if (HasValue()) return &Value();
         return nullptr;
     }
 
-    constexpr inline auto AndThen(auto&& f) const {
+    constexpr auto AndThen(auto&& f) const {
         if (HasValue())
             return f(Value());
         else
             return RemoveCVReference<InvokeResult<decltype(f), Type>> {};
     }
 
-    constexpr inline auto Transform(auto&& f) const {
+    constexpr auto Transform(auto&& f) const {
         if (HasValue())
             return Optional {f(Value())};
         else
             return Optional {};
     }
 
-    constexpr inline auto OrElse(auto&& f) const {
+    constexpr auto OrElse(auto&& f) const {
         if (HasValue())
             return Value();
         else

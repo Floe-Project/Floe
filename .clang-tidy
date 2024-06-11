@@ -12,6 +12,7 @@
 Checks: '-*,
   bugprone-integer-division,
   bugprone-signal-handler,
+  bugprone-undefined-memory-manipulation,
   clang-analyzer-core.BitwiseShift
   clang-analyzer-core.CallAndMessage
   clang-analyzer-core.DivideZero

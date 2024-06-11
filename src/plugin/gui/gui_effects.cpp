@@ -261,7 +261,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
                                                 FLT_MAX,
                                                 0.0f,
                                                 name);
-        const f32 epsilon = 2;
+        f32 const epsilon = 2;
         return f32x2 {Round(size.x + epsilon) + (f32)FXHeadingExtraWidth, (f32)FXHeadingH};
     };
 
@@ -273,7 +273,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
         auto master_heading_container =
             lay.CreateParentItem(effects_root, 1, 0, LAY_HFILL, LAY_ROW | LAY_START);
 
-        const auto heading_size = get_heading_size(k_effect_info[ToInt(fx.type)].name);
+        auto const heading_size = get_heading_size(k_effect_info[ToInt(fx.type)].name);
         ids.heading = lay.CreateChildItem(master_heading_container,
                                           (LayScalar)heading_size.x,
                                           (LayScalar)heading_size.y,
@@ -615,8 +615,8 @@ void DoEffectsWindow(Gui* g, Rect r) {
     }
 
     auto const draw_divider = [&](LayID id) {
-        const auto room_at_scroll_window_bottom = imgui.PointsToPixels(15);
-        const auto line_r =
+        auto const room_at_scroll_window_bottom = imgui.PointsToPixels(15);
+        auto const line_r =
             imgui.GetRegisteredAndConvertedRect(lay.GetRect(id).WithH(room_at_scroll_window_bottom));
         imgui.graphics->AddLine(line_r.TopLeft(),
                                 line_r.TopRight(),
@@ -661,8 +661,8 @@ void DoEffectsWindow(Gui* g, Rect r) {
 
         auto const do_heading = [&](Effect& fx, u32 col) {
             {
-                const auto id = imgui.GetID("heading");
-                const auto r = lay.GetRect(ids.heading);
+                auto const id = imgui.GetID("heading");
+                auto const r = lay.GetRect(ids.heading);
                 buttons::Button(g, id, r, k_effect_info[ToInt(fx.type)].name, buttons::EffectHeading(col));
 
                 if (imgui.WasJustActivated(id)) {
@@ -679,8 +679,8 @@ void DoEffectsWindow(Gui* g, Rect r) {
             }
 
             {
-                const auto close_id = imgui.GetID("close");
-                const auto r = lay.GetRect(ids.close);
+                auto const close_id = imgui.GetID("close");
+                auto const r = lay.GetRect(ids.close);
                 if (buttons::Button(g,
                                     close_id,
                                     r,
@@ -697,7 +697,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
 
         switch (ids.type) {
             case EffectType::Distortion: {
-                auto const cols = GetFxCols((EffectType)ids.type);
+                auto const cols = GetFxCols(ids.type);
 
                 do_heading(plugin.processor.distortion, cols.back);
                 auto& d = ids.distortion;
@@ -718,7 +718,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
                 break;
             }
             case EffectType::BitCrush: {
-                auto const cols = GetFxCols((EffectType)ids.type);
+                auto const cols = GetFxCols(ids.type);
 
                 do_heading(plugin.processor.bit_crush, cols.back);
                 auto& b = ids.bit_crush;
@@ -749,7 +749,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
                 break;
             }
             case EffectType::Compressor: {
-                auto const cols = GetFxCols((EffectType)ids.type);
+                auto const cols = GetFxCols(ids.type);
 
                 do_heading(plugin.processor.compressor, cols.back);
                 auto& b = ids.compressor;
@@ -774,7 +774,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
                 break;
             }
             case EffectType::FilterEffect: {
-                auto const cols = GetFxCols((EffectType)ids.type);
+                auto const cols = GetFxCols(ids.type);
 
                 do_heading(plugin.processor.filter_effect, cols.back);
                 auto& f = ids.filter;
@@ -805,7 +805,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
                 break;
             }
             case EffectType::StereoWiden: {
-                auto const cols = GetFxCols((EffectType)ids.type);
+                auto const cols = GetFxCols(ids.type);
 
                 do_heading(plugin.processor.stereo_widen, cols.back);
                 KnobAndLabel(g,
@@ -815,7 +815,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
                 break;
             }
             case EffectType::Chorus: {
-                auto const cols = GetFxCols((EffectType)ids.type);
+                auto const cols = GetFxCols(ids.type);
 
                 do_heading(plugin.processor.chorus, cols.back);
                 KnobAndLabel(g,
@@ -843,21 +843,21 @@ void DoEffectsWindow(Gui* g, Rect r) {
             }
 
             case EffectType::Reverb: {
-                auto const cols = GetFxCols((EffectType)ids.type);
+                auto const cols = GetFxCols(ids.type);
                 do_heading(plugin.processor.reverb, cols.back);
                 do_all_ids(ids.reverb.ids, k_reverb_params, cols);
                 break;
             }
 
             case EffectType::Phaser: {
-                auto const cols = GetFxCols((EffectType)ids.type);
+                auto const cols = GetFxCols(ids.type);
                 do_heading(plugin.processor.phaser, cols.back);
                 do_all_ids(ids.new_phaser.ids, k_new_phaser_params, cols);
                 break;
             }
 
             case EffectType::NewDelay: {
-                auto const cols = GetFxCols((EffectType)ids.type);
+                auto const cols = GetFxCols(ids.type);
                 do_heading(plugin.processor.new_delay, cols.back);
                 auto const knob_style = knobs::DefaultKnob(cols.highlight);
 
@@ -927,7 +927,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
             }
 
             case EffectType::ConvolutionReverb: {
-                auto const cols = GetFxCols((EffectType)ids.type);
+                auto const cols = GetFxCols(ids.type);
 
                 do_heading(plugin.processor.convo, cols.back);
 

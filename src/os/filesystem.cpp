@@ -13,7 +13,7 @@
 static constexpr ErrorCodeCategory k_fp_error_category {
     .category_id = "FP",
     .message = [](Writer const& writer, ErrorCode e) -> ErrorCodeOr<void> {
-        const auto get_str = [code = e.code]() -> String {
+        auto const get_str = [code = e.code]() -> String {
             switch ((FilesystemError)code) {
                 case FilesystemError::PathDoesNotExist: return "File or folder does not exist";
                 case FilesystemError::TooManyFilesOpen: return "Too many files open";
@@ -338,10 +338,10 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
             if (dir_to_watch.recursive && !native::supports_recursive_watch) {
                 DynamicArray<DirectoryWatcher::WatchedDirectory::Child> children {result.arena};
 
-                const auto try_iterate = [&]() -> ErrorCodeOr<void> {
+                auto const try_iterate = [&]() -> ErrorCodeOr<void> {
                     auto it = TRY(RecursiveDirectoryIterator::Create(scratch_arena, dir_to_watch.path, "*"));
                     while (it.HasMoreFiles()) {
-                        const auto& entry = it.Get();
+                        auto const& entry = it.Get();
 
                         if (entry.type == FileType::Directory) {
                             String subpath = entry.path;
@@ -359,7 +359,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                     return k_success;
                 };
 
-                const auto outcome = try_iterate();
+                auto const outcome = try_iterate();
                 if (outcome.HasError()) return outcome.Error();
 
                 result.children = children.ToOwnedSpan();

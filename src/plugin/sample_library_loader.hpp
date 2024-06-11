@@ -49,24 +49,24 @@ struct RefCounted {
     RefCounted() = default;
     RefCounted(Type& t, Atomic<u32>& r, WorkSignaller* s) : m_data(&t), m_refs(&r), m_work_signaller(s) {}
 
-    inline void Retain() const {
+    void Retain() const {
         if (m_refs) m_refs->FetchAdd(1, MemoryOrder::Relaxed);
     }
-    inline void Release() const {
+    void Release() const {
         if (m_refs) {
             auto prev = m_refs->SubFetch(1, MemoryOrder::Relaxed);
             ASSERT(prev != ~(u32)0);
             if (prev == 0 && m_work_signaller) m_work_signaller->Signal();
         }
     }
-    inline void Assign(RefCounted const& other) {
+    void Assign(RefCounted const& other) {
         Release();
         other.Retain();
         m_data = other.m_data;
         m_refs = other.m_refs;
         m_work_signaller = other.m_work_signaller;
     }
-    inline void ChangeRefCount(RefCountChange t) const {
+    void ChangeRefCount(RefCountChange t) const {
         switch (t) {
             case RefCountChange::Retain: Retain(); break;
             case RefCountChange::Release: Release(); break;

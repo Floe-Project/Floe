@@ -33,7 +33,7 @@ class StereoWiden final : public Effect {
         : Effect(s, EffectType::StereoWiden)
         , m_width_smoother_id(s.CreateSmoother()) {}
 
-    inline StereoAudioFrame
+    StereoAudioFrame
     ProcessFrame(AudioProcessingContext const&, StereoAudioFrame in, u32 frame_index) override {
         return DoStereoWiden(m_smoothed_value_system.Value(m_width_smoother_id, frame_index), in);
     }

@@ -68,13 +68,13 @@ class FilterEffect final : public Effect {
         if (set_params) m_smoothed_value_system.Set(m_filter_coeff_smoother_id, m_filter_params);
     }
 
-    inline StereoAudioFrame
+    StereoAudioFrame
     ProcessFrame(AudioProcessingContext const&, StereoAudioFrame in, u32 frame_index) override {
         auto [coeffs, filter_mix] = m_smoothed_value_system.Value(m_filter_coeff_smoother_id, frame_index);
         return Process(m_filter2, coeffs, Process(m_filter1, coeffs, in * filter_mix));
     }
 
-    inline void ResetInternal() override {
+    void ResetInternal() override {
         m_filter1 = {};
         m_filter2 = {};
     }

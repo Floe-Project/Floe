@@ -48,15 +48,15 @@ struct AtomicRefList {
 
         struct ScopedAccessPtr {
             NON_COPYABLE(ScopedAccessPtr);
-            inline ScopedAccessPtr(Node* retained) : retained_node(retained) {}
-            inline ScopedAccessPtr(ScopedAccessPtr&& other)
+            ScopedAccessPtr(Node* retained) : retained_node(retained) {}
+            ScopedAccessPtr(ScopedAccessPtr&& other)
                 : retained_node(Exchange(other.retained_node, nullptr)) {}
-            inline ~ScopedAccessPtr() {
+            ~ScopedAccessPtr() {
                 if (retained_node) retained_node->Release();
             }
-            inline explicit operator bool() const { return retained_node != nullptr; }
-            inline ValueType* operator->() const { return &retained_node->value; }
-            inline ValueType& operator*() const { return retained_node->value; }
+            explicit operator bool() const { return retained_node != nullptr; }
+            ValueType* operator->() const { return &retained_node->value; }
+            ValueType& operator*() const { return retained_node->value; }
             Node* retained_node;
         };
 

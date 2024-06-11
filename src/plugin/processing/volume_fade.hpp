@@ -21,20 +21,20 @@ struct VolumeFade {
             m_phase_sine_turns = 0;
     }
 
-    inline void ForceSetAsFadeIn(f32 sample_rate, f32 ms_for_fade_in = 0.25f) {
+    void ForceSetAsFadeIn(f32 sample_rate, f32 ms_for_fade_in = 0.25f) {
         m_state = State::FadeIn;
         m_phase_sine_turns = 0;
         auto const samples_for_fade = sample_rate * (ms_for_fade_in / 1000.0f);
         m_increment = 0.25f / samples_for_fade;
     }
 
-    inline void ForceSetFullVolume() {
+    void ForceSetFullVolume() {
         m_state = State::FullVolume;
         m_phase_sine_turns = 0.25f;
         m_increment = 0;
     }
 
-    inline void SetAsFadeIn(f32 sample_rate, f32 ms_for_fade_in = 0.25f) {
+    void SetAsFadeIn(f32 sample_rate, f32 ms_for_fade_in = 0.25f) {
         if (IsFullVolume()) return;
 
         auto const samples_for_fade = sample_rate * (ms_for_fade_in / 1000.0f);
@@ -44,7 +44,7 @@ struct VolumeFade {
         m_state = State::FadeIn;
     }
 
-    inline void SetAsFadeOut(f32 sample_rate, f32 ms_for_fade_out = 10) {
+    void SetAsFadeOut(f32 sample_rate, f32 ms_for_fade_out = 10) {
         if (IsSilent()) return;
 
         auto const samples_for_fade = sample_rate * (ms_for_fade_out / 1000.0f);
@@ -53,12 +53,12 @@ struct VolumeFade {
         m_state = State::FadeOut;
     }
 
-    inline void SetAsFadeOutIfNotAlready(f32 sample_rate, f32 ms_for_fade_out = 10) {
+    void SetAsFadeOutIfNotAlready(f32 sample_rate, f32 ms_for_fade_out = 10) {
         if (m_state == State::FadeOut) return;
         SetAsFadeOut(sample_rate, ms_for_fade_out);
     }
 
-    inline f32 GetFade() {
+    f32 GetFade() {
         switch (m_state) {
             case State::FullVolume: return 1;
             case State::Silent: return 0;
@@ -90,7 +90,7 @@ struct VolumeFade {
         State state_changed;
     };
 
-    inline FadeResult GetFadeAndStateChange() {
+    FadeResult GetFadeAndStateChange() {
         auto const initial_state = m_state;
         FadeResult r;
         r.value = GetFade();
@@ -98,7 +98,7 @@ struct VolumeFade {
         return r;
     }
 
-    inline State JumpMultipleSteps(u32 steps) {
+    State JumpMultipleSteps(u32 steps) {
         if (m_state == State::FullVolume || m_state == State::Silent) return State::NoStateChanged;
 
         m_phase_sine_turns += m_increment * (f32)steps;
@@ -117,11 +117,11 @@ struct VolumeFade {
         return State::NoStateChanged;
     }
 
-    inline bool IsSilent() const { return m_state == State::Silent; }
-    inline bool IsFullVolume() const { return m_state == State::FullVolume; }
-    inline bool IsFadingIn() const { return m_state == State::FadeIn; }
-    inline bool IsFadingOut() const { return m_state == State::FadeOut; }
-    inline State GetCurrentState() const { return m_state; }
+    bool IsSilent() const { return m_state == State::Silent; }
+    bool IsFullVolume() const { return m_state == State::FullVolume; }
+    bool IsFadingIn() const { return m_state == State::FadeIn; }
+    bool IsFadingOut() const { return m_state == State::FadeOut; }
+    State GetCurrentState() const { return m_state; }
 
   private:
     State m_state {State::Silent};

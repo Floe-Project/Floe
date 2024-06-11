@@ -20,7 +20,7 @@ enum DistFunction {
 };
 
 struct DistortionProcessor {
-    inline f32 Saturate(f32 input, DistFunction type, f32 amount_fraction) {
+    f32 Saturate(f32 input, DistFunction type, f32 amount_fraction) {
         f32 output = 0;
 
         auto const input_gain = amount_fraction * 59 + 1;
@@ -86,10 +86,10 @@ struct DistortionProcessor {
         output /= input_gain;
         output *= MapFrom01(amount_fraction, 1, 2);
 
-        return (f32)output;
+        return output;
     }
 
-    static inline f32 Sinc(f32 x) {
+    static f32 Sinc(f32 x) {
         if (x == 0.0f) return 1.0f;
         x *= maths::k_pi<>;
         return Sin(x) / x;
@@ -106,7 +106,7 @@ class Distortion final : public Effect {
         , m_amount_smoother_id(s.CreateSmoother()) {}
 
   private:
-    inline StereoAudioFrame
+    StereoAudioFrame
     ProcessFrame(AudioProcessingContext const&, StereoAudioFrame in, u32 frame_index) override {
         auto const amt = m_smoothed_value_system.Value(m_amount_smoother_id, frame_index);
         StereoAudioFrame out {m_processor_l.Saturate(in.l, m_type, amt),

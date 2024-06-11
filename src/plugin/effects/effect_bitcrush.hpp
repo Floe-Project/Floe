@@ -7,16 +7,16 @@
 #include "smoothed_value_system.hpp"
 
 struct BitCrushProcessor {
-    static inline f32 Round(f32 f) { return (f > 0.0f) ? Floor(f + 0.5f) : Ceil(f - 0.5f); }
+    static f32 Round(f32 f) { return (f > 0.0f) ? Floor(f + 0.5f) : Ceil(f - 0.5f); }
 
-    static inline s64 IntegerPowerBase2(s64 exponent) {
+    static s64 IntegerPowerBase2(s64 exponent) {
         s64 i = 1;
         for (int j = 1; j <= exponent; j++)
             i *= 2;
         return i;
     }
 
-    inline f32 BitCrush(f32 input, f32 sample_rate, int bit_depth, int bit_rate) {
+    f32 BitCrush(f32 input, f32 sample_rate, int bit_depth, int bit_rate) {
         auto resolution = IntegerPowerBase2(bit_depth) - 1;
         auto step = (int)(sample_rate / (f32)bit_rate);
 
@@ -43,7 +43,7 @@ class BitCrush final : public Effect {
     BitCrush(FloeSmoothedValueSystem& s) : Effect(s, EffectType::BitCrush), m_wet_dry(s) {}
 
   private:
-    inline StereoAudioFrame
+    StereoAudioFrame
     ProcessFrame(AudioProcessingContext const& context, StereoAudioFrame in, u32 frame_index) override {
         StereoAudioFrame const wet {
             m_bit_crusher_l.BitCrush(in.l, context.sample_rate, m_bit_depth, m_bit_rate),

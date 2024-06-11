@@ -479,7 +479,7 @@ struct Context {
     //
     // > Misc
     //
-    inline f32 PointsToPixels(f32 points) const { return points * pixels_per_point; }
+    f32 PointsToPixels(f32 points) const { return points * pixels_per_point; }
     void SetPixelsPerPoint(f32 v) { pixels_per_point = v; }
 
     f32x2 WindowPosToScreenPos(f32x2 rel_pos);

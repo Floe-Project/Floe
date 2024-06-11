@@ -67,20 +67,20 @@ struct Vector {
         if (data) GpaFree(data);
     }
 
-    inline bool Empty() const { return size == 0; }
-    inline int Size() const { return size; }
-    inline int Capacity() const { return capacity; }
+    bool Empty() const { return size == 0; }
+    int Size() const { return size; }
+    int Capacity() const { return capacity; }
 
-    inline ValueType& operator[](int i) {
+    ValueType& operator[](int i) {
         ASSERT(i < size);
         return data[i];
     }
-    inline ValueType const& operator[](int i) const {
+    ValueType const& operator[](int i) const {
         ASSERT(i < size);
         return data[i];
     }
 
-    inline void Clear() {
+    void Clear() {
         if (data) {
             size = capacity = 0;
             GpaFree(data);
@@ -89,35 +89,35 @@ struct Vector {
     }
     Iterator begin() { return data; }
     ConstIterator begin() const { return data; }
-    inline Iterator end() { return data + size; }
+    Iterator end() { return data + size; }
     ConstIterator end() const { return data + size; }
-    inline ValueType& Front() {
+    ValueType& Front() {
         ASSERT(size > 0);
         return data[0];
     }
-    inline ValueType const& Front() const {
+    ValueType const& Front() const {
         ASSERT(size > 0);
         return data[0];
     }
-    inline ValueType& Back() {
+    ValueType& Back() {
         ASSERT(size > 0);
         return data[size - 1];
     }
-    inline ValueType const& Back() const {
+    ValueType const& Back() const {
         ASSERT(size > 0);
         return data[size - 1];
     }
 
-    inline int GrowCapacity(int new_size) {
+    int GrowCapacity(int new_size) {
         int const new_capacity = capacity ? (capacity + capacity / 2) : 8;
         return new_capacity > new_size ? new_capacity : new_size;
     }
 
-    inline void Resize(int new_size) {
+    void Resize(int new_size) {
         if (new_size > capacity) Reserve(GrowCapacity(new_size));
         size = new_size;
     }
-    inline void Reserve(int new_capacity) {
+    void Reserve(int new_capacity) {
         if (new_capacity <= capacity) return;
         auto* new_data = (ValueType*)GpaAlloc((usize)new_capacity * sizeof(ValueType));
         if (data) {
@@ -128,11 +128,11 @@ struct Vector {
         capacity = new_capacity;
     }
 
-    inline void PushBack(ValueType const& v) {
+    void PushBack(ValueType const& v) {
         if (size == capacity) Reserve(GrowCapacity(size + 1));
         data[size++] = v;
     }
-    inline void PopBack() {
+    void PopBack() {
         ASSERT(size > 0);
         size--;
     }
@@ -612,16 +612,16 @@ struct DrawList {
                         int num_segments = 0);
 
     // Stateful path API, add points then finish with PathFill() or PathStroke()
-    inline void PathClear() { path.Resize(0); }
-    inline void PathLineTo(f32x2 const& pos) { path.PushBack(pos); }
-    inline void PathLineToMergeDuplicate(f32x2 const& pos) {
+    void PathClear() { path.Resize(0); }
+    void PathLineTo(f32x2 const& pos) { path.PushBack(pos); }
+    void PathLineToMergeDuplicate(f32x2 const& pos) {
         if (path.size == 0 || !MemoryIsEqual(&path[path.size - 1], &pos, 8)) path.PushBack(pos);
     }
-    inline void PathFill(u32 col) {
+    void PathFill(u32 col) {
         AddConvexPolyFilled(path.data, path.size, col, true);
         PathClear();
     }
-    inline void PathStroke(u32 col, bool closed, f32 thickness = 1.0f) {
+    void PathStroke(u32 col, bool closed, f32 thickness = 1.0f) {
         AddPolyline(path.data, path.size, col, closed, thickness, true);
         PathClear();
     }
@@ -674,22 +674,22 @@ struct DrawList {
                     f32x2 const& uv_c,
                     f32x2 const& uv_d,
                     u32 col);
-    inline void PrimWriteVtx(f32x2 const& pos, f32x2 const& uv, u32 col) {
+    void PrimWriteVtx(f32x2 const& pos, f32x2 const& uv, u32 col) {
         vtx_write_ptr->pos = pos;
         vtx_write_ptr->uv = uv;
         vtx_write_ptr->col = col;
         vtx_write_ptr++;
         vtx_current_idx++;
     }
-    inline void PrimWriteIdx(DrawIdx idx) {
+    void PrimWriteIdx(DrawIdx idx) {
         *idx_write_ptr = idx;
         idx_write_ptr++;
     }
-    inline void PrimVtx(f32x2 const& pos, f32x2 const& uv, u32 col) {
+    void PrimVtx(f32x2 const& pos, f32x2 const& uv, u32 col) {
         PrimWriteIdx((DrawIdx)vtx_current_idx);
         PrimWriteVtx(pos, uv, col);
     }
-    inline void PathFillConvex(u32 col) { PathFill(col); }
+    void PathFillConvex(u32 col) { PathFill(col); }
 
     static void ShadeVertsLinearColorGradientSetAlpha(DrawList* draw_list,
                                                       int vert_start_idx,

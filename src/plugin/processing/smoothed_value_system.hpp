@@ -43,19 +43,19 @@ class SmoothedValueSystem {
 
     DoubleId CreateDoubleSmoother() { return m_double_smoothers.CreateSmoother(); }
 
-    inline f32 Value(FloatId smoother, u32 frame_index) const {
+    f32 Value(FloatId smoother, u32 frame_index) const {
         return m_float_smoothers.Value(m_num_valid_frames, smoother, frame_index);
     }
 
-    inline f64 Value(DoubleId smoother, u32 frame_index) const {
+    f64 Value(DoubleId smoother, u32 frame_index) const {
         return m_double_smoothers.Value(m_num_valid_frames, smoother, frame_index);
     }
 
-    inline bool IsSmoothing(FloatId smoother, u32 frame_index) const {
+    bool IsSmoothing(FloatId smoother, u32 frame_index) const {
         return m_float_smoothers.IsSmoothing(smoother, frame_index);
     }
 
-    inline rbj_filter::SmoothedCoefficients::State Value(FilterId smoother, u32 frame_index) const {
+    rbj_filter::SmoothedCoefficients::State Value(FilterId smoother, u32 frame_index) const {
         ASSERT(frame_index < m_num_valid_frames);
 
         if (m_processed_filter_this_frame[u16(smoother)])
@@ -64,11 +64,11 @@ class SmoothedValueSystem {
             return {m_smoothed_filters[u16(smoother)].Coeffs(), 1};
     }
 
-    inline f32* AllValues(FloatId smoother) {
+    f32* AllValues(FloatId smoother) {
         return m_float_smoothers.AllValues(m_num_valid_frames, smoother);
     }
 
-    inline f32 TargetValue(FloatId smoother) const { return m_float_smoothers.TargetValue(smoother); }
+    f32 TargetValue(FloatId smoother) const { return m_float_smoothers.TargetValue(smoother); }
 
     void SetVariableLength(FloatId smoother,
                            f32 value,
@@ -186,7 +186,7 @@ class SmoothedValueSystem {
                 n = 0;
         }
 
-        inline Type Value(u32 block_size, IdType smoother, u32 frame_index) const {
+        Type Value(u32 block_size, IdType smoother, u32 frame_index) const {
             ASSERT(frame_index < block_size);
 
             if (frame_index < num_frames_smoothed_this_block[u16(smoother)])
@@ -195,11 +195,11 @@ class SmoothedValueSystem {
                 return smoothed_values[u16(smoother)].target;
         }
 
-        inline bool IsSmoothing(IdType smoother, u32 frame_index) const {
+        bool IsSmoothing(IdType smoother, u32 frame_index) const {
             return frame_index < num_frames_smoothed_this_block[u16(smoother)];
         }
 
-        inline Type* AllValues(u32 block_size, IdType smoother) {
+        Type* AllValues(u32 block_size, IdType smoother) {
             auto const result_buffer_offset = u16(smoother) * block_size;
 
             if (num_frames_smoothed_this_block[u16(smoother)] < block_size) {
@@ -214,9 +214,9 @@ class SmoothedValueSystem {
             return result_buffer.data + result_buffer_offset;
         }
 
-        inline Type TargetValue(IdType smoother) const { return smoothed_values[u16(smoother)].target; }
+        Type TargetValue(IdType smoother) const { return smoothed_values[u16(smoother)].target; }
 
-        inline void ProcessBlock(u32 block_size) {
+        void ProcessBlock(u32 block_size) {
             if (!num_smoothers) return;
 
             for (auto& n : num_frames_smoothed_this_block.Items().SubSpan(0, num_smoothers))

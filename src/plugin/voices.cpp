@@ -436,7 +436,7 @@ class ChunkwiseVoiceProcessor {
         m_voice.filters = m_filters;
     }
 
-    inline bool Process(u32 num_frames) {
+    bool Process(u32 num_frames) {
         u32 samples_written = 0;
         Span<f32> write_buffer = m_voice.pool.buffer_pool[m_voice.index];
 
@@ -515,7 +515,7 @@ class ChunkwiseVoiceProcessor {
     }
 
   private:
-    inline void CheckSamplesAreValid([[maybe_unused]] usize buffer_pos, [[maybe_unused]] u32 num) {
+    void CheckSamplesAreValid([[maybe_unused]] usize buffer_pos, [[maybe_unused]] u32 num) {
 #if FLOE_DEBUG
         for (usize i = buffer_pos; i < buffer_pos + (usize)num; ++i) {
             auto const s = m_buffer[i];
@@ -524,26 +524,26 @@ class ChunkwiseVoiceProcessor {
 #endif
     }
 
-    inline void UpdateLastValidFrame(u32 chunk_size) {
+    void UpdateLastValidFrame(u32 chunk_size) {
         m_last_frame_in_odd_num_frames = GetLastFrameInOddNumFrames(chunk_size);
     }
 
-    inline bool HasPitchLfo() const {
+    bool HasPitchLfo() const {
         return m_voice.controller->lfo.on &&
                m_voice.controller->lfo.dest == param_values::LfoDestination::Pitch;
     }
 
-    inline bool HasPanLfo() const {
+    bool HasPanLfo() const {
         return m_voice.controller->lfo.on &&
                m_voice.controller->lfo.dest == param_values::LfoDestination::Pan;
     }
 
-    inline bool HasFilterLfo() const {
+    bool HasFilterLfo() const {
         return m_voice.controller->lfo.on &&
                m_voice.controller->lfo.dest == param_values::LfoDestination::Filter;
     }
 
-    inline bool HasVolumeLfo() const {
+    bool HasVolumeLfo() const {
         return m_voice.controller->lfo.on &&
                m_voice.controller->lfo.dest == param_values::LfoDestination::Volume;
     }
@@ -552,7 +552,7 @@ class ChunkwiseVoiceProcessor {
         return ((num_frames % 2) != 0) ? (num_frames - 1) : UINT32_MAX;
     }
 
-    inline void MultiplyVectorToBufferAtPos(usize const pos, f32x4 const& gain) {
+    void MultiplyVectorToBufferAtPos(usize const pos, f32x4 const& gain) {
         ASSERT(pos + 4 <= m_buffer.size);
         auto p = LoadUnalignedToType<f32x4>(&m_buffer[pos]);
         p *= gain;
@@ -560,7 +560,7 @@ class ChunkwiseVoiceProcessor {
         CheckSamplesAreValid(pos, 4);
     }
 
-    inline void AddVectorToBufferAtPos(usize const pos, f32x4 const& addition) {
+    void AddVectorToBufferAtPos(usize const pos, f32x4 const& addition) {
         ASSERT(pos + 4 <= m_buffer.size);
         f32x4 p;
         p = LoadUnalignedToType<f32x4>(&m_buffer[pos]);
@@ -569,13 +569,13 @@ class ChunkwiseVoiceProcessor {
         CheckSamplesAreValid(pos, 4);
     }
 
-    inline void CopyVectorToBufferAtPos(usize const pos, f32x4 const& data) {
+    void CopyVectorToBufferAtPos(usize const pos, f32x4 const& data) {
         ASSERT(pos + 4 <= m_buffer.size);
         StoreToUnaligned(&m_buffer[pos], data);
         CheckSamplesAreValid(pos, 4);
     }
 
-    inline f64 GetPitchRatio(VoiceSample& w, u32 frame) {
+    f64 GetPitchRatio(VoiceSample& w, u32 frame) {
         auto pitch_ratio = m_voice.smoothing_system.Value(w.pitch_ratio_smoother_id, frame);
         if (HasPitchLfo()) {
             static constexpr f64 k_max_semitones = 1;
@@ -587,7 +587,7 @@ class ChunkwiseVoiceProcessor {
         return pitch_ratio;
     }
 
-    inline bool SampleGetAndInc(VoiceSample& w, u32 frame, f32& out_l, f32& out_r) {
+    bool SampleGetAndInc(VoiceSample& w, u32 frame, f32& out_l, f32& out_r) {
         SampleGetData(*w.sampler.data, w.sampler.loop, w.sampler.loop_and_reverse_flags, w.pos, out_l, out_r);
         auto const pitch_ratio = GetPitchRatio(w, frame);
         return IncrementSamplePlaybackPos(w.sampler.loop,
@@ -597,7 +597,7 @@ class ChunkwiseVoiceProcessor {
                                           (f64)w.sampler.data->num_frames);
     }
 
-    inline bool SampleGetAndIncWithXFade(VoiceSample& w, u32 frame, f32& out_l, f32& out_r) {
+    bool SampleGetAndIncWithXFade(VoiceSample& w, u32 frame, f32& out_l, f32& out_r) {
         bool sample_still_going = false;
         if (w.sampler.region->options.timbre_crossfade_region) {
             if (auto const v = m_voice.smoothing_system.Value(w.sampler.xfade_vol_smoother_id, frame);
@@ -619,7 +619,7 @@ class ChunkwiseVoiceProcessor {
         return sample_still_going;
     }
 
-    inline bool AddSampleDataOntoBuffer(VoiceSample& w, u32 num_frames) {
+    bool AddSampleDataOntoBuffer(VoiceSample& w, u32 num_frames) {
         usize sample_pos = 0;
         for (u32 frame = 0; frame < num_frames; frame += 2) {
             f32 sl1 {};
@@ -644,7 +644,7 @@ class ChunkwiseVoiceProcessor {
         return true;
     }
 
-    inline void ConvertRandomNumsToWhiteNoiseInBuffer(u32 num_frames) {
+    void ConvertRandomNumsToWhiteNoiseInBuffer(u32 num_frames) {
         usize sample_pos = 0;
         f32x4 const randon_num_to_01_scale = 1.0f / (f32)0x7FFF;
         f32x4 const scale = 0.5f * 0.2f;
@@ -657,7 +657,7 @@ class ChunkwiseVoiceProcessor {
         }
     }
 
-    inline void FillBufferWithMonoWhiteNoise(u32 num_frames) {
+    void FillBufferWithMonoWhiteNoise(u32 num_frames) {
         usize sample_pos = 0;
         for (u32 frame = 0; frame < num_frames; frame++) {
             auto const rand = (f32)FastRand(m_voice.pool.random_seed);
@@ -668,7 +668,7 @@ class ChunkwiseVoiceProcessor {
         ConvertRandomNumsToWhiteNoiseInBuffer(num_frames);
     }
 
-    inline void FillBufferWithStereoWhiteNoise(u32 num_frames) {
+    void FillBufferWithStereoWhiteNoise(u32 num_frames) {
         auto const num_samples = num_frames * 2;
         for (auto const sample_pos : Range(num_samples))
             m_buffer[sample_pos] = (f32)FastRand(m_voice.pool.random_seed);
@@ -684,7 +684,7 @@ class ChunkwiseVoiceProcessor {
         }
     }
 
-    inline void FillBufferWithSampleData(u32 num_frames) {
+    void FillBufferWithSampleData(u32 num_frames) {
         ZeroChunkBuffer(num_frames);
         for (auto& s : m_voice.voice_samples) {
             if (!s.is_active) continue;
@@ -756,7 +756,7 @@ class ChunkwiseVoiceProcessor {
         }
     }
 
-    inline void ApplyVolumeLFO(u32 num_frames) {
+    void ApplyVolumeLFO(u32 num_frames) {
         usize sample_pos = 0;
         f32 v1 = 1;
         if (HasVolumeLfo()) {
@@ -781,7 +781,7 @@ class ChunkwiseVoiceProcessor {
         m_voice.current_gain *= v1;
     }
 
-    inline u32 ApplyVolumeEnvelope(u32 num_frames) {
+    u32 ApplyVolumeEnvelope(u32 num_frames) {
         auto vol_env = m_voice.vol_env;
         auto env_on = m_voice.controller->vol_env_on;
         auto vol_env_params = m_voice.controller->vol_env;
@@ -807,7 +807,7 @@ class ChunkwiseVoiceProcessor {
         return num_frames;
     }
 
-    inline u32 ApplyGain(u32 num_frames) {
+    u32 ApplyGain(u32 num_frames) {
         usize sample_pos = 0;
         f32 fade1 {};
         for (u32 frame = 0; frame < num_frames; frame += 2) {
@@ -828,7 +828,7 @@ class ChunkwiseVoiceProcessor {
         return num_frames;
     }
 
-    inline void ApplyPan(u32 num_frames) {
+    void ApplyPan(u32 num_frames) {
         usize sample_pos = 0;
         for (auto const frame : Range(num_frames)) {
             auto pan_pos = m_voice.controller->smoothing_system.Value(m_voice.controller->pan_pos_smoother_id,
@@ -849,7 +849,7 @@ class ChunkwiseVoiceProcessor {
         }
     }
 
-    inline void ApplyFilter(u32 num_frames) {
+    void ApplyFilter(u32 num_frames) {
         auto const filter_type = m_voice.controller->filter_type;
 
         auto fil_env = m_voice.fil_env;
@@ -911,7 +911,7 @@ class ChunkwiseVoiceProcessor {
         }
     }
 
-    inline void FillLFOBuffer(u32 num_frames) {
+    void FillLFOBuffer(u32 num_frames) {
         for (auto const i : Range(num_frames)) {
             auto v = m_voice.lfo.Tick();
             constexpr f32 k_lfo_lowpass_smoothing = 0.9f;
@@ -920,7 +920,7 @@ class ChunkwiseVoiceProcessor {
         }
     }
 
-    inline void ZeroChunkBuffer(u32 num_frames) {
+    void ZeroChunkBuffer(u32 num_frames) {
         auto num_samples = num_frames * 2;
         num_samples += num_samples % 2;
         SimdZeroAlignedBuffer(m_buffer.data, (usize)num_samples);

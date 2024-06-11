@@ -18,24 +18,24 @@ struct Params {
         return Exp(-Log(one_plus_target_ratio / target_ratio) / num_samples);
     }
 
-    inline void SetAttackSamples(f32 num_samples, f32 target_ratio) {
+    void SetAttackSamples(f32 num_samples, f32 target_ratio) {
         auto const one_plus_target_ratio = target_ratio + 1.0f;
         attack_coef = CalcCoeff(num_samples, one_plus_target_ratio, target_ratio);
         attack_base = one_plus_target_ratio * (1.0f - attack_coef);
     }
 
-    inline void SetDecaySamples(f32 num_samples, f32 target_ratio) {
+    void SetDecaySamples(f32 num_samples, f32 target_ratio) {
         decay_coef = CalcCoeff(num_samples, 1 + target_ratio, target_ratio);
         decay_base = (sustain_amount - target_ratio) * (1.0f - decay_coef);
         decay_target_ratio = target_ratio;
     }
 
-    inline void SetReleaseSamples(f32 num_samples, f32 target_ratio) {
+    void SetReleaseSamples(f32 num_samples, f32 target_ratio) {
         release_coef = CalcCoeff(num_samples, 1 + target_ratio, target_ratio);
         release_base = -target_ratio * (1.0f - release_coef);
     }
 
-    inline void SetSustainAmp(f32 volume_amp) {
+    void SetSustainAmp(f32 volume_amp) {
         sustain_amount = volume_amp;
         decay_base = (sustain_amount - decay_target_ratio) * (1.0f - decay_coef);
     }
@@ -53,28 +53,28 @@ struct Params {
 enum class State { Idle, Attack, Decay, Sustain, Release };
 
 struct Processor {
-    inline void Gate(bool set_to_active) {
+    void Gate(bool set_to_active) {
         if (set_to_active)
             state = State::Attack;
         else if (state != State::Idle)
             state = State::Release;
     }
 
-    inline void Reset() {
+    void Reset() {
         state = State::Idle;
         output = 0.0f;
         prev_output = 0;
     }
 
     // TODO: don't smooth here
-    inline f32 SmoothOutput() {
+    f32 SmoothOutput() {
         static constexpr f32 k_smoothing_amount = 0.10f;
         f32 const result = prev_output + k_smoothing_amount * (output - prev_output);
         prev_output = result;
         return result;
     }
 
-    inline f32 Process(Params const& params) {
+    f32 Process(Params const& params) {
         switch (state) {
             case State::Idle: break;
             case State::Attack: {
@@ -107,7 +107,7 @@ struct Processor {
         return Clamp(SmoothOutput(), 0.0f, 1.0f);
     }
 
-    inline bool IsIdle() { return state == State::Idle; }
+    bool IsIdle() { return state == State::Idle; }
 
     f32 prev_output = 0;
     f32 output = 0;

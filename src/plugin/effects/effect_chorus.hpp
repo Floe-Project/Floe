@@ -33,7 +33,7 @@ struct ChorusProcessor {
         Reset();
     }
 
-    inline StereoAudioFrame Process(StereoAudioFrame in,
+    StereoAudioFrame Process(StereoAudioFrame in,
                                     f32 depth01,
                                     rbj_filter::Coeffs const& lowpass_coeffs,
                                     rbj_filter::Coeffs const& highpass_coeffs) {
@@ -133,7 +133,7 @@ class Chorus final : public Effect {
             m_wet_dry.SetDry(m_smoothed_value_system, p->ProjectedValue());
     }
 
-    inline StereoAudioFrame
+    StereoAudioFrame
     ProcessFrame(AudioProcessingContext const&, StereoAudioFrame in, u32 frame_index) override {
         auto const depth = m_smoothed_value_system.Value(m_depth_01_smoother_id, frame_index);
         auto [highpass_coeffs, filter_mix] =

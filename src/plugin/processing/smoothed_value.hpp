@@ -17,7 +17,7 @@ class SmoothedValueFilter {
     f32 GetUnsmoothedValue() const { return m_value; }
     void SetPreviousValue(f32 v) { m_prev = v; }
 
-    inline f32 Get01Value(f32 const cutoff01 = k_default_cutoff) {
+    f32 Get01Value(f32 const cutoff01 = k_default_cutoff) {
         auto local_value_instance = m_value;
         auto result = m_prev;
         m_prev = m_prev + cutoff01 * (local_value_instance - m_prev);
@@ -25,7 +25,7 @@ class SmoothedValueFilter {
         return result;
     }
 
-    inline f32 GetValue(f32 const cutoff01 = k_default_cutoff) {
+    f32 GetValue(f32 const cutoff01 = k_default_cutoff) {
         f32 const result = m_prev + cutoff01 * (m_value - m_prev);
         m_prev = result;
         return result;

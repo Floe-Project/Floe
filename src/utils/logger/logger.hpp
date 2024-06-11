@@ -50,85 +50,85 @@ struct Logger {
 
     void TraceLn(String message = {}, SourceLocation loc = SourceLocation::Current());
 
-    inline void Debug(String str) {
+    void Debug(String str) {
         if (LogLevel::Debug < max_level_allowed) return;
         LogFunction(str, LogLevel::Info, false);
     }
-    inline void Info(String str) {
+    void Info(String str) {
         if (LogLevel::Info < max_level_allowed) return;
         LogFunction(str, LogLevel::Info, false);
     }
-    inline void Warning(String str) {
+    void Warning(String str) {
         if (LogLevel::Warning < max_level_allowed) return;
         LogFunction(str, LogLevel::Info, false);
     }
-    inline void Error(String str) {
+    void Error(String str) {
         if (LogLevel::Error < max_level_allowed) return;
         LogFunction(str, LogLevel::Info, false);
     }
 
-    inline void DebugLn(String str) {
+    void DebugLn(String str) {
         if (LogLevel::Debug < max_level_allowed) return;
         LogFunction(str, LogLevel::Info, true);
     }
-    inline void InfoLn(String str) {
+    void InfoLn(String str) {
         if (LogLevel::Info < max_level_allowed) return;
         LogFunction(str, LogLevel::Info, true);
     }
-    inline void WarningLn(String str) {
+    void WarningLn(String str) {
         if (LogLevel::Warning < max_level_allowed) return;
         LogFunction(str, LogLevel::Info, true);
     }
-    inline void ErrorLn(String str) {
+    void ErrorLn(String str) {
         if (LogLevel::Error < max_level_allowed) return;
         LogFunction(str, LogLevel::Info, true);
     }
 
     template <typename... Args>
-    inline void DebugLn(String format, Args const&... args) {
+    void DebugLn(String format, Args const&... args) {
         if (LogLevel::Debug < max_level_allowed) return;
         LogAllocator log_allocator;
         LogFunction(fmt::Format(log_allocator, format, args...), LogLevel::Debug, true);
     }
     template <typename... Args>
-    inline void InfoLn(String format, Args const&... args) {
+    void InfoLn(String format, Args const&... args) {
         if (LogLevel::Info < max_level_allowed) return;
         LogAllocator log_allocator;
         LogFunction(fmt::Format(log_allocator, format, args...), LogLevel::Info, true);
     }
     template <typename... Args>
-    inline void ErrorLn(String format, Args const&... args) {
+    void ErrorLn(String format, Args const&... args) {
         if (LogLevel::Error < max_level_allowed) return;
         LogAllocator log_allocator;
         LogFunction(fmt::Format(log_allocator, format, args...), LogLevel::Error, true);
     }
     template <typename... Args>
-    inline void WarningLn(String format, Args const&... args) {
+    void WarningLn(String format, Args const&... args) {
         if (LogLevel::Warning < max_level_allowed) return;
         LogAllocator log_allocator;
         LogFunction(fmt::Format(log_allocator, format, args...), LogLevel::Warning, true);
     }
 
     template <typename... Args>
-    inline void Debug(String format, Args const&... args) {
+    void Debug(String format, Args const&... args) {
         if (LogLevel::Debug < max_level_allowed) return;
         LogAllocator log_allocator;
         LogFunction(fmt::Format(log_allocator, format, args...), LogLevel::Debug, false);
     }
     template <typename... Args>
-    inline void Info(String format, Args const&... args) {
+    void Info(String format, Args const&... args) {
         if (LogLevel::Info < max_level_allowed) return;
         LogAllocator log_allocator;
         LogFunction(fmt::Format(log_allocator, format, args...), LogLevel::Info, false);
     }
     template <typename... Args>
-    inline void Error(String format, Args const&... args) {
+    void Error(String format, Args const&... args) {
         if (LogLevel::Error < max_level_allowed) return;
         LogAllocator log_allocator;
         LogFunction(fmt::Format(log_allocator, format, args...), LogLevel::Error, false);
     }
     template <typename... Args>
-    inline void Warning(String format, Args const&... args) {
+    void Warning(String format, Args const&... args) {
         if (LogLevel::Warning < max_level_allowed) return;
         LogAllocator log_allocator;
         LogFunction(fmt::Format(log_allocator, format, args...), LogLevel::Warning, false);

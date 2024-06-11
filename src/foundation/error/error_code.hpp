@@ -146,36 +146,36 @@ class [[nodiscard]] ErrorCodeOr {
 
     ~ErrorCodeOr() { Clear(); }
 
-    inline bool HasValue() const { return m_storage_type == StorageType::Value; }
-    inline bool HasError() const { return m_storage_type == StorageType::Error; }
-    inline bool Uninitialised() const { return m_storage_type == StorageType::Uninit; }
+    bool HasValue() const { return m_storage_type == StorageType::Value; }
+    bool HasError() const { return m_storage_type == StorageType::Error; }
+    bool Uninitialised() const { return m_storage_type == StorageType::Uninit; }
 
-    inline Type& Value() {
+    Type& Value() {
         ASSERT(HasValue());
         return *(Type*)m_storage;
     }
-    inline Type const& Value() const {
+    Type const& Value() const {
         ASSERT(HasValue());
         return *(Type const*)m_storage;
     }
-    inline Type ValueOr(Type fallback) {
+    Type ValueOr(Type fallback) {
         if (HasValue()) return Value();
         return fallback;
     }
-    inline Type OrElse(auto&& function) {
+    Type OrElse(auto&& function) {
         if (HasValue()) return Value();
         return function(Error());
     }
-    inline Type ReleaseValueOr(Type fallback) {
+    Type ReleaseValueOr(Type fallback) {
         if (HasValue()) return ReleaseValue();
         return Move(fallback);
     }
 
-    inline ErrorCode& Error() {
+    ErrorCode& Error() {
         ASSERT(HasError());
         return *(::ErrorCode*)m_storage;
     }
-    inline ErrorCode const& Error() const {
+    ErrorCode const& Error() const {
         ASSERT(HasError());
         return *(ErrorCode const*)m_storage;
     }
@@ -249,7 +249,7 @@ struct ErrorCodeCategory {
 struct ErrorCodeRelocateTryHelpers {
     TRY_HELPER_INHERIT(IsError, TryHelpers)
     TRY_HELPER_INHERIT(ExtractValue, TryHelpers)
-    static inline ErrorCode ExtractError(auto const& o, SourceLocation loc = SourceLocation::Current()) {
+    static ErrorCode ExtractError(auto const& o, SourceLocation loc = SourceLocation::Current()) {
         auto e = o.Error();
         e.source_location = loc;
         return e;

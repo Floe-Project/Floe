@@ -238,7 +238,7 @@ PUBLIC constexpr u64 IrFileHash(mdata::FileInfo const& ir_file) {
 }
 
 PUBLIC String StringFromStringPool(char const* string_pool_block, mdata::StringInPool s) {
-    auto start = (char const*)string_pool_block + s.offset;
+    auto start = string_pool_block + s.offset;
     return String(start, s.size);
 }
 

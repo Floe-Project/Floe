@@ -8,7 +8,7 @@
 #include "volume_fade.hpp"
 
 struct OnePoleLowPassFilter {
-    inline f32 LowPass(f32 const input, f32 const cutoff01) {
+    f32 LowPass(f32 const input, f32 const cutoff01) {
         f32 const output = m_prev_output + cutoff01 * (input - m_prev_output);
         m_prev_output = output;
         return output;
@@ -317,7 +317,7 @@ class SmoothedCoefficients {
         RecalculateCoefficientsWithCurrentValues();
     }
 
-    inline State Value() {
+    State Value() {
         PerformSmoothingStepIfNeeded();
         auto fade = m_fade.GetFade();
         if (m_fade.IsSilent()) {
@@ -332,16 +332,16 @@ class SmoothedCoefficients {
         return {m_coeffs, fade};
     }
 
-    inline rbj_filter::Coeffs Coeffs() const { return m_coeffs; }
+    rbj_filter::Coeffs Coeffs() const { return m_coeffs; }
 
-    inline bool NeedsUpdate() const {
+    bool NeedsUpdate() const {
         if (m_remaining_samples) return true;
         if (m_fade.GetCurrentState() != VolumeFade::State::FullVolume) return true;
         return false;
     }
 
   private:
-    inline void PerformSmoothingStepIfNeeded() {
+    void PerformSmoothingStepIfNeeded() {
         if (m_remaining_samples) {
             m_coeffs = Coefficients({.type = m_type,
                                      .fs = m_sample_rate,
@@ -353,7 +353,7 @@ class SmoothedCoefficients {
         }
     }
 
-    inline void RecalculateCoefficientsWithCurrentValues() {
+    void RecalculateCoefficientsWithCurrentValues() {
         m_coeffs = Coefficients({.type = m_type,
                                  .fs = m_sample_rate,
                                  .fc = m_fc.current,
@@ -367,7 +367,7 @@ class SmoothedCoefficients {
             current = v;
         }
 
-        inline f32 Get(int remaining_samples) {
+        f32 Get(int remaining_samples) {
             current += (target - current) / (f32)remaining_samples;
             return current;
         }
@@ -432,7 +432,7 @@ inline f32 SkewResonance(f32 percent) {
 }
 
 struct CachedHelpers {
-    inline void Update(f32 sample_rate, f32 cutoff, f32 res, f32 shelf_gain = 2.0f) {
+    void Update(f32 sample_rate, f32 cutoff, f32 res, f32 shelf_gain = 2.0f) {
         auto const q = ResonanceToQ(res);
 
         auto calculate_g_coeff = [](f32 sample_rate, f32 cutoff) {

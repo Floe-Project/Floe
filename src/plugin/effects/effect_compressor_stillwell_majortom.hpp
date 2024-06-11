@@ -13,7 +13,7 @@ class Compressor final : public Effect {
     Compressor(FloeSmoothedValueSystem& s) : Effect(s, EffectType::Compressor) {}
 
   private:
-    inline StereoAudioFrame
+    StereoAudioFrame
     ProcessFrame(AudioProcessingContext const& context, StereoAudioFrame in, u32 frame_index) override {
         (void)frame_index;
         StereoAudioFrame out;

@@ -19,7 +19,7 @@
 struct EqBand {
     EqBand(FloeSmoothedValueSystem& s) : eq_coeffs_smoother_id(s.CreateFilterSmoother()) {}
 
-    inline StereoAudioFrame Process(FloeSmoothedValueSystem& s, StereoAudioFrame in, u32 frame_index) {
+    StereoAudioFrame Process(FloeSmoothedValueSystem& s, StereoAudioFrame in, u32 frame_index) {
         auto [coeffs, mix] = s.Value(eq_coeffs_smoother_id, frame_index);
         return rbj_filter::Process(eq_data, coeffs, in * mix);
     }
@@ -90,7 +90,7 @@ struct EqBands {
 
     void SetOn(FloeSmoothedValueSystem& s, bool on) { s.Set(eq_mix_smoother_id, on ? 1.0f : 0.0f, 4); }
 
-    inline StereoAudioFrame Process(FloeSmoothedValueSystem& s, StereoAudioFrame in, u32 frame_index) {
+    StereoAudioFrame Process(FloeSmoothedValueSystem& s, StereoAudioFrame in, u32 frame_index) {
         StereoAudioFrame result = in;
         if (auto mix = s.Value(eq_mix_smoother_id, frame_index); mix != 0) {
             for (auto& eq_band : eq_bands)

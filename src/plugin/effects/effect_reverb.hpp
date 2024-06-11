@@ -11,7 +11,7 @@ class Reverb final : public Effect {
     Reverb(FloeSmoothedValueSystem& s) : Effect(s, EffectType::Reverb), reverb(vitfx::reverb::Create()) {}
     ~Reverb() override { vitfx::reverb::Destroy(reverb); }
 
-    inline void ResetInternal() override { vitfx::reverb::HardReset(*reverb); }
+    void ResetInternal() override { vitfx::reverb::HardReset(*reverb); }
 
     virtual void PrepareToPlay(AudioProcessingContext const& context) override {
         vitfx::reverb::SetSampleRate(*reverb, (int)context.sample_rate);

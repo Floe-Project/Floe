@@ -11,7 +11,7 @@ class Phaser final : public Effect {
     Phaser(FloeSmoothedValueSystem& s) : Effect(s, EffectType::Phaser), phaser(vitfx::phaser::Create()) {}
     ~Phaser() override { vitfx::phaser::Destroy(phaser); }
 
-    inline void ResetInternal() override { vitfx::phaser::HardReset(*phaser); }
+    void ResetInternal() override { vitfx::phaser::HardReset(*phaser); }
 
     virtual void PrepareToPlay(AudioProcessingContext const& context) override {
         vitfx::phaser::SetSampleRate(*phaser, (int)context.sample_rate);

@@ -294,7 +294,7 @@ PUBLIC ErrorCodeOr<void> ValueToString(Writer writer, T const& value, FormatOpti
             if (file.size) {
                 constexpr auto k_find_last_slash = [](String str) {
                     for (usize i = str.size - 1; i != usize(-1); --i) {
-                        const auto c = str[i];
+                        auto const c = str[i];
                         if constexpr (IS_WINDOWS) {
                             if (c == '\\' || c == '/') return i;
                         } else if (c == '/') {

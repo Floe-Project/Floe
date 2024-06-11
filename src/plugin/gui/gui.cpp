@@ -139,7 +139,7 @@ ImagePixelsFromLibrary(Gui* g, sample_lib::Library const& lib, LibraryImageType 
 graphics::ImageID CopyPixelsToGpuLoadedImage(Gui* g, ImagePixelsRgba const& px) {
     ASSERT(px.data);
     auto const id = ({
-        const auto outcome = g->gui_platform.graphics_ctx->CreateImageID(px.data, px.size, 4);
+        auto const outcome = g->gui_platform.graphics_ctx->CreateImageID(px.data, px.size, 4);
         if (outcome.HasError()) {
             g->logger.ErrorLn("Failed to create a texture (size {}x{}): {}",
                               px.size.width,
@@ -209,8 +209,8 @@ static void BoxBlur(u8 const* in, u8* out, int width, int height, int radius) {
                     SimdWrite4Bytes(avg / box_width, write_ptr);
                     write_ptr += k_channels;
 
-                    const auto lhs_ptr = row_start_read_ptr + Max(col_bytes - radius_bytes_left, 0);
-                    const auto rhs_ptr =
+                    auto const lhs_ptr = row_start_read_ptr + Max(col_bytes - radius_bytes_left, 0);
+                    auto const rhs_ptr =
                         row_start_read_ptr + Min(col_bytes + radius_bytes_right, max_col_bytes);
                     avg += SimdRead4Bytes(rhs_ptr) - SimdRead4Bytes(lhs_ptr);
                 }
@@ -256,8 +256,8 @@ static void BoxBlur(u8 const* in, u8* out, int width, int height, int radius) {
 
                     int const top_row_index = Max(row - radius, 0);
                     int const bot_row_index = Min(row + radius_p1, max_row_index);
-                    const auto lhs_ptr = col_start_read_ptr + (top_row_index * width_bytes);
-                    const auto rhs_ptr = col_start_read_ptr + (bot_row_index * width_bytes);
+                    auto const lhs_ptr = col_start_read_ptr + (top_row_index * width_bytes);
+                    auto const rhs_ptr = col_start_read_ptr + (bot_row_index * width_bytes);
                     avg += SimdRead4Bytes(rhs_ptr) - SimdRead4Bytes(lhs_ptr);
                 }
             };
@@ -310,7 +310,7 @@ LibraryImages LoadLibraryBackgroundAndIconIfNeeded(Gui* g, sample_lib::Library c
         ImagePixelsRgba const bg_pixels = ({
             Optional<ImagePixelsRgba> opt {};
             if (FLOE_EDITOR_ENABLED && g_background_filepath[0]) {
-                const auto path = FromNullTerminated(g_background_filepath);
+                auto const path = FromNullTerminated(g_background_filepath);
                 auto o = DecodeImageFromFile(path);
                 if (o.HasError()) {
                     imgs.background_missing = true;
@@ -385,8 +385,7 @@ LibraryImages LoadLibraryBackgroundAndIconIfNeeded(Gui* g, sample_lib::Library c
                 blur_img_size = {(u16)(window_size.x * downscale_factor),
                                  (u16)(window_size.y * downscale_factor)};
                 blurred_image_num_bytes = (usize)(blur_img_size.width * blur_img_size.height * k_channels);
-                blurred_image_buffer =
-                    arena.AllocateBytesForTypeOversizeAllowed<u8>((usize)blurred_image_num_bytes);
+                blurred_image_buffer = arena.AllocateBytesForTypeOversizeAllowed<u8>(blurred_image_num_bytes);
 
                 stbir_resize_uint8(background_rgba,
                                    (int)background_size.width,
@@ -694,10 +693,10 @@ Gui::Gui(GuiPlatform& platform, PluginInstance& plugin)
     m_window_size_listener_id =
         plugin.shared_data.settings.tracking.window_size_change_listeners.Add([this]() {
             gui_platform.SetGUIDirty();
-            const auto& host = this->plugin.host;
-            const auto host_gui = (const clap_host_gui*)host.get_extension(&host, CLAP_EXT_GUI);
+            auto const& host = this->plugin.host;
+            auto const host_gui = (clap_host_gui const*)host.get_extension(&host, CLAP_EXT_GUI);
             if (host_gui) {
-                const auto size = gui_settings::WindowSize(this->plugin.shared_data.settings.settings.gui);
+                auto const size = gui_settings::WindowSize(this->plugin.shared_data.settings.settings.gui);
                 host_gui->resize_hints_changed(&host);
                 host_gui->request_resize(&host, size.width, size.height);
             }
@@ -760,15 +759,15 @@ void GUIUpdate(Gui* g) {
 
     auto draw_top_window = [](IMGUI_DRAW_WINDOW_BG_ARGS) {
         auto r = window->unpadded_bounds;
-        const auto top = GMC(TopPanelBackTop);
-        const auto bot = GMC(TopPanelBackBot);
+        auto const top = GMC(TopPanelBackTop);
+        auto const bot = GMC(TopPanelBackBot);
         s.graphics->AddRectFilledMultiColor(r.Min(), r.Max(), top, top, bot, bot);
     };
     auto draw_mid_window = [&](IMGUI_DRAW_WINDOW_BG_ARGS) {
         bool has_image_bg = false;
         auto r = window->unpadded_bounds;
 
-        const auto first_lib_name = g->plugin.layers[0].LibName();
+        auto const first_lib_name = g->plugin.layers[0].LibName();
         if (first_lib_name) {
             auto background_lib = g->plugin.shared_data.available_libraries.FindRetained(*first_lib_name);
             DEFER { background_lib.Release(); };

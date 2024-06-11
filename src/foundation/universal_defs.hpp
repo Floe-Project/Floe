@@ -402,7 +402,7 @@ ALWAYS_INLINE constexpr auto ToInt(Type value) {
 
 // ==========================================================================================================
 template <typename T>
-inline constexpr T&& Move([[clang::lifetimebound]] T& arg) {
+constexpr T&& Move([[clang::lifetimebound]] T& arg) {
     return static_cast<T&&>(arg);
 }
 

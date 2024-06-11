@@ -19,14 +19,14 @@ struct Writer {
         };
     }
 
-    inline ErrorCodeOr<void> WriteByte(u8 byte) const { return WriteBytes({&byte, 1}); }
-    inline ErrorCodeOr<void> WriteBytes(Span<u8 const> bytes) const {
+    ErrorCodeOr<void> WriteByte(u8 byte) const { return WriteBytes({&byte, 1}); }
+    ErrorCodeOr<void> WriteBytes(Span<u8 const> bytes) const {
         return invoke_write_bytes(write_bytes_function_ptr, object, bytes);
     }
-    inline ErrorCodeOr<void> WriteChar(char c) const { return WriteByte((u8)c); }
-    inline ErrorCodeOr<void> WriteChars(Span<char const> cs) const { return WriteBytes(cs.ToByteSpan()); }
+    ErrorCodeOr<void> WriteChar(char c) const { return WriteByte((u8)c); }
+    ErrorCodeOr<void> WriteChars(Span<char const> cs) const { return WriteBytes(cs.ToByteSpan()); }
 
-    inline ErrorCodeOr<void> WriteCharRepeated(char c, usize count) const {
+    ErrorCodeOr<void> WriteCharRepeated(char c, usize count) const {
         Array<u8, 32> bytes = {};
         FillMemory(bytes, (u8)c);
 

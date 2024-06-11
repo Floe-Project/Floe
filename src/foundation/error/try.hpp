@@ -15,9 +15,9 @@ inline constexpr SuccessType k_success {SuccessType::Construct::Token};
 // This is the standard way of inquiring the state of a return union. You can create a alternate versions of
 // this struct and then use it with TRY_X or TRY_H.
 struct TryHelpers {
-    static inline auto IsError(auto const& o) { return o.HasError(); }
-    static inline auto ExtractError(auto const& o) { return o.Error(); }
-    static inline auto ExtractValue(auto& o) { return o.ReleaseValue(); }
+    static auto IsError(auto const& o) { return o.HasError(); }
+    static auto ExtractError(auto const& o) { return o.Error(); }
+    static auto ExtractValue(auto& o) { return o.ReleaseValue(); }
 };
 
 // Uses clang 'statement expression', a non-standard extension

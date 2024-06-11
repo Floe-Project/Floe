@@ -81,7 +81,7 @@ class ConvolutionReverb final : public Effect {
     }
 
     // audio-thread
-    inline bool IsSilent() const { return m_remaining_tail_length == 0; }
+    bool IsSilent() const { return m_remaining_tail_length == 0; }
 
     // [audio-thread]
     bool SwapConvolversIfNeeded() {
@@ -139,7 +139,7 @@ class ConvolutionReverb final : public Effect {
         return result;
     }
 
-    inline void UpdateRemainingTailLength(StereoAudioFrame frame) {
+    void UpdateRemainingTailLength(StereoAudioFrame frame) {
         if (!frame.IsSilent())
             m_remaining_tail_length = m_max_tail_length;
         else if (m_remaining_tail_length)
@@ -160,7 +160,7 @@ class ConvolutionReverb final : public Effect {
             m_wet_dry.SetDry(m_smoothed_value_system, p->ProjectedValue());
     }
 
-    inline void ResetInternal() override {
+    void ResetInternal() override {
         m_filter = {};
 
         if (m_convolver) Zero(*m_convolver);

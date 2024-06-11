@@ -426,12 +426,12 @@ struct ArenaAllocator : public Allocator {
             ASSERT(size != 0);
             return {(u8*)this, size};
         }
-        inline u8* BufferData() { return (u8*)this + HeaderAllocSize(); }
-        inline usize BufferSize() const {
+        u8* BufferData() { return (u8*)this + HeaderAllocSize(); }
+        usize BufferSize() const {
             ASSERT(size > HeaderAllocSize());
             return size - HeaderAllocSize();
         }
-        inline Span<u8> BufferView() { return {BufferData(), BufferSize()}; }
+        Span<u8> BufferView() { return {BufferData(), BufferSize()}; }
         static constexpr usize HeaderAllocSize() {
             static_assert(k_max_alignment * 2 >= sizeof(Region));
             return k_max_alignment * 2;

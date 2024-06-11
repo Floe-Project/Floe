@@ -9,7 +9,7 @@ struct LFO {
     enum class Waveform { None, Sine, Triangle, Sawtooth, Square };
 
     // returns [-1, 1]
-    inline f32 Tick() {
+    f32 Tick() {
         // We track the phase of the LFO using the method described by Remy Muller:
         // https://www.musicdsp.org/en/latest/Synthesis/152-another-lfo-class.html
         auto const index = phase >> 24; // top 8 bits is the table index which overflows automatically

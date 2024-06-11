@@ -74,7 +74,7 @@ struct StereoPeakMeter {
     bool DidClipRecently() const { return m_clipping_detection_counter_atomic.Load() != 0; }
 
   private:
-    static inline f32 SmoothOutput(f32 output, f32& prev_output) {
+    static f32 SmoothOutput(f32 output, f32& prev_output) {
         static constexpr f32 k_smoothing_amount = 0.001f;
         f32 const result = prev_output + k_smoothing_amount * (output - prev_output);
         prev_output = result;

@@ -28,11 +28,11 @@ struct EffectWetDryHelper {
     void SetWet(FloeSmoothedValueSystem& s, f32 amp) { SetValue(s, m_wet_smoother_id, amp); }
     void SetDry(FloeSmoothedValueSystem& s, f32 amp) { SetValue(s, m_dry_smoother_id, amp); }
 
-    inline f32 Mix(FloeSmoothedValueSystem& s, u32 frame_index, f32 w, f32 d) {
+    f32 Mix(FloeSmoothedValueSystem& s, u32 frame_index, f32 w, f32 d) {
         return w * s.Value(m_wet_smoother_id, frame_index) + d * s.Value(m_dry_smoother_id, frame_index);
     }
 
-    inline StereoAudioFrame
+    StereoAudioFrame
     MixStereo(FloeSmoothedValueSystem& s, u32 frame_index, StereoAudioFrame wet, StereoAudioFrame dry) {
         return wet * s.Value(m_wet_smoother_id, frame_index) + dry * s.Value(m_dry_smoother_id, frame_index);
     }
@@ -100,7 +100,7 @@ class Effect {
     }
 
     // audio-thread
-    inline void Reset() {
+    void Reset() {
         if (!m_state_is_reset) ResetInternal();
         m_state_is_reset = true;
     }
@@ -110,7 +110,7 @@ class Effect {
     friend class EffectLegacyModeHelper;
 
   protected:
-    inline bool ShouldProcessBlock() {
+    bool ShouldProcessBlock() {
         if (m_smoothed_value_system.Value(m_mix_smoother_id, 0) == 0 &&
             m_smoothed_value_system.TargetValue(m_mix_smoother_id) == 0)
             return false;
@@ -118,14 +118,14 @@ class Effect {
         return true;
     }
 
-    inline StereoAudioFrame MixOnOffSmoothing(StereoAudioFrame wet, StereoAudioFrame dry, u32 frame_index) {
+    StereoAudioFrame MixOnOffSmoothing(StereoAudioFrame wet, StereoAudioFrame dry, u32 frame_index) {
         return LinearInterpolate(m_smoothed_value_system.Value(m_mix_smoother_id, frame_index), dry, wet);
     }
 
     FloeSmoothedValueSystem& m_smoothed_value_system;
 
   private:
-    inline virtual StereoAudioFrame
+    virtual StereoAudioFrame
     ProcessFrame(AudioProcessingContext const&, StereoAudioFrame in, u32 frame_index) {
         (void)frame_index;
         return in;
@@ -134,7 +134,7 @@ class Effect {
     virtual void OnParamChangeInternal(ChangedParams changed_params,
                                        AudioProcessingContext const& context) = 0;
 
-    inline virtual void ResetInternal() {}
+    virtual void ResetInternal() {}
 
     FloeSmoothedValueSystem::FloatId const m_mix_smoother_id;
     bool m_state_is_reset = true;

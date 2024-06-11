@@ -12,7 +12,7 @@ class Delay final : public Effect {
     Delay(FloeSmoothedValueSystem& s) : Effect(s, EffectType::NewDelay), delay(vitfx::delay::Create()) {}
     ~Delay() override { vitfx::delay::Destroy(delay); }
 
-    inline void ResetInternal() override { vitfx::delay::HardReset(*delay); }
+    void ResetInternal() override { vitfx::delay::HardReset(*delay); }
 
     virtual void PrepareToPlay(AudioProcessingContext const& context) override {
         vitfx::delay::SetSampleRate(*delay, (int)context.sample_rate);
@@ -128,11 +128,11 @@ class Delay final : public Effect {
 
         if (update_time_l) {
             params[ToInt(Params::TimeLeftHz)] =
-                is_synced ? (f32)SyncedTimeToHz(context.tempo, synced_time_l) : free_time_hz_l;
+                is_synced ? SyncedTimeToHz(context.tempo, synced_time_l) : free_time_hz_l;
         }
         if (update_time_r) {
             params[ToInt(Params::TimeRightHz)] =
-                is_synced ? (f32)SyncedTimeToHz(context.tempo, synced_time_r) : free_time_hz_r;
+                is_synced ? SyncedTimeToHz(context.tempo, synced_time_r) : free_time_hz_r;
         }
     }
 

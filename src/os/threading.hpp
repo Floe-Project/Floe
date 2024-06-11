@@ -134,26 +134,26 @@ class Atomic {
 
     NON_COPYABLE_AND_MOVEABLE(Atomic);
 
-    inline Type& Raw() { return m_data; }
+    Type& Raw() { return m_data; }
 
-    inline void Store(Type v, MemoryOrder memory_order = MemoryOrder::SequentiallyConsistent) {
+    void Store(Type v, MemoryOrder memory_order = MemoryOrder::SequentiallyConsistent) {
         __atomic_store(&m_data, &v, int(memory_order));
     }
 
-    inline Type Load(MemoryOrder memory_order = MemoryOrder::SequentiallyConsistent) const {
+    Type Load(MemoryOrder memory_order = MemoryOrder::SequentiallyConsistent) const {
         Type result;
         __atomic_load(&m_data, &result, int(memory_order));
         return result;
     }
 
-    inline Type Exchange(Type desired, MemoryOrder memory_order = MemoryOrder::SequentiallyConsistent) {
+    Type Exchange(Type desired, MemoryOrder memory_order = MemoryOrder::SequentiallyConsistent) {
         alignas(Type) unsigned char buf[sizeof(Type)];
         auto* ptr = reinterpret_cast<Type*>(buf);
         __atomic_exchange(&m_data, &desired, ptr, int(memory_order));
         return *ptr;
     }
 
-    inline bool CompareExchangeWeak(Type& expected,
+    bool CompareExchangeWeak(Type& expected,
                                     Type desired,
                                     MemoryOrder success_memory_order = MemoryOrder::SequentiallyConsistent,
                                     MemoryOrder failure_memory_order = MemoryOrder::SequentiallyConsistent) {
@@ -165,7 +165,7 @@ class Atomic {
                                          int(failure_memory_order));
     }
 
-    inline bool
+    bool
     CompareExchangeStrong(Type& expected,
                           Type desired,
                           MemoryOrder success_memory_order = MemoryOrder::SequentiallyConsistent,
@@ -231,10 +231,10 @@ inline static void SpinLoopPause() {
 
 class AtomicFlag {
   public:
-    inline bool ExchangeTrue(MemoryOrder mem_order = MemoryOrder::SequentiallyConsistent) {
+    bool ExchangeTrue(MemoryOrder mem_order = MemoryOrder::SequentiallyConsistent) {
         return __atomic_test_and_set(&m_flag, (int)mem_order);
     }
-    inline void StoreFalse(MemoryOrder mem_order = MemoryOrder::SequentiallyConsistent) {
+    void StoreFalse(MemoryOrder mem_order = MemoryOrder::SequentiallyConsistent) {
         __atomic_clear(&m_flag, (int)mem_order);
     }
 
@@ -247,7 +247,7 @@ struct AtomicCountdown {
 
     explicit AtomicCountdown(u32 initial_value) : counter(initial_value) {}
 
-    inline void CountDown(u32 steps = 1) {
+    void CountDown(u32 steps = 1) {
         auto const current = counter.SubFetch(steps, MemoryOrder::Release);
         if (current == 0)
             WakeWaitingThreads(counter, NumWaitingThreads::All);
@@ -255,11 +255,11 @@ struct AtomicCountdown {
             ASSERT(current < LargestRepresentableValue<u32>());
     }
 
-    inline void Increase(u32 steps = 1) { counter.FetchAdd(steps); }
+    void Increase(u32 steps = 1) { counter.FetchAdd(steps); }
 
-    inline bool TryWait() const { return counter.Load(MemoryOrder::Acquire) == 0; }
+    bool TryWait() const { return counter.Load(MemoryOrder::Acquire) == 0; }
 
-    inline WaitResult WaitUntilZero(Optional<u32> timeout_ms = {}) {
+    WaitResult WaitUntilZero(Optional<u32> timeout_ms = {}) {
         while (true) {
             auto const current = counter.Load(MemoryOrder::Acquire);
             ASSERT(current < LargestRepresentableValue<u32>());
@@ -365,7 +365,7 @@ class MutexProtected {
     constexpr MutexProtected(Args&&... value) : m_value(Forward<Args>(value)...) {}
 
     template <typename Function>
-    inline decltype(auto) Use(Function&& function) {
+    decltype(auto) Use(Function&& function) {
         ScopedMutexLock const lock(mutex);
         return function(m_value);
     }
@@ -380,14 +380,14 @@ class MutexProtected {
 
 class SpinLock {
   public:
-    inline void Lock() {
+    void Lock() {
         while (m_lock_flag.ExchangeTrue(MemoryOrder::Acquire)) {
         }
     }
 
-    inline bool TryLock() { return !m_lock_flag.ExchangeTrue(MemoryOrder::Acquire); }
+    bool TryLock() { return !m_lock_flag.ExchangeTrue(MemoryOrder::Acquire); }
 
-    inline void Unlock() { m_lock_flag.StoreFalse(); }
+    void Unlock() { m_lock_flag.StoreFalse(); }
 
   private:
     AtomicFlag m_lock_flag = {};

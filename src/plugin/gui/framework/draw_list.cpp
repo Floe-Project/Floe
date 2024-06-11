@@ -1999,7 +1999,7 @@ void Font::BuildLookupTable() {
         tab_glyph = *FindGlyph(L' ');
         tab_glyph.codepoint = '\t';
         tab_glyph.x_advance *= 4;
-        index_x_advance[(int)tab_glyph.codepoint] = (f32)tab_glyph.x_advance;
+        index_x_advance[(int)tab_glyph.codepoint] = tab_glyph.x_advance;
         index_lookup[(int)tab_glyph.codepoint] = (Char16)(glyphs.size - 1);
     }
 

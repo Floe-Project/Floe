@@ -952,17 +952,17 @@ enum class StateVersion : u16 {
 struct StateCoder {
     template <typename Type>
     requires(Arithmetic<Type>)
-    inline ErrorCodeOr<void> CodeNumber(Type& number, StateVersion version_added) {
+    ErrorCodeOr<void> CodeNumber(Type& number, StateVersion version_added) {
         return CodeTrivialObject(number, version_added);
     }
 
     template <TriviallyCopyable Type>
-    inline ErrorCodeOr<void> CodeTrivialObject(Type& trivial_obj, StateVersion version_added) {
+    ErrorCodeOr<void> CodeTrivialObject(Type& trivial_obj, StateVersion version_added) {
         if (version >= version_added) return options.read_or_write_data(&trivial_obj, sizeof(Type));
         return k_success;
     }
 
-    inline ErrorCodeOr<void> CodeDynArray(dyn::DynArray auto& arr, StateVersion version_added) {
+    ErrorCodeOr<void> CodeDynArray(dyn::DynArray auto& arr, StateVersion version_added) {
         using Type = RemoveReference<decltype(arr)>::ValueType;
         static_assert(Fundamental<Type>,
                       "structs might have padding between members which are hard to ensure consistency with");
@@ -979,7 +979,7 @@ struct StateCoder {
         return k_success;
     }
 
-    inline ErrorCodeOr<void>
+    ErrorCodeOr<void>
     CodeString(String& string, ArenaAllocator& allocator, StateVersion version_added) {
         if (version >= version_added) {
             u16 size = 0;
@@ -995,7 +995,7 @@ struct StateCoder {
     }
 
     template <TriviallyCopyable Type>
-    inline ErrorCodeOr<Type>
+    ErrorCodeOr<Type>
     CodeNumberNowRemoved(Type& number, StateVersion version_added, StateVersion version_removed) {
         if (version >= version_added && version < version_removed)
             return CodeInternal(&number, sizeof(number));
@@ -1024,8 +1024,8 @@ struct StateCoder {
         return k_success;
     }
 
-    inline bool IsWriting() const { return options.mode == CodeStateOptions::Mode::Encode; }
-    inline bool IsReading() const { return options.mode == CodeStateOptions::Mode::Decode; }
+    bool IsWriting() const { return options.mode == CodeStateOptions::Mode::Encode; }
+    bool IsReading() const { return options.mode == CodeStateOptions::Mode::Decode; }
 
     CodeStateOptions const& options;
     StateVersion version;

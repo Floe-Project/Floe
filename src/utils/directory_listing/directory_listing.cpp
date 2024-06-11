@@ -204,7 +204,7 @@ DirectoryListing::ScanResult DirectoryListing::Rescan() {
                 return k_success;
             }
 
-            const auto entry_path = String(e.path).Clone(m_arena);
+            auto const entry_path = String(e.path).Clone(m_arena);
             dyn::Append(m_entries, Entry {entry_path, type, create_metadata(entry_path)});
 
             return k_success;

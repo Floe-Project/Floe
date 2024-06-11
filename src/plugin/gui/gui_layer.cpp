@@ -451,26 +451,26 @@ void Draw(Gui* g,
     auto settings = FloeWindowSettings(imgui, [&](IMGUI_DRAW_WINDOW_BG_ARGS) {
         auto desired_lib_name = layer->LibName();
         if (!desired_lib_name) return;
-        const auto get_background_uvs = [&](const LibraryImages& imgs,
+        auto const get_background_uvs = [&](LibraryImages const& imgs,
                                             Rect r,
                                             imgui::Window* window,
                                             f32x2& out_min_uv,
                                             f32x2& out_max_uv) {
-            const auto whole_uv = GetMaxUVToMaintainAspectRatio(*imgs.background, r.size);
-            const auto left_margin = r.x - window->parent_window->bounds.x;
-            const auto top_margin = r.y - window->parent_window->bounds.y;
+            auto const whole_uv = GetMaxUVToMaintainAspectRatio(*imgs.background, r.size);
+            auto const left_margin = r.x - window->parent_window->bounds.x;
+            auto const top_margin = r.y - window->parent_window->bounds.y;
 
             out_min_uv = {whole_uv.x * (left_margin / r.size.x), whole_uv.y * (top_margin / r.size.y)};
             out_max_uv = {whole_uv.x * (r.w + left_margin) / r.size.x,
                           whole_uv.y * (r.h + top_margin) / r.size.y};
         };
 
-        const auto& r = window->bounds;
+        auto const& r = window->bounds;
 
         auto background_lib = g->plugin.shared_data.available_libraries.FindRetained(*desired_lib_name);
         DEFER { background_lib.Release(); };
 
-        const auto panel_rounding = editor::GetSize(imgui, UiSizeId::BlurredPanelRounding);
+        auto const panel_rounding = editor::GetSize(imgui, UiSizeId::BlurredPanelRounding);
 
         if (background_lib && !g->settings.settings.gui.high_contrast_gui) {
             auto imgs = LoadLibraryBackgroundAndIconIfNeeded(g, *background_lib);
@@ -489,13 +489,13 @@ void Draw(Gui* g,
                 }
 
                 {
-                    const int vtx_idx_0 = s.graphics->vtx_buffer.size;
-                    const auto pos = r.Min() + f32x2 {1, 1};
-                    const auto size = f32x2 {r.w, r.h / 2} - f32x2 {2, 2};
+                    int const vtx_idx_0 = s.graphics->vtx_buffer.size;
+                    auto const pos = r.Min() + f32x2 {1, 1};
+                    auto const size = f32x2 {r.w, r.h / 2} - f32x2 {2, 2};
                     s.graphics->AddRectFilled(pos, pos + size, 0xffffffff, panel_rounding);
-                    const int vtx_idx_1 = s.graphics->vtx_buffer.size;
+                    int const vtx_idx_1 = s.graphics->vtx_buffer.size;
                     s.graphics->AddRectFilled(pos, pos + size, 0xffffffff, panel_rounding);
-                    const int vtx_idx_2 = s.graphics->vtx_buffer.size;
+                    int const vtx_idx_2 = s.graphics->vtx_buffer.size;
 
                     graphics::DrawList::ShadeVertsLinearColorGradientSetAlpha(
                         s.graphics,

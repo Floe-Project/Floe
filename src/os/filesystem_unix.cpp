@@ -159,7 +159,7 @@ ErrorCodeOr<File> OpenFile(String filename, FileMode mode) {
     auto nullterm_filename = NullTerminated(filename, temp_allocator);
 
     char const* mode_str = ({
-        const char* w;
+        char const* w;
         switch (mode) {
             case FileMode::Read: w = "rb"; break;
             case FileMode::Write: w = "wb"; break;

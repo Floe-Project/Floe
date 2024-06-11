@@ -129,7 +129,7 @@ void StartupCrashHandler() {
 
     g_exception_handler = AddVectoredExceptionHandler(1, [](PEXCEPTION_POINTERS exception_info) -> LONG {
         // some exceptions are expected and should be ignored; for example lua will trigger exceptions.
-        if (const auto msg = ExceptionCodeString(exception_info->ExceptionRecord->ExceptionCode); msg.size) {
+        if (auto const msg = ExceptionCodeString(exception_info->ExceptionRecord->ExceptionCode); msg.size) {
             StdPrint(StdStream::Err, "Unhandled exception: ");
             StdPrint(StdStream::Err, msg);
             StdPrint(StdStream::Err, "\n");
@@ -138,7 +138,7 @@ void StartupCrashHandler() {
             if (exception_info->ExceptionRecord->ExceptionCode == EXCEPTION_ILLEGAL_INSTRUCTION &&
                 exception_info->ExceptionRecord->ExceptionAddress) {
                 auto* pc =
-                    reinterpret_cast<const unsigned char*>(exception_info->ExceptionRecord->ExceptionAddress);
+                    reinterpret_cast<unsigned char const*>(exception_info->ExceptionRecord->ExceptionAddress);
                 if (pc[0] == 0x67 && pc[1] == 0x0f && pc[2] == 0xb9 && pc[3] == 0x40)
                     DumpInfoAboutUBSanToStderr();
             }
@@ -235,7 +235,7 @@ static constexpr ErrorCodeCategory k_error_category {
     .category_id = "WIN",
     .message = [](Writer const& writer, ErrorCode code) -> ErrorCodeOr<void> {
         WCHAR buf[200];
-        const auto num_chars_written =
+        auto const num_chars_written =
             FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
                            nullptr,
                            (DWORD)code.code,

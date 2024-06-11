@@ -630,7 +630,7 @@ PUBLIC HashTable<String, String> ParseCommandLineArgs(ArenaAllocator& arena, Spa
         String value;
     };
     auto const try_get_combined_key_val = [](String arg) {
-        if (const auto opt_index = Find(arg, '='))
+        if (auto const opt_index = Find(arg, '='))
             return KeyVal {arg.SubSpan(0, *opt_index), arg.SubSpan(*opt_index + 1)};
         return KeyVal {arg, ""_s};
     };

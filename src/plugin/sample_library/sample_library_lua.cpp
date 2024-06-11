@@ -280,8 +280,8 @@ static Span<String> SetArrayOfStrings(LuaState& ctx, FieldInfo field_info) {
     }
 
     IterateTableAtTop(ctx, [&]() {
-        if (const auto type = lua_type(ctx.lua, -2); type != LUA_TNUMBER) {
-            const auto err_message = fmt::Format(ctx.lua_arena,
+        if (auto const type = lua_type(ctx.lua, -2); type != LUA_TNUMBER) {
+            auto const err_message = fmt::Format(ctx.lua_arena,
                                                  "{}: expecting a list; keys should be numbers, not {}",
                                                  field_info.name,
                                                  LuaValueToString(ctx.lua, -2, ctx.lua_arena));
@@ -289,8 +289,8 @@ static Span<String> SetArrayOfStrings(LuaState& ctx, FieldInfo field_info) {
             lua_error(ctx.lua);
         }
 
-        if (const auto type = lua_type(ctx.lua, -1); type != LUA_TSTRING) {
-            const auto err_message = fmt::Format(ctx.lua_arena,
+        if (auto const type = lua_type(ctx.lua, -1); type != LUA_TSTRING) {
+            auto const err_message = fmt::Format(ctx.lua_arena,
                                                  "{}: expecting a list of strings, not {}"_s,
                                                  field_info.name,
                                                  LuaTypeName(ctx.lua, type));
@@ -345,7 +345,7 @@ struct TableFields<Region::File> {
                         [](SET_FIELD_VALUE_ARGS) {
                             auto& file = FIELD_OBJ;
                             file.loop = Loop {};
-                            const auto vals = ListOfInts(ctx, 3, info);
+                            auto const vals = ListOfInts(ctx, 3, info);
                             file.loop->start_frame = vals[0];
                             file.loop->end_frame = vals[1];
                             if (vals[2] < 0)
@@ -402,7 +402,7 @@ struct TableFields<Region::Options> {
                         [](SET_FIELD_VALUE_ARGS) {
                             auto& region = FIELD_OBJ;
                             region.timbre_crossfade_region = Range {};
-                            const auto vals = ListOfInts(ctx, 2, info);
+                            auto const vals = ListOfInts(ctx, 2, info);
                             if (vals[0] < 0 || vals[1] > 100 || vals[1] < 1 || vals[1] > 101)
                                 luaL_error(
                                     ctx.lua,
@@ -488,7 +488,7 @@ struct TableFields<Region::TriggerCriteria> {
                     .required = false,
                     .set =
                         [](SET_FIELD_VALUE_ARGS) {
-                            const auto vals = ListOfInts(ctx, 2, info);
+                            auto const vals = ListOfInts(ctx, 2, info);
                             if (vals[0] < 0 || vals[1] > 128 || vals[1] < 1 || vals[1] > 129)
                                 luaL_error(
                                     ctx.lua,
@@ -512,7 +512,7 @@ struct TableFields<Region::TriggerCriteria> {
                     .required = false,
                     .set =
                         [](SET_FIELD_VALUE_ARGS) {
-                            const auto vals = ListOfInts(ctx, 2, info);
+                            auto const vals = ListOfInts(ctx, 2, info);
                             if (vals[0] < 0 || vals[1] > 100 || vals[1] < 1 || vals[1] > 101)
                                 luaL_error(
                                     ctx.lua,
@@ -535,7 +535,7 @@ struct TableFields<Region::TriggerCriteria> {
                     .required = false,
                     .set =
                         [](SET_FIELD_VALUE_ARGS) {
-                            const auto val = luaL_checkinteger(ctx.lua, -1);
+                            auto const val = luaL_checkinteger(ctx.lua, -1);
                             if (val < 0)
                                 luaL_error(ctx.lua, "'%s' should be a positive integer", info.name.data);
                             FIELD_OBJ.round_robin_index = (u32)val;
@@ -1129,7 +1129,7 @@ LibraryPtrOrError ReadLua(Reader& reader,
         lua_sethook(
             ctx.lua,
             [](lua_State* lua, lua_Debug*) {
-                const auto& ctx = **(LuaState**)lua_getextraspace(lua);
+                auto const& ctx = **(LuaState**)lua_getextraspace(lua);
                 ASSERT(ctx.start_time < TimePoint::Now());
                 if (ctx.start_time.SecondsFromNow() > ctx.options.max_seconds_allowed)
                     luaL_error(lua, "timeout");
@@ -1221,7 +1221,7 @@ LibraryPtrOrError ReadLua(Reader& reader,
 
                 auto const map_sample = [](Region& region, u8 prev_end_before, u8 next_root) {
                     region.trigger.key_range.start = prev_end_before;
-                    const auto this_root = region.file.root_key;
+                    auto const this_root = region.file.root_key;
                     region.trigger.key_range.end = this_root + (next_root - this_root) / 2 + 1;
                     if (next_root == 128) region.trigger.key_range.end = 128;
                 };
@@ -1262,11 +1262,8 @@ WordWrap(String string, Writer writer, u32 width, Optional<String> line_prefix =
     }
 
     for (usize i = 0; i < string.size;) {
-        auto next_white_space = FindIf(
-                                    string,
-                                    [](char c) { return IsWhitespace(c); },
-                                    i)
-                                    .ValueOr(string.size);
+        auto next_white_space =
+            FindIf(string, [](char c) { return IsWhitespace(c); }, i).ValueOr(string.size);
 
         auto const word = string.SubSpan(i, next_white_space - i);
         if ((col + word.size) > width) {
@@ -1585,7 +1582,7 @@ TEST_CASE(TestIncorrectParameters) {
         auto o = ReadLua(lua, "test.lua", result_arena, arena);
         CHECK(o.Is<Error>());
         if (o.Is<Error>()) {
-            const auto err = o.Get<Error>();
+            auto const err = o.Get<Error>();
             tester.log.DebugLn("Success: this error was expected: {}, {}", err.code, err.message);
             CHECK(o.Get<Error>().code == LuaErrorCode::Runtime);
         } else
@@ -1820,7 +1817,7 @@ TEST_CASE(TestErrorHandling) {
 
     auto check = [&](ErrorCodeOr<void> expected, String lua_code, Options options = {}) {
         ArenaAllocator result_arena {PageAllocator::Instance()};
-        const auto outcome = ReadLua(lua_code, lua_filepath, result_arena, scratch_arena, options);
+        auto const outcome = ReadLua(lua_code, lua_filepath, result_arena, scratch_arena, options);
         if (auto err = outcome.TryGetFromTag<ResultType::Error>()) {
             if (expected.Succeeded()) {
                 tester.log.ErrorLn(

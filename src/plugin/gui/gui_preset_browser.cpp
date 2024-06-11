@@ -559,8 +559,8 @@ void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
         imgui.BeginWindow(FloeWindowSettings(
                               imgui,
                               [&](IMGUI_DRAW_WINDOW_BG_ARGS) {
-                                  const auto r = window->unpadded_bounds;
-                                  const auto rounding = editor::GetSize(s, UiSizeId::CornerRounding);
+                                  auto const r = window->unpadded_bounds;
+                                  auto const rounding = editor::GetSize(s, UiSizeId::CornerRounding);
 
                                   s.graphics->AddRectFilled(r.Min(),
                                                             r.Min() + f32x2 {r.w, table_title_h},
@@ -583,7 +583,7 @@ void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
 
                                   s.graphics->AddRect(r.Min(), r.Max(), GMCC(Browser, BorderRect), rounding);
 
-                                  const auto line_col = GMCC(Browser, SectionHeadingLine);
+                                  auto const line_col = GMCC(Browser, SectionHeadingLine);
                                   s.graphics->AddLine(r.Min() + f32x2 {preset_folders_panel_width, 0},
                                                       r.Min() + f32x2 {preset_folders_panel_width, r.h},
                                                       line_col);
@@ -641,7 +641,7 @@ void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
 
                     auto settings = imgui::DefTextInput();
                     settings.draw = [](IMGUI_DRAW_TEXT_INPUT_ARGS) {
-                        const auto rounding = editor::GetSize(s, UiSizeId::CornerRounding);
+                        auto const rounding = editor::GetSize(s, UiSizeId::CornerRounding);
                         s.graphics->AddRectFilled(r.Min(), r.Max(), GMCC(Browser, SearchBack), rounding);
 
                         if (result->HasSelection()) {

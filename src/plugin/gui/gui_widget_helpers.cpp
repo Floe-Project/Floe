@@ -449,10 +449,10 @@ imgui::TextInputSettings GetParameterTextInputSettings() {
     settings.draw = [](IMGUI_DRAW_TEXT_INPUT_ARGS) {
         if (!s.TextInputHasFocus(id)) return;
 
-        const auto text_pos = result->GetTextPos();
-        const auto w = Max(r.w, draw::GetTextWidth(s.graphics->context->CurrentFont(), text));
-        const Rect background_r {r.CentreX() - w / 2, text_pos.y, w, s.graphics->context->CurrentFontSize()};
-        const auto rounding = editor::GetSize(s, UiSizeId::CornerRounding);
+        auto const text_pos = result->GetTextPos();
+        auto const w = Max(r.w, draw::GetTextWidth(s.graphics->context->CurrentFont(), text));
+        Rect const background_r {r.CentreX() - w / 2, text_pos.y, w, s.graphics->context->CurrentFontSize()};
+        auto const rounding = editor::GetSize(s, UiSizeId::CornerRounding);
 
         s.graphics->AddRectFilled(background_r.Min(), background_r.Max(), GMC(KnobTextInputBack), rounding);
         s.graphics->AddRect(background_r.Min(), background_r.Max(), GMC(KnobTextInputBorder), rounding);

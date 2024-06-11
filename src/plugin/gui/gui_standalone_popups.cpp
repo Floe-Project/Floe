@@ -223,7 +223,7 @@ void DoErrorsStandalone(Gui* g) {
                             auto col = GMC(ErrorWindowButtonBack);
                             if (s.IsHot(id)) col = GMC(ErrorWindowButtonBackHover);
                             if (s.IsActive(id)) col = GMC(ErrorWindowButtonBackActive);
-                            const auto rounding = editor::GetSize(s, UiSizeId::CornerRounding);
+                            auto const rounding = editor::GetSize(s, UiSizeId::CornerRounding);
                             s.graphics->AddRectFilled(r.Min(), r.Max(), col, rounding);
 
                             auto text_r = r;
@@ -474,14 +474,14 @@ void DoSettingsStandalone(Gui* g) {
         };
 
         auto do_divider = [&](String title) {
-            const auto div_r =
+            auto const div_r =
                 imgui.GetRegisteredAndConvertedRect({0, y_pos, imgui.Width(), line_height * 2});
             g->imgui.graphics->AddTextJustified(div_r,
                                                 title,
                                                 GMC(SettingsWindowMainText),
                                                 TextJustification::Left,
                                                 TextOverflowType::ShowDotsOnRight);
-            const auto line_y = div_r.y + line_height * 1.1f;
+            auto const line_y = div_r.y + line_height * 1.1f;
             g->imgui.graphics->AddLine({div_r.x, line_y},
                                        {div_r.Right(), line_y},
                                        GMC(SettingsWindowMainText));
@@ -489,7 +489,7 @@ void DoSettingsStandalone(Gui* g) {
         };
 
         auto do_lhs_title = [&](String text) {
-            const auto title_r =
+            auto const title_r =
                 imgui.GetRegisteredAndConvertedRect({0, y_pos, imgui.Width(), line_height * 2});
             g->imgui.graphics->AddTextJustified(title_r,
                                                 text,
@@ -499,7 +499,7 @@ void DoSettingsStandalone(Gui* g) {
         };
 
         auto do_icon_button = [&imgui, g](Rect r, String icon, String tooltip) {
-            const auto id = imgui.GetID(icon);
+            auto const id = imgui.GetID(icon);
             bool const clicked =
                 imgui.ButtonBehavior(r, id, {.left_mouse = true, .triggers_on_mouse_up = true});
             g->gui_platform.graphics_ctx->PushFont(g->icons);
@@ -559,7 +559,7 @@ void DoSettingsStandalone(Gui* g) {
         do_divider("Folders");
 
         auto do_rhs_subheading = [&](String text) {
-            const auto info_text_r =
+            auto const info_text_r =
                 imgui.GetRegisteredAndConvertedRect({left_col_width, y_pos, right_col_width, line_height});
             g->imgui.graphics->AddTextJustified(info_text_r,
                                                 text,
@@ -584,7 +584,7 @@ void DoSettingsStandalone(Gui* g) {
             FolderEdits result {};
             do_lhs_title(title);
             do_rhs_subheading(subheading);
-            const auto box_r = imgui.GetRegisteredAndConvertedRect(
+            auto const box_r = imgui.GetRegisteredAndConvertedRect(
                 {left_col_width,
                  y_pos,
                  right_col_width,
@@ -598,19 +598,19 @@ void DoSettingsStandalone(Gui* g) {
                 for (auto [index, path] : Enumerate<u32>(paths)) {
                     imgui.PushID(pos);
                     DEFER { imgui.PopID(); };
-                    const auto path_r = Rect {box_r.x,
+                    auto const path_r = Rect {box_r.x,
                                               box_r.y + ((f32)pos * path_gui_height),
                                               right_col_width,
                                               path_gui_height};
                     auto reduced_path_r = path_r.ReducedHorizontally(path_gui_spacing);
 
                     if (paths.data == extra_paths.data) {
-                        const auto del_button_r = rect_cut::CutRight(reduced_path_r, line_height);
+                        auto const del_button_r = rect_cut::CutRight(reduced_path_r, line_height);
                         rect_cut::CutRight(reduced_path_r, path_gui_spacing);
                         if (do_icon_button(del_button_r, ICON_FA_TIMES, "Remove")) remove_index = index;
                     }
 
-                    const auto open_button_r = rect_cut::CutRight(reduced_path_r, line_height);
+                    auto const open_button_r = rect_cut::CutRight(reduced_path_r, line_height);
                     rect_cut::CutRight(reduced_path_r, path_gui_spacing);
                     if (do_icon_button(open_button_r, ICON_FA_EXTERNAL_LINK_ALT, "Open folder"))
                         OpenFolderInFileBrowser(path);
@@ -632,13 +632,13 @@ void DoSettingsStandalone(Gui* g) {
             y_pos += box_r.h + line_height / 3.0f;
 
             {
-                const auto text = "Add"_s;
-                const auto size =
+                auto const text = "Add"_s;
+                auto const size =
                     draw::GetTextSize(imgui.graphics->context->CurrentFont(), text, imgui.Width()) +
                     f32x2 {line_height, line_height / 2};
-                const auto button_r =
+                auto const button_r =
                     imgui.GetRegisteredAndConvertedRect({left_col_width, y_pos, size.x, size.y});
-                const auto id = imgui.GetID("addlib");
+                auto const id = imgui.GetID("addlib");
                 if (imgui.ButtonBehavior(button_r, id, {.left_mouse = true, .triggers_on_mouse_up = true}))
                     result.add = true;
                 imgui.graphics->AddRectFilled(button_r,
@@ -646,7 +646,7 @@ void DoSettingsStandalone(Gui* g) {
                                                                : GMC(SettingsWindowButtonBackHover),
                                               rounding);
                 imgui.graphics->AddRect(button_r, GMC(SettingsWindowButtonOutline), rounding);
-                const auto text_r = button_r.ReducedHorizontally(path_gui_spacing);
+                auto const text_r = button_r.ReducedHorizontally(path_gui_spacing);
                 imgui.graphics->AddTextJustified(text_r,
                                                  text,
                                                  GMC(SettingsWindowButtonText),

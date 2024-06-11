@@ -35,7 +35,7 @@ struct Standalone {
             [](clap_host_t const* h) {
                 auto& standalone = *(Standalone*)h->host_data;
                 auto gui =
-                    (const clap_plugin_gui*)standalone.plugin.get_extension(&standalone.plugin, CLAP_EXT_GUI);
+                    (clap_plugin_gui const*)standalone.plugin.get_extension(&standalone.plugin, CLAP_EXT_GUI);
                 clap_gui_resize_hints resize_hints;
                 if (!gui->get_resize_hints(&standalone.plugin, &resize_hints)) PanicIfReached();
                 if (resize_hints.can_resize_vertically && resize_hints.can_resize_horizontally) {
@@ -60,7 +60,7 @@ struct Standalone {
                     PanicIfReached(); // IMPROVE: support request_resize from non-main thread
 
                 auto gui =
-                    (const clap_plugin_gui*)standalone.plugin.get_extension(&standalone.plugin, CLAP_EXT_GUI);
+                    (clap_plugin_gui const*)standalone.plugin.get_extension(&standalone.plugin, CLAP_EXT_GUI);
                 puglSetSize(standalone.gui_view, width, height);
                 return gui->set_size(&standalone.plugin, width, height);
             },

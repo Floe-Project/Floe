@@ -544,7 +544,7 @@ non_existent_key = novalue)foo"_s,
         CHECK_EQ(data.midi.cc_to_param_mapping->cc_num, 10);
         DynamicArrayInline<u32, 3> expected_ids {ArrayT<u32>({1, 3, 4})};
         for (auto param = data.midi.cc_to_param_mapping->param; param != nullptr; param = param->next) {
-            const auto found = Find(expected_ids, param->id);
+            auto const found = Find(expected_ids, param->id);
             CHECK(found);
             dyn::RemoveSwapLast(expected_ids, *found);
         }

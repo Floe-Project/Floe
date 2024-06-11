@@ -154,9 +154,9 @@ class Atomic {
     }
 
     bool CompareExchangeWeak(Type& expected,
-                                    Type desired,
-                                    MemoryOrder success_memory_order = MemoryOrder::SequentiallyConsistent,
-                                    MemoryOrder failure_memory_order = MemoryOrder::SequentiallyConsistent) {
+                             Type desired,
+                             MemoryOrder success_memory_order = MemoryOrder::SequentiallyConsistent,
+                             MemoryOrder failure_memory_order = MemoryOrder::SequentiallyConsistent) {
         return __atomic_compare_exchange(&m_data,
                                          &expected,
                                          &desired,
@@ -165,11 +165,10 @@ class Atomic {
                                          int(failure_memory_order));
     }
 
-    bool
-    CompareExchangeStrong(Type& expected,
-                          Type desired,
-                          MemoryOrder success_memory_order = MemoryOrder::SequentiallyConsistent,
-                          MemoryOrder failure_memory_order = MemoryOrder::SequentiallyConsistent) {
+    bool CompareExchangeStrong(Type& expected,
+                               Type desired,
+                               MemoryOrder success_memory_order = MemoryOrder::SequentiallyConsistent,
+                               MemoryOrder failure_memory_order = MemoryOrder::SequentiallyConsistent) {
         return __atomic_compare_exchange(&m_data,
                                          &expected,
                                          &desired,

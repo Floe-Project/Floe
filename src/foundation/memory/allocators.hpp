@@ -188,7 +188,7 @@ struct Allocator {
             .context = (void*)num_used_in_existing_allocation,
             .function =
                 [](ResizeCommand::MoveMemoryHandler::Args args) {
-                    const auto num_objects_used = (decltype(num_used_in_existing_allocation))args.context;
+                    auto const num_objects_used = (decltype(num_used_in_existing_allocation))args.context;
                     if constexpr (TriviallyCopyable<Type>) {
                         CopyMemory(args.destination, args.source, *num_objects_used * sizeof(Type));
                     } else {

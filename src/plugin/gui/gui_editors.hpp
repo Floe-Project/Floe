@@ -121,7 +121,7 @@ static void TakeScreenshot(Gui* g) {
 
         int num = 1;
         while (true) {
-            const auto initial_size = path.size;
+            auto const initial_size = path.size;
             fmt::Append(path, "-{}.jpg", num);
             ++num;
 

@@ -51,7 +51,7 @@ FloeWindowSettings(imgui::Context const& imgui,
     wnd_settings.flags = imgui::WindowFlags_NoScrollbarX;
     wnd_settings.scrollbar_width = editor::GetSize(imgui, UiSizeId::ScrollbarWidth);
     wnd_settings.draw_routine_scrollbar = [](IMGUI_DRAW_WINDOW_SCROLLBAR_ARGS) {
-        const auto rounding = editor::GetSize(s, UiSizeId::CornerRounding);
+        auto const rounding = editor::GetSize(s, UiSizeId::CornerRounding);
         s.graphics->AddRectFilled(bounds.Min(), bounds.Max(), GMC(ScrollbarBack), rounding);
         uint32_t handle_col = GMC(ScrollbarHandle);
         if (s.IsHot(id))

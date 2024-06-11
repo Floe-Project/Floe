@@ -342,7 +342,7 @@ requires(sizeof(typename DynType::ValueType) == 1)
 PUBLIC constexpr Writer WriterFor(DynType& array) {
     Writer result;
     result.Set<DynType>(array, [](DynType& arr, Span<u8 const> bytes) -> ErrorCodeOr<void> {
-        AppendSpan(arr, {(const typename DynType::ValueType*)bytes.data, bytes.size});
+        AppendSpan(arr, {(typename DynType::ValueType const*)bytes.data, bytes.size});
         return k_success;
     });
     return result;

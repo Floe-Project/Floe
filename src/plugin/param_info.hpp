@@ -1641,7 +1641,7 @@ consteval auto CreateParams() {
         using enum LayerParamIndex;
 
         auto lp = [&result, layer_index](LayerParamIndex index) -> ParameterInfo& {
-            const auto global_index = ParamIndexFromLayerParamIndex(layer_index, index);
+            auto const global_index = ParamIndexFromLayerParamIndex(layer_index, index);
             return result.params[ToInt(global_index)];
         };
 

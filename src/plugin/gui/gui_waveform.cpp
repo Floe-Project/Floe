@@ -115,7 +115,7 @@ static void GUIDoSampleWaveformOverlay(Gui* g, PluginInstance::Layer* layer, Rec
                                 f32 default_val,
                                 bool invert_slider,
                                 FunctionRef<void(f32)> callback) {
-        const auto grabber_unregistered = grabber_r;
+        auto const grabber_unregistered = grabber_r;
         if (tooltip_param) MidiLearnMenu(g, *tooltip_param, grabber_unregistered);
         imgui.RegisterAndConvertRect(&grabber_r);
 

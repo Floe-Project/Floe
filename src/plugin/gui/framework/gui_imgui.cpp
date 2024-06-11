@@ -2453,7 +2453,7 @@ f32 Context::LargestStringWidth(f32 pad, void* items, int num, String (*GetStr)(
 
 f32 Context::LargestStringWidth(f32 pad, Span<String const> strs) {
     auto str_get = [](void* items, int index) -> String {
-        auto strs = (const String*)items;
+        auto strs = (String const*)items;
         return strs[index];
     };
 

@@ -219,7 +219,7 @@ TEST_CASE(TestFilesystem) {
 
     SUBCASE("DeleteDirectory") {
         auto test_delete_directory = [&a, &tester]() -> ErrorCodeOr<void> {
-            const auto dir = TRY(KnownDirectoryWithSubdirectories(a,
+            auto const dir = TRY(KnownDirectoryWithSubdirectories(a,
                                                                   KnownDirectories::Temporary,
                                                                   Array {"test"_s, "framework_dir"}));
             TRY(CreateDirectory(dir, {.create_intermediate_directories = true}));
@@ -270,13 +270,13 @@ TEST_CASE(TestFilesystem) {
         };
 
         auto make_dir = [&](Span<String const> name) -> ErrorCodeOr<String> {
-            const auto dir = make_path(name);
+            auto const dir = make_path(name);
             TRY(CreateDirectory(dir, {.create_intermediate_directories = true}));
             return dir;
         };
 
         auto make_file_containing_its_own_subpath = [&](Span<String const> path) -> ErrorCodeOr<String> {
-            const auto f = make_path(path);
+            auto const f = make_path(path);
             TRY(WriteFile(f, path::Join(a, path)));
             return f;
         };
@@ -303,7 +303,7 @@ TEST_CASE(TestFilesystem) {
             REQUIRE(TRY(GetFileType(existing_files[2])) == FileType::RegularFile);
 
             for (auto& f : TRY(GetFilesRecursive(a, dir2))) {
-                const auto file_type = TRY(GetFileType(f));
+                auto const file_type = TRY(GetFileType(f));
                 if (file_type == FileType::RegularFile) {
                     bool found = false;
                     for (auto& existing : existing_files)
@@ -429,7 +429,7 @@ TEST_CASE(TestReadingDirectoryChanges) {
                 a,
                 [&](String path, ErrorCodeOr<DirectoryWatcher::FileChange> change_outcome) {
                     CHECK(path::Equal(path, dir));
-                    const auto change = REQUIRE_UNWRAP(change_outcome);
+                    auto const change = REQUIRE_UNWRAP(change_outcome);
                     tester.log.DebugLn("Change in {}, type {}, subdir {}", path, change.type, change.subpath);
                     dyn::Append(changes,
                                 {
@@ -439,10 +439,10 @@ TEST_CASE(TestReadingDirectoryChanges) {
                 }));
 
             CHECK_OP(changes.size, >=, expected_changes.size);
-            for (const auto& expected : expected_changes) {
+            for (auto const& expected : expected_changes) {
                 CAPTURE(expected.subpath);
                 CAPTURE(expected.type);
-                const auto found = FindIf(changes, [&](const TestFileChange& c) {
+                auto const found = FindIf(changes, [&](TestFileChange const& c) {
                     return c.subpath == expected.subpath && c.type == expected.type;
                 });
                 CHECK(found);
@@ -450,13 +450,13 @@ TEST_CASE(TestReadingDirectoryChanges) {
             if (changes.size != expected_changes.size) {
                 tester.log.DebugLn(
                     "ReadDirectoryChanges resulted different changes than expected. Expected:");
-                for (const auto& change : expected_changes) {
+                for (auto const& change : expected_changes) {
                     tester.log.DebugLn("  {} {}",
                                        change.subpath,
                                        DirectoryWatcher::FileChange::TypeToString(change.type));
                 }
                 tester.log.DebugLn("Actual:");
-                for (const auto& change : changes) {
+                for (auto const& change : changes) {
                     tester.log.DebugLn("  {} {}",
                                        change.subpath,
                                        DirectoryWatcher::FileChange::TypeToString(change.type));

@@ -34,9 +34,9 @@ struct ChorusProcessor {
     }
 
     StereoAudioFrame Process(StereoAudioFrame in,
-                                    f32 depth01,
-                                    rbj_filter::Coeffs const& lowpass_coeffs,
-                                    rbj_filter::Coeffs const& highpass_coeffs) {
+                             f32 depth01,
+                             rbj_filter::Coeffs const& lowpass_coeffs,
+                             rbj_filter::Coeffs const& highpass_coeffs) {
         constexpr auto k_min_time_multiplier = 0.04f;
         auto const depth = -(0.5f - k_min_time_multiplier / 2) * depth01 + 1.0f;
         auto const time_multiplier =

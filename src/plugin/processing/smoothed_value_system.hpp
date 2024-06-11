@@ -64,9 +64,7 @@ class SmoothedValueSystem {
             return {m_smoothed_filters[u16(smoother)].Coeffs(), 1};
     }
 
-    f32* AllValues(FloatId smoother) {
-        return m_float_smoothers.AllValues(m_num_valid_frames, smoother);
-    }
+    f32* AllValues(FloatId smoother) { return m_float_smoothers.AllValues(m_num_valid_frames, smoother); }
 
     f32 TargetValue(FloatId smoother) const { return m_float_smoothers.TargetValue(smoother); }
 

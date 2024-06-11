@@ -20,9 +20,9 @@ void MidPanel(Gui* g) {
 
     auto const get_background_uvs =
         [&](LibraryImages const& imgs, Rect r, imgui::Window* window, f32x2& out_min_uv, f32x2& out_max_uv) {
-            const auto whole_uv = GetMaxUVToMaintainAspectRatio(*imgs.background, mid_panel_size);
-            const auto left_margin = r.x - window->parent_window->bounds.x;
-            const auto top_margin = r.y - window->parent_window->bounds.y;
+            auto const whole_uv = GetMaxUVToMaintainAspectRatio(*imgs.background, mid_panel_size);
+            auto const left_margin = r.x - window->parent_window->bounds.x;
+            auto const top_margin = r.y - window->parent_window->bounds.y;
 
             out_min_uv = {whole_uv.x * (left_margin / mid_panel_size.x),
                           whole_uv.y * (top_margin / mid_panel_size.y)};
@@ -33,10 +33,10 @@ void MidPanel(Gui* g) {
     auto const panel_rounding = editor::GetSize(imgui, UiSizeId::BlurredPanelRounding);
 
     auto do_randomise_button = [&](String tooltip) {
-        const auto margin = editor::GetSize(imgui, UiSizeId::MidPanelTitleMarginLeft);
-        const auto size = editor::GetSize(imgui, UiSizeId::LayerSelectorButtonW);
-        const Rect btn_r {imgui.Width() - (size + margin), 0, size, mid_panel_title_height};
-        const auto id = imgui.GetID("rand");
+        auto const margin = editor::GetSize(imgui, UiSizeId::MidPanelTitleMarginLeft);
+        auto const size = editor::GetSize(imgui, UiSizeId::LayerSelectorButtonW);
+        Rect const btn_r {imgui.Width() - (size + margin), 0, size, mid_panel_title_height};
+        auto const id = imgui.GetID("rand");
         if (buttons::Button(g, id, btn_r, ICON_FA_RANDOM, buttons::IconButton().WithRandomiseIconScaling()))
             return true;
         Tooltip(g, id, btn_r, tooltip);
@@ -45,9 +45,9 @@ void MidPanel(Gui* g) {
 
     {
         auto settings = FloeWindowSettings(imgui, [&](IMGUI_DRAW_WINDOW_BG_ARGS) {
-            const auto first_lib_name = g->plugin.layers[0].LibName();
+            auto const first_lib_name = g->plugin.layers[0].LibName();
             if (first_lib_name) {
-                const auto& r = window->bounds;
+                auto const& r = window->bounds;
 
                 auto background_lib = g->plugin.shared_data.available_libraries.FindRetained(*first_lib_name);
                 DEFER { background_lib.Release(); };
@@ -77,13 +77,13 @@ void MidPanel(Gui* g) {
                         }
 
                         {
-                            const int vtx_idx_0 = s.graphics->vtx_buffer.size;
-                            const auto pos = r.Min() + f32x2 {1, 1};
-                            const auto size = f32x2 {r.w, r.h / 2} - f32x2 {2, 2};
+                            int const vtx_idx_0 = s.graphics->vtx_buffer.size;
+                            auto const pos = r.Min() + f32x2 {1, 1};
+                            auto const size = f32x2 {r.w, r.h / 2} - f32x2 {2, 2};
                             s.graphics->AddRectFilled(pos, pos + size, 0xffffffff, panel_rounding);
-                            const int vtx_idx_1 = s.graphics->vtx_buffer.size;
+                            int const vtx_idx_1 = s.graphics->vtx_buffer.size;
                             s.graphics->AddRectFilled(pos, pos + size, 0xffffffff, panel_rounding);
-                            const int vtx_idx_2 = s.graphics->vtx_buffer.size;
+                            int const vtx_idx_2 = s.graphics->vtx_buffer.size;
 
                             graphics::DrawList::ShadeVertsLinearColorGradientSetAlpha(
                                 s.graphics,
@@ -109,7 +109,7 @@ void MidPanel(Gui* g) {
                                             {r.Right(), r.y + mid_panel_title_height},
                                             GMC(LayerDividerLine));
                         for (u32 i = 1; i < k_num_layers; ++i) {
-                            const auto x_pos = r.x + (f32)i * (r.w / k_num_layers);
+                            auto const x_pos = r.x + (f32)i * (r.w / k_num_layers);
                             s.graphics->AddLine({x_pos, r.y + mid_panel_title_height},
                                                 {x_pos, r.Bottom()},
                                                 GMC(LayerDividerLine));
@@ -169,9 +169,9 @@ void MidPanel(Gui* g) {
 
     {
         auto settings = FloeWindowSettings(imgui, [&](IMGUI_DRAW_WINDOW_BG_ARGS) {
-            const auto first_lib_name = g->plugin.layers[0].LibName();
+            auto const first_lib_name = g->plugin.layers[0].LibName();
             if (first_lib_name) {
-                const auto& r = window->bounds;
+                auto const& r = window->bounds;
 
                 auto background_lib = g->plugin.shared_data.available_libraries.FindRetained(*first_lib_name);
                 DEFER { background_lib.Release(); };
@@ -199,13 +199,13 @@ void MidPanel(Gui* g) {
                         }
 
                         {
-                            const int vtx_idx_0 = s.graphics->vtx_buffer.size;
-                            const auto pos = r.Min() + f32x2 {1, 1};
-                            const auto size = f32x2 {r.w, r.h / 2} - f32x2 {2, 2};
+                            int const vtx_idx_0 = s.graphics->vtx_buffer.size;
+                            auto const pos = r.Min() + f32x2 {1, 1};
+                            auto const size = f32x2 {r.w, r.h / 2} - f32x2 {2, 2};
                             s.graphics->AddRectFilled(pos, pos + size, 0xffffffff, panel_rounding);
-                            const int vtx_idx_1 = s.graphics->vtx_buffer.size;
+                            int const vtx_idx_1 = s.graphics->vtx_buffer.size;
                             s.graphics->AddRectFilled(pos, pos + size, 0xffffffff, panel_rounding);
-                            const int vtx_idx_2 = s.graphics->vtx_buffer.size;
+                            int const vtx_idx_2 = s.graphics->vtx_buffer.size;
 
                             graphics::DrawList::ShadeVertsLinearColorGradientSetAlpha(
                                 s.graphics,

@@ -979,8 +979,7 @@ struct StateCoder {
         return k_success;
     }
 
-    ErrorCodeOr<void>
-    CodeString(String& string, ArenaAllocator& allocator, StateVersion version_added) {
+    ErrorCodeOr<void> CodeString(String& string, ArenaAllocator& allocator, StateVersion version_added) {
         if (version >= version_added) {
             u16 size = 0;
             if (IsWriting()) size = CheckedCast<u16>(string.size);
@@ -1290,7 +1289,7 @@ ErrorCodeOr<void> SavePresetFile(String path, StateSnapshot const& state) {
                   CodeStateOptions {
                       .mode = CodeStateOptions::Mode::Encode,
                       .read_or_write_data = [&file](void* data, usize bytes) -> ErrorCodeOr<void> {
-                          TRY(file.Write({(const u8*)data, bytes}));
+                          TRY(file.Write({(u8 const*)data, bytes}));
                           return k_success;
                       },
                       .source = StateSource::PresetFile,
@@ -1391,7 +1390,7 @@ TEST_CASE(TestParsersHandleInvalidData) {
     u64 seed = SeedFromTime();
 
     auto const make_random_data = [&]() {
-        const auto data_size = RandomIntInRange<usize>(seed, 1, 1000);
+        auto const data_size = RandomIntInRange<usize>(seed, 1, 1000);
         auto data = scratch_arena.NewMultiple<char>(data_size);
         for (auto& b : data)
             b = RandomIntInRange<char>(seed,
@@ -1482,7 +1481,7 @@ TEST_CASE(TestNewSerialisation) {
                           CodeStateOptions {
                               .mode = CodeStateOptions::Mode::Encode,
                               .read_or_write_data = [&](void* data, usize bytes) -> ErrorCodeOr<void> {
-                                  dyn::AppendSpan(serialised_data, Span<const u8> {(const u8*)data, bytes});
+                                  dyn::AppendSpan(serialised_data, Span<u8 const> {(u8 const*)data, bytes});
                                   return k_success;
                               },
                               .source = source,

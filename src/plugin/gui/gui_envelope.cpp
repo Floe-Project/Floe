@@ -32,8 +32,8 @@ void GUIDoEnvelope(Gui* g,
     settings.pad_bottom_right = {};
     settings.pad_top_left = {};
     settings.draw_routine_window_background = [&handle_size](IMGUI_DRAW_WINDOW_BG_ARGS) {
-        const auto& r = window->bounds.Reduced(handle_size / 2);
-        const auto rounding = editor::GetSize(s, UiSizeId::CornerRounding);
+        auto const& r = window->bounds.Reduced(handle_size / 2);
+        auto const rounding = editor::GetSize(s, UiSizeId::CornerRounding);
         s.graphics->AddRectFilled(r.Min(), r.Max(), GMC(Envelope_Back), rounding);
     };
     imgui.PushID(layer->index);
@@ -71,8 +71,8 @@ void GUIDoEnvelope(Gui* g,
         auto norm_attack_val = attack_param.LinearValue();
 
         auto const get_x_coord_at_percent = [&](f32 percent) {
-            const auto min_x = padded_x;
-            const auto max_x = min_x + max_attack_percent * padded_width;
+            auto const min_x = padded_x;
+            auto const max_x = min_x + max_attack_percent * padded_width;
             return MapFrom01(percent, min_x, max_x);
         };
 
@@ -122,14 +122,14 @@ void GUIDoEnvelope(Gui* g,
         auto const sustain_norm_value = sustain_param.LinearValue();
 
         auto const get_x_coord_at_percent = [&](f32 percent) {
-            const auto min_x = attack_point.x;
-            const auto max_x = min_x + max_decay_percent * padded_width;
+            auto const min_x = attack_point.x;
+            auto const max_x = min_x + max_decay_percent * padded_width;
             return MapFrom01(percent, min_x, max_x);
         };
 
         auto const get_y_coord_at_percent = [&](f32 percent) {
-            const auto min_x = padded_x;
-            const auto max_x = min_x + padded_height;
+            auto const min_x = padded_x;
+            auto const max_x = min_x + padded_height;
             return MapFrom01(percent, min_x, max_x);
         };
 
@@ -205,8 +205,8 @@ void GUIDoEnvelope(Gui* g,
         auto const release_norm_value = release_param.LinearValue();
 
         auto const get_x_coord_at_percent = [&](f32 percent) {
-            const auto min_x = sustain_point.x;
-            const auto max_x = min_x + max_release_percent * padded_width;
+            auto const min_x = sustain_point.x;
+            auto const max_x = min_x + max_release_percent * padded_width;
             return MapFrom01(percent, min_x, max_x);
         };
 

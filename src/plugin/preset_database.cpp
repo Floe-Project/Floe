@@ -42,7 +42,7 @@ static ErrorCodeOr<void> Exec(sqlite3* db, char const* sql, ExecCallback callbac
         [](void* user_data, int num_columns, char** column_texts, char** column_names) -> int {
             if (!user_data) return 0;
             auto& callback = *(ExecCallback*)user_data;
-            const auto r = callback(num_columns, column_texts, column_names);
+            auto const r = callback(num_columns, column_texts, column_names);
             return (r == CallbackResult::Continue) ? 0 : 1;
         },
         callback ? &callback : nullptr,
@@ -359,7 +359,7 @@ static ErrorCodeOr<void> AddScanFolder(sqlite3* db,
             InsertOrGetUniqueId(scratch_arena, db, "FileExtensions", "Extension", ext, "FileExtensionId"));
 
         Optional<int> const sub_folder_id = ({
-            const auto subdirs = path::Directory(String(entry.path).SubSpan(folder.size + 1));
+            auto const subdirs = path::Directory(String(entry.path).SubSpan(folder.size + 1));
             Optional<int> id {};
             if (subdirs)
                 id = TRY(

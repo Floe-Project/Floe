@@ -37,8 +37,8 @@ static void DrawPeakMeters(imgui::Context const& s, Rect r, f32 vl, f32 vr, bool
         }
 
         auto draw_marker = [&](f32 db, bool bold) {
-            const f32 pos = MapTo01(db, k_min_db, k_max_db);
-            const auto line_y = padded_r.y + ((1 - pos) * padded_r.h);
+            f32 const pos = MapTo01(db, k_min_db, k_max_db);
+            auto const line_y = padded_r.y + ((1 - pos) * padded_r.h);
             s.graphics->AddLine({r.x, line_y},
                                 {r.x + (marker_w - marker_pad), line_y},
                                 bold ? GMC(PeakMeterMarkersBold) : GMC(PeakMeterMarkers));

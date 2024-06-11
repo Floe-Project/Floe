@@ -716,17 +716,17 @@ PUBLIC bool SetIfMatchingArray(EventHandlerStack& handler_stack,
                                String expected_key,
                                DynamicArray<DynamicArray<char>>& string_array,
                                Allocator& string_allocator) {
-    return SetIfMatchingArray(
-        handler_stack,
-        event,
-        expected_key,
-        [&string_array, &string_allocator](EventHandlerStack&, Event const& event) {
-            if (event.type == EventType::String) {
-                dyn::Append(string_array, DynamicArray<char> {event.string, string_allocator});
-                return true;
-            }
-            return false;
-        });
+    return SetIfMatchingArray(handler_stack,
+                              event,
+                              expected_key,
+                              [&string_array, &string_allocator](EventHandlerStack&, Event const& event) {
+                                  if (event.type == EventType::String) {
+                                      dyn::Append(string_array,
+                                                  DynamicArray<char> {event.string, string_allocator});
+                                      return true;
+                                  }
+                                  return false;
+                              });
 }
 
 template <typename Type>

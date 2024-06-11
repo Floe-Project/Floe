@@ -21,7 +21,7 @@ TEST_CASE(TestErrorNotifications) {
             [&]() {
                 auto seed = SeedFromTime();
                 while (iterations.Load() < k_num_iterations) {
-                    const auto id = RandomIntInRange<u64>(seed, 0, 20);
+                    auto const id = RandomIntInRange<u64>(seed, 0, 20);
                     if (RandomIntInRange<u32>(seed, 0, 5) == 0) {
                         no.RemoveError(id);
                     } else {
@@ -381,7 +381,7 @@ TEST_CASE(TestAtomicRefList) {
                 auto seed = SeedFromTime();
                 for (_ : Range(5000)) {
                     for (char c = 'a'; c <= 'z'; ++c) {
-                        const auto r = RandomIntInRange(seed, 0, 2);
+                        auto const r = RandomIntInRange(seed, 0, 2);
                         if (r == 0) {
                             for (auto it = map.begin(); it != map.end();)
                                 if (it->value.obj[0] == c) {

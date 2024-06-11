@@ -1304,7 +1304,7 @@ void DrawList::AddTextJustified(Rect r,
                 }
             } else if (overflow_type == TextOverflowType::ShowDotsOnLeft) {
                 auto get_char_previous_to_end = [](char const* start, char const* end) {
-                    const char* prev_s = start;
+                    char const* prev_s = start;
                     for (auto s = start; s < end && *s != '\0';) {
                         s = IncrementUTF8Characters(s, 1);
                         if (s >= end) return prev_s;

@@ -468,7 +468,7 @@ void ColoursGUISliders(EditorGUI* gui, String search) {
         auto text_editor = [&](Rect edit_r, imgui::Id id, ColourString& str) {
             dyn::NullTerminated(str);
             auto settings = imgui::DefTextInput();
-            const auto res = gui->imgui->TextInput(settings, edit_r, id, str);
+            auto const res = gui->imgui->TextInput(settings, edit_r, id, str);
             if (res.enter_pressed) {
                 dyn::Assign(str, res.text);
                 return true;

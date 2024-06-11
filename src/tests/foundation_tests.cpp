@@ -432,7 +432,7 @@ TEST_CASE(DynamicArrayBasics) {
         auto const default_initialised = !Fundamental<Type>;
 
         auto check_grow_buffer_incrementally = [&]() {
-            const usize max = 550;
+            usize const max = 550;
             for (usize i = 1; i <= max; ++i) {
                 dyn::Resize(buf, i);
                 REQUIRE(buf.size == i);
@@ -1204,7 +1204,7 @@ TEST_CASE(TestLinkedList) {
     auto remove_if = [&](auto pred) {
         SinglyLinkedListRemoveIf(
             list.first,
-            [&](const Node& node) { return pred(node.val); },
+            [&](Node const& node) { return pred(node.val); },
             [&](Node* node) { a.Delete(node); });
     };
 
@@ -1973,7 +1973,7 @@ TEST_CASE(TestRandomFloatGenerator) {
         auto test = [&](bool allow_repititions) {
             constexpr T k_max_val = 100;
             for (_ : Range(k_num_rand_test_repititions)) {
-                const auto random_num =
+                auto const random_num =
                     generator.GetRandomInRange(seed, -k_max_val, k_max_val, allow_repititions);
                 REQUIRE(random_num >= -k_max_val);
                 REQUIRE(random_num <= k_max_val);
@@ -2054,7 +2054,7 @@ TEST_CASE(Testversion) {
 
     auto const check_string_parsing = [&](String str, Version ver) {
         CAPTURE(str);
-        const auto parsed_ver = ParseVersionString(str);
+        auto const parsed_ver = ParseVersionString(str);
         REQUIRE(parsed_ver.HasValue());
         CAPTURE(parsed_ver->ToString(tester.scratch_arena));
         CAPTURE(ver.ToString(tester.scratch_arena));

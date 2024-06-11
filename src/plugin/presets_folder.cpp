@@ -97,7 +97,7 @@ DirectoryListing::Entry const* SelectPresetFromListing(DirectoryListing const& l
                             .meets_custom_requirement =
                                 [&library_info = library_info](DirectoryListing::Entry const& entry) {
                                     if (entry.Metadata()) {
-                                        const auto& meta = *(const PresetMetadata*)entry.Metadata();
+                                        auto const& meta = *(PresetMetadata const*)entry.Metadata();
                                         for (auto& l : meta.used_libraries)
                                             if (l == library_info.name) return true;
                                     }
@@ -154,7 +154,7 @@ PresetsFolderScanResult FetchOrRescanPresetsFolder(PresetsListing& listing,
             BeginScan(listing.scanned_folder);
 
             DirectoryListing new_listing {PageAllocator::Instance()};
-            const auto errors = new_listing.ScanFolders(
+            auto const errors = new_listing.ScanFolders(
                 folders_to_scan,
                 true,
                 Array {"*.mirage*"_s, "*.floe-preset"},
@@ -188,7 +188,7 @@ PresetsFolderScanResult FetchOrRescanPresetsFolder(PresetsListing& listing,
                     return nullptr;
                 });
 
-            const auto error_id = [](String path) {
+            auto const error_id = [](String path) {
                 return ((u64)U32FromChars("pres") << 32) | Hash32(path);
             };
             for (auto& err : errors.folder_errors) {

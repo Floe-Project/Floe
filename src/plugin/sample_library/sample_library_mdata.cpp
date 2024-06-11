@@ -27,7 +27,7 @@ static Range ConvertVelocityToStartEndRange(s8 low_velo, s8 high_velo) {
 
 TEST_CASE(TestConvertVelocityRange) {
     auto check = [&](s8 low_velo, s8 high_velo, Range expected_out) {
-        const auto out = ConvertVelocityToStartEndRange(low_velo, high_velo);
+        auto const out = ConvertVelocityToStartEndRange(low_velo, high_velo);
         REQUIRE_EQ(out.start, expected_out.start);
         REQUIRE_EQ(out.end, expected_out.end);
     };

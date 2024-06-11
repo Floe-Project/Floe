@@ -33,7 +33,7 @@ void RegisterTest(Tester& tester, TestFunction f, String title) {
 String TempFolder(Tester& tester) {
     if (!tester.test_output_folder) {
         tester.test_output_folder = ({
-            const auto o = KnownDirectoryWithSubdirectories(tester.arena,
+            auto const o = KnownDirectoryWithSubdirectories(tester.arena,
                                                             KnownDirectories::Temporary,
                                                             Array {"Floe"_s, "tests"});
             if (o.HasError()) {

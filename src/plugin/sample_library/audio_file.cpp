@@ -54,7 +54,7 @@ static ErrorCodeOr<AudioData> DecodeFlac(Reader& reader, Allocator& allocator) {
             // Read callback
             auto& context = *((Context*)user_data);
 
-            const auto requested_bytes = *bytes;
+            auto const requested_bytes = *bytes;
 
             auto outcome = context.reader.Read({buffer, *bytes});
             if (outcome.HasError()) {
@@ -104,7 +104,7 @@ static ErrorCodeOr<AudioData> DecodeFlac(Reader& reader, Allocator& allocator) {
             // Write callback
             auto& context = *((Context*)user_data);
 
-            const auto start_pos = context.samples_pos;
+            auto const start_pos = context.samples_pos;
 
             if (frame->header.channels == 0 || frame->header.channels > 2) {
                 context.error_code = AudioFileError::NotMonoOrStereo;
@@ -114,11 +114,11 @@ static ErrorCodeOr<AudioData> DecodeFlac(Reader& reader, Allocator& allocator) {
             u64 bits_per_sample = frame->header.bits_per_sample;
             if (!bits_per_sample) bits_per_sample = context.bits_per_sample;
             if (!bits_per_sample) return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
-            const auto divisor = (f32)(1ull << (bits_per_sample - 1));
+            auto const divisor = (f32)(1ull << (bits_per_sample - 1));
 
             for (unsigned int chan = 0; chan < frame->header.channels; ++chan) {
                 for (unsigned int sample = 0; sample < frame->header.blocksize; ++sample) {
-                    const auto val = buffer[chan][sample];
+                    auto const val = buffer[chan][sample];
                     context.interleaved_samples[start_pos + chan + sample * frame->header.channels] =
                         (f32)val / divisor;
                 }
@@ -133,7 +133,7 @@ static ErrorCodeOr<AudioData> DecodeFlac(Reader& reader, Allocator& allocator) {
             // The StreamInfo block will always be before the stream
             auto& context = *((Context*)user_data);
             if (metadata->type != FLAC__METADATA_TYPE_STREAMINFO) return;
-            const auto& info = metadata->data.stream_info;
+            auto const& info = metadata->data.stream_info;
 
             if (info.channels == 0 || info.channels > 2) {
                 context.error_code = AudioFileError::NotMonoOrStereo;
@@ -144,7 +144,7 @@ static ErrorCodeOr<AudioData> DecodeFlac(Reader& reader, Allocator& allocator) {
 
             context.bits_per_sample = info.bits_per_sample;
 
-            context.hash = Hash(Span<const u8> {info.md5sum, sizeof(info.md5sum)});
+            context.hash = Hash(Span<u8 const> {info.md5sum, sizeof(info.md5sum)});
             context.sample_rate = (f32)info.sample_rate;
             context.channels = CheckedCast<u8>(info.channels);
             context.num_frames = CheckedCast<u32>(info.total_samples);

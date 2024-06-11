@@ -33,7 +33,7 @@ static sample_lib::Library* BuiltinLibrary() {
         .path = ":memory:",
         .file_hash = 100,
         .create_file_reader = [](sample_lib::Library const&, String path) -> ErrorCodeOr<Reader> {
-            const auto embedded_irs = EmbeddedIrs();
+            auto const embedded_irs = EmbeddedIrs();
             for (auto& ir : embedded_irs.irs)
                 if (ToString(ir.filename) == path) return Reader::FromMemory({ir.data, ir.size});
             return ErrorCode(FilesystemError::PathDoesNotExist);
@@ -141,7 +141,7 @@ static void LoadAudioAsync(ListedAudioData& audio_data,
 
         ASSERT(audio_data.state.Load() == LoadingState::Loading);
 
-        const auto outcome = [&audio_data, &lib]() -> ErrorCodeOr<AudioData> {
+        auto const outcome = [&audio_data, &lib]() -> ErrorCodeOr<AudioData> {
             auto reader = TRY(lib.create_file_reader(lib, audio_data.path));
             return DecodeAudioFile(reader, audio_data.path, AudioDataAllocator::Instance());
         }();
@@ -459,7 +459,7 @@ static void AddAsyncJob(LibrariesAsyncContext& async_ctx,
                 String path =
                     args.path_or_memory.Is<String>() ? args.path_or_memory.Get<String>() : ":memory:";
                 ZoneText(path.data, path.size);
-                const auto try_job = [&]() -> Optional<sample_lib::LibraryPtrOrError> {
+                auto const try_job = [&]() -> Optional<sample_lib::LibraryPtrOrError> {
                     using H = sample_lib::TryHelpersOutcomeToError;
                     if (args.format == sample_lib::FileFormat::Lua && args.path_or_memory.Is<String>()) {
                         // it will be more efficient to just load the whole lua into memory
@@ -469,7 +469,7 @@ static void AddAsyncJob(LibrariesAsyncContext& async_ctx,
                     }
 
                     auto reader = TRY_H(Reader::FromPathOrMemory(args.path_or_memory));
-                    const auto file_hash = TRY_H(sample_lib::Hash(reader, args.format));
+                    auto const file_hash = TRY_H(sample_lib::Hash(reader, args.format));
 
                     for (auto& node : args.libraries) {
                         if (auto l = node.TryScoped()) {
@@ -489,21 +489,21 @@ static void AddAsyncJob(LibrariesAsyncContext& async_ctx,
                 ZoneScopedN("scan folder");
                 auto& j = *job.data.Get<LibrariesAsyncContext::Job::ScanFolder*>();
                 if (auto folder = j.args.folder->TryScoped()) {
-                    const auto& path = folder->path;
+                    auto const& path = folder->path;
                     ZoneText(path.data, path.size);
 
-                    const auto try_job = [&]() -> ErrorCodeOr<void> {
+                    auto const try_job = [&]() -> ErrorCodeOr<void> {
                         auto it = TRY(DirectoryIterator::Create(scratch_arena, path, "*"));
                         while (it.HasMoreFiles()) {
-                            const auto& entry = it.Get();
-                            const auto ext = path::Extension(entry.path);
+                            auto const& entry = it.Get();
+                            auto const ext = path::Extension(entry.path);
                             if (ext == ".mdata") {
                                 ReadLibraryAsync(async_ctx,
                                                  lib_list,
                                                  String(entry.path),
                                                  sample_lib::FileFormat::Mdata);
                             } else if (entry.type == FileType::Directory && ext == ".library") {
-                                const String lua_path =
+                                String const lua_path =
                                     path::Join(scratch_arena, Array {String(entry.path), "config.lua"});
                                 ReadLibraryAsync(async_ctx, lib_list, lua_path, sample_lib::FileFormat::Lua);
                             }
@@ -720,7 +720,7 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
             }
             for (auto& l : libs.libraries)
                 if (l.value.lib->file_format_specifics.tag == sample_lib::FileFormat::Lua)
-                    if (const auto dir = path::Directory(l.value.lib->path))
+                    if (auto const dir = path::Directory(l.value.lib->path))
                         dyn::Append(dirs, {.path = *dir, .recursive = true});
             dirs.ToOwnedSpan();
         });
@@ -731,15 +731,15 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
             scratch_arena,
             [&](String watched_dir, ErrorCodeOr<DirectoryWatcher::FileChange> outcome) {
                 if (outcome.HasValue()) {
-                    const auto& change = outcome.Value();
+                    auto const& change = outcome.Value();
 
                     enum class Type { Unknown, MainLibraryFile, AuxilleryLibraryFile };
                     Type type {Type::Unknown};
                     LibrariesList::Node* relates_to_lib {};
-                    const auto full_path =
+                    auto const full_path =
                         String(path::Join(scratch_arena, Array {watched_dir, change.subpath}));
                     for (auto& node : libs.libraries) {
-                        const auto& lib = *node.value.lib;
+                        auto const& lib = *node.value.lib;
                         if (path::Equal(lib.path, full_path)) {
                             relates_to_lib = &node;
                             type = Type::MainLibraryFile;
@@ -907,7 +907,7 @@ static void RemoveUnreferencedObjects(LoadingThread& thread,
                                       List<ListedAudioData>& audio_datas) {
     ZoneScoped;
     thread.connections.Use([](auto& connections) {
-        connections.RemoveIf([](const Connection& h) { return !h.used.Load(MemoryOrder::Relaxed); });
+        connections.RemoveIf([](Connection const& h) { return !h.used.Load(MemoryOrder::Relaxed); });
     });
 
     for (auto& l : libraries)
@@ -1295,7 +1295,7 @@ static void LoadingThreadLoop(LoadingThread& thread) {
                         auto const num_completed = ({
                             u32 n = 0;
                             for (auto& a : i->audio_data_set) {
-                                const auto state = a->state.Load();
+                                auto const state = a->state.Load();
                                 if (state == LoadingState::CompletedSucessfully) ++n;
                             }
                             n;
@@ -1964,8 +1964,8 @@ TEST_CASE(TestAssetLoader) {
                 (RandomIntInRange(random_seed, 0, 2) == 0)
                     ? LoadRequest {sample_lib::IrId {.library_name = k_builtin_library_name,
                                                      .ir_name = ({
-                                                         const auto ele = RandomElement(
-                                                             Span<const BinaryData> {builtin_irs.irs},
+                                                         auto const ele = RandomElement(
+                                                             Span<BinaryData const> {builtin_irs.irs},
                                                              random_seed);
                                                          String {ele.name.data, ele.name.size};
                                                      })}}

@@ -225,7 +225,7 @@ clap_plugin_gui const floe_gui {
         hints->can_resize_vertically = true;
         hints->can_resize_horizontally = true;
         hints->preserve_aspect_ratio = true;
-        const auto ratio = gui_settings::CurrentAspectRatio(g_cross_instance_systems->settings.settings.gui);
+        auto const ratio = gui_settings::CurrentAspectRatio(g_cross_instance_systems->settings.settings.gui);
         hints->aspect_ratio_width = ratio.width;
         hints->aspect_ratio_height = ratio.height;
         return true;
@@ -240,7 +240,7 @@ clap_plugin_gui const floe_gui {
     // Returns true if the plugin could adjust the given size.
     // [main-thread]
     .adjust_size = [](clap_plugin_t const*, u32* width, u32* height) -> bool {
-        const auto sz = gui_settings::ConstrainWindowSizeToAspectRatio(
+        auto const sz = gui_settings::ConstrainWindowSizeToAspectRatio(
             {CheckedCast<u16>(*width), CheckedCast<u16>(*height)},
             gui_settings::CurrentAspectRatio(g_cross_instance_systems->settings.settings.gui));
         *width = sz.width;
@@ -326,7 +326,7 @@ clap_plugin_params const floe_params {
     // Copies the parameter's info to param_info. Returns true on success.
     // [main-thread]
     .get_info = [](clap_plugin_t const*, u32 param_index, clap_param_info_t* param_info) -> bool {
-        const auto& param = k_param_infos[param_index];
+        auto const& param = k_param_infos[param_index];
         param_info->id = ParamIndexToId((ParamIndex)param_index);
         param_info->default_value = (f64)param.default_linear_value;
         param_info->max_value = (f64)param.linear_range.max;
@@ -348,9 +348,9 @@ clap_plugin_params const floe_params {
     .get_value = [](clap_plugin_t const* plugin, clap_id param_id, f64* out_value) -> bool {
         auto& floe = *(FloeInstance*)plugin->plugin_data;
         DebugAssertMainThread(floe.host);
-        const auto opt_index = ParamIdToIndex(param_id);
+        auto const opt_index = ParamIdToIndex(param_id);
         if (!opt_index) return false;
-        const auto index = (usize)*opt_index;
+        auto const index = (usize)*opt_index;
         if (floe.plugin->preset_is_loading)
             *out_value = (f64)floe.plugin->latest_snapshot.state.param_values[index];
         else
@@ -364,11 +364,11 @@ clap_plugin_params const floe_params {
     .value_to_text =
         [](clap_plugin_t const*, clap_id param_id, f64 value, char* out_buffer, u32 out_buffer_capacity)
         -> bool {
-        const auto opt_index = ParamIdToIndex(param_id);
+        auto const opt_index = ParamIdToIndex(param_id);
         if (!opt_index) return false;
-        const auto index = (usize)*opt_index;
-        const auto& p = k_param_infos[index];
-        const auto str = p.LinearValueToString((f32)value);
+        auto const index = (usize)*opt_index;
+        auto const& p = k_param_infos[index];
+        auto const str = p.LinearValueToString((f32)value);
         if (!str) return false;
         if (out_buffer_capacity < (str->size + 1)) return false;
         CopyMemory(out_buffer, str->data, str->size);
@@ -381,10 +381,10 @@ clap_plugin_params const floe_params {
     // [main-thread]
     .text_to_value =
         [](clap_plugin_t const*, clap_id param_id, char const* param_value_text, f64* out_value) -> bool {
-        const auto opt_index = ParamIdToIndex(param_id);
+        auto const opt_index = ParamIdToIndex(param_id);
         if (!opt_index) return false;
-        const auto index = (usize)*opt_index;
-        const auto& p = k_param_infos[index];
+        auto const index = (usize)*opt_index;
+        auto const& p = k_param_infos[index];
         if (auto v = p.StringToLinearValue(FromNullTerminated(param_value_text))) {
             *out_value = (f64)*v;
             return true;

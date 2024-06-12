@@ -247,14 +247,6 @@
             pkgs.gnome.zenity
             pkgs.libGL
             pkgs.libGLU
-
-            (pkgs.writeShellScriptBin "pluginval-windows" ''
-              wine ${pluginval-windows}/bin/pluginval.exe $@
-            '')
-
-            (pkgs.writeShellScriptBin "clap-val-windows" ''
-              wine ${clap-val-windows}/bin/clap-validator.exe $@
-            '')
           ];
           shellHook = ''
             export MACOSX_SDK_SYSROOT="${macosx-sdks}"

@@ -154,26 +154,6 @@ fn tryConcatCompileCommands(step: *std.Build.Step) !void {
             }
         }
 
-        {
-            var out_f = try std.fs.createFileAbsolute(step.owner.pathJoin(&.{ build_gen, "clang-tidy-cmd.sh" }), .{});
-            defer out_f.close();
-            var buffered_writer: std.io.BufferedWriter(20 * 1024, @TypeOf(out_f.writer())) = .{ .unbuffered_writer = out_f.writer() };
-            const writer = buffered_writer.writer();
-
-            // At this point, we have the complete list of files that were compiled and so we can create a clang-tidy command.
-            // Unfortunately, clang-tidy can't read a compile_commands.json itself.
-            try writer.writeAll(
-                \\#!/bin/sh
-                \\echo "Running clang-tidy on all Floe source files..."
-            );
-            try std.fmt.format(writer, "\nclang-tidy \"$@\" -p {s} ", .{std.fs.path.dirname(generic_out_path).?});
-
-            for (compile_commands.items) |c| {
-                try std.fmt.format(writer, "{s} ", .{c.file});
-            }
-            try buffered_writer.flush();
-        }
-
         var out_f = try std.fs.createFileAbsolute(out_path, .{});
         defer out_f.close();
         var buffered_writer: std.io.BufferedWriter(20 * 1024, @TypeOf(out_f.writer())) = .{ .unbuffered_writer = out_f.writer() };

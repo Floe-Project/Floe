@@ -24,7 +24,13 @@ check-reuse:
 check-format:
   {{all_src_files}} | xargs clang-format --dry-run --Werror
 
-format-all:
+clang-tidy:
+  jq -r '.[].file' build_gen/compile_commands.json | xargs clang-tidy -p build_gen 
+
+cppcheck:
+  cppcheck --project=build_gen/compile_commands.json --cppcheck-build-dir=.zig-cache --enable=unusedFunction
+
+format:
   {{all_src_files}} | xargs clang-format -i
 
 test-clap-val:
@@ -51,50 +57,74 @@ test-wine-units:
 test-wine-clap-val:
   wine $CLAPVAL_WINDOWS_PATH validate zig-out/x86-windows/Floe.clap
 
-parallel_tests := "check-reuse check-format test-clap-val test-units test-pluginval test-vst3-val" + if os() == "linux" {
-  " test-wine-vst3-val test-wine-pluginval test-wine-clap-val test-wine-units"
+# level 0: fast tests
+level_0_common_tests := replace("""
+  check-reuse 
+  check-format
+  test-clap-val
+  test-units
+  test-pluginval
+  test-vst3-val
+""", "\n", " ")
+
+level_0_linux_tests := replace("""
+  test-wine-vst3-val
+  test-wine-pluginval
+  test-wine-clap-val
+  test-wine-units
+""", "\n", " ")
+
+level_0_tests := level_0_common_tests + if os() == "linux" {
+  level_0_linux_tests
 } else {
   ""
 }
 
-tests:
+# level 1: slower tests
+level_1_tests := replace("""
+  clang-tidy
+  cppcheck
+""", "\n", " ")
+
+tests level: (parallel if level == "0" { level_0_tests } else { level_0_tests + level_1_tests })
+
+parallel tasks:
   #!/usr/bin/env bash
   mkdir -p build_gen
-  test_results_json=build_gen/test_results.json
+  results_json=build_gen/results.json
 
-  parallel --results $test_results_json just ::: {{parallel_tests}}
+  parallel --bar --results $results_json just ::: {{tasks}}
 
   # parallel's '--results x.json' flag does not produce valid JSON, so we need to fix it
-  sed 's/$/,/' $test_results_json | head -c -2 > results.json.tmp
-  { echo "["; cat results.json.tmp; echo "]"; } > $test_results_json
+  sed 's/$/,/' $results_json | head -c -2 > results.json.tmp
+  { echo "["; cat results.json.tmp; echo "]"; } > $results_json
   rm results.json.tmp
 
-  # remove any Commands == "" (for some reason just adds these)
-  jq "[ .[] | select(.Command != \"\") ]" $test_results_json > results.json.tmp
-  mv results.json.tmp $test_results_json
+  # remove any items where `Command == ""` (for some reason just adds these)
+  jq "[ .[] | select(.Command != \"\") ]" $results_json > results.json.tmp
+  mv results.json.tmp $results_json
 
-  # print stdout and stderr for failed tests
-  jq -r '.[] | select(.Exitval != 0) | "\n\u001b[34m[Stdout] \(.Command):\u001b[0m", .Stdout, "\n\u001b[34m[Stderr] \(.Command):\u001b[0m", .Stderr' $test_results_json
-  echo -e "\033[0;34m[Summary]\033[0m"
+  # print stdout and stderr for failed 
+  jq -r '.[] | select(.Exitval != 0) | "\n\u001b[34m[Stdout] \(.Command):\u001b[0m", .Stdout, "\n\u001b[34m[Stderr] \(.Command):\u001b[0m", .Stderr' $results_json
 
-  # prepare a TSV summary of the test results
-  summary=$(jq -r '["Command", "Time(s)", "Return Code"], (.[] | [.Command, .JobRuntime, .Exitval]) | @tsv' $test_results_json)
-  failed=$(jq '. | map(select(.Exitval != 0)) | length' $test_results_json)
-  num_jobs=$(jq '. | length' $test_results_json)
+  # prepare a TSV summary of the results
+  summary=$(jq -r '["Command", "Time(s)", "Return Code"], (.[] | [.Command, .JobRuntime, .Exitval]) | @tsv' $results_json)
+  failed=$(jq '. | map(select(.Exitval != 0)) | length' $results_json)
+  num_tasks=$(jq '. | length' $results_json)
 
   # use miller to pretty-print the summary, along with a markdown version for GitHub Actions
+  echo -e "\033[0;34m[Summary]\033[0m"
+  [[ ! -z $GITHUB_ACTIONS ]] && echo "# Summary\n\n" >> $GITHUB_STEP_SUMMARY
   printf "%s\n" "$summary" | mlr --itsv --opprint sort -f "Return Code"
-  [[ ! -z $GITHUB_ACTIONS ]] && echo "# Test Summary\n\n" >> $GITHUB_STEP_SUMMARY
   [[ ! -z $GITHUB_ACTIONS ]] && printf "%s\n" "$summary" | mlr --itsv --omd sort -f "Return Code" >> $GITHUB_STEP_SUMMARY
 
   if [ $failed -eq 0 ]; then
-    echo -e "\033[0;32mAll $num_jobs jobs passed\033[0m"
-    [[ ! -z $GITHUB_ACTIONS ]] && echo ":white_check_mark: All $num_jobs tests passed" >> $GITHUB_STEP_SUMMARY
+    echo -e "\033[0;32mAll $num_tasks tasks passed\033[0m"
+    [[ ! -z $GITHUB_ACTIONS ]] && echo ":white_check_mark: All $num_tasks tasks succeeded" >> $GITHUB_STEP_SUMMARY
   else
-    echo -e "\033[0;31m$failed/$num_jobs jobs failed\033[0m"
-    [[ ! -z $GITHUB_ACTIONS ]] && echo ":x: $failed/$num_jobs tests failed" >> $GITHUB_STEP_SUMMARY
+    echo -e "\033[0;31m$failed/$num_tasks tasks failed\033[0m"
+    [[ ! -z $GITHUB_ACTIONS ]] && echo ":x: $failed/$num_tasks tasks failed" >> $GITHUB_STEP_SUMMARY
   fi
 
   exit 0
-
 

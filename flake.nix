@@ -184,6 +184,7 @@
             pkgs.gnused
             pkgs.coreutils
             pkgs.jq
+            pkgs.just
 
             (pkgs.writeShellScriptBin "format-all" ''
               ${pkgs.fd}/bin/fd . -e .mm -e .cpp -e .hpp -e .h src | xargs ${pkgs.llvmPackages_18.clang-unwrapped}/bin/clang-format -i
@@ -257,6 +258,8 @@
           ];
           shellHook = ''
             export MACOSX_SDK_SYSROOT="${macosx-sdks}"
+            export PLUGINVAL_WINDOWS_PATH="${pluginval-windows}/bin/pluginval.exe"
+            export CLAPVAL_WINDOWS_PATH="${clap-val-windows}/bin/clap-validator.exe"
           '';
         };
       });

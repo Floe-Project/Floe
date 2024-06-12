@@ -790,6 +790,9 @@ pub fn build(b: *std.Build) void {
 
     const user_given_target_presets = b.option([]const u8, "targets", "Target operating system");
 
+    // ignore any error
+    std.fs.makeDirAbsolute(build_gen) catch {};
+
     // const install_dir = b.install_path; // zig-out
 
     const targets = getTargets(b, user_given_target_presets) catch @panic("OOM");

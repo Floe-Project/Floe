@@ -49,8 +49,25 @@
             unzip $src
           '';
 
-          buildPhase = ''
+          installPhase = ''
             mkdir -p $out/bin
+            cp -R . $out/bin
+          '';
+        };
+
+        clap-val-windows = pkgs.stdenv.mkDerivation {
+          pname = "clap-validator-windows";
+          version = "0.3.2";
+
+          src = builtins.fetchurl {
+            url = "https://github.com/free-audio/clap-validator/releases/download/0.3.2/clap-validator-0.3.2-windows.zip";
+            sha256 = "sha256:1nmxfndv9afqkdplhp6fnm9b6k4v2nvp1a10ahmm92alq18vxkb8";
+          };
+
+          buildInputs = [ pkgs.unzip ];
+
+          unpackPhase = ''
+            unzip $src
           '';
 
           installPhase = ''
@@ -229,6 +246,14 @@
             pkgs.gnome.zenity
             pkgs.libGL
             pkgs.libGLU
+
+            (pkgs.writeShellScriptBin "pluginval-windows" ''
+              wine ${pluginval-windows}/bin/pluginval.exe $@
+            '')
+
+            (pkgs.writeShellScriptBin "clap-val-windows" ''
+              wine ${clap-val-windows}/bin/clap-validator.exe $@
+            '')
           ];
           shellHook = ''
             export MACOSX_SDK_SYSROOT="${macosx-sdks}"

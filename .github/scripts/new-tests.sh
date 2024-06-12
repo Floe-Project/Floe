@@ -25,11 +25,21 @@ jobs=(
 
 if [ $(uname -s) != "Darwin" ] && [ -z $GITHUB_ACTIONS ]; then
   jobs+=(
+    # wine
+    "pluginval-windows zig-out/x86-windows/Floe.vst3"
+    "clap-val-windows validate zig-out/x86-windows/Floe.clap"
     "wine zig-out/x86-windows/tests.exe"
+    "wine zig-out/x86-windows/VST3-Validator.exe zig-out/x86-windows/Floe.vst3"
   )
 fi
 
-# level 1: slow tests, only run if level 1 or higher
+if [ $(uname -s) == "Darwin" ]; then
+  jobs+=(
+    # TODO: add auval
+  )
+fi
+
+# level 1: slow tests
 if [ $test_level -ge 1 ]; then
   jobs+=(
     "sh build_gen/clang-tidy-cmd.sh"
@@ -46,7 +56,7 @@ jq -r '.[] | select(.Exitval != 0) | "\n\u001b[34m[Stdout] \(.Command):\u001b[0m
 
 echo -e "\033[0;34m[Summary]\033[0m"
 
-summary=$(echo $json | jq -r '["Command", "Time", "Return Code"], (.[] | [.Command, .JobRuntime, .Exitval]) | @tsv')
+summary=$(echo $json | jq -r '["Command", "Time(s)", "Return Code"], (.[] | [.Command, .JobRuntime, .Exitval]) | @tsv')
 
 printf "%s\n" "$summary" | mlr --itsv --opprint sort -f "Return Code"
 

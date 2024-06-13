@@ -19,12 +19,8 @@ jobs:
 
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
-
-      - name: Nix Develop Action
-        uses: nicknovitski/nix-develop@v1.1.0
-
-      - name: Setup Zig Cache
-        uses: Hanaasagi/zig-action-cache@master
+      - uses: nicknovitski/nix-develop@v1.1.0
+      - uses: Hanaasagi/zig-action-cache@master
         with:
           cache-directories: ".zig-cache"
 
@@ -42,6 +38,18 @@ jobs:
         id: compile_mac
         continue-on-error: true
         run: zig build compile -Dtargets=mac_ub
+
+      - name: Tests
+        continue-on-error: true
+        run: just test-ci
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          directory: build_gen/coverage-out/tests
+          verbose: true
+          fail_ci_if_error: true
 
       # IMPORTANT(upload-artifact): 
       #  1. If multiple paths are provided as input, the least common ancestor of all the search paths will be used as the 
@@ -171,14 +179,6 @@ jobs:
         name: Run kcov
         run: kcov kcov-output ./tests
 
-      - if: matrix.command == 'kcov'
-        name: Upload coverage reports
-        uses: codecov/codecov-action@v4
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          directory: zig-out/x86-linux/kcov-output/tests
-          verbose: true
-          fail_ci_if_error: true
 
   reuse-compliance:
     runs-on: ubuntu-latest

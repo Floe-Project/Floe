@@ -112,19 +112,39 @@ fn tryConcatCompileCommands(step: *std.Build.Step) !void {
 
                     var to_remove = std.ArrayList(u32).init(arena.allocator());
                     var index: u32 = 0;
-                    for (args.items) |*arg| {
+                    for (args.items) |arg| {
                         // clangd crashes when using c++2b on mac (May 2023)
                         // if (std.mem.eql(u8, arg.*, "-std=c++2b"))
                         //     arg.* = try arena.allocator().dupe(u8, "-std=c++20");
 
                         // clangd doesn't like this flag
-                        if (std.mem.eql(u8, arg.*, "--no-default-config"))
+                        if (std.mem.eql(u8, arg, "--no-default-config"))
                             try to_remove.append(index);
 
                         // clang-tidy doesn't like this flag being there
-                        if (std.mem.eql(u8, arg.*, "-ftime-trace"))
+                        if (std.mem.eql(u8, arg, "-ftime-trace"))
                             try to_remove.append(index);
 
+                        // clang-tidy doesn't like this
+                        if (std.mem.eql(u8, arg, "-ObjC++"))
+                            try to_remove.append(index);
+
+                        index = index + 1;
+                    }
+
+                    // clang-tidy doesn't like this when cross-compiling macos, it's a sequence we need to look for and remove, it's no good just removing the '+pan'
+                    index = 0;
+                    for (args.items) |arg| {
+                        if (std.mem.eql(u8, arg, "-Xclang")) {
+                            if (index + 3 < args.items.len) {
+                                if (std.mem.eql(u8, args.items[index + 1], "-target-feature") and std.mem.eql(u8, args.items[index + 2], "-Xclang") and std.mem.eql(u8, args.items[index + 3], "+pan")) {
+                                    try to_remove.append(index);
+                                    try to_remove.append(index + 1);
+                                    try to_remove.append(index + 2);
+                                    try to_remove.append(index + 3);
+                                }
+                            }
+                        }
                         index = index + 1;
                     }
 
@@ -156,15 +176,15 @@ fn tryConcatCompileCommands(step: *std.Build.Step) !void {
             const existing_compile_commands = try std.json.parseFromSlice([]CompileFragment, arena.allocator(), file_contents, .{});
 
             for (existing_compile_commands.value) |existing_c| {
-                var already_present = false;
+                var is_replaced_by_newer = false;
                 for (compile_commands.items) |new_c| {
                     if (std.mem.eql(u8, new_c.file, existing_c.file)) {
-                        already_present = true;
+                        is_replaced_by_newer = true;
                         break;
                     }
                 }
 
-                if (!already_present) {
+                if (!is_replaced_by_newer) {
                     try compile_commands.append(existing_c);
                 }
             }
@@ -801,8 +821,6 @@ pub fn build(b: *std.Build) void {
     tryCopyCompileCommandsForTargetFileToDefault(b.allocator, target_for_compile_commands.result);
 
     for (targets.items) |target| {
-        std.debug.print("Target: {s}\n", .{target.result.zigTriple(b.allocator) catch @panic("OOM")});
-
         var join_compile_commands = b.allocator.create(ConcatCompileCommandsStep) catch @panic("OOM");
         join_compile_commands.* = ConcatCompileCommandsStep{
             .step = std.Build.Step.init(.{

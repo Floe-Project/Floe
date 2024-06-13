@@ -74,16 +74,13 @@ jobs:
             zig-out/x86-windows/tests.exe
             zig-out/x86-windows/VST3-Validator.exe
 
-  test:
+  test-windows:
     strategy:
       fail-fast: false # run even if others in this matrix failed
       matrix:
-        system: [
-          {os: windows, log-root-dir: "C:/Users/runner/AppData/Local" },
-        ]
         test: [ unit, vst3val, pluginval, clapval ]
-    name: ${{ matrix.system.os }}-${{ matrix.test }}
-    runs-on: ${{ matrix.system.os }}-latest
+    name: windows-${{ matrix.test }}
+    runs-on: windows-latest
     needs: compile
     timeout-minutes: 10
     steps:
@@ -96,10 +93,9 @@ jobs:
       # The artifact will be installed to ${{ github.workspace }}
       - uses: actions/download-artifact@v4
         with:
-          name: binaries-${{ matrix.system.os }}
+          name: binaries-windows
 
-      - if: matrix.system.os == 'windows'
-        shell: pwsh
+      - shell: pwsh
         name: ${{ matrix.test }}
         run: |
           powershell -ExecutionPolicy Bypass -File .github\scripts\run-test.ps1 -test_type ${{ matrix.test }} -binaries_dir "${{ github.workspace }}"
@@ -108,7 +104,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: log-${{ matrix.system.os }}-${{ matrix.test }}
+          name: log-windows-${{ matrix.test }}
           if-no-files-found: ignore
-          path: ${{ matrix.system.log-root-dir }}/FrozenPlain/floe.log
+          path: C:/Users/runner/AppData/Local/Floe/floe.log
 

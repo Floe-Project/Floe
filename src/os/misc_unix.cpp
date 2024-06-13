@@ -286,7 +286,8 @@ void StartupCrashHandler() {
 
     for (auto [index, signal] : Enumerate(k_signals)) {
         struct sigaction action {};
-        action.sa_flags = (int)(SA_SIGINFO | SA_NODEFER | SA_RESETHAND);
+        action.sa_flags =
+            (int)(SA_SIGINFO | SA_NODEFER | SA_RESETHAND); // NOLINT(readability-redundant-casting)
         sigfillset(&action.sa_mask);
         sigdelset(&action.sa_mask, signal);
         action.sa_sigaction = &SignalHandler;

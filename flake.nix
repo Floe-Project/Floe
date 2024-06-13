@@ -184,6 +184,7 @@
             pkgs.coreutils
             pkgs.jq
             pkgs.just
+            pkgs.reuse
 
             (pkgs.writeShellScriptBin "format-all" ''
               ${pkgs.fd}/bin/fd . -e .mm -e .cpp -e .hpp -e .h src | xargs ${pkgs.llvmPackages_18.clang-unwrapped}/bin/clang-format -i

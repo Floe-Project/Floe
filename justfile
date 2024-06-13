@@ -16,8 +16,15 @@ check-reuse:
 check-format:
   {{all_src_files}} | xargs clang-format --dry-run --Werror
 
-clang-tidy arch_os_pair=native_arch_os_pair:
+# install compile database (compile_commands.json)
+install-cbd arch_os_pair=native_arch_os_pair:
+  cp build_gen/compile_commands_{{arch_os_pair}}.json build_gen/compile_commands.json
+
+clang-tidy arch_os_pair=native_arch_os_pair: (install-cbd arch_os_pair)
+  #!/usr/bin/env bash
   jq -r '.[].file' build_gen/compile_commands_{{arch_os_pair}}.json | xargs clang-tidy -p build_gen 
+
+clang-tidy-all: (clang-tidy "x86_64-linux") (clang-tidy "x86_64-windows") (clang-tidy "aarch64-macos")
 
 cppcheck arch_os_pair=native_arch_os_pair:
   # IMPROVE: use --check-level=exhaustive?
@@ -96,7 +103,7 @@ static_analyisers := replace("""
 checks_local_level_0 := if os() == "linux" { quick_checks_linux } else { quick_checks_non_linux }
 checks_local_level_1 := checks_local_level_0 + static_analyisers 
 
-checks_ci := static_analyisers + if os() == "linux" { quick_checks_linux_ci + " coverage" } else { quick_checks_non_linux } 
+checks_ci := if os() == "linux" { quick_checks_linux_ci + " coverage cppcheck clang-tidy-all" } else { " test-units test-clap-val test-pluginval cppcheck" } 
 
 test level: (parallel if level == "0" { checks_local_level_0 } else { checks_local_level_1 } )
 

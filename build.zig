@@ -30,7 +30,7 @@ const rootdir = struct {
 }.getSrcDir();
 
 const build_gen_relative = "build_gen";
-const build_gen = rootdir ++ "/" ++ build_gen_relative;
+const build_gen_abs = rootdir ++ "/" ++ build_gen_relative;
 
 const TargetOs = enum {
     windows,
@@ -41,10 +41,27 @@ const TargetOs = enum {
 const ConcatCompileCommandsStep = struct {
     step: std.Build.Step,
     target: std.Build.ResolvedTarget,
+    use_as_default: bool,
 };
 
-fn compileCommandsDir(alloc: std.mem.Allocator, target: std.Target) ![]u8 {
-    return std.fmt.allocPrint(alloc, "{s}/compile_commands_{s}", .{ build_gen, try target.zigTriple(alloc) });
+fn archAndOsPair(target: std.Target) std.BoundedArray(u8, 32) {
+    var result = std.BoundedArray(u8, 32).init(0) catch @panic("OOM");
+    std.fmt.format(result.writer(), "{s}-{s}", .{ @tagName(target.cpu.arch), @tagName(target.os.tag) }) catch @panic("OOM");
+    return result;
+}
+
+fn compileCommandsDirForTarget(alloc: std.mem.Allocator, target: std.Target) ![]u8 {
+    return std.fmt.allocPrint(alloc, "{s}/compile_commands_{s}", .{ build_gen_abs, archAndOsPair(target).slice() });
+}
+
+fn compileCommandsFileForTarget(alloc: std.mem.Allocator, target: std.Target) ![]u8 {
+    return std.fmt.allocPrint(alloc, "{s}.json", .{compileCommandsDirForTarget(alloc, target) catch @panic("OOM")});
+}
+
+fn tryCopyCompileCommandsForTargetFileToDefault(alloc: std.mem.Allocator, target: std.Target) void {
+    const generic_out_path = std.fs.path.join(alloc, &.{ build_gen_abs, "compile_commands.json" }) catch @panic("OOM");
+    const out_path = compileCommandsFileForTarget(alloc, target) catch @panic("OOM");
+    std.fs.copyFileAbsolute(out_path, generic_out_path, .{ .override_mode = null }) catch {};
 }
 
 fn tryConcatCompileCommands(step: *std.Build.Step) !void {
@@ -61,7 +78,7 @@ fn tryConcatCompileCommands(step: *std.Build.Step) !void {
     };
 
     var compile_commands = std.ArrayList(CompileFragment).init(arena.allocator());
-    const compile_commands_dir = try compileCommandsDir(arena.allocator(), self.target.result);
+    const compile_commands_dir = try compileCommandsDirForTarget(arena.allocator(), self.target.result);
 
     {
         const maybe_dir = std.fs.openDirAbsolute(compile_commands_dir, .{ .iterate = true });
@@ -126,8 +143,7 @@ fn tryConcatCompileCommands(step: *std.Build.Step) !void {
     }
 
     if (compile_commands.items.len != 0) {
-        const out_path = try std.fmt.allocPrint(arena.allocator(), "{s}/compile_commands_{s}.json", .{ build_gen, try self.target.result.zigTriple(arena.allocator()) });
-        const generic_out_path = step.owner.pathJoin(&.{ build_gen, "compile_commands.json" });
+        const out_path = compileCommandsFileForTarget(arena.allocator(), self.target.result) catch @panic("OOM");
 
         const maybe_file = std.fs.openFileAbsolute(out_path, .{});
         if (maybe_file != std.fs.File.OpenError.FileNotFound) {
@@ -163,7 +179,9 @@ fn tryConcatCompileCommands(step: *std.Build.Step) !void {
 
         try std.fs.deleteTreeAbsolute(compile_commands_dir);
 
-        try std.fs.copyFileAbsolute(out_path, generic_out_path, .{ .override_mode = null });
+        if (self.use_as_default) {
+            tryCopyCompileCommandsForTargetFileToDefault(arena.allocator(), self.target.result);
+        }
     }
 }
 
@@ -595,9 +613,9 @@ fn applyUniversalSettings(context: *BuildContext, step: *std.Build.Step.Compile)
         }
         b.sysroot = sdk_root;
 
-        step.addSystemIncludePath(b.path(b.pathJoin(&.{ sdk_root.?, "/usr/include" })));
-        step.addLibraryPath(b.path(b.pathJoin(&.{ sdk_root.?, "/usr/lib" })));
-        step.addFrameworkPath(b.path(b.pathJoin(&.{ sdk_root.?, "/System/Library/Frameworks" })));
+        step.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ sdk_root.?, "/usr/include" }) });
+        step.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ sdk_root.?, "/usr/lib" }) });
+        step.addFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ sdk_root.?, "/System/Library/Frameworks" }) });
     }
 }
 
@@ -771,11 +789,16 @@ pub fn build(b: *std.Build) void {
     const user_given_target_presets = b.option([]const u8, "targets", "Target operating system");
 
     // ignore any error
-    std.fs.makeDirAbsolute(build_gen) catch {};
+    std.fs.makeDirAbsolute(build_gen_abs) catch {};
 
     // const install_dir = b.install_path; // zig-out
 
     const targets = getTargets(b, user_given_target_presets) catch @panic("OOM");
+
+    // If we're building for multiple targets at the same time, we need to choose one that gets to be the final compile_commands.json.
+    const target_for_compile_commands = targets.items[0];
+    // We'll try installing the desired compile_commands.json version here in case any previous build already created it.
+    tryCopyCompileCommandsForTargetFileToDefault(b.allocator, target_for_compile_commands.result);
 
     for (targets.items) |target| {
         std.debug.print("Target: {s}\n", .{target.result.zigTriple(b.allocator) catch @panic("OOM")});
@@ -789,14 +812,11 @@ pub fn build(b: *std.Build) void {
                 .makeFn = concatCompileCommands,
             }),
             .target = target,
+            .use_as_default = target.query.eql(target_for_compile_commands.query),
         };
 
         // NOTE (Sam, 27th June 2023): we can set the field override_dest_dir to this value, but it does not effect the PDB location on Windows. PDB's will end up in different folders. I'm not sure if this is a bug or not.
-        const install_subfolder_string = b.fmt("{s}-{s}", .{
-            target.result.cpu.arch.genericName(),
-            @tagName(target.result.os.tag),
-        });
-
+        const install_subfolder_string = b.dupe(archAndOsPair(target.result).slice());
         const install_subfolder = std.Build.Step.InstallArtifact.Options.Dir{
             .override = std.Build.InstallDir{ .custom = install_subfolder_string },
         };
@@ -806,7 +826,7 @@ pub fn build(b: *std.Build) void {
         const generic_flags = genericFlags(&build_context, target, &.{}) catch unreachable;
         const generic_fp_flags = genericFlags(&build_context, target, &.{
             "-gen-cdb-fragment-path",
-            compileCommandsDir(b.allocator, target.result) catch unreachable, // IMPROVE: will this error if the path contains a space?
+            compileCommandsDirForTarget(b.allocator, target.result) catch unreachable, // IMPROVE: will this error if the path contains a space?
             "-Werror",
             "-Wconversion",
             "-Wexit-time-destructors",
@@ -2040,8 +2060,8 @@ pub fn build(b: *std.Build) void {
                 if (sidebar_image_path_relative != null) {
                     flags.append(b.fmt("-DSIDEBAR_IMAGE_PATH=\"{s}\"", .{sidebar_image_path_relative.?})) catch unreachable;
                 }
-                flags.append("-DCLAP_PLUGIN_PATH=\"zig-out/x86-windows/Floe.clap\"") catch unreachable;
-                flags.append("-DVST3_PLUGIN_PATH=\"zig-out/x86-windows/Floe.vst3\"") catch unreachable;
+                flags.append("-DCLAP_PLUGIN_PATH=\"zig-out/x86_64-windows/Floe.clap\"") catch unreachable;
+                flags.append("-DVST3_PLUGIN_PATH=\"zig-out/x86_64-windows/Floe.vst3\"") catch unreachable;
                 win_installer.addWin32ResourceFile(.{
                     .file = b.path(installer_path ++ "/resources.rc"),
                     .flags = flags.items,

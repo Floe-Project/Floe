@@ -3,16 +3,8 @@
 
 # This file assumes 'nix develop' has already been run
 
-native_binary_dir := "zig-out/" + if os() == "linux" {
-  "x86-linux"
-} else if os() == "macos" {
-  "x86-macos"
-} else if os() == "windows" {
-  "x86-windows"
-} else {
-  "unknown"
-}
-
+native_arch_os_pair := arch() + "-" + os()
+native_binary_dir := "zig-out/" + native_arch_os_pair
 all_src_files := 'fd . -e .mm -e .cpp -e .hpp -e .h src' 
 
 build target_os='native':
@@ -24,11 +16,12 @@ check-reuse:
 check-format:
   {{all_src_files}} | xargs clang-format --dry-run --Werror
 
-clang-tidy:
-  jq -r '.[].file' build_gen/compile_commands.json | xargs clang-tidy -p build_gen 
+clang-tidy arch_os_pair=native_arch_os_pair:
+  jq -r '.[].file' build_gen/compile_commands_{{arch_os_pair}}.json | xargs clang-tidy -p build_gen 
 
-cppcheck:
-  cppcheck --project=build_gen/compile_commands.json --cppcheck-build-dir=.zig-cache --enable=unusedFunction
+cppcheck arch_os_pair=native_arch_os_pair:
+  # IMPROVE: use --check-level=exhaustive?
+  cppcheck --project={{justfile_directory()}}/build_gen/compile_commands_{{arch_os_pair}}.json --cppcheck-build-dir={{justfile_directory()}}/.zig-cache --enable=unusedFunction --error-exitcode=2
 
 format:
   {{all_src_files}} | xargs clang-format -i
@@ -46,16 +39,16 @@ test-vst3-val:
   timeout 2 {{native_binary_dir}}/VST3-Validator {{native_binary_dir}}/Floe.vst3
 
 test-wine-vst3-val:
-  wine zig-out/x86-windows/VST3-Validator.exe zig-out/x86-windows/Floe.vst3
+  wine zig-out/x86_64-windows/VST3-Validator.exe zig-out/x86_64-windows/Floe.vst3
 
 test-wine-pluginval:
-  wine $PLUGINVAL_WINDOWS_PATH zig-out/x86-windows/Floe.vst3
+  wine $PLUGINVAL_WINDOWS_PATH zig-out/x86_64-windows/Floe.vst3
 
 test-wine-units:
-  wine zig-out/x86-windows/tests.exe
+  wine zig-out/x86_64-windows/tests.exe
 
 test-wine-clap-val:
-  wine $CLAPVAL_WINDOWS_PATH validate zig-out/x86-windows/Floe.clap
+  wine $CLAPVAL_WINDOWS_PATH validate zig-out/x86_64-windows/Floe.clap
 
 coverage:
   mkdir -p build_gen

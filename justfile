@@ -50,6 +50,7 @@ test-wine-units:
 test-wine-clap-val:
   wine $CLAPVAL_WINDOWS_PATH validate zig-out/x86_64-windows/Floe.clap
 
+[linux]
 coverage:
   mkdir -p build_gen
   # TODO: run other tests with coverage and --merge the results
@@ -93,9 +94,9 @@ static_analyisers := replace("""
 """, "\n", " ")
 
 checks_local_level_0 := if os() == "linux" { quick_checks_linux } else { quick_checks_non_linux }
-checks_local_level_1 := checks_local_level_0 + static_analyisers + " coverage"
+checks_local_level_1 := checks_local_level_0 + static_analyisers 
 
-checks_ci := static_analyisers + if os() == "linux" { quick_checks_linux_ci } else { quick_checks_non_linux } 
+checks_ci := static_analyisers + if os() == "linux" { quick_checks_linux_ci + " coverage" } else { quick_checks_non_linux } 
 
 test level: (parallel if level == "0" { checks_local_level_0 } else { checks_local_level_1 } )
 

@@ -174,7 +174,6 @@
             pluginval
             clang-build-analyzer
             pkgs.zip
-            pkgs.kcov
             pkgs.llvmPackages_18.bintools-unwrapped # llvm-lipo, llvm-addr2line, dsymutil
             pkgs.llvmPackages_18.clang-unwrapped # clangd, clang-tidy, clang-format
             pkgs.cppcheck
@@ -247,6 +246,7 @@
             pkgs.gnome.zenity
             pkgs.libGL
             pkgs.libGLU
+            pkgs.kcov
           ];
           shellHook = ''
             export MACOSX_SDK_SYSROOT="${macosx-sdks}"

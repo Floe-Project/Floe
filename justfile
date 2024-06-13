@@ -57,36 +57,56 @@ test-wine-units:
 test-wine-clap-val:
   wine $CLAPVAL_WINDOWS_PATH validate zig-out/x86-windows/Floe.clap
 
-# level 0: fast tests
-level_0_common_tests := replace("""
+coverage:
+  mkdir -p build_gen
+  # TODO: run other tests with coverage and --merge the results
+  kcov --include-pattern={{justfile_directory()}}/src build_gen/coverage-out {{native_binary_dir}}/tests
+
+# Local linux
+quick_checks_linux := replace("""
   check-reuse 
   check-format
-  test-clap-val
   test-units
+  test-clap-val
   test-pluginval
   test-vst3-val
-""", "\n", " ")
-
-level_0_linux_tests := replace("""
   test-wine-vst3-val
   test-wine-pluginval
   test-wine-clap-val
   test-wine-units
 """, "\n", " ")
 
-level_0_tests := level_0_common_tests + if os() == "linux" {
-  level_0_linux_tests
-} else {
-  ""
-}
+# NOTE: we use different checks for linux CI at the moment because of a couple of things we have yet to solve:
+# 1. We haven't set up wine on CI yet
+# 2. Linux plugin tests (pluginval, vst3-val, etc) do not work. Something out running the plugin always crashes
+quick_checks_linux_ci := replace("""
+  check-reuse 
+  check-format
+  test-units
+""", "\n", " ")
 
-# level 1: slower tests
-level_1_tests := replace("""
+quick_checks_non_linux := replace("""
+  check-reuse 
+  check-format
+  test-units
+  test-clap-val
+  test-pluginval
+  test-vst3-val
+""", "\n", " ")
+
+static_analyisers := replace("""
   clang-tidy
   cppcheck
 """, "\n", " ")
 
-tests level: (parallel if level == "0" { level_0_tests } else { level_0_tests + level_1_tests })
+checks_local_level_0 := if os() == "linux" { quick_checks_linux } else { quick_checks_non_linux }
+checks_local_level_1 := checks_local_level_0 + static_analyisers + " coverage"
+
+checks_ci := static_analyisers + if os() == "linux" { quick_checks_linux_ci } else { quick_checks_non_linux } 
+
+test level: (parallel if level == "0" { checks_local_level_0 } else { checks_local_level_1 } )
+
+test-ci: (parallel checks_ci)
 
 parallel tasks:
   #!/usr/bin/env bash

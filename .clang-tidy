@@ -56,5 +56,3 @@ CheckOptions:
   - { key: readability-identifier-naming.TypeAliasIgnoredRegexp,   value: '^[a-z][0-9]+.*$|^[a-z]size$|^uintptr$' }
   - { key: modernize-use-auto.MinTypeNameLength,                   value: 0 }
 
-ExtraArgs:
-- -Wno-unknown-pragmas  # IMPROVE: remove this after switch to clang-tidy-18, this is a workaround for clang-tidy issues in header files on macOS

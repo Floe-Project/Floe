@@ -45,16 +45,16 @@ jobs:
         run: just build mac_ub
 
       - name: Tests
-        continue-on-error: true
         run: just test-ci
 
-      - name: Upload coverage reports
+      - if: matrix.os == 'ubuntu-latest'
+        name: Upload coverage reports
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           directory: build_gen/coverage-out/tests
           verbose: true
-          fail_ci_if_error: true
+          fail_ci_if_error: false
 
       # IMPORTANT(upload-artifact): 
       #  1. If multiple paths are provided as input, the least common ancestor of all the search paths will be used as the 
@@ -102,7 +102,6 @@ jobs:
         shell: pwsh
         name: ${{ matrix.test }}
         run: |
-          tree /F 
           powershell -ExecutionPolicy Bypass -File .github\scripts\run-test.ps1 -test_type ${{ matrix.test }} -binaries_dir "${{ github.workspace }}"
 
       - name: Upload logs

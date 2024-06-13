@@ -189,9 +189,7 @@ static f64 CountsPerSecond() {
     return result;
 }
 
-f64 operator-(TimePoint lhs, TimePoint rhs) {
-    return f64((f64)(lhs.m_time - rhs.m_time) / CountsPerSecond());
-}
+f64 operator-(TimePoint lhs, TimePoint rhs) { return (f64)(lhs.m_time - rhs.m_time) / CountsPerSecond(); }
 
 TimePoint operator+(TimePoint t, f64 s) {
     t.m_time += (s64)(s * CountsPerSecond());

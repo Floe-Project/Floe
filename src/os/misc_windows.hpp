@@ -28,7 +28,7 @@ inline ErrorCode HresultErrorCode(HRESULT hr,
 class ScopedWin32ComUsage {
   public:
     static ErrorCodeOr<ScopedWin32ComUsage> Create() {
-        auto const hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+        auto const hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
         if (hr != S_OK && hr != S_FALSE && hr != RPC_E_CHANGED_MODE) {
             ASSERT(hr != E_INVALIDARG);
             return HresultErrorCode(hr, "CoInitializeEx");

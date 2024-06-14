@@ -200,6 +200,7 @@
           ];
           shellHook = ''
             export MACOSX_SDK_SYSROOT="${macosx-sdks}"
+          '' + pkgs.lib.optionalString pkgs.stdenv.isLinux ''
             export PLUGINVAL_WINDOWS_PATH="${pluginval-windows}/bin/pluginval.exe"
             export CLAPVAL_WINDOWS_PATH="${clap-val-windows}/bin/clap-validator.exe"
           '';

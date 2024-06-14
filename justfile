@@ -60,15 +60,19 @@ test-pluginval:
 test-vst3-val:
   timeout 2 {{native_binary_dir}}/VST3-Validator {{native_binary_dir}}/Floe.vst3
 
+[linux]
 test-wine-vst3-val:
   wine zig-out/x86_64-windows/VST3-Validator.exe zig-out/x86_64-windows/Floe.vst3
 
+[linux]
 test-wine-pluginval:
   wine $PLUGINVAL_WINDOWS_PATH zig-out/x86_64-windows/Floe.vst3
 
+[linux]
 test-wine-units:
   wine zig-out/x86_64-windows/tests.exe
 
+[linux]
 test-wine-clap-val:
   wine $CLAPVAL_WINDOWS_PATH validate zig-out/x86_64-windows/Floe.clap
 

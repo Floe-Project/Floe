@@ -91,6 +91,7 @@ jobs:
   deploy:
     name: Deploy
     needs: [prepare-macos, prepare-windows]
+    runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:

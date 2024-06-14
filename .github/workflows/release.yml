@@ -77,7 +77,8 @@ jobs:
           name: binaries-windows
           path: files
 
-      # TODO: codesign
+      # TODO: codesign, use https://melatonin.dev/blog/code-signing-on-windows-with-azure-trusted-signing/?
+      # TODO: get logos images and core library
 
       - working-directory: files
         run: 7z a -tzip ${{ env.WINDOWS_FINAL_ZIP }} .
@@ -104,6 +105,9 @@ jobs:
           export VERSION=$(cat version.txt)
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
 
+          # Nice little one-liner to extract changes from the larger changelog, thanks to QOwnNotes for this.
+          grep -Pzo "## ${VERSION}\n(\n|.)+?\n##" ../changelog.md | sed '$ d' >> latest_changes.md
+
       - uses: actions/download-artifact@v4
         with:
           name: final-windows
@@ -119,6 +123,5 @@ jobs:
           name: Release v${{ env.VERSION }}
           tag: v${{ env.VERSION }}
           draft: true
-          # TODO: show release notes and install instructions
-          # bodyFile: "body.md"
+          bodyFile: latest_changes.md
 

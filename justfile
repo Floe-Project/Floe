@@ -9,7 +9,7 @@ all_src_files := 'fd . -e .mm -e .cpp -e .hpp -e .h src'
 gen_files_dir := "build_gen"
 
 build target_os='native':
-  zig build compile -Dtargets={{target_os}} -Dbuild-mode=development 
+  zig build compile -Dtargets={{target_os}} -Dbuild-mode=development
 
 # build and report compile-time statistics
 build-timed target_os='native':

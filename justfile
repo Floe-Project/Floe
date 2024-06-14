@@ -6,12 +6,23 @@
 native_arch_os_pair := arch() + "-" + os()
 native_binary_dir := "zig-out/" + native_arch_os_pair
 all_src_files := 'fd . -e .mm -e .cpp -e .hpp -e .h src' 
+gen_files_dir := "build_gen"
 
 build target_os='native':
   zig build compile -Dtargets={{target_os}} -Dbuild-mode=development 
 
+# build and report compile-time statistics
 build-timed target_os='native':
-  time analyzed-build just build {{target_os}}
+  #!/usr/bin/env bash
+  artifactDir={{gen_files_dir}}/clang-build-analyzer-artifacts
+  reportFile={{gen_files_dir}}/clang-build-analyzer-report
+  mkdir -p ''${artifactDir}
+  ClangBuildAnalyzer --start ${artifactDir}
+  time just build {{target_os}}
+  returnCode=$?
+  ClangBuildAnalyzer --stop ${artifactDir} ${reportFile}
+  ClangBuildAnalyzer --analyze ${reportFile}
+  exit ${returnCode}
 
 check-reuse:
   reuse lint
@@ -21,17 +32,18 @@ check-format:
 
 # install compile database (compile_commands.json)
 install-cbd arch_os_pair=native_arch_os_pair:
-  cp build_gen/compile_commands_{{arch_os_pair}}.json build_gen/compile_commands.json
+  cp {{gen_files_dir}}/compile_commands_{{arch_os_pair}}.json {{gen_files_dir}}/compile_commands.json
 
 clang-tidy arch_os_pair=native_arch_os_pair: (install-cbd arch_os_pair)
   #!/usr/bin/env bash
-  jq -r '.[].file' build_gen/compile_commands_{{arch_os_pair}}.json | xargs clang-tidy -p build_gen 
+  jq -r '.[].file' {{gen_files_dir}}/compile_commands_{{arch_os_pair}}.json | xargs clang-tidy -p {{gen_files_dir}} 
 
 clang-tidy-all: (clang-tidy "x86_64-linux") (clang-tidy "x86_64-windows") (clang-tidy "aarch64-macos")
 
 cppcheck arch_os_pair=native_arch_os_pair:
   # IMPROVE: use --check-level=exhaustive?
-  cppcheck --project={{justfile_directory()}}/build_gen/compile_commands_{{arch_os_pair}}.json --cppcheck-build-dir={{justfile_directory()}}/.zig-cache --enable=unusedFunction --error-exitcode=2
+  # IMPROVE: investigate other flags such as --enable=constVariable
+  cppcheck --project={{justfile_directory()}}/{{gen_files_dir}}/compile_commands_{{arch_os_pair}}.json --cppcheck-build-dir={{justfile_directory()}}/.zig-cache --enable=unusedFunction --error-exitcode=2
 
 format:
   {{all_src_files}} | xargs clang-format -i
@@ -62,66 +74,73 @@ test-wine-clap-val:
 
 [linux]
 coverage:
-  mkdir -p build_gen
-  # TODO: run other tests with coverage and --merge the results
-  kcov --include-pattern={{justfile_directory()}}/src build_gen/coverage-out {{native_binary_dir}}/tests
+  mkdir -p {{gen_files_dir}}
+  # IMPROVE: run other tests with coverage and --merge the results
+  kcov --include-pattern={{justfile_directory()}}/src {{gen_files_dir}}/coverage-out {{native_binary_dir}}/tests
 
-# Local linux
-quick_checks_linux := replace("""
-  check-reuse 
+# IMPROVE: add auval tests on macos
+checks_level_0 := replace( 
+  "
+  check-reuse
   check-format
   test-units
   test-clap-val
   test-pluginval
   test-vst3-val
-  test-wine-vst3-val
-  test-wine-pluginval
-  test-wine-clap-val
-  test-wine-units
-""", "\n", " ")
+  " + 
+  if os() == "linux" {
+    "
+    test-wine-vst3-val
+    test-wine-pluginval
+    test-wine-clap-val
+    test-wine-units
+    "
+  } else {
+    ""
+  }, "\n", " ")
 
-# NOTE: we use different checks for linux CI at the moment because of a couple of things we have yet to solve:
-# 1. We haven't set up wine on CI yet
-# 2. Linux plugin tests (pluginval, vst3-val, etc) do not work. Something out running the plugin always crashes
-quick_checks_linux_ci := replace("""
-  check-reuse 
-  check-format
-  test-units
-""", "\n", " ")
-
-quick_checks_non_linux := replace("""
-  check-reuse 
-  check-format
-  test-units
-  test-clap-val
-  test-pluginval
-  test-vst3-val
-""", "\n", " ")
-
-static_analyisers := replace("""
-  clang-tidy
+checks_level_1 := checks_level_0 + replace( 
+  "
   cppcheck
-""", "\n", " ")
+  clang-tidy
+  ", "\n", " ")
 
-checks_local_level_0 := if os() == "linux" { quick_checks_linux } else { quick_checks_non_linux }
-checks_local_level_1 := checks_local_level_0 + static_analyisers 
+# IMPROVE: Linux CI: enable plugin tests when we have a solution to the crashes
+# IMPROVE: Linux CI: enable wine tests when we have a way to install wine on CI
+checks_ci := replace(
+  if os() == "linux" {
+    "
+    check-reuse 
+    check-format
+    test-units
+    coverage
+    cppcheck
+    clang-tidy-all
+    "
+  } else {
+    "
+    test-units
+    test-clap-val
+    test-pluginval
+    test-vst3-val
+    cppcheck
+    "
+  }, "\n", " ")
 
-checks_ci := if os() == "linux" { 
-  quick_checks_linux_ci + " coverage cppcheck clang-tidy-all" 
-} else { 
-  "test-units test-clap-val test-pluginval test-vst3-val cppcheck"
-} 
-
-test level: (parallel if level == "0" { checks_local_level_0 } else { checks_local_level_1 } )
+test level: (parallel if level == "0" { checks_level_0 } else { checks_level_1 })
 
 test-ci: (parallel checks_ci)
 
 parallel tasks:
   #!/usr/bin/env bash
-  mkdir -p build_gen
-  results_json=build_gen/results.json
+  mkdir -p {{gen_files_dir}}
+  results_json={{gen_files_dir}}/results.json
 
-  parallel --bar --results $results_json just ::: {{tasks}}
+  # use the --bar argument only if we are not on GITHUB_ACTIONS
+  progress_bar=""
+  [[ -z $GITHUB_ACTIONS ]] && progress_bar="--bar"
+
+  parallel $progress_bar --results $results_json just ::: {{tasks}}
 
   # parallel's '--results x.json' flag does not produce valid JSON, so we need to fix it
   sed 's/$/,/' $results_json | head -c -2 > results.json.tmp
@@ -140,9 +159,9 @@ parallel tasks:
   failed=$(jq '. | map(select(.Exitval != 0)) | length' $results_json)
   num_tasks=$(jq '. | length' $results_json)
 
-  # use miller to pretty-print the summary, along with a markdown version for GitHub Actions
+  # use Miller to pretty-print the summary, along with a markdown version for GitHub Actions
   echo -e "\033[0;34m[Summary]\033[0m"
-  [[ ! -z $GITHUB_ACTIONS ]] && echo "# Summary\n\n" >> $GITHUB_STEP_SUMMARY
+  [[ ! -z $GITHUB_ACTIONS ]] && echo "# Summary" >> $GITHUB_STEP_SUMMARY
   printf "%s\n" "$summary" | mlr --itsv --opprint sort -f "Return Code"
   [[ ! -z $GITHUB_ACTIONS ]] && printf "%s\n" "$summary" | mlr --itsv --omd sort -f "Return Code" >> $GITHUB_STEP_SUMMARY
 

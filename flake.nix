@@ -11,7 +11,6 @@
   outputs = { self, nixpkgs, flake-utils, zig }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        zig-out-folder = "zig-out/${builtins.replaceStrings [ "_64" "darwin" ] [ "" "macos" ] system}";
         pkgs = import nixpkgs { inherit system; };
         zigpkgs = zig.packages.${system};
 
@@ -158,7 +157,6 @@
             cp $(find . -name "pluginval" -executable) $out/bin
           '' + pkgs.lib.optionalString pkgs.stdenv.isDarwin ''
             mkdir -p $out/Applications
-            # cp $(find . -name "pluginval" -executable) $out/bin
             cp -R $(find . -type d -name "pluginval.app") $out/Applications
             ln -s $out/Applications/pluginval.app/Contents/MacOS/pluginval $out/bin
           '';
@@ -185,55 +183,6 @@
             pkgs.jq
             pkgs.just
             pkgs.reuse
-
-            (pkgs.writeShellScriptBin "format-all" ''
-              ${pkgs.fd}/bin/fd . -e .mm -e .cpp -e .hpp -e .h src | xargs ${pkgs.llvmPackages_18.clang-unwrapped}/bin/clang-format -i
-            '')
-
-            (pkgs.writeShellScriptBin "check-format-all" ''
-              ${pkgs.fd}/bin/fd . -e .mm -e .cpp -e .hpp -e .h src | xargs ${pkgs.llvmPackages_18.clang-unwrapped}/bin/clang-format --dry-run --Werror
-            '')
-
-            (pkgs.writeShellScriptBin "clang-tidy-all" ''
-              echo "NOTE: Our clang-tidy command is generated after a successful compilation using our Zig build system"
-              sh build_gen/clang-tidy-cmd.sh
-            '')
-
-            # --enable=constVariable ?
-            (pkgs.writeShellScriptBin "cppcheck-all" ''
-              echo "NOTE: Our cppcheck command depends on a successful compilation using our Zig build system"
-              ${pkgs.cppcheck}/bin/cppcheck --project=$PWD/build_gen/compile_commands.json --cppcheck-build-dir=$PWD/build_gen --enable=unusedFunction
-            '')
-
-            # IMPROVE: Add a test for running auval on our AUv2
-
-            (pkgs.writeShellScriptBin "test-pluginval" ''
-              ${pluginval}/bin/pluginval ${zig-out-folder}/Floe.vst3
-            '')
-
-            (pkgs.writeShellScriptBin "test-clap-validator" ''
-              ${clap-val}/bin/clap-validator validate ${zig-out-folder}/Floe.clap
-            '')
-
-            (pkgs.writeShellScriptBin "test-vst3-validator" ''
-              ${zig-out-folder}/VST3-Validator ${zig-out-folder}/Floe.vst3
-            '')
-
-            (pkgs.writeShellScriptBin "test-units" ''
-              ${zig-out-folder}/tests
-            '')
-
-            (pkgs.writeShellScriptBin "analyzed-build" ''
-              artifactDir=build_gen/tmp
-              reportFile=build_gen/build-report
-              mkdir -p ''${artifactDir}
-              ${clang-build-analyzer}/bin/ClangBuildAnalyzer --start ''${artifactDir}
-              "$@"
-              returnCode=$?
-              ${clang-build-analyzer}/bin/ClangBuildAnalyzer --stop ''${artifactDir} ''${reportFile}
-              ${clang-build-analyzer}/bin/ClangBuildAnalyzer --analyze ''${reportFile}
-              exit ''${returnCode}
-            '')
 
             # dsymutil internally calls "lipo", so we have to make sure it's available under that name
             (pkgs.writeShellScriptBin "lipo" "llvm-lipo $@")

@@ -429,7 +429,7 @@ PUBLIC DynamicArray<u8> GetWaveformImageFromSample(AudioData const& audio_file, 
             if (x == 0) {
                 f32 l;
                 f32 r;
-                for (_ : Range(150)) {
+                for (auto _ : Range(150)) {
                     sv_filter::Process(avg_l, l, d_l, sv_filter::Type::Lowpass, c_l);
                     sv_filter::Process(avg_r, r, d_r, sv_filter::Type::Lowpass, c_r);
                 }

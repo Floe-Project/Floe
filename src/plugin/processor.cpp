@@ -913,7 +913,7 @@ clap_process_status Process(AudioProcessor& processor, clap_process const& proce
     if (interleaved_outputs.size == 0) {
         interleaved_outputs = processor.voice_pool.buffer_pool[0];
         SimdZeroAlignedBuffer(interleaved_outputs.data, num_sample_frames * 2);
-    } else if constexpr (RUNTIME_SAFETY_CHECKS_ON) {
+    } else if constexpr (RUNTIME_SAFETY_CHECKS_ON && !PRODUCTION_BUILD) {
         for (auto const frame : Range(num_sample_frames)) {
             auto const& l = interleaved_outputs[frame * 2 + 0];
             auto const& r = interleaved_outputs[frame * 2 + 1];
@@ -940,8 +940,8 @@ clap_process_status Process(AudioProcessor& processor, clap_process const& proce
                 }
             }
         }
-        ASSERT(unused_buffer_indexes[0] != UINT32_MAX);
-        ASSERT(unused_buffer_indexes[1] != UINT32_MAX);
+        ASSERT_HOT(unused_buffer_indexes[0] != UINT32_MAX);
+        ASSERT_HOT(unused_buffer_indexes[1] != UINT32_MAX);
 
         ScratchBuffers const scratch_buffers(
             num_sample_frames,

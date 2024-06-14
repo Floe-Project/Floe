@@ -320,7 +320,7 @@ Parse(Settings& content, ArenaAllocator& content_allocator, ArenaAllocator& scra
 ErrorCodeOr<void> WriteFile(Settings const& data, String path) {
     ArenaAllocatorWithInlineStorage<4000> scratch_arena;
 
-    _ = CreateDirectory(path::Directory(path).ValueOr({}),
+    auto _ = CreateDirectory(path::Directory(path).ValueOr({}),
                         {
                             .create_intermediate_directories = true,
                             .fail_if_exists = false,

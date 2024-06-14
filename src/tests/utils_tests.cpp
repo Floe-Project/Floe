@@ -91,11 +91,11 @@ void DoAtomicQueueTest(tests::Tester& tester, String name) {
             AtomicQueue<int, k_size, k_num_producers, k_num_consumers> q;
 
             constexpr int k_val = 99;
-            for (_ : Range(k_size))
+            for (auto _ : Range(k_size))
                 REQUIRE(q.Push(k_val));
             REQUIRE(!q.Push(k_val));
 
-            for (_ : Range(k_size)) {
+            for (auto _ : Range(k_size)) {
                 int v;
                 REQUIRE(q.Pop(v));
                 REQUIRE(v == k_val);
@@ -144,7 +144,7 @@ void DoAtomicQueueTest(tests::Tester& tester, String name) {
             Array<int, 1> small_item {};
             Array<int, 4> big_item {};
             u64 seed = SeedFromTime();
-            for (_ : Range(10000)) {
+            for (auto _ : Range(10000)) {
                 if (RandomIntInRange<int>(seed, 0, 1) == 0)
                     if (push)
                         q.Push(small_item);
@@ -379,7 +379,7 @@ TEST_CASE(TestAtomicRefList) {
         thread.Start(
             [&]() {
                 auto seed = SeedFromTime();
-                for (_ : Range(5000)) {
+                for (auto _ : Range(5000)) {
                     for (char c = 'a'; c <= 'z'; ++c) {
                         auto const r = RandomIntInRange(seed, 0, 2);
                         if (r == 0) {
@@ -855,7 +855,7 @@ struct TestDirectoryStructure {
         : tester(tester)
         , root_dir(path::Join(tester.scratch_arena, Array {TempFolder(tester), "directory_listing_test"})) {
 
-        _ = Delete(root_dir, {});
+        auto _ = Delete(root_dir, {});
         CreateDirIfNotExist(root_dir);
 
         CreateFile(path::Join(tester.scratch_arena, Array {root_dir, "file1.txt"}));

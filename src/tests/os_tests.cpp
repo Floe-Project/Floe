@@ -13,7 +13,7 @@ TEST_CASE(TestFileApi) {
     SUBCASE("Create a file") {
         auto f = OpenFile(filename, FileMode::Write);
         REQUIRE(f.HasValue());
-        _ = f.Value().Write(k_file_contents.ToByteSpan());
+        auto _ = f.Value().Write(k_file_contents.ToByteSpan());
     }
 
     SUBCASE("Move a file") {
@@ -49,7 +49,7 @@ TEST_CASE(TestFileApi) {
         DynamicArray<char> file_data {tester.scratch_arena};
         constexpr usize k_one_hundred_mb {1024 * 1024 * 100};
         file_data.Reserve(k_one_hundred_mb);
-        for (_ : Range(1000000))
+        for (auto _ : Range(1000000))
             dyn::AppendSpan(file_data, k_str);
         auto const big_file_name =
             path::Join(scratch_arena, Array {tests::TempFolder(tester), "big file.txt"});
@@ -259,7 +259,7 @@ TEST_CASE(TestFilesystem) {
     SUBCASE("MoveDirectoryContents") {
         auto const temp_dir_path =
             path::Join(a, Array {tests::TempFolder(tester), "MoveDirectoryContents test"});
-        _ = Delete(temp_dir_path, {});
+        auto _ = Delete(temp_dir_path, {});
         TRY(CreateDirectory(temp_dir_path));
 
         auto make_path = [&](Span<String const> sub_paths) {
@@ -369,7 +369,7 @@ TEST_CASE(TestReadingDirectoryChanges) {
     auto& a = tester.scratch_arena;
 
     auto const dir = (String)path::Join(a, Array {tests::TempFolder(tester), "ReadDirectoryChanges test"});
-    _ = Delete(dir, {.type = DeleteOptions::Type::DirectoryRecursively, .fail_if_not_exists = false});
+    auto _ = Delete(dir, {.type = DeleteOptions::Type::DirectoryRecursively, .fail_if_not_exists = false});
     TRY(CreateDirectory(dir, {.create_intermediate_directories = false, .fail_if_exists = true}));
 
     struct TestPath {

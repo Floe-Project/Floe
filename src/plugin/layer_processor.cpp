@@ -409,7 +409,7 @@ static void TriggerVoicesIfNeeded(LayerProcessor& layer,
                                   f32 velocity_to_volume_01) {
     if (layer.inst.tag == InstrumentType::None) return;
 
-    ASSERT(note_vel_float >= 0 && note_vel_float <= 1);
+    ASSERT_HOT(note_vel_float >= 0 && note_vel_float <= 1);
     auto const note_vel = (u8)RoundPositiveFloat(note_vel_float * 99);
 
     // TODO: handle sustain pedal
@@ -653,7 +653,7 @@ ProcessResult ProcessLayer(LayerProcessor& layer,
         frame.Store(buffer.data, i);
     }
 
-    ASSERT(!layer.inst_change_fade.IsSilent());
+    ASSERT_HOT(!layer.inst_change_fade.IsSilent());
 
     layer.peak_meter.AddBuffer(ToStereoFramesSpan(buffer.data, num_frames));
 

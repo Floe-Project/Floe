@@ -67,11 +67,11 @@ static void LayerInstrumentMenuItems(Gui* g, PluginInstance::Layer* layer) {
 
     if (DoMultipleMenuItems(g, insts, current)) {
         if (current == 0)
-            _ = SetInstrument(g->plugin, layer->index, InstrumentId {InstrumentType::None});
+            auto _ = SetInstrument(g->plugin, layer->index, InstrumentId {InstrumentType::None});
         else if (current >= 1 && current <= (int)WaveformType::Count)
-            _ = SetInstrument(g->plugin, layer->index, InstrumentId {(WaveformType)(current - 1)});
+            auto _ = SetInstrument(g->plugin, layer->index, InstrumentId {(WaveformType)(current - 1)});
         else
-            _ = SetInstrument(g->plugin, layer->index, InstrumentId {inst_info[(usize)current]});
+            auto _ = SetInstrument(g->plugin, layer->index, InstrumentId {inst_info[(usize)current]});
     }
 }
 

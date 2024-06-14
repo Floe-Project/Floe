@@ -397,10 +397,10 @@ void DestoryDirectoryWatcher(DirectoryWatcher& watcher) {
 
     for (auto& dir : watcher.watched_dirs)
         dir.state = DirectoryWatcher::WatchedDirectory::State::NeedsUnwatching;
-    _ = native::ReadDirectoryChanges(watcher,
-                                     true,
-                                     scratch_arena,
-                                     [&](String, ErrorCodeOr<DirectoryWatcher::FileChange>) {});
+    auto _ = native::ReadDirectoryChanges(watcher,
+                                          true,
+                                          scratch_arena,
+                                          [&](String, ErrorCodeOr<DirectoryWatcher::FileChange>) {});
 
     watcher.watched_dirs.RemoveIf([&](DirectoryWatcher::WatchedDirectory const&) { return true; });
 

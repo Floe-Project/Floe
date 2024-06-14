@@ -286,8 +286,6 @@ using IndexSequenceFor = MakeIndexSequence<sizeof...(Types)>;
 #define CONCAT_HELPER(x, y) x##y
 #define CONCAT(x, y)        CONCAT_HELPER(x, y)
 
-#define _ [[maybe_unused]] auto CONCAT(unused_result, __LINE__)
-
 // ==========================================================================================================
 [[noreturn]] void AssertionFailed(char const* expression, SourceLocation loc, char const* message = nullptr);
 [[noreturn]] void Panic(char const* message, SourceLocation loc = SourceLocation::Current());
@@ -297,6 +295,17 @@ extern void (*g_panic_handler)(char const* message, SourceLocation loc);
 #define ASSERT(expression, ...)                                                                              \
     do {                                                                                                     \
         if constexpr (RUNTIME_SAFETY_CHECKS_ON) {                                                            \
+            if (!(expression)) AssertionFailed(#expression, SourceLocation::Current(), ##__VA_ARGS__);       \
+        } else                                                                                               \
+            _Pragma("clang diagnostic push") _Pragma("clang diagnostic ignored \"-Wassume\"")                \
+                __builtin_assume(!!(expression));                                                            \
+        _Pragma("clang diagnostic pop")                                                                      \
+    } while (0)
+
+// For use in hot code paths - this will be removed in production builds
+#define ASSERT_HOT(expression, ...)                                                                          \
+    do {                                                                                                     \
+        if constexpr (RUNTIME_SAFETY_CHECKS_ON && !PRODUCTION_BUILD) {                                       \
             if (!(expression)) AssertionFailed(#expression, SourceLocation::Current(), ##__VA_ARGS__);       \
         } else                                                                                               \
             _Pragma("clang diagnostic push") _Pragma("clang diagnostic ignored \"-Wassume\"")                \

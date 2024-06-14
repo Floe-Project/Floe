@@ -671,8 +671,8 @@ clap_plugin const floe_plugin {
         ZoneKeyNum("events", process->in_events->size(process->in_events));
         ZoneKeyNum("num_frames", process->frames_count);
 
-        ASSERT(floe.active);
-        ASSERT(floe.processing);
+        ASSERT_HOT(floe.active);
+        ASSERT_HOT(floe.processing);
         if (!floe.active || !floe.processing || !process) return CLAP_PROCESS_ERROR;
         ScopedNoDenormals const no_denormals;
         return processor_callbacks.process(floe.plugin->processor, *process);

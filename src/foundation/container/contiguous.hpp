@@ -8,7 +8,7 @@
     constexpr type* begin() const_word { return data; }                                                      \
     constexpr type* end() const_word { return data + size; }                                                 \
     ALWAYS_INLINE constexpr type& operator[](usize index) const_word {                                       \
-        ASSERT(index < size);                                                                                \
+        ASSERT_HOT(index < size);                                                                            \
         return data[index];                                                                                  \
     }
 

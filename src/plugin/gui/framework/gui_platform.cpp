@@ -217,7 +217,7 @@ void GuiPlatform::Update() {
     auto update_time_counter = TimePoint::Now();
 #endif
     update_guicall_count = 0;
-    for (_ : Range(4)) {
+    for (auto _ : Range(4)) {
         ZoneNamedN(repeat, "repeat", true);
         update();
 

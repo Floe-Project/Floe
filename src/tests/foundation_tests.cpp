@@ -97,7 +97,7 @@ TEST_CASE(TestCircularBuffer) {
         CHECK(buf.Full());
         CHECK(buf.Size() == 0);
 
-        for (_ : Range(2)) {
+        for (auto _ : Range(2)) {
             buf.Push(1);
             CHECK(!buf.Empty());
             CHECK(!buf.Full());
@@ -117,7 +117,7 @@ TEST_CASE(TestCircularBuffer) {
             CAPTURE(pre_pushes);
             for (auto const i : Range(pre_pushes))
                 buf.Push(i);
-            for (_ : Range(pre_pushes))
+            for (auto _ : Range(pre_pushes))
                 buf.Pop();
 
             for (auto const i : Range(100))
@@ -199,9 +199,9 @@ TEST_CASE(TestCircularBufferRefType) {
         CircularBuffer<Foo> buf {allocator};
 
         u16 warmup {};
-        for (_ : Range(51))
+        for (auto _ : Range(51))
             buf.Push({warmup});
-        for (_ : Range(51))
+        for (auto _ : Range(51))
             CHECK(&buf.Pop().i == &warmup);
 
         for (auto& b : bytes)
@@ -217,7 +217,7 @@ TEST_CASE(TestCircularBufferRefType) {
         u64 random_seed = SeedFromTime();
         int push_counter = 0;
         int pop_counter = 0;
-        for (_ : Range(10000)) {
+        for (auto _ : Range(10000)) {
             auto update = RandomIntInRange<int>(random_seed, -8, 8);
             if (update < 0) {
                 while (update != 0) {
@@ -1686,7 +1686,7 @@ TEST_CASE(TestTrigLookupTable) {
     REQUIRE(trig_table_lookup::Tan(-maths::k_pi<>) == 0);
 
     f32 phase = -600;
-    for (_ : Range(100)) {
+    for (auto _ : Range(100)) {
         constexpr f32 k_arbitrary_value = 42.3432798f;
         REQUIRE(ApproxEqual(trig_table_lookup::Sin(phase), Sin(phase), 0.01f));
         REQUIRE(ApproxEqual(trig_table_lookup::Cos(phase), Cos(phase), 0.01f));
@@ -1932,7 +1932,7 @@ TEST_CASE(TestRandomIntGeneratorUnsignedintgeneratationRandomIntGenerator) {
 
     SUBCASE("Correct generation in range 0 to 3 with repeating last value allowed") {
         constexpr unsigned int k_max_val = 3;
-        for (_ : Range(k_num_rand_test_repititions)) {
+        for (auto _ : Range(k_num_rand_test_repititions)) {
             auto const random_num = generator.GetRandomInRange(seed, 0, k_max_val, false);
             REQUIRE(random_num <= k_max_val);
         }
@@ -1940,7 +1940,7 @@ TEST_CASE(TestRandomIntGeneratorUnsignedintgeneratationRandomIntGenerator) {
 
     SUBCASE("Correct generation in range 0 to 3000000000 with repeating last value allowed") {
         constexpr unsigned int k_max_val = 3000000000;
-        for (_ : Range(k_num_rand_test_repititions)) {
+        for (auto _ : Range(k_num_rand_test_repititions)) {
             auto random_num = generator.GetRandomInRange(seed, 0, k_max_val, false);
             REQUIRE(random_num <= k_max_val);
         }
@@ -1948,7 +1948,7 @@ TEST_CASE(TestRandomIntGeneratorUnsignedintgeneratationRandomIntGenerator) {
 
     SUBCASE("Correct generation in range 0 to 3 with repeating last value disallowed") {
         constexpr unsigned int k_max_val = 3;
-        for (_ : Range(k_num_rand_test_repititions)) {
+        for (auto _ : Range(k_num_rand_test_repititions)) {
             auto const random_num = generator.GetRandomInRange(seed, 0, k_max_val, true);
             REQUIRE(random_num <= k_max_val);
         }
@@ -1956,7 +1956,7 @@ TEST_CASE(TestRandomIntGeneratorUnsignedintgeneratationRandomIntGenerator) {
 
     SUBCASE("Correct generation in range 0 to 3000000000 with repeating last value disallowed") {
         constexpr unsigned int k_max_val = 3000000000;
-        for (_ : Range(k_num_rand_test_repititions)) {
+        for (auto _ : Range(k_num_rand_test_repititions)) {
             auto random_num = generator.GetRandomInRange(seed, 0, k_max_val, true);
             REQUIRE(random_num <= k_max_val);
         }
@@ -1972,7 +1972,7 @@ TEST_CASE(TestRandomFloatGenerator) {
     SUBCASE("random values are in a correct range") {
         auto test = [&](bool allow_repititions) {
             constexpr T k_max_val = 100;
-            for (_ : Range(k_num_rand_test_repititions)) {
+            for (auto _ : Range(k_num_rand_test_repititions)) {
                 auto const random_num =
                     generator.GetRandomInRange(seed, -k_max_val, k_max_val, allow_repititions);
                 REQUIRE(random_num >= -k_max_val);
@@ -1991,7 +1991,7 @@ TEST_CASE(TestRandomIntGeneratorSignedintgeneratationRandomIntGenerator) {
 
     SUBCASE("Correct generation in range -10 to 10 with repeating last value allowed") {
         constexpr int k_max_val = 10;
-        for (_ : Range(k_num_rand_test_repititions)) {
+        for (auto _ : Range(k_num_rand_test_repititions)) {
             auto const random_num = generator.GetRandomInRange(seed, -k_max_val, k_max_val, false);
             REQUIRE(random_num >= -k_max_val);
             REQUIRE(random_num <= k_max_val);
@@ -2000,7 +2000,7 @@ TEST_CASE(TestRandomIntGeneratorSignedintgeneratationRandomIntGenerator) {
 
     SUBCASE("Correct generation in range -10 to 10 with repeating last value disallowed") {
         constexpr int k_max_val = 10;
-        for (_ : Range(k_num_rand_test_repititions)) {
+        for (auto _ : Range(k_num_rand_test_repititions)) {
             auto const random_num = generator.GetRandomInRange(seed, -k_max_val, k_max_val, true);
             REQUIRE(random_num >= -k_max_val);
             REQUIRE(random_num <= k_max_val);
@@ -2088,7 +2088,7 @@ TEST_CASE(Testversion) {
         u16 maj = 0;
         u8 min = 0;
         u8 pat = 0;
-        for (_ : Range(256)) {
+        for (auto _ : Range(256)) {
             ++pat;
             if (pat > 20) {
                 pat = 0;
@@ -2464,7 +2464,7 @@ TEST_CASE(TestAllocatorTypes) {
         constexpr auto k_iterations = 1000;
         DynamicArrayInline<Span<u8>, k_iterations> allocs;
         DynamicArrayInline<void*, k_iterations> set;
-        for (_ : Range(k_iterations)) {
+        for (auto _ : Range(k_iterations)) {
             dyn::Append(allocs, a.Allocate({1, 1, true}));
             REQUIRE(Last(allocs).data != nullptr);
             dyn::AppendIfNotAlreadyThere(set, Last(allocs).data);
@@ -2559,7 +2559,7 @@ TEST_CASE(TestAllocatorTypes) {
         u64 seed = SeedFromTime();
         RandomIntGenerator<usize> rand_gen;
         usize index = 0;
-        for (_ : Range(ArraySize(sizes) * 5)) {
+        for (auto _ : Range(ArraySize(sizes) * 5)) {
             switch (rand_gen.GetRandomInRange(seed, 0, 5)) {
                 case 0:
                 case 1:

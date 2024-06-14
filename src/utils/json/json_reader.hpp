@@ -363,7 +363,7 @@ static ValueOrError<Token, JsonParseError> GetToken(Tokeniser* tokeniser) {
                     } else {
                         ++it;
                         auto sub_it = it;
-                        for (_ : Range(4)) {
+                        for (auto _ : Range(4)) {
                             if (sub_it == str_end || !IsHexDigit(*sub_it)) {
                                 invalid_escape_chars = true;
                                 break;

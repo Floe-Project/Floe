@@ -1860,7 +1860,7 @@ TEST_CASE(TestErrorHandling) {
     SUBCASE("fails when requirements are low") {
         DynamicArray<char> buf {scratch_arena};
         dyn::AppendSpan(buf, "local tab = {}\n");
-        for (_ : ::Range(3))
+        for (auto _ : ::Range(3))
             for (char c = 'a'; c <= 'z'; ++c)
                 fmt::Append(buf, "tab[\"{}\"] = 1\n", c);
         dyn::AppendSpan(buf, "return tab\n");

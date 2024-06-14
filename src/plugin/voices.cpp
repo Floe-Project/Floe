@@ -280,7 +280,7 @@ inline void SetEqualPan(Voice& voice, f32 pan_pos) {
     constexpr auto k_root_2_over_2 = maths::k_sqrt_two<> / 2;
     auto const left = k_root_2_over_2 * (cosx - sinx);
     auto const right = k_root_2_over_2 * (cosx + sinx);
-    ASSERT(left >= 0 && right >= 0);
+    ASSERT_HOT(left >= 0 && right >= 0);
 
     voice.amp_l = left;
     voice.amp_r = right;
@@ -516,12 +516,12 @@ class ChunkwiseVoiceProcessor {
 
   private:
     void CheckSamplesAreValid([[maybe_unused]] usize buffer_pos, [[maybe_unused]] u32 num) {
-#if FLOE_DEBUG
-        for (usize i = buffer_pos; i < buffer_pos + (usize)num; ++i) {
-            auto const s = m_buffer[i];
-            ASSERT(s >= -ERRONEOUS_SAMPLE_VALUE && s <= ERRONEOUS_SAMPLE_VALUE);
+        if constexpr (RUNTIME_SAFETY_CHECKS_ON && !PRODUCTION_BUILD) {
+            for (usize i = buffer_pos; i < buffer_pos + (usize)num; ++i) {
+                auto const s = m_buffer[i];
+                ASSERT(s >= -k_erroneous_sample_value && s <= k_erroneous_sample_value);
+            }
         }
-#endif
     }
 
     void UpdateLastValidFrame(u32 chunk_size) {
@@ -553,7 +553,7 @@ class ChunkwiseVoiceProcessor {
     }
 
     void MultiplyVectorToBufferAtPos(usize const pos, f32x4 const& gain) {
-        ASSERT(pos + 4 <= m_buffer.size);
+        ASSERT_HOT(pos + 4 <= m_buffer.size);
         auto p = LoadUnalignedToType<f32x4>(&m_buffer[pos]);
         p *= gain;
         StoreToUnaligned(&m_buffer[pos], p);
@@ -561,7 +561,7 @@ class ChunkwiseVoiceProcessor {
     }
 
     void AddVectorToBufferAtPos(usize const pos, f32x4 const& addition) {
-        ASSERT(pos + 4 <= m_buffer.size);
+        ASSERT_HOT(pos + 4 <= m_buffer.size);
         f32x4 p;
         p = LoadUnalignedToType<f32x4>(&m_buffer[pos]);
         p += addition;
@@ -570,7 +570,7 @@ class ChunkwiseVoiceProcessor {
     }
 
     void CopyVectorToBufferAtPos(usize const pos, f32x4 const& data) {
-        ASSERT(pos + 4 <= m_buffer.size);
+        ASSERT_HOT(pos + 4 <= m_buffer.size);
         StoreToUnaligned(&m_buffer[pos], data);
         CheckSamplesAreValid(pos, 4);
     }
@@ -982,7 +982,7 @@ Array<Span<f32>, k_num_layers> ProcessVoices(VoicePool& pool,
 
     for (auto& v : pool.voices) {
         if (v.written_to_buffer_this_block) {
-            if constexpr (RUNTIME_SAFETY_CHECKS_ON) {
+            if constexpr (RUNTIME_SAFETY_CHECKS_ON && PRODUCTION_BUILD) {
                 for (auto const frame : Range(num_frames)) {
                     auto const& l = pool.buffer_pool[v.index][frame * 2 + 0];
                     auto const& r = pool.buffer_pool[v.index][frame * 2 + 1];

@@ -1608,7 +1608,7 @@ TEST_CASE(TestFuzzingJsonState) {
                 }
             }
         } else {
-            for (_ : Range(3)) {
+            for (auto _ : Range(3)) {
                 auto const range = info.projection ? info.projection->range : info.linear_range;
                 auto v = RandomFloatInRange(seed, range.min, range.max);
                 auto const original_v = v;

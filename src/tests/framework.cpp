@@ -63,7 +63,7 @@ static Optional<String> SearchUpwardsFromExeForFolder(Tester& tester, String fol
     DynamicArray<char> buf {dir, tester.scratch_arena};
 
     constexpr usize k_max_folder_heirarchy = 20;
-    for (_ : Range(k_max_folder_heirarchy)) {
+    for (auto _ : Range(k_max_folder_heirarchy)) {
         auto const opt_dir = path::Directory(dir);
         if (!opt_dir.HasValue()) break;
         ASSERT(dir.size != opt_dir->size);

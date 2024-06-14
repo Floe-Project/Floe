@@ -1572,7 +1572,7 @@ TEST_CASE(TestAssetLoader) {
         // We copy the test library files to a temp directory so that we can modify them without messing up
         // our test data. And also on Windows WSL, we can watch for directory changes - which doesn't work on
         // the WSL filesystem.
-        _ = Delete(lib_dir, {.type = DeleteOptions::Type::DirectoryRecursively, .fail_if_not_exists = false});
+        auto _ = Delete(lib_dir, {.type = DeleteOptions::Type::DirectoryRecursively, .fail_if_not_exists = false});
         {
             auto const source = (String)path::Join(
                 tester.scratch_arena,
@@ -1957,7 +1957,7 @@ TEST_CASE(TestAssetLoader) {
         dyn::AppendSpan(temp_rename, ".foo");
         bool is_renamed = false;
 
-        for (_ : Range(k_num_calls)) {
+        for (auto _ : Range(k_num_calls)) {
             SendLoadRequest(
                 thread,
                 connection,

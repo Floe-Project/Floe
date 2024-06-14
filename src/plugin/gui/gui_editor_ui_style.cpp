@@ -86,7 +86,7 @@ static String UiStyleFilepath(Allocator& a, String filename) {
 
 static void WriteHeader(Writer writer) {
     // REUSE-IgnoreStart
-    _ = fmt::FormatToWriter(
+    auto _ = fmt::FormatToWriter(
         writer,
         "// Copyright 2018-2024 Sam Windell\n// SPDX-License-Identifier: GPL-3.0-or-later\n\n");
     // REUSE-IgnoreEnd

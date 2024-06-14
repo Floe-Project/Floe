@@ -298,8 +298,8 @@ TEST_CASE(TestPresetBrowserFilters) {
     return k_success;
 }
 
-TEST_CASE(TestCurrentPresetInfo) {
 #if 0
+TEST_CASE(TestCurrentPresetInfo) {
     auto listing = TRY(TestListing(tester.scratch_arena));
     CoreLibrary core;
     u64 random_seed = SeedFromTime();
@@ -360,11 +360,8 @@ TEST_CASE(TestCurrentPresetInfo) {
         REQUIRE(current_preset_info.Path());
     }
 
-#endif
     return k_success;
 }
+#endif
 
-TEST_REGISTRATION(FloePresetTests) {
-    REGISTER_TEST(TestCurrentPresetInfo);
-    REGISTER_TEST(TestPresetBrowserFilters);
-}
+TEST_REGISTRATION(FloePresetTests) { REGISTER_TEST(TestPresetBrowserFilters); }

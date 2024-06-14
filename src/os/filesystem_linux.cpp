@@ -45,7 +45,7 @@ ErrorCodeOr<Optional<MutableString>> FilesystemDialog(DialogOptions options) {
     FILE* f = popen(dyn::NullTerminated(command), "r");
     if (f) {
         char filename[4000];
-        fgets(filename, ArraySize(filename), f);
+        auto _ = fgets(filename, ArraySize(filename), f);
         pclose(f);
         auto result = WhitespaceStripped(FromNullTerminated(filename));
         if (path::IsAbsolute(result, path::Format::Posix)) return result.Clone(options.allocator);
@@ -142,7 +142,7 @@ ErrorCodeOr<MutableString> ConvertToAbsolutePath(Allocator& a, String path) {
     }
 
     char result[PATH_MAX] {};
-    realpath(dyn::NullTerminated(path_nt), result);
+    auto _ = realpath(dyn::NullTerminated(path_nt), result);
     auto const result_path = FromNullTerminated(result);
     if (path::IsAbsolute(result_path)) return result_path.Clone(a);
 

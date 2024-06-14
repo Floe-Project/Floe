@@ -23,10 +23,10 @@ SystemStats GetSystemStats() {
 
 void OpenFolderInFileBrowser(String path) {
     PathArena path_allocator;
-    ::system(fmt::Format(path_allocator, "xdg-open {}\0", path).data);
+    auto _ = ::system(fmt::Format(path_allocator, "xdg-open {}\0", path).data);
 }
 
 void OpenUrlInBrowser(String url) {
     ArenaAllocatorWithInlineStorage<200> arena;
-    ::system(fmt::Format(arena, "xdg-open {}\0", url).data);
+    auto _ = ::system(fmt::Format(arena, "xdg-open {}\0", url).data);
 }

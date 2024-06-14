@@ -535,8 +535,8 @@ void WriteColoursFile() {}
 void WriteSizesFile() {}
 void WriteColourMapFile() {}
 
-void SizesGUISliders(EditorGUI* g, String search) {}
-void ColourMapGUIMenus(EditorGUI* g, String search, String colour_search, bool high_contrast) {}
-void ColoursGUISliders(EditorGUI* gui, String search) {}
+void SizesGUISliders(EditorGUI*, String) {}
+void ColourMapGUIMenus(EditorGUI*, String, String, bool) {}
+void ColoursGUISliders(EditorGUI*, String) {}
 
 #endif

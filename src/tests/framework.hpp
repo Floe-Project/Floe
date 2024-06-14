@@ -275,8 +275,8 @@ Type& CreateOrFetchFixtureObject(Tester& tester) {
 #define REGISTER_TEST(func)
 #define TEST_REGISTRATION(name)                                                                              \
     template <typename Unused>                                                                               \
-    void name(tests::Tester& tester)
+    void name(tests::Tester&)
 
-#define TEST_CASE(func) __attribute__((unused)) tests::Result func(tests::Tester& tester)
+#define TEST_CASE(func) __attribute__((unused)) tests::Result func([[maybe_unused]] tests::Tester& tester)
 
 #endif

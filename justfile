@@ -11,6 +11,9 @@ gen_files_dir := "build_gen"
 build target_os='native':
   zig build compile -Dtargets={{target_os}} -Dbuild-mode=development
 
+build-release target_os='native':
+  zig build compile -Dtargets={{target_os}} -Dbuild-mode=production
+
 # build and report compile-time statistics
 build-timed target_os='native':
   #!/usr/bin/env bash

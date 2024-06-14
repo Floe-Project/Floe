@@ -505,52 +505,55 @@ fn genericFlags(context: *BuildContext, target: std.Build.ResolvedTarget, extra_
         try flags.append("-DTRACY_MANUAL_LIFETIME");
         try flags.append("-DTRACY_DELAYED_INIT");
         try flags.append("-DTRACY_ONLY_LOCALHOST");
+        if (target.result.os.tag == .linux) {
+            // Couldn't get these working well so just disabling them
+            try flags.append("-DTRACY_NO_CALLSTACK");
+            try flags.append("-DTRACY_NO_SYSTEM_TRACING");
+        }
     }
 
-    if (context.build_mode != .production) {
-        // A bit of information about debug symbols:
-        // DWARF is a debugging information format. It is used widely, particularly on Linux and macOS. libbacktrace,
-        // which we use for getting nice stack traces can read DWARF information from the executable on any OS. All
-        // we need to do is make sure that the DWARF info is available for libbacktrace to read.
-        //
-        // On Windows, there is the PDB format, this is a separate file that contains the debug information. Zig
-        // generates this too, but we can tell it to also embed DWARF debug info into the executable, that's what the
-        // -gdwarf flag does.
-        //
-        // On Linux, it's easy, just use the same flag.
-        //
-        // On macOS, there is a slightly different approach. DWARF info is embedded in the compiled .o flags. But it's
-        // not aggregated into the final executable. Instead, the final executable contains a 'debug map' which points
-        // to all of the object files and shows where the DWARF info is. You can see this map by running
-        // 'dsymutil --dump-debug-map my-exe'.
-        //
-        // In order to aggregate the DWARF info into the final executable, we need to run 'dsymutil my-exe'. This then
-        // outputs a .dSYM folder which contains the aggregated DWARF info. libbacktrace looks for this dSYM folder
-        // adjacent to the executable.
+    // A bit of information about debug symbols:
+    // DWARF is a debugging information format. It is used widely, particularly on Linux and macOS. libbacktrace,
+    // which we use for getting nice stack traces can read DWARF information from the executable on any OS. All
+    // we need to do is make sure that the DWARF info is available for libbacktrace to read.
+    //
+    // On Windows, there is the PDB format, this is a separate file that contains the debug information. Zig
+    // generates this too, but we can tell it to also embed DWARF debug info into the executable, that's what the
+    // -gdwarf flag does.
+    //
+    // On Linux, it's easy, just use the same flag.
+    //
+    // On macOS, there is a slightly different approach. DWARF info is embedded in the compiled .o flags. But it's
+    // not aggregated into the final executable. Instead, the final executable contains a 'debug map' which points
+    // to all of the object files and shows where the DWARF info is. You can see this map by running
+    // 'dsymutil --dump-debug-map my-exe'.
+    //
+    // In order to aggregate the DWARF info into the final executable, we need to run 'dsymutil my-exe'. This then
+    // outputs a .dSYM folder which contains the aggregated DWARF info. libbacktrace looks for this dSYM folder
+    // adjacent to the executable.
 
-        // Include dwark debug info, even on windows. This means we can use the libbacktrace library everywhere to get really
-        // good stack traces.
-        try flags.append("-gdwarf");
+    // Include dwark debug info, even on windows. This means we can use the libbacktrace library everywhere to get really
+    // good stack traces.
+    try flags.append("-gdwarf");
 
-        if (context.optimise == .ReleaseFast) {
-            if (target.result.os.tag != .windows) {
-                // By default, zig enables UBSan (unless ReleaseFast mode) in trap mode. Meaning it will catch undefined
-                // behaviour and trigger a trap which can be caught by signal handlers. UBSan also has a mode where undefined
-                // behaviour will instead call various functions. This is called the UBSan runtime. It's really easy to implement
-                // the 'minimal' version of this runtime: we just have to declare a nuch of functions like __ubsan_handle_x. So
-                // that's what we do rather than trying to link with the system's version.
-                // https://github.com/ziglang/zig/issues/5163#issuecomment-811606110
-                try flags.append("-fno-sanitize-trap=undefined"); // undo zig's default behaviour (trap mode)
-                const minimal_runtime_mode = false; // I think it's better performance. Certainly less information.
-                if (minimal_runtime_mode) {
-                    try flags.append("-fsanitize-runtime"); // set it to 'minimal' mode
-                }
-            } else {
-                // For some reason the same method of creating our own UBSan runtime doesn't work on windows. These are the link
-                // errors that we get:
-                // error: lld-link: could not open 'liblibclang_rt.ubsan_standalone-x86_64.a': No such file or directory
-                // error: lld-link: could not open 'liblibclang_rt.ubsan_standalone_cxx-x86_64.a': No such file or directory
+    if (context.optimise != .ReleaseFast) {
+        if (target.result.os.tag != .windows) {
+            // By default, zig enables UBSan (unless ReleaseFast mode) in trap mode. Meaning it will catch undefined
+            // behaviour and trigger a trap which can be caught by signal handlers. UBSan also has a mode where undefined
+            // behaviour will instead call various functions. This is called the UBSan runtime. It's really easy to implement
+            // the 'minimal' version of this runtime: we just have to declare a nuch of functions like __ubsan_handle_x. So
+            // that's what we do rather than trying to link with the system's version.
+            // https://github.com/ziglang/zig/issues/5163#issuecomment-811606110
+            try flags.append("-fno-sanitize-trap=undefined"); // undo zig's default behaviour (trap mode)
+            const minimal_runtime_mode = false; // I think it's better performance. Certainly less information.
+            if (minimal_runtime_mode) {
+                try flags.append("-fsanitize-runtime"); // set it to 'minimal' mode
             }
+        } else {
+            // For some reason the same method of creating our own UBSan runtime doesn't work on windows. These are the link
+            // errors that we get:
+            // error: lld-link: could not open 'liblibclang_rt.ubsan_standalone-x86_64.a': No such file or directory
+            // error: lld-link: could not open 'liblibclang_rt.ubsan_standalone_cxx-x86_64.a': No such file or directory
         }
     }
 
@@ -558,9 +561,7 @@ fn genericFlags(context: *BuildContext, target: std.Build.ResolvedTarget, extra_
         // On Windows, fix compile errors related to deprecated usage of string in mingw
         try flags.append("-DSTRSAFE_NO_DEPRECATE");
         try flags.append("-DUNICODE");
-        // "-fms-runtime-lib=static", // TODO: do we need to use this for static linking runtime on windows?
-        // TODO: do I needs these: WINVER=0x0601 _WIN32_WINNT=0x0601
-        // https://docs.microsoft.com/en-us/windows/win32/winprog/using-the-windows- headers?redirectedfrom=MSDN
+        try flags.append("-D_UNICODE");
     } else if (target.result.os.tag == .macos) {
         try flags.append("-DGL_SILENCE_DEPRECATION"); // disable opengl warnings on macos
 
@@ -571,10 +572,6 @@ fn genericFlags(context: *BuildContext, target: std.Build.ResolvedTarget, extra_
             "-Wno-deprecated-declarations",
             "-Wno-deprecated-anon-enum-enum-conversion",
         });
-    } else if (target.result.os.tag == .linux) {
-        // Couldn't get these working well so just disabling them
-        try flags.append("-DTRACY_NO_CALLSTACK");
-        try flags.append("-DTRACY_NO_SYSTEM_TRACING");
     }
 
     return try flags.toOwnedSlice();
@@ -682,7 +679,7 @@ fn getTargets(b: *std.Build, user_given_target_presets: ?[]const u8) !std.ArrayL
     // TODO: not sure if SSE3+ is really a good idea, all we really need is sse2. Also, should we use 'baseline' instead of trying to define our own cpu feature requirements?
     const x86_cpu = "sandybridge+sse+sse2+sse3+sse4_1";
     const apple_arm_cpu = "apple_m1";
-    const min_windows_version = "win8_1";
+    const min_windows_version = "win10";
     const min_macos_version = "11.0";
 
     // IMPROVE: refactor this
@@ -773,7 +770,7 @@ pub fn build(b: *std.Build) void {
         .test_step = b.step("test", "Run tests"),
         .optimise = switch (build_mode) {
             .development => std.builtin.OptimizeMode.Debug,
-            .performance_profiling, .production => std.builtin.OptimizeMode.ReleaseFast,
+            .performance_profiling, .production => std.builtin.OptimizeMode.ReleaseSafe,
         },
     };
 
@@ -1841,6 +1838,11 @@ pub fn build(b: *std.Build) void {
                     extra_flags.append("-DMAC=1") catch unreachable;
                 },
                 else => {},
+            }
+            if (build_context.optimise == .Debug) {
+                extra_flags.append("-DDEVELOPMENT=1") catch unreachable;
+            } else {
+                extra_flags.append("-DRELEASE=1") catch unreachable;
             }
             extra_flags.append("-fno-char8_t") catch unreachable;
             extra_flags.append("-DMACOS_USE_STD_FILESYSTEM=1") catch unreachable;

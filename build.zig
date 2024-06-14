@@ -32,12 +32,6 @@ const rootdir = struct {
 const build_gen_relative = "build_gen";
 const build_gen_abs = rootdir ++ "/" ++ build_gen_relative;
 
-const TargetOs = enum {
-    windows,
-    linux,
-    macos,
-};
-
 const ConcatCompileCommandsStep = struct {
     step: std.Build.Step,
     target: std.Build.ResolvedTarget,
@@ -677,83 +671,60 @@ fn buildLua(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.built
     return lib;
 }
 
-const TargetPreset = enum {
-    native,
-    windows,
-    linux,
-    mac_x86,
-    mac_arm,
-    mac_ub, // universal binary
-};
-
 fn getTargets(b: *std.Build, user_given_target_presets: ?[]const u8) !std.ArrayList(std.Build.ResolvedTarget) {
-    var target_presets = std.ArrayList(TargetPreset).init(b.allocator);
-    defer target_presets.deinit();
-    if (user_given_target_presets) |preset_strings| {
-        var it = std.mem.splitSequence(u8, preset_strings, ",");
-        while (it.next()) |preset_string| {
-            const p = std.meta.stringToEnum(TargetPreset, preset_string);
-            if (p == null) @panic("invalid target");
-            try target_presets.append(p.?);
-        }
-    } else {
-        try target_presets.append(TargetPreset.native);
+    var preset_strings: []const u8 = "native";
+    if (user_given_target_presets != null) {
+        preset_strings = user_given_target_presets.?;
     }
 
     var targets = std.ArrayList(std.Build.ResolvedTarget).init(b.allocator);
-    var has_macos_x86 = false;
-    var has_macos_arm = false;
-    for (target_presets.items) |p| {
-        // TODO: not sure if SSE3+ is really a good idea, all we really need is sse2. Also, should we use 'baseline' instead of trying to define our own cpu feature requirements?
-        const x86_cpu = "sandybridge+sse+sse2+sse3+sse4_1";
-        const apple_arm_cpu = "apple_m1";
-        const min_windows_version = "win8_1";
-        const min_macos_version = "11.0";
-        switch (p) {
-            .native => {
-                try targets.append(b.resolveTargetQuery(try std.Target.Query.parse(.{
-                    .arch_os_abi = "native",
-                    .cpu_features = "native",
-                })));
-            },
-            .windows => {
-                try targets.append(b.resolveTargetQuery(try std.Target.Query.parse(.{
-                    .arch_os_abi = "x86_64-windows." ++ min_windows_version,
-                    .cpu_features = x86_cpu,
-                })));
-            },
-            .linux => {
-                try targets.append(b.resolveTargetQuery(try std.Target.Query.parse(.{
-                    .arch_os_abi = "x86_64-linux-gnu.2.29",
-                    .cpu_features = x86_cpu,
-                })));
-            },
-            .mac_x86 => {
-                try targets.append(b.resolveTargetQuery(try std.Target.Query.parse(.{
-                    .arch_os_abi = "x86_64-macos." ++ min_macos_version,
-                    .cpu_features = x86_cpu,
-                })));
-                has_macos_x86 = true;
-            },
-            .mac_arm => {
-                try targets.append(b.resolveTargetQuery(try std.Target.Query.parse(.{
-                    .arch_os_abi = "aarch64-macos." ++ min_macos_version,
-                    .cpu_features = apple_arm_cpu,
-                })));
-                has_macos_arm = true;
-            },
-            .mac_ub => {
-                try targets.append(b.resolveTargetQuery(try std.Target.Query.parse(.{
-                    .arch_os_abi = "x86_64-macos." ++ min_macos_version,
-                    .cpu_features = x86_cpu,
-                })));
-                has_macos_x86 = true;
-                try targets.append(b.resolveTargetQuery(try std.Target.Query.parse(.{
-                    .arch_os_abi = "aarch64-macos." ++ min_macos_version,
-                    .cpu_features = apple_arm_cpu,
-                })));
-                has_macos_arm = true;
-            },
+
+    // TODO: not sure if SSE3+ is really a good idea, all we really need is sse2. Also, should we use 'baseline' instead of trying to define our own cpu feature requirements?
+    const x86_cpu = "sandybridge+sse+sse2+sse3+sse4_1";
+    const apple_arm_cpu = "apple_m1";
+    const min_windows_version = "win8_1";
+    const min_macos_version = "11.0";
+
+    // IMPROVE: refactor this
+    var it = std.mem.splitSequence(u8, preset_strings, ",");
+    while (it.next()) |preset_string| {
+        if (std.mem.eql(u8, preset_string, "native")) {
+            try targets.append(b.resolveTargetQuery(try std.Target.Query.parse(.{
+                .arch_os_abi = "native",
+                .cpu_features = "native",
+            })));
+        } else if (std.mem.eql(u8, preset_string, "x86_64-windows") or std.mem.eql(u8, preset_string, "windows")) {
+            try targets.append(b.resolveTargetQuery(try std.Target.Query.parse(.{
+                .arch_os_abi = "x86_64-windows." ++ min_windows_version,
+                .cpu_features = x86_cpu,
+            })));
+        } else if (std.mem.eql(u8, preset_string, "x86_64-linux") or std.mem.eql(u8, preset_string, "linux")) {
+            try targets.append(b.resolveTargetQuery(try std.Target.Query.parse(.{
+                .arch_os_abi = "x86_64-linux-gnu.2.29",
+                .cpu_features = x86_cpu,
+            })));
+        } else if (std.mem.eql(u8, preset_string, "x86_64-macos") or std.mem.eql(u8, preset_string, "mac_x86")) {
+            try targets.append(b.resolveTargetQuery(try std.Target.Query.parse(.{
+                .arch_os_abi = "x86_64-macos." ++ min_macos_version,
+                .cpu_features = x86_cpu,
+            })));
+        } else if (std.mem.eql(u8, preset_string, "aarch64-macos") or std.mem.eql(u8, preset_string, "mac_arm")) {
+            try targets.append(b.resolveTargetQuery(try std.Target.Query.parse(.{
+                .arch_os_abi = "aarch64-macos." ++ min_macos_version,
+                .cpu_features = apple_arm_cpu,
+            })));
+        } else if (std.mem.eql(u8, preset_string, "mac_ub")) {
+            try targets.append(b.resolveTargetQuery(try std.Target.Query.parse(.{
+                .arch_os_abi = "x86_64-macos." ++ min_macos_version,
+                .cpu_features = x86_cpu,
+            })));
+            try targets.append(b.resolveTargetQuery(try std.Target.Query.parse(.{
+                .arch_os_abi = "aarch64-macos." ++ min_macos_version,
+                .cpu_features = apple_arm_cpu,
+            })));
+        } else {
+            std.debug.print("unknown target preset: {s}\n", .{preset_string});
+            @panic("unknown target preset");
         }
     }
 

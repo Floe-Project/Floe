@@ -249,7 +249,7 @@ class JsonStateParser {
     Array<bool, k_num_parameters> param_value_is_present {};
     DynamicArrayInline<EffectType, k_num_effect_types> fx_order {};
 
-    Optional<Version> version {};
+    Optional<Version> mirage_version {};
     String last_loaded_preset_name {};
     bool last_loaded_preset_changed {};
     String library_name {};
@@ -414,7 +414,7 @@ class JsonStateParser {
 
     bool HandleMaster(EventHandlerStack& handler_stack, Event const& event) {
         if (event.type == EventType::Int && event.key == "version") {
-            version = Version((u32)event.integer);
+            mirage_version = Version((u32)event.integer);
             return true;
         }
         if (SetIfMatchingObject(handler_stack,
@@ -848,13 +848,13 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
     // Ensure backwards compatibility by recreating old bug behaviour
     // ======================================================================================================
     {
-        auto const floe_preset_version_hex = parser.version.ValueOr({}).Packed();
+        auto const mirage_preset_version_hex = parser.mirage_version.ValueOr({}).Packed();
 
         // Prior to 1.2.0 the behaviour was the same as if Param_CC64Retrigger was
         // turned off. If we have gotten here, the state we are trying to load must
         // be from pre-1.2.0.
         constexpr auto k_version_that_added_cc64_retrig = PackVersionIntoU32(2, 0, 0);
-        if (floe_preset_version_hex < k_version_that_added_cc64_retrig) {
+        if (mirage_preset_version_hex < k_version_that_added_cc64_retrig) {
             static constexpr f32 k_value_for_backwards_compat = 0;
             for (auto const lay : Range(k_num_layers)) {
                 state
@@ -872,7 +872,7 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
         // of people's old DAW projects, we recreate this behaviour by setting those
         // values to 0 here.
         constexpr auto k_version_that_fixed_no_key_tracking_tuning_bug = PackVersionIntoU32(1, 2, 0);
-        if (floe_preset_version_hex < k_version_that_fixed_no_key_tracking_tuning_bug) {
+        if (mirage_preset_version_hex < k_version_that_fixed_no_key_tracking_tuning_bug) {
             for (auto const layer_index : Range(k_num_layers)) {
                 auto const keytracking_off = layer_param_value(layer_index, LayerParamIndex::Keytrack) < 0.5f;
                 if (keytracking_off) {
@@ -887,7 +887,7 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
         // the behaviour of people's old DAW projects, we recreate this behaviour by
         // muting the layer.
         constexpr auto k_version_that_fixed_start_offset_past_ping_pong_silent = PackVersionIntoU32(1, 2, 0);
-        if (floe_preset_version_hex < k_version_that_fixed_start_offset_past_ping_pong_silent) {
+        if (mirage_preset_version_hex < k_version_that_fixed_start_offset_past_ping_pong_silent) {
             for (auto const layer_index : Range(k_num_layers)) {
                 auto const loop_on = layer_param_value(layer_index, LayerParamIndex::EngineV1LoopOn) >= 0.5f;
                 auto const ping_pong_on =
@@ -906,7 +906,7 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
         // equivalent to being set to 0. We recreate that behaviour here so as to
         // maintain backwards compatibility.
         constexpr auto k_version_that_added_ping_pong_xfade = PackVersionIntoU32(2, 0, 3);
-        if (floe_preset_version_hex < k_version_that_added_ping_pong_xfade) {
+        if (mirage_preset_version_hex < k_version_that_added_ping_pong_xfade) {
             for (auto const layer_index : Range(k_num_layers)) {
                 if (layer_param_value(layer_index, LayerParamIndex::EngineV1LoopOn) >= 0.5f &&
                     layer_param_value(layer_index, LayerParamIndex::EngineV1LoopPingPong) >= 0.5f) {

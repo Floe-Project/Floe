@@ -17,7 +17,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-const floe_version_string = "3.0.0-Beta.1";
 const floe_description = "Sample-based synth plugin";
 const floe_copyright = "Sam Windell";
 const floe_vendor = "Floe";
@@ -807,7 +806,15 @@ pub fn build(b: *std.Build) void {
             .override = std.Build.InstallDir{ .custom = install_subfolder_string },
         };
 
-        const floe_version = comptime std.SemanticVersion.parse(floe_version_string) catch @panic("invalid version");
+        var floe_version_string: ?[]const u8 = null;
+        {
+            var file = std.fs.openFileAbsolute(rootdir ++ "/version.txt", .{ .mode = .read_only }) catch @panic("version.txt not found");
+            defer file.close();
+            floe_version_string = file.readToEndAlloc(b.allocator, 256) catch @panic("version.txt error");
+            floe_version_string = std.mem.trim(u8, floe_version_string.?, " \r\n\t");
+        }
+
+        const floe_version = std.SemanticVersion.parse(floe_version_string.?) catch @panic("invalid version");
 
         const generic_flags = genericFlags(&build_context, target, &.{}) catch unreachable;
         const generic_fp_flags = genericFlags(&build_context, target, &.{
@@ -856,19 +863,22 @@ pub fn build(b: *std.Build) void {
         const objcpp_flags = objcppFlags(b, cpp_flags, &.{}) catch unreachable;
         const objcpp_fp_flags = objcppFlags(b, cpp_fp_flags, &.{}) catch unreachable;
 
+        const floe_version_major: i64 = @intCast(floe_version.major);
+        const floe_version_minor: i64 = @intCast(floe_version.minor);
+        const floe_version_patch: i64 = @intCast(floe_version.patch);
+
         const build_config_step = b.addConfigHeader(.{
             .style = .blank,
         }, .{
             .PRODUCTION_BUILD = build_context.build_mode == .production,
             .RUNTIME_SAFETY_CHECKS_ON = build_context.optimise == .Debug or build_context.optimise == .ReleaseSafe,
             .GIT_HEAD_SHA1 = if (build_context.build_mode == .production) getGitCommit(b) else "",
-            .FLOE_MAJOR_VERSION = @as(i64, floe_version.major),
-            .FLOE_MINOR_VERSION = @as(i64, floe_version.minor),
-            .FLOE_PATCH_VERSION = @as(i64, floe_version.patch),
+            .FLOE_MAJOR_VERSION = floe_version_major,
+            .FLOE_MINOR_VERSION = floe_version_minor,
+            .FLOE_PATCH_VERSION = floe_version_patch,
             .FLOE_BETA_VERSION = floe_version.pre != null,
             .FLOE_ADDITIONAL_VERSION_DESCRIPTION = if (floe_version.pre != null) floe_version.pre.? else "",
             .FLOE_IS_BETA = floe_version.pre != null,
-            .FLOE_INITIAL_LOAD_LIBRARY = "Music Box Suite",
             .FLOE_VERSION_STRING = floe_version_string,
             .FLOE_DESCRIPTION = floe_description,
             .FLOE_URL = floe_url,

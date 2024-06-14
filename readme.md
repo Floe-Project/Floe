@@ -13,6 +13,7 @@ SPDX-License-Identifier: CC0-1.0
 _Large-scale changes are underway, many things are missing and broken for now._
 
 ## Previously known as Mirage
+Floe is fully backwards-compatible with Mirage.
 ### Why the name change?
 - Mirage is already used by a hardware sampler from the 80s.
 - The project has changed: it's now a separate, open-source, adjacent project to FrozenPlain. It supports new plugin formats.

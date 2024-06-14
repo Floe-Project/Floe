@@ -41,10 +41,9 @@ constexpr auto k_plugin_infos = Array {
     },
 #ifdef CORE_LIBRARY_ZIP_PATH
     ComponentInfo {
-        .name = "Floe Core Library v" FLOE_VERSION_STRING, // TODO: should the core library be
-                                                           // versioned the same?
+        .name = "Floe Core Library",
         .install_dir = nullopt,
-        .install_dir_fallback = "C:\\Program Files\\Floe"_s, // TODO: change this
+        .install_dir_fallback = "C:\\Users\\Public\\Floe"_s,
         .filename = "Core.library",
         .resource_id = CORE_LIBRARY_RC_ID,
     },

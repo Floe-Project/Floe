@@ -26,7 +26,7 @@ jobs:
             .zig-cache
             build_gen
 
-      - run: just build release windows,mac_ub
+      - run: just build-release windows,mac_ub
 
       - uses: actions/upload-artifact@v4
         with:

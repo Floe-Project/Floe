@@ -8,7 +8,10 @@ native_binary_dir := "zig-out/" + native_arch_os_pair
 all_src_files := 'fd . -e .mm -e .cpp -e .hpp -e .h src' 
 
 build target_os='native':
-  time analyzed-build zig build compile -Dtargets={{target_os}} -Dbuild-mode=development 
+  zig build compile -Dtargets={{target_os}} -Dbuild-mode=development 
+
+build-timed target_os='native':
+  time analyzed-build just build {{target_os}}
 
 check-reuse:
   reuse lint
@@ -103,7 +106,11 @@ static_analyisers := replace("""
 checks_local_level_0 := if os() == "linux" { quick_checks_linux } else { quick_checks_non_linux }
 checks_local_level_1 := checks_local_level_0 + static_analyisers 
 
-checks_ci := if os() == "linux" { quick_checks_linux_ci + " coverage cppcheck clang-tidy-all" } else { " test-units test-clap-val test-pluginval cppcheck" } 
+checks_ci := if os() == "linux" { 
+  quick_checks_linux_ci + " coverage cppcheck clang-tidy-all" 
+} else { 
+  "test-units test-clap-val test-pluginval test-vst3-val cppcheck"
+} 
 
 test level: (parallel if level == "0" { checks_local_level_0 } else { checks_local_level_1 } )
 

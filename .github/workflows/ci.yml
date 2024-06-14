@@ -69,10 +69,10 @@ jobs:
           if-no-files-found: error
           retention-days: 2
           path: |
-            zig-out/x86-windows/Floe.vst3
-            zig-out/x86-windows/Floe.clap
-            zig-out/x86-windows/tests.exe
-            zig-out/x86-windows/VST3-Validator.exe
+            zig-out/x86_64-windows/Floe.vst3
+            zig-out/x86_64-windows/Floe.clap
+            zig-out/x86_64-windows/tests.exe
+            zig-out/x86_64-windows/VST3-Validator.exe
 
   test-windows:
     strategy:

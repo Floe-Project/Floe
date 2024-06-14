@@ -1,0 +1,123 @@
+name: Release
+
+on:
+  workflow_dispatch:
+
+env:
+  MACOS_FINAL_ZIP: Floe-macOS.zip
+  WINDOWS_FINAL_ZIP: Floe-Windows.zip
+
+jobs:
+  compile:
+    name: Compile
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - uses: nicknovitski/nix-develop@v1.1.0
+      - uses: Hanaasagi/zig-action-cache@master
+        with:
+          cache-directories: |
+            .zig-cache
+            build_gen
+
+      - run: just build release windows,mac_ub
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binaries-windows
+          if-no-files-found: error
+          path: |
+            zig-out/x86_64-windows/Floe.vst3
+            zig-out/x86_64-windows/Floe.clap
+            zig-out/x86_64-windows/Floe Installer.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binaries-macos
+          if-no-files-found: error
+          path: |
+            zig-out/universal-macos/Floe.vst3
+            zig-out/universal-macos/Floe.clap
+            # zig-out/universal-macos/Floe.component
+
+  prepare-macos:
+    name: Prepare macOS
+    runs-on: macos-latest
+    needs: compile
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: binaries-windows
+          path: files
+
+      # TODO: codesign, notarize, build installer
+
+      - working-directory: files
+        run: zip -r ../${{ env.MACOS_FINAL_ZIP }} .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: final-macos
+          if-no-files-found: error
+          path: ${{ env.MACOS_FINAL_ZIP }}
+
+  prepare-windows:
+    name: Prepare Windows
+    runs-on: windows-latest
+    needs: compile
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: binaries-windows
+          path: files
+
+      # TODO: codesign
+
+      - working-directory: files
+        run: 7z a -tzip ${{ env.WINDOWS_FINAL_ZIP }} .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: final-windows
+          if-no-files-found: error
+          path: files
+
+  deploy:
+    name: Deploy
+    needs: [prepare-macos, prepare-windows]
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: version.txt
+
+      - name: 'Set Env'
+        run: |
+          export VERSION=$(cat version.txt)
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: final-windows
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: final-macos
+
+      - uses: ncipollo/release-action@v1
+        with:
+          artifactErrorsFailBuild: true
+          artifacts: ${{ env.WINDOWS_FINAL_ZIP }},${{ env.MACOS_FINAL_ZIP }}
+          name: Release v${{ env.VERSION }}
+          tag: v${{ env.VERSION }}
+          draft: true
+          # TODO: show release notes and install instructions
+          # bodyFile: "body.md"
+

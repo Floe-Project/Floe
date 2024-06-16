@@ -1,0 +1,4 @@
+site_name: Floe
+site_url: https://floe-synth.github.io/floe
+theme:
+  name: material

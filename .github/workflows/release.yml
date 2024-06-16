@@ -12,7 +12,6 @@ env:
 
 jobs:
   compile:
-    name: Compile
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
@@ -50,7 +49,6 @@ jobs:
             # zig-out/universal-macos/Floe.component
 
   prepare-macos:
-    name: Prepare macOS
     runs-on: macos-latest
     needs: compile
     steps:
@@ -71,7 +69,6 @@ jobs:
           path: ${{ env.MACOS_FINAL_ZIP }}
 
   prepare-windows:
-    name: Prepare Windows
     runs-on: windows-latest
     needs: compile
     steps:
@@ -93,7 +90,6 @@ jobs:
           path: files
 
   deploy:
-    name: Deploy
     needs: [prepare-macos, prepare-windows]
     runs-on: ubuntu-latest
     permissions:
@@ -109,15 +105,12 @@ jobs:
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
 
           # Nice little one-liner to extract changes from the larger changelog, thanks to QOwnNotes for this.
+          # It does require us to be consistent with our changelog format, but that's a good thing.
           grep -Pzo "## ${VERSION}\n(\n|.)+?\n##" ../changelog.md | sed '$ d' >> latest_changes.md
 
       - uses: actions/download-artifact@v4
         with:
-          name: final-windows
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: final-macos
+          pattern: final-*
 
       - uses: ncipollo/release-action@v1
         with:

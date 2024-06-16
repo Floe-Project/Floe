@@ -162,15 +162,15 @@ parallel tasks:
   jq -r '.[] | select(.Exitval != 0) | "\n\u001b[34m[Stdout] \(.Command):\u001b[0m", .Stdout, "\n\u001b[34m[Stderr] \(.Command):\u001b[0m", .Stderr' $results_json
 
   # prepare a TSV summary of the results
-  summary=$(jq -r '["Command", "Time(s)", "Return Code"], (.[] | [.Command, .JobRuntime, .Exitval]) | @tsv' $results_json)
+  summary=$(jq -r '["Command", "Time(s)", "Return-Code"], (.[] | [.Command, .JobRuntime, .Exitval]) | @tsv' $results_json)
   failed=$(jq '. | map(select(.Exitval != 0)) | length' $results_json)
   num_tasks=$(jq '. | length' $results_json)
 
   # use Miller to pretty-print the summary, along with a markdown version for GitHub Actions
   echo -e "\033[0;34m[Summary]\033[0m"
-  [[ ! -z $GITHUB_ACTIONS ]] && echo "# Summary" >> $GITHUB_STEP_SUMMARY && echo "" >> $GITHUB_STEP_SUMMARY
-  printf "%s\n" "$summary" | mlr --itsv --opprint sort -f "Return Code"
-  [[ ! -z $GITHUB_ACTIONS ]] && printf "%s\n\n" "$summary" | mlr --itsv --omd sort -f "Return Code" >> $GITHUB_STEP_SUMMARY
+  [[ ! -z $GITHUB_ACTIONS ]] && echo "# Summary ({{os()}})" >> $GITHUB_STEP_SUMMARY && echo "" >> $GITHUB_STEP_SUMMARY
+  printf "%s\n" "$summary" | mlr --itsv --opprint sort -f "Return-Code"
+  [[ ! -z $GITHUB_ACTIONS ]] && printf "%s\n\n" "$summary" | mlr --itsv --omd sort -f "Return-Code" >> $GITHUB_STEP_SUMMARY
 
   if [ $failed -eq 0 ]; then
     echo -e "\033[0;32mAll $num_tasks tasks passed\033[0m"

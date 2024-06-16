@@ -13,8 +13,7 @@ on:
       - main
 
 jobs:
-  compile-and-test-mac:
-    name: Compile and test on macOS
+  mac-compile-and-test:
     runs-on: macos-latest
     timeout-minutes: 30
     steps:
@@ -34,8 +33,7 @@ jobs:
       - run: just build mac_ub
       - run: just test-ci
 
-  compile-and-test-linux-and-cross:
-    name: Compile/cross-compile and test on Linux
+  linux-compile-and-test:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -95,15 +93,15 @@ jobs:
             zig-out/x86_64-windows/tests.exe
             zig-out/x86_64-windows/VST3-Validator.exe
 
-  test-windows:
+  windows-test:
     strategy:
       fail-fast: false # run even if others in this matrix failed
       matrix:
         test: [ unit, vst3val, pluginval, clapval ]
     name: windows-${{ matrix.test }}
     runs-on: windows-latest
-    needs: compile-and-test-linux-and-cross
-    if: always()
+    needs: linux-compile-and-test
+    if: '!cancelled()'
     timeout-minutes: 10
     steps:
       # The artifact will be installed to ${{ github.workspace }}
@@ -120,6 +118,7 @@ jobs:
       - shell: pwsh
         name: ${{ matrix.test }}
         run: |
+          tree /F 
           powershell -ExecutionPolicy Bypass -File .github\scripts\run-test.ps1 -test_type ${{ matrix.test }} -binaries_dir "${{ github.workspace }}"
 
       - name: Upload logs

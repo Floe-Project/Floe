@@ -1,7 +1,6 @@
 site_name: Floe
 site_url: https://floe-synth.github.io/floe
 repo_url: https://github.com/floe-synth/floe
-
 theme:
   name: material
   palette:
@@ -24,3 +23,5 @@ theme:
       toggle:
         icon: material/brightness-4
         name: Switch to system preference
+  icon:
+    repo: fontawesome/brands/github

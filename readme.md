@@ -3,7 +3,6 @@ SPDX-FileCopyrightText: 2018-2024 Sam Windell
 SPDX-License-Identifier: CC0-1.0
 -->
 
-
 # Floe
 
 ![CI](https://github.com/Floe-Synth/Floe/actions/workflows/ci.yml/badge.svg)

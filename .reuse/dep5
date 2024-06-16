@@ -19,6 +19,6 @@ Files: third_party_libs/sqlite/*
 Copyright: Sqlite Authors
 License: Unlicense
 
-Files: *.lock build_resources/*.lock
+Files: *.lock build_resources/*.lock version.txt
 Copyright: 2024 Sam Windell
 License: CC0-1.0

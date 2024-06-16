@@ -43,10 +43,12 @@ clang-tidy arch_os_pair=native_arch_os_pair: (install-cbd arch_os_pair)
 
 clang-tidy-all: (clang-tidy "x86_64-linux") (clang-tidy "x86_64-windows") (clang-tidy "aarch64-macos")
 
-cppcheck arch_os_pair=native_arch_os_pair:
-  # IMPROVE: use --check-level=exhaustive?
-  # IMPROVE: investigate other flags such as --enable=constVariable
-  cppcheck --project={{justfile_directory()}}/{{gen_files_dir}}/compile_commands_{{arch_os_pair}}.json --cppcheck-build-dir={{justfile_directory()}}/.zig-cache --enable=unusedFunction --error-exitcode=2
+# IMPROVE: (June 2024) cppcheck thinks there are syntax errors in valid code, cppcheck v2.14.1. We should try again 
+# in the future and see if it's fixed. If so, it should be added to run alongside clang-tidy in CI, etc.
+# cppcheck arch_os_pair=native_arch_os_pair:
+#   # IMPROVE: use --check-level=exhaustive?
+#   # IMPROVE: investigate other flags such as --enable=constVariable
+#   cppcheck --project={{justfile_directory()}}/{{gen_files_dir}}/compile_commands_{{arch_os_pair}}.json --cppcheck-build-dir={{justfile_directory()}}/.zig-cache --enable=unusedFunction --error-exitcode=2
 
 format:
   {{all_src_files}} | xargs clang-format -i
@@ -108,7 +110,6 @@ checks_level_0 := replace(
 
 checks_level_1 := checks_level_0 + replace( 
   "
-  cppcheck
   clang-tidy
   ", "\n", " ")
 
@@ -121,7 +122,6 @@ checks_ci := replace(
     check-format
     test-units
     coverage
-    cppcheck
     clang-tidy-all
     "
   } else {
@@ -130,7 +130,6 @@ checks_ci := replace(
     test-clap-val
     test-pluginval
     test-vst3-val
-    cppcheck
     "
   }, "\n", " ")
 

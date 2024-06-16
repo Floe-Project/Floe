@@ -119,7 +119,6 @@ jobs:
       - shell: pwsh
         name: ${{ matrix.test }}
         run: |
-          tree /F 
           powershell -ExecutionPolicy Bypass -File .github\scripts\run-test.ps1 -test_type ${{ matrix.test }} -binaries_dir "${{ github.workspace }}"
 
       - name: Upload logs

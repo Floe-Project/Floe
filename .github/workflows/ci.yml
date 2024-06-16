@@ -6,16 +6,17 @@ name: CI
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
   pull_request:
+    branches:
+      - main
 
 jobs:
-  compile:
-    name: Compile
+  compile-and-test-mac:
+    name: Compile and test on macOS
+    runs-on: macos-latest
     timeout-minutes: 30
-    strategy:
-      matrix:
-        os: [ ubuntu-latest, macos-latest ]
-    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -30,31 +31,51 @@ jobs:
             .zig-cache
             build_gen
 
-      - if: matrix.os == 'ubuntu-latest'
-        name: Compile Linux
+      - run: just build mac_ub
+      - run: just test-ci
+
+  compile-and-test-linux-and-cross:
+    name: Compile/cross-compile and test on Linux
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - uses: nicknovitski/nix-develop@v1.1.0
+      - uses: Hanaasagi/zig-action-cache@master
+        with:
+          cache-directories: |
+            .zig-cache
+            build_gen
+
+      - id: compile_linux
+        if: '!cancelled()'
         run: just build linux
 
-      - if: matrix.os == 'ubuntu-latest'
-        name: Compile Windows
-        id: compile_windows
-        continue-on-error: true
+      - id: compile_windows
+        if: '!cancelled()'
         run: just build windows
 
-      - name: Compile Mac
-        continue-on-error: true
+      - id: compile_macos
+        if: '!cancelled()'
         run: just build mac_ub
 
-      - name: Tests
+      - id: tests
+        if: '!cancelled()'
         run: just test-ci
 
-      - if: matrix.os == 'ubuntu-latest'
+      - if: '!cancelled()'
         name: Upload coverage reports
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           directory: build_gen/coverage-out/tests
           verbose: true
-          fail_ci_if_error: false
+          fail_ci_if_error: true
 
       # IMPORTANT(upload-artifact): 
       #  1. If multiple paths are provided as input, the least common ancestor of all the search paths will be used as the 
@@ -62,7 +83,7 @@ jobs:
       #  2. All file permissions are removed when uploading.
 
       - name: Upload Windows binaries
-        if: matrix.os == 'ubuntu-latest' && steps.compile_windows.outcome == 'success'
+        if: '!cancelled()'
         uses: actions/upload-artifact@v4
         with:
           name: binaries-windows
@@ -81,19 +102,20 @@ jobs:
         test: [ unit, vst3val, pluginval, clapval ]
     name: windows-${{ matrix.test }}
     runs-on: windows-latest
-    needs: compile
+    needs: compile-and-test-linux-and-cross
+    if: always()
     timeout-minutes: 10
     steps:
+      # The artifact will be installed to ${{ github.workspace }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: binaries-windows
+
       - uses: actions/checkout@v4
         with:
           sparse-checkout: |
             test_files
             .github
-
-      # The artifact will be installed to ${{ github.workspace }}
-      - uses: actions/download-artifact@v4
-        with:
-          name: binaries-windows
 
       - shell: pwsh
         name: ${{ matrix.test }}
@@ -101,7 +123,7 @@ jobs:
           powershell -ExecutionPolicy Bypass -File .github\scripts\run-test.ps1 -test_type ${{ matrix.test }} -binaries_dir "${{ github.workspace }}"
 
       - name: Upload logs
-        if: always()
+        if: '!cancelled()'
         uses: actions/upload-artifact@v4
         with:
           name: log-windows-${{ matrix.test }}

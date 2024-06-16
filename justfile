@@ -175,10 +175,9 @@ parallel tasks:
   if [ $failed -eq 0 ]; then
     echo -e "\033[0;32mAll $num_tasks tasks passed\033[0m"
     [[ ! -z $GITHUB_ACTIONS ]] && echo "### :white_check_mark: All $num_tasks tasks succeeded" >> $GITHUB_STEP_SUMMARY
+    exit 0
   else
     echo -e "\033[0;31m$failed/$num_tasks tasks failed\033[0m"
     [[ ! -z $GITHUB_ACTIONS ]] && echo "### :x: $failed/$num_tasks tasks failed" >> $GITHUB_STEP_SUMMARY
+    exit 1
   fi
-
-  exit 0
-

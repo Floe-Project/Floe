@@ -12,6 +12,15 @@ SPDX-License-Identifier: CC0-1.0
 ### Sample-based synthesiser plugin
 _Large-scale changes are underway, many things are missing and broken for now._
 
+Roadmap:
+- [x] Make open-source
+- [ ] Implement comprehensive CI/CD to aid rapid development
+- [ ] Fix bugs
+- [ ] Implement GUI for new features (mixing instruments for different libraries)
+- [ ] Overhaul audio engine: better internals for parameters, thread-safety and refactoring
+- [ ] Version 1.0 release?
+- [ ] Overhaul GUI internals: refactor, add proper layout system
+
 ## Previously known as Mirage
 Floe is fully backwards-compatible with Mirage.
 ### Why the name change?

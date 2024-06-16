@@ -321,10 +321,10 @@ ErrorCodeOr<void> WriteFile(Settings const& data, String path) {
     ArenaAllocatorWithInlineStorage<4000> scratch_arena;
 
     auto _ = CreateDirectory(path::Directory(path).ValueOr({}),
-                        {
-                            .create_intermediate_directories = true,
-                            .fail_if_exists = false,
-                        });
+                             {
+                                 .create_intermediate_directories = true,
+                                 .fail_if_exists = false,
+                             });
 
     auto file = TRY(OpenFile(path, FileMode::Write));
     auto writer = file.Writer();

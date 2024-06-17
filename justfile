@@ -43,46 +43,48 @@ clang-tidy arch_os_pair=native_arch_os_pair: (install-cbd arch_os_pair)
 
 clang-tidy-all: (clang-tidy "x86_64-linux") (clang-tidy "x86_64-windows") (clang-tidy "aarch64-macos")
 
-# IMPROVE: (June 2024) cppcheck thinks there are syntax errors in valid code, cppcheck v2.14.1. We should try again 
-# in the future and see if it's fixed. If so, it should be added to run alongside clang-tidy in CI, etc.
+# IMPROVE: (June 2024) cppcheck v2.14.0 and v2.14.1 thinks there are syntax errors in valid code. It could be a cppcheck bug or it could be an incompatibility in how we are using it. Regardless, we should try again in the future and see if it's fixed. If it works it should run alongside clang-tidy in CI, etc.
 # cppcheck arch_os_pair=native_arch_os_pair:
 #   # IMPROVE: use --check-level=exhaustive?
 #   # IMPROVE: investigate other flags such as --enable=constVariable
 #   cppcheck --project={{justfile_directory()}}/{{gen_files_dir}}/compile_commands_{{arch_os_pair}}.json --cppcheck-build-dir={{justfile_directory()}}/.zig-cache --enable=unusedFunction --error-exitcode=2
 
+_build_if_requested condition build-type:
+  if [[ -n "{{condition}}" ]]; then just build {{build-type}}; fi
+
 format:
   {{all_src_files}} | xargs clang-format -i
 
-test-clap-val:
+test-clap-val build="": (_build_if_requested build "native")
   clap-validator validate --in-process {{native_binary_dir}}/Floe.clap
 
-test-units:
+test-units build="": (_build_if_requested build "native")
   {{native_binary_dir}}/tests
 
-test-pluginval:
+test-pluginval build="": (_build_if_requested build "native")
   pluginval {{native_binary_dir}}/Floe.vst3
 
-test-vst3-val:
+test-vst3-val build="": (_build_if_requested build "native")
   timeout 2 {{native_binary_dir}}/VST3-Validator {{native_binary_dir}}/Floe.vst3
 
 [linux]
-test-wine-vst3-val:
+test-wine-vst3-val build="": (_build_if_requested build "windows")
   wine zig-out/x86_64-windows/VST3-Validator.exe zig-out/x86_64-windows/Floe.vst3
 
 [linux]
-test-wine-pluginval:
+test-wine-pluginval build="": (_build_if_requested build "windows")
   wine $PLUGINVAL_WINDOWS_PATH zig-out/x86_64-windows/Floe.vst3
 
 [linux]
-test-wine-units:
+test-wine-units build="": (_build_if_requested build "windows")
   wine zig-out/x86_64-windows/tests.exe
 
 [linux]
-test-wine-clap-val:
+test-wine-clap-val build="": (_build_if_requested build "windows")
   wine $CLAPVAL_WINDOWS_PATH validate zig-out/x86_64-windows/Floe.clap
 
 [linux]
-coverage:
+coverage build="": (_build_if_requested build "native")
   mkdir -p {{gen_files_dir}}
   # IMPROVE: run other tests with coverage and --merge the results
   kcov --include-pattern={{justfile_directory()}}/src {{gen_files_dir}}/coverage-out {{native_binary_dir}}/tests
@@ -133,7 +135,7 @@ checks_ci := replace(
     "
   }, "\n", " ")
 
-test level: (parallel if level == "0" { checks_level_0 } else { checks_level_1 })
+test level="0" build="": (_build_if_requested build "dev") (parallel if level == "0" { checks_level_0 } else { checks_level_1 })
 
 test-ci: (parallel checks_ci)
 

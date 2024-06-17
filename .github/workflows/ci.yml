@@ -50,20 +50,16 @@ jobs:
             .zig-cache
             build_gen
 
-      - id: compile_linux
-        if: '!cancelled()'
+      - if: '!cancelled()'
         run: just build linux
 
-      - id: compile_windows
-        if: '!cancelled()'
+      - if: '!cancelled()'
         run: just build windows
 
-      - id: compile_macos
-        if: '!cancelled()'
+      - if: '!cancelled()'
         run: just build mac_ub
 
-      - id: tests
-        if: '!cancelled()'
+      - if: '!cancelled()'
         run: just test-ci
 
       - if: '!cancelled()'
@@ -104,17 +100,16 @@ jobs:
     if: '!cancelled()'
     timeout-minutes: 10
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            test_files
+            .github
+
       # The artifact will be installed to ${{ github.workspace }}
       - uses: actions/download-artifact@v4
         with:
           name: binaries-windows
-
-      - uses: actions/checkout@v4
-        with:
-          clean: false
-          sparse-checkout: |
-            test_files
-            .github
 
       - shell: pwsh
         name: ${{ matrix.test }}

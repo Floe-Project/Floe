@@ -705,8 +705,10 @@ fn getTargets(b: *std.Build, user_given_target_presets: ?[]const u8) !std.ArrayL
 
     var targets = std.ArrayList(std.Build.ResolvedTarget).init(b.allocator);
 
-    // TODO: not sure if SSE3+ is really a good idea, all we really need is sse2. Also, should we use 'baseline' instead of trying to define our own cpu feature requirements?
-    const x86_cpu = "sandybridge+sse+sse2+sse3+sse4_1";
+    // I think Win10+ and macOS 11+ would allow us to target x86_64_v2 (which includes SSE3 and SSE4), but I can't
+    // find definitive information on this. It's not a big deal for now; the baseline x86_64 target includes SSE2
+    // which is the important feature for our performance-critical code.
+    const x86_cpu = "x86_64";
     const apple_arm_cpu = "apple_m1";
     const min_windows_version = "win10";
     const min_macos_version = "11.0";

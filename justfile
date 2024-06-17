@@ -64,6 +64,9 @@ test-units build="": (_build_if_requested build "native")
 test-pluginval build="": (_build_if_requested build "native")
   pluginval {{native_binary_dir}}/Floe.vst3
 
+test-pluginval-au build="": (_build_if_requested build "native")
+  pluginval {{native_binary_dir}}/Floe.component
+
 test-vst3-val build="": (_build_if_requested build "native")
   timeout 2 {{native_binary_dir}}/VST3-Validator {{native_binary_dir}}/Floe.vst3
 
@@ -107,7 +110,7 @@ checks_level_0 := replace(
     test-wine-units
     "
   } else {
-    ""
+    "test-pluginval-au"
   }, "\n", " ")
 
 checks_level_1 := checks_level_0 + replace( 
@@ -132,6 +135,7 @@ checks_ci := replace(
     test-clap-val
     test-pluginval
     test-vst3-val
+    test-pluginval-au
     "
   }, "\n", " ")
 

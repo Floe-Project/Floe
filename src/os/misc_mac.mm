@@ -6,6 +6,8 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdouble-promotion"
 #pragma clang diagnostic ignored "-Wextra-semi"
+#pragma clang diagnostic ignored "-Wconversion"
+#pragma clang diagnostic ignored "-Wcast-align"
 #include <AppKit/AppKit.h>
 #include <CoreServices/CoreServices.h>
 #include <sys/sysctl.h>

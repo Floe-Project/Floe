@@ -16,11 +16,11 @@
 
         macosx-sdks = pkgs.stdenv.mkDerivation {
           pname = "macosx-sdks";
-          version = "11.3";
+          version = "12.0";
 
           src = builtins.fetchurl {
-            url = "https://github.com/joseluisq/macosx-sdks/releases/download/11.3/MacOSX11.3.sdk.tar.xz";
-            sha256 = "sha256:1c9crsg9ha4196ic4gjacwqjkc2ij1yg3ncas9rik7l7sdri7p4s";
+            url = "https://github.com/joseluisq/macosx-sdks/releases/download/12.0/MacOSX12.0.sdk.tar.xz";
+            sha256 = "sha256:1z8ga5m9624g3hc0kpdfpqbq1ghswxg57w813jdb18z6166g41xc";
           };
 
           buildPhase = ''

@@ -731,13 +731,13 @@ fn getTargets(b: *std.Build, user_given_target_presets: ?[]const u8) !std.ArrayL
     // the actual targets
     try target_map.put("native", &.{.native});
     try target_map.put("x86_64-windows", &.{.x86_64_windows});
-    if (builtin.os.tag == .linux) try target_map.put("x86_64-linux", &.{.native}); // we only support native linux builds for now
+    try target_map.put("x86_64-linux", &.{.x86_64_linux});
     try target_map.put("x86_64-macos", &.{.x86_64_macos});
     try target_map.put("aarch64-macos", &.{.aarch64_macos});
 
     // aliases/shortcuts
     try target_map.put("windows", &.{.x86_64_windows});
-    if (builtin.os.tag == .linux) try target_map.put("linux", &.{.native}); // we only support native linux builds for now
+    try target_map.put("linux", &.{.x86_64_linux});
     try target_map.put("mac_x86", &.{.x86_64_macos});
     try target_map.put("mac_arm", &.{.aarch64_macos});
     try target_map.put("mac_ub", &.{ .x86_64_macos, .aarch64_macos });

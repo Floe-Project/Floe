@@ -229,6 +229,9 @@ INTERFACE void __ubsan_handle_alignment_assumption([[maybe_unused]] void* _data,
                                                    [[maybe_unused]] unsigned long offset) {
     HandleUbsanError("alignment-assumption");
 }
+INTERFACE void __ubsan_handle_missing_return([[maybe_unused]] void* _data) {
+    HandleUbsanError("missing-return");
+}
 
 // Minimal UBSan runtime
 #define MINIMAL_HANDLER_RECOVER(name, msg)                                                                   \

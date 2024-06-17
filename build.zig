@@ -21,6 +21,7 @@ const floe_description = "Sample-based synth plugin";
 const floe_copyright = "Sam Windell";
 const floe_vendor = "Floe";
 const floe_url = "https://github.com/Floe-Synth/Floe";
+const floe_au_factory_function = "FloeFactoryFunction";
 
 const rootdir = struct {
     fn getSrcDir() []const u8 {
@@ -125,7 +126,7 @@ fn tryConcatCompileCommands(step: *std.Build.Step) !void {
                         index = index + 1;
                     }
 
-                    // clang-tidy doesn't like this when cross-compiling macos, it's a sequence we need to look for and remove, it's no good just removing the '+pan'
+                    // clang-tidy doesn't like this when cross-compiling macos, it's a sequence we need to look for and remove, it's no good just removing the '+pan' by itself
                     index = 0;
                     for (args.items) |arg| {
                         if (std.mem.eql(u8, arg, "-Xclang")) {
@@ -243,6 +244,12 @@ fn postInstallMacosBinary(context: *BuildContext, step: *std.Build.Step, make_ma
             const pkg_info_file = try dir.createFile(b.pathJoin(&.{ bundle_name, "Contents", "Info.plist" }), std.fs.File.CreateFlags{});
             defer pkg_info_file.close();
 
+            // TODO: include AU info
+            // \\ <?xml version="1.0" encoding="UTF-8"?>
+            // \\ <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+            // \\ <plist version="1.0">
+            // \\ </plist>
+
             try std.fmt.format(pkg_info_file.writer(),
                 \\<?xml version="1.0" encoding="UTF-8"?>
                 \\<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -272,6 +279,7 @@ fn postInstallMacosBinary(context: *BuildContext, step: *std.Build.Step, make_ma
                 \\        <true />
                 \\        <key>NSHumanReadableCopyright</key>
                 \\        <string>Copyright {[copyright]s}</string>
+                \\{[audio_unit_dict]s}
                 \\    </dict>
                 \\</plist>
             , .{
@@ -283,6 +291,42 @@ fn postInstallMacosBinary(context: *BuildContext, step: *std.Build.Step, make_ma
                 .minor = if (version != null) version.?.minor else 0,
                 .patch = if (version != null) version.?.patch else 0,
                 .copyright = floe_copyright,
+                .audio_unit_dict = if (std.mem.count(u8, bundle_name, ".component") == 1)
+                    b.fmt(
+                        \\        <key>AudioComponents</key>
+                        \\        <array>
+                        \\            <dict>
+                        \\                <key>name</key>
+                        \\                <string>Floe</string>
+                        \\                <key>description</key>
+                        \\                <string>{[description]s}</string>
+                        \\                <key>factoryFunction</key>
+                        \\                <string>{[factory_function]s}</string>
+                        \\                <key>manufacturer</key>
+                        \\                <string>{[vendor]s}</string>
+                        \\                <key>subtype</key>
+                        \\                <string>smpl</string>
+                        \\                <key>type</key>
+                        \\                <string>aumu</string>
+                        \\                <key>version</key>
+                        \\                <integer>{[version_packed]d}</integer>
+                        \\                <key>resourceUsage</key>
+                        \\                <dict>
+                        \\                    <key>network.client</key>
+                        \\                    <true/>
+                        \\                    <key>temporary-exception.files.all.read-write</key>
+                        \\                    <true/>
+                        \\                </dict>
+                        \\            </dict>
+                        \\        </array>
+                    , .{
+                        .description = floe_description,
+                        .factory_function = floe_au_factory_function,
+                        .vendor = floe_vendor,
+                        .version_packed = if (version != null) (version.?.major << 16) | (version.?.minor << 8) | version.?.patch else 0,
+                    })
+                else
+                    "",
             });
         }
     } else {
@@ -864,7 +908,7 @@ pub fn build(b: *std.Build) void {
             "-Wdouble-promotion",
             "-Woverloaded-virtual",
             "-Wno-missing-field-initializers",
-            b.fmt("-DOBJC_NAME_PREFIX=FpFloe{d}{d}{d}", .{ floe_version.major, floe_version.minor, floe_version.patch }),
+            b.fmt("-DOBJC_NAME_PREFIX=Floe{d}{d}{d}", .{ floe_version.major, floe_version.minor, floe_version.patch }),
             "-DFLAC__NO_DLL",
             "-DPUGL_DISABLE_DEPRECATED",
             "-DPUGL_STATIC",
@@ -1885,6 +1929,7 @@ pub fn build(b: *std.Build) void {
             }
             extra_flags.append("-fno-char8_t") catch unreachable;
             extra_flags.append("-DMACOS_USE_STD_FILESYSTEM=1") catch unreachable;
+            extra_flags.append("-DCLAP_WRAPPER_VERSION=\"0.9.1\"") catch unreachable;
             const flags = cppFlags(b, generic_flags, extra_flags.items) catch unreachable;
 
             vst3.addCSourceFiles(.{ .files = &.{
@@ -1904,39 +1949,24 @@ pub fn build(b: *std.Build) void {
                 wrapper_path ++ "/src/detail/shared/sha1.cpp",
                 wrapper_path ++ "/src/detail/clap/fsutil.cpp",
             }, .flags = flags });
+
             switch (target.result.os.tag) {
                 .windows => {
                     vst3.addCSourceFiles(.{ .files = &.{
                         wrapper_path ++ "/src/detail/os/windows.cpp",
+                        vst3_path ++ "/public.sdk/source/main/dllmain.cpp",
                     }, .flags = flags });
                 },
                 .linux => {
                     vst3.addCSourceFiles(.{ .files = &.{
                         wrapper_path ++ "/src/detail/os/linux.cpp",
+                        vst3_path ++ "/public.sdk/source/main/linuxmain.cpp",
                     }, .flags = flags });
                 },
                 .macos => {
                     vst3.addCSourceFiles(.{ .files = &.{
                         wrapper_path ++ "/src/detail/os/macos.mm",
                         wrapper_path ++ "/src/detail/clap/mac_helpers.mm",
-                    }, .flags = flags });
-                },
-                else => {},
-            }
-
-            switch (target.result.os.tag) {
-                .windows => {
-                    vst3.addCSourceFiles(.{ .files = &.{
-                        vst3_path ++ "/public.sdk/source/main/dllmain.cpp",
-                    }, .flags = flags });
-                },
-                .linux => {
-                    vst3.addCSourceFiles(.{ .files = &.{
-                        vst3_path ++ "/public.sdk/source/main/linuxmain.cpp",
-                    }, .flags = flags });
-                },
-                .macos => {
-                    vst3.addCSourceFiles(.{ .files = &.{
                         vst3_path ++ "/public.sdk/source/main/macmain.cpp",
                     }, .flags = flags });
                 },
@@ -1978,6 +2008,169 @@ pub fn build(b: *std.Build) void {
             };
             vst3_post_install_step.step.dependOn(b.getInstallStep());
             build_context.master_step.dependOn(&vst3_post_install_step.step);
+        }
+
+        if (target.result.os.tag == .macos) {
+            const au_sdk = b.addStaticLibrary(.{
+                .name = "AU",
+                .target = target,
+                .optimize = build_context.optimise,
+            });
+            {
+                const au_path = "third_party_libs/AudioUnitSDK";
+                au_sdk.addCSourceFiles(.{
+                    .files = &.{
+                        au_path ++ "/src/AudioUnitSDK/AUBuffer.cpp",
+                        au_path ++ "/src/AudioUnitSDK/AUBufferAllocator.cpp",
+                        au_path ++ "/src/AudioUnitSDK/AUEffectBase.cpp",
+                        au_path ++ "/src/AudioUnitSDK/AUInputElement.cpp",
+                        au_path ++ "/src/AudioUnitSDK/AUMIDIBase.cpp",
+                        au_path ++ "/src/AudioUnitSDK/AUBase.cpp",
+                        au_path ++ "/src/AudioUnitSDK/AUMIDIEffectBase.cpp",
+                        au_path ++ "/src/AudioUnitSDK/AUOutputElement.cpp",
+                        au_path ++ "/src/AudioUnitSDK/AUPlugInDispatch.cpp",
+                        au_path ++ "/src/AudioUnitSDK/AUScopeElement.cpp",
+                        au_path ++ "/src/AudioUnitSDK/ComponentBase.cpp",
+                        au_path ++ "/src/AudioUnitSDK/MusicDeviceBase.cpp",
+                    },
+                    .flags = cpp_flags,
+                });
+                au_sdk.addIncludePath(b.path(au_path ++ "/include"));
+                // au_sdk.linkFramework("Foundation");
+                // au_sdk.linkFramework("CoreFoundation");
+                // au_sdk.linkFramework("AppKit");
+                // au_sdk.linkFramework("AudioToolbox");
+                // au_sdk.linkFramework("CoreMIDI");
+                au_sdk.linkLibCpp();
+                applyUniversalSettings(&build_context, au_sdk);
+            }
+
+            {
+                const au = b.addSharedLibrary(.{
+                    .name = "Floe.component",
+                    .target = target,
+                    .optimize = build_context.optimise,
+                    .version = floe_version,
+                    .pic = true,
+                });
+                var extra_flags = std.ArrayList([]const u8).init(b.allocator);
+                switch (target.result.os.tag) {
+                    .windows => {
+                        extra_flags.append("-DWIN=1") catch unreachable;
+                    },
+                    .linux => {
+                        extra_flags.append("-DLIN=1") catch unreachable;
+                    },
+                    .macos => {
+                        extra_flags.append("-DMAC=1") catch unreachable;
+                    },
+                    else => {},
+                }
+                if (build_context.optimise == .Debug) {
+                    extra_flags.append("-DDEVELOPMENT=1") catch unreachable;
+                } else {
+                    extra_flags.append("-DRELEASE=1") catch unreachable;
+                }
+                extra_flags.append("-fno-char8_t") catch unreachable;
+                extra_flags.append("-DMACOS_USE_STD_FILESYSTEM=1") catch unreachable;
+                extra_flags.append("-DCLAP_WRAPPER_VERSION=\"0.9.1\"") catch unreachable;
+                const flags = cppFlags(b, generic_flags, extra_flags.items) catch unreachable;
+
+                au.addCSourceFiles(.{ .files = &.{
+                    "src/plugin/plugin_clap_entry.cpp",
+                }, .flags = cpp_fp_flags });
+
+                const wrapper_path = "third_party_libs/clap-wrapper";
+                au.addCSourceFiles(.{ .files = &.{
+                    wrapper_path ++ "/src/clap_proxy.cpp",
+                    wrapper_path ++ "/src/detail/shared/sha1.cpp",
+                    wrapper_path ++ "/src/detail/clap/fsutil.cpp",
+                    wrapper_path ++ "/src/detail/os/macos.mm",
+                    wrapper_path ++ "/src/detail/clap/mac_helpers.mm",
+                    wrapper_path ++ "/src/wrapasauv2.cpp",
+                    wrapper_path ++ "/src/detail/auv2/process.cpp",
+                    wrapper_path ++ "/src/detail/auv2/wrappedview.mm",
+                    wrapper_path ++ "/src/detail/auv2/parameter.cpp",
+                }, .flags = flags });
+
+                {
+                    const file = std.fs.createFileAbsolute(b.pathJoin(&.{ rootdir, build_gen_relative, "generated_entrypoints.hxx" }), .{ .truncate = true }) catch @panic("could not create file");
+                    defer file.close();
+                    file.writeAll(b.fmt(
+                        \\ #pragma once
+                        \\ #include "detail/auv2/auv2_base_classes.h"
+                        \\
+                        \\ struct {[factory_function]s} : free_audio::auv2_wrapper::WrapAsAUV2 {{
+                        \\     {[factory_function]s}(AudioComponentInstance ci) : 
+                        \\         free_audio::auv2_wrapper::WrapAsAUV2(AUV2_Type::aumu_musicdevice, "Floe", "", 0, ci) {{}}
+                        \\ }};
+                        \\ AUSDK_COMPONENT_ENTRY(ausdk::AUMusicDeviceFactory, {[factory_function]s});
+                    , .{
+                        .factory_function = floe_au_factory_function,
+                    })) catch @panic("could not write to file");
+                }
+
+                {
+                    const file = std.fs.createFileAbsolute(b.pathJoin(&.{ rootdir, build_gen_relative, "generated_cocoaclasses.hxx" }), .{ .truncate = true }) catch @panic("could not create file");
+                    defer file.close();
+                    // TODO: add version to "floeinst" string for better objc name collision prevention
+                    file.writeAll(b.fmt(
+                        \\ #pragma once
+                        \\
+                        \\ #define CLAP_WRAPPER_COCOA_CLASS_NSVIEW {[name]s}_nsview
+                        \\ #define CLAP_WRAPPER_COCOA_CLASS {[name]s}
+                        \\ #define CLAP_WRAPPER_TIMER_CALLBACK timerCallback_{[name]s}
+                        \\ #define CLAP_WRAPPER_FILL_AUCV fillAUCV_{[name]s}
+                        \\ #include "detail/auv2/wrappedview.asinclude.mm"
+                        \\ #undef CLAP_WRAPPER_COCOA_CLASS_NSVIEW
+                        \\ #undef CLAP_WRAPPER_COCOA_CLASS
+                        \\ #undef CLAP_WRAPPER_TIMER_CALLBACK
+                        \\ #undef CLAP_WRAPPER_FILL_AUCV
+                        \\
+                        \\ bool fillAudioUnitCocoaView(AudioUnitCocoaViewInfo* viewInfo, std::shared_ptr<Clap::Plugin> _plugin) {{
+                        \\     return fillAUCV_{[name]s}(viewInfo);
+                        \\ }}
+                    , .{
+                        .name = b.fmt("Floe{d}{d}{d}", .{ floe_version.major, floe_version.minor, floe_version.patch }),
+                    })) catch @panic("could not write to file");
+                }
+
+                au.addIncludePath(b.path("third_party_libs/clap/include"));
+                au.addIncludePath(b.path("third_party_libs/clap-wrapper/include"));
+                au.addIncludePath(b.path("third_party_libs/AudioUnitSDK/include"));
+                au.addIncludePath(b.path("third_party_libs/clap-wrapper/libs/fmt"));
+                au.addIncludePath(b.path(build_gen_relative));
+                au.addIncludePath(b.path(wrapper_path ++ "/src"));
+                au.linkLibCpp();
+
+                au.linkLibrary(plugin);
+                au.linkLibrary(au_sdk);
+                au.linkFramework("AudioToolbox");
+                au.linkFramework("CoreMIDI");
+
+                au.addConfigHeader(build_config_step);
+                au.addIncludePath(b.path("src"));
+
+                const au_install_artifact_step = b.addInstallArtifact(au, .{ .dest_dir = install_subfolder });
+                b.getInstallStep().dependOn(&au_install_artifact_step.step);
+                applyUniversalSettings(&build_context, au);
+                addToLipoSteps(&build_context, au, true) catch @panic("OOM");
+
+                var au_post_install_step = b.allocator.create(PostInstallStep) catch @panic("OOM");
+                au_post_install_step.* = PostInstallStep{
+                    .step = std.Build.Step.init(.{
+                        .id = std.Build.Step.Id.custom,
+                        .name = "Post install config",
+                        .owner = b,
+                        .makeFn = performPostInstallConfig,
+                    }),
+                    .make_macos_bundle = true,
+                    .context = &build_context,
+                    .compile_step = au,
+                };
+                au_post_install_step.step.dependOn(b.getInstallStep());
+                build_context.master_step.dependOn(&au_post_install_step.step);
+            }
         }
 
         if (target.result.os.tag == .windows) {

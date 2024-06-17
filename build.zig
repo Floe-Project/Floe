@@ -673,6 +673,36 @@ fn getTargets(b: *std.Build, user_given_target_presets: ?[]const u8) !std.ArrayL
         preset_strings = user_given_target_presets.?;
     }
 
+    const SupportedTargetId = enum {
+        native,
+        x86_64_windows,
+        x86_64_linux,
+        x86_64_macos,
+        aarch64_macos,
+    };
+
+    // declare a hash map of target presets to SupportedTargetId
+    var target_map = std.StringHashMap([]const SupportedTargetId).init(b.allocator);
+
+    // the actual targets
+    try target_map.put("native", &.{.native});
+    try target_map.put("x86_64-windows", &.{.x86_64_windows});
+    try target_map.put("x86_64-linux", &.{.x86_64_linux});
+    try target_map.put("x86_64-macos", &.{.x86_64_macos});
+    try target_map.put("aarch64-macos", &.{.aarch64_macos});
+
+    // aliases/shortcuts
+    try target_map.put("windows", &.{.x86_64_windows});
+    try target_map.put("linux", &.{.x86_64_linux});
+    try target_map.put("mac_x86", &.{.x86_64_macos});
+    try target_map.put("mac_arm", &.{.aarch64_macos});
+    try target_map.put("mac_ub", &.{ .x86_64_macos, .aarch64_macos });
+    if (builtin.os.tag == .linux) {
+        try target_map.put("dev", &.{ .native, .x86_64_windows, .aarch64_macos });
+    } else if (builtin.os.tag == .macos) {
+        try target_map.put("dev", &.{ .native, .x86_64_windows });
+    }
+
     var targets = std.ArrayList(std.Build.ResolvedTarget).init(b.allocator);
 
     // TODO: not sure if SSE3+ is really a good idea, all we really need is sse2. Also, should we use 'baseline' instead of trying to define our own cpu feature requirements?
@@ -681,46 +711,43 @@ fn getTargets(b: *std.Build, user_given_target_presets: ?[]const u8) !std.ArrayL
     const min_windows_version = "win10";
     const min_macos_version = "11.0";
 
-    // IMPROVE: refactor this
     var it = std.mem.splitSequence(u8, preset_strings, ",");
     while (it.next()) |preset_string| {
-        if (std.mem.eql(u8, preset_string, "native")) {
-            try targets.append(b.resolveTargetQuery(try std.Target.Query.parse(.{
-                .arch_os_abi = "native",
-                .cpu_features = "native",
-            })));
-        } else if (std.mem.eql(u8, preset_string, "x86_64-windows") or std.mem.eql(u8, preset_string, "windows")) {
-            try targets.append(b.resolveTargetQuery(try std.Target.Query.parse(.{
-                .arch_os_abi = "x86_64-windows." ++ min_windows_version,
-                .cpu_features = x86_cpu,
-            })));
-        } else if (std.mem.eql(u8, preset_string, "x86_64-linux") or std.mem.eql(u8, preset_string, "linux")) {
-            try targets.append(b.resolveTargetQuery(try std.Target.Query.parse(.{
-                .arch_os_abi = "x86_64-linux-gnu.2.29",
-                .cpu_features = x86_cpu,
-            })));
-        } else if (std.mem.eql(u8, preset_string, "x86_64-macos") or std.mem.eql(u8, preset_string, "mac_x86")) {
-            try targets.append(b.resolveTargetQuery(try std.Target.Query.parse(.{
-                .arch_os_abi = "x86_64-macos." ++ min_macos_version,
-                .cpu_features = x86_cpu,
-            })));
-        } else if (std.mem.eql(u8, preset_string, "aarch64-macos") or std.mem.eql(u8, preset_string, "mac_arm")) {
-            try targets.append(b.resolveTargetQuery(try std.Target.Query.parse(.{
-                .arch_os_abi = "aarch64-macos." ++ min_macos_version,
-                .cpu_features = apple_arm_cpu,
-            })));
-        } else if (std.mem.eql(u8, preset_string, "mac_ub")) {
-            try targets.append(b.resolveTargetQuery(try std.Target.Query.parse(.{
-                .arch_os_abi = "x86_64-macos." ++ min_macos_version,
-                .cpu_features = x86_cpu,
-            })));
-            try targets.append(b.resolveTargetQuery(try std.Target.Query.parse(.{
-                .arch_os_abi = "aarch64-macos." ++ min_macos_version,
-                .cpu_features = apple_arm_cpu,
-            })));
-        } else {
+        const target_ids = target_map.get(preset_string) orelse {
             std.debug.print("unknown target preset: {s}\n", .{preset_string});
             @panic("unknown target preset");
+        };
+
+        for (target_ids) |t| {
+            var arch_os_abi: []const u8 = undefined;
+            var cpu_features: []const u8 = undefined;
+            switch (t) {
+                .native => {
+                    arch_os_abi = "native";
+                    cpu_features = "native";
+                },
+                .x86_64_windows => {
+                    arch_os_abi = "x86_64-windows." ++ min_windows_version;
+                    cpu_features = x86_cpu;
+                },
+                .x86_64_linux => {
+                    arch_os_abi = "x86_64-linux-gnu.2.29";
+                    cpu_features = x86_cpu;
+                },
+                .x86_64_macos => {
+                    arch_os_abi = "x86_64-macos." ++ min_macos_version;
+                    cpu_features = x86_cpu;
+                },
+                .aarch64_macos => {
+                    arch_os_abi = "aarch64-macos." ++ min_macos_version;
+                    cpu_features = apple_arm_cpu;
+                },
+            }
+
+            try targets.append(b.resolveTargetQuery(try std.Target.Query.parse(.{
+                .arch_os_abi = arch_os_abi,
+                .cpu_features = cpu_features,
+            })));
         }
     }
 

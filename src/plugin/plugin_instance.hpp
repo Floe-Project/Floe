@@ -134,7 +134,7 @@ struct PluginInstance {
         Malloc::Instance()};
 };
 
-extern PluginCallbacks<PluginInstance> const plugin_instance_callbacks;
+PluginCallbacks<PluginInstance> PluginInstanceCallbacks();
 
 void RunFunctionOnMainThread(PluginInstance& plugin, ThreadsafeFunctionQueue::Function function);
 

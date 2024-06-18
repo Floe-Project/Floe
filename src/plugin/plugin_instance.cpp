@@ -811,8 +811,11 @@ static bool PluginLoadState(PluginInstance& plugin, clap_istream const& stream) 
     return true;
 }
 
-PluginCallbacks<PluginInstance> const plugin_instance_callbacks {
-    .on_main_thread = OnMainThread,
-    .save_state = PluginSaveState,
-    .load_state = PluginLoadState,
-};
+PluginCallbacks<PluginInstance> PluginInstanceCallbacks() {
+    PluginCallbacks<PluginInstance> result {
+        .on_main_thread = OnMainThread,
+        .save_state = PluginSaveState,
+        .load_state = PluginLoadState,
+    };
+    return result;
+}

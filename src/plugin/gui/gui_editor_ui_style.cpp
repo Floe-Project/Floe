@@ -31,7 +31,6 @@ String ui_sizes_names[ToInt(UiSizeId::Count)] = {
 };
 
 #pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wexit-time-destructors"
 #pragma clang diagnostic ignored "-Wglobal-constructors"
 
 EditorCol ui_cols[k_max_num_colours] = {

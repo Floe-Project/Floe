@@ -214,45 +214,6 @@ static EffectsArray OrderEffectsToEnum(EffectsArray e) {
     return e;
 }
 
-AudioProcessor::AudioProcessor(clap_host const& host)
-    : host(host)
-    , distortion(smoothed_value_system)
-    , bit_crush(smoothed_value_system)
-    , compressor(smoothed_value_system)
-    , filter_effect(smoothed_value_system)
-    , stereo_widen(smoothed_value_system)
-    , chorus(smoothed_value_system)
-    , reverb(smoothed_value_system)
-    , new_delay(smoothed_value_system)
-    , phaser(smoothed_value_system)
-    , convo(smoothed_value_system)
-    , effects_ordered_by_type(OrderEffectsToEnum(EffectsArray {
-          &distortion,
-          &bit_crush,
-          &compressor,
-          &filter_effect,
-          &stereo_widen,
-          &chorus,
-          &reverb,
-          &new_delay,
-          &phaser,
-          &convo,
-      })) {
-
-    for (auto const i : Range(k_num_parameters)) {
-        PLACEMENT_NEW(&params[i])
-        Parameter {
-            .info = k_param_infos[i],
-            .value = k_param_infos[i].default_linear_value,
-        };
-    }
-
-    Bitset<k_num_parameters> changed;
-    changed.SetAll();
-    ProcessorOnParamChange(*this, {params.data, changed});
-    smoothed_value_system.ResetAll();
-}
-
 static void HandleNoteOn(AudioProcessor& processor, MidiChannelNote note, f32 note_vel, u32 offset) {
     for (auto& layer : processor.layer_processors) {
         LayerHandleNoteOn(layer,
@@ -1026,11 +987,50 @@ static void OnMainThread(AudioProcessor& processor, bool& update_gui) {
     if (flags & AudioProcessor::MainThreadCallbackFlagsRedrawGui) update_gui = true;
 }
 
-PluginCallbacks<AudioProcessor> const processor_callbacks = {
-    .activate = Activate,
-    .deactivate = Deactivate,
-    .reset = Reset,
-    .process = Process,
-    .flush_parameter_events = FlushParameterEvents,
-    .on_main_thread = OnMainThread,
-};
+AudioProcessor::AudioProcessor(clap_host const& host)
+    : host(host)
+    , distortion(smoothed_value_system)
+    , bit_crush(smoothed_value_system)
+    , compressor(smoothed_value_system)
+    , filter_effect(smoothed_value_system)
+    , stereo_widen(smoothed_value_system)
+    , chorus(smoothed_value_system)
+    , reverb(smoothed_value_system)
+    , new_delay(smoothed_value_system)
+    , phaser(smoothed_value_system)
+    , convo(smoothed_value_system)
+    , effects_ordered_by_type(OrderEffectsToEnum(EffectsArray {
+          &distortion,
+          &bit_crush,
+          &compressor,
+          &filter_effect,
+          &stereo_widen,
+          &chorus,
+          &reverb,
+          &new_delay,
+          &phaser,
+          &convo,
+      })) {
+
+    for (auto const i : Range(k_num_parameters)) {
+        PLACEMENT_NEW(&params[i])
+        Parameter {
+            .info = k_param_infos[i],
+            .value = k_param_infos[i].default_linear_value,
+        };
+    }
+
+    Bitset<k_num_parameters> changed;
+    changed.SetAll();
+    ProcessorOnParamChange(*this, {params.data, changed});
+    smoothed_value_system.ResetAll();
+
+    processor_callbacks = {
+        .activate = Activate,
+        .deactivate = Deactivate,
+        .reset = Reset,
+        .process = Process,
+        .flush_parameter_events = FlushParameterEvents,
+        .on_main_thread = OnMainThread,
+    };
+}

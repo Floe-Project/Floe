@@ -161,7 +161,7 @@ static f32 STB_TEXTEDIT_GETWIDTH(STB_TEXTEDIT_STRING* imgui, int line_index, int
 static int STB_TEXTEDIT_KEYTOTEXT(int key) { return key >= 0x10000 ? 0 : key; }
 
 // NOLINTNEXTLINE(readability-identifier-naming)
-static Char32 STB_TEXTEDIT_NEWLINE = '\n';
+static Char32 const STB_TEXTEDIT_NEWLINE = '\n';
 
 static f32x2 InputTextCalcTextSizeW(Context* imgui,
                                     Char32 const* text_begin,

@@ -103,7 +103,7 @@ clap_plugin_state const floe_plugin_state {
         ZoneScopedMessage(floe.trace_config, "state save");
         DebugAssertMainThread(floe.host);
 
-        if (!plugin_instance_callbacks.save_state(*floe.plugin, *stream)) return false;
+        if (!PluginInstanceCallbacks().save_state(*floe.plugin, *stream)) return false;
         return true;
     },
 
@@ -115,7 +115,7 @@ clap_plugin_state const floe_plugin_state {
         ZoneScopedMessage(floe.trace_config, "state load");
         DebugAssertMainThread(floe.host);
 
-        if (!plugin_instance_callbacks.load_state(*floe.plugin, *stream)) return false;
+        if (!PluginInstanceCallbacks().load_state(*floe.plugin, *stream)) return false;
         return true;
     },
 };
@@ -411,7 +411,8 @@ clap_plugin_params const floe_params {
             auto& floe = *(FloeInstance*)plugin->plugin_data;
             if (!floe.active) DebugAssertMainThread(floe.host);
             if (!in || !out) return;
-            processor_callbacks.flush_parameter_events(floe.plugin->processor, *in, *out);
+            auto& processor = floe.plugin->processor;
+            processor.processor_callbacks.flush_parameter_events(processor, *in, *out);
         },
 };
 
@@ -584,9 +585,10 @@ clap_plugin const floe_plugin {
         DebugAssertMainThread(floe.host);
         ASSERT(!floe.active);
         if (floe.active) return false;
+        auto& processor = floe.plugin->processor;
 
         PluginActivateArgs const args {sample_rate, min_frames_count, max_frames_count};
-        if (!processor_callbacks.activate(floe.plugin->processor, args)) return false;
+        if (!processor.processor_callbacks.activate(processor, args)) return false;
         floe.active = true;
         return true;
     },
@@ -605,7 +607,8 @@ clap_plugin const floe_plugin {
                 // active when the audio plugin is deactivate.
                 floe.gui_platform->CloseWindow();
             }
-            processor_callbacks.deactivate(floe.plugin->processor);
+            auto& processor = floe.plugin->processor;
+            processor.processor_callbacks.deactivate(processor);
             floe.active = false;
         },
 
@@ -617,7 +620,8 @@ clap_plugin const floe_plugin {
         ASSERT(floe.active);
         ASSERT(!floe.processing);
         tracy::SetThreadName("Audio");
-        processor_callbacks.start_processing(floe.plugin->processor);
+        auto& processor = floe.plugin->processor;
+        processor.processor_callbacks.start_processing(processor);
         floe.processing = true;
         return true;
     },
@@ -630,7 +634,8 @@ clap_plugin const floe_plugin {
             ZoneScopedMessage(floe.trace_config, "plugin stop_processing");
             ASSERT(floe.active);
             ASSERT(floe.processing);
-            processor_callbacks.stop_processing(floe.plugin->processor);
+            auto& processor = floe.plugin->processor;
+            processor.processor_callbacks.stop_processing(processor);
             floe.processing = false;
         },
 
@@ -644,7 +649,8 @@ clap_plugin const floe_plugin {
         [](clap_plugin const* plugin) {
             auto& floe = *(FloeInstance*)plugin->plugin_data;
             ZoneScopedMessage(floe.trace_config, "plugin reset");
-            processor_callbacks.reset(floe.plugin->processor);
+            auto& processor = floe.plugin->processor;
+            processor.processor_callbacks.reset(processor);
         },
 
     // process audio, events, ...
@@ -662,7 +668,8 @@ clap_plugin const floe_plugin {
         ASSERT_HOT(floe.processing);
         if (!floe.active || !floe.processing || !process) return CLAP_PROCESS_ERROR;
         ScopedNoDenormals const no_denormals;
-        return processor_callbacks.process(floe.plugin->processor, *process);
+        auto& processor = floe.plugin->processor;
+        return processor.processor_callbacks.process(floe.plugin->processor, *process);
     },
 
     // Query an extension.
@@ -695,8 +702,9 @@ clap_plugin const floe_plugin {
             if (floe.plugin) {
                 bool update_gui = false;
 
-                processor_callbacks.on_main_thread(floe.plugin->processor, update_gui);
-                plugin_instance_callbacks.on_main_thread(*floe.plugin, update_gui);
+                auto& processor = floe.plugin->processor;
+                processor.processor_callbacks.on_main_thread(processor, update_gui);
+                PluginInstanceCallbacks().on_main_thread(*floe.plugin, update_gui);
                 if (update_gui && floe.gui_platform) floe.gui_platform->SetGUIDirty();
             }
         },

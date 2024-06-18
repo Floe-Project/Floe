@@ -31,6 +31,9 @@ Checks: '-*,
   readability-math-missing-parentheses,
   readability-redundant-casting,
   readability-redundant-inline-specifier,
+  cppcoreguidelines-interfaces-global-init,
+  bugprone-dynamic-static-initializers,
+  concurrency-mt-unsafe,
 '
 
 # NOTE: bit of a hack - it requires that this folder is called floe

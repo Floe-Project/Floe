@@ -68,7 +68,9 @@ ErrorCodeOr<void> DirectoryIterator::Increment() {
     do {
         skip = false;
         errno = 0;
-        auto entry = ::readdir((DIR*)m_handle);
+        // "modern implementations (including the glibc implementation), concurrent calls to readdir() that
+        // specify different directory streams are thread-safe"
+        auto entry = readdir((DIR*)m_handle); // NOLINT(concurrency-mt-unsafe)
         if (entry) {
             auto entry_name = FromNullTerminated(entry->d_name);
             if (!MatchWildcard(m_wildcard, entry_name) || entry_name == "."_s || entry_name == ".."_s ||

@@ -259,9 +259,9 @@ struct AudioProcessor {
     EffectsArray actual_fx_order {effects_ordered_by_type};
 
     bool activated = false;
-};
 
-extern PluginCallbacks<AudioProcessor> const processor_callbacks;
+    PluginCallbacks<AudioProcessor> processor_callbacks;
+};
 
 void ParameterJustStartedMoving(AudioProcessor& processor, ParamIndex index);
 void ParameterJustStoppedMoving(AudioProcessor& processor, ParamIndex index);

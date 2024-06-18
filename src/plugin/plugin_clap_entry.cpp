@@ -17,7 +17,6 @@ static clap_plugin_factory_t const factory = {
     .create_plugin = [](clap_plugin_factory const*,
                         clap_host_t const* host,
                         char const* plugin_id) -> clap_plugin_t const* {
-        g_log_file.DebugLn("create_plugin");
         if (NullTermStringsEqual(plugin_id, k_plugin_info.id)) {
             auto& p = CreatePlugin(host);
             return &p;

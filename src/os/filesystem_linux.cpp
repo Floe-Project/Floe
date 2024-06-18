@@ -4,6 +4,7 @@
 #include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <fts.h>
 #include <ftw.h>
 #include <link.h>
 #include <linux/limits.h>
@@ -135,7 +136,7 @@ ErrorCodeOr<MutableString> ConvertToAbsolutePath(Allocator& a, String path) {
     DynamicArray<char> path_nt(path, temp_path_allocator);
 
     if (StartsWith(path_nt, '~')) {
-        char const* home = getenv("HOME");
+        char const* home = secure_getenv("HOME");
         if (home == nullptr) return ErrorCode(FilesystemError::PathDoesNotExist);
         dyn::Remove(path_nt, 0, 1);
         dyn::PrependSpan(path_nt, FromNullTerminated(home));
@@ -160,15 +161,24 @@ ErrorCodeOr<void> Delete(String path, DeleteOptions options) {
         if ((errno == EEXIST || errno == ENOTEMPTY) &&
             (options.type == DeleteOptions::Type::Any ||
              options.type == DeleteOptions::Type::DirectoryRecursively)) {
-            if (nftw(
-                    path_ptr,
-                    [](char const* fpath,
-                       [[maybe_unused]] const struct stat* sb,
-                       [[maybe_unused]] int typeflag,
-                       [[maybe_unused]] struct FTW* ftwbuf) -> int { return remove(fpath); },
-                    64,
-                    FTW_DEPTH | FTW_PHYS) != 0)
-                return FilesystemErrnoErrorCode(errno);
+
+            char* files[] = {(char*)path_ptr, nullptr};
+            auto ftsp = fts_open(files, FTS_NOCHDIR | FTS_PHYSICAL, nullptr);
+            if (!ftsp) return FilesystemErrnoErrorCode(errno);
+            DEFER { fts_close(ftsp); };
+
+            while (auto curr = fts_read(ftsp)) {
+                switch (curr->fts_info) {
+                    // IMPROVE: handle more error cases
+                    case FTS_DP:
+                    case FTS_F:
+                    case FTS_SL:
+                    case FTS_SLNONE:
+                    case FTS_DEFAULT:
+                        if (remove(curr->fts_accpath) != 0) return FilesystemErrnoErrorCode(errno);
+                        break;
+                }
+            }
             return k_success;
         }
 

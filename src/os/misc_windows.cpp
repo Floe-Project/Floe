@@ -4,6 +4,7 @@
 //
 #include <dbghelp.h>
 #include <errhandlingapi.h>
+#include <process.h>
 #include <shellapi.h>
 #include <versionhelpers.h>
 
@@ -81,6 +82,8 @@ void TryShrinkPages(void* ptr, usize old_size, usize new_size) {
     (void)new_size;
     // IMPROVE: actually shrink the memory
 }
+
+int CurrentProcessId() { return _getpid(); }
 
 static String ExceptionCodeString(DWORD code) {
     switch (code) {

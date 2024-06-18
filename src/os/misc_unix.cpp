@@ -31,6 +31,8 @@ void FreePages(void* ptr, usize bytes) {
     munmap(ptr, bytes);
 }
 
+int CurrentProcessId() { return getpid(); }
+
 void TryShrinkPages(void* ptr, usize old_size, usize new_size) {
     TracyFree(ptr);
     auto const page_size = GetSystemStats().page_size;

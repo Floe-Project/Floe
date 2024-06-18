@@ -1,6 +1,8 @@
 // Copyright 2018-2024 Sam Windell
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <time.h>
+
 #include "foundation/foundation.hpp"
 #include "utils/debug/debug.hpp"
 
@@ -26,6 +28,95 @@
 #include "settings/settings_file.hpp"
 #include "settings/settings_gui.hpp"
 #include "tracy/TracyC.h"
+
+void FloeLogger::LogFunction(String str, LogLevel level, bool add_newline) {
+    TracyMessageEx(
+        {
+            .category = "floelogger",
+            .colour = 0xffffff,
+            .object_id = nullopt,
+        },
+        "{}: {}",
+        ({
+            String c;
+            switch (level) {
+                case LogLevel::Debug: c = "Debug: "_s; break;
+                case LogLevel::Info: c = ""_s; break;
+                case LogLevel::Warning: c = "Warning: "_s; break;
+                case LogLevel::Error: c = "Error: "_s; break;
+            }
+            c;
+        }),
+        str);
+
+    bool first_message = false;
+
+    // Could just use a mutex here but this atomic method avoids the class having to have any sort of
+    // destructor which is particularly beneficial at the moment trying to debug a crash at shutdown.
+    //
+    // NOTE: this is not perfect - this method for thread-safety means that logs could be printed out of
+    // order.
+
+    FloeLogger::State ex = FloeLogger::State::Uninitialised;
+    if (state.CompareExchangeStrong(ex, FloeLogger::State::Initialising)) {
+        ArenaAllocatorWithInlineStorage<1000> arena;
+        auto outcome = KnownDirectoryWithSubdirectories(arena, KnownDirectories::Logs, Array {"Floe"_s});
+        if (outcome.HasValue()) {
+            auto path = DynamicArray<char>::FromOwnedSpan(outcome.Value(), arena);
+            path::JoinAppend(path, "floe.log");
+            filepath = String(path);
+            first_message = true;
+        } else {
+            filepath = ""_s;
+            DebugLn("failed to get logs known dir: {}", outcome.Error());
+        }
+        state.Store(FloeLogger::State::Initialised);
+    } else if (ex == FloeLogger::State::Initialising) {
+        do {
+            SpinLoopPause();
+        } while (state.Load() == FloeLogger::State::Initialising);
+    }
+
+    auto file = ({
+        auto outcome = OpenFile(filepath, FileMode::Append);
+        if (outcome.HasError()) {
+            DebugLn("failed to open log file: {}", outcome.Error());
+            return;
+        }
+        outcome.ReleaseValue();
+    });
+
+    auto try_writing = [&](Writer writer) -> ErrorCodeOr<void> {
+        if (first_message) {
+            TRY(writer.WriteChars("=======================\n"_s));
+
+            char time_buffer[128];
+            auto t = time(nullptr);
+            auto const time_str_len = strftime(time_buffer, sizeof(time_buffer), "%c", localtime(&t));
+            TRY(writer.WriteChars(String {time_buffer, time_str_len}));
+            TRY(writer.WriteChar('\n'));
+
+            TRY(fmt::FormatToWriter(writer,
+                                    "Floe v{}.{}.{}\n",
+                                    FLOE_MAJOR_VERSION,
+                                    FLOE_MINOR_VERSION,
+                                    FLOE_PATCH_VERSION));
+
+            TRY(fmt::FormatToWriter(writer, "OS: {}\n", OperatingSystemName()));
+        }
+
+        TRY(writer.WriteChars(LogPrefix(level, {.ansi_colors = false, .no_info_prefix = false})));
+        TRY(writer.WriteChars(str));
+        if (add_newline) TRY(writer.WriteChar('\n'));
+        return k_success;
+    };
+
+    auto writer = file.Writer();
+    auto o = try_writing(writer);
+    if (o.HasError()) DebugLn("failed to write log file: {}, {}", filepath, o.Error());
+}
+
+FloeLogger g_logger {};
 
 template <typename Type>
 class UninitialisedGlobalObj {
@@ -65,6 +156,7 @@ static u16 g_floe_instance_id_counter = 0;
 
 struct FloeInstance {
     FloeInstance(clap_host const* clap_host);
+    ~FloeInstance() { g_logger.TraceLn(); }
 
     clap_host const& host;
     clap_plugin clap_plugin;
@@ -521,7 +613,6 @@ clap_plugin const floe_plugin {
             ___tracy_startup_profiler();
             tracy::SetThreadName("Main");
 #endif
-            StartupCrashHandler();
         }
 
         TracyMessageEx(floe.trace_config, "plugin init");
@@ -555,7 +646,7 @@ clap_plugin const floe_plugin {
         [](clap_plugin const* plugin) {
             auto& floe = *(FloeInstance*)plugin->plugin_data;
             if (!floe.initialised) {
-                delete &floe;
+                PageAllocator::Instance().Delete(&floe);
                 return;
             }
 
@@ -569,17 +660,15 @@ clap_plugin const floe_plugin {
 
                 if (--floe_globals_counter == 0) g_cross_instance_systems.Uninit();
 
-                delete &floe;
+                PageAllocator::Instance().Delete(&floe);
             }
 
-            if (--globals_counter == 0) {
-                ShutdownCrashHandler();
+            if (--globals_counter == 0)
 #ifdef TRACY_ENABLE
                 ___tracy_shutdown_profiler();
 #else
                 ;
 #endif
-            }
         },
 
     // Activate and deactivate the plugin.
@@ -714,11 +803,12 @@ clap_plugin const floe_plugin {
 };
 
 FloeInstance::FloeInstance(clap_host const* host) : host(*host) {
+    g_logger.TraceLn();
     clap_plugin = floe_plugin;
     clap_plugin.plugin_data = this;
 }
 
 clap_plugin const& CreatePlugin(clap_host const* host) {
-    auto result = new FloeInstance(host);
+    auto result = PageAllocator::Instance().New<FloeInstance>(host);
     return result->clap_plugin;
 }

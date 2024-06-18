@@ -20,6 +20,8 @@ struct SystemStats {
 
 SystemStats GetSystemStats();
 
+int CurrentProcessId();
+
 void OpenFolderInFileBrowser(String path);
 void OpenUrlInBrowser(String url);
 

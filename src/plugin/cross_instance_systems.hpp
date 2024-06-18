@@ -7,20 +7,10 @@
 #include "utils/thread_extra/thread_pool.hpp"
 
 #include "common/paths.hpp"
+#include "plugin.hpp"
 #include "presets_folder.hpp"
 #include "sample_library_loader.hpp"
 #include "settings/settings_file.hpp"
-
-struct FloeLogger : Logger {
-    FloeLogger(ArenaAllocator& arena) : arena(arena) {}
-
-    void LogFunction(String str, LogLevel level, bool add_newline) override;
-
-    ArenaAllocator& arena;
-    DynamicArray<char> graphics_info {arena};
-    Optional<String> m_path;
-    bool m_printed_graphics {};
-};
 
 struct CrossInstanceSystems {
     CrossInstanceSystems();
@@ -29,7 +19,7 @@ struct CrossInstanceSystems {
     u64 folder_settings_listener_id;
     ArenaAllocator arena;
     ThreadsafeErrorNotifications error_notifications {};
-    FloeLogger logger;
+    FloeLogger& logger;
     FloePaths paths;
     SettingsFile settings;
     ThreadPool thread_pool;

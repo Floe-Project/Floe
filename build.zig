@@ -673,14 +673,6 @@ fn applyUniversalSettings(context: *BuildContext, step: *std.Build.Step.Compile)
     }
 }
 
-fn getGitCommit(b: *std.Build) []const u8 {
-    const result = std.process.Child.run(.{
-        .allocator = b.allocator,
-        .argv = &.{ "git", "rev-parse", "HEAD" },
-    }) catch @panic("can't run git");
-    return std.mem.trim(u8, result.stdout, " \r\n\t");
-}
-
 fn buildLua(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) *std.Build.Step.Compile {
     const lib_opts = .{
         .name = "lua",
@@ -945,7 +937,6 @@ pub fn build(b: *std.Build) void {
         }, .{
             .PRODUCTION_BUILD = build_context.build_mode == .production,
             .RUNTIME_SAFETY_CHECKS_ON = build_context.optimise == .Debug or build_context.optimise == .ReleaseSafe,
-            .GIT_HEAD_SHA1 = if (build_context.build_mode == .production) getGitCommit(b) else "",
             .FLOE_MAJOR_VERSION = floe_version_major,
             .FLOE_MINOR_VERSION = floe_version_minor,
             .FLOE_PATCH_VERSION = floe_version_patch,

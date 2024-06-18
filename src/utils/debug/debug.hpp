@@ -34,7 +34,7 @@ PUBLIC inline void DebugLoc(SourceLocation loc = SourceLocation::Current()) {
     if constexpr (!PRODUCTION_BUILD) DebugLn("{}, {}({})", loc.function, loc.file, loc.line);
 }
 
-#define DBG_PRINT(x)        DebugLn("DBG {} = {}", #x, x)
+#define DBG_PRINT_EXPR(x)   DebugLn("DBG {} = {}", #x, x)
 #define DBG_PRINT_STRUCT(x) DebugLn("DBG {} = {}", #x, fmt::DumpStruct(x))
 
 // Sometimes don't want to depend on our usual string formatting because that code could be cause of the
@@ -62,6 +62,8 @@ struct InlineSprintfBuffer {
     int size_remaining = (int)ArraySize(buffer);
     char* write_ptr = buffer;
 };
+
+[[noreturn]] void DefaultPanicHandler(char const* message, SourceLocation loc);
 
 template <typename... Args>
 [[noreturn]] PUBLIC void PanicF(SourceLocation loc, String format, Args const&... args) {

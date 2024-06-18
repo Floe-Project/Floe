@@ -33,6 +33,14 @@ jobs:
       - run: just build mac_ub
       - run: just test-ci
 
+      - name: Upload logs
+        if: '!cancelled()'
+        uses: actions/upload-artifact@v4
+        with:
+          name: log-macos
+          if-no-files-found: ignore
+          path: /Users/runner/Library/Logs/Floe/floe.log
+
   linux-compile-and-test:
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -88,6 +96,14 @@ jobs:
             zig-out/x86_64-windows/Floe.clap
             zig-out/x86_64-windows/tests.exe
             zig-out/x86_64-windows/VST3-Validator.exe
+
+      - name: Upload logs
+        if: '!cancelled()'
+        uses: actions/upload-artifact@v4
+        with:
+          name: log-linux
+          if-no-files-found: ignore
+          path: /home/runner/.local/state/Floe/floe.log
 
   windows-test:
     strategy:

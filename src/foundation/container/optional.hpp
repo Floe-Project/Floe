@@ -25,6 +25,7 @@ class [[nodiscard]] Optional<Type> {
     constexpr Optional() : no_value {}, has_value {false} {}
     constexpr Optional(NulloptType) : no_value {}, has_value {} {}
     constexpr Optional(Type const& v) : value {v}, has_value {true} {}
+    constexpr ~Optional() = default;
 
     constexpr Optional(Optional const& other) : has_value {other.has_value} {
         if (other.has_value) {

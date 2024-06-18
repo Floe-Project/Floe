@@ -58,7 +58,7 @@ static void DoGUIColourEditor(Gui* g, Rect r) {
     imgui.BeginWindow(sets, r, "GUI Colours");
     EditorReset(&g->editor);
 
-    [[clang::no_destroy]] static EditorTextInputBuffer search;
+    static EditorTextInputBuffer search;
     EditorTextInput(&g->editor, "Search:", search);
     ColoursGUISliders(&g->editor, search);
 
@@ -72,9 +72,9 @@ static void DoGUIColourMapEditor(Gui* g, Rect r) {
     imgui.BeginWindow(sets, r, "GUI Colours");
     EditorReset(&g->editor);
 
-    [[clang::no_destroy]] static EditorTextInputBuffer search;
+    static EditorTextInputBuffer search;
     EditorTextInput(&g->editor, "Search:", search);
-    [[clang::no_destroy]] static EditorTextInputBuffer colour_search;
+    static EditorTextInputBuffer colour_search;
     EditorTextInput(&g->editor, "Colour Search:", colour_search);
 
     static bool show_high_contrast = false;
@@ -92,7 +92,7 @@ static void DoGUISizeEditor(Gui* g, Rect r) {
     imgui.BeginWindow(sets, r, "GUI Sizes");
     EditorReset(&g->editor);
 
-    [[clang::no_destroy]] static EditorTextInputBuffer search;
+    static EditorTextInputBuffer search;
     EditorTextInput(&g->editor, "Search:", search);
     SizesGUISliders(&g->editor, search);
 

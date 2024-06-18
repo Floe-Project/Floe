@@ -52,7 +52,7 @@ static sample_lib::Library* BuiltinLibrary() {
             };
         }
 
-        [[clang::no_destroy]] static FixedSizeAllocator<1000> alloc;
+        static FixedSizeAllocator<1000> alloc;
         builtin_library.irs_by_name =
             decltype(builtin_library.irs_by_name)::Create(alloc, ToInt(EmbeddedIr_Count));
 

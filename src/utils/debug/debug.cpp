@@ -322,7 +322,7 @@ struct BacktraceState {
     }
 
     static BacktraceState& Instance() {
-        [[clang::no_destroy]] static BacktraceState instance;
+        static BacktraceState instance;
         return instance;
     }
 

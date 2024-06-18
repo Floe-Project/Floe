@@ -171,7 +171,7 @@ void WriteColourMapFile() {
 void SizesGUISliders(EditorGUI* g, String search) {
     EditorHeading(g, "Sizes");
 
-    [[clang::no_destroy]] static DynamicArray<String> categories {Malloc::Instance()};
+    static DynamicArrayInline<String, ToInt(UiSizeId::Count)> categories {};
     if (categories.size == 0)
         for (auto const i : Range(ToInt(UiSizeId::Count)))
             dyn::AppendIfNotAlreadyThere(categories, ui_sizes_categories[i]);
@@ -232,7 +232,7 @@ static auto GetColourNames(bool include_none) {
 void ColourMapGUIMenus(EditorGUI* g, String search, String colour_search, bool high_contrast) {
     EditorHeading(g, "Colour Mapping");
 
-    [[clang::no_destroy]] static DynamicArray<String> categories {Malloc::Instance()};
+    static DynamicArrayInline<String, ToInt(UiColMap::Count)> categories {};
     if (categories.size == 0)
         for (auto const i : Range(ToInt(UiColMap::Count)))
             dyn::AppendIfNotAlreadyThere(categories, ui_col_map_categories[i]);

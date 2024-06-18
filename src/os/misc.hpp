@@ -28,7 +28,7 @@ void FreePages(void* ptr, usize bytes);
 void TryShrinkPages(void* ptr, usize old_size, usize new_size);
 
 // Allocate whole pages at a time - often 4kb each; this is the smallest size that the OS gives out.
-class PageAllocator : public Allocator {
+class PageAllocator final : public Allocator {
     static usize AlignUpToPageSize(usize size) { return AlignForward(size, GetSystemStats().page_size); }
 
   public:
@@ -77,7 +77,7 @@ class PageAllocator : public Allocator {
     }
 
     static Allocator& Instance() {
-        [[clang::no_destroy]] static PageAllocator a;
+        static PageAllocator a;
         return a;
     }
 };

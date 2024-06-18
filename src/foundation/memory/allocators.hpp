@@ -57,7 +57,7 @@ using AllocatorCommandUnion = TaggedUnion<AllocatorCommand,
                                           TypeAndTag<ResizeCommand, AllocatorCommand::Resize>>;
 
 struct Allocator {
-    virtual ~Allocator() {}
+    virtual ~Allocator() = default;
 
     Span<u8> Allocate(AllocateCommand const& command) { return DoCommand(command); }
     void Free(Span<u8> data) { DoCommand(FreeCommand {.allocation = data}); }
@@ -309,7 +309,7 @@ static void CheckAllocatorCommandIsValid(AllocatorCommandUnion const& command_un
     }
 }
 
-class Malloc : public Allocator {
+class Malloc final : public Allocator {
   public:
     Span<u8> DoCommand(AllocatorCommandUnion const& command) override {
         CheckAllocatorCommandIsValid(command);
@@ -355,7 +355,7 @@ class Malloc : public Allocator {
     }
 
     static Allocator& Instance() {
-        [[clang::no_destroy]] static Malloc a;
+        static Malloc a;
         return a;
     }
 };
@@ -643,7 +643,7 @@ struct ArenaAllocator : public Allocator {
 
 // If there is no fallback allocator then there is no need to call Free().
 template <usize static_size>
-class FixedSizeAllocator : public Allocator {
+class FixedSizeAllocator final : public Allocator {
   public:
     NON_COPYABLE_AND_MOVEABLE(FixedSizeAllocator);
 

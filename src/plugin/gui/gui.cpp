@@ -683,7 +683,7 @@ Gui::Gui(GuiPlatform& platform, PluginInstance& plugin)
     , plugin(plugin)
     , logger(platform.logger)
     , settings(plugin.shared_data.settings) {
-    g_logger.TraceLn();
+    g_log_file.TraceLn();
     imgui.platform = &platform;
 
     editor.imgui = &imgui;
@@ -705,7 +705,7 @@ Gui::Gui(GuiPlatform& platform, PluginInstance& plugin)
 }
 
 Gui::~Gui() {
-    g_logger.TraceLn();
+    g_log_file.TraceLn();
     if (midi_keyboard_note_held_with_mouse) {
         plugin.processor.events_for_audio_thread.Push(
             GuiNoteClickReleased {.key = midi_keyboard_note_held_with_mouse.Value()});

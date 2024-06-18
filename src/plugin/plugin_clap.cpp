@@ -1,8 +1,6 @@
 // Copyright 2018-2024 Sam Windell
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include <time.h>
-
 #include "foundation/foundation.hpp"
 #include "utils/debug/debug.hpp"
 
@@ -28,95 +26,6 @@
 #include "settings/settings_file.hpp"
 #include "settings/settings_gui.hpp"
 #include "tracy/TracyC.h"
-
-void FloeLogger::LogFunction(String str, LogLevel level, bool add_newline) {
-    TracyMessageEx(
-        {
-            .category = "floelogger",
-            .colour = 0xffffff,
-            .object_id = nullopt,
-        },
-        "{}: {}",
-        ({
-            String c;
-            switch (level) {
-                case LogLevel::Debug: c = "Debug: "_s; break;
-                case LogLevel::Info: c = ""_s; break;
-                case LogLevel::Warning: c = "Warning: "_s; break;
-                case LogLevel::Error: c = "Error: "_s; break;
-            }
-            c;
-        }),
-        str);
-
-    bool first_message = false;
-
-    // Could just use a mutex here but this atomic method avoids the class having to have any sort of
-    // destructor which is particularly beneficial at the moment trying to debug a crash at shutdown.
-    //
-    // NOTE: this is not perfect - this method for thread-safety means that logs could be printed out of
-    // order.
-
-    FloeLogger::State ex = FloeLogger::State::Uninitialised;
-    if (state.CompareExchangeStrong(ex, FloeLogger::State::Initialising)) {
-        ArenaAllocatorWithInlineStorage<1000> arena;
-        auto outcome = KnownDirectoryWithSubdirectories(arena, KnownDirectories::Logs, Array {"Floe"_s});
-        if (outcome.HasValue()) {
-            auto path = DynamicArray<char>::FromOwnedSpan(outcome.Value(), arena);
-            path::JoinAppend(path, "floe.log");
-            filepath = String(path);
-            first_message = true;
-        } else {
-            filepath = ""_s;
-            DebugLn("failed to get logs known dir: {}", outcome.Error());
-        }
-        state.Store(FloeLogger::State::Initialised);
-    } else if (ex == FloeLogger::State::Initialising) {
-        do {
-            SpinLoopPause();
-        } while (state.Load() == FloeLogger::State::Initialising);
-    }
-
-    auto file = ({
-        auto outcome = OpenFile(filepath, FileMode::Append);
-        if (outcome.HasError()) {
-            DebugLn("failed to open log file: {}", outcome.Error());
-            return;
-        }
-        outcome.ReleaseValue();
-    });
-
-    auto try_writing = [&](Writer writer) -> ErrorCodeOr<void> {
-        if (first_message) {
-            TRY(writer.WriteChars("=======================\n"_s));
-
-            char time_buffer[128];
-            auto t = time(nullptr);
-            auto const time_str_len = strftime(time_buffer, sizeof(time_buffer), "%c", localtime(&t));
-            TRY(writer.WriteChars(String {time_buffer, time_str_len}));
-            TRY(writer.WriteChar('\n'));
-
-            TRY(fmt::FormatToWriter(writer,
-                                    "Floe v{}.{}.{}\n",
-                                    FLOE_MAJOR_VERSION,
-                                    FLOE_MINOR_VERSION,
-                                    FLOE_PATCH_VERSION));
-
-            TRY(fmt::FormatToWriter(writer, "OS: {}\n", OperatingSystemName()));
-        }
-
-        TRY(writer.WriteChars(LogPrefix(level, {.ansi_colors = false, .no_info_prefix = false})));
-        TRY(writer.WriteChars(str));
-        if (add_newline) TRY(writer.WriteChar('\n'));
-        return k_success;
-    };
-
-    auto writer = file.Writer();
-    auto o = try_writing(writer);
-    if (o.HasError()) DebugLn("failed to write log file: {}, {}", filepath, o.Error());
-}
-
-FloeLogger g_logger {};
 
 template <typename Type>
 class UninitialisedGlobalObj {
@@ -156,7 +65,7 @@ static u16 g_floe_instance_id_counter = 0;
 
 struct FloeInstance {
     FloeInstance(clap_host const* clap_host);
-    ~FloeInstance() { g_logger.TraceLn(); }
+    ~FloeInstance() { g_log_file.TraceLn(); }
 
     clap_host const& host;
     clap_plugin clap_plugin;
@@ -183,8 +92,7 @@ struct FloeInstance {
 };
 
 // TODO: combine these counters
-static u16 globals_counter = 0;
-static u16 floe_globals_counter = 0;
+static u16 g_num_instances = 0;
 
 clap_plugin_state const floe_plugin_state {
     // Saves the plugin state into stream.
@@ -389,9 +297,13 @@ clap_plugin_gui const floe_gui {
         ZoneScopedMessage(floe.trace_config, "gui show");
         DebugAssertMainThread(floe.host);
         floe.gui_platform->SetVisible(true);
-        if (g_cross_instance_systems->logger.graphics_info.size == 0)
-            dyn::Assign(g_cross_instance_systems->logger.graphics_info,
-                        floe.gui_platform->graphics_ctx->graphics_device_info.Items());
+        static bool shown_graphics_info = false;
+        if (!shown_graphics_info) {
+            shown_graphics_info = true;
+            g_cross_instance_systems->logger.InfoLn(
+                "{}",
+                floe.gui_platform->graphics_ctx->graphics_device_info.Items());
+        }
         return true;
     },
 
@@ -495,6 +407,7 @@ clap_plugin_params const floe_params {
     // [active ? audio-thread : main-thread]
     .flush =
         [](clap_plugin_t const* plugin, clap_input_events_t const* in, clap_output_events_t const* out) {
+            ZoneScopedN("clap_plugin_params flush");
             auto& floe = *(FloeInstance*)plugin->plugin_data;
             if (!floe.active) DebugAssertMainThread(floe.host);
             if (!in || !out) return;
@@ -544,6 +457,7 @@ clap_plugin_note_ports const floe_note_ports {
     // get info about about a note port.
     // [main-thread]
     .get = [](clap_plugin_t const*, u32 index, bool is_input, clap_note_port_info_t* info) -> bool {
+        ZoneScopedN("clap_plugin_note_ports get");
         if (index != 0 || !is_input) return false;
 
         info->id = k_main_note_port_id;
@@ -558,6 +472,7 @@ clap_plugin_thread_pool const floe_thread_pool {
     // Called by the thread pool
     .exec =
         [](clap_plugin_t const* plugin, u32 task_index) {
+            ZoneScopedN("clap_plugin_thread_pool exec");
             auto& floe = *(FloeInstance*)plugin->plugin_data;
             floe.plugin->processor.host_thread_pool->OnThreadPoolExec(task_index);
         },
@@ -567,10 +482,12 @@ clap_plugin_timer_support const floe_timer {
     // [main-thread]
     .on_timer =
         [](clap_plugin_t const* plugin, clap_id timer_id) {
+            ZoneScopedN("clap_plugin_timer_support on_timer");
             auto& floe = *(FloeInstance*)plugin->plugin_data;
             DebugAssertMainThread(floe.host);
-            (void)timer_id; // At the moment we are only ever using timer for GUI stuff, so we don't need to
-                            // check for specific timer ids.
+            (void)timer_id;
+            // At the moment we are only ever using timer for GUI stuff, so we don't need to
+            // check for specific timer ids.
             floe.gui_platform->PollAndUpdate();
         },
 };
@@ -584,11 +501,13 @@ clap_plugin_posix_fd_support const floe_posix_fd {
     // [main-thread]
     .on_fd =
         [](clap_plugin_t const* plugin, int fd, clap_posix_fd_flags_t flags) {
+            ZoneScopedN("clap_plugin_posix_fd_support on_fd");
             auto& floe = *(FloeInstance*)plugin->plugin_data;
             DebugAssertMainThread(floe.host);
             (void)flags;
-            (void)fd; // At the moment we are only ever using posix fd for GUI stuff, so we don't need to
-                      // check for specific fd values or flags.
+            (void)fd;
+            // At the moment we are only ever using posix fd for GUI stuff, so we don't need to
+            // check for specific fd values or flags.
             floe.gui_platform->PollAndUpdate();
         },
 };
@@ -606,24 +525,16 @@ clap_plugin const floe_plugin {
         ASSERT(!floe.initialised);
         if (floe.initialised) return false;
 
-        if (globals_counter++ == 0) {
-            DebugSetThreadAsMainThread();
-            SetThreadName("Main");
+        ZoneScopedMessage(floe.trace_config, "plugin init");
+
+        DebugSetThreadAsMainThread();
+        SetThreadName("Main");
 #ifdef TRACY_ENABLE
-            ___tracy_startup_profiler();
-            tracy::SetThreadName("Main");
+        // ___tracy_startup_profiler();
+        tracy::SetThreadName("Main");
 #endif
-        }
 
-        TracyMessageEx(floe.trace_config, "plugin init");
-        ZoneScopedN("clap plugin init");
-
-        if (floe_globals_counter == 0) {
-            g_cross_instance_systems.Init();
-            floe_globals_counter++;
-        }
-
-        DebugAssertMainThread(floe.host);
+        if (g_num_instances++ == 0) g_cross_instance_systems.Init();
 
         floe.gui_platform = CreateGuiPlatform(
             floe.host,
@@ -645,30 +556,17 @@ clap_plugin const floe_plugin {
     .destroy =
         [](clap_plugin const* plugin) {
             auto& floe = *(FloeInstance*)plugin->plugin_data;
-            if (!floe.initialised) {
-                PageAllocator::Instance().Delete(&floe);
-                return;
-            }
+            ZoneScopedMessage(floe.trace_config, "plugin destroy (init:{})", floe.initialised);
 
-            {
-                TracyMessageEx(floe.trace_config, "plugin destroy");
-                ZoneScopedN("clap plugin destroy");
-
+            if (floe.initialised) {
                 floe.gui.Clear();
                 floe.plugin.Clear();
                 DestroyGuiPlatform(floe.gui_platform);
 
-                if (--floe_globals_counter == 0) g_cross_instance_systems.Uninit();
-
-                PageAllocator::Instance().Delete(&floe);
+                if (--g_num_instances == 0) g_cross_instance_systems.Uninit();
             }
 
-            if (--globals_counter == 0)
-#ifdef TRACY_ENABLE
-                ___tracy_shutdown_profiler();
-#else
-                ;
-#endif
+            PageAllocator::Instance().Delete(&floe);
         },
 
     // Activate and deactivate the plugin.
@@ -715,9 +613,9 @@ clap_plugin const floe_plugin {
     // [audio-thread & active_state & !processing_state]
     .start_processing = [](clap_plugin const* plugin) -> bool {
         auto& floe = *(FloeInstance*)plugin->plugin_data;
+        ZoneScopedMessage(floe.trace_config, "plugin start_processing");
         ASSERT(floe.active);
         ASSERT(!floe.processing);
-        ZoneScopedMessage(floe.trace_config, "plugin start_processing");
         tracy::SetThreadName("Audio");
         processor_callbacks.start_processing(floe.plugin->processor);
         floe.processing = true;
@@ -729,9 +627,9 @@ clap_plugin const floe_plugin {
     .stop_processing =
         [](clap_plugin const* plugin) {
             auto& floe = *(FloeInstance*)plugin->plugin_data;
+            ZoneScopedMessage(floe.trace_config, "plugin stop_processing");
             ASSERT(floe.active);
             ASSERT(floe.processing);
-            ZoneScopedMessage(floe.trace_config, "plugin stop_processing");
             processor_callbacks.stop_processing(floe.plugin->processor);
             floe.processing = false;
         },
@@ -755,7 +653,7 @@ clap_plugin const floe_plugin {
     // [audio-thread & active_state & processing_state]
     .process = [](clap_plugin const* plugin, clap_process_t const* process) -> clap_process_status {
         auto& floe = *(FloeInstance*)plugin->plugin_data;
-        ZoneScopedN("clap plugin process");
+        ZoneScopedMessage(floe.trace_config, "plugin process");
         ZoneKeyNum("instance", floe.id);
         ZoneKeyNum("events", process->in_events->size(process->in_events));
         ZoneKeyNum("num_frames", process->frames_count);
@@ -772,7 +670,9 @@ clap_plugin const floe_plugin {
     // It is forbidden to call it before plugin->init().
     // You can call it within plugin->init() call, and after.
     // [thread-safe]
-    .get_extension = [](clap_plugin const*, char const* id) -> void const* {
+    .get_extension = [](clap_plugin const* plugin, char const* id) -> void const* {
+        auto& floe = *(FloeInstance*)plugin->plugin_data;
+        ZoneScopedMessage(floe.trace_config, "plugin get_extension");
         if (NullTermStringsEqual(id, CLAP_EXT_STATE)) return &floe_plugin_state;
         if (NullTermStringsEqual(id, CLAP_EXT_GUI)) return &floe_gui;
         if (NullTermStringsEqual(id, CLAP_EXT_PARAMS)) return &floe_params;
@@ -803,7 +703,7 @@ clap_plugin const floe_plugin {
 };
 
 FloeInstance::FloeInstance(clap_host const* host) : host(*host) {
-    g_logger.TraceLn();
+    g_log_file.TraceLn();
     clap_plugin = floe_plugin;
     clap_plugin.plugin_data = this;
 }

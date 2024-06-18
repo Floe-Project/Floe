@@ -5,10 +5,7 @@
 #include "foundation/foundation.hpp"
 #include "os/misc.hpp"
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wconversion"
-#include "tracy/Tracy.hpp"
-#pragma clang diagnostic pop
+#include "tracy_wrapped.hpp"
 
 #ifdef TRACY_ENABLE
 constexpr bool k_tracy_enable = true;
@@ -78,7 +75,7 @@ struct StacktraceOptions {
     bool ansi_colours = false;
 };
 
-using StacktraceStack = DynamicArrayInline<uintptr_t, 32>;
+using StacktraceStack = DynamicArrayInline<uintptr, 32>;
 Optional<StacktraceStack> CurrentStacktrace(int skip_frames = 1);
 
 MutableString CurrentStacktraceString(Allocator& a, StacktraceOptions options = {}, int skip_frames = 1);

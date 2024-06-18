@@ -7,8 +7,7 @@
 
 #include "foundation/foundation.hpp"
 #include "os/misc.hpp"
-
-#include "tracy/Tracy.hpp"
+#include "utils/debug/debug.hpp"
 
 static constexpr ErrorCodeCategory k_fp_error_category {
     .category_id = "FP",

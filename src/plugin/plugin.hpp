@@ -3,24 +3,11 @@
 
 #pragma once
 #include "os/threading.hpp"
-#include "utils/logger/logger.hpp"
 
 #include "clap/ext/gui.h"
 #include "clap/ext/thread-check.h"
 #include "clap/stream.h"
 #include "config.h"
-
-struct FloeLogger : Logger {
-    void LogFunction(String str, LogLevel level, bool add_newline) override;
-
-    enum class State : u32 { Uninitialised, Initialising, Initialised };
-    Atomic<State> state {State::Uninitialised};
-    bool graphics_info_printed {};
-    DynamicArrayInline<char, 1024> graphics_info;
-    DynamicArrayInline<char, 256> filepath;
-};
-
-extern FloeLogger g_logger;
 
 struct PluginActivateArgs {
     f64 sample_rate;

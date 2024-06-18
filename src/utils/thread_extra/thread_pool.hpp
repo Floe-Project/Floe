@@ -5,6 +5,7 @@
 #include "foundation/foundation.hpp"
 #include "os/misc.hpp"
 #include "os/threading.hpp"
+#include "utils/debug/tracy_wrapped.hpp"
 
 struct ThreadPool {
     using FunctionType = FunctionQueue<>::Function;
@@ -12,6 +13,7 @@ struct ThreadPool {
     ~ThreadPool() { StopAllThreads(); }
 
     void Init(String pool_name, Optional<u32> num_threads) {
+        ZoneScoped;
         ASSERT(m_workers.size == 0);
         if (!num_threads) num_threads = Min(Max(GetSystemStats().num_logical_cpus / 2u, 1u), 4u);
 
@@ -23,6 +25,7 @@ struct ThreadPool {
     }
 
     void StopAllThreads() {
+        ZoneScoped;
         m_thread_stop_requested.Store(true);
         m_cond_var.WakeAll();
         for (auto& t : m_workers)
@@ -32,6 +35,7 @@ struct ThreadPool {
     }
 
     void AddJob(FunctionType f) {
+        ZoneScoped;
         ASSERT(f);
         {
             ScopedMutexLock const lock(m_mutex);
@@ -42,6 +46,7 @@ struct ThreadPool {
 
   private:
     static void WorkerProc(ThreadPool* thread_pool) {
+        ZoneScoped;
         ArenaAllocatorWithInlineStorage<4000> scratch_arena {};
         while (true) {
             Optional<FunctionQueue<>::Function> f {};

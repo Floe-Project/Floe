@@ -16,9 +16,9 @@
 #include <unistd.h>
 
 #include "foundation/foundation.hpp"
+#include "utils/debug/debug.hpp"
 
 #include "filesystem.hpp"
-#include "tracy/Tracy.hpp"
 
 ErrorCodeOr<Optional<MutableString>> FilesystemDialog(DialogOptions options) {
     DynamicArrayInline<char, 3000> command {};

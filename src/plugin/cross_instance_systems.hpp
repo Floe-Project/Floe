@@ -19,7 +19,7 @@ struct CrossInstanceSystems {
     u64 folder_settings_listener_id;
     ArenaAllocator arena;
     ThreadsafeErrorNotifications error_notifications {};
-    FloeLogger& logger;
+    Logger& logger;
     FloePaths paths;
     SettingsFile settings;
     ThreadPool thread_pool;

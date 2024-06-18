@@ -666,6 +666,7 @@ FlushParameterEvents(AudioProcessor& processor, clap_input_events const& in, cla
 }
 
 clap_process_status Process(AudioProcessor& processor, clap_process const& process) {
+    ZoneScoped;
     ASSERT(process.audio_outputs_count == 1);
 
     if (process.audio_outputs->channel_count != 2) return CLAP_PROCESS_ERROR;

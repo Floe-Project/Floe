@@ -7,7 +7,6 @@
 
 #include "foundation/foundation.hpp"
 
-#include "tracy/Tracy.hpp"
 #if __APPLE__
 #include <OpenGL/gl.h>
 #include <OpenGL/glext.h>

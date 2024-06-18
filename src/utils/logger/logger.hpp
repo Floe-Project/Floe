@@ -3,6 +3,7 @@
 
 #pragma once
 #include "foundation/foundation.hpp"
+#include "os/threading.hpp"
 
 enum class LogLevel { Debug, Info, Warning, Error };
 
@@ -147,3 +148,15 @@ struct CliOutLogger : Logger {
     void LogFunction(String str, LogLevel level, bool add_newline) override;
 };
 extern CliOutLogger cli_out;
+
+struct FileLogger : Logger {
+    void LogFunction(String str, LogLevel level, bool add_newline) override;
+
+    enum class State : u32 { Uninitialised, Initialising, Initialised };
+    Atomic<State> state {State::Uninitialised};
+    bool graphics_info_printed {};
+    DynamicArrayInline<char, 1024> graphics_info;
+    DynamicArrayInline<char, 256> filepath;
+};
+
+extern FileLogger g_log_file;

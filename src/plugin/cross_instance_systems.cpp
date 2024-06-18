@@ -14,7 +14,7 @@
 
 CrossInstanceSystems::CrossInstanceSystems()
     : arena(PageAllocator::Instance(), Kb(16))
-    , logger(g_logger)
+    , logger(g_log_file)
     , paths(CreateFloePaths(arena))
     , settings(paths)
     , available_libraries(paths.always_scanned_folders[ToInt(ScanFolderType::Libraries)], error_notifications)

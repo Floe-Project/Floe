@@ -48,6 +48,7 @@ StateSnapshot CurrentStateSnapshot(PluginInstance& plugin) {
 }
 
 static void PresetLoadComplete(PluginInstance& plugin) {
+    ZoneScoped;
     DebugAssertMainThread(plugin.host);
     ASSERT(!plugin.pending_sample_lib_request_ids || plugin.pending_sample_lib_request_ids->size == 0);
     plugin.pending_sample_lib_request_ids.Clear();
@@ -71,6 +72,7 @@ void ApplyNewState(PluginInstance& plugin,
                    StateSnapshot const* state,
                    StateSnapshotMetadata const& state_metadata,
                    StateSource source) {
+    ZoneScoped;
     DebugAssertMainThread(plugin.host);
 
     plugin.latest_snapshot_arena.ResetCursorAndConsolidateRegions();
@@ -200,6 +202,7 @@ static void SetDesiredInstrument(PluginInstance& plugin,
 }
 
 static void AssetLoadedJobCompleted(PluginInstance& plugin, sample_lib_loader::LoadResult result) {
+    ZoneScoped;
     DebugAssertMainThread(plugin.host);
 
     enum class ResultSource { OneOff, PartOfPendingStateChange, LastInPendingStateChange };

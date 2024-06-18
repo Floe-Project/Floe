@@ -950,6 +950,7 @@ static void CancelLoadingAudioForInstrumentIfPossible(ListedInstrument* i, uintp
 }
 
 static void LoadingThreadLoop(LoadingThread& thread) {
+    ZoneScoped;
     ArenaAllocator scratch_arena {PageAllocator::Instance(), Kb(128)};
     List<ListedAudioData> audio_datas {PageAllocator::Instance()};
     uintptr_t debug_result_id = 0;

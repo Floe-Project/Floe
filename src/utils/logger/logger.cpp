@@ -24,7 +24,7 @@ void StdoutLogger::LogFunction(String str, LogLevel level, bool add_newline) {
     if (add_newline) StdPrint(StdStream::Out, "\n"_s);
 }
 
-[[clang::no_destroy]] StdoutLogger stdout_log;
+StdoutLogger stdout_log;
 
 void CliOutLogger::LogFunction(String str, LogLevel level, bool add_newline) {
     LogPrefixOptions options = {.ansi_colors = true};
@@ -39,4 +39,4 @@ void CliOutLogger::LogFunction(String str, LogLevel level, bool add_newline) {
     if (add_newline) StdPrint(stream, "\n"_s);
 }
 
-[[clang::no_destroy]] CliOutLogger cli_out;
+CliOutLogger cli_out;

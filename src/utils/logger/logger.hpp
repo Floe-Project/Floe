@@ -45,7 +45,7 @@ using LogAllocator = ArenaAllocatorWithInlineStorage<1500>;
 // Wraps a function that prints a string (to a file or stdout, for example) providing convenience
 // functions for invoking it: different log levels, with or without newlines, log-level filtering.
 struct Logger {
-    virtual ~Logger() {}
+    virtual ~Logger() = default;
     virtual void LogFunction(String str, LogLevel level, bool add_newline) = 0;
 
     void TraceLn(String message = {}, SourceLocation loc = SourceLocation::Current());

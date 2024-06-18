@@ -25,7 +25,6 @@
     X(FloeLibraryLuaTests)                                                                                   \
     X(FloeLibraryTests)                                                                                      \
     X(FloeAssetLoaderTests)                                                                                  \
-    X(FloePresetDatabaseTests)                                                                               \
     X(FloeParamStringConversionTests)                                                                        \
     X(FloeSettingsFileTests)
 

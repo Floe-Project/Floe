@@ -1320,17 +1320,6 @@ pub fn build(b: *std.Build) void {
         miniz.addCSourceFile(.{ .file = b.path("third_party_libs/miniz/miniz.c") });
         miniz.linkLibC();
 
-        var sqlite = b.addStaticLibrary(.{
-            .name = "sqlite",
-            .target = target,
-            .optimize = build_context.optimise,
-        });
-        sqlite.addCSourceFile(.{
-            .file = b.path("third_party_libs/sqlite/sqlite3.c"),
-            .flags = &.{"-DSQLITE_DEFAULT_FOREIGN_KEYS=1"},
-        });
-        sqlite.linkLibC();
-
         var dr_wav = b.addObject(.{
             .name = "dr_wav",
             .target = target,
@@ -1458,7 +1447,6 @@ pub fn build(b: *std.Build) void {
                     plugin_path ++ "/param_info.cpp",
                     plugin_path ++ "/plugin_clap.cpp",
                     plugin_path ++ "/plugin_instance.cpp",
-                    plugin_path ++ "/preset_database.cpp",
                     plugin_path ++ "/presets_folder.cpp",
                     plugin_path ++ "/processing/audio_utils.cpp",
                     plugin_path ++ "/processing/midi.cpp",
@@ -1523,7 +1511,6 @@ pub fn build(b: *std.Build) void {
             plugin.addIncludePath(b.path("src/plugin"));
             plugin.addIncludePath(b.path("src"));
             plugin.addConfigHeader(build_config_step);
-            plugin.linkLibrary(sqlite);
             plugin.linkLibrary(library);
             plugin.linkLibrary(fft_convolver);
             const embedded_files = b.addObject(.{

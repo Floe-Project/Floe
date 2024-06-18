@@ -24,8 +24,9 @@ static constexpr ErrorCodeCategory k_errno_category {
             return writer.WriteChars(FromNullTerminated(buffer));
         }
 #else
-        char buffer[200];
-        return writer.WriteChars(FromNullTerminated(strerror_r((int)code.code, buffer, ArraySize(buffer))));
+        char buffer[200] {};
+        strerror_r((int)code.code, buffer, ArraySize(buffer));
+        return writer.WriteChars(FromNullTerminated(buffer));
 #endif
     },
 };

@@ -233,10 +233,9 @@ struct Allocator {
 
     // Only use on a pointer allocated with New
     template <typename Type>
-    void Delete(Type*& ptr) {
+    void Delete(Type* ptr) {
         ptr->~Type();
         Free({(u8*)ptr, sizeof(Type)});
-        ptr = nullptr;
     }
 
     // Only use on a pointer allocated with NewMultiple

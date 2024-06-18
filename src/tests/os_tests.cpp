@@ -1,8 +1,26 @@
 // Copyright 2018-2024 Sam Windell
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include <time.h>
 
 #include "os/filesystem.hpp"
 #include "tests/framework.hpp"
+
+TEST_CASE(TestEpochTime) {
+    auto const ns = NanosecondsSinceEpoch();
+    auto const t = LocalTimeFromNanosecondsSinceEpoch(ns);
+
+    auto std_time = time(nullptr);
+    auto std_local_time = *localtime(&std_time); // NOLINT(concurrency-mt-unsafe)
+
+    CHECK_EQ(t.year, (std_local_time.tm_year + 1900));
+    CHECK_EQ(t.months_since_jan, std_local_time.tm_mon);
+    CHECK_EQ(t.day_of_month, std_local_time.tm_mday);
+    CHECK_EQ(t.hour, std_local_time.tm_hour);
+    CHECK_EQ(t.minute, std_local_time.tm_min);
+    CHECK_EQ(t.second, std_local_time.tm_sec);
+
+    return k_success;
+}
 
 TEST_CASE(TestFileApi) {
     auto& scratch_arena = tester.scratch_arena;
@@ -588,6 +606,7 @@ TEST_CASE(TestThread) {
 }
 
 TEST_REGISTRATION(RegisterOsTests) {
+    REGISTER_TEST(TestEpochTime);
     REGISTER_TEST(TestThread);
     REGISTER_TEST(TestFutex);
     REGISTER_TEST(TestMutex);

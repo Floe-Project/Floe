@@ -66,6 +66,33 @@ void StdPrint(StdStream stream, String str) {
     }
 }
 
+s128 NanosecondsSinceEpoch() {
+#if __APPLE__
+    return (s128)clock_gettime_nsec_np(CLOCK_REALTIME);
+#else
+    timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return (s128)ts.tv_sec * (s128)1e+9 + (s128)ts.tv_nsec;
+#endif
+}
+
+DateAndTime LocalTimeFromNanosecondsSinceEpoch(s128 nanoseconds) {
+    timespec ts;
+    ts.tv_sec = (time_t)(nanoseconds / (s128)1e+9);
+    ts.tv_nsec = (long)(nanoseconds % (s128)1e+9);
+    struct tm result {};
+    localtime_r(&ts.tv_sec, &result);
+    return DateAndTime {
+        .year = (s16)(result.tm_year + 1900),
+        .months_since_jan = (s8)result.tm_mon,
+        .day_of_month = (s8)result.tm_mday,
+        .hour = (s8)result.tm_hour,
+        .minute = (s8)result.tm_min,
+        .second = (s8)result.tm_sec,
+        .nanosecond = (s32)ts.tv_nsec,
+    };
+}
+
 TimePoint TimePoint::Now() {
 #if __APPLE__
     return TimePoint((s64)clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW));
@@ -295,12 +322,15 @@ void StartupCrashHandler() {
         action.sa_sigaction = &SignalHandler;
 
         int const r = sigaction(signal, &action, &g_previous_signal_actions[index]);
-        if (r != 0)
+        if (r != 0) {
+            char buffer[200] = {};
+            strerror_r(errno, buffer, sizeof(buffer));
             StdPrint(StdStream::Err,
                      fmt::FormatInline<200>("failed setting signal handler {}, errno({}) {}\n",
                                             signal,
                                             errno,
-                                            strerror(errno)));
+                                            FromNullTerminated(buffer)));
+        }
     }
 }
 

@@ -175,6 +175,42 @@ void StdPrint(StdStream stream, String str) {
     }
 }
 
+// the FILETIME structure represents the number of 100-nanosecond intervals since January 1, 1601 UTC
+constexpr s64 k_epoch_offset = 116444736000000000;
+
+s128 NanosecondsSinceEpoch() {
+    FILETIME ft;
+    GetSystemTimeAsFileTime(&ft);
+    ULARGE_INTEGER const li {
+        .LowPart = ft.dwLowDateTime,
+        .HighPart = ft.dwHighDateTime,
+    };
+    return ((s128)(li.QuadPart) - k_epoch_offset) * 100;
+}
+
+DateAndTime LocalTimeFromNanosecondsSinceEpoch(s128 nanoseconds) {
+    ULARGE_INTEGER const li {
+        .QuadPart = (ULONGLONG)(nanoseconds / 100) + k_epoch_offset,
+    };
+    FILETIME const gmt {
+        .dwLowDateTime = li.LowPart,
+        .dwHighDateTime = li.HighPart,
+    };
+
+    FILETIME local;
+    FileTimeToLocalFileTime(&gmt, &local);
+
+    SYSTEMTIME st;
+    FileTimeToSystemTime(&local, &st);
+    return {.year = (s16)st.wYear,
+            .months_since_jan = (s8)(st.wMonth - 1),
+            .day_of_month = (s8)st.wDay,
+            .hour = (s8)st.wHour,
+            .minute = (s8)st.wMinute,
+            .second = (s8)st.wSecond,
+            .nanosecond = (s32)st.wMilliseconds * 1000000};
+}
+
 TimePoint TimePoint::Now() {
     s64 result;
     LARGE_INTEGER counter;

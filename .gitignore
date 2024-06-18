@@ -5,6 +5,7 @@
 nvim-project.ini
 .zig-cache/
 build_gen/
+docs/book/
 zig-out/
 build_resources/logos/
 build_resources/Core.library/

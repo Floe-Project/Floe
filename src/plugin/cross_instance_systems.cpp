@@ -71,8 +71,7 @@ void FloeLogger::LogFunction(String str, LogLevel level, bool add_newline) {
                                     "Floe v{}.{}.{} {}\n",
                                     FLOE_MAJOR_VERSION,
                                     FLOE_MINOR_VERSION,
-                                    FLOE_PATCH_VERSION,
-                                    FLOE_ADDITIONAL_VERSION_DESCRIPTION));
+                                    FLOE_PATCH_VERSION));
 
             TRY(writer.WriteChars("Git commit: " GIT_HEAD_SHA1 "\n"_s));
 

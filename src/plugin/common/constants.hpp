@@ -12,16 +12,8 @@ static constexpr bool k_editor_enabled = FLOE_EDITOR_ENABLED;
 
 #define VERSION_HEX VERSION_PACKED(MAJOR_VERSION, MINOR_VERSION, PATCH_VERSION)
 
-#if FLOE_IS_BETA
-#define PRODUCT_NAME "Floe Beta"
-constexpr Version k_floe_version {FLOE_MAJOR_VERSION,
-                                  FLOE_MINOR_VERSION,
-                                  FLOE_PATCH_VERSION,
-                                  (u8)FLOE_BETA_VERSION};
-#else
 #define PRODUCT_NAME "Floe"
 Version const k_floe_version {FLOE_MAJOR_VERSION, FLOE_MINOR_VERSION, FLOE_PATCH_VERSION};
-#endif
 
 constexpr u32 k_max_num_active_voices = 32;
 constexpr u32 k_num_voices = 64;

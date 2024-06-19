@@ -9,6 +9,7 @@
 
 //
 #include "foundation_tests.cpp"
+#include "hosting_tests.cpp"
 #include "os_tests.cpp"
 #include "utils_tests.cpp"
 
@@ -17,6 +18,7 @@
     X(RegisterFoundationTests)                                                                               \
     X(RegisterOsTests)                                                                                       \
     X(RegisterutilsTests)                                                                                    \
+    X(RegisterHostingTests)                                                                                  \
     X(RegisterAudioUtilsTests)                                                                               \
     X(RegisterVolumeFadeTests)                                                                               \
     X(FloeStateCodingTests)                                                                                  \
@@ -44,6 +46,7 @@ int main(int argc, char** argv) {
     DebugSetThreadAsMainThread();
 #ifdef TRACY_ENABLE
     ___tracy_startup_profiler();
+    DEFER { ___tracy_shutdown_profiler(); };
     tracy::SetThreadName("Main");
 #endif
 

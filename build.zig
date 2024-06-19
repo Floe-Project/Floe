@@ -1194,7 +1194,6 @@ pub fn build(b: *std.Build) void {
                     } });
                     pugl.linkFramework("OpenGL");
                     pugl.linkFramework("CoreVideo");
-                    pugl.linkLibCpp();
                 },
                 else => {
                     pugl.addCSourceFiles(.{ .files = &.{

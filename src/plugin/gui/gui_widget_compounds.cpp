@@ -128,7 +128,7 @@ bool KnobAndLabel(Gui* g,
     if (param.info.display_format == ParamDisplayFormat::VolumeAmp)
         knob_style.overload_position = param.info.LineariseValue(1, true);
     bool const changed = knobs::Knob(g, param, knob_r, knob_style);
-    labels::Label(g, param, label_r, labels::ParameterCentred(greyed_out));
+    labels::Label(g, param, label_r, labels::ParameterCentred(g->imgui, greyed_out));
     return changed;
 }
 

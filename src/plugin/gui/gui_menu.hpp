@@ -24,7 +24,7 @@ struct PopupMenuItems {
     ~PopupMenuItems() { m_g->imgui.graphics->context->PopFont(); }
 
     void DoFakeButton(String text) {
-        labels::Label(m_g, GetItemRect(), text, labels::FakeMenuItem());
+        labels::Label(m_g, GetItemRect(), text, labels::FakeMenuItem(m_g->imgui));
         m_y_pos += m_h;
     }
 
@@ -32,7 +32,7 @@ struct PopupMenuItems {
         bool result = false;
         auto id = m_g->imgui.GetID(text);
         auto r = GetItemRect();
-        if (buttons::Button(m_g, id, r, text, buttons::MenuItem(closes_popup))) result = true;
+        if (buttons::Button(m_g, id, r, text, buttons::MenuItem(m_g->imgui, closes_popup))) result = true;
         m_y_pos += m_h;
         if (tooltip.size) Tooltip(m_g, id, r, tooltip);
 
@@ -44,7 +44,8 @@ struct PopupMenuItems {
         bool result = false;
         if (!id) id = m_g->imgui.GetID(text);
         auto r = GetItemRect();
-        if (buttons::Toggle(m_g, id, r, state, text, buttons::MenuToggleItem(true))) result = true;
+        if (buttons::Toggle(m_g, id, r, state, text, buttons::MenuToggleItem(m_g->imgui, true)))
+            result = true;
         m_y_pos += m_h;
         if (tooltip.size) Tooltip(m_g, id, r, tooltip);
         return result;
@@ -56,7 +57,8 @@ struct PopupMenuItems {
 
     bool DoSubMenuButton(String text, imgui::Id popup_id) {
         bool result = false;
-        if (buttons::Popup(m_g, popup_id, GetItemRect(), text, buttons::SubMenuItem())) result = true;
+        if (buttons::Popup(m_g, popup_id, GetItemRect(), text, buttons::SubMenuItem(m_g->imgui)))
+            result = true;
         m_y_pos += m_h;
         return result;
     }
@@ -79,6 +81,7 @@ struct PopupMenuItems {
     }
 
     void Divider() {
+        auto& imgui = m_g->imgui;
         Rect div_r = {m_div_gap_x, m_y_pos + (m_div_h / 2), m_g->imgui.Width() - 2 * m_div_gap_x, 1};
         m_g->imgui.RegisterAndConvertRect(&div_r);
         m_g->imgui.graphics->AddRectFilled(div_r.Min(), div_r.Max(), GMC(PopupItemDivider));

@@ -108,7 +108,7 @@ PresetBrowser::DoPresetFolderRecurse(DirectoryListing::Entry const* f, f32& ypos
             DynamicArray<char> name {f->Filename(), g->scratch_arena};
             if (name == "."_s) PanicIfReached();
             if (!f->HasChildren()) dyn::AppendSpan(name, " <empty>"_s);
-            if (buttons::Toggle(g, imgui_id, r, state, name, buttons::PresetsBrowserFolderButton()))
+            if (buttons::Toggle(g, imgui_id, r, state, name, buttons::PresetsBrowserFolderButton(imgui)))
                 clicked_preset_folder = f;
             auto const rel_pos = imgui.ScreenPosToWindowPos(imgui.platform->cursor_pos);
             if (persistent_data.current_dragging_preset) {
@@ -226,7 +226,7 @@ DirectoryListing::Entry const* PresetBrowser::DoPresetFilesRecurse(DirectoryList
                         labels::Label(g,
                                       r.WithW(max_heading_w),
                                       f->Parent()->Filename(),
-                                      labels::PresetBrowserFolder());
+                                      labels::PresetBrowserFolder(imgui));
                         imgui.graphics->context->PopFont();
 
                         if (f->Parent()->Parent()) {
@@ -245,7 +245,7 @@ DirectoryListing::Entry const* PresetBrowser::DoPresetFilesRecurse(DirectoryList
                                 labels::Label(g,
                                               r.CutLeft(path_x),
                                               TrimPath(g->scratch_arena, path),
-                                              labels::PresetBrowserFolderPath());
+                                              labels::PresetBrowserFolderPath(imgui));
                             }
                         }
                     }
@@ -261,7 +261,12 @@ DirectoryListing::Entry const* PresetBrowser::DoPresetFilesRecurse(DirectoryList
                 }
                 if (IsOnScreen(imgui, r)) {
                     auto const name = f->FilenameNoExt();
-                    if (buttons::Toggle(g, imgui_id, r, state, name, buttons::PresetsBrowserFileButton()))
+                    if (buttons::Toggle(g,
+                                        imgui_id,
+                                        r,
+                                        state,
+                                        name,
+                                        buttons::PresetsBrowserFileButton(imgui)))
                         clicked_preset_file = f;
                     if (imgui.WasJustActivated(imgui_id)) {
                         persistent_data.current_dragging_preset =
@@ -439,7 +444,10 @@ void PresetBrowser::DoAllPresetFiles() {
         // of the list
         auto const heading_font = g->mada;
         imgui.graphics->context->PushFont(heading_font);
-        labels::Label(g, {GetAndIncrementRect(false, ypos, 0)}, "Loading...", labels::PresetBrowserFolder());
+        labels::Label(g,
+                      {GetAndIncrementRect(false, ypos, 0)},
+                      "Loading...",
+                      labels::PresetBrowserFolder(imgui));
         imgui.graphics->context->PopFont();
         imgui.RedrawAtIntervalSeconds(g->redraw_counter, 0.5);
     }
@@ -500,7 +508,7 @@ void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
 
         if (DoCloseButtonForCurrentWindow(g,
                                           "Close the preset browser panel",
-                                          buttons::BrowserIconButton().WithLargeIcon())) {
+                                          buttons::BrowserIconButton(imgui).WithLargeIcon())) {
             persistent_data.show_preset_panel = false;
         }
 
@@ -512,7 +520,7 @@ void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
                     g,
                     {gap_left_heading, panel_ypos, imgui.Width() - gap_left_heading, heading_height},
                     "Floe Presets",
-                    labels::BrowserHeading());
+                    labels::BrowserHeading(imgui));
                 imgui.graphics->context->PopFont();
             }
 
@@ -542,7 +550,7 @@ void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
                                     load_file_id,
                                     load_file_r,
                                     "Load from File",
-                                    buttons::PresetsBrowserPopupButton())) {
+                                    buttons::PresetsBrowserPopupButton(imgui))) {
                     g->OpenDialog(DialogType::LoadPreset);
                 }
                 Tooltip(g, load_file_id, load_file_r, "Load an external preset from a file"_s);
@@ -556,50 +564,50 @@ void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
         auto const table_title_h = editor::GetSize(imgui, UiSizeId::PresetSectionHeadingHeight);
         auto const files_panel_width = imgui.Width() - preset_folders_panel_width;
 
-        imgui.BeginWindow(FloeWindowSettings(
-                              imgui,
-                              [&](IMGUI_DRAW_WINDOW_BG_ARGS) {
-                                  auto const r = window->unpadded_bounds;
-                                  auto const rounding = editor::GetSize(s, UiSizeId::CornerRounding);
+        imgui.BeginWindow(
+            FloeWindowSettings(
+                imgui,
+                [&](IMGUI_DRAW_WINDOW_BG_ARGS) {
+                    auto const r = window->unpadded_bounds;
+                    auto const rounding = editor::GetSize(imgui, UiSizeId::CornerRounding);
 
-                                  s.graphics->AddRectFilled(r.Min(),
-                                                            r.Min() + f32x2 {r.w, table_title_h},
-                                                            GMCC(Browser, TopRowBack),
-                                                            rounding,
-                                                            1 | 2);
+                    imgui.graphics->AddRectFilled(r.Min(),
+                                                  r.Min() + f32x2 {r.w, table_title_h},
+                                                  GMCC(Browser, TopRowBack),
+                                                  rounding,
+                                                  1 | 2);
 
-                                  s.graphics->AddRectFilled(r.Min() + f32x2 {0, table_title_h},
-                                                            r.Min() + f32x2 {preset_folders_panel_width, r.h},
-                                                            GMCC(PresetBrowser, FoldersBack),
-                                                            rounding,
-                                                            8);
+                    imgui.graphics->AddRectFilled(r.Min() + f32x2 {0, table_title_h},
+                                                  imgui.Min() + f32x2 {preset_folders_panel_width, r.h},
+                                                  GMCC(PresetBrowser, FoldersBack),
+                                                  rounding,
+                                                  8);
 
-                                  s.graphics->AddRectFilled(
-                                      r.Min() + f32x2 {preset_folders_panel_width, table_title_h},
-                                      r.Max(),
-                                      GMCC(PresetBrowser, FilesBack),
-                                      rounding,
-                                      8);
+                    imgui.graphics->AddRectFilled(r.Min() + f32x2 {preset_folders_panel_width, table_title_h},
+                                                  r.Max(),
+                                                  GMCC(PresetBrowser, FilesBack),
+                                                  rounding,
+                                                  8);
 
-                                  s.graphics->AddRect(r.Min(), r.Max(), GMCC(Browser, BorderRect), rounding);
+                    imgui.graphics->AddRect(r.Min(), r.Max(), GMCC(Browser, BorderRect), rounding);
 
-                                  auto const line_col = GMCC(Browser, SectionHeadingLine);
-                                  s.graphics->AddLine(r.Min() + f32x2 {preset_folders_panel_width, 0},
-                                                      r.Min() + f32x2 {preset_folders_panel_width, r.h},
-                                                      line_col);
+                    auto const line_col = GMCC(Browser, SectionHeadingLine);
+                    imgui.graphics->AddLine(r.Min() + f32x2 {preset_folders_panel_width, 0},
+                                            r.Min() + f32x2 {preset_folders_panel_width, r.h},
+                                            line_col);
 
-                                  s.graphics->AddLine(r.Min() + f32x2 {0, table_title_h},
-                                                      r.Min() + f32x2 {r.w, table_title_h},
-                                                      line_col);
-                              }),
-                          {0, panel_ypos, imgui.Width(), imgui.Height() - panel_ypos},
-                          "Preset Folders");
+                    imgui.graphics->AddLine(r.Min() + f32x2 {0, table_title_h},
+                                            r.Min() + f32x2 {r.w, table_title_h},
+                                            line_col);
+                }),
+            {0, panel_ypos, imgui.Width(), imgui.Height() - panel_ypos},
+            "Preset Folders");
         DEFER { imgui.EndWindow(); };
 
         labels::Label(g,
                       {0, 0, preset_folders_panel_width, table_title_h},
                       "Filter By Folder",
-                      labels::PresetSectionHeading());
+                      labels::PresetSectionHeading(imgui));
 
         {
             imgui.BeginWindow(FloeWindowSettings(imgui, [](IMGUI_DRAW_WINDOW_BG_ARGS) {}),
@@ -634,28 +642,28 @@ void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
 
                 lay.PerformLayout();
 
-                labels::Label(g, title, "Presets", labels::PresetSectionHeading());
+                labels::Label(g, title, "Presets", labels::PresetSectionHeading(imgui));
 
                 {
                     auto const search_r = lay.GetRect(search);
 
                     auto settings = imgui::DefTextInput();
                     settings.draw = [](IMGUI_DRAW_TEXT_INPUT_ARGS) {
-                        auto const rounding = editor::GetSize(s, UiSizeId::CornerRounding);
-                        s.graphics->AddRectFilled(r.Min(), r.Max(), GMCC(Browser, SearchBack), rounding);
+                        auto const rounding = editor::GetSize(imgui, UiSizeId::CornerRounding);
+                        imgui.graphics->AddRectFilled(r.Min(), r.Max(), GMCC(Browser, SearchBack), rounding);
 
                         if (result->HasSelection()) {
                             auto selection_r = result->GetSelectionRect();
-                            s.graphics->AddRectFilled(selection_r.Min(),
-                                                      selection_r.Max(),
-                                                      GMCC(Browser, SearchSelection));
+                            imgui.graphics->AddRectFilled(selection_r.Min(),
+                                                          selection_r.Max(),
+                                                          GMCC(Browser, SearchSelection));
                         }
 
                         if (result->show_cursor) {
                             auto cursor_r = result->GetCursorRect();
-                            s.graphics->AddRectFilled(cursor_r.Min(),
-                                                      cursor_r.Max(),
-                                                      GMCC(Browser, SearchCursor));
+                            imgui.graphics->AddRectFilled(cursor_r.Min(),
+                                                          cursor_r.Max(),
+                                                          GMCC(Browser, SearchCursor));
                         }
 
                         auto col = GMCC(Browser, SearchText);
@@ -664,7 +672,7 @@ void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
                             col = GMCC(Browser, SearchTextInactive);
                         }
 
-                        s.graphics->AddText(result->GetTextPos(), col, text);
+                        imgui.graphics->AddText(result->GetTextPos(), col, text);
                     };
                     settings.select_all_on_first_open = false;
                     auto const search_text_input =
@@ -683,19 +691,23 @@ void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
                                             icon_id,
                                             icon_r,
                                             ICON_FA_TIMES_CIRCLE,
-                                            buttons::BrowserIconButton())) {
+                                            buttons::BrowserIconButton(imgui))) {
                             dyn::Clear(g->plugin.preset_browser_filters.search_filter);
                         }
                         Tooltip(g, icon_id, icon_r, "Clear the search text"_s);
                     } else {
-                        buttons::FakeButton(g, icon_r, ICON_FA_SEARCH, buttons::BrowserIconButton());
+                        buttons::FakeButton(g, icon_r, ICON_FA_SEARCH, buttons::BrowserIconButton(imgui));
                     }
                 }
 
                 {
                     auto const rand_id = imgui.GetID("rand");
                     auto const rand_r = lay.GetRect(random);
-                    if (buttons::Button(g, rand_id, rand_r, ICON_FA_RANDOM, buttons::BrowserIconButton())) {
+                    if (buttons::Button(g,
+                                        rand_id,
+                                        rand_r,
+                                        ICON_FA_RANDOM,
+                                        buttons::BrowserIconButton(imgui))) {
                         LoadPresetFromListing(g->plugin,
                                               PresetRandomiseCriteria {g->plugin.preset_browser_filters},
                                               listing);

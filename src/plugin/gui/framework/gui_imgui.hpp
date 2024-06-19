@@ -105,34 +105,38 @@ struct TextInputFlags {
 //
 //
 
-#define IMGUI_DRAW_WINDOW_SCROLLBAR_ARGS  const imgui::Context &s, Rect bounds, Rect handle_rect, imgui::Id id
+#define IMGUI_DRAW_WINDOW_SCROLLBAR_ARGS                                                                     \
+    const imgui::Context &imgui, Rect bounds, Rect handle_rect, imgui::Id id
 #define IMGUI_DRAW_WINDOW_SCROLLBAR(name) void name(IMGUI_DRAW_WINDOW_SCROLLBAR_ARGS)
 using DrawWindowScrollbar = void(IMGUI_DRAW_WINDOW_SCROLLBAR_ARGS);
 
-#define IMGUI_DRAW_WINDOW_BG_ARGS       MAYBE_UNUSED const imgui::Context &s, MAYBE_UNUSED imgui::Window *window
+#define IMGUI_DRAW_WINDOW_BG_ARGS                                                                            \
+    _Pragma("clang diagnostic push") _Pragma("clang diagnostic ignored \"-Wshadow\"")                        \
+        MAYBE_UNUSED const imgui::Context &imgui,                                                            \
+        MAYBE_UNUSED imgui::Window *window _Pragma("clang diagnostic pop")
 #define IMGUI_DRAW_WINDOW_BG_ARGS_TYPES const imgui::Context&, imgui::Window*
 #define IMGUI_DRAW_WINDOW_BG(name)      void name(IMGUI_DRAW_WINDOW_BG_ARGS)
 using DrawWindowBackground = void(IMGUI_DRAW_WINDOW_BG_ARGS);
 
 #define IMGUI_DRAW_BUTTON_ARGS                                                                               \
-    MAYBE_UNUSED const imgui::Context &s, MAYBE_UNUSED Rect r, MAYBE_UNUSED imgui::Id id,                    \
+    MAYBE_UNUSED const imgui::Context &imgui, MAYBE_UNUSED Rect r, MAYBE_UNUSED imgui::Id id,                \
         MAYBE_UNUSED String str, MAYBE_UNUSED bool state
 #define IMGUI_DRAW_BUTTON(name) void name(IMGUI_DRAW_BUTTON_ARGS)
 using DrawButton = void(IMGUI_DRAW_BUTTON_ARGS);
 
 #define IMGUI_DRAW_SLIDER_ARGS                                                                               \
-    MAYBE_UNUSED const imgui::Context &s, MAYBE_UNUSED Rect r, MAYBE_UNUSED imgui::Id id,                    \
+    MAYBE_UNUSED const imgui::Context &imgui, MAYBE_UNUSED Rect r, MAYBE_UNUSED imgui::Id id,                \
         MAYBE_UNUSED f32 percent, MAYBE_UNUSED const imgui::SliderSettings *settings
 #define IMGUI_DRAW_SLIDER(name) void name(IMGUI_DRAW_SLIDER_ARGS)
 using DrawSlider = void(IMGUI_DRAW_SLIDER_ARGS);
 
 #define IMGUI_DRAW_TEXT_INPUT_ARGS                                                                           \
-    MAYBE_UNUSED const imgui::Context &s, MAYBE_UNUSED Rect r, MAYBE_UNUSED imgui::Id id,                    \
+    MAYBE_UNUSED const imgui::Context &imgui, MAYBE_UNUSED Rect r, MAYBE_UNUSED imgui::Id id,                \
         MAYBE_UNUSED String text, MAYBE_UNUSED imgui::TextInputResult *result
 #define IMGUI_DRAW_TEXT_INPUT(name) void name(IMGUI_DRAW_TEXT_INPUT_ARGS)
 using DrawTextInput = void(IMGUI_DRAW_TEXT_INPUT_ARGS);
 
-#define IMGUI_DRAW_TEXT_ARGS  const imgui::Context &s, Rect r, u32 col, String str
+#define IMGUI_DRAW_TEXT_ARGS  const imgui::Context &imgui, Rect r, u32 col, String str
 #define IMGUI_DRAW_TEXT(name) void name(IMGUI_DRAW_TEXT_ARGS)
 using DrawText = void(IMGUI_DRAW_TEXT_ARGS);
 
@@ -731,52 +735,52 @@ f32x2 BestPopupPos(Rect base_r, Rect avoid_r, f32x2 window_size, bool find_left_
 
 PUBLIC IMGUI_DRAW_WINDOW_BG(DefaultDrawWindowBackground) {
     auto r = window->unpadded_bounds;
-    s.graphics->AddRectFilled(r.Min(), r.Max(), 0xff202020);
-    s.graphics->AddRect(r.Min(), r.Max(), 0xffffffff);
+    imgui.graphics->AddRectFilled(r.Min(), r.Max(), 0xff202020);
+    imgui.graphics->AddRect(r.Min(), r.Max(), 0xffffffff);
 }
 
 PUBLIC IMGUI_DRAW_WINDOW_BG(DefaultDrawPopupBackground) {
     auto r = window->unpadded_bounds;
-    s.graphics->AddRectFilled(r.Min(), r.Max(), 0xff202020);
-    s.graphics->AddRect(r.Min(), r.Max(), 0xffffffff);
+    imgui.graphics->AddRectFilled(r.Min(), r.Max(), 0xff202020);
+    imgui.graphics->AddRect(r.Min(), r.Max(), 0xffffffff);
 }
 
 PUBLIC IMGUI_DRAW_WINDOW_SCROLLBAR(DefaultDrawWindowScrollbar) {
-    s.graphics->AddRectFilled(bounds.Min(), bounds.Max(), 0xff404040);
+    imgui.graphics->AddRectFilled(bounds.Min(), bounds.Max(), 0xff404040);
     u32 col = 0xffe5e5e5;
-    if (s.IsHot(id))
+    if (imgui.IsHot(id))
         col = 0xffffffff;
-    else if (s.IsActive(id))
+    else if (imgui.IsActive(id))
         col = 0xffb5b5b5;
-    s.graphics->AddRectFilled(handle_rect.Min(), handle_rect.Max(), col);
+    imgui.graphics->AddRectFilled(handle_rect.Min(), handle_rect.Max(), col);
 }
 
 PUBLIC IMGUI_DRAW_BUTTON(DefaultDrawButton) {
     u32 col = 0xffd5d5d5;
-    if (s.IsHot(id)) col = 0xfff0f0f0;
-    if (s.IsActive(id)) col = 0xff808080;
+    if (imgui.IsHot(id)) col = 0xfff0f0f0;
+    if (imgui.IsActive(id)) col = 0xff808080;
     if (state) col = 0xff808080;
-    s.graphics->AddRectFilled(r.Min(), r.Max(), col);
+    imgui.graphics->AddRectFilled(r.Min(), r.Max(), col);
 
-    auto font_size = s.graphics->context->CurrentFontSize();
-    auto pad = (f32)s.platform->window_size.width / 200.0f;
-    s.graphics->AddText(f32x2 {r.x + pad, r.y + (r.h / 2 - font_size / 2)}, 0xff000000, str);
+    auto font_size = imgui.graphics->context->CurrentFontSize();
+    auto pad = (f32)imgui.platform->window_size.width / 200.0f;
+    imgui.graphics->AddText(f32x2 {r.x + pad, r.y + (r.h / 2 - font_size / 2)}, 0xff000000, str);
 }
 
 PUBLIC IMGUI_DRAW_BUTTON(DefaultDrawPopupButton) {
     (void)state;
     u32 col = 0xffd5d5d5;
-    if (s.IsHot(id)) col = 0xfff0f0f0;
-    if (s.IsActive(id)) col = 0xff808080;
-    s.graphics->AddRectFilled(r.Min(), r.Max(), col);
+    if (imgui.IsHot(id)) col = 0xfff0f0f0;
+    if (imgui.IsActive(id)) col = 0xff808080;
+    imgui.graphics->AddRectFilled(r.Min(), r.Max(), col);
 
-    auto font_size = s.graphics->context->CurrentFontSize();
-    s.graphics->AddText(f32x2 {r.x + 4, r.y + (r.h - font_size) / 2}, 0xff000000, str);
+    auto font_size = imgui.graphics->context->CurrentFontSize();
+    imgui.graphics->AddText(f32x2 {r.x + 4, r.y + (r.h - font_size) / 2}, 0xff000000, str);
 
-    s.graphics->AddTriangleFilled({r.Right() - 14, r.y + 4},
-                                  {r.Right() - 4, r.y + (r.h / 2)},
-                                  {r.Right() - 14, r.y + r.h - 4},
-                                  0xff000000);
+    imgui.graphics->AddTriangleFilled({r.Right() - 14, r.y + 4},
+                                      {r.Right() - 4, r.y + (r.h / 2)},
+                                      {r.Right() - 14, r.y + r.h - 4},
+                                      0xff000000);
 }
 
 PUBLIC void DefaultDrawSlider(Context const& s, Rect r, Id, f32 percent, SliderSettings const*) {
@@ -813,7 +817,7 @@ PUBLIC WindowSettings DefMainWindow() {
     s.pad_bottom_right = {4, 4};
     s.draw_routine_window_background = [](IMGUI_DRAW_WINDOW_BG_ARGS) {
         auto r = window->unpadded_bounds;
-        s.graphics->AddRectFilled(r.Min(), r.Max(), 0xff151515);
+        imgui.graphics->AddRectFilled(r.Min(), r.Max(), 0xff151515);
     };
     return s;
 }
@@ -907,12 +911,12 @@ PUBLIC TextSettings DefText() {
     TextSettings s;
     s.col = 0xffffffff;
     s.draw = [](IMGUI_DRAW_TEXT_ARGS) {
-        auto font_size = s.graphics->context->CurrentFontSize();
+        auto font_size = imgui.graphics->context->CurrentFontSize();
         f32x2 pos;
         pos.x = (f32)(int)r.x;
         pos.y = r.y + ((r.h / 2) - (font_size / 2));
         pos.y = (f32)(int)pos.y;
-        s.graphics->AddText(s.graphics->context->CurrentFont(), font_size, pos, col, str, 0);
+        imgui.graphics->AddText(imgui.graphics->context->CurrentFont(), font_size, pos, col, str, 0);
     };
     return s;
 }

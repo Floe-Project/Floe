@@ -4,6 +4,7 @@
 #pragma once
 #include "foundation/foundation.hpp"
 
+#include "gui_editor_ui_style.hpp"
 #include "gui_fwd.hpp"
 #include "layout.hpp"
 
@@ -23,9 +24,24 @@ struct Style {
     Optional<f32> overload_position {};
 };
 
-Style DefaultKnob(Optional<u32> highlight_col = {});
-Style BidirectionalKnob(Optional<u32> highlight_col = {});
-Style FakeKnobStyle();
+PUBLIC Style DefaultKnob(imgui::Context const& imgui, Optional<u32> _highlight_col = {}) {
+    Style s {};
+    s.highlight_col = _highlight_col ? *_highlight_col : GMC(KnobOuterArcBright);
+    s.line_col = _highlight_col ? GMC(FXKnobLine) : GMC(KnobLine);
+    return s;
+}
+
+PUBLIC Style BidirectionalKnob(imgui::Context const& imgui, Optional<u32> _highlight_col = {}) {
+    auto s = DefaultKnob(imgui, _highlight_col);
+    s.bidirectional = true;
+    return s;
+}
+
+PUBLIC Style FakeKnobStyle(imgui::Context const& imgui) {
+    auto s = DefaultKnob(imgui);
+    s.is_fake = true;
+    return s;
+}
 
 bool Knob(Gui* g, imgui::Id id, Rect r, f32& percent, f32 default_percent, Style const& style);
 bool Knob(Gui* g, imgui::Id id, Parameter const& param, Rect r, Style const& style);

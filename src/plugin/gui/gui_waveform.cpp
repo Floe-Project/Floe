@@ -499,6 +499,7 @@ static void GUIDoSampleWaveformOverlay(Gui* g, PluginInstance::Layer* layer, Rec
 }
 
 void GUIDoSampleWaveform(Gui* g, PluginInstance::Layer* layer, Rect r) {
+    auto& imgui = g->imgui;
     auto reg_r = r;
     g->imgui.RegisterAndConvertRect(&reg_r);
     g->imgui.PushID(layer);
@@ -513,7 +514,7 @@ void GUIDoSampleWaveform(Gui* g, PluginInstance::Layer* layer, Rect r) {
     bool is_loading = false;
     if (g->plugin.sample_lib_loader_connection.instrument_loading_percents[(usize)layer->index].Load() !=
         -1) {
-        labels::Label(g, r, "Loading...", labels::WaveformLoadingLabel());
+        labels::Label(g, r, "Loading...", labels::WaveformLoadingLabel(g->imgui));
         is_loading = true;
     } else if (auto audio_file = layer->GetSampleForGUIWaveform()) {
         auto const offset = layer->processor.params[ToInt(LayerParamIndex::SampleOffset)].LinearValue();

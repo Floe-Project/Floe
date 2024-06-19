@@ -131,21 +131,22 @@ void ParameterValuePopup(Gui* g, Span<Parameter const*> params, imgui::Id id, Re
 void MidiLearnMenu(Gui* g, ParamIndex param, Rect r) { MidiLearnMenu(g, {&param, 1}, r); }
 
 void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
+    auto& imgui = g->imgui;
     auto& plugin = g->plugin;
-    g->imgui.PushID((int)params[0]);
-    auto popup_id = g->imgui.GetID("MidiLearnPopup");
-    auto right_clicker_id = g->imgui.GetID("MidiLearnClicker");
-    g->imgui.PopID();
+    imgui.PushID((int)params[0]);
+    auto popup_id = imgui.GetID("MidiLearnPopup");
+    auto right_clicker_id = imgui.GetID("MidiLearnClicker");
+    imgui.PopID();
 
-    g->imgui.RegisterAndConvertRect(&r);
-    g->imgui.PopupButtonBehavior(r,
-                                 right_clicker_id,
-                                 popup_id,
-                                 {.right_mouse = true, .triggers_on_mouse_up = true});
+    imgui.RegisterAndConvertRect(&r);
+    imgui.PopupButtonBehavior(r,
+                              right_clicker_id,
+                              popup_id,
+                              {.right_mouse = true, .triggers_on_mouse_up = true});
 
-    if (!g->imgui.IsPopupOpen(popup_id)) return;
+    if (!imgui.IsPopupOpen(popup_id)) return;
 
-    auto item_height = g->imgui.graphics->context->CurrentFontSize() * 1.5f;
+    auto item_height = imgui.graphics->context->CurrentFontSize() * 1.5f;
     static constexpr String k_reset_text = "Set To Default Value";
     static constexpr String k_set_text = "Set Value";
     static constexpr String k_learn_text = "MIDI CC Learn";
@@ -194,17 +195,17 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
                                          false);
     Rect const popup_r(popup_pos, 0, 0);
 
-    auto settings = PopupWindowSettings(g->imgui);
+    auto settings = PopupWindowSettings(imgui);
     settings.flags =
         imgui::WindowFlags_AutoWidth | imgui::WindowFlags_AutoHeight | imgui::WindowFlags_AutoPosition;
-    if (g->imgui.BeginWindowPopup(settings, popup_id, popup_r)) {
+    if (imgui.BeginWindowPopup(settings, popup_id, popup_r)) {
         StartFloeMenu(g);
         DEFER { EndFloeMenu(g); };
         f32 pos = 0;
 
         for (auto param : params) {
-            g->imgui.PushID((int)param);
-            DEFER { g->imgui.PopID(); };
+            imgui.PushID((int)param);
+            DEFER { imgui.PopID(); };
 
             if (params.size != 1) {
                 labels::Label(g,
@@ -212,7 +213,7 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
                               fmt::Format(g->scratch_arena,
                                           "{}: ",
                                           g->plugin.processor.params[ToInt(param)].info.gui_label),
-                              labels::FakeMenuItem());
+                              labels::FakeMenuItem(imgui));
                 pos += item_height;
             }
 
@@ -220,12 +221,12 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
                 if (buttons::Button(g,
                                     {0, pos, item_width, item_height},
                                     k_reset_text,
-                                    buttons::MenuItem(false))) {
+                                    buttons::MenuItem(imgui, false))) {
                     SetParameterValue(plugin.processor,
                                       param,
                                       plugin.processor.params[ToInt(param)].DefaultLinearValue(),
                                       {});
-                    g->imgui.ClosePopupToLevel(0);
+                    imgui.ClosePopupToLevel(0);
                 }
                 pos += item_height;
             }
@@ -234,8 +235,8 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
                 if (buttons::Button(g,
                                     {0, pos, item_width, item_height},
                                     k_set_text,
-                                    buttons::MenuItem(false))) {
-                    g->imgui.ClosePopupToLevel(0);
+                                    buttons::MenuItem(imgui, false))) {
+                    imgui.ClosePopupToLevel(0);
                     g->param_text_editor_to_open = param;
                 }
                 pos += item_height;
@@ -245,7 +246,7 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
                 if (buttons::Button(g,
                                     {0, pos, item_width, item_height},
                                     k_cancel_text,
-                                    buttons::MenuItem(false))) {
+                                    buttons::MenuItem(imgui, false))) {
                     CancelMidiCCLearn(plugin.processor);
                 }
                 pos += item_height;
@@ -253,7 +254,7 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
                 if (buttons::Button(g,
                                     {0, pos, item_width, item_height},
                                     k_learn_text,
-                                    buttons::MenuItem(false))) {
+                                    buttons::MenuItem(imgui, false))) {
                     LearnMidiCC(plugin.processor, param);
                 }
                 pos += item_height;
@@ -267,12 +268,12 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
             if (ccs_bitset.AnyValuesSet()) closes_popups = true;
             for (auto const cc_num : Range(128uz)) {
                 if (!ccs_bitset.Get(cc_num)) continue;
-                g->imgui.PushID((u64)cc_num);
+                imgui.PushID((u64)cc_num);
 
                 if (buttons::Button(g,
                                     {0, pos, item_width, item_height},
                                     fmt::Format(g->scratch_arena, k_remove_fmt, cc_num),
-                                    buttons::MenuItem(closes_popups))) {
+                                    buttons::MenuItem(imgui, closes_popups))) {
                     UnlearnMidiCC(plugin.processor, param, (u7)cc_num);
                 }
                 pos += item_height;
@@ -283,7 +284,7 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
                                         {0, pos, item_width, item_height},
                                         state,
                                         fmt::Format(g->scratch_arena, k_always_set_fmt, cc_num),
-                                        buttons::MenuItem(closes_popups))) {
+                                        buttons::MenuItem(imgui, closes_popups))) {
                         midi_settings::AddPersistentCcToParamMapping(g->settings.settings.midi,
                                                                      g->settings.arena,
                                                                      (u8)cc_num,
@@ -292,42 +293,42 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
                     pos += item_height;
                 }
 
-                g->imgui.PopID();
+                imgui.PopID();
             }
 
-            g->imgui.PushID("always_set");
+            imgui.PushID("always_set");
             for (auto const cc_num : Range((u8)128)) {
                 if (persistent_ccs.Get(cc_num)) {
-                    g->imgui.PushID(cc_num);
+                    imgui.PushID(cc_num);
 
                     bool state = true;
                     if (buttons::Toggle(g,
                                         {0, pos, item_width, item_height},
                                         state,
                                         fmt::Format(g->scratch_arena, k_always_set_fmt, cc_num),
-                                        buttons::MenuItem(closes_popups))) {
+                                        buttons::MenuItem(imgui, closes_popups))) {
                         midi_settings::RemovePersistentCcToParamMapping(g->settings.settings.midi,
                                                                         cc_num,
                                                                         ParamIndexToId(param));
                     }
                     pos += item_height;
 
-                    g->imgui.PopID();
+                    imgui.PopID();
                 }
             }
-            g->imgui.PopID();
+            imgui.PopID();
 
             if (params.size != 1 && param != Last(params)) {
-                auto const div_gap_x = editor::GetSize(g->imgui, UiSizeId::MenuItemDividerGapX);
-                auto const div_h = editor::GetSize(g->imgui, UiSizeId::MenuItemDividerH);
+                auto const div_gap_x = editor::GetSize(imgui, UiSizeId::MenuItemDividerGapX);
+                auto const div_h = editor::GetSize(imgui, UiSizeId::MenuItemDividerH);
 
                 Rect div_r = {div_gap_x, pos + (div_h / 2), item_width - 2 * div_gap_x, 1};
-                g->imgui.RegisterAndConvertRect(&div_r);
-                g->imgui.graphics->AddRectFilled(div_r.Min(), div_r.Max(), GMC(PopupItemDivider));
+                imgui.RegisterAndConvertRect(&div_r);
+                imgui.graphics->AddRectFilled(div_r.Min(), div_r.Max(), GMC(PopupItemDivider));
                 pos += div_h;
             }
         }
-        g->imgui.EndWindow();
+        imgui.EndWindow();
     }
 }
 
@@ -350,7 +351,7 @@ bool DoMultipleMenuItems(Gui* g,
                             {0, h * (f32)i, w, h},
                             state,
                             GetStr(items, i),
-                            buttons::MenuItem(true)))
+                            buttons::MenuItem(g->imgui, true)))
             clicked = i;
     }
     if (clicked != -1 && current != clicked) {
@@ -429,7 +430,7 @@ bool DoOverlayClickableBackground(Gui* g) {
     auto& imgui = g->imgui;
     auto invis_sets = FloeWindowSettings(imgui, [](IMGUI_DRAW_WINDOW_BG_ARGS) {
         auto r = window->unpadded_bounds;
-        s.graphics->AddRectFilled(r.Min(), r.Max(), GMC(SidePanelOverlay));
+        imgui.graphics->AddRectFilled(r.Min(), r.Max(), GMC(SidePanelOverlay));
     });
     imgui.BeginWindow(invis_sets, {0, 0, imgui.Width(), imgui.Height()}, "invisible");
     auto invis_window = imgui.CurrentWindow();
@@ -447,27 +448,33 @@ imgui::TextInputSettings GetParameterTextInputSettings() {
     imgui::TextInputSettings settings = imgui::DefTextInputDraggerInt().text_input_settings;
     settings.text_flags = {.centre_align = true};
     settings.draw = [](IMGUI_DRAW_TEXT_INPUT_ARGS) {
-        if (!s.TextInputHasFocus(id)) return;
+        if (!imgui.TextInputHasFocus(id)) return;
 
         auto const text_pos = result->GetTextPos();
-        auto const w = Max(r.w, draw::GetTextWidth(s.graphics->context->CurrentFont(), text));
-        Rect const background_r {r.CentreX() - w / 2, text_pos.y, w, s.graphics->context->CurrentFontSize()};
-        auto const rounding = editor::GetSize(s, UiSizeId::CornerRounding);
+        auto const w = Max(r.w, draw::GetTextWidth(imgui.graphics->context->CurrentFont(), text));
+        Rect const background_r {r.CentreX() - w / 2,
+                                 text_pos.y,
+                                 w,
+                                 imgui.graphics->context->CurrentFontSize()};
+        auto const rounding = editor::GetSize(imgui, UiSizeId::CornerRounding);
 
-        s.graphics->AddRectFilled(background_r.Min(), background_r.Max(), GMC(KnobTextInputBack), rounding);
-        s.graphics->AddRect(background_r.Min(), background_r.Max(), GMC(KnobTextInputBorder), rounding);
+        imgui.graphics->AddRectFilled(background_r.Min(),
+                                      background_r.Max(),
+                                      GMC(KnobTextInputBack),
+                                      rounding);
+        imgui.graphics->AddRect(background_r.Min(), background_r.Max(), GMC(KnobTextInputBorder), rounding);
 
         if (result->HasSelection()) {
             auto selection_r = result->GetSelectionRect();
-            s.graphics->AddRectFilled(selection_r.Min(), selection_r.Max(), GMC(TextInputSelection));
+            imgui.graphics->AddRectFilled(selection_r.Min(), selection_r.Max(), GMC(TextInputSelection));
         }
 
         if (result->show_cursor) {
             auto cursor_r = result->GetCursorRect();
-            s.graphics->AddRectFilled(cursor_r.Min(), cursor_r.Max(), GMC(TextInputCursor));
+            imgui.graphics->AddRectFilled(cursor_r.Min(), cursor_r.Max(), GMC(TextInputCursor));
         }
 
-        s.graphics->AddText(text_pos, GMC(TextInputText), text);
+        imgui.graphics->AddText(text_pos, GMC(TextInputText), text);
     };
 
     return settings;

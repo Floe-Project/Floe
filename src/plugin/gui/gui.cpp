@@ -763,7 +763,7 @@ void GUIUpdate(Gui* g) {
         auto r = window->unpadded_bounds;
         auto const top = GMC(TopPanelBackTop);
         auto const bot = GMC(TopPanelBackBot);
-        s.graphics->AddRectFilledMultiColor(r.Min(), r.Max(), top, top, bot, bot);
+        imgui.graphics->AddRectFilledMultiColor(r.Min(), r.Max(), top, top, bot, bot);
     };
     auto draw_mid_window = [&](IMGUI_DRAW_WINDOW_BG_ARGS) {
         bool has_image_bg = false;
@@ -778,23 +778,23 @@ void GUIUpdate(Gui* g) {
                 if (imgs.background) {
                     auto tex = g->gui_platform.graphics_ctx->GetTextureFromImage(*imgs.background);
                     if (tex) {
-                        s.graphics->AddImage(*tex,
-                                             r.Min(),
-                                             r.Max(),
-                                             {0, 0},
-                                             GetMaxUVToMaintainAspectRatio(*imgs.background, r.size));
+                        imgui.graphics->AddImage(*tex,
+                                                 r.Min(),
+                                                 r.Max(),
+                                                 {0, 0},
+                                                 GetMaxUVToMaintainAspectRatio(*imgs.background, r.size));
                         has_image_bg = true;
                     }
                 }
             }
         }
 
-        if (!has_image_bg) s.graphics->AddRectFilled(r.Min(), r.Max(), GMC(MidPanelBack));
-        s.graphics->AddLine(r.TopLeft(), r.TopRight(), GMC(MidPanelTopLine));
+        if (!has_image_bg) imgui.graphics->AddRectFilled(r.Min(), r.Max(), GMC(MidPanelBack));
+        imgui.graphics->AddLine(r.TopLeft(), r.TopRight(), GMC(MidPanelTopLine));
     };
     auto draw_bot_window = [](IMGUI_DRAW_WINDOW_BG_ARGS) {
         auto r = window->unpadded_bounds;
-        s.graphics->AddRectFilled(r.Min(), r.Max(), GMC(BotPanelBack));
+        imgui.graphics->AddRectFilled(r.Min(), r.Max(), GMC(BotPanelBack));
     };
 
     {

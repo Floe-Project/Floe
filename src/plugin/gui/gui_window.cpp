@@ -13,18 +13,18 @@ imgui::WindowSettings PopupWindowSettings(imgui::Context const& imgui) {
     res.pad_bottom_right = {1, rounding};
     res.draw_routine_popup_background = [rounding](IMGUI_DRAW_WINDOW_BG_ARGS) {
         auto r = window->unpadded_bounds;
-        draw::DropShadow(s, r, rounding);
-        s.graphics->AddRectFilled(r.Min(), r.Max(), GMC(PopupWindowBack), rounding);
-        s.graphics->AddRect(r.Min(), r.Max(), GMC(PopupWindowOutline), rounding);
+        draw::DropShadow(imgui, r, rounding);
+        imgui.graphics->AddRectFilled(r.Min(), r.Max(), GMC(PopupWindowBack), rounding);
+        imgui.graphics->AddRect(r.Min(), r.Max(), GMC(PopupWindowOutline), rounding);
     };
     res.draw_routine_scrollbar = [](IMGUI_DRAW_WINDOW_SCROLLBAR_ARGS) {
-        s.graphics->AddRectFilled(bounds.Min(), bounds.Max(), GMC(PopupScrollbarBack));
+        imgui.graphics->AddRectFilled(bounds.Min(), bounds.Max(), GMC(PopupScrollbarBack));
         uint32_t handle_col = GMC(PopupScrollbarHandle);
-        if (s.IsHotOrActive(id)) handle_col = GMC(PopupScrollbarHandleHover);
-        s.graphics->AddRectFilled(handle_rect.Min(),
-                                  handle_rect.Max(),
-                                  handle_col,
-                                  editor::GetSize(s, UiSizeId::CornerRounding));
+        if (imgui.IsHotOrActive(id)) handle_col = GMC(PopupScrollbarHandleHover);
+        imgui.graphics->AddRectFilled(handle_rect.Min(),
+                                      handle_rect.Max(),
+                                      handle_col,
+                                      editor::GetSize(imgui, UiSizeId::CornerRounding));
     };
     res.scrollbar_width = editor::GetSize(imgui, UiSizeId::ScrollbarWidth);
     return res;
@@ -51,14 +51,14 @@ FloeWindowSettings(imgui::Context const& imgui,
     wnd_settings.flags = imgui::WindowFlags_NoScrollbarX;
     wnd_settings.scrollbar_width = editor::GetSize(imgui, UiSizeId::ScrollbarWidth);
     wnd_settings.draw_routine_scrollbar = [](IMGUI_DRAW_WINDOW_SCROLLBAR_ARGS) {
-        auto const rounding = editor::GetSize(s, UiSizeId::CornerRounding);
-        s.graphics->AddRectFilled(bounds.Min(), bounds.Max(), GMC(ScrollbarBack), rounding);
+        auto const rounding = editor::GetSize(imgui, UiSizeId::CornerRounding);
+        imgui.graphics->AddRectFilled(bounds.Min(), bounds.Max(), GMC(ScrollbarBack), rounding);
         uint32_t handle_col = GMC(ScrollbarHandle);
-        if (s.IsHot(id))
+        if (imgui.IsHot(id))
             handle_col = GMC(ScrollbarHandleHover);
-        else if (s.IsActive(id))
+        else if (imgui.IsActive(id))
             handle_col = GMC(ScrollbarHandleActive);
-        s.graphics->AddRectFilled(handle_rect.Min(), handle_rect.Max(), handle_col, rounding);
+        imgui.graphics->AddRectFilled(handle_rect.Min(), handle_rect.Max(), handle_col, rounding);
     };
     return wnd_settings;
 }

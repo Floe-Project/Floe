@@ -51,12 +51,12 @@ void BotPanel(Gui* g) {
     ;
     auto dn_id = imgui.GetID("Dn");
     auto& settings = g->settings.settings.gui;
-    if (buttons::Button(g, up_id, oct_up_r, ICON_FA_CARET_UP, buttons::IconButton())) {
+    if (buttons::Button(g, up_id, oct_up_r, ICON_FA_CARET_UP, buttons::IconButton(imgui))) {
         int const new_octave = Min(settings.keyboard_octave + 1, k_octave_highest);
         settings.keyboard_octave = new_octave;
         g->settings.tracking.changed = true;
     }
-    if (buttons::Button(g, dn_id, oct_dn_r, ICON_FA_CARET_DOWN, buttons::IconButton())) {
+    if (buttons::Button(g, dn_id, oct_dn_r, ICON_FA_CARET_DOWN, buttons::IconButton(imgui))) {
         int const new_octave = Max(settings.keyboard_octave - 1, k_octave_lowest);
         settings.keyboard_octave = new_octave;
         g->settings.tracking.changed = true;
@@ -71,7 +71,7 @@ void BotPanel(Gui* g) {
                           k_octave_lowest,
                           k_octave_highest,
                           settings.keyboard_octave,
-                          draggers::DefaultStyle().WithNoBackground().WithSensitivity(500))) {
+                          draggers::DefaultStyle(imgui).WithNoBackground().WithSensitivity(500))) {
         g->settings.tracking.changed = true;
     }
     Tooltip(g, oct_text_id, oct_text_r, "GUI Keyboard Octave - Double Click To Edit"_s);

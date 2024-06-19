@@ -10,13 +10,13 @@
 
 namespace draggers {
 
-Style DefaultStyle() {
+Style DefaultStyle(imgui::Context const& imgui) {
     Style s {};
     s.background = GMC(Dragger1Back);
     s.text = GMC(TextInputText);
     s.selection_back = GMC(TextInputSelection);
     s.cursor = GMC(TextInputCursor);
-    s.button_style = buttons::IconButton();
+    s.button_style = buttons::IconButton(imgui);
     return s;
 }
 
@@ -29,15 +29,15 @@ bool Dragger(Gui* g, imgui::Id id, Rect r, int min, int max, int& value, Style c
     settings.text_input_settings.draw = [&style](IMGUI_DRAW_TEXT_INPUT_ARGS) {
         if (result->HasSelection()) {
             auto selection_r = result->GetSelectionRect();
-            s.graphics->AddRectFilled(selection_r.Min(), selection_r.Max(), style.selection_back);
+            imgui.graphics->AddRectFilled(selection_r.Min(), selection_r.Max(), style.selection_back);
         }
 
         if (result->show_cursor) {
             auto cursor_r = result->GetCursorRect();
-            s.graphics->AddRectFilled(cursor_r.Min(), cursor_r.Max(), style.cursor);
+            imgui.graphics->AddRectFilled(cursor_r.Min(), cursor_r.Max(), style.cursor);
         }
 
-        s.graphics->AddText(result->GetTextPos(), style.text, text);
+        imgui.graphics->AddText(result->GetTextPos(), style.text, text);
     };
     settings.text_input_settings.text_flags.centre_align = true;
     return g->imgui.TextInputDraggerInt(settings, r, id, min, max, value);

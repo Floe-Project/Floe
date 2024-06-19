@@ -67,7 +67,9 @@ static void StandalonePopupHeading(Gui* g,
 }
 
 bool DoStandaloneCloseButton(Gui* g) {
-    if (DoCloseButtonForCurrentWindow(g, "Close this window", buttons::BrowserIconButton().WithLargeIcon())) {
+    if (DoCloseButtonForCurrentWindow(g,
+                                      "Close this window",
+                                      buttons::BrowserIconButton(g->imgui).WithLargeIcon())) {
         g->imgui.CloseTopPopupOnly();
         return true;
     }
@@ -159,7 +161,7 @@ void DoErrorsStandalone(Gui* g) {
 
     if (imgui.BeginWindowPopup(settings, GetStandaloneID(StandaloneWindowsLoadError), r, "ErrorModal")) {
         f32 y_pos = 0;
-        auto text_style = labels::ErrorWindowLabel();
+        auto text_style = labels::ErrorWindowLabel(imgui);
 
         // title
         StandalonePopupHeading(g, y_pos, "Errors");
@@ -221,17 +223,17 @@ void DoErrorsStandalone(Gui* g) {
                         auto btn_sets = imgui::DefButton();
                         btn_sets.draw = [](IMGUI_DRAW_BUTTON_ARGS) {
                             auto col = GMC(ErrorWindowButtonBack);
-                            if (s.IsHot(id)) col = GMC(ErrorWindowButtonBackHover);
-                            if (s.IsActive(id)) col = GMC(ErrorWindowButtonBackActive);
-                            auto const rounding = editor::GetSize(s, UiSizeId::CornerRounding);
-                            s.graphics->AddRectFilled(r.Min(), r.Max(), col, rounding);
+                            if (imgui.IsHot(id)) col = GMC(ErrorWindowButtonBackHover);
+                            if (imgui.IsActive(id)) col = GMC(ErrorWindowButtonBackActive);
+                            auto const rounding = editor::GetSize(imgui, UiSizeId::CornerRounding);
+                            imgui.graphics->AddRectFilled(r.Min(), r.Max(), col, rounding);
 
                             auto text_r = r;
                             text_r.x += text_r.h * 0.2f;
-                            s.graphics->AddTextJustified(text_r,
-                                                         str,
-                                                         GMC(ErrorWindowButtonText),
-                                                         TextJustification::CentredLeft);
+                            imgui.graphics->AddTextJustified(text_r,
+                                                             str,
+                                                             GMC(ErrorWindowButtonText),
+                                                             TextJustification::CentredLeft);
                         };
 
                         bool button_added = false;
@@ -440,11 +442,12 @@ void DoSettingsStandalone(Gui* g) {
         StandalonePopupHeading(g, y_pos, "Settings");
         DoStandaloneCloseButton(g);
 
-        auto subwindow_settings = FloeWindowSettings(imgui, [](imgui::Context const& s, imgui::Window* w) {
-            s.graphics->AddRectFilled(w->unpadded_bounds.Min(),
-                                      w->unpadded_bounds.Max(),
-                                      GMC(PopupWindowBack));
-        });
+        auto subwindow_settings =
+            FloeWindowSettings(imgui, [](imgui::Context const& imgui, imgui::Window* w) {
+                imgui.graphics->AddRectFilled(w->unpadded_bounds.Min(),
+                                              w->unpadded_bounds.Max(),
+                                              GMC(PopupWindowBack));
+            });
         subwindow_settings.draw_routine_scrollbar = settings.draw_routine_scrollbar;
         imgui.BeginWindow(subwindow_settings, {0, y_pos, imgui.Width(), imgui.Height() - y_pos}, "inner");
         DEFER { imgui.EndWindow(); };
@@ -464,7 +467,7 @@ void DoSettingsStandalone(Gui* g) {
                                 {left_col_width, y_pos, right_col_width, line_height},
                                 state,
                                 title,
-                                buttons::SettingsWindowButton())) {
+                                buttons::SettingsWindowButton(imgui))) {
                 g->settings.tracking.changed = true;
                 result = true;
             }
@@ -740,7 +743,7 @@ void DoLicencesStandalone(Gui* g) {
                                                  {0, y_pos, imgui.Width(), h},
                                                  state,
                                                  txt.name,
-                                                 buttons::LicencesFoldButton());
+                                                 buttons::LicencesFoldButton(imgui));
             if (changed) {
                 open[i] = !open[i];
                 for (auto const j : Range((int)ArraySize(k_third_party_licence_texts))) {

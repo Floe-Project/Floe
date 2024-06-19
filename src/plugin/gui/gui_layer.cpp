@@ -85,7 +85,7 @@ static void DoInstSelectorGUI(Gui* g, Rect r, u32 layer) {
     auto layer_obj = &plugin.layers[layer];
     auto const inst_name = layer_obj->InstName();
 
-    if (buttons::Popup(g, imgui_id, imgui_id + 1, r, inst_name, buttons::InstSelectorPopupButton())) {
+    if (buttons::Popup(g, imgui_id, imgui_id + 1, r, inst_name, buttons::InstSelectorPopupButton(imgui))) {
         LayerInstrumentMenuItems(g, layer_obj);
         imgui.EndWindow();
     }
@@ -427,12 +427,12 @@ void Layout(Gui* g,
     }
 }
 
-static void DrawSelectorProgressBar(imgui::Context const& s, Rect r, f32 load_percent) {
+static void DrawSelectorProgressBar(imgui::Context const& imgui, Rect r, f32 load_percent) {
     auto min = r.Min();
     auto max = f32x2 {r.x + Max(4.0f, r.w * load_percent), r.Bottom()};
     auto col = GMC(LayerSelectorMenuLoading);
-    auto const rounding = editor::GetSize(s, UiSizeId::CornerRounding);
-    s.graphics->AddRectFilled(min, max, col, rounding);
+    auto const rounding = editor::GetSize(imgui, UiSizeId::CornerRounding);
+    imgui.graphics->AddRectFilled(min, max, col, rounding);
 }
 
 void Draw(Gui* g,
@@ -479,26 +479,26 @@ void Draw(Gui* g,
                     f32x2 min_uv;
                     f32x2 max_uv;
                     get_background_uvs(imgs, r, window, min_uv, max_uv);
-                    s.graphics->AddImageRounded(*tex,
-                                                r.Min(),
-                                                r.Max(),
-                                                min_uv,
-                                                max_uv,
-                                                GMC(BlurredImageDrawColour),
-                                                panel_rounding);
+                    imgui.graphics->AddImageRounded(*tex,
+                                                    r.Min(),
+                                                    r.Max(),
+                                                    min_uv,
+                                                    max_uv,
+                                                    GMC(BlurredImageDrawColour),
+                                                    panel_rounding);
                 }
 
                 {
-                    int const vtx_idx_0 = s.graphics->vtx_buffer.size;
+                    int const vtx_idx_0 = imgui.graphics->vtx_buffer.size;
                     auto const pos = r.Min() + f32x2 {1, 1};
                     auto const size = f32x2 {r.w, r.h / 2} - f32x2 {2, 2};
-                    s.graphics->AddRectFilled(pos, pos + size, 0xffffffff, panel_rounding);
-                    int const vtx_idx_1 = s.graphics->vtx_buffer.size;
-                    s.graphics->AddRectFilled(pos, pos + size, 0xffffffff, panel_rounding);
-                    int const vtx_idx_2 = s.graphics->vtx_buffer.size;
+                    imgui.graphics->AddRectFilled(pos, pos + size, 0xffffffff, panel_rounding);
+                    int const vtx_idx_1 = imgui.graphics->vtx_buffer.size;
+                    imgui.graphics->AddRectFilled(pos, pos + size, 0xffffffff, panel_rounding);
+                    int const vtx_idx_2 = imgui.graphics->vtx_buffer.size;
 
                     graphics::DrawList::ShadeVertsLinearColorGradientSetAlpha(
-                        s.graphics,
+                        imgui.graphics,
                         vtx_idx_0,
                         vtx_idx_1,
                         pos,
@@ -506,7 +506,7 @@ void Draw(Gui* g,
                         GMC(BlurredImageGradientOverlay),
                         0);
                     graphics::DrawList::ShadeVertsLinearColorGradientSetAlpha(
-                        s.graphics,
+                        imgui.graphics,
                         vtx_idx_1,
                         vtx_idx_2,
                         pos + f32x2 {size.x, 0},
@@ -515,7 +515,7 @@ void Draw(Gui* g,
                         0);
                 }
 
-                s.graphics->AddRect(r.Min(), r.Max(), GMC(BlurredImageBorder), panel_rounding);
+                imgui.graphics->AddRect(r.Min(), r.Max(), GMC(BlurredImageBorder), panel_rounding);
             }
         }
     });
@@ -573,13 +573,17 @@ void Draw(Gui* g,
             g->imgui.RedrawAtIntervalSeconds(g->redraw_counter, 0.1);
         }
 
-        if (buttons::Button(g, selector_left_id, selector_left_r, ICON_FA_CARET_LEFT, buttons::IconButton()))
+        if (buttons::Button(g,
+                            selector_left_id,
+                            selector_left_r,
+                            ICON_FA_CARET_LEFT,
+                            buttons::IconButton(imgui)))
             CycleInstrument(*plugin, layer->index, CycleDirection::Backward);
         if (buttons::Button(g,
                             selector_right_id,
                             selector_right_r,
                             ICON_FA_CARET_RIGHT,
-                            buttons::IconButton())) {
+                            buttons::IconButton(imgui))) {
             CycleInstrument(*plugin, layer->index, CycleDirection::Forward);
         }
         {
@@ -589,7 +593,7 @@ void Draw(Gui* g,
                                 rand_id,
                                 rand_r,
                                 ICON_FA_RANDOM,
-                                buttons::IconButton().WithRandomiseIconScaling())) {
+                                buttons::IconButton(imgui).WithRandomiseIconScaling())) {
                 LoadRandomInstrument(*plugin, layer->index, false);
             }
             Tooltip(g, rand_id, rand_r, "Load a random instrument"_s);
@@ -629,7 +633,7 @@ void Draw(Gui* g,
                      layer->processor.params[ToInt(LayerParamIndex::Volume)],
                      volume_knob_r,
                      volume_name_r,
-                     knobs::DefaultKnob());
+                     knobs::DefaultKnob(imgui));
     }
 
     // mute and solo
@@ -655,17 +659,17 @@ void Draw(Gui* g,
                         layer->processor.params[ToInt(LayerParamIndex::Mute)],
                         mute_r,
                         "M",
-                        buttons::IconButton());
+                        buttons::IconButton(imgui));
         buttons::Toggle(g,
                         layer->processor.params[ToInt(LayerParamIndex::Solo)],
                         solo_r,
                         "S",
-                        buttons::IconButton());
+                        buttons::IconButton(imgui));
     }
 
     // knobs
     {
-        auto semitone_style = draggers::DefaultStyle();
+        auto semitone_style = draggers::DefaultStyle(imgui);
         semitone_style.always_show_plus = true;
         draggers::Dragger(g,
                           layer->processor.params[ToInt(LayerParamIndex::TuneSemitone)],
@@ -674,16 +678,16 @@ void Draw(Gui* g,
         labels::Label(g,
                       layer->processor.params[ToInt(LayerParamIndex::TuneSemitone)],
                       c.knob1.label,
-                      labels::ParameterCentred());
+                      labels::ParameterCentred(imgui));
 
         KnobAndLabel(g,
                      layer->processor.params[ToInt(LayerParamIndex::TuneCents)],
                      c.knob2,
-                     knobs::BidirectionalKnob());
+                     knobs::BidirectionalKnob(imgui));
         KnobAndLabel(g,
                      layer->processor.params[ToInt(LayerParamIndex::Pan)],
                      c.knob3,
-                     knobs::BidirectionalKnob());
+                     knobs::BidirectionalKnob(imgui));
     }
 
     draw_divider(c.divider2);
@@ -698,12 +702,12 @@ void Draw(Gui* g,
                 buttons::Toggle(g,
                                 layer->processor.params[ToInt(LayerParamIndex::Reverse)],
                                 c.main.reverse,
-                                buttons::ParameterToggleButton());
+                                buttons::ParameterToggleButton(imgui));
 
                 buttons::PopupWithItems(g,
                                         layer->processor.params[ToInt(LayerParamIndex::LoopMode)],
                                         c.main.loop_mode,
-                                        buttons::ParameterPopupButton());
+                                        buttons::ParameterPopupButton(imgui));
             }
 
             draw_divider(c.main.divider);
@@ -713,7 +717,7 @@ void Draw(Gui* g,
                 buttons::Toggle(g,
                                 layer->processor.params[ToInt(LayerParamIndex::VolEnvOn)],
                                 c.main.env_on,
-                                buttons::LayerHeadingButton());
+                                buttons::LayerHeadingButton(imgui));
                 bool const env_on = layer->processor.params[ToInt(LayerParamIndex::VolEnvOn)].ValueAsBool();
                 GUIDoEnvelope(g,
                               layer,
@@ -733,27 +737,27 @@ void Draw(Gui* g,
             buttons::Toggle(g,
                             layer->processor.params[ToInt(LayerParamIndex::FilterOn)],
                             c.filter.filter_on,
-                            buttons::LayerHeadingButton());
+                            buttons::LayerHeadingButton(imgui));
 
             buttons::PopupWithItems(g,
                                     layer->processor.params[ToInt(LayerParamIndex::FilterType)],
                                     c.filter.filter_type,
-                                    buttons::ParameterPopupButton(greyed_out));
+                                    buttons::ParameterPopupButton(imgui, greyed_out));
 
             KnobAndLabel(g,
                          layer->processor.params[ToInt(LayerParamIndex::FilterCutoff)],
                          c.filter.cutoff,
-                         knobs::DefaultKnob(),
+                         knobs::DefaultKnob(imgui),
                          greyed_out);
             KnobAndLabel(g,
                          layer->processor.params[ToInt(LayerParamIndex::FilterResonance)],
                          c.filter.reso,
-                         knobs::DefaultKnob(),
+                         knobs::DefaultKnob(imgui),
                          greyed_out);
             KnobAndLabel(g,
                          layer->processor.params[ToInt(LayerParamIndex::FilterEnvAmount)],
                          c.filter.env_amount,
-                         knobs::BidirectionalKnob(),
+                         knobs::BidirectionalKnob(imgui),
                          greyed_out);
 
             GUIDoEnvelope(
@@ -775,48 +779,48 @@ void Draw(Gui* g,
             buttons::Toggle(g,
                             layer->processor.params[ToInt(LayerParamIndex::EqOn)],
                             lay.GetRect(c.eq.on),
-                            buttons::LayerHeadingButton());
+                            buttons::LayerHeadingButton(imgui));
 
             buttons::PopupWithItems(g,
                                     layer->processor.params[ToInt(LayerParamIndex::EqType1)],
                                     lay.GetRect(c.eq.type[0]),
-                                    buttons::ParameterPopupButton(greyed_out));
+                                    buttons::ParameterPopupButton(imgui, greyed_out));
 
             KnobAndLabel(g,
                          layer->processor.params[ToInt(LayerParamIndex::EqFreq1)],
                          c.eq.freq[0],
-                         knobs::DefaultKnob(),
+                         knobs::DefaultKnob(imgui),
                          greyed_out);
             KnobAndLabel(g,
                          layer->processor.params[ToInt(LayerParamIndex::EqResonance1)],
                          c.eq.reso[0],
-                         knobs::DefaultKnob(),
+                         knobs::DefaultKnob(imgui),
                          greyed_out);
             KnobAndLabel(g,
                          layer->processor.params[ToInt(LayerParamIndex::EqGain1)],
                          c.eq.gain[0],
-                         knobs::BidirectionalKnob(),
+                         knobs::BidirectionalKnob(imgui),
                          greyed_out);
 
             buttons::PopupWithItems(g,
                                     layer->processor.params[ToInt(LayerParamIndex::EqType2)],
                                     lay.GetRect(c.eq.type[1]),
-                                    buttons::ParameterPopupButton(greyed_out));
+                                    buttons::ParameterPopupButton(imgui, greyed_out));
 
             KnobAndLabel(g,
                          layer->processor.params[ToInt(LayerParamIndex::EqFreq2)],
                          c.eq.freq[1],
-                         knobs::DefaultKnob(),
+                         knobs::DefaultKnob(imgui),
                          greyed_out);
             KnobAndLabel(g,
                          layer->processor.params[ToInt(LayerParamIndex::EqResonance2)],
                          c.eq.reso[1],
-                         knobs::DefaultKnob(),
+                         knobs::DefaultKnob(imgui),
                          greyed_out);
             KnobAndLabel(g,
                          layer->processor.params[ToInt(LayerParamIndex::EqGain2)],
                          c.eq.gain[1],
-                         knobs::BidirectionalKnob(),
+                         knobs::BidirectionalKnob(imgui),
                          greyed_out);
 
             break;
@@ -825,11 +829,11 @@ void Draw(Gui* g,
             draggers::Dragger(g,
                               layer->processor.params[ToInt(LayerParamIndex::MidiTranspose)],
                               c.midi.transpose,
-                              draggers::DefaultStyle());
+                              draggers::DefaultStyle(imgui));
             labels::Label(g,
                           layer->processor.params[ToInt(LayerParamIndex::MidiTranspose)],
                           c.midi.transpose_name,
-                          labels::Parameter());
+                          labels::Parameter(imgui));
             {
                 auto const label_id = imgui.GetID("transp");
                 auto const label_r = lay.GetRect(c.midi.transpose_name);
@@ -845,15 +849,15 @@ void Draw(Gui* g,
             buttons::Toggle(g,
                             layer->processor.params[ToInt(LayerParamIndex::Keytrack)],
                             c.midi.keytrack,
-                            buttons::MidiButton());
+                            buttons::MidiButton(imgui));
             buttons::Toggle(g,
                             layer->processor.params[ToInt(LayerParamIndex::Monophonic)],
                             c.midi.mono,
-                            buttons::MidiButton());
+                            buttons::MidiButton(imgui));
             buttons::Toggle(g,
                             layer->processor.params[ToInt(LayerParamIndex::CC64Retrigger)],
                             c.midi.retrig,
-                            buttons::MidiButton());
+                            buttons::MidiButton(imgui));
 
             {
                 static constexpr auto k_num_btns = ToInt(param_values::VelocityMappingMode::Count);
@@ -880,7 +884,7 @@ void Draw(Gui* g,
                             btn_r,
                             state,
                             "",
-                            buttons::VelocityButton((param_values::VelocityMappingMode)btn_ind))) {
+                            buttons::VelocityButton(imgui, (param_values::VelocityMappingMode)btn_ind))) {
                         auto velo_param_id =
                             ParamIndexFromLayerParamIndex(layer->index, LayerParamIndex::VelocityMapping);
                         SetParameterValue(g->plugin.processor, velo_param_id, (f32)btn_ind, {});
@@ -892,7 +896,7 @@ void Draw(Gui* g,
                 labels::Label(g,
                               layer->processor.params[ToInt(LayerParamIndex::VelocityMapping)],
                               c.midi.velo_name,
-                              labels::Parameter());
+                              labels::Parameter(imgui));
 
                 auto const label_id = imgui.GetID("velobtn");
                 auto const label_r = lay.GetRect(c.midi.velo_name);
@@ -914,40 +918,40 @@ void Draw(Gui* g,
             buttons::Toggle(g,
                             layer->processor.params[ToInt(LayerParamIndex::LfoOn)],
                             c.lfo.on,
-                            buttons::LayerHeadingButton());
+                            buttons::LayerHeadingButton(imgui));
             auto const greyed_out = !layer->processor.params[ToInt(LayerParamIndex::LfoOn)].ValueAsBool();
 
             buttons::PopupWithItems(g,
                                     layer->processor.params[ToInt(LayerParamIndex::LfoDestination)],
                                     c.lfo.target,
-                                    buttons::ParameterPopupButton(greyed_out));
+                                    buttons::ParameterPopupButton(imgui, greyed_out));
             labels::Label(g,
                           layer->processor.params[ToInt(LayerParamIndex::LfoDestination)],
                           c.lfo.target_name,
-                          labels::Parameter());
+                          labels::Parameter(imgui));
 
             buttons::PopupWithItems(g,
                                     layer->processor.params[ToInt(LayerParamIndex::LfoRestart)],
                                     c.lfo.mode,
-                                    buttons::ParameterPopupButton(greyed_out));
+                                    buttons::ParameterPopupButton(imgui, greyed_out));
             labels::Label(g,
                           layer->processor.params[ToInt(LayerParamIndex::LfoRestart)],
                           c.lfo.mode_name,
-                          labels::Parameter());
+                          labels::Parameter(imgui));
 
             buttons::PopupWithItems(g,
                                     layer->processor.params[ToInt(LayerParamIndex::LfoShape)],
                                     c.lfo.shape,
-                                    buttons::ParameterPopupButton(greyed_out));
+                                    buttons::ParameterPopupButton(imgui, greyed_out));
             labels::Label(g,
                           layer->processor.params[ToInt(LayerParamIndex::LfoShape)],
                           c.lfo.shape_name,
-                          labels::Parameter());
+                          labels::Parameter(imgui));
 
             KnobAndLabel(g,
                          layer->processor.params[ToInt(LayerParamIndex::LfoAmount)],
                          c.lfo.amount,
-                         knobs::BidirectionalKnob(),
+                         knobs::BidirectionalKnob(imgui),
                          greyed_out);
 
             Parameter const* rate_param;
@@ -956,14 +960,17 @@ void Draw(Gui* g,
                 buttons::PopupWithItems(g,
                                         *rate_param,
                                         c.lfo.rate.control,
-                                        buttons::ParameterPopupButton(greyed_out));
+                                        buttons::ParameterPopupButton(imgui, greyed_out));
             } else {
                 rate_param = &layer->processor.params[ToInt(LayerParamIndex::LfoRateHz)];
-                knobs::Knob(g, *rate_param, c.lfo.rate.control, knobs::DefaultKnob().GreyedOut(greyed_out));
+                knobs::Knob(g,
+                            *rate_param,
+                            c.lfo.rate.control,
+                            knobs::DefaultKnob(imgui).GreyedOut(greyed_out));
             }
 
             auto const rate_name_r = lay.GetRect(c.lfo.rate.label);
-            labels::Label(g, *rate_param, rate_name_r, labels::ParameterCentred(greyed_out));
+            labels::Label(g, *rate_param, rate_name_r, labels::ParameterCentred(imgui, greyed_out));
 
             Rect const sync_r {rate_name_r.x + rate_name_r.w / 2 - LFO_SyncSwitchWidth / 2,
                                rate_name_r.Bottom() + LFO_SyncSwitchGapY,
@@ -972,7 +979,7 @@ void Draw(Gui* g,
             buttons::Toggle(g,
                             layer->processor.params[ToInt(LayerParamIndex::LfoSyncSwitch)],
                             sync_r,
-                            buttons::ParameterToggleButton());
+                            buttons::ParameterToggleButton(imgui));
 
             break;
         }
@@ -992,7 +999,7 @@ void Draw(Gui* g,
                               layer->processor.params[ToInt(LayerParamIndex::LfoOn)].ValueAsBool()) ||
                              (page_type == PageType::Eq &&
                               layer->processor.params[ToInt(LayerParamIndex::EqOn)].ValueAsBool());
-        if (buttons::Toggle(g, id, tab_r, state, name, buttons::LayerTabButton(has_dot)))
+        if (buttons::Toggle(g, id, tab_r, state, name, buttons::LayerTabButton(imgui, has_dot)))
             layer_gui->selected_page = page_type;
         Tooltip(g, id, tab_r, fmt::Format(g->scratch_arena, "Open {} tab", name));
     }

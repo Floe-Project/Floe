@@ -32,7 +32,7 @@ struct Style {
     buttons::Style button_style;
 };
 
-Style DefaultStyle();
+Style DefaultStyle(imgui::Context const& imgui);
 
 bool Dragger(Gui* g, imgui::Id id, Rect r, int min, int max, int& value, Style const& style);
 bool Dragger(Gui* g, Parameter const& param, Rect r, Style const& style);

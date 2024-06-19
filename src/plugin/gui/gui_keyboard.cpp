@@ -55,7 +55,7 @@ Optional<KeyboardGuiKeyPressed> KeyboardGui(Gui* g, Rect r, int starting_octave)
     auto overlay_key = [&](int key, Rect key_rect, UiColMap col_index) {
         auto const num_active_voices = voices_per_midi_note[(usize)key].Load();
         if (num_active_voices != 0) {
-            auto overlay = colours::FromU32(editor::GetCol(col_index));
+            auto overlay = colours::FromU32(editor::GetCol(imgui, col_index));
             overlay.a = (uint8_t)Min(255, overlay.a + 40 * num_active_voices);
             auto overlay_u32 = colours::ToU32(overlay);
             imgui.graphics->AddRectFilled(key_rect.Min(),

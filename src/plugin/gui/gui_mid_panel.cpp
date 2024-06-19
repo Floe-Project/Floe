@@ -37,7 +37,11 @@ void MidPanel(Gui* g) {
         auto const size = editor::GetSize(imgui, UiSizeId::LayerSelectorButtonW);
         Rect const btn_r {imgui.Width() - (size + margin), 0, size, mid_panel_title_height};
         auto const id = imgui.GetID("rand");
-        if (buttons::Button(g, id, btn_r, ICON_FA_RANDOM, buttons::IconButton().WithRandomiseIconScaling()))
+        if (buttons::Button(g,
+                            id,
+                            btn_r,
+                            ICON_FA_RANDOM,
+                            buttons::IconButton(imgui).WithRandomiseIconScaling()))
             return true;
         Tooltip(g, id, btn_r, tooltip);
         return false;
@@ -62,31 +66,31 @@ void MidPanel(Gui* g) {
                             f32x2 min_uv;
                             f32x2 max_uv;
                             get_background_uvs(imgs, r, window, min_uv, max_uv);
-                            s.graphics->AddImageRounded(*tex,
-                                                        r.Min(),
-                                                        r.Max(),
-                                                        min_uv,
-                                                        max_uv,
-                                                        GMC(BlurredImageDrawColour),
-                                                        panel_rounding);
+                            imgui.graphics->AddImageRounded(*tex,
+                                                            r.Min(),
+                                                            r.Max(),
+                                                            min_uv,
+                                                            max_uv,
+                                                            GMC(BlurredImageDrawColour),
+                                                            panel_rounding);
                         } else {
-                            s.graphics->AddRectFilled(r.Min(),
-                                                      r.Max(),
-                                                      GMC(BlurredImageFallback),
-                                                      panel_rounding);
+                            imgui.graphics->AddRectFilled(r.Min(),
+                                                          r.Max(),
+                                                          GMC(BlurredImageFallback),
+                                                          panel_rounding);
                         }
 
                         {
-                            int const vtx_idx_0 = s.graphics->vtx_buffer.size;
+                            int const vtx_idx_0 = imgui.graphics->vtx_buffer.size;
                             auto const pos = r.Min() + f32x2 {1, 1};
                             auto const size = f32x2 {r.w, r.h / 2} - f32x2 {2, 2};
-                            s.graphics->AddRectFilled(pos, pos + size, 0xffffffff, panel_rounding);
-                            int const vtx_idx_1 = s.graphics->vtx_buffer.size;
-                            s.graphics->AddRectFilled(pos, pos + size, 0xffffffff, panel_rounding);
-                            int const vtx_idx_2 = s.graphics->vtx_buffer.size;
+                            imgui.graphics->AddRectFilled(pos, pos + size, 0xffffffff, panel_rounding);
+                            int const vtx_idx_1 = imgui.graphics->vtx_buffer.size;
+                            imgui.graphics->AddRectFilled(pos, pos + size, 0xffffffff, panel_rounding);
+                            int const vtx_idx_2 = imgui.graphics->vtx_buffer.size;
 
                             graphics::DrawList::ShadeVertsLinearColorGradientSetAlpha(
-                                s.graphics,
+                                imgui.graphics,
                                 vtx_idx_0,
                                 vtx_idx_1,
                                 pos,
@@ -94,7 +98,7 @@ void MidPanel(Gui* g) {
                                 GMC(BlurredImageGradientOverlay),
                                 0);
                             graphics::DrawList::ShadeVertsLinearColorGradientSetAlpha(
-                                s.graphics,
+                                imgui.graphics,
                                 vtx_idx_1,
                                 vtx_idx_2,
                                 pos + f32x2 {size.x, 0},
@@ -103,16 +107,16 @@ void MidPanel(Gui* g) {
                                 0);
                         }
 
-                        s.graphics->AddRect(r.Min(), r.Max(), GMC(BlurredImageBorder), panel_rounding);
+                        imgui.graphics->AddRect(r.Min(), r.Max(), GMC(BlurredImageBorder), panel_rounding);
 
-                        s.graphics->AddLine({r.x, r.y + mid_panel_title_height},
-                                            {r.Right(), r.y + mid_panel_title_height},
-                                            GMC(LayerDividerLine));
+                        imgui.graphics->AddLine({r.x, r.y + mid_panel_title_height},
+                                                {r.Right(), r.y + mid_panel_title_height},
+                                                GMC(LayerDividerLine));
                         for (u32 i = 1; i < k_num_layers; ++i) {
                             auto const x_pos = r.x + (f32)i * (r.w / k_num_layers);
-                            s.graphics->AddLine({x_pos, r.y + mid_panel_title_height},
-                                                {x_pos, r.Bottom()},
-                                                GMC(LayerDividerLine));
+                            imgui.graphics->AddLine({x_pos, r.y + mid_panel_title_height},
+                                                    {x_pos, r.Bottom()},
+                                                    GMC(LayerDividerLine));
                         }
                     }
                 }
@@ -184,31 +188,31 @@ void MidPanel(Gui* g) {
                             f32x2 min_uv;
                             f32x2 max_uv;
                             get_background_uvs(imgs, r, window, min_uv, max_uv);
-                            s.graphics->AddImageRounded(*tex,
-                                                        r.Min(),
-                                                        r.Max(),
-                                                        min_uv,
-                                                        max_uv,
-                                                        GMC(BlurredImageDrawColour),
-                                                        panel_rounding);
+                            imgui.graphics->AddImageRounded(*tex,
+                                                            r.Min(),
+                                                            r.Max(),
+                                                            min_uv,
+                                                            max_uv,
+                                                            GMC(BlurredImageDrawColour),
+                                                            panel_rounding);
                         } else {
-                            s.graphics->AddRectFilled(r.Min(),
-                                                      r.Max(),
-                                                      GMC(BlurredImageFallback),
-                                                      panel_rounding);
+                            imgui.graphics->AddRectFilled(r.Min(),
+                                                          r.Max(),
+                                                          GMC(BlurredImageFallback),
+                                                          panel_rounding);
                         }
 
                         {
-                            int const vtx_idx_0 = s.graphics->vtx_buffer.size;
+                            int const vtx_idx_0 = imgui.graphics->vtx_buffer.size;
                             auto const pos = r.Min() + f32x2 {1, 1};
                             auto const size = f32x2 {r.w, r.h / 2} - f32x2 {2, 2};
-                            s.graphics->AddRectFilled(pos, pos + size, 0xffffffff, panel_rounding);
-                            int const vtx_idx_1 = s.graphics->vtx_buffer.size;
-                            s.graphics->AddRectFilled(pos, pos + size, 0xffffffff, panel_rounding);
-                            int const vtx_idx_2 = s.graphics->vtx_buffer.size;
+                            imgui.graphics->AddRectFilled(pos, pos + size, 0xffffffff, panel_rounding);
+                            int const vtx_idx_1 = imgui.graphics->vtx_buffer.size;
+                            imgui.graphics->AddRectFilled(pos, pos + size, 0xffffffff, panel_rounding);
+                            int const vtx_idx_2 = imgui.graphics->vtx_buffer.size;
 
                             graphics::DrawList::ShadeVertsLinearColorGradientSetAlpha(
-                                s.graphics,
+                                imgui.graphics,
                                 vtx_idx_0,
                                 vtx_idx_1,
                                 pos,
@@ -216,7 +220,7 @@ void MidPanel(Gui* g) {
                                 GMC(BlurredImageGradientOverlay),
                                 0);
                             graphics::DrawList::ShadeVertsLinearColorGradientSetAlpha(
-                                s.graphics,
+                                imgui.graphics,
                                 vtx_idx_1,
                                 vtx_idx_2,
                                 pos + f32x2 {size.x, 0},
@@ -225,11 +229,11 @@ void MidPanel(Gui* g) {
                                 0);
                         }
 
-                        s.graphics->AddRect(r.Min(), r.Max(), GMC(BlurredImageBorder), panel_rounding);
+                        imgui.graphics->AddRect(r.Min(), r.Max(), GMC(BlurredImageBorder), panel_rounding);
 
-                        s.graphics->AddLine({r.x, r.y + mid_panel_title_height},
-                                            {r.Right(), r.y + mid_panel_title_height},
-                                            GMC(LayerDividerLine));
+                        imgui.graphics->AddLine({r.x, r.y + mid_panel_title_height},
+                                                {r.Right(), r.y + mid_panel_title_height},
+                                                GMC(LayerDividerLine));
                     }
                 }
             }

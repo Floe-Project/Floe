@@ -20,7 +20,7 @@ static void PresetsWindowButton(Gui* g, PluginInstance* a, Rect r) {
     DynamicArrayInline<char, 100> preset_text {a->latest_snapshot.metadata.Name()};
     if (StateChangedSinceLastSnapshot(*a)) dyn::AppendSpan(preset_text, " (modified)"_s);
 
-    if (buttons::Button(g, button_id, r, preset_text, buttons::PresetsPopupButton())) {
+    if (buttons::Button(g, button_id, r, preset_text, buttons::PresetsPopupButton(g->imgui))) {
         if (!g->preset_browser_data.show_preset_panel) g->preset_browser_data.ShowPresetBrowser();
     }
 
@@ -144,7 +144,7 @@ void TopPanel(Gui* g) {
 
         auto title_r = lay.GetRect(title).Up(Round(-title_font->descent));
 
-        labels::Label(g, title_r, name, labels::Title(GMC(TopPanelTitleText)));
+        labels::Label(g, title_r, name, labels::Title(imgui, GMC(TopPanelTitleText)));
         if (title_font) imgui.graphics->context->PopFont();
     }
 
@@ -153,7 +153,7 @@ void TopPanel(Gui* g) {
     Optional<PresetSelectionCriteria> preset_load_criteria {};
 
     //
-    auto large_icon_button_style = buttons::TopPanelIconButton().WithLargeIcon();
+    auto large_icon_button_style = buttons::TopPanelIconButton(imgui).WithLargeIcon();
     {
         auto btn_id = imgui.GetID("L");
         if (buttons::Button(g, btn_id, preset_left_r, ICON_FA_CARET_LEFT, large_icon_button_style))
@@ -341,8 +341,11 @@ void TopPanel(Gui* g) {
 
     peak_meters::PeakMeter(g, level_r, plugin.processor.peak_meter, true);
 
-    KnobAndLabel(g, plugin.processor.params[ToInt(ParamIndex::MasterVolume)], vol, knobs::DefaultKnob());
-    KnobAndLabel(g, plugin.processor.params[ToInt(ParamIndex::MasterVelocity)], velo, knobs::DefaultKnob());
+    KnobAndLabel(g, plugin.processor.params[ToInt(ParamIndex::MasterVolume)], vol, knobs::DefaultKnob(imgui));
+    KnobAndLabel(g,
+                 plugin.processor.params[ToInt(ParamIndex::MasterVelocity)],
+                 velo,
+                 knobs::DefaultKnob(imgui));
 
     {
         g->dynamics_slider_is_held = false;
@@ -352,7 +355,7 @@ void TopPanel(Gui* g) {
                         id,
                         plugin.processor.params[ToInt(ParamIndex::MasterDynamics)],
                         dyn.control,
-                        knobs::DefaultKnob());
+                        knobs::DefaultKnob(imgui));
             g->dynamics_slider_is_held = imgui.IsActive(id);
             if (imgui.WasJustActivated(id))
                 g->imgui.platform->gui_update_requirements.requires_another_update = true;
@@ -372,7 +375,7 @@ void TopPanel(Gui* g) {
         labels::Label(g,
                       plugin.processor.params[ToInt(ParamIndex::MasterDynamics)],
                       dyn.label,
-                      labels::ParameterCentred(!has_insts_with_dynamics));
+                      labels::ParameterCentred(imgui, !has_insts_with_dynamics));
     }
 
     lay.Reset();

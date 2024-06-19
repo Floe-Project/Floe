@@ -11,40 +11,40 @@
 
 namespace peak_meters {
 
-static void DrawPeakMeters(imgui::Context const& s, Rect r, f32 vl, f32 vr, bool did_clip) {
-    auto const gap = editor::GetSize(s, UiSizeId::PeakMeterGap);
-    auto const marker_w = editor::GetSize(s, UiSizeId::PeakMeterMarkerWidth);
-    auto const marker_pad = editor::GetSize(s, UiSizeId::PeakMeterMarkerPad);
+static void DrawPeakMeters(imgui::Context const& imgui, Rect r, f32 vl, f32 vr, bool did_clip) {
+    auto const gap = editor::GetSize(imgui, UiSizeId::PeakMeterGap);
+    auto const marker_w = editor::GetSize(imgui, UiSizeId::PeakMeterMarkerWidth);
+    auto const marker_pad = editor::GetSize(imgui, UiSizeId::PeakMeterMarkerPad);
     auto padded_r = Rect {r.x + marker_w, r.y, r.w - (marker_w * 2), r.h};
     auto w = (padded_r.w / 2) - (gap / 2);
 
     constexpr f32 k_max_db = 10;
     constexpr f32 k_min_db = -70;
 
-    auto const rounding = editor::GetSize(s, UiSizeId::CornerRounding);
+    auto const rounding = editor::GetSize(imgui, UiSizeId::CornerRounding);
 
     {
         {
             auto l_channel = padded_r;
             l_channel.w = w;
-            s.graphics->AddRectFilled(l_channel, GMC(PeakMeterBack), rounding);
+            imgui.graphics->AddRectFilled(l_channel, GMC(PeakMeterBack), rounding);
         }
         {
             auto r_channel = padded_r;
             r_channel.x += w + gap;
             r_channel.w = w;
-            s.graphics->AddRectFilled(r_channel, GMC(PeakMeterBack), rounding);
+            imgui.graphics->AddRectFilled(r_channel, GMC(PeakMeterBack), rounding);
         }
 
         auto draw_marker = [&](f32 db, bool bold) {
             f32 const pos = MapTo01(db, k_min_db, k_max_db);
             auto const line_y = padded_r.y + ((1 - pos) * padded_r.h);
-            s.graphics->AddLine({r.x, line_y},
-                                {r.x + (marker_w - marker_pad), line_y},
-                                bold ? GMC(PeakMeterMarkersBold) : GMC(PeakMeterMarkers));
-            s.graphics->AddLine({r.Right() - (marker_w - marker_pad), line_y},
-                                {r.Right(), line_y},
-                                bold ? GMC(PeakMeterMarkersBold) : GMC(PeakMeterMarkers));
+            imgui.graphics->AddLine({r.x, line_y},
+                                    {r.x + (marker_w - marker_pad), line_y},
+                                    bold ? GMC(PeakMeterMarkersBold) : GMC(PeakMeterMarkers));
+            imgui.graphics->AddLine({r.Right() - (marker_w - marker_pad), line_y},
+                                    {r.Right(), line_y},
+                                    bold ? GMC(PeakMeterMarkersBold) : GMC(PeakMeterMarkers));
         };
 
         draw_marker(0, true);
@@ -78,20 +78,20 @@ static void DrawPeakMeters(imgui::Context const& s, Rect r, f32 vl, f32 vr, bool
             if (chan_r.y < top_segment_line) {
                 auto col = GMC(PeakMeterHighlightTop);
                 if (did_clip) col = GMC(PeakMeterClipping);
-                s.graphics->AddRectFilled(chan_r.Min(), chan_r.Max(), col);
+                imgui.graphics->AddRectFilled(chan_r.Min(), chan_r.Max(), col);
             }
 
             if (chan_r.y < mid_segment_line) {
                 auto col = GMC(PeakMeterHighlightMiddle);
                 if (did_clip) col = GMC(PeakMeterClipping);
                 auto const top = Max(chan_r.y, top_segment_line);
-                s.graphics->AddRectFilled(f32x2 {chan_r.x, top}, chan_r.Max(), col);
+                imgui.graphics->AddRectFilled(f32x2 {chan_r.x, top}, chan_r.Max(), col);
             }
 
             auto col = GMC(PeakMeterHighlightBottom);
             if (did_clip) col = GMC(PeakMeterClipping);
             auto const top = Max(chan_r.y, mid_segment_line);
-            s.graphics->AddRectFilled(f32x2 {chan_r.x, top}, chan_r.Max(), col, rounding, 4 | 8);
+            imgui.graphics->AddRectFilled(f32x2 {chan_r.x, top}, chan_r.Max(), col, rounding, 4 | 8);
         }
     }
 }

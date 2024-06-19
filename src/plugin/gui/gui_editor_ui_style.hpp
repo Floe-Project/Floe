@@ -60,9 +60,9 @@ struct EditorColMap {
 extern EditorColMap ui_col_map[ToInt(UiColMap::Count)];
 
 // Get Mapped Colour
-#define GMC(v) editor::GetCol(UiColMap::v)
+#define GMC(v) editor::GetCol(imgui, UiColMap::v)
 // Get Mapped Categoried Colour
-#define GMCC(category, val) editor::GetCol(UiColMap::category##val)
+#define GMCC(category, val) editor::GetCol(imgui, UiColMap::category##val)
 
 namespace editor {
 
@@ -70,7 +70,7 @@ int FindColourIndex(String str);
 
 extern bool g_high_contrast_gui; // IMPROVE: this is hacky
 
-inline u32 GetCol(UiColMap type) {
+inline u32 GetCol(imgui::Context const&, UiColMap type) {
     String col_string = ui_col_map[ToInt(type)].colour;
     if (g_high_contrast_gui && ui_col_map[ToInt(type)].high_contrast_colour.size)
         col_string = ui_col_map[ToInt(type)].high_contrast_colour;

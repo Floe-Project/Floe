@@ -9,6 +9,7 @@
 #include "effects/effect.hpp"
 #include "gui.hpp"
 #include "gui/framework/colours.hpp"
+#include "gui/framework/gui_imgui.hpp"
 #include "gui/gui_dragger_widgets.hpp"
 #include "gui_editor_ui_style.hpp"
 #include "gui_label_widgets.hpp"
@@ -161,7 +162,7 @@ static void DoImpulseResponseMenu(Gui* g, LayID lay_id) {
     auto id = g->imgui.GetID("Impulse");
     auto const ir_name =
         g->plugin.processor.convo.ir_index ? String(g->plugin.processor.convo.ir_index->ir_name) : "None"_s;
-    if (buttons::Popup(g, id, id + 1, r, ir_name, buttons::ParameterPopupButton())) {
+    if (buttons::Popup(g, id, id + 1, r, ir_name, buttons::ParameterPopupButton(g->imgui))) {
         ImpulseResponseMenuItems(g);
         g->imgui.EndWindow();
     }
@@ -174,7 +175,7 @@ struct FXColours {
     u32 button;
 };
 
-static FXColours GetFxCols(EffectType type) {
+static FXColours GetFxCols(imgui::Context const& imgui, EffectType type) {
     switch (type) {
         case EffectType::Distortion:
             return {GMCC(Distortion, Back), GMCC(Distortion, Highlight), GMCC(Distortion, Button)};
@@ -257,7 +258,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
 
     auto get_heading_size = [&](String name) {
         auto size = heading_font->CalcTextSizeA(heading_font->font_size_no_scale *
-                                                    buttons::EffectHeading(0).text_scaling,
+                                                    buttons::EffectHeading(imgui, 0).text_scaling,
                                                 FLT_MAX,
                                                 0.0f,
                                                 name);
@@ -637,7 +638,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
             KnobAndLabel(g,
                          plugin.processor.params[ToInt(params[i])],
                          ids[i],
-                         knobs::DefaultKnob(cols.highlight));
+                         knobs::DefaultKnob(imgui, cols.highlight));
 
         u8 previous_group = 0;
         for (auto const i : Range(ids.size)) {
@@ -663,7 +664,11 @@ void DoEffectsWindow(Gui* g, Rect r) {
             {
                 auto const id = imgui.GetID("heading");
                 auto const r = lay.GetRect(ids.heading);
-                buttons::Button(g, id, r, k_effect_info[ToInt(fx.type)].name, buttons::EffectHeading(col));
+                buttons::Button(g,
+                                id,
+                                r,
+                                k_effect_info[ToInt(fx.type)].name,
+                                buttons::EffectHeading(imgui, col));
 
                 if (imgui.WasJustActivated(id)) {
                     dragging_fx_unit = DraggingFX {id, &fx, FindSlotInEffects(ordered_effects, &fx), {}};
@@ -685,7 +690,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
                                     close_id,
                                     r,
                                     ICON_FA_TIMES,
-                                    buttons::IconButton().WithIconScaling(0.7f))) {
+                                    buttons::IconButton(imgui).WithIconScaling(0.7f))) {
                     SetParameterValue(plugin.processor, k_effect_info[ToInt(fx.type)].on_param_index, 0, {});
                 }
                 Tooltip(g,
@@ -697,7 +702,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
 
         switch (ids.type) {
             case EffectType::Distortion: {
-                auto const cols = GetFxCols(ids.type);
+                auto const cols = GetFxCols(imgui, ids.type);
 
                 do_heading(plugin.processor.distortion, cols.back);
                 auto& d = ids.distortion;
@@ -705,20 +710,20 @@ void DoEffectsWindow(Gui* g, Rect r) {
                 buttons::PopupWithItems(g,
                                         plugin.processor.params[ToInt(ParamIndex::DistortionType)],
                                         d.type.control,
-                                        buttons::ParameterPopupButton());
+                                        buttons::ParameterPopupButton(imgui));
                 labels::Label(g,
                               plugin.processor.params[ToInt(ParamIndex::DistortionType)],
                               d.type.label,
-                              labels::ParameterCentred());
+                              labels::ParameterCentred(imgui));
 
                 KnobAndLabel(g,
                              plugin.processor.params[ToInt(ParamIndex::DistortionDrive)],
                              d.amount,
-                             knobs::DefaultKnob(cols.highlight));
+                             knobs::DefaultKnob(imgui, cols.highlight));
                 break;
             }
             case EffectType::BitCrush: {
-                auto const cols = GetFxCols(ids.type);
+                auto const cols = GetFxCols(imgui, ids.type);
 
                 do_heading(plugin.processor.bit_crush, cols.back);
                 auto& b = ids.bit_crush;
@@ -726,30 +731,30 @@ void DoEffectsWindow(Gui* g, Rect r) {
                 draggers::Dragger(g,
                                   plugin.processor.params[ToInt(ParamIndex::BitCrushBits)],
                                   b.bits.control,
-                                  draggers::DefaultStyle());
+                                  draggers::DefaultStyle(imgui));
                 labels::Label(g,
                               plugin.processor.params[ToInt(ParamIndex::BitCrushBits)],
                               b.bits.label,
-                              labels::ParameterCentred());
+                              labels::ParameterCentred(imgui));
 
                 KnobAndLabel(g,
                              plugin.processor.params[ToInt(ParamIndex::BitCrushBitRate)],
                              b.sample_rate,
-                             knobs::DefaultKnob(cols.highlight));
+                             knobs::DefaultKnob(imgui, cols.highlight));
                 KnobAndLabel(g,
                              plugin.processor.params[ToInt(ParamIndex::BitCrushWet)],
                              b.wet,
-                             knobs::DefaultKnob(cols.highlight));
+                             knobs::DefaultKnob(imgui, cols.highlight));
                 KnobAndLabel(g,
                              plugin.processor.params[ToInt(ParamIndex::BitCrushDry)],
                              b.dry,
-                             knobs::DefaultKnob(cols.highlight));
+                             knobs::DefaultKnob(imgui, cols.highlight));
 
                 draw_knob_joining_line(b.wet.control, b.dry.control);
                 break;
             }
             case EffectType::Compressor: {
-                auto const cols = GetFxCols(ids.type);
+                auto const cols = GetFxCols(imgui, ids.type);
 
                 do_heading(plugin.processor.compressor, cols.back);
                 auto& b = ids.compressor;
@@ -757,24 +762,24 @@ void DoEffectsWindow(Gui* g, Rect r) {
                 KnobAndLabel(g,
                              plugin.processor.params[ToInt(ParamIndex::CompressorThreshold)],
                              b.threshold,
-                             knobs::DefaultKnob(cols.highlight));
+                             knobs::DefaultKnob(imgui, cols.highlight));
                 KnobAndLabel(g,
                              plugin.processor.params[ToInt(ParamIndex::CompressorRatio)],
                              b.ratio,
-                             knobs::DefaultKnob(cols.highlight));
+                             knobs::DefaultKnob(imgui, cols.highlight));
                 KnobAndLabel(g,
                              plugin.processor.params[ToInt(ParamIndex::CompressorGain)],
                              b.gain,
-                             knobs::BidirectionalKnob(cols.highlight));
+                             knobs::BidirectionalKnob(imgui, cols.highlight));
 
                 buttons::Toggle(g,
                                 plugin.processor.params[ToInt(ParamIndex::CompressorAutoGain)],
                                 b.auto_gain,
-                                buttons::ParameterToggleButton(cols.highlight));
+                                buttons::ParameterToggleButton(imgui, cols.highlight));
                 break;
             }
             case EffectType::FilterEffect: {
-                auto const cols = GetFxCols(ids.type);
+                auto const cols = GetFxCols(imgui, ids.type);
 
                 do_heading(plugin.processor.filter_effect, cols.back);
                 auto& f = ids.filter;
@@ -782,102 +787,102 @@ void DoEffectsWindow(Gui* g, Rect r) {
                 buttons::PopupWithItems(g,
                                         plugin.processor.params[ToInt(ParamIndex::FilterType)],
                                         f.type.control,
-                                        buttons::ParameterPopupButton());
+                                        buttons::ParameterPopupButton(imgui));
                 labels::Label(g,
                               plugin.processor.params[ToInt(ParamIndex::FilterType)],
                               f.type.label,
-                              labels::ParameterCentred());
+                              labels::ParameterCentred(imgui));
 
                 KnobAndLabel(g,
                              plugin.processor.params[ToInt(ParamIndex::FilterCutoff)],
                              f.cutoff,
-                             knobs::DefaultKnob(cols.highlight));
+                             knobs::DefaultKnob(imgui, cols.highlight));
                 KnobAndLabel(g,
                              plugin.processor.params[ToInt(ParamIndex::FilterResonance)],
                              f.reso,
-                             knobs::DefaultKnob(cols.highlight));
+                             knobs::DefaultKnob(imgui, cols.highlight));
                 if (f.using_gain) {
                     KnobAndLabel(g,
                                  plugin.processor.params[ToInt(ParamIndex::FilterGain)],
                                  f.gain,
-                                 knobs::DefaultKnob(cols.highlight));
+                                 knobs::DefaultKnob(imgui, cols.highlight));
                 }
                 break;
             }
             case EffectType::StereoWiden: {
-                auto const cols = GetFxCols(ids.type);
+                auto const cols = GetFxCols(imgui, ids.type);
 
                 do_heading(plugin.processor.stereo_widen, cols.back);
                 KnobAndLabel(g,
                              plugin.processor.params[ToInt(ParamIndex::StereoWidenWidth)],
                              ids.stereo.width,
-                             knobs::BidirectionalKnob(cols.highlight));
+                             knobs::BidirectionalKnob(imgui, cols.highlight));
                 break;
             }
             case EffectType::Chorus: {
-                auto const cols = GetFxCols(ids.type);
+                auto const cols = GetFxCols(imgui, ids.type);
 
                 do_heading(plugin.processor.chorus, cols.back);
                 KnobAndLabel(g,
                              plugin.processor.params[ToInt(ParamIndex::ChorusRate)],
                              ids.chorus.rate,
-                             knobs::DefaultKnob(cols.highlight));
+                             knobs::DefaultKnob(imgui, cols.highlight));
                 KnobAndLabel(g,
                              plugin.processor.params[ToInt(ParamIndex::ChorusDepth)],
                              ids.chorus.depth,
-                             knobs::DefaultKnob(cols.highlight));
+                             knobs::DefaultKnob(imgui, cols.highlight));
                 KnobAndLabel(g,
                              plugin.processor.params[ToInt(ParamIndex::ChorusHighpass)],
                              ids.chorus.highpass,
-                             knobs::DefaultKnob(cols.highlight));
+                             knobs::DefaultKnob(imgui, cols.highlight));
                 KnobAndLabel(g,
                              plugin.processor.params[ToInt(ParamIndex::ChorusWet)],
                              ids.chorus.wet,
-                             knobs::DefaultKnob(cols.highlight));
+                             knobs::DefaultKnob(imgui, cols.highlight));
                 KnobAndLabel(g,
                              plugin.processor.params[ToInt(ParamIndex::ChorusDry)],
                              ids.chorus.dry,
-                             knobs::DefaultKnob(cols.highlight));
+                             knobs::DefaultKnob(imgui, cols.highlight));
                 draw_knob_joining_line(ids.chorus.wet.control, ids.chorus.dry.control);
                 break;
             }
 
             case EffectType::Reverb: {
-                auto const cols = GetFxCols(ids.type);
+                auto const cols = GetFxCols(imgui, ids.type);
                 do_heading(plugin.processor.reverb, cols.back);
                 do_all_ids(ids.reverb.ids, k_reverb_params, cols);
                 break;
             }
 
             case EffectType::Phaser: {
-                auto const cols = GetFxCols(ids.type);
+                auto const cols = GetFxCols(imgui, ids.type);
                 do_heading(plugin.processor.phaser, cols.back);
                 do_all_ids(ids.new_phaser.ids, k_new_phaser_params, cols);
                 break;
             }
 
             case EffectType::NewDelay: {
-                auto const cols = GetFxCols(ids.type);
+                auto const cols = GetFxCols(imgui, ids.type);
                 do_heading(plugin.processor.new_delay, cols.back);
-                auto const knob_style = knobs::DefaultKnob(cols.highlight);
+                auto const knob_style = knobs::DefaultKnob(imgui, cols.highlight);
 
                 if (plugin.processor.params[ToInt(ParamIndex::NewDelayTimeSyncSwitch)].ValueAsBool()) {
                     buttons::PopupWithItems(g,
                                             plugin.processor.params[ToInt(ParamIndex::NewDelayTimeSyncedL)],
                                             ids.new_delay.left.control,
-                                            buttons::ParameterPopupButton());
+                                            buttons::ParameterPopupButton(imgui));
                     buttons::PopupWithItems(g,
                                             plugin.processor.params[ToInt(ParamIndex::NewDelayTimeSyncedR)],
                                             ids.new_delay.right.control,
-                                            buttons::ParameterPopupButton());
+                                            buttons::ParameterPopupButton(imgui));
                     labels::Label(g,
                                   plugin.processor.params[ToInt(ParamIndex::NewDelayTimeSyncedL)],
                                   ids.new_delay.left.label,
-                                  labels::ParameterCentred());
+                                  labels::ParameterCentred(imgui));
                     labels::Label(g,
                                   plugin.processor.params[ToInt(ParamIndex::NewDelayTimeSyncedR)],
                                   ids.new_delay.right.label,
-                                  labels::ParameterCentred());
+                                  labels::ParameterCentred(imgui));
                 } else {
                     KnobAndLabel(g,
                                  plugin.processor.params[ToInt(ParamIndex::NewDelayTimeLMs)],
@@ -893,16 +898,16 @@ void DoEffectsWindow(Gui* g, Rect r) {
                 buttons::Toggle(g,
                                 plugin.processor.params[ToInt(ParamIndex::NewDelayTimeSyncSwitch)],
                                 ids.new_delay.sync_btn,
-                                buttons::ParameterToggleButton(cols.highlight));
+                                buttons::ParameterToggleButton(imgui, cols.highlight));
 
                 buttons::PopupWithItems(g,
                                         plugin.processor.params[ToInt(ParamIndex::NewDelayMode)],
                                         ids.new_delay.mode.control,
-                                        buttons::ParameterPopupButton());
+                                        buttons::ParameterPopupButton(imgui));
                 labels::Label(g,
                               plugin.processor.params[ToInt(ParamIndex::NewDelayMode)],
                               ids.new_delay.mode.label,
-                              labels::ParameterCentred());
+                              labels::ParameterCentred(imgui));
 
                 KnobAndLabel(g,
                              plugin.processor.params[ToInt(ParamIndex::NewDelayFeedback)],
@@ -927,25 +932,25 @@ void DoEffectsWindow(Gui* g, Rect r) {
             }
 
             case EffectType::ConvolutionReverb: {
-                auto const cols = GetFxCols(ids.type);
+                auto const cols = GetFxCols(imgui, ids.type);
 
                 do_heading(plugin.processor.convo, cols.back);
 
                 DoImpulseResponseMenu(g, ids.convo.ir.control);
-                labels::Label(g, ids.convo.ir.label, "Impulse", labels::ParameterCentred());
+                labels::Label(g, ids.convo.ir.label, "Impulse", labels::ParameterCentred(imgui));
 
                 KnobAndLabel(g,
                              plugin.processor.params[ToInt(ParamIndex::ConvolutionReverbHighpass)],
                              ids.convo.highpass,
-                             knobs::DefaultKnob(cols.highlight));
+                             knobs::DefaultKnob(imgui, cols.highlight));
                 KnobAndLabel(g,
                              plugin.processor.params[ToInt(ParamIndex::ConvolutionReverbWet)],
                              ids.convo.wet,
-                             knobs::DefaultKnob(cols.highlight));
+                             knobs::DefaultKnob(imgui, cols.highlight));
                 KnobAndLabel(g,
                              plugin.processor.params[ToInt(ParamIndex::ConvolutionReverbDry)],
                              ids.convo.dry,
-                             knobs::DefaultKnob(cols.highlight));
+                             knobs::DefaultKnob(imgui, cols.highlight));
 
                 draw_knob_joining_line(ids.convo.wet.control, ids.convo.dry.control);
                 break;
@@ -958,7 +963,9 @@ void DoEffectsWindow(Gui* g, Rect r) {
         g->gui_platform.gui_update_requirements.cursor_type = CursorType::AllArrows;
         {
             auto style = buttons::EffectHeading(
-                colours::ChangeBrightness(GetFxCols(dragging_fx_unit->fx->type).back | 0xff000000, 0.7f));
+                imgui,
+                colours::ChangeBrightness(GetFxCols(imgui, dragging_fx_unit->fx->type).back | 0xff000000,
+                                          0.7f));
             style.draw_with_overlay_graphics = true;
 
             auto const text = k_effect_info[ToInt(dragging_fx_unit->fx->type)].name;
@@ -1006,7 +1013,10 @@ void DoEffectsWindow(Gui* g, Rect r) {
             auto const converted_slot_r = imgui.GetRegisteredAndConvertedRect(slot_r);
             auto const grabber_r = slot_r.CutLeft(slot_r.w - (f32)FXSwitchBoardGrabRegionWidth);
 
-            labels::Label(g, number_r, fmt::Format(g->scratch_arena, "{}", slot + 1), labels::Parameter());
+            labels::Label(g,
+                          number_r,
+                          fmt::Format(g->scratch_arena, "{}", slot + 1),
+                          labels::Parameter(imgui));
 
             if (dragging_fx &&
                 (imgui.platform->ContainsCursor(converted_slot_r) || dragging_fx->drop_slot == slot)) {
@@ -1021,7 +1031,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
                 auto fx = ordered_effects[fx_index++];
                 if (dragging_fx && fx == dragging_fx->fx) fx = ordered_effects[fx_index++];
 
-                auto style = buttons::ParameterToggleButton(GetFxCols(fx->type).button);
+                auto style = buttons::ParameterToggleButton(imgui, GetFxCols(imgui, fx->type).button);
                 style.no_tooltips = true;
                 auto [changed, id] = buttons::Toggle(
                     g,
@@ -1031,7 +1041,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
                     style);
 
                 {
-                    auto grabber_style = buttons::EffectButtonGrabber();
+                    auto grabber_style = buttons::EffectButtonGrabber(imgui);
                     if (imgui.IsHot(id)) grabber_style.main_cols.reg = grabber_style.main_cols.hot_on;
                     buttons::FakeButton(g, grabber_r, {}, grabber_style);
 
@@ -1057,7 +1067,8 @@ void DoEffectsWindow(Gui* g, Rect r) {
         }
 
         if (dragging_fx) {
-            auto style = buttons::ParameterToggleButton(GetFxCols(dragging_fx->fx->type).button);
+            auto style =
+                buttons::ParameterToggleButton(imgui, GetFxCols(imgui, dragging_fx->fx->type).button);
             style.draw_with_overlay_graphics = true;
 
             Rect btn_r {lay.GetRect(switches[0])};

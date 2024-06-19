@@ -762,7 +762,8 @@ fn getTargets(b: *std.Build, user_given_target_presets: ?[]const u8) !std.ArrayL
             switch (t) {
                 .native => {
                     arch_os_abi = "native";
-                    cpu_features = "native";
+                    // valgrind doesn't like some AVX instructions so we'll target the baseline x86_64 for now
+                    cpu_features = if (builtin.cpu.arch == .x86_64) x86_cpu else "native";
                 },
                 .x86_64_windows => {
                     arch_os_abi = "x86_64-windows." ++ min_windows_version;

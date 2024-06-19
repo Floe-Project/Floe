@@ -22,6 +22,7 @@ const floe_copyright = "Sam Windell";
 const floe_vendor = "Floe";
 const floe_url = "https://github.com/Floe-Synth/Floe";
 const floe_au_factory_function = "FloeFactoryFunction";
+const floe_plugin_gui = true;
 
 const rootdir = struct {
     fn getSrcDir() []const u8 {
@@ -948,6 +949,7 @@ pub fn build(b: *std.Build) void {
             .IS_WINDOWS = target.result.os.tag == .windows,
             .IS_MACOS = target.result.os.tag == .macos,
             .IS_LINUX = target.result.os.tag == .linux,
+            .FLOE_GUI = floe_plugin_gui,
         });
 
         var stb_sprintf = b.addObject(.{
@@ -1286,7 +1288,6 @@ pub fn build(b: *std.Build) void {
                 .linux => {
                     library.addCSourceFiles(.{ .files = &unix_source_files, .flags = cpp_fp_flags });
                     library.addCSourceFiles(.{ .files = &linux_source_files, .flags = cpp_fp_flags });
-                    library.linkSystemLibrary2("x11", .{ .use_pkg_config = .force });
                 },
                 else => {
                     unreachable;
@@ -1298,7 +1299,7 @@ pub fn build(b: *std.Build) void {
             library.linkLibC();
             library.linkLibrary(tracy);
             library.addObject(stb_sprintf);
-            library.linkLibCpp(); // needed for __cxa_demangle
+            // library.linkLibCpp(); // needed for __cxa_demangle
             library.linkLibrary(libbacktrace);
             join_compile_commands.step.dependOn(&library.step);
             applyUniversalSettings(&build_context, library);
@@ -1440,7 +1441,7 @@ pub fn build(b: *std.Build) void {
             const plugin_path = "src/plugin";
 
             plugin.addCSourceFiles(.{
-                .files = &.{
+                .files = &(.{
                     plugin_path ++ "/common/common_errors.cpp",
                     plugin_path ++ "/cross_instance_systems.cpp",
                     plugin_path ++ "/layer_processor.cpp",
@@ -1461,6 +1462,7 @@ pub fn build(b: *std.Build) void {
                     plugin_path ++ "/sample_library/sample_library_lua.cpp",
                     plugin_path ++ "/sample_library/sample_library_mdata.cpp",
                     plugin_path ++ "/state/state_coding.cpp",
+                } ++ if (floe_plugin_gui) .{
                     plugin_path ++ "/gui/framework/draw_list.cpp",
                     plugin_path ++ "/gui/framework/gui_imgui.cpp",
                     plugin_path ++ "/gui/framework/gui_platform.cpp",
@@ -1489,7 +1491,7 @@ pub fn build(b: *std.Build) void {
                     plugin_path ++ "/gui/gui_window.cpp",
                     plugin_path ++ "/gui/framework/draw_list_opengl.cpp",
                     plugin_path ++ "/gui/framework/gui_platform_pugl.cpp",
-                },
+                } else .{}),
                 .flags = cpp_fp_flags,
             });
 
@@ -1524,9 +1526,11 @@ pub fn build(b: *std.Build) void {
             embedded_files.addIncludePath(b.path("build_resources"));
             plugin.addObject(embedded_files);
             plugin.linkLibrary(tracy);
-            plugin.linkLibrary(pugl);
+            if (floe_plugin_gui) {
+                plugin.linkLibrary(pugl);
+                plugin.addObject(stb_image);
+            }
             plugin.linkLibrary(flac);
-            plugin.addObject(stb_image);
             plugin.addObject(dr_wav);
             plugin.addObject(xxhash);
             plugin.linkLibrary(buildLua(b, target, build_context.optimise));
@@ -1620,7 +1624,7 @@ pub fn build(b: *std.Build) void {
         }
 
         // standalone is for development-only at the moment
-        if (build_context.build_mode != .production) {
+        if (build_context.build_mode != .production and floe_plugin_gui) {
             const portmidi = b.addStaticLibrary(.{
                 .name = "portmidi",
                 .target = target,
@@ -2011,11 +2015,6 @@ pub fn build(b: *std.Build) void {
                     .flags = cpp_flags,
                 });
                 au_sdk.addIncludePath(b.path(au_path ++ "/include"));
-                // au_sdk.linkFramework("Foundation");
-                // au_sdk.linkFramework("CoreFoundation");
-                // au_sdk.linkFramework("AppKit");
-                // au_sdk.linkFramework("AudioToolbox");
-                // au_sdk.linkFramework("CoreMIDI");
                 au_sdk.linkLibCpp();
                 applyUniversalSettings(&build_context, au_sdk);
             }

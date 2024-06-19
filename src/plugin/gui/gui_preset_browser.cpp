@@ -217,7 +217,7 @@ DirectoryListing::Entry const* PresetBrowser::DoPresetFilesRecurse(DirectoryList
                                 imgui.GetRegisteredAndConvertedRect({0, r.y, imgui.Width(), 1});
                             imgui.graphics->AddRectFilled(divider.Min(),
                                                           divider.Max(),
-                                                          GMCC(Browser, FileDivider));
+                                                          GMC(BrowserFileDivider));
                         }
 
                         auto const max_heading_w = r.w / 2;
@@ -573,25 +573,25 @@ void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
 
                     imgui.graphics->AddRectFilled(r.Min(),
                                                   r.Min() + f32x2 {r.w, table_title_h},
-                                                  GMCC(Browser, TopRowBack),
+                                                  GMC(BrowserTopRowBack),
                                                   rounding,
                                                   1 | 2);
 
                     imgui.graphics->AddRectFilled(r.Min() + f32x2 {0, table_title_h},
                                                   imgui.Min() + f32x2 {preset_folders_panel_width, r.h},
-                                                  GMCC(PresetBrowser, FoldersBack),
+                                                  GMC(PresetBrowserFoldersBack),
                                                   rounding,
                                                   8);
 
                     imgui.graphics->AddRectFilled(r.Min() + f32x2 {preset_folders_panel_width, table_title_h},
                                                   r.Max(),
-                                                  GMCC(PresetBrowser, FilesBack),
+                                                  GMC(PresetBrowserFilesBack),
                                                   rounding,
                                                   8);
 
-                    imgui.graphics->AddRect(r.Min(), r.Max(), GMCC(Browser, BorderRect), rounding);
+                    imgui.graphics->AddRect(r.Min(), r.Max(), GMC(BrowserBorderRect), rounding);
 
-                    auto const line_col = GMCC(Browser, SectionHeadingLine);
+                    auto const line_col = GMC(BrowserSectionHeadingLine);
                     imgui.graphics->AddLine(r.Min() + f32x2 {preset_folders_panel_width, 0},
                                             r.Min() + f32x2 {preset_folders_panel_width, r.h},
                                             line_col);
@@ -650,26 +650,26 @@ void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
                     auto settings = imgui::DefTextInput();
                     settings.draw = [](IMGUI_DRAW_TEXT_INPUT_ARGS) {
                         auto const rounding = editor::GetSize(imgui, UiSizeId::CornerRounding);
-                        imgui.graphics->AddRectFilled(r.Min(), r.Max(), GMCC(Browser, SearchBack), rounding);
+                        imgui.graphics->AddRectFilled(r.Min(), r.Max(), GMC(BrowserSearchBack), rounding);
 
                         if (result->HasSelection()) {
                             auto selection_r = result->GetSelectionRect();
                             imgui.graphics->AddRectFilled(selection_r.Min(),
                                                           selection_r.Max(),
-                                                          GMCC(Browser, SearchSelection));
+                                                          GMC(BrowserSearchSelection));
                         }
 
                         if (result->show_cursor) {
                             auto cursor_r = result->GetCursorRect();
                             imgui.graphics->AddRectFilled(cursor_r.Min(),
                                                           cursor_r.Max(),
-                                                          GMCC(Browser, SearchCursor));
+                                                          GMC(BrowserSearchCursor));
                         }
 
-                        auto col = GMCC(Browser, SearchText);
+                        auto col = GMC(BrowserSearchText);
                         if (!text.size) {
                             text = "Search folders/presets...";
-                            col = GMCC(Browser, SearchTextInactive);
+                            col = GMC(BrowserSearchTextInactive);
                         }
 
                         imgui.graphics->AddText(result->GetTextPos(), col, text);

@@ -178,21 +178,21 @@ struct FXColours {
 static FXColours GetFxCols(imgui::Context const& imgui, EffectType type) {
     switch (type) {
         case EffectType::Distortion:
-            return {GMCC(Distortion, Back), GMCC(Distortion, Highlight), GMCC(Distortion, Button)};
+            return {GMC(DistortionBack), GMC(DistortionHighlight), GMC(DistortionButton)};
         case EffectType::BitCrush:
-            return {GMCC(BitCrush, Back), GMCC(BitCrush, Highlight), GMCC(BitCrush, Button)};
+            return {GMC(BitCrushBack), GMC(BitCrushHighlight), GMC(BitCrushButton)};
         case EffectType::Compressor:
-            return {GMCC(Compressor, Back), GMCC(Compressor, Highlight), GMCC(Compressor, Button)};
+            return {GMC(CompressorBack), GMC(CompressorHighlight), GMC(CompressorButton)};
         case EffectType::FilterEffect:
-            return {GMCC(Filter, Back), GMCC(Filter, Highlight), GMCC(Filter, Button)};
+            return {GMC(FilterBack), GMC(FilterHighlight), GMC(FilterButton)};
         case EffectType::StereoWiden:
-            return {GMCC(Stereo, Back), GMCC(Stereo, Highlight), GMCC(Stereo, Button)};
-        case EffectType::Chorus: return {GMCC(Chorus, Back), GMCC(Chorus, Highlight), GMCC(Chorus, Button)};
-        case EffectType::Reverb: return {GMCC(Reverb, Back), GMCC(Reverb, Highlight), GMCC(Reverb, Button)};
-        case EffectType::NewDelay: return {GMCC(Delay, Back), GMCC(Delay, Highlight), GMCC(Delay, Button)};
+            return {GMC(StereoBack), GMC(StereoHighlight), GMC(StereoButton)};
+        case EffectType::Chorus: return {GMC(ChorusBack), GMC(ChorusHighlight), GMC(ChorusButton)};
+        case EffectType::Reverb: return {GMC(ReverbBack), GMC(ReverbHighlight), GMC(ReverbButton)};
+        case EffectType::NewDelay: return {GMC(DelayBack), GMC(DelayHighlight), GMC(DelayButton)};
         case EffectType::ConvolutionReverb:
-            return {GMCC(Convolution, Back), GMCC(Convolution, Highlight), GMCC(Convolution, Button)};
-        case EffectType::Phaser: return {GMCC(Phaser, Back), GMCC(Phaser, Highlight), GMCC(Phaser, Button)};
+            return {GMC(ConvolutionBack), GMC(ConvolutionHighlight), GMC(ConvolutionButton)};
+        case EffectType::Phaser: return {GMC(PhaserBack), GMC(PhaserHighlight), GMC(PhaserButton)};
         case EffectType::Count: PanicIfReached();
     }
     return {};

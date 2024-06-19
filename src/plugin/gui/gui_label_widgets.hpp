@@ -79,7 +79,7 @@ PUBLIC Style WaveformLoadingLabel(imgui::Context const& imgui) {
     Style s {};
     s.type = buttons::LayoutAndSizeType::IconOrText;
     s.icon_or_text.justification = TextJustification::Centred;
-    s.main_cols.reg = GMCC(Waveform_, LoadingText);
+    s.main_cols.reg = GMC(Waveform_LoadingText);
     return s;
 }
 

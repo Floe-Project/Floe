@@ -151,17 +151,17 @@ PUBLIC Style BrowserIconButton(imgui::Context const& imgui) {
 
 PUBLIC Style LayerHeadingButton(imgui::Context const& imgui, u32 highlight_col = {}) {
     Style s {};
-    if (!highlight_col) highlight_col = GMCC(ToggleButton, IconOn);
+    if (!highlight_col) highlight_col = GMC(ToggleButtonIconOn);
     s.type = LayoutAndSizeType::IconAndText;
-    s.main_cols.reg = GMCC(ToggleButton, IconOff);
+    s.main_cols.reg = GMC(ToggleButtonIconOff);
     s.main_cols.on = highlight_col;
     s.main_cols.hot_off = s.main_cols.reg;
     s.main_cols.hot_on = s.main_cols.on;
     s.main_cols.active_on = s.main_cols.hot_on;
     s.main_cols.active_off = s.main_cols.active_on;
-    s.text_cols.reg = GMCC(ToggleButton, TextOff);
-    s.text_cols.on = GMCC(ToggleButton, TextOn);
-    s.text_cols.hot_on = GMCC(ToggleButton, TextHover);
+    s.text_cols.reg = GMC(ToggleButtonTextOff);
+    s.text_cols.on = GMC(ToggleButtonTextOn);
+    s.text_cols.hot_on = GMC(ToggleButtonTextHover);
     s.text_cols.hot_off = s.text_cols.hot_on;
     s.text_cols.active_on = s.text_cols.hot_on;
     s.text_cols.active_off = s.text_cols.active_on;
@@ -293,13 +293,13 @@ PUBLIC Style PresetsBrowserPopupButton(imgui::Context const& imgui) {
     auto s = ParameterPopupButton(imgui);
     s.icon_or_text.overflow_type = TextOverflowType::ShowDotsOnLeft;
     s.main_cols.grey_out_aware = false;
-    s.main_cols.reg = GMCC(Browser, FolderPopupButtonText);
+    s.main_cols.reg = GMC(BrowserFolderPopupButtonText);
     s.main_cols.on = s.main_cols.reg;
-    s.main_cols.hot_on = GMCC(Browser, FolderPopupButtonTextHover);
+    s.main_cols.hot_on = GMC(BrowserFolderPopupButtonTextHover);
     s.main_cols.hot_off = s.main_cols.hot_on;
     s.main_cols.active_on = s.main_cols.hot_on;
     s.main_cols.active_off = s.main_cols.active_on;
-    s.back_cols.reg = GMCC(Browser, FolderPopupButtonBack);
+    s.back_cols.reg = GMC(BrowserFolderPopupButtonBack);
     s.back_cols.on = s.back_cols.reg;
     s.back_cols.hot_on = s.back_cols.reg;
     s.back_cols.hot_off = s.back_cols.hot_on;

@@ -61,8 +61,6 @@ extern EditorColMap ui_col_map[ToInt(UiColMap::Count)];
 
 // Get Mapped Colour
 #define GMC(v) editor::GetCol(imgui, UiColMap::v)
-// Get Mapped Categoried Colour
-#define GMCC(category, val) editor::GetCol(imgui, UiColMap::category##val)
 
 namespace editor {
 
@@ -71,18 +69,19 @@ int FindColourIndex(String str);
 extern bool g_high_contrast_gui; // IMPROVE: this is hacky
 
 inline u32 GetCol(imgui::Context const&, UiColMap type) {
-    String col_string = ui_col_map[ToInt(type)].colour;
-    if (g_high_contrast_gui && ui_col_map[ToInt(type)].high_contrast_colour.size)
-        col_string = ui_col_map[ToInt(type)].high_contrast_colour;
+    auto const map_index = ToInt(type);
+    String col_string = ui_col_map[map_index].colour;
+    if (g_high_contrast_gui && ui_col_map[map_index].high_contrast_colour.size)
+        col_string = ui_col_map[map_index].high_contrast_colour;
 
-    if (auto index = FindColourIndex(col_string); index != -1) return ui_cols[index].col;
+    if (auto const col_index = FindColourIndex(col_string); col_index != -1) return ui_cols[col_index].col;
     return {};
 }
 
-inline f32 GetSize(imgui::Context const& s, UiSizeId size_id) {
+inline f32 GetSize(imgui::Context const& imgui, UiSizeId size_id) {
     f32 res = 1;
     switch (ui_sizes_units[ToInt(size_id)]) {
-        case UiSizeUnit::Points: res = s.PointsToPixels(ui_sizes[ToInt(size_id)]); break;
+        case UiSizeUnit::Points: res = imgui.PointsToPixels(ui_sizes[ToInt(size_id)]); break;
         case UiSizeUnit::None: res = ui_sizes[ToInt(size_id)]; break;
         case UiSizeUnit::Count: PanicIfReached();
     }

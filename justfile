@@ -11,6 +11,9 @@ gen_files_dir := "build_gen"
 build target_os='native':
   zig build compile -Dtargets={{target_os}} -Dbuild-mode=development
 
+build-tracy:
+  zig build compile -Dtargets=native -Dbuild-mode=development -Dtracy
+
 build-release target_os='native':
   zig build compile -Dtargets={{target_os}} -Dbuild-mode=production
 
@@ -58,8 +61,8 @@ format:
 test-clap-val build="": (_build_if_requested build "native")
   clap-validator validate --in-process {{native_binary_dir}}/Floe.clap
 
-test-units build="": (_build_if_requested build "native")
-  {{native_binary_dir}}/tests
+test-units build="" +args="": (_build_if_requested build "native")
+  {{native_binary_dir}}/tests {{args}}
 
 test-pluginval build="": (_build_if_requested build "native")
   pluginval {{native_binary_dir}}/Floe.vst3
@@ -91,6 +94,10 @@ coverage build="": (_build_if_requested build "native")
   mkdir -p {{gen_files_dir}}
   # IMPROVE: run other tests with coverage and --merge the results
   kcov --include-pattern={{justfile_directory()}}/src {{gen_files_dir}}/coverage-out {{native_binary_dir}}/tests
+
+[linux]
+valgrind build="": (_build_if_requested build "native")
+  valgrind --fair-sched=yes {{native_binary_dir}}/tests
 
 # IMPROVE: add auval tests on macos
 checks_level_0 := replace( 

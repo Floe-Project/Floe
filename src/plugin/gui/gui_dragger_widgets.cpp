@@ -3,8 +3,8 @@
 
 #include "gui_dragger_widgets.hpp"
 
+#include "framework/gui_live_edit.hpp"
 #include "gui.hpp"
-#include "gui_editor_ui_style.hpp"
 #include "gui_widget_helpers.hpp"
 #include "icons-fa/IconsFontAwesome5.h"
 
@@ -49,7 +49,7 @@ bool Dragger(Gui* g, Parameter const& param, Rect r, Style const& style) {
     auto& imgui = g->imgui;
 
     auto result = param.ValueAsInt<int>();
-    auto const btn_w = editor::GetSize(imgui, UiSizeId::ParamIntButtonSize);
+    auto const btn_w = live_edit::Size(imgui, UiSizeId::ParamIntButtonSize);
 
     Rect left_r = r;
     left_r.w = btn_w;
@@ -68,7 +68,7 @@ bool Dragger(Gui* g, Parameter const& param, Rect r, Style const& style) {
         imgui.graphics->AddRectFilled(converted_r.Min(),
                                       converted_r.Max(),
                                       style.background,
-                                      editor::GetSize(imgui, UiSizeId::CornerRounding));
+                                      live_edit::Size(imgui, UiSizeId::CornerRounding));
     }
 
     bool changed = Dragger(g,

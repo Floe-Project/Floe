@@ -3,10 +3,10 @@
 
 #include <icons-fa/IconsFontAwesome5.h>
 
+#include "framework/gui_live_edit.hpp"
 #include "gui.hpp"
 #include "gui_button_widgets.hpp"
 #include "gui_dragger_widgets.hpp"
-#include "gui_editor_ui_style.hpp"
 #include "gui_keyboard.hpp"
 #include "gui_widget_helpers.hpp"
 #include "plugin_instance.hpp"
@@ -16,10 +16,10 @@ void BotPanel(Gui* g) {
     auto& lay = g->layout;
     auto& plugin = g->plugin;
 
-    auto const slider_w = editor::GetSize(imgui, UiSizeId::MidiKeyboardSlider);
-    auto const control_w = editor::GetSize(imgui, UiSizeId::MidiKeyboardControlWidth);
-    auto const button_h = editor::GetSize(imgui, UiSizeId::MidiKeyboardButtonSize);
-    auto const button_ygap = editor::GetSize(imgui, UiSizeId::MidiKeyboardButtonYGap);
+    auto const slider_w = live_edit::Size(imgui, UiSizeId::MidiKeyboardSlider);
+    auto const control_w = live_edit::Size(imgui, UiSizeId::MidiKeyboardControlWidth);
+    auto const button_h = live_edit::Size(imgui, UiSizeId::MidiKeyboardButtonSize);
+    auto const button_ygap = live_edit::Size(imgui, UiSizeId::MidiKeyboardButtonYGap);
 
     auto root = lay.CreateRootItem((LayScalar)imgui.Width(),
                                    (LayScalar)imgui.Height(),

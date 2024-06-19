@@ -1471,7 +1471,6 @@ pub fn build(b: *std.Build) void {
                     plugin_path ++ "/gui/gui_button_widgets.cpp",
                     plugin_path ++ "/gui/gui_dragger_widgets.cpp",
                     plugin_path ++ "/gui/gui_drawing_helpers.cpp",
-                    plugin_path ++ "/gui/gui_editor_ui_style.cpp",
                     plugin_path ++ "/gui/gui_editor_widgets.cpp",
                     plugin_path ++ "/gui/gui_effects.cpp",
                     plugin_path ++ "/gui/gui_envelope.cpp",
@@ -1529,6 +1528,7 @@ pub fn build(b: *std.Build) void {
             if (floe_plugin_gui) {
                 plugin.linkLibrary(pugl);
                 plugin.addObject(stb_image);
+                plugin.addIncludePath(b.path("src/plugin/gui/live_edit_defs"));
             }
             plugin.linkLibrary(flac);
             plugin.addObject(dr_wav);

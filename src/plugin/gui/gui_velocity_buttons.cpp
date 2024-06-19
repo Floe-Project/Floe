@@ -3,7 +3,6 @@
 
 #include "gui_velocity_buttons.hpp"
 
-#include "gui_editor_ui_style.hpp"
 #include "param_info.hpp"
 
 static void DrawVelocityButtonBack(imgui::Context const& imgui, Rect r) {

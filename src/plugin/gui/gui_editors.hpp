@@ -5,8 +5,8 @@
 
 #include "os/filesystem.hpp"
 
+#include "framework/gui_live_edit.hpp"
 #include "gui.hpp"
-#include "gui_editor_ui_style.hpp"
 #include "gui_editor_widgets.hpp"
 #include "stb/stb_image_write.h"
 

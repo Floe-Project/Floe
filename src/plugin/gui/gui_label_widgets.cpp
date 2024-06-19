@@ -4,7 +4,6 @@
 #include "gui_label_widgets.hpp"
 
 #include "gui.hpp"
-#include "gui_editor_ui_style.hpp"
 #include "param.hpp"
 
 namespace labels {

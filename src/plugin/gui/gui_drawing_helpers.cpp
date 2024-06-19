@@ -8,14 +8,14 @@
 #include "foundation/foundation.hpp"
 
 #include "framework/gui_imgui.hpp"
+#include "framework/gui_live_edit.hpp"
 #include "gui/framework/colours.hpp"
-#include "gui_editor_ui_style.hpp"
 
 namespace draw {
 
 void DropShadow(imgui::Context const& imgui, Rect r, Optional<f32> rounding_opt) {
-    auto const rounding = rounding_opt ? *rounding_opt : editor::GetSize(imgui, UiSizeId::CornerRounding);
-    auto const blur = editor::GetSize(imgui, UiSizeId::WindowDropShadowBlur);
+    auto const rounding = rounding_opt ? *rounding_opt : live_edit::Size(imgui, UiSizeId::CornerRounding);
+    auto const blur = live_edit::Size(imgui, UiSizeId::WindowDropShadowBlur);
     imgui.graphics->AddDropShadow(r.Min(), r.Max(), GMC(WindowDropShadow), blur, rounding);
 }
 

@@ -3,11 +3,11 @@
 
 #include "gui_layer.hpp"
 
+#include "framework/gui_live_edit.hpp"
 #include "gui.hpp"
 #include "gui_button_widgets.hpp"
 #include "gui_dragger_widgets.hpp"
 #include "gui_drawing_helpers.hpp"
-#include "gui_editor_ui_style.hpp"
 #include "gui_envelope.hpp"
 #include "gui_label_widgets.hpp"
 #include "gui_peak_meter_widget.hpp"
@@ -123,7 +123,7 @@ void Layout(Gui* g,
     auto& imgui = g->imgui;
     auto& lay = g->layout;
 
-#define GUI_SIZE(cat, n, v, u) [[maybe_unused]] const auto cat##n = editor::GetSize(imgui, UiSizeId::cat##n);
+#define GUI_SIZE(cat, n, v, u) [[maybe_unused]] const auto cat##n = live_edit::Size(imgui, UiSizeId::cat##n);
 #include SIZES_DEF_FILENAME
 #undef GUI_SIZE
 
@@ -207,7 +207,7 @@ void Layout(Gui* g,
             auto const page_type = (PageType)i;
             auto size = draw::GetTextWidth(imgui.graphics->context->CurrentFont(), GetPageTitle(page_type));
             if (page_type == PageType::Filter || page_type == PageType::Lfo || page_type == PageType::Eq)
-                size += editor::GetSize(imgui, UiSizeId::LayerParamsGroupTabsIconW2);
+                size += live_edit::Size(imgui, UiSizeId::LayerParamsGroupTabsIconW2);
             c.tabs[i] =
                 lay.CreateChildItem(tab_lay, (LayScalar)(size + (f32)LayerParamsGroupTabsGap), 1, LAY_VFILL);
         }
@@ -431,7 +431,7 @@ static void DrawSelectorProgressBar(imgui::Context const& imgui, Rect r, f32 loa
     auto min = r.Min();
     auto max = f32x2 {r.x + Max(4.0f, r.w * load_percent), r.Bottom()};
     auto col = GMC(LayerSelectorMenuLoading);
-    auto const rounding = editor::GetSize(imgui, UiSizeId::CornerRounding);
+    auto const rounding = live_edit::Size(imgui, UiSizeId::CornerRounding);
     imgui.graphics->AddRectFilled(min, max, col, rounding);
 }
 
@@ -444,7 +444,7 @@ void Draw(Gui* g,
     auto& lay = g->layout;
     auto& imgui = g->imgui;
 
-#define GUI_SIZE(cat, n, v, u) [[maybe_unused]] const auto cat##n = editor::GetSize(imgui, UiSizeId::cat##n);
+#define GUI_SIZE(cat, n, v, u) [[maybe_unused]] const auto cat##n = live_edit::Size(imgui, UiSizeId::cat##n);
 #include SIZES_DEF_FILENAME
 #undef GUI_SIZE
 
@@ -470,7 +470,7 @@ void Draw(Gui* g,
         auto background_lib = g->plugin.shared_data.available_libraries.FindRetained(*desired_lib_name);
         DEFER { background_lib.Release(); };
 
-        auto const panel_rounding = editor::GetSize(imgui, UiSizeId::BlurredPanelRounding);
+        auto const panel_rounding = live_edit::Size(imgui, UiSizeId::BlurredPanelRounding);
 
         if (background_lib && !g->settings.settings.gui.high_contrast_gui) {
             auto imgs = LoadLibraryBackgroundAndIconIfNeeded(g, *background_lib);
@@ -554,7 +554,7 @@ void Draw(Gui* g,
         auto const registered_selector_box_r =
             imgui.GetRegisteredAndConvertedRect(lay.GetRect(c.selector_box));
         {
-            auto const rounding = editor::GetSize(imgui, UiSizeId::CornerRounding);
+            auto const rounding = live_edit::Size(imgui, UiSizeId::CornerRounding);
             auto const col =
                 should_highlight ? GMC(LayerSelectorMenuBackHighlight) : GMC(LayerSelectorMenuBack);
             imgui.graphics->AddRectFilled(registered_selector_box_r.Min(),
@@ -647,7 +647,7 @@ void Draw(Gui* g,
 
         auto const col_border = GMC(LayerMuteSoloBorder);
         auto const col_background = GMC(LayerMuteSoloBackground);
-        auto const rounding = editor::GetSize(imgui, UiSizeId::CornerRounding);
+        auto const rounding = live_edit::Size(imgui, UiSizeId::CornerRounding);
         auto reg_mute_solo_r = imgui.GetRegisteredAndConvertedRect(mute_solo_r);
         auto reg_mute_r = imgui.GetRegisteredAndConvertedRect(mute_r);
         imgui.graphics->AddRectFilled(reg_mute_solo_r.Min(), reg_mute_solo_r.Max(), col_background, rounding);

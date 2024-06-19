@@ -4,7 +4,7 @@
 #pragma once
 
 #include "framework/draw_list.hpp"
-#include "gui_editor_ui_style.hpp"
+#include "framework/gui_imgui.hpp"
 #include "gui_fwd.hpp"
 #include "icons-fa/IconsFontAwesome5.h"
 #include "layout.hpp"

@@ -3,10 +3,10 @@
 
 #include "gui_envelope.hpp"
 
+#include "framework/gui_live_edit.hpp"
 #include "gui.hpp"
 #include "gui/framework/colours.hpp"
 #include "gui_drawing_helpers.hpp"
-#include "gui_editor_ui_style.hpp"
 #include "gui_widget_helpers.hpp"
 
 void GUIDoEnvelope(Gui* g,
@@ -33,7 +33,7 @@ void GUIDoEnvelope(Gui* g,
     settings.pad_top_left = {};
     settings.draw_routine_window_background = [&handle_size](IMGUI_DRAW_WINDOW_BG_ARGS) {
         auto const& r = window->bounds.Reduced(handle_size / 2);
-        auto const rounding = editor::GetSize(imgui, UiSizeId::CornerRounding);
+        auto const rounding = live_edit::Size(imgui, UiSizeId::CornerRounding);
         imgui.graphics->AddRectFilled(r.Min(), r.Max(), GMC(Envelope_Back), rounding);
     };
     imgui.PushID(layer->index);

@@ -3,9 +3,9 @@
 
 #include "gui_keyboard.hpp"
 
+#include "framework/gui_live_edit.hpp"
 #include "gui.hpp"
 #include "gui/framework/colours.hpp"
-#include "gui_editor_ui_style.hpp"
 
 Optional<KeyboardGuiKeyPressed> KeyboardGui(Gui* g, Rect r, int starting_octave) {
     auto& imgui = g->imgui;
@@ -34,8 +34,10 @@ Optional<KeyboardGuiKeyPressed> KeyboardGui(Gui* g, Rect r, int starting_octave)
 
     f32 const white_note_width = (r.w / (num_octaves * 7.0f));
     f32 const black_note_width =
-        (white_note_width * (0.5f * g_live_edit_gui.ui_sizes[ToInt(UiSizeId::MidiKeyboardBlackNoteWidth)] / 100.0f));
-    f32 const active_voice_marker_h = r.h * (g_live_edit_gui.ui_sizes[ToInt(UiSizeId::MidiKeyboardActiveMarkerH)] / 100.0f);
+        (white_note_width *
+         (0.5f * imgui.live_edit_values.ui_sizes[ToInt(UiSizeId::MidiKeyboardBlackNoteWidth)] / 100.0f));
+    f32 const active_voice_marker_h =
+        r.h * (imgui.live_edit_values.ui_sizes[ToInt(UiSizeId::MidiKeyboardActiveMarkerH)] / 100.0f);
 
     f32 const d1 = ((white_note_width * 3) - (black_note_width * 2)) / 3;
     f32 const d2 = ((white_note_width * 4) - (black_note_width * 3)) / 4;
@@ -55,7 +57,7 @@ Optional<KeyboardGuiKeyPressed> KeyboardGui(Gui* g, Rect r, int starting_octave)
     auto overlay_key = [&](int key, Rect key_rect, UiColMap col_index) {
         auto const num_active_voices = voices_per_midi_note[(usize)key].Load();
         if (num_active_voices != 0) {
-            auto overlay = colours::FromU32(editor::GetCol(imgui, col_index));
+            auto overlay = colours::FromU32(live_edit::Col(imgui, col_index));
             overlay.a = (uint8_t)Min(255, overlay.a + 40 * num_active_voices);
             auto overlay_u32 = colours::ToU32(overlay);
             imgui.graphics->AddRectFilled(key_rect.Min(),

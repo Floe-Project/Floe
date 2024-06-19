@@ -4,7 +4,7 @@
 #pragma once
 #include "foundation/foundation.hpp"
 
-#include "gui_editor_ui_style.hpp"
+#include "framework/gui_imgui.hpp"
 #include "gui_fwd.hpp"
 #include "layout.hpp"
 

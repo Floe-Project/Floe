@@ -10,12 +10,12 @@
 
 #include "common/constants.hpp"
 #include "common/paths.hpp"
+#include "framework/gui_live_edit.hpp"
 #include "framework/gui_platform.hpp"
 #include "gui.hpp"
 #include "gui/framework/draw_list.hpp"
 #include "gui/gui_button_widgets.hpp"
 #include "gui_drawing_helpers.hpp"
-#include "gui_editor_ui_style.hpp"
 #include "gui_label_widgets.hpp"
 #include "gui_widget_helpers.hpp"
 #include "gui_window.hpp"
@@ -56,8 +56,8 @@ static void StandalonePopupHeading(Gui* g,
                                    String str,
                                    TextJustification justification = TextJustification::CentredLeft) {
     auto& imgui = g->imgui;
-    auto error_window_title_h = editor::GetSize(imgui, UiSizeId::ErrorWindowTitleH);
-    auto error_window_title_gap_y = editor::GetSize(imgui, UiSizeId::ErrorWindowTitleGapY);
+    auto error_window_title_h = live_edit::Size(imgui, UiSizeId::ErrorWindowTitleH);
+    auto error_window_title_gap_y = live_edit::Size(imgui, UiSizeId::ErrorWindowTitleGapY);
 
     imgui.graphics->context->PushFont(g->mada);
     auto const r = imgui.GetRegisteredAndConvertedRect({0, y_pos, imgui.Width(), error_window_title_h});
@@ -142,8 +142,8 @@ void DoErrorsStandalone(Gui* g) {
     g->gui_platform.graphics_ctx->PushFont(g->roboto_small);
     DEFER { g->gui_platform.graphics_ctx->PopFont(); };
     auto& imgui = g->imgui;
-    auto popup_w = editor::GetSize(imgui, UiSizeId::ErrorWindowWidth);
-    auto popup_h = editor::GetSize(imgui, UiSizeId::ErrorWindowHeight);
+    auto popup_w = live_edit::Size(imgui, UiSizeId::ErrorWindowWidth);
+    auto popup_h = live_edit::Size(imgui, UiSizeId::ErrorWindowHeight);
 
     auto settings = StandalonePopupSettings(g->imgui);
 
@@ -155,7 +155,7 @@ void DoErrorsStandalone(Gui* g) {
 
     auto font = imgui.graphics->context->CurrentFont();
 
-#define GUI_SIZE(cat, n, v, u) [[maybe_unused]] const auto cat##n = editor::GetSize(imgui, UiSizeId::cat##n);
+#define GUI_SIZE(cat, n, v, u) [[maybe_unused]] const auto cat##n = live_edit::Size(imgui, UiSizeId::cat##n);
 #include SIZES_DEF_FILENAME
 #undef GUI_SIZE
 
@@ -225,7 +225,7 @@ void DoErrorsStandalone(Gui* g) {
                             auto col = GMC(ErrorWindowButtonBack);
                             if (imgui.IsHot(id)) col = GMC(ErrorWindowButtonBackHover);
                             if (imgui.IsActive(id)) col = GMC(ErrorWindowButtonBackActive);
-                            auto const rounding = editor::GetSize(imgui, UiSizeId::CornerRounding);
+                            auto const rounding = live_edit::Size(imgui, UiSizeId::CornerRounding);
                             imgui.graphics->AddRectFilled(r.Min(), r.Max(), col, rounding);
 
                             auto text_r = r;
@@ -282,8 +282,8 @@ void DoMetricsStandalone(Gui* g) {
     g->gui_platform.graphics_ctx->PushFont(g->roboto_small);
     DEFER { g->gui_platform.graphics_ctx->PopFont(); };
     auto& imgui = g->imgui;
-    auto popup_w = editor::GetSize(imgui, UiSizeId::MetricsWindowWidth);
-    auto popup_h = editor::GetSize(imgui, UiSizeId::MetricsWindowHeight);
+    auto popup_w = live_edit::Size(imgui, UiSizeId::MetricsWindowWidth);
+    auto popup_h = live_edit::Size(imgui, UiSizeId::MetricsWindowHeight);
 
     auto settings = StandalonePopupSettings(g->imgui);
 
@@ -330,8 +330,8 @@ void DoAboutStandalone(Gui* g) {
     g->gui_platform.graphics_ctx->PushFont(g->roboto_small);
     DEFER { g->gui_platform.graphics_ctx->PopFont(); };
     auto& imgui = g->imgui;
-    auto popup_w = editor::GetSize(imgui, UiSizeId::AboutWindowWidth);
-    auto popup_h = editor::GetSize(imgui, UiSizeId::AboutWindowHeight);
+    auto popup_w = live_edit::Size(imgui, UiSizeId::AboutWindowWidth);
+    auto popup_h = live_edit::Size(imgui, UiSizeId::AboutWindowHeight);
 
     auto settings = StandalonePopupSettings(g->imgui);
 
@@ -371,8 +371,8 @@ void DoLoadingOverlay(Gui* g) {
     DEFER { g->gui_platform.graphics_ctx->PopFont(); };
     auto& imgui = g->imgui;
 
-    auto popup_w = editor::GetSize(imgui, UiSizeId::LoadingOverlayBoxWidth);
-    auto popup_h = editor::GetSize(imgui, UiSizeId::LoadingOverlayBoxHeight);
+    auto popup_w = live_edit::Size(imgui, UiSizeId::LoadingOverlayBoxWidth);
+    auto popup_h = live_edit::Size(imgui, UiSizeId::LoadingOverlayBoxHeight);
 
     auto settings = StandalonePopupSettings(g->imgui);
 
@@ -399,8 +399,8 @@ void DoInstrumentInfoStandalone(Gui* g) {
     g->gui_platform.graphics_ctx->PushFont(g->roboto_small);
     DEFER { g->gui_platform.graphics_ctx->PopFont(); };
     auto& imgui = g->imgui;
-    auto popup_w = editor::GetSize(imgui, UiSizeId::InfoWindowWidth);
-    auto popup_h = editor::GetSize(imgui, UiSizeId::InfoWindowHeight);
+    auto popup_w = live_edit::Size(imgui, UiSizeId::InfoWindowWidth);
+    auto popup_h = live_edit::Size(imgui, UiSizeId::InfoWindowHeight);
 
     auto settings = StandalonePopupSettings(g->imgui);
 
@@ -426,8 +426,8 @@ void DoSettingsStandalone(Gui* g) {
     g->gui_platform.graphics_ctx->PushFont(g->roboto_small);
     DEFER { g->gui_platform.graphics_ctx->PopFont(); };
     auto& imgui = g->imgui;
-    auto popup_w = editor::GetSize(imgui, UiSizeId::SettingsWindowWidth);
-    auto popup_h = editor::GetSize(imgui, UiSizeId::SettingsWindowHeight);
+    auto popup_w = live_edit::Size(imgui, UiSizeId::SettingsWindowWidth);
+    auto popup_h = live_edit::Size(imgui, UiSizeId::SettingsWindowHeight);
 
     auto settings = StandalonePopupSettings(g->imgui);
 
@@ -459,7 +459,7 @@ void DoSettingsStandalone(Gui* g) {
         ASSERT(right_col_width > line_height);
         auto const path_gui_height = line_height * 1.5f;
         auto const path_gui_spacing = line_height / 3;
-        auto const rounding = editor::GetSize(g->imgui, UiSizeId::CornerRounding);
+        auto const rounding = live_edit::Size(g->imgui, UiSizeId::CornerRounding);
 
         auto do_toggle_button = [&](String title, bool& state) {
             bool result = false;
@@ -713,8 +713,8 @@ void DoLicencesStandalone(Gui* g) {
     g->gui_platform.graphics_ctx->PushFont(g->roboto_small);
     DEFER { g->gui_platform.graphics_ctx->PopFont(); };
     auto& imgui = g->imgui;
-    auto popup_w = editor::GetSize(imgui, UiSizeId::LicencesWindowWidth);
-    auto popup_h = editor::GetSize(imgui, UiSizeId::LicencesWindowHeight);
+    auto popup_w = live_edit::Size(imgui, UiSizeId::LicencesWindowWidth);
+    auto popup_h = live_edit::Size(imgui, UiSizeId::LicencesWindowHeight);
 
     auto settings = StandalonePopupSettings(g->imgui);
 
@@ -726,7 +726,7 @@ void DoLicencesStandalone(Gui* g) {
 
     if (imgui.BeginWindowPopup(settings, GetStandaloneID(StandaloneWindowsLicences), r, "LicencesModal")) {
         DoStandaloneCloseButton(g);
-        auto h = editor::GetSize(imgui, UiSizeId::MenuItemHeight);
+        auto h = live_edit::Size(imgui, UiSizeId::MenuItemHeight);
         f32 y_pos = 0;
         StandalonePopupHeading(g, y_pos, "Licences");
 

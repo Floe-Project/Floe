@@ -3,8 +3,8 @@
 
 #include "gui_widget_compounds.hpp"
 
+#include "framework/gui_live_edit.hpp"
 #include "gui.hpp"
-#include "gui_editor_ui_style.hpp"
 #include "gui_label_widgets.hpp"
 #include "gui_widget_helpers.hpp"
 #include "param_info.hpp"
@@ -22,7 +22,7 @@ LayID LayoutParameterComponent(Gui* g,
     auto& imgui = g->imgui;
     auto& lay = g->layout;
 
-#define GUI_SIZE(cat, n, v, u) [[maybe_unused]] const auto cat##n = editor::GetSize(imgui, UiSizeId::cat##n);
+#define GUI_SIZE(cat, n, v, u) [[maybe_unused]] const auto cat##n = live_edit::Size(imgui, UiSizeId::cat##n);
 #include SIZES_DEF_FILENAME
 #undef GUI_SIZE
 
@@ -32,7 +32,7 @@ LayID LayoutParameterComponent(Gui* g,
     auto const starting_width = width;
     auto height = width - ParamComponentHeightOffset;
     auto const starting_height = height;
-    auto gap_x = size_index_for_gapx ? editor::GetSize(imgui, *size_index_for_gapx) : ParamComponentMarginLR;
+    auto gap_x = size_index_for_gapx ? live_edit::Size(imgui, *size_index_for_gapx) : ParamComponentMarginLR;
     auto gap_bottom = ParamComponentMarginB;
     auto gap_top = ParamComponentMarginT;
 
@@ -87,10 +87,10 @@ LayID LayoutParameterComponent(Gui* g,
         set_bottom_gap_independent_of_size);
 
     if (param.info.value_type == ParamValueType::Int) {
-        auto const dragger_width = editor::GetSize(g->imgui, UiSizeId::FXDraggerWidth);
-        auto const dragger_height = editor::GetSize(g->imgui, UiSizeId::FXDraggerHeight);
-        auto const dragger_margin_t = editor::GetSize(g->imgui, UiSizeId::FXDraggerMarginT);
-        auto const dragger_margin_b = editor::GetSize(g->imgui, UiSizeId::FXDraggerMarginB);
+        auto const dragger_width = live_edit::Size(g->imgui, UiSizeId::FXDraggerWidth);
+        auto const dragger_height = live_edit::Size(g->imgui, UiSizeId::FXDraggerHeight);
+        auto const dragger_margin_t = live_edit::Size(g->imgui, UiSizeId::FXDraggerMarginT);
+        auto const dragger_margin_b = live_edit::Size(g->imgui, UiSizeId::FXDraggerMarginB);
 
         lay_set_size_xy(&g->layout.ctx, param_layid, dragger_width, dragger_height);
         g->layout.SetTopMargin(param_layid, dragger_margin_t);

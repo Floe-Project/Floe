@@ -5,6 +5,7 @@
 #include "foundation/foundation.hpp"
 
 #include "draw_list.hpp"
+#include "gui_live_edit.hpp"
 #include "gui_platform.hpp"
 
 namespace imgui {
@@ -729,6 +730,43 @@ struct Context {
     int dragged_mouse = -1;
 
     DynamicArray<Id> id_stack {Malloc::Instance()};
+
+#if !FLOE_EDITOR_ENABLED
+    static constexpr
+#endif
+        // NOLINTNEXTLINE(readability-identifier-naming)
+        LiveEditGui live_edit_values {
+            .ui_sizes =
+                {
+#define GUI_SIZE(cat, n, v, unit) v,
+#include SIZES_DEF_FILENAME
+#undef GUI_SIZE
+                },
+            .ui_sizes_units =
+                {
+#define GUI_SIZE(cat, n, v, unit) UiSizeUnit::unit,
+#include SIZES_DEF_FILENAME
+#undef GUI_SIZE
+                },
+            .ui_sizes_names =
+                {
+#define GUI_SIZE(cat, n, v, unit) #n,
+#include SIZES_DEF_FILENAME
+#undef GUI_SIZE
+                },
+            .ui_cols =
+                {
+#define GUI_COL(name, val, based_on, bright, alpha) {String(name), val, String(based_on), bright, alpha},
+#include COLOURS_DEF_FILENAME
+#undef GUI_COL
+                },
+            .ui_col_map =
+                {
+#define GUI_COL_MAP(cat, n, col, high_contrast_col) {String(col), String(high_contrast_col)},
+#include COLOUR_MAP_DEF_FILENAME
+#undef GUI_COL_MAP
+                },
+        };
 };
 
 f32x2 BestPopupPos(Rect base_r, Rect avoid_r, f32x2 window_size, bool find_left_or_right);
@@ -922,3 +960,42 @@ PUBLIC TextSettings DefText() {
 }
 
 } // namespace imgui
+
+namespace live_edit {
+
+extern bool g_high_contrast_gui; // IMPROVE: this is hacky
+
+inline u32 Col(imgui::Context const& imgui, UiColMap type) {
+    auto const map_index = ToInt(type);
+
+    String const col_string =
+        (g_high_contrast_gui && imgui.live_edit_values.ui_col_map[map_index].high_contrast_colour.size)
+            ? imgui.live_edit_values.ui_col_map[map_index].high_contrast_colour
+            : imgui.live_edit_values.ui_col_map[map_index].colour;
+
+    // NOTE: linear search but probably ok
+    for (auto const i : Range(k_max_num_colours))
+        if (String(imgui.live_edit_values.ui_cols[i].name) == col_string) {
+            return imgui.live_edit_values.ui_cols[i].col;
+            break;
+        }
+
+    return {};
+}
+
+inline f32 Size(imgui::Context const& imgui, UiSizeId size_id) {
+    f32 res = 1;
+    switch (imgui.live_edit_values.ui_sizes_units[ToInt(size_id)]) {
+        case UiSizeUnit::Points:
+            res = imgui.PointsToPixels(imgui.live_edit_values.ui_sizes[ToInt(size_id)]);
+            break;
+        case UiSizeUnit::None: res = imgui.live_edit_values.ui_sizes[ToInt(size_id)]; break;
+        case UiSizeUnit::Count: PanicIfReached();
+    }
+    return res;
+}
+
+} // namespace live_edit
+
+// Get Mapped Colour
+#define GMC(v) live_edit::Col(imgui, UiColMap::v)

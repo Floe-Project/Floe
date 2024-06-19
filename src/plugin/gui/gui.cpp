@@ -16,9 +16,9 @@
 #include "build_resources/embedded_files.h"
 #include "common/common_errors.hpp"
 #include "common/constants.hpp"
+#include "framework/gui_live_edit.hpp"
 #include "gui/framework/draw_list.hpp"
 #include "gui/framework/gui_imgui.hpp"
-#include "gui_editor_ui_style.hpp"
 #include "gui_editor_widgets.hpp"
 #include "gui_editors.hpp"
 #include "gui_standalone_popups.hpp"
@@ -380,7 +380,7 @@ LibraryImages LoadLibraryBackgroundAndIconIfNeeded(Gui* g, sample_lib::Library c
             auto const window_size = g->gui_platform.window_size.ToFloat2() * 0.5f;
             if ((int)window_size.x < background_size.width && (int)window_size.x < background_size.height) {
                 auto const downscale_factor =
-                    editor::GetSize(g->imgui, UiSizeId::BackgroundBlurringDownscaleFactor) / 100.0f;
+                    live_edit::Size(g->imgui, UiSizeId::BackgroundBlurringDownscaleFactor) / 100.0f;
 
                 blur_img_size = {(u16)(window_size.x * downscale_factor),
                                  (u16)(window_size.y * downscale_factor)};
@@ -415,7 +415,7 @@ LibraryImages LoadLibraryBackgroundAndIconIfNeeded(Gui* g, sample_lib::Library c
                 brightness /= (u64)blurred_image_num_bytes;
                 brightness_percent = (f32)brightness / 255.0f;
                 f32 const max_exponent =
-                    editor::GetSize(g->imgui, UiSizeId::BackgroundBlurringBrightnessExponent) / 100.0f;
+                    live_edit::Size(g->imgui, UiSizeId::BackgroundBlurringBrightnessExponent) / 100.0f;
                 brightness_scaling =
                     Pow(2.0f, MapFrom01(1 - brightness_percent, -max_exponent, max_exponent));
 
@@ -439,9 +439,11 @@ LibraryImages LoadLibraryBackgroundAndIconIfNeeded(Gui* g, sample_lib::Library c
             // Blend on top a dark colour to achieve a more consistently dark background
             {
                 f32x4 const overlay_colour =
-                    Clamp(editor::GetSize(g->imgui, UiSizeId::BackgroundBlurringOverlayColour), 0.0f, 255.0f);
+                    Clamp(live_edit::Size(g->imgui, UiSizeId::BackgroundBlurringOverlayColour),
+                          0.0f,
+                          255.0f);
                 f32x4 const overlay_intensity =
-                    Clamp(editor::GetSize(g->imgui, UiSizeId::BackgroundBlurringOverlayIntensity) / 100.0f,
+                    Clamp(live_edit::Size(g->imgui, UiSizeId::BackgroundBlurringOverlayIntensity) / 100.0f,
                           0.0f,
                           1.0f);
 
@@ -463,7 +465,7 @@ LibraryImages LoadLibraryBackgroundAndIconIfNeeded(Gui* g, sample_lib::Library c
             {
                 // 1. Do a subtle blur into a new buffer
                 auto const subtle_blur_radius =
-                    (int)(editor::GetSize(g->imgui, UiSizeId::BackgroundBlurringBlurringSmall) *
+                    (int)(live_edit::Size(g->imgui, UiSizeId::BackgroundBlurringBlurringSmall) *
                           ((f32)blur_img_size.width / 700.0f));
                 auto subtle_blur_buffer =
                     arena.AllocateBytesForTypeOversizeAllowed<u8>(blurred_image_num_bytes);
@@ -481,7 +483,7 @@ LibraryImages LoadLibraryBackgroundAndIconIfNeeded(Gui* g, sample_lib::Library c
                 auto huge_blur_buffer =
                     arena.AllocateBytesForTypeOversizeAllowed<u8>(blurred_image_num_bytes);
                 auto const huge_blur_radius =
-                    editor::GetSize(g->imgui, UiSizeId::BackgroundBlurringBlurring) *
+                    live_edit::Size(g->imgui, UiSizeId::BackgroundBlurringBlurring) *
                     ((f32)blur_img_size.width / 700.0f);
                 BoxBlur(blurred_image_buffer.data,
                         huge_blur_buffer.data,
@@ -493,7 +495,7 @@ LibraryImages LoadLibraryBackgroundAndIconIfNeeded(Gui* g, sample_lib::Library c
                 auto s = subtle_blur_buffer.data;
                 auto h = huge_blur_buffer.data;
                 auto const opacity_of_subtle_blur_on_top_huge_blur =
-                    editor::GetSize(g->imgui, UiSizeId::BackgroundBlurringBlurringSmallOpacity) / 100.0f;
+                    live_edit::Size(g->imgui, UiSizeId::BackgroundBlurringBlurringSmallOpacity) / 100.0f;
 
                 for (usize i = 0; i < blurred_image_num_bytes; i += k_channels) {
                     f32x4 const s_v {(f32)s[i + 0], (f32)s[i + 1], (f32)s[i + 2], 0};
@@ -735,7 +737,7 @@ void GUIUpdate(Gui* g) {
     ZoneScoped;
     DebugAssertMainThread(g->plugin.host);
 
-    editor::g_high_contrast_gui = g->settings.settings.gui.high_contrast_gui; // IMRPOVE: hacky
+    live_edit::g_high_contrast_gui = g->settings.settings.gui.high_contrast_gui; // IMRPOVE: hacky
     g->scratch_arena.ResetCursorAndConsolidateRegions();
     CreateFontsIfNeeded(g);
     auto& imgui = g->imgui;
@@ -755,7 +757,7 @@ void GUIUpdate(Gui* g) {
     DEFER { g->gui_platform.graphics_ctx->PopFont(); };
 
     auto& settings = g->settings.settings.gui;
-    auto const top_h = editor::GetSize(imgui, UiSizeId::Top2Height);
+    auto const top_h = live_edit::Size(imgui, UiSizeId::Top2Height);
     auto const bot_h = settings.show_keyboard ? gui_settings::KeyboardHeight(g->settings.settings.gui) : 0;
     auto const mid_h = (f32)g->gui_platform.window_size.height - (top_h + bot_h);
 
@@ -816,10 +818,10 @@ void GUIUpdate(Gui* g) {
     {
         auto sets = imgui::DefWindow();
         sets.draw_routine_window_background = draw_top_window;
-        sets.pad_top_left = {editor::GetSize(imgui, UiSizeId::Top2PadLR),
-                             editor::GetSize(imgui, UiSizeId::Top2PadT)};
-        sets.pad_bottom_right = {editor::GetSize(imgui, UiSizeId::Top2PadLR),
-                                 editor::GetSize(imgui, UiSizeId::Top2PadB)};
+        sets.pad_top_left = {live_edit::Size(imgui, UiSizeId::Top2PadLR),
+                             live_edit::Size(imgui, UiSizeId::Top2PadT)};
+        sets.pad_bottom_right = {live_edit::Size(imgui, UiSizeId::Top2PadLR),
+                                 live_edit::Size(imgui, UiSizeId::Top2PadB)};
         imgui.BeginWindow(sets, {0, 0, imgui.Width(), top_h}, "TopPanel");
         TopPanel(g);
         imgui.EndWindow();

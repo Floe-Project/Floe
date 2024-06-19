@@ -2454,3 +2454,9 @@ f32 Context::LargestStringWidth(f32 pad, Span<String const> strs) {
 }
 
 } // namespace imgui
+
+namespace live_edit {
+
+bool g_high_contrast_gui = false;
+
+} // namespace live_edit

@@ -50,3 +50,10 @@ bool EditorMenuItems(EditorGUI* g, Span<String const> items, int& current);
 bool EditorMenu(EditorGUI* g, Rect r, Span<String const> items, int& current);
 
 void EditorLabelAlternatingBack(EditorGUI* g, Rect r, String, bool extra_highlight);
+
+void WriteColoursFile();
+void WriteSizesFile();
+void WriteColourMapFile();
+void SizesGUISliders(EditorGUI* g, String search);
+void ColourMapGUIMenus(EditorGUI* g, String search, String colour_search, bool show_high_contrast);
+void ColoursGUISliders(EditorGUI* gui, String search);

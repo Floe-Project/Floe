@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #pragma once
+#include "framework/gui_live_edit.hpp"
 #include "gui.hpp"
-#include "gui_editor_ui_style.hpp"
 #include "gui_label_widgets.hpp"
 #include "gui_widget_helpers.hpp"
 
@@ -13,10 +13,10 @@ struct PopupMenuItems {
         m_g = _g;
 
         m_g->imgui.graphics->context->PushFont(m_g->roboto_small);
-        m_h = editor::GetSize(m_g->imgui, UiSizeId::MenuItemHeight);
+        m_h = live_edit::Size(m_g->imgui, UiSizeId::MenuItemHeight);
 
-        m_div_gap_x = editor::GetSize(m_g->imgui, UiSizeId::MenuItemDividerGapX);
-        m_div_h = editor::GetSize(m_g->imgui, UiSizeId::MenuItemDividerH);
+        m_div_gap_x = live_edit::Size(m_g->imgui, UiSizeId::MenuItemDividerGapX);
+        m_div_h = live_edit::Size(m_g->imgui, UiSizeId::MenuItemDividerH);
 
         m_w = MenuItemWidth(m_g, m_items);
         m_y_pos = 0;

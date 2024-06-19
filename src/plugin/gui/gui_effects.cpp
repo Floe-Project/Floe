@@ -7,11 +7,11 @@
 #include <icons-fa/IconsFontAwesome5.h>
 
 #include "effects/effect.hpp"
+#include "framework/gui_live_edit.hpp"
 #include "gui.hpp"
 #include "gui/framework/colours.hpp"
 #include "gui/framework/gui_imgui.hpp"
 #include "gui/gui_dragger_widgets.hpp"
-#include "gui_editor_ui_style.hpp"
 #include "gui_label_widgets.hpp"
 #include "gui_widget_compounds.hpp"
 #include "gui_widget_helpers.hpp"
@@ -179,14 +179,11 @@ static FXColours GetFxCols(imgui::Context const& imgui, EffectType type) {
     switch (type) {
         case EffectType::Distortion:
             return {GMC(DistortionBack), GMC(DistortionHighlight), GMC(DistortionButton)};
-        case EffectType::BitCrush:
-            return {GMC(BitCrushBack), GMC(BitCrushHighlight), GMC(BitCrushButton)};
+        case EffectType::BitCrush: return {GMC(BitCrushBack), GMC(BitCrushHighlight), GMC(BitCrushButton)};
         case EffectType::Compressor:
             return {GMC(CompressorBack), GMC(CompressorHighlight), GMC(CompressorButton)};
-        case EffectType::FilterEffect:
-            return {GMC(FilterBack), GMC(FilterHighlight), GMC(FilterButton)};
-        case EffectType::StereoWiden:
-            return {GMC(StereoBack), GMC(StereoHighlight), GMC(StereoButton)};
+        case EffectType::FilterEffect: return {GMC(FilterBack), GMC(FilterHighlight), GMC(FilterButton)};
+        case EffectType::StereoWiden: return {GMC(StereoBack), GMC(StereoHighlight), GMC(StereoButton)};
         case EffectType::Chorus: return {GMC(ChorusBack), GMC(ChorusHighlight), GMC(ChorusButton)};
         case EffectType::Reverb: return {GMC(ReverbBack), GMC(ReverbHighlight), GMC(ReverbButton)};
         case EffectType::NewDelay: return {GMC(DelayBack), GMC(DelayHighlight), GMC(DelayButton)};
@@ -203,7 +200,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
     auto& lay = g->layout;
     auto& plugin = g->plugin;
 
-#define GUI_SIZE(cat, n, v, u) [[maybe_unused]] const auto cat##n = editor::GetSize(imgui, UiSizeId::cat##n);
+#define GUI_SIZE(cat, n, v, u) [[maybe_unused]] const auto cat##n = live_edit::Size(imgui, UiSizeId::cat##n);
 #include SIZES_DEF_FILENAME
 #undef GUI_SIZE
 

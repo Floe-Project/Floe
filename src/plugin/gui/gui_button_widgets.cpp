@@ -3,8 +3,8 @@
 
 #include "gui_button_widgets.hpp"
 
+#include "framework/gui_live_edit.hpp"
 #include "gui.hpp"
-#include "gui_editor_ui_style.hpp"
 #include "gui_velocity_buttons.hpp"
 #include "gui_widget_helpers.hpp"
 #include "gui_window.hpp"
@@ -36,7 +36,7 @@ static u32 GetCol(Gui* g, Style const& style, ColourSet const& colours, imgui::I
 
 static bool DrawBackground(Gui* g, Style const& style, Rect r, imgui::Id id, bool state) {
     if (auto col = GetCol(g, style, style.back_cols, id, state)) {
-        auto const rounding = editor::GetSize(g->imgui, UiSizeId::CornerRounding);
+        auto const rounding = live_edit::Size(g->imgui, UiSizeId::CornerRounding);
         g->imgui.graphics->AddRectFilled(r.Min(), r.Max(), col, rounding, style.corner_rounding_flags);
         return true;
     }
@@ -55,12 +55,12 @@ static void DrawKeyboardIcon(Gui* g, Style const& style, Rect r, imgui::Id id, b
     auto& s = g->imgui;
     DrawBackground(g, style, r, id, state);
 
-    auto const white_width = editor::GetSize(s, UiSizeId::KeyboardIconWhiteWidth) / 100.0f * r.w;
-    auto const white_height = editor::GetSize(s, UiSizeId::KeyboardIconWhiteHeight) / 100.0f * r.w;
-    auto const rounding = editor::GetSize(s, UiSizeId::KeyboardIconRounding) / 100.0f * r.w;
-    auto const black_width = editor::GetSize(s, UiSizeId::KeyboardIconBlackWidth) / 100.0f * r.w;
-    auto const black_height = editor::GetSize(s, UiSizeId::KeyboardIconBlackHeight) / 100.0f * r.w;
-    auto const gap = Max(1.0f, editor::GetSize(s, UiSizeId::KeyboardIconGap) / 100.0f * r.w);
+    auto const white_width = live_edit::Size(s, UiSizeId::KeyboardIconWhiteWidth) / 100.0f * r.w;
+    auto const white_height = live_edit::Size(s, UiSizeId::KeyboardIconWhiteHeight) / 100.0f * r.w;
+    auto const rounding = live_edit::Size(s, UiSizeId::KeyboardIconRounding) / 100.0f * r.w;
+    auto const black_width = live_edit::Size(s, UiSizeId::KeyboardIconBlackWidth) / 100.0f * r.w;
+    auto const black_height = live_edit::Size(s, UiSizeId::KeyboardIconBlackHeight) / 100.0f * r.w;
+    auto const gap = Max(1.0f, live_edit::Size(s, UiSizeId::KeyboardIconGap) / 100.0f * r.w);
 
     auto const total_width = white_width * 3 + gap * 2;
     auto const total_height = white_height;
@@ -108,10 +108,10 @@ static void DrawIconOrText(Gui* g,
 
     if (style.icon_or_text.justification & TextJustification::Left) {
         if (style.icon_or_text.add_margin_x)
-            r = r.CutLeft(editor::GetSize(s, UiSizeId::MenuButtonTextMarginL));
+            r = r.CutLeft(live_edit::Size(s, UiSizeId::MenuButtonTextMarginL));
     } else if (style.icon_or_text.justification & TextJustification::Right) {
         if (style.icon_or_text.add_margin_x)
-            r = r.CutRight(editor::GetSize(s, UiSizeId::MenuButtonTextMarginL));
+            r = r.CutRight(live_edit::Size(s, UiSizeId::MenuButtonTextMarginL));
     }
 
     if (style.icon_or_text.capitalise) str = GetTempCapitalisedString(str);
@@ -136,17 +136,17 @@ static void DrawIconAndTextButton(Gui* g, Style const& style, Rect r, imgui::Id 
         auto just = TextJustification::CentredLeft;
         auto btn_r = r;
         if (style.type == LayoutAndSizeType::IconAndTextLayerTab) {
-            btn_r = r.WithW(editor::GetSize(s, UiSizeId::LayerParamsGroupTabsIconW));
+            btn_r = r.WithW(live_edit::Size(s, UiSizeId::LayerParamsGroupTabsIconW));
             just = TextJustification::CentredRight;
         } else if (style.type == LayoutAndSizeType::IconAndTextMidiButton) {
-            btn_r = r.WithW(editor::GetSize(s, UiSizeId::MIDI_ItemWidth));
+            btn_r = r.WithW(live_edit::Size(s, UiSizeId::MIDI_ItemWidth));
             just = TextJustification::CentredRight;
         } else if (style.type == LayoutAndSizeType::IconAndTextMenuItem) {
-            btn_r = r.WithW(editor::GetSize(s, UiSizeId::MenuItem_TickWidth))
-                        .CutLeft(editor::GetSize(s, UiSizeId::MenuItem_IconMarginX));
+            btn_r = r.WithW(live_edit::Size(s, UiSizeId::MenuItem_TickWidth))
+                        .CutLeft(live_edit::Size(s, UiSizeId::MenuItem_IconMarginX));
         } else if (style.type == LayoutAndSizeType::IconAndTextSubMenuItem) {
-            btn_r = r.CutLeft(r.w - editor::GetSize(s, UiSizeId::MenuItem_SubMenuArrowWidth))
-                        .CutRight(editor::GetSize(s, UiSizeId::MenuItem_IconMarginX));
+            btn_r = r.CutLeft(r.w - live_edit::Size(s, UiSizeId::MenuItem_SubMenuArrowWidth))
+                        .CutRight(live_edit::Size(s, UiSizeId::MenuItem_IconMarginX));
             just = TextJustification::CentredRight;
         }
         s.graphics->AddTextJustified(btn_r,
@@ -160,13 +160,13 @@ static void DrawIconAndTextButton(Gui* g, Style const& style, Rect r, imgui::Id 
     if (style.icon_and_text.capitalise) str = GetTempCapitalisedString(str);
 
     auto just = TextJustification::CentredLeft;
-    auto text_offset = editor::GetSize(s, UiSizeId::Page_HeadingTextOffset);
+    auto text_offset = live_edit::Size(s, UiSizeId::Page_HeadingTextOffset);
     if (style.type == LayoutAndSizeType::IconAndTextMidiButton) {
-        text_offset =
-            editor::GetSize(s, UiSizeId::MIDI_ItemWidth) + editor::GetSize(s, UiSizeId::MIDI_ItemMarginLR);
+        text_offset = live_edit::Size(s, UiSizeId::MIDI_ItemWidth) +
+                      live_edit::Size(s, UiSizeId::MIDI_ItemMarginLR);
     } else if (style.type == LayoutAndSizeType::IconAndTextMenuItem ||
                style.type == LayoutAndSizeType::IconAndTextSubMenuItem) {
-        text_offset = editor::GetSize(s, UiSizeId::MenuItem_TickWidth);
+        text_offset = live_edit::Size(s, UiSizeId::MenuItem_TickWidth);
     } else if (style.type == LayoutAndSizeType::IconAndTextLayerTab) {
         text_offset = 0;
         just = TextJustification::Centred;

@@ -34,8 +34,8 @@ Optional<KeyboardGuiKeyPressed> KeyboardGui(Gui* g, Rect r, int starting_octave)
 
     f32 const white_note_width = (r.w / (num_octaves * 7.0f));
     f32 const black_note_width =
-        (white_note_width * (0.5f * ui_sizes[ToInt(UiSizeId::MidiKeyboardBlackNoteWidth)] / 100.0f));
-    f32 const active_voice_marker_h = r.h * (ui_sizes[ToInt(UiSizeId::MidiKeyboardActiveMarkerH)] / 100.0f);
+        (white_note_width * (0.5f * g_live_edit_gui.ui_sizes[ToInt(UiSizeId::MidiKeyboardBlackNoteWidth)] / 100.0f));
+    f32 const active_voice_marker_h = r.h * (g_live_edit_gui.ui_sizes[ToInt(UiSizeId::MidiKeyboardActiveMarkerH)] / 100.0f);
 
     f32 const d1 = ((white_note_width * 3) - (black_note_width * 2)) / 3;
     f32 const d2 = ((white_note_width * 4) - (black_note_width * 3)) / 4;

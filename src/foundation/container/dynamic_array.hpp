@@ -509,6 +509,9 @@ struct DynamicArray {
     usize capacity_bytes {};
 };
 
+// IMPROVE: for trivially copyable types, use a union for storage like we do for Optional so that the type can
+// be used in constexpr contexts
+
 template <typename Type, usize k_capacity>
 requires(!Const<Type>)
 struct DynamicArrayInline {

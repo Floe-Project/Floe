@@ -28,10 +28,17 @@ enum class UiSizeId : u16 {
     Count
 };
 
-extern f32 ui_sizes[ToInt(UiSizeId::Count)];
-extern UiSizeUnit ui_sizes_units[ToInt(UiSizeId::Count)];
-
-using ColourString = DynamicArrayInline<char, 30>;
+struct ColourString {
+    constexpr ColourString() = default;
+    constexpr ColourString(String s) : size(s.size) { __builtin_memcpy(data, s.data, s.size); }
+    constexpr operator String() const { return {data, size}; }
+    void NullTerminate() {
+        ASSERT(size < ArraySize(data));
+        data[size] = 0;
+    }
+    usize size {};
+    char data[30] {};
+};
 
 struct EditorCol {
     ColourString name {};
@@ -43,7 +50,6 @@ struct EditorCol {
 };
 
 static constexpr int k_max_num_colours = 74;
-extern EditorCol ui_cols[k_max_num_colours];
 
 enum class UiColMap : u16 {
 #define GUI_COL_MAP(cat, n, v, high_contrast_col) cat##n,
@@ -57,7 +63,15 @@ struct EditorColMap {
     ColourString high_contrast_colour;
 };
 
-extern EditorColMap ui_col_map[ToInt(UiColMap::Count)];
+struct LiveEditGui {
+    f32 ui_sizes[ToInt(UiSizeId::Count)];
+    UiSizeUnit ui_sizes_units[ToInt(UiSizeId::Count)];
+    String ui_sizes_names[ToInt(UiSizeId::Count)];
+    EditorCol ui_cols[k_max_num_colours];
+    EditorColMap ui_col_map[ToInt(UiColMap::Count)];
+};
+
+extern LiveEditGui g_live_edit_gui;
 
 // Get Mapped Colour
 #define GMC(v) editor::GetCol(imgui, UiColMap::v)
@@ -70,19 +84,20 @@ extern bool g_high_contrast_gui; // IMPROVE: this is hacky
 
 inline u32 GetCol(imgui::Context const&, UiColMap type) {
     auto const map_index = ToInt(type);
-    String col_string = ui_col_map[map_index].colour;
-    if (g_high_contrast_gui && ui_col_map[map_index].high_contrast_colour.size)
-        col_string = ui_col_map[map_index].high_contrast_colour;
+    String col_string = g_live_edit_gui.ui_col_map[map_index].colour;
+    if (g_high_contrast_gui && g_live_edit_gui.ui_col_map[map_index].high_contrast_colour.size)
+        col_string = g_live_edit_gui.ui_col_map[map_index].high_contrast_colour;
 
-    if (auto const col_index = FindColourIndex(col_string); col_index != -1) return ui_cols[col_index].col;
+    if (auto const col_index = FindColourIndex(col_string); col_index != -1)
+        return g_live_edit_gui.ui_cols[col_index].col;
     return {};
 }
 
 inline f32 GetSize(imgui::Context const& imgui, UiSizeId size_id) {
     f32 res = 1;
-    switch (ui_sizes_units[ToInt(size_id)]) {
-        case UiSizeUnit::Points: res = imgui.PointsToPixels(ui_sizes[ToInt(size_id)]); break;
-        case UiSizeUnit::None: res = ui_sizes[ToInt(size_id)]; break;
+    switch (g_live_edit_gui.ui_sizes_units[ToInt(size_id)]) {
+        case UiSizeUnit::Points: res = imgui.PointsToPixels(g_live_edit_gui.ui_sizes[ToInt(size_id)]); break;
+        case UiSizeUnit::None: res = g_live_edit_gui.ui_sizes[ToInt(size_id)]; break;
         case UiSizeUnit::Count: PanicIfReached();
     }
     return res;

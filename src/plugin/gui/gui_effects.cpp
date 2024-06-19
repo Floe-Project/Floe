@@ -200,14 +200,35 @@ void DoEffectsWindow(Gui* g, Rect r) {
     auto& lay = g->layout;
     auto& plugin = g->plugin;
 
-#define GUI_SIZE(cat, n, v, u) [[maybe_unused]] const auto cat##n = live_edit::Size(imgui, UiSizeId::cat##n);
-#include SIZES_DEF_FILENAME
-#undef GUI_SIZE
+    auto const fx_divider_margin_t = live_edit::Size(imgui, UiSizeId::FXDividerMarginT);
+    auto const fx_divider_margin_b = live_edit::Size(imgui, UiSizeId::FXDividerMarginB);
+    auto const fx_knob_joining_line_thickness = live_edit::Size(imgui, UiSizeId::FXKnobJoiningLineThickness);
+    auto const fx_knob_joining_line_pad_lr = live_edit::Size(imgui, UiSizeId::FXKnobJoiningLinePadLR);
+    auto const fx_close_button_width = live_edit::Size(imgui, UiSizeId::FXCloseButtonWidth);
+    auto const fx_close_button_height = live_edit::Size(imgui, UiSizeId::FXCloseButtonHeight);
+    auto const fx_heading_h = live_edit::Size(imgui, UiSizeId::FXHeadingH);
+    auto const fx_heading_extra_width = live_edit::Size(imgui, UiSizeId::FXHeadingExtraWidth);
+    auto const fx_heading_l = live_edit::Size(imgui, UiSizeId::FXHeadingL);
+    auto const fx_heading_r = live_edit::Size(imgui, UiSizeId::FXHeadingR);
+    auto const fx_param_button_height = live_edit::Size(imgui, UiSizeId::FXParamButtonHeight);
+    auto const fx_delay_sync_btn_width = live_edit::Size(imgui, UiSizeId::FXDelaySyncBtnWidth);
+    auto const fx_switch_board_item_height = live_edit::Size(imgui, UiSizeId::FXSwitchBoardItemHeight);
+    auto const fx_compressor_auto_gain_width = live_edit::Size(imgui, UiSizeId::FXCompressorAutoGainWidth);
+    auto const fx_switch_board_number_width = live_edit::Size(imgui, UiSizeId::FXSwitchBoardNumberWidth);
+    auto const fx_switch_board_grab_region_width =
+        live_edit::Size(imgui, UiSizeId::FXSwitchBoardGrabRegionWidth);
+    auto const corner_rounding = live_edit::Size(imgui, UiSizeId::CornerRounding);
 
     auto settings = FloeWindowSettings(imgui, [](IMGUI_DRAW_WINDOW_BG_ARGS) {});
-    settings.flags |= imgui::WindowFlags_AlwaysDrawScrollY;
-    settings.pad_top_left = {(f32)FXWindowPadL, (f32)FXWindowPadT};
-    settings.pad_bottom_right = {(f32)FXWindowPadR, (f32)FXWindowPadB};
+    {
+        auto const fx_window_pad_l = live_edit::Size(imgui, UiSizeId::FXWindowPadL);
+        auto const fx_window_pad_t = live_edit::Size(imgui, UiSizeId::FXWindowPadT);
+        auto const fx_window_pad_r = live_edit::Size(imgui, UiSizeId::FXWindowPadR);
+        auto const fx_window_pad_b = live_edit::Size(imgui, UiSizeId::FXWindowPadB);
+        settings.flags |= imgui::WindowFlags_AlwaysDrawScrollY;
+        settings.pad_top_left = {(f32)fx_window_pad_l, (f32)fx_window_pad_t};
+        settings.pad_bottom_right = {(f32)fx_window_pad_r, (f32)fx_window_pad_b};
+    }
     imgui.BeginWindow(settings, r, "Effects");
     DEFER { imgui.EndWindow(); };
     DEFER { lay.Reset(); };
@@ -229,27 +250,33 @@ void DoEffectsWindow(Gui* g, Rect r) {
     int const switches_left_col_size = k_num_effect_types / 2 + (k_num_effect_types % 2);
 
     {
+        auto const fx_switch_board_margin_l = live_edit::Size(imgui, UiSizeId::FXSwitchBoardMarginL);
+        auto const fx_switch_board_margin_t = live_edit::Size(imgui, UiSizeId::FXSwitchBoardMarginT);
+        auto const fx_switch_board_margin_r = live_edit::Size(imgui, UiSizeId::FXSwitchBoardMarginR);
+        auto const fx_switch_board_margin_b = live_edit::Size(imgui, UiSizeId::FXSwitchBoardMarginB);
+
         auto switches_container = lay.CreateParentItem(effects_root, 1, 0, LAY_HFILL, LAY_ROW);
         lay.SetMargins(switches_container,
-                       FXSwitchBoardMarginL,
-                       FXSwitchBoardMarginT,
-                       FXSwitchBoardMarginR,
-                       FXSwitchBoardMarginB);
+                       fx_switch_board_margin_l,
+                       fx_switch_board_margin_t,
+                       fx_switch_board_margin_r,
+                       fx_switch_board_margin_b);
 
         auto left = lay.CreateParentItem(switches_container, 1, 0, LAY_HFILL, LAY_COLUMN);
         auto right = lay.CreateParentItem(switches_container, 1, 0, LAY_HFILL, LAY_COLUMN);
 
         for (auto const i : Range(k_num_effect_types)) {
             auto const parent = (i < switches_left_col_size) ? left : right;
-            switches[i] = lay.CreateChildItem(parent,
-                                              (root_width / 2) - FXSwitchBoardMarginL - FXSwitchBoardMarginR,
-                                              FXSwitchBoardItemHeight,
-                                              0);
+            switches[i] =
+                lay.CreateChildItem(parent,
+                                    (root_width / 2) - fx_switch_board_margin_l - fx_switch_board_margin_r,
+                                    fx_switch_board_item_height,
+                                    0);
         }
     }
 
     switches_bottom_divider = lay.CreateChildItem(effects_root, 1, 1, LAY_HFILL);
-    lay.SetMargins(switches_bottom_divider, 0, 0, 0, FXDividerMarginB);
+    lay.SetMargins(switches_bottom_divider, 0, 0, 0, fx_divider_margin_b);
 
     auto heading_font = g->fira_sans;
 
@@ -260,7 +287,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
                                                 0.0f,
                                                 name);
         f32 const epsilon = 2;
-        return f32x2 {Round(size.x + epsilon) + (f32)FXHeadingExtraWidth, (f32)FXHeadingH};
+        return f32x2 {Round(size.x + epsilon) + (f32)fx_heading_extra_width, (f32)fx_heading_h};
     };
 
     auto create_fx_ids = [&](Effect& fx, LayID* heading_container_out) {
@@ -276,12 +303,13 @@ void DoEffectsWindow(Gui* g, Rect r) {
                                           (LayScalar)heading_size.x,
                                           (LayScalar)heading_size.y,
                                           LAY_LEFT | LAY_TOP);
-        lay.SetMargins(ids.heading, FXHeadingL, 0, FXHeadingR, 0);
+        lay.SetMargins(ids.heading, fx_heading_l, 0, fx_heading_r, 0);
 
         auto heading_container =
             lay.CreateParentItem(master_heading_container, 1, 0, LAY_HFILL, LAY_ROW | LAY_END);
 
-        ids.close = lay.CreateChildItem(master_heading_container, FXCloseButtonWidth, FXCloseButtonHeight, 0);
+        ids.close =
+            lay.CreateChildItem(master_heading_container, fx_close_button_width, fx_close_button_height, 0);
 
         if (heading_container_out) *heading_container_out = heading_container;
         return ids;
@@ -289,7 +317,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
 
     auto create_divider_id = [&]() {
         auto result = lay.CreateChildItem(effects_root, 1, 1, LAY_HFILL);
-        lay.SetMargins(result, 0, FXDividerMarginT, 0, FXDividerMarginB);
+        lay.SetMargins(result, 0, fx_divider_margin_t, 0, fx_divider_margin_b);
         return result;
     };
 
@@ -376,8 +404,10 @@ void DoEffectsWindow(Gui* g, Rect r) {
                 auto ids = create_fx_ids(plugin.processor.compressor, &heading_container);
                 auto param_container = create_param_container();
 
-                ids.compressor.auto_gain =
-                    lay.CreateChildItem(heading_container, FXCompressorAutoGainWidth, FXParamButtonHeight, 0);
+                ids.compressor.auto_gain = lay.CreateChildItem(heading_container,
+                                                               fx_compressor_auto_gain_width,
+                                                               fx_param_button_height,
+                                                               0);
 
                 LayoutParameterComponent(g,
                                          param_container,
@@ -498,8 +528,10 @@ void DoEffectsWindow(Gui* g, Rect r) {
                 auto ids = create_fx_ids(plugin.processor.new_delay, &heading_container);
                 auto param_container = create_param_container();
 
-                ids.new_delay.sync_btn =
-                    lay.CreateChildItem(heading_container, FXDelaySyncBtnWidth, FXParamButtonHeight, 0);
+                ids.new_delay.sync_btn = lay.CreateChildItem(heading_container,
+                                                             fx_delay_sync_btn_width,
+                                                             fx_param_button_height,
+                                                             0);
 
                 auto left = &plugin.processor.params[ToInt(ParamIndex::NewDelayTimeSyncedL)];
                 auto right = &plugin.processor.params[ToInt(ParamIndex::NewDelayTimeSyncedR)];
@@ -624,10 +656,10 @@ void DoEffectsWindow(Gui* g, Rect r) {
     auto const draw_knob_joining_line = [&](LayID knob1, LayID knob2) {
         auto r1 = imgui.GetRegisteredAndConvertedRect(lay.GetRect(knob1));
         auto r2 = imgui.GetRegisteredAndConvertedRect(lay.GetRect(knob2));
-        f32x2 const start {r1.Right() + FXKnobJoiningLinePadLR,
-                           r1.CentreY() - FXKnobJoiningLineThickness / 2};
-        f32x2 const end {r2.x - FXKnobJoiningLinePadLR, start.y};
-        imgui.graphics->AddLine(start, end, GMC(FXKnobJoiningLine), (f32)FXKnobJoiningLineThickness);
+        f32x2 const start {r1.Right() + fx_knob_joining_line_pad_lr,
+                           r1.CentreY() - fx_knob_joining_line_thickness / 2};
+        f32x2 const end {r2.x - fx_knob_joining_line_pad_lr, start.y};
+        imgui.graphics->AddLine(start, end, GMC(FXKnobJoiningLine), (f32)fx_knob_joining_line_thickness);
     };
 
     auto const do_all_ids = [&](Span<LayIDPair> ids, Span<ParamIndex const> params, FXColours cols) {
@@ -1005,10 +1037,10 @@ void DoEffectsWindow(Gui* g, Rect r) {
         usize fx_index = 0;
         for (auto const slot : Range(k_num_effect_types)) {
             auto const whole_r = lay.GetRect(switches[slot]);
-            auto const number_r = whole_r.WithW((f32)FXSwitchBoardNumberWidth);
-            auto const slot_r = whole_r.CutLeft((f32)FXSwitchBoardNumberWidth);
+            auto const number_r = whole_r.WithW((f32)fx_switch_board_number_width);
+            auto const slot_r = whole_r.CutLeft((f32)fx_switch_board_number_width);
             auto const converted_slot_r = imgui.GetRegisteredAndConvertedRect(slot_r);
-            auto const grabber_r = slot_r.CutLeft(slot_r.w - (f32)FXSwitchBoardGrabRegionWidth);
+            auto const grabber_r = slot_r.CutLeft(slot_r.w - (f32)fx_switch_board_grab_region_width);
 
             labels::Label(g,
                           number_r,
@@ -1023,7 +1055,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
                 imgui.graphics->AddRectFilled(converted_slot_r.Min(),
                                               converted_slot_r.Max(),
                                               GMC(FXButtonDropZone),
-                                              (f32)CornerRounding);
+                                              (f32)corner_rounding);
             } else {
                 auto fx = ordered_effects[fx_index++];
                 if (dragging_fx && fx == dragging_fx->fx) fx = ordered_effects[fx_index++];

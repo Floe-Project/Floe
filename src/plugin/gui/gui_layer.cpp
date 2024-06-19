@@ -123,49 +123,75 @@ void Layout(Gui* g,
     auto& imgui = g->imgui;
     auto& lay = g->layout;
 
-#define GUI_SIZE(cat, n, v, u) [[maybe_unused]] const auto cat##n = live_edit::Size(imgui, UiSizeId::cat##n);
-#include SIZES_DEF_FILENAME
-#undef GUI_SIZE
+    auto const param_popup_button_height = live_edit::Size(imgui, UiSizeId::ParamPopupButtonHeight);
+    auto const page_heading_height = live_edit::Size(imgui, UiSizeId::Page_HeadingHeight);
 
     auto container = lay.CreateRootItem((LayScalar)width, (LayScalar)height, LAY_COLUMN | LAY_START);
 
     // selector
     {
+        auto const layer_selector_box_height = live_edit::Size(imgui, UiSizeId::LayerSelectorBoxHeight);
+        auto const layer_selector_box_margin_l = live_edit::Size(imgui, UiSizeId::LayerSelectorBoxMarginL);
+        auto const layer_selector_box_margin_t = live_edit::Size(imgui, UiSizeId::LayerSelectorBoxMarginT);
+        auto const layer_selector_box_margin_r = live_edit::Size(imgui, UiSizeId::LayerSelectorBoxMarginR);
+        auto const layer_selector_box_margin_b = live_edit::Size(imgui, UiSizeId::LayerSelectorBoxMarginB);
+        auto const layer_selector_button_w = live_edit::Size(imgui, UiSizeId::LayerSelectorButtonW);
+        auto const layer_selector_box_buttons_margin_r =
+            live_edit::Size(imgui, UiSizeId::LayerSelectorBoxButtonsMarginR);
+
         c.selector_box =
-            lay.CreateParentItem(container, 1, LayerSelectorBoxHeight, LAY_HFILL, LAY_ROW | LAY_START);
+            lay.CreateParentItem(container, 1, layer_selector_box_height, LAY_HFILL, LAY_ROW | LAY_START);
         lay.SetMargins(c.selector_box,
-                       LayerSelectorBoxMarginL,
-                       LayerSelectorBoxMarginT,
-                       LayerSelectorBoxMarginR,
-                       LayerSelectorBoxMarginB);
+                       layer_selector_box_margin_l,
+                       layer_selector_box_margin_t,
+                       layer_selector_box_margin_r,
+                       layer_selector_box_margin_b);
 
         c.selector_menu = lay.CreateChildItem(c.selector_box, 1, 1, LAY_FILL);
-        c.selector_l = lay.CreateChildItem(c.selector_box, LayerSelectorButtonW, 1, LAY_VFILL);
-        c.selector_r = lay.CreateChildItem(c.selector_box, LayerSelectorButtonW, 1, LAY_VFILL);
-        c.selector_randomise = lay.CreateChildItem(c.selector_box, LayerSelectorButtonW, 1, LAY_VFILL);
-        lay.SetRightMargin(c.selector_randomise, LayerSelectorBoxButtonsMarginR);
+        c.selector_l = lay.CreateChildItem(c.selector_box, layer_selector_button_w, 1, LAY_VFILL);
+        c.selector_r = lay.CreateChildItem(c.selector_box, layer_selector_button_w, 1, LAY_VFILL);
+        c.selector_randomise = lay.CreateChildItem(c.selector_box, layer_selector_button_w, 1, LAY_VFILL);
+        lay.SetRightMargin(c.selector_randomise, layer_selector_box_buttons_margin_r);
     }
 
     if (layer->instrument.tag == InstrumentType::None) return;
 
     // mixer container 1
     {
+        auto const layer_mixer_container1_margin_l =
+            live_edit::Size(imgui, UiSizeId::LayerMixerContainer1MarginL);
+        auto const layer_mixer_container1_margin_t =
+            live_edit::Size(imgui, UiSizeId::LayerMixerContainer1MarginT);
+        auto const layer_mixer_container1_margin_r =
+            live_edit::Size(imgui, UiSizeId::LayerMixerContainer1MarginR);
+        auto const layer_mixer_container1_margin_b =
+            live_edit::Size(imgui, UiSizeId::LayerMixerContainer1MarginB);
         auto subcontainer_1 = lay.CreateParentItem(container, 1, 0, LAY_HFILL, LAY_ROW | LAY_MIDDLE);
         lay.SetMargins(subcontainer_1,
-                       LayerMixerContainer1MarginL,
-                       LayerMixerContainer1MarginT,
-                       LayerMixerContainer1MarginR,
-                       LayerMixerContainer1MarginB);
+                       layer_mixer_container1_margin_l,
+                       layer_mixer_container1_margin_t,
+                       layer_mixer_container1_margin_r,
+                       layer_mixer_container1_margin_b);
 
-        c.volume = lay.CreateChildItem(subcontainer_1, LayerVolumeKnobSize, LayerVolumeKnobSize, LAY_HCENTER);
-        lay.SetRightMargin(c.volume, LayerVolumeKnobMarginR);
+        auto const layer_volume_knob_size = live_edit::Size(imgui, UiSizeId::LayerVolumeKnobSize);
+        auto const layer_volume_knob_margin_r = live_edit::Size(imgui, UiSizeId::LayerVolumeKnobMarginR);
+        c.volume =
+            lay.CreateChildItem(subcontainer_1, layer_volume_knob_size, layer_volume_knob_size, LAY_HCENTER);
+        lay.SetRightMargin(c.volume, layer_volume_knob_margin_r);
+
+        auto const layer_mute_solo_width = live_edit::Size(imgui, UiSizeId::LayerMuteSoloWidth);
+        auto const layer_mute_solo_height = live_edit::Size(imgui, UiSizeId::LayerMuteSoloHeight);
+        auto const layer_mute_solo_margin_l = live_edit::Size(imgui, UiSizeId::LayerMuteSoloMarginL);
+        auto const layer_mute_solo_margin_t = live_edit::Size(imgui, UiSizeId::LayerMuteSoloMarginT);
+        auto const layer_mute_solo_margin_r = live_edit::Size(imgui, UiSizeId::LayerMuteSoloMarginR);
+        auto const layer_mute_solo_margin_b = live_edit::Size(imgui, UiSizeId::LayerMuteSoloMarginB);
         c.mute_solo =
-            lay.CreateChildItem(subcontainer_1, LayerMuteSoloWidth, LayerMuteSoloHeight, LAY_HCENTER);
+            lay.CreateChildItem(subcontainer_1, layer_mute_solo_width, layer_mute_solo_height, LAY_HCENTER);
         lay.SetMargins(c.mute_solo,
-                       LayerMuteSoloMarginL,
-                       LayerMuteSoloMarginT,
-                       LayerMuteSoloMarginR,
-                       LayerMuteSoloMarginB);
+                       layer_mute_solo_margin_l,
+                       layer_mute_solo_margin_t,
+                       layer_mute_solo_margin_r,
+                       layer_mute_solo_margin_b);
     }
 
     // mixer container 2
@@ -176,9 +202,13 @@ void Layout(Gui* g,
                                  c.knob1,
                                  layer->processor.params[ToInt(LayerParamIndex::TuneSemitone)],
                                  UiSizeId::LayerPitchMarginLR);
-        lay_set_size_xy(&lay.ctx, c.knob1.control, LayerPitchWidth, LayerPitchHeight);
-        lay.SetTopMargin(c.knob1.control, LayerPitchMarginT);
-        lay.SetBottomMargin(c.knob1.control, LayerPitchMarginB);
+        auto const layer_pitch_width = live_edit::Size(imgui, UiSizeId::LayerPitchWidth);
+        auto const layer_pitch_height = live_edit::Size(imgui, UiSizeId::LayerPitchHeight);
+        auto const layer_pitch_margin_t = live_edit::Size(imgui, UiSizeId::LayerPitchMarginT);
+        auto const layer_pitch_margin_b = live_edit::Size(imgui, UiSizeId::LayerPitchMarginB);
+        lay_set_size_xy(&lay.ctx, c.knob1.control, layer_pitch_width, layer_pitch_height);
+        lay.SetTopMargin(c.knob1.control, layer_pitch_margin_t);
+        lay.SetBottomMargin(c.knob1.control, layer_pitch_margin_b);
 
         LayoutParameterComponent(g,
                                  subcontainer_2,
@@ -192,82 +222,109 @@ void Layout(Gui* g,
                                  UiSizeId::LayerMixerKnobGapX);
     }
 
+    auto const layer_mixer_divider_vert_margins =
+        live_edit::Size(imgui, UiSizeId::LayerMixerDividerVertMargins);
     // divider
     {
         c.divider = lay.CreateChildItem(container, 1, 1, LAY_HFILL);
-        lay.SetMargins(c.divider, 0, LayerMixerDividerVertMargins, 0, LayerMixerDividerVertMargins);
+        lay.SetMargins(c.divider, 0, layer_mixer_divider_vert_margins, 0, layer_mixer_divider_vert_margins);
     }
 
     // tabs
     {
+        auto const layer_params_group_tabs_h = live_edit::Size(imgui, UiSizeId::LayerParamsGroupTabsH);
+        auto const layer_params_group_box_gap_x = live_edit::Size(imgui, UiSizeId::LayerParamsGroupBoxGapX);
+        auto const layer_params_group_tabs_gap = live_edit::Size(imgui, UiSizeId::LayerParamsGroupTabsGap);
         auto tab_lay =
-            lay.CreateParentItem(container, 1, LayerParamsGroupTabsH, LAY_HFILL, LAY_ROW | LAY_MIDDLE);
-        lay.SetMargins(tab_lay, LayerParamsGroupBoxGapX, 0, LayerParamsGroupBoxGapX, 0);
+            lay.CreateParentItem(container, 1, layer_params_group_tabs_h, LAY_HFILL, LAY_ROW | LAY_MIDDLE);
+        lay.SetMargins(tab_lay, layer_params_group_box_gap_x, 0, layer_params_group_box_gap_x, 0);
         for (auto const i : Range(k_num_pages)) {
             auto const page_type = (PageType)i;
             auto size = draw::GetTextWidth(imgui.graphics->context->CurrentFont(), GetPageTitle(page_type));
             if (page_type == PageType::Filter || page_type == PageType::Lfo || page_type == PageType::Eq)
                 size += live_edit::Size(imgui, UiSizeId::LayerParamsGroupTabsIconW2);
-            c.tabs[i] =
-                lay.CreateChildItem(tab_lay, (LayScalar)(size + (f32)LayerParamsGroupTabsGap), 1, LAY_VFILL);
+            c.tabs[i] = lay.CreateChildItem(tab_lay,
+                                            (LayScalar)(size + (f32)layer_params_group_tabs_gap),
+                                            1,
+                                            LAY_VFILL);
         }
     }
 
     // divider2
     {
         c.divider2 = lay.CreateChildItem(container, 1, 1, LAY_HFILL);
-        lay.SetMargins(c.divider2, 0, LayerMixerDividerVertMargins, 0, LayerMixerDividerVertMargins);
+        lay.SetMargins(c.divider2, 0, layer_mixer_divider_vert_margins, 0, layer_mixer_divider_vert_margins);
     }
 
     {
+        auto const page_heading_margin_l = live_edit::Size(imgui, UiSizeId::Page_HeadingMarginL);
+        auto const page_heading_margin_t = live_edit::Size(imgui, UiSizeId::Page_HeadingMarginT);
+        auto const page_heading_margin_b = live_edit::Size(imgui, UiSizeId::Page_HeadingMarginB);
         auto set_heading_margins = [&](LayID id) {
-            lay.SetMargins(id, Page_HeadingMarginL, Page_HeadingMarginT, 0, Page_HeadingMarginB);
+            lay.SetMargins(id, page_heading_margin_l, page_heading_margin_t, 0, page_heading_margin_b);
         };
 
         auto page_container = lay.CreateParentItem(container, 1, 1, LAY_FILL, LAY_COLUMN | LAY_START);
 
+        auto const main_envelope_h = live_edit::Size(imgui, UiSizeId::Main_EnvelopeH);
+
         switch (layer_gui->selected_page) {
             case PageType::Main: {
-                c.main.waveform = lay.CreateChildItem(page_container, 1, Main_WaveformH, LAY_HFILL);
+                auto const main_waveform_h = live_edit::Size(imgui, UiSizeId::Main_WaveformH);
+                auto const main_waveform_margin_lr = live_edit::Size(imgui, UiSizeId::Main_WaveformMarginLR);
+                auto const main_waveform_margin_tb = live_edit::Size(imgui, UiSizeId::Main_WaveformMarginTB);
+                c.main.waveform = lay.CreateChildItem(page_container, 1, main_waveform_h, LAY_HFILL);
                 lay.SetMargins(c.main.waveform,
-                               Main_WaveformMarginLR,
-                               Main_WaveformMarginTB,
-                               Main_WaveformMarginLR,
-                               Main_WaveformMarginTB);
+                               main_waveform_margin_lr,
+                               main_waveform_margin_tb,
+                               main_waveform_margin_lr,
+                               main_waveform_margin_tb);
 
+                auto const main_item_margin_lr = live_edit::Size(imgui, UiSizeId::Main_ItemMarginLR);
+                auto const main_item_height = live_edit::Size(imgui, UiSizeId::Main_ItemHeight);
+                auto const main_item_gap_y = live_edit::Size(imgui, UiSizeId::Main_ItemGapY);
                 auto btn_container = lay.CreateParentItem(page_container, 1, 0, LAY_HFILL, LAY_ROW);
-                lay.SetMargins(btn_container, Main_ItemMarginLR, 0, Main_ItemMarginLR, 0);
-                c.main.reverse = lay.CreateChildItem(btn_container, 1, Main_ItemHeight, LAY_HFILL);
-                lay.SetMargins(c.main.reverse, 0, Main_ItemGapY, 0, Main_ItemGapY);
-                c.main.loop_mode = lay.CreateChildItem(btn_container, 1, ParamPopupButtonHeight, LAY_HFILL);
-                lay.SetMargins(c.main.loop_mode, 0, Main_ItemGapY, 0, Main_ItemGapY);
+                lay.SetMargins(btn_container, main_item_margin_lr, 0, main_item_margin_lr, 0);
+                c.main.reverse = lay.CreateChildItem(btn_container, 1, main_item_height, LAY_HFILL);
+                lay.SetMargins(c.main.reverse, 0, main_item_gap_y, 0, main_item_gap_y);
+                c.main.loop_mode =
+                    lay.CreateChildItem(btn_container, 1, param_popup_button_height, LAY_HFILL);
+                lay.SetMargins(c.main.loop_mode, 0, main_item_gap_y, 0, main_item_gap_y);
 
+                auto const main_divider_margin_t = live_edit::Size(imgui, UiSizeId::Main_DividerMarginT);
+                auto const main_divider_margin_b = live_edit::Size(imgui, UiSizeId::Main_DividerMarginB);
                 c.main.divider = lay.CreateChildItem(page_container, 1, 1, LAY_HFILL);
-                lay.SetMargins(c.main.divider, 0, Main_DividerMarginT, 0, Main_DividerMarginB);
+                lay.SetMargins(c.main.divider, 0, main_divider_margin_t, 0, main_divider_margin_b);
 
-                c.main.env_on = lay.CreateChildItem(page_container, 1, Page_HeadingHeight, LAY_HFILL);
+                c.main.env_on = lay.CreateChildItem(page_container, 1, page_heading_height, LAY_HFILL);
                 set_heading_margins(c.main.env_on);
                 lay.SetBottomMargin(c.main.env_on, 0);
 
-                c.main.envelope = lay.CreateChildItem(page_container, 1, Main_EnvelopeH, LAY_HFILL);
+                auto const main_envelope_margin_lr = live_edit::Size(imgui, UiSizeId::Main_EnvelopeMarginLR);
+                auto const main_envelope_margin_tb = live_edit::Size(imgui, UiSizeId::Main_EnvelopeMarginTB);
+                c.main.envelope = lay.CreateChildItem(page_container, 1, main_envelope_h, LAY_HFILL);
                 lay.SetMargins(c.main.envelope,
-                               Main_EnvelopeMarginLR,
-                               Main_EnvelopeMarginTB,
-                               Main_EnvelopeMarginLR,
-                               Main_EnvelopeMarginTB);
+                               main_envelope_margin_lr,
+                               main_envelope_margin_tb,
+                               main_envelope_margin_lr,
+                               main_envelope_margin_tb);
 
                 break;
             }
             case PageType::Filter: {
                 auto filter_heading_container =
                     lay.CreateParentItem(page_container, 1, 0, LAY_HFILL, LAY_ROW);
-                c.filter.filter_on =
-                    lay.CreateChildItem(filter_heading_container, 1, Page_HeadingHeight, LAY_HFILL | LAY_TOP);
+                c.filter.filter_on = lay.CreateChildItem(filter_heading_container,
+                                                         1,
+                                                         page_heading_height,
+                                                         LAY_HFILL | LAY_TOP);
                 set_heading_margins(c.filter.filter_on);
                 c.filter.filter_type =
-                    lay.CreateChildItem(filter_heading_container, 1, ParamPopupButtonHeight, LAY_HFILL);
-                lay.SetMargins(c.filter.filter_type, 0, 0, Page_HeadingMarginL, 0);
-                lay.SetBottomMargin(filter_heading_container, Filter_GapYBeforeKnobs);
+                    lay.CreateChildItem(filter_heading_container, 1, param_popup_button_height, LAY_HFILL);
+                lay.SetMargins(c.filter.filter_type, 0, 0, page_heading_margin_l, 0);
+                auto const filter_gap_y_before_knobs =
+                    live_edit::Size(imgui, UiSizeId::Filter_GapYBeforeKnobs);
+                lay.SetBottomMargin(filter_heading_container, filter_gap_y_before_knobs);
 
                 auto filter_knobs_container =
                     lay.CreateParentItem(page_container, 1, 0, LAY_HFILL, LAY_ROW | LAY_MIDDLE);
@@ -287,25 +344,31 @@ void Layout(Gui* g,
                                          layer->processor.params[ToInt(LayerParamIndex::FilterEnvAmount)],
                                          UiSizeId::Page_3KnobGapX);
 
-                c.filter.envelope = lay.CreateChildItem(page_container, 1, Main_EnvelopeH, LAY_HFILL);
+                auto const filter_envelope_margin_lr =
+                    live_edit::Size(imgui, UiSizeId::Filter_EnvelopeMarginLR);
+                auto const filter_envelope_margin_tb =
+                    live_edit::Size(imgui, UiSizeId::Filter_EnvelopeMarginTB);
+                c.filter.envelope = lay.CreateChildItem(page_container, 1, main_envelope_h, LAY_HFILL);
                 lay.SetMargins(c.filter.envelope,
-                               Filter_EnvelopeMarginLR,
-                               Filter_EnvelopeMarginTB,
-                               Filter_EnvelopeMarginLR,
-                               Filter_EnvelopeMarginTB);
+                               filter_envelope_margin_lr,
+                               filter_envelope_margin_tb,
+                               filter_envelope_margin_lr,
+                               filter_envelope_margin_tb);
                 break;
             }
             case PageType::Eq: {
-                c.eq.on = lay.CreateChildItem(page_container, 1, Page_HeadingHeight, LAY_HFILL);
+                c.eq.on = lay.CreateChildItem(page_container, 1, page_heading_height, LAY_HFILL);
                 set_heading_margins(c.eq.on);
 
+                auto const eq_band_gap_y = live_edit::Size(imgui, UiSizeId::EQ_BandGapY);
                 {
-                    c.eq.type[0] = lay.CreateChildItem(page_container, 1, ParamPopupButtonHeight, LAY_HFILL);
+                    c.eq.type[0] =
+                        lay.CreateChildItem(page_container, 1, param_popup_button_height, LAY_HFILL);
                     lay.SetMargins(c.eq.type[0],
-                                   Page_HeadingMarginL,
-                                   EQ_BandGapY,
-                                   Page_HeadingMarginL,
-                                   EQ_BandGapY);
+                                   page_heading_margin_l,
+                                   eq_band_gap_y,
+                                   page_heading_margin_l,
+                                   eq_band_gap_y);
 
                     auto knob_container =
                         lay.CreateParentItem(page_container, 1, 0, LAY_HFILL, LAY_ROW | LAY_MIDDLE);
@@ -324,16 +387,17 @@ void Layout(Gui* g,
                                              c.eq.gain[0],
                                              layer->processor.params[ToInt(LayerParamIndex::EqGain1)],
                                              UiSizeId::Page_3KnobGapX);
-                    lay.SetBottomMargin(knob_container, EQ_BandGapY);
+                    lay.SetBottomMargin(knob_container, eq_band_gap_y);
                 }
 
                 {
-                    c.eq.type[1] = lay.CreateChildItem(page_container, 1, ParamPopupButtonHeight, LAY_HFILL);
+                    c.eq.type[1] =
+                        lay.CreateChildItem(page_container, 1, param_popup_button_height, LAY_HFILL);
                     lay.SetMargins(c.eq.type[1],
-                                   Page_HeadingMarginL,
-                                   EQ_BandGapY,
-                                   Page_HeadingMarginL,
-                                   EQ_BandGapY);
+                                   page_heading_margin_l,
+                                   eq_band_gap_y,
+                                   page_heading_margin_l,
+                                   eq_band_gap_y);
 
                     auto knob_container =
                         lay.CreateParentItem(page_container, 1, 0, LAY_HFILL, LAY_ROW | LAY_MIDDLE);
@@ -357,42 +421,52 @@ void Layout(Gui* g,
                 break;
             }
             case PageType::Midi: {
+                auto const midi_item_height = live_edit::Size(imgui, UiSizeId::MIDI_ItemHeight);
+                auto const midi_item_width = live_edit::Size(imgui, UiSizeId::MIDI_ItemWidth);
+                auto const midi_item_margin_lr = live_edit::Size(imgui, UiSizeId::MIDI_ItemMarginLR);
+                auto const midi_item_gap_y = live_edit::Size(imgui, UiSizeId::MIDI_ItemGapY);
                 auto layout_item_single = [&](LayID& control) {
-                    control = lay.CreateChildItem(page_container, 1, MIDI_ItemHeight, LAY_HFILL);
+                    control = lay.CreateChildItem(page_container, 1, midi_item_height, LAY_HFILL);
                     lay.SetMargins(control,
-                                   MIDI_ItemMarginLR,
-                                   MIDI_ItemGapY,
-                                   MIDI_ItemMarginLR,
-                                   MIDI_ItemGapY);
+                                   midi_item_margin_lr,
+                                   midi_item_gap_y,
+                                   midi_item_margin_lr,
+                                   midi_item_gap_y);
                 };
 
                 auto layout_item = [&](LayID& control, LayID& name, LayScalar height) {
                     auto parent = lay.CreateParentItem(page_container, 1, 0, LAY_HFILL, LAY_ROW);
-                    control = lay.CreateChildItem(parent, MIDI_ItemWidth, height, 0);
+                    control = lay.CreateChildItem(parent, midi_item_width, height, 0);
                     lay.SetMargins(control,
-                                   MIDI_ItemMarginLR,
-                                   MIDI_ItemGapY,
-                                   MIDI_ItemMarginLR,
-                                   MIDI_ItemGapY);
+                                   midi_item_margin_lr,
+                                   midi_item_gap_y,
+                                   midi_item_margin_lr,
+                                   midi_item_gap_y);
                     name = lay.CreateChildItem(parent, 1, height, LAY_HFILL);
                 };
 
-                layout_item(c.midi.transpose, c.midi.transpose_name, MIDI_ItemHeight);
+                layout_item(c.midi.transpose, c.midi.transpose_name, midi_item_height);
                 layout_item_single(c.midi.keytrack);
                 layout_item_single(c.midi.mono);
                 layout_item_single(c.midi.retrig);
-                layout_item(c.midi.velo_buttons, c.midi.velo_name, MIDI_VeloButtonsHeight);
+                auto const midi_velo_buttons_height = live_edit::Size(imgui, UiSizeId::MIDI_VeloButtonsHeight);
+                layout_item(c.midi.velo_buttons, c.midi.velo_name, midi_velo_buttons_height);
                 break;
             }
             case PageType::Lfo: {
-                c.lfo.on = lay.CreateChildItem(page_container, 1, Page_HeadingHeight, LAY_HFILL);
+                c.lfo.on = lay.CreateChildItem(page_container, 1, page_heading_height, LAY_HFILL);
                 set_heading_margins(c.lfo.on);
 
+                auto const lfo_item_width = live_edit::Size(imgui, UiSizeId::LFO_ItemWidth);
+                auto const lfo_item_margin_l = live_edit::Size(imgui, UiSizeId::LFO_ItemMarginL);
+                auto const lfo_item_gap_y = live_edit::Size(imgui, UiSizeId::LFO_ItemGapY);
+                auto const lfo_item_margin_r = live_edit::Size(imgui, UiSizeId::LFO_ItemMarginR);
+                auto const lfo_gap_y_before_knobs = live_edit::Size(imgui, UiSizeId::LFO_GapYBeforeKnobs);
                 auto layout_item = [&](LayID& control, LayID& name) {
                     auto parent = lay.CreateParentItem(page_container, 1, 0, LAY_HFILL, LAY_ROW);
-                    control = lay.CreateChildItem(parent, LFO_ItemWidth, ParamPopupButtonHeight, 0);
-                    lay.SetMargins(control, LFO_ItemMarginL, LFO_ItemGapY, LFO_ItemMarginR, LFO_ItemGapY);
-                    name = lay.CreateChildItem(parent, 1, ParamPopupButtonHeight, LAY_HFILL);
+                    control = lay.CreateChildItem(parent, lfo_item_width, param_popup_button_height, 0);
+                    lay.SetMargins(control, lfo_item_margin_l, lfo_item_gap_y, lfo_item_margin_r, lfo_item_gap_y);
+                    name = lay.CreateChildItem(parent, 1, param_popup_button_height, LAY_HFILL);
                 };
 
                 layout_item(c.lfo.target, c.lfo.target_name);
@@ -401,7 +475,7 @@ void Layout(Gui* g,
 
                 auto knob_container =
                     lay.CreateParentItem(page_container, 1, 0, LAY_HFILL, LAY_ROW | LAY_MIDDLE);
-                lay.SetTopMargin(knob_container, LFO_GapYBeforeKnobs);
+                lay.SetTopMargin(knob_container, lfo_gap_y_before_knobs);
 
                 LayoutParameterComponent(g,
                                          knob_container,

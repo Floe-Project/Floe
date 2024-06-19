@@ -22,28 +22,38 @@ LayID LayoutParameterComponent(Gui* g,
     auto& imgui = g->imgui;
     auto& lay = g->layout;
 
-#define GUI_SIZE(cat, n, v, u) [[maybe_unused]] const auto cat##n = live_edit::Size(imgui, UiSizeId::cat##n);
-#include SIZES_DEF_FILENAME
-#undef GUI_SIZE
+    auto const param_component_large_width = live_edit::Size(imgui, UiSizeId::ParamComponentLargeWidth);
+    auto const param_component_small_width = live_edit::Size(imgui, UiSizeId::ParamComponentSmallWidth);
+    auto const param_component_extra_small_width =
+        live_edit::Size(imgui, UiSizeId::ParamComponentExtraSmallWidth);
+    auto const param_component_height_offset = live_edit::Size(imgui, UiSizeId::ParamComponentHeightOffset);
+    auto const param_component_margin_lr = live_edit::Size(imgui, UiSizeId::ParamComponentMarginLR);
+    auto const param_component_margin_t = live_edit::Size(imgui, UiSizeId::ParamComponentMarginT);
+    auto const param_component_margin_b = live_edit::Size(imgui, UiSizeId::ParamComponentMarginB);
+    auto const param_component_label_gap_y = live_edit::Size(imgui, UiSizeId::ParamComponentLabelGapY);
+    auto const param_popup_button_height = live_edit::Size(imgui, UiSizeId::ParamPopupButtonHeight);
+    auto const menu_button_text_margin_l = live_edit::Size(imgui, UiSizeId::MenuButtonTextMarginL);
+    auto const fx_convo_ir_width = live_edit::Size(imgui, UiSizeId::FXConvoIRWidth);
 
-    auto width = type == LayoutType::Layer ? ParamComponentLargeWidth
-                                           : (type == LayoutType::Effect ? ParamComponentSmallWidth
-                                                                         : ParamComponentExtraSmallWidth);
+    auto width = type == LayoutType::Layer ? param_component_large_width
+                                           : (type == LayoutType::Effect ? param_component_small_width
+                                                                         : param_component_extra_small_width);
     auto const starting_width = width;
-    auto height = width - ParamComponentHeightOffset;
+    auto height = width - param_component_height_offset;
     auto const starting_height = height;
-    auto gap_x = size_index_for_gapx ? live_edit::Size(imgui, *size_index_for_gapx) : ParamComponentMarginLR;
-    auto gap_bottom = ParamComponentMarginB;
-    auto gap_top = ParamComponentMarginT;
+    auto gap_x =
+        size_index_for_gapx ? live_edit::Size(imgui, *size_index_for_gapx) : param_component_margin_lr;
+    auto gap_bottom = param_component_margin_b;
+    auto gap_top = param_component_margin_t;
 
     if (index_for_menu_items) {
         auto const menu_items = ParameterMenuItems(*index_for_menu_items);
-        auto strings_width = MaxStringLength(g, menu_items) + MenuButtonTextMarginL * 2;
+        auto strings_width = MaxStringLength(g, menu_items) + menu_button_text_margin_l * 2;
         width = (LayScalar)strings_width;
-        height = (LayScalar)ParamPopupButtonHeight;
+        height = (LayScalar)param_popup_button_height;
     } else if (is_convo_ir) {
-        height = (LayScalar)ParamPopupButtonHeight;
-        width = FXConvoIRWidth;
+        height = (LayScalar)param_popup_button_height;
+        width = fx_convo_ir_width;
     }
 
     if (set_gapx_independent_of_size && width != starting_width)
@@ -59,7 +69,7 @@ LayID LayoutParameterComponent(Gui* g,
     lay.SetMargins(container, gap_x, gap_top, gap_x, gap_bottom);
 
     param_layid = lay.CreateChildItem(container, width, (LayScalar)height, 0);
-    lay.SetBottomMargin(param_layid, ParamComponentLabelGapY);
+    lay.SetBottomMargin(param_layid, param_component_label_gap_y);
     name = lay.CreateChildItem(container, width, (LayScalar)(imgui.graphics->context->CurrentFontSize()), 0);
 
     return container;

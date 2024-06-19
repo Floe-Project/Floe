@@ -205,6 +205,7 @@ DateAndTime LocalTimeFromNanosecondsSinceEpoch(s128 nanoseconds) {
     return {.year = (s16)st.wYear,
             .months_since_jan = (s8)(st.wMonth - 1),
             .day_of_month = (s8)st.wDay,
+            .days_since_sunday = (s8)st.wDayOfWeek,
             .hour = (s8)st.wHour,
             .minute = (s8)st.wMinute,
             .second = (s8)st.wSecond,

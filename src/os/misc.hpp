@@ -94,16 +94,6 @@ void StdPrint(StdStream stream, String str);
 
 Mutex& StdStreamMutex(StdStream stream);
 
-struct DateAndTime {
-    s16 year;
-    s8 months_since_jan; // 0-11
-    s8 day_of_month; // 0-31
-    s8 hour;
-    s8 minute;
-    s8 second;
-    s32 nanosecond;
-};
-
 constexpr String k_day_names_short[] = {
     "Sun"_s,
     "Mon"_s,
@@ -127,6 +117,19 @@ constexpr String k_month_names_short[] = {
     "Oct"_s,
     "Nov"_s,
     "Dec"_s,
+};
+
+struct DateAndTime {
+    String MonthName() const { return k_month_names_short[months_since_jan]; }
+    String DayName() const { return k_day_names_short[days_since_sunday]; }
+    s16 year;
+    s8 months_since_jan; // 0-11
+    s8 day_of_month; // 0-31
+    s8 days_since_sunday; // 0-6
+    s8 hour;
+    s8 minute;
+    s8 second;
+    s32 nanosecond;
 };
 
 s128 NanosecondsSinceEpoch();

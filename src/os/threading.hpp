@@ -38,6 +38,7 @@ static constexpr NativeHandleSizes NativeHandleSizes() {
 }
 
 void SleepThisThread(int milliseconds);
+void YieldThisThread();
 
 u64 CurrentThreadID();
 
@@ -127,29 +128,26 @@ enum class MemoryOrder {
 };
 
 template <typename Type>
-class Atomic {
-  public:
+struct Atomic {
     Atomic() {}
-    Atomic(Type v) : m_data(v) {}
+    Atomic(Type v) : raw(v) {}
 
     NON_COPYABLE_AND_MOVEABLE(Atomic);
 
-    Type& Raw() { return m_data; }
-
     void Store(Type v, MemoryOrder memory_order = MemoryOrder::SequentiallyConsistent) {
-        __atomic_store(&m_data, &v, int(memory_order));
+        __atomic_store(&raw, &v, int(memory_order));
     }
 
     Type Load(MemoryOrder memory_order = MemoryOrder::SequentiallyConsistent) const {
         Type result;
-        __atomic_load(&m_data, &result, int(memory_order));
+        __atomic_load(&raw, &result, int(memory_order));
         return result;
     }
 
     Type Exchange(Type desired, MemoryOrder memory_order = MemoryOrder::SequentiallyConsistent) {
         alignas(Type) unsigned char buf[sizeof(Type)];
         auto* ptr = reinterpret_cast<Type*>(buf);
-        __atomic_exchange(&m_data, &desired, ptr, int(memory_order));
+        __atomic_exchange(&raw, &desired, ptr, int(memory_order));
         return *ptr;
     }
 
@@ -157,7 +155,7 @@ class Atomic {
                              Type desired,
                              MemoryOrder success_memory_order = MemoryOrder::SequentiallyConsistent,
                              MemoryOrder failure_memory_order = MemoryOrder::SequentiallyConsistent) {
-        return __atomic_compare_exchange(&m_data,
+        return __atomic_compare_exchange(&raw,
                                          &expected,
                                          &desired,
                                          true,
@@ -169,7 +167,7 @@ class Atomic {
                                Type desired,
                                MemoryOrder success_memory_order = MemoryOrder::SequentiallyConsistent,
                                MemoryOrder failure_memory_order = MemoryOrder::SequentiallyConsistent) {
-        return __atomic_compare_exchange(&m_data,
+        return __atomic_compare_exchange(&raw,
                                          &expected,
                                          &desired,
                                          false,
@@ -180,7 +178,7 @@ class Atomic {
 #define ATOMIC_INTEGER_METHOD(name, builtin)                                                                 \
     template <Integral U = Type>                                                                             \
     inline Type name(Type v, MemoryOrder memory_order = MemoryOrder::SequentiallyConsistent) {               \
-        return builtin(&m_data, v, int(memory_order));                                                       \
+        return builtin(&raw, v, int(memory_order));                                                          \
     }
 
     ATOMIC_INTEGER_METHOD(FetchAdd, __atomic_fetch_add)
@@ -196,7 +194,6 @@ class Atomic {
     ATOMIC_INTEGER_METHOD(XorFetch, __atomic_xor_fetch)
     ATOMIC_INTEGER_METHOD(NandFetch, __atomic_nand_fetch)
 
-  private:
     // Align 1/2/4/8/16-byte types to at least their size.
     static constexpr int k_min_alignment = (sizeof(Type) & (sizeof(Type) - 1)) || sizeof(Type) > 16
                                                ? 0
@@ -208,7 +205,7 @@ class Atomic {
     static_assert(sizeof(Type) != 0);
     static_assert(__atomic_always_lock_free(sizeof(Type), nullptr));
 
-    alignas(k_alignment) Type m_data {};
+    alignas(k_alignment) Type raw {};
 };
 
 // futex

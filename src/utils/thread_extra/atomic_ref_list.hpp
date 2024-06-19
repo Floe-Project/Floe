@@ -118,7 +118,7 @@ struct AtomicRefList {
         }
 
         auto node = arena.NewUninitialised<Node>();
-        node->reader_uses.Raw() = 0;
+        node->reader_uses.raw = 0;
         node->writer_next = nullptr;
         return node;
     }

@@ -63,7 +63,7 @@ void WakeWaitingThreads(Atomic<u32>& value, NumWaitingThreads num_waiters) {
     while (true) {
         auto const return_code =
             __ulock_wake(UL_COMPARE_AND_WAIT | (num_waiters == NumWaitingThreads::One ? 0 : ULF_WAKE_ALL),
-                         &value.Raw(),
+                         &value.raw,
                          0);
         if (return_code >= 0) return;
         auto const err = errno;
@@ -77,7 +77,7 @@ void WakeWaitingThreads(Atomic<u32>& value, NumWaitingThreads num_waiters) {
 
 WaitResult WaitIfValueIsExpected(Atomic<u32>& value, u32 expected, Optional<u32> timeout_milliseconds) {
     auto const return_code = __ulock_wait(UL_COMPARE_AND_WAIT,
-                                          &value.Raw(),
+                                          &value.raw,
                                           expected,
                                           timeout_milliseconds ? *timeout_milliseconds * 1000 : 0);
     if (return_code < 0) {

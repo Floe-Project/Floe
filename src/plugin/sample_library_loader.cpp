@@ -275,7 +275,7 @@ AvailableLibraries::AvailableLibraries(Span<String const> always_scanned_folders
         PLACEMENT_NEW(&node->value) AvailableLibraries::ScanFolder();
         dyn::Assign(node->value.path, e);
         node->value.source = AvailableLibraries::ScanFolder::Source::AlwaysScannedFolder;
-        node->value.state.Raw() = AvailableLibraries::ScanFolder::State::NotScanned;
+        node->value.state.raw = AvailableLibraries::ScanFolder::State::NotScanned;
         scan_folders.Insert(node);
     }
 }
@@ -306,7 +306,7 @@ void AvailableLibraries::SetExtraScanFolders(Span<String const> extra_folders) {
         PLACEMENT_NEW(&node->value) AvailableLibraries::ScanFolder();
         dyn::Assign(node->value.path, e);
         node->value.source = AvailableLibraries::ScanFolder::Source::ExtraFolder;
-        node->value.state.Raw() = AvailableLibraries::ScanFolder::State::NotScanned;
+        node->value.state.raw = AvailableLibraries::ScanFolder::State::NotScanned;
         scan_folders.Insert(node);
     }
 }
@@ -1481,7 +1481,7 @@ Connection& OpenConnection(LoadingThread& thread,
             .used = true,
         };
         for (auto& p : connection->instrument_loading_percents)
-            p.Raw() = -1;
+            p.raw = -1;
         return *connection;
     });
 }

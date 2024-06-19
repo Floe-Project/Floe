@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "os/filesystem.hpp"
+#include "os/threading.hpp"
 #include "tests/framework.hpp"
 #include "utils/directory_listing/directory_listing.hpp"
 #include "utils/error_notifications.hpp"
@@ -10,15 +11,34 @@
 #include "utils/leak_detecting_allocator.hpp"
 #include "utils/thread_extra/atomic_queue.hpp"
 
+struct StartingGun {
+    void Wait() {
+        while (true) {
+            WaitIfValueIsExpected(value, 0);
+            if (value.Load() == 1) return;
+        }
+    }
+    void Fire() {
+        value.Store(1);
+        WakeWaitingThreads(value, NumWaitingThreads::All);
+    }
+    Atomic<u32> value {0};
+};
+
 TEST_CASE(TestErrorNotifications) {
     ThreadsafeErrorNotifications no;
 
     Atomic<u32> iterations {0};
     constexpr u32 k_num_iterations = 10000;
     Array<Thread, 4> producers;
+    Atomic<bool> thread_ready {false};
+    StartingGun starting_gun;
     for (auto& p : producers) {
         p.Start(
             [&]() {
+                thread_ready.Store(true);
+                starting_gun.Wait();
+
                 auto seed = SeedFromTime();
                 while (iterations.Load() < k_num_iterations) {
                     auto const id = RandomIntInRange<u64>(seed, 0, 20);
@@ -36,11 +56,16 @@ TEST_CASE(TestErrorNotifications) {
                     }
 
                     iterations.FetchAdd(1);
+                    YieldThisThread();
                 }
             },
             "producer");
     }
 
+    while (!thread_ready.Load())
+        YieldThisThread();
+
+    starting_gun.Fire();
     auto seed = SeedFromTime();
     while (iterations.Load() < k_num_iterations) {
         for (auto& n : no.items) {
@@ -55,6 +80,7 @@ TEST_CASE(TestErrorNotifications) {
                 }
             }
         }
+        YieldThisThread();
     }
 
     for (auto& p : producers)
@@ -137,10 +163,9 @@ void DoAtomicQueueTest(tests::Tester& tester, String name) {
         }
 
         auto const do_random_spamming = [](AtomicQueue<int, k_size, k_num_producers, k_num_consumers>& q,
-                                           Atomic<bool>& ready,
+                                           StartingGun& starting_gun,
                                            bool push) {
-            while (!ready.Load())
-                ;
+            starting_gun.Wait();
             Array<int, 1> small_item {};
             Array<int, 4> big_item {};
             u64 seed = SeedFromTime();
@@ -161,49 +186,53 @@ void DoAtomicQueueTest(tests::Tester& tester, String name) {
             AtomicQueue<int, k_size, k_num_producers, k_num_consumers> q;
             Thread producer;
             Thread consumer;
-            Atomic<bool> ready {false};
-            producer.Start([&]() { do_random_spamming(q, ready, true); }, "Producer");
-            consumer.Start([&]() { do_random_spamming(q, ready, false); }, "Consumer");
-            ready.Store(true);
+            StartingGun starting_gun;
+            producer.Start([&]() { do_random_spamming(q, starting_gun, true); }, "Producer");
+            consumer.Start([&]() { do_random_spamming(q, starting_gun, false); }, "Consumer");
+            starting_gun.Fire();
             producer.Join();
             consumer.Join();
         }
 
         SUBCASE("2 threads: all push/pops are accounted for and in order") {
-            int const num_values = 10000;
+            constexpr int k_num_values = 10000;
             AtomicQueue<int, k_size, k_num_producers, k_num_consumers> q;
 
+            // NOTE(Sam): Yieiding the thread is necessary here when running with Valgrind. It doesn't seem to
+            // be nececssary normally though.
+
             Thread producer;
-            Thread consumer;
-            Atomic<bool> ready {false};
+            StartingGun starting_gun;
+            Atomic<bool> producer_ready {false};
             producer.Start(
                 [&]() {
-                    while (!ready.Load())
-                        ;
-                    for (auto const index : Range(num_values))
-                        while (!q.Push({&index, 1}))
-                            ;
+                    producer_ready.Store(true);
+                    starting_gun.Wait();
+                    for (auto const index : Range(k_num_values))
+                        while (!q.Push(index))
+                            YieldThisThread();
                 },
                 "Producer");
-            consumer.Start(
-                [&]() {
-                    while (!ready.Load())
-                        ;
-                    int index = 0;
-                    do {
-                        Array<int, 1> buf;
-                        if (auto num_popped = q.Pop(buf)) {
-                            ASSERT(num_popped == 1);
-                            ASSERT(buf[0] == index);
-                            index++;
-                        }
-                    } while (index != num_values);
-                },
-                "Consumer");
 
-            ready.Store(true);
+            while (!producer_ready.Load())
+                YieldThisThread();
+
+            tester.log.DebugLn("Producer ready");
+            starting_gun.Fire();
+
+            int index = 0;
+            do {
+                Array<int, 1> buf;
+                if (auto num_popped = q.Pop(Span<int> {buf})) {
+                    CHECK_EQ(num_popped, 1u);
+                    CHECK_EQ(buf[0], index);
+                    index++;
+                } else {
+                    YieldThisThread();
+                }
+            } while (index != k_num_values);
+
             producer.Join();
-            consumer.Join();
         }
 
         if constexpr (k_num_consumers == NumConsumers::Many || k_num_producers == NumProducers::Many) {
@@ -212,15 +241,15 @@ void DoAtomicQueueTest(tests::Tester& tester, String name) {
                 Array<Thread, k_num_producers == NumProducers::One ? 1 : 4> producers;
                 Array<Thread, k_num_consumers == NumConsumers::One ? 1 : 4> consumers;
 
-                Atomic<bool> ready {false};
+                StartingGun starting_gun;
 
                 for (auto& producer : producers)
-                    producer.Start([&]() { do_random_spamming(q, ready, true); }, "Producer");
+                    producer.Start([&]() { do_random_spamming(q, starting_gun, true); }, "Producer");
 
                 for (auto& consumer : consumers)
-                    consumer.Start([&]() { do_random_spamming(q, ready, false); }, "Consumer");
+                    consumer.Start([&]() { do_random_spamming(q, starting_gun, false); }, "Consumer");
 
-                ready.Store(true);
+                starting_gun.Fire();
 
                 for (auto& producer : producers)
                     producer.Join();
@@ -376,8 +405,14 @@ TEST_CASE(TestAtomicRefList) {
     SUBCASE("multithreading") {
         Thread thread;
         Atomic<bool> done {false};
+
+        StartingGun starting_gun;
+        Atomic<bool> thread_ready {false};
+
         thread.Start(
             [&]() {
+                thread_ready.Store(true);
+                starting_gun.Wait();
                 auto seed = SeedFromTime();
                 for (auto _ : Range(5000)) {
                     for (char c = 'a'; c <= 'z'; ++c) {
@@ -407,17 +442,23 @@ TEST_CASE(TestAtomicRefList) {
                             map.DeleteRemovedAndUnreferenced();
                         }
                     }
+                    YieldThisThread();
                 }
                 done.Store(true);
             },
             "test thread");
 
+        while (!thread_ready.Load())
+            YieldThisThread();
+
+        starting_gun.Fire();
         while (!done.Load()) {
             for (auto& i : map)
                 if (auto val = i.TryRetain()) {
                     CHECK(val->obj[0] >= 'a' && val->obj[0] <= 'z');
                     i.Release();
                 }
+            YieldThisThread();
         }
 
         thread.Join();

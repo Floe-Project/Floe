@@ -33,6 +33,7 @@ void Semaphore::Signal() { ReleaseSemaphore(m_sema.As<HANDLE>(), 1, nullptr); }
 void Semaphore::Signal(int count) { ReleaseSemaphore(m_sema.As<HANDLE>(), count, nullptr); }
 
 void SleepThisThread(int milliseconds) { ::Sleep((DWORD)milliseconds); }
+void YieldThisThread() { Sleep(0); }
 
 Mutex::Mutex() { InitializeCriticalSection(&mutex.As<CRITICAL_SECTION>()); }
 
@@ -42,7 +43,7 @@ bool Mutex::TryLock() { return TryEnterCriticalSection(&mutex.As<CRITICAL_SECTIO
 void Mutex::Unlock() { LeaveCriticalSection(&mutex.As<CRITICAL_SECTION>()); }
 
 WaitResult WaitIfValueIsExpected(Atomic<u32>& value, u32 expected, Optional<u32> timeout_milliseconds) {
-    auto const succeed = WaitOnAddress(&value.Raw(),
+    auto const succeed = WaitOnAddress(&value.raw,
                                        &expected,
                                        sizeof(expected),
                                        timeout_milliseconds ? *timeout_milliseconds : INFINITE);
@@ -56,8 +57,8 @@ WaitResult WaitIfValueIsExpected(Atomic<u32>& value, u32 expected, Optional<u32>
 
 void WakeWaitingThreads(Atomic<u32>& v, NumWaitingThreads num_waiters) {
     switch (num_waiters) {
-        case NumWaitingThreads::One: WakeByAddressSingle(&v.Raw()); break;
-        case NumWaitingThreads::All: WakeByAddressAll(&v.Raw()); break;
+        case NumWaitingThreads::One: WakeByAddressSingle(&v.raw); break;
+        case NumWaitingThreads::All: WakeByAddressAll(&v.raw); break;
     }
 }
 

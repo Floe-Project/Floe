@@ -9,6 +9,7 @@
 #include "threading.hpp"
 
 void SleepThisThread(int milliseconds) { usleep((unsigned)milliseconds * 1000); }
+void YieldThisThread() { sched_yield(); }
 
 u64 CurrentThreadID() { return (u64)(uintptr)pthread_self(); }
 

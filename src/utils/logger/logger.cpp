@@ -3,8 +3,6 @@
 
 #include "logger.hpp"
 
-#include <time.h>
-
 #include "foundation/foundation.hpp"
 #include "os/filesystem.hpp"
 #include "os/misc.hpp"
@@ -108,10 +106,16 @@ void FileLogger::LogFunction(String str, LogLevel level, bool add_newline) {
         if (first_message) {
             TRY(writer.WriteChars("=======================\n"_s));
 
-            char time_buffer[128];
-            auto t = time(nullptr);
-            auto const time_str_len = strftime(time_buffer, sizeof(time_buffer), "%c", localtime(&t));
-            TRY(writer.WriteChars(String {time_buffer, time_str_len}));
+            auto const t = LocalTimeFromNanosecondsSinceEpoch(NanosecondsSinceEpoch());
+            TRY(fmt::FormatToWriter(writer,
+                                    "{} {} {} {} {}:{}:{}",
+                                    t.DayName(),
+                                    t.MonthName(),
+                                    t.day_of_month,
+                                    t.year,
+                                    t.hour,
+                                    t.minute,
+                                    t.second));
             TRY(writer.WriteChar('\n'));
 
             TRY(fmt::FormatToWriter(writer,

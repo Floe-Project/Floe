@@ -110,11 +110,13 @@ void* CreateOrFetchFixturePointer(Tester& tester,
     return tester.fixture_pointer;
 }
 
-int RunAllTests(Tester& tester) {
+int RunAllTests(Tester& tester, Optional<String> filter_pattern) {
     cli_out.InfoLn("Running tests ...");
     Stopwatch const overall_stopwatch;
 
     for (auto& test_case : tester.test_cases) {
+        if (filter_pattern && !MatchWildcard(*filter_pattern, test_case.title)) continue;
+
         tester.current_test_case = &test_case;
         tester.log.DebugLn("Running ...");
 

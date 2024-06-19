@@ -83,19 +83,15 @@ int main(int argc, char** argv) {
             }
         }
 
-#define X(fn)                                                                                                \
-    if (!filter_pattern || MatchWildcard(*filter_pattern, #fn)) fn(tester);
+#define X(fn) fn(tester);
         TEST_REGISTER_FUNCTIONS
 #if _WIN32
         WINDOWS_FP_TEST_REGISTER_FUNCTIONS
 #endif
 #undef X
 
-        result = RunAllTests(tester);
+        result = RunAllTests(tester, filter_pattern);
     }
 
-#ifdef TRACY_ENABLE
-    ___tracy_shutdown_profiler();
-#endif
     return result;
 }

@@ -116,7 +116,7 @@ struct Tester {
 };
 
 void RegisterTest(Tester& tester, TestFunction f, String title);
-int RunAllTests(Tester& tester);
+int RunAllTests(Tester& tester, Optional<String> filter_pattern = {});
 void Check(Tester& tester,
            bool expression,
            String message,

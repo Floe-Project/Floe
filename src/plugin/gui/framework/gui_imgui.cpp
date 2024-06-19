@@ -31,19 +31,12 @@ void Context::Trace(u32 type, char const* function, char const* fmt, ...) {
     if (type & TraceTypePopup) type_name = "Popup";
 
     static char buffer[512];
-#if __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wformat"
-#endif
     stbsp_sprintf(buffer,
                   "[Imgui] %llu:%d %s %s - ",
-                  platform->update_count,
+                  (unsigned long long)platform->update_count,
                   platform->update_guicall_count,
                   type_name,
                   function);
-#if __clang__
-#pragma clang diagnostic pop
-#endif
 
     auto len = (int)NullTerminatedSize(buffer);
 

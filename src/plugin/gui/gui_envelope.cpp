@@ -34,7 +34,7 @@ void GUIDoEnvelope(Gui* g,
     settings.draw_routine_window_background = [&handle_size](IMGUI_DRAW_WINDOW_BG_ARGS) {
         auto const& r = window->bounds.Reduced(handle_size / 2);
         auto const rounding = LiveSize(imgui, UiSizeId::CornerRounding);
-        imgui.graphics->AddRectFilled(r.Min(), r.Max(), GMC(Envelope_Back), rounding);
+        imgui.graphics->AddRectFilled(r.Min(), r.Max(), LiveCol(imgui, UiColMap::Envelope_Back), rounding);
     };
     imgui.PushID(layer->index);
     DEFER { imgui.PopID(); };
@@ -261,13 +261,13 @@ void GUIDoEnvelope(Gui* g,
 
         f32x2 const point_below_decay = {decay_point_screen.x, bottom_left.y};
 
-        auto const area_col = GMC(Envelope_Area);
-        auto const range_lines_col = GMC(Envelope_RangeLines);
-        auto const hover_col = GMC(Envelope_HandleHover);
-        auto const greyed_out_line_col = GMC(Envelope_LineGreyedOut);
-        auto const greyed_out_handle_col = GMC(Envelope_HandleGreyedOut);
-        auto line_col = GMC(Envelope_Line);
-        auto handle_col = GMC(Envelope_Handle);
+        auto const area_col = LiveCol(imgui, UiColMap::Envelope_Area);
+        auto const range_lines_col = LiveCol(imgui, UiColMap::Envelope_RangeLines);
+        auto const hover_col = LiveCol(imgui, UiColMap::Envelope_HandleHover);
+        auto const greyed_out_line_col = LiveCol(imgui, UiColMap::Envelope_LineGreyedOut);
+        auto const greyed_out_handle_col = LiveCol(imgui, UiColMap::Envelope_HandleGreyedOut);
+        auto line_col = LiveCol(imgui, UiColMap::Envelope_Line);
+        auto handle_col = LiveCol(imgui, UiColMap::Envelope_Handle);
 
         auto const handle_visible_size = handle_size / 10;
 

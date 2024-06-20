@@ -68,10 +68,14 @@ void DoTooltipText(Gui* g, String str, Rect r, bool rect_is_window_pos) {
     draw::DropShadow(imgui, popup_r);
     imgui.overlay_graphics.AddRectFilled(popup_r.Min(),
                                          popup_r.Max(),
-                                         GMC(TooltipBack),
+                                         LiveCol(imgui, UiColMap::TooltipBack),
                                          LiveSize(imgui, UiSizeId::CornerRounding));
-    imgui.overlay_graphics
-        .AddText(font, font->font_size_no_scale, text_start, GMC(TooltipText), str, size + 1);
+    imgui.overlay_graphics.AddText(font,
+                                   font->font_size_no_scale,
+                                   text_start,
+                                   LiveCol(imgui, UiColMap::TooltipText),
+                                   str,
+                                   size + 1);
 
     g->imgui.graphics->context->PopFont();
 }
@@ -324,7 +328,9 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
 
                 Rect div_r = {div_gap_x, pos + (div_h / 2), item_width - 2 * div_gap_x, 1};
                 imgui.RegisterAndConvertRect(&div_r);
-                imgui.graphics->AddRectFilled(div_r.Min(), div_r.Max(), GMC(PopupItemDivider));
+                imgui.graphics->AddRectFilled(div_r.Min(),
+                                              div_r.Max(),
+                                              LiveCol(imgui, UiColMap::PopupItemDivider));
                 pos += div_h;
             }
         }
@@ -430,7 +436,7 @@ bool DoOverlayClickableBackground(Gui* g) {
     auto& imgui = g->imgui;
     auto invis_sets = FloeWindowSettings(imgui, [](IMGUI_DRAW_WINDOW_BG_ARGS) {
         auto r = window->unpadded_bounds;
-        imgui.graphics->AddRectFilled(r.Min(), r.Max(), GMC(SidePanelOverlay));
+        imgui.graphics->AddRectFilled(r.Min(), r.Max(), LiveCol(imgui, UiColMap::SidePanelOverlay));
     });
     imgui.BeginWindow(invis_sets, {0, 0, imgui.Width(), imgui.Height()}, "invisible");
     auto invis_window = imgui.CurrentWindow();
@@ -460,21 +466,28 @@ imgui::TextInputSettings GetParameterTextInputSettings() {
 
         imgui.graphics->AddRectFilled(background_r.Min(),
                                       background_r.Max(),
-                                      GMC(KnobTextInputBack),
+                                      LiveCol(imgui, UiColMap::KnobTextInputBack),
                                       rounding);
-        imgui.graphics->AddRect(background_r.Min(), background_r.Max(), GMC(KnobTextInputBorder), rounding);
+        imgui.graphics->AddRect(background_r.Min(),
+                                background_r.Max(),
+                                LiveCol(imgui, UiColMap::KnobTextInputBorder),
+                                rounding);
 
         if (result->HasSelection()) {
             auto selection_r = result->GetSelectionRect();
-            imgui.graphics->AddRectFilled(selection_r.Min(), selection_r.Max(), GMC(TextInputSelection));
+            imgui.graphics->AddRectFilled(selection_r.Min(),
+                                          selection_r.Max(),
+                                          LiveCol(imgui, UiColMap::TextInputSelection));
         }
 
         if (result->show_cursor) {
             auto cursor_r = result->GetCursorRect();
-            imgui.graphics->AddRectFilled(cursor_r.Min(), cursor_r.Max(), GMC(TextInputCursor));
+            imgui.graphics->AddRectFilled(cursor_r.Min(),
+                                          cursor_r.Max(),
+                                          LiveCol(imgui, UiColMap::TextInputCursor));
         }
 
-        imgui.graphics->AddText(text_pos, GMC(TextInputText), text);
+        imgui.graphics->AddText(text_pos, LiveCol(imgui, UiColMap::TextInputText), text);
     };
 
     return settings;

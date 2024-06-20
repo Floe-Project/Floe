@@ -38,8 +38,7 @@ PresetBrowser::PresetBrowser(Gui* g, PresetBrowserPersistentData& persistent_dat
     preset_folders_panel_width = LiveSize(imgui, UiSizeId::PresetFoldersPanelWidth);
     preset_panel_xgap = LiveSize(imgui, UiSizeId::PresetPanelGapX);
 
-    preset_button_folder_initial_indent =
-        LiveSize(imgui, UiSizeId::PresetButtonFolderInitialIndent);
+    preset_button_folder_initial_indent = LiveSize(imgui, UiSizeId::PresetButtonFolderInitialIndent);
     preset_button_folder_arrow_indent = LiveSize(imgui, UiSizeId::PresetButtonFolderArrorIndent);
     preset_button_folder_indent = LiveSize(imgui, UiSizeId::PresetButtonFolderIndent);
     preset_button_file_indent = LiveSize(imgui, UiSizeId::PresetButtonFileIndent);
@@ -100,7 +99,7 @@ PresetBrowser::DoPresetFolderRecurse(DirectoryListing::Entry const* f, f32& ypos
                                         file_arrow_size,
                                         f32x2 {text_r.x - preset_button_folder_arrow_indent,
                                                text_r.y + (text_r.h / 2 - file_arrow_size / 2)},
-                                        GMC(PresetBrowserFileDownArrow),
+                                        LiveCol(imgui, UiColMap::PresetBrowserFileDownArrow),
                                         ICON_FA_CHECK);
             }
 
@@ -218,7 +217,7 @@ DirectoryListing::Entry const* PresetBrowser::DoPresetFilesRecurse(DirectoryList
                                 imgui.GetRegisteredAndConvertedRect({0, r.y, imgui.Width(), 1});
                             imgui.graphics->AddRectFilled(divider.Min(),
                                                           divider.Max(),
-                                                          GMC(BrowserFileDivider));
+                                                          LiveCol(imgui, UiColMap::BrowserFileDivider));
                         }
 
                         auto const max_heading_w = r.w / 2;
@@ -574,25 +573,28 @@ void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
 
                     imgui.graphics->AddRectFilled(r.Min(),
                                                   r.Min() + f32x2 {r.w, table_title_h},
-                                                  GMC(BrowserTopRowBack),
+                                                  LiveCol(imgui, UiColMap::BrowserTopRowBack),
                                                   rounding,
                                                   1 | 2);
 
                     imgui.graphics->AddRectFilled(r.Min() + f32x2 {0, table_title_h},
                                                   imgui.Min() + f32x2 {preset_folders_panel_width, r.h},
-                                                  GMC(PresetBrowserFoldersBack),
+                                                  LiveCol(imgui, UiColMap::PresetBrowserFoldersBack),
                                                   rounding,
                                                   8);
 
                     imgui.graphics->AddRectFilled(r.Min() + f32x2 {preset_folders_panel_width, table_title_h},
                                                   r.Max(),
-                                                  GMC(PresetBrowserFilesBack),
+                                                  LiveCol(imgui, UiColMap::PresetBrowserFilesBack),
                                                   rounding,
                                                   8);
 
-                    imgui.graphics->AddRect(r.Min(), r.Max(), GMC(BrowserBorderRect), rounding);
+                    imgui.graphics->AddRect(r.Min(),
+                                            r.Max(),
+                                            LiveCol(imgui, UiColMap::BrowserBorderRect),
+                                            rounding);
 
-                    auto const line_col = GMC(BrowserSectionHeadingLine);
+                    auto const line_col = LiveCol(imgui, UiColMap::BrowserSectionHeadingLine);
                     imgui.graphics->AddLine(r.Min() + f32x2 {preset_folders_panel_width, 0},
                                             r.Min() + f32x2 {preset_folders_panel_width, r.h},
                                             line_col);
@@ -651,26 +653,29 @@ void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
                     auto settings = imgui::DefTextInput();
                     settings.draw = [](IMGUI_DRAW_TEXT_INPUT_ARGS) {
                         auto const rounding = LiveSize(imgui, UiSizeId::CornerRounding);
-                        imgui.graphics->AddRectFilled(r.Min(), r.Max(), GMC(BrowserSearchBack), rounding);
+                        imgui.graphics->AddRectFilled(r.Min(),
+                                                      r.Max(),
+                                                      LiveCol(imgui, UiColMap::BrowserSearchBack),
+                                                      rounding);
 
                         if (result->HasSelection()) {
                             auto selection_r = result->GetSelectionRect();
                             imgui.graphics->AddRectFilled(selection_r.Min(),
                                                           selection_r.Max(),
-                                                          GMC(BrowserSearchSelection));
+                                                          LiveCol(imgui, UiColMap::BrowserSearchSelection));
                         }
 
                         if (result->show_cursor) {
                             auto cursor_r = result->GetCursorRect();
                             imgui.graphics->AddRectFilled(cursor_r.Min(),
                                                           cursor_r.Max(),
-                                                          GMC(BrowserSearchCursor));
+                                                          LiveCol(imgui, UiColMap::BrowserSearchCursor));
                         }
 
-                        auto col = GMC(BrowserSearchText);
+                        auto col = LiveCol(imgui, UiColMap::BrowserSearchText);
                         if (!text.size) {
                             text = "Search folders/presets...";
-                            col = GMC(BrowserSearchTextInactive);
+                            col = LiveCol(imgui, UiColMap::BrowserSearchTextInactive);
                         }
 
                         imgui.graphics->AddText(result->GetTextPos(), col, text);

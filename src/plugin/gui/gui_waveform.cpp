@@ -44,9 +44,9 @@ static void GUIDoSampleWaveformOverlay(Gui* g, PluginInstance::Layer* layer, Rec
         u32 back_col;
         u32 back_hover_col;
         u32 text_col;
-        back_col = GMC(Waveform_LoopHandle);
-        back_hover_col = GMC(Waveform_LoopHandleHover);
-        text_col = GMC(Waveform_LoopHandleText);
+        back_col = LiveCol(imgui, UiColMap::Waveform_LoopHandle);
+        back_hover_col = LiveCol(imgui, UiColMap::Waveform_LoopHandleHover);
+        text_col = LiveCol(imgui, UiColMap::Waveform_LoopHandleText);
 
         String text {};
         HandleDirection handle_direction {HandleDirection::Left};
@@ -64,18 +64,19 @@ static void GUIDoSampleWaveformOverlay(Gui* g, PluginInstance::Layer* layer, Rec
             case HandleType::Offset: {
                 text = ICON_FA_CARET_RIGHT;
                 handle_direction = HandleDirection::Left;
-                back_col = GMC(Waveform_OffsetHandle);
-                back_hover_col = GMC(Waveform_OffsetHandleHover);
-                text_col = GMC(Waveform_OffsetHandleText);
+                back_col = LiveCol(imgui, UiColMap::Waveform_OffsetHandle);
+                back_hover_col = LiveCol(imgui, UiColMap::Waveform_OffsetHandleHover);
+                text_col = LiveCol(imgui, UiColMap::Waveform_OffsetHandleText);
                 break;
             }
             case HandleType::Xfade: {
                 text = ICON_FA_BURN;
                 handle_direction = !ping_pong ? (reverse ? HandleDirection::Left : HandleDirection::Right)
                                               : HandleDirection::Right;
-                back_col = inactive ? GMC(Waveform_XfadeHandleInactive) : GMC(Waveform_XfadeHandle);
-                back_hover_col = GMC(Waveform_XfadeHandleHover);
-                text_col = GMC(Waveform_XfadeHandleText);
+                back_col = inactive ? LiveCol(imgui, UiColMap::Waveform_XfadeHandleInactive)
+                                    : LiveCol(imgui, UiColMap::Waveform_XfadeHandle);
+                back_hover_col = LiveCol(imgui, UiColMap::Waveform_XfadeHandleHover);
+                text_col = LiveCol(imgui, UiColMap::Waveform_XfadeHandleText);
                 break;
             }
         }
@@ -386,11 +387,12 @@ static void GUIDoSampleWaveformOverlay(Gui* g, PluginInstance::Layer* layer, Rec
 
         imgui.graphics->AddRectFilled(sample_offset_r.Min(),
                                       sample_offset_r.Max(),
-                                      GMC(Waveform_SampleOffset));
+                                      LiveCol(imgui, UiColMap::Waveform_SampleOffset));
         imgui.graphics->AddRectFilled(f32x2 {sample_offset_r.Right() - 1, sample_offset_r.y},
                                       sample_offset_r.Max(),
-                                      imgui.IsHotOrActive(offs_imgui_id) ? GMC(Waveform_OffsetHandleHover)
-                                                                         : GMC(Waveform_OffsetHandle));
+                                      imgui.IsHotOrActive(offs_imgui_id)
+                                          ? LiveCol(imgui, UiColMap::Waveform_OffsetHandleHover)
+                                          : LiveCol(imgui, UiColMap::Waveform_OffsetHandle));
     }
 
     // drawing
@@ -402,15 +404,19 @@ static void GUIDoSampleWaveformOverlay(Gui* g, PluginInstance::Layer* layer, Rec
 
         if (draw_xfade && loop_xfade_size > 0.01f) {
             if (!ping_pong) {
-                imgui.graphics->AddLine(xfade_line.Min(), end_line.BottomLeft(), GMC(Waveform_XFade));
+                imgui.graphics->AddLine(xfade_line.Min(),
+                                        end_line.BottomLeft(),
+                                        LiveCol(imgui, UiColMap::Waveform_XFade));
                 imgui.graphics->AddLine(other_xfade_line.BottomLeft(),
                                         start_line.TopLeft(),
-                                        GMC(Waveform_XFade));
+                                        LiveCol(imgui, UiColMap::Waveform_XFade));
             } else {
                 imgui.graphics->AddLine(other_xfade_line.BottomLeft(),
                                         left_line.TopLeft(),
-                                        GMC(Waveform_XFade));
-                imgui.graphics->AddLine(right_line.TopRight(), xfade_line.BottomLeft(), GMC(Waveform_XFade));
+                                        LiveCol(imgui, UiColMap::Waveform_XFade));
+                imgui.graphics->AddLine(right_line.TopRight(),
+                                        xfade_line.BottomLeft(),
+                                        LiveCol(imgui, UiColMap::Waveform_XFade));
             }
         }
 
@@ -423,7 +429,7 @@ static void GUIDoSampleWaveformOverlay(Gui* g, PluginInstance::Layer* layer, Rec
                                         start_line.BottomLeft()};
                 imgui.graphics->AddConvexPolyFilled(points,
                                                     (int)ArraySize(points),
-                                                    GMC(Waveform_RegionOverlay),
+                                                    LiveCol(imgui, UiColMap::Waveform_RegionOverlay),
                                                     true);
             } else {
                 f32x2 const points[] = {other_xfade_line.BottomLeft(),
@@ -432,29 +438,33 @@ static void GUIDoSampleWaveformOverlay(Gui* g, PluginInstance::Layer* layer, Rec
                                         xfade_line.BottomRight()};
                 imgui.graphics->AddConvexPolyFilled(points,
                                                     (int)ArraySize(points),
-                                                    GMC(Waveform_RegionOverlay),
+                                                    LiveCol(imgui, UiColMap::Waveform_RegionOverlay),
                                                     true);
             }
         } else {
             imgui.graphics->AddRectFilled(loop_region_r.Min(),
                                           loop_region_r.Max(),
-                                          region_active ? GMC(Waveform_RegionOverlayHover)
-                                                        : GMC(Waveform_RegionOverlay));
+                                          region_active
+                                              ? LiveCol(imgui, UiColMap::Waveform_RegionOverlayHover)
+                                              : LiveCol(imgui, UiColMap::Waveform_RegionOverlay));
         }
 
         imgui.graphics->AddRectFilled(start_line.Min(),
                                       start_line.Max(),
-                                      imgui.IsHotOrActive(start_id) ? GMC(Waveform_LoopHandleHover)
-                                                                    : GMC(Waveform_LoopHandle));
+                                      imgui.IsHotOrActive(start_id)
+                                          ? LiveCol(imgui, UiColMap::Waveform_LoopHandleHover)
+                                          : LiveCol(imgui, UiColMap::Waveform_LoopHandle));
         imgui.graphics->AddRectFilled(end_line.Min(),
                                       end_line.Max(),
-                                      imgui.IsHotOrActive(end_id) ? GMC(Waveform_LoopHandleHover)
-                                                                  : GMC(Waveform_LoopHandle));
+                                      imgui.IsHotOrActive(end_id)
+                                          ? LiveCol(imgui, UiColMap::Waveform_LoopHandleHover)
+                                          : LiveCol(imgui, UiColMap::Waveform_LoopHandle));
         if (draw_xfade && loop_xfade_size > 0.01f) {
             imgui.graphics->AddRectFilled(xfade_line.Min(),
                                           xfade_line.Max(),
-                                          imgui.IsHotOrActive(xfade_id) ? GMC(Waveform_XfadeHandleHover)
-                                                                        : GMC(Waveform_XfadeHandle));
+                                          imgui.IsHotOrActive(xfade_id)
+                                              ? LiveCol(imgui, UiColMap::Waveform_XfadeHandleHover)
+                                              : LiveCol(imgui, UiColMap::Waveform_XfadeHandle));
         }
 
         draw_handle(start_handle, start_id, HandleType::LoopStart, false);
@@ -509,7 +519,10 @@ void GUIDoSampleWaveform(Gui* g, PluginInstance::Layer* layer, Rect r) {
 
     auto waveform_r_unreg = r;
     auto waveform_r = g->imgui.GetRegisteredAndConvertedRect(waveform_r_unreg);
-    g->imgui.graphics->AddRectFilled(waveform_r.Min(), waveform_r.Max(), GMC(Waveform_LoopBack), rounding);
+    g->imgui.graphics->AddRectFilled(waveform_r.Min(),
+                                     waveform_r.Max(),
+                                     LiveCol(imgui, UiColMap::Waveform_LoopBack),
+                                     rounding);
 
     bool is_loading = false;
     if (g->plugin.sample_lib_loader_connection.instrument_loading_percents[(usize)layer->index].Load() !=
@@ -568,8 +581,9 @@ void GUIDoSampleWaveform(Gui* g, PluginInstance::Layer* layer, Rect r) {
                                         waveform_r.Max(),
                                         whole_section_uv.lo,
                                         whole_section_uv.hi,
-                                        (!loop_points_editable) ? GMC(Waveform_LoopWaveformLoop)
-                                                                : GMC(Waveform_LoopWaveform));
+                                        (!loop_points_editable)
+                                            ? LiveCol(imgui, UiColMap::Waveform_LoopWaveformLoop)
+                                            : LiveCol(imgui, UiColMap::Waveform_LoopWaveform));
 
             if ((loop_end - loop_start) != 0 && loop_points_editable) {
                 g->imgui.graphics->AddImage(
@@ -578,7 +592,7 @@ void GUIDoSampleWaveform(Gui* g, PluginInstance::Layer* layer, Rect r) {
                     waveform_r.Max() - f32x2 {waveform_r.w * (reverse ? loop_end : (1.0f - loop_end)), 0},
                     loop_section_uv.lo,
                     loop_section_uv.hi,
-                    GMC(Waveform_LoopWaveformLoop));
+                    LiveCol(imgui, UiColMap::Waveform_LoopWaveformLoop));
             }
 
             if (offset != 0) {
@@ -587,7 +601,7 @@ void GUIDoSampleWaveform(Gui* g, PluginInstance::Layer* layer, Rect r) {
                                             waveform_r.Max() - f32x2 {r.w * (1.0f - offset), 0},
                                             offset_section_uv.lo,
                                             offset_section_uv.hi,
-                                            GMC(Waveform_LoopWaveformOffset));
+                                            LiveCol(imgui, UiColMap::Waveform_LoopWaveformOffset));
             }
         }
     }

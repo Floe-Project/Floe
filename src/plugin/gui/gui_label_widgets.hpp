@@ -34,23 +34,25 @@ PUBLIC Style Title(imgui::Context const& imgui, u32 col) {
     return s;
 }
 
-PUBLIC Style BrowserHeading(imgui::Context const& imgui) { return CentredLeft(imgui, GMC(BrowserHeading)); }
+PUBLIC Style BrowserHeading(imgui::Context const& imgui) {
+    return CentredLeft(imgui, LiveCol(imgui, UiColMap::BrowserHeading));
+}
 
 PUBLIC Style PresetBrowserFolder(imgui::Context const& imgui) {
-    auto s = CentredLeft(imgui, GMC(PresetBrowserFileFolderText));
+    auto s = CentredLeft(imgui, LiveCol(imgui, UiColMap::PresetBrowserFileFolderText));
     s.icon_or_text.justification = TextJustification::Baseline | TextJustification::Left;
     return s;
 }
 
 PUBLIC Style PresetBrowserFolderPath(imgui::Context const& imgui) {
-    auto s = CentredLeft(imgui, GMC(PresetBrowserFileFolderTextPath));
+    auto s = CentredLeft(imgui, LiveCol(imgui, UiColMap::PresetBrowserFileFolderTextPath));
     s.icon_or_text.justification = TextJustification::Baseline | TextJustification::Right;
     s.icon_or_text.overflow_type = TextOverflowType::ShowDotsOnLeft;
     return s;
 }
 
 PUBLIC Style PresetSectionHeading(imgui::Context const& imgui) {
-    return CentredLeft(imgui, GMC(BrowserSectionHeading));
+    return CentredLeft(imgui, LiveCol(imgui, UiColMap::BrowserSectionHeading));
 }
 
 PUBLIC Style Parameter(imgui::Context const& imgui, bool greyed_out = false) {
@@ -59,7 +61,8 @@ PUBLIC Style Parameter(imgui::Context const& imgui, bool greyed_out = false) {
     s.icon_or_text.justification = TextJustification::CentredLeft;
     s.icon_or_text.add_margin_x = false;
     s.icon_or_text.capitalise = false;
-    s.main_cols.reg = greyed_out ? GMC(ParameterLabelGreyedOut) : GMC(ParameterLabel);
+    s.main_cols.reg = greyed_out ? LiveCol(imgui, UiColMap::ParameterLabelGreyedOut)
+                                 : LiveCol(imgui, UiColMap::ParameterLabel);
     return s;
 }
 
@@ -70,7 +73,7 @@ PUBLIC Style ParameterCentred(imgui::Context const& imgui, bool greyed_out = fal
 }
 
 PUBLIC Style ErrorWindowLabel(imgui::Context const& imgui) {
-    auto s = CentredLeft(imgui, GMC(PopupItemText));
+    auto s = CentredLeft(imgui, LiveCol(imgui, UiColMap::PopupItemText));
     s.icon_or_text.add_margin_x = false;
     return s;
 }
@@ -79,7 +82,7 @@ PUBLIC Style WaveformLoadingLabel(imgui::Context const& imgui) {
     Style s {};
     s.type = buttons::LayoutAndSizeType::IconOrText;
     s.icon_or_text.justification = TextJustification::Centred;
-    s.main_cols.reg = GMC(Waveform_LoadingText);
+    s.main_cols.reg = LiveCol(imgui, UiColMap::Waveform_LoadingText);
     return s;
 }
 

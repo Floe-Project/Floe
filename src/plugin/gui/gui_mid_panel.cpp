@@ -71,12 +71,12 @@ void MidPanel(Gui* g) {
                                                             r.Max(),
                                                             min_uv,
                                                             max_uv,
-                                                            GMC(BlurredImageDrawColour),
+                                                            LiveCol(imgui, UiColMap::BlurredImageDrawColour),
                                                             panel_rounding);
                         } else {
                             imgui.graphics->AddRectFilled(r.Min(),
                                                           r.Max(),
-                                                          GMC(BlurredImageFallback),
+                                                          LiveCol(imgui, UiColMap::BlurredImageFallback),
                                                           panel_rounding);
                         }
 
@@ -95,7 +95,7 @@ void MidPanel(Gui* g) {
                                 vtx_idx_1,
                                 pos,
                                 pos + f32x2 {0, size.y},
-                                GMC(BlurredImageGradientOverlay),
+                                LiveCol(imgui, UiColMap::BlurredImageGradientOverlay),
                                 0);
                             graphics::DrawList::ShadeVertsLinearColorGradientSetAlpha(
                                 imgui.graphics,
@@ -103,20 +103,23 @@ void MidPanel(Gui* g) {
                                 vtx_idx_2,
                                 pos + f32x2 {size.x, 0},
                                 pos + f32x2 {size.x, size.y},
-                                GMC(BlurredImageGradientOverlay),
+                                LiveCol(imgui, UiColMap::BlurredImageGradientOverlay),
                                 0);
                         }
 
-                        imgui.graphics->AddRect(r.Min(), r.Max(), GMC(BlurredImageBorder), panel_rounding);
+                        imgui.graphics->AddRect(r.Min(),
+                                                r.Max(),
+                                                LiveCol(imgui, UiColMap::BlurredImageBorder),
+                                                panel_rounding);
 
                         imgui.graphics->AddLine({r.x, r.y + mid_panel_title_height},
                                                 {r.Right(), r.y + mid_panel_title_height},
-                                                GMC(LayerDividerLine));
+                                                LiveCol(imgui, UiColMap::LayerDividerLine));
                         for (u32 i = 1; i < k_num_layers; ++i) {
                             auto const x_pos = r.x + (f32)i * (r.w / k_num_layers);
                             imgui.graphics->AddLine({x_pos, r.y + mid_panel_title_height},
                                                     {x_pos, r.Bottom()},
-                                                    GMC(LayerDividerLine));
+                                                    LiveCol(imgui, UiColMap::LayerDividerLine));
                         }
                     }
                 }
@@ -138,7 +141,7 @@ void MidPanel(Gui* g) {
             imgui.RegisterAndConvertRect(&title_r);
             imgui.graphics->AddTextJustified(title_r,
                                              "Layers",
-                                             GMC(MidPanelTitleText),
+                                             LiveCol(imgui, UiColMap::MidPanelTitleText),
                                              TextJustification::CentredLeft);
         }
 
@@ -193,12 +196,12 @@ void MidPanel(Gui* g) {
                                                             r.Max(),
                                                             min_uv,
                                                             max_uv,
-                                                            GMC(BlurredImageDrawColour),
+                                                            LiveCol(imgui, UiColMap::BlurredImageDrawColour),
                                                             panel_rounding);
                         } else {
                             imgui.graphics->AddRectFilled(r.Min(),
                                                           r.Max(),
-                                                          GMC(BlurredImageFallback),
+                                                          LiveCol(imgui, UiColMap::BlurredImageFallback),
                                                           panel_rounding);
                         }
 
@@ -217,7 +220,7 @@ void MidPanel(Gui* g) {
                                 vtx_idx_1,
                                 pos,
                                 pos + f32x2 {0, size.y},
-                                GMC(BlurredImageGradientOverlay),
+                                LiveCol(imgui, UiColMap::BlurredImageGradientOverlay),
                                 0);
                             graphics::DrawList::ShadeVertsLinearColorGradientSetAlpha(
                                 imgui.graphics,
@@ -225,15 +228,18 @@ void MidPanel(Gui* g) {
                                 vtx_idx_2,
                                 pos + f32x2 {size.x, 0},
                                 pos + f32x2 {size.x, size.y},
-                                GMC(BlurredImageGradientOverlay),
+                                LiveCol(imgui, UiColMap::BlurredImageGradientOverlay),
                                 0);
                         }
 
-                        imgui.graphics->AddRect(r.Min(), r.Max(), GMC(BlurredImageBorder), panel_rounding);
+                        imgui.graphics->AddRect(r.Min(),
+                                                r.Max(),
+                                                LiveCol(imgui, UiColMap::BlurredImageBorder),
+                                                panel_rounding);
 
                         imgui.graphics->AddLine({r.x, r.y + mid_panel_title_height},
                                                 {r.Right(), r.y + mid_panel_title_height},
-                                                GMC(LayerDividerLine));
+                                                LiveCol(imgui, UiColMap::LayerDividerLine));
                     }
                 }
             }
@@ -256,7 +262,7 @@ void MidPanel(Gui* g) {
             imgui.RegisterAndConvertRect(&title_r);
             imgui.graphics->AddTextJustified(title_r,
                                              "Effects",
-                                             GMC(MidPanelTitleText),
+                                             LiveCol(imgui, UiColMap::MidPanelTitleText),
                                              TextJustification::CentredLeft);
         }
 

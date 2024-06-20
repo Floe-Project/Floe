@@ -134,7 +134,10 @@ void TopPanel(Gui* g) {
     {
         auto back_r = imgui.GetRegisteredAndConvertedRect(lay.GetRect(preset_box));
         auto const rounding = LiveSize(imgui, UiSizeId::CornerRounding);
-        imgui.graphics->AddRectFilled(back_r.Min(), back_r.Max(), GMC(TopPanelPresetsBack), rounding);
+        imgui.graphics->AddRectFilled(back_r.Min(),
+                                      back_r.Max(),
+                                      LiveCol(imgui, UiColMap::TopPanelPresetsBack),
+                                      rounding);
     }
 
     {
@@ -144,7 +147,7 @@ void TopPanel(Gui* g) {
 
         auto title_r = lay.GetRect(title).Up(Round(-title_font->descent));
 
-        labels::Label(g, title_r, name, labels::Title(imgui, GMC(TopPanelTitleText)));
+        labels::Label(g, title_r, name, labels::Title(imgui, LiveCol(imgui, UiColMap::TopPanelTitleText)));
         if (title_font) imgui.graphics->context->PopFont();
     }
 

@@ -27,13 +27,13 @@ static void DrawPeakMeters(imgui::Context const& imgui, Rect r, f32 vl, f32 vr, 
         {
             auto l_channel = padded_r;
             l_channel.w = w;
-            imgui.graphics->AddRectFilled(l_channel, GMC(PeakMeterBack), rounding);
+            imgui.graphics->AddRectFilled(l_channel, LiveCol(imgui, UiColMap::PeakMeterBack), rounding);
         }
         {
             auto r_channel = padded_r;
             r_channel.x += w + gap;
             r_channel.w = w;
-            imgui.graphics->AddRectFilled(r_channel, GMC(PeakMeterBack), rounding);
+            imgui.graphics->AddRectFilled(r_channel, LiveCol(imgui, UiColMap::PeakMeterBack), rounding);
         }
 
         auto draw_marker = [&](f32 db, bool bold) {
@@ -41,10 +41,12 @@ static void DrawPeakMeters(imgui::Context const& imgui, Rect r, f32 vl, f32 vr, 
             auto const line_y = padded_r.y + ((1 - pos) * padded_r.h);
             imgui.graphics->AddLine({r.x, line_y},
                                     {r.x + (marker_w - marker_pad), line_y},
-                                    bold ? GMC(PeakMeterMarkersBold) : GMC(PeakMeterMarkers));
+                                    bold ? LiveCol(imgui, UiColMap::PeakMeterMarkersBold)
+                                         : LiveCol(imgui, UiColMap::PeakMeterMarkers));
             imgui.graphics->AddLine({r.Right() - (marker_w - marker_pad), line_y},
                                     {r.Right(), line_y},
-                                    bold ? GMC(PeakMeterMarkersBold) : GMC(PeakMeterMarkers));
+                                    bold ? LiveCol(imgui, UiColMap::PeakMeterMarkersBold)
+                                         : LiveCol(imgui, UiColMap::PeakMeterMarkers));
         };
 
         draw_marker(0, true);
@@ -76,20 +78,20 @@ static void DrawPeakMeters(imgui::Context const& imgui, Rect r, f32 vl, f32 vr, 
 
         for (auto& chan_r : channel_rs) {
             if (chan_r.y < top_segment_line) {
-                auto col = GMC(PeakMeterHighlightTop);
-                if (did_clip) col = GMC(PeakMeterClipping);
+                auto col = LiveCol(imgui, UiColMap::PeakMeterHighlightTop);
+                if (did_clip) col = LiveCol(imgui, UiColMap::PeakMeterClipping);
                 imgui.graphics->AddRectFilled(chan_r.Min(), chan_r.Max(), col);
             }
 
             if (chan_r.y < mid_segment_line) {
-                auto col = GMC(PeakMeterHighlightMiddle);
-                if (did_clip) col = GMC(PeakMeterClipping);
+                auto col = LiveCol(imgui, UiColMap::PeakMeterHighlightMiddle);
+                if (did_clip) col = LiveCol(imgui, UiColMap::PeakMeterClipping);
                 auto const top = Max(chan_r.y, top_segment_line);
                 imgui.graphics->AddRectFilled(f32x2 {chan_r.x, top}, chan_r.Max(), col);
             }
 
-            auto col = GMC(PeakMeterHighlightBottom);
-            if (did_clip) col = GMC(PeakMeterClipping);
+            auto col = LiveCol(imgui, UiColMap::PeakMeterHighlightBottom);
+            if (did_clip) col = LiveCol(imgui, UiColMap::PeakMeterClipping);
             auto const top = Max(chan_r.y, mid_segment_line);
             imgui.graphics->AddRectFilled(f32x2 {chan_r.x, top}, chan_r.Max(), col, rounding, 4 | 8);
         }

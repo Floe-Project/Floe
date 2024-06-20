@@ -9,7 +9,7 @@
 #include "tests/framework.hpp"
 
 TEST_CASE(TestHostingClap) {
-#if __linux__ && 0
+#if __linux__
     struct Fixture {
         Fixture(tests::Tester&) {}
         Optional<String> clap_path {};

@@ -24,8 +24,7 @@ LayID LayoutParameterComponent(Gui* g,
 
     auto const param_component_large_width = LiveSize(imgui, UiSizeId::ParamComponentLargeWidth);
     auto const param_component_small_width = LiveSize(imgui, UiSizeId::ParamComponentSmallWidth);
-    auto const param_component_extra_small_width =
-        LiveSize(imgui, UiSizeId::ParamComponentExtraSmallWidth);
+    auto const param_component_extra_small_width = LiveSize(imgui, UiSizeId::ParamComponentExtraSmallWidth);
     auto const param_component_height_offset = LiveSize(imgui, UiSizeId::ParamComponentHeightOffset);
     auto const param_component_margin_lr = LiveSize(imgui, UiSizeId::ParamComponentMarginLR);
     auto const param_component_margin_t = LiveSize(imgui, UiSizeId::ParamComponentMarginT);
@@ -41,8 +40,7 @@ LayID LayoutParameterComponent(Gui* g,
     auto const starting_width = width;
     auto height = width - param_component_height_offset;
     auto const starting_height = height;
-    auto gap_x =
-        size_index_for_gapx ? LiveSize(imgui, *size_index_for_gapx) : param_component_margin_lr;
+    auto gap_x = size_index_for_gapx ? LiveSize(imgui, *size_index_for_gapx) : param_component_margin_lr;
     auto gap_bottom = param_component_margin_b;
     auto gap_top = param_component_margin_t;
 

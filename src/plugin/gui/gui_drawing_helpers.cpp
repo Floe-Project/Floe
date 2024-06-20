@@ -16,7 +16,11 @@ namespace draw {
 void DropShadow(imgui::Context const& imgui, Rect r, Optional<f32> rounding_opt) {
     auto const rounding = rounding_opt ? *rounding_opt : LiveSize(imgui, UiSizeId::CornerRounding);
     auto const blur = LiveSize(imgui, UiSizeId::WindowDropShadowBlur);
-    imgui.graphics->AddDropShadow(r.Min(), r.Max(), GMC(WindowDropShadow), blur, rounding);
+    imgui.graphics->AddDropShadow(r.Min(),
+                                  r.Max(),
+                                  LiveCol(imgui, UiColMap::WindowDropShadow),
+                                  blur,
+                                  rounding);
 }
 
 f32x2 GetTextSize(graphics::Font* font, String str, Optional<f32> wrap_width) {
@@ -42,7 +46,8 @@ void VoiceMarkerLine(imgui::Context const& imgui,
         if (tail_size > 1) {
             auto const aa = imgui.graphics->context->fill_anti_alias;
             imgui.graphics->context->fill_anti_alias = false;
-            auto const darkened_col = colours::ChangeBrightness(GMC(Waveform_LoopVoiceMarkers), 0.7f);
+            auto const darkened_col =
+                colours::ChangeBrightness(LiveCol(imgui, UiColMap::Waveform_LoopVoiceMarkers), 0.7f);
             auto const col = colours::WithAlpha(darkened_col, (u8)MapFrom01(opacity, 10, 40));
             auto const transparent_col = colours::WithAlpha(darkened_col, 0);
 
@@ -73,7 +78,8 @@ void VoiceMarkerLine(imgui::Context const& imgui,
     {
         auto const aa = imgui.graphics->context->anti_aliased_lines;
         imgui.graphics->context->anti_aliased_lines = false;
-        auto const col = colours::WithAlpha(GMC(Waveform_LoopVoiceMarkers), (u8)(opacity * 255.0f));
+        auto const col =
+            colours::WithAlpha(LiveCol(imgui, UiColMap::Waveform_LoopVoiceMarkers), (u8)(opacity * 255.0f));
 
         imgui.graphics->AddLine(pos, pos + f32x2 {0, height}, col);
         imgui.graphics->context->anti_aliased_lines = aa;

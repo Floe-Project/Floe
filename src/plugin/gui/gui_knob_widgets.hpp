@@ -26,8 +26,8 @@ struct Style {
 
 PUBLIC Style DefaultKnob(imgui::Context const& imgui, Optional<u32> _highlight_col = {}) {
     Style s {};
-    s.highlight_col = _highlight_col ? *_highlight_col : GMC(KnobOuterArcBright);
-    s.line_col = _highlight_col ? GMC(FXKnobLine) : GMC(KnobLine);
+    s.highlight_col = _highlight_col ? *_highlight_col : LiveCol(imgui, UiColMap::KnobOuterArcBright);
+    s.line_col = _highlight_col ? LiveCol(imgui, UiColMap::FXKnobLine) : LiveCol(imgui, UiColMap::KnobLine);
     return s;
 }
 

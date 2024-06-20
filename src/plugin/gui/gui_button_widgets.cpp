@@ -107,11 +107,9 @@ static void DrawIconOrText(Gui* g,
     DrawBackground(g, style, r, id, state);
 
     if (style.icon_or_text.justification & TextJustification::Left) {
-        if (style.icon_or_text.add_margin_x)
-            r = r.CutLeft(LiveSize(s, UiSizeId::MenuButtonTextMarginL));
+        if (style.icon_or_text.add_margin_x) r = r.CutLeft(LiveSize(s, UiSizeId::MenuButtonTextMarginL));
     } else if (style.icon_or_text.justification & TextJustification::Right) {
-        if (style.icon_or_text.add_margin_x)
-            r = r.CutRight(LiveSize(s, UiSizeId::MenuButtonTextMarginL));
+        if (style.icon_or_text.add_margin_x) r = r.CutRight(LiveSize(s, UiSizeId::MenuButtonTextMarginL));
     }
 
     if (style.icon_or_text.capitalise) str = GetTempCapitalisedString(str);
@@ -162,8 +160,7 @@ static void DrawIconAndTextButton(Gui* g, Style const& style, Rect r, imgui::Id 
     auto just = TextJustification::CentredLeft;
     auto text_offset = LiveSize(s, UiSizeId::Page_HeadingTextOffset);
     if (style.type == LayoutAndSizeType::IconAndTextMidiButton) {
-        text_offset = LiveSize(s, UiSizeId::MIDI_ItemWidth) +
-                      LiveSize(s, UiSizeId::MIDI_ItemMarginLR);
+        text_offset = LiveSize(s, UiSizeId::MIDI_ItemWidth) + LiveSize(s, UiSizeId::MIDI_ItemMarginLR);
     } else if (style.type == LayoutAndSizeType::IconAndTextMenuItem ||
                style.type == LayoutAndSizeType::IconAndTextSubMenuItem) {
         text_offset = LiveSize(s, UiSizeId::MenuItem_TickWidth);

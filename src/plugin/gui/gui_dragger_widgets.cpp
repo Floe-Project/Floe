@@ -12,10 +12,10 @@ namespace draggers {
 
 Style DefaultStyle(imgui::Context const& imgui) {
     Style s {};
-    s.background = GMC(Dragger1Back);
-    s.text = GMC(TextInputText);
-    s.selection_back = GMC(TextInputSelection);
-    s.cursor = GMC(TextInputCursor);
+    s.background = LiveCol(imgui, UiColMap::Dragger1Back);
+    s.text = LiveCol(imgui, UiColMap::TextInputText);
+    s.selection_back = LiveCol(imgui, UiColMap::TextInputSelection);
+    s.cursor = LiveCol(imgui, UiColMap::TextInputCursor);
     s.button_style = buttons::IconButton(imgui);
     return s;
 }

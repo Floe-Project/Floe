@@ -94,11 +94,11 @@ struct Style {
 PUBLIC Style IconButton(imgui::Context const& imgui) {
     Style s {};
     s.type = LayoutAndSizeType::IconOrText;
-    s.main_cols.reg = GMC(IconButton1Regular);
-    s.main_cols.on = GMC(IconButton1On);
-    s.main_cols.hot_on = GMC(IconButton1Hover);
+    s.main_cols.reg = LiveCol(imgui, UiColMap::IconButton1Regular);
+    s.main_cols.on = LiveCol(imgui, UiColMap::IconButton1On);
+    s.main_cols.hot_on = LiveCol(imgui, UiColMap::IconButton1Hover);
     s.main_cols.hot_off = s.main_cols.hot_on;
-    s.main_cols.active_on = GMC(IconButton1Active);
+    s.main_cols.active_on = LiveCol(imgui, UiColMap::IconButton1Active);
     s.main_cols.active_off = s.main_cols.active_on;
     s.icon_or_text.add_margin_x = false;
     s.icon_or_text.justification = TextJustification::Centred;
@@ -109,13 +109,13 @@ PUBLIC Style IconButton(imgui::Context const& imgui) {
 PUBLIC Style SettingsWindowButton(imgui::Context const& imgui) {
     auto s = IconButton(imgui);
     s.type = LayoutAndSizeType::IconAndText;
-    s.text_cols.reg = GMC(SettingsWindowMainText);
-    s.text_cols.hot_on = GMC(SettingsWindowHoveredMainText);
+    s.text_cols.reg = LiveCol(imgui, UiColMap::SettingsWindowMainText);
+    s.text_cols.hot_on = LiveCol(imgui, UiColMap::SettingsWindowHoveredMainText);
     s.text_cols.hot_off = s.text_cols.hot_on;
     s.text_cols.active_on = s.text_cols.reg;
     s.text_cols.active_off = s.text_cols.active_on;
     s.text_cols.on = s.text_cols.reg;
-    s.main_cols.reg = GMC(SettingsWindowIconButton);
+    s.main_cols.reg = LiveCol(imgui, UiColMap::SettingsWindowIconButton);
     s.main_cols.hot_on = s.main_cols.reg;
     s.main_cols.hot_off = s.main_cols.reg;
     s.main_cols.active_on = s.main_cols.reg;
@@ -129,39 +129,39 @@ PUBLIC Style SettingsWindowButton(imgui::Context const& imgui) {
 
 PUBLIC Style TopPanelIconButton(imgui::Context const& imgui) {
     auto s = IconButton(imgui);
-    s.main_cols.reg = GMC(TopPanelIconButtonRegular);
-    s.main_cols.on = GMC(TopPanelIconButtonOn);
-    s.main_cols.hot_on = GMC(TopPanelIconButtonHover);
+    s.main_cols.reg = LiveCol(imgui, UiColMap::TopPanelIconButtonRegular);
+    s.main_cols.on = LiveCol(imgui, UiColMap::TopPanelIconButtonOn);
+    s.main_cols.hot_on = LiveCol(imgui, UiColMap::TopPanelIconButtonHover);
     s.main_cols.hot_off = s.main_cols.hot_on;
-    s.main_cols.active_on = GMC(TopPanelIconButtonActive);
+    s.main_cols.active_on = LiveCol(imgui, UiColMap::TopPanelIconButtonActive);
     s.main_cols.active_off = s.main_cols.active_on;
     return s;
 }
 
 PUBLIC Style BrowserIconButton(imgui::Context const& imgui) {
     auto s = IconButton(imgui);
-    s.main_cols.reg = GMC(BrowserIconButtonRegular);
-    s.main_cols.on = GMC(BrowserIconButtonOn);
-    s.main_cols.hot_on = GMC(BrowserIconButtonHover);
+    s.main_cols.reg = LiveCol(imgui, UiColMap::BrowserIconButtonRegular);
+    s.main_cols.on = LiveCol(imgui, UiColMap::BrowserIconButtonOn);
+    s.main_cols.hot_on = LiveCol(imgui, UiColMap::BrowserIconButtonHover);
     s.main_cols.hot_off = s.main_cols.hot_on;
-    s.main_cols.active_on = GMC(BrowserIconButtonActive);
+    s.main_cols.active_on = LiveCol(imgui, UiColMap::BrowserIconButtonActive);
     s.main_cols.active_on = s.main_cols.active_off;
     return s;
 }
 
 PUBLIC Style LayerHeadingButton(imgui::Context const& imgui, u32 highlight_col = {}) {
     Style s {};
-    if (!highlight_col) highlight_col = GMC(ToggleButtonIconOn);
+    if (!highlight_col) highlight_col = LiveCol(imgui, UiColMap::ToggleButtonIconOn);
     s.type = LayoutAndSizeType::IconAndText;
-    s.main_cols.reg = GMC(ToggleButtonIconOff);
+    s.main_cols.reg = LiveCol(imgui, UiColMap::ToggleButtonIconOff);
     s.main_cols.on = highlight_col;
     s.main_cols.hot_off = s.main_cols.reg;
     s.main_cols.hot_on = s.main_cols.on;
     s.main_cols.active_on = s.main_cols.hot_on;
     s.main_cols.active_off = s.main_cols.active_on;
-    s.text_cols.reg = GMC(ToggleButtonTextOff);
-    s.text_cols.on = GMC(ToggleButtonTextOn);
-    s.text_cols.hot_on = GMC(ToggleButtonTextHover);
+    s.text_cols.reg = LiveCol(imgui, UiColMap::ToggleButtonTextOff);
+    s.text_cols.on = LiveCol(imgui, UiColMap::ToggleButtonTextOn);
+    s.text_cols.hot_on = LiveCol(imgui, UiColMap::ToggleButtonTextHover);
     s.text_cols.hot_off = s.text_cols.hot_on;
     s.text_cols.active_on = s.text_cols.hot_on;
     s.text_cols.active_off = s.text_cols.active_on;
@@ -185,9 +185,9 @@ PUBLIC Style LayerTabButton(imgui::Context const& imgui, bool has_dot) {
         s.type = LayoutAndSizeType::IconOrText;
     else
         s.type = LayoutAndSizeType::IconAndTextLayerTab;
-    s.main_cols.reg = GMC(LayerTabButtonText);
-    s.main_cols.on = GMC(LayerTabButtonTextActive);
-    s.main_cols.hot_on = GMC(LayerTabButtonTextHover);
+    s.main_cols.reg = LiveCol(imgui, UiColMap::LayerTabButtonText);
+    s.main_cols.on = LiveCol(imgui, UiColMap::LayerTabButtonTextActive);
+    s.main_cols.hot_on = LiveCol(imgui, UiColMap::LayerTabButtonTextHover);
     s.main_cols.hot_off = s.main_cols.hot_on;
     s.main_cols.active_on = s.main_cols.hot_on;
     s.main_cols.active_off = s.main_cols.active_on;
@@ -203,11 +203,11 @@ PUBLIC Style LayerTabButton(imgui::Context const& imgui, bool has_dot) {
 PUBLIC Style ParameterPopupButton(imgui::Context const& imgui, bool _greyed_out = false) {
     auto s = LayerHeadingButton(imgui);
     s.type = LayoutAndSizeType::IconOrText;
-    s.main_cols.reg = GMC(MenuButtonText);
-    s.main_cols.greyed_out = GMC(MenuButtonTextInactive);
+    s.main_cols.reg = LiveCol(imgui, UiColMap::MenuButtonText);
+    s.main_cols.greyed_out = LiveCol(imgui, UiColMap::MenuButtonTextInactive);
     s.main_cols.greyed_out_on = s.main_cols.greyed_out;
     s.main_cols.on = s.main_cols.reg;
-    s.main_cols.hot_on = GMC(MenuButtonTextHover);
+    s.main_cols.hot_on = LiveCol(imgui, UiColMap::MenuButtonTextHover);
     s.main_cols.hot_off = s.main_cols.hot_on;
     s.main_cols.active_on = s.main_cols.hot_on;
     s.main_cols.active_off = s.main_cols.active_on;
@@ -218,7 +218,7 @@ PUBLIC Style ParameterPopupButton(imgui::Context const& imgui, bool _greyed_out 
     s.icon_or_text.justification = TextJustification::CentredLeft;
     s.icon_or_text.overflow_type = TextOverflowType::ShowDotsOnRight;
 
-    s.back_cols.reg = GMC(MenuButtonBack);
+    s.back_cols.reg = LiveCol(imgui, UiColMap::MenuButtonBack);
     s.back_cols.on = s.back_cols.reg;
     s.back_cols.hot_on = s.back_cols.reg;
     s.back_cols.hot_off = s.back_cols.reg;
@@ -250,17 +250,17 @@ PUBLIC Style MidiButton(imgui::Context const& imgui) {
 PUBLIC Style PresetsBrowserFolderButton(imgui::Context const& imgui) {
     Style s {};
     s.type = LayoutAndSizeType::IconOrText;
-    s.back_cols.reg = GMC(PresetBrowserFolderButtonBackOff);
-    s.back_cols.on = GMC(PresetBrowserFolderButtonBackOn);
-    s.back_cols.hot_on = GMC(PresetBrowserFolderButtonBackHover);
+    s.back_cols.reg = LiveCol(imgui, UiColMap::PresetBrowserFolderButtonBackOff);
+    s.back_cols.on = LiveCol(imgui, UiColMap::PresetBrowserFolderButtonBackOn);
+    s.back_cols.hot_on = LiveCol(imgui, UiColMap::PresetBrowserFolderButtonBackHover);
     s.back_cols.hot_off = s.back_cols.hot_on;
-    s.back_cols.active_on = GMC(PresetBrowserFolderButtonBackActive);
+    s.back_cols.active_on = LiveCol(imgui, UiColMap::PresetBrowserFolderButtonBackActive);
     s.back_cols.active_off = s.back_cols.active_on;
-    s.main_cols.reg = GMC(PresetBrowserFolderButtonTextOff);
-    s.main_cols.on = GMC(PresetBrowserFolderButtonTextOn);
-    s.main_cols.hot_on = GMC(PresetBrowserFolderButtonTextHover);
+    s.main_cols.reg = LiveCol(imgui, UiColMap::PresetBrowserFolderButtonTextOff);
+    s.main_cols.on = LiveCol(imgui, UiColMap::PresetBrowserFolderButtonTextOn);
+    s.main_cols.hot_on = LiveCol(imgui, UiColMap::PresetBrowserFolderButtonTextHover);
     s.main_cols.hot_off = s.main_cols.hot_on;
-    s.main_cols.active_on = GMC(PresetBrowserFolderButtonTextActive);
+    s.main_cols.active_on = LiveCol(imgui, UiColMap::PresetBrowserFolderButtonTextActive);
     s.main_cols.active_off = s.main_cols.active_on;
     s.icon_or_text.add_margin_x = true;
     s.icon_or_text.justification = TextJustification::CentredLeft;
@@ -271,17 +271,17 @@ PUBLIC Style PresetsBrowserFolderButton(imgui::Context const& imgui) {
 PUBLIC Style PresetsBrowserFileButton(imgui::Context const& imgui) {
     Style s {};
     s.type = LayoutAndSizeType::IconOrText;
-    s.back_cols.reg = GMC(PresetBrowserFileButtonBackOff);
-    s.back_cols.on = GMC(PresetBrowserFileButtonBackOn);
-    s.back_cols.hot_on = GMC(PresetBrowserFileButtonBackHover);
+    s.back_cols.reg = LiveCol(imgui, UiColMap::PresetBrowserFileButtonBackOff);
+    s.back_cols.on = LiveCol(imgui, UiColMap::PresetBrowserFileButtonBackOn);
+    s.back_cols.hot_on = LiveCol(imgui, UiColMap::PresetBrowserFileButtonBackHover);
     s.back_cols.hot_off = s.back_cols.hot_on;
-    s.back_cols.active_on = GMC(PresetBrowserFileButtonBackActive);
+    s.back_cols.active_on = LiveCol(imgui, UiColMap::PresetBrowserFileButtonBackActive);
     s.back_cols.active_off = s.back_cols.active_on;
-    s.main_cols.reg = GMC(PresetBrowserFileButtonTextOff);
-    s.main_cols.on = GMC(PresetBrowserFileButtonTextOn);
-    s.main_cols.hot_on = GMC(PresetBrowserFileButtonTextHover);
+    s.main_cols.reg = LiveCol(imgui, UiColMap::PresetBrowserFileButtonTextOff);
+    s.main_cols.on = LiveCol(imgui, UiColMap::PresetBrowserFileButtonTextOn);
+    s.main_cols.hot_on = LiveCol(imgui, UiColMap::PresetBrowserFileButtonTextHover);
     s.main_cols.hot_off = s.main_cols.hot_on;
-    s.main_cols.active_on = GMC(PresetBrowserFileButtonTextActive);
+    s.main_cols.active_on = LiveCol(imgui, UiColMap::PresetBrowserFileButtonTextActive);
     s.main_cols.active_off = s.main_cols.active_on;
     s.icon_or_text.add_margin_x = true;
     s.icon_or_text.justification = TextJustification::CentredLeft;
@@ -293,13 +293,13 @@ PUBLIC Style PresetsBrowserPopupButton(imgui::Context const& imgui) {
     auto s = ParameterPopupButton(imgui);
     s.icon_or_text.overflow_type = TextOverflowType::ShowDotsOnLeft;
     s.main_cols.grey_out_aware = false;
-    s.main_cols.reg = GMC(BrowserFolderPopupButtonText);
+    s.main_cols.reg = LiveCol(imgui, UiColMap::BrowserFolderPopupButtonText);
     s.main_cols.on = s.main_cols.reg;
-    s.main_cols.hot_on = GMC(BrowserFolderPopupButtonTextHover);
+    s.main_cols.hot_on = LiveCol(imgui, UiColMap::BrowserFolderPopupButtonTextHover);
     s.main_cols.hot_off = s.main_cols.hot_on;
     s.main_cols.active_on = s.main_cols.hot_on;
     s.main_cols.active_off = s.main_cols.active_on;
-    s.back_cols.reg = GMC(BrowserFolderPopupButtonBack);
+    s.back_cols.reg = LiveCol(imgui, UiColMap::BrowserFolderPopupButtonBack);
     s.back_cols.on = s.back_cols.reg;
     s.back_cols.hot_on = s.back_cols.reg;
     s.back_cols.hot_off = s.back_cols.hot_on;
@@ -313,18 +313,18 @@ PUBLIC Style MenuItem(imgui::Context const& imgui, bool _closes_popups) {
     s.type = LayoutAndSizeType::IconAndTextMenuItem;
     s.closes_popups = _closes_popups;
     s.back_cols.reg = 0;
-    s.back_cols.hot_on = GMC(PopupItemBackHover);
+    s.back_cols.hot_on = LiveCol(imgui, UiColMap::PopupItemBackHover);
     s.back_cols.hot_off = s.back_cols.hot_on;
-    s.back_cols.active_on = GMC(PopupItemBackHover);
+    s.back_cols.active_on = LiveCol(imgui, UiColMap::PopupItemBackHover);
     s.back_cols.active_off = s.back_cols.active_on;
-    s.back_cols.on = GMC(PopupItemBackHover);
-    s.text_cols.reg = GMC(PopupItemText);
+    s.back_cols.on = LiveCol(imgui, UiColMap::PopupItemBackHover);
+    s.text_cols.reg = LiveCol(imgui, UiColMap::PopupItemText);
     s.text_cols.hot_on = s.text_cols.reg;
     s.text_cols.hot_off = s.text_cols.reg;
     s.text_cols.active_on = s.text_cols.reg;
     s.text_cols.active_off = s.text_cols.active_on;
     s.text_cols.on = s.text_cols.reg;
-    s.main_cols.reg = GMC(PopupItemIcon);
+    s.main_cols.reg = LiveCol(imgui, UiColMap::PopupItemIcon);
     s.main_cols.hot_on = s.main_cols.reg;
     s.main_cols.hot_off = s.main_cols.reg;
     s.main_cols.active_on = s.main_cols.reg;
@@ -357,7 +357,7 @@ PUBLIC Style EffectButtonGrabber(imgui::Context const& imgui) {
     s.icon_or_text.default_icon = ICON_FA_ARROWS_ALT_V;
     s.icon_scaling = 0.7f;
     s.main_cols = {};
-    s.main_cols.hot_on = GMC(FXButtonGripIcon);
+    s.main_cols.hot_on = LiveCol(imgui, UiColMap::FXButtonGripIcon);
     s.main_cols.hot_off = s.main_cols.hot_on;
     return s;
 }
@@ -366,7 +366,7 @@ PUBLIC Style EffectHeading(imgui::Context const& imgui, u32 back_col) {
     Style s {};
     s.type = buttons::LayoutAndSizeType::IconOrText;
     s.icon_or_text.justification = TextJustification::Centred;
-    s.main_cols.reg = GMC(FXHeading);
+    s.main_cols.reg = LiveCol(imgui, UiColMap::FXHeading);
     s.main_cols.active_on = s.main_cols.reg;
     s.main_cols.active_off = s.main_cols.active_on;
     s.main_cols.hot_on = s.main_cols.reg;

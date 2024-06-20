@@ -176,20 +176,46 @@ struct FXColours {
 };
 
 static FXColours GetFxCols(imgui::Context const& imgui, EffectType type) {
+    using enum UiColMap;
     switch (type) {
         case EffectType::Distortion:
-            return {GMC(DistortionBack), GMC(DistortionHighlight), GMC(DistortionButton)};
-        case EffectType::BitCrush: return {GMC(BitCrushBack), GMC(BitCrushHighlight), GMC(BitCrushButton)};
+            return {LiveCol(imgui, DistortionBack),
+                    LiveCol(imgui, DistortionHighlight),
+                    LiveCol(imgui, DistortionButton)};
+        case EffectType::BitCrush:
+            return {LiveCol(imgui, BitCrushBack),
+                    LiveCol(imgui, BitCrushHighlight),
+                    LiveCol(imgui, BitCrushButton)};
         case EffectType::Compressor:
-            return {GMC(CompressorBack), GMC(CompressorHighlight), GMC(CompressorButton)};
-        case EffectType::FilterEffect: return {GMC(FilterBack), GMC(FilterHighlight), GMC(FilterButton)};
-        case EffectType::StereoWiden: return {GMC(StereoBack), GMC(StereoHighlight), GMC(StereoButton)};
-        case EffectType::Chorus: return {GMC(ChorusBack), GMC(ChorusHighlight), GMC(ChorusButton)};
-        case EffectType::Reverb: return {GMC(ReverbBack), GMC(ReverbHighlight), GMC(ReverbButton)};
-        case EffectType::NewDelay: return {GMC(DelayBack), GMC(DelayHighlight), GMC(DelayButton)};
+            return {LiveCol(imgui, CompressorBack),
+                    LiveCol(imgui, CompressorHighlight),
+                    LiveCol(imgui, CompressorButton)};
+        case EffectType::FilterEffect:
+            return {LiveCol(imgui, FilterBack),
+                    LiveCol(imgui, FilterHighlight),
+                    LiveCol(imgui, FilterButton)};
+        case EffectType::StereoWiden:
+            return {LiveCol(imgui, StereoBack),
+                    LiveCol(imgui, StereoHighlight),
+                    LiveCol(imgui, StereoButton)};
+        case EffectType::Chorus:
+            return {LiveCol(imgui, ChorusBack),
+                    LiveCol(imgui, ChorusHighlight),
+                    LiveCol(imgui, ChorusButton)};
+        case EffectType::Reverb:
+            return {LiveCol(imgui, ReverbBack),
+                    LiveCol(imgui, ReverbHighlight),
+                    LiveCol(imgui, ReverbButton)};
+        case EffectType::NewDelay:
+            return {LiveCol(imgui, DelayBack), LiveCol(imgui, DelayHighlight), LiveCol(imgui, DelayButton)};
         case EffectType::ConvolutionReverb:
-            return {GMC(ConvolutionBack), GMC(ConvolutionHighlight), GMC(ConvolutionButton)};
-        case EffectType::Phaser: return {GMC(PhaserBack), GMC(PhaserHighlight), GMC(PhaserButton)};
+            return {LiveCol(imgui, ConvolutionBack),
+                    LiveCol(imgui, ConvolutionHighlight),
+                    LiveCol(imgui, ConvolutionButton)};
+        case EffectType::Phaser:
+            return {LiveCol(imgui, PhaserBack),
+                    LiveCol(imgui, PhaserHighlight),
+                    LiveCol(imgui, PhaserButton)};
         case EffectType::Count: PanicIfReached();
     }
     return {};
@@ -650,7 +676,8 @@ void DoEffectsWindow(Gui* g, Rect r) {
             imgui.GetRegisteredAndConvertedRect(lay.GetRect(id).WithH(room_at_scroll_window_bottom));
         imgui.graphics->AddLine(line_r.TopLeft(),
                                 line_r.TopRight(),
-                                (id == closest_divider) ? GMC(FXDividerLineDropZone) : GMC(FXDividerLine));
+                                (id == closest_divider) ? LiveCol(imgui, UiColMap::FXDividerLineDropZone)
+                                                        : LiveCol(imgui, UiColMap::FXDividerLine));
     };
 
     auto const draw_knob_joining_line = [&](LayID knob1, LayID knob2) {
@@ -659,7 +686,10 @@ void DoEffectsWindow(Gui* g, Rect r) {
         f32x2 const start {r1.Right() + fx_knob_joining_line_pad_lr,
                            r1.CentreY() - fx_knob_joining_line_thickness / 2};
         f32x2 const end {r2.x - fx_knob_joining_line_pad_lr, start.y};
-        imgui.graphics->AddLine(start, end, GMC(FXKnobJoiningLine), (f32)fx_knob_joining_line_thickness);
+        imgui.graphics->AddLine(start,
+                                end,
+                                LiveCol(imgui, UiColMap::FXKnobJoiningLine),
+                                (f32)fx_knob_joining_line_thickness);
     };
 
     auto const do_all_ids = [&](Span<LayIDPair> ids, Span<ParamIndex const> params, FXColours cols) {
@@ -1054,7 +1084,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
                 dragging_fx->drop_slot = slot;
                 imgui.graphics->AddRectFilled(converted_slot_r.Min(),
                                               converted_slot_r.Max(),
-                                              GMC(FXButtonDropZone),
+                                              LiveCol(imgui, UiColMap::FXButtonDropZone),
                                               (f32)corner_rounding);
             } else {
                 auto fx = ordered_effects[fx_index++];

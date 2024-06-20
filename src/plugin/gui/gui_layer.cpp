@@ -495,7 +495,7 @@ void Layout(Gui* g,
 static void DrawSelectorProgressBar(imgui::Context const& imgui, Rect r, f32 load_percent) {
     auto min = r.Min();
     auto max = f32x2 {r.x + Max(4.0f, r.w * load_percent), r.Bottom()};
-    auto col = GMC(LayerSelectorMenuLoading);
+    auto col = LiveCol(imgui, UiColMap::LayerSelectorMenuLoading);
     auto const rounding = LiveSize(imgui, UiSizeId::CornerRounding);
     imgui.graphics->AddRectFilled(min, max, col, rounding);
 }
@@ -549,7 +549,7 @@ void Draw(Gui* g,
                                                     r.Max(),
                                                     min_uv,
                                                     max_uv,
-                                                    GMC(BlurredImageDrawColour),
+                                                    LiveCol(imgui, UiColMap::BlurredImageDrawColour),
                                                     panel_rounding);
                 }
 
@@ -568,7 +568,7 @@ void Draw(Gui* g,
                         vtx_idx_1,
                         pos,
                         pos + f32x2 {0, size.y},
-                        GMC(BlurredImageGradientOverlay),
+                        LiveCol(imgui, UiColMap::BlurredImageGradientOverlay),
                         0);
                     graphics::DrawList::ShadeVertsLinearColorGradientSetAlpha(
                         imgui.graphics,
@@ -576,11 +576,14 @@ void Draw(Gui* g,
                         vtx_idx_2,
                         pos + f32x2 {size.x, 0},
                         pos + f32x2 {size.x, size.y},
-                        GMC(BlurredImageGradientOverlay),
+                        LiveCol(imgui, UiColMap::BlurredImageGradientOverlay),
                         0);
                 }
 
-                imgui.graphics->AddRect(r.Min(), r.Max(), GMC(BlurredImageBorder), panel_rounding);
+                imgui.graphics->AddRect(r.Min(),
+                                        r.Max(),
+                                        LiveCol(imgui, UiColMap::BlurredImageBorder),
+                                        panel_rounding);
             }
         }
     });
@@ -593,7 +596,7 @@ void Draw(Gui* g,
         imgui.RegisterAndConvertRect(&line_r);
         imgui.graphics->AddLine({line_r.x, line_r.Bottom()},
                                 {line_r.Right(), line_r.Bottom()},
-                                GMC(LayerDividerLine));
+                                LiveCol(imgui, UiColMap::LayerDividerLine));
     };
 
     // Inst selector
@@ -620,8 +623,8 @@ void Draw(Gui* g,
             imgui.GetRegisteredAndConvertedRect(lay.GetRect(c.selector_box));
         {
             auto const rounding = LiveSize(imgui, UiSizeId::CornerRounding);
-            auto const col =
-                should_highlight ? GMC(LayerSelectorMenuBackHighlight) : GMC(LayerSelectorMenuBack);
+            auto const col = should_highlight ? LiveCol(imgui, UiColMap::LayerSelectorMenuBackHighlight)
+                                              : LiveCol(imgui, UiColMap::LayerSelectorMenuBack);
             imgui.graphics->AddRectFilled(registered_selector_box_r.Min(),
                                           registered_selector_box_r.Max(),
                                           col,
@@ -710,8 +713,8 @@ void Draw(Gui* g,
                              mute_solo_r.w / 2,
                              mute_solo_r.h};
 
-        auto const col_border = GMC(LayerMuteSoloBorder);
-        auto const col_background = GMC(LayerMuteSoloBackground);
+        auto const col_border = LiveCol(imgui, UiColMap::LayerMuteSoloBorder);
+        auto const col_background = LiveCol(imgui, UiColMap::LayerMuteSoloBackground);
         auto const rounding = LiveSize(imgui, UiSizeId::CornerRounding);
         auto reg_mute_solo_r = imgui.GetRegisteredAndConvertedRect(mute_solo_r);
         auto reg_mute_r = imgui.GetRegisteredAndConvertedRect(mute_r);
@@ -1073,7 +1076,7 @@ void Draw(Gui* g,
     auto const& layer_processor = plugin->processor.layer_processors[(usize)layer->index];
     if (layer_processor.is_silent.Load()) {
         auto pos = imgui.curr_window->unpadded_bounds.pos;
-        imgui.graphics->AddRectFilled(pos, pos + imgui.Size(), GMC(LayerMutedOverlay));
+        imgui.graphics->AddRectFilled(pos, pos + imgui.Size(), LiveCol(imgui, UiColMap::LayerMutedOverlay));
     }
 }
 

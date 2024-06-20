@@ -13,13 +13,13 @@ Optional<KeyboardGuiKeyPressed> KeyboardGui(Gui* g, Rect r, int starting_octave)
     auto const keyboard = g->plugin.processor.for_main_thread.notes_currently_held.GetBlockwise();
     auto const& voices_per_midi_note = g->plugin.processor.voice_pool.voices_per_midi_note_for_gui;
 
-    auto const col_black_key = GMC(KeyboardBlackKey);
-    auto const col_black_key_outline = GMC(KeyboardBlackKeyOutline);
-    auto const col_black_key_hover = GMC(KeyboardBlackKeyHover);
-    auto const col_black_key_down = GMC(KeyboardBlackKeyDown);
-    auto const col_white_key = GMC(KeyboardWhiteKey);
-    auto const col_white_key_hover = GMC(KeyboardWhiteKeyHover);
-    auto const col_white_key_down = GMC(KeyboardWhiteKeyDown);
+    auto const col_black_key = LiveCol(imgui, UiColMap::KeyboardBlackKey);
+    auto const col_black_key_outline = LiveCol(imgui, UiColMap::KeyboardBlackKeyOutline);
+    auto const col_black_key_hover = LiveCol(imgui, UiColMap::KeyboardBlackKeyHover);
+    auto const col_black_key_down = LiveCol(imgui, UiColMap::KeyboardBlackKeyDown);
+    auto const col_white_key = LiveCol(imgui, UiColMap::KeyboardWhiteKey);
+    auto const col_white_key_hover = LiveCol(imgui, UiColMap::KeyboardWhiteKeyHover);
+    auto const col_white_key_down = LiveCol(imgui, UiColMap::KeyboardWhiteKeyDown);
 
     starting_octave += k_octave_default_offset;
     ASSERT(starting_octave >= k_lowest_starting_oct);
@@ -57,7 +57,7 @@ Optional<KeyboardGuiKeyPressed> KeyboardGui(Gui* g, Rect r, int starting_octave)
     auto overlay_key = [&](int key, Rect key_rect, UiColMap col_index) {
         auto const num_active_voices = voices_per_midi_note[(usize)key].Load();
         if (num_active_voices != 0) {
-            auto overlay = colours::FromU32(live_edit::Col(imgui, col_index));
+            auto overlay = colours::FromU32(LiveCol(imgui, col_index));
             overlay.a = (uint8_t)Min(255, overlay.a + 40 * num_active_voices);
             auto overlay_u32 = colours::ToU32(overlay);
             imgui.graphics->AddRectFilled(key_rect.Min(),

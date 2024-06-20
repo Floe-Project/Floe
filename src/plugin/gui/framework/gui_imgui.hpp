@@ -965,13 +965,15 @@ namespace live_edit {
 
 extern bool g_high_contrast_gui; // IMPROVE: this is hacky
 
-inline u32 Col(imgui::Context const& imgui, UiColMap type) {
+} // namespace live_edit
+
+inline u32 LiveCol(imgui::Context const& imgui, UiColMap type) {
     auto const map_index = ToInt(type);
 
-    String const col_string =
-        (g_high_contrast_gui && imgui.live_edit_values.ui_col_map[map_index].high_contrast_colour.size)
-            ? imgui.live_edit_values.ui_col_map[map_index].high_contrast_colour
-            : imgui.live_edit_values.ui_col_map[map_index].colour;
+    String const col_string = (live_edit::g_high_contrast_gui &&
+                               imgui.live_edit_values.ui_col_map[map_index].high_contrast_colour.size)
+                                  ? imgui.live_edit_values.ui_col_map[map_index].high_contrast_colour
+                                  : imgui.live_edit_values.ui_col_map[map_index].colour;
 
     // NOTE: linear search but probably ok
     for (auto const i : Range(k_max_num_colours))
@@ -982,8 +984,6 @@ inline u32 Col(imgui::Context const& imgui, UiColMap type) {
 
     return {};
 }
-
-} // namespace live_edit
 
 inline f32 LiveSize(imgui::Context const& imgui, UiSizeId size_id) {
     f32 res = 1;
@@ -996,6 +996,3 @@ inline f32 LiveSize(imgui::Context const& imgui, UiSizeId size_id) {
     }
     return res;
 }
-
-// Get Mapped Colour
-#define GMC(v) live_edit::Col(imgui, UiColMap::v)

@@ -439,9 +439,7 @@ LibraryImages LoadLibraryBackgroundAndIconIfNeeded(Gui* g, sample_lib::Library c
             // Blend on top a dark colour to achieve a more consistently dark background
             {
                 f32x4 const overlay_colour =
-                    Clamp(LiveSize(g->imgui, UiSizeId::BackgroundBlurringOverlayColour),
-                          0.0f,
-                          255.0f);
+                    Clamp(LiveSize(g->imgui, UiSizeId::BackgroundBlurringOverlayColour), 0.0f, 255.0f);
                 f32x4 const overlay_intensity =
                     Clamp(LiveSize(g->imgui, UiSizeId::BackgroundBlurringOverlayIntensity) / 100.0f,
                           0.0f,
@@ -482,9 +480,8 @@ LibraryImages LoadLibraryBackgroundAndIconIfNeeded(Gui* g, sample_lib::Library c
                 // 2. Do a huge blur into a different buffer
                 auto huge_blur_buffer =
                     arena.AllocateBytesForTypeOversizeAllowed<u8>(blurred_image_num_bytes);
-                auto const huge_blur_radius =
-                    LiveSize(g->imgui, UiSizeId::BackgroundBlurringBlurring) *
-                    ((f32)blur_img_size.width / 700.0f);
+                auto const huge_blur_radius = LiveSize(g->imgui, UiSizeId::BackgroundBlurringBlurring) *
+                                              ((f32)blur_img_size.width / 700.0f);
                 BoxBlur(blurred_image_buffer.data,
                         huge_blur_buffer.data,
                         blur_img_size.width,
@@ -763,8 +760,8 @@ void GUIUpdate(Gui* g) {
 
     auto draw_top_window = [](IMGUI_DRAW_WINDOW_BG_ARGS) {
         auto r = window->unpadded_bounds;
-        auto const top = GMC(TopPanelBackTop);
-        auto const bot = GMC(TopPanelBackBot);
+        auto const top = LiveCol(imgui, UiColMap::TopPanelBackTop);
+        auto const bot = LiveCol(imgui, UiColMap::TopPanelBackBot);
         imgui.graphics->AddRectFilledMultiColor(r.Min(), r.Max(), top, top, bot, bot);
     };
     auto draw_mid_window = [&](IMGUI_DRAW_WINDOW_BG_ARGS) {
@@ -791,12 +788,13 @@ void GUIUpdate(Gui* g) {
             }
         }
 
-        if (!has_image_bg) imgui.graphics->AddRectFilled(r.Min(), r.Max(), GMC(MidPanelBack));
-        imgui.graphics->AddLine(r.TopLeft(), r.TopRight(), GMC(MidPanelTopLine));
+        if (!has_image_bg)
+            imgui.graphics->AddRectFilled(r.Min(), r.Max(), LiveCol(imgui, UiColMap::MidPanelBack));
+        imgui.graphics->AddLine(r.TopLeft(), r.TopRight(), LiveCol(imgui, UiColMap::MidPanelTopLine));
     };
     auto draw_bot_window = [](IMGUI_DRAW_WINDOW_BG_ARGS) {
         auto r = window->unpadded_bounds;
-        imgui.graphics->AddRectFilled(r.Min(), r.Max(), GMC(BotPanelBack));
+        imgui.graphics->AddRectFilled(r.Min(), r.Max(), LiveCol(imgui, UiColMap::BotPanelBack));
     };
 
     {
@@ -818,10 +816,8 @@ void GUIUpdate(Gui* g) {
     {
         auto sets = imgui::DefWindow();
         sets.draw_routine_window_background = draw_top_window;
-        sets.pad_top_left = {LiveSize(imgui, UiSizeId::Top2PadLR),
-                             LiveSize(imgui, UiSizeId::Top2PadT)};
-        sets.pad_bottom_right = {LiveSize(imgui, UiSizeId::Top2PadLR),
-                                 LiveSize(imgui, UiSizeId::Top2PadB)};
+        sets.pad_top_left = {LiveSize(imgui, UiSizeId::Top2PadLR), LiveSize(imgui, UiSizeId::Top2PadT)};
+        sets.pad_bottom_right = {LiveSize(imgui, UiSizeId::Top2PadLR), LiveSize(imgui, UiSizeId::Top2PadB)};
         imgui.BeginWindow(sets, {0, 0, imgui.Width(), top_h}, "TopPanel");
         TopPanel(g);
         imgui.EndWindow();

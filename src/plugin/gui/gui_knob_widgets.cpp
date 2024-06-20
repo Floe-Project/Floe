@@ -22,16 +22,16 @@ static void DrawKnob(Gui* g, imgui::Id id, Rect r, f32 percent, Style const& sty
     ASSERT(percent >= 0 && percent <= 1);
     ASSERT(angle >= start_radians && angle <= end_radians);
 
-    auto inner_arc_col = GMC(KnobInnerArc);
+    auto inner_arc_col = LiveCol(imgui, UiColMap::KnobInnerArc);
     auto bright_arc_col = style.highlight_col;
     if (style.greyed_out) {
-        bright_arc_col = GMC(KnobOuterArcGreyedOut);
-        inner_arc_col = GMC(KnobInnerArcGreyedOut);
+        bright_arc_col = LiveCol(imgui, UiColMap::KnobOuterArcGreyedOut);
+        inner_arc_col = LiveCol(imgui, UiColMap::KnobInnerArcGreyedOut);
     }
     auto line_col = style.line_col;
     if (imgui.IsHot(id) || imgui.IsActive(id)) {
-        inner_arc_col = GMC(KnobInnerArcHover);
-        line_col = GMC(KnobLineHover);
+        inner_arc_col = LiveCol(imgui, UiColMap::KnobInnerArcHover);
+        line_col = LiveCol(imgui, UiColMap::KnobLineHover);
     }
 
     // outer arc
@@ -43,7 +43,7 @@ static void DrawKnob(Gui* g, imgui::Id id, Rect r, f32 percent, Style const& sty
                                   start_radians,
                                   end_radians,
                                   32);
-        imgui.graphics->PathStroke(GMC(KnobOuterArcEmpty), false, outer_arc_thickness);
+        imgui.graphics->PathStroke(LiveCol(imgui, UiColMap::KnobOuterArcEmpty), false, outer_arc_thickness);
     } else {
         auto const overload_radians = start_radians + delta * *style.overload_position;
         auto const radians_per_px = maths::k_tau<> * r.w / 2;
@@ -56,7 +56,9 @@ static void DrawKnob(Gui* g, imgui::Id id, Rect r, f32 percent, Style const& sty
                                       start_radians,
                                       overload_radians,
                                       32);
-            imgui.graphics->PathStroke(GMC(KnobOuterArcEmpty), false, outer_arc_thickness);
+            imgui.graphics->PathStroke(LiveCol(imgui, UiColMap::KnobOuterArcEmpty),
+                                       false,
+                                       outer_arc_thickness);
         }
 
         if constexpr (0) {
@@ -67,7 +69,7 @@ static void DrawKnob(Gui* g, imgui::Id id, Rect r, f32 percent, Style const& sty
                                       overload_radians,
                                       overload_radians_end,
                                       32);
-            imgui.graphics->PathStroke(GMC(KnobOuterArcOverload), false, gain_thickness);
+            imgui.graphics->PathStroke(LiveCol(imgui, UiColMap::KnobOuterArcOverload), false, gain_thickness);
         }
 
         {
@@ -78,7 +80,7 @@ static void DrawKnob(Gui* g, imgui::Id id, Rect r, f32 percent, Style const& sty
                                       overload_radians_end,
                                       end_radians,
                                       32);
-            imgui.graphics->PathStroke(GMC(KnobOuterArcOverload), false, gain_thickness);
+            imgui.graphics->PathStroke(LiveCol(imgui, UiColMap::KnobOuterArcOverload), false, gain_thickness);
         }
 
         if constexpr (0) {
@@ -96,7 +98,10 @@ static void DrawKnob(Gui* g, imgui::Id id, Rect r, f32 percent, Style const& sty
             auto const outer_point = c + (offset * f32x2 {arc_radius_outer, arc_radius_outer});
             auto const inner_point = c + (offset * f32x2 {arc_radius_inner, arc_radius_inner});
 
-            imgui.graphics->AddLine(inner_point, outer_point, GMC(KnobOuterArcOverload), line_weight);
+            imgui.graphics->AddLine(inner_point,
+                                    outer_point,
+                                    LiveCol(imgui, UiColMap::KnobOuterArcOverload),
+                                    line_weight);
         }
     }
 

@@ -46,8 +46,14 @@ void OpenStandalone(imgui::Context& imgui, StandaloneWindows type) {
 static void DoLabelLine(imgui::Context& imgui, f32& y_pos, String label, String value) {
     auto const line_height = imgui.graphics->context->CurrentFontSize();
     auto const text_r = imgui.GetRegisteredAndConvertedRect({0, y_pos, imgui.Width(), line_height});
-    imgui.graphics->AddTextJustified(text_r, label, GMC(PopupItemText), TextJustification::CentredLeft);
-    imgui.graphics->AddTextJustified(text_r, value, GMC(PopupItemText), TextJustification::CentredRight);
+    imgui.graphics->AddTextJustified(text_r,
+                                     label,
+                                     LiveCol(imgui, UiColMap::PopupItemText),
+                                     TextJustification::CentredLeft);
+    imgui.graphics->AddTextJustified(text_r,
+                                     value,
+                                     LiveCol(imgui, UiColMap::PopupItemText),
+                                     TextJustification::CentredRight);
     y_pos += line_height;
 }
 
@@ -61,7 +67,7 @@ static void StandalonePopupHeading(Gui* g,
 
     imgui.graphics->context->PushFont(g->mada);
     auto const r = imgui.GetRegisteredAndConvertedRect({0, y_pos, imgui.Width(), error_window_title_h});
-    g->imgui.graphics->AddTextJustified(r, str, GMC(PopupItemText), justification);
+    g->imgui.graphics->AddTextJustified(r, str, LiveCol(imgui, UiColMap::PopupItemText), justification);
     imgui.graphics->context->PopFont();
     y_pos += error_window_title_h + error_window_title_gap_y;
 }
@@ -222,9 +228,10 @@ void DoErrorsStandalone(Gui* g) {
 
                         auto btn_sets = imgui::DefButton();
                         btn_sets.draw = [](IMGUI_DRAW_BUTTON_ARGS) {
-                            auto col = GMC(ErrorWindowButtonBack);
-                            if (imgui.IsHot(id)) col = GMC(ErrorWindowButtonBackHover);
-                            if (imgui.IsActive(id)) col = GMC(ErrorWindowButtonBackActive);
+                            auto col = LiveCol(imgui, UiColMap::ErrorWindowButtonBack);
+                            if (imgui.IsHot(id)) col = LiveCol(imgui, UiColMap::ErrorWindowButtonBackHover);
+                            if (imgui.IsActive(id))
+                                col = LiveCol(imgui, UiColMap::ErrorWindowButtonBackActive);
                             auto const rounding = LiveSize(imgui, UiSizeId::CornerRounding);
                             imgui.graphics->AddRectFilled(r.Min(), r.Max(), col, rounding);
 
@@ -232,7 +239,7 @@ void DoErrorsStandalone(Gui* g) {
                             text_r.x += text_r.h * 0.2f;
                             imgui.graphics->AddTextJustified(text_r,
                                                              str,
-                                                             GMC(ErrorWindowButtonText),
+                                                             LiveCol(imgui, UiColMap::ErrorWindowButtonText),
                                                              TextJustification::CentredLeft);
                         };
 
@@ -446,7 +453,7 @@ void DoSettingsStandalone(Gui* g) {
             FloeWindowSettings(imgui, [](imgui::Context const& imgui, imgui::Window* w) {
                 imgui.graphics->AddRectFilled(w->unpadded_bounds.Min(),
                                               w->unpadded_bounds.Max(),
-                                              GMC(PopupWindowBack));
+                                              LiveCol(imgui, UiColMap::PopupWindowBack));
             });
         subwindow_settings.draw_routine_scrollbar = settings.draw_routine_scrollbar;
         imgui.BeginWindow(subwindow_settings, {0, y_pos, imgui.Width(), imgui.Height() - y_pos}, "inner");
@@ -481,13 +488,13 @@ void DoSettingsStandalone(Gui* g) {
                 imgui.GetRegisteredAndConvertedRect({0, y_pos, imgui.Width(), line_height * 2});
             g->imgui.graphics->AddTextJustified(div_r,
                                                 title,
-                                                GMC(SettingsWindowMainText),
+                                                LiveCol(imgui, UiColMap::SettingsWindowMainText),
                                                 TextJustification::Left,
                                                 TextOverflowType::ShowDotsOnRight);
             auto const line_y = div_r.y + line_height * 1.1f;
             g->imgui.graphics->AddLine({div_r.x, line_y},
                                        {div_r.Right(), line_y},
-                                       GMC(SettingsWindowMainText));
+                                       LiveCol(imgui, UiColMap::SettingsWindowMainText));
             y_pos += div_r.h + line_height * 0.1f;
         };
 
@@ -496,7 +503,7 @@ void DoSettingsStandalone(Gui* g) {
                 imgui.GetRegisteredAndConvertedRect({0, y_pos, imgui.Width(), line_height * 2});
             g->imgui.graphics->AddTextJustified(title_r,
                                                 text,
-                                                GMC(SettingsWindowMainText),
+                                                LiveCol(imgui, UiColMap::SettingsWindowMainText),
                                                 TextJustification::Left,
                                                 TextOverflowType::ShowDotsOnRight);
         };
@@ -508,8 +515,9 @@ void DoSettingsStandalone(Gui* g) {
             g->gui_platform.graphics_ctx->PushFont(g->icons);
             g->imgui.graphics->AddTextJustified(r,
                                                 icon,
-                                                !imgui.IsHot(id) ? GMC(SettingsWindowIconButton)
-                                                                 : GMC(SettingsWindowIconButtonHover),
+                                                !imgui.IsHot(id)
+                                                    ? LiveCol(imgui, UiColMap::SettingsWindowIconButton)
+                                                    : LiveCol(imgui, UiColMap::SettingsWindowIconButtonHover),
                                                 TextJustification::CentredLeft,
                                                 TextOverflowType::AllowOverflow,
                                                 0.9f);
@@ -566,7 +574,7 @@ void DoSettingsStandalone(Gui* g) {
                 imgui.GetRegisteredAndConvertedRect({left_col_width, y_pos, right_col_width, line_height});
             g->imgui.graphics->AddTextJustified(info_text_r,
                                                 text,
-                                                GMC(SettingsWindowDullText),
+                                                LiveCol(imgui, UiColMap::SettingsWindowDullText),
                                                 TextJustification::Left,
                                                 TextOverflowType::ShowDotsOnRight);
             y_pos += line_height * 1.5f;
@@ -593,7 +601,9 @@ void DoSettingsStandalone(Gui* g) {
                  right_col_width,
                  path_gui_height * (f32)Max(1u, (u32)(extra_paths.size + always_scanned_paths.size))});
 
-            g->imgui.graphics->AddRectFilled(box_r, GMC(SettingsWindowPathBackground), rounding);
+            g->imgui.graphics->AddRectFilled(box_r,
+                                             LiveCol(imgui, UiColMap::SettingsWindowPathBackground),
+                                             rounding);
 
             u32 pos = 0;
             for (auto paths : Array {always_scanned_paths, extra_paths}) {
@@ -620,7 +630,7 @@ void DoSettingsStandalone(Gui* g) {
 
                     g->imgui.graphics->AddTextJustified(reduced_path_r,
                                                         path,
-                                                        GMC(SettingsWindowMainText),
+                                                        LiveCol(imgui, UiColMap::SettingsWindowMainText),
                                                         TextJustification::CentredLeft,
                                                         TextOverflowType::ShowDotsOnLeft);
                     ++pos;
@@ -645,14 +655,17 @@ void DoSettingsStandalone(Gui* g) {
                 if (imgui.ButtonBehavior(button_r, id, {.left_mouse = true, .triggers_on_mouse_up = true}))
                     result.add = true;
                 imgui.graphics->AddRectFilled(button_r,
-                                              !imgui.IsHot(id) ? GMC(SettingsWindowButtonBack)
-                                                               : GMC(SettingsWindowButtonBackHover),
+                                              !imgui.IsHot(id)
+                                                  ? LiveCol(imgui, UiColMap::SettingsWindowButtonBack)
+                                                  : LiveCol(imgui, UiColMap::SettingsWindowButtonBackHover),
                                               rounding);
-                imgui.graphics->AddRect(button_r, GMC(SettingsWindowButtonOutline), rounding);
+                imgui.graphics->AddRect(button_r,
+                                        LiveCol(imgui, UiColMap::SettingsWindowButtonOutline),
+                                        rounding);
                 auto const text_r = button_r.ReducedHorizontally(path_gui_spacing);
                 imgui.graphics->AddTextJustified(text_r,
                                                  text,
-                                                 GMC(SettingsWindowButtonText),
+                                                 LiveCol(imgui, UiColMap::SettingsWindowButtonText),
                                                  TextJustification::Centred);
             }
 
@@ -702,8 +715,12 @@ static void DoMultilineText(Gui* g, String text, f32& y_pos) {
     auto text_r = Rect {0, y_pos, size.x, size.y};
     y_pos += size.y + line_height / 2;
     imgui.RegisterAndConvertRect(&text_r);
-    imgui.graphics
-        ->AddText(font, font->font_size_no_scale, text_r.pos, GMC(PopupItemText), text, imgui.Width());
+    imgui.graphics->AddText(font,
+                            font->font_size_no_scale,
+                            text_r.pos,
+                            LiveCol(imgui, UiColMap::PopupItemText),
+                            text,
+                            imgui.Width());
 }
 
 void DoLicencesStandalone(Gui* g) {

@@ -96,6 +96,7 @@
           pname = "clap-validator";
           version = "0.3.2";
           buildType = "debug";
+          dontStrip = true;
           src = pkgs.fetchFromGitHub {
             owner = "free-audio";
             repo = "clap-validator";
@@ -122,6 +123,9 @@
             hash = "sha256-o253DBl3jHumaKzxHDZXK/MpFMrq06MmBia9HEYLtXs=";
             fetchSubmodules = true;
           };
+
+          cmakeBuildType = "Debug";
+          dontStrip = true;
 
           nativeBuildInputs = [
             pkgs.cmake

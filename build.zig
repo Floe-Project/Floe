@@ -541,6 +541,12 @@ fn genericFlags(context: *BuildContext, target: std.Build.ResolvedTarget, extra_
     try flags.append("-D_FILE_OFFSET_BITS=64");
     try flags.append("-ftime-trace");
 
+    if (target.result.os.tag == .linux) {
+        // NOTE(Sam, June 2024): workaround for a bug in Zig (most likely) where our shared library always causes a crash after dlclose(), as described here: https://github.com/ziglang/zig/issues/17908
+        // The workaround involves adding this flag and also adding a custom bit of code using __attribute__((destructor)) to manually call __cxa_finalize(): https://stackoverflow.com/questions/34308720/where-is-dso-handle-defined/48256026#48256026
+        try flags.append("-fno-use-cxa-atexit");
+    }
+
     if (context.build_mode == .production) {
         try flags.append("-fmacro-prefix-map=" ++ "=/"); // make the __FILE__ macro non-absolute
         try flags.append("-fvisibility=hidden");

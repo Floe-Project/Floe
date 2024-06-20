@@ -25,9 +25,15 @@ static clap_plugin_factory_t const factory = {
     },
 };
 
-bool g_clap_entry_init = false;
+#if __linux__
+// NOLINTBEGIN
+extern "C" void* __dso_handle;
+extern "C" void __cxa_finalize(void*);
+__attribute__((destructor)) void onfini() { __cxa_finalize(__dso_handle); }
+// NOLINTEND
+#endif
 
-__attribute__((destructor)) static void Init() { g_log_file.DebugLn("__attribute__((destructor))"); }
+bool g_clap_entry_init = false;
 
 extern "C" CLAP_EXPORT const clap_plugin_entry_t clap_entry = {
     .clap_version = CLAP_VERSION,

@@ -135,6 +135,7 @@ checks_ci := replace(
     test-units
     coverage
     clang-tidy-all
+    test-clap-val
     "
   } else {
     "

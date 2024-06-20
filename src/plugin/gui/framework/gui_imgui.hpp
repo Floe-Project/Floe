@@ -983,7 +983,9 @@ inline u32 Col(imgui::Context const& imgui, UiColMap type) {
     return {};
 }
 
-inline f32 Size(imgui::Context const& imgui, UiSizeId size_id) {
+} // namespace live_edit
+
+inline f32 LiveSize(imgui::Context const& imgui, UiSizeId size_id) {
     f32 res = 1;
     switch (imgui.live_edit_values.ui_sizes_units[ToInt(size_id)]) {
         case UiSizeUnit::Points:
@@ -994,8 +996,6 @@ inline f32 Size(imgui::Context const& imgui, UiSizeId size_id) {
     }
     return res;
 }
-
-} // namespace live_edit
 
 // Get Mapped Colour
 #define GMC(v) live_edit::Col(imgui, UiColMap::v)

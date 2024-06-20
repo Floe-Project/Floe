@@ -19,8 +19,8 @@ static void GUIDoSampleWaveformOverlay(Gui* g, PluginInstance::Layer* layer, Rec
     auto& plugin = g->plugin;
     auto& imgui = g->imgui;
 
-    auto const handle_height = live_edit::Size(imgui, UiSizeId::Main_WaveformHandleHeight);
-    auto const handle_width = live_edit::Size(imgui, UiSizeId::Main_WaveformHandleWidth);
+    auto const handle_height = LiveSize(imgui, UiSizeId::Main_WaveformHandleHeight);
+    auto const handle_width = LiveSize(imgui, UiSizeId::Main_WaveformHandleWidth);
     auto const epsilon = 0.001f;
     auto const slider_sensitivity = 400.0f;
 
@@ -505,7 +505,7 @@ void GUIDoSampleWaveform(Gui* g, PluginInstance::Layer* layer, Rect r) {
     g->imgui.PushID(layer);
     DEFER { g->imgui.PopID(); };
 
-    auto const rounding = live_edit::Size(g->imgui, UiSizeId::CornerRounding);
+    auto const rounding = LiveSize(g->imgui, UiSizeId::CornerRounding);
 
     auto waveform_r_unreg = r;
     auto waveform_r = g->imgui.GetRegisteredAndConvertedRect(waveform_r_unreg);

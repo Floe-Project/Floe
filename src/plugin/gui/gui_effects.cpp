@@ -196,35 +196,35 @@ static FXColours GetFxCols(imgui::Context const& imgui, EffectType type) {
 }
 
 void DoEffectsWindow(Gui* g, Rect r) {
+    using enum UiSizeId;
     auto& imgui = g->imgui;
     auto& lay = g->layout;
     auto& plugin = g->plugin;
 
-    auto const fx_divider_margin_t = live_edit::Size(imgui, UiSizeId::FXDividerMarginT);
-    auto const fx_divider_margin_b = live_edit::Size(imgui, UiSizeId::FXDividerMarginB);
-    auto const fx_knob_joining_line_thickness = live_edit::Size(imgui, UiSizeId::FXKnobJoiningLineThickness);
-    auto const fx_knob_joining_line_pad_lr = live_edit::Size(imgui, UiSizeId::FXKnobJoiningLinePadLR);
-    auto const fx_close_button_width = live_edit::Size(imgui, UiSizeId::FXCloseButtonWidth);
-    auto const fx_close_button_height = live_edit::Size(imgui, UiSizeId::FXCloseButtonHeight);
-    auto const fx_heading_h = live_edit::Size(imgui, UiSizeId::FXHeadingH);
-    auto const fx_heading_extra_width = live_edit::Size(imgui, UiSizeId::FXHeadingExtraWidth);
-    auto const fx_heading_l = live_edit::Size(imgui, UiSizeId::FXHeadingL);
-    auto const fx_heading_r = live_edit::Size(imgui, UiSizeId::FXHeadingR);
-    auto const fx_param_button_height = live_edit::Size(imgui, UiSizeId::FXParamButtonHeight);
-    auto const fx_delay_sync_btn_width = live_edit::Size(imgui, UiSizeId::FXDelaySyncBtnWidth);
-    auto const fx_switch_board_item_height = live_edit::Size(imgui, UiSizeId::FXSwitchBoardItemHeight);
-    auto const fx_compressor_auto_gain_width = live_edit::Size(imgui, UiSizeId::FXCompressorAutoGainWidth);
-    auto const fx_switch_board_number_width = live_edit::Size(imgui, UiSizeId::FXSwitchBoardNumberWidth);
-    auto const fx_switch_board_grab_region_width =
-        live_edit::Size(imgui, UiSizeId::FXSwitchBoardGrabRegionWidth);
-    auto const corner_rounding = live_edit::Size(imgui, UiSizeId::CornerRounding);
+    auto const fx_divider_margin_t = LiveSize(imgui, FXDividerMarginT);
+    auto const fx_divider_margin_b = LiveSize(imgui, FXDividerMarginB);
+    auto const fx_knob_joining_line_thickness = LiveSize(imgui, FXKnobJoiningLineThickness);
+    auto const fx_knob_joining_line_pad_lr = LiveSize(imgui, FXKnobJoiningLinePadLR);
+    auto const fx_close_button_width = LiveSize(imgui, FXCloseButtonWidth);
+    auto const fx_close_button_height = LiveSize(imgui, FXCloseButtonHeight);
+    auto const fx_heading_h = LiveSize(imgui, FXHeadingH);
+    auto const fx_heading_extra_width = LiveSize(imgui, FXHeadingExtraWidth);
+    auto const fx_heading_l = LiveSize(imgui, FXHeadingL);
+    auto const fx_heading_r = LiveSize(imgui, FXHeadingR);
+    auto const fx_param_button_height = LiveSize(imgui, FXParamButtonHeight);
+    auto const fx_delay_sync_btn_width = LiveSize(imgui, FXDelaySyncBtnWidth);
+    auto const fx_switch_board_item_height = LiveSize(imgui, FXSwitchBoardItemHeight);
+    auto const fx_compressor_auto_gain_width = LiveSize(imgui, FXCompressorAutoGainWidth);
+    auto const fx_switch_board_number_width = LiveSize(imgui, FXSwitchBoardNumberWidth);
+    auto const fx_switch_board_grab_region_width = LiveSize(imgui, FXSwitchBoardGrabRegionWidth);
+    auto const corner_rounding = LiveSize(imgui, CornerRounding);
 
     auto settings = FloeWindowSettings(imgui, [](IMGUI_DRAW_WINDOW_BG_ARGS) {});
     {
-        auto const fx_window_pad_l = live_edit::Size(imgui, UiSizeId::FXWindowPadL);
-        auto const fx_window_pad_t = live_edit::Size(imgui, UiSizeId::FXWindowPadT);
-        auto const fx_window_pad_r = live_edit::Size(imgui, UiSizeId::FXWindowPadR);
-        auto const fx_window_pad_b = live_edit::Size(imgui, UiSizeId::FXWindowPadB);
+        auto const fx_window_pad_l = LiveSize(imgui, FXWindowPadL);
+        auto const fx_window_pad_t = LiveSize(imgui, FXWindowPadT);
+        auto const fx_window_pad_r = LiveSize(imgui, FXWindowPadR);
+        auto const fx_window_pad_b = LiveSize(imgui, FXWindowPadB);
         settings.flags |= imgui::WindowFlags_AlwaysDrawScrollY;
         settings.pad_top_left = {(f32)fx_window_pad_l, (f32)fx_window_pad_t};
         settings.pad_bottom_right = {(f32)fx_window_pad_r, (f32)fx_window_pad_b};
@@ -250,10 +250,10 @@ void DoEffectsWindow(Gui* g, Rect r) {
     int const switches_left_col_size = k_num_effect_types / 2 + (k_num_effect_types % 2);
 
     {
-        auto const fx_switch_board_margin_l = live_edit::Size(imgui, UiSizeId::FXSwitchBoardMarginL);
-        auto const fx_switch_board_margin_t = live_edit::Size(imgui, UiSizeId::FXSwitchBoardMarginT);
-        auto const fx_switch_board_margin_r = live_edit::Size(imgui, UiSizeId::FXSwitchBoardMarginR);
-        auto const fx_switch_board_margin_b = live_edit::Size(imgui, UiSizeId::FXSwitchBoardMarginB);
+        auto const fx_switch_board_margin_l = LiveSize(imgui, FXSwitchBoardMarginL);
+        auto const fx_switch_board_margin_t = LiveSize(imgui, FXSwitchBoardMarginT);
+        auto const fx_switch_board_margin_r = LiveSize(imgui, FXSwitchBoardMarginR);
+        auto const fx_switch_board_margin_b = LiveSize(imgui, FXSwitchBoardMarginB);
 
         auto switches_container = lay.CreateParentItem(effects_root, 1, 0, LAY_HFILL, LAY_ROW);
         lay.SetMargins(switches_container,

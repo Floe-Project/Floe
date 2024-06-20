@@ -35,7 +35,7 @@ static void DrawKnob(Gui* g, imgui::Id id, Rect r, f32 percent, Style const& sty
     }
 
     // outer arc
-    auto const outer_arc_thickness = live_edit::Size(imgui, UiSizeId::KnobOuterArcWeight);
+    auto const outer_arc_thickness = LiveSize(imgui, UiSizeId::KnobOuterArcWeight);
     auto const outer_arc_radius_mid = r.w * 0.5f;
     if (!style.overload_position) {
         imgui.graphics->PathArcTo(c,
@@ -82,7 +82,7 @@ static void DrawKnob(Gui* g, imgui::Id id, Rect r, f32 percent, Style const& sty
         }
 
         if constexpr (0) {
-            auto const line_weight = live_edit::Size(imgui, UiSizeId::KnobLineWeight);
+            auto const line_weight = LiveSize(imgui, UiSizeId::KnobLineWeight);
             auto const line_height = outer_arc_thickness * 1.4f;
 
             auto const arc_radius_outer = outer_arc_radius_mid + line_height / 2;
@@ -119,14 +119,14 @@ static void DrawKnob(Gui* g, imgui::Id id, Rect r, f32 percent, Style const& sty
     }
 
     // inner arc
-    auto inner_arc_radius_mid = outer_arc_radius_mid - live_edit::Size(imgui, UiSizeId::KnobInnerArc);
-    auto inner_arc_thickness = live_edit::Size(imgui, UiSizeId::KnobInnerArcWeight);
+    auto inner_arc_radius_mid = outer_arc_radius_mid - LiveSize(imgui, UiSizeId::KnobInnerArc);
+    auto inner_arc_thickness = LiveSize(imgui, UiSizeId::KnobInnerArcWeight);
     imgui.graphics->PathArcTo(c, inner_arc_radius_mid, start_radians, end_radians, 32);
     imgui.graphics->PathStroke(inner_arc_col, false, inner_arc_thickness);
 
     // cursor
     if (!style.is_fake) {
-        auto const line_weight = live_edit::Size(imgui, UiSizeId::KnobLineWeight);
+        auto const line_weight = LiveSize(imgui, UiSizeId::KnobLineWeight);
 
         auto const inner_arc_radius_outer = inner_arc_radius_mid + inner_arc_thickness / 2;
         auto const inner_arc_radius_inner = inner_arc_radius_mid - inner_arc_thickness / 2;

@@ -22,18 +22,18 @@ LayID LayoutParameterComponent(Gui* g,
     auto& imgui = g->imgui;
     auto& lay = g->layout;
 
-    auto const param_component_large_width = live_edit::Size(imgui, UiSizeId::ParamComponentLargeWidth);
-    auto const param_component_small_width = live_edit::Size(imgui, UiSizeId::ParamComponentSmallWidth);
+    auto const param_component_large_width = LiveSize(imgui, UiSizeId::ParamComponentLargeWidth);
+    auto const param_component_small_width = LiveSize(imgui, UiSizeId::ParamComponentSmallWidth);
     auto const param_component_extra_small_width =
-        live_edit::Size(imgui, UiSizeId::ParamComponentExtraSmallWidth);
-    auto const param_component_height_offset = live_edit::Size(imgui, UiSizeId::ParamComponentHeightOffset);
-    auto const param_component_margin_lr = live_edit::Size(imgui, UiSizeId::ParamComponentMarginLR);
-    auto const param_component_margin_t = live_edit::Size(imgui, UiSizeId::ParamComponentMarginT);
-    auto const param_component_margin_b = live_edit::Size(imgui, UiSizeId::ParamComponentMarginB);
-    auto const param_component_label_gap_y = live_edit::Size(imgui, UiSizeId::ParamComponentLabelGapY);
-    auto const param_popup_button_height = live_edit::Size(imgui, UiSizeId::ParamPopupButtonHeight);
-    auto const menu_button_text_margin_l = live_edit::Size(imgui, UiSizeId::MenuButtonTextMarginL);
-    auto const fx_convo_ir_width = live_edit::Size(imgui, UiSizeId::FXConvoIRWidth);
+        LiveSize(imgui, UiSizeId::ParamComponentExtraSmallWidth);
+    auto const param_component_height_offset = LiveSize(imgui, UiSizeId::ParamComponentHeightOffset);
+    auto const param_component_margin_lr = LiveSize(imgui, UiSizeId::ParamComponentMarginLR);
+    auto const param_component_margin_t = LiveSize(imgui, UiSizeId::ParamComponentMarginT);
+    auto const param_component_margin_b = LiveSize(imgui, UiSizeId::ParamComponentMarginB);
+    auto const param_component_label_gap_y = LiveSize(imgui, UiSizeId::ParamComponentLabelGapY);
+    auto const param_popup_button_height = LiveSize(imgui, UiSizeId::ParamPopupButtonHeight);
+    auto const menu_button_text_margin_l = LiveSize(imgui, UiSizeId::MenuButtonTextMarginL);
+    auto const fx_convo_ir_width = LiveSize(imgui, UiSizeId::FXConvoIRWidth);
 
     auto width = type == LayoutType::Layer ? param_component_large_width
                                            : (type == LayoutType::Effect ? param_component_small_width
@@ -42,7 +42,7 @@ LayID LayoutParameterComponent(Gui* g,
     auto height = width - param_component_height_offset;
     auto const starting_height = height;
     auto gap_x =
-        size_index_for_gapx ? live_edit::Size(imgui, *size_index_for_gapx) : param_component_margin_lr;
+        size_index_for_gapx ? LiveSize(imgui, *size_index_for_gapx) : param_component_margin_lr;
     auto gap_bottom = param_component_margin_b;
     auto gap_top = param_component_margin_t;
 
@@ -97,10 +97,10 @@ LayID LayoutParameterComponent(Gui* g,
         set_bottom_gap_independent_of_size);
 
     if (param.info.value_type == ParamValueType::Int) {
-        auto const dragger_width = live_edit::Size(g->imgui, UiSizeId::FXDraggerWidth);
-        auto const dragger_height = live_edit::Size(g->imgui, UiSizeId::FXDraggerHeight);
-        auto const dragger_margin_t = live_edit::Size(g->imgui, UiSizeId::FXDraggerMarginT);
-        auto const dragger_margin_b = live_edit::Size(g->imgui, UiSizeId::FXDraggerMarginB);
+        auto const dragger_width = LiveSize(g->imgui, UiSizeId::FXDraggerWidth);
+        auto const dragger_height = LiveSize(g->imgui, UiSizeId::FXDraggerHeight);
+        auto const dragger_margin_t = LiveSize(g->imgui, UiSizeId::FXDraggerMarginT);
+        auto const dragger_margin_b = LiveSize(g->imgui, UiSizeId::FXDraggerMarginB);
 
         lay_set_size_xy(&g->layout.ctx, param_layid, dragger_width, dragger_height);
         g->layout.SetTopMargin(param_layid, dragger_margin_t);

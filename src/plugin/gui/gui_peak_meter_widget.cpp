@@ -12,16 +12,16 @@
 namespace peak_meters {
 
 static void DrawPeakMeters(imgui::Context const& imgui, Rect r, f32 vl, f32 vr, bool did_clip) {
-    auto const gap = live_edit::Size(imgui, UiSizeId::PeakMeterGap);
-    auto const marker_w = live_edit::Size(imgui, UiSizeId::PeakMeterMarkerWidth);
-    auto const marker_pad = live_edit::Size(imgui, UiSizeId::PeakMeterMarkerPad);
+    auto const gap = LiveSize(imgui, UiSizeId::PeakMeterGap);
+    auto const marker_w = LiveSize(imgui, UiSizeId::PeakMeterMarkerWidth);
+    auto const marker_pad = LiveSize(imgui, UiSizeId::PeakMeterMarkerPad);
     auto padded_r = Rect {r.x + marker_w, r.y, r.w - (marker_w * 2), r.h};
     auto w = (padded_r.w / 2) - (gap / 2);
 
     constexpr f32 k_max_db = 10;
     constexpr f32 k_min_db = -70;
 
-    auto const rounding = live_edit::Size(imgui, UiSizeId::CornerRounding);
+    auto const rounding = LiveSize(imgui, UiSizeId::CornerRounding);
 
     {
         {

@@ -49,7 +49,7 @@ bool Dragger(Gui* g, Parameter const& param, Rect r, Style const& style) {
     auto& imgui = g->imgui;
 
     auto result = param.ValueAsInt<int>();
-    auto const btn_w = live_edit::Size(imgui, UiSizeId::ParamIntButtonSize);
+    auto const btn_w = LiveSize(imgui, UiSizeId::ParamIntButtonSize);
 
     Rect left_r = r;
     left_r.w = btn_w;
@@ -68,7 +68,7 @@ bool Dragger(Gui* g, Parameter const& param, Rect r, Style const& style) {
         imgui.graphics->AddRectFilled(converted_r.Min(),
                                       converted_r.Max(),
                                       style.background,
-                                      live_edit::Size(imgui, UiSizeId::CornerRounding));
+                                      LiveSize(imgui, UiSizeId::CornerRounding));
     }
 
     bool changed = Dragger(g,

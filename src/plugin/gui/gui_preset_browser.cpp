@@ -35,30 +35,30 @@ PresetBrowser::PresetBrowser(Gui* g, PresetBrowserPersistentData& persistent_dat
         selected_folder = listing.listing->Find(g->plugin.preset_browser_filters.selected_folder_hash);
     }
 
-    preset_folders_panel_width = live_edit::Size(imgui, UiSizeId::PresetFoldersPanelWidth);
-    preset_panel_xgap = live_edit::Size(imgui, UiSizeId::PresetPanelGapX);
+    preset_folders_panel_width = LiveSize(imgui, UiSizeId::PresetFoldersPanelWidth);
+    preset_panel_xgap = LiveSize(imgui, UiSizeId::PresetPanelGapX);
 
     preset_button_folder_initial_indent =
-        live_edit::Size(imgui, UiSizeId::PresetButtonFolderInitialIndent);
-    preset_button_folder_arrow_indent = live_edit::Size(imgui, UiSizeId::PresetButtonFolderArrorIndent);
-    preset_button_folder_indent = live_edit::Size(imgui, UiSizeId::PresetButtonFolderIndent);
-    preset_button_file_indent = live_edit::Size(imgui, UiSizeId::PresetButtonFileIndent);
-    file_folder_gap_above = live_edit::Size(imgui, UiSizeId::PresetFilesFolderHeadingGapAbove);
+        LiveSize(imgui, UiSizeId::PresetButtonFolderInitialIndent);
+    preset_button_folder_arrow_indent = LiveSize(imgui, UiSizeId::PresetButtonFolderArrorIndent);
+    preset_button_folder_indent = LiveSize(imgui, UiSizeId::PresetButtonFolderIndent);
+    preset_button_file_indent = LiveSize(imgui, UiSizeId::PresetButtonFileIndent);
+    file_folder_gap_above = LiveSize(imgui, UiSizeId::PresetFilesFolderHeadingGapAbove);
 
-    preset_button_height = live_edit::Size(imgui, UiSizeId::PresetButtonHeight);
-    preset_button_ygap = live_edit::Size(imgui, UiSizeId::PresetButtonGapY);
+    preset_button_height = LiveSize(imgui, UiSizeId::PresetButtonHeight);
+    preset_button_ygap = LiveSize(imgui, UiSizeId::PresetButtonGapY);
 
-    subheading_above = live_edit::Size(imgui, UiSizeId::PresetSubheadingAbove);
-    subheading_height = live_edit::Size(imgui, UiSizeId::PresetSubheadingHeight);
-    subheading_below = live_edit::Size(imgui, UiSizeId::PresetSubheadingBelow);
-    left_margin = live_edit::Size(imgui, UiSizeId::SidePanelTextMarginLeft);
-    file_arrow_size = live_edit::Size(imgui, UiSizeId::PresetFileArrowSize);
+    subheading_above = LiveSize(imgui, UiSizeId::PresetSubheadingAbove);
+    subheading_height = LiveSize(imgui, UiSizeId::PresetSubheadingHeight);
+    subheading_below = LiveSize(imgui, UiSizeId::PresetSubheadingBelow);
+    left_margin = LiveSize(imgui, UiSizeId::SidePanelTextMarginLeft);
+    file_arrow_size = LiveSize(imgui, UiSizeId::PresetFileArrowSize);
 
     wnd_settings = StandalonePopupSettings(imgui);
-    wnd_settings.pad_top_left = {live_edit::Size(imgui, UiSizeId::PresetPadL),
-                                 live_edit::Size(imgui, UiSizeId::PresetPadT)};
-    wnd_settings.pad_bottom_right = {live_edit::Size(imgui, UiSizeId::PresetPadR),
-                                     live_edit::Size(imgui, UiSizeId::PresetPadB)};
+    wnd_settings.pad_top_left = {LiveSize(imgui, UiSizeId::PresetPadL),
+                                 LiveSize(imgui, UiSizeId::PresetPadT)};
+    wnd_settings.pad_bottom_right = {LiveSize(imgui, UiSizeId::PresetPadR),
+                                     LiveSize(imgui, UiSizeId::PresetPadB)};
 }
 
 PresetBrowser::~PresetBrowser() {
@@ -209,8 +209,8 @@ DirectoryListing::Entry const* PresetBrowser::DoPresetFilesRecurse(DirectoryList
                     Rect const r {0,
                                   ypos,
                                   imgui.Width(),
-                                  live_edit::Size(imgui, UiSizeId::PresetFilesFolderHeadingHeight)};
-                    ypos += r.h + live_edit::Size(imgui, UiSizeId::PresetFilesFolderHeadingPadBelow);
+                                  LiveSize(imgui, UiSizeId::PresetFilesFolderHeadingHeight)};
+                    ypos += r.h + LiveSize(imgui, UiSizeId::PresetFilesFolderHeadingPadBelow);
 
                     if (IsOnScreen(imgui, r)) {
                         if (starting_y >= preset_button_height) {
@@ -491,9 +491,9 @@ void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
         //
         //
         {
-            auto const width = live_edit::Size(imgui, UiSizeId::PresetWidth);
-            auto const height = live_edit::Size(imgui, UiSizeId::PresetHeight);
-            auto const y_offs = live_edit::Size(imgui, UiSizeId::PresetYOffset);
+            auto const width = LiveSize(imgui, UiSizeId::PresetWidth);
+            auto const height = LiveSize(imgui, UiSizeId::PresetHeight);
+            auto const y_offs = LiveSize(imgui, UiSizeId::PresetYOffset);
             imgui.BeginWindow(wnd_settings,
                               {mid_panel_r.CentreX() - width / 2,
                                mid_panel_r.CentreY() - height / 2 - y_offs,
@@ -502,10 +502,10 @@ void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
                               "PresetPanel");
         }
 
-        auto const gap_above_heading = live_edit::Size(imgui, UiSizeId::PresetHeadingPadT);
-        auto const heading_height = live_edit::Size(imgui, UiSizeId::PresetHeadingHeight);
-        auto const gap_below_heading = live_edit::Size(imgui, UiSizeId::PresetHeadingPadB);
-        auto const gap_left_heading = live_edit::Size(imgui, UiSizeId::PresetHeadingPadL);
+        auto const gap_above_heading = LiveSize(imgui, UiSizeId::PresetHeadingPadT);
+        auto const heading_height = LiveSize(imgui, UiSizeId::PresetHeadingHeight);
+        auto const gap_below_heading = LiveSize(imgui, UiSizeId::PresetHeadingPadB);
+        auto const gap_left_heading = LiveSize(imgui, UiSizeId::PresetHeadingPadL);
 
         if (DoCloseButtonForCurrentWindow(g,
                                           "Close the preset browser panel",
@@ -529,10 +529,10 @@ void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
             auto& lay = g->layout;
             DEFER { lay.Reset(); };
             {
-                auto const pad_t = live_edit::Size(imgui, UiSizeId::PresetTopControlsPadT);
-                auto const pad_r = live_edit::Size(imgui, UiSizeId::PresetTopControlsPadR);
-                auto const h = live_edit::Size(imgui, UiSizeId::PresetTopControlsHeight);
-                auto const preset_btn_w = live_edit::Size(imgui, UiSizeId::PresetTopControlsButtonWidth);
+                auto const pad_t = LiveSize(imgui, UiSizeId::PresetTopControlsPadT);
+                auto const pad_r = LiveSize(imgui, UiSizeId::PresetTopControlsPadR);
+                auto const h = LiveSize(imgui, UiSizeId::PresetTopControlsHeight);
+                auto const preset_btn_w = LiveSize(imgui, UiSizeId::PresetTopControlsButtonWidth);
 
                 auto root = lay.CreateRootItem((LayScalar)imgui.Width(),
                                                (LayScalar)imgui.Height(),
@@ -562,7 +562,7 @@ void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
         //
         //
         //
-        auto const table_title_h = live_edit::Size(imgui, UiSizeId::PresetSectionHeadingHeight);
+        auto const table_title_h = LiveSize(imgui, UiSizeId::PresetSectionHeadingHeight);
         auto const files_panel_width = imgui.Width() - preset_folders_panel_width;
 
         imgui.BeginWindow(
@@ -570,7 +570,7 @@ void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
                 imgui,
                 [&](IMGUI_DRAW_WINDOW_BG_ARGS) {
                     auto const r = window->unpadded_bounds;
-                    auto const rounding = live_edit::Size(imgui, UiSizeId::CornerRounding);
+                    auto const rounding = LiveSize(imgui, UiSizeId::CornerRounding);
 
                     imgui.graphics->AddRectFilled(r.Min(),
                                                   r.Min() + f32x2 {r.w, table_title_h},
@@ -626,17 +626,17 @@ void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
 
                 LayID search;
                 {
-                    auto const h = live_edit::Size(imgui, UiSizeId::PresetSearchHeight);
-                    auto const w = live_edit::Size(imgui, UiSizeId::PresetSearchWidth);
-                    auto const pad_r = live_edit::Size(imgui, UiSizeId::PresetSearchPadR);
+                    auto const h = LiveSize(imgui, UiSizeId::PresetSearchHeight);
+                    auto const w = LiveSize(imgui, UiSizeId::PresetSearchWidth);
+                    auto const pad_r = LiveSize(imgui, UiSizeId::PresetSearchPadR);
                     search = lay.CreateChildItem(root, w, h, LAY_VCENTER);
                     lay.SetRightMargin(search, pad_r);
                 }
 
                 LayID random;
                 {
-                    auto const size = live_edit::Size(imgui, UiSizeId::PresetRandomButtonSize);
-                    auto const pad_r = live_edit::Size(imgui, UiSizeId::PresetRandomButtonPadR);
+                    auto const size = LiveSize(imgui, UiSizeId::PresetRandomButtonSize);
+                    auto const pad_r = LiveSize(imgui, UiSizeId::PresetRandomButtonPadR);
                     random = lay.CreateChildItem(root, size, size, LAY_VCENTER);
                     lay.SetRightMargin(random, pad_r);
                 }
@@ -650,7 +650,7 @@ void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
 
                     auto settings = imgui::DefTextInput();
                     settings.draw = [](IMGUI_DRAW_TEXT_INPUT_ARGS) {
-                        auto const rounding = live_edit::Size(imgui, UiSizeId::CornerRounding);
+                        auto const rounding = LiveSize(imgui, UiSizeId::CornerRounding);
                         imgui.graphics->AddRectFilled(r.Min(), r.Max(), GMC(BrowserSearchBack), rounding);
 
                         if (result->HasSelection()) {

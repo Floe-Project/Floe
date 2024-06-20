@@ -16,10 +16,10 @@ void BotPanel(Gui* g) {
     auto& lay = g->layout;
     auto& plugin = g->plugin;
 
-    auto const slider_w = live_edit::Size(imgui, UiSizeId::MidiKeyboardSlider);
-    auto const control_w = live_edit::Size(imgui, UiSizeId::MidiKeyboardControlWidth);
-    auto const button_h = live_edit::Size(imgui, UiSizeId::MidiKeyboardButtonSize);
-    auto const button_ygap = live_edit::Size(imgui, UiSizeId::MidiKeyboardButtonYGap);
+    auto const slider_w = LiveSize(imgui, UiSizeId::MidiKeyboardSlider);
+    auto const control_w = LiveSize(imgui, UiSizeId::MidiKeyboardControlWidth);
+    auto const button_h = LiveSize(imgui, UiSizeId::MidiKeyboardButtonSize);
+    auto const button_ygap = LiveSize(imgui, UiSizeId::MidiKeyboardButtonYGap);
 
     auto root = lay.CreateRootItem((LayScalar)imgui.Width(),
                                    (LayScalar)imgui.Height(),

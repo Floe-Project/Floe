@@ -13,9 +13,9 @@ void MidPanel(Gui* g) {
     auto& lay = g->layout;
     auto& plugin = g->plugin;
 
-    auto const layer_width = live_edit::Size(imgui, UiSizeId::LayerWidth);
+    auto const layer_width = LiveSize(imgui, UiSizeId::LayerWidth);
     auto const total_layer_width = layer_width * k_num_layers;
-    auto const mid_panel_title_height = live_edit::Size(imgui, UiSizeId::MidPanelTitleHeight);
+    auto const mid_panel_title_height = LiveSize(imgui, UiSizeId::MidPanelTitleHeight);
     auto const mid_panel_size = imgui.Size();
 
     auto const get_background_uvs =
@@ -30,11 +30,11 @@ void MidPanel(Gui* g) {
                           whole_uv.y * (r.h + top_margin) / mid_panel_size.y};
         };
 
-    auto const panel_rounding = live_edit::Size(imgui, UiSizeId::BlurredPanelRounding);
+    auto const panel_rounding = LiveSize(imgui, UiSizeId::BlurredPanelRounding);
 
     auto do_randomise_button = [&](String tooltip) {
-        auto const margin = live_edit::Size(imgui, UiSizeId::MidPanelTitleMarginLeft);
-        auto const size = live_edit::Size(imgui, UiSizeId::LayerSelectorButtonW);
+        auto const margin = LiveSize(imgui, UiSizeId::MidPanelTitleMarginLeft);
+        auto const size = LiveSize(imgui, UiSizeId::LayerSelectorButtonW);
         Rect const btn_r {imgui.Width() - (size + margin), 0, size, mid_panel_title_height};
         auto const id = imgui.GetID("rand");
         if (buttons::Button(g,
@@ -123,15 +123,15 @@ void MidPanel(Gui* g) {
             }
         });
 
-        settings.pad_top_left.x = live_edit::Size(imgui, UiSizeId::LayersBoxMarginL);
-        settings.pad_top_left.y = live_edit::Size(imgui, UiSizeId::LayersBoxMarginT);
-        settings.pad_bottom_right.x = live_edit::Size(imgui, UiSizeId::LayersBoxMarginR);
-        settings.pad_bottom_right.y = live_edit::Size(imgui, UiSizeId::LayersBoxMarginB);
+        settings.pad_top_left.x = LiveSize(imgui, UiSizeId::LayersBoxMarginL);
+        settings.pad_top_left.y = LiveSize(imgui, UiSizeId::LayersBoxMarginT);
+        settings.pad_bottom_right.x = LiveSize(imgui, UiSizeId::LayersBoxMarginR);
+        settings.pad_bottom_right.y = LiveSize(imgui, UiSizeId::LayersBoxMarginB);
         imgui.BeginWindow(settings, {0, 0, total_layer_width, imgui.Height()}, "Layers");
 
         // do the title
         {
-            Rect title_r {live_edit::Size(imgui, UiSizeId::MidPanelTitleMarginLeft),
+            Rect title_r {LiveSize(imgui, UiSizeId::MidPanelTitleMarginLeft),
                           0,
                           imgui.Width(),
                           mid_panel_title_height};
@@ -238,10 +238,10 @@ void MidPanel(Gui* g) {
                 }
             }
         });
-        settings.pad_top_left.x = live_edit::Size(imgui, UiSizeId::FXListMarginL);
-        settings.pad_top_left.y = live_edit::Size(imgui, UiSizeId::FXListMarginT);
-        settings.pad_bottom_right.x = live_edit::Size(imgui, UiSizeId::FXListMarginR);
-        settings.pad_bottom_right.y = live_edit::Size(imgui, UiSizeId::FXListMarginB);
+        settings.pad_top_left.x = LiveSize(imgui, UiSizeId::FXListMarginL);
+        settings.pad_top_left.y = LiveSize(imgui, UiSizeId::FXListMarginT);
+        settings.pad_bottom_right.x = LiveSize(imgui, UiSizeId::FXListMarginR);
+        settings.pad_bottom_right.y = LiveSize(imgui, UiSizeId::FXListMarginB);
 
         imgui.BeginWindow(settings,
                           {total_layer_width, 0, imgui.Width() - total_layer_width, imgui.Height()},
@@ -249,7 +249,7 @@ void MidPanel(Gui* g) {
 
         // do the title
         {
-            Rect title_r {live_edit::Size(imgui, UiSizeId::MidPanelTitleMarginLeft),
+            Rect title_r {LiveSize(imgui, UiSizeId::MidPanelTitleMarginLeft),
                           0,
                           imgui.Width(),
                           mid_panel_title_height};

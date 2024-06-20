@@ -24,10 +24,10 @@ f32 MaxStringLength(Gui* g, void* items, int num, String (*GetStr)(void* items, 
 f32 MaxStringLength(Gui* g, Span<String const> strs) { return g->imgui.LargestStringWidth(0, strs); }
 
 f32 MenuItemWidth(Gui* g, void* items, int num, String (*GetStr)(void* items, int index)) {
-    return MaxStringLength(g, items, num, GetStr) + live_edit::Size(g->imgui, UiSizeId::MenuItemPadX);
+    return MaxStringLength(g, items, num, GetStr) + LiveSize(g->imgui, UiSizeId::MenuItemPadX);
 }
 f32 MenuItemWidth(Gui* g, Span<String const> strs) {
-    return MaxStringLength(g, strs) + live_edit::Size(g->imgui, UiSizeId::MenuItemPadX);
+    return MaxStringLength(g, strs) + LiveSize(g->imgui, UiSizeId::MenuItemPadX);
 }
 
 //
@@ -39,9 +39,9 @@ void DoTooltipText(Gui* g, String str, Rect r, bool rect_is_window_pos) {
 
     auto& imgui = g->imgui;
     auto font = imgui.overlay_graphics.context->CurrentFont();
-    auto size = live_edit::Size(imgui, UiSizeId::TooltipMaxWidth);
-    auto pad_x = live_edit::Size(imgui, UiSizeId::TooltipPadX);
-    auto pad_y = live_edit::Size(imgui, UiSizeId::TooltipPadY);
+    auto size = LiveSize(imgui, UiSizeId::TooltipMaxWidth);
+    auto pad_x = LiveSize(imgui, UiSizeId::TooltipPadX);
+    auto pad_y = LiveSize(imgui, UiSizeId::TooltipPadY);
 
     auto wrapped_size = draw::GetTextSize(font, str, size);
     size = Min(size, wrapped_size.x);
@@ -69,7 +69,7 @@ void DoTooltipText(Gui* g, String str, Rect r, bool rect_is_window_pos) {
     imgui.overlay_graphics.AddRectFilled(popup_r.Min(),
                                          popup_r.Max(),
                                          GMC(TooltipBack),
-                                         live_edit::Size(imgui, UiSizeId::CornerRounding));
+                                         LiveSize(imgui, UiSizeId::CornerRounding));
     imgui.overlay_graphics
         .AddText(font, font->font_size_no_scale, text_start, GMC(TooltipText), str, size + 1);
 
@@ -319,8 +319,8 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
             imgui.PopID();
 
             if (params.size != 1 && param != Last(params)) {
-                auto const div_gap_x = live_edit::Size(imgui, UiSizeId::MenuItemDividerGapX);
-                auto const div_h = live_edit::Size(imgui, UiSizeId::MenuItemDividerH);
+                auto const div_gap_x = LiveSize(imgui, UiSizeId::MenuItemDividerGapX);
+                auto const div_h = LiveSize(imgui, UiSizeId::MenuItemDividerH);
 
                 Rect div_r = {div_gap_x, pos + (div_h / 2), item_width - 2 * div_gap_x, 1};
                 imgui.RegisterAndConvertRect(&div_r);
@@ -341,7 +341,7 @@ bool DoMultipleMenuItems(Gui* g,
     DEFER { EndFloeMenu(g); };
 
     auto w = MenuItemWidth(g, items, num_items, GetStr);
-    auto h = live_edit::Size(g->imgui, UiSizeId::MenuItemHeight);
+    auto h = LiveSize(g->imgui, UiSizeId::MenuItemHeight);
 
     int clicked = -1;
     for (auto const i : Range(num_items)) {
@@ -412,8 +412,8 @@ void EndParameterGUI(Gui* g,
 
 bool DoCloseButtonForCurrentWindow(Gui* g, String tooltip_text, buttons::Style const& style) {
     auto& imgui = g->imgui;
-    f32 const pad = live_edit::Size(imgui, UiSizeId::SidePanelCloseButtonPad);
-    f32 const size = live_edit::Size(imgui, UiSizeId::SidePanelCloseButtonSize);
+    f32 const pad = LiveSize(imgui, UiSizeId::SidePanelCloseButtonPad);
+    f32 const size = LiveSize(imgui, UiSizeId::SidePanelCloseButtonSize);
 
     auto const x = imgui.Width() - (pad + size);
     Rect const btn_r = {x, pad, size, size};
@@ -456,7 +456,7 @@ imgui::TextInputSettings GetParameterTextInputSettings() {
                                  text_pos.y,
                                  w,
                                  imgui.graphics->context->CurrentFontSize()};
-        auto const rounding = live_edit::Size(imgui, UiSizeId::CornerRounding);
+        auto const rounding = LiveSize(imgui, UiSizeId::CornerRounding);
 
         imgui.graphics->AddRectFilled(background_r.Min(),
                                       background_r.Max(),

@@ -62,7 +62,7 @@ void TopPanel(Gui* g) {
     bool const has_insts_with_dynamics = true; // TODO, get the value properly?
     auto title_font = g->mada_big;
 
-#define GUI_SIZE(cat, n, v, u) [[maybe_unused]] const auto cat##n = live_edit::Size(imgui, UiSizeId::cat##n);
+#define GUI_SIZE(cat, n, v, u) [[maybe_unused]] const auto cat##n = LiveSize(imgui, UiSizeId::cat##n);
 #include SIZES_DEF_FILENAME
 #undef GUI_SIZE
 
@@ -133,7 +133,7 @@ void TopPanel(Gui* g) {
     //
     {
         auto back_r = imgui.GetRegisteredAndConvertedRect(lay.GetRect(preset_box));
-        auto const rounding = live_edit::Size(imgui, UiSizeId::CornerRounding);
+        auto const rounding = LiveSize(imgui, UiSizeId::CornerRounding);
         imgui.graphics->AddRectFilled(back_r.Min(), back_r.Max(), GMC(TopPanelPresetsBack), rounding);
     }
 

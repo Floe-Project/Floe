@@ -14,8 +14,8 @@
 namespace draw {
 
 void DropShadow(imgui::Context const& imgui, Rect r, Optional<f32> rounding_opt) {
-    auto const rounding = rounding_opt ? *rounding_opt : live_edit::Size(imgui, UiSizeId::CornerRounding);
-    auto const blur = live_edit::Size(imgui, UiSizeId::WindowDropShadowBlur);
+    auto const rounding = rounding_opt ? *rounding_opt : LiveSize(imgui, UiSizeId::CornerRounding);
+    auto const blur = LiveSize(imgui, UiSizeId::WindowDropShadowBlur);
     imgui.graphics->AddDropShadow(r.Min(), r.Max(), GMC(WindowDropShadow), blur, rounding);
 }
 

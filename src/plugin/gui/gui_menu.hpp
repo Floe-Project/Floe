@@ -13,10 +13,10 @@ struct PopupMenuItems {
         m_g = _g;
 
         m_g->imgui.graphics->context->PushFont(m_g->roboto_small);
-        m_h = live_edit::Size(m_g->imgui, UiSizeId::MenuItemHeight);
+        m_h = LiveSize(m_g->imgui, UiSizeId::MenuItemHeight);
 
-        m_div_gap_x = live_edit::Size(m_g->imgui, UiSizeId::MenuItemDividerGapX);
-        m_div_h = live_edit::Size(m_g->imgui, UiSizeId::MenuItemDividerH);
+        m_div_gap_x = LiveSize(m_g->imgui, UiSizeId::MenuItemDividerGapX);
+        m_div_h = LiveSize(m_g->imgui, UiSizeId::MenuItemDividerH);
 
         m_w = MenuItemWidth(m_g, m_items);
         m_y_pos = 0;

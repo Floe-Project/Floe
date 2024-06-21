@@ -130,21 +130,21 @@ checks_level_1 := checks_level_0 + replace(
 # IMPROVE: Linux CI: enable plugin tests when we have a solution to the crashes
 # IMPROVE: Linux CI: enable wine tests when we have a way to install wine on CI
 checks_ci := replace(
-  if os() == "linux" {
-    "
-    check-reuse 
-    check-format
-    test-units
-    coverage
-    clang-tidy-all
-    test-clap-val
-    "
-  } else {
-    "
+  "
     test-units
     test-clap-val
     test-pluginval
     test-vst3-val
+  " +
+  if os() == "linux" {
+    "
+    check-reuse 
+    check-format
+    coverage
+    clang-tidy-all
+    "
+  } else {
+    "
     test-pluginval-au
     "
   }, "\n", " ")

@@ -506,12 +506,10 @@ void Draw(Gui* g,
           PluginInstance::Layer* layer,
           LayerLayoutTempIDs& c,
           LayerLayout* layer_gui) {
+    using enum UiSizeId;
+
     auto& lay = g->layout;
     auto& imgui = g->imgui;
-
-#define GUI_SIZE(cat, n, v, u) [[maybe_unused]] const auto cat##n = LiveSize(imgui, UiSizeId::cat##n);
-#include SIZES_DEF_FILENAME
-#undef GUI_SIZE
 
     auto settings = FloeWindowSettings(imgui, [&](IMGUI_DRAW_WINDOW_BG_ARGS) {
         auto desired_lib_name = layer->LibName();
@@ -679,11 +677,15 @@ void Draw(Gui* g,
     auto const volume_knob_r = lay.GetRect(c.volume);
     // level meter
     {
-        Rect const peak_meter_r {volume_knob_r.Centre().x - LayerPeakMeterWidth / 2,
-                                 volume_knob_r.y +
-                                     (volume_knob_r.h - (LayerPeakMeterHeight + LayerPeakMeterBottomGap)),
-                                 LayerPeakMeterWidth,
-                                 LayerPeakMeterHeight - LayerPeakMeterBottomGap};
+        auto const layer_peak_meter_width = LiveSize(imgui, LayerPeakMeterWidth);
+        auto const layer_peak_meter_height = LiveSize(imgui, LayerPeakMeterHeight);
+        auto const layer_peak_meter_bottom_gap = LiveSize(imgui, LayerPeakMeterBottomGap);
+
+        Rect const peak_meter_r {
+            volume_knob_r.Centre().x - layer_peak_meter_width / 2,
+            volume_knob_r.y + (volume_knob_r.h - (layer_peak_meter_height + layer_peak_meter_bottom_gap)),
+            layer_peak_meter_width,
+            layer_peak_meter_height - layer_peak_meter_bottom_gap};
         auto const& processor = plugin->processor.layer_processors[(usize)layer->index];
         peak_meters::PeakMeter(g, peak_meter_r, processor.peak_meter, false);
     }
@@ -691,7 +693,7 @@ void Draw(Gui* g,
     // volume
     {
         auto const volume_name_h = lay.GetRect(c.knob1.label).h;
-        auto const volume_name_y_gap = LayerVolumeNameGapY;
+        auto const volume_name_y_gap = LiveSize(imgui, LayerVolumeNameGapY);
         Rect const volume_name_r {volume_knob_r.x,
                                   volume_knob_r.Bottom() - volume_name_h + volume_name_y_gap,
                                   volume_knob_r.w,
@@ -930,7 +932,7 @@ void Draw(Gui* g,
             {
                 static constexpr auto k_num_btns = ToInt(param_values::VelocityMappingMode::Count);
                 static_assert(k_num_btns == 6, "");
-                auto const btn_gap = MIDI_VeloButtonsSpacing;
+                auto const btn_gap = LiveSize(imgui, MIDI_VeloButtonsSpacing);
                 auto const whole_velo_r =
                     lay.GetRect(c.midi.velo_buttons).CutRight(btn_gap * 2).CutBottom(btn_gap);
 
@@ -1040,10 +1042,14 @@ void Draw(Gui* g,
             auto const rate_name_r = lay.GetRect(c.lfo.rate.label);
             labels::Label(g, *rate_param, rate_name_r, labels::ParameterCentred(imgui, greyed_out));
 
-            Rect const sync_r {rate_name_r.x + rate_name_r.w / 2 - LFO_SyncSwitchWidth / 2,
-                               rate_name_r.Bottom() + LFO_SyncSwitchGapY,
-                               LFO_SyncSwitchWidth,
-                               LFO_SyncSwitchHeight};
+            auto const lfo_sync_switch_width = LiveSize(imgui, LFO_SyncSwitchWidth);
+            auto const lfo_sync_switch_height = LiveSize(imgui, LFO_SyncSwitchHeight);
+            auto const lfo_sync_switch_gap_y = LiveSize(imgui, LFO_SyncSwitchGapY);
+
+            Rect const sync_r {rate_name_r.x + rate_name_r.w / 2 - lfo_sync_switch_width / 2,
+                               rate_name_r.Bottom() + lfo_sync_switch_gap_y,
+                               lfo_sync_switch_width,
+                               lfo_sync_switch_height};
             buttons::Toggle(g,
                             layer->processor.params[ToInt(LayerParamIndex::LfoSyncSwitch)],
                             sync_r,

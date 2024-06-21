@@ -129,8 +129,8 @@ enum class MemoryOrder {
 
 template <typename Type>
 struct Atomic {
-    Atomic() {}
-    Atomic(Type v) : raw(v) {}
+    constexpr Atomic() = default;
+    constexpr Atomic(Type v) : raw(v) {}
 
     NON_COPYABLE_AND_MOVEABLE(Atomic);
 

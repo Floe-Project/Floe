@@ -161,13 +161,14 @@ void DoErrorsStandalone(Gui* g) {
 
     auto font = imgui.graphics->context->CurrentFont();
 
-#define GUI_SIZE(cat, n, v, u) [[maybe_unused]] const auto cat##n = LiveSize(imgui, UiSizeId::cat##n);
-#include SIZES_DEF_FILENAME
-#undef GUI_SIZE
-
     if (imgui.BeginWindowPopup(settings, GetStandaloneID(StandaloneWindowsLoadError), r, "ErrorModal")) {
         f32 y_pos = 0;
         auto text_style = labels::ErrorWindowLabel(imgui);
+
+        auto const error_window_button_h = LiveSize(imgui, UiSizeId::ErrorWindowButtonH);
+        auto const error_window_button_gap_x = LiveSize(imgui, UiSizeId::ErrorWindowButtonGapX);
+        auto const error_window_gap_after_desc = LiveSize(imgui, UiSizeId::ErrorWindowGapAfterDesc);
+        auto const error_window_divider_spacing_y = LiveSize(imgui, UiSizeId::ErrorWindowDividerSpacingY);
 
         // title
         StandalonePopupHeading(g, y_pos, "Errors");
@@ -190,13 +191,14 @@ void DoErrorsStandalone(Gui* g) {
                     // title
                     {
                         imgui.graphics->context->PushFont(g->mada);
+                        auto const error_window_item_h = LiveSize(imgui, UiSizeId::ErrorWindowItemH);
                         labels::Label(g,
-                                      {0, y_pos, imgui.Width(), (f32)ErrorWindowItemH},
+                                      {0, y_pos, imgui.Width(), (f32)error_window_item_h},
                                       e.title,
                                       text_style);
                         imgui.graphics->context->PopFont();
 
-                        y_pos += (f32)ErrorWindowItemH;
+                        y_pos += (f32)error_window_item_h;
                     }
 
                     // desc
@@ -208,8 +210,8 @@ void DoErrorsStandalone(Gui* g) {
                         }
                         if (e.error_code) fmt::Append(error_text, "{}", *e.error_code);
 
-                        auto max_width = imgui.Width() * 0.95f;
-                        auto size = draw::GetTextSize(font, error_text, max_width);
+                        auto const max_width = imgui.Width() * 0.95f;
+                        auto const size = draw::GetTextSize(font, error_text, max_width);
                         auto desc_r = Rect {0, y_pos, size.x, size.y};
                         imgui.RegisterAndConvertRect(&desc_r);
                         imgui.graphics->AddText(font,
@@ -218,13 +220,13 @@ void DoErrorsStandalone(Gui* g) {
                                                 text_style.main_cols.reg,
                                                 error_text,
                                                 max_width);
-                        y_pos += size.y + (f32)ErrorWindowGapAfterDesc;
+                        y_pos += size.y + (f32)error_window_gap_after_desc;
                     }
 
                     // buttons
                     {
                         f32 x_pos = 0;
-                        auto btn_w = (f32)ErrorWindowButtonW;
+                        auto const btn_w = (f32)LiveSize(imgui, UiSizeId::ErrorWindowButtonW);
 
                         auto btn_sets = imgui::DefButton();
                         btn_sets.draw = [](IMGUI_DRAW_BUTTON_ARGS) {
@@ -248,8 +250,10 @@ void DoErrorsStandalone(Gui* g) {
                         auto do_button = [&](String name) {
                             button_added = true;
                             bool const clicked =
-                                imgui.Button(btn_sets, {x_pos, y_pos, btn_w, (f32)ErrorWindowButtonH}, name);
-                            x_pos += btn_w + (f32)ErrorWindowButtonGapX;
+                                imgui.Button(btn_sets,
+                                             {x_pos, y_pos, btn_w, (f32)error_window_button_h},
+                                             name);
+                            x_pos += btn_w + (f32)error_window_button_gap_x;
                             return clicked;
                         };
 
@@ -259,15 +263,15 @@ void DoErrorsStandalone(Gui* g) {
                         }
                     }
 
-                    y_pos += (f32)ErrorWindowButtonH;
+                    y_pos += (f32)error_window_button_h;
 
                     // divider line
                     if (it->next.Load(MemoryOrder::Relaxed) != nullptr) {
-                        y_pos += (f32)ErrorWindowGapAfterDesc;
+                        y_pos += (f32)error_window_gap_after_desc;
                         auto line_r = Rect {0, y_pos, imgui.Width(), 1};
                         imgui.RegisterAndConvertRect(&line_r);
                         imgui.graphics->AddLine(line_r.Min(), line_r.Max(), text_style.main_cols.reg);
-                        y_pos += (f32)ErrorWindowDividerSpacingY;
+                        y_pos += (f32)error_window_divider_spacing_y;
                     }
 
                     ++num_errors;
@@ -276,7 +280,7 @@ void DoErrorsStandalone(Gui* g) {
         }
 
         // Add space to the bottom of the scroll window
-        imgui.GetRegisteredAndConvertedRect({0, y_pos, 1, (f32)ErrorWindowButtonH});
+        imgui.GetRegisteredAndConvertedRect({0, y_pos, 1, (f32)error_window_button_h});
 
         if (!num_errors) imgui.ClosePopupToLevel(0);
 

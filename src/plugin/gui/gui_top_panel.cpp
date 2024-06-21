@@ -62,41 +62,50 @@ void TopPanel(Gui* g) {
     bool const has_insts_with_dynamics = true; // TODO, get the value properly?
     auto title_font = g->mada_big;
 
-#define GUI_SIZE(cat, n, v, u) [[maybe_unused]] const auto cat##n = LiveSize(imgui, UiSizeId::cat##n);
-#include SIZES_DEF_FILENAME
-#undef GUI_SIZE
+    auto const title_width = LiveSize(imgui, UiSizeId::Top2TitleWidth);
+    auto const title_margin_l = LiveSize(imgui, UiSizeId::Top2TitleMarginL);
+    auto const preset_box_margin_l = LiveSize(imgui, UiSizeId::Top2PresetBoxMarginL);
+    auto const preset_box_margin_r = LiveSize(imgui, UiSizeId::Top2PresetBoxMarginR);
+    auto const preset_box_pad_r = LiveSize(imgui, UiSizeId::Top2PresetBoxPadR);
+    auto const preset_box_w = LiveSize(imgui, UiSizeId::Top2PresetBoxW);
+    auto const preset_box_icon_width = LiveSize(imgui, UiSizeId::Top2PresetBoxIconWidth);
+    auto const icon_width = LiveSize(imgui, UiSizeId::Top2IconWidth);
+    auto const icon_height = LiveSize(imgui, UiSizeId::Top2IconHeight);
+    auto const knobs_margin_l = LiveSize(imgui, UiSizeId::Top2KnobsMarginL);
+    auto const knobs_margin_r = LiveSize(imgui, UiSizeId::Top2KnobsMarginR);
+    auto const peak_meter_w = LiveSize(imgui, UiSizeId::Top2PeakMeterW);
+    auto const peak_meter_h = LiveSize(imgui, UiSizeId::Top2PeakMeterH);
 
     auto root = lay.CreateRootItem((LayScalar)imgui.Width(), (LayScalar)imgui.Height(), LAY_ROW | LAY_START);
 
     auto left_container = lay.CreateParentItem(root, 0, 1, LAY_VFILL, LAY_ROW | LAY_START);
 
     auto title = lay.CreateChildItem(left_container,
-                                     Top2TitleWidth,
+                                     title_width,
                                      (LayScalar)title_font->font_size_no_scale,
                                      LAY_VCENTER);
-    lay.SetLeftMargin(title, Top2TitleMarginL);
+    lay.SetLeftMargin(title, title_margin_l);
 
     auto right_container = lay.CreateParentItem(root, 1, 1, LAY_FILL, LAY_ROW | LAY_END);
 
     auto preset_box = lay.CreateParentItem(right_container, 0, 0, LAY_VCENTER, LAY_ROW | LAY_START);
-    lay.SetRightMargin(preset_box, Top2PresetBoxMarginR);
-    lay.SetLeftMargin(preset_box, Top2PresetBoxMarginL);
+    lay.SetRightMargin(preset_box, preset_box_margin_r);
+    lay.SetLeftMargin(preset_box, preset_box_margin_l);
 
-    auto preset_menu = lay.CreateChildItem(preset_box, Top2PresetBoxW, Top2IconHeight, 0);
-    auto preset_left = lay.CreateChildItem(preset_box, Top2PresetBoxIconWidth, Top2IconHeight, 0);
-    auto preset_right = lay.CreateChildItem(preset_box, Top2PresetBoxIconWidth, Top2IconHeight, 0);
-    auto preset_random = lay.CreateChildItem(preset_box, Top2PresetBoxIconWidth, Top2IconHeight, 0);
-    auto preset_random_menu = lay.CreateChildItem(preset_box, Top2PresetBoxIconWidth, Top2IconHeight, 0);
-    auto preset_save = lay.CreateChildItem(preset_box, Top2PresetBoxIconWidth, Top2IconHeight, 0);
-    lay.SetRightMargin(preset_save, Top2PresetBoxPadR);
+    auto preset_menu = lay.CreateChildItem(preset_box, preset_box_w, icon_height, 0);
+    auto preset_left = lay.CreateChildItem(preset_box, preset_box_icon_width, icon_height, 0);
+    auto preset_right = lay.CreateChildItem(preset_box, preset_box_icon_width, icon_height, 0);
+    auto preset_random = lay.CreateChildItem(preset_box, preset_box_icon_width, icon_height, 0);
+    auto preset_random_menu = lay.CreateChildItem(preset_box, preset_box_icon_width, icon_height, 0);
+    auto preset_save = lay.CreateChildItem(preset_box, preset_box_icon_width, icon_height, 0);
+    lay.SetRightMargin(preset_save, preset_box_pad_r);
 
-    auto cog = lay.CreateChildItem(right_container, Top2IconWidth, Top2IconHeight, LAY_VCENTER);
-    auto menu = lay.CreateChildItem(right_container, Top2IconWidth, Top2IconHeight, LAY_VCENTER);
-    auto engine_version_lay_id =
-        lay.CreateChildItem(right_container, Top2IconWidth, Top2IconHeight, LAY_VCENTER);
+    auto cog = lay.CreateChildItem(right_container, icon_width, icon_height, LAY_VCENTER);
+    auto menu = lay.CreateChildItem(right_container, icon_width, icon_height, LAY_VCENTER);
+    auto engine_version_lay_id = lay.CreateChildItem(right_container, icon_width, icon_height, LAY_VCENTER);
 
     auto knob_container = lay.CreateParentItem(right_container, 0, 0, LAY_VCENTER, LAY_ROW);
-    lay.SetMargins(knob_container, Top2KnobsMarginL, 0, Top2KnobsMarginR, 0);
+    lay.SetMargins(knob_container, knobs_margin_l, 0, knobs_margin_r, 0);
     LayIDPair dyn;
     LayoutParameterComponent(g,
                              knob_container,
@@ -116,7 +125,7 @@ void TopPanel(Gui* g) {
                              plugin.processor.params[ToInt(ParamIndex::MasterVolume)],
                              UiSizeId::Top2KnobsGapX);
 
-    auto level = lay.CreateChildItem(right_container, Top2PeakMeterW, Top2PeakMeterH, LAY_VCENTER);
+    auto level = lay.CreateChildItem(right_container, peak_meter_w, peak_meter_h, LAY_VCENTER);
 
     lay.PerformLayout();
 

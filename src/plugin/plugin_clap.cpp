@@ -530,20 +530,32 @@ clap_plugin const floe_plugin {
     // If init returns true, then the plugin is initialized and in the deactivated state.
     // [main-thread]
     .init = [](clap_plugin const* plugin) -> bool {
+        g_log_file.DebugLn("plugin init");
         auto& floe = *(FloeInstance*)plugin->plugin_data;
         ASSERT(!floe.initialised);
         if (floe.initialised) return false;
 
+        bool const first_instance = g_num_instances == 0;
+        ++g_num_instances;
+
         ZoneScopedMessage(floe.trace_config, "plugin init");
 
-        DebugSetThreadAsMainThread();
-        SetThreadName("Main");
-#ifdef TRACY_ENABLE
-        // ___tracy_startup_profiler();
-        tracy::SetThreadName("Main");
-#endif
+        if (first_instance) {
+            g_panic_handler = [](char const* message, SourceLocation loc) {
+                g_log_file.ErrorLn("{}: {}", loc, message);
+                DefaultPanicHandler(message, loc);
+            };
 
-        if (g_num_instances++ == 0) g_cross_instance_systems.Init();
+            DebugSetThreadAsMainThread();
+            SetThreadName("Main");
+#ifdef TRACY_ENABLE
+            ___tracy_startup_profiler();
+            tracy::SetThreadName("Main");
+#endif
+            StartupCrashHandler();
+        }
+
+        if (first_instance) g_cross_instance_systems.Init();
 
 #if FLOE_GUI
         floe.gui_platform = CreateGuiPlatform(
@@ -567,6 +579,7 @@ clap_plugin const floe_plugin {
     // [main-thread & !active]
     .destroy =
         [](clap_plugin const* plugin) {
+            g_log_file.DebugLn("plugin destroy");
             auto& floe = *(FloeInstance*)plugin->plugin_data;
             ZoneScopedMessage(floe.trace_config, "plugin destroy (init:{})", floe.initialised);
 
@@ -578,7 +591,14 @@ clap_plugin const floe_plugin {
 
                 floe.plugin.Clear();
 
-                if (--g_num_instances == 0) g_cross_instance_systems.Uninit();
+                if (--g_num_instances == 0) {
+                    g_cross_instance_systems.Uninit();
+
+                    ShutdownCrashHandler();
+#ifdef TRACY_ENABLE
+                    ___tracy_shutdown_profiler();
+#endif
+                }
             }
 
             PageAllocator::Instance().Delete(&floe);

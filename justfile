@@ -205,14 +205,18 @@ build-macos-installer:
   mkdir -p installer
   cd installer
 
-  # TODO: refactor this to avoid repetition
+  distribution_xml_choices=""
+  distribution_xml_choice_outlines=""
 
   make_package() {
     file_extension=$1
     plugin_installer_folder=$2
+    title=$3
+    description=$4
 
     package_folder=package_$file_extension
     install_folder=Library/Audio/Plug-Ins/$plugin_installer_folder
+    identifier=com.Floe.$file_extension
 
     mkdir -p $package_folder
     cd $package_folder
@@ -221,12 +225,20 @@ build-macos-installer:
     cd ../
     pkgbuild --analyze --root $package_folder $package_folder.plist
     cat $package_folder.plist
-    pkgbuild --root $package_folder --component-plist $package_folder.plist --identifier com.Floe.$file_extension --install-location / --version $version $package_folder.pkg
+    pkgbuild --root $package_folder --component-plist $package_folder.plist --identifier $identifier --install-location / --version $version $package_folder.pkg
+
+    choice=$(cat <<EOF
+    <choice id="$identifier" title="$title" description="$description">
+        <pkg-ref id="$identifier" version="$version">$package_folder.pkg</pkg-ref>
+    </choice>
+  EOF)
+    distribution_xml_choices=$(printf "%s%s\n" "$distribution_xml_choices" "$choice")
+    distribution_xml_choice_outlines=$(printf "%s%s\n" "$distribution_xml_choice_outlines" "<line choice=\"$identifier\" />")
   }
 
-  make_package vst3 VST3
-  make_package component Components
-  make_package clap CLAP
+  make_package vst3 VST3 "Floe VST3" "VST3 format of the Floe plugin"
+  make_package component Components "Floe AudioUnit (AUv2)" "AudioUnit (version 2) format of the Floe plugin"
+  make_package clap CLAP "Floe CLAP" "CLAP format of the Floe plugin"
 
   # package to create empty folders that Floe might use
   mkdir -p floe_dirs
@@ -237,11 +249,34 @@ build-macos-installer:
   pkgbuild --root floe_dirs --identifier com.Floe.dirs --install-location / --version $version floe_dirs.pkg
 
   mkdir -p productbuild_files
-  echo "Welcome to Floe's installer. Version $version" > productbuild_files/welcome.txt
-  productbuild --distribution {{justfile_directory()}}/build_resources/macos_installer_distribution.xml --resources productbuild_files --package-path . ../Floe-Installer-v$version.pkg
+  echo "This application will install Floe on your computer. You will be able to select which types of audio plugin format you would like to install. Please note that sample libraries are separate: this installer just installs the Floe engine." > productbuild_files/welcome.txt
+
+  # extract the minimum macOS version from one of the plugin's Info.plist
+  min_macos_version=$(grep -A 1 '<key>LSMinimumSystemVersion</key>' ../Floe.vst3/Contents/Info.plist | grep '<string>' | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
+
+  cat >distribution.xml <<EOF
+  <installer-gui-script minSpecVersion="1">
+      <title>Floe v$version</title>
+      <welcome file="welcome.txt" mime-type="text/plain"/>
+      <options customize="always" require-scripts="false"/>
+      <os-version min="$min_macos_version" /> 
+      <choice id="com.Floe.dirs" title="Floe Folders" description="Create empty folders ready for Floe to use to look for libraries and presets" enabled="false">
+          <pkg-ref id="com.Floe.dirs" version="$version">floe_dirs.pkg</pkg-ref>
+      </choice>
+      $distribution_xml_choices
+      <choices-outline>
+          <line choice="com.Floe.dirs" />
+          $distribution_xml_choice_outlines
+      </choices-outline>
+  </installer-gui-script>
+  EOF
+  cat distribution.xml
+
+  productbuild --distribution distribution.xml --resources productbuild_files --package-path . ../Floe-Installer-v$version.pkg
 
   cd ../
   rm -rf installer
+
 
   # TODO: sign the installer: ['productsign', '--timestamp', '--sign', '"Developer ID Installer"', unsigned_package_name, signed_package_name]
 

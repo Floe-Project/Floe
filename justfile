@@ -194,3 +194,58 @@ parallel tasks:
     [[ ! -z $GITHUB_ACTIONS ]] && echo "### :x: $failed/$num_tasks tasks failed" >> $GITHUB_STEP_SUMMARY
     exit 1
   fi
+
+[macos]
+build-macos-installer:
+  #!/usr/bin/env bash
+  version=$(cat version.txt)
+  cd zig-out/universal-macos
+
+  rm -rf installer
+  mkdir -p installer
+  cd installer
+
+  # TODO: refactor this to avoid repetition
+
+  # vst3
+  package_folder=installer_package_vst3
+  mkdir -p $package_folder
+  cd $package_folder
+  mkdir -p Library/Audio/Plug-Ins/VST3
+  cp -r ../../Floe.vst3 Library/Audio/Plug-Ins/VST3
+  cd ../
+  pkgbuild --analyze --root $package_folder $package_folder.plist
+  cat $package_folder.plist
+  pkgbuild --root $package_folder --component-plist $package_folder.plist --identifier com.Floe.VST3 --install-location / --version $version $package_folder.pkg
+
+  # au
+  package_folder=installer_package_au
+  mkdir -p $package_folder
+  cd $package_folder
+  mkdir -p Library/Audio/Plug-Ins/Components
+  cp -r ../../Floe.au Library/Audio/Plug-Ins/Components
+  cd ../
+  pkgbuild --analyze --root $package_folder $package_folder.plist
+  cat $package_folder.plist
+  pkgbuild --root $package_folder --component-plist $package_folder.plist --identifier com.Floe.AU --install-location / --version $version $package_folder.pkg
+
+  # clap
+  package_folder=installer_package_clap
+  mkdir -p $package_folder
+  cd $package_folder
+  mkdir -p Library/Audio/Plug-Ins/CLAP
+  cp -r ../../Floe.clap Library/Audio/Plug-Ins/CLAP
+  cd ../
+  pkgbuild --analyze --root $package_folder $package_folder.plist
+  cat $package_folder.plist
+  pkgbuild --root $package_folder --component-plist $package_folder.plist --identifier com.Floe.CLAP --install-location / --version $version $package_folder.pkg
+
+  # mkdir -p Library/Application\ Support/Floe/Presets
+  # mkdir -p Library/Application\ Support/Floe/Libraries
+
+  mkdir -p productbuild_files
+  echo "Welcome to Floe's installer" > productbuild_files/welcome.txt
+  productbuild --distribution {{justfile_directory()}}/build_resources/macos_installer_distribution.xml --resources productbuild_files --package-path . Floe-Installer.pkg
+
+  # TODO: sign the installer: ['productsign', '--timestamp', '--sign', '"Developer ID Installer"', unsigned_package_name, signed_package_name]
+

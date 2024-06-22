@@ -57,7 +57,7 @@ jobs:
           name: binaries-windows
           path: files
 
-      # TODO: codesign, notarize, build installer
+      # TODO: codesign, notarize, build installer, Apple-Actions/import-codesign-certs
 
       - working-directory: files
         run: zip -r ../${{ env.MACOS_FINAL_ZIP }} .

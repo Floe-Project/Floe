@@ -3,6 +3,8 @@
 
 # This file assumes 'nix develop' has already been run
 
+set dotenv-load
+
 native_arch_os_pair := arch() + "-" + os()
 native_binary_dir := "zig-out/" + native_arch_os_pair
 all_src_files := 'fd . -e .mm -e .cpp -e .hpp -e .h src' 
@@ -199,7 +201,9 @@ parallel tasks:
 build-macos-installer:
   #!/usr/bin/env bash
   version=$(cat version.txt)
-  cd zig-out/universal-macos
+  universal_macos_abs_path="{{justfile_directory()}}/zig-out/universal-macos"
+
+  cd $universal_macos_abs_path
 
   rm -rf installer
   mkdir -p installer
@@ -208,28 +212,31 @@ build-macos-installer:
   distribution_xml_choices=""
   distribution_xml_choice_outlines=""
 
+  # report an error if the developer ID is not set, remember, justfile supports .env files
+  [[ -z $MACOS_DEV_ID_APP_NAME ]] && echo "MACOS_DEV_ID_APP_NAME is not set" && exit 1
+  [[ -z $MACOS_DEV_ID_INSTALLER_NAME ]] && echo "MACOS_DEV_ID_INSTALLER_NAME is not set" && exit 1
+
   make_package() {
     file_extension=$1
-    plugin_installer_folder=$2
+    destination_plugin_folder=$2
     title=$3
     description=$4
 
-    package_folder=package_$file_extension
-    install_folder=Library/Audio/Plug-Ins/$plugin_installer_folder
+    package_root=package_$file_extension
+    install_folder=Library/Audio/Plug-Ins/$destination_plugin_folder
     identifier=com.Floe.$file_extension
+    plugin_path=$universal_macos_abs_path/Floe.$file_extension
 
-    mkdir -p $package_folder
-    cd $package_folder
-    mkdir -p $install_folder
-    cp -r ../../Floe.$file_extension $install_folder
-    cd ../
-    pkgbuild --analyze --root $package_folder $package_folder.plist
-    cat $package_folder.plist
-    pkgbuild --root $package_folder --component-plist $package_folder.plist --identifier $identifier --install-location / --version $version $package_folder.pkg
+    codesign --sign "$MACOS_DEV_ID_APP_NAME" --timestamp --options=runtime --deep --force --entitlements "{{justfile_directory()}}/build_resources/plugin.entitlements" "$plugin_path"
+
+    mkdir -p $package_root/$install_folder
+    cp -r "$plugin_path" $package_root/$install_folder
+    pkgbuild --analyze --root $package_root $package_root.plist
+    pkgbuild --root $package_root --component-plist $package_root.plist --identifier $identifier --install-location / --version $version $package_root.pkg
 
     choice=$(cat <<EOF
     <choice id="$identifier" title="$title" description="$description">
-        <pkg-ref id="$identifier" version="$version">$package_folder.pkg</pkg-ref>
+        <pkg-ref id="$identifier" version="$version">$package_root.pkg</pkg-ref>
     </choice>
   EOF)
     distribution_xml_choices=$(printf "%s%s\n" "$distribution_xml_choices" "$choice")
@@ -240,7 +247,7 @@ build-macos-installer:
   make_package component Components "Floe AudioUnit (AUv2)" "AudioUnit (version 2) format of the Floe plugin"
   make_package clap CLAP "Floe CLAP" "CLAP format of the Floe plugin"
 
-  # package to create empty folders that Floe might use
+  # make a package to create empty folders that Floe might use
   mkdir -p floe_dirs
   cd floe_dirs
   mkdir -p Library/Application\ Support/Floe/Presets
@@ -252,7 +259,7 @@ build-macos-installer:
   echo "This application will install Floe on your computer. You will be able to select which types of audio plugin format you would like to install. Please note that sample libraries are separate: this installer just installs the Floe engine." > productbuild_files/welcome.txt
 
   # extract the minimum macOS version from one of the plugin's Info.plist
-  min_macos_version=$(grep -A 1 '<key>LSMinimumSystemVersion</key>' ../Floe.vst3/Contents/Info.plist | grep '<string>' | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
+  min_macos_version=$(grep -A 1 '<key>LSMinimumSystemVersion</key>' "$universal_macos_abs_path/Floe.vst3/Contents/Info.plist" | grep '<string>' | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
 
   cat >distribution.xml <<EOF
   <installer-gui-script minSpecVersion="1">
@@ -270,13 +277,9 @@ build-macos-installer:
       </choices-outline>
   </installer-gui-script>
   EOF
-  cat distribution.xml
 
-  productbuild --distribution distribution.xml --resources productbuild_files --package-path . ../Floe-Installer-v$version.pkg
+  productbuild --distribution distribution.xml --resources productbuild_files --package-path . unsigned.pkg
+  productsign --timestamp --sign "$MACOS_DEV_ID_INSTALLER_NAME" unsigned.pkg $universal_macos_abs_path/Floe-Installer-v$version.pkg
 
   cd ../
   rm -rf installer
-
-
-  # TODO: sign the installer: ['productsign', '--timestamp', '--sign', '"Developer ID Installer"', unsigned_package_name, signed_package_name]
-

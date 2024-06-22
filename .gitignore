@@ -9,3 +9,4 @@ docs/book/
 zig-out/
 build_resources/logos/
 build_resources/Core.library/
+.env

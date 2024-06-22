@@ -23,6 +23,7 @@ const floe_vendor = "Floe";
 const floe_url = "https://github.com/Floe-Synth/Floe";
 const floe_au_factory_function = "FloeFactoryFunction";
 const floe_plugin_gui = true;
+const min_macos_version = "11.0.0"; // use 3-part version for plist
 
 const rootdir = struct {
     fn getSrcDir() []const u8 {
@@ -280,6 +281,8 @@ fn postInstallMacosBinary(context: *BuildContext, step: *std.Build.Step, make_ma
                 \\        <true />
                 \\        <key>NSHumanReadableCopyright</key>
                 \\        <string>Copyright {[copyright]s}</string>
+                \\        <key>LSMinimumSystemVersion</key>
+                \\        <string>{[min_macos_version]s}</string>
                 \\{[audio_unit_dict]s}
                 \\    </dict>
                 \\</plist>
@@ -292,6 +295,7 @@ fn postInstallMacosBinary(context: *BuildContext, step: *std.Build.Step, make_ma
                 .minor = if (version != null) version.?.minor else 0,
                 .patch = if (version != null) version.?.patch else 0,
                 .copyright = floe_copyright,
+                .min_macos_version = min_macos_version,
                 .audio_unit_dict = if (std.mem.count(u8, bundle_name, ".component") == 1)
                     b.fmt(
                         \\        <key>AudioComponents</key>
@@ -754,7 +758,6 @@ fn getTargets(b: *std.Build, user_given_target_presets: ?[]const u8) !std.ArrayL
     const x86_cpu = "x86_64";
     const apple_arm_cpu = "apple_m1";
     const min_windows_version = "win10";
-    const min_macos_version = "11.0";
 
     var it = std.mem.splitSequence(u8, preset_strings, ",");
     while (it.next()) |preset_string| {

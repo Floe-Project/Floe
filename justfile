@@ -207,45 +207,41 @@ build-macos-installer:
 
   # TODO: refactor this to avoid repetition
 
-  # vst3
-  package_folder=installer_package_vst3
-  mkdir -p $package_folder
-  cd $package_folder
-  mkdir -p Library/Audio/Plug-Ins/VST3
-  cp -r ../../Floe.vst3 Library/Audio/Plug-Ins/VST3
-  cd ../
-  pkgbuild --analyze --root $package_folder $package_folder.plist
-  cat $package_folder.plist
-  pkgbuild --root $package_folder --component-plist $package_folder.plist --identifier com.Floe.VST3 --install-location / --version $version $package_folder.pkg
+  make_package() {
+    file_extension=$1
+    plugin_installer_folder=$2
 
-  # au
-  package_folder=installer_package_au
-  mkdir -p $package_folder
-  cd $package_folder
-  mkdir -p Library/Audio/Plug-Ins/Components
-  cp -r ../../Floe.au Library/Audio/Plug-Ins/Components
-  cd ../
-  pkgbuild --analyze --root $package_folder $package_folder.plist
-  cat $package_folder.plist
-  pkgbuild --root $package_folder --component-plist $package_folder.plist --identifier com.Floe.AU --install-location / --version $version $package_folder.pkg
+    package_folder=package_$file_extension
+    install_folder=Library/Audio/Plug-Ins/$plugin_installer_folder
 
-  # clap
-  package_folder=installer_package_clap
-  mkdir -p $package_folder
-  cd $package_folder
-  mkdir -p Library/Audio/Plug-Ins/CLAP
-  cp -r ../../Floe.clap Library/Audio/Plug-Ins/CLAP
-  cd ../
-  pkgbuild --analyze --root $package_folder $package_folder.plist
-  cat $package_folder.plist
-  pkgbuild --root $package_folder --component-plist $package_folder.plist --identifier com.Floe.CLAP --install-location / --version $version $package_folder.pkg
+    mkdir -p $package_folder
+    cd $package_folder
+    mkdir -p $install_folder
+    cp -r ../../Floe.$file_extension $install_folder
+    cd ../
+    pkgbuild --analyze --root $package_folder $package_folder.plist
+    cat $package_folder.plist
+    pkgbuild --root $package_folder --component-plist $package_folder.plist --identifier com.Floe.$file_extension --install-location / --version $version $package_folder.pkg
+  }
 
-  # mkdir -p Library/Application\ Support/Floe/Presets
-  # mkdir -p Library/Application\ Support/Floe/Libraries
+  make_package vst3 VST3
+  make_package component Components
+  make_package clap CLAP
+
+  # package to create empty folders that Floe might use
+  mkdir -p floe_dirs
+  cd floe_dirs
+  mkdir -p Library/Application\ Support/Floe/Presets
+  mkdir -p Library/Application\ Support/Floe/Libraries
+  cd ../
+  pkgbuild --root floe_dirs --identifier com.Floe.dirs --install-location / --version $version floe_dirs.pkg
 
   mkdir -p productbuild_files
-  echo "Welcome to Floe's installer" > productbuild_files/welcome.txt
-  productbuild --distribution {{justfile_directory()}}/build_resources/macos_installer_distribution.xml --resources productbuild_files --package-path . Floe-Installer.pkg
+  echo "Welcome to Floe's installer. Version $version" > productbuild_files/welcome.txt
+  productbuild --distribution {{justfile_directory()}}/build_resources/macos_installer_distribution.xml --resources productbuild_files --package-path . ../Floe-Installer-v$version.pkg
+
+  cd ../
+  rm -rf installer
 
   # TODO: sign the installer: ['productsign', '--timestamp', '--sign', '"Developer ID Installer"', unsigned_package_name, signed_package_name]
 

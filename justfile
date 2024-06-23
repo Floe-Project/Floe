@@ -9,6 +9,7 @@ native_arch_os_pair := arch() + "-" + os()
 native_binary_dir := "zig-out/" + native_arch_os_pair
 all_src_files := 'fd . -e .mm -e .cpp -e .hpp -e .h src' 
 gen_files_dir := "build_gen"
+release_files_dir := justfile_directory() + "/zig-out/release"
 
 build target_os='native':
   zig build compile -Dtargets={{target_os}} -Dbuild-mode=development
@@ -197,6 +198,57 @@ parallel tasks:
     exit 1
   fi
 
+[no-cd]
+windows-codesign-file file description:
+  #!/usr/bin/env bash
+  set -euo pipefail # don't use 'set -x' because it might print sensitive information
+
+  cert_file={{justfile_directory()}}/{{gen_files_dir}}/windows-codesign-cert.pfx
+  if [[ ! -f $cert_file ]]; then
+    # decode the base64-encoded certificate string
+    echo "$WINDOWS_CODESIGN_CERT_PFX" | base64 -d > $cert_file
+  fi
+
+  # signtool.exe alternative
+  osslsigncode sign \
+    -pkcs12 $cert_file \
+    -pass "$WINDOWS_CODESIGN_CERT_PFX_PASSWORD" \
+    -n "{{description}}" \
+    -i https://github.com/Floe-Synth/Floe \
+    -t http://timestamp.sectigo.com \
+    -in "{{file}}" \
+    -out "{{file}}.signed"
+
+  mv {{file}}.signed {{file}}
+
+windows-prepare-release:
+  #!/usr/bin/env bash
+  set -euxo pipefail
+
+  version=$(cat version.txt)
+
+  mkdir -p {{release_files_dir}}
+
+  [[ ! -d zig-out/x86_64-windows ]] && echo "x86_64-windows folder not found" && exit 1
+  cd zig-out/x86_64-windows
+
+  just windows-codesign-file Floe.vst3 "Floe VST3"
+  just windows-codesign-file Floe.clap "Floe CLAP"
+
+  installer_file=$(find . -type f -name "*Installer*.exe")
+  just windows-codesign-file $installer_file "Installer for Floe audio plugin formats"
+
+  # zip the installer
+  final_installer_name=$(echo $installer_file | sed 's/.exe//')
+  final_installer_zip_name="Floe-Installer-v$version-Windows.zip"
+  zip -r $final_installer_zip_name $installer_file
+  mv $final_installer_zip_name {{release_files_dir}}
+
+  # zip the manual-install files
+  final_manual_zip_name="Floe-Manual-Install-v$version-Windows.zip"
+  zip -r $final_manual_zip_name Floe.vst3 Floe.clap
+  mv $final_manual_zip_name {{release_files_dir}}
+
 [macos, no-cd]
 macos-notarize file:
   #!/usr/bin/env bash
@@ -211,6 +263,7 @@ macos-prepare-release-plugins:
   [[ ! -d zig-out/universal-macos ]] && echo "universal-macos folder not found" && exit 1
 
   version=$(cat version.txt)
+  mkdir -p {{release_files_dir}}
 
   cd zig-out/universal-macos
 
@@ -274,9 +327,10 @@ macos-prepare-release-plugins:
   echo "  Floe.component: MachintoshHD -> /Library/Audio/Plug-Ins/Components" >> readme.txt
   echo "  Floe.clap: MachintoshHD -> /Library/Audio/Plug-Ins/CLAP" >> readme.txt
 
-  final_manual_zip_name="Floe-ManualInstall-v$version-macOS.zip"
+  final_manual_zip_name="Floe-Manual-Install-v$version-macOS.zip"
   rm -f $final_manual_zip_name
   zip -r $final_manual_zip_name Floe.vst3 Floe.component Floe.clap readme.txt
+  mv $final_manual_zip_name {{release_files_dir}}
 
   rm readme.txt
 
@@ -287,9 +341,11 @@ macos-build-installer:
   [[ ! -f version.txt ]] && echo "version.txt file not found" && exit 1
   [[ ! -d zig-out/universal-macos ]] && echo "universal-macos folder not found" && exit 1
 
+  mkdir -p {{release_files_dir}}
+
   version=$(cat version.txt)
   universal_macos_abs_path="{{justfile_directory()}}/zig-out/universal-macos"
-  final_installer_name="Floe-Installer-v$version-macOS"
+  final_installer_name="Floe-Installer-v$version"
 
   cd $universal_macos_abs_path
 
@@ -375,5 +431,10 @@ macos-build-installer:
   xcrun stapler staple $final_installer_name.pkg
 
   # step 5: zip the installer
-  rm -f $final_installer_name.zip
-  zip -r $final_installer_name.zip $final_installer_name.pkg
+  final_zip_name=$final_installer_name-macOS.zip
+  rm -f $final_zip_name
+  zip -r $final_zip_name $final_installer_name.pkg
+  mv $final_zip_name {{release_files_dir}}
+
+[macos]
+macos-prepare-release: (macos-prepare-release-plugins) (macos-build-installer)

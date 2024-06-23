@@ -2240,7 +2240,7 @@ pub fn build(b: *std.Build) void {
                 }
 
                 const win_installer = b.addExecutable(.{
-                    .name = "Floe Installer",
+                    .name = b.fmt("Floe-Installer-v{s}", .{ .version = floe_version_string.? }),
                     .target = target,
                     .optimize = build_context.optimise,
                     .version = floe_version,

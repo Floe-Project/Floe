@@ -6,14 +6,10 @@ name: Release
 on:
   workflow_dispatch:
 
-env:
-  MACOS_FINAL_ZIP: Floe-macOS.zip
-  WINDOWS_FINAL_ZIP: Floe-Windows.zip
-
 jobs:
-  compile:
+  build-windows:
     timeout-minutes: 60
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest # NOTE: we don't actually use Windows
     steps:
       - uses: actions/checkout@v4
         with:
@@ -28,69 +24,76 @@ jobs:
             .zig-cache
             build_gen
 
-      - run: just build-release windows,mac_ub
+      # justfile can automatically read a .env file so this is a convenient way to pass secrets to our scripts
+      - name: 'create env file'
+        run: |
+          touch .env
+          echo "WINDOWS_CODESIGN_CERT_PFX=${{ secrets.WINDOWS_CODESIGN_CERT_PFX }}" >> .env
+          echo "WINDOWS_CODESIGN_CERT_PFX_PASSWORD=${{ secrets.WINDOWS_CODESIGN_CERT_PFX_PASSWORD }}" >> .env
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: binaries-windows
-          if-no-files-found: error
-          path: |
-            zig-out/x86_64-windows/Floe.vst3
-            zig-out/x86_64-windows/Floe.clap
-            zig-out/x86_64-windows/Floe Installer.exe
+      - run: just build-release windows
+      - run: just windows-prepare-release
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: binaries-macos
-          if-no-files-found: error
-          path: |
-            zig-out/universal-macos/Floe.vst3
-            zig-out/universal-macos/Floe.clap
-            zig-out/universal-macos/Floe.component
-
-  prepare-macos:
-    runs-on: macos-latest
-    needs: compile
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: binaries-macos
-          path: files
-
-      # TODO: codesign, notarize, build installer, Apple-Actions/import-codesign-certs
-
-      - working-directory: files
-        run: zip -r ../${{ env.MACOS_FINAL_ZIP }} .
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: final-macos
-          if-no-files-found: error
-          path: ${{ env.MACOS_FINAL_ZIP }}
-
-  prepare-windows:
-    runs-on: windows-latest
-    needs: compile
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: binaries-windows
-          path: files
-
-      # TODO: codesign, use https://melatonin.dev/blog/code-signing-on-windows-with-azure-trusted-signing/?
-      # TODO: get logos images and core library
-
-      - working-directory: files
-        run: 7z a -tzip ${{ env.WINDOWS_FINAL_ZIP }} .
+      - name: 'get release dir from just'
+        run: |
+          export RELEASE_DIR=$(just --evaluate release_files_dir)
+          echo "RELEASE_DIR=${RELEASE}" >> $GITHUB_ENV
 
       - uses: actions/upload-artifact@v4
         with:
           name: final-windows
           if-no-files-found: error
-          path: files
+          path: ${{ env.RELEASE_DIR }}
+
+  build-macos:
+    runs-on: macos-latest
+    needs: compile
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - uses: nicknovitski/nix-develop@v1.1.0
+      - uses: Hanaasagi/zig-action-cache@master
+        with:
+          cache-directories: |
+            .zig-cache
+            build_gen
+
+      - run: just build-release mac_arm
+
+      - uses: apple-actions/import-codesign-certs@v3
+        with: 
+          p12-file-base64: ${{ secrets.MACOS_DEV_CERTS_P12 }}
+          p12-password: ${{ secrets.MACOS_DEV_CERTS_P12_PASSWORD }}
+
+      # justfile can automatically read a .env file so this is a convenient way to pass secrets to our scripts
+      - name: 'create env file'
+        run: |
+          touch .env
+          echo "MACOS_DEV_ID_INSTALLER_NAME=${{ secrets.MACOS_DEV_ID_INSTALLER_NAME }}" >> .env
+          echo "MACOS_DEV_ID_APP_NAME=${{ secrets.MACOS_DEV_ID_APP_NAME }}" >> .env
+          echo "MACOS_NOTARIZATION_USERNAME=${{ secrets.MACOS_NOTARIZATION_USERNAME }}" >> .env
+          echo "MACOS_NOTARIZATION_PASSWORD=${{ secrets.MACOS_NOTARIZATION_PASSWORD }}" >> .env
+          echo "MACOS_TEAM_ID=${{ secrets.MACOS_TEAM_ID }}" >> .env
+
+      - run: just macos-prepare-release
+
+      - name: 'get release dir from just'
+        run: |
+          export RELEASE_DIR=$(just --evaluate release_files_dir)
+          echo "RELEASE_DIR=${RELEASE}" >> $GITHUB_ENV
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: final-macos
+          if-no-files-found: error
+          path: ${{ env.RELEASE_DIR }}
 
   deploy:
-    needs: [prepare-macos, prepare-windows]
+    needs: [build-macos, build-windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -104,18 +107,20 @@ jobs:
           export VERSION=$(cat version.txt)
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
 
-          # Nice little one-liner to extract changes from the larger changelog, thanks to QOwnNotes for this.
-          # It does require us to be consistent with our changelog format, but that's a good thing.
+          # Nice little one-liner to extract changes from the larger changelog. Thanks to QOwnNotes for this.
+          # NOTE: it requires us to be consistent with our changelog format, but that's a good thing anyways.
           grep -Pzo "## ${VERSION}\n(\n|.)+?\n##" ../changelog.md | sed '$ d' >> latest_changes.md
 
       - uses: actions/download-artifact@v4
         with:
           pattern: final-*
+          path: release_files
+          merge-multiple: true
 
       - uses: ncipollo/release-action@v1
         with:
           artifactErrorsFailBuild: true
-          artifacts: ${{ env.WINDOWS_FINAL_ZIP }},${{ env.MACOS_FINAL_ZIP }}
+          artifacts: "release_files/*"
           name: Release v${{ env.VERSION }}
           tag: v${{ env.VERSION }}
           draft: true

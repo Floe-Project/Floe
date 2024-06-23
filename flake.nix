@@ -188,6 +188,7 @@
             pkgs.just
             pkgs.reuse
             pkgs.mdbook
+            pkgs.osslsigncode
 
             # dsymutil internally calls "lipo", so we have to make sure it's available under that name
             (pkgs.writeShellScriptBin "lipo" "llvm-lipo $@")

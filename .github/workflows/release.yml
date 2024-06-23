@@ -27,8 +27,8 @@ jobs:
 
       - run: just windows-prepare-release
         env:
-          WINDOWS_CODESIGN_CERT_PFX=${{ secrets.WINDOWS_CODESIGN_CERT_PFX }}
-          WINDOWS_CODESIGN_CERT_PFX_PASSWORD=${{ secrets.WINDOWS_CODESIGN_CERT_PFX_PASSWORD }}
+          WINDOWS_CODESIGN_CERT_PFX: ${{ secrets.WINDOWS_CODESIGN_CERT_PFX }}
+          WINDOWS_CODESIGN_CERT_PFX_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_CERT_PFX_PASSWORD }}
 
       - name: 'get release dir from just'
         run: |
@@ -57,7 +57,7 @@ jobs:
             .zig-cache
             build_gen
 
-      - run: just build-release mac_arm
+      - run: just build-release mac_ub
 
       - uses: apple-actions/import-codesign-certs@v3
         with: 

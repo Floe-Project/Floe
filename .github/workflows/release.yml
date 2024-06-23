@@ -93,14 +93,13 @@ jobs:
         with:
           sparse-checkout: version.txt
 
+      - uses: taiki-e/install-action@just
+
       - name: 'Set Env'
         run: |
           export VERSION=$(cat version.txt)
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
-
-          # Nice little one-liner to extract changes from the larger changelog. Thanks to QOwnNotes for this.
-          # NOTE: it requires us to be consistent with our changelog format, but that's a good thing anyways.
-          grep -Pzo "## ${VERSION}\n(\n|.)+?\n##" ../changelog.md | sed '$ d' >> latest_changes.md
+          just latest-changes > latest_changes.md
 
       - uses: actions/download-artifact@v4
         with:

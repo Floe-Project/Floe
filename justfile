@@ -198,6 +198,11 @@ parallel tasks:
     exit 1
   fi
 
+latest-changes:
+  #!/usr/bin/env bash
+  changes=$(sed -n "/## $(cat version.txt)/,/## /{ /## /!p }" changelog.md)
+  printf "%s" "$changes" # trim trailing newline
+
 [no-cd]
 windows-codesign-file file description:
   #!/usr/bin/env bash

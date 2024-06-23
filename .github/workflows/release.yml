@@ -8,7 +8,6 @@ on:
 
 jobs:
   build-windows:
-    timeout-minutes: 60
     runs-on: ubuntu-latest # NOTE: we don't actually use Windows
     steps:
       - uses: actions/checkout@v4
@@ -24,15 +23,12 @@ jobs:
             .zig-cache
             build_gen
 
-      # justfile can automatically read a .env file so this is a convenient way to pass secrets to our scripts
-      - name: 'create env file'
-        run: |
-          touch .env
-          echo "WINDOWS_CODESIGN_CERT_PFX=${{ secrets.WINDOWS_CODESIGN_CERT_PFX }}" >> .env
-          echo "WINDOWS_CODESIGN_CERT_PFX_PASSWORD=${{ secrets.WINDOWS_CODESIGN_CERT_PFX_PASSWORD }}" >> .env
-
       - run: just build-release windows
+
       - run: just windows-prepare-release
+        env:
+          WINDOWS_CODESIGN_CERT_PFX=${{ secrets.WINDOWS_CODESIGN_CERT_PFX }}
+          WINDOWS_CODESIGN_CERT_PFX_PASSWORD=${{ secrets.WINDOWS_CODESIGN_CERT_PFX_PASSWORD }}
 
       - name: 'get release dir from just'
         run: |
@@ -68,17 +64,13 @@ jobs:
           p12-file-base64: ${{ secrets.MACOS_DEV_CERTS_P12 }}
           p12-password: ${{ secrets.MACOS_DEV_CERTS_P12_PASSWORD }}
 
-      # justfile can automatically read a .env file so this is a convenient way to pass secrets to our scripts
-      - name: 'create env file'
-        run: |
-          touch .env
-          echo "MACOS_DEV_ID_INSTALLER_NAME=${{ secrets.MACOS_DEV_ID_INSTALLER_NAME }}" >> .env
-          echo "MACOS_DEV_ID_APP_NAME=${{ secrets.MACOS_DEV_ID_APP_NAME }}" >> .env
-          echo "MACOS_NOTARIZATION_USERNAME=${{ secrets.MACOS_NOTARIZATION_USERNAME }}" >> .env
-          echo "MACOS_NOTARIZATION_PASSWORD=${{ secrets.MACOS_NOTARIZATION_PASSWORD }}" >> .env
-          echo "MACOS_TEAM_ID=${{ secrets.MACOS_TEAM_ID }}" >> .env
-
       - run: just macos-prepare-release
+        env:
+          MACOS_DEV_ID_INSTALLER_NAME: ${{ secrets.MACOS_DEV_ID_INSTALLER_NAME }}
+          MACOS_DEV_ID_APP_NAME: ${{ secrets.MACOS_DEV_ID_APP_NAME }}
+          MACOS_NOTARIZATION_USERNAME: ${{ secrets.MACOS_NOTARIZATION_USERNAME }}
+          MACOS_NOTARIZATION_PASSWORD: ${{ secrets.MACOS_NOTARIZATION_PASSWORD }}
+          MACOS_TEAM_ID: ${{ secrets.MACOS_TEAM_ID }}
 
       - name: 'get release dir from just'
         run: |

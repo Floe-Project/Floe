@@ -33,7 +33,7 @@ jobs:
       - name: 'get release dir from just'
         run: |
           export RELEASE_DIR=$(just --evaluate release_files_dir)
-          echo "RELEASE_DIR=${RELEASE}" >> $GITHUB_ENV
+          echo "RELEASE_DIR=${RELEASE_DIR}" >> $GITHUB_ENV
 
       - uses: actions/upload-artifact@v4
         with:
@@ -75,7 +75,7 @@ jobs:
       - name: 'get release dir from just'
         run: |
           export RELEASE_DIR=$(just --evaluate release_files_dir)
-          echo "RELEASE_DIR=${RELEASE}" >> $GITHUB_ENV
+          echo "RELEASE_DIR=${RELEASE_DIR}" >> $GITHUB_ENV
 
       - uses: actions/upload-artifact@v4
         with:

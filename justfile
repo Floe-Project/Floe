@@ -197,25 +197,111 @@ parallel tasks:
     exit 1
   fi
 
-[macos]
-build-macos-installer:
+[macos, no-cd]
+macos-notarize file:
   #!/usr/bin/env bash
+  set -euo pipefail # don't use 'set -x' because it might print sensitive information
+  xcrun notarytool submit {{file}} --apple-id "$MACOS_NOTARIZATION_USERNAME" --password "$MACOS_NOTARIZATION_PASSWORD" --team-id $MACOS_TEAM_ID --wait
+
+[macos]
+macos-prepare-release-plugins:
+  #!/usr/bin/env bash
+  set -euo pipefail # don't use 'set -x' because it might print sensitive information
+  [[ ! -f version.txt ]] && echo "version.txt file not found" && exit 1
+  [[ ! -d zig-out/universal-macos ]] && echo "universal-macos folder not found" && exit 1
+
+  version=$(cat version.txt)
+
+  cd zig-out/universal-macos
+
+  # step 1: codesign
+  cat >plugin.entitlements <<EOF
+  <?xml version="1.0" encoding="UTF-8"?>
+  <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+  <plist version="1.0">
+  <dict>
+      <key>com.apple.security.app-sandbox</key>
+      <true/>
+      <key>com.apple.security.files.user-selected.read-write</key>
+      <true/>
+      <key>com.apple.security.assets.music.read-write</key>
+      <true/>
+      <key>com.apple.security.files.bookmarks.app-scope</key>
+      <true/>
+  </dict>
+  </plist>
+  EOF
+
+  codesign_plugin() {
+    codesign --sign "$MACOS_DEV_ID_APP_NAME" --timestamp --options=runtime --deep --force --entitlements plugin.entitlements $1
+  }
+
+  export -f codesign_plugin
+  SHELL=$(type -p bash) parallel --bar codesign_plugin ::: Floe.vst3 Floe.component Floe.clap
+
+  rm plugin.entitlements
+
+  # step 2: notarize
+  notarize_plugin() {
+    plugin=$1
+    temp_subdir=notarizing_$plugin
+
+    rm -rf $temp_subdir
+    mkdir -p $temp_subdir
+    zip -r $temp_subdir/$plugin.zip $plugin
+
+    just macos-notarize $temp_subdir/$plugin.zip
+
+    unzip $temp_subdir/$plugin.zip -d $temp_subdir
+    xcrun stapler staple $temp_subdir/$plugin
+    # replace the original bundle with the stapled one
+    rm -rf $plugin
+    mv $temp_subdir/$plugin $plugin
+    rm -rf $temp_subdir
+  }
+
+  export -f notarize_plugin
+  SHELL=$(type -p bash) parallel --bar notarize_plugin ::: Floe.vst3 Floe.component Floe.clap
+
+  # step 3: zip
+  echo "These are the manual-install macOS plugin files for Floe version $version." > readme.txt
+  echo "" >> readme.txt
+  echo "It's normally recommended to use the installer instead of these manual-install files." >> readme.txt
+  echo "The installer is a separate download to this." >> readme.txt
+  echo "" >> readme.txt
+  echo "For for manual installation, you can copy these files to the appropriate folders:" >> readme.txt
+  echo "  Floe.vst3: MachintoshHD -> /Library/Audio/Plug-Ins/VST3" >> readme.txt
+  echo "  Floe.component: MachintoshHD -> /Library/Audio/Plug-Ins/Components" >> readme.txt
+  echo "  Floe.clap: MachintoshHD -> /Library/Audio/Plug-Ins/CLAP" >> readme.txt
+
+  final_manual_zip_name="Floe-ManualInstall-v$version-macOS.zip"
+  rm -f $final_manual_zip_name
+  zip -r $final_manual_zip_name Floe.vst3 Floe.component Floe.clap readme.txt
+
+  rm readme.txt
+
+[macos]
+macos-build-installer:
+  #!/usr/bin/env bash
+  set -euo pipefail # don't use 'set -x' because it might print sensitive information
+  [[ ! -f version.txt ]] && echo "version.txt file not found" && exit 1
+  [[ ! -d zig-out/universal-macos ]] && echo "universal-macos folder not found" && exit 1
+
   version=$(cat version.txt)
   universal_macos_abs_path="{{justfile_directory()}}/zig-out/universal-macos"
+  final_installer_name="Floe-Installer-v$version-macOS"
 
   cd $universal_macos_abs_path
 
-  rm -rf installer
-  mkdir -p installer
-  cd installer
+  temp_working_subdir="temp_installer_working_subdir"
+  rm -rf $temp_working_subdir
+  mkdir -p $temp_working_subdir
+  cd $temp_working_subdir
 
   distribution_xml_choices=""
   distribution_xml_choice_outlines=""
 
-  # report an error if the developer ID is not set, remember, justfile supports .env files
-  [[ -z $MACOS_DEV_ID_APP_NAME ]] && echo "MACOS_DEV_ID_APP_NAME is not set" && exit 1
-  [[ -z $MACOS_DEV_ID_INSTALLER_NAME ]] && echo "MACOS_DEV_ID_INSTALLER_NAME is not set" && exit 1
-
+  # step 1: make packages for each plugin so they are selectable options in the final installer
   make_package() {
     file_extension=$1
     destination_plugin_folder=$2
@@ -227,7 +313,7 @@ build-macos-installer:
     identifier=com.Floe.$file_extension
     plugin_path=$universal_macos_abs_path/Floe.$file_extension
 
-    codesign --sign "$MACOS_DEV_ID_APP_NAME" --timestamp --options=runtime --deep --force --entitlements "{{justfile_directory()}}/build_resources/plugin.entitlements" "$plugin_path"
+    codesign --verify "$plugin_path" || { echo "ERROR: the plugin file isn't codesigned, do that before this command"; exit 1; }
 
     mkdir -p $package_root/$install_folder
     cp -r "$plugin_path" $package_root/$install_folder
@@ -247,7 +333,7 @@ build-macos-installer:
   make_package component Components "Floe AudioUnit (AUv2)" "AudioUnit (version 2) format of the Floe plugin"
   make_package clap CLAP "Floe CLAP" "CLAP format of the Floe plugin"
 
-  # make a package to create empty folders that Floe might use
+  # step 2: make a package to create empty folders that Floe might use
   mkdir -p floe_dirs
   cd floe_dirs
   mkdir -p Library/Application\ Support/Floe/Presets
@@ -255,10 +341,10 @@ build-macos-installer:
   cd ../
   pkgbuild --root floe_dirs --identifier com.Floe.dirs --install-location / --version $version floe_dirs.pkg
 
+  # step 3: make the final installer combining all the packages
   mkdir -p productbuild_files
   echo "This application will install Floe on your computer. You will be able to select which types of audio plugin format you would like to install. Please note that sample libraries are separate: this installer just installs the Floe engine." > productbuild_files/welcome.txt
 
-  # extract the minimum macOS version from one of the plugin's Info.plist
   min_macos_version=$(grep -A 1 '<key>LSMinimumSystemVersion</key>' "$universal_macos_abs_path/Floe.vst3/Contents/Info.plist" | grep '<string>' | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
 
   cat >distribution.xml <<EOF
@@ -279,7 +365,15 @@ build-macos-installer:
   EOF
 
   productbuild --distribution distribution.xml --resources productbuild_files --package-path . unsigned.pkg
-  productsign --timestamp --sign "$MACOS_DEV_ID_INSTALLER_NAME" unsigned.pkg $universal_macos_abs_path/Floe-Installer-v$version.pkg
+  productsign --timestamp --sign "$MACOS_DEV_ID_INSTALLER_NAME" unsigned.pkg $universal_macos_abs_path/$final_installer_name.pkg
 
   cd ../
-  rm -rf installer
+  rm -rf $temp_working_subdir
+
+  # step 4: notarize the installer
+  just macos-notarize $final_installer_name.pkg
+  xcrun stapler staple $final_installer_name.pkg
+
+  # step 5: zip the installer
+  rm -f $final_installer_name.zip
+  zip -r $final_installer_name.zip $final_installer_name.pkg

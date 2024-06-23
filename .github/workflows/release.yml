@@ -46,7 +46,7 @@ jobs:
           path: |
             zig-out/universal-macos/Floe.vst3
             zig-out/universal-macos/Floe.clap
-            # zig-out/universal-macos/Floe.component
+            zig-out/universal-macos/Floe.component
 
   prepare-macos:
     runs-on: macos-latest
@@ -54,7 +54,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: binaries-windows
+          name: binaries-macos
           path: files
 
       # TODO: codesign, notarize, build installer, Apple-Actions/import-codesign-certs

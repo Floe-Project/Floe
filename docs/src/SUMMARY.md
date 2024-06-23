@@ -5,4 +5,4 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Summary
 
-- [Chapter 1](./chapter_1.md)
+[Introduction](./introduction.md)

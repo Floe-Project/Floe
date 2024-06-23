@@ -6,4 +6,11 @@ authors = ["Sam Windell"]
 language = "en"
 multilingual = false
 src = "src"
-title = "Floe Documentaion"
+title = "Floe User Manual"
+
+[output.html]
+default-theme = "rust"
+preferred-dark-theme = "coal"
+smart-punctuation = true
+site-url = "/Floe/"
+git-repository-url = "https://github.com/Floe-Synth/Floe"

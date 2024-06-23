@@ -250,8 +250,18 @@ windows-prepare-release:
   mv $final_installer_zip_name {{release_files_dir}}
 
   # zip the manual-install files
+  echo "These are the manual-install Windows plugin files for Floe version $version." > readme.txt
+  echo "" >> readme.txt
+  echo "It's normally recommended to use the installer instead of these manual-install files." >> readme.txt
+  echo "The installer is a separate download to this." >> readme.txt
+  echo "" >> readme.txt
+  echo "For for manual installation, you can copy these files to the appropriate folders:" >> readme.txt
+  echo "  Floe.vst3: C:/Program Files/Common Files/VST3" >> readme.txt
+  echo "  Floe.clap: C:/Program Files/Common Files/CLAP" >> readme.txt
+
   final_manual_zip_name="Floe-Manual-Install-v$version-Windows.zip"
-  zip -r $final_manual_zip_name Floe.vst3 Floe.clap
+  zip -r $final_manual_zip_name Floe.vst3 Floe.clap readme.txt
+  rm readme.txt
   mv $final_manual_zip_name {{release_files_dir}}
 
 [macos, no-cd]

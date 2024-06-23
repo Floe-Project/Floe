@@ -47,7 +47,6 @@ jobs:
 
   build-macos:
     runs-on: macos-latest
-    needs: compile
     steps:
       - uses: actions/checkout@v4
         with:

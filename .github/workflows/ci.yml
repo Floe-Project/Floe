@@ -153,10 +153,9 @@ jobs:
           path: C:/Users/runner/AppData/Local/Floe/floe.log
 
   generate-docs:
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && '!cancelled()'
     runs-on: ubuntu-latest
     needs: linux-compile-and-test
-    if: '!cancelled()'
     permissions:
       contents: write
     steps:

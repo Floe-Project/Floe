@@ -57,27 +57,50 @@ ErrorCodeOr<void> Main(String destination_folder) {
             return k_success;
         };
 
-        String windows_version = {};
-        switch (MIN_WINDOWS_NTDDI_VERSION) {
-            case __NTDDI_WIN10: windows_version = "Windows 10"; break;
-            case __NTDDI_WIN10_TH2: windows_version = "Windows 10 (Build 10586)"; break;
-            case __NTDDI_WIN10_RS1: windows_version = "Windows 10 (Build 14393)"; break;
-            case __NTDDI_WIN10_RS2: windows_version = "Windows 10 (Build 15063)"; break;
-            case __NTDDI_WIN10_RS3: windows_version = "Windows 10 (Build 16299)"; break;
-            case __NTDDI_WIN10_RS4: windows_version = "Windows 10 (Build 17134)"; break;
-            case __NTDDI_WIN10_RS5: windows_version = "Windows 10 (Build 17763)"; break;
-            case __NTDDI_WIN10_19H1: windows_version = "Windows 10 (Build 18362)"; break;
-            case __NTDDI_WIN10_VB: windows_version = "Windows 10 (Build 19041)"; break;
-            case __NTDDI_WIN10_MN: windows_version = "Windows 10 (Build 19042)"; break;
-            case __NTDDI_WIN10_FE: windows_version = "Windows 10 (Build 19043)"; break;
-            case __NTDDI_WIN10_CO: windows_version = "Windows 11"; break;
-            case __NTDDI_WIN10_NI: windows_version = "Windows 11 (Build 22621)"; break;
-            case __NTDDI_WIN10_CU: windows_version = "Windows 11 (Build 22621)"; break;
-            default: PanicIfReached();
+        {
+            String windows_version = {};
+            switch (MIN_WINDOWS_NTDDI_VERSION) {
+                case __NTDDI_WIN10: windows_version = "Windows 10"; break;
+                case __NTDDI_WIN10_TH2: windows_version = "Windows 10 (Build 10586)"; break;
+                case __NTDDI_WIN10_RS1: windows_version = "Windows 10 (Build 14393)"; break;
+                case __NTDDI_WIN10_RS2: windows_version = "Windows 10 (Build 15063)"; break;
+                case __NTDDI_WIN10_RS3: windows_version = "Windows 10 (Build 16299)"; break;
+                case __NTDDI_WIN10_RS4: windows_version = "Windows 10 (Build 17134)"; break;
+                case __NTDDI_WIN10_RS5: windows_version = "Windows 10 (Build 17763)"; break;
+                case __NTDDI_WIN10_19H1: windows_version = "Windows 10 (Build 18362)"; break;
+                case __NTDDI_WIN10_VB: windows_version = "Windows 10 (Build 19041)"; break;
+                case __NTDDI_WIN10_MN: windows_version = "Windows 10 (Build 19042)"; break;
+                case __NTDDI_WIN10_FE: windows_version = "Windows 10 (Build 19043)"; break;
+                case __NTDDI_WIN10_CO: windows_version = "Windows 11"; break;
+                case __NTDDI_WIN10_NI: windows_version = "Windows 11 (Build 22621)"; break;
+                case __NTDDI_WIN10_CU: windows_version = "Windows 11 (Build 22621)"; break;
+                default: PanicIfReached();
+            }
+
+            TRY(write_value("min-windows-version", windows_version));
         }
 
-        TRY(write_value("min-windows-version", windows_version));
-        TRY(write_value("min-macos-version", MIN_MACOS_VERSION));
+        {
+            auto const macos_version = ParseVersionString(MIN_MACOS_VERSION).Value();
+            DynamicArrayInline<char, 64> macos_version_str {"macOS "};
+            ASSERT(macos_version.major != 0);
+            fmt::Append(macos_version_str, "{}", macos_version.major);
+            if (macos_version.minor != 0) fmt::Append(macos_version_str, ".{}", macos_version.minor);
+            if (macos_version.patch != 0) fmt::Append(macos_version_str, ".{}", macos_version.patch);
+
+            String release_name = {};
+            switch (macos_version.major) {
+                case 11: release_name = "Big Sur"; break;
+                case 12: release_name = "Monterey"; break;
+                case 13: release_name = "Ventura"; break;
+                case 14: release_name = "Sonoma"; break;
+                case 15: release_name = "Sequoia"; break;
+                default: PanicIfReached();
+            }
+            fmt::Append(macos_version_str, " ({})", release_name);
+
+            TRY(write_value("min-macos-version", macos_version_str));
+        }
     }
 
     return k_success;

@@ -1537,7 +1537,7 @@ Example usage of floe.<PROTO_FUNC>:
 
     static constexpr String k_placeholder = "<PLACEHOLDER>";
     static constexpr u32 k_indent_spaces = 4;
-    static constexpr u32 k_word_wrap_width = 90;
+    static constexpr u32 k_word_wrap_width = 87;
     Array<Span<FieldInfo const>, ToInt(InterpretedTypes::Count)> struct_fields;
 };
 

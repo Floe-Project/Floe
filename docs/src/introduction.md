@@ -16,6 +16,8 @@ Welcome to the user manual for Floe. This manual is designed to help you get sta
 
 This manual contains information for Floe version {{#include ../../version.txt}} and earlier.
 
+If you're viewing this online, you might find the search feature useful: open it by clicking the magnifying glass icon at the top of the page. Additionally, there is a printer icon in the top right for either printing this book, or saving it to a PDF.
+
 ## What is Floe?
 Floe is a sample-based synthesis plugin developed by [FrozenPlain](https://frozenplain.com). It's free and open-source and developed separately from FrozenPlain's commercial products. The project is hosted on [Github](https://github.com/Floe-Synth/Floe).
 
@@ -26,25 +28,10 @@ Key features:
 - Three-layer architecture for blending timbres into new sounds
 - Designed to easily create playable and expressive instruments
 - Sound shaping tools: filters, envelopes, LFOs and an effects rack
-- Powerful browsers for sample and preset collections
-- Supports multisampled instruments: velocity layers, round-robin, crossfade layers
-- Crafted with longevity and freedom in mind
+- Powerful browsers for samples and presets
+- Multisampled instruments: velocity layers, round-robin, crossfade layers
+- Create your own sample libraries using Lua scripts
+- Built to last: [free software](https://fsfe.org/freesoftware/freesoftware.en.html), GPLv3 licensed and new infrastructure for long-term development
 
-## Requirements
-### Windows
-- {{#include ../../mdbook_config.txt:min-windows-version}} or later
-- 64-bit
-- CLAP or VST3 host
-
-### macOS
-- {{#include ../../mdbook_config.txt:min-macos-version}} or later
-- Apple Silicon or Intel
-- CLAP, AU (version 2) or VST3 host
-
-## Previously know as Mirage
-Floe is a continuation of FrozenPlain's Mirage plugin (developed from 2018 to 2023). The project has taken a new direction and so we decided to give it a new name. Here's the key points:
-- Floe is free and open-source, whereas Mirage was closed-source.
-- Floe is not directly tied to FrozenPlain's commercial products. It's a separate project.
-- Floe is backwards-compatible with Mirage libraries and presets.
-- Mirage is already the name of a hardware sampler from the 80s - we wanted to avoid confusion.
+Floe was [previously known as Mirage](./mirage.md).
 

@@ -153,6 +153,8 @@ jobs:
           path: C:/Users/runner/AppData/Local/Floe/floe.log
 
   generate-docs:
+    # !cancelled() ensures this is run even if the compile-and-test job failed, unless it was manually cancelled. 
+    # We want this because a test failure needn't stop us from updating the docs.
     if: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && !cancelled() }}
     runs-on: ubuntu-latest
     needs: linux-compile-and-test

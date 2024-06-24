@@ -47,3 +47,6 @@ However, Linux is only provided for development purposes at the moment, and you 
 
 ## Developers
 - Sam Windell ([FrozenPlain](https://frozenplain.com/))
+
+## User manual
+https://floe-synth.github.io/Floe/

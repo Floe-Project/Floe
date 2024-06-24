@@ -24,6 +24,7 @@ const floe_url = "https://github.com/Floe-Synth/Floe";
 const floe_au_factory_function = "FloeFactoryFunction";
 const floe_plugin_gui = true;
 const min_macos_version = "11.0.0"; // use 3-part version for plist
+const min_windows_version = "win10";
 
 const rootdir = struct {
     fn getSrcDir() []const u8 {
@@ -757,7 +758,6 @@ fn getTargets(b: *std.Build, user_given_target_presets: ?[]const u8) !std.ArrayL
     // which is the important feature for our performance-critical code.
     const x86_cpu = "x86_64";
     const apple_arm_cpu = "apple_m1";
-    const min_windows_version = "win10";
 
     var it = std.mem.splitSequence(u8, preset_strings, ",");
     while (it.next()) |preset_string| {
@@ -811,8 +811,6 @@ fn getLicenceText(b: *std.Build, filename: []const u8) ![]const u8 {
 }
 
 pub fn build(b: *std.Build) void {
-    const gen_docs_step = b.step("gen-docs", "Generate HTML documentation snippets");
-
     const build_mode = b.option(
         BuildMode,
         "build-mode",
@@ -942,6 +940,7 @@ pub fn build(b: *std.Build) void {
         const floe_version_major: i64 = @intCast(floe_version.major);
         const floe_version_minor: i64 = @intCast(floe_version.minor);
         const floe_version_patch: i64 = @intCast(floe_version.patch);
+        const windows_ntddi_version: i64 = @intFromEnum(std.Target.Os.WindowsVersion.parse(min_windows_version) catch @panic("invalid win ver"));
 
         const build_config_step = b.addConfigHeader(.{
             .style = .blank,
@@ -959,6 +958,8 @@ pub fn build(b: *std.Build) void {
             .IS_MACOS = target.result.os.tag == .macos,
             .IS_LINUX = target.result.os.tag == .linux,
             .FLOE_GUI = floe_plugin_gui,
+            .MIN_WINDOWS_NTDDI_VERSION = windows_ntddi_version,
+            .MIN_MACOS_VERSION = min_macos_version,
         });
 
         var stb_sprintf = b.addObject(.{
@@ -1549,10 +1550,14 @@ pub fn build(b: *std.Build) void {
         }
 
         if (build_context.build_mode != .production) {
-            var gen_docs = b.addExecutable(.{ .name = "gen_docs", .target = target, .optimize = build_context.optimise });
-            const gen_docs_path = "src/gen_param_docs_html";
+            var gen_docs = b.addExecutable(.{
+                .name = "gen_docs_tool",
+                .target = target,
+                .optimize = build_context.optimise,
+            });
+            const gen_docs_path = "src/gen_docs_tool";
             gen_docs.addCSourceFiles(.{ .files = &.{
-                gen_docs_path ++ "/gen_param_docs_html_main.cpp",
+                gen_docs_path ++ "/gen_docs_tool.cpp",
             }, .flags = cpp_fp_flags });
             gen_docs.linkLibrary(plugin);
             gen_docs.addIncludePath(b.path("src"));
@@ -1561,10 +1566,6 @@ pub fn build(b: *std.Build) void {
             join_compile_commands.step.dependOn(&gen_docs.step);
             applyUniversalSettings(&build_context, gen_docs);
             b.getInstallStep().dependOn(&b.addInstallArtifact(gen_docs, .{ .dest_dir = install_subfolder }).step);
-
-            var run_gen_docs = b.addRunArtifact(gen_docs);
-            run_gen_docs.addArgs(&.{"zig-out/parameters.html"});
-            gen_docs_step.dependOn(&run_gen_docs.step);
         }
 
         var clap_post_install_step = b.allocator.create(PostInstallStep) catch @panic("OOM");

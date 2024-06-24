@@ -6,13 +6,15 @@ SPDX-License-Identifier: GPL-3.0-or-later
 <div class="warning">
 Floe is heavily under development. This manual is a work-in-progress.
 
-Some things may be incorrect, missing or broken. We are bit-by-bit filling in the gaps ahead of version 1.0.
+Some things may be incorrect, missing or broken. We are bit-by-bit filling in the gaps ahead of version 1.0.0.
 
 </div>
 
 # Floe User Manual
 
 Welcome to the user manual for Floe. This manual is designed to help you get started with Floe and to provide a reference for all of its features.
+
+This manual contains information for Floe version {{#include ../../version.txt}} and earlier.
 
 ## What is Floe?
 Floe is a sample-based synthesis plugin developed by [FrozenPlain](https://frozenplain.com). It's free and open-source and developed separately from FrozenPlain's commercial products. The project is hosted on [Github](https://github.com/Floe-Synth/Floe).
@@ -27,6 +29,17 @@ Key features:
 - Powerful browsers for sample and preset collections
 - Supports multisampled instruments: velocity layers, round-robin, crossfade layers
 - Crafted with longevity and freedom in mind
+
+## Requirements
+### Windows
+- {{#include ../../mdbook_config.txt:min-windows-version}} or later
+- 64-bit
+- CLAP or VST3 host
+
+### macOS
+- {{#include ../../mdbook_config.txt:min-macos-version}} or later
+- Apple Silicon or Intel
+- CLAP, AU (version 2) or VST3 host
 
 ## Previously know as Mirage
 Floe is a continuation of FrozenPlain's Mirage plugin (developed from 2018 to 2023). The project has taken a new direction and so we decided to give it a new name. Here's the key points:

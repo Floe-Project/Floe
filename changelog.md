@@ -3,7 +3,7 @@ SPDX-FileCopyrightText: 2018-2024 Sam Windell
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
-# Floe Changelog
+# Changelog
 
 ## 0.0.1
 - Initial version

@@ -165,6 +165,7 @@ static constexpr void DumpStructSprintf(DumpStructContext& ctx, char const* form
     auto const size_remaining = (int)(ArraySize(ctx.buffer) - ctx.pos);
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wformat-security"
+#pragma clang diagnostic ignored "-Wdouble-promotion"
     auto const n = stbsp_snprintf(ctx.buffer + ctx.pos, size_remaining, format, args...);
 #pragma clang diagnostic pop
 

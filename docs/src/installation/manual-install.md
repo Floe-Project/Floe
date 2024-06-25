@@ -19,4 +19,6 @@ You can copy these files to wherever your DAW looks for plugins. You can overwri
 - VST3 (_Floe.vst3_): `/Library/Audio/Plug-Ins/VST3`
 - AU (_Floe.component_): `/Library/Audio/Plug-Ins/Components`
 
+Next, you might need to [install sample libraries](installing-libraries.md). 
+
 

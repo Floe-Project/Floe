@@ -12,6 +12,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 - [Requirements](./installation/requirements.md)
 - [Installer](./installation/installer.md)
 - [Manual Installation](./installation/manual-install.md)
+- [Installing Sample Libraries](./installation/installing-libraries.md)
 
 # Sample Library Development
 - [Lua Libraries](./lua-sample-library-format.md)

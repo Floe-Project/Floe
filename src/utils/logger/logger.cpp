@@ -78,10 +78,10 @@ void FileLogger::LogFunction(String str, LogLevel level, bool add_newline) {
         if (outcome.HasValue()) {
             auto path = DynamicArray<char>::FromOwnedSpan(outcome.Value(), arena);
             path::JoinAppend(path, "floe.log");
-            filepath = String(path);
+            dyn::Assign(filepath, String(path));
             first_message = true;
         } else {
-            filepath = ""_s;
+            dyn::Clear(filepath);
             DebugLn("failed to get logs known dir: {}", outcome.Error());
         }
         state.Store(FileLogger::State::Initialised);
@@ -96,7 +96,7 @@ void FileLogger::LogFunction(String str, LogLevel level, bool add_newline) {
     auto file = ({
         auto outcome = OpenFile(filepath, FileMode::Append);
         if (outcome.HasError()) {
-            DebugLn("failed to open log file: {}", outcome.Error());
+            ::DebugLn("failed to open log file {}: {}", filepath, outcome.Error());
             return;
         }
         outcome.ReleaseValue();
@@ -135,7 +135,7 @@ void FileLogger::LogFunction(String str, LogLevel level, bool add_newline) {
 
     auto writer = file.Writer();
     auto o = try_writing(writer);
-    if (o.HasError()) DebugLn("failed to write log file: {}, {}", filepath, o.Error());
+    if (o.HasError()) ::DebugLn("failed to write log file: {}, {}", filepath, o.Error());
 }
 
 FileLogger g_log_file {};

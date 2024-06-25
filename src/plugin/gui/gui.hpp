@@ -139,6 +139,10 @@ struct Gui {
     Layout layout = {};
     imgui::Context imgui = {};
     EditorGUI editor = {};
+    // TODO: really weird crash where this becomes null mid-frame
+    // probably some undefined behaviour somewhere or a threading issue, I can't think what else would cause
+    // it even weirder: if these font fields are moved the top of this struct the crash doesn't happen. Could
+    // be UB in imgui::Context.
     graphics::Font* fira_sans {};
     graphics::Font* roboto_small {};
     graphics::Font* mada_big {};

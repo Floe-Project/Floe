@@ -28,7 +28,6 @@
 #include "sample_library_loader.hpp"
 #include "settings/settings_filesystem.hpp"
 #include "settings/settings_gui.hpp"
-#include "state/state_coding.hpp"
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wconversion"

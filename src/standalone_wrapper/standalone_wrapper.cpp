@@ -260,7 +260,7 @@ static bool OpenMidi(Standalone& standalone) {
     }
 
     auto const num_devices = Pm_CountDevices();
-    if (num_devices == 0) return false;
+    if (num_devices == 0) return true;
 
     Optional<PmDeviceID> id_to_use = {};
     for (auto const i : Range(num_devices)) {

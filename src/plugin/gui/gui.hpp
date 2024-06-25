@@ -139,20 +139,12 @@ struct Gui {
     Layout layout = {};
     imgui::Context imgui = {};
     EditorGUI editor = {};
+    graphics::Font* fira_sans {};
+    graphics::Font* roboto_small {};
+    graphics::Font* mada_big {};
+    graphics::Font* mada {};
+    graphics::Font* icons {};
     PresetBrowserPersistentData preset_browser_data {};
-
-    union {
-        struct {
-            graphics::Font* fira_sans;
-            graphics::Font* roboto_small;
-            graphics::Font* mada_big;
-            graphics::Font* mada;
-            graphics::Font* icons;
-        };
-        struct {
-            graphics::Font* fonts[5];
-        };
-    };
 
     layer_gui::LayerLayout layer_gui[k_num_layers] = {};
 

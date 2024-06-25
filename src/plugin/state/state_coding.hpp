@@ -15,8 +15,6 @@ struct CodeStateOptions {
     bool abbreviated_read;
 };
 
-#define FLOE_PRESET_FILE_EXTENSION ".floe-preset"
-
 // "Code" as in decode/encode
 ErrorCodeOr<void> CodeState(StateSnapshot& state, CodeStateOptions const& options);
 

@@ -157,7 +157,7 @@ PresetsFolderScanResult FetchOrRescanPresetsFolder(PresetsListing& listing,
             auto const errors = new_listing.ScanFolders(
                 folders_to_scan,
                 true,
-                Array {"*.mirage*"_s, "*.floe-preset"},
+                Array {"*.mirage*"_s, "*" FLOE_PRESET_FILE_EXTENSION},
                 [](String path, ArenaAllocator& arena) -> ErrorCodeOr<void*> {
                     if (path::Extension(path) == FLOE_PRESET_FILE_EXTENSION) {
                         auto file = TRY_I(OpenFile(path, FileMode::Read));
@@ -251,7 +251,7 @@ static ErrorCodeOr<DirectoryListing> TestListing(tests::Tester& tester) {
                                                       ConcatArrays(Array {TestFilesFolder(tester)},
                                                                    k_repo_subdirs_floe_test_presets))},
                             false,
-                            Array {"*.mirage-*"_s, "*.floe-preset"},
+                            Array {"*.mirage-*"_s, "*" FLOE_PRESET_FILE_EXTENSION},
                             {});
     if (result.folder_errors.size) return result.folder_errors[0].error;
     return listing;

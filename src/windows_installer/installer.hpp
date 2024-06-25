@@ -44,7 +44,7 @@ constexpr auto k_plugin_infos = Array {
         .name = "Floe Core Library",
         .install_dir = nullopt,
         .install_dir_fallback = "C:\\Users\\Public\\Floe"_s,
-        .filename = "Core.library",
+        .filename = "Core",
         .resource_id = CORE_LIBRARY_RC_ID,
     },
 #endif

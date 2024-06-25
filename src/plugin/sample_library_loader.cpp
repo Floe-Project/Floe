@@ -502,10 +502,16 @@ static void AddAsyncJob(LibrariesAsyncContext& async_ctx,
                                                  lib_list,
                                                  String(entry.path),
                                                  sample_lib::FileFormat::Mdata);
-                            } else if (entry.type == FileType::Directory && ext == ".library") {
+                            } else if (entry.type == FileType::Directory) {
                                 String const lua_path =
                                     path::Join(scratch_arena, Array {String(entry.path), "config.lua"});
-                                ReadLibraryAsync(async_ctx, lib_list, lua_path, sample_lib::FileFormat::Lua);
+                                if (auto const ft_outcome = GetFileType(lua_path);
+                                    ft_outcome.HasValue() && ft_outcome.Value() == FileType::RegularFile) {
+                                    ReadLibraryAsync(async_ctx,
+                                                     lib_list,
+                                                     lua_path,
+                                                     sample_lib::FileFormat::Lua);
+                                }
                             }
                             TRY(it.Increment());
                         }

@@ -15,6 +15,8 @@ static constexpr bool k_editor_enabled = FLOE_EDITOR_ENABLED;
 #define PRODUCT_NAME "Floe"
 Version const k_floe_version {FLOE_MAJOR_VERSION, FLOE_MINOR_VERSION, FLOE_PATCH_VERSION};
 
+#define FLOE_PRESET_FILE_EXTENSION ".floe-preset"
+
 constexpr u32 k_max_num_active_voices = 32;
 constexpr u32 k_num_voices = 64;
 constexpr u32 k_max_num_voice_samples = 4;

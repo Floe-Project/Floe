@@ -24,10 +24,7 @@ jobs:
             build_gen
 
       - run: |
-          wget https://github.com/Floe-Synth/Core-Library/archive/refs/heads/main.zip
-          unzip -d build_resources main.zip
-          rm main.zip
-          mv build_resources/Core-Library-main build_resources/Core # this is where the Core library is expected to be
+          just fetch-core-library
           just build-release windows
 
       - run: just windows-prepare-release

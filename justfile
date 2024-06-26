@@ -203,6 +203,14 @@ latest-changes:
   changes=$(sed -n "/## $(cat version.txt)/,/## /{ /## /!p }" changelog.md)
   printf "%s" "$changes" # trim trailing newline
 
+fetch-core-library:
+  #!/usr/bin/env bash
+  cd build_resources
+  wget https://github.com/Floe-Synth/Core-Library/archive/refs/heads/main.zip
+  unzip main.zip
+  rm main.zip
+  mv Core-Library-main Core # this is where the Core library is expected to be
+
 [no-cd]
 windows-codesign-file file description:
   #!/usr/bin/env bash

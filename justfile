@@ -412,6 +412,8 @@ macos-build-installer:
   cd ../
   pkgbuild --root floe_dirs --identifier com.Floe.dirs --install-location / --version $version floe_dirs.pkg
 
+  # TODO: bundle Core library if it can be found
+
   # step 3: make the final installer combining all the packages
   mkdir -p productbuild_files
   echo "This application will install Floe on your computer. You will be able to select which types of audio plugin format you would like to install. Please note that sample libraries are separate: this installer just installs the Floe engine." > productbuild_files/welcome.txt

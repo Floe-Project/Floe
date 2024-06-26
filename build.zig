@@ -828,7 +828,7 @@ pub fn build(b: *std.Build) void {
     const core_library_path = b.option(
         []const u8,
         "core-lib-path",
-        "Full path to the Core library, used for embedding in the installer",
+        "Full path to the Core library, used for embedding in the Windows installer",
     ) orelse (b.pathJoin(&.{ rootdir, "build_resources", "Core" }));
 
     var enable_tracy = b.option(bool, "tracy", "Enable Tracy profiler") orelse false;

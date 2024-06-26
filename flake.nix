@@ -176,6 +176,7 @@
             pluginval
             clang-build-analyzer
             pkgs.zip
+            pkgs.unzip
             pkgs.llvmPackages_18.bintools-unwrapped # llvm-lipo, llvm-addr2line, dsymutil
             pkgs.llvmPackages_18.clang-unwrapped # clangd, clang-tidy, clang-format
             pkgs.cppcheck
@@ -189,6 +190,7 @@
             pkgs.reuse
             pkgs.mdbook
             pkgs.osslsigncode
+            pkgs.wget
 
             # dsymutil internally calls "lipo", so we have to make sure it's available under that name
             (pkgs.writeShellScriptBin "lipo" "llvm-lipo $@")

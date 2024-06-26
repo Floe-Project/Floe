@@ -420,7 +420,15 @@ macos-build-installer:
   cd ../
   pkgbuild --root floe_dirs --identifier com.Floe.dirs --install-location / --version $version floe_dirs.pkg
 
-  # TODO: bundle Core library if it can be found
+  # TODO: add the Core library to the installer
+  # core_library="{{justfile_directory()}}/build_resources/Core"
+  # if [[ -d core_library ]]; then
+  #   mkdir -p core_library
+  #   cd core_library
+  #   install_folder = "Library/Application Support/Floe/Libraries"
+  #   mkdir -p $install_folder
+  #   cp -r $core_library $install_folder
+  # fi
 
   # step 3: make the final installer combining all the packages
   mkdir -p productbuild_files

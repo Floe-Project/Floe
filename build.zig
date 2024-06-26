@@ -2258,7 +2258,7 @@ pub fn build(b: *std.Build) void {
                     // IMPROVE: it's slow to zip this every time
                     // NOTE: we enter the library folder and build the zip from there. This way, the zip contains only the contents of the Core Library folder, not the folder itself. Additionally, we exclude the .git folder.
                     const zip_core = b.addSystemCommand(&.{ "zip", "-x", ".git/*", "-r", b.pathJoin(&.{ rootdir, core_library_zip_path_relative }), "." });
-                    zip_core.setCwd(b.path(core_library_path));
+                    zip_core.setCwd(core_library_path);
                     win_installer.step.dependOn(&zip_core.step);
                     flags.append(b.fmt("-DCORE_LIBRARY_ZIP_PATH=\"{s}\"", .{core_library_zip_path_relative})) catch unreachable;
                 } else {

@@ -521,6 +521,7 @@ clap_plugin_posix_fd_support const floe_posix_fd {
         },
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-interfaces-global-init)
 clap_plugin const floe_plugin {
     .desc = &k_plugin_info,
     .plugin_data = nullptr,

@@ -214,6 +214,22 @@ check-spelling:
 [windows]
 test-windows:
   {{native_binary_dir}}/tests.exe --log-level=debug
+  {{native_binary_dir}}/VST3-Validator.exe {{native_binary_dir}}/Floe.vst3
+
+  # if pluginval is not available, download it
+  if [[ ! -f pluginval.exe ]]; then
+    wget "https://github.com/Tracktion/pluginval/releases/download/v1.0.3/pluginval_Windows.zip"
+    unzip pluginval_Windows.zip
+    rm pluginval_Windows.zip
+  fi
+  pluginval.exe --verbose --validate {{native_binary_dir}}/Floe.vst3
+
+  if [[ ! clap-validator.exe ]]; then
+    wget "https://github.com/free-audio/clap-validator/releases/download/0.3.2/clap-validator-0.3.2-windows.zip"
+    unzip clap-validator-0.3.2-windows.zip
+    rm clap-validator-0.3.2-windows.zip
+  fi
+  clap-validator.exe validate {{native_binary_dir}}/Floe.clap
 
 latest-changes:
   #!/usr/bin/env bash

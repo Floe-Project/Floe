@@ -226,7 +226,7 @@ void DoErrorsStandalone(Gui* g) {
                     // buttons
                     {
                         f32 x_pos = 0;
-                        auto const btn_w = (f32)LiveSize(imgui, UiSizeId::ErrorWindowButtonW);
+                        auto const btn_w = LiveSize(imgui, UiSizeId::ErrorWindowButtonW);
 
                         auto btn_sets = imgui::DefButton();
                         btn_sets.draw = [](IMGUI_DRAW_BUTTON_ARGS) {

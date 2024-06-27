@@ -143,6 +143,7 @@ checks_ci := replace(
     "
     check-reuse 
     check-format
+    check-spelling
     coverage
     clang-tidy-all
     "
@@ -197,6 +198,16 @@ parallel tasks:
   else
     echo -e "\033[0;31m$failed/$num_tasks tasks failed\033[0m"
     [[ ! -z $GITHUB_ACTIONS ]] && echo "### :x: $failed/$num_tasks tasks failed" >> $GITHUB_STEP_SUMMARY
+    exit 1
+  fi
+
+check-spelling:
+  #!/usr/bin/env bash
+  # hunspell doesn't do anything fancy at all, it just checks each word for spelling. It means we get lots of
+  # false positives, but I think it's still worth it. We can just add words to ignored-spellings.dic.
+  output=$(fd . -e .md --exclude third_party_libs/ --exclude src/readme.md | xargs hunspell -l -d en_GB -p docs/ignored-spellings.dic readme.md)
+  echo "$output"
+  if [[ -n "$output" ]]; then
     exit 1
   fi
 

@@ -24,83 +24,17 @@ jobs:
         if: '!cancelled()'
         shell: powershell
         run: |
-          $env:PATH += ";C:\Program Files\Git\bin"
-          just test-bash-exe
+          just test-env
 
       - name: "2"
         if: '!cancelled()'
-        shell: powershell
+        shell: bash
         run: |
-          $env:PATH += ";C:\Program Files\Git\bin"
-          just test-bash
+          just test-env
 
       - name: "3"
         if: '!cancelled()'
-        shell: powershell
-        run: |
-          $env:PATH += ";C:\Program Files\Git\bin"
-          just test-env
-      
-      - name: "4"
-        if: '!cancelled()'
-        shell: bash
-        run: |
-          just test-bash-exe
-
-      - name: "5"
-        if: '!cancelled()'
-        shell: bash
-        run: |
-          just test-bash
-
-      - name: "6"
-        if: '!cancelled()'
-        shell: bash
         run: |
           just test-env
 
-      - name: Install Git Bash
-        if: '!cancelled()'
-        run: |
-          choco install git -y
-          refreshenv
-
-      - name: "7"
-        if: '!cancelled()'
-        shell: powershell
-        run: |
-          $env:PATH += ";C:\Program Files\Git\bin"
-          just test-bash-exe
-
-      - name: "8"
-        if: '!cancelled()'
-        shell: powershell
-        run: |
-          $env:PATH += ";C:\Program Files\Git\bin"
-          just test-bash
-
-      - name: "9"
-        if: '!cancelled()'
-        shell: powershell
-        run: |
-          $env:PATH += ";C:\Program Files\Git\bin"
-          just test-env
-      
-      - name: "10"
-        if: '!cancelled()'
-        shell: bash
-        run: |
-          just test-bash-exe
-
-      - name: "11"
-        if: '!cancelled()'
-        shell: bash
-        run: |
-          just test-bash
-
-      - name: "12"
-        if: '!cancelled()'
-        shell: bash
-        run: |
-          just test-env
 

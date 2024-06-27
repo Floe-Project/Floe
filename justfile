@@ -10,6 +10,8 @@ native_binary_dir := "zig-out/" + native_arch_os_pair
 all_src_files := 'fd . -e .mm -e .cpp -e .hpp -e .h src' 
 gen_files_dir := "build_gen"
 release_files_dir := justfile_directory() + "/zig-out/release"
+build_resources_core := justfile_directory() + "/build_resources/Core"
+floe_manual_url := "https://floe-synth.github.io/Floe/"
 
 build target_os='native':
   zig build compile -Dtargets={{target_os}} -Dbuild-mode=development
@@ -18,7 +20,7 @@ build-tracy:
   zig build compile -Dtargets=native -Dbuild-mode=development -Dtracy
 
 build-release target_os='native':
-  zig build compile -Dtargets={{target_os}} -Dbuild-mode=production
+  zig build compile -Dtargets={{target_os}} -Dbuild-mode=production -Dcore-lib-path="{{build_resources_core}}"
 
 # build and report compile-time statistics
 build-timed target_os='native':
@@ -39,7 +41,7 @@ check-reuse:
 check-format:
   {{all_src_files}} | xargs clang-format --dry-run --Werror
 
-# install compile database (compile_commands.json)
+# install Compile DataBase (compile_commands.json)
 install-cbd arch_os_pair=native_arch_os_pair:
   cp {{gen_files_dir}}/compile_commands_{{arch_os_pair}}.json {{gen_files_dir}}/compile_commands.json
 
@@ -205,11 +207,25 @@ latest-changes:
 
 fetch-core-library:
   #!/usr/bin/env bash
+  mkdir -p build_resources
   cd build_resources
   wget https://github.com/Floe-Synth/Core-Library/archive/refs/heads/main.zip
   unzip main.zip
   rm main.zip
-  mv Core-Library-main Core # this is where the Core library is expected to be
+  mv Core-Library-main {{build_resources_core}}
+
+[no-cd]
+_try-add-core-library-to-zip zip-path:
+  #!/usr/bin/env bash
+  if [[ -d "{{build_resources_core}}" ]]; then
+    # need to do some faffing with folders so that we only zip the library and none of the parent folders
+    full_zip_path=$(realpath {{zip-path}})
+    core_dirname=$(dirname "{{build_resources_core}}")
+    core_filename=$(basename "{{build_resources_core}}")
+    pushd $core_dirname
+    zip -r $full_zip_path $core_filename 
+    popd
+  fi
 
 [no-cd]
 windows-codesign-file file description:
@@ -249,7 +265,7 @@ windows-prepare-release:
   just windows-codesign-file Floe.clap "Floe CLAP"
 
   installer_file=$(find . -type f -name "*Installer*.exe")
-  just windows-codesign-file $installer_file "Installer for Floe audio plugin formats"
+  just windows-codesign-file $installer_file "Installer for Floe"
 
   # zip the installer
   final_installer_name=$(echo $installer_file | sed 's/.exe//')
@@ -258,17 +274,16 @@ windows-prepare-release:
   mv $final_installer_zip_name {{release_files_dir}}
 
   # zip the manual-install files
-  echo "These are the manual-install Windows plugin files for Floe version $version." > readme.txt
+  echo "These are the manual-install Windows plugin files and Core library for Floe version $version." > readme.txt
   echo "" >> readme.txt
   echo "It's normally recommended to use the installer instead of these manual-install files." >> readme.txt
   echo "The installer is a separate download to this." >> readme.txt
   echo "" >> readme.txt
-  echo "For for manual installation, you can copy these files to the appropriate folders:" >> readme.txt
-  echo "  Floe.vst3: C:/Program Files/Common Files/VST3" >> readme.txt
-  echo "  Floe.clap: C:/Program Files/Common Files/CLAP" >> readme.txt
+  echo "Installation instructions: {{floe_manual_url}}" >> readme.txt
 
   final_manual_zip_name="Floe-Manual-Install-v$version-Windows.zip"
   zip -r $final_manual_zip_name Floe.vst3 Floe.clap readme.txt
+  just _try-add-core-library-to-zip $final_manual_zip_name
   rm readme.txt
   mv $final_manual_zip_name {{release_files_dir}}
 
@@ -312,6 +327,7 @@ macos-prepare-release-plugins:
     codesign --sign "$MACOS_DEV_ID_APP_NAME" --timestamp --options=runtime --deep --force --entitlements plugin.entitlements $1
   }
 
+  # we can do it in parallel for speed, but we need to be careful there's no comflicting use of the filesystem
   export -f codesign_plugin
   SHELL=$(type -p bash) parallel --bar codesign_plugin ::: Floe.vst3 Floe.component Floe.clap
 
@@ -336,23 +352,22 @@ macos-prepare-release-plugins:
     rm -rf $temp_subdir
   }
 
-  export -f notarize_plugin
-  SHELL=$(type -p bash) parallel --bar notarize_plugin ::: Floe.vst3 Floe.component Floe.clap
+  # we can do it in parallel for speed, but we need to be careful there's no comflicting use of the filesystem
+  # export -f notarize_plugin
+  # SHELL=$(type -p bash) parallel --bar notarize_plugin ::: Floe.vst3 Floe.component Floe.clap
 
   # step 3: zip
-  echo "These are the manual-install macOS plugin files for Floe version $version." > readme.txt
+  echo "These are the manual-install macOS files for Floe version $version." > readme.txt
   echo "" >> readme.txt
   echo "It's normally recommended to use the installer instead of these manual-install files." >> readme.txt
   echo "The installer is a separate download to this." >> readme.txt
   echo "" >> readme.txt
-  echo "For for manual installation, you can copy these files to the appropriate folders:" >> readme.txt
-  echo "  Floe.vst3: MachintoshHD -> /Library/Audio/Plug-Ins/VST3" >> readme.txt
-  echo "  Floe.component: MachintoshHD -> /Library/Audio/Plug-Ins/Components" >> readme.txt
-  echo "  Floe.clap: MachintoshHD -> /Library/Audio/Plug-Ins/CLAP" >> readme.txt
+  echo "Installation instructions: {{floe_manual_url}}" >> readme.txt
 
   final_manual_zip_name="Floe-Manual-Install-v$version-macOS.zip"
   rm -f $final_manual_zip_name
   zip -r $final_manual_zip_name Floe.vst3 Floe.component Floe.clap readme.txt
+  just _try-add-core-library-to-zip $final_manual_zip_name
   mv $final_manual_zip_name {{release_files_dir}}
 
   rm readme.txt
@@ -421,15 +436,23 @@ macos-build-installer:
   pkgbuild --root floe_dirs --identifier com.Floe.dirs --install-location / --version $version floe_dirs.pkg
   
   # step 3: make a package for the core library
-  build_resources_core="{{justfile_directory()}}/build_resources/Core"
-  if [[ -d $build_resources_core ]]; then
+  if [[ -d "{{build_resources_core}}" ]]; then
     mkdir -p core_library
     cd core_library
     install_folder="Library/Application Support/Floe/Libraries"
     mkdir -p $install_folder
-    cp -r $build_resources_core $install_folder
+    cp -r "{{build_resources_core}}" $install_folder
     cd ../
     pkgbuild --root core_library --identifier com.Floe.Core --install-location / --version $version core_library.pkg
+
+    identifier=com.Floe.core
+    choice=$(cat <<EOF
+    <choice id="$identifier" title="Core Library" description="Core Floe library containing a few reverb impulses responses">
+        <pkg-ref id="$identifier" version="$version">core_library.pkg</pkg-ref>
+    </choice>
+  EOF)
+    distribution_xml_choices=$(printf "%s%s\n" "$distribution_xml_choices" "$choice")
+    distribution_xml_choice_outlines=$(printf "%s%s\n" "$distribution_xml_choice_outlines" "<line choice=\"$identifier\" />")
   fi
 
   # step 4: make the final installer combining all the packages
@@ -448,13 +471,9 @@ macos-build-installer:
       <choice id="com.Floe.dirs" title="Floe Folders" description="Create empty folders ready for Floe to use to look for libraries and presets" enabled="false">
           <pkg-ref id="com.Floe.dirs" version="$version">floe_dirs.pkg</pkg-ref>
       </choice>
-      <choice id="com.Floe.core" title="Core Library" description="Core Floe library containing a few reverb impulses responses">
-          <pkg-ref id="com.Floe.core" version="$version">core_library.pkg</pkg-ref>
-      </choice>
       $distribution_xml_choices
       <choices-outline>
           <line choice="com.Floe.dirs" />
-          <line choice="com.Floe.core" />
           $distribution_xml_choice_outlines
       </choices-outline>
   </installer-gui-script>

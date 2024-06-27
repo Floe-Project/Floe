@@ -419,21 +419,24 @@ macos-build-installer:
   mkdir -p Library/Application\ Support/Floe/Libraries
   cd ../
   pkgbuild --root floe_dirs --identifier com.Floe.dirs --install-location / --version $version floe_dirs.pkg
+  
+  # step 3: make a package for the core library
+  build_resources_core="{{justfile_directory()}}/build_resources/Core"
+  if [[ -d $build_resources_core ]]; then
+    mkdir -p core_library
+    cd core_library
+    install_folder="Library/Application Support/Floe/Libraries"
+    mkdir -p $install_folder
+    cp -r $build_resources_core $install_folder
+    cd ../
+    pkgbuild --root core_library --identifier com.Floe.Core --install-location / --version $version core_library.pkg
+  fi
 
-  # TODO: add the Core library to the installer
-  # core_library="{{justfile_directory()}}/build_resources/Core"
-  # if [[ -d core_library ]]; then
-  #   mkdir -p core_library
-  #   cd core_library
-  #   install_folder = "Library/Application Support/Floe/Libraries"
-  #   mkdir -p $install_folder
-  #   cp -r $core_library $install_folder
-  # fi
-
-  # step 3: make the final installer combining all the packages
+  # step 4: make the final installer combining all the packages
   mkdir -p productbuild_files
   echo "This application will install Floe on your computer. You will be able to select which types of audio plugin format you would like to install. Please note that sample libraries are separate: this installer just installs the Floe engine." > productbuild_files/welcome.txt
 
+  # find the min macos version from one of the plugin's plists
   min_macos_version=$(grep -A 1 '<key>LSMinimumSystemVersion</key>' "$universal_macos_abs_path/Floe.vst3/Contents/Info.plist" | grep '<string>' | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
 
   cat >distribution.xml <<EOF
@@ -445,9 +448,13 @@ macos-build-installer:
       <choice id="com.Floe.dirs" title="Floe Folders" description="Create empty folders ready for Floe to use to look for libraries and presets" enabled="false">
           <pkg-ref id="com.Floe.dirs" version="$version">floe_dirs.pkg</pkg-ref>
       </choice>
+      <choice id="com.Floe.core" title="Core Library" description="Core Floe library containing a few reverb impulses responses">
+          <pkg-ref id="com.Floe.core" version="$version">core_library.pkg</pkg-ref>
+      </choice>
       $distribution_xml_choices
       <choices-outline>
           <line choice="com.Floe.dirs" />
+          <line choice="com.Floe.core" />
           $distribution_xml_choice_outlines
       </choices-outline>
   </installer-gui-script>
@@ -459,11 +466,11 @@ macos-build-installer:
   cd ../
   rm -rf $temp_working_subdir
 
-  # step 4: notarize the installer
+  # step 5: notarize the installer
   just macos-notarize $final_installer_name.pkg
   xcrun stapler staple $final_installer_name.pkg
 
-  # step 5: zip the installer
+  # step 6: zip the installer
   final_zip_name=$final_installer_name-macOS.zip
   rm -f $final_zip_name
   zip -r $final_zip_name $final_installer_name.pkg

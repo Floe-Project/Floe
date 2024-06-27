@@ -59,7 +59,9 @@ jobs:
             .zig-cache
             build_gen
 
-      - run: just build-release mac_ub
+      - run: |
+          just fetch-core-library
+          just build-release mac_ub
 
       - uses: apple-actions/import-codesign-certs@v3
         with: 

@@ -104,9 +104,11 @@ jobs:
           export VERSION=$(cat version.txt)
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
           just latest-changes > latest_changes.md
+
           just fetch-core-library
           mkdir -p release_files
-          zip -r release_files/Core-Library.zip build_resources/Core 
+          cd build_resources
+          zip -r ../release_files/Floe-Core-Library.zip Core 
 
       - uses: actions/download-artifact@v4
         with:

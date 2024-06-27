@@ -1,0 +1,106 @@
+
+name: Windows Just
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            .github/scripts/just-test
+
+      - shell: bash
+        run: mv .github/scripts/just-test justfile
+
+      - uses: taiki-e/install-action@just
+
+      - name: "1"
+        if: '!cancelled()'
+        shell: powershell
+        run: |
+          $env:PATH += ";C:\Program Files\Git\bin"
+          just test-bash-exe
+
+      - name: "2"
+        if: '!cancelled()'
+        shell: powershell
+        run: |
+          $env:PATH += ";C:\Program Files\Git\bin"
+          just test-bash
+
+      - name: "3"
+        if: '!cancelled()'
+        shell: powershell
+        run: |
+          $env:PATH += ";C:\Program Files\Git\bin"
+          just test-env
+      
+      - name: "4"
+        if: '!cancelled()'
+        shell: bash
+        run: |
+          just test-bash-exe
+
+      - name: "5"
+        if: '!cancelled()'
+        shell: bash
+        run: |
+          just test-bash
+
+      - name: "6"
+        if: '!cancelled()'
+        shell: bash
+        run: |
+          just test-env
+
+      - name: Install Git Bash
+        if: '!cancelled()'
+        run: |
+          choco install git -y
+          refreshenv
+
+      - name: "7"
+        if: '!cancelled()'
+        shell: powershell
+        run: |
+          $env:PATH += ";C:\Program Files\Git\bin"
+          just test-bash-exe
+
+      - name: "8"
+        if: '!cancelled()'
+        shell: powershell
+        run: |
+          $env:PATH += ";C:\Program Files\Git\bin"
+          just test-bash
+
+      - name: "9"
+        if: '!cancelled()'
+        shell: powershell
+        run: |
+          $env:PATH += ";C:\Program Files\Git\bin"
+          just test-env
+      
+      - name: "10"
+        if: '!cancelled()'
+        shell: bash
+        run: |
+          just test-bash-exe
+
+      - name: "11"
+        if: '!cancelled()'
+        shell: bash
+        run: |
+          just test-bash
+
+      - name: "12"
+        if: '!cancelled()'
+        shell: bash
+        run: |
+          just test-env
+

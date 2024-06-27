@@ -1,0 +1,17 @@
+
+test-bash-exe:
+  #! bash.exe
+  echo "bash-exe"
+
+test-bash:
+  #! bash
+  echo "bash"
+
+test-git-bash:
+  #! C:\Program Files\Git\bin\bash.exe
+  echo "full path"
+
+test-env:
+  #!/usr/bin/env bash
+  echo "env"
+

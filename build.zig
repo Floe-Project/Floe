@@ -2254,7 +2254,7 @@ pub fn build(b: *std.Build) void {
                     found = false;
                 };
                 if (found) {
-                    const core_library_zip_path_relative = b.pathJoin(&.{ "zig-out", "floe-core-library.zip" });
+                    const core_library_zip_path_relative = b.pathJoin(&.{ build_gen_relative, "floe-core-library.zip" });
                     // IMPROVE: it's slow to zip this every time
                     // NOTE: we enter the library folder and build the zip from there. This way, the zip contains only the contents of the Core Library folder, not the folder itself. Additionally, we exclude the .git folder.
                     const zip_core = b.addSystemCommand(&.{ "zip", "-x", ".git/*", "-r", b.pathJoin(&.{ rootdir, core_library_zip_path_relative }), "." });

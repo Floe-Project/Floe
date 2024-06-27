@@ -12,6 +12,16 @@ gen_files_dir := "build_gen"
 release_files_dir := justfile_directory() + "/zig-out/release"
 build_resources_core := justfile_directory() + "/build_resources/Core"
 floe_manual_url := "https://floe-synth.github.io/Floe/"
+cross_platform_bash_shebang := if os() == 'windows' {
+  'bash.exe'
+} else {
+  '/usr/bin/env bash'
+}
+run_windows_program := if os() == 'windows' {
+  ''
+} else {
+  'wine'
+}
 
 build target_os='native':
   zig build compile -Dtargets={{target_os}} -Dbuild-mode=development
@@ -211,25 +221,34 @@ check-spelling:
     exit 1
   fi
 
-[windows]
+
 test-windows:
-  {{native_binary_dir}}/tests.exe --log-level=debug
-  {{native_binary_dir}}/VST3-Validator.exe {{native_binary_dir}}/Floe.vst3
+  #!{{cross_platform_bash_shebang}}
+  {{run_windows_program}} zig-out/x86_64-windows/tests.exe --log-level=debug
+  {{run_windows_program}} {{native_binary_dir}}/VST3-Validator.exe {{native_binary_dir}}/Floe.vst3
+
+  download_zip() {
+    url=$1
+
+    mkdir -p {{gen_files_dir}}
+    pushd {{gen_files_dir}}
+    wget $url
+    basename=$(basename $url)
+    unzip $basename
+    rm $basename
+    popd
+  }
 
   # if pluginval is not available, download it
-  if [[ ! -f pluginval.exe ]]; then
-    wget "https://github.com/Tracktion/pluginval/releases/download/v1.0.3/pluginval_Windows.zip"
-    unzip pluginval_Windows.zip
-    rm pluginval_Windows.zip
+  if [[ ! -f {{gen_files_dir}}/pluginval.exe ]]; then
+    download_zip "https://github.com/Tracktion/pluginval/releases/download/v1.0.3/pluginval_Windows.zip"
   fi
-  pluginval.exe --verbose --validate {{native_binary_dir}}/Floe.vst3
+  {{run_windows_program}} {{gen_files_dir}}/pluginval.exe --verbose --validate {{native_binary_dir}}/Floe.vst3
 
-  if [[ ! clap-validator.exe ]]; then
-    wget "https://github.com/free-audio/clap-validator/releases/download/0.3.2/clap-validator-0.3.2-windows.zip"
-    unzip clap-validator-0.3.2-windows.zip
-    rm clap-validator-0.3.2-windows.zip
+  if [[ ! -f {{gen_files_dir}}/clap-validator.exe ]]; then
+    download_zip  "https://github.com/free-audio/clap-validator/releases/download/0.3.2/clap-validator-0.3.2-windows.zip"
   fi
-  clap-validator.exe validate {{native_binary_dir}}/Floe.clap
+  {{run_windows_program}} {{gen_files_dir}}/clap-validator.exe validate {{native_binary_dir}}/Floe.clap
 
 latest-changes:
   #!/usr/bin/env bash

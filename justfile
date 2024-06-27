@@ -157,8 +157,10 @@ checks_ci := replace(
     "
   }, "\n", " ")
 
+[unix]
 test level="0" build="": (_build_if_requested build "dev") (parallel if level == "0" { checks_level_0 } else { checks_level_1 })
 
+[unix]
 test-ci: (parallel checks_ci)
 
 [unix]
@@ -425,7 +427,7 @@ macos-build-installer:
   [[ ! -f version.txt ]] && echo "version.txt file not found" && exit 1
   [[ ! -d zig-out/universal-macos ]] && echo "universal-macos folder not found" && exit 1
 
-  mkdir -p {{release_files_dir}}
+  mkdir -p "{{release_files_dir}}"
 
   version=$(cat version.txt)
   universal_macos_abs_path="{{justfile_directory()}}/zig-out/universal-macos"
@@ -434,20 +436,20 @@ macos-build-installer:
   cd $universal_macos_abs_path
 
   temp_working_subdir="temp_installer_working_subdir"
-  rm -rf $temp_working_subdir
-  mkdir -p $temp_working_subdir
-  cd $temp_working_subdir
+  rm -rf "$temp_working_subdir"
+  mkdir -p "$temp_working_subdir"
+  pushd "$temp_working_subdir"
 
   distribution_xml_choices=""
   distribution_xml_choice_outlines=""
 
   add_package_to_distribution_xml() {
-    identifier=$1
-    title=$2
-    description=$3
-    pkg_name=$4
+    local identifier="$1"
+    local title="$2"
+    local description="$3"
+    local pkg_name="$4"
 
-    choice=$(cat <<EOF
+    local choice=$(cat <<EOF
     <choice id="$identifier" title="$title" description="$description">
         <pkg-ref id="$identifier" version="$version">$pkg_name</pkg-ref>
     </choice>
@@ -459,24 +461,24 @@ macos-build-installer:
 
   # step 1: make packages for each plugin so they are selectable options in the final installer
   make_package() {
-    file_extension=$1
-    destination_plugin_folder=$2
-    title=$3
-    description=$4
+    local file_extension="$1"
+    local destination_plugin_folder="$2"
+    local title="$3"
+    local description="$4"
 
-    package_root=package_$file_extension
-    install_folder=Library/Audio/Plug-Ins/$destination_plugin_folder
-    identifier=com.Floe.$file_extension
-    plugin_path=$universal_macos_abs_path/Floe.$file_extension
+    local package_root="package_$file_extension"
+    local install_folder="Library/Audio/Plug-Ins/$destination_plugin_folder"
+    local identifier="com.Floe.$file_extension"
+    local plugin_path="$universal_macos_abs_path/Floe.$file_extension"
 
     codesign --verify "$plugin_path" || { echo "ERROR: the plugin file isn't codesigned, do that before this command"; exit 1; }
 
-    mkdir -p $package_root/$install_folder
-    cp -r "$plugin_path" $package_root/$install_folder
-    pkgbuild --analyze --root $package_root $package_root.plist
-    pkgbuild --root $package_root --component-plist $package_root.plist --identifier $identifier --install-location / --version $version $package_root.pkg
+    mkdir -p "$package_root/$install_folder"
+    cp -r "$plugin_path" "$package_root/$install_folder"
+    pkgbuild --analyze --root "$package_root" "$package_root.plist"
+    pkgbuild --root "$package_root" --component-plist "$package_root.plist" --identifier "$identifier" --install-location / --version "$version" "$package_root.pkg"
 
-    add_package_to_distribution_xml $identifier $title $description $package_root.pkg
+    add_package_to_distribution_xml "$identifier" "$title" "$description" "$package_root.pkg"
   }
 
   make_package vst3 VST3 "Floe VST3" "VST3 format of the Floe plugin"
@@ -485,11 +487,11 @@ macos-build-installer:
 
   # step 2: make a package to create empty folders that Floe might use
   mkdir -p floe_dirs
-  cd floe_dirs
-  mkdir -p Library/Application\ Support/Floe/Presets
-  mkdir -p Library/Application\ Support/Floe/Libraries
-  cd ../
-  pkgbuild --root floe_dirs --identifier com.Floe.dirs --install-location / --version $version floe_dirs.pkg
+  pushd floe_dirs
+  mkdir -p "Library/Application Support/Floe/Presets"
+  mkdir -p "Library/Application Support/Floe/Libraries"
+  popd
+  pkgbuild --root floe_dirs --identifier com.Floe.dirs --install-location / --version "$version" floe_dirs.pkg
   add_package_to_distribution_xml \
     com.Floe.dirs \
     "Floe Folders" \
@@ -499,12 +501,12 @@ macos-build-installer:
   # step 3: make a package for the core library
   if [[ -d "{{build_resources_core}}" ]]; then
     mkdir -p core_library
-    cd core_library
+    pushd core_library
     install_folder="Library/Application Support/Floe/Libraries"
-    mkdir -p $install_folder
-    cp -r "{{build_resources_core}}" $install_folder
-    cd ../
-    pkgbuild --root core_library --identifier com.Floe.Core --install-location / --version $version core_library.pkg
+    mkdir -p "$install_folder"
+    cp -r "{{build_resources_core}}" "$install_folder"
+    popd
+    pkgbuild --root core_library --identifier com.Floe.Core --install-location / --version "$version" core_library.pkg
 
     identifier=com.Floe.core
 
@@ -536,20 +538,20 @@ macos-build-installer:
   EOF
 
   productbuild --distribution distribution.xml --resources productbuild_files --package-path . unsigned.pkg
-  productsign --timestamp --sign "$MACOS_DEV_ID_INSTALLER_NAME" unsigned.pkg $universal_macos_abs_path/$final_installer_name.pkg
+  productsign --timestamp --sign "$MACOS_DEV_ID_INSTALLER_NAME" unsigned.pkg "$universal_macos_abs_path/$final_installer_name.pkg"
 
-  cd ../
-  rm -rf $temp_working_subdir
+  popd
+  rm -rf "$temp_working_subdir"
 
   # step 5: notarize the installer
   just macos-notarize $final_installer_name.pkg
   xcrun stapler staple $final_installer_name.pkg
 
   # step 6: zip the installer
-  final_zip_name=$final_installer_name-macOS.zip
-  rm -f $final_zip_name
-  zip -r $final_zip_name $final_installer_name.pkg
-  mv $final_zip_name {{release_files_dir}}
+  final_zip_name="$final_installer_name-macOS.zip"
+  rm -f "$final_zip_name"
+  zip -r "$final_zip_name" "$final_installer_name.pkg"
+  mv "$final_zip_name" "{{release_files_dir}}"
 
 [macos]
 macos-prepare-release: (macos-prepare-release-plugins) (macos-build-installer)

@@ -11,12 +11,6 @@ all_src_files := 'fd . -e .mm -e .cpp -e .hpp -e .h src'
 gen_files_dir := "build_gen"
 release_files_dir := justfile_directory() + "/zig-out/release"
 build_resources_core := justfile_directory() + "/build_resources/Core"
-floe_manual_url := "https://floe-synth.github.io/Floe/"
-cross_platform_bash_shebang := if os() == 'windows' {
-  'bash.exe'
-} else {
-  '/usr/bin/env bash'
-}
 run_windows_program := if os() == 'windows' {
   ''
 } else {
@@ -167,6 +161,7 @@ test level="0" build="": (_build_if_requested build "dev") (parallel if level ==
 
 test-ci: (parallel checks_ci)
 
+[unix]
 parallel tasks:
   #!/usr/bin/env bash
   mkdir -p {{gen_files_dir}}
@@ -211,19 +206,20 @@ parallel tasks:
     exit 1
   fi
 
+[unix]
 check-spelling:
   #!/usr/bin/env bash
   # hunspell doesn't do anything fancy at all, it just checks each word for spelling. It means we get lots of
   # false positives, but I think it's still worth it. We can just add words to ignored-spellings.dic.
-  output=$(fd . -e .md --exclude third_party_libs/ --exclude src/readme.md | xargs hunspell -l -d en_GB -p docs/ignored-spellings.dic readme.md)
+  output=$(fd . -e .md --exclude third_party_libs/ --exclude src/readme.md | xargs hunspell -l -d en_GB -p docs/ignored-spellings.dic)
   echo "$output"
   if [[ -n "$output" ]]; then
     exit 1
   fi
 
-
+[linux, windows]
 test-windows:
-  #!{{cross_platform_bash_shebang}}
+  #!/usr/bin/env bash
   {{run_windows_program}} zig-out/x86_64-windows/tests.exe --log-level=debug
   {{run_windows_program}} {{native_binary_dir}}/VST3-Validator.exe {{native_binary_dir}}/Floe.vst3
 
@@ -250,11 +246,13 @@ test-windows:
   fi
   {{run_windows_program}} {{gen_files_dir}}/clap-validator.exe validate {{native_binary_dir}}/Floe.clap
 
+[unix]
 latest-changes:
   #!/usr/bin/env bash
   changes=$(sed -n "/## $(cat version.txt)/,/## /{ /## /!p }" changelog.md)
   printf "%s" "$changes" # trim trailing newline
 
+[unix]
 fetch-core-library:
   #!/usr/bin/env bash
   mkdir -p build_resources
@@ -264,7 +262,7 @@ fetch-core-library:
   rm main.zip
   mv Core-Library-main {{build_resources_core}}
 
-[no-cd]
+[unix, no-cd]
 _try-add-core-library-to-zip zip-path:
   #!/usr/bin/env bash
   if [[ -d "{{build_resources_core}}" ]]; then
@@ -277,7 +275,17 @@ _try-add-core-library-to-zip zip-path:
     popd
   fi
 
-[no-cd]
+[unix, no-cd]
+_create_manual_install_readme os_name:
+  #!/usr/bin/env bash
+  echo "These are the manual-install {{os_name}} plugin files and Core library for Floe version $version." > readme.txt
+  echo "" >> readme.txt
+  echo "It's normally recommended to use the installer instead of these manual-install files." >> readme.txt
+  echo "The installer is a separate download to this." >> readme.txt
+  echo "" >> readme.txt
+  echo "Installation instructions: https://floe-synth.github.io/Floe/" >> readme.txt
+
+[unix, no-cd]
 windows-codesign-file file description:
   #!/usr/bin/env bash
   set -euo pipefail # don't use 'set -x' because it might print sensitive information
@@ -300,6 +308,7 @@ windows-codesign-file file description:
 
   mv {{file}}.signed {{file}}
 
+[unix]
 windows-prepare-release:
   #!/usr/bin/env bash
   set -euxo pipefail
@@ -324,13 +333,7 @@ windows-prepare-release:
   mv $final_installer_zip_name {{release_files_dir}}
 
   # zip the manual-install files
-  echo "These are the manual-install Windows plugin files and Core library for Floe version $version." > readme.txt
-  echo "" >> readme.txt
-  echo "It's normally recommended to use the installer instead of these manual-install files." >> readme.txt
-  echo "The installer is a separate download to this." >> readme.txt
-  echo "" >> readme.txt
-  echo "Installation instructions: {{floe_manual_url}}" >> readme.txt
-
+  just _create_manual_install_readme "Windows"
   final_manual_zip_name="Floe-Manual-Install-v$version-Windows.zip"
   zip -r $final_manual_zip_name Floe.vst3 Floe.clap readme.txt
   just _try-add-core-library-to-zip $final_manual_zip_name
@@ -377,7 +380,7 @@ macos-prepare-release-plugins:
     codesign --sign "$MACOS_DEV_ID_APP_NAME" --timestamp --options=runtime --deep --force --entitlements plugin.entitlements $1
   }
 
-  # we can do it in parallel for speed, but we need to be careful there's no comflicting use of the filesystem
+  # we can do it in parallel for speed, but we need to be careful there's no conflicting use of the filesystem
   export -f codesign_plugin
   SHELL=$(type -p bash) parallel --bar codesign_plugin ::: Floe.vst3 Floe.component Floe.clap
 
@@ -402,24 +405,17 @@ macos-prepare-release-plugins:
     rm -rf $temp_subdir
   }
 
-  # we can do it in parallel for speed, but we need to be careful there's no comflicting use of the filesystem
-  # export -f notarize_plugin
-  # SHELL=$(type -p bash) parallel --bar notarize_plugin ::: Floe.vst3 Floe.component Floe.clap
+  # we can do it in parallel for speed, but we need to be careful there's no conflicting use of the filesystem
+  export -f notarize_plugin
+  SHELL=$(type -p bash) parallel --bar notarize_plugin ::: Floe.vst3 Floe.component Floe.clap
 
   # step 3: zip
-  echo "These are the manual-install macOS files for Floe version $version." > readme.txt
-  echo "" >> readme.txt
-  echo "It's normally recommended to use the installer instead of these manual-install files." >> readme.txt
-  echo "The installer is a separate download to this." >> readme.txt
-  echo "" >> readme.txt
-  echo "Installation instructions: {{floe_manual_url}}" >> readme.txt
-
+  just _create_manual_install_readme "macOS"
   final_manual_zip_name="Floe-Manual-Install-v$version-macOS.zip"
   rm -f $final_manual_zip_name
   zip -r $final_manual_zip_name Floe.vst3 Floe.component Floe.clap readme.txt
   just _try-add-core-library-to-zip $final_manual_zip_name
   mv $final_manual_zip_name {{release_files_dir}}
-
   rm readme.txt
 
 [macos]
@@ -445,6 +441,22 @@ macos-build-installer:
   distribution_xml_choices=""
   distribution_xml_choice_outlines=""
 
+  add_package_to_distribution_xml() {
+    identifier=$1
+    title=$2
+    description=$3
+    pkg_name=$4
+
+    choice=$(cat <<EOF
+    <choice id="$identifier" title="$title" description="$description">
+        <pkg-ref id="$identifier" version="$version">$pkg_name</pkg-ref>
+    </choice>
+  EOF)
+    # add the choices with correct newlines
+    distribution_xml_choices=$(printf "%s%s\n" "$distribution_xml_choices" "$choice")
+    distribution_xml_choice_outlines=$(printf "%s%s\n" "$distribution_xml_choice_outlines" "<line choice=\"$identifier\" />")
+  }
+
   # step 1: make packages for each plugin so they are selectable options in the final installer
   make_package() {
     file_extension=$1
@@ -464,13 +476,7 @@ macos-build-installer:
     pkgbuild --analyze --root $package_root $package_root.plist
     pkgbuild --root $package_root --component-plist $package_root.plist --identifier $identifier --install-location / --version $version $package_root.pkg
 
-    choice=$(cat <<EOF
-    <choice id="$identifier" title="$title" description="$description">
-        <pkg-ref id="$identifier" version="$version">$package_root.pkg</pkg-ref>
-    </choice>
-  EOF)
-    distribution_xml_choices=$(printf "%s%s\n" "$distribution_xml_choices" "$choice")
-    distribution_xml_choice_outlines=$(printf "%s%s\n" "$distribution_xml_choice_outlines" "<line choice=\"$identifier\" />")
+    add_package_to_distribution_xml $identifier $title $description $package_root.pkg
   }
 
   make_package vst3 VST3 "Floe VST3" "VST3 format of the Floe plugin"
@@ -484,6 +490,11 @@ macos-build-installer:
   mkdir -p Library/Application\ Support/Floe/Libraries
   cd ../
   pkgbuild --root floe_dirs --identifier com.Floe.dirs --install-location / --version $version floe_dirs.pkg
+  add_package_to_distribution_xml \
+    com.Floe.dirs \
+    "Floe Folders" \
+    "Create empty folders ready for Floe to use to look for libraries and presets" \
+    floe_dirs.pkg
   
   # step 3: make a package for the core library
   if [[ -d "{{build_resources_core}}" ]]; then
@@ -496,13 +507,12 @@ macos-build-installer:
     pkgbuild --root core_library --identifier com.Floe.Core --install-location / --version $version core_library.pkg
 
     identifier=com.Floe.core
-    choice=$(cat <<EOF
-    <choice id="$identifier" title="Core Library" description="Core Floe library containing a few reverb impulses responses">
-        <pkg-ref id="$identifier" version="$version">core_library.pkg</pkg-ref>
-    </choice>
-  EOF)
-    distribution_xml_choices=$(printf "%s%s\n" "$distribution_xml_choices" "$choice")
-    distribution_xml_choice_outlines=$(printf "%s%s\n" "$distribution_xml_choice_outlines" "<line choice=\"$identifier\" />")
+
+    add_package_to_distribution_xml \
+      "com.Floe.core" \
+      "Core Library" \
+      "Core Floe library containing a few reverb impulses responses" \
+      core_library.pkg
   fi
 
   # step 4: make the final installer combining all the packages
@@ -518,12 +528,8 @@ macos-build-installer:
       <welcome file="welcome.txt" mime-type="text/plain"/>
       <options customize="always" require-scripts="false"/>
       <os-version min="$min_macos_version" /> 
-      <choice id="com.Floe.dirs" title="Floe Folders" description="Create empty folders ready for Floe to use to look for libraries and presets" enabled="false">
-          <pkg-ref id="com.Floe.dirs" version="$version">floe_dirs.pkg</pkg-ref>
-      </choice>
       $distribution_xml_choices
       <choices-outline>
-          <line choice="com.Floe.dirs" />
           $distribution_xml_choice_outlines
       </choices-outline>
   </installer-gui-script>

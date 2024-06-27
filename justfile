@@ -211,6 +211,10 @@ check-spelling:
     exit 1
   fi
 
+[windows]
+test-windows:
+  {{native_binary_dir}}/tests.exe --log-level=debug
+
 latest-changes:
   #!/usr/bin/env bash
   changes=$(sed -n "/## $(cat version.txt)/,/## /{ /## /!p }" changelog.md)

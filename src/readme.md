@@ -4,7 +4,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 --->
 - `foundation`: basics, designed to be used by every single file
 - `os`: OS API abstractions: filesystem, threading, etc.
-- `utils`: more specialized stuff building off of foundation + os
+- `utils`: more specialised stuff building off of foundation + os
 - `tests`: unit tests and framework
 - `plugin`: audio plugin code
 - `standalone_wrapper`: audio plugin standalone wrapper

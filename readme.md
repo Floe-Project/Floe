@@ -22,7 +22,7 @@ We aim to offer comprehensive documentation in the form of a user manual. We use
 Online user manual: https://floe-synth.github.io/Floe/
 
 ## Roadmap
-We want Floe to be a constantly evolving and improving project with regular stable, backwards-compatibile releases. Currently we are working towards the first stable version, 1.0.
+We want Floe to be a constantly evolving and improving project with regular stable, backwards-compatible releases. Currently we are working towards the first stable version, 1.0.
 
 - [x] Make open-source
 - [x] Implement comprehensive CI/CD to aid rapid development
@@ -40,7 +40,7 @@ Floe is fully backwards-compatible with Mirage.
 - Floe is more linked to FrozenPlain's tundra/arctic theme.
 
 ## License
-This project is licensed under GPL version 3 or later. See the LICENCES folder for the full licence text. We follow the [REUSE](https://reuse.software/) recommendations for this repo.
+This project is licensed under GPL version 3 or later. See the LICENCES folder for the full licence text. We follow the [REUSE](https://reuse.software/) recommendations for this repository.
 
 ## Building
 Building is done on a Linux or macOS system. Cross compilation is supported. Therefore from Linux/macOS you can build for Windows and other platforms. 
@@ -56,4 +56,4 @@ However, Linux is only provided for development purposes at the moment, and you 
 - We don't use the C++ standard library, and only sparingly use the C standard library.
 - We only support one compiler: Clang (via Zig), and so we wholeheartedly use Clang-specific features and features from C++20/23 and above.
 - Good tooling is a priority. The build system generates a compile_commands.json, so clangd, clang-tidy, cppcheck, etc. are all supported.
-- We heavilty utilise modern tools such as Nix and justfile.
+- We heavily utilise modern tools such as Nix and justfile.

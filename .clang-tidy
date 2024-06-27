@@ -38,6 +38,7 @@ Checks: '-*,
 
 # NOTE: bit of a hack - it requires that this folder is called floe
 HeaderFilterRegex: '.*floe/src.*' # only check our code
+WarningsAsErrors: '*'
 
 CheckOptions:
   - { key: readability-identifier-naming.NamespaceCase,            value: lower_case }

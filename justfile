@@ -194,11 +194,23 @@ test level="0" build="": (_build_if_requested build "dev") (parallel if level ==
 [unix]
 test-ci: (parallel checks_ci)
 
+_print-ci-summary num_tasks num_failed:
+  #!/usr/bin/env bash
+  if [ "{{num_failed}}" -eq 0 ]; then
+    echo -e "\033[0;32mAll {{num_tasks}} tasks passed\033[0m"
+    [[ ! -z $GITHUB_ACTIONS ]] && echo "### :white_check_mark: All {{num_tasks}} tasks succeeded" >> $GITHUB_STEP_SUMMARY
+  else
+    echo -e "\033[0;31m{{num_failed}}/{{num_tasks}} tasks failed\033[0m"
+    [[ ! -z $GITHUB_ACTIONS ]] && echo "### :x: {{num_failed}}/{{num_tasks}} tasks failed" >> $GITHUB_STEP_SUMMARY
+  fi
+  exit 0
+
 [windows, linux]
 test-ci-windows:
   #!/usr/bin/env bash
 
-  failed=0
+  num_tasks=0
+  num_failed=0
 
   if [[ -z $GITHUB_ACTIONS ]]; then
     mkdir -p {{gen_files_dir}}
@@ -213,10 +225,11 @@ test-ci-windows:
   test() {
     local name="$1"
 
-    just $name
+    just "$name"
     local result=$?
     echo "| $name | $result |" >> $GITHUB_STEP_SUMMARY
-    [[ $result -ne 0 ]] && failed=1
+    num_tasks=$((num_tasks + 1))
+    [[ $result -ne 0 ]] && num_failed=$((num_failed + 1))
   }
   
   test test-windows-pluginval
@@ -224,7 +237,14 @@ test-ci-windows:
   test test-windows-vst3-val
   test test-windows-clap-val
 
-  exit $failed
+  if [[ -z $GITHUB_ACTIONS ]]; then
+    cat {{gen_files_dir}}/test_ci_windows_summary.md
+  fi
+
+  just _print-ci-summary $num_tasks $num_failed
+  if [ $num_failed -ne 0 ]; then
+    exit 1
+  fi
 
 [unix]
 parallel tasks:
@@ -252,7 +272,7 @@ parallel tasks:
 
   # prepare a TSV summary of the results
   summary=$(jq -r '["Command", "Time(s)", "Return-Code"], (.[] | [.Command, .JobRuntime, .Exitval]) | @tsv' $results_json)
-  failed=$(jq '. | map(select(.Exitval != 0)) | length' $results_json)
+  num_failed=$(jq '. | map(select(.Exitval != 0)) | length' $results_json)
   num_tasks=$(jq '. | length' $results_json)
 
   # use Miller to pretty-print the summary, along with a markdown version for GitHub Actions
@@ -261,13 +281,8 @@ parallel tasks:
   printf "%s\n" "$summary" | mlr --itsv --opprint sort -f "Return-Code"
   [[ ! -z $GITHUB_ACTIONS ]] && printf "%s\n" "$summary" | mlr --itsv --omd sort -f "Return-Code" >> $GITHUB_STEP_SUMMARY && echo "" >> $GITHUB_STEP_SUMMARY
 
-  if [ $failed -eq 0 ]; then
-    echo -e "\033[0;32mAll $num_tasks tasks passed\033[0m"
-    [[ ! -z $GITHUB_ACTIONS ]] && echo "### :white_check_mark: All $num_tasks tasks succeeded" >> $GITHUB_STEP_SUMMARY
-    exit 0
-  else
-    echo -e "\033[0;31m$failed/$num_tasks tasks failed\033[0m"
-    [[ ! -z $GITHUB_ACTIONS ]] && echo "### :x: $failed/$num_tasks tasks failed" >> $GITHUB_STEP_SUMMARY
+  just _print-ci-summary $num_tasks $num_failed
+  if [ $num_failed -ne 0 ]; then
     exit 1
   fi
 

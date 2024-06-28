@@ -20,6 +20,10 @@ PuglWorld* g_world {};
 
 constexpr uintptr_t k_timer_id = 200;
 
+// TODO(1.0): go over the API docs and review usage
+// TODO(1.0): add error handling
+// TODO(1.0): integrate this with the clap interface, there's no need having an abstraction layer here
+
 struct PuglPlatform : public GuiPlatform {
     PuglPlatform(GUI_PLATFORM_ARGS) : GuiPlatform(GUI_PLATFORM_FORWARD_ARGS) {}
 

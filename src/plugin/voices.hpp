@@ -107,7 +107,7 @@ struct Voice {
     int note_off_count = 0;
 
     LFO lfo = {};
-    OnePoleLowPassFilter lfo_smoother {}; // TODO: does the lfo need to be smoothed?
+    OnePoleLowPassFilter lfo_smoother {}; // TODO(1.0): does the lfo need to be smoothed?
 
     VolumeFade volume_fade;
     adsr::Processor vol_env = {};
@@ -199,7 +199,7 @@ struct VoicePool {
     Array<Voice, k_num_voices> voices {MakeInitialisedArray<Voice, k_num_voices>(*this)};
     Array<Span<f32>, k_num_voices> buffer_pool {};
 
-    // TODO: hide waveform markers for Waveform instruments, only show them for sampled instrument
+    // TODO(1.0): hide waveform markers for Waveform instruments, only show them for sampled instrument
     Array<Atomic<VoiceWaveformMarkerForGui>, k_num_voices> voice_waveform_markers_for_gui {};
     Array<Atomic<VoiceEnvelopeMarkerForGui>, k_num_voices> voice_vol_env_markers_for_gui {};
     Array<Atomic<VoiceEnvelopeMarkerForGui>, k_num_voices> voice_fil_env_markers_for_gui {};

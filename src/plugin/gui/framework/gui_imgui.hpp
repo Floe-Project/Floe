@@ -967,6 +967,7 @@ extern bool g_high_contrast_gui; // IMPROVE: this is hacky
 
 } // namespace live_edit
 
+// IMPROVE: separate out possibly constexpr lookup from runtime calculation for better performance
 inline u32 LiveCol(imgui::Context const& imgui, UiColMap type) {
     auto const map_index = ToInt(type);
 

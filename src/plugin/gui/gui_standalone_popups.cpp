@@ -727,6 +727,8 @@ static void DoMultilineText(Gui* g, String text, f32& y_pos) {
                             imgui.Width());
 }
 
+// TODO(1.0): fix GPL licence text being cut short
+
 void DoLicencesStandalone(Gui* g) {
 #include "third_party_licence_text.hpp"
     static bool open[ArraySize(k_third_party_licence_texts)];

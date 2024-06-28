@@ -22,7 +22,7 @@ const floe_copyright = "Sam Windell";
 const floe_vendor = "Floe";
 const floe_url = "https://github.com/Floe-Synth/Floe";
 const floe_au_factory_function = "FloeFactoryFunction";
-const floe_plugin_gui = true;
+const floe_plugin_gui = true; // TODO(1.0): remove this
 const min_macos_version = "11.0.0"; // use 3-part version for plist
 const min_windows_version = "win10";
 

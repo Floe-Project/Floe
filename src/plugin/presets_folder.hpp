@@ -11,9 +11,11 @@
 #include "rescan_mode.hpp"
 #include "scanned_folder.hpp"
 
-// TODO: this has potential crashes. The lifetime of the listing can end while there are
+// TODO(1.0): this needs entirely replacing: use new ReadDirectoryChanges, AssetRefList, HashTable, etc
+// Refer to the (now deleted) work on a sqlite based preset database if needed.
+//
+// NOTE: this has potential crashes. The lifetime of the listing can end while there are
 // still jobs in the thread pool - which would then access deleted memory
-// TODO: this needs entirely replacing: use new ReadDirectoryChanges, AssetRefList, HashTable, etc
 
 struct PresetsListing {
     PresetsListing(Span<String const> always_scanned_folders, ThreadsafeErrorNotifications& error_notifs);

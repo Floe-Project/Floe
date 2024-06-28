@@ -59,7 +59,7 @@ void TopPanel(Gui* g) {
     auto& lay = g->layout;
     auto& plugin = g->plugin;
 
-    bool const has_insts_with_dynamics = true; // TODO, get the value properly?
+    bool const has_insts_with_dynamics = true; // TODO(1.0), get the value properly?
     auto title_font = g->mada_big;
 
     auto const title_width = LiveSize(imgui, UiSizeId::Top2TitleWidth);
@@ -199,7 +199,7 @@ void TopPanel(Gui* g) {
                     preset_load_criteria = PresetRandomiseCriteria {PresetRandomiseMode::Folder};
                     break;
                 case PresetRandomiseMode::Library:
-                    // TODO:
+                    // TODO(1.0):
                     break;
             }
         }

@@ -412,7 +412,7 @@ static void TriggerVoicesIfNeeded(LayerProcessor& layer,
     ASSERT_HOT(note_vel_float >= 0 && note_vel_float <= 1);
     auto const note_vel = (u8)RoundPositiveFloat(note_vel_float * 99);
 
-    // TODO: handle sustain pedal
+    // TODO(1.0): handle sustain pedal
     // if (auto i = layer.inst.GetNullable<const LoadedInstrument *>()) {
     //     if (context.midi_note_state.sustain_keys[note.channel].Get(note.note) &&
     //         !((*i)->instrument.flags & Floesample_lib::Instrument::TriggersOnKeyRelease)) {
@@ -479,6 +479,7 @@ static void TriggerVoicesIfNeeded(LayerProcessor& layer,
 
         if (!sampler_params.voice_sample_params.size) return;
 
+        // TODO(1.0): test this
         // do velocity feathering if needed
         {
             VoiceStartParams::SamplerParams::Region* feather_region_1 = nullptr;
@@ -532,7 +533,7 @@ static void TriggerVoicesIfNeeded(LayerProcessor& layer,
         }
     }
 
-    // TODO: I don't think this works now given the changes to trigger_event
+    // TODO(1.0): I don't think this works now given the changes to trigger_event
     if (layer.monophonic) {
         for (auto& v : voice_pool.EnumerateActiveLayerVoices(layer.voice_controller))
             if (!layer.voice_controller.vol_env_on)
@@ -552,9 +553,9 @@ void LayerHandleNoteOff(LayerProcessor& layer,
                         f32 dynamics_param_value_01,
                         f32 velocity_to_volume_01) {
     (void)triggered_by_cc64;
-    // TODO: handle sustain pedal
+    // TODO(1.0): handle sustain pedal
     // if (!context.midi_note_state.sustain_pedal_down.Get(note.channel))
-    // TODO: handle volume envelope off
+    // TODO(1.0): handle volume envelope off
 
     NoteOff(voice_pool, layer.voice_controller, note);
     TriggerVoicesIfNeeded(layer,
@@ -562,7 +563,7 @@ void LayerHandleNoteOff(LayerProcessor& layer,
                           voice_pool,
                           sample_lib::TriggerEvent::NoteOff,
                           note,
-                          1, // TODO: get the note-off velocity from the corresponding note-on
+                          1, // TODO(1.0): get the note-off velocity from the corresponding note-on
                           0,
                           dynamics_param_value_01,
                           velocity_to_volume_01);
@@ -576,7 +577,7 @@ void LayerHandleNoteOn(LayerProcessor& layer,
                        u32 offset,
                        f32 dynamics_param_value_01,
                        f32 velocity_to_volume_01) {
-    // TODO: handle sutain pedal
+    // TODO(1.0): handle sutain pedal
     TriggerVoicesIfNeeded(layer,
                           context,
                           voice_pool,

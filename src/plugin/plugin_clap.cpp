@@ -93,7 +93,6 @@ struct FloeInstance {
 #endif
 };
 
-// TODO: combine these counters
 static u16 g_num_instances = 0;
 
 clap_plugin_state const floe_plugin_state {

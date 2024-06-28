@@ -359,7 +359,7 @@ ErrorCodeOr<Optional<MutableString>> FilesystemDialog(DialogOptions options) {
       }
     }];
 #endif
-            TODO();
+            TODO(); // TODO(1.0)
             return nullopt;
         }
         case DialogOptions::Type::SaveFile: {
@@ -418,7 +418,7 @@ void DirectoryChanged([[maybe_unused]] ConstFSEventStreamRef streamRef,
                       FSEventStreamEventId const eventIds[]) {
     auto** paths = (char**)eventPaths;
     for (size_t i = 0; i < numEvents; i++) {
-        // TODO: handle and dispatch events
+        // TODO(1.0): handle and dispatch events
         printf("Event %llu in path %s\n", eventIds[i], paths[i]);
 
         if (eventFlags[i] & kFSEventStreamEventFlagItemCreated) printf("    File or directory created\n");
@@ -442,7 +442,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                                        bool watched_directories_changed,
                                        [[maybe_unused]] ArenaAllocator& scratch_arena,
                                        DirectoryWatcher::Callback callback) {
-    // TODO: watch/unwatch based on watched_directories_changed and reviewing the state of all the dirs
+    // TODO(1.0): watch/unwatch based on watched_directories_changed and reviewing the state of all the dirs
     (void)callback;
     auto& fs_watcher = *(FsWatcher*)watcher.native_data.pointer;
     if (watched_directories_changed) {
@@ -475,7 +475,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                                 kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagWatchRoot |
                                     kFSEventStreamCreateFlagNoDefer);
         if (!fs_watcher.stream)
-            return ErrorCode {FilesystemError::PathDoesNotExist}; // TODO: not the right error
+            return ErrorCode {FilesystemError::PathDoesNotExist}; // TODO(1.0): not the right error
 
         if (!fs_watcher.queue)
             fs_watcher.queue = dispatch_queue_create("com.example.fseventsqueue", DISPATCH_QUEUE_SERIAL);
@@ -484,7 +484,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
         if (!FSEventStreamStart(fs_watcher.stream)) {
             FSEventStreamInvalidate(fs_watcher.stream);
             FSEventStreamRelease(fs_watcher.stream);
-            return ErrorCode {FilesystemError::PathDoesNotExist}; // TODO: not the right error
+            return ErrorCode {FilesystemError::PathDoesNotExist}; // TODO(1.0): not the right error
         }
     }
 

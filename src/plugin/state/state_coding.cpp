@@ -492,7 +492,7 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
     // Handle the parameters that are no longer in the engine
     // ======================================================================================================
 #if 0
-    // TODO: use this method of getting old effects perhaps?
+    // IMPROVE: use this method of getting old effects perhaps?
     struct OldReverbEffect {
         bool on = false;
         f32 dry_01 = 1.0f;
@@ -1780,6 +1780,8 @@ TEST_CASE(TestLoadingOldFiles) {
         CHECK_APPROX_EQ(state.param_values[ToInt(ParamIndex::PhaserFeedback)], 0.4f, 0.01f);
         CHECK_APPROX_EQ(state.param_values[ToInt(ParamIndex::PhaserStereoAmount)], 0.0f, 0.01f);
         CHECK_LT(state.param_values[ToInt(ParamIndex::PhaserMix)], 0.5f);
+
+        // TODO(1.0): test new delay param remapping
     }
 
     return k_success;

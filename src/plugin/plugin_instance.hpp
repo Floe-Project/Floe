@@ -13,7 +13,9 @@
 #include "sample_library_loader.hpp"
 #include "state/state_snapshot.hpp"
 
-// TODO: fetch the IRs dynamically once we have the new library infrastructure
+// TODO(1.0): Core-Library Repo: tag all IRs in the config.lua
+//
+// TODO(1.0): fetch the IRs dynamically once we have the new library infrastructure
 constexpr auto k_core_version_1_irs = Array {
     "2s Airy 1"_s,
     "2s Rough Crackle",

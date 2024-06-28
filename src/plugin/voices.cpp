@@ -154,7 +154,7 @@ void SetVoicePitch(Voice& v, f32 pitch, f32 sample_rate) {
 }
 
 void UpdateXfade(Voice& v, f32 knob_pos_01, bool hard_set) {
-    // TODO: I think the dynamics knob should also apply a volume attenuation. How should we handle this?
+    // TODO(1.0): I think the dynamics knob should also apply a volume attenuation. How should we handle this?
     // Previously, it was hardcoded in this code. We should probably take this into consideration because
     // old Arctic Strings presets depend on this.
 #if 0

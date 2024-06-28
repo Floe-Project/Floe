@@ -518,7 +518,8 @@ static void AddAsyncJob(LibrariesAsyncContext& async_ctx,
                         return k_success;
                     };
 
-                    // TODO: had a crash here: invalid memory when doing a memcpy. Happened twice now
+                    // TODO(1.0): had a crash here: invalid memory when doing a memcpy. Happened twice now.
+                    // kcov on linux might be a repro.
                     j.result.outcome = try_job();
                 } else {
                     j.result.outcome = k_success;
@@ -813,7 +814,7 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
                         }
                         case DirectoryWatcher::FileChange::Type::RenamedOldName:
                         case DirectoryWatcher::FileChange::Type::RenamedNewName: {
-                            // TODO: I think we can do better here at working out what's a remove/add/etc
+                            // TODO(1.0): I think we can do better here at working out what's a remove/add/etc
                             if (relates_to_scan_folder)
                                 relates_to_scan_folder->value.state.Store(
                                     AvailableLibraries::ScanFolder::State::RescanRequested);
@@ -853,15 +854,18 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
                             type,
                             (bool)relates_to_scan_folder);
                 } else {
-                    // TODO
+                    // TODO(1.0) handle error
                     DebugLn("Reading directory changes failed for {}: {}", watched_dir, outcome.Error());
                 }
             });
         if (outcome.HasError()) {
-            // TODO
+            // TODO(1.0) handle error
             DebugLn("Reading directory changes failed: {}", outcome.Error());
         }
     }
+
+    // TODO(1.0): if a library/instrument has changed trigger a reload for all clients of this loader so it
+    // feels totally seamless
 
     // remove libraries that are not in any active scan-folders
     for (auto it = libs.libraries.begin(); it != libs.libraries.end();) {

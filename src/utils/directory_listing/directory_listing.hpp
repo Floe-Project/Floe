@@ -1,7 +1,8 @@
 // Copyright 2018-2024 Sam Windell
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// TODO: probably remove this in favour of ad-hoc data structures that use DirectoryIterator
+// TODO: probably remove this in favour of ad-hoc data structures that use DirectoryIterator. This change is
+// related to the proposed changes in presets_folder.hpp
 
 #pragma once
 #include "foundation/foundation.hpp"

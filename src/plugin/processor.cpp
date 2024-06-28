@@ -138,7 +138,8 @@ bool SetParameterValue(AudioProcessor& processor, ParamIndex index, f32 value, P
     DebugAssertMainThread(processor.host);
     auto& param = processor.params[ToInt(index)];
 
-    bool const changed = param.SetLinearValue(value); // TODO: remove this in favour of passing events around?
+    bool const changed =
+        param.SetLinearValue(value); // TODO(1.0): remove this in favour of passing events around?
 
     processor.param_events_for_audio_thread.Push(
         GuiChangedParam {.value = value,
@@ -938,6 +939,7 @@ clap_process_status Process(AudioProcessor& processor, clap_process const& proce
         }
         processor.peak_meter.AddBuffer(interleaved_stereo_samples);
 
+        // TODO(1.0): review new delay/reverb tails and see if there's any issues
         processor.fx_need_another_frame_of_processing =
             any_fx_processed && (!processor.peak_meter.Silent() || !processor.convo.IsSilent());
     } else {
@@ -968,7 +970,7 @@ clap_process_status Process(AudioProcessor& processor, clap_process const& proce
 }
 
 static void Reset(AudioProcessor&) {
-    // TODO:
+    // TODO(1.0):
     // - Clears all buffers, performs a full reset of the processing state (filters, oscillators,
     //   envelopes, lfo, ...) and kills all voices.
     // - The parameter's value remain unchanged.

@@ -32,7 +32,7 @@ static void LayerInstrumentMenuItems(Gui* g, PluginInstance::Layer* layer) {
     StartFloeMenu(g);
     DEFER { EndFloeMenu(g); };
 
-    // TODO: this is not production-ready code. The plan is to have an instrument selector based on sqlite
+    // TODO(1.0): this is not production-ready code. We need a new powerful database-like browser GUI
     int current = 0;
     DynamicArray<String> insts {g->scratch_arena};
     DynamicArray<sample_lib::InstrumentId> inst_info {g->scratch_arena};
@@ -606,7 +606,7 @@ void Draw(Gui* g,
         auto selector_right_r = lay.GetRect(c.selector_r);
 
         bool const should_highlight = false;
-        // TODO: how are we going to handle the new dynamics knob changes
+        // TODO(1.0): how are we going to handle the new dynamics knob changes
 #if 0
         if (auto inst = layer->instrument.GetNullable<AssetReference<LoadedInstrument>>();
             inst && (*inst) &&

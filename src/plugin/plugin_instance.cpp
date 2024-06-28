@@ -300,7 +300,7 @@ void LoadRandomInstrument(PluginInstance& plugin,
                           bool allow_none_to_be_selected,
                           bool disallow_previous_result,
                           sample_lib_loader::LoadRequest* add_to_existing_batch) {
-    // TODO
+    // TODO(1.0)
     (void)plugin;
     (void)layer_index;
     (void)allow_none_to_be_selected;
@@ -309,14 +309,14 @@ void LoadRandomInstrument(PluginInstance& plugin,
 }
 
 void CycleInstrument(PluginInstance& plugin, u32 layer_index, CycleDirection direction) {
-    // TODO
+    // TODO(1.0)
     (void)plugin;
     (void)layer_index;
     (void)direction;
 }
 
 void RandomiseAllLayerInsts(PluginInstance& plugin) {
-    // TODO
+    // TODO(1.0)
     (void)plugin;
 }
 
@@ -371,7 +371,7 @@ void SetAllParametersToDefaultValues(PluginInstance& plugin) {
 }
 
 static void ProcessorRandomiseAllParamsInternal(PluginInstance& plugin, bool only_effects) {
-    // TODO: this should create a new StateSnapshot and apply it, rather than change params/insts individually
+    // TODO(1.0): this should create a new StateSnapshot and apply it, rather than change params/insts individually
     (void)plugin;
     (void)only_effects;
 

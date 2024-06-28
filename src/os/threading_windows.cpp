@@ -105,7 +105,7 @@ static void SetThreadName(char const*, unsigned) {
     // info.dwThreadID = id;
     // info.dwFlags = 0;
 
-    // TODO: clang doesn't support Windows exceptions
+    // IMPROVE: clang doesn't support Windows exceptions, how can this be done?
     // __try {
     //     RaiseException(0x406D1388, 0, sizeof(info) / sizeof(ULONG_PTR), (ULONG_PTR *)&info);
     // } __except (EXCEPTION_EXECUTE_HANDLER) {

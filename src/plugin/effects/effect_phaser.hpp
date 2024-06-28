@@ -37,7 +37,7 @@ class Phaser final : public Effect {
                 .out_interleaved = (f32*)(wet.data + pos),
             };
             CopyMemory(args.params, params, sizeof(params));
-            // TODO: use center_semitones_buffered
+            // TODO(1.0): use center_semitones_buffered
 
             vitfx::phaser::Process(*phaser, args);
 

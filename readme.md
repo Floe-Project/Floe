@@ -34,7 +34,7 @@ We want Floe to be a constantly evolving and improving project with regular stab
 - [ ] Overhaul GUI internals: refactor, add proper layout system
 
 ## Previously known as Mirage
-Floe is backwards-compatible with Mirage's libraries and presets. See more inforation about this in the [user manual](https://floe-synth.github.io/Floe/mirage.html).
+Floe is backwards-compatible with Mirage's libraries and presets. See more information about this in the [user manual](https://floe-synth.github.io/Floe/mirage.html).
 
 ## License
 This project is licensed under GPL version 3 or later. See the LICENCES folder for the full licence text. We follow the [REUSE](https://reuse.software/) recommendations for this repository.
@@ -53,4 +53,4 @@ However, Linux is only provided for development purposes at the moment, and you 
 - We don't use the C++ standard library, and only sparingly use the C standard library.
 - We only support one compiler: Clang (via Zig), and so we wholeheartedly use Clang-specific features and features from C++20/23 and above.
 - Good tooling is a priority. The build system generates a compile_commands.json, so clangd, clang-tidy, cppcheck, etc. are all supported.
-- We pair `Nix` with `just` for acessing great tools, being able to deeply integrate the project and be consistent across machines (local/CI/Linux/macOS).
+- We pair `Nix` with `just` for accessing great tools, being able to deeply integrate the project and be consistent across machines (local/CI/Linux/macOS).

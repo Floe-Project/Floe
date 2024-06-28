@@ -116,6 +116,7 @@ jobs:
           rm "main.zip"
           mv "Core-Library-main" "Core"
           zip -r "Floe-Core-Library.zip" "Core"
+          rm -rf "Core"
 
       - uses: actions/download-artifact@v4
         with:

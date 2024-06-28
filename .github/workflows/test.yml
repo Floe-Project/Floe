@@ -18,4 +18,6 @@ jobs:
          bash install.sh
 
       - shell: bash
-        run: parallel echo ::: a b c
+        run: |
+          parallel echo ::: "a" "b" "c"
+

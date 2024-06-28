@@ -363,7 +363,7 @@ _try-add-core-library-to-zip zip-path:
 [unix, no-cd]
 _create-manual-install-readme os_name:
   #!/usr/bin/env bash
-  echo "These are the manual-install {{os_name}} plugin files and Core library for Floe version $version." > readme.txt
+  echo "These are the manual-install {{os_name}} plugin files and Core library for Floe version $(cat {{justfile_directory()}}/version.txt)." > readme.txt
   echo "" >> readme.txt
   echo "It's normally recommended to use the installer instead of these manual-install files." >> readme.txt
   echo "The installer is a separate download to this." >> readme.txt

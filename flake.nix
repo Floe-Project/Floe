@@ -193,6 +193,7 @@
             pkgs.wget
             pkgs.hunspell
             pkgs.hunspellDicts.en_GB-ise
+            pkgs.lychee # link checker
 
             # dsymutil internally calls "lipo", so we have to make sure it's available under that name
             (pkgs.writeShellScriptBin "lipo" "llvm-lipo $@")

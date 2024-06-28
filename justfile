@@ -76,6 +76,10 @@ check-spelling:
     exit 1
   fi
 
+[unix]
+check-links:
+  lychee docs readme.md changelog.md
+
 # install Compile DataBase (compile_commands.json)
 install-cbd arch_os_pair=native_arch_os_pair:
   cp {{gen_files_dir}}/compile_commands_{{arch_os_pair}}.json {{gen_files_dir}}/compile_commands.json
@@ -158,11 +162,12 @@ coverage build="": (_build_if_requested build "native")
 valgrind build="": (_build_if_requested build "native")
   valgrind --fair-sched=yes {{native_binary_dir}}/tests
 
-# IMPROVE: add auval tests on macos
 checks_level_0 := replace( 
   "
   check-reuse
   check-format
+  check-links
+  check-spelling
   test-units
   test-clap-val
   test-pluginval
@@ -184,8 +189,6 @@ checks_level_1 := checks_level_0 + replace(
   clang-tidy
   ", "\n", " ")
 
-# IMPROVE: Linux CI: enable plugin tests when we have a solution to the crashes
-# IMPROVE: Linux CI: enable wine tests when we have a way to install wine on CI
 checks_ci := replace(
   "
     test-units
@@ -198,6 +201,7 @@ checks_ci := replace(
     check-reuse 
     check-format
     check-spelling
+    check-links
     coverage
     clang-tidy-all
     "

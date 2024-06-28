@@ -217,6 +217,12 @@ test level="0" build="": (_build_if_requested build "dev") (parallel if level ==
 [unix]
 test-ci: (parallel checks_ci)
 
+install-pre-commit-hook:
+  rm -f .git/hooks/pre-commit
+  echo "#!/usr/bin/env bash" > .git/hooks/pre-commit
+  echo "set -euxo pipefail" >> .git/hooks/pre-commit
+  echo "just check-reuse" >> .git/hooks/pre-commit
+
 _print-ci-summary num_tasks num_failed:
   #!/usr/bin/env bash
   if [ "{{num_failed}}" -eq 0 ]; then

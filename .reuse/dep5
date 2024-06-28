@@ -15,10 +15,6 @@ Files: third_party_libs/dr_*.h third_party_libs/miniaudio/miniaudio.h
 Copyright: Copyright David Reid
 License: Unlicense
 
-Files: third_party_libs/sqlite/*
-Copyright: Sqlite Authors
-License: Unlicense
-
 Files: *.lock build_resources/*.lock version.txt
 Copyright: 2024 Sam Windell
 License: CC0-1.0

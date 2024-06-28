@@ -796,73 +796,97 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
         auto const wait_result = WaitForSingleObjectEx(watch.overlapped.hEvent, 0, TRUE);
 
         if (wait_result == WAIT_OBJECT_0) {
-            DWORD bytes_transferred;
+            DWORD bytes_transferred {};
             if (GetOverlappedResult(watch.handle, &watch.overlapped, &bytes_transferred, FALSE)) {
-                if (bytes_transferred) {
-                    u8 const* base = watch.buffer.data;
-                    while (base < watch.buffer.end()) {
-                        DWORD action;
-                        DWORD next_entry_offset;
-                        Array<wchar_t, 1000> filename_buf;
-                        WString filename;
+                auto const* base = watch.buffer.data;
+                auto const* end = Min<u8 const*>(base + bytes_transferred, watch.buffer.end());
+                auto const min_chunk_size = sizeof(FILE_NOTIFY_INFORMATION);
 
-                        {
-                            // I've found that it's possible to receive
-                            // FILE_NOTIFY_INFORMATION.NextEntryOffset values that result in the next event
-                            // being misaligned. Reading unaligned memory is not normally a great idea and if
-                            // you have UBSan enabled it will crash. To work around this, we copy the given
-                            // memory into correctly aligned structures. Another option would be to disable
-                            // UBSan for this function but I'm not sure of the consequences of misaligned
-                            // reads so let's play it safe.
+                ASSERT(base <= end);
+                DebugLn("base: {}, end: {}, end - base: {}", base, end, end - base);
 
-                            FILE_NOTIFY_INFORMATION event;
-                            CopyMemory(&event, base, sizeof(event));
-                            auto const num_wchars = event.FileNameLength / sizeof(wchar_t);
-                            if (num_wchars > filename_buf.size) {
-                                DebugLn(
-                                    "ERROR: filename too long for buffer ({} chars): FileNameLength: {}, NextEntryOffset: {}, bytes_transferred: {}",
-                                    num_wchars,
-                                    event.FileNameLength,
-                                    event.NextEntryOffset,
-                                    bytes_transferred);
-                                PanicIfReached();
-                                break;
-                            }
-                            CopyMemory(filename_buf.data,
-                                       base + offsetof(FILE_NOTIFY_INFORMATION, FileName),
-                                       event.FileNameLength);
-                            action = event.Action;
-                            next_entry_offset = event.NextEntryOffset;
-                            filename = {filename_buf.data, num_wchars};
-                        }
+                bool error = false;
 
-                        Optional<DirectoryWatcher::FileChange::Type> type {};
-                        switch (action) {
-                            case FILE_ACTION_ADDED: type = DirectoryWatcher::FileChange::Type::Added; break;
-                            case FILE_ACTION_REMOVED:
-                                type = DirectoryWatcher::FileChange::Type::Deleted;
-                                break;
-                            case FILE_ACTION_MODIFIED:
-                                type = DirectoryWatcher::FileChange::Type::Modified;
-                                break;
-                            case FILE_ACTION_RENAMED_OLD_NAME:
-                                type = DirectoryWatcher::FileChange::Type::RenamedOldName;
-                                break;
-                            case FILE_ACTION_RENAMED_NEW_NAME:
-                                type = DirectoryWatcher::FileChange::Type::RenamedNewName;
-                                break;
-                        }
-                        if (type) {
-                            auto const narrowed = Narrow(scratch_arena, filename);
-                            if (narrowed.HasValue())
-                                callback(dir.path, DirectoryWatcher::FileChange {*type, narrowed.Value()});
-                        }
-
-                        if (!next_entry_offset) break;
-
-                        base += next_entry_offset;
+                while (true) {
+                    if (base >= end || ((usize)(end - base) < min_chunk_size)) {
+                        DebugLn("ERROR: invalid data received");
+                        error = true;
+                        break;
                     }
-                } else {
+
+                    ASSERT(bytes_transferred >= min_chunk_size);
+
+                    DWORD action;
+                    DWORD next_entry_offset;
+                    Array<wchar_t, 1000> filename_buf;
+                    WString filename;
+
+                    {
+                        // I've found that it's possible to receive
+                        // FILE_NOTIFY_INFORMATION.NextEntryOffset values that result in the next event
+                        // being misaligned. Reading unaligned memory is not normally a great idea for
+                        // performance. And if you have UBSan enabled it will crash. To work around this,
+                        // we copy the given memory into correctly aligned structures. Another option
+                        // would be to disable UBSan for this function but I'm not sure of the
+                        // consequences of misaligned reads so let's play it safe.
+
+                        ASSERT(bytes_transferred != 1);
+                        FILE_NOTIFY_INFORMATION event;
+                        __builtin_memcpy_inline(&event, base, sizeof(event));
+
+                        if ((base + event.NextEntryOffset) > end) {
+                            DebugLn(
+                                "ERROR: invalid data received: NextEntryOffset points outside of buffer: FileNameLength: {}, NextEntryOffset: {}",
+                                event.FileNameLength,
+                                event.NextEntryOffset);
+                            error = true;
+                            break;
+                        }
+
+                        auto const num_wchars = event.FileNameLength / sizeof(wchar_t);
+                        if (num_wchars > filename_buf.size) {
+                            DebugLn(
+                                "ERROR: filename too long for buffer ({} chars): FileNameLength: {}, NextEntryOffset: {}, bytes_transferred: {}, min_chunk_size: {}",
+                                num_wchars,
+                                event.FileNameLength,
+                                event.NextEntryOffset,
+                                bytes_transferred,
+                                min_chunk_size);
+                            error = true;
+                            break;
+                        }
+                        CopyMemory(filename_buf.data,
+                                   base + offsetof(FILE_NOTIFY_INFORMATION, FileName),
+                                   event.FileNameLength);
+                        action = event.Action;
+                        next_entry_offset = event.NextEntryOffset;
+                        filename = {filename_buf.data, num_wchars};
+                    }
+
+                    Optional<DirectoryWatcher::FileChange::Type> type {};
+                    switch (action) {
+                        case FILE_ACTION_ADDED: type = DirectoryWatcher::FileChange::Type::Added; break;
+                        case FILE_ACTION_REMOVED: type = DirectoryWatcher::FileChange::Type::Deleted; break;
+                        case FILE_ACTION_MODIFIED: type = DirectoryWatcher::FileChange::Type::Modified; break;
+                        case FILE_ACTION_RENAMED_OLD_NAME:
+                            type = DirectoryWatcher::FileChange::Type::RenamedOldName;
+                            break;
+                        case FILE_ACTION_RENAMED_NEW_NAME:
+                            type = DirectoryWatcher::FileChange::Type::RenamedNewName;
+                            break;
+                    }
+                    if (type) {
+                        auto const narrowed = Narrow(scratch_arena, filename);
+                        if (narrowed.HasValue())
+                            callback(dir.path, DirectoryWatcher::FileChange {*type, narrowed.Value()});
+                    }
+
+                    if (!next_entry_offset) break; // successfully read all events
+
+                    base += next_entry_offset;
+                }
+
+                if (error) {
                     callback(dir.path,
                              DirectoryWatcher::FileChange {
                                  DirectoryWatcher::FileChange::Type::UnknownManualRescanNeeded,

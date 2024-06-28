@@ -25,6 +25,8 @@ jobs:
 
       - run: |
           just fetch-core-library
+          # NOTE: the logos probably have copyright so this should only be done if you have permission
+          just fetch-logos 
           just build-release windows
 
       - run: just windows-prepare-release
@@ -92,6 +94,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      RELEASE_ARTIFACTS_FOLDER: release_artifacts
     steps:
       - uses: actions/checkout@v4
         with:
@@ -103,23 +107,23 @@ jobs:
         run: |
           export VERSION=$(cat version.txt)
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
-          just latest-changes > latest_changes.md
+          just echo-latest-changes > latest_changes.md
 
-          just fetch-core-library
-          mkdir -p release_files
-          cd build_resources
-          zip -r ../release_files/Floe-Core-Library.zip Core 
+          mkdir -p "$RELEASE_ARTIFACTS_FOLDER"
+          cd "$RELEASE_ARTIFACTS_FOLDER"
+          wget "https://github.com/Floe-Synth/Core-Library/archive/refs/heads/main.zip"
+          mv "main.zip" "Floe-Core-Library.zip"
 
       - uses: actions/download-artifact@v4
         with:
           pattern: final-*
-          path: release_files
+          path: ${{ env.RELEASE_ARTIFACTS_FOLDER }}
           merge-multiple: true
 
       - uses: ncipollo/release-action@v1
         with:
           artifactErrorsFailBuild: true
-          artifacts: "release_files/*"
+          artifacts: "${{ env.RELEASE_ARTIFACTS_FOLDER }}/*"
           name: Release v${{ env.VERSION }}
           tag: v${{ env.VERSION }}
           draft: true

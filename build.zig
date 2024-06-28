@@ -535,6 +535,7 @@ const BuildContext = struct {
     master_step: *std.Build.Step,
     test_step: *std.Build.Step,
     optimise: std.builtin.OptimizeMode,
+    external_build_resources_subdir: ?[]const u8,
 };
 
 fn genericFlags(context: *BuildContext, target: std.Build.ResolvedTarget, extra_flags: []const []const u8) ![][]const u8 {
@@ -810,6 +811,32 @@ fn getLicenceText(b: *std.Build, filename: []const u8) ![]const u8 {
     return try file.readToEndAlloc(b.allocator, 1024 * 1024 * 1024);
 }
 
+const ExternalResource = struct {
+    relative_path: []const u8,
+    absolute_path: []const u8,
+};
+
+fn getExternalResource(context: *BuildContext, name: []const u8) ?ExternalResource {
+    if (context.external_build_resources_subdir == null) {
+        std.debug.print("WARNING: external resource folder is not set. Some aspects of the final build might be empty\n", .{});
+        return null;
+    }
+
+    const relative_path = context.b.pathJoin(&.{ context.external_build_resources_subdir.?, name });
+    const absolute_path = context.b.pathJoin(&.{ rootdir, relative_path });
+
+    var found = true;
+    std.fs.accessAbsolute(absolute_path, .{}) catch {
+        found = false;
+    };
+    if (found) {
+        return .{ .relative_path = relative_path, .absolute_path = absolute_path };
+    } else {
+        std.debug.print("WARNING: external resource \"{s}\" not found in {s}. Some aspects of the final build might be empty\n", .{ name, context.external_build_resources_subdir.? });
+        return null;
+    }
+}
+
 pub fn build(b: *std.Build) void {
     const build_mode = b.option(
         BuildMode,
@@ -825,12 +852,6 @@ pub fn build(b: *std.Build) void {
         "Whether the installer should be set to administrator-required mode",
     ) orelse (build_mode == .production);
 
-    const core_library_path = b.option(
-        []const u8,
-        "core-lib-path",
-        "Full path to the Core library, used for embedding in the Windows installer",
-    ) orelse (b.pathJoin(&.{ rootdir, "build_resources", "Core" }));
-
     var enable_tracy = b.option(bool, "tracy", "Enable Tracy profiler") orelse false;
     if (build_mode == .performance_profiling) enable_tracy = true;
 
@@ -845,6 +866,7 @@ pub fn build(b: *std.Build) void {
             .development => std.builtin.OptimizeMode.Debug,
             .performance_profiling, .production => std.builtin.OptimizeMode.ReleaseSafe,
         },
+        .external_build_resources_subdir = b.option([]const u8, "external-resources", "Path relative to build.zig that contains external build resources"),
     };
 
     const user_given_target_presets = b.option([]const u8, "targets", "Target operating system");
@@ -2161,22 +2183,9 @@ pub fn build(b: *std.Build) void {
         if (target.result.os.tag == .windows) {
             const installer_path = "src/windows_installer";
 
-            // Images for the installer are optional and separate to this repo. If they are wanted, they should be placed in the build_resources/logos folder. See below for the expected filenames within that folder.
-            var logo_path_relative: ?[]const u8 = null;
-            var sidebar_image_path_relative: ?[]const u8 = null;
-            {
-                const subdir = b.pathJoin(&.{ "build_resources", "logos" });
-                var found = true;
-                std.fs.accessAbsolute(b.pathJoin(&.{ rootdir, subdir }), .{}) catch {
-                    found = false;
-                };
-                if (found) {
-                    logo_path_relative = b.pathJoin(&.{ subdir, "logo.ico" });
-                    sidebar_image_path_relative = b.pathJoin(&.{ subdir, "small_square_logo.png" });
-                } else {
-                    std.debug.print("WARNING: missing logos, some aspects of the final build might be missing\n", .{});
-                }
-            }
+            // the logos probably have a different license to the rest of the codebase, so we keep them separate and optional
+            const logo_image = getExternalResource(&build_context, "Logos/icon.ico");
+            const sidebar_image = getExternalResource(&build_context, "Logos/icon-with-text-100px.png");
 
             {
                 const win_installer_description = "Installer for Floe plugins";
@@ -2249,24 +2258,20 @@ pub fn build(b: *std.Build) void {
                 });
                 var flags = std.ArrayList([]const u8).init(b.allocator);
 
-                var found = true;
-                std.fs.accessAbsolute(core_library_path, .{}) catch {
-                    found = false;
-                };
-                if (found) {
+                // The core library is optionally packaged
+                const core_library = getExternalResource(&build_context, "Core");
+                if (core_library != null) {
                     const core_library_zip_path_relative = b.pathJoin(&.{ build_gen_relative, "floe-core-library.zip" });
                     // IMPROVE: it's slow to zip this every time
                     // NOTE: we enter the library folder and build the zip from there. This way, the zip contains only the contents of the Core Library folder, not the folder itself. Additionally, we exclude the .git folder.
                     const zip_core = b.addSystemCommand(&.{ "zip", "-x", ".git/*", "-r", b.pathJoin(&.{ rootdir, core_library_zip_path_relative }), "." });
-                    zip_core.setCwd(.{ .cwd_relative = core_library_path });
+                    zip_core.setCwd(.{ .cwd_relative = core_library.?.absolute_path });
                     win_installer.step.dependOn(&zip_core.step);
                     flags.append(b.fmt("-DCORE_LIBRARY_ZIP_PATH=\"{s}\"", .{core_library_zip_path_relative})) catch unreachable;
-                } else {
-                    std.debug.print("WARNING: missing core library, some aspects of the final build might be missing\n", .{});
                 }
 
-                if (sidebar_image_path_relative != null) {
-                    flags.append(b.fmt("-DSIDEBAR_IMAGE_PATH=\"{s}\"", .{sidebar_image_path_relative.?})) catch unreachable;
+                if (sidebar_image != null) {
+                    flags.append(b.fmt("-DSIDEBAR_IMAGE_PATH=\"{s}\"", .{sidebar_image.?.relative_path})) catch unreachable;
                 }
                 flags.append("-DCLAP_PLUGIN_PATH=\"zig-out/x86_64-windows/Floe.clap\"") catch unreachable;
                 flags.append("-DVST3_PLUGIN_PATH=\"zig-out/x86_64-windows/Floe.vst3\"") catch unreachable;
@@ -2291,7 +2296,7 @@ pub fn build(b: *std.Build) void {
                 addWin32EmbedInfo(win_installer, .{
                     .name = "Floe Installer",
                     .description = win_installer_description,
-                    .icon_path = logo_path_relative,
+                    .icon_path = if (logo_image != null) logo_image.?.relative_path else null,
                 }) catch @panic("OOM");
                 win_installer.addConfigHeader(build_config_step);
                 win_installer.addIncludePath(b.path("src"));

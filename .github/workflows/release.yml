@@ -112,7 +112,10 @@ jobs:
           mkdir -p "$RELEASE_ARTIFACTS_FOLDER"
           cd "$RELEASE_ARTIFACTS_FOLDER"
           wget "https://github.com/Floe-Synth/Core-Library/archive/refs/heads/main.zip"
-          mv "main.zip" "Floe-Core-Library.zip"
+          unzip "main.zip"
+          rm "main.zip"
+          mv "Core-Library-main" "Core"
+          zip -r "Floe-Core-Library.zip" "Core"
 
       - uses: actions/download-artifact@v4
         with:

@@ -13,6 +13,7 @@ jobs:
         run: |
          (curl pi.dk/3/) > install.sh
          bash install.sh
+         parallel echo ::: "a" "b" "c"
 
       - shell: bash
         run: |

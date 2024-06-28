@@ -1,7 +1,7 @@
 # Copyright 2018-2024 Sam Windell
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# This file assumes 'nix develop' has already been run
+# NOTE: for the most part, we assume that `nix develop` has been run before using this justfile
 
 set dotenv-load
 
@@ -138,7 +138,6 @@ test-windows-vst3-val:
 [linux, windows]
 test-windows-pluginval:
   #!/usr/bin/env bash
-  # if pluginval is not available, download it
   if [[ ! -f {{cache_dir}}/pluginval.exe ]]; then
     just _download-and-unzip-to-cache-dir "https://github.com/Tracktion/pluginval/releases/download/v1.0.3/pluginval_Windows.zip"
   fi
@@ -217,11 +216,19 @@ test level="0" build="": (_build_if_requested build "dev") (parallel if level ==
 [unix]
 test-ci: (parallel checks_ci)
 
+[unix]
 install-pre-commit-hook:
   rm -f .git/hooks/pre-commit
   echo "#!/usr/bin/env bash" > .git/hooks/pre-commit
-  echo "set -euxo pipefail" >> .git/hooks/pre-commit
-  echo "just check-reuse" >> .git/hooks/pre-commit
+  echo "set -euo pipefail" >> .git/hooks/pre-commit
+  echo "echo '[===] Running pre-commit checks...'" >> .git/hooks/pre-commit
+  echo "just pre-commit-checks" >> .git/hooks/pre-commit
+  echo "echo '[===] All pre-commit checks passed'" >> .git/hooks/pre-commit
+  echo "echo ''" >> .git/hooks/pre-commit
+  chmod +x .git/hooks/pre-commit
+
+[unix]
+pre-commit-checks: (parallel "check-format check-reuse check-spelling check-links") 
 
 _print-ci-summary num_tasks num_failed:
   #!/usr/bin/env bash

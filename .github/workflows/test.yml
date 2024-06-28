@@ -1,0 +1,21 @@
+name: Test
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  t1:
+    runs-on: windows-latest
+    steps:
+      - shell: bash
+        run: |
+         (wget -O - pi.dk/3) > install.sh
+         sha1sum install.sh | grep 67bd7bc7dc20aff99eb8f1266574dadb 12345678 67bd7bc7 dc20aff9 9eb8f126 6574dadb
+         md5sum install.sh | grep b7a15cdbb07fb6e11b0338577bc1780f b7a15cdb b07fb6e1 1b033857 7bc1780f
+         sha512sum install.sh | grep 186000b62b66969d7506ca4f885e0c80e02a22444 6f25960b d4b90cf6 ba5b76de c1acdf39 f3d24249 72930394 a4164351 93a7668d 21ff9839 6f920be5 186000b6 2b66969d 7506ca4f 885e0c80 e02a2244 40e8a43f
+         bash install.sh
+
+      - shell: bash
+        run: parallel echo ::: a b c

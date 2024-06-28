@@ -117,7 +117,7 @@ jobs:
           if-no-files-found: error
           path: build_gen/generated_docs
 
-  windows-test-new:
+  windows-test:
     runs-on: windows-latest
     needs: linux-compile-and-test
     if: '!cancelled()'
@@ -136,34 +136,7 @@ jobs:
           name: binaries-windows
           path: zig-out/x86_64-windows
 
-      - run: just test-windows
-
-  windows-test:
-    strategy:
-      fail-fast: false # run even if others in this matrix failed
-      matrix:
-        test: [ unit, vst3val, pluginval, clapval ]
-    name: windows-${{ matrix.test }}
-    runs-on: windows-latest
-    needs: linux-compile-and-test
-    if: '!cancelled()'
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          sparse-checkout: |
-            test_files
-            .github
-
-      # The artifact will be installed to ${{ github.workspace }}
-      - uses: actions/download-artifact@v4
-        with:
-          name: binaries-windows
-
-      - shell: pwsh
-        name: ${{ matrix.test }}
-        run: |
-          powershell -ExecutionPolicy Bypass -File .github\scripts\run-test.ps1 -test_type ${{ matrix.test }} -binaries_dir "${{ github.workspace }}"
+      - run: just test-ci-windows
 
       - name: Upload logs
         if: '!cancelled()'

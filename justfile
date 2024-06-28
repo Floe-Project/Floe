@@ -11,6 +11,7 @@ all_src_files := 'fd . -e .mm -e .cpp -e .hpp -e .h src'
 gen_files_dir := "build_gen"
 release_files_dir := justfile_directory() + "/zig-out/release"
 build_resources_core := justfile_directory() + "/build_resources/Core"
+cache_dir := ".zig-cache"
 run_windows_program := if os() == 'windows' {
   ''
 } else {
@@ -44,6 +45,17 @@ check-reuse:
 
 check-format:
   {{all_src_files}} | xargs clang-format --dry-run --Werror
+
+# hunspell doesn't do anything fancy at all, it just checks each word for spelling. It means we get lots of
+# false positives, but I think it's still worth it. We can just add words to ignored-spellings.dic.
+[unix]
+check-spelling:
+  #!/usr/bin/env bash
+  output=$(fd . -e .md --exclude third_party_libs/ --exclude src/readme.md | xargs hunspell -l -d en_GB -p docs/ignored-spellings.dic)
+  echo "$output"
+  if [[ -n "$output" ]]; then
+    exit 1
+  fi
 
 # install Compile DataBase (compile_commands.json)
 install-cbd arch_os_pair=native_arch_os_pair:
@@ -82,21 +94,40 @@ test-pluginval-au build="": (_build_if_requested build "native")
 test-vst3-val build="": (_build_if_requested build "native")
   timeout 2 {{native_binary_dir}}/VST3-Validator {{native_binary_dir}}/Floe.vst3
 
-[linux]
-test-wine-vst3-val build="": (_build_if_requested build "windows")
-  wine zig-out/x86_64-windows/VST3-Validator.exe zig-out/x86_64-windows/Floe.vst3
+_download-and-unzip-to-cache-dir url:
+  #!/usr/bin/env bash
+  mkdir -p {{cache_dir}}
+  pushd {{cache_dir}}
+  wget {{url}} 
+  basename=$(basename {{url}})
+  unzip $basename
+  rm $basename
+  popd
 
-[linux]
-test-wine-pluginval build="": (_build_if_requested build "windows")
-  wine $PLUGINVAL_WINDOWS_PATH zig-out/x86_64-windows/Floe.vst3
+[linux, windows]
+test-windows-units:
+  {{run_windows_program}} zig-out/x86_64-windows/tests.exe --log-level=debug
 
-[linux]
-test-wine-units build="": (_build_if_requested build "windows")
-  wine zig-out/x86_64-windows/tests.exe
+[linux, windows]
+test-windows-vst3-val:
+  {{run_windows_program}} zig-out/x86_64-windows/VST3-Validator.exe zig-out/x86_64-windows/Floe.vst3
 
-[linux]
-test-wine-clap-val build="": (_build_if_requested build "windows")
-  wine $CLAPVAL_WINDOWS_PATH validate zig-out/x86_64-windows/Floe.clap
+[linux, windows]
+test-windows-pluginval:
+  #!/usr/bin/env bash
+  # if pluginval is not available, download it
+  if [[ ! -f {{cache_dir}}/pluginval.exe ]]; then
+    just _download-and-unzip-to-cache-dir "https://github.com/Tracktion/pluginval/releases/download/v1.0.3/pluginval_Windows.zip"
+  fi
+  {{run_windows_program}} {{cache_dir}}/pluginval.exe --verbose --validate zig-out/x86_64-windows/Floe.vst3
+
+[linux, windows]
+test-windows-clap-val:
+  #!/usr/bin/env bash
+  if [[ ! -f {{cache_dir}}/clap-validator.exe ]]; then
+    just _download-and-unzip-to-cache-dir  "https://github.com/free-audio/clap-validator/releases/download/0.3.2/clap-validator-0.3.2-windows.zip"
+  fi
+  {{run_windows_program}} {{cache_dir}}/clap-validator.exe validate zig-out/x86_64-windows/Floe.clap
 
 [linux]
 coverage build="": (_build_if_requested build "native")
@@ -120,10 +151,10 @@ checks_level_0 := replace(
   " + 
   if os() == "linux" {
     "
-    test-wine-vst3-val
-    test-wine-pluginval
-    test-wine-clap-val
-    test-wine-units
+    test-windows-vst3-val
+    test-windows-pluginval
+    test-windows-clap-val
+    test-windows-units
     "
   } else {
     "test-pluginval-au"
@@ -162,6 +193,38 @@ test level="0" build="": (_build_if_requested build "dev") (parallel if level ==
 
 [unix]
 test-ci: (parallel checks_ci)
+
+[windows, linux]
+test-ci-windows:
+  #!/usr/bin/env bash
+
+  failed=0
+
+  if [[ -z $GITHUB_ACTIONS ]]; then
+    mkdir -p {{gen_files_dir}}
+    rm -f {{gen_files_dir}}/test_ci_windows_summary.md
+    export GITHUB_STEP_SUMMARY={{gen_files_dir}}/test_ci_windows_summary.md
+  fi
+
+  echo "# Summary (Windows)" >> $GITHUB_STEP_SUMMARY && echo "" >> $GITHUB_STEP_SUMMARY
+  echo "| Command | Return-Code |" >> $GITHUB_STEP_SUMMARY
+  echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
+
+  test() {
+    local name="$1"
+
+    just $name
+    local result=$?
+    echo "| $name | $result |" >> $GITHUB_STEP_SUMMARY
+    [[ $result -ne 0 ]] && failed=1
+  }
+  
+  test test-windows-pluginval
+  test test-windows-units
+  test test-windows-vst3-val
+  test test-windows-clap-val
+
+  exit $failed
 
 [unix]
 parallel tasks:
@@ -209,46 +272,6 @@ parallel tasks:
   fi
 
 [unix]
-check-spelling:
-  #!/usr/bin/env bash
-  # hunspell doesn't do anything fancy at all, it just checks each word for spelling. It means we get lots of
-  # false positives, but I think it's still worth it. We can just add words to ignored-spellings.dic.
-  output=$(fd . -e .md --exclude third_party_libs/ --exclude src/readme.md | xargs hunspell -l -d en_GB -p docs/ignored-spellings.dic)
-  echo "$output"
-  if [[ -n "$output" ]]; then
-    exit 1
-  fi
-
-[linux, windows]
-test-windows:
-  #!/usr/bin/env bash
-  {{run_windows_program}} zig-out/x86_64-windows/tests.exe --log-level=debug
-  {{run_windows_program}} {{native_binary_dir}}/VST3-Validator.exe {{native_binary_dir}}/Floe.vst3
-
-  download_zip() {
-    url=$1
-
-    mkdir -p {{gen_files_dir}}
-    pushd {{gen_files_dir}}
-    wget $url
-    basename=$(basename $url)
-    unzip $basename
-    rm $basename
-    popd
-  }
-
-  # if pluginval is not available, download it
-  if [[ ! -f {{gen_files_dir}}/pluginval.exe ]]; then
-    download_zip "https://github.com/Tracktion/pluginval/releases/download/v1.0.3/pluginval_Windows.zip"
-  fi
-  {{run_windows_program}} {{gen_files_dir}}/pluginval.exe --verbose --validate {{native_binary_dir}}/Floe.vst3
-
-  if [[ ! -f {{gen_files_dir}}/clap-validator.exe ]]; then
-    download_zip  "https://github.com/free-audio/clap-validator/releases/download/0.3.2/clap-validator-0.3.2-windows.zip"
-  fi
-  {{run_windows_program}} {{gen_files_dir}}/clap-validator.exe validate {{native_binary_dir}}/Floe.clap
-
-[unix]
 latest-changes:
   #!/usr/bin/env bash
   changes=$(sed -n "/## $(cat version.txt)/,/## /{ /## /!p }" changelog.md)
@@ -262,23 +285,23 @@ fetch-core-library:
   wget https://github.com/Floe-Synth/Core-Library/archive/refs/heads/main.zip
   unzip main.zip
   rm main.zip
-  mv Core-Library-main {{build_resources_core}}
+  mv Core-Library-main "{{build_resources_core}}"
 
 [unix, no-cd]
 _try-add-core-library-to-zip zip-path:
   #!/usr/bin/env bash
   if [[ -d "{{build_resources_core}}" ]]; then
     # need to do some faffing with folders so that we only zip the library and none of the parent folders
-    full_zip_path=$(realpath {{zip-path}})
+    full_zip_path=$(realpath "{{zip-path}}")
     core_dirname=$(dirname "{{build_resources_core}}")
     core_filename=$(basename "{{build_resources_core}}")
-    pushd $core_dirname
-    zip -r $full_zip_path $core_filename 
+    pushd "$core_dirname"
+    zip -r "$full_zip_path" "$core_filename"
     popd
   fi
 
 [unix, no-cd]
-_create_manual_install_readme os_name:
+_create-manual-install-readme os_name:
   #!/usr/bin/env bash
   echo "These are the manual-install {{os_name}} plugin files and Core library for Floe version $version." > readme.txt
   echo "" >> readme.txt
@@ -335,7 +358,7 @@ windows-prepare-release:
   mv $final_installer_zip_name {{release_files_dir}}
 
   # zip the manual-install files
-  just _create_manual_install_readme "Windows"
+  just _create-manual-install-readme "Windows"
   final_manual_zip_name="Floe-Manual-Install-v$version-Windows.zip"
   zip -r $final_manual_zip_name Floe.vst3 Floe.clap readme.txt
   just _try-add-core-library-to-zip $final_manual_zip_name
@@ -412,7 +435,7 @@ macos-prepare-release-plugins:
   SHELL=$(type -p bash) parallel --bar notarize_plugin ::: Floe.vst3 Floe.component Floe.clap
 
   # step 3: zip
-  just _create_manual_install_readme "macOS"
+  just _create-manual-install-readme "macOS"
   final_manual_zip_name="Floe-Manual-Install-v$version-macOS.zip"
   rm -f $final_manual_zip_name
   zip -r $final_manual_zip_name Floe.vst3 Floe.component Floe.clap readme.txt

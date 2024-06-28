@@ -268,7 +268,7 @@ WatchDirectory(int inotify_id, String path, bool recursive, ArenaAllocator& scra
     (void)recursive; // we handle this later on
     if (!PRODUCTION_BUILD && StartsWithSpan(path, "/mnt"_s))
         return ErrorCode {
-            FilesystemError::FolderContainsTooManyFiles}; // TODO: is there a better way to avoid the slow
+            FilesystemError::FolderContainsTooManyFiles}; // IMPROVE: is there a better way to avoid the slow
                                                           // not-mounted check on my machine?
     auto const scratch_cursor = scratch_arena.TotalUsed();
     DEFER { scratch_arena.TryShrinkTotalUsed(scratch_cursor); };

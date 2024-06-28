@@ -371,7 +371,8 @@ void SetAllParametersToDefaultValues(PluginInstance& plugin) {
 }
 
 static void ProcessorRandomiseAllParamsInternal(PluginInstance& plugin, bool only_effects) {
-    // TODO(1.0): this should create a new StateSnapshot and apply it, rather than change params/insts individually
+    // TODO(1.0): this should create a new StateSnapshot and apply it, rather than change params/insts
+    // individually
     (void)plugin;
     (void)only_effects;
 

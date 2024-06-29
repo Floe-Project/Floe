@@ -133,3 +133,14 @@ jobs:
           draft: true
           bodyFile: latest_changes.md
 
+      - if: '!cancelled()'
+        run: |
+          icon=""
+          if [ "${{ job.status }}" == "success" ]; then
+            icon="✅"
+          else
+            icon="❌"
+          fi
+          status="$icon Floe release v${{ env.VERSION }}: ${{ job.status }}"
+          curl -d "$status" "ntfy.sh/${{ secrets.NTFY_RELEASE_URL }}"
+

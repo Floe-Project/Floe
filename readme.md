@@ -24,6 +24,8 @@ We aim to offer comprehensive documentation in the form of a user manual. We use
 ## Roadmap
 We want Floe to be a constantly evolving and improving project with regular stable, backwards-compatible releases. Currently we are working towards the first stable version, 1.0.
 
+We track the [milestones that we are working towards here](https://github.com/Floe-Synth/Floe/milestones?direction=asc&sort=title&state=open).
+
 - [x] Make open-source
 - [x] Implement comprehensive CI/CD to aid rapid development
 - [ ] Fix bugs and essential to-dos

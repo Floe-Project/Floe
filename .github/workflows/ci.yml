@@ -27,7 +27,6 @@ jobs:
       - uses: Hanaasagi/zig-action-cache@master
         with:
           cache-directories: |
-            .zig-cache
             build_gen
 
       - run: just build mac_ub
@@ -55,7 +54,6 @@ jobs:
       - uses: Hanaasagi/zig-action-cache@master
         with:
           cache-directories: |
-            .zig-cache
             build_gen
 
       - if: '!cancelled()'

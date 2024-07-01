@@ -286,7 +286,6 @@ PUBLIC ErrorCodeOr<void> ValueToString(Writer writer, T const& value, FormatOpti
         if (value.category->message) {
             TRY(writer.WriteChars(": "));
             TRY(value.category->message(writer, value));
-            TRY(writer.WriteChar('.'));
         }
         if (options.error_debug_info) {
             TRY(writer.WriteChar('\n'));

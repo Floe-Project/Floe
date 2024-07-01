@@ -22,11 +22,11 @@ We aim to offer comprehensive documentation in the form of a user manual. We use
 [Online user manual](https://floe-synth.github.io/Floe/)
 
 ## Roadmap
-We want Floe to be a constantly evolving and improving project with regular stable, backwards-compatible releases. Currently we are working towards the first stable version, 1.0. 
+We want Floe to be a constantly evolving and improving project with regular stable, backwards-compatible releases. Currently we are working towards the first stable version, 1.0. We use GitHub issues to track the [milestones](https://github.com/Floe-Synth/Floe/milestones?direction=asc&sort=title&state=open) towards that.
 
 The work from Mirage (the old project) to Floe v1.0 has been related to building infrastructure for long-term, sustainable development. New features and improvements will be coming once we have a strong foundation.
 
-We use GitHub issues to track the [milestones that we are working towards](https://github.com/Floe-Synth/Floe/milestones?direction=asc&sort=title&state=open).
+Additionally, once we reach v1.0, we'd like to expand the number of sample libraries available and update Mirage libraries to Floe's new sample library format.
 
 ## Previously known as Mirage
 Floe is backwards-compatible with Mirage's libraries and presets. See more information about this in the [user manual](https://floe-synth.github.io/Floe/mirage.html).

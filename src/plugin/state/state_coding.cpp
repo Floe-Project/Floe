@@ -439,7 +439,7 @@ class JsonStateParser {
         if (id == "width"_s) return EffectType::StereoWiden;
         if (id == "chorus"_s) return EffectType::Chorus;
         if (id == "verb"_s) return EffectType::Reverb;
-        if (id == "delay"_s) return EffectType::NewDelay;
+        if (id == "delay"_s) return EffectType::Delay;
         if (id == "phaser"_s) return EffectType::Phaser;
         if (id == "conv"_s) return EffectType::ConvolutionReverb;
 
@@ -758,36 +758,36 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
             return nullopt;
         };
 
-        state.LinearParam(ParamIndex::NewDelayOn) = old_settings_on;
-        state.LinearParam(ParamIndex::NewDelayTimeLMs) =
-            ParamInfo(ParamIndex::NewDelayTimeLMs).LineariseValue(old_settings_delay_time_ms_l, true).Value();
-        state.LinearParam(ParamIndex::NewDelayTimeRMs) =
-            ParamInfo(ParamIndex::NewDelayTimeRMs).LineariseValue(old_settings_delay_time_ms_r, true).Value();
-        state.LinearParam(ParamIndex::NewDelayTimeSyncSwitch) = old_settings_is_synced;
-        state.LinearParam(ParamIndex::NewDelayTimeSyncedL) =
+        state.LinearParam(ParamIndex::DelayOn) = old_settings_on;
+        state.LinearParam(ParamIndex::DelayTimeLMs) =
+            ParamInfo(ParamIndex::DelayTimeLMs).LineariseValue(old_settings_delay_time_ms_l, true).Value();
+        state.LinearParam(ParamIndex::DelayTimeRMs) =
+            ParamInfo(ParamIndex::DelayTimeRMs).LineariseValue(old_settings_delay_time_ms_r, true).Value();
+        state.LinearParam(ParamIndex::DelayTimeSyncSwitch) = old_settings_is_synced;
+        state.LinearParam(ParamIndex::DelayTimeSyncedL) =
             get_synced_delay_time(NoLongerExistingParam::DelayTimeSyncedL)
                 .ValueOr((f32)param_values::DelaySyncedTime::_1_4);
-        state.LinearParam(ParamIndex::NewDelayTimeSyncedR) =
+        state.LinearParam(ParamIndex::DelayTimeSyncedR) =
             get_synced_delay_time(NoLongerExistingParam::DelayTimeSyncedR)
                 .ValueOr((f32)param_values::DelaySyncedTime::_1_4);
 
-        auto& new_mode = state.LinearParam(ParamIndex::NewDelayMode);
-        new_mode = (f32)param_values::NewDelayMode::Stereo;
+        auto& new_mode = state.LinearParam(ParamIndex::DelayMode);
+        new_mode = (f32)param_values::DelayMode::Stereo;
         if (auto const str = parser.non_existent_params[ToInt(NoLongerExistingParam::DelaySinevibesMode)]
                                  .TryGet<String>()) {
             if (*str == "Stereo"_s)
-                new_mode = (f32)param_values::NewDelayMode::Stereo;
+                new_mode = (f32)param_values::DelayMode::Stereo;
             else if (*str == "Ping-pong LR"_s)
-                new_mode = (f32)param_values::NewDelayMode::PingPong;
+                new_mode = (f32)param_values::DelayMode::PingPong;
             else if (*str == "Ping-pong RL"_s)
-                new_mode = (f32)param_values::NewDelayMode::PingPong;
+                new_mode = (f32)param_values::DelayMode::PingPong;
         }
 
-        state.LinearParam(ParamIndex::NewDelayFilterSpread) = 1;
-        state.LinearParam(ParamIndex::NewDelayFilterCutoffSemitones) =
+        state.LinearParam(ParamIndex::DelayFilterSpread) = 1;
+        state.LinearParam(ParamIndex::DelayFilterCutoffSemitones) =
             0.5f + (-old_settings_bidirectional_filter_01) / 2;
 
-        state.LinearParam(ParamIndex::NewDelayFeedback) = old_settings_feedback;
+        state.LinearParam(ParamIndex::DelayFeedback) = old_settings_feedback;
     }
 
     // Ensure there are no missing effects in the fx order
@@ -805,7 +805,7 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
                 EffectType::StereoWiden,
                 EffectType::Chorus,
                 EffectType::Reverb,
-                EffectType::NewDelay,
+                EffectType::Delay,
                 EffectType::Phaser,
                 EffectType::ConvolutionReverb,
             };
@@ -1716,7 +1716,7 @@ TEST_CASE(TestLoadingOldFiles) {
         CHECK_EQ(state.fx_order[4], EffectType::StereoWiden);
         CHECK_EQ(state.fx_order[5], EffectType::Chorus);
         CHECK_EQ(state.fx_order[6], EffectType::Reverb);
-        CHECK_EQ(state.fx_order[7], EffectType::NewDelay);
+        CHECK_EQ(state.fx_order[7], EffectType::Delay);
         CHECK_EQ(state.fx_order[8], EffectType::Phaser);
         CHECK_EQ(state.fx_order[9], EffectType::ConvolutionReverb);
 

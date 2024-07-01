@@ -206,7 +206,7 @@ static FXColours GetFxCols(imgui::Context const& imgui, EffectType type) {
             return {LiveCol(imgui, ReverbBack),
                     LiveCol(imgui, ReverbHighlight),
                     LiveCol(imgui, ReverbButton)};
-        case EffectType::NewDelay:
+        case EffectType::Delay:
             return {LiveCol(imgui, DelayBack), LiveCol(imgui, DelayHighlight), LiveCol(imgui, DelayButton)};
         case EffectType::ConvolutionReverb:
             return {LiveCol(imgui, ConvolutionBack),
@@ -549,7 +549,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
                 break;
             }
 
-            case EffectType::NewDelay: {
+            case EffectType::Delay: {
                 LayID heading_container;
                 auto ids = create_fx_ids(plugin.processor.new_delay, &heading_container);
                 auto param_container = create_param_container();
@@ -559,11 +559,11 @@ void DoEffectsWindow(Gui* g, Rect r) {
                                                              fx_param_button_height,
                                                              0);
 
-                auto left = &plugin.processor.params[ToInt(ParamIndex::NewDelayTimeSyncedL)];
-                auto right = &plugin.processor.params[ToInt(ParamIndex::NewDelayTimeSyncedR)];
-                if (!plugin.processor.params[ToInt(ParamIndex::NewDelayTimeSyncSwitch)].ValueAsBool()) {
-                    left = &plugin.processor.params[ToInt(ParamIndex::NewDelayTimeLMs)];
-                    right = &plugin.processor.params[ToInt(ParamIndex::NewDelayTimeRMs)];
+                auto left = &plugin.processor.params[ToInt(ParamIndex::DelayTimeSyncedL)];
+                auto right = &plugin.processor.params[ToInt(ParamIndex::DelayTimeSyncedR)];
+                if (!plugin.processor.params[ToInt(ParamIndex::DelayTimeSyncSwitch)].ValueAsBool()) {
+                    left = &plugin.processor.params[ToInt(ParamIndex::DelayTimeLMs)];
+                    right = &plugin.processor.params[ToInt(ParamIndex::DelayTimeRMs)];
                 }
                 LayoutParameterComponent(g, param_container, ids.new_delay.left, *left, nullopt, false, true);
                 LayoutParameterComponent(g,
@@ -577,29 +577,29 @@ void DoEffectsWindow(Gui* g, Rect r) {
                     LayoutParameterComponent(g,
                                              param_container,
                                              ids.new_delay.feedback,
-                                             plugin.processor.params[ToInt(ParamIndex::NewDelayFeedback)]);
+                                             plugin.processor.params[ToInt(ParamIndex::DelayFeedback)]);
                 }
                 {
                     auto const id =
                         LayoutParameterComponent(g,
                                                  param_container,
                                                  ids.new_delay.mode,
-                                                 plugin.processor.params[ToInt(ParamIndex::NewDelayMode)]);
+                                                 plugin.processor.params[ToInt(ParamIndex::DelayMode)]);
                     lay_set_behave(&lay.ctx, id, LAY_BREAK);
                 }
                 LayoutParameterComponent(
                     g,
                     param_container,
                     ids.new_delay.filter_cutoff,
-                    plugin.processor.params[ToInt(ParamIndex::NewDelayFilterCutoffSemitones)]);
+                    plugin.processor.params[ToInt(ParamIndex::DelayFilterCutoffSemitones)]);
                 LayoutParameterComponent(g,
                                          param_container,
                                          ids.new_delay.filter_spread,
-                                         plugin.processor.params[ToInt(ParamIndex::NewDelayFilterSpread)]);
+                                         plugin.processor.params[ToInt(ParamIndex::DelayFilterSpread)]);
                 LayoutParameterComponent(g,
                                          param_container,
                                          ids.new_delay.mix,
-                                         plugin.processor.params[ToInt(ParamIndex::NewDelayMix)]);
+                                         plugin.processor.params[ToInt(ParamIndex::DelayMix)]);
 
                 ids.divider = create_divider_id();
                 dyn::Append(effects, ids);
@@ -920,68 +920,68 @@ void DoEffectsWindow(Gui* g, Rect r) {
                 break;
             }
 
-            case EffectType::NewDelay: {
+            case EffectType::Delay: {
                 auto const cols = GetFxCols(imgui, ids.type);
                 do_heading(plugin.processor.new_delay, cols.back);
                 auto const knob_style = knobs::DefaultKnob(imgui, cols.highlight);
 
-                if (plugin.processor.params[ToInt(ParamIndex::NewDelayTimeSyncSwitch)].ValueAsBool()) {
+                if (plugin.processor.params[ToInt(ParamIndex::DelayTimeSyncSwitch)].ValueAsBool()) {
                     buttons::PopupWithItems(g,
-                                            plugin.processor.params[ToInt(ParamIndex::NewDelayTimeSyncedL)],
+                                            plugin.processor.params[ToInt(ParamIndex::DelayTimeSyncedL)],
                                             ids.new_delay.left.control,
                                             buttons::ParameterPopupButton(imgui));
                     buttons::PopupWithItems(g,
-                                            plugin.processor.params[ToInt(ParamIndex::NewDelayTimeSyncedR)],
+                                            plugin.processor.params[ToInt(ParamIndex::DelayTimeSyncedR)],
                                             ids.new_delay.right.control,
                                             buttons::ParameterPopupButton(imgui));
                     labels::Label(g,
-                                  plugin.processor.params[ToInt(ParamIndex::NewDelayTimeSyncedL)],
+                                  plugin.processor.params[ToInt(ParamIndex::DelayTimeSyncedL)],
                                   ids.new_delay.left.label,
                                   labels::ParameterCentred(imgui));
                     labels::Label(g,
-                                  plugin.processor.params[ToInt(ParamIndex::NewDelayTimeSyncedR)],
+                                  plugin.processor.params[ToInt(ParamIndex::DelayTimeSyncedR)],
                                   ids.new_delay.right.label,
                                   labels::ParameterCentred(imgui));
                 } else {
                     KnobAndLabel(g,
-                                 plugin.processor.params[ToInt(ParamIndex::NewDelayTimeLMs)],
+                                 plugin.processor.params[ToInt(ParamIndex::DelayTimeLMs)],
                                  ids.new_delay.left,
                                  knob_style);
                     KnobAndLabel(g,
-                                 plugin.processor.params[ToInt(ParamIndex::NewDelayTimeRMs)],
+                                 plugin.processor.params[ToInt(ParamIndex::DelayTimeRMs)],
                                  ids.new_delay.right,
                                  knob_style);
                 }
                 draw_knob_joining_line(ids.new_delay.left.control, ids.new_delay.right.control);
 
                 buttons::Toggle(g,
-                                plugin.processor.params[ToInt(ParamIndex::NewDelayTimeSyncSwitch)],
+                                plugin.processor.params[ToInt(ParamIndex::DelayTimeSyncSwitch)],
                                 ids.new_delay.sync_btn,
                                 buttons::ParameterToggleButton(imgui, cols.highlight));
 
                 buttons::PopupWithItems(g,
-                                        plugin.processor.params[ToInt(ParamIndex::NewDelayMode)],
+                                        plugin.processor.params[ToInt(ParamIndex::DelayMode)],
                                         ids.new_delay.mode.control,
                                         buttons::ParameterPopupButton(imgui));
                 labels::Label(g,
-                              plugin.processor.params[ToInt(ParamIndex::NewDelayMode)],
+                              plugin.processor.params[ToInt(ParamIndex::DelayMode)],
                               ids.new_delay.mode.label,
                               labels::ParameterCentred(imgui));
 
                 KnobAndLabel(g,
-                             plugin.processor.params[ToInt(ParamIndex::NewDelayFeedback)],
+                             plugin.processor.params[ToInt(ParamIndex::DelayFeedback)],
                              ids.new_delay.feedback,
                              knob_style);
                 KnobAndLabel(g,
-                             plugin.processor.params[ToInt(ParamIndex::NewDelayMix)],
+                             plugin.processor.params[ToInt(ParamIndex::DelayMix)],
                              ids.new_delay.mix,
                              knob_style);
                 KnobAndLabel(g,
-                             plugin.processor.params[ToInt(ParamIndex::NewDelayFilterCutoffSemitones)],
+                             plugin.processor.params[ToInt(ParamIndex::DelayFilterCutoffSemitones)],
                              ids.new_delay.filter_cutoff,
                              knob_style);
                 KnobAndLabel(g,
-                             plugin.processor.params[ToInt(ParamIndex::NewDelayFilterSpread)],
+                             plugin.processor.params[ToInt(ParamIndex::DelayFilterSpread)],
                              ids.new_delay.filter_spread,
                              knob_style);
                 draw_knob_joining_line(ids.new_delay.filter_cutoff.control,

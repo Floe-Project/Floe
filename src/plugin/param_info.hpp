@@ -102,17 +102,17 @@ enum class ParamIndex : u16 {
     ChorusDry,
     ChorusOn,
 
-    NewDelayMode,
-    NewDelayFilterCutoffSemitones,
-    NewDelayFilterSpread,
-    NewDelayMix,
-    NewDelayFeedback,
-    NewDelayTimeLMs,
-    NewDelayTimeRMs,
-    NewDelayTimeSyncSwitch,
-    NewDelayTimeSyncedL,
-    NewDelayTimeSyncedR,
-    NewDelayOn,
+    DelayMode,
+    DelayFilterCutoffSemitones,
+    DelayFilterSpread,
+    DelayMix,
+    DelayFeedback,
+    DelayTimeLMs,
+    DelayTimeRMs,
+    DelayTimeSyncSwitch,
+    DelayTimeSyncedL,
+    DelayTimeSyncedR,
+    DelayOn,
 
     PhaserCenterSemitones,
     PhaserModFreqHz,
@@ -432,7 +432,7 @@ constexpr auto k_delay_synced_time_strings = ArrayT<String>({
 });
 static_assert(k_delay_synced_time_strings.size == ToInt(DelaySyncedTime::Count));
 
-enum class NewDelayMode { // never reorder
+enum class DelayMode { // never reorder
     Mono,
     Stereo,
     PingPong,
@@ -445,7 +445,7 @@ constexpr auto k_new_delay_mode_strings = ArrayT<String>({
     "Ping-pong",
     "Mid ping-pong",
 });
-static_assert(k_new_delay_mode_strings.size == ToInt(NewDelayMode::Count));
+static_assert(k_new_delay_mode_strings.size == ToInt(DelayMode::Count));
 
 enum class VelocityMappingMode { // never reorder
     None,
@@ -481,7 +481,7 @@ struct ParameterInfo {
         EffectFilterType,
         DistortionType,
         DelaySyncedTime,
-        NewDelayMode,
+        DelayMode,
         VelocityMappingMode,
         Count,
     };
@@ -686,7 +686,7 @@ constexpr Span<String const> MenuItems(ParameterInfo::MenuType type) {
         case ParameterInfo::MenuType::EffectFilterType: return k_effect_filter_type_strings;
         case ParameterInfo::MenuType::DistortionType: return k_distortion_type_strings;
         case ParameterInfo::MenuType::DelaySyncedTime: return k_delay_synced_time_strings;
-        case ParameterInfo::MenuType::NewDelayMode: return k_new_delay_mode_strings;
+        case ParameterInfo::MenuType::DelayMode: return k_new_delay_mode_strings;
         case ParameterInfo::MenuType::VelocityMappingMode: return k_velocity_mapping_mode_strings;
         case ParameterInfo::MenuType::None:
         case ParameterInfo::MenuType::Count: break;
@@ -1276,11 +1276,11 @@ consteval auto CreateParams() {
     };
 
     // =====================================================================================================
-    mp(NewDelayMode) = Args {
+    mp(DelayMode) = Args {
         .id = id(IdRegion::Master, 90), // never change
         .value_config = val_config_helpers::Menu({
-            .type = ParameterInfo::MenuType::NewDelayMode,
-            .default_val = (u32)NewDelayMode::Stereo,
+            .type = ParameterInfo::MenuType::DelayMode,
+            .default_val = (u32)DelayMode::Stereo,
         }),
         .modules = {ParameterModule::Effect, ParameterModule::Delay},
         .name = "Mode"_s,
@@ -1288,7 +1288,7 @@ consteval auto CreateParams() {
         .tooltip = "Delay type"_s,
     };
 
-    mp(NewDelayFilterCutoffSemitones) = Args {
+    mp(DelayFilterCutoffSemitones) = Args {
         .id = id(IdRegion::Master, 91), // never change
         .value_config = val_config_helpers::FilterSemitones({.default_val = 60}),
         .modules = {ParameterModule::Effect, ParameterModule::Delay},
@@ -1297,7 +1297,7 @@ consteval auto CreateParams() {
         .tooltip = "High/low frequency reduction"_s,
     };
 
-    mp(NewDelayFilterSpread) = Args {
+    mp(DelayFilterSpread) = Args {
         .id = id(IdRegion::Master, 92), // never change
         .value_config = val_config_helpers::Percent({.default_percent = 50}),
         .modules = {ParameterModule::Effect, ParameterModule::Delay},
@@ -1305,7 +1305,7 @@ consteval auto CreateParams() {
         .gui_label = "Spread"_s,
         .tooltip = "Width of the filter"_s,
     };
-    mp(NewDelayTimeLMs) = Args {
+    mp(DelayTimeLMs) = Args {
         .id = id(IdRegion::Master, 93), // never change
         .value_config = val_config_helpers::Ms({.projection = {{15, 4000}, 2.0f}, .default_ms = 470}),
         .modules = {ParameterModule::Effect, ParameterModule::Delay},
@@ -1313,7 +1313,7 @@ consteval auto CreateParams() {
         .gui_label = "Time L"_s,
         .tooltip = "Left delay time (in milliseconds)"_s,
     };
-    mp(NewDelayTimeRMs) = Args {
+    mp(DelayTimeRMs) = Args {
         .id = id(IdRegion::Master, 94), // never change
         .value_config = val_config_helpers::Ms({.projection = {{15, 4000}, 2.0f}, .default_ms = 470}),
         .modules = {ParameterModule::Effect, ParameterModule::Delay},
@@ -1321,7 +1321,7 @@ consteval auto CreateParams() {
         .gui_label = "Time R"_s,
         .tooltip = "Right delay time (in milliseconds)"_s,
     };
-    mp(NewDelayTimeSyncedL) = Args {
+    mp(DelayTimeSyncedL) = Args {
         .id = id(IdRegion::Master, 95), // never change
         .value_config = val_config_helpers::Menu({
             .type = ParameterInfo::MenuType::DelaySyncedTime,
@@ -1332,7 +1332,7 @@ consteval auto CreateParams() {
         .gui_label = "Time L"_s,
         .tooltip = "Left delay time (synced to the host tempo)"_s,
     };
-    mp(NewDelayTimeSyncedR) = Args {
+    mp(DelayTimeSyncedR) = Args {
         .id = id(IdRegion::Master, 96), // never change
         .value_config = val_config_helpers::Menu({
             .type = ParameterInfo::MenuType::DelaySyncedTime,
@@ -1343,7 +1343,7 @@ consteval auto CreateParams() {
         .gui_label = "Time R"_s,
         .tooltip = "Right delay time (synced to the host tempo)"_s,
     };
-    mp(NewDelayTimeSyncSwitch) = Args {
+    mp(DelayTimeSyncSwitch) = Args {
         .id = id(IdRegion::Master, 97), // never change
         .value_config = val_config_helpers::Bool({.default_state = true}),
         .modules = {ParameterModule::Effect, ParameterModule::Delay},
@@ -1351,7 +1351,7 @@ consteval auto CreateParams() {
         .gui_label = "Tempo Sync"_s,
         .tooltip = "Synchronise timings to the host's BPM"_s,
     };
-    mp(NewDelayMix) = Args {
+    mp(DelayMix) = Args {
         .id = id(IdRegion::Master, 98), // never change
         .value_config = val_config_helpers::Percent({.default_percent = 50}),
         .modules = {ParameterModule::Effect, ParameterModule::Delay},
@@ -1359,7 +1359,7 @@ consteval auto CreateParams() {
         .gui_label = "Mix"_s,
         .tooltip = "Level of processed signal"_s,
     };
-    mp(NewDelayOn) = Args {
+    mp(DelayOn) = Args {
         .id = id(IdRegion::Master, 99), // never change
         .value_config = val_config_helpers::Bool({.default_state = false}),
         .modules = {ParameterModule::Effect, ParameterModule::Delay},
@@ -1367,7 +1367,7 @@ consteval auto CreateParams() {
         .gui_label = "Delay"_s,
         .tooltip = "Enable/disable the delay effect"_s,
     };
-    mp(NewDelayFeedback) = Args {
+    mp(DelayFeedback) = Args {
         .id = id(IdRegion::Master, 100), // never change
         .value_config = val_config_helpers::Percent({.default_percent = 50}),
         .modules = {ParameterModule::Effect, ParameterModule::Delay},

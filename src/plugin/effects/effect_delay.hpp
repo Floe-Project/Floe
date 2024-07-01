@@ -9,7 +9,7 @@
 
 class Delay final : public Effect {
   public:
-    Delay(FloeSmoothedValueSystem& s) : Effect(s, EffectType::NewDelay), delay(vitfx::delay::Create()) {}
+    Delay(FloeSmoothedValueSystem& s) : Effect(s, EffectType::Delay), delay(vitfx::delay::Create()) {}
     ~Delay() override { vitfx::delay::Destroy(delay); }
 
     void ResetInternal() override { vitfx::delay::HardReset(*delay); }
@@ -87,43 +87,43 @@ class Delay final : public Effect {
         bool update_time_l = false;
         bool update_time_r = false;
 
-        if (auto p = changed_params.Param(ParamIndex::NewDelayTimeSyncSwitch)) is_synced = p->ValueAsBool();
+        if (auto p = changed_params.Param(ParamIndex::DelayTimeSyncSwitch)) is_synced = p->ValueAsBool();
 
-        if (auto p = changed_params.Param(ParamIndex::NewDelayFeedback))
+        if (auto p = changed_params.Param(ParamIndex::DelayFeedback))
             params[ToInt(Params::Feedback)] = p->ProjectedValue();
 
-        if (auto p = changed_params.Param(ParamIndex::NewDelayTimeSyncedL)) {
+        if (auto p = changed_params.Param(ParamIndex::DelayTimeSyncedL)) {
             synced_time_l = ToSyncedTime(p->ValueAsInt<param_values::DelaySyncedTime>());
             update_time_l = true;
         }
 
-        if (auto p = changed_params.Param(ParamIndex::NewDelayTimeSyncedR)) {
+        if (auto p = changed_params.Param(ParamIndex::DelayTimeSyncedR)) {
             synced_time_r = ToSyncedTime(p->ValueAsInt<param_values::DelaySyncedTime>());
             update_time_r = true;
         }
 
-        if (auto p = changed_params.Param(ParamIndex::NewDelayTimeLMs)) {
+        if (auto p = changed_params.Param(ParamIndex::DelayTimeLMs)) {
             free_time_hz_l = MsToHz(p->ProjectedValue());
             update_time_l = true;
         }
 
-        if (auto p = changed_params.Param(ParamIndex::NewDelayTimeRMs)) {
+        if (auto p = changed_params.Param(ParamIndex::DelayTimeRMs)) {
             free_time_hz_r = MsToHz(p->ProjectedValue());
             update_time_r = true;
         }
 
-        if (auto p = changed_params.Param(ParamIndex::NewDelayMode)) {
-            auto mode = p->ValueAsInt<param_values::NewDelayMode>();
+        if (auto p = changed_params.Param(ParamIndex::DelayMode)) {
+            auto mode = p->ValueAsInt<param_values::DelayMode>();
             params[ToInt(Params::Mode)] = (f32)mode;
         }
 
-        if (auto p = changed_params.Param(ParamIndex::NewDelayFilterCutoffSemitones))
+        if (auto p = changed_params.Param(ParamIndex::DelayFilterCutoffSemitones))
             params[ToInt(Params::FilterCutoffSemitones)] = p->ProjectedValue();
-        if (auto p = changed_params.Param(ParamIndex::NewDelayFilterSpread))
+        if (auto p = changed_params.Param(ParamIndex::DelayFilterSpread))
             params[ToInt(Params::FilterSpread)] = p->ProjectedValue();
-        if (auto p = changed_params.Param(ParamIndex::NewDelayMix))
+        if (auto p = changed_params.Param(ParamIndex::DelayMix))
             params[ToInt(Params::Mix)] = p->ProjectedValue();
-        if (auto p = changed_params.Param(ParamIndex::NewDelayFeedback))
+        if (auto p = changed_params.Param(ParamIndex::DelayFeedback))
             params[ToInt(Params::Feedback)] = p->ProjectedValue();
 
         if (update_time_l) {

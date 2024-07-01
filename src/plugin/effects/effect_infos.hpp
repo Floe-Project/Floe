@@ -15,7 +15,7 @@ enum class EffectType : u32 {
     StereoWiden,
     Chorus,
     Reverb,
-    NewDelay,
+    Delay,
     ConvolutionReverb,
     Phaser,
     Count,
@@ -96,13 +96,13 @@ consteval auto CreateEffectInfos() {
                     .on_param_index = ParamIndex::ReverbOn,
                 };
                 break;
-            case EffectType::NewDelay:
+            case EffectType::Delay:
                 info = {
                     .description =
                         "Simulate an echo effect, as if the sound is reflecting off of a distant surface.",
                     .name = "Delay",
                     .id = 11, // never change
-                    .on_param_index = ParamIndex::NewDelayOn,
+                    .on_param_index = ParamIndex::DelayOn,
                 };
                 break;
             case EffectType::ConvolutionReverb:

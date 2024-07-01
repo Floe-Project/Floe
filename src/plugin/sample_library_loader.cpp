@@ -448,6 +448,7 @@ static void AddAsyncJob(LibrariesAsyncContext& async_ctx,
         async_ctx.jobs.Store(job, MemoryOrder::Release);
     }
 
+    async_ctx.num_uncompleted_jobs.FetchAdd(1, MemoryOrder::AcquireRelease);
     async_ctx.thread_pool.AddJob([&async_ctx, &job = *job, &lib_list]() {
         ZoneNamed(do_job, true);
         ArenaAllocator scratch_arena {PageAllocator::Instance()};
@@ -531,7 +532,6 @@ static void AddAsyncJob(LibrariesAsyncContext& async_ctx,
         job.completed.Store(true, MemoryOrder::SequentiallyConsistent);
         async_ctx.work_signaller.Signal();
     });
-    async_ctx.num_uncompleted_jobs.FetchAdd(1, MemoryOrder::Relaxed);
 }
 
 // any thread
@@ -581,8 +581,9 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
     for (auto& node : libs.scan_folders) {
         if (auto f = node.TryScoped()) {
             auto expected = AvailableLibraries::ScanFolder::State::RescanRequested;
-            if (!f->state.CompareExchangeStrong(expected, AvailableLibraries::ScanFolder::State::Scanning))
-                continue;
+            auto const exchanged =
+                f->state.CompareExchangeStrong(expected, AvailableLibraries::ScanFolder::State::Scanning);
+            if (!exchanged) continue;
         }
 
         LibrariesAsyncContext::Job::ScanFolder* scan_job;
@@ -604,14 +605,14 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
     }
 
     // handle async jobs that have completed
-    for (auto node = async_ctx.jobs.Load(MemoryOrder::Relaxed); node != nullptr;
+    for (auto node = async_ctx.jobs.Load(MemoryOrder::Acquire); node != nullptr;
          node = node->next.Load(MemoryOrder::Relaxed)) {
         if (node->handled) continue;
         if (!node->completed.Load(MemoryOrder::Acquire)) continue;
 
         DEFER {
             node->handled = true;
-            async_ctx.num_uncompleted_jobs.FetchSub(1, MemoryOrder::Relaxed);
+            async_ctx.num_uncompleted_jobs.FetchSub(1, MemoryOrder::AcquireRelease);
         };
         auto const& job = *node;
         switch (job.data.tag) {
@@ -702,10 +703,12 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
                             };
                             libs.error_notifications.AddOrUpdateError(item);
                         }
-                        folder->state.Store(AvailableLibraries::ScanFolder::State::ScanFailed);
+                        folder->state.Store(AvailableLibraries::ScanFolder::State::ScanFailed,
+                                            MemoryOrder::Release);
                     } else {
                         libs.error_notifications.RemoveError(folder_error_id);
-                        folder->state.Store(AvailableLibraries::ScanFolder::State::ScannedSuccessfully);
+                        folder->state.Store(AvailableLibraries::ScanFolder::State::ScannedSuccessfully,
+                                            MemoryOrder::Release);
                     }
                 }
                 break;
@@ -1156,7 +1159,7 @@ static void LoadingThreadLoop(LoadingThread& thread) {
                         lib = *l_ptr;
 
                     if (!lib) {
-                        if (libs_async_ctx.num_uncompleted_jobs.Load(MemoryOrder::Relaxed) == 0) {
+                        if (libs_async_ctx.num_uncompleted_jobs.Load(MemoryOrder::AcquireRelease) == 0) {
                             {
                                 auto item = pending_result.request.connection.error_notifications.NewError();
                                 item->value = {
@@ -1442,7 +1445,8 @@ static void LoadingThreadLoop(LoadingThread& thread) {
                 thread.num_samples_loaded.Store(num_samples_loaded);
                 thread.total_bytes_used_by_samples.Store(total_bytes_used);
             }
-        } while (!pending_results.Empty() || libs_async_ctx.num_uncompleted_jobs.Load(MemoryOrder::Relaxed));
+        } while (!pending_results.Empty() ||
+                 libs_async_ctx.num_uncompleted_jobs.Load(MemoryOrder::AcquireRelease));
 
         ZoneNamedN(post_inner, "post inner", true);
 

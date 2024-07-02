@@ -125,7 +125,7 @@
         };
       in
       {
-        devShells.default = pkgs.mkShell {
+        devShells.default = pkgs.mkShell rec {
           packages = [
             # If you change the zig version you probably also want to change the ZLS version. 
             # For me, that's done my home-manager setup at the moment.
@@ -166,6 +166,10 @@
             pkgs.libGLU
             pkgs.kcov
           ];
+          nativeBuildInputs = [
+            pkgs.libGL
+          ];
+          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath nativeBuildInputs;
           shellHook = ''
             export MACOSX_SDK_SYSROOT="${macosx-sdks}"
           '';

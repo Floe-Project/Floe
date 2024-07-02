@@ -1626,33 +1626,33 @@ pub fn build(b: *std.Build) void {
             build_context.master_step.dependOn(&clap_post_install_step.step);
         }
 
-        const miniaudio = b.addStaticLibrary(.{ .name = "miniaudio", .target = target, .optimize = build_context.optimise });
-        {
-            // disabling pulse audio because it was causing lots of stutters on my machine
-            miniaudio.addCSourceFiles(.{
-                .files = &.{"third_party_libs/miniaudio/miniaudio.c"},
-                .flags = genericFlags(&build_context, target, &.{"-DMA_NO_PULSEAUDIO"}) catch @panic("OOM"),
-            });
-            miniaudio.linkLibC();
-            switch (target.result.os.tag) {
-                .macos => {
-                    applyUniversalSettings(&build_context, miniaudio);
-                    miniaudio.linkFramework("CoreAudio");
-                },
-                .windows => {
-                    miniaudio.linkSystemLibrary("dsound");
-                },
-                .linux => {
-                    miniaudio.linkSystemLibrary2("alsa", .{ .use_pkg_config = .force });
-                },
-                else => {
-                    unreachable;
-                },
-            }
-        }
-
         // standalone is for development-only at the moment
         if (build_context.build_mode != .production) {
+            const miniaudio = b.addStaticLibrary(.{ .name = "miniaudio", .target = target, .optimize = build_context.optimise });
+            {
+                // disabling pulse audio because it was causing lots of stutters on my machine
+                miniaudio.addCSourceFiles(.{
+                    .files = &.{"third_party_libs/miniaudio/miniaudio.c"},
+                    .flags = genericFlags(&build_context, target, &.{"-DMA_NO_PULSEAUDIO"}) catch @panic("OOM"),
+                });
+                miniaudio.linkLibC();
+                switch (target.result.os.tag) {
+                    .macos => {
+                        applyUniversalSettings(&build_context, miniaudio);
+                        miniaudio.linkFramework("CoreAudio");
+                    },
+                    .windows => {
+                        miniaudio.linkSystemLibrary("dsound");
+                    },
+                    .linux => {
+                        miniaudio.linkSystemLibrary2("alsa", .{ .use_pkg_config = .force });
+                    },
+                    else => {
+                        unreachable;
+                    },
+                }
+            }
+
             const portmidi = b.addStaticLibrary(.{
                 .name = "portmidi",
                 .target = target,

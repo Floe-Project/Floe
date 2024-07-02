@@ -193,7 +193,11 @@ struct AtomicRefList {
         dead_list = iterator.node;
 
         // signal that the reader should no longer user this node
-        iterator.node->reader_uses.FetchAdd(Node::k_dead_bit);
+        // NOTE: we use the ADD operation here instead of bitwise OR because it's probably faster on x86: the
+        // XADD instruction vs the CMPXCHG instruction. This is fine because we know that the dead bit isn't
+        // already set and so doing and ADD is the same as doing an OR.
+        auto const u = iterator.node->reader_uses.FetchAdd(Node::k_dead_bit);
+        ASSERT((u & Node::k_dead_bit) == 0, "already dead");
 
         return Iterator {.node = iterator.node->next.Load(), .prev = iterator.prev};
     }

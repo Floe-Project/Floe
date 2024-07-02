@@ -33,48 +33,6 @@
           '';
         };
 
-        pluginval-windows = pkgs.stdenv.mkDerivation {
-          pname = "pluginval-windows";
-          version = "1.0.3";
-
-          src = builtins.fetchurl {
-            url = "https://github.com/Tracktion/pluginval/releases/download/v1.0.3/pluginval_Windows.zip";
-            sha256 = "sha256:1b93hldf7b9z23d85sw828cd96hiqzqdk9hcxi94vbzb3bibv0sd";
-          };
-
-          buildInputs = [ pkgs.unzip ];
-
-          unpackPhase = ''
-            unzip $src
-          '';
-
-          installPhase = ''
-            mkdir -p $out/bin
-            cp -R . $out/bin
-          '';
-        };
-
-        clap-val-windows = pkgs.stdenv.mkDerivation {
-          pname = "clap-validator-windows";
-          version = "0.3.2";
-
-          src = builtins.fetchurl {
-            url = "https://github.com/free-audio/clap-validator/releases/download/0.3.2/clap-validator-0.3.2-windows.zip";
-            sha256 = "sha256:1nmxfndv9afqkdplhp6fnm9b6k4v2nvp1a10ahmm92alq18vxkb8";
-          };
-
-          buildInputs = [ pkgs.unzip ];
-
-          unpackPhase = ''
-            unzip $src
-          '';
-
-          installPhase = ''
-            mkdir -p $out/bin
-            cp -R . $out/bin
-          '';
-        };
-
         clang-build-analyzer = pkgs.stdenv.mkDerivation rec {
           pname = "clang-build-analyzer";
           version = "1.5.0";
@@ -203,7 +161,6 @@
             pkgs.xorg.libX11
             pkgs.xorg.libXext
             pkgs.xorg.libXcursor
-            pkgs.gtk4
             pkgs.gnome.zenity
             pkgs.libGL
             pkgs.libGLU
@@ -211,9 +168,6 @@
           ];
           shellHook = ''
             export MACOSX_SDK_SYSROOT="${macosx-sdks}"
-          '' + pkgs.lib.optionalString pkgs.stdenv.isLinux ''
-            export PLUGINVAL_WINDOWS_PATH="${pluginval-windows}/bin/pluginval.exe"
-            export CLAPVAL_WINDOWS_PATH="${clap-val-windows}/bin/clap-validator.exe"
           '';
         };
       });

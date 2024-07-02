@@ -28,9 +28,6 @@
 //   acceptable though because the reader needs act knowing that items are added or removed often: skipping or
 //   repeating are similar in effect to adding or removing.
 
-// IMPROVE: we're doing lots of atomic operations with SequentiallyConsistent ordering. We can use more
-// relaxed modes for lots of these.
-
 template <typename ValueType>
 struct AtomicRefList {
     // Nodes are never destroyed or freed until this class is destroyed so use-after-free is not an issue. To
@@ -40,7 +37,7 @@ struct AtomicRefList {
         [[nodiscard]] ValueType* TryRetain() {
             auto const r = reader_uses.FetchAdd(1, MemoryOrder::Relaxed);
             if (r & k_dead_bit) [[unlikely]] {
-                reader_uses.FetchSub(1, MemoryOrder::AcquireRelease);
+                reader_uses.FetchSub(1, MemoryOrder::Release);
                 return nullptr;
             }
             return &value;
@@ -48,7 +45,7 @@ struct AtomicRefList {
 
         // reader, if TryRetain() returned non-null
         void Release() {
-            auto const r = reader_uses.FetchSub(1, MemoryOrder::AcquireRelease);
+            auto const r = reader_uses.FetchSub(1, MemoryOrder::Release);
             ASSERT(r != 0);
         }
 
@@ -105,7 +102,7 @@ struct AtomicRefList {
         // You should RemoveAll and DeleteRemovedAndUnreferenced before the object is destroyed. We don't want
         // to do that here because we want this object to be able to live on a reader thread instead of living
         // on a writer thread.
-        ASSERT(live_list.Load() == nullptr);
+        ASSERT(live_list.Load(MemoryOrder::Acquire) == nullptr);
         ASSERT(dead_list == nullptr);
     }
 
@@ -154,16 +151,16 @@ struct AtomicRefList {
 
         // put it into the live list
         if (insert_after) {
-            node->next.Store(insert_after->next.Load());
-            insert_after->next.Store(node);
+            node->next.Store(insert_after->next.Load(MemoryOrder::Relaxed), MemoryOrder::Relaxed);
+            insert_after->next.Store(node, MemoryOrder::Release);
             ASSERT(node > insert_after);
         } else {
-            node->next.Store(live_list.Load());
-            live_list.Store(node);
+            node->next.Store(live_list.Load(MemoryOrder::Relaxed), MemoryOrder::Relaxed);
+            live_list.Store(node, MemoryOrder::Release);
         }
 
-        // signal that the reader can now use this node
-        node->reader_uses.FetchAnd(~Node::k_dead_bit);
+        // signal that the readers can now use this node
+        node->reader_uses.FetchAnd(~Node::k_dead_bit, MemoryOrder::AcquireRelease);
     }
 
     // writer, returns next iterator (i.e. instead of ++it in a loop)
@@ -182,9 +179,9 @@ struct AtomicRefList {
 
         // remove it from the live_list
         if (iterator.prev)
-            iterator.prev->next.Store(iterator.node->next.Load());
+            iterator.prev->next.Store(iterator.node->next.Load(MemoryOrder::Relaxed), MemoryOrder::Release);
         else
-            live_list.Store(iterator.node->next.Load());
+            live_list.Store(iterator.node->next.Load(MemoryOrder::Relaxed), MemoryOrder::Release);
 
         // add it to the dead list. we use a separate 'next' variable for this because the reader still might
         // be using the node and it needs to know how to correctly iterate through the list rather than
@@ -192,14 +189,14 @@ struct AtomicRefList {
         iterator.node->writer_next = dead_list;
         dead_list = iterator.node;
 
-        // signal that the reader should no longer user this node
-        // NOTE: we use the ADD operation here instead of bitwise OR because it's probably faster on x86: the
+        // signal that the readers should no longer use this node
+        // NOTE: we use the ADD operation here instead of bitwise-OR because it's probably faster on x86: the
         // XADD instruction vs the CMPXCHG instruction. This is fine because we know that the dead bit isn't
-        // already set and so doing and ADD is the same as doing an OR.
-        auto const u = iterator.node->reader_uses.FetchAdd(Node::k_dead_bit);
+        // already set and is a power-of-2 and so doing and ADD is the same as doing an OR.
+        auto const u = iterator.node->reader_uses.FetchAdd(Node::k_dead_bit, MemoryOrder::AcquireRelease);
         ASSERT((u & Node::k_dead_bit) == 0, "already dead");
 
-        return Iterator {.node = iterator.node->next.Load(), .prev = iterator.prev};
+        return Iterator {.node = iterator.node->next.Load(MemoryOrder::Relaxed), .prev = iterator.prev};
     }
 
     // writer
@@ -226,7 +223,7 @@ struct AtomicRefList {
             ASSERT(previous != i);
             if (previous) ASSERT(previous != i->writer_next);
 
-            if (i->reader_uses.Load() == Node::k_dead_bit) {
+            if (i->reader_uses.Load(MemoryOrder::Acquire) == Node::k_dead_bit) {
                 if (!previous)
                     dead_list = i->writer_next;
                 else

@@ -87,10 +87,8 @@ struct FloeInstance {
 
     Optional<PluginInstance> plugin {};
 
-#if FLOE_GUI
     GuiPlatform* gui_platform = nullptr;
     Optional<Gui> gui {};
-#endif
 };
 
 static u16 g_num_instances = 0;
@@ -121,7 +119,6 @@ clap_plugin_state const floe_plugin_state {
     },
 };
 
-#if FLOE_GUI
 // Size (width, height) is in pixels; the corresponding windowing system extension is
 // responsible for defining if it is physical pixels or logical pixels.
 clap_plugin_gui const floe_gui {
@@ -323,7 +320,6 @@ clap_plugin_gui const floe_gui {
         return true;
     },
 };
-#endif
 
 clap_plugin_params const floe_params {
     // Returns the number of parameters.
@@ -490,11 +486,9 @@ clap_plugin_timer_support const floe_timer {
             auto& floe = *(FloeInstance*)plugin->plugin_data;
             DebugAssertMainThread(floe.host);
             (void)timer_id;
-#if FLOE_GUI
             // At the moment we are only ever using timer for GUI stuff, so we don't need to
             // check for specific timer ids.
             floe.gui_platform->PollAndUpdate();
-#endif
         },
 };
 
@@ -512,11 +506,9 @@ clap_plugin_posix_fd_support const floe_posix_fd {
             DebugAssertMainThread(floe.host);
             (void)flags;
             (void)fd;
-#if FLOE_GUI
             // At the moment we are only ever using posix fd for GUI stuff, so we don't need to
             // check for specific fd values or flags.
             floe.gui_platform->PollAndUpdate();
-#endif
         },
 };
 
@@ -552,12 +544,10 @@ clap_plugin const floe_plugin {
             ___tracy_startup_profiler();
             tracy::SetThreadName("Main");
 #endif
-            StartupCrashHandler();
         }
 
         if (first_instance) g_cross_instance_systems.Init();
 
-#if FLOE_GUI
         floe.gui_platform = CreateGuiPlatform(
             floe.host,
             [&floe]() { GUIUpdate(&*floe.gui); },
@@ -566,7 +556,6 @@ clap_plugin const floe_plugin {
 
         floe.gui_platform->window_size =
             gui_settings::WindowSize(g_cross_instance_systems->settings.settings.gui);
-#endif
 
         floe.plugin.Emplace(floe.host, *g_cross_instance_systems);
 
@@ -584,10 +573,8 @@ clap_plugin const floe_plugin {
             ZoneScopedMessage(floe.trace_config, "plugin destroy (init:{})", floe.initialised);
 
             if (floe.initialised) {
-#if FLOE_GUI
                 floe.gui.Clear();
                 DestroyGuiPlatform(floe.gui_platform);
-#endif
 
                 floe.plugin.Clear();
 
@@ -636,13 +623,11 @@ clap_plugin const floe_plugin {
             DebugAssertMainThread(floe.host);
             ASSERT(floe.active);
             if (!floe.active) return;
-#if FLOE_GUI
             if (floe.gui) {
                 // TODO: I'm not entirely sure if this is ok or not. But I do want to avoid the GUI being
                 // active when the audio plugin is deactivate.
                 floe.gui_platform->CloseWindow();
             }
-#endif
             auto& processor = floe.plugin->processor;
             processor.processor_callbacks.deactivate(processor);
             floe.active = false;
@@ -717,9 +702,7 @@ clap_plugin const floe_plugin {
         auto& floe = *(FloeInstance*)plugin->plugin_data;
         ZoneScopedMessage(floe.trace_config, "plugin get_extension");
         if (NullTermStringsEqual(id, CLAP_EXT_STATE)) return &floe_plugin_state;
-#if FLOE_GUI
         if (NullTermStringsEqual(id, CLAP_EXT_GUI)) return &floe_gui;
-#endif
         if (NullTermStringsEqual(id, CLAP_EXT_PARAMS)) return &floe_params;
         if (NullTermStringsEqual(id, CLAP_EXT_NOTE_PORTS)) return &floe_note_ports;
         if (NullTermStringsEqual(id, CLAP_EXT_AUDIO_PORTS)) return &floe_audio_ports;
@@ -743,9 +726,7 @@ clap_plugin const floe_plugin {
                 auto& processor = floe.plugin->processor;
                 processor.processor_callbacks.on_main_thread(processor, update_gui);
                 PluginInstanceCallbacks().on_main_thread(*floe.plugin, update_gui);
-#if FLOE_GUI
                 if (update_gui && floe.gui_platform) floe.gui_platform->SetGUIDirty();
-#endif
             }
         },
 };

@@ -22,7 +22,6 @@ const floe_copyright = "Sam Windell";
 const floe_vendor = "Floe";
 const floe_url = "https://github.com/Floe-Synth/Floe";
 const floe_au_factory_function = "FloeFactoryFunction";
-const floe_plugin_gui = true; // TODO(1.0): remove this
 const min_macos_version = "11.0.0"; // use 3-part version for plist
 const min_windows_version = "win10";
 
@@ -979,7 +978,6 @@ pub fn build(b: *std.Build) void {
             .IS_WINDOWS = target.result.os.tag == .windows,
             .IS_MACOS = target.result.os.tag == .macos,
             .IS_LINUX = target.result.os.tag == .linux,
-            .FLOE_GUI = floe_plugin_gui,
             .MIN_WINDOWS_NTDDI_VERSION = windows_ntddi_version,
             .MIN_MACOS_VERSION = min_macos_version,
         });
@@ -1494,7 +1492,6 @@ pub fn build(b: *std.Build) void {
                     plugin_path ++ "/sample_library/sample_library_lua.cpp",
                     plugin_path ++ "/sample_library/sample_library_mdata.cpp",
                     plugin_path ++ "/state/state_coding.cpp",
-                } ++ if (floe_plugin_gui) .{
                     plugin_path ++ "/gui/framework/draw_list.cpp",
                     plugin_path ++ "/gui/framework/gui_imgui.cpp",
                     plugin_path ++ "/gui/framework/gui_platform.cpp",
@@ -1522,7 +1519,7 @@ pub fn build(b: *std.Build) void {
                     plugin_path ++ "/gui/gui_window.cpp",
                     plugin_path ++ "/gui/framework/draw_list_opengl.cpp",
                     plugin_path ++ "/gui/framework/gui_platform_pugl.cpp",
-                } else .{}),
+                }),
                 .flags = cpp_fp_flags,
             });
 
@@ -1557,11 +1554,9 @@ pub fn build(b: *std.Build) void {
             embedded_files.addIncludePath(b.path("build_resources"));
             plugin.addObject(embedded_files);
             plugin.linkLibrary(tracy);
-            if (floe_plugin_gui) {
-                plugin.linkLibrary(pugl);
-                plugin.addObject(stb_image);
-                plugin.addIncludePath(b.path("src/plugin/gui/live_edit_defs"));
-            }
+            plugin.linkLibrary(pugl);
+            plugin.addObject(stb_image);
+            plugin.addIncludePath(b.path("src/plugin/gui/live_edit_defs"));
             plugin.linkLibrary(flac);
             plugin.addObject(dr_wav);
             plugin.addObject(xxhash);
@@ -1656,7 +1651,7 @@ pub fn build(b: *std.Build) void {
         }
 
         // standalone is for development-only at the moment
-        if (build_context.build_mode != .production and floe_plugin_gui) {
+        if (build_context.build_mode != .production) {
             const portmidi = b.addStaticLibrary(.{
                 .name = "portmidi",
                 .target = target,

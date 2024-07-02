@@ -845,11 +845,12 @@ pub fn build(b: *std.Build) void {
 
     // Installing plugins to global plugin folders requires admin rights but it's often easier to debug
     // things without requiring admin. For production builds it's always enabled.
-    const windows_installer_require_admin = b.option(
+    var windows_installer_require_admin = b.option(
         bool,
         "win-installer-elevated",
         "Whether the installer should be set to administrator-required mode",
     ) orelse (build_mode == .production);
+    if (build_mode == .production) windows_installer_require_admin = true;
 
     var enable_tracy = b.option(bool, "tracy", "Enable Tracy profiler") orelse false;
     if (build_mode == .performance_profiling) enable_tracy = true;

@@ -54,7 +54,7 @@ struct RefCounted {
     }
     void Release() const {
         if (m_refs) {
-            auto prev = m_refs->SubFetch(1, MemoryOrder::Relaxed);
+            auto prev = m_refs->SubFetch(1, MemoryOrder::AcquireRelease);
             ASSERT(prev != ~(u32)0);
             if (prev == 0 && m_work_signaller) m_work_signaller->Signal();
         }

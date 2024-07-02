@@ -5,11 +5,13 @@
 #include "foundation/foundation.hpp"
 #include "os/threading.hpp"
 
-// Multiple reader, single writer. Reading speed is the priority. Designed for the case where a
-// background-thread is creating expensive-to-construct objects (like file reading + decoding) and a reading
-// thread (such as a GUI thread) needs to use the objects with little overhead. The writing thread needs to
-// frequently add or remove items from the list. Nodes from this struct can be stored in other data structures
-// such as hash tables if needed. So long as node values are accessed with TryRetain and Release.
+// Lock-free list. Multiple readers, single writer.
+//
+// Reading speed is the priority. Designed for the case where a background-thread is creating
+// expensive-to-construct objects (like file reading + decoding) and a reading thread (such as a GUI thread)
+// needs to use the objects with little overhead. The writing thread needs to frequently add or remove items
+// from the list. Nodes from this struct can be stored in other data structures such as hash tables if needed.
+// So long as node values are accessed with TryRetain and Release.
 //
 // It's like a bit like a mutex-protected std::list<std::weak_ptr<MyObject>>.
 //
@@ -25,6 +27,10 @@
 //   impossible depending on when the writer calls DeleteRemovedOrUnreferenced. This limitation is often
 //   acceptable though because the reader needs act knowing that items are added or removed often: skipping or
 //   repeating are similar in effect to adding or removing.
+
+// IMPROVE: we're doing lots of atomic operations with SequentiallyConsistent ordering. We can use more
+// relaxed modes for lots of these.
+
 template <typename ValueType>
 struct AtomicRefList {
     // Nodes are never destroyed or freed until this class is destroyed so use-after-free is not an issue. To
@@ -34,7 +40,7 @@ struct AtomicRefList {
         [[nodiscard]] ValueType* TryRetain() {
             auto const r = reader_uses.FetchAdd(1, MemoryOrder::Relaxed);
             if (r & k_dead_bit) [[unlikely]] {
-                reader_uses.FetchSub(1, MemoryOrder::Relaxed);
+                reader_uses.FetchSub(1, MemoryOrder::AcquireRelease);
                 return nullptr;
             }
             return &value;
@@ -42,7 +48,7 @@ struct AtomicRefList {
 
         // reader, if TryRetain() returned non-null
         void Release() {
-            auto const r = reader_uses.FetchSub(1, MemoryOrder::Relaxed);
+            auto const r = reader_uses.FetchSub(1, MemoryOrder::AcquireRelease);
             ASSERT(r != 0);
         }
 
@@ -106,7 +112,7 @@ struct AtomicRefList {
     // reader or writer
     // If you are the reader the values should be consider weak references: you MUST call TryRetain (and
     // afterwards Release) on the object before using it.
-    Iterator begin() const { return Iterator(live_list.Load(MemoryOrder::Relaxed), nullptr); }
+    Iterator begin() const { return Iterator(live_list.Load(MemoryOrder::Acquire), nullptr); }
     Iterator end() const { return Iterator(nullptr, nullptr); }
 
     // writer, call placement-new on node->value

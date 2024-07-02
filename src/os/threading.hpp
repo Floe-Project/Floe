@@ -118,11 +118,20 @@ class Semaphore {
     OpaqueHandle<NativeHandleSizes().sema> m_sema;
 };
 
+// These atomics are just a wrapper around the compiler instrinsics. They follow the C++ memory model:
+// https://en.cppreference.com/w/cpp/atomic/memory_order. And so you can use them as you would std::atomic.
+
 enum class MemoryOrder {
     Relaxed = __ATOMIC_RELAXED,
     Consume = __ATOMIC_CONSUME, // load-consume
-    Acquire = __ATOMIC_ACQUIRE, // load-acquire
-    Release = __ATOMIC_RELEASE, // store-release
+
+    // Acquire goes on atomic loads and ensures all memory operations declared after actually happen after it.
+    Acquire = __ATOMIC_ACQUIRE,
+
+    // Release goes on atomic stores and ensures that all memory operations declared before it actually happen
+    // before it
+    Release = __ATOMIC_RELEASE,
+
     AcquireRelease = __ATOMIC_ACQ_REL, // store-release load-acquire
     SequentiallyConsistent = __ATOMIC_SEQ_CST, // store-release load-acquire
 };
@@ -151,6 +160,7 @@ struct Atomic {
         return *ptr;
     }
 
+    // Returns true if the exchange succeeded.
     bool CompareExchangeWeak(Type& expected,
                              Type desired,
                              MemoryOrder success_memory_order = MemoryOrder::SequentiallyConsistent,
@@ -163,6 +173,7 @@ struct Atomic {
                                          int(failure_memory_order));
     }
 
+    // Returns true if the exchange succeeded.
     bool CompareExchangeStrong(Type& expected,
                                Type desired,
                                MemoryOrder success_memory_order = MemoryOrder::SequentiallyConsistent,
@@ -244,7 +255,7 @@ struct AtomicCountdown {
     explicit AtomicCountdown(u32 initial_value) : counter(initial_value) {}
 
     void CountDown(u32 steps = 1) {
-        auto const current = counter.SubFetch(steps, MemoryOrder::Release);
+        auto const current = counter.SubFetch(steps, MemoryOrder::AcquireRelease);
         if (current == 0)
             WakeWaitingThreads(counter, NumWaitingThreads::All);
         else

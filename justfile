@@ -103,8 +103,6 @@ format:
   {{all_src_files}} | xargs clang-format -i
 
 test-clap-val build="": (_build_if_requested build "native")
-  ldd $(which clap-validator)
-  ldd {{native_binary_dir}}/Floe.clap
   clap-validator validate --in-process {{native_binary_dir}}/Floe.clap
 
 test-units build="" +args="": (_build_if_requested build "native")

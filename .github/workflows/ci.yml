@@ -57,7 +57,7 @@ jobs:
             build_gen
 
       - if: '!cancelled()'
-        run: just build linux
+        run: just build native
 
       - if: '!cancelled()'
         run: just build windows

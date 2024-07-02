@@ -121,7 +121,7 @@ _download-and-unzip-to-cache-dir url:
   #!/usr/bin/env bash
   mkdir -p {{cache_dir}}
   pushd {{cache_dir}}
-  wget {{url}} 
+  curl -O {{url}} 
   basename=$(basename {{url}})
   unzip $basename
   rm $basename

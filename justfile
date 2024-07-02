@@ -161,6 +161,7 @@ coverage build="": (_build_if_requested build "native")
 valgrind build="": (_build_if_requested build "native")
   valgrind --fair-sched=yes {{native_binary_dir}}/tests
 
+# TODO: add vst3-val, pluginval and plugival-au (and wine variants) when we re-enable wrappers
 checks_level_0 := replace( 
   "
   check-reuse
@@ -169,18 +170,15 @@ checks_level_0 := replace(
   check-spelling
   test-units
   test-clap-val
-  test-pluginval
-  test-vst3-val
   " + 
   if os() == "linux" {
     "
-    test-windows-vst3-val
-    test-windows-pluginval
     test-windows-clap-val
     test-windows-units
     "
   } else {
-    "test-pluginval-au"
+    "
+    "
   }, "\n", " ")
 
 checks_level_1 := checks_level_0 + replace( 
@@ -188,12 +186,11 @@ checks_level_1 := checks_level_0 + replace(
   clang-tidy
   ", "\n", " ")
 
+# TODO: add vst3-val, pluginval and plugival-au when we re-enable wrappers
 checks_ci := replace(
   "
     test-units
     test-clap-val
-    test-pluginval
-    test-vst3-val
   " +
   if os() == "linux" {
     "
@@ -206,7 +203,6 @@ checks_ci := replace(
     "
   } else {
     "
-    test-pluginval-au
     "
   }, "\n", " ")
 
@@ -268,9 +264,9 @@ test-ci-windows:
     [[ $result -ne 0 ]] && num_failed=$((num_failed + 1))
   }
   
-  test test-windows-pluginval
+  # test test-windows-pluginval # TODO: re-enable when wrappers are supported
   test test-windows-units
-  test test-windows-vst3-val
+  # test test-windows-vst3-val # TODO: re-enable when wrappers are supported
   test test-windows-clap-val
 
   if [[ -z $GITHUB_ACTIONS ]]; then
@@ -405,7 +401,7 @@ windows-prepare-release:
   [[ ! -d zig-out/x86_64-windows ]] && echo "x86_64-windows folder not found" && exit 1
   cd zig-out/x86_64-windows
 
-  just windows-codesign-file Floe.vst3 "Floe VST3"
+  # just windows-codesign-file Floe.vst3 "Floe VST3" # TODO: re-enable when wrappers are supported
   just windows-codesign-file Floe.clap "Floe CLAP"
 
   installer_file=$(find . -type f -name "*Installer*.exe")
@@ -420,7 +416,8 @@ windows-prepare-release:
   # zip the manual-install files
   just _create-manual-install-readme "Windows"
   final_manual_zip_name="Floe-Manual-Install-v$version-Windows.zip"
-  zip -r $final_manual_zip_name Floe.vst3 Floe.clap readme.txt
+  # TODO: add Floe.vst3 to zip when wrappers are supported
+  zip -r $final_manual_zip_name Floe.clap readme.txt
   just _try-add-core-library-to-zip $final_manual_zip_name
   rm readme.txt
   mv $final_manual_zip_name {{release_files_dir}}
@@ -465,9 +462,12 @@ macos-prepare-release-plugins:
     codesign --sign "$MACOS_DEV_ID_APP_NAME" --timestamp --options=runtime --deep --force --entitlements plugin.entitlements $1
   }
 
+  # TODO: add Floe.vst3 and Floe.component when wrappers are supported
+  plugin_list="Floe.clap"
+
   # we can do it in parallel for speed, but we need to be careful there's no conflicting use of the filesystem
   export -f codesign_plugin
-  SHELL=$(type -p bash) parallel --bar codesign_plugin ::: Floe.vst3 Floe.component Floe.clap
+  SHELL=$(type -p bash) parallel --bar codesign_plugin ::: $plugin_list
 
   rm plugin.entitlements
 
@@ -492,13 +492,13 @@ macos-prepare-release-plugins:
 
   # we can do it in parallel for speed, but we need to be careful there's no conflicting use of the filesystem
   export -f notarize_plugin
-  SHELL=$(type -p bash) parallel --bar notarize_plugin ::: Floe.vst3 Floe.component Floe.clap
+  SHELL=$(type -p bash) parallel --bar notarize_plugin ::: $plugin_list
 
   # step 3: zip
   just _create-manual-install-readme "macOS"
   final_manual_zip_name="Floe-Manual-Install-v$version-macOS.zip"
   rm -f $final_manual_zip_name
-  zip -r $final_manual_zip_name Floe.vst3 Floe.component Floe.clap readme.txt
+  zip -r $final_manual_zip_name $plugin_list readme.txt
   just _try-add-core-library-to-zip $final_manual_zip_name
   mv $final_manual_zip_name {{release_files_dir}}
   rm readme.txt
@@ -564,8 +564,9 @@ macos-build-installer:
     add_package_to_distribution_xml "$identifier" "$title" "$description" "$package_root.pkg"
   }
 
-  make_package vst3 VST3 "Floe VST3" "VST3 format of the Floe plugin"
-  make_package component Components "Floe AudioUnit (AUv2)" "AudioUnit (version 2) format of the Floe plugin"
+  # TODO: re-enable when wrappers are supported
+  # make_package vst3 VST3 "Floe VST3" "VST3 format of the Floe plugin"
+  # make_package component Components "Floe AudioUnit (AUv2)" "AudioUnit (version 2) format of the Floe plugin"
   make_package clap CLAP "Floe CLAP" "CLAP format of the Floe plugin"
 
   # step 2: make a package to create empty folders that Floe might use
@@ -605,7 +606,7 @@ macos-build-installer:
   echo "This application will install Floe on your computer. You will be able to select which types of audio plugin format you would like to install. Please note that sample libraries are separate: this installer just installs the Floe engine." > productbuild_files/welcome.txt
 
   # find the min macos version from one of the plugin's plists
-  min_macos_version=$(grep -A 1 '<key>LSMinimumSystemVersion</key>' "$universal_macos_abs_path/Floe.vst3/Contents/Info.plist" | grep '<string>' | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
+  min_macos_version=$(grep -A 1 '<key>LSMinimumSystemVersion</key>' "$universal_macos_abs_path/Floe.clap/Contents/Info.plist" | grep '<string>' | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
 
   cat >distribution.xml <<EOF
   <installer-gui-script minSpecVersion="1">

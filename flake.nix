@@ -165,7 +165,6 @@
             pkgs.libGL
             pkgs.libGLU
             pkgs.kcov
-            pkgs.glibc
           ];
           shellHook = ''
             export MACOSX_SDK_SYSROOT="${macosx-sdks}"

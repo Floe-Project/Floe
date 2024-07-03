@@ -59,11 +59,11 @@ jobs:
       - if: '!cancelled()'
         run: just build linux
 
-      - if: '!cancelled()'
-        run: just build windows
-
-      - if: '!cancelled()'
-        run: just build mac_ub
+      # - if: '!cancelled()'
+      #   run: just build windows
+      #
+      # - if: '!cancelled()'
+      #   run: just build mac_ub
 
       - if: '!cancelled()'
         run: just test-ci

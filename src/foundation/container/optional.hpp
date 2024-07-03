@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #pragma once
+#include "foundation/memory/cloneable.hpp"
 #include "foundation/universal_defs.hpp"
 
 struct NulloptType {
@@ -114,7 +115,7 @@ class [[nodiscard]] Optional<Type> {
         return Value();
     }
 
-    constexpr Optional Clone(Allocator& a) const;
+    constexpr Optional Clone(Allocator& a, CloneType clone_type = CloneType::Deep) const;
 
     union {
         Type value;
@@ -185,7 +186,7 @@ class [[nodiscard]] Optional<Type> {
         m_has_value = true;
     }
 
-    constexpr Optional Clone(Allocator& a) const;
+    constexpr Optional Clone(Allocator& a, CloneType clone_type = CloneType::Deep) const;
 
     constexpr Type& Value() {
         ASSERT(HasValue());

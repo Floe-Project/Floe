@@ -7,9 +7,9 @@
 #include "foundation/memory/allocators.hpp"
 
 struct ErrorWithPath {
-    ErrorWithPath Clone(Allocator& alloc) const {
+    ErrorWithPath Clone(Allocator& alloc, CloneType clone_type) const {
         return {
-            .path = path.Clone(alloc),
+            .path = path.Clone(alloc, clone_type),
             .error = error,
         };
     }

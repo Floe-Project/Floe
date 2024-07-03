@@ -134,36 +134,32 @@ struct Allocator {
         return result;
     }
 
-    // You must Free() the result of this call.
     template <typename Type>
-    auto ShallowClone(Type const& container) -> Span<typename Type::ValueType> {
-        using ValueType = RemoveConst<typename Type::ValueType>;
-
-        if (!container.size) return {};
-
-        auto result = AllocateExactSizeUninitialised<ValueType>(container.size);
-        for (auto const i : Range(container.size))
-            PLACEMENT_NEW(&result[i]) ValueType(container[i]);
-
-        return result;
-    }
-
-    template <typename Type>
-    auto Clone(Type const& container) {
+    auto Clone(Type const& container, CloneType clone_type = CloneType::Deep) {
         using ValueType = RemoveConst<typename Type::ValueType>;
         static_assert(TriviallyCopyable<ValueType> || Cloneable<ValueType>);
 
         if (!container.size) return Span<ValueType> {};
-
         auto result = AllocateExactSizeUninitialised<ValueType>(container.size);
-        for (auto const i : Range(container.size))
-            if constexpr (Cloneable<ValueType> || IsSpecializationOf<ValueType, Span>)
-                PLACEMENT_NEW(&result[i]) ValueType(container[i].Clone(*this));
-            else if constexpr (TriviallyCopyable<ValueType>)
-                PLACEMENT_NEW(&result[i]) ValueType(container[i]);
-            else
-                PanicIfReached();
 
+        switch (clone_type) {
+            case CloneType::Shallow: {
+                for (auto const i : Range(container.size))
+                    PLACEMENT_NEW(&result[i]) ValueType(container[i]);
+                break;
+            }
+            case CloneType::Deep: {
+                for (auto const i : Range(container.size))
+                    if constexpr (Cloneable<ValueType> || IsSpecializationOf<ValueType, Span>)
+                        PLACEMENT_NEW(&result[i]) ValueType(container[i].Clone(*this));
+                    else if constexpr (TriviallyCopyable<ValueType>)
+                        PLACEMENT_NEW(&result[i]) ValueType(container[i]);
+                    else
+                        PanicIfReached();
+
+                break;
+            }
+        }
         return result;
     }
 
@@ -265,20 +261,20 @@ struct Allocator {
 };
 
 template <typename Type>
-constexpr Span<RemoveConst<Type>> Span<Type>::Clone(Allocator& a) const {
-    return a.Clone(*this);
+constexpr Span<RemoveConst<Type>> Span<Type>::Clone(Allocator& a, CloneType clone_type) const {
+    return a.Clone(*this, clone_type);
 }
 
 template <TriviallyCopyable Type>
-constexpr Optional<Type> Optional<Type>::Clone(Allocator& a) const {
-    if (HasValue()) return Value().Clone(a);
+constexpr Optional<Type> Optional<Type>::Clone(Allocator& a, CloneType clone_type) const {
+    if (HasValue()) return Value().Clone(a, clone_type);
     return nullopt;
 }
 
 template <typename Type>
 requires(!TriviallyCopyable<Type>)
-constexpr Optional<Type> Optional<Type>::Clone(Allocator& a) const {
-    if (HasValue()) return Value().Clone(a);
+constexpr Optional<Type> Optional<Type>::Clone(Allocator& a, CloneType clone_type) const {
+    if (HasValue()) return Value().Clone(a, clone_type);
     return nullopt;
 }
 

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #pragma once
+#include "foundation/memory/cloneable.hpp"
 #include "foundation/universal_defs.hpp"
 #include "foundation/utils/maths.hpp"
 
@@ -21,7 +22,7 @@ struct Span {
 
     constexpr Span(ContiguousContainerSimilarTo<Span> auto&& other) : data(other.data), size(other.size) {}
 
-    constexpr Span<RemoveConst<Type>> Clone(Allocator& a) const;
+    constexpr Span<RemoveConst<Type>> Clone(Allocator& a, CloneType clone_type = CloneType::Deep) const;
 
     template <usize N>
     constexpr Span(Type (&array_literal)[N]) : data(array_literal) {

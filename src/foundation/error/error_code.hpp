@@ -182,8 +182,8 @@ class [[nodiscard]] ErrorCodeOr {
 
     template <typename U = Type>
     requires(Cloneable<Type>)
-    ErrorCodeOr<Type> Clone(Allocator& a) const {
-        if (HasValue()) return Value().Clone(a);
+    ErrorCodeOr<Type> Clone(Allocator& a, CloneType clone_type) const {
+        if (HasValue()) return Value().Clone(a, clone_type);
         if (HasError()) return Error();
         return {};
     }

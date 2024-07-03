@@ -6,7 +6,9 @@
 
 struct Allocator;
 
+enum class CloneType { Shallow, Deep };
+
 template <typename Type>
 concept Cloneable = requires(Type const t, Allocator& a) {
-    { t.Clone(a) } -> Same<Type>;
+    { t.Clone(a, CloneType {}) } -> Same<Type>;
 };

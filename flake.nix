@@ -4,14 +4,16 @@
 {
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-24.05";
+    glibc-nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
     zig.url = "github:mitchellh/zig-overlay";
   };
 
-  outputs = { self, nixpkgs, flake-utils, zig }:
+  outputs = { self, nixpkgs, glibc-nixpkgs, flake-utils, zig }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; };
+        glibc-pkgs = import glibc-nixpkgs { inherit system; };
         zigpkgs = zig.packages.${system};
 
         macosx-sdks = pkgs.stdenv.mkDerivation {
@@ -165,6 +167,7 @@
             pkgs.libGL
             pkgs.libGLU
             pkgs.kcov
+            glibc-pkgs.glibc
           ];
           shellHook = ''
             export MACOSX_SDK_SYSROOT="${macosx-sdks}"

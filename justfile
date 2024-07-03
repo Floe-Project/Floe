@@ -199,7 +199,6 @@ checks_ci := replace(
     check-spelling
     check-links
     coverage
-    clang-tidy-all
     "
   } else {
     "

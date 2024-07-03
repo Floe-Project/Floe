@@ -1,0 +1,7 @@
+# run valgrind with --gen-suppressions=all and it will print blocks like these
+# if you add the blocks to this file then they will be suppressed
+{
+   stb_sprintf_suppression
+   Memcheck:Cond
+   fun:stbsp_vsprintfcb
+}

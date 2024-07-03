@@ -160,7 +160,13 @@ coverage build="": (_build_if_requested build "native")
 
 [linux]
 valgrind build="": (_build_if_requested build "native")
-  valgrind --fair-sched=yes {{native_binary_dir}}/tests
+  valgrind \
+    --leak-check=full \
+    --fair-sched=yes \
+    --suppressions=valgrind.supp \
+    --error-exitcode=1 \
+    --exit-on-first-error=yes \
+    {{native_binary_dir}}/tests
 
 # TODO: add vst3-val, pluginval and plugival-au (and wine variants) when we re-enable wrappers
 checks_level_0 := replace( 

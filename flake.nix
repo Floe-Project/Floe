@@ -169,7 +169,7 @@
           shellHook = ''
             export MACOSX_SDK_SYSROOT="${macosx-sdks}"
           '';
-          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath buildInputs;
+          # LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath buildInputs;
         };
       });
 }

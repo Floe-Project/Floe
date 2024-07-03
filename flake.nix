@@ -4,16 +4,14 @@
 {
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-24.05";
-    glibc-nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
     zig.url = "github:mitchellh/zig-overlay";
   };
 
-  outputs = { self, nixpkgs, glibc-nixpkgs, flake-utils, zig }:
+  outputs = { self, nixpkgs, flake-utils, zig }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; };
-        glibc-pkgs = import glibc-nixpkgs { inherit system; };
         zigpkgs = zig.packages.${system};
 
         macosx-sdks = pkgs.stdenv.mkDerivation {
@@ -127,8 +125,8 @@
         };
       in
       {
-        devShells.default = pkgs.mkShell {
-          packages = [
+        devShells.default = pkgs.mkShell rec {
+          buildInputs = [
             # If you change the zig version you probably also want to change the ZLS version. 
             # For me, that's done my home-manager setup at the moment.
             zigpkgs."0.13.0"
@@ -167,11 +165,12 @@
             pkgs.libGL
             pkgs.libGLU
             pkgs.kcov
-            glibc-pkgs.glibc
+            pkgs.glibc
           ];
           shellHook = ''
             export MACOSX_SDK_SYSROOT="${macosx-sdks}"
           '';
+          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath buildInputs;
         };
       });
 }

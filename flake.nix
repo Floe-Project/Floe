@@ -125,8 +125,8 @@
         };
       in
       {
-        devShells.default = pkgs.mkShell rec {
-          buildInputs = [
+        devShells.default = pkgs.mkShell {
+          packages = [
             # If you change the zig version you probably also want to change the ZLS version. 
             # For me, that's done my home-manager setup at the moment.
             zigpkgs."0.13.0"
@@ -165,11 +165,15 @@
             pkgs.libGL
             pkgs.libGLU
             pkgs.kcov
+            pkgs.patchelf
+
+            (pkgs.writeShellScriptBin "patchrpath" ''
+              patchelf --add-rpath "${pkgs.libGL}/lib" $@
+            '')
           ];
           shellHook = ''
             export MACOSX_SDK_SYSROOT="${macosx-sdks}"
           '';
-          # LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath buildInputs;
         };
       });
 }

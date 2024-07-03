@@ -39,6 +39,7 @@ logos_abs_dir := join(justfile_directory(), external_build_resources, "Logos")
 
 build target_os='native':
   zig build compile -Dtargets={{target_os}} -Dbuild-mode=development -Dexternal-resources="{{external_build_resources}}"
+  if [[ "{{os()}}" == "linux" ]]; then patchrpath zig-out/x86_64-linux/Floe.clap; fi
 
 build-tracy:
   zig build compile -Dtargets=native -Dbuild-mode=development -Dtracy
@@ -199,6 +200,7 @@ checks_ci := replace(
     check-spelling
     check-links
     coverage
+    clang-tidy-all
     "
   } else {
     "

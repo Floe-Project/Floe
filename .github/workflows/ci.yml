@@ -68,7 +68,16 @@ jobs:
       - if: '!cancelled()'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgl1
+          sudo apt-get install -y libgl1-mesa-glx
+
+          ldd --version
+
+          echo "ldd zig-out/x86_64-linux/Floe.clap"
+          ldd zig-out/x86_64-linux/Floe.clap
+
+          echo "ldd clap-validator"
+          ldd $(which clap-validator)
+
           just test-ci
 
       - if: '!cancelled()'

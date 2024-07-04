@@ -82,6 +82,13 @@ DateAndTime LocalTimeFromNanosecondsSinceEpoch(s128 nanoseconds) {
     ts.tv_nsec = (long)(nanoseconds % (s128)1e+9);
     struct tm result {};
     localtime_r(&ts.tv_sec, &result);
+
+    auto ns = ts.tv_nsec;
+    s16 milliseconds = CheckedCast<s16>(ns / 1'000'000);
+    ns %= 1'000'000;
+    s16 microseconds = CheckedCast<s16>(ns / 1'000);
+    ns %= 1'000;
+
     return DateAndTime {
         .year = (s16)(result.tm_year + 1900),
         .months_since_jan = (s8)result.tm_mon,
@@ -90,7 +97,9 @@ DateAndTime LocalTimeFromNanosecondsSinceEpoch(s128 nanoseconds) {
         .hour = (s8)result.tm_hour,
         .minute = (s8)result.tm_min,
         .second = (s8)result.tm_sec,
-        .nanosecond = (s32)ts.tv_nsec,
+        .millisecond = milliseconds,
+        .microsecond = microseconds,
+        .nanosecond = (s16)ns,
     };
 }
 

@@ -129,7 +129,9 @@ struct DateAndTime {
     s8 hour;
     s8 minute;
     s8 second;
-    s32 nanosecond;
+    s16 millisecond;
+    s16 microsecond;
+    s16 nanosecond;
 };
 
 s128 NanosecondsSinceEpoch();

@@ -150,6 +150,15 @@ ErrorCodeOr<MutableString> ConvertToAbsolutePath(Allocator& a, String path) {
     return FilesystemErrnoErrorCode(errno);
 }
 
+ErrorCodeOr<MutableString> ResolveSymlinks(Allocator& a, String path) {
+    ASSERT(path.size);
+    PathArena temp_path_allocator;
+
+    char result[PATH_MAX] {};
+    auto _ = realpath(NullTerminated(path, temp_path_allocator), result);
+    return FromNullTerminated(result).Clone(a);
+}
+
 ErrorCodeOr<void> Delete(String path, DeleteOptions options) {
     PathArena temp_path_allocator;
     auto const path_ptr = NullTerminated(path, temp_path_allocator);

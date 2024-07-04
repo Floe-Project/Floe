@@ -163,6 +163,8 @@ ErrorCodeOr<bool> DeleteDirectoryIfMacBundle(String dir);
 // current drive specifier, e.g. C:/my-path
 ErrorCodeOr<MutableString> ConvertToAbsolutePath(Allocator& a, String path);
 
+ErrorCodeOr<MutableString> ResolveSymlinks(Allocator& a, String path);
+
 ErrorCodeOr<void> MoveFileOrDirIntoFolder(String from, String to, ExistingDestinationHandling existing);
 
 ErrorCodeOr<void> MoveFile(String from, String to, ExistingDestinationHandling existing);

@@ -93,6 +93,16 @@ ErrorCodeOr<MutableString> ConvertToAbsolutePath(Allocator& a, String path) {
     return result;
 }
 
+// NOTE: on macos there are some 'firmlinks' which are like symlinks but are resolved by the kernel
+ErrorCodeOr<MutableString> ResolveSymlinks(Allocator& a, String path) {
+    ASSERT(path.size);
+    auto nspath = StringToNSString(path);
+    char resolved_path[PATH_MAX * 2];
+    if (realpath([nspath fileSystemRepresentation], resolved_path) == nullptr)
+        return FilesystemErrnoErrorCode(errno);
+    return a.Clone(FromNullTerminated(resolved_path));
+}
+
 ErrorCodeOr<void> Delete(String path, DeleteOptions options) {
     PathArena path_arena;
     switch (options.type) {

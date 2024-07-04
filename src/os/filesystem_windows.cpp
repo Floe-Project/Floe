@@ -343,6 +343,11 @@ ErrorCodeOr<MutableString> ConvertToAbsolutePath(Allocator& a, String path) {
     return result;
 }
 
+ErrorCodeOr<MutableString> ResolveSymlinks(Allocator& a, String path) {
+    // TODO:
+    return path.Clone(a);
+}
+
 static ErrorCodeOr<void> Win32DeleteDirectory(WString windows_path, ArenaAllocator& arena) {
     DynamicArray<wchar_t> path_buffer {windows_path, arena};
     dyn::AppendSpan(path_buffer, L"\\*");

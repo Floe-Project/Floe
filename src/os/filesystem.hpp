@@ -323,6 +323,7 @@ struct DirectoryWatcher {
         State state {};
         bool is_desired {};
         String path;
+        String resolved_path;
         bool recursive;
         Span<Child> children; // used if recursive an the backend doesn't support recursive normally
         NativeData native_data;
@@ -336,7 +337,7 @@ struct DirectoryWatcher {
 
 namespace native {
 
-extern bool supports_recursive_watch;
+extern bool const supports_recursive_watch;
 
 ErrorCodeOr<void> Initialise(DirectoryWatcher& w);
 void Deinitialise(DirectoryWatcher& w);

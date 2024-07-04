@@ -257,7 +257,7 @@ ErrorCodeOr<MutableString> CurrentExecutablePath(Allocator& a) {
 
 namespace native {
 
-bool supports_recursive_watch = false;
+bool const supports_recursive_watch = false;
 
 ErrorCodeOr<void> Initialise(DirectoryWatcher& w) {
     ZoneScoped;

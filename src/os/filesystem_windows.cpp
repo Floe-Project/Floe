@@ -706,7 +706,7 @@ namespace native {
 ErrorCodeOr<void> Initialise(DirectoryWatcher&) { return k_success; }
 void Deinitialise(DirectoryWatcher&) {}
 
-bool supports_recursive_watch = true;
+bool const supports_recursive_watch = true;
 
 constexpr DWORD k_directory_changes_filter = FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME |
                                              FILE_NOTIFY_CHANGE_SIZE | FILE_NOTIFY_CHANGE_LAST_WRITE;

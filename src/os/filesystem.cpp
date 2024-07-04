@@ -309,7 +309,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
         if (auto dir_ptr = ({
                 DirectoryWatcher::WatchedDirectory* d = nullptr;
                 for (auto& dir : watcher.watched_dirs) {
-                    if (dir.path == dir_to_watch.path && dir.recursive == dir_to_watch.recursive) {
+                    if (path::Equal(dir.path, dir_to_watch.path) && dir.recursive == dir_to_watch.recursive) {
                         d = &dir;
                         break;
                     }
@@ -332,7 +332,12 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                 .recursive = dir_to_watch.recursive,
                 .children = {},
             };
-            result.path = result.arena.Clone(dir_to_watch.path);
+
+            {
+                auto p = result.arena.Clone(dir_to_watch.path);
+                result.path = p;
+                result.resolved_path = ResolveSymlinks(result.arena, dir_to_watch.path).ValueOr(p);
+            }
 
             if (dir_to_watch.recursive && !native::supports_recursive_watch) {
                 DynamicArray<DirectoryWatcher::WatchedDirectory::Child> children {result.arena};

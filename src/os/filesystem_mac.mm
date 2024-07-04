@@ -11,6 +11,7 @@
 #include <CoreServices/CoreServices.h>
 #include <dirent.h>
 #include <mach-o/dyld.h>
+#include <pthread.h>
 #include <sys/event.h>
 #include <sys/stat.h>
 #pragma clang diagnostic pop
@@ -398,6 +399,19 @@ namespace native {
 struct FsWatcher {
     FSEventStreamRef stream {};
     dispatch_queue_t queue {};
+
+    struct Event {
+        String path;
+        FSEventStreamEventFlags flags;
+        Event* next;
+        Event* prev;
+    };
+    Mutex event_mutex;
+    ArenaAllocator event_arena {PageAllocator::Instance()};
+    struct Events {
+        Event* first;
+        Event* last;
+    } events;
 };
 
 ErrorCodeOr<void> Initialise(DirectoryWatcher& w) {
@@ -418,33 +432,30 @@ void Deinitialise(DirectoryWatcher& w) {
 
 // IMPROVE: FSEvent do actually support recursive watching I think, but I believe it will require setting up
 // multiple streams
-bool supports_recursive_watch = false;
+bool const supports_recursive_watch = false;
 
-void DirectoryChanged([[maybe_unused]] ConstFSEventStreamRef streamRef,
-                      [[maybe_unused]] void* clientCallBackInfo,
-                      size_t numEvents,
-                      void* eventPaths,
-                      FSEventStreamEventFlags const eventFlags[],
-                      FSEventStreamEventId const eventIds[]) {
-    auto** paths = (char**)eventPaths;
-    for (size_t i = 0; i < numEvents; i++) {
-        // TODO(1.0): handle and dispatch events
-        printf("Event %llu in path %s\n", eventIds[i], paths[i]);
+Atomic<bool> inside_sync = false;
 
-        if (eventFlags[i] & kFSEventStreamEventFlagItemCreated) printf("    File or directory created\n");
-        if (eventFlags[i] & kFSEventStreamEventFlagItemRemoved) printf("    File or directory removed\n");
-        if (eventFlags[i] & kFSEventStreamEventFlagItemRenamed) printf("    File or directory renamed\n");
-        if (eventFlags[i] & kFSEventStreamEventFlagItemModified) printf("    File or directory modified\n");
-        if (eventFlags[i] & kFSEventStreamEventFlagItemInodeMetaMod)
-            printf("    File or directory inode metadata modified\n");
-        if (eventFlags[i] & kFSEventStreamEventFlagItemFinderInfoMod)
-            printf("    File or directory Finder Info modified\n");
-        if (eventFlags[i] & kFSEventStreamEventFlagItemChangeOwner)
-            printf("    File or directory ownership changed\n");
-        if (eventFlags[i] & kFSEventStreamEventFlagItemXattrMod)
-            printf("    File or directory extended attribute modified\n");
-        if (eventFlags[i] & kFSEventStreamEventFlagItemIsFile) printf("    Event refers to a file\n");
-        if (eventFlags[i] & kFSEventStreamEventFlagItemIsDir) printf("    Event refers to a directory\n");
+void DirectoryChanged([[maybe_unused]] ConstFSEventStreamRef stream_ref,
+                      [[maybe_unused]] void* user_data,
+                      size_t num_events,
+                      void* event_paths,
+                      FSEventStreamEventFlags const event_flags[],
+                      [[maybe_unused]] FSEventStreamEventId const event_ids[]) {
+    auto& watcher = *(FsWatcher*)user_data;
+    auto** paths = (char**)event_paths;
+    for (size_t i = 0; i < num_events; i++) {
+        watcher.event_mutex.Lock();
+        DEFER { watcher.event_mutex.Unlock(); };
+
+        auto event = watcher.event_arena.NewUninitialised<FsWatcher::Event>();
+        PLACEMENT_NEW(event)
+        FsWatcher::Event {
+            .path = watcher.event_arena.Clone(FromNullTerminated(paths[i])),
+            .flags = event_flags[i],
+        };
+
+        DoublyLinkedListAppend(watcher.events, event);
     }
 }
 
@@ -472,23 +483,32 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                                                           (CFIndex)dir.path.size,
                                                           kCFStringEncodingUTF8,
                                                           false);
+
             DEFER { CFRelease(cf_path); };
             CFArrayAppendValue(paths, cf_path);
         }
+
+        FSEventStreamContext context {};
+        context.info = &fs_watcher;
+
+        constexpr double k_latency_seconds = 0.1;
         fs_watcher.stream =
             FSEventStreamCreate(nullptr,
                                 &DirectoryChanged,
-                                nullptr,
+                                &context,
                                 paths,
                                 kFSEventStreamEventIdSinceNow,
-                                0.3,
+                                k_latency_seconds,
                                 kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagWatchRoot |
                                     kFSEventStreamCreateFlagNoDefer);
         if (!fs_watcher.stream)
             return ErrorCode {FilesystemError::PathDoesNotExist}; // TODO(1.0): not the right error
 
-        if (!fs_watcher.queue)
-            fs_watcher.queue = dispatch_queue_create("com.example.fseventsqueue", DISPATCH_QUEUE_SERIAL);
+        if (!fs_watcher.queue) {
+            auto attr =
+                dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL, QOS_CLASS_USER_INITIATED, -10);
+            fs_watcher.queue = dispatch_queue_create("com.floe.fseventsqueue", attr);
+        }
         FSEventStreamSetDispatchQueue(fs_watcher.stream, fs_watcher.queue);
 
         if (!FSEventStreamStart(fs_watcher.stream)) {
@@ -499,6 +519,54 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
     }
 
     if (fs_watcher.stream) FSEventStreamFlushSync(fs_watcher.stream);
+
+    {
+        fs_watcher.event_mutex.Lock();
+        DEFER { fs_watcher.event_mutex.Unlock(); };
+
+        for (auto event = fs_watcher.events.first; event; event = event->next) {
+            for (auto const& dir : watcher.watched_dirs) {
+                if (StartsWithSpan(event->path, dir.resolved_path)) {
+                    if (event->flags & kFSEventStreamEventFlagMustScanSubDirs) {
+                        callback(event->path,
+                                 DirectoryWatcher::FileChange {
+                                     .type = DirectoryWatcher::FileChange::Type::UnknownManualRescanNeeded,
+                                     .subpath = {},
+                                 });
+                    } else {
+                        String subpath {};
+                        if (event->path.size == dir.resolved_path.size)
+                            continue; // ignore
+                        else
+                            subpath = event->path.SubSpan(dir.resolved_path.size);
+                        if (subpath[0] == '/') subpath = subpath.SubSpan(1);
+
+                        Optional<DirectoryWatcher::FileChange::Type> type {};
+                        if (event->flags & kFSEventStreamEventFlagItemRenamed)
+                            type = DirectoryWatcher::FileChange::Type::RenamedNewName;
+                        if (event->flags & kFSEventStreamEventFlagItemModified)
+                            type = DirectoryWatcher::FileChange::Type::Modified;
+                        if (event->flags & kFSEventStreamEventFlagItemCreated)
+                            type = DirectoryWatcher::FileChange::Type::Added;
+                        if (event->flags & kFSEventStreamEventFlagItemRemoved)
+                            type = DirectoryWatcher::FileChange::Type::Deleted;
+
+                        if (type) {
+                            callback(dir.path,
+                                     DirectoryWatcher::FileChange {
+                                         .type = *type,
+                                         .subpath = subpath,
+                                     });
+                        }
+                    }
+                }
+            }
+        }
+
+        fs_watcher.events.first = nullptr;
+        fs_watcher.events.last = nullptr;
+        fs_watcher.event_arena.ResetCursorAndConsolidateRegions();
+    }
 
     return k_success;
 }

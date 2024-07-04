@@ -441,6 +441,7 @@ TEST_CASE(TestReadingDirectoryChanges) {
         auto check = [&](Span<TestFileChange const> expected_changes) -> ErrorCodeOr<void> {
             SleepThisThread(1); // give the watcher time to detect the changes
             DynamicArray<TestFileChange> changes {a};
+
             TRY(ReadDirectoryChanges(
                 watcher,
                 dirs_to_watch,
@@ -448,7 +449,10 @@ TEST_CASE(TestReadingDirectoryChanges) {
                 [&](String path, ErrorCodeOr<DirectoryWatcher::FileChange> change_outcome) {
                     CHECK(path::Equal(path, dir));
                     auto const change = REQUIRE_UNWRAP(change_outcome);
-                    tester.log.DebugLn("Change in {}, type {}, subdir {}", path, change.type, change.subpath);
+                    tester.log.DebugLn("Change in {}, type {}, subdir {}",
+                                       path,
+                                       DirectoryWatcher::FileChange::TypeToString(change.type),
+                                       change.subpath);
                     dyn::Append(changes,
                                 {
                                     .subpath = a.Clone(change.subpath),

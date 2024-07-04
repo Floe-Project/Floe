@@ -18,6 +18,7 @@
 #undef Rect
 
 #include "foundation/foundation.hpp"
+#include "os/misc.hpp"
 #include "os/misc_mac.hpp"
 #include "os/threading.hpp"
 #include "utils/debug/debug.hpp"
@@ -94,7 +95,9 @@ ErrorCodeOr<MutableString> ConvertToAbsolutePath(Allocator& a, String path) {
     return result;
 }
 
-// NOTE: on macos there are some 'firmlinks' which are like symlinks but are resolved by the kernel
+// NOTE: on macOS there are some 'firmlinks' which are like symlinks but are resolved by the kernel.
+// These firmlinks are not resolved if we use the NSString resolving functions, so we use realpath.
+// e.g. /var -> /private/var only happens with realpath
 ErrorCodeOr<MutableString> ResolveSymlinks(Allocator& a, String path) {
     ASSERT(path.size);
     auto nspath = StringToNSString(path);
@@ -396,6 +399,13 @@ ErrorCodeOr<Optional<MutableString>> FilesystemDialog(DialogOptions options) {
 
 namespace native {
 
+// NOTE: It seems you can receive filesystem events from before you start watching the directory even if you
+// use the kFSEventStreamEventIdSinceNow flag. There could be some sort of buffering going on.
+
+// NOTE: FSEvents is a callback based API. You receive events in a separate thread and there doesn't seem to
+// be a way around that. FSEventStreamFlushSync might flush the events but you can still receive others at any
+// time in the other thread.
+
 struct FsWatcher {
     FSEventStreamRef stream {};
     dispatch_queue_t queue {};
@@ -403,6 +413,7 @@ struct FsWatcher {
     struct Event {
         String path;
         FSEventStreamEventFlags flags;
+        s128 time;
         Event* next;
         Event* prev;
     };
@@ -430,11 +441,7 @@ void Deinitialise(DirectoryWatcher& w) {
     w.allocator.Delete(watcher);
 }
 
-// IMPROVE: FSEvent do actually support recursive watching I think, but I believe it will require setting up
-// multiple streams
-bool const supports_recursive_watch = false;
-
-Atomic<bool> inside_sync = false;
+bool const supports_recursive_watch = true;
 
 void DirectoryChanged([[maybe_unused]] ConstFSEventStreamRef stream_ref,
                       [[maybe_unused]] void* user_data,
@@ -444,6 +451,67 @@ void DirectoryChanged([[maybe_unused]] ConstFSEventStreamRef stream_ref,
                       [[maybe_unused]] FSEventStreamEventId const event_ids[]) {
     auto& watcher = *(FsWatcher*)user_data;
     auto** paths = (char**)event_paths;
+
+    if constexpr (!PRODUCTION_BUILD) {
+        DynamicArrayInline<char, 4000> info;
+        struct Flag {
+            FSEventStreamEventFlags flag;
+            String name;
+        };
+        constexpr Flag k_flags[] = {
+            {kFSEventStreamEventFlagMustScanSubDirs, "MustScanSubDirs"},
+            {kFSEventStreamEventFlagUserDropped, "UserDropped"},
+            {kFSEventStreamEventFlagKernelDropped, "KernelDropped"},
+            {kFSEventStreamEventFlagEventIdsWrapped, "EventIdsWrapped"},
+            {kFSEventStreamEventFlagHistoryDone, "HistoryDone"},
+            {kFSEventStreamEventFlagRootChanged, "RootChanged"},
+            {kFSEventStreamEventFlagMount, "Mount"},
+            {kFSEventStreamEventFlagUnmount, "Unmount"},
+            {kFSEventStreamEventFlagItemChangeOwner, "ItemChangeOwner"},
+            {kFSEventStreamEventFlagItemCreated, "ItemCreated"},
+            {kFSEventStreamEventFlagItemFinderInfoMod, "ItemFinderInfoMod"},
+            {kFSEventStreamEventFlagItemInodeMetaMod, "ItemInodeMetaMod"},
+            {kFSEventStreamEventFlagItemIsDir, "ItemIsDir"},
+            {kFSEventStreamEventFlagItemIsFile, "ItemIsFile"},
+            {kFSEventStreamEventFlagItemIsHardlink, "ItemIsHardlink"},
+            {kFSEventStreamEventFlagItemIsLastHardlink, "ItemIsLastHardlink"},
+            {kFSEventStreamEventFlagItemIsSymlink, "ItemIsSymlink"},
+            {kFSEventStreamEventFlagItemModified, "ItemModified"},
+            {kFSEventStreamEventFlagItemRemoved, "ItemRemoved"},
+            {kFSEventStreamEventFlagItemRenamed, "ItemRenamed"},
+            {kFSEventStreamEventFlagItemXattrMod, "ItemXattrMod"},
+            {kFSEventStreamEventFlagOwnEvent, "OwnEvent"},
+            {kFSEventStreamEventFlagItemCloned, "ItemCloned"},
+        };
+        auto writer = dyn::WriterFor(info);
+
+        auto _ = fmt::AppendLine(writer, "FSEvent received {} events:", num_events);
+
+        for (size_t i = 0; i < num_events; i++) {
+            MAYBE_UNUSED auto u1 = fmt::AppendLine(writer, "  {{");
+            MAYBE_UNUSED auto u2 = fmt::AppendLine(writer, "    path: {}", paths[i]);
+
+            DynamicArrayInline<char, 1000> flags_str;
+            for (auto const& flag : k_flags)
+                if (event_flags[i] & flag.flag) {
+                    dyn::AppendSpan(flags_str, flag.name);
+                    dyn::AppendSpan(flags_str, ", ");
+                }
+            if (flags_str.size) flags_str.size -= 2;
+            MAYBE_UNUSED auto u3 = fmt::AppendLine(writer, "    flags: {}", flags_str);
+            MAYBE_UNUSED auto u4 = fmt::AppendLine(writer, "    id: {}", event_ids[i]);
+
+            MAYBE_UNUSED auto u5 = fmt::AppendLine(writer, "  }}");
+        }
+
+        StdPrint(StdStream::Err, info);
+    }
+
+    // TODO: we need to decipher these events more. We get strange combinations of things all at the same time
+    // and we can't track renames very well.
+
+    auto const time = NanosecondsSinceEpoch();
+
     for (size_t i = 0; i < num_events; i++) {
         watcher.event_mutex.Lock();
         DEFER { watcher.event_mutex.Unlock(); };
@@ -453,6 +521,7 @@ void DirectoryChanged([[maybe_unused]] ConstFSEventStreamRef stream_ref,
         FsWatcher::Event {
             .path = watcher.event_arena.Clone(FromNullTerminated(paths[i])),
             .flags = event_flags[i],
+            .time = time,
         };
 
         DoublyLinkedListAppend(watcher.events, event);
@@ -463,7 +532,6 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                                        bool watched_directories_changed,
                                        [[maybe_unused]] ArenaAllocator& scratch_arena,
                                        DirectoryWatcher::Callback callback) {
-    // TODO(1.0): watch/unwatch based on watched_directories_changed and reviewing the state of all the dirs
     (void)callback;
     auto& fs_watcher = *(FsWatcher*)watcher.native_data.pointer;
     if (watched_directories_changed) {
@@ -492,6 +560,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
         context.info = &fs_watcher;
 
         constexpr double k_latency_seconds = 0.1;
+
         fs_watcher.stream =
             FSEventStreamCreate(nullptr,
                                 &DirectoryChanged,
@@ -504,6 +573,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
         if (!fs_watcher.stream)
             return ErrorCode {FilesystemError::PathDoesNotExist}; // TODO(1.0): not the right error
 
+        // FSEvents is a callback based API where you always receive events in a separate thread.
         if (!fs_watcher.queue) {
             auto attr =
                 dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL, QOS_CLASS_USER_INITIATED, -10);
@@ -511,6 +581,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
         }
         FSEventStreamSetDispatchQueue(fs_watcher.stream, fs_watcher.queue);
 
+        DebugLn("Starting FSEventStream");
         if (!FSEventStreamStart(fs_watcher.stream)) {
             FSEventStreamInvalidate(fs_watcher.stream);
             FSEventStreamRelease(fs_watcher.stream);
@@ -518,7 +589,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
         }
     }
 
-    if (fs_watcher.stream) FSEventStreamFlushSync(fs_watcher.stream);
+    if (fs_watcher.stream) FSEventStreamFlushAsync(fs_watcher.stream);
 
     {
         fs_watcher.event_mutex.Lock();
@@ -541,11 +612,24 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                             subpath = event->path.SubSpan(dir.resolved_path.size);
                         if (subpath[0] == '/') subpath = subpath.SubSpan(1);
 
+                        // FSEvents ONLY supports recursive watching so we just have to ignore subdirectory
+                        // events
+                        if (!dir.recursive && Contains(subpath, '/')) {
+                            DebugLn("Ignoring subdirectory event: {} because {} is watched non-recursively",
+                                    subpath,
+                                    dir.path);
+                            continue;
+                        }
+
                         Optional<DirectoryWatcher::FileChange::Type> type {};
-                        if (event->flags & kFSEventStreamEventFlagItemRenamed)
-                            type = DirectoryWatcher::FileChange::Type::RenamedNewName;
+
+                        // Modified seems to be set at the same time as Created/Removed etc. So let's check it
+                        // first and allow our type to be overwritten by the more significant flags
                         if (event->flags & kFSEventStreamEventFlagItemModified)
                             type = DirectoryWatcher::FileChange::Type::Modified;
+
+                        if (event->flags & kFSEventStreamEventFlagItemRenamed)
+                            type = DirectoryWatcher::FileChange::Type::RenamedNewName;
                         if (event->flags & kFSEventStreamEventFlagItemCreated)
                             type = DirectoryWatcher::FileChange::Type::Added;
                         if (event->flags & kFSEventStreamEventFlagItemRemoved)
@@ -556,6 +640,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                                      DirectoryWatcher::FileChange {
                                          .type = *type,
                                          .subpath = subpath,
+                                         .time = event->time,
                                      });
                         }
                     }

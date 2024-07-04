@@ -423,42 +423,53 @@ TEST_CASE(TestReadingDirectoryChanges) {
             .recursive = recursive,
         }};
 
-        TRY(ReadDirectoryChanges(watcher,
-                                 dirs_to_watch,
-                                 a,
-                                 [&](String path, ErrorCodeOr<DirectoryWatcher::FileChange> change) {
-                                     if (change.HasValue())
-                                         tester.log.DebugLn("Change in {}", path);
-                                     else
-                                         tester.log.DebugLn("Error in {}: {}", path, change.Error());
-                                     REQUIRE(false);
-                                 }));
+        TRY(ReadDirectoryChanges(
+            watcher,
+            dirs_to_watch,
+            a,
+            [&](String path, ErrorCodeOr<DirectoryWatcher::FileChange> change) {
+                if (change.HasValue())
+                    tester.log.DebugLn("Unexpected callback: {}", path);
+                else
+                    tester.log.DebugLn("Enexpected callback: error in {}: {}", path, change.Error());
+                REQUIRE(false);
+            }));
 
         struct TestFileChange {
             String subpath;
             DirectoryWatcher::FileChange::Type type;
         };
         auto check = [&](Span<TestFileChange const> expected_changes) -> ErrorCodeOr<void> {
-            SleepThisThread(1); // give the watcher time to detect the changes
             DynamicArray<TestFileChange> changes {a};
 
-            TRY(ReadDirectoryChanges(
-                watcher,
-                dirs_to_watch,
-                a,
-                [&](String path, ErrorCodeOr<DirectoryWatcher::FileChange> change_outcome) {
-                    CHECK(path::Equal(path, dir));
-                    auto const change = REQUIRE_UNWRAP(change_outcome);
-                    tester.log.DebugLn("Change in {}, type {}, subdir {}",
-                                       path,
-                                       DirectoryWatcher::FileChange::TypeToString(change.type),
-                                       change.subpath);
-                    dyn::Append(changes,
-                                {
-                                    .subpath = a.Clone(change.subpath),
-                                    .type = change.type,
-                                });
-                }));
+            for (auto const _ : Range(4)) {
+                SleepThisThread(1); // give the watcher time to detect the changes
+                TRY(ReadDirectoryChanges(
+                    watcher,
+                    dirs_to_watch,
+                    a,
+                    [&](String path, ErrorCodeOr<DirectoryWatcher::FileChange> change_outcome) {
+                        CHECK(path::Equal(path, dir));
+                        auto const change = REQUIRE_UNWRAP(change_outcome);
+                        CHECK(change.time != 0);
+                        auto local_time = LocalTimeFromNanosecondsSinceEpoch(change.time);
+                        tester.log.DebugLn("Event: \"{}\" {} in \"{}\" at {}:{}:{}:{}:{}:{}",
+                                           change.subpath,
+                                           DirectoryWatcher::FileChange::TypeToString(change.type),
+                                           path,
+                                           local_time.hour,
+                                           local_time.minute,
+                                           local_time.second,
+                                           local_time.millisecond,
+                                           local_time.microsecond,
+                                           local_time.nanosecond);
+                        dyn::Append(changes,
+                                    {
+                                        .subpath = a.Clone(change.subpath),
+                                        .type = change.type,
+                                    });
+                    }));
+            }
 
             CHECK_OP(changes.size, >=, expected_changes.size);
             for (auto const& expected : expected_changes) {
@@ -471,7 +482,8 @@ TEST_CASE(TestReadingDirectoryChanges) {
             }
             if (changes.size != expected_changes.size) {
                 tester.log.DebugLn(
-                    "ReadDirectoryChanges resulted different changes than expected. Expected:");
+                    "ReadDirectoryChanges resulted different changes than expected ({}). Expected:",
+                    recursive ? "recursive" : "non-recursive");
                 for (auto const& change : expected_changes) {
                     tester.log.DebugLn("  {} {}",
                                        change.subpath,

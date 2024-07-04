@@ -300,6 +300,7 @@ struct DirectoryWatcher {
         }
         Type type;
         String subpath;
+        s128 time;
     };
 
     using Callback = FunctionRef<void(String watched_dir, ErrorCodeOr<FileChange> change)>;
@@ -325,7 +326,12 @@ struct DirectoryWatcher {
         String path;
         String resolved_path;
         bool recursive;
-        Span<Child> children; // used if recursive an the backend doesn't support recursive normally
+
+        // used if recursive an the backend doesn't support recursive normally
+        // TODO: this is only needed on Linux, it should move there
+        // TODO: we need to update this if the children directories change
+        Span<Child> children; 
+
         NativeData native_data;
     };
 

@@ -451,18 +451,10 @@ TEST_CASE(TestReadingDirectoryChanges) {
                     [&](String path, ErrorCodeOr<DirectoryWatcher::FileChange> change_outcome) {
                         CHECK(path::Equal(path, dir));
                         auto const change = REQUIRE_UNWRAP(change_outcome);
-                        CHECK(change.time != 0);
-                        auto local_time = LocalTimeFromNanosecondsSinceEpoch(change.time);
-                        tester.log.DebugLn("Event: \"{}\" {} in \"{}\" at {}:{}:{}:{}:{}:{}",
+                        tester.log.DebugLn("Event: \"{}\" {} in \"{}\"",
                                            change.subpath,
                                            DirectoryWatcher::FileChange::TypeToString(change.type),
-                                           path,
-                                           local_time.hour,
-                                           local_time.minute,
-                                           local_time.second,
-                                           local_time.millisecond,
-                                           local_time.microsecond,
-                                           local_time.nanosecond);
+                                           path);
                         dyn::Append(changes,
                                     {
                                         .subpath = a.Clone(change.subpath),

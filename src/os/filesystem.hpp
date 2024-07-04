@@ -300,7 +300,6 @@ struct DirectoryWatcher {
         }
         Type type;
         String subpath;
-        s128 time;
     };
 
     using Callback = FunctionRef<void(String watched_dir, ErrorCodeOr<FileChange> change)>;

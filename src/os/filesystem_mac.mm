@@ -510,8 +510,6 @@ void DirectoryChanged([[maybe_unused]] ConstFSEventStreamRef stream_ref,
     // TODO: we need to decipher these events more. We get strange combinations of things all at the same time
     // and we can't track renames very well.
 
-    auto const time = NanosecondsSinceEpoch();
-
     for (size_t i = 0; i < num_events; i++) {
         watcher.event_mutex.Lock();
         DEFER { watcher.event_mutex.Unlock(); };
@@ -521,7 +519,6 @@ void DirectoryChanged([[maybe_unused]] ConstFSEventStreamRef stream_ref,
         FsWatcher::Event {
             .path = watcher.event_arena.Clone(FromNullTerminated(paths[i])),
             .flags = event_flags[i],
-            .time = time,
         };
 
         DoublyLinkedListAppend(watcher.events, event);
@@ -640,7 +637,6 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                                      DirectoryWatcher::FileChange {
                                          .type = *type,
                                          .subpath = subpath,
-                                         .time = event->time,
                                      });
                         }
                     }

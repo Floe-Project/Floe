@@ -26,9 +26,10 @@ struct StateSnapshot {
 enum class StateSource { PresetFile, Daw };
 
 struct StateSnapshotMetadata {
-    StateSnapshotMetadata Clone(Allocator& a) const {
+    StateSnapshotMetadata Clone(Allocator& a, CloneType clone_type = CloneType::Shallow) const {
+        auto _ = clone_type;
         return {
-            .name_or_path = name_or_path.Clone(a),
+            .name_or_path = name_or_path.Clone(a, CloneType::Shallow),
         };
     }
 

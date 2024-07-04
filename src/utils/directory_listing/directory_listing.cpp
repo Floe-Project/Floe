@@ -134,17 +134,17 @@ static ErrorCodeOr<void> IterateDir(String dir, bool recursive, CallbackType cal
 
 DirectoryListing::ScanResult DirectoryListing::Rescan() {
     ArenaAllocatorWithInlineStorage<4000> allocator;
-    auto temp_root_paths = allocator.Clone(m_root_paths);
-    auto temp_wildcards = allocator.Clone(m_file_name_wildcards);
+    auto temp_root_paths = allocator.Clone(m_root_paths, CloneType::Deep);
+    auto temp_wildcards = allocator.Clone(m_file_name_wildcards, CloneType::Deep);
     DynamicArray<Index> root_entry_indexes {allocator};
 
     m_num_directories = 0;
     m_num_files = 0;
     dyn::Clear(m_entries);
     m_arena.ResetCursorAndConsolidateRegions();
-    m_file_name_wildcards = m_arena.Clone(temp_wildcards);
+    m_file_name_wildcards = m_arena.Clone(temp_wildcards, CloneType::Deep);
     m_roots = m_arena.NewMultiple<Entry*>(temp_root_paths.size);
-    m_root_paths = m_arena.Clone(temp_root_paths);
+    m_root_paths = m_arena.Clone(temp_root_paths, CloneType::Deep);
 
     dyn::Append(m_entries, Entry {"All"_s, Entry::Type::Directory, nullptr});
 
@@ -204,7 +204,7 @@ DirectoryListing::ScanResult DirectoryListing::Rescan() {
                 return k_success;
             }
 
-            auto const entry_path = String(e.path).Clone(m_arena);
+            auto const entry_path = String(e.path).Clone(m_arena, CloneType::Shallow);
             dyn::Append(m_entries, Entry {entry_path, type, create_metadata(entry_path)});
 
             return k_success;
@@ -257,8 +257,8 @@ DirectoryListing::ScanResult DirectoryListing::ScanFolders(Span<String const> pa
                                                            Span<String const> file_name_wildcards,
                                                            CreateMetadataFunction&& create_metadata) {
     m_recursive = recursive;
-    m_file_name_wildcards = m_arena.Clone(file_name_wildcards);
-    m_root_paths = m_arena.Clone(paths);
+    m_file_name_wildcards = m_arena.Clone(file_name_wildcards, CloneType::Deep);
+    m_root_paths = m_arena.Clone(paths, CloneType::Deep);
     m_create_metadata = Move(create_metadata);
     return Rescan();
 }

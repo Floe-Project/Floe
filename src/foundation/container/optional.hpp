@@ -115,7 +115,7 @@ class [[nodiscard]] Optional<Type> {
         return Value();
     }
 
-    constexpr Optional Clone(Allocator& a, CloneType clone_type = CloneType::Deep) const;
+    constexpr Optional Clone(Allocator& a, CloneType clone_type = CloneType::Shallow) const;
 
     union {
         Type value;
@@ -186,7 +186,7 @@ class [[nodiscard]] Optional<Type> {
         m_has_value = true;
     }
 
-    constexpr Optional Clone(Allocator& a, CloneType clone_type = CloneType::Deep) const;
+    constexpr Optional Clone(Allocator& a, CloneType clone_type = CloneType::Shallow) const;
 
     constexpr Type& Value() {
         ASSERT(HasValue());

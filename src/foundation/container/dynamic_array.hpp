@@ -403,7 +403,7 @@ struct DynamicArray {
         return *this;
     }
 
-    constexpr DynamicArray Clone(Allocator& a, CloneType clone_type = CloneType::Deep) const {
+    constexpr DynamicArray Clone(Allocator& a, CloneType clone_type) const {
         auto cloned_items = const_cast<DynamicArray&>(*this).Items().Clone(a, clone_type);
         return DynamicArray::FromOwnedSpan(cloned_items, a);
     }

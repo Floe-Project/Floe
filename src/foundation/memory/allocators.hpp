@@ -135,7 +135,7 @@ struct Allocator {
     }
 
     template <typename Type>
-    auto Clone(Type const& container, CloneType clone_type = CloneType::Deep) {
+    auto Clone(Type const& container, CloneType clone_type = CloneType::Shallow) {
         using ValueType = RemoveConst<typename Type::ValueType>;
         static_assert(TriviallyCopyable<ValueType> || Cloneable<ValueType>);
 
@@ -150,8 +150,8 @@ struct Allocator {
             }
             case CloneType::Deep: {
                 for (auto const i : Range(container.size))
-                    if constexpr (Cloneable<ValueType> || IsSpecializationOf<ValueType, Span>)
-                        PLACEMENT_NEW(&result[i]) ValueType(container[i].Clone(*this));
+                    if constexpr (Cloneable<ValueType>)
+                        PLACEMENT_NEW(&result[i]) ValueType(container[i].Clone(*this, CloneType::Deep));
                     else if constexpr (TriviallyCopyable<ValueType>)
                         PLACEMENT_NEW(&result[i]) ValueType(container[i]);
                     else
@@ -160,20 +160,6 @@ struct Allocator {
                 break;
             }
         }
-        return result;
-    }
-
-    // You must Free() the result of this call.
-    template <typename Type>
-    auto ShallowCloneFromStd(Type const& container) -> Span<typename Type::value_type> {
-        using ValueType = RemoveConst<typename Type::value_type>;
-
-        if (!container.size()) return {};
-
-        auto result = AllocateExactSizeUninitialised<ValueType>(container.size());
-        for (auto const i : Range(container.size()))
-            PLACEMENT_NEW(&result[i]) ValueType(container[i]);
-
         return result;
     }
 

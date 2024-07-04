@@ -22,7 +22,7 @@ struct Span {
 
     constexpr Span(ContiguousContainerSimilarTo<Span> auto&& other) : data(other.data), size(other.size) {}
 
-    constexpr Span<RemoveConst<Type>> Clone(Allocator& a, CloneType clone_type = CloneType::Deep) const;
+    constexpr Span<RemoveConst<Type>> Clone(Allocator& a, CloneType clone_type = CloneType::Shallow) const;
 
     template <usize N>
     constexpr Span(Type (&array_literal)[N]) : data(array_literal) {

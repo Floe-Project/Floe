@@ -8,10 +8,10 @@
 #include "tracy/TracyC.h"
 
 //
-#include "foundation_tests.cpp"
-#include "hosting_tests.cpp"
-#include "os_tests.cpp"
-#include "utils_tests.cpp"
+#include "foundation_tests.hpp"
+#include "hosting_tests.hpp"
+#include "os_tests.hpp"
+#include "utils_tests.hpp"
 
 // IMPROVE standardise naming scheme
 #define TEST_REGISTER_FUNCTIONS                                                                              \

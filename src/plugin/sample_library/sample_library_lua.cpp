@@ -1479,8 +1479,8 @@ Example usage of floe.<PROTO_FUNC>:
     },
   }))
 )aaa";
-            FixedSizeAllocator<k_documentation_preamble.size + 200> alloc;
-            auto preamble = fmt::FormatStringReplace(alloc,
+            ArenaAllocatorWithInlineStorage<4000> arena;
+            auto preamble = fmt::FormatStringReplace(arena,
                                                      k_documentation_preamble,
                                                      ArrayT<fmt::StringReplacement>({
                                                          {"<LUA>", LUA_VERSION},

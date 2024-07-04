@@ -315,15 +315,15 @@ TEST_CASE(NoNeedlessAllocationsAreDone) {
     DynamicArray<DynamicArray<String>> arr {arr_alloc};
     DynamicArray<String> const strs {arr_alloc};
 
-    dyn::Append(arr, strs.Clone(a));
-    dyn::Append(arr, strs.Clone(a));
-    dyn::Prepend(arr, strs.Clone(a));
-    dyn::Insert(arr, 1, strs.Clone(a));
+    dyn::Append(arr, strs.Clone(a, CloneType::Deep));
+    dyn::Append(arr, strs.Clone(a, CloneType::Deep));
+    dyn::Prepend(arr, strs.Clone(a, CloneType::Deep));
+    dyn::Insert(arr, 1, strs.Clone(a, CloneType::Deep));
     dyn::Remove(arr, 0);
 
     SUBCASE("move assigning does not change the allocator") {
         DynamicArray<DynamicArray<String>> other_arr {a};
-        dyn::Append(other_arr, strs.Clone(a));
+        dyn::Append(other_arr, strs.Clone(a, CloneType::Deep));
         arr = Move(other_arr);
         REQUIRE(&arr.allocator == &arr_alloc);
         REQUIRE(&other_arr.allocator == &a);
@@ -352,7 +352,7 @@ TEST_CASE(Clone) {
     dyn::Append(buf, "2"_s);
     dyn::Append(buf, nullopt);
 
-    auto const duped = buf.Clone(Malloc::Instance());
+    auto const duped = buf.Clone(a, CloneType::Shallow);
     REQUIRE(duped.size == 3);
     REQUIRE(duped[0].HasValue());
     REQUIRE(duped[0].Value() == "1"_s);
@@ -403,9 +403,16 @@ struct AllocedString {
     AllocedString() : data() {}
     AllocedString(String d) : data(d.Clone(Malloc::Instance())) {}
     AllocedString(AllocedString const& other) : data(other.data.Clone(Malloc::Instance())) {}
+    AllocedString(AllocedString&& other) : data(other.data) { other.data = {}; }
     AllocedString& operator=(AllocedString const& other) {
         if (data.size) Malloc::Instance().Free(data.ToByteSpan());
         data = other.data.Clone(Malloc::Instance());
+        return *this;
+    }
+    AllocedString& operator=(AllocedString&& other) {
+        if (data.size) Malloc::Instance().Free(data.ToByteSpan());
+        data = other.data;
+        other.data = {};
         return *this;
     }
     ~AllocedString() {
@@ -1736,6 +1743,8 @@ TEST_CASE(TestMathsTrigTurns) {
 }
 
 TEST_CASE(TestPath) {
+    auto& scratch_arena = tester.scratch_arena;
+
     using namespace path;
     SUBCASE("Trim") {
         CHECK_EQ(TrimDirectorySeparatorsEnd("foo/"_s, Format::Posix), "foo"_s);
@@ -1810,10 +1819,9 @@ TEST_CASE(TestPath) {
         CHECK_EQ(s, "/foo"_s);
 
         {
-            auto result =
-                Join(Malloc::Instance(),
-                     ArrayT<String>({DynamicArray<char> {"foo", Malloc::Instance()}, "bar"_s, "baz"_s}),
-                     Format::Posix);
+            auto result = Join(scratch_arena,
+                               ArrayT<String>({DynamicArray<char> {"foo", scratch_arena}, "bar"_s, "baz"_s}),
+                               Format::Posix);
             CHECK_EQ(result, "foo/bar/baz"_s);
         }
     }

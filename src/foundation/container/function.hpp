@@ -154,7 +154,7 @@ struct TrivialAllocatedFunction<ReturnType(Args...)> {
 
     constexpr TrivialAllocatedFunction(TrivialAllocatedFunction const& other) : allocator(other.allocator) {
         invoke_function = other.invoke_function;
-        function_object_storage = allocator.Clone(other.function_object_storage);
+        function_object_storage = allocator.Clone(other.function_object_storage, CloneType::Deep);
     }
 
     constexpr TrivialAllocatedFunction& operator=(TrivialAllocatedFunction const& other) {

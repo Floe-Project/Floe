@@ -243,7 +243,7 @@ struct DynamicHashTable {
         if (&other.allocator == &allocator)
             table.elems = other.table.elems;
         else {
-            table.elems = allocator.Clone(other.table.Elements()).data;
+            table.elems = allocator.Clone(other.table.Elements(), CloneType::Deep).data;
             other.Free();
         }
 

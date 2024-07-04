@@ -163,6 +163,7 @@ valgrind build="": (_build_if_requested build "native")
   valgrind \
     --leak-check=full \
     --fair-sched=yes \
+    --num-callers=25 \
     --suppressions=valgrind.supp \
     --error-exitcode=1 \
     --exit-on-first-error=yes \

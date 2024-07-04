@@ -166,6 +166,7 @@
             pkgs.libGLU
             pkgs.kcov
             pkgs.patchelf
+            pkgs.glibc
 
             (pkgs.writeShellScriptBin "patchrpath" ''
               patchelf --add-rpath "${pkgs.libGL}/lib" $@

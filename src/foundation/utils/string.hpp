@@ -320,6 +320,15 @@ PUBLIC constexpr bool NullTermStringsEqual(char const* a, char const* b) {
     return *a == 0 && *b == 0;
 }
 
+PUBLIC constexpr bool NullTermStringStartsWith(char const* str, char const* prefix) {
+    while (*prefix) {
+        if (*str != *prefix) return false;
+        ++str;
+        ++prefix;
+    }
+    return true;
+}
+
 template <typename Type>
 requires(CharacterType<Type>)
 PUBLIC constexpr Span<Type> FromNullTerminated(Type* null_term_data) {

@@ -330,7 +330,6 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                 .state = DirectoryWatcher::WatchedDirectory::State::NeedsWatching,
                 .is_desired = true,
                 .recursive = dir_to_watch.recursive,
-                .children = {},
             };
 
             auto p = result.arena.Clone(dir_to_watch.path);

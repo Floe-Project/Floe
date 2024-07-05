@@ -270,25 +270,95 @@ void Deinitialise(DirectoryWatcher& w) {
     close(w.native_data.int_id);
 }
 
-static ErrorCodeOr<int>
-WatchDirectory(int inotify_id, String path, bool recursive, ArenaAllocator& scratch_arena) {
-    (void)recursive; // we handle this later on
-    if (!PRODUCTION_BUILD && StartsWithSpan(path, "/mnt"_s))
+struct WatchedDirectory {
+    struct SubDir {
+        String subpath;
+        DirectoryWatcher::WatchedDirectory::State state;
+        int watch_id;
+    };
+
+    int watch_id;
+
+    // TODO: we need to update this if the children directories change
+    Span<SubDir> subdirs;
+};
+
+static ErrorCodeOr<int> InotifyWatch(int inotify_id, char const* path, ArenaAllocator& scratch_arena) {
+    if (!PRODUCTION_BUILD && NullTermStringStartsWith(path, "/mnt"))
         return ErrorCode {
             FilesystemError::FolderContainsTooManyFiles}; // IMPROVE: is there a better way to avoid the slow
                                                           // not-mounted check on my machine?
     auto const scratch_cursor = scratch_arena.TotalUsed();
     DEFER { scratch_arena.TryShrinkTotalUsed(scratch_cursor); };
     ZoneScoped;
-    auto const id =
+    auto const watch_id =
         inotify_add_watch(inotify_id,
-                          scratch_arena.CloneNullTerminated(path).data,
+                          path,
                           IN_MODIFY | IN_CREATE | IN_DELETE | IN_CLOSE_WRITE | IN_MOVED_TO | IN_MOVED_FROM);
-    if (id == -1) return FilesystemErrnoErrorCode(errno);
-    return id;
+    if (watch_id == -1) return FilesystemErrnoErrorCode(errno);
+    return watch_id;
 }
 
-static void UnwatchDirectory(int inotify_id, int handle) { inotify_rm_watch(inotify_id, handle); }
+static void InotifyUnwatch(int inotify_id, int watch_id) {
+    auto const rc = inotify_rm_watch(inotify_id, watch_id);
+    ASSERT(rc == 0);
+}
+
+static ErrorCodeOr<WatchedDirectory*> WatchDirectory(DirectoryWatcher::WatchedDirectory& dir,
+                                                     int inotify_id,
+                                                     String path,
+                                                     bool recursive,
+                                                     ArenaAllocator& scratch_arena) {
+    auto watch_id = TRY(InotifyWatch(inotify_id, NullTerminated(path, scratch_arena), scratch_arena));
+
+    auto result = Malloc::Instance().New<WatchedDirectory>(watch_id);
+
+    if (recursive) {
+        DynamicArray<WatchedDirectory::SubDir> subdirs {dir.arena};
+
+        auto const try_watch_subdirs = [&]() -> ErrorCodeOr<void> {
+            auto it = TRY(RecursiveDirectoryIterator::Create(scratch_arena, dir.path, "*"));
+            DynamicArray<char> full_subpath {dir.path, scratch_arena};
+            while (it.HasMoreFiles()) {
+                auto const& entry = it.Get();
+
+                if (entry.type == FileType::Directory) {
+                    String subpath = entry.path;
+                    subpath = TrimStartIfMatches(subpath, dir.path);
+                    subpath = path::TrimDirectorySeparatorsStart(subpath);
+
+                    dyn::Resize(full_subpath, dir.path.size);
+                    path::JoinAppend(full_subpath, subpath);
+
+                    dyn::Append(
+                        subdirs,
+                        {
+                            .subpath = dir.arena.Clone(subpath),
+                            .state = DirectoryWatcher::WatchedDirectory::State::Watching,
+                            .watch_id = TRY(
+                                InotifyWatch(inotify_id, dyn::NullTerminated(full_subpath), scratch_arena)),
+                        });
+                }
+
+                TRY(it.Increment());
+            }
+            return k_success;
+        };
+
+        auto const outcome = try_watch_subdirs();
+        if (outcome.HasError()) return outcome.Error();
+
+        result->subdirs = subdirs.ToOwnedSpan();
+    }
+
+    return result;
+}
+
+static void UnwatchDirectory(int inotify_id, WatchedDirectory* d) {
+    auto const rc = inotify_rm_watch(inotify_id, d->watch_id);
+    ASSERT(rc == 0);
+    Malloc::Instance().Delete(d);
+}
 
 ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                                        bool watched_directories_changed,
@@ -297,13 +367,14 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
     (void)watched_directories_changed;
     for (auto& dir : watcher.watched_dirs) {
         auto const unwatch_dir = [&](DirectoryWatcher::WatchedDirectory::State out_state) {
-            for (auto& child : dir.children) {
+            auto& native_dir = *(WatchedDirectory*)dir.native_data.pointer;
+            for (auto& child : native_dir.subdirs) {
                 if (child.state == DirectoryWatcher::WatchedDirectory::State::Watching)
-                    UnwatchDirectory(watcher.native_data.int_id, child.native_data.int_id);
+                    InotifyUnwatch(watcher.native_data.int_id, child.watch_id);
                 child.state = out_state;
             }
             if (dir.state == DirectoryWatcher::WatchedDirectory::State::Watching)
-                UnwatchDirectory(watcher.native_data.int_id, dir.native_data.int_id);
+                UnwatchDirectory(watcher.native_data.int_id, (WatchedDirectory*)dir.native_data.pointer);
             dir.state = out_state;
         };
 
@@ -312,51 +383,13 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
             case DirectoryWatcher::WatchedDirectory::State::Watching: break; // no change
             case DirectoryWatcher::WatchedDirectory::State::WatchingFailed: break; // no change
             case DirectoryWatcher::WatchedDirectory::State::NeedsWatching: {
-                if (dir.recursive) {
-                    DynamicArray<DirectoryWatcher::WatchedDirectory::Child> children {dir.arena};
-
-                    auto const try_iterate = [&]() -> ErrorCodeOr<void> {
-                        auto it = TRY(RecursiveDirectoryIterator::Create(scratch_arena, dir.path, "*"));
-                        while (it.HasMoreFiles()) {
-                            auto const& entry = it.Get();
-
-                            if (entry.type == FileType::Directory) {
-                                String subpath = entry.path;
-                                subpath = TrimStartIfMatches(subpath, dir.path);
-                                subpath = path::TrimDirectorySeparatorsStart(subpath);
-                                dyn::Append(
-                                    children,
-                                    {
-                                        .subpath = dir.arena.Clone(subpath),
-                                        .state = DirectoryWatcher::WatchedDirectory::State::NeedsWatching,
-                                    });
-                            }
-
-                            TRY(it.Increment());
-                        }
-                        return k_success;
-                    };
-
-                    auto const outcome = try_iterate();
-                    if (outcome.HasError()) return outcome.Error();
-
-                    dir.children = children.ToOwnedSpan();
-                }
-
                 auto const try_watching = [&]() -> ErrorCodeOr<void> {
-                    dir.native_data.int_id = TRY(
-                        WatchDirectory(watcher.native_data.int_id, dir.path, dir.recursive, scratch_arena));
+                    dir.native_data.pointer = TRY(WatchDirectory(dir,
+                                                                 watcher.native_data.int_id,
+                                                                 dir.path,
+                                                                 dir.recursive,
+                                                                 scratch_arena));
                     dir.state = DirectoryWatcher::WatchedDirectory::State::Watching;
-
-                    // IMPROVE: lots of allocations here
-                    for (auto& child : dir.children) {
-                        child.native_data.int_id =
-                            TRY(WatchDirectory(watcher.native_data.int_id,
-                                               path::Join(scratch_arena, Array {dir.path, child.subpath}),
-                                               true,
-                                               scratch_arena));
-                        child.state = DirectoryWatcher::WatchedDirectory::State::Watching;
-                    }
 
                     return k_success;
                 };
@@ -401,13 +434,14 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
 
             String dir {};
             String subdirs {};
-            for (auto const& watch : watcher.watched_dirs)
-                if (watch.native_data.int_id == event->wd) {
+            for (auto const& watch : watcher.watched_dirs) {
+                auto const& native_data = *(WatchedDirectory*)watch.native_data.pointer;
+                if (native_data.watch_id == event->wd) {
                     dir = watch.path;
                     break;
                 } else {
-                    for (auto const& child : watch.children) {
-                        if (child.native_data.int_id == event->wd) {
+                    for (auto const& child : native_data.subdirs) {
+                        if (child.watch_id == event->wd) {
                             dir = watch.path;
                             subdirs = child.subpath;
                             break;
@@ -415,6 +449,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                     }
                     if (dir.size) break;
                 }
+            }
             if (!dir.size) continue;
 
             auto filepath = event->len ? FromNullTerminated(event->name) : String {};

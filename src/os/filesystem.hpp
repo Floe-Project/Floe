@@ -313,23 +313,12 @@ struct DirectoryWatcher {
             NotWatching,
         };
 
-        struct Child {
-            String subpath;
-            State state;
-            NativeData native_data;
-        };
-
         ArenaAllocator arena {Malloc::Instance(), 0, 256};
         State state {};
         bool is_desired {};
         String path;
         String resolved_path;
         bool recursive;
-
-        // used if recursive an the backend doesn't support recursive normally
-        // TODO: this is only needed on Linux, it should move there
-        // TODO: we need to update this if the children directories change
-        Span<Child> children;
 
         NativeData native_data;
     };

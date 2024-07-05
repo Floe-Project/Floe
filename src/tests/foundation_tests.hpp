@@ -1470,6 +1470,12 @@ TEST_CASE(TestSearching) {
     CHECK(!StartsWithSpan(""_s, "aa"_s));
     CHECK(!StartsWithSpan("aa"_s, ""_s));
 
+    CHECK(NullTermStringStartsWith("aa", "a"));
+    CHECK(!NullTermStringStartsWith("aa", "b"));
+    CHECK(!NullTermStringStartsWith("", "b"));
+    CHECK(NullTermStringStartsWith("", ""));
+    CHECK(NullTermStringStartsWith("b", ""));
+
     CHECK(EndsWith("aa"_s, 'a'));
     CHECK(!EndsWith("aa"_s, 'b'));
     CHECK(EndsWithSpan("aaa"_s, "aa"_s));

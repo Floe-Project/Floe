@@ -126,10 +126,9 @@
       in
       {
         devShells.default = pkgs.mkShell rec {
+          # nativeBuildInputs is for tools
           nativeBuildInputs = [
-            # If you change the zig version you probably also want to change the ZLS version. 
-            # For me, that's done my home-manager setup at the moment.
-            zigpkgs."0.13.0"
+            zigpkgs."0.13.0" # NOTE(Sam): if you change this version you might also need to change your ZLS version 
             clap-val
             pluginval
             clang-build-analyzer
@@ -161,6 +160,10 @@
             pkgs.kcov
             pkgs.patchelf
 
+            # These 2 utilities ensure that we can run the binaries that we build regardless of the system outside of
+            # this nix devshell. For example on Ubuntu CI machines we don't have to manage what dependencies are 
+            # installed on the system via apt.
+
             # The dynamic linker can normally find the libraries inside the nix devshell except when we are running
             # an external program that hosts our audio plugin. For example clap-validator fails to load our clap with 
             # the error 'libGL.so.1 cannot be found'. Presumably this is due to LD_LIBRARY_PATH not being available to
@@ -171,10 +174,15 @@
               patchelf --set-rpath "${pkgs.lib.makeLibraryPath buildInputs}" $@
             '')
 
+            # Executables (as opposed to shared libraries) will default to being interpreted by the system's dynamic 
+            # linker (often /lib64/ld-linux-x86-64.so.2). This can cause problems relating to using different versions
+            # of glibc at the same time. So we use patchelf to force using the same ld.
             (pkgs.writeShellScriptBin "patchinterpreter" ''
               patchelf --set-interpreter "${pkgs.glibc}/lib/ld-linux-x86-64.so.2" $@
             '')
           ];
+
+          # buildInputs is for libraries
           buildInputs = [ ] ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
             pkgs.alsa-lib
             pkgs.xorg.libX11

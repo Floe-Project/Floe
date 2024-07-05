@@ -441,8 +441,6 @@ void Deinitialise(DirectoryWatcher& w) {
     w.allocator.Delete(watcher);
 }
 
-bool const supports_recursive_watch = true;
-
 void DirectoryChanged([[maybe_unused]] ConstFSEventStreamRef stream_ref,
                       [[maybe_unused]] void* user_data,
                       size_t num_events,

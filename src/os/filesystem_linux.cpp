@@ -257,8 +257,6 @@ ErrorCodeOr<MutableString> CurrentExecutablePath(Allocator& a) {
 
 namespace native {
 
-bool const supports_recursive_watch = false;
-
 ErrorCodeOr<void> Initialise(DirectoryWatcher& w) {
     ZoneScoped;
     auto h = inotify_init1(IN_NONBLOCK);
@@ -314,6 +312,37 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
             case DirectoryWatcher::WatchedDirectory::State::Watching: break; // no change
             case DirectoryWatcher::WatchedDirectory::State::WatchingFailed: break; // no change
             case DirectoryWatcher::WatchedDirectory::State::NeedsWatching: {
+                if (dir.recursive) {
+                    DynamicArray<DirectoryWatcher::WatchedDirectory::Child> children {dir.arena};
+
+                    auto const try_iterate = [&]() -> ErrorCodeOr<void> {
+                        auto it = TRY(RecursiveDirectoryIterator::Create(scratch_arena, dir.path, "*"));
+                        while (it.HasMoreFiles()) {
+                            auto const& entry = it.Get();
+
+                            if (entry.type == FileType::Directory) {
+                                String subpath = entry.path;
+                                subpath = TrimStartIfMatches(subpath, dir.path);
+                                subpath = path::TrimDirectorySeparatorsStart(subpath);
+                                dyn::Append(
+                                    children,
+                                    {
+                                        .subpath = dir.arena.Clone(subpath),
+                                        .state = DirectoryWatcher::WatchedDirectory::State::NeedsWatching,
+                                    });
+                            }
+
+                            TRY(it.Increment());
+                        }
+                        return k_success;
+                    };
+
+                    auto const outcome = try_iterate();
+                    if (outcome.HasError()) return outcome.Error();
+
+                    dir.children = children.ToOwnedSpan();
+                }
+
                 auto const try_watching = [&]() -> ErrorCodeOr<void> {
                     dir.native_data.int_id = TRY(
                         WatchDirectory(watcher.native_data.int_id, dir.path, dir.recursive, scratch_arena));

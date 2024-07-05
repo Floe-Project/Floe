@@ -329,7 +329,7 @@ struct DirectoryWatcher {
         // used if recursive an the backend doesn't support recursive normally
         // TODO: this is only needed on Linux, it should move there
         // TODO: we need to update this if the children directories change
-        Span<Child> children; 
+        Span<Child> children;
 
         NativeData native_data;
     };
@@ -341,8 +341,6 @@ struct DirectoryWatcher {
 };
 
 namespace native {
-
-extern bool const supports_recursive_watch;
 
 ErrorCodeOr<void> Initialise(DirectoryWatcher& w);
 void Deinitialise(DirectoryWatcher& w);

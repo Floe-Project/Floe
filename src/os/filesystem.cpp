@@ -333,41 +333,9 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                 .children = {},
             };
 
-            {
-                auto p = result.arena.Clone(dir_to_watch.path);
-                result.path = p;
-                result.resolved_path = ResolveSymlinks(result.arena, dir_to_watch.path).ValueOr(p);
-            }
-
-            if (dir_to_watch.recursive && !native::supports_recursive_watch) {
-                DynamicArray<DirectoryWatcher::WatchedDirectory::Child> children {result.arena};
-
-                auto const try_iterate = [&]() -> ErrorCodeOr<void> {
-                    auto it = TRY(RecursiveDirectoryIterator::Create(scratch_arena, dir_to_watch.path, "*"));
-                    while (it.HasMoreFiles()) {
-                        auto const& entry = it.Get();
-
-                        if (entry.type == FileType::Directory) {
-                            String subpath = entry.path;
-                            subpath = TrimStartIfMatches(subpath, dir_to_watch.path);
-                            subpath = path::TrimDirectorySeparatorsStart(subpath);
-                            dyn::Append(children,
-                                        {
-                                            .subpath = result.arena.Clone(subpath),
-                                            .state = DirectoryWatcher::WatchedDirectory::State::NeedsWatching,
-                                        });
-                        }
-
-                        TRY(it.Increment());
-                    }
-                    return k_success;
-                };
-
-                auto const outcome = try_iterate();
-                if (outcome.HasError()) return outcome.Error();
-
-                result.children = children.ToOwnedSpan();
-            }
+            auto p = result.arena.Clone(dir_to_watch.path);
+            result.path = p;
+            result.resolved_path = ResolveSymlinks(result.arena, dir_to_watch.path).ValueOr(p);
 
             return result;
         };

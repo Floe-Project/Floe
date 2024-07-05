@@ -843,7 +843,7 @@ pub fn build(b: *std.Build) void {
         "The preset for building the project, affects optimisation, debug settings, etc.",
     ) orelse .development;
 
-    const system_mode = b.systemIntegrationOption("all", .{});
+    const use_pkg_config = std.Build.Module.SystemLib.UsePkgConfig.yes;
 
     // Installing plugins to global plugin folders requires admin rights but it's often easier to debug
     // things without requiring admin. For production builds it's always enabled.
@@ -1241,19 +1241,11 @@ pub fn build(b: *std.Build) void {
                     pugl.root_module.addCMacro("USE_XSYNC", "1");
                     pugl.root_module.addCMacro("USE_XCURSOR", "1");
 
-                    if (system_mode) {
-                        pugl.linkSystemLibrary("GL");
-                        pugl.linkSystemLibrary("GLX");
-                        pugl.linkSystemLibrary("X11");
-                        pugl.linkSystemLibrary("Xcursor");
-                        pugl.linkSystemLibrary("Xext");
-                    } else {
-                        pugl.linkSystemLibrary2("gl", .{ .use_pkg_config = .force });
-                        pugl.linkSystemLibrary2("glx", .{ .use_pkg_config = .force });
-                        pugl.linkSystemLibrary2("x11", .{ .use_pkg_config = .force });
-                        pugl.linkSystemLibrary2("xcursor", .{ .use_pkg_config = .force });
-                        pugl.linkSystemLibrary2("xext", .{ .use_pkg_config = .force });
-                    }
+                    pugl.linkSystemLibrary2("gl", .{ .use_pkg_config = use_pkg_config });
+                    pugl.linkSystemLibrary2("glx", .{ .use_pkg_config = use_pkg_config });
+                    pugl.linkSystemLibrary2("x11", .{ .use_pkg_config = use_pkg_config });
+                    pugl.linkSystemLibrary2("xcursor", .{ .use_pkg_config = use_pkg_config });
+                    pugl.linkSystemLibrary2("xext", .{ .use_pkg_config = use_pkg_config });
                 },
             }
 
@@ -1656,11 +1648,7 @@ pub fn build(b: *std.Build) void {
                         miniaudio.linkSystemLibrary("dsound");
                     },
                     .linux => {
-                        if (system_mode) {
-                            miniaudio.linkSystemLibrary("asound");
-                        } else {
-                            miniaudio.linkSystemLibrary2("alsa", .{ .use_pkg_config = .force });
-                        }
+                        miniaudio.linkSystemLibrary2("alsa", .{ .use_pkg_config = use_pkg_config });
                     },
                     else => {
                         unreachable;
@@ -1706,11 +1694,7 @@ pub fn build(b: *std.Build) void {
                             "third_party_libs/portmidi/pm_linux/pmlinuxalsa.c",
                             "third_party_libs/portmidi/porttime/ptlinux.c",
                         }, .flags = genericFlags(&build_context, target, &.{"-DPMALSA"}) catch @panic("OOM") });
-                        if (system_mode) {
-                            portmidi.linkSystemLibrary("asound");
-                        } else {
-                            portmidi.linkSystemLibrary2("alsa", .{ .use_pkg_config = .force });
-                        }
+                        portmidi.linkSystemLibrary2("alsa", .{ .use_pkg_config = use_pkg_config });
                     },
                     else => {
                         unreachable;

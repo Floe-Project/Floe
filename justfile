@@ -39,16 +39,21 @@ logos_abs_dir := join(justfile_directory(), external_build_resources, "Logos")
 
 patch-rpath:
   #!/usr/bin/env bash
-  if [[ "{{os()}}" == "linux" ]]; then
-    if [[ -f "{{native_binary_dir}}/Floe.clap" ]]; then
-      patchrpath "{{native_binary_dir}}/Floe.clap"
-    fi
-    if [[ -f "{{native_binary_dir}}/Floe.vst3" ]]; then
-      patchrpath "{{native_binary_dir}}/Floe.vst3"
-    fi
-    if [[ -f "{{native_binary_dir}}/tests" ]]; then
-      patchinterpreter "{{native_binary_dir}}/tests"
-    fi
+  if [[ "{{os()}}" == "linux" && ! -f "/etc/NIXOS" ]]; then
+    patch_file() {
+      command=$1
+      file=$2
+
+      if [[ -f $file ]]; then
+        $command $file
+      fi
+    }
+
+    patch_file patchrpath "{{native_binary_dir}}/Floe.clap"
+    patch_file patchrpath "{{native_binary_dir}}/Floe.vst3/Contents/x86_64-linux/Floe.so"
+    patch_file patchinterpreter "{{native_binary_dir}}/tests"
+    patch_file patchinterpreter "{{native_binary_dir}}/gen_docs_tool"
+    patch_file patchinterpreter "{{native_binary_dir}}/VST3-Validator"
   fi
 
 build target_os='native':

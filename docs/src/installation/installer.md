@@ -5,7 +5,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Installer
 
-The best way to install or upgrade Floe is to use the installer. 
+The typical way to install or upgrade Floe is to use the installer. 
 1. Unzip the installer file. This is normally just a matter of double-clicking the file.
 1. Close your DAW.
 1. Run the installer program.

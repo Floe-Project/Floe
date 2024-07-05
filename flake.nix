@@ -125,8 +125,8 @@
         };
       in
       {
-        devShells.default = pkgs.mkShell {
-          packages = [
+        devShells.default = pkgs.mkShell rec {
+          nativeBuildInputs = [
             # If you change the zig version you probably also want to change the ZLS version. 
             # For me, that's done my home-manager setup at the moment.
             zigpkgs."0.13.0"
@@ -157,20 +157,28 @@
             (pkgs.writeShellScriptBin "lipo" "llvm-lipo $@")
           ] ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
             pkgs.pkg-config
+            pkgs.gnome.zenity
+            pkgs.kcov
+            pkgs.patchelf
+
+            # The dynamic linker can normally find the libraries inside the nix devshell except when we are running
+            # an external program that hosts our audio plugin. For example clap-validator fails to load our clap with 
+            # the error 'libGL.so.1 cannot be found'. Presumably this is due to LD_LIBRARY_PATH not being available to
+            # the external program. 
+            # As well as LD_LIBRARY_PATH, dynamic linkers also look at the rpath of the binary (which is embedded in
+            # the binary itself) to find the libraries. So that's what we use patchelf for here.
+            (pkgs.writeShellScriptBin "patchrpath" ''
+              patchelf --set-rpath "${pkgs.lib.makeLibraryPath buildInputs}" $@
+            '')
+          ];
+          buildInputs = [ ] ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
             pkgs.alsa-lib
             pkgs.xorg.libX11
             pkgs.xorg.libXext
             pkgs.xorg.libXcursor
-            pkgs.gnome.zenity
             pkgs.libGL
             pkgs.libGLU
-            pkgs.kcov
-            pkgs.patchelf
             pkgs.glibc
-
-            (pkgs.writeShellScriptBin "patchrpath" ''
-              patchelf --add-rpath "${pkgs.libGL}/lib" $@
-            '')
           ];
           shellHook = ''
             export MACOSX_SDK_SYSROOT="${macosx-sdks}"

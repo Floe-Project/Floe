@@ -37,9 +37,20 @@ external_build_resources := "build_resources/external"
 core_library_abs_dir := join(justfile_directory(), external_build_resources, "Core")
 logos_abs_dir := join(justfile_directory(), external_build_resources, "Logos")
 
+patch-rpath:
+  #!/usr/bin/env bash
+  if [[ "{{os()}}" == "linux" ]]; then
+    if [[ -f "{{native_binary_dir}}/Floe.clap" ]]; then
+      patchrpath "{{native_binary_dir}}/Floe.clap"
+    fi
+    if [[ -f "{{native_binary_dir}}/Floe.vst3" ]]; then
+      patchrpath "{{native_binary_dir}}/Floe.vst3"
+    fi
+  fi
+
 build target_os='native':
   zig build compile -Dtargets={{target_os}} -Dbuild-mode=development -Dexternal-resources="{{external_build_resources}}"
-  if [[ "{{os()}}" == "linux" ]]; then patchrpath zig-out/x86_64-linux/Floe.clap; fi
+  just patch-rpath
 
 build-tracy:
   zig build compile -Dtargets=native -Dbuild-mode=development -Dtracy

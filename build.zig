@@ -1596,6 +1596,7 @@ pub fn build(b: *std.Build) void {
                 .target = target,
                 .optimize = build_context.optimise,
                 .version = floe_version,
+                .pic = true,
             });
             clap.addCSourceFiles(.{ .files = &.{"src/plugin/plugin_clap_entry.cpp"}, .flags = cpp_fp_flags });
             clap.addConfigHeader(build_config_step);

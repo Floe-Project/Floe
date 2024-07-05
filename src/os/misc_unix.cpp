@@ -84,9 +84,9 @@ DateAndTime LocalTimeFromNanosecondsSinceEpoch(s128 nanoseconds) {
     localtime_r(&ts.tv_sec, &result);
 
     auto ns = ts.tv_nsec;
-    s16 milliseconds = CheckedCast<s16>(ns / 1'000'000);
+    auto const milliseconds = CheckedCast<s16>(ns / 1'000'000);
     ns %= 1'000'000;
-    s16 microseconds = CheckedCast<s16>(ns / 1'000);
+    auto const microseconds = CheckedCast<s16>(ns / 1'000);
     ns %= 1'000;
 
     return DateAndTime {

@@ -46,6 +46,9 @@ patch-rpath:
     if [[ -f "{{native_binary_dir}}/Floe.vst3" ]]; then
       patchrpath "{{native_binary_dir}}/Floe.vst3"
     fi
+    if [[ -f "{{native_binary_dir}}/tests" ]]; then
+      patchinterpreter "{{native_binary_dir}}/tests"
+    fi
   fi
 
 build target_os='native':

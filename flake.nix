@@ -170,6 +170,10 @@
             (pkgs.writeShellScriptBin "patchrpath" ''
               patchelf --set-rpath "${pkgs.lib.makeLibraryPath buildInputs}" $@
             '')
+
+            (pkgs.writeShellScriptBin "patchinterpreter" ''
+              patchelf --set-interpreter "${pkgs.glibc}/lib/ld-linux-x86-64.so.2" $@
+            '')
           ];
           buildInputs = [ ] ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
             pkgs.alsa-lib

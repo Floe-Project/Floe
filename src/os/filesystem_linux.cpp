@@ -454,10 +454,9 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
             auto filepath = event->len ? FromNullTerminated(event->name) : String {};
             if (subdirs.size) filepath = path::Join(scratch_arena, Array {subdirs, filepath});
 
-            auto const actions = Array {*action};
             callback(dir,
                      DirectoryWatcher::FileChange {
-                         .changes = actions.Items(),
+                         .changes = Array {*action},
                          .subpath = filepath,
                          .file_type = file_type,
                      });

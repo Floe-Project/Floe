@@ -883,8 +883,8 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                     if (type) {
                         auto const narrowed = Narrow(scratch_arena, filename);
                         if (narrowed.HasValue()) {
-                            auto const changes = Array {*type};
-                            callback(dir.path, DirectoryWatcher::FileChange {changes.Items(), narrowed.Value()});
+                            callback(dir.path,
+                                     DirectoryWatcher::FileChange {Array {*type}, narrowed.Value()});
                         }
                     }
 

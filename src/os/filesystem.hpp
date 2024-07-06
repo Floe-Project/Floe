@@ -353,7 +353,23 @@ void DestoryDirectoryWatcher(DirectoryWatcher& w);
 struct DirectoryToWatch {
     String path;
     bool recursive;
+    // IMPROVE: allow a user-pointer here?
 };
+
+// TODO: might be nice to change this API to just return a list of changes, one for each corresponding
+// directory inputted, rather than a callback-based API
+//
+// TODO: we should ensure coalescing of changes in the backends so that we can clarify this API to say: "You
+// will recieve at most one callback for each subpath. The callback will contain all changes that have
+// happened to that subpath since the last call, in the order they happened. This way, you only need to look
+// at the last event if you want a gross view of the changes rather than dealing with each intermediate
+// state. For example you might not care if a file was modified shortly before being deleted."
+
+// There's a few reasons that this API is the way it is:
+// - We want it to very simple-to-use in a polling loop: no need to track watching/unwatching, just call this
+//   with the list of directories you want to watch and it will return the changes since the last call.
+// - The underlying APIs often allow watching multiple directories at once so we follow that pattern rather
+//   than fighting it to allow separate calls for each directory.
 
 ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& w,
                                        Span<DirectoryToWatch const> directories,

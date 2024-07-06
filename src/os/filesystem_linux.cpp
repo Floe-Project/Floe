@@ -267,7 +267,7 @@ struct WatchedDirectory {
     int watch_id;
 
     // TODO: we need to update this if the children directories change
-    Span<SubDir> subdirs;
+    ArenaList<SubDir, false> subdirs;
 };
 
 static ErrorCodeOr<int> InotifyWatch(int inotify_id, char const* path, ArenaAllocator& scratch_arena) {
@@ -309,14 +309,8 @@ static ErrorCodeOr<WatchedDirectory*> WatchDirectory(DirectoryWatcher::WatchedDi
         if (!success) InotifyUnwatch(inotify_id, watch_id);
     };
 
-    auto result = Malloc::Instance().New<WatchedDirectory>(watch_id);
-    DEFER {
-        if (!success) Malloc::Instance().Delete(result);
-    };
-
+    ArenaList<WatchedDirectory::SubDir, false> subdirs {dir.arena};
     if (recursive) {
-        DynamicArray<WatchedDirectory::SubDir> subdirs {dir.arena};
-
         auto const try_watch_subdirs = [&]() -> ErrorCodeOr<void> {
             auto it = TRY(RecursiveDirectoryIterator::Create(scratch_arena, dir.path, "*"));
             DynamicArray<char> full_subpath {dir.path, scratch_arena};
@@ -331,14 +325,14 @@ static ErrorCodeOr<WatchedDirectory*> WatchDirectory(DirectoryWatcher::WatchedDi
                     dyn::Resize(full_subpath, dir.path.size);
                     path::JoinAppend(full_subpath, subpath);
 
-                    dyn::Append(
-                        subdirs,
-                        {
-                            .subpath = dir.arena.Clone(subpath),
-                            .state = DirectoryWatcher::WatchedDirectory::State::Watching,
-                            .watch_id = TRY(
-                                InotifyWatch(inotify_id, dyn::NullTerminated(full_subpath), scratch_arena)),
-                        });
+                    auto subdir = subdirs.PrependUninitialised();
+                    PLACEMENT_NEW(subdir)
+                    WatchedDirectory::SubDir {
+                        .subpath = dir.arena.Clone(subpath),
+                        .state = DirectoryWatcher::WatchedDirectory::State::Watching,
+                        .watch_id =
+                            TRY(InotifyWatch(inotify_id, dyn::NullTerminated(full_subpath), scratch_arena)),
+                    };
                 }
 
                 TRY(it.Increment());
@@ -352,10 +346,9 @@ static ErrorCodeOr<WatchedDirectory*> WatchDirectory(DirectoryWatcher::WatchedDi
                 InotifyUnwatch(inotify_id, subdir.watch_id);
             return outcome.Error();
         }
-
-        result->subdirs = subdirs.ToOwnedSpan();
     }
 
+    auto result = Malloc::Instance().New<WatchedDirectory>(watch_id, Move(subdirs));
     success = true;
     return result;
 }
@@ -411,7 +404,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
 
     alignas(struct inotify_event) char buf[4096];
     while (true) {
-        ZoneNamedN(read_trace, "read (watcher)", true);
+        ZoneNamedN(read_trace, "inotify read", true);
         auto const len = read(watcher.native_data.int_id, buf, sizeof(buf));
         if (len == -1 && errno != EAGAIN) return FilesystemErrnoErrorCode(errno);
 
@@ -434,10 +427,13 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                 action = DirectoryWatcher::FileChange::Type::Added;
             if (!action) continue;
 
+            auto const file_type = event->mask & IN_ISDIR ? FileType::Directory : FileType::RegularFile;
+
             String dir {};
             String subdirs {};
             for (auto const& watch : watcher.watched_dirs) {
                 if (watch.state != DirectoryWatcher::WatchedDirectory::State::Watching) continue;
+
                 auto const& native_data = *(WatchedDirectory*)watch.native_data.pointer;
                 if (native_data.watch_id == event->wd) {
                     dir = watch.path;
@@ -458,7 +454,12 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
             auto filepath = event->len ? FromNullTerminated(event->name) : String {};
             if (subdirs.size) filepath = path::Join(scratch_arena, Array {subdirs, filepath});
 
-            callback(dir, DirectoryWatcher::FileChange {*action, filepath});
+            callback(dir,
+                     DirectoryWatcher::FileChange {
+                         .type = *action,
+                         .subpath = filepath,
+                         .file_type = file_type,
+                     });
         }
     }
 

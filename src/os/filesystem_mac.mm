@@ -616,6 +616,9 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                             continue;
                         }
 
+                        auto const file_type = (event->flags & kFSEventStreamEventFlagItemIsDir) ? FileType::Folder
+                                                                       : FileType::RegularFile;
+
                         Optional<DirectoryWatcher::FileChange::Type> type {};
 
                         // Modified seems to be set at the same time as Created/Removed etc. So let's check it
@@ -635,6 +638,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                                      DirectoryWatcher::FileChange {
                                          .type = *type,
                                          .subpath = subpath,
+                                         .file_type = file_type,
                                      });
                         }
                     }

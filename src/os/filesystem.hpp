@@ -300,6 +300,7 @@ struct DirectoryWatcher {
         }
         Type type;
         String subpath;
+        Optional<FileType> file_type; // might not be available
     };
 
     using Callback = FunctionRef<void(String watched_dir, ErrorCodeOr<FileChange> change)>;
@@ -324,7 +325,7 @@ struct DirectoryWatcher {
     };
 
     Allocator& allocator;
-    List<WatchedDirectory> watched_dirs;
+    ArenaList<WatchedDirectory, true> watched_dirs;
     DynamicArrayInline<u64, 25> blacklisted_path_hashes;
     NativeData native_data;
 };

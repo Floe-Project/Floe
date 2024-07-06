@@ -144,7 +144,7 @@ struct ListedLibrary {
     ArenaAllocator arena;
     sample_lib::Library* lib {};
 
-    List<ListedInstrument> instruments {PageAllocator::Instance()};
+    ArenaList<ListedInstrument, false> instruments {arena};
 };
 
 using LibrariesList = AtomicRefList<ListedLibrary>;
@@ -219,7 +219,7 @@ struct LoadingThread {
     AvailableLibraries& available_libraries;
     ThreadPool& thread_pool;
     Atomic<RequestId> request_id_counter {};
-    MutexProtected<List<Connection>> connections {Malloc::Instance()};
+    MutexProtected<ArenaList<Connection, true>> connections {Malloc::Instance()};
     Thread thread {};
     Atomic<bool> end_thread {false};
     ThreadsafeQueue<QueuedRequest> request_queue {PageAllocator::Instance()};

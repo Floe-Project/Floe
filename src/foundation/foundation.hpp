@@ -17,6 +17,7 @@
 #include "utils/version.hpp" // IWYU pragma: export
 #include "utils/writer.hpp" // IWYU pragma: export
 
+#include "container/arena_list.hpp" // IWYU pragma: export
 #include "container/array.hpp" // IWYU pragma: export
 #include "container/bitset.hpp" // IWYU pragma: export
 #include "container/circular_buffer.hpp" // IWYU pragma: export
@@ -25,7 +26,6 @@
 #include "container/function.hpp" // IWYU pragma: export
 #include "container/function_queue.hpp" // IWYU pragma: export
 #include "container/hash_table.hpp" // IWYU pragma: export
-#include "container/list.hpp" // IWYU pragma: export
 #include "container/optional.hpp" // IWYU pragma: export
 #include "container/queue.hpp" // IWYU pragma: export
 #include "container/span.hpp" // IWYU pragma: export

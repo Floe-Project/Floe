@@ -34,7 +34,7 @@ struct PresetMetadata {
 };
 
 struct PresetBrowserFilters {
-    u64 selected_folder_hash {}; // TODO: store an Entry pointer probably
+    u64 selected_folder_hash {}; // IMPROVE: store an Entry pointer probably
     DynamicArrayInline<char, 128> search_filter {};
 };
 

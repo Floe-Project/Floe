@@ -5,16 +5,26 @@
 #include "foundation/memory/allocators.hpp"
 #include "foundation/utils/linked_list.hpp"
 
-template <typename Type>
-struct List {
-    List(Allocator& a) : arena(a) {}
+template <typename Type, bool k_owns_arena>
+struct ArenaList {
+    template <typename U = Type>
+    requires(!k_owns_arena)
+    ArenaList(ArenaAllocator& a) : arena(a) {}
 
-    ~List() { ASSERT(first == nullptr); }
+    template <typename U = Type>
+    requires(k_owns_arena)
+    ArenaList(Allocator& a) : arena(a) {}
 
-    List(List&& other)
+    template <typename U = Type>
+    requires(k_owns_arena)
+    ArenaList(ArenaList&& other)
         : arena(Move(other.arena))
         , first(Exchange(other.first, nullptr))
         , free_list(Exchange(other.free_list, nullptr)) {}
+
+    ~ArenaList() {
+        if constexpr (!TriviallyDestructible<Type>) ASSERT(first == nullptr);
+    }
 
     struct Node {
         Type data;
@@ -30,7 +40,7 @@ struct List {
             return result;
         }
 
-        return arena.NewUninitialised<Node>();
+        return arena.template NewUninitialised<Node>();
     }
 
     void PrependNode(Node* node) {
@@ -59,7 +69,7 @@ struct List {
             return &result->data;
         }
 
-        auto new_node = arena.NewUninitialised<Node>();
+        auto new_node = arena.template NewUninitialised<Node>();
         PrependNode(new_node);
         return &new_node->data;
     }
@@ -74,10 +84,12 @@ struct List {
 
     bool Empty() const { return first == nullptr; }
 
-    Iterator begin() { return Iterator {first}; }
-    Iterator end() { return Iterator {nullptr}; }
+    Iterator begin() const { return Iterator {first}; }
+    Iterator end() const { return Iterator {nullptr}; }
 
-    ArenaAllocator arena;
+    using Arena = Conditional<k_owns_arena, ArenaAllocator, ArenaAllocator&>;
+
+    Arena arena;
     Node* first {};
     Node* free_list {};
 };

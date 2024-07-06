@@ -187,7 +187,7 @@ static void TriggerReloadIfAudioIsCancelled(ListedAudioData& audio_data,
            audio_data.state.Load() != LoadingState::PendingCancel);
 }
 
-static ListedAudioData* FetchOrCreateAudioData(List<ListedAudioData>& audio_datas,
+static ListedAudioData* FetchOrCreateAudioData(ArenaList<ListedAudioData, true>& audio_datas,
                                                sample_lib::Library const& lib,
                                                String path,
                                                ThreadPoolContext& thread_pool_ctx,
@@ -215,7 +215,7 @@ static ListedAudioData* FetchOrCreateAudioData(List<ListedAudioData>& audio_data
 }
 
 static ListedInstrument* FetchOrCreateInstrument(LibrariesList::Node& lib_node,
-                                                 List<ListedAudioData>& audio_datas,
+                                                 ArenaList<ListedAudioData, true>& audio_datas,
                                                  sample_lib::Instrument const& inst,
                                                  ThreadPoolContext& thread_pool_ctx) {
     auto& lib = lib_node.value;
@@ -915,7 +915,7 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
 
 static void RemoveUnreferencedObjects(LoadingThread& thread,
                                       LibrariesList& libraries,
-                                      List<ListedAudioData>& audio_datas) {
+                                      ArenaList<ListedAudioData, true>& audio_datas) {
     ZoneScoped;
     thread.connections.Use([](auto& connections) {
         connections.RemoveIf([](Connection const& h) { return !h.used.Load(MemoryOrder::Relaxed); });
@@ -963,7 +963,7 @@ static void CancelLoadingAudioForInstrumentIfPossible(ListedInstrument* i, uintp
 static void LoadingThreadLoop(LoadingThread& thread) {
     ZoneScoped;
     ArenaAllocator scratch_arena {PageAllocator::Instance(), Kb(128)};
-    List<ListedAudioData> audio_datas {PageAllocator::Instance()};
+    ArenaList<ListedAudioData, true> audio_datas {PageAllocator::Instance()};
     uintptr_t debug_result_id = 0;
 
     Optional<DirectoryWatcher> watcher = {};

@@ -257,19 +257,6 @@ ErrorCodeOr<MutableString> CurrentExecutablePath(Allocator& a) {
 
 namespace native {
 
-ErrorCodeOr<void> Initialise(DirectoryWatcher& w) {
-    ZoneScoped;
-    auto h = inotify_init1(IN_NONBLOCK);
-    if (h == -1) return FilesystemErrnoErrorCode(errno);
-    w.native_data.int_id = h;
-    return k_success;
-}
-
-void Deinitialise(DirectoryWatcher& w) {
-    ZoneScoped;
-    close(w.native_data.int_id);
-}
-
 struct WatchedDirectory {
     struct SubDir {
         String subpath;
@@ -304,14 +291,28 @@ static void InotifyUnwatch(int inotify_id, int watch_id) {
     ASSERT(rc == 0);
 }
 
+static void UnwatchDirectory(int inotify_id, WatchedDirectory* d) {
+    if (!d) return;
+    auto const rc = inotify_rm_watch(inotify_id, d->watch_id);
+    ASSERT(rc == 0);
+    Malloc::Instance().Delete(d);
+}
+
 static ErrorCodeOr<WatchedDirectory*> WatchDirectory(DirectoryWatcher::WatchedDirectory& dir,
                                                      int inotify_id,
                                                      String path,
                                                      bool recursive,
                                                      ArenaAllocator& scratch_arena) {
+    bool success = false;
     auto watch_id = TRY(InotifyWatch(inotify_id, NullTerminated(path, scratch_arena), scratch_arena));
+    DEFER {
+        if (!success) InotifyUnwatch(inotify_id, watch_id);
+    };
 
     auto result = Malloc::Instance().New<WatchedDirectory>(watch_id);
+    DEFER {
+        if (!success) Malloc::Instance().Delete(result);
+    };
 
     if (recursive) {
         DynamicArray<WatchedDirectory::SubDir> subdirs {dir.arena};
@@ -346,18 +347,32 @@ static ErrorCodeOr<WatchedDirectory*> WatchDirectory(DirectoryWatcher::WatchedDi
         };
 
         auto const outcome = try_watch_subdirs();
-        if (outcome.HasError()) return outcome.Error();
+        if (outcome.HasError()) {
+            for (auto const& subdir : subdirs)
+                InotifyUnwatch(inotify_id, subdir.watch_id);
+            return outcome.Error();
+        }
 
         result->subdirs = subdirs.ToOwnedSpan();
     }
 
+    success = true;
     return result;
 }
 
-static void UnwatchDirectory(int inotify_id, WatchedDirectory* d) {
-    auto const rc = inotify_rm_watch(inotify_id, d->watch_id);
-    ASSERT(rc == 0);
-    Malloc::Instance().Delete(d);
+ErrorCodeOr<void> Initialise(DirectoryWatcher& w) {
+    ZoneScoped;
+    auto h = inotify_init1(IN_NONBLOCK);
+    if (h == -1) return FilesystemErrnoErrorCode(errno);
+    w.native_data.int_id = h;
+    return k_success;
+}
+
+void Deinitialise(DirectoryWatcher& w) {
+    ZoneScoped;
+    for (auto const& dir : w.watched_dirs)
+        ASSERT(dir.native_data.pointer == nullptr);
+    close(w.native_data.int_id);
 }
 
 ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
@@ -366,42 +381,29 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                                        DirectoryWatcher::Callback callback) {
     (void)watched_directories_changed;
     for (auto& dir : watcher.watched_dirs) {
-        auto const unwatch_dir = [&](DirectoryWatcher::WatchedDirectory::State out_state) {
-            auto& native_dir = *(WatchedDirectory*)dir.native_data.pointer;
-            for (auto& child : native_dir.subdirs) {
-                if (child.state == DirectoryWatcher::WatchedDirectory::State::Watching)
-                    InotifyUnwatch(watcher.native_data.int_id, child.watch_id);
-                child.state = out_state;
-            }
-            if (dir.state == DirectoryWatcher::WatchedDirectory::State::Watching)
-                UnwatchDirectory(watcher.native_data.int_id, (WatchedDirectory*)dir.native_data.pointer);
-            dir.state = out_state;
-        };
-
         switch (dir.state) {
             case DirectoryWatcher::WatchedDirectory::State::NotWatching: break; // no change
             case DirectoryWatcher::WatchedDirectory::State::Watching: break; // no change
             case DirectoryWatcher::WatchedDirectory::State::WatchingFailed: break; // no change
             case DirectoryWatcher::WatchedDirectory::State::NeedsWatching: {
-                auto const try_watching = [&]() -> ErrorCodeOr<void> {
-                    dir.native_data.pointer = TRY(WatchDirectory(dir,
-                                                                 watcher.native_data.int_id,
-                                                                 dir.path,
-                                                                 dir.recursive,
-                                                                 scratch_arena));
-                    dir.state = DirectoryWatcher::WatchedDirectory::State::Watching;
-
-                    return k_success;
-                };
-                auto const outcome = try_watching();
+                auto const outcome =
+                    WatchDirectory(dir, watcher.native_data.int_id, dir.path, dir.recursive, scratch_arena);
                 if (outcome.HasError()) {
-                    unwatch_dir(DirectoryWatcher::WatchedDirectory::State::WatchingFailed);
+                    dir.state = DirectoryWatcher::WatchedDirectory::State::WatchingFailed;
+                    ASSERT(dir.native_data.pointer == nullptr);
                     callback(dir.path, outcome.Error());
                 }
+                dir.state = DirectoryWatcher::WatchedDirectory::State::Watching;
+                dir.native_data.pointer = outcome.Value();
                 break;
             }
             case DirectoryWatcher::WatchedDirectory::State::NeedsUnwatching: {
-                unwatch_dir(DirectoryWatcher::WatchedDirectory::State::NotWatching);
+                auto& native_dir = *(WatchedDirectory*)dir.native_data.pointer;
+                for (auto& child : native_dir.subdirs)
+                    InotifyUnwatch(watcher.native_data.int_id, child.watch_id);
+                UnwatchDirectory(watcher.native_data.int_id, (WatchedDirectory*)dir.native_data.pointer);
+                dir.state = DirectoryWatcher::WatchedDirectory::State::NotWatching;
+                dir.native_data.pointer = nullptr;
                 break;
             }
         }
@@ -435,6 +437,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
             String dir {};
             String subdirs {};
             for (auto const& watch : watcher.watched_dirs) {
+                if (watch.state != DirectoryWatcher::WatchedDirectory::State::Watching) continue;
                 auto const& native_data = *(WatchedDirectory*)watch.native_data.pointer;
                 if (native_data.watch_id == event->wd) {
                     dir = watch.path;

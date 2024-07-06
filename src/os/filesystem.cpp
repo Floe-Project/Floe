@@ -367,7 +367,8 @@ void DestoryDirectoryWatcher(DirectoryWatcher& watcher) {
     ArenaAllocatorWithInlineStorage<1000> scratch_arena;
 
     for (auto& dir : watcher.watched_dirs)
-        dir.state = DirectoryWatcher::WatchedDirectory::State::NeedsUnwatching;
+        if (dir.state == DirectoryWatcher::WatchedDirectory::State::Watching)
+            dir.state = DirectoryWatcher::WatchedDirectory::State::NeedsUnwatching;
     auto _ = native::ReadDirectoryChanges(watcher,
                                           true,
                                           scratch_arena,

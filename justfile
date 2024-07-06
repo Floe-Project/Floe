@@ -177,6 +177,7 @@ coverage build="": (_build_if_requested build "native")
   # IMPROVE: run other tests with coverage and --merge the results
   kcov --include-pattern={{justfile_directory()}}/src {{gen_files_dir}}/coverage-out {{native_binary_dir}}/tests
 
+# IMPROVE: also run validators through valgrind
 [linux]
 valgrind build="": (_build_if_requested build "native")
   valgrind \
@@ -185,7 +186,7 @@ valgrind build="": (_build_if_requested build "native")
     --num-callers=25 \
     --suppressions=valgrind.supp \
     --error-exitcode=1 \
-    --exit-on-first-error=yes \
+    --exit-on-first-error=no \
     {{native_binary_dir}}/tests
 
 # TODO: add vst3-val, pluginval and plugival-au (and wine variants) when we re-enable wrappers
@@ -227,6 +228,7 @@ checks_ci := replace(
     check-links
     coverage
     clang-tidy-all
+    valgrind
     "
   } else {
     "

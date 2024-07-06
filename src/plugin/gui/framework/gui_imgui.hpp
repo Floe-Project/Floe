@@ -192,7 +192,7 @@ struct TextInputDraggerSettings {
 //
 
 struct Window {
-    char name[128] = {}; // TODO: make into DynamicArrayInline
+    DynamicArrayInline<char, 128> name;
     bool is_open = false;
     bool skip_drawing_this_frame = false;
 

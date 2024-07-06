@@ -1572,7 +1572,7 @@ void Context::BeginWindow(WindowSettings settings, Window* window, Rect r, Strin
     auto const draw_on_top = (flags & WindowFlags_DrawOnTop);
 
     dyn::Append(active_windows, window);
-    CopyStringIntoBufferWithNullTerm(window->name, str);
+    dyn::Assign(window->name, str);
     window->user_flags = next_window_user_flags;
     next_window_user_flags = 0;
     window->flags = flags;
@@ -2188,7 +2188,9 @@ void Context::DebugWindow(Rect r) {
 
     if (DebugTextHeading(debug_windows, "Windows")) {
         DebugTextItem("Hovered ID", "%u", HoveredWindow() ? HoveredWindow()->id : 0);
-        DebugTextItem("Hovered Name", "%s", HoveredWindow() ? HoveredWindow()->name : "");
+        DebugTextItem("Hovered Name",
+                      "%s",
+                      HoveredWindow() ? dyn::NullTerminated(HoveredWindow()->name) : "");
         DebugTextItem("Hovered Root", "%u", HoveredWindow() ? HoveredWindow()->root_window->id : 0);
         ArenaAllocatorWithInlineStorage<2000> allocator;
         DynamicArray<char> buffer {allocator};

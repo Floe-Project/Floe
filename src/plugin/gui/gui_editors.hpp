@@ -105,7 +105,7 @@ static char g_background_filepath[260];
 
 static void TakeScreenshot(Gui* g) {
     for (auto wnd : g->imgui.windows) {
-        if (NullTermStringsEqual(wnd->name, "DebugR")) {
+        if (wnd->name == "DebugR") {
             wnd->skip_drawing_this_frame = true;
             break;
         }

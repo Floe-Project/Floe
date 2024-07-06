@@ -350,6 +350,7 @@ parallel tasks:
 [unix]
 echo-latest-changes:
   #!/usr/bin/env bash
+  # we look for the heading with the version number and then print everything until the next heading
   changes=$(sed -n "/## $(cat version.txt)/,/## /{ /## /!p }" changelog.md)
   printf "%s" "$changes" # trim trailing newline
 

@@ -519,8 +519,6 @@ static void AddAsyncJob(LibrariesAsyncContext& async_ctx,
                         return k_success;
                     };
 
-                    // TODO(1.0): had a crash here: invalid memory when doing a memcpy. Happened twice now.
-                    // kcov on linux might be a repro.
                     j.result.outcome = try_job();
                 } else {
                     j.result.outcome = k_success;

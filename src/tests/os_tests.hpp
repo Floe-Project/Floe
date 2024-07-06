@@ -443,7 +443,7 @@ TEST_CASE(TestReadingDirectoryChanges) {
             DynamicArray<TestFileChange> changes {a};
 
             for (auto const _ : Range(4)) {
-                SleepThisThread(1); // give the watcher time to detect the changes
+                SleepThisThread(5); // give the watcher time to detect the changes
                 TRY(ReadDirectoryChanges(
                     watcher,
                     dirs_to_watch,

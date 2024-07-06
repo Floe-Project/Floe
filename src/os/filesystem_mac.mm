@@ -404,16 +404,24 @@ namespace native {
 
 // NOTE: FSEvents is a callback based API. You receive events in a separate thread and there doesn't seem to
 // be a way around that. FSEventStreamFlushSync might flush the events but you can still receive others at any
-// time in the other thread.
+// time in the other thread. Therefore we use a queue to pass the buffer the events from the background thread
+// to the ReadDirectoryChanges thread.
+
+// References:
+// https://developer.apple.com/library/archive/documentation/Darwin/Conceptual/FSEvents_ProgGuide/UsingtheFSEventsFramework/UsingtheFSEventsFramework.html
+// CHOC library: https://github.com/Tracktion/choc/blob/main/platform/choc_FileWatcher.h
+// EFSW library: https://github.com/SpartanJ/efsw/blob/master/src/efsw/WatcherFSEvents.cpp
+// Atom file watcher: https://github.com/atom/watcher/blob/master/docs/macos.md
 
 struct FsWatcher {
     FSEventStreamRef stream {};
     dispatch_queue_t queue {};
 
     struct Event {
+        enum class Existence { Unknown, Exists, DoesNotExist };
         String path;
         FSEventStreamEventFlags flags;
-        s128 time;
+        Existence exists = Existence::Unknown;
         Event* next;
         Event* prev;
     };
@@ -505,10 +513,35 @@ void DirectoryChanged([[maybe_unused]] ConstFSEventStreamRef stream_ref,
         StdPrint(StdStream::Err, info);
     }
 
-    // TODO: we need to decipher these events more. We get strange combinations of things all at the same time
-    // and we can't track renames very well.
+#if 0
+    ArenaAllocatorWithInlineStorage<1024> scratch_arena;
+    auto coalesced = scratch_arena.NewMultiple<bool>(num_events);
+#endif
 
     for (size_t i = 0; i < num_events; i++) {
+        FSEventStreamEventFlags flags = event_flags[i];
+#if 0
+        if (coalesced[i]) continue;
+
+        for (size_t j = i + 1; j < num_events; j++) {
+            if (coalesced[j]) continue;
+            if (NullTermStringsEqual(paths[i], paths[j])) {
+                flags |= event_flags[j];
+                coalesced[j] = true;
+            }
+        }
+#endif
+
+        auto existence = FsWatcher::Event::Existence::Unknown;
+        if (flags & (kFSEventStreamEventFlagItemRenamed | kFSEventStreamEventFlagItemRemoved |
+                     kFSEventStreamEventFlagItemCreated)) {
+            struct stat info;
+            if (lstat(paths[i], &info) == 0)
+                existence = FsWatcher::Event::Existence::Exists;
+            else if (errno == ENOENT)
+                existence = FsWatcher::Event::Existence::DoesNotExist;
+        }
+
         watcher.event_mutex.Lock();
         DEFER { watcher.event_mutex.Unlock(); };
 
@@ -516,7 +549,8 @@ void DirectoryChanged([[maybe_unused]] ConstFSEventStreamRef stream_ref,
         PLACEMENT_NEW(event)
         FsWatcher::Event {
             .path = watcher.event_arena.Clone(FromNullTerminated(paths[i])),
-            .flags = event_flags[i],
+            .flags = flags,
+            .exists = existence,
         };
 
         DoublyLinkedListAppend(watcher.events, event);
@@ -554,7 +588,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
         FSEventStreamContext context {};
         context.info = &fs_watcher;
 
-        constexpr double k_latency_seconds = 0.1;
+        constexpr double k_latency_seconds = 0.0; // TODO: allow setting this as an option?
 
         fs_watcher.stream =
             FSEventStreamCreate(nullptr,
@@ -616,32 +650,51 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                             continue;
                         }
 
+                        auto const created = event->flags & kFSEventStreamEventFlagItemCreated;
+                        auto const removed = event->flags & kFSEventStreamEventFlagItemRemoved;
+                        auto const renamed = event->flags & kFSEventStreamEventFlagItemRenamed;
+                        auto const modified = event->flags & kFSEventStreamEventFlagItemModified;
+
+                        DynamicArrayInline<DirectoryWatcher::FileChange::Type, 10> order;
+
+                        if (renamed) {
+                            if (event->exists == FsWatcher::Event::Existence::Exists)
+                                dyn::Append(order, DirectoryWatcher::FileChange::Type::RenamedNewName);
+                            else if (event->exists == FsWatcher::Event::Existence::DoesNotExist)
+                                dyn::Append(order, DirectoryWatcher::FileChange::Type::RenamedOldName);
+                        } else {
+                            if (created && removed)
+                                if (event->exists == FsWatcher::Event::Existence::DoesNotExist)
+                                    dyn::Append(order, DirectoryWatcher::FileChange::Type::Added);
+                                else
+                                    dyn::Append(order, DirectoryWatcher::FileChange::Type::Deleted);
+                            else if (created)
+                                dyn::Append(order, DirectoryWatcher::FileChange::Type::Added);
+                        }
+
+                        // TODO: this logic isn't quite right, we can get 'modified' AFTER 'removed'
+                        if (modified) dyn::Append(order, DirectoryWatcher::FileChange::Type::Modified);
+
+                        if (!renamed) {
+                            if (removed && created)
+                                if (event->exists == FsWatcher::Event::Existence::DoesNotExist)
+                                    dyn::Append(order, DirectoryWatcher::FileChange::Type::Deleted);
+                                else
+                                    dyn::Append(order, DirectoryWatcher::FileChange::Type::Added);
+                            else if (removed)
+                                dyn::Append(order, DirectoryWatcher::FileChange::Type::Deleted);
+                        }
+
                         auto const file_type = (event->flags & kFSEventStreamEventFlagItemIsDir)
-                                                   ? FileType::Folder
+                                                   ? FileType::Directory
                                                    : FileType::RegularFile;
-
-                        Optional<DirectoryWatcher::FileChange::Type> type {};
-
-                        // Modified seems to be set at the same time as Created/Removed etc. So let's check it
-                        // first and allow our type to be overwritten by the more significant flags
-                        if (event->flags & kFSEventStreamEventFlagItemModified)
-                            type = DirectoryWatcher::FileChange::Type::Modified;
-
-                        if (event->flags & kFSEventStreamEventFlagItemRenamed)
-                            type = DirectoryWatcher::FileChange::Type::RenamedNewName;
-                        if (event->flags & kFSEventStreamEventFlagItemCreated)
-                            type = DirectoryWatcher::FileChange::Type::Added;
-                        if (event->flags & kFSEventStreamEventFlagItemRemoved)
-                            type = DirectoryWatcher::FileChange::Type::Deleted;
-
-                        if (type) {
+                        for (auto const type : order)
                             callback(dir.path,
                                      DirectoryWatcher::FileChange {
-                                         .type = *type,
+                                         .type = type,
                                          .subpath = subpath,
                                          .file_type = file_type,
                                      });
-                        }
                     }
                 }
             }

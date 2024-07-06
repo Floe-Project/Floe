@@ -312,7 +312,8 @@ Parse(Settings& content, ArenaAllocator& content_allocator, ArenaAllocator& scra
         dyn::Append(unknown_lines, line);
     }
 
-    content.filesystem.extra_libraries_scan_folders = content_allocator.Clone(extra_libraries_folders, CloneType::Deep);
+    content.filesystem.extra_libraries_scan_folders =
+        content_allocator.Clone(extra_libraries_folders, CloneType::Deep);
     content.filesystem.extra_presets_scan_folders = content_allocator.Clone(presets_folders, CloneType::Deep);
     content.unknown_lines_from_file = content_allocator.Clone(unknown_lines, CloneType::Deep);
 }

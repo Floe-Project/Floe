@@ -51,7 +51,9 @@ bool HandleRescanRequest(ScannedFolder& folder,
                 folder.thread_arena.ResetCursorAndConsolidateRegions();
                 ASSERT(thread_pool);
                 thread_pool->AddJob(
-                    [folders_to_scan = folder.thread_arena.Clone(folders_to_scan, CloneType::Deep), &folder, scan = scan]() {
+                    [folders_to_scan = folder.thread_arena.Clone(folders_to_scan, CloneType::Deep),
+                     &folder,
+                     scan = scan]() {
                         scan(folders_to_scan);
                         folder.async_scans.FetchSub(1);
                     });

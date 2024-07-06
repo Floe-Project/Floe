@@ -616,8 +616,9 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                             continue;
                         }
 
-                        auto const file_type = (event->flags & kFSEventStreamEventFlagItemIsDir) ? FileType::Folder
-                                                                       : FileType::RegularFile;
+                        auto const file_type = (event->flags & kFSEventStreamEventFlagItemIsDir)
+                                                   ? FileType::Folder
+                                                   : FileType::RegularFile;
 
                         Optional<DirectoryWatcher::FileChange::Type> type {};
 

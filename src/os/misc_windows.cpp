@@ -338,7 +338,7 @@ TEST_CASE(TestScopedWin32ComUsage) {
     return k_success;
 }
 
-TEST_REGISTRATION(RegisterWindowsPlatformTests) {
+TEST_REGISTRATION(RegisterWindowsSpecificTests) {
     REGISTER_TEST(TestScopedWin32ComUsage);
     REGISTER_TEST(TestWindowsErrors);
 }

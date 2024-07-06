@@ -1081,7 +1081,7 @@ TEST_CASE(TestDirectoryListing) {
     return k_success;
 }
 
-TEST_REGISTRATION(RegisterutilsTests) {
+TEST_REGISTRATION(RegisterUtilsTests) {
     REGISTER_TEST(TestDirectoryListing);
     REGISTER_TEST(TestSprintfBuffer);
     REGISTER_TEST(TestStacktraceString);

@@ -452,7 +452,7 @@ TEST_CASE(TestLegacyConversion) {
     return k_success;
 }
 
-TEST_REGISTRATION(FloeParamStringConversionTests) {
+TEST_REGISTRATION(RegisterParamInfoTests) {
     REGISTER_TEST(TestLegacyConversion);
     REGISTER_TEST(TestParamStringConversion);
 }

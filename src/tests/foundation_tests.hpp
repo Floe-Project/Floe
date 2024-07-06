@@ -236,7 +236,7 @@ TEST_CASE(TestCircularBufferRefType) {
     return k_success;
 }
 
-TEST_CASE(TestDynamicString) {
+TEST_CASE(TestDynamicArrayChar) {
     LeakDetectingAllocator a1;
     auto& a2 = Malloc::Instance();
     Allocator* allocators[] = {&a1, &a2};
@@ -307,31 +307,49 @@ TEST_CASE(TestWriter) {
     return k_success;
 }
 
-TEST_CASE(NoNeedlessAllocationsAreDone) {
+TEST_CASE(TestDynamicArrayClone) {
     LeakDetectingAllocator a;
 
-    auto& arr_alloc = Malloc::Instance();
+    SUBCASE("deep") {
+        auto& arr_alloc = Malloc::Instance();
 
-    DynamicArray<DynamicArray<String>> arr {arr_alloc};
-    DynamicArray<String> const strs {arr_alloc};
+        DynamicArray<DynamicArray<String>> arr {arr_alloc};
+        DynamicArray<String> const strs {arr_alloc};
 
-    dyn::Append(arr, strs.Clone(a, CloneType::Deep));
-    dyn::Append(arr, strs.Clone(a, CloneType::Deep));
-    dyn::Prepend(arr, strs.Clone(a, CloneType::Deep));
-    dyn::Insert(arr, 1, strs.Clone(a, CloneType::Deep));
-    dyn::Remove(arr, 0);
+        dyn::Append(arr, strs.Clone(a, CloneType::Deep));
+        dyn::Append(arr, strs.Clone(a, CloneType::Deep));
+        dyn::Prepend(arr, strs.Clone(a, CloneType::Deep));
+        dyn::Insert(arr, 1, strs.Clone(a, CloneType::Deep));
+        dyn::Remove(arr, 0);
 
-    SUBCASE("move assigning does not change the allocator") {
-        DynamicArray<DynamicArray<String>> other_arr {a};
-        dyn::Append(other_arr, strs.Clone(a, CloneType::Deep));
-        arr = Move(other_arr);
-        REQUIRE(&arr.allocator == &arr_alloc);
-        REQUIRE(&other_arr.allocator == &a);
+        SUBCASE("move assigning does not change the allocator") {
+            DynamicArray<DynamicArray<String>> other_arr {a};
+            dyn::Append(other_arr, strs.Clone(a, CloneType::Deep));
+            arr = Move(other_arr);
+            REQUIRE(&arr.allocator == &arr_alloc);
+            REQUIRE(&other_arr.allocator == &a);
+        }
     }
+
+    SUBCASE("shallow") {
+        DynamicArray<Optional<String>> buf {a};
+        dyn::Append(buf, "1"_s);
+        dyn::Append(buf, "2"_s);
+        dyn::Append(buf, nullopt);
+
+        auto const duped = buf.Clone(a, CloneType::Shallow);
+        REQUIRE(duped.size == 3);
+        REQUIRE(duped[0].HasValue());
+        REQUIRE(duped[0].Value() == "1"_s);
+        REQUIRE(duped[1].HasValue());
+        REQUIRE(duped[1].Value() == "2"_s);
+        REQUIRE(!duped[2].HasValue());
+    }
+
     return k_success;
 }
 
-TEST_CASE(Trim) {
+TEST_CASE(TestDynamicArrayString) {
     DynamicArrayInline<char, 64> buf;
     dyn::Assign(buf, "a   "_s);
     dyn::TrimWhitespace(buf);
@@ -345,24 +363,7 @@ TEST_CASE(Trim) {
     return k_success;
 }
 
-TEST_CASE(Clone) {
-    LeakDetectingAllocator a;
-    DynamicArray<Optional<String>> buf {a};
-    dyn::Append(buf, "1"_s);
-    dyn::Append(buf, "2"_s);
-    dyn::Append(buf, nullopt);
-
-    auto const duped = buf.Clone(a, CloneType::Shallow);
-    REQUIRE(duped.size == 3);
-    REQUIRE(duped[0].HasValue());
-    REQUIRE(duped[0].Value() == "1"_s);
-    REQUIRE(duped[1].HasValue());
-    REQUIRE(duped[1].Value() == "2"_s);
-    REQUIRE(!duped[2].HasValue());
-    return k_success;
-}
-
-TEST_CASE(DynamicArrayInlineBasics) {
+TEST_CASE(TestDynamicArrayInlineBasics) {
     SUBCASE("Basics") {
         DynamicArrayInline<char, 10> arr {"aa"_s};
         REQUIRE(arr == "aa"_s);
@@ -424,7 +425,7 @@ struct AllocedString {
 };
 
 template <typename Type>
-TEST_CASE(DynamicArrayBasics) {
+TEST_CASE(TestDynamicArrayBasics) {
     Malloc a1;
     FixedSizeAllocator<50> fixed_size_a;
     LeakDetectingAllocator a5;
@@ -905,7 +906,7 @@ static ErrorCodeOr<void> TestTrivialFunctionBasics(tests::Tester& tester, Functi
     return k_success;
 }
 
-TEST_CASE(TestFixedSizeFunction2) {
+TEST_CASE(TestFunction) {
     SUBCASE("Fixed size") {
         SUBCASE("basics") {
             TrivialFixedSizeFunction<24, void()> f {SimpleFunction};
@@ -1072,7 +1073,7 @@ TEST_CASE(TestFunctionQueue) {
     return k_success;
 }
 
-TEST_CASE(TestStringHashTable) {
+TEST_CASE(TestHashTable) {
     auto& a = tester.scratch_arena;
 
     SUBCASE("table") {
@@ -1430,7 +1431,7 @@ TEST_CASE(TestBinarySearch) {
     return k_success;
 }
 
-TEST_CASE(TestSearching) {
+TEST_CASE(TestStringSearching) {
     CHECK(Contains("abc"_s, 'a'));
     CHECK(!Contains("abc"_s, 'd'));
     CHECK(!Contains(""_s, 'a'));
@@ -1940,38 +1941,87 @@ TEST_CASE(TestPath) {
 
 constexpr int k_num_rand_test_repititions = 200;
 
-TEST_CASE(TestRandomIntGeneratorUnsignedintgeneratationRandomIntGenerator) {
-    RandomIntGenerator<unsigned int> generator;
-    u64 seed = SeedFromTime();
+TEST_CASE(TestRandomIntGeneratorUnsigned) {
+    SUBCASE("unsigned") {
+        RandomIntGenerator<unsigned int> generator;
+        u64 seed = SeedFromTime();
 
-    SUBCASE("Correct generation in range 0 to 3 with repeating last value allowed") {
-        constexpr unsigned int k_max_val = 3;
-        for (auto _ : Range(k_num_rand_test_repititions)) {
-            auto const random_num = generator.GetRandomInRange(seed, 0, k_max_val, false);
-            REQUIRE(random_num <= k_max_val);
+        SUBCASE("Correct generation in range 0 to 3 with repeating last value allowed") {
+            constexpr unsigned int k_max_val = 3;
+            for (auto _ : Range(k_num_rand_test_repititions)) {
+                auto const random_num = generator.GetRandomInRange(seed, 0, k_max_val, false);
+                REQUIRE(random_num <= k_max_val);
+            }
+        }
+
+        SUBCASE("Correct generation in range 0 to 3000000000 with repeating last value allowed") {
+            constexpr unsigned int k_max_val = 3000000000;
+            for (auto _ : Range(k_num_rand_test_repititions)) {
+                auto random_num = generator.GetRandomInRange(seed, 0, k_max_val, false);
+                REQUIRE(random_num <= k_max_val);
+            }
+        }
+
+        SUBCASE("Correct generation in range 0 to 3 with repeating last value disallowed") {
+            constexpr unsigned int k_max_val = 3;
+            for (auto _ : Range(k_num_rand_test_repititions)) {
+                auto const random_num = generator.GetRandomInRange(seed, 0, k_max_val, true);
+                REQUIRE(random_num <= k_max_val);
+            }
+        }
+
+        SUBCASE("Correct generation in range 0 to 3000000000 with repeating last value disallowed") {
+            constexpr unsigned int k_max_val = 3000000000;
+            for (auto _ : Range(k_num_rand_test_repititions)) {
+                auto random_num = generator.GetRandomInRange(seed, 0, k_max_val, true);
+                REQUIRE(random_num <= k_max_val);
+            }
         }
     }
+    SUBCASE("signed") {
+        RandomIntGenerator<int> generator;
+        u64 seed = SeedFromTime();
 
-    SUBCASE("Correct generation in range 0 to 3000000000 with repeating last value allowed") {
-        constexpr unsigned int k_max_val = 3000000000;
-        for (auto _ : Range(k_num_rand_test_repititions)) {
-            auto random_num = generator.GetRandomInRange(seed, 0, k_max_val, false);
-            REQUIRE(random_num <= k_max_val);
+        SUBCASE("Correct generation in range -10 to 10 with repeating last value allowed") {
+            constexpr int k_max_val = 10;
+            for (auto _ : Range(k_num_rand_test_repititions)) {
+                auto const random_num = generator.GetRandomInRange(seed, -k_max_val, k_max_val, false);
+                REQUIRE(random_num >= -k_max_val);
+                REQUIRE(random_num <= k_max_val);
+            }
+        }
+
+        SUBCASE("Correct generation in range -10 to 10 with repeating last value disallowed") {
+            constexpr int k_max_val = 10;
+            for (auto _ : Range(k_num_rand_test_repititions)) {
+                auto const random_num = generator.GetRandomInRange(seed, -k_max_val, k_max_val, true);
+                REQUIRE(random_num >= -k_max_val);
+                REQUIRE(random_num <= k_max_val);
+            }
         }
     }
+    SUBCASE("move object") {
+        RandomIntGenerator<int> generator;
+        u64 seed = SeedFromTime();
 
-    SUBCASE("Correct generation in range 0 to 3 with repeating last value disallowed") {
-        constexpr unsigned int k_max_val = 3;
-        for (auto _ : Range(k_num_rand_test_repititions)) {
-            auto const random_num = generator.GetRandomInRange(seed, 0, k_max_val, true);
+        constexpr int k_max_val = 10;
+        {
+            auto const random_num = generator.GetRandomInRange(seed, -k_max_val, k_max_val, false);
+            REQUIRE(random_num >= -k_max_val);
             REQUIRE(random_num <= k_max_val);
         }
-    }
 
-    SUBCASE("Correct generation in range 0 to 3000000000 with repeating last value disallowed") {
-        constexpr unsigned int k_max_val = 3000000000;
-        for (auto _ : Range(k_num_rand_test_repititions)) {
-            auto random_num = generator.GetRandomInRange(seed, 0, k_max_val, true);
+        auto generator2 = generator;
+        {
+            auto const random_num = generator2.GetRandomInRange(seed, -k_max_val, k_max_val, false);
+            REQUIRE(random_num >= -k_max_val);
+            REQUIRE(random_num <= k_max_val);
+        }
+
+        auto generator3 = Move(generator);
+        {
+            auto const random_num = generator3.GetRandomInRange(seed, -k_max_val, k_max_val, false);
+            REQUIRE(random_num >= -k_max_val);
             REQUIRE(random_num <= k_max_val);
         }
     }
@@ -1999,58 +2049,7 @@ TEST_CASE(TestRandomFloatGenerator) {
     return k_success;
 }
 
-TEST_CASE(TestRandomIntGeneratorSignedintgeneratationRandomIntGenerator) {
-    RandomIntGenerator<int> generator;
-    u64 seed = SeedFromTime();
-
-    SUBCASE("Correct generation in range -10 to 10 with repeating last value allowed") {
-        constexpr int k_max_val = 10;
-        for (auto _ : Range(k_num_rand_test_repititions)) {
-            auto const random_num = generator.GetRandomInRange(seed, -k_max_val, k_max_val, false);
-            REQUIRE(random_num >= -k_max_val);
-            REQUIRE(random_num <= k_max_val);
-        }
-    }
-
-    SUBCASE("Correct generation in range -10 to 10 with repeating last value disallowed") {
-        constexpr int k_max_val = 10;
-        for (auto _ : Range(k_num_rand_test_repititions)) {
-            auto const random_num = generator.GetRandomInRange(seed, -k_max_val, k_max_val, true);
-            REQUIRE(random_num >= -k_max_val);
-            REQUIRE(random_num <= k_max_val);
-        }
-    }
-    return k_success;
-}
-
-TEST_CASE(TestRandomIntGeneratorCopyingandmovingobjectRandomIntGenerator) {
-    RandomIntGenerator<int> generator;
-    u64 seed = SeedFromTime();
-
-    constexpr int k_max_val = 10;
-    {
-        auto const random_num = generator.GetRandomInRange(seed, -k_max_val, k_max_val, false);
-        REQUIRE(random_num >= -k_max_val);
-        REQUIRE(random_num <= k_max_val);
-    }
-
-    auto generator2 = generator;
-    {
-        auto const random_num = generator2.GetRandomInRange(seed, -k_max_val, k_max_val, false);
-        REQUIRE(random_num >= -k_max_val);
-        REQUIRE(random_num <= k_max_val);
-    }
-
-    auto generator3 = Move(generator);
-    {
-        auto const random_num = generator3.GetRandomInRange(seed, -k_max_val, k_max_val, false);
-        REQUIRE(random_num >= -k_max_val);
-        REQUIRE(random_num <= k_max_val);
-    }
-    return k_success;
-}
-
-TEST_CASE(Testversion) {
+TEST_CASE(TestVersion) {
     REQUIRE(Version {1, 0, 0}.ToString() == "1.0.0"_s);
     REQUIRE(Version {10, 99, 99}.ToString() == "10.99.99"_s);
     REQUIRE(Version {10, 99, 99, 2u}.ToString() == "10.99.99-Beta2"_s);
@@ -2134,6 +2133,7 @@ TEST_CASE(TestMemoryUtils) {
     REQUIRE(BytesToAddForAlignment(31, 32) == 1);
     return k_success;
 }
+
 TEST_CASE(TestAsciiToUppercase) {
     REQUIRE(ToUppercaseAscii('a') == 'A');
     REQUIRE(ToUppercaseAscii('z') == 'Z');
@@ -2677,7 +2677,7 @@ TEST_CASE(TestAllocatorTypes) {
     return k_success;
 }
 
-TEST_CASE(TestArenaAllocatorcursor) {
+TEST_CASE(TestArenaAllocatorCursor) {
     LeakDetectingAllocator leak_detecting_allocator;
     constexpr usize k_first_region_size = 64;
     ArenaAllocator arena {leak_detecting_allocator, k_first_region_size};
@@ -2727,7 +2727,7 @@ TEST_REGISTRATION(RegisterFoundationTests) {
     REGISTER_TEST(TestAllocatorTypes<ArenaAllocatorPage>);
     REGISTER_TEST(TestAllocatorTypes<ArenaAllocatorBigBuf>);
     REGISTER_TEST(TestAllocatorTypes<LeakDetectingAllocator>);
-    REGISTER_TEST(TestArenaAllocatorcursor);
+    REGISTER_TEST(TestArenaAllocatorCursor);
     REGISTER_TEST(TestParseCommandLineArgs);
     REGISTER_TEST(TestAsciiToUppercase);
     REGISTER_TEST(TestAsciiToLowercase);
@@ -2741,12 +2741,10 @@ TEST_REGISTRATION(RegisterFoundationTests) {
     REGISTER_TEST(TestMatchWildcard);
     REGISTER_TEST(TestStringAlgorithms);
     REGISTER_TEST(TestMemoryUtils);
-    REGISTER_TEST(Testversion);
+    REGISTER_TEST(TestVersion);
     REGISTER_TEST(TestRandomFloatGenerator<f32>);
     REGISTER_TEST(TestRandomFloatGenerator<f64>);
-    REGISTER_TEST(TestRandomIntGeneratorUnsignedintgeneratationRandomIntGenerator); // TODO: fix name
-    REGISTER_TEST(TestRandomIntGeneratorSignedintgeneratationRandomIntGenerator);
-    REGISTER_TEST(TestRandomIntGeneratorCopyingandmovingobjectRandomIntGenerator);
+    REGISTER_TEST(TestRandomIntGeneratorUnsigned);
     REGISTER_TEST(TestPath);
     REGISTER_TEST(TestTrigLookupTable);
     REGISTER_TEST(TestMathsTrigTurns);
@@ -2755,24 +2753,23 @@ TEST_REGISTRATION(RegisterFoundationTests) {
     REGISTER_TEST(TestFormatStringReplace);
     REGISTER_TEST(TestIntToString);
     REGISTER_TEST(TestSort);
-    REGISTER_TEST(TestSearching);
+    REGISTER_TEST(TestStringSearching);
     REGISTER_TEST(TestBinarySearch);
     REGISTER_TEST(TestOptional<int>);
     REGISTER_TEST(TestOptional<AllocedString>);
     REGISTER_TEST(TestCircularBuffer);
     REGISTER_TEST(TestCircularBufferRefType);
-    REGISTER_TEST(DynamicArrayBasics<int>);
-    REGISTER_TEST(DynamicArrayBasics<AllocedString>);
-    REGISTER_TEST(DynamicArrayBasics<Optional<AllocedString>>);
-    REGISTER_TEST(NoNeedlessAllocationsAreDone);
-    REGISTER_TEST(Trim);
+    REGISTER_TEST(TestDynamicArrayBasics<int>);
+    REGISTER_TEST(TestDynamicArrayBasics<AllocedString>);
+    REGISTER_TEST(TestDynamicArrayBasics<Optional<AllocedString>>);
+    REGISTER_TEST(TestDynamicArrayClone);
+    REGISTER_TEST(TestDynamicArrayString);
     REGISTER_TEST(TestLinkedList);
     REGISTER_TEST(TestWriter);
-    REGISTER_TEST(Clone);
     REGISTER_TEST(TestBitset);
-    REGISTER_TEST(DynamicArrayInlineBasics);
-    REGISTER_TEST(TestDynamicString);
-    REGISTER_TEST(TestFixedSizeFunction2);
+    REGISTER_TEST(TestDynamicArrayInlineBasics);
+    REGISTER_TEST(TestDynamicArrayChar);
+    REGISTER_TEST(TestFunction);
     REGISTER_TEST(TestFunctionQueue);
-    REGISTER_TEST(TestStringHashTable);
+    REGISTER_TEST(TestHashTable);
 }

@@ -13,32 +13,30 @@
 #include "os_tests.hpp"
 #include "utils_tests.hpp"
 
-// IMPROVE standardise naming scheme
 #define TEST_REGISTER_FUNCTIONS                                                                              \
     X(RegisterFoundationTests)                                                                               \
     X(RegisterOsTests)                                                                                       \
-    X(RegisterutilsTests)                                                                                    \
+    X(RegisterUtilsTests)                                                                                    \
     X(RegisterHostingTests)                                                                                  \
     X(RegisterAudioUtilsTests)                                                                               \
     X(RegisterVolumeFadeTests)                                                                               \
-    X(FloeStateCodingTests)                                                                                  \
-    X(FloeAudioFormatTests)                                                                                  \
-    X(FloePresetTests)                                                                                       \
-    X(FloeLibraryLuaTests)                                                                                   \
-    X(FloeLibraryTests)                                                                                      \
-    X(FloeAssetLoaderTests)                                                                                  \
-    X(FloeParamStringConversionTests)                                                                        \
-    X(FloeSettingsFileTests)
+    X(RegisterStateCodingTests)                                                                              \
+    X(RegisterAudioFileTests)                                                                                \
+    X(RegisterPresetTests)                                                                                   \
+    X(RegisterLibraryLuaTests)                                                                               \
+    X(RegisterLibraryMdataTests)                                                                             \
+    X(RegisterSampleLibraryLoaderTests)                                                                      \
+    X(RegisterParamInfoTests)                                                                                \
+    X(RegisterSettingsFileTests)
 
-#define WINDOWS_FP_TEST_REGISTER_FUNCTIONS X(RegisterWindowsPlatformTests)
+#define WINDOWS_FP_TEST_REGISTER_FUNCTIONS X(RegisterWindowsSpecificTests)
 
+// Declare the test functions
 #define X(fn) void fn(tests::Tester&);
-
 TEST_REGISTER_FUNCTIONS
 #if _WIN32
 WINDOWS_FP_TEST_REGISTER_FUNCTIONS
 #endif
-
 #undef X
 
 int main(int argc, char** argv) {
@@ -86,6 +84,7 @@ int main(int argc, char** argv) {
             }
         }
 
+        // Register the test functions
 #define X(fn) fn(tester);
         TEST_REGISTER_FUNCTIONS
 #if _WIN32

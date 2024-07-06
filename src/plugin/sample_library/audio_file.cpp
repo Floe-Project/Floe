@@ -335,4 +335,4 @@ TEST_CASE(TestAudioFormats) {
     return k_success;
 }
 
-TEST_REGISTRATION(FloeAudioFormatTests) { REGISTER_TEST(TestAudioFormats); }
+TEST_REGISTRATION(RegisterAudioFileTests) { REGISTER_TEST(TestAudioFormats); }

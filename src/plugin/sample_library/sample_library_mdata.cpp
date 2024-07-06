@@ -526,4 +526,4 @@ ReadMdata(Reader& reader, String filepath, ArenaAllocator& result_arena, ArenaAl
 
 } // namespace sample_lib
 
-TEST_REGISTRATION(FloeLibraryTests) { REGISTER_TEST(sample_lib::TestConvertVelocityRange); }
+TEST_REGISTRATION(RegisterLibraryMdataTests) { REGISTER_TEST(sample_lib::TestConvertVelocityRange); }

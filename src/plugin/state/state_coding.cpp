@@ -1787,7 +1787,7 @@ TEST_CASE(TestLoadingOldFiles) {
     return k_success;
 }
 
-TEST_REGISTRATION(FloeStateCodingTests) {
+TEST_REGISTRATION(RegisterStateCodingTests) {
     REGISTER_TEST(TestLoadingOldFiles);
     REGISTER_TEST(TestBackwardCompat);
     REGISTER_TEST(TestFuzzingJsonState);

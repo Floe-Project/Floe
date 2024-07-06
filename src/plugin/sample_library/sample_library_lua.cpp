@@ -2289,7 +2289,7 @@ TEST_CASE(TestMdataConversion) {
 
 } // namespace sample_lib
 
-TEST_REGISTRATION(FloeLibraryLuaTests) {
+TEST_REGISTRATION(RegisterLibraryLuaTests) {
     REGISTER_TEST(sample_lib::TestDocumentedExampleIsValid);
     REGISTER_TEST(sample_lib::TestWordWrap);
     REGISTER_TEST(sample_lib::TestBasicFile);

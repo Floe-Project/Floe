@@ -569,7 +569,7 @@ non_existent_key = novalue)foo"_s,
     return k_success;
 }
 
-TEST_REGISTRATION(FloeSettingsFileTests) {
+TEST_REGISTRATION(RegisterSettingsFileTests) {
     REGISTER_TEST(TestJsonParsing);
     REGISTER_TEST(TestIniParsing);
 }

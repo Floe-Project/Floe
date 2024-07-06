@@ -542,7 +542,7 @@ TEST_CASE(TestReadingDirectoryChanges) {
     return k_success;
 }
 
-TEST_CASE(TestTimer) {
+TEST_CASE(TestTimePoint) {
     Stopwatch const sw;
 
     auto t1 = TimePoint::Now();
@@ -622,5 +622,5 @@ TEST_REGISTRATION(RegisterOsTests) {
     REGISTER_TEST(TestFileApi);
     REGISTER_TEST(TestReadingDirectoryChanges);
     REGISTER_TEST(TestFileApi);
-    REGISTER_TEST(TestTimer);
+    REGISTER_TEST(TestTimePoint);
 }

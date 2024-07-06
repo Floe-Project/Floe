@@ -1564,7 +1564,7 @@ static Type& ExtractSuccess(tests::Tester& tester, LoadResult const& result, Loa
     return *opt_r;
 }
 
-TEST_CASE(TestAssetLoader) {
+TEST_CASE(TestSampleLibraryLoader) {
     struct Fixture {
         Fixture(tests::Tester&) : available_libs({}, error_notif) { thread_pool.Init("Thread Pool", 8u); }
         bool initialised = false;
@@ -2018,4 +2018,6 @@ TEST_CASE(TestAssetLoader) {
 
 } // namespace sample_lib_loader
 
-TEST_REGISTRATION(FloeAssetLoaderTests) { REGISTER_TEST(sample_lib_loader::TestAssetLoader); }
+TEST_REGISTRATION(RegisterSampleLibraryLoaderTests) {
+    REGISTER_TEST(sample_lib_loader::TestSampleLibraryLoader);
+}

@@ -364,4 +364,4 @@ TEST_CASE(TestCurrentPresetInfo) {
 }
 #endif
 
-TEST_REGISTRATION(FloePresetTests) { REGISTER_TEST(TestPresetBrowserFilters); }
+TEST_REGISTRATION(RegisterPresetTests) { REGISTER_TEST(TestPresetBrowserFilters); }

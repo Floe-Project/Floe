@@ -12,6 +12,7 @@
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
+#include <valgrind/valgrind.h>
 
 #include "foundation/foundation.hpp"
 #include "os/misc.hpp"
@@ -20,6 +21,14 @@
 #include "time.h"
 
 void* AllocatePages(usize bytes) {
+    if constexpr (!PRODUCTION_BUILD) {
+        if (RUNNING_ON_VALGRIND) {
+            auto const p = malloc(bytes);
+            TracyAlloc(p, bytes);
+            return p;
+        }
+    }
+
     auto p = mmap(nullptr, bytes, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
     TracyAlloc(p, bytes);
     if (p == MAP_FAILED) return nullptr;
@@ -28,12 +37,23 @@ void* AllocatePages(usize bytes) {
 
 void FreePages(void* ptr, usize bytes) {
     TracyFree(ptr);
+
+    if constexpr (!PRODUCTION_BUILD) {
+        if (RUNNING_ON_VALGRIND) {
+            free(ptr);
+            return;
+        }
+    }
     munmap(ptr, bytes);
 }
 
 int CurrentProcessId() { return getpid(); }
 
 void TryShrinkPages(void* ptr, usize old_size, usize new_size) {
+    if constexpr (!PRODUCTION_BUILD) {
+        if (RUNNING_ON_VALGRIND) return;
+    }
+
     TracyFree(ptr);
     auto const page_size = GetSystemStats().page_size;
     auto const current_num_pages = old_size / page_size;

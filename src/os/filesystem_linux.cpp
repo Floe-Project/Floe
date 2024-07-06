@@ -414,17 +414,17 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
         for (char* ptr = buf; ptr < buf + len; ptr += sizeof(struct inotify_event) + event->len) {
             event = CheckedPointerCast<const struct inotify_event*>(ptr);
 
-            Optional<DirectoryWatcher::FileChange::Type> action {};
+            Optional<DirectoryWatcher::FileChange::Change> action {};
             if (event->mask & IN_MODIFY || event->mask & IN_CLOSE_WRITE)
-                action = DirectoryWatcher::FileChange::Type::Modified;
+                action = DirectoryWatcher::FileChange::Change::Modified;
             else if (event->mask & IN_MOVED_TO)
-                action = DirectoryWatcher::FileChange::Type::RenamedNewName;
+                action = DirectoryWatcher::FileChange::Change::RenamedNewName;
             else if (event->mask & IN_MOVED_FROM)
-                action = DirectoryWatcher::FileChange::Type::RenamedOldName;
+                action = DirectoryWatcher::FileChange::Change::RenamedOldName;
             else if (event->mask & IN_DELETE)
-                action = DirectoryWatcher::FileChange::Type::Deleted;
+                action = DirectoryWatcher::FileChange::Change::Deleted;
             else if (event->mask & IN_CREATE)
-                action = DirectoryWatcher::FileChange::Type::Added;
+                action = DirectoryWatcher::FileChange::Change::Added;
             if (!action) continue;
 
             auto const file_type = event->mask & IN_ISDIR ? FileType::Directory : FileType::RegularFile;
@@ -454,9 +454,10 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
             auto filepath = event->len ? FromNullTerminated(event->name) : String {};
             if (subdirs.size) filepath = path::Join(scratch_arena, Array {subdirs, filepath});
 
+            auto const actions = Array {*action};
             callback(dir,
                      DirectoryWatcher::FileChange {
-                         .type = *action,
+                         .changes = actions.Items(),
                          .subpath = filepath,
                          .file_type = file_type,
                      });

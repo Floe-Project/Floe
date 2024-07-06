@@ -628,11 +628,13 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
             for (auto const& dir : watcher.watched_dirs) {
                 if (StartsWithSpan(event->path, dir.resolved_path)) {
                     if (event->flags & kFSEventStreamEventFlagMustScanSubDirs) {
-                        callback(event->path,
-                                 DirectoryWatcher::FileChange {
-                                     .type = DirectoryWatcher::FileChange::Type::UnknownManualRescanNeeded,
-                                     .subpath = {},
-                                 });
+                        callback(
+                            event->path,
+                            DirectoryWatcher::FileChange {
+                                .changes =
+                                    Array {DirectoryWatcher::FileChange::Change::UnknownManualRescanNeeded},
+                                .subpath = {},
+                            });
                     } else {
                         String subpath {};
                         if (event->path.size == dir.resolved_path.size)
@@ -655,46 +657,48 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                         auto const renamed = event->flags & kFSEventStreamEventFlagItemRenamed;
                         auto const modified = event->flags & kFSEventStreamEventFlagItemModified;
 
-                        DynamicArrayInline<DirectoryWatcher::FileChange::Type, 10> order;
+                        DirectoryWatcher::FileChange change {
+                            .changes = {},
+                            .subpath = subpath,
+                            .file_type = (event->flags & kFSEventStreamEventFlagItemIsDir)
+                                             ? FileType::Directory
+                                             : FileType::RegularFile,
+                        };
 
                         if (renamed) {
                             if (event->exists == FsWatcher::Event::Existence::Exists)
-                                dyn::Append(order, DirectoryWatcher::FileChange::Type::RenamedNewName);
+                                dyn::Append(change.changes,
+                                            DirectoryWatcher::FileChange::Change::RenamedNewName);
                             else if (event->exists == FsWatcher::Event::Existence::DoesNotExist)
-                                dyn::Append(order, DirectoryWatcher::FileChange::Type::RenamedOldName);
+                                dyn::Append(change.changes,
+                                            DirectoryWatcher::FileChange::Change::RenamedOldName);
                         } else {
                             if (created && removed)
                                 if (event->exists == FsWatcher::Event::Existence::DoesNotExist)
-                                    dyn::Append(order, DirectoryWatcher::FileChange::Type::Added);
+                                    dyn::Append(change.changes, DirectoryWatcher::FileChange::Change::Added);
                                 else
-                                    dyn::Append(order, DirectoryWatcher::FileChange::Type::Deleted);
+                                    dyn::Append(change.changes,
+                                                DirectoryWatcher::FileChange::Change::Deleted);
                             else if (created)
-                                dyn::Append(order, DirectoryWatcher::FileChange::Type::Added);
+                                dyn::Append(change.changes, DirectoryWatcher::FileChange::Change::Added);
                         }
 
                         // TODO: this logic isn't quite right, we can get 'modified' AFTER 'removed'
-                        if (modified) dyn::Append(order, DirectoryWatcher::FileChange::Type::Modified);
+                        if (modified)
+                            dyn::Append(change.changes, DirectoryWatcher::FileChange::Change::Modified);
 
                         if (!renamed) {
                             if (removed && created)
                                 if (event->exists == FsWatcher::Event::Existence::DoesNotExist)
-                                    dyn::Append(order, DirectoryWatcher::FileChange::Type::Deleted);
+                                    dyn::Append(change.changes,
+                                                DirectoryWatcher::FileChange::Change::Deleted);
                                 else
-                                    dyn::Append(order, DirectoryWatcher::FileChange::Type::Added);
+                                    dyn::Append(change.changes, DirectoryWatcher::FileChange::Change::Added);
                             else if (removed)
-                                dyn::Append(order, DirectoryWatcher::FileChange::Type::Deleted);
+                                dyn::Append(change.changes, DirectoryWatcher::FileChange::Change::Deleted);
                         }
 
-                        auto const file_type = (event->flags & kFSEventStreamEventFlagItemIsDir)
-                                                   ? FileType::Directory
-                                                   : FileType::RegularFile;
-                        for (auto const type : order)
-                            callback(dir.path,
-                                     DirectoryWatcher::FileChange {
-                                         .type = type,
-                                         .subpath = subpath,
-                                         .file_type = file_type,
-                                     });
+                        callback(dir.path, change);
                     }
                 }
             }

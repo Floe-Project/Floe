@@ -279,26 +279,28 @@ struct DirectoryWatcher {
     };
 
     struct FileChange {
-        enum class Type {
+        enum class Change {
             Added,
             Deleted,
             Modified,
             RenamedOldName,
             RenamedNewName,
-            UnknownManualRescanNeeded
+            UnknownManualRescanNeeded,
+            Count
         };
-        static String TypeToString(Type t) {
+        static String TypeToString(Change t) {
             switch (t) {
-                case Type::Added: return "Added";
-                case Type::Deleted: return "Deleted";
-                case Type::Modified: return "Modified";
-                case Type::RenamedOldName: return "RenamedOldName";
-                case Type::RenamedNewName: return "RenamedNewName";
-                case Type::UnknownManualRescanNeeded: return "UnknownManualRescanNeeded";
+                case Change::Added: return "Added";
+                case Change::Deleted: return "Deleted";
+                case Change::Modified: return "Modified";
+                case Change::RenamedOldName: return "RenamedOldName";
+                case Change::RenamedNewName: return "RenamedNewName";
+                case Change::UnknownManualRescanNeeded: return "UnknownManualRescanNeeded";
+                case Change::Count: break;
             }
             return "Unknown";
         }
-        Type type;
+        DynamicArrayInline<Change, ToInt(Change::Count)> changes; // ordered
         String subpath;
         Optional<FileType> file_type; // might not be available
     };

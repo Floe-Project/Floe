@@ -776,8 +776,8 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
                         if (relates_to_scan_folder) relates_to_scan_folder->Release();
                     };
 
-                    switch (change.type) {
-                        case DirectoryWatcher::FileChange::Type::Added: {
+                    switch (Last(change.changes)) {
+                        case DirectoryWatcher::FileChange::Change::Added: {
                             ASSERT(!path::StartsWithDirectorySeparator(change.subpath));
                             ASSERT(!path::EndsWithDirectorySeparator(change.subpath));
                             int num_separators = 0;
@@ -797,7 +797,7 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
                                                  sample_lib::FileFormat::Mdata);
                             break;
                         }
-                        case DirectoryWatcher::FileChange::Type::Deleted: {
+                        case DirectoryWatcher::FileChange::Change::Deleted: {
                             if (relates_to_lib) {
                                 switch (type) {
                                     case Type::Unknown: break;
@@ -809,12 +809,12 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
                             }
                             break;
                         }
-                        case DirectoryWatcher::FileChange::Type::Modified: {
+                        case DirectoryWatcher::FileChange::Change::Modified: {
                             if (relates_to_lib) RereadLibraryAsync(async_ctx, libs.libraries, relates_to_lib);
                             break;
                         }
-                        case DirectoryWatcher::FileChange::Type::RenamedOldName:
-                        case DirectoryWatcher::FileChange::Type::RenamedNewName: {
+                        case DirectoryWatcher::FileChange::Change::RenamedOldName:
+                        case DirectoryWatcher::FileChange::Change::RenamedNewName: {
                             // TODO(1.0): I think we can do better here at working out what's a remove/add/etc
                             if (relates_to_scan_folder)
                                 relates_to_scan_folder->value.state.Store(
@@ -823,32 +823,16 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
                                 RereadLibraryAsync(async_ctx, libs.libraries, relates_to_lib);
                             break;
                         }
-                        case DirectoryWatcher::FileChange::Type::UnknownManualRescanNeeded: {
+                        case DirectoryWatcher::FileChange::Change::UnknownManualRescanNeeded: {
                             if (relates_to_scan_folder)
                                 relates_to_scan_folder->value.state.Store(
                                     AvailableLibraries::ScanFolder::State::RescanRequested);
                             break;
                         }
+                        case DirectoryWatcher::FileChange::Change::Count: break;
                     }
                     DebugLn("FS change: {}, {}, {}, relates to lib {}, type {}, found folder: {}",
-                            ({
-                                String s {};
-                                switch (change.type) {
-                                    case DirectoryWatcher::FileChange::Type::Added: s = "added"; break;
-                                    case DirectoryWatcher::FileChange::Type::Deleted: s = "deleted"; break;
-                                    case DirectoryWatcher::FileChange::Type::Modified: s = "modified"; break;
-                                    case DirectoryWatcher::FileChange::Type::RenamedOldName:
-                                        s = "rename (old)";
-                                        break;
-                                    case DirectoryWatcher::FileChange::Type::RenamedNewName:
-                                        s = "rename (new)";
-                                        break;
-                                    case DirectoryWatcher::FileChange::Type::UnknownManualRescanNeeded:
-                                        s = "manual rescan needed";
-                                        break;
-                                }
-                                s;
-                            }),
+                            DirectoryWatcher::FileChange::TypeToString(Last(change.changes)),
                             watched_dir,
                             change.subpath,
                             relates_to_lib ? relates_to_lib->value.lib->name : ""_s,

@@ -66,7 +66,7 @@ PUBLIC constexpr T* End(T (&array)[N]) {
     return &array[N];
 }
 
-PUBLIC constexpr auto& Last(ContiguousContainer auto&& data) {
+PUBLIC constexpr auto& Last(auto&& data) {
     ASSERT(data.size);
     return data.data[data.size - 1];
 }

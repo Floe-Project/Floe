@@ -526,6 +526,12 @@ struct DynamicArrayInline {
         ASSERT(dyn::AssignAssumingAlreadyEmpty(*this, data));
     }
 
+    template <usize k_array_capacity>
+    requires(k_array_capacity <= k_capacity)
+    constexpr DynamicArrayInline(Array<Type, k_array_capacity> const& array) {
+        ASSERT(dyn::AssignAssumingAlreadyEmpty(*this, array.Items()));
+    }
+
     constexpr DynamicArrayInline(DynamicArrayInline const& other) {
         dyn::AssignAssumingAlreadyEmpty(*this, other.Items());
     }

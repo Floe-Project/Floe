@@ -866,22 +866,26 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                         filename = {filename_buf.data, num_wchars};
                     }
 
-                    Optional<DirectoryWatcher::FileChange::Type> type {};
+                    Optional<DirectoryWatcher::FileChange::Change> type {};
                     switch (action) {
-                        case FILE_ACTION_ADDED: type = DirectoryWatcher::FileChange::Type::Added; break;
-                        case FILE_ACTION_REMOVED: type = DirectoryWatcher::FileChange::Type::Deleted; break;
-                        case FILE_ACTION_MODIFIED: type = DirectoryWatcher::FileChange::Type::Modified; break;
+                        case FILE_ACTION_ADDED: type = DirectoryWatcher::FileChange::Change::Added; break;
+                        case FILE_ACTION_REMOVED: type = DirectoryWatcher::FileChange::Change::Deleted; break;
+                        case FILE_ACTION_MODIFIED:
+                            type = DirectoryWatcher::FileChange::Change::Modified;
+                            break;
                         case FILE_ACTION_RENAMED_OLD_NAME:
-                            type = DirectoryWatcher::FileChange::Type::RenamedOldName;
+                            type = DirectoryWatcher::FileChange::Change::RenamedOldName;
                             break;
                         case FILE_ACTION_RENAMED_NEW_NAME:
-                            type = DirectoryWatcher::FileChange::Type::RenamedNewName;
+                            type = DirectoryWatcher::FileChange::Change::RenamedNewName;
                             break;
                     }
                     if (type) {
                         auto const narrowed = Narrow(scratch_arena, filename);
-                        if (narrowed.HasValue())
-                            callback(dir.path, DirectoryWatcher::FileChange {*type, narrowed.Value()});
+                        if (narrowed.HasValue()) {
+                            auto const changes = Array {*type};
+                            callback(dir.path, DirectoryWatcher::FileChange {changes.Items(), narrowed.Value()});
+                        }
                     }
 
                     if (!next_entry_offset) break; // successfully read all events
@@ -892,7 +896,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                 if (error) {
                     callback(dir.path,
                              DirectoryWatcher::FileChange {
-                                 DirectoryWatcher::FileChange::Type::UnknownManualRescanNeeded,
+                                 Array {DirectoryWatcher::FileChange::Change::UnknownManualRescanNeeded},
                                  "",
                              });
                 }
@@ -917,7 +921,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
             if (error == ERROR_NOTIFY_ENUM_DIR)
                 callback(dir.path,
                          DirectoryWatcher::FileChange {
-                             DirectoryWatcher::FileChange::Type::UnknownManualRescanNeeded,
+                             Array {DirectoryWatcher::FileChange::Change::UnknownManualRescanNeeded},
                              "",
                          });
             else

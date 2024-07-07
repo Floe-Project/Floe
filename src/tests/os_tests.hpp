@@ -498,50 +498,63 @@ TEST_CASE(TestReadingDirectoryChanges) {
             return k_success;
         };
 
-        SUBCASE("delete is detected") {
-            TRY(Delete(file.full_path, {}));
-            TRY(check(Array {TestFileChange {file.subpath, DirectoryWatcher::FileChange::Change::Deleted}}));
-        }
-
-        SUBCASE("modify is detected") {
-            TRY(WriteFile(file.full_path, "new data"));
-            TRY(check(Array {TestFileChange {file.subpath, DirectoryWatcher::FileChange::Change::Modified}}));
-        }
-
-        SUBCASE("rename is detected") {
-            auto const new_file = TestPath::Create(a, dir, "file1_renamed.txt");
-            TRY(MoveFile(file.full_path, new_file.full_path, ExistingDestinationHandling::Fail));
-            TRY(check(Array {
-                TestFileChange {file.subpath, DirectoryWatcher::FileChange::Change::RenamedOldName},
-                TestFileChange {new_file.subpath, DirectoryWatcher::FileChange::Change::RenamedNewName}}));
-        }
-
-        if (recursive) {
-            SUBCASE("delete in subfolder is detected") {
-                TRY(Delete(subfile.full_path, {}));
+        SUBCASE(recursive ? "recursive"_s : "non-recursive"_s) {
+            SUBCASE("delete is detected") {
+                TRY(Delete(file.full_path, {}));
                 TRY(check(
-                    Array {TestFileChange {subfile.subpath, DirectoryWatcher::FileChange::Change::Deleted}}));
+                    Array {TestFileChange {file.subpath, DirectoryWatcher::FileChange::Change::Deleted}}));
             }
 
             SUBCASE("modify is detected") {
-                TRY(WriteFile(subfile.full_path, "new data"));
+                TRY(WriteFile(file.full_path, "new data"));
                 TRY(check(
-                    Array {TestFileChange {subfile.subpath, DirectoryWatcher::FileChange::Change::Modified}}));
+                    Array {TestFileChange {file.subpath, DirectoryWatcher::FileChange::Change::Modified}}));
             }
 
             SUBCASE("rename is detected") {
-                auto const new_subfile =
-                    TestPath::Create(a, dir, path::Join(a, Array {subdir.subpath, "file2_renamed.txt"}));
-                TRY(MoveFile(subfile.full_path, new_subfile.full_path, ExistingDestinationHandling::Fail));
+                auto const new_file = TestPath::Create(a, dir, "file1_renamed.txt");
+                TRY(MoveFile(file.full_path, new_file.full_path, ExistingDestinationHandling::Fail));
                 TRY(check(Array {
-                    TestFileChange {subfile.subpath, DirectoryWatcher::FileChange::Change::RenamedOldName},
-                    TestFileChange {new_subfile.subpath,
+                    TestFileChange {file.subpath, DirectoryWatcher::FileChange::Change::RenamedOldName},
+                    TestFileChange {new_file.subpath,
                                     DirectoryWatcher::FileChange::Change::RenamedNewName}}));
             }
-        } else {
-            SUBCASE("delete in subfolder is not detected") {
-                TRY(Delete(subfile.full_path, {}));
-                TRY(check({}));
+
+            if (recursive) {
+                SUBCASE("delete in subfolder is detected") {
+                    TRY(Delete(subfile.full_path, {}));
+                    TRY(check(Array {
+                        TestFileChange {subfile.subpath, DirectoryWatcher::FileChange::Change::Deleted}}));
+                }
+
+                SUBCASE("modify is detected") {
+                    TRY(WriteFile(subfile.full_path, "new data"));
+                    TRY(check(Array {
+                        TestFileChange {subfile.subpath, DirectoryWatcher::FileChange::Change::Modified}}));
+                }
+
+                SUBCASE("rename is detected") {
+                    auto const new_subfile =
+                        TestPath::Create(a, dir, path::Join(a, Array {subdir.subpath, "file2_renamed.txt"}));
+                    TRY(MoveFile(subfile.full_path,
+                                 new_subfile.full_path,
+                                 ExistingDestinationHandling::Fail));
+                    TRY(check(Array {TestFileChange {subfile.subpath,
+                                                     DirectoryWatcher::FileChange::Change::RenamedOldName},
+                                     TestFileChange {new_subfile.subpath,
+                                                     DirectoryWatcher::FileChange::Change::RenamedNewName}}));
+                }
+
+                SUBCASE("deleting subfolder is detected") {
+                    TRY(Delete(subdir.full_path, {.type = DeleteOptions::Type::DirectoryRecursively}));
+                    TRY(check(Array {
+                        TestFileChange {subdir.subpath, DirectoryWatcher::FileChange::Change::Deleted}}));
+                }
+            } else {
+                SUBCASE("delete in subfolder is not detected") {
+                    TRY(Delete(subfile.full_path, {}));
+                    TRY(check({}));
+                }
             }
         }
     }

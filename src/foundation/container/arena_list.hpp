@@ -82,6 +82,13 @@ struct ArenaList {
             [this](Node* i) { Delete(i); });
     }
 
+    void Remove(Type const* value) {
+        SinglyLinkedListRemoveIf(
+            first,
+            [value](Node const& i) { return &i.data == value; },
+            [this](Node* i) { Delete(i); });
+    }
+
     bool Empty() const { return first == nullptr; }
 
     Iterator begin() const { return Iterator {first}; }

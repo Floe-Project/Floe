@@ -257,24 +257,68 @@ ErrorCodeOr<MutableString> CurrentExecutablePath(Allocator& a) {
 
 namespace native {
 
+// Makes string allocations reusable within an arena. The lifetime is managed by the arena, but you can
+// (optionally) Clone/Free individual strings within that lifetime to avoid lots of reallocations. It avoids
+// having make everything RAII ready (std C++ style).
+struct PathPool {
+    struct Path {
+        MutableString buffer;
+        Path* next {};
+    };
+
+    String Clone(String p, ArenaAllocator& arena) {
+        {
+            Path* prev_free = nullptr;
+            for (auto free = free_list; free != nullptr; free = free->next) {
+                // if we find a free path that is big enough, use it
+                if (free->buffer.size >= p.size) {
+                    SinglyLinkedListRemove(free_list, free, prev_free);
+                    SinglyLinkedListPrepend(used_list, free);
+
+                    // copy and return
+                    CopyMemory(free->buffer.data, p.data, p.size);
+                    return {free->buffer.data, p.size};
+                }
+                prev_free = free;
+            }
+        }
+
+        auto new_path = arena.NewUninitialised<Path>();
+        new_path->buffer = arena.AllocateExactSizeUninitialised<char>(Min(p.size, 64uz));
+        CopyMemory(new_path->buffer.data, p.data, p.size);
+        SinglyLinkedListPrepend(used_list, new_path);
+        return {new_path->buffer.data, p.size};
+    }
+
+    void Free(String p) {
+        Path* prev = nullptr;
+        for (auto i = used_list; i != nullptr; i = i->next) {
+            if (i->buffer.data == p.data) {
+                SinglyLinkedListRemove(used_list, i, prev);
+                SinglyLinkedListPrepend(free_list, i);
+                return;
+            }
+            prev = i;
+        }
+    }
+
+    Path* used_list {};
+    Path* free_list {};
+};
+
 struct WatchedDirectory {
     struct SubDir {
-        String subpath;
-        DirectoryWatcher::WatchedDirectory::State state;
         int watch_id;
+        String subpath;
     };
 
     int watch_id;
-
     // TODO: we need to update this if the children directories change
     ArenaList<SubDir, false> subdirs;
+    PathPool path_pool;
 };
 
 static ErrorCodeOr<int> InotifyWatch(int inotify_id, char const* path, ArenaAllocator& scratch_arena) {
-    if (!PRODUCTION_BUILD && NullTermStringStartsWith(path, "/mnt"))
-        return ErrorCode {
-            FilesystemError::FolderContainsTooManyFiles}; // IMPROVE: is there a better way to avoid the slow
-                                                          // not-mounted check on my machine?
     auto const scratch_cursor = scratch_arena.TotalUsed();
     DEFER { scratch_arena.TryShrinkTotalUsed(scratch_cursor); };
     ZoneScoped;
@@ -310,6 +354,7 @@ static ErrorCodeOr<WatchedDirectory*> WatchDirectory(DirectoryWatcher::WatchedDi
     };
 
     ArenaList<WatchedDirectory::SubDir, false> subdirs {dir.arena};
+    PathPool path_pool {};
     if (recursive) {
         auto const try_watch_subdirs = [&]() -> ErrorCodeOr<void> {
             auto it = TRY(RecursiveDirectoryIterator::Create(scratch_arena, dir.path, "*"));
@@ -328,10 +373,9 @@ static ErrorCodeOr<WatchedDirectory*> WatchDirectory(DirectoryWatcher::WatchedDi
                     auto subdir = subdirs.PrependUninitialised();
                     PLACEMENT_NEW(subdir)
                     WatchedDirectory::SubDir {
-                        .subpath = dir.arena.Clone(subpath),
-                        .state = DirectoryWatcher::WatchedDirectory::State::Watching,
                         .watch_id =
                             TRY(InotifyWatch(inotify_id, dyn::NullTerminated(full_subpath), scratch_arena)),
+                        .subpath = path_pool.Clone(subpath, dir.arena),
                     };
                 }
 
@@ -348,7 +392,7 @@ static ErrorCodeOr<WatchedDirectory*> WatchDirectory(DirectoryWatcher::WatchedDi
         }
     }
 
-    auto result = Malloc::Instance().New<WatchedDirectory>(watch_id, Move(subdirs));
+    auto result = Malloc::Instance().New<WatchedDirectory>(watch_id, Move(subdirs), path_pool);
     success = true;
     return result;
 }
@@ -405,14 +449,16 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
     alignas(struct inotify_event) char buf[4096];
     while (true) {
         ZoneNamedN(read_trace, "inotify read", true);
-        auto const len = read(watcher.native_data.int_id, buf, sizeof(buf));
-        if (len == -1 && errno != EAGAIN) return FilesystemErrnoErrorCode(errno);
+        auto const bytes_read = read(watcher.native_data.int_id, buf, sizeof(buf));
+        if (bytes_read == -1 && errno != EAGAIN) return FilesystemErrnoErrorCode(errno);
 
-        if (len <= 0) break;
+        if (bytes_read <= 0) break;
 
         const struct inotify_event* event;
-        for (char* ptr = buf; ptr < buf + len; ptr += sizeof(struct inotify_event) + event->len) {
+        for (char* ptr = buf; ptr < buf + bytes_read; ptr += sizeof(struct inotify_event) + event->len) {
             event = CheckedPointerCast<const struct inotify_event*>(ptr);
+
+            // TODO: what happens if the watched directory is deleted or renamed?
 
             Optional<DirectoryWatcher::FileChange::Change> action {};
             if (event->mask & IN_MODIFY || event->mask & IN_CLOSE_WRITE)
@@ -427,7 +473,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                 action = DirectoryWatcher::FileChange::Change::Added;
             if (!action) continue;
 
-            auto const file_type = event->mask & IN_ISDIR ? FileType::Directory : FileType::RegularFile;
+            auto const file_type = (event->mask & IN_ISDIR) ? FileType::Directory : FileType::RegularFile;
 
             String dir {};
             String subdirs {};

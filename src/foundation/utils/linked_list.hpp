@@ -30,6 +30,14 @@ PUBLIC inline void SinglyLinkedListRemoveIf(NodeType*& first,
 }
 
 template <typename NodeType>
+PUBLIC void SinglyLinkedListRemove(NodeType*& head, NodeType* node, NodeType* previous) {
+    if (previous)
+        previous->next = node->next;
+    else
+        head = node->next;
+}
+
+template <typename NodeType>
 PUBLIC void SinglyLinkedListPrepend(NodeType*& head, NodeType* new_node) {
     new_node->next = head;
     head = new_node;

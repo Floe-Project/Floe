@@ -887,18 +887,18 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                         filename = {filename_buf.data, num_wchars};
                     }
 
-                    Optional<DirectoryWatcher::FileChange::Change> type {};
+                    Optional<DirectoryWatcher::Change> type {};
                     switch (action) {
-                        case FILE_ACTION_ADDED: type = DirectoryWatcher::FileChange::Change::Added; break;
-                        case FILE_ACTION_REMOVED: type = DirectoryWatcher::FileChange::Change::Deleted; break;
+                        case FILE_ACTION_ADDED: type = DirectoryWatcher::Change::Added; break;
+                        case FILE_ACTION_REMOVED: type = DirectoryWatcher::Change::Deleted; break;
                         case FILE_ACTION_MODIFIED:
-                            type = DirectoryWatcher::FileChange::Change::Modified;
+                            type = DirectoryWatcher::Change::Modified;
                             break;
                         case FILE_ACTION_RENAMED_OLD_NAME:
-                            type = DirectoryWatcher::FileChange::Change::RenamedOldName;
+                            type = DirectoryWatcher::Change::RenamedOldName;
                             break;
                         case FILE_ACTION_RENAMED_NEW_NAME:
-                            type = DirectoryWatcher::FileChange::Change::RenamedNewName;
+                            type = DirectoryWatcher::Change::RenamedNewName;
                             break;
                     }
                     if (type) {
@@ -917,7 +917,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                 if (error) {
                     callback(*dir.linked_dir_to_watch,
                              DirectoryWatcher::FileChange {
-                                 Array {DirectoryWatcher::FileChange::Change::UnknownManualRescanNeeded},
+                                 Array {DirectoryWatcher::Change::UnknownManualRescanNeeded},
                                  "",
                              });
                 }
@@ -942,7 +942,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
             if (error == ERROR_NOTIFY_ENUM_DIR)
                 callback(*dir.linked_dir_to_watch,
                          DirectoryWatcher::FileChange {
-                             Array {DirectoryWatcher::FileChange::Change::UnknownManualRescanNeeded},
+                             Array {DirectoryWatcher::Change::UnknownManualRescanNeeded},
                              "",
                          });
             else

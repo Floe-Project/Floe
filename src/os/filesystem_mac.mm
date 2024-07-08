@@ -644,7 +644,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                             *dir.linked_dir_to_watch,
                             DirectoryWatcher::FileChange {
                                 .changes =
-                                    Array {DirectoryWatcher::FileChange::Change::UnknownManualRescanNeeded},
+                                    Array {DirectoryWatcher::Change::UnknownManualRescanNeeded},
                                 .subpath = subpath,
                             });
                         continue;
@@ -674,30 +674,30 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
 
                     if (renamed) {
                         if (event->exists == FsWatcher::Event::Existence::Exists)
-                            dyn::Append(change.changes, DirectoryWatcher::FileChange::Change::RenamedNewName);
+                            dyn::Append(change.changes, DirectoryWatcher::Change::RenamedNewName);
                         else if (event->exists == FsWatcher::Event::Existence::DoesNotExist)
-                            dyn::Append(change.changes, DirectoryWatcher::FileChange::Change::RenamedOldName);
+                            dyn::Append(change.changes, DirectoryWatcher::Change::RenamedOldName);
                     } else {
                         if (created && removed)
                             if (event->exists == FsWatcher::Event::Existence::DoesNotExist)
-                                dyn::Append(change.changes, DirectoryWatcher::FileChange::Change::Added);
+                                dyn::Append(change.changes, DirectoryWatcher::Change::Added);
                             else
-                                dyn::Append(change.changes, DirectoryWatcher::FileChange::Change::Deleted);
+                                dyn::Append(change.changes, DirectoryWatcher::Change::Deleted);
                         else if (created)
-                            dyn::Append(change.changes, DirectoryWatcher::FileChange::Change::Added);
+                            dyn::Append(change.changes, DirectoryWatcher::Change::Added);
                     }
 
                     // TODO: this logic isn't quite right, we can get 'modified' AFTER 'removed'
-                    if (modified) dyn::Append(change.changes, DirectoryWatcher::FileChange::Change::Modified);
+                    if (modified) dyn::Append(change.changes, DirectoryWatcher::Change::Modified);
 
                     if (!renamed) {
                         if (removed && created)
                             if (event->exists == FsWatcher::Event::Existence::DoesNotExist)
-                                dyn::Append(change.changes, DirectoryWatcher::FileChange::Change::Deleted);
+                                dyn::Append(change.changes, DirectoryWatcher::Change::Deleted);
                             else
-                                dyn::Append(change.changes, DirectoryWatcher::FileChange::Change::Added);
+                                dyn::Append(change.changes, DirectoryWatcher::Change::Added);
                         else if (removed)
-                            dyn::Append(change.changes, DirectoryWatcher::FileChange::Change::Deleted);
+                            dyn::Append(change.changes, DirectoryWatcher::Change::Deleted);
                     }
 
                     callback(*dir.linked_dir_to_watch, change);

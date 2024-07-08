@@ -628,17 +628,17 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                 // IMPROVE: do we need to handle renaming root directories in this case?
             }
 
-            Optional<DirectoryWatcher::FileChange::Change> action {};
+            Optional<DirectoryWatcher::Change> action {};
             if (event->mask & IN_MODIFY || event->mask & IN_CLOSE_WRITE)
-                action = DirectoryWatcher::FileChange::Change::Modified;
+                action = DirectoryWatcher::Change::Modified;
             else if (event->mask & IN_MOVED_TO)
-                action = DirectoryWatcher::FileChange::Change::RenamedNewName;
+                action = DirectoryWatcher::Change::RenamedNewName;
             else if (event->mask & IN_MOVED_FROM)
-                action = DirectoryWatcher::FileChange::Change::RenamedOldName;
+                action = DirectoryWatcher::Change::RenamedOldName;
             else if (event->mask & IN_DELETE || (event->mask & IN_DELETE_SELF && this_event.IsForRoot()))
-                action = DirectoryWatcher::FileChange::Change::Deleted;
+                action = DirectoryWatcher::Change::Deleted;
             else if (event->mask & IN_CREATE)
-                action = DirectoryWatcher::FileChange::Change::Added;
+                action = DirectoryWatcher::Change::Added;
             if (!action) continue;
 
             auto filepath = event->len ? FromNullTerminated(event->name) : String {};

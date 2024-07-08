@@ -634,79 +634,73 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
         for (auto event = fs_watcher.events.first; event; event = event->next) {
             for (auto const& dir : watcher.watched_dirs) {
                 if (StartsWithSpan(event->path, dir.resolved_path)) {
+                    String subpath {};
+                    if (event->path.size != dir.resolved_path.size)
+                        subpath = event->path.SubSpan(dir.resolved_path.size);
+                    if (subpath.size && subpath[0] == '/') subpath = subpath.SubSpan(1);
+
                     if (event->flags & kFSEventStreamEventFlagMustScanSubDirs) {
                         callback(
-                            event->path,
+                            *dir.linked_dir_to_watch,
                             DirectoryWatcher::FileChange {
                                 .changes =
                                     Array {DirectoryWatcher::FileChange::Change::UnknownManualRescanNeeded},
-                                .subpath = {},
+                                .subpath = subpath,
                             });
-                    } else {
-                        String subpath {};
-                        if (event->path.size == dir.resolved_path.size)
-                            continue; // ignore
-                        else
-                            subpath = event->path.SubSpan(dir.resolved_path.size);
-                        if (subpath[0] == '/') subpath = subpath.SubSpan(1);
-
-                        // FSEvents ONLY supports recursive watching so we just have to ignore subdirectory
-                        // events
-                        if (!dir.recursive && Contains(subpath, '/')) {
-                            DebugLn("Ignoring subdirectory event: {} because {} is watched non-recursively",
-                                    subpath,
-                                    dir.path);
-                            continue;
-                        }
-
-                        auto const created = event->flags & kFSEventStreamEventFlagItemCreated;
-                        auto const removed = event->flags & kFSEventStreamEventFlagItemRemoved;
-                        auto const renamed = event->flags & kFSEventStreamEventFlagItemRenamed;
-                        auto const modified = event->flags & kFSEventStreamEventFlagItemModified;
-
-                        DirectoryWatcher::FileChange change {
-                            .changes = {},
-                            .subpath = subpath,
-                            .file_type = (event->flags & kFSEventStreamEventFlagItemIsDir)
-                                             ? FileType::Directory
-                                             : FileType::RegularFile,
-                        };
-
-                        if (renamed) {
-                            if (event->exists == FsWatcher::Event::Existence::Exists)
-                                dyn::Append(change.changes,
-                                            DirectoryWatcher::FileChange::Change::RenamedNewName);
-                            else if (event->exists == FsWatcher::Event::Existence::DoesNotExist)
-                                dyn::Append(change.changes,
-                                            DirectoryWatcher::FileChange::Change::RenamedOldName);
-                        } else {
-                            if (created && removed)
-                                if (event->exists == FsWatcher::Event::Existence::DoesNotExist)
-                                    dyn::Append(change.changes, DirectoryWatcher::FileChange::Change::Added);
-                                else
-                                    dyn::Append(change.changes,
-                                                DirectoryWatcher::FileChange::Change::Deleted);
-                            else if (created)
-                                dyn::Append(change.changes, DirectoryWatcher::FileChange::Change::Added);
-                        }
-
-                        // TODO: this logic isn't quite right, we can get 'modified' AFTER 'removed'
-                        if (modified)
-                            dyn::Append(change.changes, DirectoryWatcher::FileChange::Change::Modified);
-
-                        if (!renamed) {
-                            if (removed && created)
-                                if (event->exists == FsWatcher::Event::Existence::DoesNotExist)
-                                    dyn::Append(change.changes,
-                                                DirectoryWatcher::FileChange::Change::Deleted);
-                                else
-                                    dyn::Append(change.changes, DirectoryWatcher::FileChange::Change::Added);
-                            else if (removed)
-                                dyn::Append(change.changes, DirectoryWatcher::FileChange::Change::Deleted);
-                        }
-
-                        callback(dir.path, change);
+                        continue;
                     }
+
+                    // FSEvents ONLY supports recursive watching so we just have to ignore subdirectory
+                    // events
+                    if (!dir.recursive && Contains(subpath, '/')) {
+                        DebugLn("Ignoring subdirectory event: {} because {} is watched non-recursively",
+                                subpath,
+                                dir.path);
+                        continue;
+                    }
+
+                    auto const created = event->flags & kFSEventStreamEventFlagItemCreated;
+                    auto const removed = event->flags & kFSEventStreamEventFlagItemRemoved;
+                    auto const renamed = event->flags & kFSEventStreamEventFlagItemRenamed;
+                    auto const modified = event->flags & kFSEventStreamEventFlagItemModified;
+
+                    DirectoryWatcher::FileChange change {
+                        .changes = {},
+                        .subpath = subpath,
+                        .file_type = (event->flags & kFSEventStreamEventFlagItemIsDir)
+                                         ? FileType::Directory
+                                         : FileType::RegularFile,
+                    };
+
+                    if (renamed) {
+                        if (event->exists == FsWatcher::Event::Existence::Exists)
+                            dyn::Append(change.changes, DirectoryWatcher::FileChange::Change::RenamedNewName);
+                        else if (event->exists == FsWatcher::Event::Existence::DoesNotExist)
+                            dyn::Append(change.changes, DirectoryWatcher::FileChange::Change::RenamedOldName);
+                    } else {
+                        if (created && removed)
+                            if (event->exists == FsWatcher::Event::Existence::DoesNotExist)
+                                dyn::Append(change.changes, DirectoryWatcher::FileChange::Change::Added);
+                            else
+                                dyn::Append(change.changes, DirectoryWatcher::FileChange::Change::Deleted);
+                        else if (created)
+                            dyn::Append(change.changes, DirectoryWatcher::FileChange::Change::Added);
+                    }
+
+                    // TODO: this logic isn't quite right, we can get 'modified' AFTER 'removed'
+                    if (modified) dyn::Append(change.changes, DirectoryWatcher::FileChange::Change::Modified);
+
+                    if (!renamed) {
+                        if (removed && created)
+                            if (event->exists == FsWatcher::Event::Existence::DoesNotExist)
+                                dyn::Append(change.changes, DirectoryWatcher::FileChange::Change::Deleted);
+                            else
+                                dyn::Append(change.changes, DirectoryWatcher::FileChange::Change::Added);
+                        else if (removed)
+                            dyn::Append(change.changes, DirectoryWatcher::FileChange::Change::Deleted);
+                    }
+
+                    callback(*dir.linked_dir_to_watch, change);
                 }
             }
         }

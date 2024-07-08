@@ -737,7 +737,7 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
             *watcher,
             dirs_to_watch,
             scratch_arena,
-            [&](String watched_dir, ErrorCodeOr<DirectoryWatcher::FileChange> outcome) {
+            [&](DirectoryToWatch const& watched_dir, ErrorCodeOr<DirectoryWatcher::FileChange> outcome) {
                 if (outcome.HasValue()) {
                     auto const& change = outcome.Value();
 
@@ -745,7 +745,7 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
                     Type type {Type::Unknown};
                     LibrariesList::Node* relates_to_lib {};
                     auto const full_path =
-                        String(path::Join(scratch_arena, Array {watched_dir, change.subpath}));
+                        String(path::Join(scratch_arena, Array {watched_dir.path, change.subpath}));
                     for (auto& node : libs.libraries) {
                         auto const& lib = *node.value.lib;
                         if (path::Equal(lib.path, full_path)) {
@@ -765,7 +765,7 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
                     AvailableLibraries::ScanFolderList::Node* relates_to_scan_folder = nullptr;
                     for (auto& n : libs.scan_folders) {
                         if (auto f = n.TryRetain()) {
-                            if (path::Equal(watched_dir, f->path)) {
+                            if (path::Equal(watched_dir.path, f->path)) {
                                 relates_to_scan_folder = &n;
                                 break;
                             }
@@ -833,14 +833,14 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
                     }
                     DebugLn("FS change: {}, {}, {}, relates to lib {}, type {}, found folder: {}",
                             DirectoryWatcher::FileChange::TypeToString(Last(change.changes)),
-                            watched_dir,
+                            watched_dir.path,
                             change.subpath,
                             relates_to_lib ? relates_to_lib->value.lib->name : ""_s,
                             type,
                             (bool)relates_to_scan_folder);
                 } else {
                     // TODO(1.0) handle error
-                    DebugLn("Reading directory changes failed for {}: {}", watched_dir, outcome.Error());
+                    DebugLn("Reading directory changes failed for {}: {}", watched_dir.path, outcome.Error());
                 }
             });
         if (outcome.HasError()) {

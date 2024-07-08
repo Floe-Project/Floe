@@ -427,11 +427,11 @@ TEST_CASE(TestReadingDirectoryChanges) {
             watcher,
             dirs_to_watch,
             a,
-            [&](String path, ErrorCodeOr<DirectoryWatcher::FileChange> change) {
+            [&](DirectoryToWatch const& path, ErrorCodeOr<DirectoryWatcher::FileChange> change) {
                 if (change.HasValue())
-                    tester.log.DebugLn("Unexpected callback: {}", path);
+                    tester.log.DebugLn("Unexpected callback: {}", path.path);
                 else
-                    tester.log.DebugLn("Enexpected callback: error in {}: {}", path, change.Error());
+                    tester.log.DebugLn("Enexpected callback: error in {}: {}", path.path, change.Error());
                 REQUIRE(false);
             }));
 
@@ -448,8 +448,9 @@ TEST_CASE(TestReadingDirectoryChanges) {
                     watcher,
                     dirs_to_watch,
                     a,
-                    [&](String path, ErrorCodeOr<DirectoryWatcher::FileChange> change_outcome) {
-                        CHECK(path::Equal(path, dir));
+                    [&](DirectoryToWatch const& path,
+                        ErrorCodeOr<DirectoryWatcher::FileChange> change_outcome) {
+                        CHECK(path::Equal(path.path, dir));
                         auto const change = REQUIRE_UNWRAP(change_outcome);
                         DynamicArrayInline<char, 500> changes_str;
                         for (auto const& c : change.changes) {
@@ -460,7 +461,7 @@ TEST_CASE(TestReadingDirectoryChanges) {
                         tester.log.DebugLn("Event: \"{}\" {{ {} }} in \"{}\"",
                                            change.subpath,
                                            changes_str,
-                                           path);
+                                           path.path);
                         for (auto const& c : change.changes)
                             dyn::Append(changes,
                                         {

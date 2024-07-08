@@ -464,7 +464,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                 if (outcome.HasError()) {
                     dir.state = DirectoryWatcher::WatchedDirectory::State::WatchingFailed;
                     ASSERT(dir.native_data.pointer == nullptr);
-                    callback(dir.path, outcome.Error());
+                    callback(*dir.linked_dir_to_watch, outcome.Error());
                 }
                 dir.state = DirectoryWatcher::WatchedDirectory::State::Watching;
                 dir.native_data.pointer = outcome.Value();
@@ -645,7 +645,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
             if (!this_event.IsForRoot())
                 filepath = path::Join(scratch_arena, Array {this_event.SubDirPath(), filepath});
 
-            callback(this_event.RootDirPath(),
+            callback(*this_event.dir.linked_dir_to_watch,
                      DirectoryWatcher::FileChange {
                          .changes = Array {*action},
                          .subpath = filepath,

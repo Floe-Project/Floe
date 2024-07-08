@@ -306,12 +306,13 @@ struct DirectoryWatcher {
             }
             return "Unknown";
         }
+        // TODO: fix: there can be more than Change::Count
         DynamicArrayInline<Change, ToInt(Change::Count)> changes; // ordered
         String subpath;
         Optional<FileType> file_type; // might not be available
     };
 
-    using Callback = FunctionRef<void(String watched_dir, ErrorCodeOr<FileChange> change)>;
+    using Callback = FunctionRef<void(DirectoryToWatch const& watched_dir, ErrorCodeOr<FileChange> change)>;
 
     struct WatchedDirectory {
         enum class State {
@@ -322,11 +323,13 @@ struct DirectoryWatcher {
             NotWatching,
         };
 
-        ArenaAllocator arena {Malloc::Instance(), 0, 256};
-        State state {};
+        ArenaAllocator arena;
+        State state;
         String path;
         String resolved_path;
         bool recursive;
+
+        DirectoryToWatch const* linked_dir_to_watch {}; // ephemeral
 
         NativeData native_data;
     };
@@ -358,6 +361,7 @@ struct DirectoryWatcher {
                         if (path::Equal(dir.path, dir_to_watch.path) &&
                             dir.recursive == dir_to_watch.recursive) {
                             d = &dir;
+                            dir.linked_dir_to_watch = &dir_to_watch;
                             break;
                         }
                     }
@@ -367,33 +371,20 @@ struct DirectoryWatcher {
                 continue;
             }
 
-            auto const path_hash = Hash(dir_to_watch.path);
-            if (Find(blacklisted_path_hashes, path_hash)) continue;
-
             any_states_changed = true;
+            is_desired[index] = true;
 
-            auto const try_start_watching = [&]() -> ErrorCodeOr<DirectoryWatcher::WatchedDirectory> {
-                DirectoryWatcher::WatchedDirectory result {
-                    .state = DirectoryWatcher::WatchedDirectory::State::NeedsWatching,
-                    .recursive = dir_to_watch.recursive,
-                };
-                is_desired[index] = true;
-
-                auto p = result.arena.Clone(dir_to_watch.path);
-                result.path = p;
-                result.resolved_path = ResolveSymlinks(result.arena, dir_to_watch.path).ValueOr(p);
-
-                return result;
+            auto new_dir = watched_dirs.PrependUninitialised();
+            PLACEMENT_NEW(new_dir)
+            DirectoryWatcher::WatchedDirectory {
+                .arena = {Malloc::Instance(), 0, 256},
+                .state = DirectoryWatcher::WatchedDirectory::State::NeedsWatching,
+                .recursive = dir_to_watch.recursive,
+                .linked_dir_to_watch = &dir_to_watch,
             };
-
-            auto outcome = try_start_watching();
-            if (outcome.HasValue()) {
-                watched_dirs.Prepend(outcome.ReleaseValue());
-            } else {
-                dyn::Append(blacklisted_path_hashes, path_hash);
-                // TODO: should we call the callback here?
-                // callback(dir_to_watch.path, outcome.Error());
-            }
+            auto const path = new_dir->arena.Clone(dir_to_watch.path);
+            new_dir->path = path;
+            new_dir->resolved_path = ResolveSymlinks(new_dir->arena, dir_to_watch.path).ValueOr(path);
         }
 
         for (auto [index, dir] : Enumerate(watched_dirs))
@@ -407,7 +398,6 @@ struct DirectoryWatcher {
 
     Allocator& allocator;
     ArenaList<WatchedDirectory, true> watched_dirs;
-    DynamicArrayInline<u64, 25> blacklisted_path_hashes;
     NativeData native_data;
 };
 

@@ -794,7 +794,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                         dir.native_data.pointer = outcome.Value();
                     } else {
                         dir.state = DirectoryWatcher::WatchedDirectory::State::WatchingFailed;
-                        callback(dir.path, outcome.Error());
+                        callback(*dir.linked_dir_to_watch, outcome.Error());
                         dir.native_data = {};
                     }
                     break;
@@ -904,7 +904,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                     if (type) {
                         auto const narrowed = Narrow(scratch_arena, filename);
                         if (narrowed.HasValue()) {
-                            callback(dir.path,
+                            callback(*dir.linked_dir_to_watch,
                                      DirectoryWatcher::FileChange {Array {*type}, narrowed.Value()});
                         }
                     }
@@ -915,14 +915,14 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                 }
 
                 if (error) {
-                    callback(dir.path,
+                    callback(*dir.linked_dir_to_watch,
                              DirectoryWatcher::FileChange {
                                  Array {DirectoryWatcher::FileChange::Change::UnknownManualRescanNeeded},
                                  "",
                              });
                 }
             } else {
-                callback(dir.path, FilesystemWin32ErrorCode(GetLastError()));
+                callback(*dir.linked_dir_to_watch, FilesystemWin32ErrorCode(GetLastError()));
             }
         } else if (wait_result != WAIT_TIMEOUT) {
             Panic("unexpected result from WaitForSingleObjectEx");
@@ -940,13 +940,13 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
         if (!succeeded) {
             auto const error = GetLastError();
             if (error == ERROR_NOTIFY_ENUM_DIR)
-                callback(dir.path,
+                callback(*dir.linked_dir_to_watch,
                          DirectoryWatcher::FileChange {
                              Array {DirectoryWatcher::FileChange::Change::UnknownManualRescanNeeded},
                              "",
                          });
             else
-                callback(dir.path, FilesystemWin32ErrorCode(error));
+                callback(*dir.linked_dir_to_watch, FilesystemWin32ErrorCode(error));
             continue;
         }
     }

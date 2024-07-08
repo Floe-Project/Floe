@@ -105,13 +105,14 @@ namespace detail {
 
 extern u32 g_inst_debug_id;
 
-enum class LoadingState {
+enum class LoadingState : u32 {
     PendingLoad,
     PendingCancel,
     Loading,
     CompletedSucessfully,
     CompletedWithError,
     CompletedCancelled,
+    Count,
 };
 
 using AudioDataAllocator = PageAllocator;

@@ -339,7 +339,9 @@ struct DirectoryWatcher {
     // private
     bool HandleWatchedDirChanges(Span<DirectoryToWatch const> dirs_to_watch, ArenaAllocator& scratch_arena) {
         auto is_desired = scratch_arena.NewMultiple<bool>(dirs_to_watch.size);
-        DEFER { scratch_arena.Free(is_desired.ToByteSpan()); };
+        DEFER {
+            if (is_desired.size) scratch_arena.Free(is_desired.ToByteSpan());
+        };
 
         bool any_states_changed = false;
 

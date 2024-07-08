@@ -74,19 +74,6 @@ using namespace detail;
 constexpr String k_trace_category = "ASL";
 constexpr u32 k_trace_colour = 0xfcba03;
 
-static String LoadingStateString(LoadingState s) {
-    String result {};
-    switch (s) {
-        case LoadingState::PendingLoad: result = "PendingLoad"; break;
-        case LoadingState::PendingCancel: result = "PendingCancel"; break;
-        case LoadingState::Loading: result = "Loading"; break;
-        case LoadingState::CompletedSucessfully: result = "CompletedSucessfully"; break;
-        case LoadingState::CompletedWithError: result = "CompletedWithError"; break;
-        case LoadingState::CompletedCancelled: result = "CompletedCancelled"; break;
-    }
-    return result;
-}
-
 ListedAudioData::~ListedAudioData() {
     ZoneScoped;
     auto const s = state.Load();
@@ -175,7 +162,7 @@ static void TriggerReloadIfAudioIsCancelled(ListedAudioData& audio_data,
             TracyMessageEx({k_trace_category, k_trace_colour, -1u},
                            "instID:{}, reusing audio which is in state: {}",
                            debug_inst_id,
-                           LoadingStateString(expected));
+                           EnumToString(expected));
         }
     } else {
         TracyMessageEx({k_trace_category, k_trace_colour, -1u},
@@ -932,7 +919,7 @@ static void CancelLoadingAudioForInstrumentIfPossible(ListedInstrument* i, uintp
             TracyMessageEx({k_trace_category, k_trace_colour, trace_id},
                            "instID:{} cancelled audio from state: {}",
                            i->debug_id,
-                           LoadingStateString(expected));
+                           EnumToString(expected));
 
             ++num_cancelled;
         }
@@ -1049,7 +1036,7 @@ static void LoadingThreadLoop(LoadingThread& thread) {
                                     for (auto& audio_data : inst->audio_data_set) {
                                         DebugLn("      Audio data: {}, {}",
                                                 audio_data->audio_data.hash,
-                                                LoadingStateString(audio_data->state.Load()));
+                                                EnumToString(audio_data->state.Load()));
                                     }
                                     break;
                                 }
@@ -1058,7 +1045,7 @@ static void LoadingThreadLoop(LoadingThread& thread) {
                                     DebugLn("    Awaiting audio for IR {}", ir->path);
                                     DebugLn("      Audio data: {}, {}",
                                             ir->audio_data.hash,
-                                            LoadingStateString(ir->state.Load()));
+                                            EnumToString(ir->state.Load()));
                                     break;
                                 }
                             }
@@ -1362,6 +1349,7 @@ static void LoadingThreadLoop(LoadingThread& thread) {
                         case LoadingState::Loading: break;
                         case LoadingState::PendingCancel:
                         case LoadingState::CompletedCancelled: PanicIfReached(); break;
+                        case LoadingState::Count: PanicIfReached(); break;
                     }
                 }
 

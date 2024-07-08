@@ -696,4 +696,5 @@ constexpr auto EnumStrings() {
     return EnumStringHelper<E>(MakeIndexSequence<ToInt(E::Count)>());
 }
 
+// Only works for enums with a final value called Count and contiguous values starting from 0.
 constexpr String EnumToString(Enum auto e) { return EnumStrings<decltype(e)>()[ToInt(e)]; }

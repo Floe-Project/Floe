@@ -784,6 +784,9 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
     auto const scratch_cursor = scratch_arena.TotalUsed();
     DEFER { scratch_arena.TryShrinkTotalUsed(scratch_cursor); };
 
+    for (auto& dir : watcher.watched_dirs)
+        dir.change_set.Clear();
+
     if (any_states_changed) {
         for (auto& dir : watcher.watched_dirs) {
             switch (dir.state) {
@@ -794,7 +797,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                         dir.native_data.pointer = outcome.Value();
                     } else {
                         dir.state = DirectoryWatcher::WatchedDirectory::State::WatchingFailed;
-                        callback(*dir.linked_dir_to_watch, outcome.Error());
+                        dir.change_set.error = outcome.Error();
                         dir.native_data = {};
                     }
                     break;
@@ -902,8 +905,14 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                     if (type) {
                         auto const narrowed = Narrow(scratch_arena, filename);
                         if (narrowed.HasValue()) {
-                            callback(*dir.linked_dir_to_watch,
-                                     DirectoryWatcher::Change {Array {*type}, narrowed.Value()});
+                            dir.change_set.Add(
+                                {
+                                    .subpath = narrowed.Value(),
+                                    .file_type = nullopt,
+                                    .change = *type,
+                                    .subpath_needs_manual_rescan = false,
+                                },
+                                scratch_arena);
                         }
                     }
 
@@ -912,15 +921,9 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                     base += next_entry_offset;
                 }
 
-                if (error) {
-                    callback(*dir.linked_dir_to_watch,
-                             DirectoryWatcher::Change {
-                                 Array {DirectoryWatcher::ChangeType::UnknownManualRescanNeeded},
-                                 "",
-                             });
-                }
+                if (error) dir.change_set.manual_rescan_needed = true;
             } else {
-                callback(*dir.linked_dir_to_watch, FilesystemWin32ErrorCode(GetLastError()));
+                dir.change_set.error = FilesystemWin32ErrorCode(GetLastError());
             }
         } else if (wait_result != WAIT_TIMEOUT) {
             Panic("unexpected result from WaitForSingleObjectEx");
@@ -938,15 +941,13 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
         if (!succeeded) {
             auto const error = GetLastError();
             if (error == ERROR_NOTIFY_ENUM_DIR)
-                callback(*dir.linked_dir_to_watch,
-                         DirectoryWatcher::Change {
-                             Array {DirectoryWatcher::ChangeType::UnknownManualRescanNeeded},
-                             "",
-                         });
+                dir.change_set.manual_rescan_needed = true;
             else
-                callback(*dir.linked_dir_to_watch, FilesystemWin32ErrorCode(error));
+                dir.change_set.error = FilesystemWin32ErrorCode(error);
             continue;
         }
+
+        if (dir.change_set.HasContent()) callback(*dir.linked_dir_to_watch, dir.change_set);
     }
 
     return k_success;

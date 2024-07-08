@@ -632,21 +632,27 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
         DEFER { fs_watcher.event_mutex.Unlock(); };
 
         for (auto event = fs_watcher.events.first; event; event = event->next) {
-            for (auto const& dir : watcher.watched_dirs) {
+            for (auto& dir : watcher.watched_dirs) {
                 if (StartsWithSpan(event->path, dir.resolved_path)) {
                     String subpath {};
                     if (event->path.size != dir.resolved_path.size)
                         subpath = event->path.SubSpan(dir.resolved_path.size);
                     if (subpath.size && subpath[0] == '/') subpath = subpath.SubSpan(1);
+                    subpath = scratch_arena.Clone(subpath);
+
+                    auto const file_type = (event->flags & kFSEventStreamEventFlagItemIsDir)
+                                               ? FileType::Directory
+                                               : FileType::RegularFile;
 
                     if (event->flags & kFSEventStreamEventFlagMustScanSubDirs) {
-                        callback(
-                            *dir.linked_dir_to_watch,
-                            DirectoryWatcher::Change {
-                                .changes =
-                                    Array {DirectoryWatcher::ChangeType::UnknownManualRescanNeeded},
+                        dir.change_set.Add(
+                            {
                                 .subpath = subpath,
-                            });
+                                .file_type = file_type,
+                                .change = {},
+                                .subpath_needs_manual_rescan = true,
+                            },
+                            scratch_arena);
                         continue;
                     }
 
@@ -664,43 +670,43 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                     auto const renamed = event->flags & kFSEventStreamEventFlagItemRenamed;
                     auto const modified = event->flags & kFSEventStreamEventFlagItemModified;
 
-                    DirectoryWatcher::Change change {
-                        .changes = {},
-                        .subpath = subpath,
-                        .file_type = (event->flags & kFSEventStreamEventFlagItemIsDir)
-                                         ? FileType::Directory
-                                         : FileType::RegularFile,
+                    auto add = [&](DirectoryWatcher::ChangeType type) {
+                        dir.change_set.Add(
+                            {
+                                .subpath = subpath,
+                                .file_type = file_type,
+                                .change = type,
+                            },
+                            scratch_arena);
                     };
 
                     if (renamed) {
                         if (event->exists == FsWatcher::Event::Existence::Exists)
-                            dyn::Append(change.changes, DirectoryWatcher::ChangeType::RenamedNewName);
+                            add(DirectoryWatcher::ChangeType::RenamedNewName);
                         else if (event->exists == FsWatcher::Event::Existence::DoesNotExist)
-                            dyn::Append(change.changes, DirectoryWatcher::ChangeType::RenamedOldName);
+                            add(DirectoryWatcher::ChangeType::RenamedOldName);
                     } else {
                         if (created && removed)
                             if (event->exists == FsWatcher::Event::Existence::DoesNotExist)
-                                dyn::Append(change.changes, DirectoryWatcher::ChangeType::Added);
+                                add(DirectoryWatcher::ChangeType::Added);
                             else
-                                dyn::Append(change.changes, DirectoryWatcher::ChangeType::Deleted);
+                                add(DirectoryWatcher::ChangeType::Deleted);
                         else if (created)
-                            dyn::Append(change.changes, DirectoryWatcher::ChangeType::Added);
+                            add(DirectoryWatcher::ChangeType::Added);
                     }
 
                     // TODO: this logic isn't quite right, we can get 'modified' AFTER 'removed'
-                    if (modified) dyn::Append(change.changes, DirectoryWatcher::ChangeType::Modified);
+                    if (modified) add(DirectoryWatcher::ChangeType::Modified);
 
                     if (!renamed) {
                         if (removed && created)
                             if (event->exists == FsWatcher::Event::Existence::DoesNotExist)
-                                dyn::Append(change.changes, DirectoryWatcher::ChangeType::Deleted);
+                                add(DirectoryWatcher::ChangeType::Deleted);
                             else
-                                dyn::Append(change.changes, DirectoryWatcher::ChangeType::Added);
+                                add(DirectoryWatcher::ChangeType::Added);
                         else if (removed)
-                            dyn::Append(change.changes, DirectoryWatcher::ChangeType::Deleted);
+                            add(DirectoryWatcher::ChangeType::Deleted);
                     }
-
-                    callback(*dir.linked_dir_to_watch, change);
                 }
             }
         }
@@ -709,6 +715,9 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
         fs_watcher.events.last = nullptr;
         fs_watcher.event_arena.ResetCursorAndConsolidateRegions();
     }
+
+    for (auto& dir : watcher.watched_dirs)
+        if (dir.change_set.HasContent()) callback(*dir.linked_dir_to_watch, dir.change_set);
 
     watcher.RemoveAllNotWatching();
 

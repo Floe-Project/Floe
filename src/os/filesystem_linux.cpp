@@ -439,6 +439,8 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
     watcher.HandleWatchedDirChanges(dirs_to_watch, scratch_arena);
 
     for (auto& dir : watcher.watched_dirs) {
+        dir.change_set.Clear();
+
         if (dir.native_data.pointer != nullptr) {
             auto& native_dir = *(WatchedDirectory*)dir.native_data.pointer;
             native_dir.subdirs.RemoveIf([&](auto& subdir) {
@@ -464,7 +466,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                 if (outcome.HasError()) {
                     dir.state = DirectoryWatcher::WatchedDirectory::State::WatchingFailed;
                     ASSERT(dir.native_data.pointer == nullptr);
-                    callback(*dir.linked_dir_to_watch, outcome.Error());
+                    dir.change_set.error = outcome.Error();
                 }
                 dir.state = DirectoryWatcher::WatchedDirectory::State::Watching;
                 dir.native_data.pointer = outcome.Value();
@@ -628,6 +630,8 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                 // IMPROVE: do we need to handle renaming root directories in this case?
             }
 
+            auto const event_name = event->len ? FromNullTerminated(event->name) : String {};
+
             Optional<DirectoryWatcher::ChangeType> action {};
             if (event->mask & IN_MODIFY || event->mask & IN_CLOSE_WRITE)
                 action = DirectoryWatcher::ChangeType::Modified;
@@ -641,17 +645,29 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                 action = DirectoryWatcher::ChangeType::Added;
             if (!action) continue;
 
-            auto filepath = event->len ? FromNullTerminated(event->name) : String {};
-            if (!this_event.IsForRoot())
-                filepath = path::Join(scratch_arena, Array {this_event.SubDirPath(), filepath});
-
-            callback(*this_event.dir.linked_dir_to_watch,
-                     DirectoryWatcher::Change {
-                         .changes = Array {*action},
-                         .subpath = filepath,
-                         .file_type = (event->mask & IN_ISDIR) ? FileType::Directory : FileType::RegularFile,
-                     });
+            this_event.dir.change_set.Add(
+                DirectoryWatcher::ChangeSet::AddChangeArgs {
+                    .subpath = this_event.SubDirPath().size
+                                   ? path::Join(scratch_arena, Array {this_event.SubDirPath(), event_name})
+                                   : scratch_arena.Clone(event_name),
+                    .file_type = (event->mask & IN_ISDIR) ? FileType::Directory : FileType::RegularFile,
+                    .change = *action,
+                    .subpath_needs_manual_rescan = false,
+                },
+                scratch_arena);
         }
+    }
+
+    for (auto const& dir : watcher.watched_dirs) {
+        DynamicArrayInline<char, 1000> printout;
+        for (auto const& change : dir.change_set.changes) {
+            fmt::Append(printout, "Changes for '{}' => '{}':\n", dir.path, change.subpath);
+            for (auto const& subchange : change.changes)
+                fmt::Append(printout, "  {}\n", EnumToString(subchange));
+        }
+        if (printout.size) DebugLn(printout);
+
+        if (dir.change_set.HasContent()) callback(*dir.linked_dir_to_watch, dir.change_set);
     }
 
     watcher.RemoveAllNotWatching();

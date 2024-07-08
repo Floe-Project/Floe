@@ -278,6 +278,47 @@ struct DirectoryToWatch {
     // IMPROVE: allow a user-pointer here?
 };
 
+// Little util that allows a simple way to push items to a list and not worry about memory. Also allows
+// easy access the last item.
+template <typename Type>
+struct ArenaStack {
+    struct Node {
+        Node* next {};
+        Type data;
+    };
+
+    using Iterator = SinglyLinkedListIterator<Node, Type>;
+
+    ArenaStack() = default;
+    ArenaStack(Type t, ArenaAllocator& arena) { Append(t, arena); }
+
+    void Append(Type data, ArenaAllocator& arena) {
+        auto node = arena.NewUninitialised<Node>();
+        node->data = data;
+        node->next = nullptr;
+        if (last) {
+            last->next = node;
+            last = node;
+        } else {
+            first = node;
+            last = node;
+        }
+    }
+
+    Type Last() const { return last->data; }
+
+    void Clear() {
+        first = nullptr;
+        last = nullptr;
+    }
+
+    auto begin() const { return Iterator {first}; }
+    auto end() const { return Iterator {nullptr}; }
+
+    Node* first {};
+    Node* last {};
+};
+
 struct DirectoryWatcher {
     union NativeData {
         void* pointer;
@@ -294,14 +335,66 @@ struct DirectoryWatcher {
         Count
     };
 
-    struct Change {
-        // TODO: fix: there can be more than ChangeType::Count
-        DynamicArrayInline<ChangeType, ToInt(ChangeType::Count)> changes; // ordered
+    struct ChangedItem {
+        bool manual_rescan_needed; // if true, ignore all changes and recursively rescan this directory
+        ArenaStack<ChangeType> changes;
         String subpath; // relative to the watched directory, empty if the watched directory itself changed
         Optional<FileType> file_type; // might not be available
     };
 
-    using Callback = FunctionRef<void(DirectoryToWatch const& watched_dir, ErrorCodeOr<Change> change)>;
+    struct ChangeSet {
+        void Clear() {
+            error = nullopt;
+            manual_rescan_needed = false;
+            changes.Clear();
+        }
+
+        bool HasContent() const { return error || manual_rescan_needed || num_changes; }
+
+        struct AddChangeArgs {
+            String subpath;
+            Optional<FileType> file_type;
+            ChangeType change; // ignored if subpath_needs_manual_rescan is true
+            bool subpath_needs_manual_rescan;
+        };
+
+        void Add(AddChangeArgs args, ArenaAllocator& arena) {
+            for (auto& c : changes)
+                if (path::Equal(c.subpath, args.subpath) && c.file_type == args.file_type) {
+                    if (args.subpath_needs_manual_rescan)
+                        c.manual_rescan_needed = true;
+                    else if (c.changes.Last() != args.change) { // don't add the same change twice
+                        c.changes.Append(args.change, arena);
+                        ++num_changes;
+                    }
+                    return;
+                }
+            changes.Append(
+                    args.subpath_needs_manual_rescan
+                        ? ChangedItem {
+                              .manual_rescan_needed = true,
+                              .changes = {},
+                              .subpath = args.subpath,
+                              .file_type = args.file_type,
+                          }
+                        :
+                ChangedItem {
+                    .manual_rescan_needed = false,
+                    .changes = {args.change, arena},
+                    .subpath = args.subpath,
+                    .file_type = args.file_type,
+                },
+                arena);
+            ++num_changes;
+        }
+
+        Optional<ErrorCode> error; // an error occurred, events could be incomplete
+        bool manual_rescan_needed {}; // if true, ignore all changes
+        ArenaStack<ChangedItem> changes {};
+        u32 num_changes {};
+    };
+
+    using Callback = FunctionRef<void(DirectoryToWatch const& watched_dir, ChangeSet change_set)>;
 
     struct WatchedDirectory {
         enum class State {
@@ -319,6 +412,7 @@ struct DirectoryWatcher {
         bool recursive;
 
         DirectoryToWatch const* linked_dir_to_watch {}; // ephemeral
+        ChangeSet change_set {}; // ephemeral
 
         NativeData native_data;
     };

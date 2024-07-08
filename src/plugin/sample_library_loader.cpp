@@ -724,9 +724,20 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
             *watcher,
             dirs_to_watch,
             scratch_arena,
-            [&](DirectoryToWatch const& watched_dir, ErrorCodeOr<DirectoryWatcher::Change> outcome) {
-                if (outcome.HasValue()) {
-                    auto const& change = outcome.Value();
+            [&](DirectoryToWatch const& watched_dir, DirectoryWatcher::ChangeSet change_set) {
+                if (change_set.manual_rescan_needed) {
+                    // TODO: handle this
+                    return;
+                }
+
+                if (change_set.error) {
+                    // TODO: handle this
+                    return;
+                }
+
+                for (auto const& change : change_set.changes) {
+                    // TODO: use a more robust way of determining which of our assets have changed. We can
+                    // do that by associating data with the watched_dir perhaps.
 
                     enum class Type { Unknown, MainLibraryFile, AuxilleryLibraryFile };
                     Type type {Type::Unknown};
@@ -763,7 +774,7 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
                         if (relates_to_scan_folder) relates_to_scan_folder->Release();
                     };
 
-                    switch (Last(change.changes)) {
+                    switch (change.changes.Last()) {
                         case DirectoryWatcher::ChangeType::Added: {
                             ASSERT(!path::StartsWithDirectorySeparator(change.subpath));
                             ASSERT(!path::EndsWithDirectorySeparator(change.subpath));
@@ -802,7 +813,8 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
                         }
                         case DirectoryWatcher::ChangeType::RenamedOldName:
                         case DirectoryWatcher::ChangeType::RenamedNewName: {
-                            // TODO(1.0): I think we can do better here at working out what's a remove/add/etc
+                            // TODO(1.0): I think we can do better here at working out what's a
+                            // remove/add/etc
                             if (relates_to_scan_folder)
                                 relates_to_scan_folder->value.state.Store(
                                     AvailableLibraries::ScanFolder::State::RescanRequested);
@@ -819,15 +831,12 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
                         case DirectoryWatcher::ChangeType::Count: break;
                     }
                     DebugLn("FS change: {}, {}, {}, relates to lib {}, type {}, found folder: {}",
-                            EnumToString(Last(change.changes)),
+                            EnumToString(change.changes.Last()),
                             watched_dir.path,
                             change.subpath,
                             relates_to_lib ? relates_to_lib->value.lib->name : ""_s,
                             type,
                             (bool)relates_to_scan_folder);
-                } else {
-                    // TODO(1.0) handle error
-                    DebugLn("Reading directory changes failed for {}: {}", watched_dir.path, outcome.Error());
                 }
             });
         if (outcome.HasError()) {

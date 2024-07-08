@@ -432,10 +432,11 @@ static ErrorCodeOr<WatchedDirectory*> WatchDirectory(DirectoryWatcher::WatchedDi
 
 constexpr bool k_debug_inotify = false;
 
-ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
-                                       Span<DirectoryToWatch const> dirs_to_watch,
-                                       ArenaAllocator& scratch_arena,
-                                       DirectoryWatcher::Callback callback) {
+ErrorCodeOr<Span<DirectoryWatcher::ChangeSet const>>
+ReadDirectoryChanges(DirectoryWatcher& watcher,
+                     Span<DirectoryToWatch const> dirs_to_watch,
+                     ArenaAllocator& result_arena,
+                     ArenaAllocator& scratch_arena) {
     watcher.HandleWatchedDirChanges(dirs_to_watch, scratch_arena);
 
     for (auto& dir : watcher.watched_dirs) {
@@ -648,29 +649,29 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
             this_event.dir.change_set.Add(
                 DirectoryWatcher::ChangeSet::AddChangeArgs {
                     .subpath = this_event.SubDirPath().size
-                                   ? path::Join(scratch_arena, Array {this_event.SubDirPath(), event_name})
-                                   : scratch_arena.Clone(event_name),
+                                   ? path::Join(result_arena, Array {this_event.SubDirPath(), event_name})
+                                   : result_arena.Clone(event_name),
                     .file_type = (event->mask & IN_ISDIR) ? FileType::Directory : FileType::RegularFile,
                     .change = *action,
                     .subpath_needs_manual_rescan = false,
                 },
-                scratch_arena);
+                result_arena);
         }
     }
 
-    for (auto const& dir : watcher.watched_dirs) {
-        DynamicArrayInline<char, 1000> printout;
-        for (auto const& change : dir.change_set.changes) {
-            fmt::Append(printout, "Changes for '{}' => '{}':\n", dir.path, change.subpath);
-            for (auto const& subchange : change.changes)
-                fmt::Append(printout, "  {}\n", EnumToString(subchange));
+    if constexpr (k_debug_inotify) {
+        for (auto const& dir : watcher.watched_dirs) {
+            DynamicArrayInline<char, 1000> printout;
+            for (auto const& change : dir.change_set.changes) {
+                fmt::Append(printout, "Changes for '{}' => '{}':\n", dir.path, change.subpath);
+                for (auto const& subchange : change.changes)
+                    fmt::Append(printout, "  {}\n", EnumToString(subchange));
+            }
+            if (printout.size) DebugLn(printout);
         }
-        if (printout.size) DebugLn(printout);
-
-        if (dir.change_set.HasContent()) callback(*dir.linked_dir_to_watch, dir.change_set);
     }
 
     watcher.RemoveAllNotWatching();
 
-    return k_success;
+    return watcher.ActiveChangeSets(result_arena);
 }

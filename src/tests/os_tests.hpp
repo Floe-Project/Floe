@@ -423,17 +423,11 @@ TEST_CASE(TestReadingDirectoryChanges) {
             .recursive = recursive,
         }};
 
-        TRY(ReadDirectoryChanges(
-            watcher,
-            dirs_to_watch,
-            a,
-            [&](DirectoryToWatch const& path, DirectoryWatcher::ChangeSet change_set) {
-                if (!change_set.error)
-                    tester.log.DebugLn("Unexpected callback: {}", path.path);
-                else
-                    tester.log.DebugLn("Enexpected callback: error in {}: {}", path.path, *change_set.error);
-                REQUIRE(false);
-            }));
+        auto const change_sets = TRY(ReadDirectoryChanges(watcher, dirs_to_watch, a, a));
+        if (change_sets.size) {
+            tester.log.DebugLn("Unexpected result");
+            REQUIRE(false);
+        }
 
         auto check = [&](Span<DirectoryWatcher::ChangeSet::AddChangeArgs const> expected_changes)
             -> ErrorCodeOr<void> {
@@ -442,38 +436,37 @@ TEST_CASE(TestReadingDirectoryChanges) {
             // we give the watcher some time and a few attempts to detect the changes
             for (auto const _ : Range(4)) {
                 SleepThisThread(5);
-                TRY(ReadDirectoryChanges(
-                    watcher,
-                    dirs_to_watch,
-                    a,
-                    [&](DirectoryToWatch const& path, DirectoryWatcher::ChangeSet change_set) {
-                        CHECK(path::Equal(path.path, dir));
-                        if (change_set.error)
-                            tester.log.DebugLn("Error in {}: {}", path.path, *change_set.error);
-                        CHECK(!change_set.error.HasValue());
+                auto const change_sets = TRY(ReadDirectoryChanges(watcher, dirs_to_watch, a, a));
 
-                        for (auto const& c : change_set.changes) {
-                            DynamicArrayInline<char, 500> changes_str;
-                            for (auto const& sub_c : c.changes) {
-                                dyn::AppendSpan(changes_str, EnumToString(sub_c));
-                                dyn::AppendSpan(changes_str, ", ");
+                for (auto const& change_set : change_sets) {
+                    auto const& path = *change_set.linked_dir_to_watch;
 
-                                changes.Add(
-                                    {
-                                        .subpath = a.Clone(c.subpath),
-                                        .file_type = c.file_type,
-                                        .change = sub_c,
-                                        .subpath_needs_manual_rescan = c.manual_rescan_needed,
-                                    },
-                                    a);
-                            }
-                            if (changes_str.size) changes_str.size -= 2;
-                            tester.log.DebugLn("Event: \"{}\" {{ {} }} in \"{}\"",
-                                               c.subpath,
-                                               changes_str,
-                                               path.path);
+                    CHECK(path::Equal(path.path, dir));
+                    if (change_set.error) tester.log.DebugLn("Error in {}: {}", path.path, *change_set.error);
+                    CHECK(!change_set.error.HasValue());
+
+                    for (auto const& c : change_set.changes) {
+                        DynamicArrayInline<char, 500> changes_str;
+                        for (auto const& sub_c : c.changes) {
+                            dyn::AppendSpan(changes_str, EnumToString(sub_c));
+                            dyn::AppendSpan(changes_str, ", ");
+
+                            changes.Add(
+                                {
+                                    .subpath = a.Clone(c.subpath),
+                                    .file_type = c.file_type,
+                                    .change = sub_c,
+                                    .subpath_needs_manual_rescan = c.manual_rescan_needed,
+                                },
+                                a);
                         }
-                    }));
+                        if (changes_str.size) changes_str.size -= 2;
+                        tester.log.DebugLn("Event: \"{}\" {{ {} }} in \"{}\"",
+                                           c.subpath,
+                                           changes_str,
+                                           path.path);
+                    }
+                }
             }
 
             CHECK_OP(changes.num_changes, >=, expected_changes.size);

@@ -272,10 +272,46 @@ class RecursiveDirectoryIterator {
     bool m_get_file_size {};
 };
 
+// File system watcher
+// =======================================================================================================
+// - inotify on Linux, ReadDirectoryChangesW on Windows, FSEvents on macOS
+// - Super simple poll-like API, just create, poll, destroy
+// - Recursive or non-recursive
+// - Events are grouped to each directory you request watching for
+// - Full error handling
+//
+// NOTE: there's no fallback if the file system watcher fails to initialize. We could eventually add a system
+// that tracks changes by repeatedly scanning the directories.
+//
+//
+// These are some of reasons why this API is the way it is:
+//
+// Per-directory events:
+// We chose to group events to each directory that you request watching for rather than receiving an stream of
+// events from all directories. This is convenient for our use-case but it does loose a bit of information: we
+// no longer have the order of events across directories. Each directory gets an ordered list of changes but
+// we have no way of knowing if a change happened in watched_dir_A before or after a change in watched_dir_B.
+//
+// Single call for multiple directories:
+// The underlying APIs sometimes work as a single stream that watches multiple directories at once so we
+// follow that pattern rather than fighting it to allow separate calls for each directory.
+//
+//
+// TODO: we should ensure coalescing of changes in the backends so that we can clarify this API to say: "You
+// will recieve at most one callback for each subpath. The callback will contain all changes that have
+// happened to that subpath since the last call, in the order they happened. This way, you only need to look
+// at the last event if you want a gross view of the changes rather than dealing with each intermediate
+// state. For example you might not care if a file was modified shortly before being deleted."
+//
+// TODO: should we limit the number of errors that can be returned so that regularly failing operations aren't
+// repeated unnecessarily?
+//
+// TODO: do a final tidy-up pass over the 3 backends.
+
 struct DirectoryToWatch {
     String path;
     bool recursive;
-    // IMPROVE: allow a user-pointer here?
+    // TODO: allow a user-pointer here?
 };
 
 // Little util that allows a simple way to push items to a list and not worry about memory. Also allows
@@ -293,6 +329,7 @@ struct ArenaStack {
     ArenaStack(Type t, ArenaAllocator& arena) { Append(t, arena); }
 
     void Append(Type data, ArenaAllocator& arena) {
+        ++size;
         auto node = arena.NewUninitialised<Node>();
         node->data = data;
         node->next = nullptr;
@@ -310,6 +347,7 @@ struct ArenaStack {
     void Clear() {
         first = nullptr;
         last = nullptr;
+        size = 0;
     }
 
     auto begin() const { return Iterator {first}; }
@@ -317,6 +355,7 @@ struct ArenaStack {
 
     Node* first {};
     Node* last {};
+    u32 size {};
 };
 
 struct DirectoryWatcher {
@@ -337,20 +376,23 @@ struct DirectoryWatcher {
 
     struct ChangedItem {
         bool manual_rescan_needed; // if true, ignore all changes and recursively rescan this directory
-        ArenaStack<ChangeType> changes;
+        ArenaStack<ChangeType> changes; // sequence of changes, loop over this or just look at the Last()
         String subpath; // relative to the watched directory, empty if the watched directory itself changed
         Optional<FileType> file_type; // might not be available
     };
 
     struct ChangeSet {
+        // private
         void Clear() {
             error = nullopt;
             manual_rescan_needed = false;
             changes.Clear();
         }
 
-        bool HasContent() const { return error || manual_rescan_needed || num_changes; }
+        // private
+        bool HasContent() const { return error || manual_rescan_needed || changes.size; }
 
+        // private
         struct AddChangeArgs {
             String subpath;
             Optional<FileType> file_type;
@@ -358,15 +400,14 @@ struct DirectoryWatcher {
             bool subpath_needs_manual_rescan;
         };
 
+        // private
         void Add(AddChangeArgs args, ArenaAllocator& arena) {
             for (auto& c : changes)
                 if (path::Equal(c.subpath, args.subpath) && c.file_type == args.file_type) {
                     if (args.subpath_needs_manual_rescan)
                         c.manual_rescan_needed = true;
-                    else if (c.changes.Last() != args.change) { // don't add the same change twice
+                    else if (c.changes.Last() != args.change) // don't add the same change twice
                         c.changes.Append(args.change, arena);
-                        ++num_changes;
-                    }
                     return;
                 }
             changes.Append(
@@ -385,16 +426,13 @@ struct DirectoryWatcher {
                     .file_type = args.file_type,
                 },
                 arena);
-            ++num_changes;
         }
 
+        DirectoryToWatch const* linked_dir_to_watch {};
         Optional<ErrorCode> error; // an error occurred, events could be incomplete
-        bool manual_rescan_needed {}; // if true, ignore all changes
-        ArenaStack<ChangedItem> changes {};
-        u32 num_changes {};
+        bool manual_rescan_needed {}; // if true, ignore all changes and recursively rescan this directory
+        ArenaStack<ChangedItem> changes {}; // loop over this
     };
-
-    using Callback = FunctionRef<void(DirectoryToWatch const& watched_dir, ChangeSet change_set)>;
 
     struct WatchedDirectory {
         enum class State {
@@ -411,23 +449,23 @@ struct DirectoryWatcher {
         String resolved_path;
         bool recursive;
 
-        DirectoryToWatch const* linked_dir_to_watch {}; // ephemeral
         ChangeSet change_set {}; // ephemeral
 
         NativeData native_data;
     };
 
     // private
-    void MarkAllAsNeedsUnwatching() {
-        for (auto& dir : watched_dirs)
-            if (dir.state == WatchedDirectory::State::Watching)
-                dir.state = WatchedDirectory::State::NeedsUnwatching;
-    }
-
-    // private
     void RemoveAllNotWatching() {
         watched_dirs.RemoveIf(
             [](WatchedDirectory const& dir) { return dir.state == WatchedDirectory::State::NotWatching; });
+    }
+
+    // private
+    Span<ChangeSet const> ActiveChangeSets(ArenaAllocator& arena) const {
+        DynamicArray<ChangeSet> result(arena);
+        for (auto const& dir : watched_dirs)
+            if (dir.change_set.HasContent()) dyn::Append(result, dir.change_set);
+        return result.ToOwnedSpan();
     }
 
     // private
@@ -446,7 +484,7 @@ struct DirectoryWatcher {
                         if (path::Equal(dir.path, dir_to_watch.path) &&
                             dir.recursive == dir_to_watch.recursive) {
                             d = &dir;
-                            dir.linked_dir_to_watch = &dir_to_watch;
+                            dir.change_set.linked_dir_to_watch = &dir_to_watch;
                             break;
                         }
                     }
@@ -465,11 +503,11 @@ struct DirectoryWatcher {
                 .arena = {Malloc::Instance(), 0, 256},
                 .state = DirectoryWatcher::WatchedDirectory::State::NeedsWatching,
                 .recursive = dir_to_watch.recursive,
-                .linked_dir_to_watch = &dir_to_watch,
             };
             auto const path = new_dir->arena.Clone(dir_to_watch.path);
             new_dir->path = path;
             new_dir->resolved_path = ResolveSymlinks(new_dir->arena, dir_to_watch.path).ValueOr(path);
+            new_dir->change_set.linked_dir_to_watch = &dir_to_watch;
         }
 
         for (auto [index, dir] : Enumerate(watched_dirs))
@@ -486,28 +524,11 @@ struct DirectoryWatcher {
     NativeData native_data;
 };
 
-// TODO: should we limit the number of errors that can be returned so that regularly failing operations aren't
-// repeated unnecessarily?
-
 ErrorCodeOr<DirectoryWatcher> CreateDirectoryWatcher(Allocator& a);
 void DestoryDirectoryWatcher(DirectoryWatcher& w);
 
-// TODO: might be nice to change this API to just return a list of changes, one for each corresponding
-// directory inputted, rather than a callback-based API
-//
-// TODO: we should ensure coalescing of changes in the backends so that we can clarify this API to say: "You
-// will recieve at most one callback for each subpath. The callback will contain all changes that have
-// happened to that subpath since the last call, in the order they happened. This way, you only need to look
-// at the last event if you want a gross view of the changes rather than dealing with each intermediate
-// state. For example you might not care if a file was modified shortly before being deleted."
-
-// There's a few reasons that this API is the way it is:
-// - We want it to very simple-to-use in a polling loop: no need to track watching/unwatching, just call this
-//   with the list of directories you want to watch and it will return the changes since the last call.
-// - The underlying APIs often allow watching multiple directories at once so we follow that pattern rather
-//   than fighting it to allow separate calls for each directory.
-
-ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& w,
-                                       Span<DirectoryToWatch const> directories,
-                                       ArenaAllocator& scratch_arena,
-                                       DirectoryWatcher::Callback callback);
+ErrorCodeOr<Span<DirectoryWatcher::ChangeSet const>>
+ReadDirectoryChanges(DirectoryWatcher& w,
+                     Span<DirectoryToWatch const> directories,
+                     ArenaAllocator& result_arena,
+                     ArenaAllocator& scratch_arena);

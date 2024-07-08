@@ -720,30 +720,33 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
             dirs.ToOwnedSpan();
         });
 
-        auto const outcome = ReadDirectoryChanges(
-            *watcher,
-            dirs_to_watch,
-            scratch_arena,
-            [&](DirectoryToWatch const& watched_dir, DirectoryWatcher::ChangeSet change_set) {
+        if (auto const outcome = ReadDirectoryChanges(*watcher, dirs_to_watch, scratch_arena, scratch_arena);
+            outcome.HasError()) {
+            // TODO(1.0) handle error
+            DebugLn("Reading directory changes failed: {}", outcome.Error());
+        } else {
+            auto const change_sets = outcome.Value();
+            for (auto const& change_set : change_sets) {
                 if (change_set.manual_rescan_needed) {
                     // TODO: handle this
-                    return;
+                    continue;
                 }
 
                 if (change_set.error) {
                     // TODO: handle this
-                    return;
+                    continue;
                 }
 
                 for (auto const& change : change_set.changes) {
                     // TODO: use a more robust way of determining which of our assets have changed. We can
-                    // do that by associating data with the watched_dir perhaps.
+                    // do that by associating data with the DirectoryToWatch perhaps.
 
                     enum class Type { Unknown, MainLibraryFile, AuxilleryLibraryFile };
                     Type type {Type::Unknown};
                     LibrariesList::Node* relates_to_lib {};
                     auto const full_path =
-                        String(path::Join(scratch_arena, Array {watched_dir.path, change.subpath}));
+                        String(path::Join(scratch_arena,
+                                          Array {change_set.linked_dir_to_watch->path, change.subpath}));
                     for (auto& node : libs.libraries) {
                         auto const& lib = *node.value.lib;
                         if (path::Equal(lib.path, full_path)) {
@@ -763,7 +766,7 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
                     AvailableLibraries::ScanFolderList::Node* relates_to_scan_folder = nullptr;
                     for (auto& n : libs.scan_folders) {
                         if (auto f = n.TryRetain()) {
-                            if (path::Equal(watched_dir.path, f->path)) {
+                            if (path::Equal(change_set.linked_dir_to_watch->path, f->path)) {
                                 relates_to_scan_folder = &n;
                                 break;
                             }
@@ -832,16 +835,13 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
                     }
                     DebugLn("FS change: {}, {}, {}, relates to lib {}, type {}, found folder: {}",
                             EnumToString(change.changes.Last()),
-                            watched_dir.path,
+                            change_set.linked_dir_to_watch->path,
                             change.subpath,
                             relates_to_lib ? relates_to_lib->value.lib->name : ""_s,
                             type,
                             (bool)relates_to_scan_folder);
                 }
-            });
-        if (outcome.HasError()) {
-            // TODO(1.0) handle error
-            DebugLn("Reading directory changes failed: {}", outcome.Error());
+            }
         }
     }
 

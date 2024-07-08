@@ -774,10 +774,11 @@ static ErrorCodeOr<WatchedDirectory*> WatchDirectory(DirectoryWatcher::WatchedDi
     return watch;
 }
 
-ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
-                                       Span<DirectoryToWatch const> dirs_to_watch,
-                                       ArenaAllocator& scratch_arena,
-                                       DirectoryWatcher::Callback callback) {
+ErrorCodeOr<Span<DirectoryWatcher::ChangeSet const>>
+ReadDirectoryChanges(DirectoryWatcher& watcher,
+                     Span<DirectoryToWatch const> dirs_to_watch,
+                     ArenaAllocator& result_arena,
+                     ArenaAllocator& scratch_arena) {
 
     auto const any_states_changed = watcher.HandleWatchedDirChanges(dirs_to_watch, scratch_arena);
 
@@ -903,7 +904,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                             break;
                     }
                     if (type) {
-                        auto const narrowed = Narrow(scratch_arena, filename);
+                        auto const narrowed = Narrow(result_arena, filename);
                         if (narrowed.HasValue()) {
                             dir.change_set.Add(
                                 {
@@ -912,7 +913,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                                     .change = *type,
                                     .subpath_needs_manual_rescan = false,
                                 },
-                                scratch_arena);
+                                result_arena);
                         }
                     }
 
@@ -946,9 +947,9 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                 dir.change_set.error = FilesystemWin32ErrorCode(error);
             continue;
         }
-
-        if (dir.change_set.HasContent()) callback(*dir.linked_dir_to_watch, dir.change_set);
     }
 
-    return k_success;
+    watcher.RemoveAllNotWatching();
+
+    return watcher.ActiveChangeSets(result_arena);
 }

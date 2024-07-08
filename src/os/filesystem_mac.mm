@@ -563,11 +563,15 @@ void EventCallback([[maybe_unused]] ConstFSEventStreamRef stream_ref,
     }
 }
 
-ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
-                                       Span<DirectoryToWatch const> dirs_to_watch,
-                                       [[maybe_unused]] ArenaAllocator& scratch_arena,
-                                       DirectoryWatcher::Callback callback) {
+ErrorCodeOr<Span<DirectoryWatcher::ChangeSet const>>
+ReadDirectoryChanges(DirectoryWatcher& watcher,
+                     Span<DirectoryToWatch const> dirs_to_watch,
+                     ArenaAllocator& result_arena,
+                     ArenaAllocator& scratch_arena) {
     auto const any_states_changed = watcher.HandleWatchedDirChanges(dirs_to_watch, scratch_arena);
+
+    for (auto& dir : watcher.watched_dirs)
+        dir.change_set.Clear();
 
     auto& fs_watcher = *(FsWatcher*)watcher.native_data.pointer;
     if (any_states_changed) {
@@ -638,7 +642,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                     if (event->path.size != dir.resolved_path.size)
                         subpath = event->path.SubSpan(dir.resolved_path.size);
                     if (subpath.size && subpath[0] == '/') subpath = subpath.SubSpan(1);
-                    subpath = scratch_arena.Clone(subpath);
+                    subpath = result_arena.Clone(subpath);
 
                     auto const file_type = (event->flags & kFSEventStreamEventFlagItemIsDir)
                                                ? FileType::Directory
@@ -652,7 +656,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                                 .change = {},
                                 .subpath_needs_manual_rescan = true,
                             },
-                            scratch_arena);
+                            result_arena);
                         continue;
                     }
 
@@ -677,7 +681,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                                 .file_type = file_type,
                                 .change = type,
                             },
-                            scratch_arena);
+                            result_arena);
                     };
 
                     if (renamed) {
@@ -716,10 +720,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
         fs_watcher.event_arena.ResetCursorAndConsolidateRegions();
     }
 
-    for (auto& dir : watcher.watched_dirs)
-        if (dir.change_set.HasContent()) callback(*dir.linked_dir_to_watch, dir.change_set);
-
     watcher.RemoveAllNotWatching();
 
-    return k_success;
+    return watcher.ActiveChangeSets(result_arena);
 }

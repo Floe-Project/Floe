@@ -1,5 +1,6 @@
 // Copyright 2018-2024 Sam Windell
 // SPDX-License-Identifier: GPL-3.0-or-later
+#pragma once
 #include <time.h>
 
 #include "os/filesystem.hpp"
@@ -469,7 +470,7 @@ TEST_CASE(TestReadingDirectoryChanges) {
                 }
             }
 
-            CHECK_OP(changes.num_changes, >=, expected_changes.size);
+            CHECK_OP(changes.changes.size, >=, expected_changes.size);
             for (auto const& expected : expected_changes) {
                 CAPTURE(expected.subpath);
                 CAPTURE(expected.change);
@@ -489,7 +490,7 @@ TEST_CASE(TestReadingDirectoryChanges) {
                 }
                 CHECK(found);
             }
-            if (changes.num_changes != expected_changes.size) {
+            if (changes.changes.size != expected_changes.size) {
                 tester.log.DebugLn(
                     "ReadDirectoryChanges resulted different changes than expected ({}). Expected:",
                     recursive ? "recursive" : "non-recursive");

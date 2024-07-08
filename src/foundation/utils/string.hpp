@@ -671,3 +671,29 @@ PUBLIC HashTable<String, String> ParseCommandLineArgs(ArenaAllocator& arena, Spa
 
     return result.ToOwnedTable();
 }
+
+// https://blog.rink.nu/2023/02/12/behind-the-magic-of-magic_enum/
+
+template <auto e>
+requires(Enum<decltype(e)>)
+consteval auto StringifyEnumValue() {
+    constexpr auto k_raw = String(__PRETTY_FUNCTION__);
+    constexpr auto k_str = [&]() {
+        auto offset = FindSpan(k_raw, "::"_s).ValueOr(0) + 2;
+        auto end = Find(k_raw, ']', offset).ValueOr(k_raw.size);
+        return k_raw.SubSpan(offset, end - offset);
+    }();
+    return k_str;
+}
+
+template <typename E, usize... I>
+consteval auto EnumStringHelper(IndexSequence<I...>) noexcept {
+    return Array<String, sizeof...(I)> {StringifyEnumValue<E(I)>()...};
+}
+
+template <typename E>
+constexpr auto EnumStrings() {
+    return EnumStringHelper<E>(MakeIndexSequence<ToInt(E::Count)>());
+}
+
+constexpr String EnumToString(Enum auto e) { return EnumStrings<decltype(e)>()[ToInt(e)]; }

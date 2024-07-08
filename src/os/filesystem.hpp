@@ -4,7 +4,7 @@
 #pragma once
 #include "foundation/foundation.hpp"
 
-enum class FilesystemError {
+enum class FilesystemError : u32 {
     PathDoesNotExist,
     PathAlreadyExists,
     TooManyFilesOpen,
@@ -284,7 +284,7 @@ struct DirectoryWatcher {
         int int_id;
     };
 
-    enum class Change {
+    enum class ChangeType : u16 {
         Added,
         Deleted,
         Modified,
@@ -293,27 +293,15 @@ struct DirectoryWatcher {
         UnknownManualRescanNeeded,
         Count
     };
-    static String TypeToString(Change t) {
-        switch (t) {
-            case Change::Added: return "Added";
-            case Change::Deleted: return "Deleted";
-            case Change::Modified: return "Modified";
-            case Change::RenamedOldName: return "RenamedOldName";
-            case Change::RenamedNewName: return "RenamedNewName";
-            case Change::UnknownManualRescanNeeded: return "UnknownManualRescanNeeded";
-            case Change::Count: break;
-        }
-        return "Unknown";
-    }
 
-    struct FileChange {
-        // TODO: fix: there can be more than Change::Count
-        DynamicArrayInline<Change, ToInt(Change::Count)> changes; // ordered
-        String subpath;
+    struct Change {
+        // TODO: fix: there can be more than ChangeType::Count
+        DynamicArrayInline<ChangeType, ToInt(ChangeType::Count)> changes; // ordered
+        String subpath; // relative to the watched directory, empty if the watched directory itself changed
         Optional<FileType> file_type; // might not be available
     };
 
-    using Callback = FunctionRef<void(DirectoryToWatch const& watched_dir, ErrorCodeOr<FileChange> change)>;
+    using Callback = FunctionRef<void(DirectoryToWatch const& watched_dir, ErrorCodeOr<Change> change)>;
 
     struct WatchedDirectory {
         enum class State {

@@ -628,17 +628,17 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                 // IMPROVE: do we need to handle renaming root directories in this case?
             }
 
-            Optional<DirectoryWatcher::Change> action {};
+            Optional<DirectoryWatcher::ChangeType> action {};
             if (event->mask & IN_MODIFY || event->mask & IN_CLOSE_WRITE)
-                action = DirectoryWatcher::Change::Modified;
+                action = DirectoryWatcher::ChangeType::Modified;
             else if (event->mask & IN_MOVED_TO)
-                action = DirectoryWatcher::Change::RenamedNewName;
+                action = DirectoryWatcher::ChangeType::RenamedNewName;
             else if (event->mask & IN_MOVED_FROM)
-                action = DirectoryWatcher::Change::RenamedOldName;
+                action = DirectoryWatcher::ChangeType::RenamedOldName;
             else if (event->mask & IN_DELETE || (event->mask & IN_DELETE_SELF && this_event.IsForRoot()))
-                action = DirectoryWatcher::Change::Deleted;
+                action = DirectoryWatcher::ChangeType::Deleted;
             else if (event->mask & IN_CREATE)
-                action = DirectoryWatcher::Change::Added;
+                action = DirectoryWatcher::ChangeType::Added;
             if (!action) continue;
 
             auto filepath = event->len ? FromNullTerminated(event->name) : String {};
@@ -646,7 +646,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                 filepath = path::Join(scratch_arena, Array {this_event.SubDirPath(), filepath});
 
             callback(*this_event.dir.linked_dir_to_watch,
-                     DirectoryWatcher::FileChange {
+                     DirectoryWatcher::Change {
                          .changes = Array {*action},
                          .subpath = filepath,
                          .file_type = (event->mask & IN_ISDIR) ? FileType::Directory : FileType::RegularFile,

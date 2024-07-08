@@ -642,9 +642,9 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                     if (event->flags & kFSEventStreamEventFlagMustScanSubDirs) {
                         callback(
                             *dir.linked_dir_to_watch,
-                            DirectoryWatcher::FileChange {
+                            DirectoryWatcher::Change {
                                 .changes =
-                                    Array {DirectoryWatcher::Change::UnknownManualRescanNeeded},
+                                    Array {DirectoryWatcher::ChangeType::UnknownManualRescanNeeded},
                                 .subpath = subpath,
                             });
                         continue;
@@ -664,7 +664,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                     auto const renamed = event->flags & kFSEventStreamEventFlagItemRenamed;
                     auto const modified = event->flags & kFSEventStreamEventFlagItemModified;
 
-                    DirectoryWatcher::FileChange change {
+                    DirectoryWatcher::Change change {
                         .changes = {},
                         .subpath = subpath,
                         .file_type = (event->flags & kFSEventStreamEventFlagItemIsDir)
@@ -674,30 +674,30 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
 
                     if (renamed) {
                         if (event->exists == FsWatcher::Event::Existence::Exists)
-                            dyn::Append(change.changes, DirectoryWatcher::Change::RenamedNewName);
+                            dyn::Append(change.changes, DirectoryWatcher::ChangeType::RenamedNewName);
                         else if (event->exists == FsWatcher::Event::Existence::DoesNotExist)
-                            dyn::Append(change.changes, DirectoryWatcher::Change::RenamedOldName);
+                            dyn::Append(change.changes, DirectoryWatcher::ChangeType::RenamedOldName);
                     } else {
                         if (created && removed)
                             if (event->exists == FsWatcher::Event::Existence::DoesNotExist)
-                                dyn::Append(change.changes, DirectoryWatcher::Change::Added);
+                                dyn::Append(change.changes, DirectoryWatcher::ChangeType::Added);
                             else
-                                dyn::Append(change.changes, DirectoryWatcher::Change::Deleted);
+                                dyn::Append(change.changes, DirectoryWatcher::ChangeType::Deleted);
                         else if (created)
-                            dyn::Append(change.changes, DirectoryWatcher::Change::Added);
+                            dyn::Append(change.changes, DirectoryWatcher::ChangeType::Added);
                     }
 
                     // TODO: this logic isn't quite right, we can get 'modified' AFTER 'removed'
-                    if (modified) dyn::Append(change.changes, DirectoryWatcher::Change::Modified);
+                    if (modified) dyn::Append(change.changes, DirectoryWatcher::ChangeType::Modified);
 
                     if (!renamed) {
                         if (removed && created)
                             if (event->exists == FsWatcher::Event::Existence::DoesNotExist)
-                                dyn::Append(change.changes, DirectoryWatcher::Change::Deleted);
+                                dyn::Append(change.changes, DirectoryWatcher::ChangeType::Deleted);
                             else
-                                dyn::Append(change.changes, DirectoryWatcher::Change::Added);
+                                dyn::Append(change.changes, DirectoryWatcher::ChangeType::Added);
                         else if (removed)
-                            dyn::Append(change.changes, DirectoryWatcher::Change::Deleted);
+                            dyn::Append(change.changes, DirectoryWatcher::ChangeType::Deleted);
                     }
 
                     callback(*dir.linked_dir_to_watch, change);

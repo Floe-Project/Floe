@@ -737,7 +737,7 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
             *watcher,
             dirs_to_watch,
             scratch_arena,
-            [&](DirectoryToWatch const& watched_dir, ErrorCodeOr<DirectoryWatcher::FileChange> outcome) {
+            [&](DirectoryToWatch const& watched_dir, ErrorCodeOr<DirectoryWatcher::Change> outcome) {
                 if (outcome.HasValue()) {
                     auto const& change = outcome.Value();
 
@@ -777,7 +777,7 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
                     };
 
                     switch (Last(change.changes)) {
-                        case DirectoryWatcher::Change::Added: {
+                        case DirectoryWatcher::ChangeType::Added: {
                             ASSERT(!path::StartsWithDirectorySeparator(change.subpath));
                             ASSERT(!path::EndsWithDirectorySeparator(change.subpath));
                             int num_separators = 0;
@@ -797,7 +797,7 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
                                                  sample_lib::FileFormat::Mdata);
                             break;
                         }
-                        case DirectoryWatcher::Change::Deleted: {
+                        case DirectoryWatcher::ChangeType::Deleted: {
                             if (relates_to_lib) {
                                 switch (type) {
                                     case Type::Unknown: break;
@@ -809,12 +809,12 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
                             }
                             break;
                         }
-                        case DirectoryWatcher::Change::Modified: {
+                        case DirectoryWatcher::ChangeType::Modified: {
                             if (relates_to_lib) RereadLibraryAsync(async_ctx, libs.libraries, relates_to_lib);
                             break;
                         }
-                        case DirectoryWatcher::Change::RenamedOldName:
-                        case DirectoryWatcher::Change::RenamedNewName: {
+                        case DirectoryWatcher::ChangeType::RenamedOldName:
+                        case DirectoryWatcher::ChangeType::RenamedNewName: {
                             // TODO(1.0): I think we can do better here at working out what's a remove/add/etc
                             if (relates_to_scan_folder)
                                 relates_to_scan_folder->value.state.Store(
@@ -823,16 +823,16 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
                                 RereadLibraryAsync(async_ctx, libs.libraries, relates_to_lib);
                             break;
                         }
-                        case DirectoryWatcher::Change::UnknownManualRescanNeeded: {
+                        case DirectoryWatcher::ChangeType::UnknownManualRescanNeeded: {
                             if (relates_to_scan_folder)
                                 relates_to_scan_folder->value.state.Store(
                                     AvailableLibraries::ScanFolder::State::RescanRequested);
                             break;
                         }
-                        case DirectoryWatcher::Change::Count: break;
+                        case DirectoryWatcher::ChangeType::Count: break;
                     }
                     DebugLn("FS change: {}, {}, {}, relates to lib {}, type {}, found folder: {}",
-                            DirectoryWatcher::TypeToString(Last(change.changes)),
+                            EnumToString(Last(change.changes)),
                             watched_dir.path,
                             change.subpath,
                             relates_to_lib ? relates_to_lib->value.lib->name : ""_s,

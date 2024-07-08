@@ -567,7 +567,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                                        Span<DirectoryToWatch const> dirs_to_watch,
                                        [[maybe_unused]] ArenaAllocator& scratch_arena,
                                        DirectoryWatcher::Callback callback) {
-    auto const any_states_changed = watcher.HandleWatchedDirChanges(dirs_to_watch);
+    auto const any_states_changed = watcher.HandleWatchedDirChanges(dirs_to_watch, scratch_arena);
 
     auto& fs_watcher = *(FsWatcher*)watcher.native_data.pointer;
     if (any_states_changed) {

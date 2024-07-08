@@ -324,7 +324,6 @@ struct DirectoryWatcher {
 
         ArenaAllocator arena {Malloc::Instance(), 0, 256};
         State state {};
-        bool is_desired {};
         String path;
         String resolved_path;
         bool recursive;
@@ -346,13 +345,13 @@ struct DirectoryWatcher {
     }
 
     // private
-    bool HandleWatchedDirChanges(Span<DirectoryToWatch const> dirs_to_watch) {
-        for (auto& dir : watched_dirs)
-            dir.is_desired = false;
+    bool HandleWatchedDirChanges(Span<DirectoryToWatch const> dirs_to_watch, ArenaAllocator& scratch_arena) {
+        auto is_desired = scratch_arena.NewMultiple<bool>(dirs_to_watch.size);
+        DEFER { scratch_arena.Free(is_desired.ToByteSpan()); };
 
         bool any_states_changed = false;
 
-        for (auto const& dir_to_watch : dirs_to_watch) {
+        for (auto const [index, dir_to_watch] : Enumerate(dirs_to_watch)) {
             if (auto dir_ptr = ({
                     DirectoryWatcher::WatchedDirectory* d = nullptr;
                     for (auto& dir : watched_dirs) {
@@ -364,7 +363,7 @@ struct DirectoryWatcher {
                     }
                     d;
                 })) {
-                dir_ptr->is_desired = true;
+                is_desired[index] = true;
                 continue;
             }
 
@@ -376,9 +375,9 @@ struct DirectoryWatcher {
             auto const try_start_watching = [&]() -> ErrorCodeOr<DirectoryWatcher::WatchedDirectory> {
                 DirectoryWatcher::WatchedDirectory result {
                     .state = DirectoryWatcher::WatchedDirectory::State::NeedsWatching,
-                    .is_desired = true,
                     .recursive = dir_to_watch.recursive,
                 };
+                is_desired[index] = true;
 
                 auto p = result.arena.Clone(dir_to_watch.path);
                 result.path = p;
@@ -397,8 +396,8 @@ struct DirectoryWatcher {
             }
         }
 
-        for (auto& dir : watched_dirs)
-            if (!dir.is_desired) {
+        for (auto [index, dir] : Enumerate(watched_dirs))
+            if (!is_desired[index]) {
                 dir.state = DirectoryWatcher::WatchedDirectory::State::NeedsUnwatching;
                 any_states_changed = true;
             }

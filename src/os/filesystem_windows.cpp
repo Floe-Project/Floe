@@ -779,7 +779,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
                                        ArenaAllocator& scratch_arena,
                                        DirectoryWatcher::Callback callback) {
 
-    auto const any_states_changed = watcher.HandleWatchedDirChanges(dirs_to_watch);
+    auto const any_states_changed = watcher.HandleWatchedDirChanges(dirs_to_watch, scratch_arena);
 
     auto const scratch_cursor = scratch_arena.TotalUsed();
     DEFER { scratch_arena.TryShrinkTotalUsed(scratch_cursor); };

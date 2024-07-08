@@ -701,11 +701,6 @@ ErrorCodeOr<Optional<MutableString>> FilesystemDialog(DialogOptions options) {
     return result;
 }
 
-namespace native {
-
-ErrorCodeOr<void> Initialise(DirectoryWatcher&) { return k_success; }
-void Deinitialise(DirectoryWatcher&) {}
-
 constexpr DWORD k_directory_changes_filter = FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME |
                                              FILE_NOTIFY_CHANGE_SIZE | FILE_NOTIFY_CHANGE_LAST_WRITE;
 
@@ -719,6 +714,29 @@ static void UnwatchDirectory(WatchedDirectory* watch) {
     CloseHandle(watch->overlapped.hEvent);
     CloseHandle(watch->handle);
     PageAllocator::Instance().Delete(watch);
+}
+
+ErrorCodeOr<DirectoryWatcher> CreateDirectoryWatcher(Allocator& a) {
+    ZoneScoped;
+    DirectoryWatcher result {
+        .allocator = a,
+        .watched_dirs = {a},
+    };
+    return result;
+}
+
+void DestoryDirectoryWatcher(DirectoryWatcher& watcher) {
+    ZoneScoped;
+    ArenaAllocatorWithInlineStorage<1000> scratch_arena;
+
+    for (auto const& dir : watcher.watched_dirs) {
+        if (dir.state == DirectoryWatcher::WatchedDirectory::State::Watching ||
+            dir.state == DirectoryWatcher::WatchedDirectory::State::NeedsUnwatching) {
+            UnwatchDirectory((WatchedDirectory*)dir.native_data.pointer);
+        }
+    }
+
+    watcher.watched_dirs.Clear();
 }
 
 static ErrorCodeOr<WatchedDirectory*> WatchDirectory(DirectoryWatcher::WatchedDirectory const& dir,
@@ -757,13 +775,16 @@ static ErrorCodeOr<WatchedDirectory*> WatchDirectory(DirectoryWatcher::WatchedDi
 }
 
 ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
-                                       bool watched_directories_changed,
+                                       Span<DirectoryToWatch const> dirs_to_watch,
                                        ArenaAllocator& scratch_arena,
                                        DirectoryWatcher::Callback callback) {
+
+    auto const any_states_changed = watcher.HandleWatchedDirChanges(dirs_to_watch);
+
     auto const scratch_cursor = scratch_arena.TotalUsed();
     DEFER { scratch_arena.TryShrinkTotalUsed(scratch_cursor); };
 
-    if (watched_directories_changed) {
+    if (any_states_changed) {
         for (auto& dir : watcher.watched_dirs) {
             switch (dir.state) {
                 case DirectoryWatcher::WatchedDirectory::State::NeedsWatching: {
@@ -932,5 +953,3 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
 
     return k_success;
 }
-
-} // namespace native

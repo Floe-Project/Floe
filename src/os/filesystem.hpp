@@ -272,6 +272,12 @@ class RecursiveDirectoryIterator {
     bool m_get_file_size {};
 };
 
+struct DirectoryToWatch {
+    String path;
+    bool recursive;
+    // IMPROVE: allow a user-pointer here?
+};
+
 struct DirectoryWatcher {
     union NativeData {
         void* pointer;
@@ -326,35 +332,91 @@ struct DirectoryWatcher {
         NativeData native_data;
     };
 
+    // private
+    void MarkAllAsNeedsUnwatching() {
+        for (auto& dir : watched_dirs)
+            if (dir.state == WatchedDirectory::State::Watching)
+                dir.state = WatchedDirectory::State::NeedsUnwatching;
+    }
+
+    // private
+    void RemoveAllNotWatching() {
+        watched_dirs.RemoveIf(
+            [](WatchedDirectory const& dir) { return dir.state == WatchedDirectory::State::NotWatching; });
+    }
+
+    // private
+    bool HandleWatchedDirChanges(Span<DirectoryToWatch const> dirs_to_watch) {
+        for (auto& dir : watched_dirs)
+            dir.is_desired = false;
+
+        bool any_states_changed = false;
+
+        for (auto const& dir_to_watch : dirs_to_watch) {
+            if (auto dir_ptr = ({
+                    DirectoryWatcher::WatchedDirectory* d = nullptr;
+                    for (auto& dir : watched_dirs) {
+                        if (path::Equal(dir.path, dir_to_watch.path) &&
+                            dir.recursive == dir_to_watch.recursive) {
+                            d = &dir;
+                            break;
+                        }
+                    }
+                    d;
+                })) {
+                dir_ptr->is_desired = true;
+                continue;
+            }
+
+            auto const path_hash = Hash(dir_to_watch.path);
+            if (Find(blacklisted_path_hashes, path_hash)) continue;
+
+            any_states_changed = true;
+
+            auto const try_start_watching = [&]() -> ErrorCodeOr<DirectoryWatcher::WatchedDirectory> {
+                DirectoryWatcher::WatchedDirectory result {
+                    .state = DirectoryWatcher::WatchedDirectory::State::NeedsWatching,
+                    .is_desired = true,
+                    .recursive = dir_to_watch.recursive,
+                };
+
+                auto p = result.arena.Clone(dir_to_watch.path);
+                result.path = p;
+                result.resolved_path = ResolveSymlinks(result.arena, dir_to_watch.path).ValueOr(p);
+
+                return result;
+            };
+
+            auto outcome = try_start_watching();
+            if (outcome.HasValue()) {
+                watched_dirs.Prepend(outcome.ReleaseValue());
+            } else {
+                dyn::Append(blacklisted_path_hashes, path_hash);
+                // TODO: should we call the callback here?
+                // callback(dir_to_watch.path, outcome.Error());
+            }
+        }
+
+        for (auto& dir : watched_dirs)
+            if (!dir.is_desired) {
+                dir.state = DirectoryWatcher::WatchedDirectory::State::NeedsUnwatching;
+                any_states_changed = true;
+            }
+
+        return any_states_changed;
+    }
+
     Allocator& allocator;
     ArenaList<WatchedDirectory, true> watched_dirs;
     DynamicArrayInline<u64, 25> blacklisted_path_hashes;
     NativeData native_data;
 };
 
-namespace native {
-
-ErrorCodeOr<void> Initialise(DirectoryWatcher& w);
-void Deinitialise(DirectoryWatcher& w);
-
-ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& w,
-                                       bool watched_directories_changed,
-                                       ArenaAllocator& scratch_arena,
-                                       DirectoryWatcher::Callback callback);
-
-} // namespace native
-
 // TODO: should we limit the number of errors that can be returned so that regularly failing operations aren't
 // repeated unnecessarily?
 
 ErrorCodeOr<DirectoryWatcher> CreateDirectoryWatcher(Allocator& a);
 void DestoryDirectoryWatcher(DirectoryWatcher& w);
-
-struct DirectoryToWatch {
-    String path;
-    bool recursive;
-    // IMPROVE: allow a user-pointer here?
-};
 
 // TODO: might be nice to change this API to just return a list of changes, one for each corresponding
 // directory inputted, rather than a callback-based API

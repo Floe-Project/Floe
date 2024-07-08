@@ -397,8 +397,6 @@ ErrorCodeOr<Optional<MutableString>> FilesystemDialog(DialogOptions options) {
     return nullopt;
 }
 
-namespace native {
-
 // NOTE: It seems you can receive filesystem events from before you start watching the directory even if you
 // use the kFSEventStreamEventIdSinceNow flag. There could be some sort of buffering going on.
 
@@ -433,28 +431,36 @@ struct FsWatcher {
     } events;
 };
 
-ErrorCodeOr<void> Initialise(DirectoryWatcher& w) {
-    w.native_data.pointer = w.allocator.New<FsWatcher>();
-    return k_success;
+ErrorCodeOr<DirectoryWatcher> CreateDirectoryWatcher(Allocator& a) {
+    ZoneScoped;
+    DirectoryWatcher result {
+        .allocator = a,
+        .watched_dirs = {a},
+        .native_data = {.pointer = a.New<FsWatcher>()},
+    };
+    return result;
 }
 
-void Deinitialise(DirectoryWatcher& w) {
-    auto watcher = (FsWatcher*)w.native_data.pointer;
-    if (watcher->stream) {
-        FSEventStreamStop(watcher->stream);
-        FSEventStreamInvalidate(watcher->stream);
-        FSEventStreamRelease(watcher->stream);
+void DestoryDirectoryWatcher(DirectoryWatcher& watcher) {
+    ZoneScoped;
+
+    auto fs_w = (FsWatcher*)watcher.native_data.pointer;
+    if (fs_w->stream) {
+        FSEventStreamStop(fs_w->stream);
+        FSEventStreamInvalidate(fs_w->stream);
+        FSEventStreamRelease(fs_w->stream);
     }
-    // dispatch_release(watcher->queue);
-    w.allocator.Delete(watcher);
+    // dispatch_release(fs_w->queue);
+    watcher.watched_dirs.Clear();
+    watcher.allocator.Delete(fs_w);
 }
 
-void DirectoryChanged([[maybe_unused]] ConstFSEventStreamRef stream_ref,
-                      [[maybe_unused]] void* user_data,
-                      size_t num_events,
-                      void* event_paths,
-                      FSEventStreamEventFlags const event_flags[],
-                      [[maybe_unused]] FSEventStreamEventId const event_ids[]) {
+void EventCallback([[maybe_unused]] ConstFSEventStreamRef stream_ref,
+                   [[maybe_unused]] void* user_data,
+                   size_t num_events,
+                   void* event_paths,
+                   FSEventStreamEventFlags const event_flags[],
+                   [[maybe_unused]] FSEventStreamEventId const event_ids[]) {
     auto& watcher = *(FsWatcher*)user_data;
     auto** paths = (char**)event_paths;
 
@@ -558,12 +564,13 @@ void DirectoryChanged([[maybe_unused]] ConstFSEventStreamRef stream_ref,
 }
 
 ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
-                                       bool watched_directories_changed,
+                                       Span<DirectoryToWatch const> dirs_to_watch,
                                        [[maybe_unused]] ArenaAllocator& scratch_arena,
                                        DirectoryWatcher::Callback callback) {
-    (void)callback;
+    auto const any_states_changed = watcher.HandleWatchedDirChanges(dirs_to_watch);
+
     auto& fs_watcher = *(FsWatcher*)watcher.native_data.pointer;
-    if (watched_directories_changed) {
+    if (any_states_changed) {
         if (fs_watcher.stream) {
             FSEventStreamStop(fs_watcher.stream);
             FSEventStreamInvalidate(fs_watcher.stream);
@@ -592,7 +599,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
 
         fs_watcher.stream =
             FSEventStreamCreate(nullptr,
-                                &DirectoryChanged,
+                                &EventCallback,
                                 &context,
                                 paths,
                                 kFSEventStreamEventIdSinceNow,
@@ -709,7 +716,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
         fs_watcher.event_arena.ResetCursorAndConsolidateRegions();
     }
 
+    watcher.RemoveAllNotWatching();
+
     return k_success;
 }
-
-} // namespace native

@@ -255,8 +255,6 @@ ErrorCodeOr<MutableString> CurrentExecutablePath(Allocator& a) {
     return a.Clone(MutableString {buffer, (usize)size});
 }
 
-namespace native {
-
 // Makes string allocations reusable within an arena. The lifetime is managed by the arena, but you can
 // (optionally) Clone/Free individual strings within that lifetime to avoid lots of reallocations. It avoids
 // having make everything RAII ready (std C++ style).
@@ -344,6 +342,36 @@ static void UnwatchDirectory(int inotify_id, WatchedDirectory* d) {
     Malloc::Instance().Delete(d);
 }
 
+ErrorCodeOr<DirectoryWatcher> CreateDirectoryWatcher(Allocator& a) {
+    ZoneScoped;
+    DirectoryWatcher result {
+        .allocator = a,
+        .watched_dirs = {a},
+    };
+    auto h = inotify_init1(IN_NONBLOCK);
+    if (h == -1) return FilesystemErrnoErrorCode(errno);
+    result.native_data.int_id = h;
+    return result;
+}
+
+void DestoryDirectoryWatcher(DirectoryWatcher& watcher) {
+    ZoneScoped;
+    ArenaAllocatorWithInlineStorage<1000> scratch_arena;
+
+    for (auto const& dir : watcher.watched_dirs) {
+        if (dir.native_data.pointer != nullptr) {
+            auto& native_dir = *(WatchedDirectory*)dir.native_data.pointer;
+            for (auto& subdir : native_dir.subdirs)
+                InotifyUnwatch(watcher.native_data.int_id, subdir.watch_id);
+            UnwatchDirectory(watcher.native_data.int_id, (WatchedDirectory*)dir.native_data.pointer);
+        }
+    }
+
+    watcher.watched_dirs.Clear();
+
+    close(watcher.native_data.int_id);
+}
+
 static ErrorCodeOr<WatchedDirectory*> WatchDirectory(DirectoryWatcher::WatchedDirectory& dir,
                                                      int inotify_id,
                                                      String path,
@@ -400,28 +428,14 @@ static ErrorCodeOr<WatchedDirectory*> WatchDirectory(DirectoryWatcher::WatchedDi
     return result;
 }
 
-ErrorCodeOr<void> Initialise(DirectoryWatcher& w) {
-    ZoneScoped;
-    auto h = inotify_init1(IN_NONBLOCK);
-    if (h == -1) return FilesystemErrnoErrorCode(errno);
-    w.native_data.int_id = h;
-    return k_success;
-}
-
-void Deinitialise(DirectoryWatcher& w) {
-    ZoneScoped;
-    for (auto const& dir : w.watched_dirs)
-        ASSERT(dir.native_data.pointer == nullptr);
-    close(w.native_data.int_id);
-}
-
 constexpr bool k_debug_inotify = false;
 
 ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
-                                       bool watched_directories_changed,
+                                       Span<DirectoryToWatch const> dirs_to_watch,
                                        ArenaAllocator& scratch_arena,
                                        DirectoryWatcher::Callback callback) {
-    (void)watched_directories_changed;
+    watcher.HandleWatchedDirChanges(dirs_to_watch);
+
     for (auto& dir : watcher.watched_dirs) {
         if (dir.native_data.pointer != nullptr) {
             auto& native_dir = *(WatchedDirectory*)dir.native_data.pointer;
@@ -634,7 +648,7 @@ ErrorCodeOr<void> ReadDirectoryChanges(DirectoryWatcher& watcher,
         }
     }
 
+    watcher.RemoveAllNotWatching();
+
     return k_success;
 }
-
-} // namespace native

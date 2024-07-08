@@ -89,6 +89,14 @@ struct ArenaList {
             [this](Node* i) { Delete(i); });
     }
 
+    void Clear() {
+        while (first) {
+            auto next = first->next;
+            Delete(first);
+            first = next;
+        }
+    }
+
     bool Empty() const { return first == nullptr; }
 
     Iterator begin() const { return Iterator {first}; }

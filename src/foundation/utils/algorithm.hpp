@@ -15,6 +15,10 @@ PUBLIC constexpr u64 U64FromChars(char const (&data)[9]) {
            ((u64)(data[4]) << 32) | ((u64)(data[5]) << 40) | ((u64)(data[6]) << 48) | ((u64)(data[7]) << 56);
 }
 
+// IMPORTANT: be careful with ToByteSpan(), the padding bytes in a struct are not necessarily zeroed and
+// therefore you may get inconsistent results if you are reading it as a block of memory
+// IMPROVE: bugprone: review uses of ToByteSpan() and perhaps come up with a different solution
+
 PUBLIC constexpr u64 HashFnv1a(auto data) {
     // FNV-1a https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function#FNV-1a_hash
     u64 hash = 0xcbf29ce484222325;

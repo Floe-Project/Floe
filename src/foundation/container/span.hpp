@@ -35,6 +35,8 @@ struct Span {
         }
     }
 
+    // NOTE: be careful here, the padding bytes in a struct are not necessarily zeroed and therefore you may
+    // get inconsistent results if you are reading it as a block of memory
     constexpr Span<u8> ToByteSpan() const { return {(u8*)data, SizeInBytes()}; }
     constexpr Span<u8 const> ToConstByteSpan() const { return {(u8 const*)data, SizeInBytes()}; }
     constexpr usize SizeInBytes() const { return size * sizeof(Type); }

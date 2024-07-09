@@ -679,7 +679,7 @@ requires(Enum<decltype(e)>)
 consteval auto StringifyEnumValue() {
     constexpr auto k_raw = String(__PRETTY_FUNCTION__);
     constexpr auto k_str = [&]() {
-        auto offset = FindSpan(k_raw, "::"_s).ValueOr(0) + 2;
+        auto offset = FindLast(k_raw, ':').ValueOr(0) + 1;
         auto end = Find(k_raw, ']', offset).ValueOr(k_raw.size);
         return k_raw.SubSpan(offset, end - offset);
     }();

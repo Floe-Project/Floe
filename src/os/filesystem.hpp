@@ -275,7 +275,7 @@ class RecursiveDirectoryIterator {
 // File system watcher
 // =======================================================================================================
 // - inotify on Linux, ReadDirectoryChangesW on Windows, FSEvents on macOS
-// - Super simple poll-like API, just create, poll, destroy
+// - Super simple poll-like API, just create, poll, destroy -  all from one thread
 // - Recursive or non-recursive
 // - Events are grouped to each directory you request watching for
 // - Full error handling
@@ -283,25 +283,23 @@ class RecursiveDirectoryIterator {
 // NOTE: there's no fallback if the file system watcher fails to initialize. We could eventually add a system
 // that tracks changes by repeatedly scanning the directories.
 //
-//
 // These are some of reasons why this API is the way it is:
+//
+// The use-case that we designed this for was for an event/worker thread. The thread is already regularly
+// polling for events from other systems. So for file changes it's convenient to have the same poll-like
+// API. The alternative API that file watchers often have is a callback-based API where you receive events in
+// a separate thread. For our use-case that would just mean having to do lots of extra thread-safety work.
 //
 // Per-directory events:
 // We chose to group events to each directory that you request watching for rather than receiving an stream of
 // events from all directories. This is convenient for our use-case but it does loose a bit of information: we
-// no longer have the order of events across directories. Each directory gets an ordered list of changes but
-// we have no way of knowing if a change happened in watched_dir_A before or after a change in watched_dir_B.
+// no longer have the order of events _across_ directories. Each directory _does_ get an ordered list of
+// changes for itself, but we have no way of knowing if a change happened in watched_dir_A before or after a
+// change in watched_dir_B. We could add a way to retain this information if it's needed in the future.
 //
 // Single call for multiple directories:
 // The underlying APIs sometimes work as a single stream that watches multiple directories at once so we
 // follow that pattern rather than fighting it to allow separate calls for each directory.
-//
-//
-// TODO: we should ensure coalescing of changes in the backends so that we can clarify this API to say: "You
-// will recieve at most one callback for each subpath. The callback will contain all changes that have
-// happened to that subpath since the last call, in the order they happened. This way, you only need to look
-// at the last event if you want a gross view of the changes rather than dealing with each intermediate
-// state. For example you might not care if a file was modified shortly before being deleted."
 //
 // TODO: should we limit the number of errors that can be returned so that regularly failing operations aren't
 // repeated unnecessarily?
@@ -314,124 +312,85 @@ struct DirectoryToWatch {
     // TODO: allow a user-pointer here?
 };
 
-// Little util that allows a simple way to push items to a list and not worry about memory. Also allows
-// easy access the last item.
-template <typename Type>
-struct ArenaStack {
-    struct Node {
-        Node* next {};
-        Type data;
-    };
-
-    using Iterator = SinglyLinkedListIterator<Node, Type>;
-
-    ArenaStack() = default;
-    ArenaStack(Type t, ArenaAllocator& arena) { Append(t, arena); }
-
-    void Append(Type data, ArenaAllocator& arena) {
-        ++size;
-        auto node = arena.NewUninitialised<Node>();
-        node->data = data;
-        node->next = nullptr;
-        if (last) {
-            last->next = node;
-            last = node;
-        } else {
-            first = node;
-            last = node;
-        }
-    }
-
-    Type Last() const { return last->data; }
-
-    void Clear() {
-        first = nullptr;
-        last = nullptr;
-        size = 0;
-    }
-
-    auto begin() const { return Iterator {first}; }
-    auto end() const { return Iterator {nullptr}; }
-
-    Node* first {};
-    Node* last {};
-    u32 size {};
-};
-
 struct DirectoryWatcher {
     union NativeData {
         void* pointer;
         int int_id;
     };
 
-    enum class ChangeType : u16 {
-        Added,
-        Deleted,
-        Modified,
-        RenamedOldName,
-        RenamedNewName,
-        UnknownManualRescanNeeded,
-        Count
+    enum class ChangeType : u16 { Added, Deleted, Modified, RenamedOldName, RenamedNewName, Count };
+
+    struct SubpathChangeSet {
+        // if true, ignore all changes and recursively rescan this directory
+        bool manual_rescan_needed;
+
+        // ordered sequence of changes, loop over this to know the full history or just look at the Last()
+        ArenaStack<ChangeType> changes;
+
+        // relative to the watched directory, empty if the watched directory itself changed
+        String subpath;
+
+        // Might not be available. We get it for free on Linux and macOS but not on Windows.
+        Optional<FileType> file_type;
     };
 
-    struct ChangedItem {
-        bool manual_rescan_needed; // if true, ignore all changes and recursively rescan this directory
-        ArenaStack<ChangeType> changes; // sequence of changes, loop over this or just look at the Last()
-        String subpath; // relative to the watched directory, empty if the watched directory itself changed
-        Optional<FileType> file_type; // might not be available
-    };
-
-    struct ChangeSet {
+    struct DirectoryChanges {
         // private
         void Clear() {
             error = nullopt;
-            manual_rescan_needed = false;
-            changes.Clear();
+            subpath_changesets.Clear();
         }
 
         // private
-        bool HasContent() const { return error || manual_rescan_needed || changes.size; }
+        bool HasContent() const { return error || subpath_changesets.size; }
 
         // private
-        struct AddChangeArgs {
+        struct Change {
             String subpath;
             Optional<FileType> file_type;
-            ChangeType change; // ignored if subpath_needs_manual_rescan is true
-            bool subpath_needs_manual_rescan;
+            ChangeType change; // ignored if manual_rescan_needed is true
+            bool manual_rescan_needed;
         };
 
         // private
-        void Add(AddChangeArgs args, ArenaAllocator& arena) {
-            for (auto& c : changes)
-                if (path::Equal(c.subpath, args.subpath) && c.file_type == args.file_type) {
-                    if (args.subpath_needs_manual_rescan)
-                        c.manual_rescan_needed = true;
-                    else if (c.changes.Last() != args.change) // don't add the same change twice
-                        c.changes.Append(args.change, arena);
+        void Add(Change change, ArenaAllocator& arena) {
+            // try finding the subpath+file_type and add the change to it
+            for (auto& subpath_changeset : subpath_changesets)
+                // We check both subpath and file_type because a file can be deleted and then created as a
+                // different type. We shouldn't coalesce in this case.
+                if (path::Equal(subpath_changeset.subpath, change.subpath) &&
+                    subpath_changeset.file_type == change.file_type) {
+                    if (change.manual_rescan_needed)
+                        subpath_changeset.manual_rescan_needed = true;
+                    else if (subpath_changeset.changes.Last() !=
+                             change.change) // don't add the same change twice
+                        subpath_changeset.changes.Append(change.change, arena);
                     return;
                 }
-            changes.Append(
-                    args.subpath_needs_manual_rescan
-                        ? ChangedItem {
-                              .manual_rescan_needed = true,
-                              .changes = {},
-                              .subpath = args.subpath,
-                              .file_type = args.file_type,
-                          }
-                        :
-                ChangedItem {
-                    .manual_rescan_needed = false,
-                    .changes = {args.change, arena},
-                    .subpath = args.subpath,
-                    .file_type = args.file_type,
-                },
-                arena);
+
+            // else, we create a new one
+            SubpathChangeSet new_changeset {
+                .manual_rescan_needed = change.manual_rescan_needed,
+                .changes = {},
+                .subpath = change.subpath,
+                .file_type = change.file_type,
+            };
+            if (!change.manual_rescan_needed) new_changeset.changes.Append(change.change, arena);
+            subpath_changesets.Append(new_changeset, arena);
         }
 
+        // A pointer to the directory that you requested watching for. Allows you to more easily associate the
+        // changes with a directory.
         DirectoryToWatch const* linked_dir_to_watch {};
-        Optional<ErrorCode> error; // an error occurred, events could be incomplete
-        bool manual_rescan_needed {}; // if true, ignore all changes and recursively rescan this directory
-        ArenaStack<ChangedItem> changes {}; // loop over this
+
+        // An error occurred, events could be incomplete. What to do is probably dependent on the type of
+        // error.
+        Optional<ErrorCode> error;
+
+        // Changesets for each subpath that had changes. This list is unordered, but the changes
+        // contained within each changset _are_ ordered. You will also get one of these with an empty
+        // 'subpath' if the watched directory itself changed.
+        ArenaStack<SubpathChangeSet> subpath_changesets {};
     };
 
     struct WatchedDirectory {
@@ -449,7 +408,8 @@ struct DirectoryWatcher {
         String resolved_path;
         bool recursive;
 
-        ChangeSet change_set {}; // ephemeral
+        DirectoryChanges directory_changes {}; // ephemeral
+        bool is_desired {}; // ephemeral
 
         NativeData native_data;
     };
@@ -461,19 +421,17 @@ struct DirectoryWatcher {
     }
 
     // private
-    Span<ChangeSet const> ActiveChangeSets(ArenaAllocator& arena) const {
-        DynamicArray<ChangeSet> result(arena);
+    Span<DirectoryChanges const> AllDirectoryChanges(ArenaAllocator& arena) const {
+        DynamicArray<DirectoryChanges> result(arena);
         for (auto const& dir : watched_dirs)
-            if (dir.change_set.HasContent()) dyn::Append(result, dir.change_set);
+            if (dir.directory_changes.HasContent()) dyn::Append(result, dir.directory_changes);
         return result.ToOwnedSpan();
     }
 
     // private
-    bool HandleWatchedDirChanges(Span<DirectoryToWatch const> dirs_to_watch, ArenaAllocator& scratch_arena) {
-        auto is_desired = scratch_arena.NewMultiple<bool>(dirs_to_watch.size);
-        DEFER {
-            if (is_desired.size) scratch_arena.Free(is_desired.ToByteSpan());
-        };
+    bool HandleWatchedDirChanges(Span<DirectoryToWatch const> dirs_to_watch) {
+        for (auto& dir : watched_dirs)
+            dir.is_desired = false;
 
         bool any_states_changed = false;
 
@@ -484,18 +442,17 @@ struct DirectoryWatcher {
                         if (path::Equal(dir.path, dir_to_watch.path) &&
                             dir.recursive == dir_to_watch.recursive) {
                             d = &dir;
-                            dir.change_set.linked_dir_to_watch = &dir_to_watch;
+                            dir.directory_changes.linked_dir_to_watch = &dir_to_watch;
                             break;
                         }
                     }
                     d;
                 })) {
-                is_desired[index] = true;
+                dir_ptr->is_desired = true;
                 continue;
             }
 
             any_states_changed = true;
-            is_desired[index] = true;
 
             auto new_dir = watched_dirs.PrependUninitialised();
             PLACEMENT_NEW(new_dir)
@@ -503,15 +460,18 @@ struct DirectoryWatcher {
                 .arena = {Malloc::Instance(), 0, 256},
                 .state = DirectoryWatcher::WatchedDirectory::State::NeedsWatching,
                 .recursive = dir_to_watch.recursive,
+                .is_desired = true,
             };
             auto const path = new_dir->arena.Clone(dir_to_watch.path);
             new_dir->path = path;
+            // some backends (FSEvents) give use events containing paths with resolved symlinks, so we need
+            // to resolve it ourselves to be able to correctly compare paths
             new_dir->resolved_path = ResolveSymlinks(new_dir->arena, dir_to_watch.path).ValueOr(path);
-            new_dir->change_set.linked_dir_to_watch = &dir_to_watch;
+            new_dir->directory_changes.linked_dir_to_watch = &dir_to_watch;
         }
 
         for (auto [index, dir] : Enumerate(watched_dirs))
-            if (!is_desired[index]) {
+            if (!dir.is_desired) {
                 dir.state = DirectoryWatcher::WatchedDirectory::State::NeedsUnwatching;
                 any_states_changed = true;
             }
@@ -527,7 +487,7 @@ struct DirectoryWatcher {
 ErrorCodeOr<DirectoryWatcher> CreateDirectoryWatcher(Allocator& a);
 void DestoryDirectoryWatcher(DirectoryWatcher& w);
 
-ErrorCodeOr<Span<DirectoryWatcher::ChangeSet const>>
+ErrorCodeOr<Span<DirectoryWatcher::DirectoryChanges const>>
 ReadDirectoryChanges(DirectoryWatcher& w,
                      Span<DirectoryToWatch const> directories,
                      ArenaAllocator& result_arena,

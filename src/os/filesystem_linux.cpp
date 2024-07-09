@@ -432,15 +432,15 @@ static ErrorCodeOr<WatchedDirectory*> WatchDirectory(DirectoryWatcher::WatchedDi
 
 constexpr bool k_debug_inotify = false;
 
-ErrorCodeOr<Span<DirectoryWatcher::ChangeSet const>>
+ErrorCodeOr<Span<DirectoryWatcher::DirectoryChanges const>>
 ReadDirectoryChanges(DirectoryWatcher& watcher,
                      Span<DirectoryToWatch const> dirs_to_watch,
                      ArenaAllocator& result_arena,
                      ArenaAllocator& scratch_arena) {
-    watcher.HandleWatchedDirChanges(dirs_to_watch, scratch_arena);
+    watcher.HandleWatchedDirChanges(dirs_to_watch);
 
     for (auto& dir : watcher.watched_dirs) {
-        dir.change_set.Clear();
+        dir.directory_changes.Clear();
 
         if (dir.native_data.pointer != nullptr) {
             auto& native_dir = *(WatchedDirectory*)dir.native_data.pointer;
@@ -467,19 +467,21 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
                 if (outcome.HasError()) {
                     dir.state = DirectoryWatcher::WatchedDirectory::State::WatchingFailed;
                     ASSERT(dir.native_data.pointer == nullptr);
-                    dir.change_set.error = outcome.Error();
+                    dir.directory_changes.error = outcome.Error();
                 }
                 dir.state = DirectoryWatcher::WatchedDirectory::State::Watching;
                 dir.native_data.pointer = outcome.Value();
                 break;
             }
             case DirectoryWatcher::WatchedDirectory::State::NeedsUnwatching: {
-                auto& native_dir = *(WatchedDirectory*)dir.native_data.pointer;
-                for (auto& child : native_dir.subdirs) {
-                    ASSERT(child.watch_id_invalidated == false);
-                    InotifyUnwatch(watcher.native_data.int_id, child.watch_id);
+                if (dir.native_data.pointer != nullptr) {
+                    auto& native_dir = *(WatchedDirectory*)dir.native_data.pointer;
+                    for (auto& child : native_dir.subdirs) {
+                        ASSERT(child.watch_id_invalidated == false);
+                        InotifyUnwatch(watcher.native_data.int_id, child.watch_id);
+                    }
+                    UnwatchDirectory(watcher.native_data.int_id, dir);
                 }
-                UnwatchDirectory(watcher.native_data.int_id, dir);
                 dir.state = DirectoryWatcher::WatchedDirectory::State::NotWatching;
                 dir.native_data.pointer = nullptr;
                 break;
@@ -646,14 +648,14 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
                 action = DirectoryWatcher::ChangeType::Added;
             if (!action) continue;
 
-            this_event.dir.change_set.Add(
-                DirectoryWatcher::ChangeSet::AddChangeArgs {
+            this_event.dir.directory_changes.Add(
+                {
                     .subpath = this_event.SubDirPath().size
                                    ? path::Join(result_arena, Array {this_event.SubDirPath(), event_name})
                                    : result_arena.Clone(event_name),
                     .file_type = (event->mask & IN_ISDIR) ? FileType::Directory : FileType::RegularFile,
                     .change = *action,
-                    .subpath_needs_manual_rescan = false,
+                    .manual_rescan_needed = false,
                 },
                 result_arena);
         }
@@ -662,7 +664,7 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
     if constexpr (k_debug_inotify) {
         for (auto const& dir : watcher.watched_dirs) {
             DynamicArrayInline<char, 1000> printout;
-            for (auto const& change : dir.change_set.changes) {
+            for (auto const& change : dir.directory_changes.subpath_changesets) {
                 fmt::Append(printout, "Changes for '{}' => '{}':\n", dir.path, change.subpath);
                 for (auto const& subchange : change.changes)
                     fmt::Append(printout, "  {}\n", EnumToString(subchange));
@@ -673,5 +675,5 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
 
     watcher.RemoveAllNotWatching();
 
-    return watcher.ActiveChangeSets(result_arena);
+    return watcher.AllDirectoryChanges(result_arena);
 }

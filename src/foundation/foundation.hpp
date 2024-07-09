@@ -18,6 +18,7 @@
 #include "utils/writer.hpp" // IWYU pragma: export
 
 #include "container/arena_list.hpp" // IWYU pragma: export
+#include "container/arena_stack.hpp" // IWYU pragma: export
 #include "container/array.hpp" // IWYU pragma: export
 #include "container/bitset.hpp" // IWYU pragma: export
 #include "container/circular_buffer.hpp" // IWYU pragma: export

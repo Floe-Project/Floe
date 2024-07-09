@@ -725,28 +725,23 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
             // TODO(1.0) handle error
             DebugLn("Reading directory changes failed: {}", outcome.Error());
         } else {
-            auto const change_sets = outcome.Value();
-            for (auto const& change_set : change_sets) {
-                if (change_set.manual_rescan_needed) {
+            auto const dir_changes_span = outcome.Value();
+            for (auto const& dir_changes : dir_changes_span) {
+                if (dir_changes.error) {
                     // TODO: handle this
                     continue;
                 }
 
-                if (change_set.error) {
-                    // TODO: handle this
-                    continue;
-                }
-
-                for (auto const& change : change_set.changes) {
+                for (auto const& subpath_changeset : dir_changes.subpath_changesets) {
                     // TODO: use a more robust way of determining which of our assets have changed. We can
                     // do that by associating data with the DirectoryToWatch perhaps.
 
                     enum class Type { Unknown, MainLibraryFile, AuxilleryLibraryFile };
                     Type type {Type::Unknown};
                     LibrariesList::Node* relates_to_lib {};
-                    auto const full_path =
-                        String(path::Join(scratch_arena,
-                                          Array {change_set.linked_dir_to_watch->path, change.subpath}));
+                    auto const full_path = String(
+                        path::Join(scratch_arena,
+                                   Array {dir_changes.linked_dir_to_watch->path, subpath_changeset.subpath}));
                     for (auto& node : libs.libraries) {
                         auto const& lib = *node.value.lib;
                         if (path::Equal(lib.path, full_path)) {
@@ -766,7 +761,7 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
                     AvailableLibraries::ScanFolderList::Node* relates_to_scan_folder = nullptr;
                     for (auto& n : libs.scan_folders) {
                         if (auto f = n.TryRetain()) {
-                            if (path::Equal(change_set.linked_dir_to_watch->path, f->path)) {
+                            if (path::Equal(dir_changes.linked_dir_to_watch->path, f->path)) {
                                 relates_to_scan_folder = &n;
                                 break;
                             }
@@ -777,21 +772,31 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
                         if (relates_to_scan_folder) relates_to_scan_folder->Release();
                     };
 
-                    switch (change.changes.Last()) {
+                    if (subpath_changeset.manual_rescan_needed) {
+                        // TODO is this the right path?
+                        if (relates_to_scan_folder)
+                            relates_to_scan_folder->value.state.Store(
+                                AvailableLibraries::ScanFolder::State::RescanRequested);
+                        continue;
+                    }
+
+                    switch (subpath_changeset.changes.Last()) {
                         case DirectoryWatcher::ChangeType::Added: {
-                            ASSERT(!path::StartsWithDirectorySeparator(change.subpath));
-                            ASSERT(!path::EndsWithDirectorySeparator(change.subpath));
+                            ASSERT(!path::StartsWithDirectorySeparator(subpath_changeset.subpath));
+                            ASSERT(!path::EndsWithDirectorySeparator(subpath_changeset.subpath));
                             int num_separators = 0;
-                            for (auto c : change.subpath)
+                            for (auto c : subpath_changeset.subpath)
                                 if (path::IsPathSeparator(c)) ++num_separators;
 
                             // We only allow libraries at the top level of the scan-folder
-                            if (num_separators == 1 && path::Filename(change.subpath) == "config.lua")
+                            if (num_separators == 1 &&
+                                path::Filename(subpath_changeset.subpath) == "config.lua")
                                 ReadLibraryAsync(async_ctx,
                                                  libs.libraries,
                                                  full_path,
                                                  sample_lib::FileFormat::Lua);
-                            else if (num_separators == 0 && path::Extension(change.subpath) == ".mdata")
+                            else if (num_separators == 0 &&
+                                     path::Extension(subpath_changeset.subpath) == ".mdata")
                                 ReadLibraryAsync(async_ctx,
                                                  libs.libraries,
                                                  full_path,
@@ -825,18 +830,12 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
                                 RereadLibraryAsync(async_ctx, libs.libraries, relates_to_lib);
                             break;
                         }
-                        case DirectoryWatcher::ChangeType::UnknownManualRescanNeeded: {
-                            if (relates_to_scan_folder)
-                                relates_to_scan_folder->value.state.Store(
-                                    AvailableLibraries::ScanFolder::State::RescanRequested);
-                            break;
-                        }
                         case DirectoryWatcher::ChangeType::Count: break;
                     }
                     DebugLn("FS change: {}, {}, {}, relates to lib {}, type {}, found folder: {}",
-                            EnumToString(change.changes.Last()),
-                            change_set.linked_dir_to_watch->path,
-                            change.subpath,
+                            EnumToString(subpath_changeset.changes.Last()),
+                            dir_changes.linked_dir_to_watch->path,
+                            subpath_changeset.subpath,
                             relates_to_lib ? relates_to_lib->value.lib->name : ""_s,
                             type,
                             (bool)relates_to_scan_folder);

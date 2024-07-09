@@ -774,19 +774,19 @@ static ErrorCodeOr<WatchedDirectory*> WatchDirectory(DirectoryWatcher::WatchedDi
     return watch;
 }
 
-ErrorCodeOr<Span<DirectoryWatcher::ChangeSet const>>
+ErrorCodeOr<Span<DirectoryWatcher::DirectoryChanges const>>
 ReadDirectoryChanges(DirectoryWatcher& watcher,
                      Span<DirectoryToWatch const> dirs_to_watch,
                      ArenaAllocator& result_arena,
                      ArenaAllocator& scratch_arena) {
 
-    auto const any_states_changed = watcher.HandleWatchedDirChanges(dirs_to_watch, scratch_arena);
+    auto const any_states_changed = watcher.HandleWatchedDirChanges(dirs_to_watch);
 
     auto const scratch_cursor = scratch_arena.TotalUsed();
     DEFER { scratch_arena.TryShrinkTotalUsed(scratch_cursor); };
 
     for (auto& dir : watcher.watched_dirs)
-        dir.change_set.Clear();
+        dir.directory_changes.Clear();
 
     if (any_states_changed) {
         for (auto& dir : watcher.watched_dirs) {
@@ -798,7 +798,7 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
                         dir.native_data.pointer = outcome.Value();
                     } else {
                         dir.state = DirectoryWatcher::WatchedDirectory::State::WatchingFailed;
-                        dir.change_set.error = outcome.Error();
+                        dir.directory_changes.error = outcome.Error();
                         dir.native_data = {};
                     }
                     break;
@@ -906,12 +906,12 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
                     if (type) {
                         auto const narrowed = Narrow(result_arena, filename);
                         if (narrowed.HasValue()) {
-                            dir.change_set.Add(
+                            dir.directory_changes.Add(
                                 {
                                     .subpath = narrowed.Value(),
                                     .file_type = nullopt,
                                     .change = *type,
-                                    .subpath_needs_manual_rescan = false,
+                                    .manual_rescan_needed = false,
                                 },
                                 result_arena);
                         }
@@ -922,9 +922,18 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
                     base += next_entry_offset;
                 }
 
-                if (error) dir.change_set.manual_rescan_needed = true;
+                if (error) {
+                    dir.directory_changes.Add(
+                        {
+                            .subpath = {},
+                            .file_type = nullopt,
+                            .change = {},
+                            .manual_rescan_needed = true,
+                        },
+                        result_arena);
+                }
             } else {
-                dir.change_set.error = FilesystemWin32ErrorCode(GetLastError());
+                dir.directory_changes.error = FilesystemWin32ErrorCode(GetLastError());
             }
         } else if (wait_result != WAIT_TIMEOUT) {
             Panic("unexpected result from WaitForSingleObjectEx");
@@ -942,14 +951,21 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
         if (!succeeded) {
             auto const error = GetLastError();
             if (error == ERROR_NOTIFY_ENUM_DIR)
-                dir.change_set.manual_rescan_needed = true;
+                dir.directory_changes.Add(
+                    {
+                        .subpath = {},
+                        .file_type = nullopt,
+                        .change = {},
+                        .manual_rescan_needed = true,
+                    },
+                    result_arena);
             else
-                dir.change_set.error = FilesystemWin32ErrorCode(error);
+                dir.directory_changes.error = FilesystemWin32ErrorCode(error);
             continue;
         }
     }
 
     watcher.RemoveAllNotWatching();
 
-    return watcher.ActiveChangeSets(result_arena);
+    return watcher.AllDirectoryChanges(result_arena);
 }

@@ -420,15 +420,10 @@ struct FsWatcher {
         String path;
         FSEventStreamEventFlags flags;
         Existence exists = Existence::Unknown;
-        Event* next;
-        Event* prev;
     };
     Mutex event_mutex;
     ArenaAllocator event_arena {PageAllocator::Instance()};
-    struct Events {
-        Event* first;
-        Event* last;
-    } events;
+    ArenaStack<Event> events;
 };
 
 ErrorCodeOr<DirectoryWatcher> CreateDirectoryWatcher(Allocator& a) {
@@ -551,27 +546,25 @@ void EventCallback([[maybe_unused]] ConstFSEventStreamRef stream_ref,
         watcher.event_mutex.Lock();
         DEFER { watcher.event_mutex.Unlock(); };
 
-        auto event = watcher.event_arena.NewUninitialised<FsWatcher::Event>();
-        PLACEMENT_NEW(event)
-        FsWatcher::Event {
-            .path = watcher.event_arena.Clone(FromNullTerminated(paths[i])),
-            .flags = flags,
-            .exists = existence,
-        };
-
-        DoublyLinkedListAppend(watcher.events, event);
+        watcher.events.Append(
+            {
+                .path = watcher.event_arena.Clone(FromNullTerminated(paths[i])),
+                .flags = flags,
+                .exists = existence,
+            },
+            watcher.event_arena);
     }
 }
 
-ErrorCodeOr<Span<DirectoryWatcher::ChangeSet const>>
+ErrorCodeOr<Span<DirectoryWatcher::DirectoryChanges const>>
 ReadDirectoryChanges(DirectoryWatcher& watcher,
                      Span<DirectoryToWatch const> dirs_to_watch,
                      ArenaAllocator& result_arena,
-                     ArenaAllocator& scratch_arena) {
-    auto const any_states_changed = watcher.HandleWatchedDirChanges(dirs_to_watch, scratch_arena);
+                     [[maybe_unused]] ArenaAllocator& scratch_arena) {
+    auto const any_states_changed = watcher.HandleWatchedDirChanges(dirs_to_watch);
 
     for (auto& dir : watcher.watched_dirs)
-        dir.change_set.Clear();
+        dir.directory_changes.Clear();
 
     auto& fs_watcher = *(FsWatcher*)watcher.native_data.pointer;
     if (any_states_changed) {
@@ -599,7 +592,7 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
         FSEventStreamContext context {};
         context.info = &fs_watcher;
 
-        constexpr double k_latency_seconds = 0.0; // TODO: allow setting this as an option?
+        constexpr double k_latency_seconds = 0.05; // TODO: allow setting this as an option?
 
         fs_watcher.stream =
             FSEventStreamCreate(nullptr,
@@ -635,26 +628,26 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
         fs_watcher.event_mutex.Lock();
         DEFER { fs_watcher.event_mutex.Unlock(); };
 
-        for (auto event = fs_watcher.events.first; event; event = event->next) {
+        for (auto const& event : fs_watcher.events) {
             for (auto& dir : watcher.watched_dirs) {
-                if (StartsWithSpan(event->path, dir.resolved_path)) {
+                if (StartsWithSpan(event.path, dir.resolved_path)) {
                     String subpath {};
-                    if (event->path.size != dir.resolved_path.size)
-                        subpath = event->path.SubSpan(dir.resolved_path.size);
+                    if (event.path.size != dir.resolved_path.size)
+                        subpath = event.path.SubSpan(dir.resolved_path.size);
                     if (subpath.size && subpath[0] == '/') subpath = subpath.SubSpan(1);
                     subpath = result_arena.Clone(subpath);
 
-                    auto const file_type = (event->flags & kFSEventStreamEventFlagItemIsDir)
+                    auto const file_type = (event.flags & kFSEventStreamEventFlagItemIsDir)
                                                ? FileType::Directory
                                                : FileType::RegularFile;
 
-                    if (event->flags & kFSEventStreamEventFlagMustScanSubDirs) {
-                        dir.change_set.Add(
+                    if (event.flags & kFSEventStreamEventFlagMustScanSubDirs) {
+                        dir.directory_changes.Add(
                             {
                                 .subpath = subpath,
                                 .file_type = file_type,
                                 .change = {},
-                                .subpath_needs_manual_rescan = true,
+                                .manual_rescan_needed = true,
                             },
                             result_arena);
                         continue;
@@ -669,13 +662,13 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
                         continue;
                     }
 
-                    auto const created = event->flags & kFSEventStreamEventFlagItemCreated;
-                    auto const removed = event->flags & kFSEventStreamEventFlagItemRemoved;
-                    auto const renamed = event->flags & kFSEventStreamEventFlagItemRenamed;
-                    auto const modified = event->flags & kFSEventStreamEventFlagItemModified;
+                    auto const created = event.flags & kFSEventStreamEventFlagItemCreated;
+                    auto const removed = event.flags & kFSEventStreamEventFlagItemRemoved;
+                    auto const renamed = event.flags & kFSEventStreamEventFlagItemRenamed;
+                    auto const modified = event.flags & kFSEventStreamEventFlagItemModified;
 
                     auto add = [&](DirectoryWatcher::ChangeType type) {
-                        dir.change_set.Add(
+                        dir.directory_changes.Add(
                             {
                                 .subpath = subpath,
                                 .file_type = file_type,
@@ -685,13 +678,13 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
                     };
 
                     if (renamed) {
-                        if (event->exists == FsWatcher::Event::Existence::Exists)
+                        if (event.exists == FsWatcher::Event::Existence::Exists)
                             add(DirectoryWatcher::ChangeType::RenamedNewName);
-                        else if (event->exists == FsWatcher::Event::Existence::DoesNotExist)
+                        else if (event.exists == FsWatcher::Event::Existence::DoesNotExist)
                             add(DirectoryWatcher::ChangeType::RenamedOldName);
                     } else {
                         if (created && removed)
-                            if (event->exists == FsWatcher::Event::Existence::DoesNotExist)
+                            if (event.exists == FsWatcher::Event::Existence::DoesNotExist)
                                 add(DirectoryWatcher::ChangeType::Added);
                             else
                                 add(DirectoryWatcher::ChangeType::Deleted);
@@ -704,7 +697,7 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
 
                     if (!renamed) {
                         if (removed && created)
-                            if (event->exists == FsWatcher::Event::Existence::DoesNotExist)
+                            if (event.exists == FsWatcher::Event::Existence::DoesNotExist)
                                 add(DirectoryWatcher::ChangeType::Deleted);
                             else
                                 add(DirectoryWatcher::ChangeType::Added);
@@ -715,12 +708,11 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
             }
         }
 
-        fs_watcher.events.first = nullptr;
-        fs_watcher.events.last = nullptr;
+        fs_watcher.events.Clear();
         fs_watcher.event_arena.ResetCursorAndConsolidateRegions();
     }
 
     watcher.RemoveAllNotWatching();
 
-    return watcher.ActiveChangeSets(result_arena);
+    return watcher.AllDirectoryChanges(result_arena);
 }

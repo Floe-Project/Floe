@@ -424,63 +424,64 @@ TEST_CASE(TestReadingDirectoryChanges) {
             .recursive = recursive,
         }};
 
-        auto const change_sets = TRY(ReadDirectoryChanges(watcher, dirs_to_watch, a, a));
-        if (change_sets.size) {
+        auto const changesets = TRY(ReadDirectoryChanges(watcher, dirs_to_watch, a, a));
+        if (changesets.size) {
             tester.log.DebugLn("Unexpected result");
             REQUIRE(false);
         }
 
-        auto check = [&](Span<DirectoryWatcher::ChangeSet::AddChangeArgs const> expected_changes)
+        auto check = [&](Span<DirectoryWatcher::DirectoryChanges::Change const> expected_changes)
             -> ErrorCodeOr<void> {
-            DirectoryWatcher::ChangeSet changes;
+            DirectoryWatcher::DirectoryChanges changes;
 
             // we give the watcher some time and a few attempts to detect the changes
             for (auto const _ : Range(4)) {
                 SleepThisThread(5);
-                auto const change_sets = TRY(ReadDirectoryChanges(watcher, dirs_to_watch, a, a));
+                auto const changesets = TRY(ReadDirectoryChanges(watcher, dirs_to_watch, a, a));
 
-                for (auto const& change_set : change_sets) {
-                    auto const& path = *change_set.linked_dir_to_watch;
+                for (auto const& changeset : changesets) {
+                    auto const& path = *changeset.linked_dir_to_watch;
 
                     CHECK(path::Equal(path.path, dir));
-                    if (change_set.error) tester.log.DebugLn("Error in {}: {}", path.path, *change_set.error);
-                    CHECK(!change_set.error.HasValue());
+                    if (changeset.error) tester.log.DebugLn("Error in {}: {}", path.path, *changeset.error);
+                    CHECK(!changeset.error.HasValue());
 
-                    for (auto const& c : change_set.changes) {
+                    for (auto const& subpath_changeset : changeset.subpath_changesets) {
                         DynamicArrayInline<char, 500> changes_str;
-                        for (auto const& sub_c : c.changes) {
-                            dyn::AppendSpan(changes_str, EnumToString(sub_c));
+                        for (auto const& change : subpath_changeset.changes) {
+                            dyn::AppendSpan(changes_str, EnumToString(change));
                             dyn::AppendSpan(changes_str, ", ");
 
                             changes.Add(
                                 {
-                                    .subpath = a.Clone(c.subpath),
-                                    .file_type = c.file_type,
-                                    .change = sub_c,
-                                    .subpath_needs_manual_rescan = c.manual_rescan_needed,
+                                    .subpath = a.Clone(subpath_changeset.subpath),
+                                    .file_type = subpath_changeset.file_type,
+                                    .change = change,
+                                    .manual_rescan_needed = subpath_changeset.manual_rescan_needed,
                                 },
                                 a);
                         }
                         if (changes_str.size) changes_str.size -= 2;
                         tester.log.DebugLn("Event: \"{}\" {{ {} }} in \"{}\"",
-                                           c.subpath,
+                                           subpath_changeset.subpath,
                                            changes_str,
                                            path.path);
                     }
                 }
             }
 
-            CHECK_OP(changes.changes.size, >=, expected_changes.size);
+            CHECK_OP(changes.subpath_changesets.size, >=, expected_changes.size);
             for (auto const& expected : expected_changes) {
                 CAPTURE(expected.subpath);
                 CAPTURE(expected.change);
 
                 bool found = false;
-                for (auto const& c : changes.changes) {
-                    if (path::Equal(c.subpath, expected.subpath) &&
-                        (!c.file_type.HasValue() || c.file_type.Value() == expected.file_type)) {
-                        for (auto const& sub_c : c.changes) {
-                            if (sub_c == expected.change) {
+                for (auto const& subpath_changeset : changes.subpath_changesets) {
+                    if (path::Equal(subpath_changeset.subpath, expected.subpath) &&
+                        (!subpath_changeset.file_type.HasValue() ||
+                         subpath_changeset.file_type.Value() == expected.file_type)) {
+                        for (auto const& change : subpath_changeset.changes) {
+                            if (change == expected.change) {
                                 found = true;
                                 break;
                             }
@@ -490,14 +491,14 @@ TEST_CASE(TestReadingDirectoryChanges) {
                 }
                 CHECK(found);
             }
-            if (changes.changes.size != expected_changes.size) {
+            if (changes.subpath_changesets.size != expected_changes.size) {
                 tester.log.DebugLn(
                     "ReadDirectoryChanges resulted different changes than expected ({}). Expected:",
                     recursive ? "recursive" : "non-recursive");
                 for (auto const& change : expected_changes)
                     tester.log.DebugLn("  {} {}", change.subpath, EnumToString(change.change));
                 tester.log.DebugLn("Actual:");
-                for (auto const& change : changes.changes)
+                for (auto const& change : changes.subpath_changesets)
                     for (auto const& sub_c : change.changes)
                         tester.log.DebugLn("  {} {}", change.subpath, EnumToString(sub_c));
             }
@@ -508,7 +509,7 @@ TEST_CASE(TestReadingDirectoryChanges) {
             SUBCASE("delete is detected") {
                 TRY(Delete(file.full_path, {}));
                 TRY(check(Array {
-                    DirectoryWatcher::ChangeSet::AddChangeArgs {file.subpath,
+                    DirectoryWatcher::DirectoryChanges::Change {file.subpath,
                                                                 FileType::RegularFile,
                                                                 DirectoryWatcher::ChangeType::Deleted}}));
             }
@@ -516,7 +517,7 @@ TEST_CASE(TestReadingDirectoryChanges) {
             SUBCASE("modify is detected") {
                 TRY(WriteFile(file.full_path, "new data"));
                 TRY(check(Array {
-                    DirectoryWatcher::ChangeSet::AddChangeArgs {file.subpath,
+                    DirectoryWatcher::DirectoryChanges::Change {file.subpath,
                                                                 FileType::RegularFile,
                                                                 DirectoryWatcher::ChangeType::Modified}}));
             }
@@ -525,10 +526,10 @@ TEST_CASE(TestReadingDirectoryChanges) {
                 auto const new_file = TestPath::Create(a, dir, "file1_renamed.txt");
                 TRY(MoveFile(file.full_path, new_file.full_path, ExistingDestinationHandling::Fail));
                 TRY(check(Array {
-                    DirectoryWatcher::ChangeSet::AddChangeArgs {file.subpath,
+                    DirectoryWatcher::DirectoryChanges::Change {file.subpath,
                                                                 FileType::RegularFile,
                                                                 DirectoryWatcher::ChangeType::RenamedOldName},
-                    DirectoryWatcher::ChangeSet::AddChangeArgs {
+                    DirectoryWatcher::DirectoryChanges::Change {
                         new_file.subpath,
                         FileType::RegularFile,
                         DirectoryWatcher::ChangeType::RenamedNewName}}));
@@ -538,14 +539,14 @@ TEST_CASE(TestReadingDirectoryChanges) {
                 SUBCASE("delete in subfolder is detected") {
                     TRY(Delete(subfile.full_path, {}));
                     TRY(check(Array {
-                        DirectoryWatcher::ChangeSet::AddChangeArgs {subfile.subpath,
+                        DirectoryWatcher::DirectoryChanges::Change {subfile.subpath,
                                                                     FileType::RegularFile,
                                                                     DirectoryWatcher::ChangeType::Deleted}}));
                 }
 
                 SUBCASE("modify is detected") {
                     TRY(WriteFile(subfile.full_path, "new data"));
-                    TRY(check(Array {DirectoryWatcher::ChangeSet::AddChangeArgs {
+                    TRY(check(Array {DirectoryWatcher::DirectoryChanges::Change {
                         subfile.subpath,
                         FileType::RegularFile,
                         DirectoryWatcher::ChangeType::Modified}}));
@@ -557,11 +558,11 @@ TEST_CASE(TestReadingDirectoryChanges) {
                     TRY(MoveFile(subfile.full_path,
                                  new_subfile.full_path,
                                  ExistingDestinationHandling::Fail));
-                    TRY(check(Array {DirectoryWatcher::ChangeSet::AddChangeArgs {
+                    TRY(check(Array {DirectoryWatcher::DirectoryChanges::Change {
                                          subfile.subpath,
                                          FileType::RegularFile,
                                          DirectoryWatcher::ChangeType::RenamedOldName},
-                                     DirectoryWatcher::ChangeSet::AddChangeArgs {
+                                     DirectoryWatcher::DirectoryChanges::Change {
                                          new_subfile.subpath,
                                          FileType::RegularFile,
                                          DirectoryWatcher::ChangeType::RenamedNewName}}));
@@ -570,7 +571,7 @@ TEST_CASE(TestReadingDirectoryChanges) {
                 SUBCASE("deleting subfolder is detected") {
                     TRY(Delete(subdir.full_path, {.type = DeleteOptions::Type::DirectoryRecursively}));
                     TRY(check(Array {
-                        DirectoryWatcher::ChangeSet::AddChangeArgs {subdir.subpath,
+                        DirectoryWatcher::DirectoryChanges::Change {subdir.subpath,
                                                                     FileType::Directory,
                                                                     DirectoryWatcher::ChangeType::Deleted}}));
                 }

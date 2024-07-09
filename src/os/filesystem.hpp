@@ -12,6 +12,7 @@ enum class FilesystemError : u32 {
     AccessDenied,
     PathIsAFile,
     PathIsAsDirectory,
+    FileWatcherCreationFailed,
     Count,
 };
 
@@ -318,7 +319,7 @@ struct DirectoryWatcher {
         int int_id;
     };
 
-    enum class ChangeType : u16 { Added, Deleted, Modified, RenamedOldName, RenamedNewName, Count };
+    enum class ChangeType : u8 { Added, Deleted, Modified, RenamedOldName, RenamedNewName, Count };
 
     struct SubpathChangeSet {
         // if true, ignore all changes and recursively rescan this directory

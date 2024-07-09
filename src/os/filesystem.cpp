@@ -22,6 +22,7 @@ static constexpr ErrorCodeCategory k_fp_error_category {
                 case FilesystemError::PathIsAFile: return "Path is a file";
                 case FilesystemError::PathIsAsDirectory: return "Path is a folder";
                 case FilesystemError::PathAlreadyExists: return "Path already exists";
+                case FilesystemError::FileWatcherCreationFailed: return "File watcher creation failed";
                 case FilesystemError::Count: break;
             }
             return "";

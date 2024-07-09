@@ -411,15 +411,17 @@ ErrorCodeOr<Optional<MutableString>> FilesystemDialog(DialogOptions options) {
 // EFSW library: https://github.com/SpartanJ/efsw/blob/master/src/efsw/WatcherFSEvents.cpp
 // Atom file watcher: https://github.com/atom/watcher/blob/master/docs/macos.md
 
+constexpr bool k_debug_fsevents = true;
+
 struct FsWatcher {
     FSEventStreamRef stream {};
     dispatch_queue_t queue {};
 
     struct Event {
-        enum class Existence { Unknown, Exists, DoesNotExist };
+        enum class LstatCheck { Unknown, Error, FileExists, FileDoesNotExist };
         String path;
         FSEventStreamEventFlags flags;
-        Existence exists = Existence::Unknown;
+        LstatCheck exists = LstatCheck::Unknown;
     };
     Mutex event_mutex;
     ArenaAllocator event_arena {PageAllocator::Instance()};
@@ -459,7 +461,7 @@ void EventCallback([[maybe_unused]] ConstFSEventStreamRef stream_ref,
     auto& watcher = *(FsWatcher*)user_data;
     auto** paths = (char**)event_paths;
 
-    if constexpr (!PRODUCTION_BUILD) {
+    if constexpr (!PRODUCTION_BUILD && k_debug_fsevents) {
         DynamicArrayInline<char, 4000> info;
         struct Flag {
             FSEventStreamEventFlags flag;
@@ -514,33 +516,24 @@ void EventCallback([[maybe_unused]] ConstFSEventStreamRef stream_ref,
         StdPrint(StdStream::Err, info);
     }
 
-#if 0
-    ArenaAllocatorWithInlineStorage<1024> scratch_arena;
-    auto coalesced = scratch_arena.NewMultiple<bool>(num_events);
-#endif
-
     for (size_t i = 0; i < num_events; i++) {
         FSEventStreamEventFlags flags = event_flags[i];
-#if 0
-        if (coalesced[i]) continue;
 
-        for (size_t j = i + 1; j < num_events; j++) {
-            if (coalesced[j]) continue;
-            if (NullTermStringsEqual(paths[i], paths[j])) {
-                flags |= event_flags[j];
-                coalesced[j] = true;
-            }
-        }
-#endif
+        // FSEvents sets the kFSEventStreamEventFlagItemRenamed flag for both the old and new name. So we have
+        // to check which is which ourselves. Additionally, FSEvents can give use many flags set at once:
+        // 'modified', 'created', 'deleted' all on the same item. We have to do our best to manually
+        // work out which order they happened in.
 
-        auto existence = FsWatcher::Event::Existence::Unknown;
+        auto existence = FsWatcher::Event::LstatCheck::Unknown;
         if (flags & (kFSEventStreamEventFlagItemRenamed | kFSEventStreamEventFlagItemRemoved |
                      kFSEventStreamEventFlagItemCreated)) {
             struct stat info;
             if (lstat(paths[i], &info) == 0)
-                existence = FsWatcher::Event::Existence::Exists;
+                existence = FsWatcher::Event::LstatCheck::FileExists;
             else if (errno == ENOENT)
-                existence = FsWatcher::Event::Existence::DoesNotExist;
+                existence = FsWatcher::Event::LstatCheck::FileDoesNotExist;
+            else
+                existence = FsWatcher::Event::LstatCheck::Error;
         }
 
         watcher.event_mutex.Lock();
@@ -592,10 +585,10 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
         FSEventStreamContext context {};
         context.info = &fs_watcher;
 
-        constexpr double k_latency_seconds = 0.05; // TODO: allow setting this as an option?
+        constexpr double k_latency_seconds = 0.05;
 
         fs_watcher.stream =
-            FSEventStreamCreate(nullptr,
+            FSEventStreamCreate(kCFAllocatorDefault,
                                 &EventCallback,
                                 &context,
                                 paths,
@@ -603,8 +596,7 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
                                 k_latency_seconds,
                                 kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagWatchRoot |
                                     kFSEventStreamCreateFlagNoDefer);
-        if (!fs_watcher.stream)
-            return ErrorCode {FilesystemError::PathDoesNotExist}; // TODO(1.0): not the right error
+        if (!fs_watcher.stream) return ErrorCode {FilesystemError::FileWatcherCreationFailed};
 
         // FSEvents is a callback based API where you always receive events in a separate thread.
         if (!fs_watcher.queue) {
@@ -614,11 +606,10 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
         }
         FSEventStreamSetDispatchQueue(fs_watcher.stream, fs_watcher.queue);
 
-        DebugLn("Starting FSEventStream");
         if (!FSEventStreamStart(fs_watcher.stream)) {
             FSEventStreamInvalidate(fs_watcher.stream);
             FSEventStreamRelease(fs_watcher.stream);
-            return ErrorCode {FilesystemError::PathDoesNotExist}; // TODO(1.0): not the right error
+            return ErrorCode {FilesystemError::FileWatcherCreationFailed};
         }
     }
 
@@ -641,7 +632,9 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
                                                ? FileType::Directory
                                                : FileType::RegularFile;
 
-                    if (event.flags & kFSEventStreamEventFlagMustScanSubDirs) {
+                    using enum FsWatcher::Event::LstatCheck;
+
+                    if (event.flags & kFSEventStreamEventFlagMustScanSubDirs || event.exists == Error) {
                         dir.directory_changes.Add(
                             {
                                 .subpath = subpath,
@@ -662,48 +655,65 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
                         continue;
                     }
 
+                    // There is no way of knowing the exact ordering of events from FSEvents. We can lstat on
+                    // a file to see if it exists at the time we receive the event which helps in some
+                    // situations. But some situations are still ambiguous. Consider the case where we have 3
+                    // flags set 'created', 'renamed' and 'removed' and we have checked that the file does not
+                    // currently exist: we can't know if it was (1) removed -> created -> renamed (old-name)
+                    // or (2) renamed (old-name) -> created -> removed.
+
+                    // Additionally, checking the filesystem (with lstat() for example) is not at all reliable
+                    // because what we are doing is tagging an event with the current state of the filesystem
+                    // rather than the state at the time of the event.
+
+                    // TODO: following from the points above, I think we need a different way to report
+                    // FSEvents. Perhaps we send use a bitset for ambiguous cases.
+
                     auto const created = event.flags & kFSEventStreamEventFlagItemCreated;
                     auto const removed = event.flags & kFSEventStreamEventFlagItemRemoved;
                     auto const renamed = event.flags & kFSEventStreamEventFlagItemRenamed;
                     auto const modified = event.flags & kFSEventStreamEventFlagItemModified;
 
-                    auto add = [&](DirectoryWatcher::ChangeType type) {
+                    DynamicArrayInline<DirectoryWatcher::ChangeType,
+                                       ToInt(DirectoryWatcher::ChangeType::Count)>
+                        changes;
+                    if (created) dyn::Append(changes, DirectoryWatcher::ChangeType::Added);
+                    if (removed) dyn::Append(changes, DirectoryWatcher::ChangeType::Deleted);
+                    if (renamed) {
+                        if (event.exists == FileExists)
+                            dyn::Append(changes, DirectoryWatcher::ChangeType::RenamedNewName);
+                        else if (event.exists == FileDoesNotExist)
+                            dyn::Append(changes, DirectoryWatcher::ChangeType::RenamedOldName);
+                    }
+                    if (modified) dyn::Append(changes, DirectoryWatcher::ChangeType::Modified);
+
+                    enum class NewPlace { Start, End };
+                    auto const move_value = [&](DirectoryWatcher::ChangeType type, NewPlace new_place) {
+                        if (Contains(changes, type)) {
+                            dyn::RemoveValue(changes, type);
+                            if (new_place == NewPlace::End)
+                                dyn::Append(changes, type);
+                            else
+                                dyn::Prepend(changes, type);
+                        }
+                    };
+
+                    if (event.exists == FileDoesNotExist) {
+                        move_value(DirectoryWatcher::ChangeType::RenamedOldName, NewPlace::End);
+                        move_value(DirectoryWatcher::ChangeType::Deleted, NewPlace::End);
+                    } else if (event.exists == FileExists) {
+                        move_value(DirectoryWatcher::ChangeType::RenamedNewName, NewPlace::Start);
+                        move_value(DirectoryWatcher::ChangeType::Added, NewPlace::Start);
+                    }
+
+                    for (auto change : changes)
                         dir.directory_changes.Add(
                             {
                                 .subpath = subpath,
                                 .file_type = file_type,
-                                .change = type,
+                                .change = change,
                             },
                             result_arena);
-                    };
-
-                    if (renamed) {
-                        if (event.exists == FsWatcher::Event::Existence::Exists)
-                            add(DirectoryWatcher::ChangeType::RenamedNewName);
-                        else if (event.exists == FsWatcher::Event::Existence::DoesNotExist)
-                            add(DirectoryWatcher::ChangeType::RenamedOldName);
-                    } else {
-                        if (created && removed)
-                            if (event.exists == FsWatcher::Event::Existence::DoesNotExist)
-                                add(DirectoryWatcher::ChangeType::Added);
-                            else
-                                add(DirectoryWatcher::ChangeType::Deleted);
-                        else if (created)
-                            add(DirectoryWatcher::ChangeType::Added);
-                    }
-
-                    // TODO: this logic isn't quite right, we can get 'modified' AFTER 'removed'
-                    if (modified) add(DirectoryWatcher::ChangeType::Modified);
-
-                    if (!renamed) {
-                        if (removed && created)
-                            if (event.exists == FsWatcher::Event::Existence::DoesNotExist)
-                                add(DirectoryWatcher::ChangeType::Deleted);
-                            else
-                                add(DirectoryWatcher::ChangeType::Added);
-                        else if (removed)
-                            add(DirectoryWatcher::ChangeType::Deleted);
-                    }
                 }
             }
         }

@@ -635,41 +635,29 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
 
             auto const event_name = event->len ? FromNullTerminated(event->name) : String {};
 
-            Optional<DirectoryWatcher::ChangeType> action {};
+            DirectoryWatcher::ChangeTypeFlags changes {};
             if (event->mask & IN_MODIFY || event->mask & IN_CLOSE_WRITE)
-                action = DirectoryWatcher::ChangeType::Modified;
+                changes |= DirectoryWatcher::ChangeType::Modified;
             else if (event->mask & IN_MOVED_TO)
-                action = DirectoryWatcher::ChangeType::RenamedNewName;
+                changes |= DirectoryWatcher::ChangeType::RenamedNewName;
             else if (event->mask & IN_MOVED_FROM)
-                action = DirectoryWatcher::ChangeType::RenamedOldName;
+                changes |= DirectoryWatcher::ChangeType::RenamedOldName;
             else if (event->mask & IN_DELETE || (event->mask & IN_DELETE_SELF && this_event.IsForRoot()))
-                action = DirectoryWatcher::ChangeType::Deleted;
+                changes |= DirectoryWatcher::ChangeType::Deleted;
             else if (event->mask & IN_CREATE)
-                action = DirectoryWatcher::ChangeType::Added;
-            if (!action) continue;
+                changes |= DirectoryWatcher::ChangeType::Added;
 
-            this_event.dir.directory_changes.Add(
-                {
-                    .subpath = this_event.SubDirPath().size
-                                   ? path::Join(result_arena, Array {this_event.SubDirPath(), event_name})
-                                   : result_arena.Clone(event_name),
-                    .file_type = (event->mask & IN_ISDIR) ? FileType::Directory : FileType::RegularFile,
-                    .change = *action,
-                    .manual_rescan_needed = false,
-                },
-                result_arena);
-        }
-    }
-
-    if constexpr (k_debug_inotify) {
-        for (auto const& dir : watcher.watched_dirs) {
-            DynamicArrayInline<char, 1000> printout;
-            for (auto const& change : dir.directory_changes.subpath_changesets) {
-                fmt::Append(printout, "Changes for '{}' => '{}':\n", dir.path, change.subpath);
-                for (auto const& subchange : change.changes)
-                    fmt::Append(printout, "  {}\n", EnumToString(subchange));
+            if (changes) {
+                this_event.dir.directory_changes.Add(
+                    {
+                        .subpath = this_event.SubDirPath().size
+                                       ? path::Join(result_arena, Array {this_event.SubDirPath(), event_name})
+                                       : result_arena.Clone(event_name),
+                        .file_type = (event->mask & IN_ISDIR) ? FileType::Directory : FileType::RegularFile,
+                        .changes = changes,
+                    },
+                    result_arena);
             }
-            if (printout.size) DebugLn(printout);
         }
     }
 

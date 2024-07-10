@@ -63,6 +63,19 @@ PUBLIC constexpr Type Abs(Type x) {
     return x < Type(0) ? -x : x;
 }
 
+// Number of bits set
+template <UnsignedInt T>
+PUBLIC ALWAYS_INLINE constexpr u8 Popcount(T x) {
+    if constexpr (sizeof(T) <= sizeof(unsigned int))
+        return (u8)__builtin_popcount(x);
+    else if constexpr (sizeof(T) <= sizeof(unsigned long))
+        return (u8)__builtin_popcountl(x);
+    else if constexpr (sizeof(T) <= sizeof(unsigned long long))
+        return (u8)__builtin_popcountll(x);
+    else
+        static_assert(false, "Unsupported type");
+}
+
 #define DEFINE_BUILTIN_MATHS_FUNC(name, func)                                                                \
     template <FloatingPoint T>                                                                               \
     PUBLIC ALWAYS_INLINE constexpr T name(T x) {                                                             \

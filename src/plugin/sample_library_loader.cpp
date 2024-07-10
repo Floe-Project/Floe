@@ -772,7 +772,7 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
                         if (relates_to_scan_folder) relates_to_scan_folder->Release();
                     };
 
-                    if (subpath_changeset.manual_rescan_needed) {
+                    if (subpath_changeset.changes & DirectoryWatcher::ChangeType::ManualRescanNeeded) {
                         // TODO is this the right path?
                         if (relates_to_scan_folder)
                             relates_to_scan_folder->value.state.Store(
@@ -780,60 +780,58 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
                         continue;
                     }
 
-                    switch (subpath_changeset.changes.Last()) {
-                        case DirectoryWatcher::ChangeType::Added: {
-                            ASSERT(!path::StartsWithDirectorySeparator(subpath_changeset.subpath));
-                            ASSERT(!path::EndsWithDirectorySeparator(subpath_changeset.subpath));
-                            int num_separators = 0;
-                            for (auto c : subpath_changeset.subpath)
-                                if (path::IsPathSeparator(c)) ++num_separators;
+                    // TODO: this isn't right; we should handle the cases where multple change bits are set at
+                    // once. What we do probably depends on if it's a single change (easy to act upon) vs
+                    // multiple changes (need to identify the important one)
 
-                            // We only allow libraries at the top level of the scan-folder
-                            if (num_separators == 1 &&
-                                path::Filename(subpath_changeset.subpath) == "config.lua")
-                                ReadLibraryAsync(async_ctx,
-                                                 libs.libraries,
-                                                 full_path,
-                                                 sample_lib::FileFormat::Lua);
-                            else if (num_separators == 0 &&
-                                     path::Extension(subpath_changeset.subpath) == ".mdata")
-                                ReadLibraryAsync(async_ctx,
-                                                 libs.libraries,
-                                                 full_path,
-                                                 sample_lib::FileFormat::Mdata);
-                            break;
-                        }
-                        case DirectoryWatcher::ChangeType::Deleted: {
-                            if (relates_to_lib) {
-                                switch (type) {
-                                    case Type::Unknown: break;
-                                    case Type::MainLibraryFile: libs.libraries.Remove(relates_to_lib); break;
-                                    case Type::AuxilleryLibraryFile:
-                                        RereadLibraryAsync(async_ctx, libs.libraries, relates_to_lib);
-                                        break;
-                                }
-                            }
-                            break;
-                        }
-                        case DirectoryWatcher::ChangeType::Modified: {
-                            if (relates_to_lib) RereadLibraryAsync(async_ctx, libs.libraries, relates_to_lib);
-                            break;
-                        }
-                        case DirectoryWatcher::ChangeType::RenamedOldName:
-                        case DirectoryWatcher::ChangeType::RenamedNewName: {
-                            // TODO(1.0): I think we can do better here at working out what's a
-                            // remove/add/etc
-                            if (relates_to_scan_folder)
-                                relates_to_scan_folder->value.state.Store(
-                                    AvailableLibraries::ScanFolder::State::RescanRequested);
-                            else if (relates_to_lib)
-                                RereadLibraryAsync(async_ctx, libs.libraries, relates_to_lib);
-                            break;
-                        }
-                        case DirectoryWatcher::ChangeType::Count: break;
+                    if (subpath_changeset.changes & DirectoryWatcher::ChangeType::Added) {
+                        ASSERT(!path::StartsWithDirectorySeparator(subpath_changeset.subpath));
+                        ASSERT(!path::EndsWithDirectorySeparator(subpath_changeset.subpath));
+                        int num_separators = 0;
+                        for (auto c : subpath_changeset.subpath)
+                            if (path::IsPathSeparator(c)) ++num_separators;
+
+                        // We only allow libraries at the top level of the scan-folder
+                        if (num_separators == 1 && path::Filename(subpath_changeset.subpath) == "config.lua")
+                            ReadLibraryAsync(async_ctx,
+                                             libs.libraries,
+                                             full_path,
+                                             sample_lib::FileFormat::Lua);
+                        else if (num_separators == 0 &&
+                                 path::Extension(subpath_changeset.subpath) == ".mdata")
+                            ReadLibraryAsync(async_ctx,
+                                             libs.libraries,
+                                             full_path,
+                                             sample_lib::FileFormat::Mdata);
                     }
+                    if (subpath_changeset.changes & DirectoryWatcher::ChangeType::Deleted) {
+                        if (relates_to_lib) {
+                            switch (type) {
+                                case Type::Unknown: break;
+                                case Type::MainLibraryFile: libs.libraries.Remove(relates_to_lib); break;
+                                case Type::AuxilleryLibraryFile:
+                                    RereadLibraryAsync(async_ctx, libs.libraries, relates_to_lib);
+                                    break;
+                            }
+                        }
+                    }
+                    if (subpath_changeset.changes & DirectoryWatcher::ChangeType::Modified) {
+                        if (relates_to_lib) RereadLibraryAsync(async_ctx, libs.libraries, relates_to_lib);
+                    }
+                    if (subpath_changeset.changes & DirectoryWatcher::ChangeType::RenamedOldName ||
+                        subpath_changeset.changes & DirectoryWatcher::ChangeType::RenamedNewName ||
+                        subpath_changeset.changes & DirectoryWatcher::ChangeType::RenamedUnknown) {
+                        // TODO(1.0): I think we can do better here at working out what's a
+                        // remove/add/etc
+                        if (relates_to_scan_folder)
+                            relates_to_scan_folder->value.state.Store(
+                                AvailableLibraries::ScanFolder::State::RescanRequested);
+                        else if (relates_to_lib)
+                            RereadLibraryAsync(async_ctx, libs.libraries, relates_to_lib);
+                    }
+
                     DebugLn("FS change: {}, {}, {}, relates to lib {}, type {}, found folder: {}",
-                            EnumToString(subpath_changeset.changes.Last()),
+                            DirectoryWatcher::ChangeType::ToString(subpath_changeset.changes),
                             dir_changes.linked_dir_to_watch->path,
                             subpath_changeset.subpath,
                             relates_to_lib ? relates_to_lib->value.lib->name : ""_s,

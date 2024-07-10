@@ -891,27 +891,26 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
                         filename = {filename_buf.data, num_wchars};
                     }
 
-                    Optional<DirectoryWatcher::ChangeType> type {};
+                    DirectoryWatcher::ChangeTypeFlags changes {};
                     switch (action) {
-                        case FILE_ACTION_ADDED: type = DirectoryWatcher::ChangeType::Added; break;
-                        case FILE_ACTION_REMOVED: type = DirectoryWatcher::ChangeType::Deleted; break;
-                        case FILE_ACTION_MODIFIED: type = DirectoryWatcher::ChangeType::Modified; break;
+                        case FILE_ACTION_ADDED: changes |= DirectoryWatcher::ChangeType::Added; break;
+                        case FILE_ACTION_REMOVED: changes |= DirectoryWatcher::ChangeType::Deleted; break;
+                        case FILE_ACTION_MODIFIED: changes |= DirectoryWatcher::ChangeType::Modified; break;
                         case FILE_ACTION_RENAMED_OLD_NAME:
-                            type = DirectoryWatcher::ChangeType::RenamedOldName;
+                            changes |= DirectoryWatcher::ChangeType::RenamedOldName;
                             break;
                         case FILE_ACTION_RENAMED_NEW_NAME:
-                            type = DirectoryWatcher::ChangeType::RenamedNewName;
+                            changes |= DirectoryWatcher::ChangeType::RenamedNewName;
                             break;
                     }
-                    if (type) {
+                    if (changes) {
                         auto const narrowed = Narrow(result_arena, filename);
                         if (narrowed.HasValue()) {
                             dir.directory_changes.Add(
                                 {
                                     .subpath = narrowed.Value(),
                                     .file_type = nullopt,
-                                    .change = *type,
-                                    .manual_rescan_needed = false,
+                                    .changes = changes,
                                 },
                                 result_arena);
                         }
@@ -927,8 +926,7 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
                         {
                             .subpath = {},
                             .file_type = nullopt,
-                            .change = {},
-                            .manual_rescan_needed = true,
+                            .changes = DirectoryWatcher::ChangeType::ManualRescanNeeded,
                         },
                         result_arena);
                 }
@@ -955,8 +953,7 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
                     {
                         .subpath = {},
                         .file_type = nullopt,
-                        .change = {},
-                        .manual_rescan_needed = true,
+                        .changes = DirectoryWatcher::ChangeType::ManualRescanNeeded,
                     },
                     result_arena);
             else

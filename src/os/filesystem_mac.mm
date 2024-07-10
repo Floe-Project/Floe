@@ -418,10 +418,8 @@ struct FsWatcher {
     dispatch_queue_t queue {};
 
     struct Event {
-        enum class LstatCheck { Unknown, Error, FileExists, FileDoesNotExist };
         String path;
         FSEventStreamEventFlags flags;
-        LstatCheck exists = LstatCheck::Unknown;
     };
     Mutex event_mutex;
     ArenaAllocator event_arena {PageAllocator::Instance()};
@@ -519,23 +517,6 @@ void EventCallback([[maybe_unused]] ConstFSEventStreamRef stream_ref,
     for (size_t i = 0; i < num_events; i++) {
         FSEventStreamEventFlags flags = event_flags[i];
 
-        // FSEvents sets the kFSEventStreamEventFlagItemRenamed flag for both the old and new name. So we have
-        // to check which is which ourselves. Additionally, FSEvents can give use many flags set at once:
-        // 'modified', 'created', 'deleted' all on the same item. We have to do our best to manually
-        // work out which order they happened in.
-
-        auto existence = FsWatcher::Event::LstatCheck::Unknown;
-        if (flags & (kFSEventStreamEventFlagItemRenamed | kFSEventStreamEventFlagItemRemoved |
-                     kFSEventStreamEventFlagItemCreated)) {
-            struct stat info;
-            if (lstat(paths[i], &info) == 0)
-                existence = FsWatcher::Event::LstatCheck::FileExists;
-            else if (errno == ENOENT)
-                existence = FsWatcher::Event::LstatCheck::FileDoesNotExist;
-            else
-                existence = FsWatcher::Event::LstatCheck::Error;
-        }
-
         watcher.event_mutex.Lock();
         DEFER { watcher.event_mutex.Unlock(); };
 
@@ -543,7 +524,6 @@ void EventCallback([[maybe_unused]] ConstFSEventStreamRef stream_ref,
             {
                 .path = watcher.event_arena.Clone(FromNullTerminated(paths[i])),
                 .flags = flags,
-                .exists = existence,
             },
             watcher.event_arena);
     }
@@ -632,15 +612,12 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
                                                ? FileType::Directory
                                                : FileType::RegularFile;
 
-                    using enum FsWatcher::Event::LstatCheck;
-
-                    if (event.flags & kFSEventStreamEventFlagMustScanSubDirs || event.exists == Error) {
+                    if (event.flags & kFSEventStreamEventFlagMustScanSubDirs) {
                         dir.directory_changes.Add(
                             {
                                 .subpath = subpath,
                                 .file_type = file_type,
-                                .change = {},
-                                .manual_rescan_needed = true,
+                                .changes = DirectoryWatcher::ChangeType::ManualRescanNeeded,
                             },
                             result_arena);
                         continue;
@@ -666,52 +643,22 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
                     // because what we are doing is tagging an event with the current state of the filesystem
                     // rather than the state at the time of the event.
 
-                    // TODO: following from the points above, I think we need a different way to report
-                    // FSEvents. Perhaps we send use a bitset for ambiguous cases.
+                    DirectoryWatcher::ChangeTypeFlags changes {};
+                    if (event.flags & kFSEventStreamEventFlagItemCreated)
+                        changes |= DirectoryWatcher::ChangeType::Added;
+                    if (event.flags & kFSEventStreamEventFlagItemRemoved)
+                        changes |= DirectoryWatcher::ChangeType::Deleted;
+                    if (event.flags & kFSEventStreamEventFlagItemRenamed)
+                        changes |= DirectoryWatcher::ChangeType::RenamedUnknown;
+                    if (event.flags & kFSEventStreamEventFlagItemModified)
+                        changes |= DirectoryWatcher::ChangeType::Modified;
 
-                    auto const created = event.flags & kFSEventStreamEventFlagItemCreated;
-                    auto const removed = event.flags & kFSEventStreamEventFlagItemRemoved;
-                    auto const renamed = event.flags & kFSEventStreamEventFlagItemRenamed;
-                    auto const modified = event.flags & kFSEventStreamEventFlagItemModified;
-
-                    DynamicArrayInline<DirectoryWatcher::ChangeType,
-                                       ToInt(DirectoryWatcher::ChangeType::Count)>
-                        changes;
-                    if (created) dyn::Append(changes, DirectoryWatcher::ChangeType::Added);
-                    if (removed) dyn::Append(changes, DirectoryWatcher::ChangeType::Deleted);
-                    if (renamed) {
-                        if (event.exists == FileExists)
-                            dyn::Append(changes, DirectoryWatcher::ChangeType::RenamedNewName);
-                        else if (event.exists == FileDoesNotExist)
-                            dyn::Append(changes, DirectoryWatcher::ChangeType::RenamedOldName);
-                    }
-                    if (modified) dyn::Append(changes, DirectoryWatcher::ChangeType::Modified);
-
-                    enum class NewPlace { Start, End };
-                    auto const move_value = [&](DirectoryWatcher::ChangeType type, NewPlace new_place) {
-                        if (Contains(changes, type)) {
-                            dyn::RemoveValue(changes, type);
-                            if (new_place == NewPlace::End)
-                                dyn::Append(changes, type);
-                            else
-                                dyn::Prepend(changes, type);
-                        }
-                    };
-
-                    if (event.exists == FileDoesNotExist) {
-                        move_value(DirectoryWatcher::ChangeType::RenamedOldName, NewPlace::End);
-                        move_value(DirectoryWatcher::ChangeType::Deleted, NewPlace::End);
-                    } else if (event.exists == FileExists) {
-                        move_value(DirectoryWatcher::ChangeType::RenamedNewName, NewPlace::Start);
-                        move_value(DirectoryWatcher::ChangeType::Added, NewPlace::Start);
-                    }
-
-                    for (auto change : changes)
+                    if (changes)
                         dir.directory_changes.Add(
                             {
                                 .subpath = subpath,
                                 .file_type = file_type,
-                                .change = change,
+                                .changes = changes,
                             },
                             result_arena);
                 }

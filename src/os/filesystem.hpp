@@ -319,14 +319,38 @@ struct DirectoryWatcher {
         int int_id;
     };
 
-    enum class ChangeType : u8 { Added, Deleted, Modified, RenamedOldName, RenamedNewName, Count };
+    using ChangeTypeFlags = u32;
+    struct ChangeType {
+        enum : ChangeTypeFlags {
+            Added = 1 << 0,
+            Deleted = 1 << 1,
+            Modified = 1 << 2,
+            RenamedOldName = 1 << 3,
+            RenamedNewName = 1 << 4,
+            RenamedUnknown = 1 << 5, // (macOS only) we don't know if it was renamed to or from this name
+
+            // if true, ignore all other changes and recursively rescan this directory
+            ManualRescanNeeded = 1 << 6,
+        };
+        static constexpr DynamicArrayInline<char, 200> ToString(ChangeTypeFlags c) {
+            DynamicArrayInline<char, 200> result;
+            if (c & Added) dyn::AppendSpan(result, "Added, ");
+            if (c & Deleted) dyn::AppendSpan(result, "Deleted, ");
+            if (c & Modified) dyn::AppendSpan(result, "Modified, ");
+            if (c & RenamedOldName) dyn::AppendSpan(result, "RenamedOldName, ");
+            if (c & RenamedNewName) dyn::AppendSpan(result, "RenamedNewName, ");
+            if (c & RenamedUnknown) dyn::AppendSpan(result, "RenamedUnknown, ");
+            if (c & ManualRescanNeeded) dyn::AppendSpan(result, "ManualRescanNeeded, ");
+            if (result.size) result.size -= 2;
+            return result;
+        }
+    };
 
     struct SubpathChangeSet {
-        // if true, ignore all changes and recursively rescan this directory
-        bool manual_rescan_needed;
+        bool IsSingleChange() const { return Popcount(changes) == 1; }
 
-        // ordered sequence of changes, loop over this to know the full history or just look at the Last()
-        ArenaStack<ChangeType> changes;
+        // bitset
+        ChangeTypeFlags changes;
 
         // relative to the watched directory, empty if the watched directory itself changed
         String subpath;
@@ -349,8 +373,7 @@ struct DirectoryWatcher {
         struct Change {
             String subpath;
             Optional<FileType> file_type;
-            ChangeType change; // ignored if manual_rescan_needed is true
-            bool manual_rescan_needed;
+            ChangeTypeFlags changes;
         };
 
         // private
@@ -361,23 +384,18 @@ struct DirectoryWatcher {
                 // different type. We shouldn't coalesce in this case.
                 if (path::Equal(subpath_changeset.subpath, change.subpath) &&
                     subpath_changeset.file_type == change.file_type) {
-                    if (change.manual_rescan_needed)
-                        subpath_changeset.manual_rescan_needed = true;
-                    else if (subpath_changeset.changes.Last() !=
-                             change.change) // don't add the same change twice
-                        subpath_changeset.changes.Append(change.change, arena);
+                    subpath_changeset.changes |= change.changes;
                     return;
                 }
 
             // else, we create a new one
-            SubpathChangeSet new_changeset {
-                .manual_rescan_needed = change.manual_rescan_needed,
-                .changes = {},
-                .subpath = change.subpath,
-                .file_type = change.file_type,
-            };
-            if (!change.manual_rescan_needed) new_changeset.changes.Append(change.change, arena);
-            subpath_changesets.Append(new_changeset, arena);
+            subpath_changesets.Append(
+                {
+                    .changes = change.changes,
+                    .subpath = change.subpath,
+                    .file_type = change.file_type,
+                },
+                arena);
         }
 
         // A pointer to the directory that you requested watching for. Allows you to more easily associate the

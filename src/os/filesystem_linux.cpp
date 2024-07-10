@@ -608,6 +608,13 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                 if (this_dir.IsForRoot()) {
                     this_dir.dir.state = DirectoryWatcher::WatchedDirectory::State::NotWatching;
                     this_dir.dir.native_data.pointer = nullptr;
+                    this_dir.dir.directory_changes.Add(
+                        {
+                            .subpath = {},
+                            .file_type = FileType::Directory,
+                            .changes = DirectoryWatcher::ChangeType::Deleted,
+                        },
+                        args.result_arena);
                 } else {
                     this_dir.subdir->watch_id_invalidated = true;
                 }
@@ -644,7 +651,7 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                 changes |= DirectoryWatcher::ChangeType::RenamedNewName;
             else if (event.mask & IN_MOVED_FROM)
                 changes |= DirectoryWatcher::ChangeType::RenamedOldName;
-            else if (event.mask & IN_DELETE || (event.mask & IN_DELETE_SELF && this_dir.IsForRoot()))
+            else if (event.mask & IN_DELETE)
                 changes |= DirectoryWatcher::ChangeType::Deleted;
             else if (event.mask & IN_CREATE)
                 changes |= DirectoryWatcher::ChangeType::Added;

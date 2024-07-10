@@ -281,8 +281,8 @@ class RecursiveDirectoryIterator {
 // - Events are grouped to each directory you request watching for
 // - Full error handling
 //
-// NOTE: there's no fallback if the file system watcher fails to initialize. We could eventually add a system
-// that tracks changes by repeatedly scanning the directories.
+// NOTE: there's no fallback if the file system watcher fails to initialize or produces an error. We could
+// eventually add a system that tracks changes by repeatedly scanning the directories.
 //
 // These are some of reasons why this API is the way it is:
 //
@@ -291,7 +291,19 @@ class RecursiveDirectoryIterator {
 // API. The alternative API that file watchers often have is a callback-based API where you receive events in
 // a separate thread. For our use-case that would just mean having to do lots of extra thread-safety work.
 //
-// Per-directory events:
+// Coalesced bitset of changes:
+// This API gives you a coalesced bitset of changes that happend to each sub-path. We don't give the order of
+// events. We do this for 2 reasons:
+// 1. On macOS (FSEvents), this kind of coalescing already happens and it's impossible to get the exact order
+//    of events. On Windows and Linux we are given the order but we coalesce anyway.
+// 2. Having the exact order isn't normally the important bit. For example knowing that something was modified
+//    before being deleted doesn't really help. It's not like we even know what the modification was. As
+//    always with the filesystem, you can't trust the state of anything until you've run a filesystem
+//    operation. The same goes for receiving filesystem events. You might have been given a 'created' event
+//    but the file might have been deleted in the time between the event being generated and you acting on it.
+//
+//
+// TODO: remove this paragraph
 // We chose to group events to each directory that you request watching for rather than receiving an stream of
 // events from all directories. This is convenient for our use-case but it does loose a bit of information: we
 // no longer have the order of events _across_ directories. Each directory _does_ get an ordered list of
@@ -406,9 +418,8 @@ struct DirectoryWatcher {
         // error.
         Optional<ErrorCode> error;
 
-        // Changesets for each subpath that had changes. This list is unordered, but the changes
-        // contained within each changset _are_ ordered. You will also get one of these with an empty
-        // 'subpath' if the watched directory itself changed.
+        // Unordered list of changesets: one for each subpath that had changes. You will also get one of these
+        // with an empty 'subpath' if the watched directory itself changed.
         ArenaStack<SubpathChangeSet> subpath_changesets {};
     };
 

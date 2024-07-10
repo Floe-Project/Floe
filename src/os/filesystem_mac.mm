@@ -403,7 +403,7 @@ ErrorCodeOr<Optional<MutableString>> FilesystemDialog(DialogOptions options) {
 // NOTE: FSEvents is a callback based API. You receive events in a separate thread and there doesn't seem to
 // be a way around that. FSEventStreamFlushSync might flush the events but you can still receive others at any
 // time in the other thread. Therefore we use a queue to pass the buffer the events from the background thread
-// to the ReadDirectoryChanges thread.
+// to the PollDirectoryChanges thread.
 
 // References:
 // https://developer.apple.com/library/archive/documentation/Darwin/Conceptual/FSEvents_ProgGuide/UsingtheFSEventsFramework/UsingtheFSEventsFramework.html
@@ -413,7 +413,7 @@ ErrorCodeOr<Optional<MutableString>> FilesystemDialog(DialogOptions options) {
 
 constexpr bool k_debug_fsevents = true;
 
-struct FsWatcher {
+struct MacWatcher {
     FSEventStreamRef stream {};
     dispatch_queue_t queue {};
 
@@ -431,7 +431,7 @@ ErrorCodeOr<DirectoryWatcher> CreateDirectoryWatcher(Allocator& a) {
     DirectoryWatcher result {
         .allocator = a,
         .watched_dirs = {a},
-        .native_data = {.pointer = a.New<FsWatcher>()},
+        .native_data = {.pointer = a.New<MacWatcher>()},
     };
     return result;
 }
@@ -439,15 +439,14 @@ ErrorCodeOr<DirectoryWatcher> CreateDirectoryWatcher(Allocator& a) {
 void DestoryDirectoryWatcher(DirectoryWatcher& watcher) {
     ZoneScoped;
 
-    auto fs_w = (FsWatcher*)watcher.native_data.pointer;
-    if (fs_w->stream) {
-        FSEventStreamStop(fs_w->stream);
-        FSEventStreamInvalidate(fs_w->stream);
-        FSEventStreamRelease(fs_w->stream);
+    auto mac_w = (MacWatcher*)watcher.native_data.pointer;
+    if (mac_w->stream) {
+        FSEventStreamStop(mac_w->stream);
+        FSEventStreamInvalidate(mac_w->stream);
+        FSEventStreamRelease(mac_w->stream);
     }
-    // dispatch_release(fs_w->queue);
     watcher.watched_dirs.Clear();
-    watcher.allocator.Delete(fs_w);
+    watcher.allocator.Delete(mac_w);
 }
 
 void EventCallback([[maybe_unused]] ConstFSEventStreamRef stream_ref,
@@ -456,7 +455,7 @@ void EventCallback([[maybe_unused]] ConstFSEventStreamRef stream_ref,
                    void* event_paths,
                    FSEventStreamEventFlags const event_flags[],
                    [[maybe_unused]] FSEventStreamEventId const event_ids[]) {
-    auto& watcher = *(FsWatcher*)user_data;
+    auto& watcher = *(MacWatcher*)user_data;
     auto** paths = (char**)event_paths;
 
     if constexpr (!PRODUCTION_BUILD && k_debug_fsevents) {
@@ -514,37 +513,43 @@ void EventCallback([[maybe_unused]] ConstFSEventStreamRef stream_ref,
         StdPrint(StdStream::Err, info);
     }
 
-    for (size_t i = 0; i < num_events; i++) {
-        FSEventStreamEventFlags flags = event_flags[i];
-
+    {
         watcher.event_mutex.Lock();
         DEFER { watcher.event_mutex.Unlock(); };
-
-        watcher.events.Append(
-            {
-                .path = watcher.event_arena.Clone(FromNullTerminated(paths[i])),
-                .flags = flags,
-            },
-            watcher.event_arena);
+        for (size_t i = 0; i < num_events; i++) {
+            watcher.events.Append(
+                {
+                    .path = watcher.event_arena.Clone(FromNullTerminated(paths[i])),
+                    .flags = event_flags[i],
+                },
+                watcher.event_arena);
+        }
     }
 }
 
 ErrorCodeOr<Span<DirectoryWatcher::DirectoryChanges const>>
-ReadDirectoryChanges(DirectoryWatcher& watcher,
-                     Span<DirectoryToWatch const> dirs_to_watch,
-                     ArenaAllocator& result_arena,
-                     [[maybe_unused]] ArenaAllocator& scratch_arena) {
-    auto const any_states_changed = watcher.HandleWatchedDirChanges(dirs_to_watch);
+PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
+    auto const any_states_changed =
+        watcher.HandleWatchedDirChanges(args.dirs_to_watch, args.retry_failed_directories);
 
     for (auto& dir : watcher.watched_dirs)
         dir.directory_changes.Clear();
 
-    auto& fs_watcher = *(FsWatcher*)watcher.native_data.pointer;
+    auto& mac_watcher = *(MacWatcher*)watcher.native_data.pointer;
     if (any_states_changed) {
-        if (fs_watcher.stream) {
-            FSEventStreamStop(fs_watcher.stream);
-            FSEventStreamInvalidate(fs_watcher.stream);
-            FSEventStreamRelease(fs_watcher.stream);
+        bool success = false;
+        DEFER {
+            if (!success) {
+                mac_watcher.stream = {};
+                for (auto& dir : watcher.watched_dirs)
+                    dir.state = DirectoryWatcher::WatchedDirectory::State::WatchingFailed;
+            }
+        };
+
+        if (mac_watcher.stream) {
+            FSEventStreamStop(mac_watcher.stream);
+            FSEventStreamInvalidate(mac_watcher.stream);
+            FSEventStreamRelease(mac_watcher.stream);
         }
         CFMutableArrayRef paths = CFArrayCreateMutable(nullptr, 0, &kCFTypeArrayCallBacks);
         DEFER { CFRelease(paths); };
@@ -563,50 +568,59 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
         }
 
         FSEventStreamContext context {};
-        context.info = &fs_watcher;
+        context.info = &mac_watcher;
 
-        constexpr double k_latency_seconds = 0.05;
-
-        fs_watcher.stream =
+        mac_watcher.stream =
             FSEventStreamCreate(kCFAllocatorDefault,
                                 &EventCallback,
                                 &context,
                                 paths,
                                 kFSEventStreamEventIdSinceNow,
-                                k_latency_seconds,
+                                args.coalesce_latency_ms / 1000.0,
                                 kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagWatchRoot |
                                     kFSEventStreamCreateFlagNoDefer);
-        if (!fs_watcher.stream) return ErrorCode {FilesystemError::FileWatcherCreationFailed};
+        if (!mac_watcher.stream) return ErrorCode {FilesystemError::FileWatcherCreationFailed};
 
         // FSEvents is a callback based API where you always receive events in a separate thread.
-        if (!fs_watcher.queue) {
+        if (!mac_watcher.queue) {
             auto attr =
                 dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL, QOS_CLASS_USER_INITIATED, -10);
-            fs_watcher.queue = dispatch_queue_create("com.floe.fseventsqueue", attr);
+            mac_watcher.queue = dispatch_queue_create("com.floe.fseventsqueue", attr);
         }
-        FSEventStreamSetDispatchQueue(fs_watcher.stream, fs_watcher.queue);
+        FSEventStreamSetDispatchQueue(mac_watcher.stream, mac_watcher.queue);
 
-        if (!FSEventStreamStart(fs_watcher.stream)) {
-            FSEventStreamInvalidate(fs_watcher.stream);
-            FSEventStreamRelease(fs_watcher.stream);
+        if (!FSEventStreamStart(mac_watcher.stream)) {
+            FSEventStreamInvalidate(mac_watcher.stream);
+            FSEventStreamRelease(mac_watcher.stream);
             return ErrorCode {FilesystemError::FileWatcherCreationFailed};
         }
+
+        success = true;
     }
 
-    if (fs_watcher.stream) FSEventStreamFlushAsync(fs_watcher.stream);
+    if (mac_watcher.stream) FSEventStreamFlushAsync(mac_watcher.stream);
 
     {
-        fs_watcher.event_mutex.Lock();
-        DEFER { fs_watcher.event_mutex.Unlock(); };
+        mac_watcher.event_mutex.Lock();
+        DEFER { mac_watcher.event_mutex.Unlock(); };
 
-        for (auto const& event : fs_watcher.events) {
+        for (auto const& event : mac_watcher.events) {
             for (auto& dir : watcher.watched_dirs) {
                 if (StartsWithSpan(event.path, dir.resolved_path)) {
                     String subpath {};
                     if (event.path.size != dir.resolved_path.size)
                         subpath = event.path.SubSpan(dir.resolved_path.size);
                     if (subpath.size && subpath[0] == '/') subpath = subpath.SubSpan(1);
-                    subpath = result_arena.Clone(subpath);
+                    subpath = args.result_arena.Clone(subpath);
+
+                    // FSEvents ONLY supports recursive watching so we just have to ignore subdirectory
+                    // events
+                    if (!dir.recursive && Contains(subpath, '/')) {
+                        DebugLn("Ignoring subdirectory event: {} because {} is watched non-recursively",
+                                subpath,
+                                dir.path);
+                        continue;
+                    }
 
                     auto const file_type = (event.flags & kFSEventStreamEventFlagItemIsDir)
                                                ? FileType::Directory
@@ -619,16 +633,7 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
                                 .file_type = file_type,
                                 .changes = DirectoryWatcher::ChangeType::ManualRescanNeeded,
                             },
-                            result_arena);
-                        continue;
-                    }
-
-                    // FSEvents ONLY supports recursive watching so we just have to ignore subdirectory
-                    // events
-                    if (!dir.recursive && Contains(subpath, '/')) {
-                        DebugLn("Ignoring subdirectory event: {} because {} is watched non-recursively",
-                                subpath,
-                                dir.path);
+                            args.result_arena);
                         continue;
                     }
 
@@ -660,16 +665,16 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
                                 .file_type = file_type,
                                 .changes = changes,
                             },
-                            result_arena);
+                            args.result_arena);
                 }
             }
         }
 
-        fs_watcher.events.Clear();
-        fs_watcher.event_arena.ResetCursorAndConsolidateRegions();
+        mac_watcher.events.Clear();
+        mac_watcher.event_arena.ResetCursorAndConsolidateRegions();
     }
 
     watcher.RemoveAllNotWatching();
 
-    return watcher.AllDirectoryChanges(result_arena);
+    return watcher.AllDirectoryChanges(args.result_arena);
 }

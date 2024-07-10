@@ -720,7 +720,13 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
             dirs.ToOwnedSpan();
         });
 
-        if (auto const outcome = ReadDirectoryChanges(*watcher, dirs_to_watch, scratch_arena, scratch_arena);
+        if (auto const outcome = PollDirectoryChanges(*watcher,
+                                                      {
+                                                          .dirs_to_watch = dirs_to_watch,
+                                                          .retry_failed_directories = false,
+                                                          .result_arena = scratch_arena,
+                                                          .scratch_arena = scratch_arena,
+                                                      });
             outcome.HasError()) {
             // TODO(1.0) handle error
             DebugLn("Reading directory changes failed: {}", outcome.Error());

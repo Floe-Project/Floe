@@ -423,8 +423,14 @@ TEST_CASE(TestReadingDirectoryChanges) {
             .path = dir,
             .recursive = recursive,
         }};
+        auto const args = PollDirectoryChangesArgs {
+            .dirs_to_watch = dirs_to_watch,
+            .retry_failed_directories = false,
+            .result_arena = a,
+            .scratch_arena = a,
+        };
 
-        auto const changesets = TRY(ReadDirectoryChanges(watcher, dirs_to_watch, a, a));
+        auto const changesets = TRY(PollDirectoryChanges(watcher, args));
         if (changesets.size) {
             tester.log.DebugLn("Unexpected result");
             REQUIRE(false);
@@ -437,7 +443,7 @@ TEST_CASE(TestReadingDirectoryChanges) {
             // we give the watcher some time and a few attempts to detect the changes
             for (auto const _ : Range(4)) {
                 SleepThisThread(5);
-                auto const changesets = TRY(ReadDirectoryChanges(watcher, dirs_to_watch, a, a));
+                auto const changesets = TRY(PollDirectoryChanges(watcher, args));
 
                 for (auto const& changeset : changesets) {
                     auto const& path = *changeset.linked_dir_to_watch;
@@ -498,6 +504,11 @@ TEST_CASE(TestReadingDirectoryChanges) {
         };
 
         SUBCASE(recursive ? "recursive"_s : "non-recursive"_s) {
+
+            // TODO: test moving/deleting the watched directory itself
+            // TODO: test an invalid directory
+            // TODO: test that errors are only reported once unless retry_failed_directories is set
+
             SUBCASE("delete is detected") {
                 TRY(Delete(file.full_path, {}));
                 TRY(check(Array {

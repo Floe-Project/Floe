@@ -304,16 +304,14 @@ struct PathPool {
     Path* free_list {};
 };
 
-// TODO: better name for these 'native' types vs the common types - currently it's the same name
-struct WatchedDirectory {
+struct LinuxWatchedDirectory {
     struct SubDir {
         int watch_id;
         String subpath;
         bool watch_id_invalidated;
     };
 
-    int watch_id;
-    // TODO: we need to update this if the children directories change
+    int root_watch_id;
     ArenaList<SubDir, false> subdirs;
     PathPool path_pool;
 };
@@ -336,9 +334,9 @@ static void InotifyUnwatch(int inotify_id, int watch_id) {
 }
 
 static void UnwatchDirectory(int inotify_id, DirectoryWatcher::WatchedDirectory& d) {
-    auto native_data = (WatchedDirectory*)d.native_data.pointer;
+    auto native_data = (LinuxWatchedDirectory*)d.native_data.pointer;
     if (!native_data) return;
-    auto const rc = inotify_rm_watch(inotify_id, native_data->watch_id);
+    auto const rc = inotify_rm_watch(inotify_id, native_data->root_watch_id);
     ASSERT(rc == 0);
     d.arena.Delete(native_data);
 }
@@ -361,7 +359,7 @@ void DestoryDirectoryWatcher(DirectoryWatcher& watcher) {
 
     for (auto& dir : watcher.watched_dirs) {
         if (dir.native_data.pointer != nullptr) {
-            auto& native_dir = *(WatchedDirectory*)dir.native_data.pointer;
+            auto& native_dir = *(LinuxWatchedDirectory*)dir.native_data.pointer;
             for (auto& subdir : native_dir.subdirs)
                 InotifyUnwatch(watcher.native_data.int_id, subdir.watch_id);
             UnwatchDirectory(watcher.native_data.int_id, dir);
@@ -373,19 +371,19 @@ void DestoryDirectoryWatcher(DirectoryWatcher& watcher) {
     close(watcher.native_data.int_id);
 }
 
-static ErrorCodeOr<WatchedDirectory*> WatchDirectory(DirectoryWatcher::WatchedDirectory& dir,
-                                                     int inotify_id,
-                                                     String path,
-                                                     bool recursive,
-                                                     Allocator& allocator,
-                                                     ArenaAllocator& scratch_arena) {
+static ErrorCodeOr<LinuxWatchedDirectory*> WatchDirectory(DirectoryWatcher::WatchedDirectory& dir,
+                                                          int inotify_id,
+                                                          String path,
+                                                          bool recursive,
+                                                          Allocator& allocator,
+                                                          ArenaAllocator& scratch_arena) {
     bool success = false;
     auto watch_id = TRY(InotifyWatch(inotify_id, NullTerminated(path, scratch_arena), scratch_arena));
     DEFER {
         if (!success) InotifyUnwatch(inotify_id, watch_id);
     };
 
-    ArenaList<WatchedDirectory::SubDir, false> subdirs {dir.arena};
+    ArenaList<LinuxWatchedDirectory::SubDir, false> subdirs {dir.arena};
     PathPool path_pool {};
     if (recursive) {
         auto const try_watch_subdirs = [&]() -> ErrorCodeOr<void> {
@@ -404,7 +402,7 @@ static ErrorCodeOr<WatchedDirectory*> WatchDirectory(DirectoryWatcher::WatchedDi
 
                     auto subdir = subdirs.PrependUninitialised();
                     PLACEMENT_NEW(subdir)
-                    WatchedDirectory::SubDir {
+                    LinuxWatchedDirectory::SubDir {
                         .watch_id =
                             TRY(InotifyWatch(inotify_id, dyn::NullTerminated(full_subpath), scratch_arena)),
                         .subpath = path_pool.Clone(subpath, dir.arena),
@@ -425,7 +423,7 @@ static ErrorCodeOr<WatchedDirectory*> WatchDirectory(DirectoryWatcher::WatchedDi
         }
     }
 
-    auto result = allocator.New<WatchedDirectory>(watch_id, Move(subdirs), path_pool);
+    auto result = allocator.New<LinuxWatchedDirectory>(watch_id, Move(subdirs), path_pool);
     success = true;
     return result;
 }
@@ -433,17 +431,14 @@ static ErrorCodeOr<WatchedDirectory*> WatchDirectory(DirectoryWatcher::WatchedDi
 constexpr bool k_debug_inotify = false;
 
 ErrorCodeOr<Span<DirectoryWatcher::DirectoryChanges const>>
-ReadDirectoryChanges(DirectoryWatcher& watcher,
-                     Span<DirectoryToWatch const> dirs_to_watch,
-                     ArenaAllocator& result_arena,
-                     ArenaAllocator& scratch_arena) {
-    watcher.HandleWatchedDirChanges(dirs_to_watch);
+PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
+    watcher.HandleWatchedDirChanges(args.dirs_to_watch, args.retry_failed_directories);
 
     for (auto& dir : watcher.watched_dirs) {
         dir.directory_changes.Clear();
 
         if (dir.native_data.pointer != nullptr) {
-            auto& native_dir = *(WatchedDirectory*)dir.native_data.pointer;
+            auto& native_dir = *(LinuxWatchedDirectory*)dir.native_data.pointer;
             native_dir.subdirs.RemoveIf([&](auto& subdir) {
                 if (subdir.watch_id_invalidated) {
                     native_dir.path_pool.Free(subdir.subpath);
@@ -463,22 +458,23 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
                                                     dir.path,
                                                     dir.recursive,
                                                     dir.arena,
-                                                    scratch_arena);
-                if (outcome.HasError()) {
+                                                    args.scratch_arena);
+                if (outcome.HasValue()) {
+                    dir.state = DirectoryWatcher::WatchedDirectory::State::Watching;
+                    dir.native_data.pointer = outcome.Value();
+                } else {
                     dir.state = DirectoryWatcher::WatchedDirectory::State::WatchingFailed;
-                    ASSERT(dir.native_data.pointer == nullptr);
                     dir.directory_changes.error = outcome.Error();
+                    ASSERT(dir.native_data.pointer == nullptr);
                 }
-                dir.state = DirectoryWatcher::WatchedDirectory::State::Watching;
-                dir.native_data.pointer = outcome.Value();
                 break;
             }
             case DirectoryWatcher::WatchedDirectory::State::NeedsUnwatching: {
                 if (dir.native_data.pointer != nullptr) {
-                    auto& native_dir = *(WatchedDirectory*)dir.native_data.pointer;
-                    for (auto& child : native_dir.subdirs) {
-                        ASSERT(child.watch_id_invalidated == false);
-                        InotifyUnwatch(watcher.native_data.int_id, child.watch_id);
+                    auto& native_dir = *(LinuxWatchedDirectory*)dir.native_data.pointer;
+                    for (auto& subdir : native_dir.subdirs) {
+                        ASSERT(subdir.watch_id_invalidated == false);
+                        InotifyUnwatch(watcher.native_data.int_id, subdir.watch_id);
                     }
                     UnwatchDirectory(watcher.native_data.int_id, dir);
                 }
@@ -497,66 +493,73 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
 
         if (bytes_read <= 0) break;
 
-        const struct inotify_event* event;
-        for (char* ptr = buf; ptr < buf + bytes_read; ptr += sizeof(struct inotify_event) + event->len) {
-            event = CheckedPointerCast<const struct inotify_event*>(ptr);
+        const struct inotify_event* event_ptr;
+        for (char* ptr = buf; ptr < buf + bytes_read; ptr += sizeof(struct inotify_event) + event_ptr->len) {
+            event_ptr = CheckedPointerCast<const struct inotify_event*>(ptr);
+            auto const& event = *event_ptr;
 
             // event queue overflowed, we might be missing any number of events. event->wd is -1.
-            // TODO: we should report 'manual rescan needed' for all dirs for this.
-            if (event->mask & IN_Q_OVERFLOW) {
-                DebugLn("ERROR: inotify queue overflowed");
+            if (event.mask & IN_Q_OVERFLOW) {
+                for (auto& d : watcher.watched_dirs) {
+                    d.directory_changes.Add(
+                        {
+                            .subpath = {},
+                            .file_type = FileType::Directory,
+                            .changes = DirectoryWatcher::ChangeType::ManualRescanNeeded,
+                        },
+                        args.result_arena);
+                }
                 continue;
             }
 
-            // Find what directory this event is for
-            struct ThisEvent {
+            struct ThisDir {
                 String RootDirPath() const { return dir.path; }
                 String SubDirPath() const { return subdir ? subdir->subpath : ""; }
-                auto& NativeObj() { return *(WatchedDirectory*)dir.native_data.pointer; }
+                auto& Native() { return *(LinuxWatchedDirectory*)dir.native_data.pointer; }
                 bool IsForRoot() const { return subdir == nullptr; }
                 DirectoryWatcher::WatchedDirectory& dir;
-                WatchedDirectory::SubDir* subdir; // if null, then it's for the root directory
+                LinuxWatchedDirectory::SubDir* subdir; // if null, then it's for the root directory
             };
-            ThisEvent this_event = ({
-                Optional<ThisEvent> e {};
+            ThisDir this_dir = ({
+                Optional<ThisDir> d {};
                 for (auto& watch : watcher.watched_dirs) {
                     if (watch.state != DirectoryWatcher::WatchedDirectory::State::Watching) continue;
 
-                    auto& native_data = *(WatchedDirectory*)watch.native_data.pointer;
-                    if (native_data.watch_id == event->wd) {
-                        e.Emplace(watch, nullptr);
+                    auto& native_data = *(LinuxWatchedDirectory*)watch.native_data.pointer;
+                    if (native_data.root_watch_id == event.wd) {
+                        d.Emplace(watch, nullptr);
                         break;
                     } else {
-                        for (auto& child : native_data.subdirs) {
-                            if (child.watch_id == event->wd) {
-                                e.Emplace(watch, &child);
+                        for (auto& subdir : native_data.subdirs) {
+                            if (subdir.watch_id == event.wd && !subdir.watch_id_invalidated) {
+                                d.Emplace(watch, &subdir);
                                 break;
                             }
                         }
-                        if (e.HasValue()) break;
+                        if (d.HasValue()) break;
                     }
                 }
-                if (!e.HasValue()) {
+                if (!d.HasValue()) {
                     if constexpr (k_debug_inotify) {
                         DebugLn("ERROR: inotify event for unknown watch id: {}, name_len: {}, name: {}",
-                                event->wd,
-                                event->len,
-                                FromNullTerminated(event->len ? event->name : ""));
+                                event.wd,
+                                event.len,
+                                FromNullTerminated(event.len ? event.name : ""));
                         DebugLn("Available watch ids:");
                         bool found_ids = false;
                         for (auto& watch : watcher.watched_dirs) {
                             if (watch.state != DirectoryWatcher::WatchedDirectory::State::Watching) continue;
                             found_ids = true;
-                            auto& native_data = *(WatchedDirectory*)watch.native_data.pointer;
-                            DebugLn("  {}: {}", native_data.watch_id, watch.path);
-                            for (auto& child : native_data.subdirs)
-                                DebugLn("    {}: {}", child.watch_id, child.subpath);
+                            auto& native_data = *(LinuxWatchedDirectory*)watch.native_data.pointer;
+                            DebugLn("  {}: {}", native_data.root_watch_id, watch.path);
+                            for (auto& subdir : native_data.subdirs)
+                                DebugLn("    {}: {}", subdir.watch_id, subdir.subpath);
                         }
                         if (!found_ids) DebugLn("  none");
                     }
                     continue;
                 }
-                e.Value();
+                d.Value();
             });
 
             if constexpr (k_debug_inotify) {
@@ -564,34 +567,34 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
                 auto _ = [&]() -> ErrorCodeOr<void> {
                     auto writer = dyn::WriterFor(printout);
                     TRY(fmt::AppendLine(writer, "{{"));
-                    TRY(fmt::AppendLine(writer, "  .wd = {}", event->wd));
+                    TRY(fmt::AppendLine(writer, "  .wd = {}", event.wd));
 
                     {
                         TRY(fmt::FormatToWriter(writer, "  .mask = "));
                         auto const sz = printout.size;
-                        if (event->mask & IN_ACCESS) dyn::AppendSpan(printout, "ACCESS, "_s);
-                        if (event->mask & IN_ATTRIB) dyn::AppendSpan(printout, "ATTRIB, "_s);
-                        if (event->mask & IN_CLOSE_WRITE) dyn::AppendSpan(printout, "CLOSE_WRITE, "_s);
-                        if (event->mask & IN_CLOSE_NOWRITE) dyn::AppendSpan(printout, "CLOSE_NOWRITE, "_s);
-                        if (event->mask & IN_CREATE) dyn::AppendSpan(printout, "CREATE, "_s);
-                        if (event->mask & IN_DELETE) dyn::AppendSpan(printout, "DELETE, "_s);
-                        if (event->mask & IN_DELETE_SELF) dyn::AppendSpan(printout, "DELETE_SELF, "_s);
-                        if (event->mask & IN_MODIFY) dyn::AppendSpan(printout, "MODIFY, "_s);
-                        if (event->mask & IN_MOVE_SELF) dyn::AppendSpan(printout, "MOVE_SELF, "_s);
-                        if (event->mask & IN_MOVED_FROM) dyn::AppendSpan(printout, "MOVED_FROM, "_s);
-                        if (event->mask & IN_MOVED_TO) dyn::AppendSpan(printout, "MOVED_TO, "_s);
-                        if (event->mask & IN_OPEN) dyn::AppendSpan(printout, "OPEN, "_s);
-                        if (event->mask & IN_IGNORED) dyn::AppendSpan(printout, "IGNORED, "_s);
-                        if (event->mask & IN_ISDIR) dyn::AppendSpan(printout, "ISDIR, "_s);
+                        if (event.mask & IN_ACCESS) dyn::AppendSpan(printout, "ACCESS, "_s);
+                        if (event.mask & IN_ATTRIB) dyn::AppendSpan(printout, "ATTRIB, "_s);
+                        if (event.mask & IN_CLOSE_WRITE) dyn::AppendSpan(printout, "CLOSE_WRITE, "_s);
+                        if (event.mask & IN_CLOSE_NOWRITE) dyn::AppendSpan(printout, "CLOSE_NOWRITE, "_s);
+                        if (event.mask & IN_CREATE) dyn::AppendSpan(printout, "CREATE, "_s);
+                        if (event.mask & IN_DELETE) dyn::AppendSpan(printout, "DELETE, "_s);
+                        if (event.mask & IN_DELETE_SELF) dyn::AppendSpan(printout, "DELETE_SELF, "_s);
+                        if (event.mask & IN_MODIFY) dyn::AppendSpan(printout, "MODIFY, "_s);
+                        if (event.mask & IN_MOVE_SELF) dyn::AppendSpan(printout, "MOVE_SELF, "_s);
+                        if (event.mask & IN_MOVED_FROM) dyn::AppendSpan(printout, "MOVED_FROM, "_s);
+                        if (event.mask & IN_MOVED_TO) dyn::AppendSpan(printout, "MOVED_TO, "_s);
+                        if (event.mask & IN_OPEN) dyn::AppendSpan(printout, "OPEN, "_s);
+                        if (event.mask & IN_IGNORED) dyn::AppendSpan(printout, "IGNORED, "_s);
+                        if (event.mask & IN_ISDIR) dyn::AppendSpan(printout, "ISDIR, "_s);
                         if (sz != printout.size) printout.size -= 2;
                         dyn::Append(printout, '\n');
                     }
 
                     TRY(fmt::AppendLine(writer,
                                         "  .path = \"{}\" => \"{}\" => \"{}\"",
-                                        this_event.RootDirPath(),
-                                        this_event.SubDirPath(),
-                                        FromNullTerminated(event->len ? event->name : "")));
+                                        this_dir.RootDirPath(),
+                                        this_dir.SubDirPath(),
+                                        FromNullTerminated(event.len ? event.name : "")));
                     TRY(fmt::AppendLine(writer, "}}"));
                     return k_success;
                 }();
@@ -601,67 +604,67 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
             // "Watch was removed explicitly (inotify_rm_watch()) or automatically (file was deleted, or
             // filesystem was unmounted)"
             // This can be given BEFORE other events for this watch_id so we mustn't invalidate it here.
-            if (event->mask & IN_IGNORED) {
-                if (this_event.IsForRoot()) {
-                    this_event.dir.state = DirectoryWatcher::WatchedDirectory::State::NotWatching;
-                    this_event.dir.native_data.pointer = nullptr;
+            if (event.mask & IN_IGNORED) {
+                if (this_dir.IsForRoot()) {
+                    this_dir.dir.state = DirectoryWatcher::WatchedDirectory::State::NotWatching;
+                    this_dir.dir.native_data.pointer = nullptr;
                 } else {
-                    this_event.subdir->watch_id_invalidated = true;
+                    this_dir.subdir->watch_id_invalidated = true;
                 }
                 continue;
             }
 
-            if (event->mask & IN_ISDIR && event->mask & IN_CREATE) {
-                DynamicArray<char> subpath {scratch_arena};
-                if (!this_event.IsForRoot()) path::JoinAppend(subpath, this_event.SubDirPath());
-                if (event->len) path::JoinAppend(subpath, FromNullTerminated(event->name));
+            if (event.mask & IN_ISDIR && event.mask & IN_CREATE) {
+                DynamicArray<char> subpath {args.scratch_arena};
+                if (!this_dir.IsForRoot()) path::JoinAppend(subpath, this_dir.SubDirPath());
+                if (event.len) path::JoinAppend(subpath, FromNullTerminated(event.name));
 
-                DynamicArray<char> full_path {scratch_arena};
-                path::JoinAppend(full_path, Array {this_event.RootDirPath(), subpath});
+                DynamicArray<char> full_path {args.scratch_arena};
+                path::JoinAppend(full_path, Array {this_dir.RootDirPath(), subpath});
 
-                auto subdir = this_event.NativeObj().subdirs.PrependUninitialised();
+                auto subdir = this_dir.Native().subdirs.PrependUninitialised();
                 PLACEMENT_NEW(subdir)
-                WatchedDirectory::SubDir {
+                LinuxWatchedDirectory::SubDir {
                     .watch_id = TRY(InotifyWatch(watcher.native_data.int_id,
                                                  dyn::NullTerminated(full_path),
-                                                 scratch_arena)),
-                    .subpath = this_event.NativeObj().path_pool.Clone(subpath, this_event.dir.arena),
+                                                 args.scratch_arena)),
+                    .subpath = this_dir.Native().path_pool.Clone(subpath, this_dir.dir.arena),
                 };
             }
 
-            if (event->mask & IN_MOVE_SELF) {
-                // IMPROVE: do we need to handle renaming root directories in this case?
-            }
+            if (event.mask & IN_MOVE_SELF)
+                TODO(); // do we need to handle renaming root directories in this case?
 
-            auto const event_name = event->len ? FromNullTerminated(event->name) : String {};
+            auto const event_name = event.len ? FromNullTerminated(event.name) : String {};
 
             DirectoryWatcher::ChangeTypeFlags changes {};
-            if (event->mask & IN_MODIFY || event->mask & IN_CLOSE_WRITE)
+            if (event.mask & IN_MODIFY || event.mask & IN_CLOSE_WRITE)
                 changes |= DirectoryWatcher::ChangeType::Modified;
-            else if (event->mask & IN_MOVED_TO)
+            else if (event.mask & IN_MOVED_TO)
                 changes |= DirectoryWatcher::ChangeType::RenamedNewName;
-            else if (event->mask & IN_MOVED_FROM)
+            else if (event.mask & IN_MOVED_FROM)
                 changes |= DirectoryWatcher::ChangeType::RenamedOldName;
-            else if (event->mask & IN_DELETE || (event->mask & IN_DELETE_SELF && this_event.IsForRoot()))
+            else if (event.mask & IN_DELETE || (event.mask & IN_DELETE_SELF && this_dir.IsForRoot()))
                 changes |= DirectoryWatcher::ChangeType::Deleted;
-            else if (event->mask & IN_CREATE)
+            else if (event.mask & IN_CREATE)
                 changes |= DirectoryWatcher::ChangeType::Added;
 
             if (changes) {
-                this_event.dir.directory_changes.Add(
+                this_dir.dir.directory_changes.Add(
                     {
-                        .subpath = this_event.SubDirPath().size
-                                       ? path::Join(result_arena, Array {this_event.SubDirPath(), event_name})
-                                       : result_arena.Clone(event_name),
-                        .file_type = (event->mask & IN_ISDIR) ? FileType::Directory : FileType::RegularFile,
+                        .subpath =
+                            this_dir.SubDirPath().size
+                                ? path::Join(args.result_arena, Array {this_dir.SubDirPath(), event_name})
+                                : args.result_arena.Clone(event_name),
+                        .file_type = (event.mask & IN_ISDIR) ? FileType::Directory : FileType::RegularFile,
                         .changes = changes,
                     },
-                    result_arena);
+                    args.result_arena);
             }
         }
     }
 
     watcher.RemoveAllNotWatching();
 
-    return watcher.AllDirectoryChanges(result_arena);
+    return watcher.AllDirectoryChanges(args.result_arena);
 }

@@ -273,51 +273,45 @@ class RecursiveDirectoryIterator {
     bool m_get_file_size {};
 };
 
-// File system watcher
+// Directory watcher
 // =======================================================================================================
 // - inotify on Linux, ReadDirectoryChangesW on Windows, FSEvents on macOS
-// - Super simple poll-like API, just create, poll, destroy -  all from one thread
+// - Super simple poll-like API, just create, poll, destroy - all from one thread
 // - Recursive or non-recursive
 // - Events are grouped to each directory you request watching for
 // - Full error handling
+// - Failed actions are only retried if you explicitly ask for it, to reduce spam
 //
-// NOTE: there's no fallback if the file system watcher fails to initialize or produces an error. We could
-// eventually add a system that tracks changes by repeatedly scanning the directories.
+// NOTE(Sam): The use-case that I designed this for was for an event/worker thread. The thread is already
+// regularly polling for events from other systems. So for file changes it's convenient to have the same
+// poll-like API. The alternative API that file watchers often have is a callback-based API where you receive
+// events in a separate thread. For my use-case that would just mean having to do lots of extra thread-safety
+// work.
 //
-// These are some of reasons why this API is the way it is:
+// There's no fallback if the file system watcher fails to initialize or produces an error. But if needed, we
+// could add a system that tracks changes by regularly scanning the directories.
 //
-// The use-case that we designed this for was for an event/worker thread. The thread is already regularly
-// polling for events from other systems. So for file changes it's convenient to have the same poll-like
-// API. The alternative API that file watchers often have is a callback-based API where you receive events in
-// a separate thread. For our use-case that would just mean having to do lots of extra thread-safety work.
-//
-// Coalesced bitset of changes:
-// This API gives you a coalesced bitset of changes that happend to each sub-path. We don't give the order of
-// events. We do this for 2 reasons:
-// 1. On macOS (FSEvents), this kind of coalescing already happens and it's impossible to get the exact order
-//    of events. On Windows and Linux we are given the order but we coalesce anyway.
+// This directory watcher gives you a coalesced bitset of changes that happend to each sub-path. We don't give
+// the order of events. We do this for 2 reasons:
+// 1. On macOS (FSEvents), this kind of coalescing already happens to a certain extend, and it's impossible to
+//    get the exact order of events.
 // 2. Having the exact order isn't normally the important bit. For example knowing that something was modified
 //    before being deleted doesn't really help. It's not like we even know what the modification was. As
 //    always with the filesystem, you can't trust the state of anything until you've run a filesystem
 //    operation. The same goes for receiving filesystem events. You might have been given a 'created' event
 //    but the file might have been deleted in the time between the event being generated and you acting on it.
+//    Therefore the changes that you receive are prompts to take further actions, not a guarantee of the
+//    current state of the filesystem.
 //
-//
-// TODO: remove this paragraph
-// We chose to group events to each directory that you request watching for rather than receiving an stream of
-// events from all directories. This is convenient for our use-case but it does loose a bit of information: we
-// no longer have the order of events _across_ directories. Each directory _does_ get an ordered list of
-// changes for itself, but we have no way of knowing if a change happened in watched_dir_A before or after a
-// change in watched_dir_B. We could add a way to retain this information if it's needed in the future.
-//
-// Single call for multiple directories:
-// The underlying APIs sometimes work as a single stream that watches multiple directories at once so we
+// This directory watcher API uses a single call for multiple directories rather than allowing for separate
+// calls - one for each directory that you want to watch. This is because in some of the backends that we use
+// (Linux and macOS), a single 'watching system' object is created to watch multiple directories at once. We
 // follow that pattern rather than fighting it to allow separate calls for each directory.
 //
-// TODO: should we limit the number of errors that can be returned so that regularly failing operations aren't
-// repeated unnecessarily?
-//
-// TODO: do a final tidy-up pass over the 3 backends.
+// On macOS, there's a couple of important things to note:
+// - You may receive changes that occurred very shortly BEFORE you created the watcher.
+// - You do not get the distinction between 'renamed to' and 'renamed from'. You only get a 'renamed' event,
+//   you must work out yourself if it was a rename to or from.
 
 struct DirectoryToWatch {
     String path;
@@ -459,13 +453,13 @@ struct DirectoryWatcher {
     }
 
     // private
-    bool HandleWatchedDirChanges(Span<DirectoryToWatch const> dirs_to_watch) {
+    bool HandleWatchedDirChanges(Span<DirectoryToWatch const> dirs_to_watch, bool retry_failed_directories) {
         for (auto& dir : watched_dirs)
             dir.is_desired = false;
 
         bool any_states_changed = false;
 
-        for (auto const [index, dir_to_watch] : Enumerate(dirs_to_watch)) {
+        for (auto& dir_to_watch : dirs_to_watch) {
             if (auto dir_ptr = ({
                     DirectoryWatcher::WatchedDirectory* d = nullptr;
                     for (auto& dir : watched_dirs) {
@@ -479,6 +473,8 @@ struct DirectoryWatcher {
                     d;
                 })) {
                 dir_ptr->is_desired = true;
+                if (retry_failed_directories && dir_ptr->state == WatchedDirectory::State::WatchingFailed)
+                    dir_ptr->state = WatchedDirectory::State::NeedsWatching;
                 continue;
             }
 
@@ -500,7 +496,7 @@ struct DirectoryWatcher {
             new_dir->directory_changes.linked_dir_to_watch = &dir_to_watch;
         }
 
-        for (auto [index, dir] : Enumerate(watched_dirs))
+        for (auto& dir : watched_dirs)
             if (!dir.is_desired) {
                 dir.state = DirectoryWatcher::WatchedDirectory::State::NeedsUnwatching;
                 any_states_changed = true;
@@ -517,8 +513,13 @@ struct DirectoryWatcher {
 ErrorCodeOr<DirectoryWatcher> CreateDirectoryWatcher(Allocator& a);
 void DestoryDirectoryWatcher(DirectoryWatcher& w);
 
+struct PollDirectoryChangesArgs {
+    Span<DirectoryToWatch const> dirs_to_watch;
+    bool retry_failed_directories = false;
+    double coalesce_latency_ms = 10; // macOS only
+    ArenaAllocator& result_arena;
+    ArenaAllocator& scratch_arena;
+};
+
 ErrorCodeOr<Span<DirectoryWatcher::DirectoryChanges const>>
-ReadDirectoryChanges(DirectoryWatcher& w,
-                     Span<DirectoryToWatch const> directories,
-                     ArenaAllocator& result_arena,
-                     ArenaAllocator& scratch_arena);
+PollDirectoryChanges(DirectoryWatcher& w, PollDirectoryChangesArgs args);

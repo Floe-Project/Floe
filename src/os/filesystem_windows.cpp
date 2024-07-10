@@ -704,16 +704,16 @@ ErrorCodeOr<Optional<MutableString>> FilesystemDialog(DialogOptions options) {
 constexpr DWORD k_directory_changes_filter = FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME |
                                              FILE_NOTIFY_CHANGE_SIZE | FILE_NOTIFY_CHANGE_LAST_WRITE;
 
-struct WatchedDirectory {
+struct WindowsWatchedDirectory {
     alignas(16) Array<u8, Kb(35)> buffer;
     HANDLE handle;
     OVERLAPPED overlapped;
 };
 
-static void UnwatchDirectory(WatchedDirectory* watch) {
-    CloseHandle(watch->overlapped.hEvent);
-    CloseHandle(watch->handle);
-    PageAllocator::Instance().Delete(watch);
+static void UnwatchDirectory(WindowsWatchedDirectory* windows_dir) {
+    CloseHandle(windows_dir->overlapped.hEvent);
+    CloseHandle(windows_dir->handle);
+    PageAllocator::Instance().Delete(windows_dir);
 }
 
 ErrorCodeOr<DirectoryWatcher> CreateDirectoryWatcher(Allocator& a) {
@@ -727,20 +727,19 @@ ErrorCodeOr<DirectoryWatcher> CreateDirectoryWatcher(Allocator& a) {
 
 void DestoryDirectoryWatcher(DirectoryWatcher& watcher) {
     ZoneScoped;
-    ArenaAllocatorWithInlineStorage<1000> scratch_arena;
 
     for (auto const& dir : watcher.watched_dirs) {
         if (dir.state == DirectoryWatcher::WatchedDirectory::State::Watching ||
             dir.state == DirectoryWatcher::WatchedDirectory::State::NeedsUnwatching) {
-            UnwatchDirectory((WatchedDirectory*)dir.native_data.pointer);
+            UnwatchDirectory((WindowsWatchedDirectory*)dir.native_data.pointer);
         }
     }
 
     watcher.watched_dirs.Clear();
 }
 
-static ErrorCodeOr<WatchedDirectory*> WatchDirectory(DirectoryWatcher::WatchedDirectory const& dir,
-                                                     ArenaAllocator& scratch_arena) {
+static ErrorCodeOr<WindowsWatchedDirectory*> WatchDirectory(DirectoryWatcher::WatchedDirectory const& dir,
+                                                            ArenaAllocator& scratch_arena) {
     auto wide_path = TRY(path::MakePathForWin32(dir.path, scratch_arena, true));
     auto handle = CreateFileW(wide_path.path.data,
                               FILE_LIST_DIRECTORY,
@@ -751,39 +750,36 @@ static ErrorCodeOr<WatchedDirectory*> WatchDirectory(DirectoryWatcher::WatchedDi
                               nullptr);
     if (handle == INVALID_HANDLE_VALUE) return FilesystemWin32ErrorCode(GetLastError());
 
-    auto watch = PageAllocator::Instance().NewUninitialised<WatchedDirectory>();
-    watch->handle = handle;
-    watch->overlapped = {};
+    auto windows_dir = PageAllocator::Instance().NewUninitialised<WindowsWatchedDirectory>();
+    windows_dir->handle = handle;
+    windows_dir->overlapped = {};
 
-    watch->overlapped.hEvent = CreateEventW(nullptr, FALSE, 0, nullptr);
+    windows_dir->overlapped.hEvent = CreateEventW(nullptr, FALSE, 0, nullptr);
 
     auto const succeeded = ReadDirectoryChangesW(handle,
-                                                 watch->buffer.data,
-                                                 (DWORD)watch->buffer.size,
+                                                 windows_dir->buffer.data,
+                                                 (DWORD)windows_dir->buffer.size,
                                                  dir.recursive,
                                                  k_directory_changes_filter,
                                                  nullptr,
-                                                 &watch->overlapped,
+                                                 &windows_dir->overlapped,
                                                  nullptr);
     if (!succeeded) {
-        UnwatchDirectory(watch);
+        UnwatchDirectory(windows_dir);
         auto const error = GetLastError();
         return FilesystemWin32ErrorCode(error);
     }
 
-    return watch;
+    return windows_dir;
 }
 
 ErrorCodeOr<Span<DirectoryWatcher::DirectoryChanges const>>
-ReadDirectoryChanges(DirectoryWatcher& watcher,
-                     Span<DirectoryToWatch const> dirs_to_watch,
-                     ArenaAllocator& result_arena,
-                     ArenaAllocator& scratch_arena) {
+PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
+    auto const any_states_changed =
+        watcher.HandleWatchedDirChanges(args.dirs_to_watch, args.retry_failed_directories);
 
-    auto const any_states_changed = watcher.HandleWatchedDirChanges(dirs_to_watch);
-
-    auto const scratch_cursor = scratch_arena.TotalUsed();
-    DEFER { scratch_arena.TryShrinkTotalUsed(scratch_cursor); };
+    auto const scratch_cursor = args.scratch_arena.TotalUsed();
+    DEFER { args.scratch_arena.TryShrinkTotalUsed(scratch_cursor); };
 
     for (auto& dir : watcher.watched_dirs)
         dir.directory_changes.Clear();
@@ -792,7 +788,7 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
         for (auto& dir : watcher.watched_dirs) {
             switch (dir.state) {
                 case DirectoryWatcher::WatchedDirectory::State::NeedsWatching: {
-                    auto const outcome = WatchDirectory(dir, scratch_arena);
+                    auto const outcome = WatchDirectory(dir, args.scratch_arena);
                     if (outcome.HasValue()) {
                         dir.state = DirectoryWatcher::WatchedDirectory::State::Watching;
                         dir.native_data.pointer = outcome.Value();
@@ -804,7 +800,7 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
                     break;
                 }
                 case DirectoryWatcher::WatchedDirectory::State::NeedsUnwatching: {
-                    UnwatchDirectory((WatchedDirectory*)dir.native_data.pointer);
+                    UnwatchDirectory((WindowsWatchedDirectory*)dir.native_data.pointer);
                     dir.native_data = {};
                     dir.state = DirectoryWatcher::WatchedDirectory::State::NotWatching;
                     break;
@@ -819,15 +815,15 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
     for (auto& dir : watcher.watched_dirs) {
         if (dir.state != DirectoryWatcher::WatchedDirectory::State::Watching) continue;
 
-        auto& watch = *(WatchedDirectory*)dir.native_data.pointer;
+        auto& windows_dir = *(WindowsWatchedDirectory*)dir.native_data.pointer;
 
-        auto const wait_result = WaitForSingleObjectEx(watch.overlapped.hEvent, 0, TRUE);
+        auto const wait_result = WaitForSingleObjectEx(windows_dir.overlapped.hEvent, 0, TRUE);
 
         if (wait_result == WAIT_OBJECT_0) {
             DWORD bytes_transferred {};
-            if (GetOverlappedResult(watch.handle, &watch.overlapped, &bytes_transferred, FALSE)) {
-                auto const* base = watch.buffer.data;
-                auto const* end = Min<u8 const*>(base + bytes_transferred, watch.buffer.end());
+            if (GetOverlappedResult(windows_dir.handle, &windows_dir.overlapped, &bytes_transferred, FALSE)) {
+                auto const* base = windows_dir.buffer.data;
+                auto const* end = Min<u8 const*>(base + bytes_transferred, windows_dir.buffer.end());
                 auto const min_chunk_size = sizeof(FILE_NOTIFY_INFORMATION);
 
                 ASSERT(base <= end);
@@ -904,7 +900,7 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
                             break;
                     }
                     if (changes) {
-                        auto const narrowed = Narrow(result_arena, filename);
+                        auto const narrowed = Narrow(args.result_arena, filename);
                         if (narrowed.HasValue()) {
                             dir.directory_changes.Add(
                                 {
@@ -912,7 +908,7 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
                                     .file_type = nullopt,
                                     .changes = changes,
                                 },
-                                result_arena);
+                                args.result_arena);
                         }
                     }
 
@@ -928,7 +924,7 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
                             .file_type = nullopt,
                             .changes = DirectoryWatcher::ChangeType::ManualRescanNeeded,
                         },
-                        result_arena);
+                        args.result_arena);
                 }
             } else {
                 dir.directory_changes.error = FilesystemWin32ErrorCode(GetLastError());
@@ -937,13 +933,13 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
             Panic("unexpected result from WaitForSingleObjectEx");
         }
 
-        auto const succeeded = ReadDirectoryChangesW(watch.handle,
-                                                     watch.buffer.data,
-                                                     (DWORD)watch.buffer.size,
+        auto const succeeded = ReadDirectoryChangesW(windows_dir.handle,
+                                                     windows_dir.buffer.data,
+                                                     (DWORD)windows_dir.buffer.size,
                                                      dir.recursive,
                                                      k_directory_changes_filter,
                                                      nullptr,
-                                                     &watch.overlapped,
+                                                     &windows_dir.overlapped,
                                                      nullptr);
 
         if (!succeeded) {
@@ -955,7 +951,7 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
                         .file_type = nullopt,
                         .changes = DirectoryWatcher::ChangeType::ManualRescanNeeded,
                     },
-                    result_arena);
+                    args.result_arena);
             else
                 dir.directory_changes.error = FilesystemWin32ErrorCode(error);
             continue;
@@ -964,5 +960,5 @@ ReadDirectoryChanges(DirectoryWatcher& watcher,
 
     watcher.RemoveAllNotWatching();
 
-    return watcher.AllDirectoryChanges(result_arena);
+    return watcher.AllDirectoryChanges(args.result_arena);
 }

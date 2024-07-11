@@ -140,7 +140,7 @@ enum class ExistingDestinationHandling {
     Fail, // Fail if it exists
 };
 
-enum class FileType { RegularFile, Directory };
+enum class FileType { File, Directory };
 
 ErrorCodeOr<FileType> GetFileType(String path);
 

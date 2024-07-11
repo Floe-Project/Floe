@@ -624,7 +624,7 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
 
                     auto const file_type = (event.flags & kFSEventStreamEventFlagItemIsDir)
                                                ? FileType::Directory
-                                               : FileType::RegularFile;
+                                               : FileType::File;
 
                     if (event.flags & kFSEventStreamEventFlagMustScanSubDirs) {
                         dir.directory_changes.Add(

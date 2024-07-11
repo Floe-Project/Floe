@@ -125,7 +125,7 @@ static void TakeScreenshot(Gui* g) {
             fmt::Append(path, "-{}.jpg", num);
             ++num;
 
-            if (auto o = GetFileType(path); o.HasValue() && o.Value() == FileType::RegularFile)
+            if (auto o = GetFileType(path); o.HasValue() && o.Value() == FileType::File)
                 dyn::Resize(path, initial_size);
             else
                 break;

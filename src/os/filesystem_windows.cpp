@@ -312,7 +312,7 @@ ErrorCodeOr<FileType> GetFileType(String absolute_path) {
         return FilesystemWin32ErrorCode(GetLastError(), "GetFileAttributesW");
 
     if (attributes & FILE_ATTRIBUTE_DIRECTORY) return FileType::Directory;
-    return FileType::RegularFile;
+    return FileType::File;
 }
 
 ErrorCodeOr<MutableString> ConvertToAbsolutePath(Allocator& a, String path) {
@@ -521,7 +521,7 @@ FillDirectoryEntry(DirectoryEntry& e, const WIN32_FIND_DATAW& data, usize base_p
     auto filename = Narrow(temp_path_arena, FromNullTerminated(data.cFileName)).Value();
     dyn::Resize(e.path, base_path_size);
     path::JoinAppend(e.path, filename);
-    e.type = FileType::RegularFile;
+    e.type = FileType::File;
     e.file_size = (data.nFileSizeHigh * (MAXDWORD + 1)) + data.nFileSizeLow;
     if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) e.type = FileType::Directory;
     return k_success;

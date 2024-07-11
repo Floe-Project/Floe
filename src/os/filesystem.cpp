@@ -77,7 +77,7 @@ MoveFileOrDirIntoFolder(String file_or_folder, String target_folder, ExistingDes
                                 {.create_intermediate_directories = true, .fail_if_exists = false}));
             return MoveDirectoryContents(file_or_folder, new_name, existing);
         }
-        case FileType::RegularFile: {
+        case FileType::File: {
             return MoveFile(file_or_folder, new_name, existing);
         }
     }
@@ -94,7 +94,7 @@ ErrorCodeOr<void> MoveFileOrDirectoryContentsIntoFolder(String file_or_dir,
         case FileType::Directory: {
             return MoveDirectoryContents(file_or_dir, destination_dir, existing);
         }
-        case FileType::RegularFile: {
+        case FileType::File: {
             PathArena path_allocator;
             auto to = path::Join(path_allocator, Array {destination_dir, path::Filename(file_or_dir)});
             return MoveFile(file_or_dir, to, existing);
@@ -110,7 +110,7 @@ MoveDirectoryContents(String source_dir, String destination_directory, ExistingD
     if (dest_file_type.HasError() && dest_file_type.Error() != FilesystemError::PathDoesNotExist)
         return dest_file_type.Error();
 
-    if (dest_file_type.Value() == FileType::RegularFile) return ErrorCode(FilesystemError::PathIsAFile);
+    if (dest_file_type.Value() == FileType::File) return ErrorCode(FilesystemError::PathIsAFile);
 
     if (existing == ExistingDestinationHandling::Fail) {
         // Do a dry-run and see if there would be any conflicts
@@ -123,7 +123,7 @@ MoveDirectoryContents(String source_dir, String destination_directory, ExistingD
             auto relative_path =
                 path::TrimDirectorySeparatorsEnd(entry.path.Items().SubSpan(source_dir.size));
             if (relative_path.size) {
-                if (entry.type == FileType::RegularFile) {
+                if (entry.type == FileType::File) {
                     PathArena path_allocator;
                     auto const o =
                         GetFileType(path::Join(path_allocator, Array {destination_directory, relative_path}));
@@ -236,7 +236,7 @@ DirectoryIterator& DirectoryIterator::operator=(DirectoryIterator&& other) {
 static ErrorCodeOr<void>
 IncrementToNextThatMatchesPattern(DirectoryIterator& it, String wildcard, bool always_increment) {
     if (always_increment) TRY(it.Increment());
-    while (it.HasMoreFiles() && it.Get().type == FileType::RegularFile &&
+    while (it.HasMoreFiles() && it.Get().type == FileType::File &&
            !MatchWildcard(wildcard, path::Filename(it.Get().path))) {
         TRY(it.Increment());
     };

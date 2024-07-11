@@ -189,7 +189,7 @@ DirectoryListing::ScanResult DirectoryListing::Rescan() {
             if (e.type == FileType::Directory) {
                 m_num_directories++;
                 type = Entry::Type::Directory;
-            } else if (e.type == FileType::RegularFile) {
+            } else if (e.type == FileType::File) {
                 bool matches = false;
                 for (auto wildcard : m_file_name_wildcards)
                     if (MatchWildcard(wildcard, path::Filename(e.path))) {

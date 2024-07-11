@@ -665,7 +665,7 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                             this_dir.SubDirPath().size
                                 ? path::Join(args.result_arena, Array {this_dir.SubDirPath(), event_name})
                                 : args.result_arena.Clone(event_name),
-                        .file_type = (event.mask & IN_ISDIR) ? FileType::Directory : FileType::RegularFile,
+                        .file_type = (event.mask & IN_ISDIR) ? FileType::Directory : FileType::File,
                         .changes = changes,
                     },
                     args.result_arena);

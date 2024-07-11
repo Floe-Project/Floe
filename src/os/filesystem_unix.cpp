@@ -22,7 +22,7 @@ ErrorCodeOr<FileType> GetFileType(String path) {
     if (r != 0) return FilesystemErrnoErrorCode(errno);
 
     if ((info.st_mode & S_IFMT) == S_IFDIR) return FileType::Directory;
-    return FileType::RegularFile;
+    return FileType::File;
 }
 
 ErrorCodeOr<s64> LastWriteTime(String path) {
@@ -79,7 +79,7 @@ ErrorCodeOr<void> DirectoryIterator::Increment() {
             } else {
                 dyn::Resize(m_e.path, m_base_path_size);
                 path::JoinAppend(m_e.path, FromNullTerminated(entry->d_name));
-                m_e.type = entry->d_type == DT_DIR ? FileType::Directory : FileType::RegularFile;
+                m_e.type = entry->d_type == DT_DIR ? FileType::Directory : FileType::File;
                 if (m_get_file_size) {
                     struct ::stat info;
                     auto r = ::stat(dyn::NullTerminated(m_e.path), &info);

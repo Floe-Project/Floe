@@ -32,7 +32,7 @@ TEST_CASE(TestHostingClap) {
 
             dyn::Assign(buf, *dir);
             path::JoinAppend(buf, "Floe.clap"_s);
-            if (auto const o = GetFileType(buf); o.HasValue() && o.Value() == FileType::RegularFile) {
+            if (auto const o = GetFileType(buf); o.HasValue() && o.Value() == FileType::File) {
                 fixture.clap_path = buf.ToOwnedSpan();
                 break;
             }

@@ -316,14 +316,14 @@ TEST_CASE(TestFilesystem) {
             dyn::Append(existing_files, make_path(Array {"dir2"_s, "subdir", "file3"}));
 
             REQUIRE(TRY(GetFileType(dir2)) == FileType::Directory);
-            REQUIRE(TRY(GetFileType(existing_files[0])) == FileType::RegularFile);
+            REQUIRE(TRY(GetFileType(existing_files[0])) == FileType::File);
             REQUIRE(TRY(GetFileType(make_path(Array {"dir2"_s, "subdir"}))) == FileType::Directory);
-            REQUIRE(TRY(GetFileType(existing_files[1])) == FileType::RegularFile);
-            REQUIRE(TRY(GetFileType(existing_files[2])) == FileType::RegularFile);
+            REQUIRE(TRY(GetFileType(existing_files[1])) == FileType::File);
+            REQUIRE(TRY(GetFileType(existing_files[2])) == FileType::File);
 
             for (auto& f : TRY(GetFilesRecursive(a, dir2))) {
                 auto const file_type = TRY(GetFileType(f));
-                if (file_type == FileType::RegularFile) {
+                if (file_type == FileType::File) {
                     bool found = false;
                     for (auto& existing : existing_files)
                         if (path::Equal(existing, f)) found = true;
@@ -511,7 +511,7 @@ TEST_CASE(TestDirectoryWatcher) {
                 TRY(Delete(file.full_path, {}));
                 TRY(check(Array {DirectoryWatcher::DirectoryChanges::Change {
                     file.subpath,
-                    FileType::RegularFile,
+                    FileType::File,
                     DirectoryWatcher::ChangeType::Deleted,
                 }}));
             }
@@ -520,7 +520,7 @@ TEST_CASE(TestDirectoryWatcher) {
                 TRY(WriteFile(file.full_path, "new data"));
                 TRY(check(Array {DirectoryWatcher::DirectoryChanges::Change {
                     file.subpath,
-                    FileType::RegularFile,
+                    FileType::File,
                     DirectoryWatcher::ChangeType::Modified,
                 }}));
             }
@@ -531,12 +531,12 @@ TEST_CASE(TestDirectoryWatcher) {
                 TRY(check(Array {
                     DirectoryWatcher::DirectoryChanges::Change {
                         file.subpath,
-                        FileType::RegularFile,
+                        FileType::File,
                         DirectoryWatcher::ChangeType::RenamedOldName,
                     },
                     DirectoryWatcher::DirectoryChanges::Change {
                         new_file.subpath,
-                        FileType::RegularFile,
+                        FileType::File,
                         DirectoryWatcher::ChangeType::RenamedNewName,
                     },
                 }));
@@ -570,7 +570,7 @@ TEST_CASE(TestDirectoryWatcher) {
                     TRY(Delete(subfile.full_path, {}));
                     TRY(check(Array {DirectoryWatcher::DirectoryChanges::Change {
                         subfile.subpath,
-                        FileType::RegularFile,
+                        FileType::File,
                         DirectoryWatcher::ChangeType::Deleted,
                     }}));
                 }
@@ -579,7 +579,7 @@ TEST_CASE(TestDirectoryWatcher) {
                     TRY(WriteFile(subfile.full_path, "new data"));
                     TRY(check(Array {DirectoryWatcher::DirectoryChanges::Change {
                         subfile.subpath,
-                        FileType::RegularFile,
+                        FileType::File,
                         DirectoryWatcher::ChangeType::Modified,
                     }}));
                 }
@@ -593,13 +593,13 @@ TEST_CASE(TestDirectoryWatcher) {
                     TRY(check(Array {
                         DirectoryWatcher::DirectoryChanges::Change {
                             subfile.subpath,
-                            FileType::RegularFile,
+                            FileType::File,
                             IS_MACOS ? DirectoryWatcher::ChangeType::RenamedUnknown
                                      : DirectoryWatcher::ChangeType::RenamedOldName,
                         },
                         DirectoryWatcher::DirectoryChanges::Change {
                             new_subfile.subpath,
-                            FileType::RegularFile,
+                            FileType::File,
                             IS_MACOS ? DirectoryWatcher::ChangeType::RenamedUnknown
                                      : DirectoryWatcher::ChangeType::RenamedNewName,
                         },

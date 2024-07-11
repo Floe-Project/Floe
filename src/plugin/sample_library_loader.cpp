@@ -494,7 +494,7 @@ static void AddAsyncJob(LibrariesAsyncContext& async_ctx,
                                 String const lua_path =
                                     path::Join(scratch_arena, Array {String(entry.path), "config.lua"});
                                 if (auto const ft_outcome = GetFileType(lua_path);
-                                    ft_outcome.HasValue() && ft_outcome.Value() == FileType::RegularFile) {
+                                    ft_outcome.HasValue() && ft_outcome.Value() == FileType::File) {
                                     ReadLibraryAsync(async_ctx,
                                                      lib_list,
                                                      lua_path,
@@ -1583,7 +1583,7 @@ TEST_CASE(TestSampleLibraryLoader) {
                 auto const relative_path =
                     path::TrimDirectorySeparatorsEnd(entry.path.Items().SubSpan(source.size));
                 auto const dest_file = path::Join(tester.scratch_arena, Array {lib_dir, relative_path});
-                if (entry.type == FileType::RegularFile) {
+                if (entry.type == FileType::File) {
                     if (auto const dir = path::Directory(dest_file)) {
                         TRY(CreateDirectory(
                             *dir,

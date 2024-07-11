@@ -870,7 +870,7 @@ TEST_CASE(TestSprintfBuffer) {
 namespace dir_listing_tests {
 struct Helpers {
     static ErrorCodeOr<usize> CountFiles(Allocator& a, String path) {
-        return Count(a, path, [](DirectoryEntry const& e) { return e.type == FileType::RegularFile; });
+        return Count(a, path, [](DirectoryEntry const& e) { return e.type == FileType::File; });
     }
     static ErrorCodeOr<usize> CountDirectores(Allocator& a, String path) {
         return Count(a, path, [](DirectoryEntry const& e) { return e.type == FileType::Directory; });
@@ -933,7 +933,7 @@ struct TestDirectoryStructure {
         auto it = TRY(RecursiveDirectoryIterator::Create(a, root_dir));
         while (it.HasMoreFiles()) {
             auto const& entry = it.Get();
-            if (entry.type == FileType::RegularFile) {
+            if (entry.type == FileType::File) {
                 path_to_remove = MutableString(entry.path).Clone(a);
                 break;
             }

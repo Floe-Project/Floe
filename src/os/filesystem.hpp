@@ -3,6 +3,7 @@
 
 #pragma once
 #include "foundation/foundation.hpp"
+#include "utils/debug/debug.hpp"
 
 enum class FilesystemError : u32 {
     PathDoesNotExist,
@@ -384,6 +385,10 @@ struct DirectoryWatcher {
 
         // private
         void Add(Change change, ArenaAllocator& arena) {
+            DebugLn("Adding change: {} {} {}",
+                    linked_dir_to_watch ? linked_dir_to_watch->path : "nullptr",
+                    change.subpath,
+                    ChangeType::ToString(change.changes));
             // try finding the subpath+file_type and add the change to it
             for (auto& subpath_changeset : subpath_changesets)
                 // We check both subpath and file_type because a file can be deleted and then created as a

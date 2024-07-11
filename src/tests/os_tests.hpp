@@ -387,34 +387,36 @@ TEST_CASE(TestFilesystem) {
 TEST_CASE(TestDirectoryWatcher) {
     auto& a = tester.scratch_arena;
 
-    auto const dir = (String)path::Join(a, Array {tests::TempFolder(tester), "PollDirectoryChanges test"});
-    auto _ = Delete(dir, {.type = DeleteOptions::Type::DirectoryRecursively, .fail_if_not_exists = false});
-    TRY(CreateDirectory(dir, {.create_intermediate_directories = false, .fail_if_exists = true}));
-
-    struct TestPath {
-        static TestPath Create(ArenaAllocator& a, String root_dir, String subpath) {
-            auto const full = path::Join(a, Array {root_dir, subpath});
-            return TestPath {
-                .full_path = full,
-                .subpath = full.SubSpan(full.size - subpath.size, subpath.size),
-            };
-        }
-        String full_path;
-        String subpath;
-    };
-
-    auto const file = TestPath::Create(a, dir, "file1.txt");
-    TRY(WriteFile(file.full_path, "data"));
-
-    auto const subdir = TestPath::Create(a, dir, "subdir");
-    TRY(CreateDirectory(subdir.full_path,
-                        {.create_intermediate_directories = false, .fail_if_exists = true}));
-
-    auto const subfile = TestPath::Create(a, dir, path::Join(a, Array {subdir.subpath, "file2.txt"}));
-    TRY(WriteFile(subfile.full_path, "data"));
-
     for (auto const recursive : Array {true, false}) {
         CAPTURE(recursive);
+
+        auto const dir =
+            (String)path::Join(a, Array {tests::TempFolder(tester), "PollDirectoryChanges test"});
+        auto _ =
+            Delete(dir, {.type = DeleteOptions::Type::DirectoryRecursively, .fail_if_not_exists = false});
+        TRY(CreateDirectory(dir, {.create_intermediate_directories = false, .fail_if_exists = true}));
+
+        struct TestPath {
+            static TestPath Create(ArenaAllocator& a, String root_dir, String subpath) {
+                auto const full = path::Join(a, Array {root_dir, subpath});
+                return TestPath {
+                    .full_path = full,
+                    .subpath = full.SubSpan(full.size - subpath.size, subpath.size),
+                };
+            }
+            String full_path;
+            String subpath;
+        };
+
+        auto const file = TestPath::Create(a, dir, "file1.txt");
+        TRY(WriteFile(file.full_path, "data"));
+
+        auto const subdir = TestPath::Create(a, dir, "subdir");
+        TRY(CreateDirectory(subdir.full_path,
+                            {.create_intermediate_directories = false, .fail_if_exists = true}));
+
+        auto const subfile = TestPath::Create(a, dir, path::Join(a, Array {subdir.subpath, "file2.txt"}));
+        TRY(WriteFile(subfile.full_path, "data"));
 
         auto watcher = TRY(CreateDirectoryWatcher(a));
         DEFER { DestoryDirectoryWatcher(watcher); };
@@ -430,15 +432,22 @@ TEST_CASE(TestDirectoryWatcher) {
             .scratch_arena = a,
         };
 
-        auto const changesets = TRY(PollDirectoryChanges(watcher, args));
-        if (changesets.size) {
+        if (auto const dir_changes_span = TRY(PollDirectoryChanges(watcher, args)); dir_changes_span.size) {
             tester.log.DebugLn("Unexpected result");
+            for (auto const& dir_changes : dir_changes_span) {
+                tester.log.DebugLn("  {}", dir_changes.linked_dir_to_watch->path);
+                tester.log.DebugLn("  {}", dir_changes.error);
+                for (auto const& subpath_changeset : dir_changes.subpath_changesets)
+                    tester.log.DebugLn("    {} {}",
+                                       subpath_changeset.subpath,
+                                       DirectoryWatcher::ChangeType::ToString(subpath_changeset.changes));
+            }
             REQUIRE(false);
         }
 
         auto check = [&](Span<DirectoryWatcher::DirectoryChanges::Change const> expected_changes)
             -> ErrorCodeOr<void> {
-            DirectoryWatcher::DirectoryChanges changes;
+            auto found_expected = a.NewMultiple<bool>(expected_changes.size);
 
             // we give the watcher some time and a few attempts to detect the changes
             for (auto const _ : Range(4)) {
@@ -454,53 +463,39 @@ TEST_CASE(TestDirectoryWatcher) {
                     CHECK(!directory_changes.error.HasValue());
 
                     for (auto const& subpath_changeset : directory_changes.subpath_changesets) {
-                        changes.Add(
-                            {
-                                .subpath = a.Clone(subpath_changeset.subpath),
-                                .file_type = subpath_changeset.file_type,
-                                .changes = subpath_changeset.changes,
-                            },
-                            a);
-                        tester.log.DebugLn("Event: \"{}\" {{ {} }} in \"{}\"",
+                        bool was_expected = false;
+                        for (auto const [index, expected] : Enumerate(expected_changes)) {
+                            if (path::Equal(subpath_changeset.subpath, expected.subpath) &&
+                                (!subpath_changeset.file_type.HasValue() ||
+                                 subpath_changeset.file_type.Value() == expected.file_type)) {
+                                if ((expected.changes & subpath_changeset.changes) == expected.changes) {
+                                    was_expected = true;
+                                    found_expected[index] = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        tester.log.DebugLn("{} change: \"{}\" {{ {} }} in \"{}\"",
+                                           was_expected ? "Was expected" : "Unexpected",
                                            subpath_changeset.subpath,
                                            DirectoryWatcher::ChangeType::ToString(subpath_changeset.changes),
                                            path);
                     }
                 }
+
+                if (ContainsOnly(found_expected, true)) break;
             }
 
-            CHECK_OP(changes.subpath_changesets.size, >=, expected_changes.size);
-            for (auto const& expected : expected_changes) {
-                CAPTURE(expected.subpath);
-                CAPTURE(expected.changes);
-
-                bool found = false;
-                for (auto const& subpath_changeset : changes.subpath_changesets) {
-                    if (path::Equal(subpath_changeset.subpath, expected.subpath) &&
-                        (!subpath_changeset.file_type.HasValue() ||
-                         subpath_changeset.file_type.Value() == expected.file_type)) {
-                        if ((expected.changes & subpath_changeset.changes) == expected.changes) {
-                            found = true;
-                            break;
-                        }
-                    }
+            for (auto const [index, expected] : Enumerate(expected_changes)) {
+                if (!found_expected[index]) {
+                    tester.log.DebugLn("Expected change not found: {} {}",
+                                       expected.subpath,
+                                       DirectoryWatcher::ChangeType::ToString(expected.changes));
                 }
-                CHECK(found);
+                CHECK(found_expected[index]);
             }
-            if (changes.subpath_changesets.size != expected_changes.size) {
-                tester.log.DebugLn(
-                    "PollDirectoryChanges resulted different changes than expected ({}). Expected:",
-                    recursive ? "recursive" : "non-recursive");
-                for (auto const& change : expected_changes)
-                    tester.log.DebugLn("  {} {}",
-                                       change.subpath,
-                                       DirectoryWatcher::ChangeType::ToString(change.changes));
-                tester.log.DebugLn("Actual:");
-                for (auto const& change : changes.subpath_changesets)
-                    tester.log.DebugLn("  {} {}",
-                                       change.subpath,
-                                       DirectoryWatcher::ChangeType::ToString(change.changes));
-            }
+
             return k_success;
         };
 
@@ -552,31 +547,21 @@ TEST_CASE(TestDirectoryWatcher) {
                 auto args2 = args;
                 bool found_delete_self = false;
                 for (auto const _ : Range(4)) {
-                    SleepThisThread(1);
+                    SleepThisThread(5);
                     auto const directory_changes_span = TRY(PollDirectoryChanges(watcher, args2));
-                    DebugLn("changes: {}", directory_changes_span.size);
                     for (auto const& directory_changes : directory_changes_span) {
-                        DebugLn("subpath changeset: {}", directory_changes.subpath_changesets.size);
-                        auto const size = directory_changes.subpath_changesets.size;
-                        bool inner = false;
-                        for (auto const& subpath_changeset : directory_changes.subpath_changesets) {
-                            inner = true;
-                            StdPrint(StdStream::Err, "FOO\n");
-                            DebugLn("FOO Event: \"{}\" {{ {} }} in \"{}\"",
-                                    subpath_changeset.subpath,
-                                    DirectoryWatcher::ChangeType::ToString(subpath_changeset.changes),
-                                    directory_changes.linked_dir_to_watch->path);
-                            if (subpath_changeset.subpath == String {} &&
-                                subpath_changeset.changes & DirectoryWatcher::ChangeType::Deleted) {
-                                found_delete_self = true;
-                                args2.dirs_to_watch = {};
-                                break;
+                        if (directory_changes.error)
+                            for (auto const& subpath_changeset : directory_changes.subpath_changesets) {
+                                if (subpath_changeset.subpath == String {} &&
+                                    subpath_changeset.changes & DirectoryWatcher::ChangeType::Deleted) {
+                                    found_delete_self = true;
+                                    args2.dirs_to_watch = {};
+                                    break;
+                                }
                             }
-                        }
-                        if (size) CHECK(inner);
                     }
+                    if (found_delete_self) break;
                 }
-                SleepThisThread(20);
                 CHECK(found_delete_self);
             }
 #endif

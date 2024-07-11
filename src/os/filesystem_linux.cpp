@@ -361,7 +361,7 @@ void DestoryDirectoryWatcher(DirectoryWatcher& watcher) {
         if (dir.native_data.pointer != nullptr) {
             auto& native_dir = *(LinuxWatchedDirectory*)dir.native_data.pointer;
             for (auto& subdir : native_dir.subdirs)
-                InotifyUnwatch(watcher.native_data.int_id, subdir.watch_id);
+                if (!subdir.watch_id_invalidated) InotifyUnwatch(watcher.native_data.int_id, subdir.watch_id);
             UnwatchDirectory(watcher.native_data.int_id, dir);
         }
     }
@@ -484,6 +484,8 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
             }
         }
     }
+
+    watcher.RemoveAllNotWatching();
 
     alignas(struct inotify_event) char buf[4096];
     while (true) {
@@ -670,8 +672,6 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
             }
         }
     }
-
-    watcher.RemoveAllNotWatching();
 
     return watcher.AllDirectoryChanges(args.result_arena);
 }

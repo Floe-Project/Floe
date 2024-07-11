@@ -309,6 +309,7 @@ struct LinuxWatchedDirectory {
         int watch_id;
         String subpath;
         bool watch_id_invalidated;
+        Optional<u32> rename_cookie;
     };
 
     int root_watch_id;
@@ -357,14 +358,10 @@ void DestoryDirectoryWatcher(DirectoryWatcher& watcher) {
     ZoneScoped;
     ArenaAllocatorWithInlineStorage<1000> scratch_arena;
 
-    for (auto& dir : watcher.watched_dirs) {
-        if (dir.native_data.pointer != nullptr) {
-            auto& native_dir = *(LinuxWatchedDirectory*)dir.native_data.pointer;
-            for (auto& subdir : native_dir.subdirs)
-                if (!subdir.watch_id_invalidated) InotifyUnwatch(watcher.native_data.int_id, subdir.watch_id);
-            UnwatchDirectory(watcher.native_data.int_id, dir);
-        }
-    }
+    // We do not need to close each watch: "all associated watches are automatically freed"
+    for (auto& dir : watcher.watched_dirs)
+        if (dir.native_data.pointer != nullptr)
+            dir.arena.Delete((LinuxWatchedDirectory*)dir.native_data.pointer);
 
     watcher.watched_dirs.Clear();
 
@@ -428,7 +425,7 @@ static ErrorCodeOr<LinuxWatchedDirectory*> WatchDirectory(DirectoryWatcher::Watc
     return result;
 }
 
-constexpr bool k_debug_inotify = false;
+constexpr bool k_debug_inotify = false && !PRODUCTION_BUILD;
 
 ErrorCodeOr<Span<DirectoryWatcher::DirectoryChanges const>>
 PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
@@ -623,26 +620,114 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                 continue;
             }
 
-            if (event.mask & IN_ISDIR && event.mask & IN_CREATE) {
+            if (this_dir.dir.recursive && event.mask & IN_ISDIR) {
+                // NOTE: we handle the 'deleted' case under IN_IGNORED above
+
                 DynamicArray<char> subpath {args.scratch_arena};
                 if (!this_dir.IsForRoot()) path::JoinAppend(subpath, this_dir.SubDirPath());
                 if (event.len) path::JoinAppend(subpath, FromNullTerminated(event.name));
 
-                DynamicArray<char> full_path {args.scratch_arena};
-                path::JoinAppend(full_path, Array {this_dir.RootDirPath(), subpath});
+                // If a folder has changed it's name we need to update that.
+                // NOTE: IN_MOVED_TO and IN_MOVED_FROM are given to the parent directory of the thing that was
+                // moved.
+                if (event.mask & IN_MOVED_FROM) {
+                    auto& native = this_dir.Native();
+                    for (auto& s : native.subdirs)
+                        if (s.subpath == subpath) s.rename_cookie = event.cookie;
+                }
+                if (event.mask & IN_MOVED_TO) {
+                    auto& native = this_dir.Native();
+                    for (auto& s : native.subdirs) {
+                        if (s.rename_cookie == event.cookie) {
+                            native.path_pool.Free(s.subpath);
+                            s.subpath = native.path_pool.Clone(subpath, this_dir.dir.arena);
+                            s.rename_cookie = nullopt;
+                        }
+                    }
+                }
 
-                auto subdir = this_dir.Native().subdirs.PrependUninitialised();
-                PLACEMENT_NEW(subdir)
-                LinuxWatchedDirectory::SubDir {
-                    .watch_id = TRY(InotifyWatch(watcher.native_data.int_id,
-                                                 dyn::NullTerminated(full_path),
-                                                 args.scratch_arena)),
-                    .subpath = this_dir.Native().path_pool.Clone(subpath, this_dir.dir.arena),
-                };
+                // A new directory was created, we need to watch it if we are watching recursively
+                if (event.mask & IN_CREATE) {
+                    DynamicArray<char> full_path {this_dir.RootDirPath(), args.scratch_arena};
+                    path::JoinAppend(full_path, ArrayT<String>({subpath}));
+
+                    // watch the created dir
+                    {
+                        auto const watch_id_outcome = InotifyWatch(watcher.native_data.int_id,
+                                                                   dyn::NullTerminated(full_path),
+                                                                   args.scratch_arena);
+                        if (watch_id_outcome.HasError()) {
+                            auto const err = watch_id_outcome.Error();
+                            if (err == FilesystemError::PathDoesNotExist) {
+                                // The directory was deleted before we could watch it
+                                continue;
+                            } else {
+                                return err;
+                            }
+                        }
+
+                        auto subdir = this_dir.Native().subdirs.PrependUninitialised();
+                        PLACEMENT_NEW(subdir)
+                        LinuxWatchedDirectory::SubDir {
+                            .watch_id = watch_id_outcome.Value(),
+                            .subpath = this_dir.Native().path_pool.Clone(subpath, this_dir.dir.arena),
+                        };
+                    }
+
+                    // we also need to check the contents of the new directory, it might have already have
+                    // files or subdirectories added
+                    {
+                        auto it = TRY(RecursiveDirectoryIterator::Create(args.scratch_arena, full_path, "*"));
+                        while (it.HasMoreFiles()) {
+                            auto& entry = it.Get();
+
+                            ASSERT(StartsWithSpan(entry.path, this_dir.RootDirPath()));
+                            auto subsubpath = entry.path.Items().SubSpan(this_dir.RootDirPath().size);
+                            if (StartsWith(subsubpath, '/')) subsubpath = subsubpath.SubSpan(1);
+
+                            this_dir.dir.directory_changes.Add(
+                                {
+                                    .subpath = args.result_arena.Clone(subsubpath),
+                                    .file_type = entry.type,
+                                    .changes = DirectoryWatcher::ChangeType::Added,
+                                },
+                                args.result_arena);
+
+                            if (entry.type == FileType::Directory) {
+                                auto const sub_watch_id_outcome =
+                                    InotifyWatch(watcher.native_data.int_id,
+                                                 NullTerminated(entry.path, args.scratch_arena),
+                                                 args.scratch_arena);
+                                bool skip = false;
+                                if (sub_watch_id_outcome.HasError()) {
+                                    auto const err = sub_watch_id_outcome.Error();
+                                    if (err == FilesystemError::PathDoesNotExist)
+                                        skip = true;
+                                    else
+                                        return err;
+                                }
+
+                                if (!skip) {
+                                    auto subsubdir = this_dir.Native().subdirs.PrependUninitialised();
+                                    PLACEMENT_NEW(subsubdir)
+                                    LinuxWatchedDirectory::SubDir {
+                                        .watch_id = sub_watch_id_outcome.Value(),
+                                        .subpath =
+                                            this_dir.Native().path_pool.Clone(subpath, this_dir.dir.arena),
+                                    };
+                                }
+                            }
+
+                            TRY(it.Increment());
+                        }
+                    }
+                }
             }
 
-            if (event.mask & IN_MOVE_SELF)
-                TODO(); // do we need to handle renaming root directories in this case?
+            if (event.mask & IN_MOVE_SELF) {
+                // I've not seen this event occur yet, if it does happen we should probably do something
+                if constexpr (!PRODUCTION_BUILD) PanicIfReached();
+            }
 
             auto const event_name = event.len ? FromNullTerminated(event.name) : String {};
 

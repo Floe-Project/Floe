@@ -826,7 +826,7 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
                     }
                     if (subpath_changeset.changes & DirectoryWatcher::ChangeType::RenamedOldName ||
                         subpath_changeset.changes & DirectoryWatcher::ChangeType::RenamedNewName ||
-                        subpath_changeset.changes & DirectoryWatcher::ChangeType::RenamedUnknown) {
+                        subpath_changeset.changes & DirectoryWatcher::ChangeType::RenamedOldOrNewName) {
                         // TODO(1.0): I think we can do better here at working out what's a
                         // remove/add/etc
                         if (relates_to_scan_folder)

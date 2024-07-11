@@ -3,7 +3,6 @@
 
 #pragma once
 #include "foundation/foundation.hpp"
-#include "utils/debug/debug.hpp"
 
 enum class FilesystemError : u32 {
     PathDoesNotExist,
@@ -214,9 +213,9 @@ instead it will return false to HasMoreFiles().
 
 Usage:
 
-const auto it = TRY(DirectoryIterator::Create(folder, "*"));
+auto it = TRY(DirectoryIterator::Create(alloc, folder, "*"));
 while (it.HasMoreFiles()) {
-    const auto &entry = it.Get();
+    auto const &entry = it.Get();
     // use entry
     TRY(it.Increment());
 }
@@ -294,7 +293,7 @@ class RecursiveDirectoryIterator {
 //
 // This directory watcher gives you a coalesced bitset of changes that happend to each sub-path. We don't give
 // the order of events. We do this for 2 reasons:
-// 1. On macOS (FSEvents), this kind of coalescing already happens to a certain extend, and it's impossible to
+// 1. On macOS (FSEvents), this kind of coalescing already happens to a certain extent, so it's impossible to
 //    get the exact order of events.
 // 2. Having the exact order isn't normally the important bit. For example knowing that something was modified
 //    before being deleted doesn't really help. It's not like we even know what the modification was. As
@@ -305,14 +304,20 @@ class RecursiveDirectoryIterator {
 //    current state of the filesystem.
 //
 // This directory watcher API uses a single call for multiple directories rather than allowing for separate
-// calls - one for each directory that you want to watch. This is because in some of the backends that we use
-// (Linux and macOS), a single 'watching system' object is created to watch multiple directories at once. We
-// follow that pattern rather than fighting it to allow separate calls for each directory.
+// calls - one for each directory that you want to watch. This is because in some of the backends (Linux and
+// macOS), a single 'watching' object is created to watch multiple directories at once. We follow that pattern
+// rather than fighting it.
 //
-// On macOS, there's a couple of important things to note:
+// IMPORTANT: you should check if you receive a 'Delete' change for the watched directory itself. If you poll
+// for a directory that doesn't exist then you will get a 'file or folder doesn't exist' error.
+//
+// On macOS:
 // - You may receive changes that occurred very shortly BEFORE you created the watcher.
 // - You do not get the distinction between 'renamed to' and 'renamed from'. You only get a 'renamed' event,
 //   you must work out yourself if it was a rename to or from.
+//
+// On Windows:
+// - While you are watching a directory, other programs cannot delete the root directory.
 
 struct DirectoryToWatch {
     String path;
@@ -334,7 +339,7 @@ struct DirectoryWatcher {
             Modified = 1 << 2,
             RenamedOldName = 1 << 3,
             RenamedNewName = 1 << 4,
-            RenamedUnknown = 1 << 5, // (macOS only) we don't know if it was renamed to or from this name
+            RenamedOldOrNewName = 1 << 5, // (macOS only) we don't know if it was renamed to or from this name
 
             // if true, ignore all other changes and recursively rescan this directory
             ManualRescanNeeded = 1 << 6,
@@ -346,7 +351,7 @@ struct DirectoryWatcher {
             if (c & Modified) dyn::AppendSpan(result, "Modified, ");
             if (c & RenamedOldName) dyn::AppendSpan(result, "RenamedOldName, ");
             if (c & RenamedNewName) dyn::AppendSpan(result, "RenamedNewName, ");
-            if (c & RenamedUnknown) dyn::AppendSpan(result, "RenamedUnknown, ");
+            if (c & RenamedOldOrNewName) dyn::AppendSpan(result, "RenamedOldOrNewName, ");
             if (c & ManualRescanNeeded) dyn::AppendSpan(result, "ManualRescanNeeded, ");
             if (result.size) result.size -= 2;
             return result;
@@ -385,10 +390,6 @@ struct DirectoryWatcher {
 
         // private
         void Add(Change change, ArenaAllocator& arena) {
-            DebugLn("Adding change: {} {} {}",
-                    linked_dir_to_watch ? linked_dir_to_watch->path : "nullptr",
-                    change.subpath,
-                    ChangeType::ToString(change.changes));
             // try finding the subpath+file_type and add the change to it
             for (auto& subpath_changeset : subpath_changesets)
                 // We check both subpath and file_type because a file can be deleted and then created as a

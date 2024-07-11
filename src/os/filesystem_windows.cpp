@@ -701,6 +701,10 @@ ErrorCodeOr<Optional<MutableString>> FilesystemDialog(DialogOptions options) {
     return result;
 }
 
+// Directory watcher
+// Jim Beveridge's excellent blog post on the ReadDirectoryChangesW API:
+// https://qualapps.blogspot.com/2010/05/understanding-readdirectorychangesw_19.html
+
 constexpr DWORD k_directory_changes_filter = FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME |
                                              FILE_NOTIFY_CHANGE_SIZE | FILE_NOTIFY_CHANGE_LAST_WRITE;
 

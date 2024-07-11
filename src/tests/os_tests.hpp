@@ -390,8 +390,7 @@ TEST_CASE(TestDirectoryWatcher) {
     for (auto const recursive : Array {true, false}) {
         CAPTURE(recursive);
 
-        auto const dir =
-            (String)path::Join(a, Array {tests::TempFolder(tester), "PollDirectoryChanges test"});
+        auto const dir = (String)path::Join(a, Array {tests::TempFolder(tester), "directory-watcher-test"});
         auto _ =
             Delete(dir, {.type = DeleteOptions::Type::DirectoryRecursively, .fail_if_not_exists = false});
         TRY(CreateDirectory(dir, {.create_intermediate_directories = false, .fail_if_exists = true}));
@@ -502,11 +501,6 @@ TEST_CASE(TestDirectoryWatcher) {
         };
 
         SUBCASE(recursive ? "recursive"_s : "non-recursive"_s) {
-            // TODO: test moving the watched directory itself
-            // TODO: test an invalid directory
-            // TODO: test creating a subdirectory and that changes are detected within it
-            // TODO: test that errors are only reported once unless retry_failed_directories is set
-
             SUBCASE("delete is detected") {
                 TRY(Delete(file.full_path, {}));
                 TRY(check(Array {DirectoryWatcher::DirectoryChanges::Change {
@@ -543,26 +537,49 @@ TEST_CASE(TestDirectoryWatcher) {
             }
 
             SUBCASE("deleting root is detected") {
-                TRY(Delete(dir, {.type = DeleteOptions::Type::DirectoryRecursively}));
-                auto args2 = args;
-                bool found_delete_self = false;
-                for (auto const _ : Range(4)) {
-                    SleepThisThread(5);
-                    auto const directory_changes_span = TRY(PollDirectoryChanges(watcher, args2));
-                    for (auto const& directory_changes : directory_changes_span) {
-                        for (auto const& subpath_changeset : directory_changes.subpath_changesets) {
-                            if (subpath_changeset.subpath.size == 0 &&
-                                subpath_changeset.changes & DirectoryWatcher::ChangeType::Deleted) {
-                                CHECK(subpath_changeset.file_type == FileType::Directory);
-                                found_delete_self = true;
-                                args2.dirs_to_watch = {};
-                                break;
+                auto const delete_outcome = Delete(dir, {.type = DeleteOptions::Type::DirectoryRecursively});
+                if (!delete_outcome.HasError()) {
+                    auto args2 = args;
+                    bool found_delete_self = false;
+                    for (auto const _ : Range(4)) {
+                        SleepThisThread(5);
+                        auto const directory_changes_span = TRY(PollDirectoryChanges(watcher, args2));
+                        for (auto const& directory_changes : directory_changes_span) {
+                            for (auto const& subpath_changeset : directory_changes.subpath_changesets) {
+                                if (subpath_changeset.subpath.size == 0 &&
+                                    subpath_changeset.changes & DirectoryWatcher::ChangeType::Deleted) {
+                                    CHECK(subpath_changeset.file_type == FileType::Directory);
+                                    found_delete_self = true;
+                                    args2.dirs_to_watch = {};
+                                    break;
+                                }
                             }
                         }
+                        if (found_delete_self) break;
                     }
-                    if (found_delete_self) break;
+                    CHECK(found_delete_self);
+                } else {
+                    // On Windows, I don't think moving a watched directory root is allowed - that's the
+                    // expected behaviour
+                    tester.log.DebugLn(
+                        "Failed to delete root watched dir: {}. This is probably normal behaviour",
+                        delete_outcome.Error());
                 }
-                CHECK(found_delete_self);
+            }
+
+            SUBCASE("no crash moving root dir") {
+                auto const dir_name = fmt::Format(a, "{}-moved", dir);
+                auto const move_outcome = MoveFile(dir, dir_name, ExistingDestinationHandling::Fail);
+                if (!move_outcome.HasError()) {
+                    DEFER { auto _ = Delete(dir_name, {.type = DeleteOptions::Type::DirectoryRecursively}); };
+                    // On Linux, we don't get any events. Perhaps a MOVE only triggers when the underlying
+                    // file object really moves and perhaps a rename like this doesn't do that. Either way I
+                    // think we just need to check nothing bad happens in this case and that will do.
+                } else {
+                    tester.log.DebugLn(
+                        "Failed to move root watched dir: {}. This is probably normal behaviour",
+                        move_outcome.Error());
+                }
             }
 
             if (recursive) {
@@ -594,13 +611,13 @@ TEST_CASE(TestDirectoryWatcher) {
                         DirectoryWatcher::DirectoryChanges::Change {
                             subfile.subpath,
                             FileType::File,
-                            IS_MACOS ? DirectoryWatcher::ChangeType::RenamedUnknown
+                            IS_MACOS ? DirectoryWatcher::ChangeType::RenamedOldOrNewName
                                      : DirectoryWatcher::ChangeType::RenamedOldName,
                         },
                         DirectoryWatcher::DirectoryChanges::Change {
                             new_subfile.subpath,
                             FileType::File,
-                            IS_MACOS ? DirectoryWatcher::ChangeType::RenamedUnknown
+                            IS_MACOS ? DirectoryWatcher::ChangeType::RenamedOldOrNewName
                                      : DirectoryWatcher::ChangeType::RenamedNewName,
                         },
                     }));
@@ -613,6 +630,64 @@ TEST_CASE(TestDirectoryWatcher) {
                         FileType::Directory,
                         DirectoryWatcher::ChangeType::Deleted,
                     }}));
+                }
+
+                SUBCASE("newly created subfolder is watched") {
+                    // create a new subdir
+                    auto const subdir2 = TestPath::Create(a, dir, "subdir2");
+                    TRY(CreateDirectory(subdir2.full_path,
+                                        {.create_intermediate_directories = false, .fail_if_exists = true}));
+
+                    // create a file within it
+                    auto const subfile2 =
+                        TestPath::Create(a, dir, path::Join(a, Array {subdir2.subpath, "file2.txt"}));
+                    TRY(WriteFile(subfile2.full_path, "data"));
+
+                    TRY(check(Array {
+                        DirectoryWatcher::DirectoryChanges::Change {
+                            subdir2.subpath,
+                            FileType::Directory,
+                            DirectoryWatcher::ChangeType::Added,
+                        },
+                        DirectoryWatcher::DirectoryChanges::Change {
+                            subfile2.subpath,
+                            FileType::File,
+                            DirectoryWatcher::ChangeType::Added,
+                        },
+                    }));
+                }
+
+                SUBCASE("moved subfolder is still watched") {
+                    auto const subdir_moved = TestPath::Create(a, dir, "subdir-moved");
+                    TRY(MoveFile(subdir.full_path,
+                                 subdir_moved.full_path,
+                                 ExistingDestinationHandling::Fail));
+
+                    auto const subfile2 =
+                        TestPath::Create(a,
+                                         dir,
+                                         path::Join(a, Array {subdir_moved.subpath, "file-in-moved.txt"}));
+                    TRY(WriteFile(subfile2.full_path, "data"));
+
+                    TRY(check(Array {
+                        DirectoryWatcher::DirectoryChanges::Change {
+                            subdir.subpath,
+                            FileType::Directory,
+                            IS_MACOS ? DirectoryWatcher::ChangeType::RenamedOldOrNewName
+                                     : DirectoryWatcher::ChangeType::RenamedOldName,
+                        },
+                        DirectoryWatcher::DirectoryChanges::Change {
+                            subdir_moved.subpath,
+                            FileType::Directory,
+                            IS_MACOS ? DirectoryWatcher::ChangeType::RenamedOldOrNewName
+                                     : DirectoryWatcher::ChangeType::RenamedNewName,
+                        },
+                        DirectoryWatcher::DirectoryChanges::Change {
+                            subfile2.subpath,
+                            FileType::File,
+                            DirectoryWatcher::ChangeType::Added,
+                        },
+                    }));
                 }
             } else {
                 SUBCASE("delete in subfolder is not detected") {
@@ -628,6 +703,78 @@ TEST_CASE(TestDirectoryWatcher) {
                 }
             }
         }
+    }
+
+    return k_success;
+}
+
+TEST_CASE(TestDirectoryWatcherErrors) {
+    auto& a = tester.scratch_arena;
+
+    auto const dir =
+        (String)path::Join(a, Array {tests::TempFolder(tester), "directory-watcher-errors-test"});
+
+    auto watcher = TRY(CreateDirectoryWatcher(a));
+    DEFER { DestoryDirectoryWatcher(watcher); };
+
+    {
+        auto const outcome = PollDirectoryChanges(watcher,
+                                                  PollDirectoryChangesArgs {
+                                                      .dirs_to_watch = Array {DirectoryToWatch {
+                                                          .path = dir,
+                                                          .recursive = false,
+                                                      }},
+                                                      .retry_failed_directories = false,
+                                                      .result_arena = a,
+                                                      .scratch_arena = a,
+                                                  });
+
+        // we're not expecting a top-level error, that should only be for if the whole watching system fails
+        REQUIRE(outcome.HasValue());
+
+        auto const directory_changes_span = outcome.Value();
+        REQUIRE(directory_changes_span.size == 1);
+        auto const& directory_changes = directory_changes_span[0];
+        REQUIRE(directory_changes.error.HasValue());
+        CHECK(directory_changes.error.Value() == FilesystemError::PathDoesNotExist);
+    }
+
+    // retrying should not repeat the error unless retry_failed_directories is set
+    {
+        auto const outcome = PollDirectoryChanges(watcher,
+                                                  PollDirectoryChangesArgs {
+                                                      .dirs_to_watch = Array {DirectoryToWatch {
+                                                          .path = dir,
+                                                          .recursive = false,
+                                                      }},
+                                                      .retry_failed_directories = false,
+                                                      .result_arena = a,
+                                                      .scratch_arena = a,
+                                                  });
+
+        CHECK(outcome.HasValue());
+        CHECK(outcome.Value().size == 0);
+    }
+
+    // the error should repeat if retry_failed_directories is set
+    {
+        auto const outcome = PollDirectoryChanges(watcher,
+                                                  PollDirectoryChangesArgs {
+                                                      .dirs_to_watch = Array {DirectoryToWatch {
+                                                          .path = dir,
+                                                          .recursive = false,
+                                                      }},
+                                                      .retry_failed_directories = true,
+                                                      .result_arena = a,
+                                                      .scratch_arena = a,
+                                                  });
+
+        CHECK(outcome.HasValue());
+        auto const directory_changes_span = outcome.Value();
+        REQUIRE(directory_changes_span.size == 1);
+        auto const& directory_changes = directory_changes_span[0];
+        REQUIRE(directory_changes.error.HasValue());
+        CHECK(directory_changes.error.Value() == FilesystemError::PathDoesNotExist);
     }
 
     return k_success;
@@ -712,6 +859,7 @@ TEST_REGISTRATION(RegisterOsTests) {
     REGISTER_TEST(TestFilesystem);
     REGISTER_TEST(TestFileApi);
     REGISTER_TEST(TestDirectoryWatcher);
+    REGISTER_TEST(TestDirectoryWatcherErrors);
     REGISTER_TEST(TestFileApi);
     REGISTER_TEST(TestTimePoint);
 }

@@ -654,7 +654,7 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                     if (event.flags & kFSEventStreamEventFlagItemRemoved)
                         changes |= DirectoryWatcher::ChangeType::Deleted;
                     if (event.flags & kFSEventStreamEventFlagItemRenamed)
-                        changes |= DirectoryWatcher::ChangeType::RenamedUnknown;
+                        changes |= DirectoryWatcher::ChangeType::RenamedOldOrNewName;
                     if (event.flags & kFSEventStreamEventFlagItemModified)
                         changes |= DirectoryWatcher::ChangeType::Modified;
 

@@ -537,65 +537,76 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
 
     auto& mac_watcher = *(MacWatcher*)watcher.native_data.pointer;
     if (any_states_changed) {
-        bool success = false;
-        DEFER {
-            if (!success) {
-                mac_watcher.stream = {};
-                for (auto& dir : watcher.watched_dirs)
-                    dir.state = DirectoryWatcher::WatchedDirectory::State::WatchingFailed;
-            }
-        };
-
         if (mac_watcher.stream) {
             FSEventStreamStop(mac_watcher.stream);
             FSEventStreamInvalidate(mac_watcher.stream);
             FSEventStreamRelease(mac_watcher.stream);
         }
+
         CFMutableArrayRef paths = CFArrayCreateMutable(nullptr, 0, &kCFTypeArrayCallBacks);
         DEFER { CFRelease(paths); };
-        for (auto const& dir : watcher.watched_dirs) {
+        for (auto& dir : watcher.watched_dirs) {
             if (dir.state != DirectoryWatcher::WatchedDirectory::State::Watching &&
                 dir.state != DirectoryWatcher::WatchedDirectory::State::NeedsWatching)
                 continue;
+
             CFStringRef cf_path = CFStringCreateWithBytes(nullptr,
                                                           (u8 const*)dir.path.data,
                                                           (CFIndex)dir.path.size,
                                                           kCFStringEncodingUTF8,
                                                           false);
-
             DEFER { CFRelease(cf_path); };
-            CFArrayAppendValue(paths, cf_path);
+
+            auto ns_string = (__bridge NSString*)cf_path;
+            if ([[NSFileManager defaultManager] fileExistsAtPath:ns_string isDirectory:nil]) {
+                CFArrayAppendValue(paths, cf_path);
+            } else {
+                dir.state = DirectoryWatcher::WatchedDirectory::State::WatchingFailed;
+                dir.directory_changes.error = ErrorCode {FilesystemError::PathDoesNotExist};
+            }
         }
 
-        FSEventStreamContext context {};
-        context.info = &mac_watcher;
+        if (CFArrayGetCount(paths) != 0) {
+            bool success = false;
+            DEFER {
+                if (!success) {
+                    mac_watcher.stream = {};
+                    for (auto& dir : watcher.watched_dirs)
+                        dir.state = DirectoryWatcher::WatchedDirectory::State::WatchingFailed;
+                }
+            };
 
-        mac_watcher.stream =
-            FSEventStreamCreate(kCFAllocatorDefault,
-                                &EventCallback,
-                                &context,
-                                paths,
-                                kFSEventStreamEventIdSinceNow,
-                                args.coalesce_latency_ms / 1000.0,
-                                kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagWatchRoot |
-                                    kFSEventStreamCreateFlagNoDefer);
-        if (!mac_watcher.stream) return ErrorCode {FilesystemError::FileWatcherCreationFailed};
+            FSEventStreamContext context {};
+            context.info = &mac_watcher;
 
-        // FSEvents is a callback based API where you always receive events in a separate thread.
-        if (!mac_watcher.queue) {
-            auto attr =
-                dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL, QOS_CLASS_USER_INITIATED, -10);
-            mac_watcher.queue = dispatch_queue_create("com.floe.fseventsqueue", attr);
+            mac_watcher.stream =
+                FSEventStreamCreate(kCFAllocatorDefault,
+                                    &EventCallback,
+                                    &context,
+                                    paths,
+                                    kFSEventStreamEventIdSinceNow,
+                                    args.coalesce_latency_ms / 1000.0,
+                                    kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagWatchRoot |
+                                        kFSEventStreamCreateFlagNoDefer);
+            if (!mac_watcher.stream) return ErrorCode {FilesystemError::FileWatcherCreationFailed};
+
+            // FSEvents is a callback based API where you always receive events in a separate thread.
+            if (!mac_watcher.queue) {
+                auto attr = dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL,
+                                                                    QOS_CLASS_USER_INITIATED,
+                                                                    -10);
+                mac_watcher.queue = dispatch_queue_create("com.floe.fseventsqueue", attr);
+            }
+            FSEventStreamSetDispatchQueue(mac_watcher.stream, mac_watcher.queue);
+
+            if (!FSEventStreamStart(mac_watcher.stream)) {
+                FSEventStreamInvalidate(mac_watcher.stream);
+                FSEventStreamRelease(mac_watcher.stream);
+                return ErrorCode {FilesystemError::FileWatcherCreationFailed};
+            }
+
+            success = true;
         }
-        FSEventStreamSetDispatchQueue(mac_watcher.stream, mac_watcher.queue);
-
-        if (!FSEventStreamStart(mac_watcher.stream)) {
-            FSEventStreamInvalidate(mac_watcher.stream);
-            FSEventStreamRelease(mac_watcher.stream);
-            return ErrorCode {FilesystemError::FileWatcherCreationFailed};
-        }
-
-        success = true;
     }
 
     if (mac_watcher.stream) FSEventStreamFlushAsync(mac_watcher.stream);

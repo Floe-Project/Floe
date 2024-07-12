@@ -319,11 +319,13 @@ class RecursiveDirectoryIterator {
 // On Windows:
 // - The root directory itself is NOT watched. You will not receive events if the root directory is deleted
 //   for example.
+// - Windows is very sketchy about giving you events for directories. You might not get the events you'd
+//   expect for creating a subdirectory for example.
 
 struct DirectoryToWatch {
     String path;
     bool recursive;
-    // TODO: allow a user-pointer here?
+    void* user_data;
 };
 
 struct DirectoryWatcher {

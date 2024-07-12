@@ -269,11 +269,12 @@ _print-ci-summary num_tasks num_failed:
 [windows, linux]
 test-ci-windows:
   #!/usr/bin/env bash
+  set -uxo pipefail
 
   num_tasks=0
   num_failed=0
 
-  if [[ -z $GITHUB_ACTIONS ]]; then
+  if [[ ! -v GITHUB_ACTIONS ]]; then
     mkdir -p {{gen_files_dir}}
     rm -f {{gen_files_dir}}/test_ci_windows_summary.md
     export GITHUB_STEP_SUMMARY={{gen_files_dir}}/test_ci_windows_summary.md
@@ -298,7 +299,7 @@ test-ci-windows:
   # test test-windows-vst3-val # TODO: re-enable when wrappers are supported
   test test-windows-clap-val
 
-  if [[ -z $GITHUB_ACTIONS ]]; then
+  if [[ ! -v GITHUB_ACTIONS ]]; then
     cat {{gen_files_dir}}/test_ci_windows_summary.md
   fi
 

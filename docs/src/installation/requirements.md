@@ -10,12 +10,12 @@ Floe is an audio plugin for Windows and macOS. It's available in the following a
 There's no 'standalone' version at the moment. And also no Linux version, but it's planned. Finally, there's no AAX (Pro Tools) version.
 
 ### Windows
-- {{#include ../../../mdbook_config.txt:min-windows-version}} or later
+- {{#include ../../mdbook_config.txt:min-windows-version}} or later
 - 64-bit computer
 - CLAP or VST3 host
 
 ### macOS
-- {{#include ../../../mdbook_config.txt:min-macos-version}} or later
+- {{#include ../../mdbook_config.txt:min-macos-version}} or later
 - Apple Silicon or Intel (Floe is a universal binary)
 - CLAP, AU (v2) or VST3 host
 

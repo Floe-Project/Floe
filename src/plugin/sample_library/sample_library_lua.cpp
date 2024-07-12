@@ -87,6 +87,7 @@ struct LuaState {
 enum class InterpretedTypes : u32 {
     Library,
     Instrument,
+    ImpulseResponse,
     Region,
     File,
     TriggerCriteria,
@@ -1316,6 +1317,9 @@ struct LuaCodePrinter {
             switch ((InterpretedTypes)i) {
                 case InterpretedTypes::Library: struct_fields[i] = FieldInfosSpan<Library>(); break;
                 case InterpretedTypes::Instrument: struct_fields[i] = FieldInfosSpan<Instrument>(); break;
+                case InterpretedTypes::ImpulseResponse:
+                    struct_fields[i] = FieldInfosSpan<ImpulseResponse>();
+                    break;
                 case InterpretedTypes::Region: struct_fields[i] = FieldInfosSpan<Region>(); break;
                 case InterpretedTypes::File: struct_fields[i] = FieldInfosSpan<Region::File>(); break;
                 case InterpretedTypes::TriggerCriteria:
@@ -1434,22 +1438,10 @@ struct LuaCodePrinter {
 
     ErrorCodeOr<void> PrintWholeLua(Writer writer, PrintMode mode) {
         if (mode.mode_flags & PrintModeFlagsDocumentedExample) {
+            // TODO: pull out information about the lua standard libraries and the apply_prototype function
+            // for mdbook
             constexpr String k_documentation_preamble =
                 R"aaa(Floe Library configuration script
-
-This file is a documented example of how Floe's new library configuration works. It's a configuration script written in <LUA>. It brings the power of a full programming language, meaning you can use features such as variables and functions to create a configuration that is easy-to-maintain and experiment with.
-
-Floe offers a handlful of functions that the Lua code can use to build a library. Part of this will involve specifying audio file paths relative to this Lua script.
-
-This format is primarily concerned with mapping audio-files to the keyboard; Floe handles more advanced sound shaping by offering a friendly GUI. The GUI also normally offers setting loop points, but this can sometimes be configured in the Lua instead.
-
-Let's define the 3 hierarchical building blocks of a Floe library.
-
-Firstly, at the lowest level, are Regions. A Region is an area of the keyboard defined by 2 dimensions: a key-range and a velocity-range. A Region has an audio file attached to it. When a note is played in Floe that fits within the given key-range and velociy-range, the audio file is played (there are various other more complicated trigger-criteria that be specified than just key & velocity).
-
-Secondly, the next structure up the hierarchy is the Instrument. These are things that are picked on the GUI. Instruments contain 1 or more Regions. Instruments should be fully playable in themselves. Sometimes an Instrument is multisampled and complicated, sometimes it's just a single looped sample that is similar in function to an oscillator on a subtractive synth.
-
-Finally, there is the top-level structure of this configuration, the Library. A library is a collection of Instruments - usually with a theme and an intended use-case.
 
 Note there there is no 'group' structure as is often found in other sample-mapping formats such as SFZ. Instead we can create functions or use loops to apply similar configuration to a set of regions. Additionally, Floe offers a helper function called floe.<PROTO_FUNC>(prototype, tbl) which allows new tables to be created that are based off an existing table. The first argument is the prototype table, and the second argument is another table that is filled with values from the prototype if they don't already exist in the second table. The modified second argument is returned. This function works in a 'deep' way - meaning that sub-tables are also handed in the same way.
 
@@ -1483,7 +1475,6 @@ Example usage of floe.<PROTO_FUNC>:
             auto preamble = fmt::FormatStringReplace(arena,
                                                      k_documentation_preamble,
                                                      ArrayT<fmt::StringReplacement>({
-                                                         {"<LUA>", LUA_VERSION},
                                                          {"<PROTO_FUNC>", "apply_prototype"},
                                                      }));
 
@@ -1508,27 +1499,42 @@ Example usage of floe.<PROTO_FUNC>:
             TRY(writer.WriteChars("\n\n"));
         }
 
-        if (mode.mode_flags & PrintModeFlagsDocumentedExample)
-            TRY(PrintWordwrappedComment(
-                writer,
-                "Creates a new library. There should only be one. Return this at the end of the file.",
-                0));
+        auto begin_function = [&](String name) -> ErrorCodeOr<void> {
+            if (mode.mode_flags & PrintModeFlagsDocumentedExample)
+                if (mode.mode_flags & PrintModeFlagsDocumentedExample)
+                    TRY(fmt::FormatToWriter(writer, "-- ANCHOR: {}\n", name));
+            return k_success;
+        };
+        auto end_function = [&](String name) -> ErrorCodeOr<void> {
+            if (mode.mode_flags & PrintModeFlagsDocumentedExample)
+                TRY(fmt::FormatToWriter(writer, "-- ANCHOR_END: {}\n", name));
+            TRY(writer.WriteChars("\n"));
+            return k_success;
+        };
+
+        TRY(begin_function("new_library"));
         TRY(writer.WriteChars("local library = floe.new_library({\n"));
         TRY(PrintStruct(writer, InterpretedTypes::Library, mode, 1));
-        TRY(writer.WriteChars("})\n\n"));
+        TRY(writer.WriteChars("})\n"));
+        TRY(end_function("new_library"));
 
-        if (mode.mode_flags & PrintModeFlagsDocumentedExample)
-            TRY(PrintWordwrappedComment(
-                writer,
-                "Creates a new instrument. First argument is a library, second argument is a table of config options.",
-                0));
+        TRY(begin_function("new_instrument"));
         TRY(writer.WriteChars("local instrument = floe.new_instrument(library, {\n"));
         TRY(PrintStruct(writer, InterpretedTypes::Instrument, mode, 1));
-        TRY(writer.WriteChars("})\n\n"));
+        TRY(writer.WriteChars("})\n"));
+        TRY(end_function("new_instrument"));
 
+        TRY(begin_function("add_region"));
         TRY(writer.WriteChars("floe.add_region(instrument, {\n"));
         TRY(PrintStruct(writer, InterpretedTypes::Region, mode, 1));
-        TRY(writer.WriteChars("})\n\n"));
+        TRY(writer.WriteChars("})\n"));
+        TRY(end_function("add_region"));
+
+        TRY(begin_function("add_ir"));
+        TRY(writer.WriteChars("floe.add_ir(library, {\n"));
+        TRY(PrintStruct(writer, InterpretedTypes::ImpulseResponse, mode, 1));
+        TRY(writer.WriteChars("})\n"));
+        TRY(end_function("add_ir"));
 
         TRY(writer.WriteChars("return library\n"));
 
@@ -1537,13 +1543,17 @@ Example usage of floe.<PROTO_FUNC>:
 
     static constexpr String k_placeholder = "<PLACEHOLDER>";
     static constexpr u32 k_indent_spaces = 4;
-    static constexpr u32 k_word_wrap_width = 87;
+    static constexpr u32 k_word_wrap_width = 82;
     Array<Span<FieldInfo const>, ToInt(InterpretedTypes::Count)> struct_fields;
 };
 
-ErrorCodeOr<void> WriteDocumentedLuaExample(Writer writer) {
+ErrorCodeOr<void> WriteDocumentedLuaExample(Writer writer, bool include_comments) {
     LuaCodePrinter printer;
-    TRY(printer.PrintWholeLua(writer, {.mode_flags = LuaCodePrinter::PrintModeFlagsDocumentedExample}));
+    TRY(printer.PrintWholeLua(
+        writer,
+        {
+            .mode_flags = include_comments ? LuaCodePrinter::PrintModeFlagsDocumentedExample : 0,
+        }));
     return k_success;
 }
 

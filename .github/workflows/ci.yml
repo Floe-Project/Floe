@@ -183,6 +183,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: generated-docs
+          path: docs
 
       # https://github.com/rust-lang/mdBook/wiki/Automated-Deployment%3A-GitHub-Actions
       - name: Install latest mdbook

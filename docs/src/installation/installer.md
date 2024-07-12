@@ -15,7 +15,7 @@ The typical way to install or upgrade Floe is to use the installer.
 Floe is backwards-compatible. This means that you can install a new version of Floe over an old version. The installer does this automatically.
 
 ### The old Mirage installer
-Previous, when Floe was known as Mirage, the installer would also install sample libraries. This is no longer the case. For Floe, sample libraries have a separate installation process. 
+Previously, when Floe was known as Mirage, the installer would also install sample libraries. This is no longer the case. For Floe, sample libraries have a separate installation process. 
 
 Additionally, the installer used to require an internet connection and an account or download-ticket. For Floe, the installer is just a simple offline program with no credentials required.
 

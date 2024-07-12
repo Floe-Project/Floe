@@ -189,6 +189,6 @@ inline LibraryPtrOrError Read(Reader& reader,
     PanicIfReached();
 }
 
-ErrorCodeOr<void> WriteDocumentedLuaExample(Writer writer);
+ErrorCodeOr<void> WriteDocumentedLuaExample(Writer writer, bool include_comments = true);
 
 } // namespace sample_lib

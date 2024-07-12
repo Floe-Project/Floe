@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <foundation/foundation.hpp>
+#include <lua/lua.h>
 #include <os/misc.hpp>
 
 #include "utils/logger/logger.hpp"
@@ -43,7 +44,16 @@ ErrorCodeOr<void> Main(String destination_folder) {
         stdout_log.InfoLn("Generating {}", lua_path);
         auto file = TRY(OpenFile(lua_path, FileMode::Write));
         auto writer = file.Writer();
-        TRY(sample_lib::WriteDocumentedLuaExample(writer));
+        TRY(sample_lib::WriteDocumentedLuaExample(writer, true));
+    }
+
+    {
+        auto const lua_path =
+            path::Join(arena, Array {destination_folder, "sample-library-example-no-comments.lua"_s});
+        stdout_log.InfoLn("Generating {}", lua_path);
+        auto file = TRY(OpenFile(lua_path, FileMode::Write));
+        auto writer = file.Writer();
+        TRY(sample_lib::WriteDocumentedLuaExample(writer, false));
     }
 
     {
@@ -59,6 +69,8 @@ ErrorCodeOr<void> Main(String destination_folder) {
             TRY(fmt::FormatToWriter(writer, "ANCHOR_END: {}\n", key));
             return k_success;
         };
+
+        TRY(write_value("lua-version", LUA_VERSION_MAJOR "." LUA_VERSION_MINOR));
 
         {
             String windows_version = {};

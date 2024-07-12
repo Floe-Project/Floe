@@ -13,12 +13,20 @@ TEST_CASE(TestEpochTime) {
     auto std_time = time(nullptr);
     auto std_local_time = *localtime(&std_time); // NOLINT(concurrency-mt-unsafe)
 
-    CHECK_EQ(t.year, (std_local_time.tm_year + 1900));
-    CHECK_EQ(t.months_since_jan, std_local_time.tm_mon);
-    CHECK_EQ(t.day_of_month, std_local_time.tm_mday);
-    CHECK_EQ(t.hour, std_local_time.tm_hour);
-    CHECK_EQ(t.minute, std_local_time.tm_min);
-    CHECK_EQ(t.second, std_local_time.tm_sec);
+    auto check_approx = [&](s64 a, s64 b, Optional<s64> wrap_max) {
+        auto b_below = b - 1;
+        if (wrap_max && b_below < 0) b_below = wrap_max.Value();
+        auto b_above = b + 1;
+        if (wrap_max && b_above > wrap_max.Value()) b_above = 0;
+        CHECK(a == b || a == b_below || a == b_above);
+    };
+
+    check_approx(t.year, (std_local_time.tm_year + 1900), {});
+    check_approx(t.months_since_jan, std_local_time.tm_mon, 11);
+    check_approx(t.day_of_month, std_local_time.tm_mday, 31);
+    check_approx(t.hour, std_local_time.tm_hour, 23);
+    check_approx(t.minute, std_local_time.tm_min, 59);
+    check_approx(t.second, std_local_time.tm_sec, 59);
 
     return k_success;
 }

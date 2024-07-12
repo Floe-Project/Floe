@@ -476,7 +476,7 @@ TEST_CASE(TestDirectoryWatcher) {
                         }
 
                         tester.log.DebugLn("{} change: \"{}\" {{ {} }} in \"{}\"",
-                                           was_expected ? "Was expected" : "Unexpected",
+                                           was_expected ? "Expected" : "Unexpected",
                                            subpath_changeset.subpath,
                                            DirectoryWatcher::ChangeType::ToString(subpath_changeset.changes),
                                            path);
@@ -536,34 +536,36 @@ TEST_CASE(TestDirectoryWatcher) {
                 }));
             }
 
-            SUBCASE("deleting root is detected") {
-                auto const delete_outcome = Delete(dir, {.type = DeleteOptions::Type::DirectoryRecursively});
-                if (!delete_outcome.HasError()) {
-                    auto args2 = args;
-                    bool found_delete_self = false;
-                    for (auto const _ : Range(4)) {
-                        SleepThisThread(5);
-                        auto const directory_changes_span = TRY(PollDirectoryChanges(watcher, args2));
-                        for (auto const& directory_changes : directory_changes_span) {
-                            for (auto const& subpath_changeset : directory_changes.subpath_changesets) {
-                                if (subpath_changeset.subpath.size == 0 &&
-                                    subpath_changeset.changes & DirectoryWatcher::ChangeType::Deleted) {
-                                    CHECK(subpath_changeset.file_type == FileType::Directory);
-                                    found_delete_self = true;
-                                    args2.dirs_to_watch = {};
-                                    break;
+            // On Windows, the root folder does not receive events
+            if constexpr (!IS_WINDOWS) {
+                SUBCASE("deleting root is detected") {
+                    auto const delete_outcome =
+                        Delete(dir, {.type = DeleteOptions::Type::DirectoryRecursively});
+                    if (!delete_outcome.HasError()) {
+                        auto args2 = args;
+                        bool found_delete_self = false;
+                        for (auto const _ : Range(4)) {
+                            SleepThisThread(5);
+                            auto const directory_changes_span = TRY(PollDirectoryChanges(watcher, args2));
+                            for (auto const& directory_changes : directory_changes_span) {
+                                for (auto const& subpath_changeset : directory_changes.subpath_changesets) {
+                                    if (subpath_changeset.subpath.size == 0 &&
+                                        subpath_changeset.changes & DirectoryWatcher::ChangeType::Deleted) {
+                                        CHECK(subpath_changeset.file_type == FileType::Directory);
+                                        found_delete_self = true;
+                                        args2.dirs_to_watch = {};
+                                        break;
+                                    }
                                 }
                             }
+                            if (found_delete_self) break;
                         }
-                        if (found_delete_self) break;
+                        CHECK(found_delete_self);
+                    } else {
+                        tester.log.DebugLn(
+                            "Failed to delete root watched dir: {}. This is probably normal behaviour",
+                            delete_outcome.Error());
                     }
-                    CHECK(found_delete_self);
-                } else {
-                    // On Windows, I don't think moving a watched directory root is allowed - that's the
-                    // expected behaviour
-                    tester.log.DebugLn(
-                        "Failed to delete root watched dir: {}. This is probably normal behaviour",
-                        delete_outcome.Error());
                 }
             }
 

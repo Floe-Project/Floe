@@ -831,7 +831,6 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                 auto const min_chunk_size = sizeof(FILE_NOTIFY_INFORMATION);
 
                 ASSERT(base <= end);
-                DebugLn("base: {}, end: {}, end - base: {}", base, end, end - base);
 
                 bool error = false;
 

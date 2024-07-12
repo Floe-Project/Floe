@@ -317,7 +317,8 @@ class RecursiveDirectoryIterator {
 //   you must work out yourself if it was a rename to or from.
 //
 // On Windows:
-// - While you are watching a directory, other programs cannot delete the root directory.
+// - The root directory itself is NOT watched. You will not receive events if the root directory is deleted
+//   for example.
 
 struct DirectoryToWatch {
     String path;

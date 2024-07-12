@@ -126,7 +126,7 @@ test-clap-val build="": (_build_if_requested build "native")
   clap-validator validate --in-process {{native_binary_dir}}/Floe.clap
 
 test-units build="" +args="": (_build_if_requested build "native")
-  {{native_binary_dir}}/tests {{args}}
+  {{native_binary_dir}}/tests {{args}} --log-level=debug
 
 test-pluginval build="": (_build_if_requested build "native")
   pluginval {{native_binary_dir}}/Floe.vst3

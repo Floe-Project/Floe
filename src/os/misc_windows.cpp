@@ -63,6 +63,13 @@ DynamicArrayInline<char, 64> OperatingSystemName() {
     return {};
 }
 
+bool IsRunningUnderWine() {
+    if (HMODULE nt = GetModuleHandleW(L"ntdll.dll")) {
+        if (GetProcAddress(nt, "wine_get_version")) return true;
+    }
+    return false;
+}
+
 void* AllocatePages(usize bytes) {
     auto p = VirtualAlloc(nullptr, (DWORD)bytes, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
     TracyAlloc(p, bytes);

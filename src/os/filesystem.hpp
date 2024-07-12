@@ -480,8 +480,10 @@ struct DirectoryWatcher {
                     d;
                 })) {
                 dir_ptr->is_desired = true;
-                if (retry_failed_directories && dir_ptr->state == WatchedDirectory::State::WatchingFailed)
+                if (retry_failed_directories && dir_ptr->state == WatchedDirectory::State::WatchingFailed) {
                     dir_ptr->state = WatchedDirectory::State::NeedsWatching;
+                    any_states_changed = true;
+                }
                 continue;
             }
 

@@ -91,7 +91,7 @@ PUBLIC void SinglyLinkedListSort(NodeType* first, NodeType* last, auto less_than
 
 template <typename List, typename Node>
 PUBLIC void DoublyLinkedListAppend(List& list, Node* new_node) {
-    new_node->prev = list.last;
+    if constexpr (requires { new_node->prev; }) new_node->prev = list.last;
     new_node->next = nullptr;
     if (list.last) {
         list.last->next = new_node;

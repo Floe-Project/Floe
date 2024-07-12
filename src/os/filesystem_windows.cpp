@@ -782,9 +782,6 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
     auto const any_states_changed =
         watcher.HandleWatchedDirChanges(args.dirs_to_watch, args.retry_failed_directories);
 
-    auto const scratch_cursor = args.scratch_arena.TotalUsed();
-    DEFER { args.scratch_arena.TryShrinkTotalUsed(scratch_cursor); };
-
     for (auto& dir : watcher.watched_dirs)
         dir.directory_changes.Clear();
 
@@ -905,6 +902,9 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                     if (changes) {
                         auto const narrowed = Narrow(args.result_arena, filename);
                         if (narrowed.HasValue()) {
+                            DebugLn("Change: {} {}",
+                                    DirectoryWatcher::ChangeType::ToString(changes),
+                                    narrowed.Value());
                             dir.directory_changes.Add(
                                 {
                                     .subpath = narrowed.Value(),
@@ -933,7 +933,7 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                 dir.directory_changes.error = FilesystemWin32ErrorCode(GetLastError());
             }
         } else if (wait_result != WAIT_TIMEOUT) {
-            Panic("unexpected result from WaitForSingleObjectEx");
+            if constexpr (!PRODUCTION_BUILD) Panic("unexpected result from WaitForSingleObjectEx");
         }
 
         auto const succeeded = ReadDirectoryChangesW(windows_dir.handle,

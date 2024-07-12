@@ -3,6 +3,7 @@
 
 #pragma once
 #include "foundation/memory/allocators.hpp"
+#include "foundation/utils/linked_list.hpp"
 
 // Little util that allows a simple way to push items to a list and not worry about memory. Also allows
 // easy access the last item.
@@ -22,14 +23,7 @@ struct ArenaStack {
         ++size;
         auto node = arena.NewUninitialised<Node>();
         node->data = data;
-        node->next = nullptr;
-        if (last) {
-            last->next = node;
-            last = node;
-        } else {
-            first = node;
-            last = node;
-        }
+        DoublyLinkedListAppend(*this, node);
     }
 
     Type Last() const { return last->data; }

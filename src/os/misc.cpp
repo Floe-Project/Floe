@@ -48,3 +48,7 @@ Mutex& StdStreamMutex(StdStream stream) {
     }
     PanicIfReached();
 }
+
+#if !IS_WINDOWS
+bool IsRunningUnderWine() { return false; }
+#endif

@@ -266,17 +266,6 @@ _print-ci-summary num_tasks num_failed:
   fi
   exit 0
 
-wsl-test:
-  #!/usr/bin/env bash
-  set -uxo pipefail
-
-  just test-windows-units
-  result=$?
-
-  if [ $result -ne 0 ]; then
-    exit 1
-  fi
-
 [windows, linux]
 test-ci-windows:
   #!/usr/bin/env bash

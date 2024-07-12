@@ -126,7 +126,10 @@ jobs:
 
       - uses: taiki-e/install-action@just
 
-      - run: wsl just wsl-test
+      - uses: Vampire/setup-wsl@v3
+
+      - shell: wsl-bash {0}
+        run: just test-ci-windows
 
   windows-test:
     runs-on: windows-latest

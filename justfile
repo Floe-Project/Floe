@@ -269,7 +269,6 @@ _print-ci-summary num_tasks num_failed:
 [windows, linux]
 test-ci-windows:
   #!/usr/bin/env bash
-  set -uxo pipefail
 
   num_tasks=0
   num_failed=0
@@ -287,8 +286,20 @@ test-ci-windows:
   test() {
     local name="$1"
 
-    just "$name"
-    local result=$?
+    local result=0
+    if [[ "{{os()}}" == "linux" ]]; then
+      just "$name"
+      result=$?
+    else
+      # on Windows the return code is lost for some reason, we have to parse the output
+      local stderr_output=$(just "$name" 2>&1 1>/dev/null)
+      echo "$stderr_output"
+      local last_line=$(echo "$stderr_output" | tail -n 1)
+      if [[ $last_line == *"failed on line"* ]]; then
+        result=1
+      fi
+    fi
+
     echo "| $name | $result |" >> $GITHUB_STEP_SUMMARY
     num_tasks=$((num_tasks + 1))
     [[ $result -ne 0 ]] && num_failed=$((num_failed + 1))

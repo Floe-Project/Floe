@@ -90,6 +90,9 @@ ListedInstrument::~ListedInstrument() {
     library_refs.FetchSub(1);
 }
 
+// NOTE: it's important that we pass this around by value because the point at which num_thread_pool_jobs == 0
+// the original object will be destroyed. But if it's passed by value then it doesn't matter because the value
+// is copied and the references within the object are still valid.
 struct ThreadPoolContext {
     ThreadPool& pool;
     AtomicCountdown& num_thread_pool_jobs;
@@ -102,9 +105,9 @@ struct LoadAudioAsyncArgs {
 
 static void LoadAudioAsync(ListedAudioData& audio_data,
                            sample_lib::Library const& lib,
-                           ThreadPoolContext& thread_pool_ctx) {
+                           ThreadPoolContext thread_pool_ctx) {
     thread_pool_ctx.num_thread_pool_jobs.Increase();
-    thread_pool_ctx.pool.AddJob([&]() {
+    thread_pool_ctx.pool.AddJob([&, thread_pool_ctx]() {
         ZoneScoped;
         DEFER {
             thread_pool_ctx.num_thread_pool_jobs.CountDown();
@@ -148,7 +151,7 @@ static void LoadAudioAsync(ListedAudioData& audio_data,
 // if the audio load is cancelled, or pending-cancel, then queue up a load again
 static void TriggerReloadIfAudioIsCancelled(ListedAudioData& audio_data,
                                             sample_lib::Library const& lib,
-                                            ThreadPoolContext& thread_pool_ctx,
+                                            ThreadPoolContext thread_pool_ctx,
                                             u32 debug_inst_id) {
     auto expected = LoadingState::PendingCancel;
     if (!audio_data.state.CompareExchangeStrong(expected, LoadingState::PendingLoad)) {
@@ -177,7 +180,7 @@ static void TriggerReloadIfAudioIsCancelled(ListedAudioData& audio_data,
 static ListedAudioData* FetchOrCreateAudioData(ArenaList<ListedAudioData, true>& audio_datas,
                                                sample_lib::Library const& lib,
                                                String path,
-                                               ThreadPoolContext& thread_pool_ctx,
+                                               ThreadPoolContext thread_pool_ctx,
                                                u32 debug_inst_id) {
     for (auto& d : audio_datas) {
         if (lib.name == d.library_name && d.path == path) {
@@ -204,7 +207,7 @@ static ListedAudioData* FetchOrCreateAudioData(ArenaList<ListedAudioData, true>&
 static ListedInstrument* FetchOrCreateInstrument(LibrariesList::Node& lib_node,
                                                  ArenaList<ListedAudioData, true>& audio_datas,
                                                  sample_lib::Instrument const& inst,
-                                                 ThreadPoolContext& thread_pool_ctx) {
+                                                 ThreadPoolContext thread_pool_ctx) {
     auto& lib = lib_node.value;
     ASSERT(&inst.library == lib.lib);
 

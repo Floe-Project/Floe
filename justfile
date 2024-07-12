@@ -286,9 +286,15 @@ test-ci-windows:
 
   test() {
     local name="$1"
+    local result=0
 
-    just "$name"
-    local result=$?
+    # we can't use $? because on Windows bash it always equals 0
+    if just "$name"; then
+      result=0
+    else
+      result=1
+    fi
+
     echo "| $name | $result |" >> $GITHUB_STEP_SUMMARY
     num_tasks=$((num_tasks + 1))
     [[ $result -ne 0 ]] && num_failed=$((num_failed + 1))

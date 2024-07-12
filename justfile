@@ -266,6 +266,17 @@ _print-ci-summary num_tasks num_failed:
   fi
   exit 0
 
+wsl-test:
+  #!/usr/bin/env bash
+  set -uxo pipefail
+
+  just test-windows-units
+  result=$?
+
+  if [ $result -ne 0 ]; then
+    exit 1
+  fi
+
 [windows, linux]
 test-ci-windows:
   #!/usr/bin/env bash
@@ -286,15 +297,9 @@ test-ci-windows:
 
   test() {
     local name="$1"
-    local result=0
 
-    # we can't use $? because on Windows bash it always equals 0
-    if just "$name"; then
-      result=0
-    else
-      result=1
-    fi
-
+    just "$name"
+    local result=$?
     echo "| $name | $result |" >> $GITHUB_STEP_SUMMARY
     num_tasks=$((num_tasks + 1))
     [[ $result -ne 0 ]] && num_failed=$((num_failed + 1))

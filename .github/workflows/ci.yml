@@ -115,6 +115,19 @@ jobs:
           if-no-files-found: error
           path: build_gen/generated_docs
 
+  windows-wsl-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            test_files
+            justfile
+
+      - uses: taiki-e/install-action@just
+
+      - run: wsl just wsl-test
+
   windows-test:
     runs-on: windows-latest
     needs: linux-compile-and-test

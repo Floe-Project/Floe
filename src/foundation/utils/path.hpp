@@ -95,6 +95,14 @@ PUBLIC constexpr bool IsAbsolute(String path, Format format = Format::Native) {
         return path.size && IsPathSeparator(path[0], Format::Posix);
 }
 
+PUBLIC constexpr usize Depth(String subpath, Format format = Format::Native) {
+    ASSERT(!IsAbsolute(subpath, format));
+    usize depth = 0;
+    for (auto c : subpath)
+        if (IsPathSeparator(c, format)) ++depth;
+    return depth;
+}
+
 [[nodiscard]] PUBLIC constexpr String TrimDirectorySeparatorsEnd(String path,
                                                                  Format format = Format::Native) {
     auto result = path;

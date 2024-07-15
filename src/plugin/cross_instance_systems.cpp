@@ -13,14 +13,16 @@ CrossInstanceSystems::CrossInstanceSystems()
     , logger(g_log_file)
     , paths(CreateFloePaths(arena))
     , settings(paths)
-    , available_libraries(paths.always_scanned_folders[ToInt(ScanFolderType::Libraries)], error_notifications)
-    , sample_library_loader(thread_pool, available_libraries) {
+    , sample_library_server(thread_pool,
+                            paths.always_scanned_folders[ToInt(ScanFolderType::Libraries)],
+                            error_notifications) {
     folder_settings_listener_id =
         settings.tracking.filesystem_change_listeners.Add([this](ScanFolderType type) {
             switch (type) {
                 case ScanFolderType::Presets: preset_listing.scanned_folder.needs_rescan.Store(true); break;
                 case ScanFolderType::Libraries: {
-                    available_libraries.SetExtraScanFolders(
+                    sample_lib_server::SetExtraScanFolders(
+                        sample_library_server,
                         settings.settings.filesystem.extra_libraries_scan_folders);
                     break;
                 }
@@ -41,7 +43,8 @@ CrossInstanceSystems::CrossInstanceSystems()
 
     ASSERT(settings.settings.gui.window_width != 0);
 
-    available_libraries.SetExtraScanFolders(settings.settings.filesystem.extra_libraries_scan_folders);
+    sample_lib_server::SetExtraScanFolders(sample_library_server,
+                                           settings.settings.filesystem.extra_libraries_scan_folders);
 }
 
 CrossInstanceSystems::~CrossInstanceSystems() {

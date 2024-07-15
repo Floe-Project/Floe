@@ -10,7 +10,7 @@
 #include "layer_processor.hpp"
 #include "plugin.hpp"
 #include "processor.hpp"
-#include "sample_library_loader.hpp"
+#include "sample_library_server.hpp"
 #include "state/state_snapshot.hpp"
 
 // TODO(1.0): Core-Library Repo: tag all IRs in the config.lua
@@ -42,13 +42,13 @@ struct PluginInstance {
         Layer(u32 index, LayerProcessor& p) : index(index), processor(p) {}
         ~Layer() {
             if (auto sampled_inst =
-                    instrument.TryGet<sample_lib_loader::RefCounted<sample_lib_loader::LoadedInstrument>>())
+                    instrument.TryGet<sample_lib_server::RefCounted<LoadedInstrument>>())
                 sampled_inst->Release();
         }
 
         AudioData const* GetSampleForGUIWaveform() const {
             if (auto sampled_inst =
-                    instrument.TryGet<sample_lib_loader::RefCounted<sample_lib_loader::LoadedInstrument>>()) {
+                    instrument.TryGet<sample_lib_server::RefCounted<LoadedInstrument>>()) {
                 if (*sampled_inst) return (*sampled_inst)->file_for_gui_waveform;
             } else {
                 // TODO: get waveform audio data
@@ -63,7 +63,7 @@ struct PluginInstance {
                 }
                 case InstrumentType::Sampler: {
                     return instrument
-                        .Get<sample_lib_loader::RefCounted<sample_lib_loader::LoadedInstrument>>()
+                        .Get<sample_lib_server::RefCounted<LoadedInstrument>>()
                         ->instrument.name;
                 }
                 case InstrumentType::None: return "None"_s;
@@ -73,7 +73,7 @@ struct PluginInstance {
 
         Optional<String> LibName() const {
             if (instrument.tag != InstrumentType::Sampler) return nullopt;
-            return instrument.Get<sample_lib_loader::RefCounted<sample_lib_loader::LoadedInstrument>>()
+            return instrument.Get<sample_lib_server::RefCounted<LoadedInstrument>>()
                 ->instrument.library.name;
         }
 
@@ -83,7 +83,7 @@ struct PluginInstance {
 
         using Instrument =
             TaggedUnion<InstrumentType,
-                        TypeAndTag<sample_lib_loader::RefCounted<sample_lib_loader::LoadedInstrument>,
+                        TypeAndTag<sample_lib_server::RefCounted<LoadedInstrument>,
                                    InstrumentType::Sampler>,
                         TypeAndTag<WaveformType, InstrumentType::WaveformSynth>>;
 
@@ -114,7 +114,7 @@ struct PluginInstance {
 
     // State
     // ========================================================================
-    using StateChangePendingJobs = DynamicArrayInline<sample_lib_loader::RequestId, k_num_layers + 1>;
+    using StateChangePendingJobs = DynamicArrayInline<sample_lib_server::RequestId, k_num_layers + 1>;
     ArenaAllocatorWithInlineStorage<1000> latest_snapshot_arena {};
     Optional<StateChangePendingJobs> pending_sample_lib_request_ids {};
     StateSnapshotWithMetadata latest_snapshot {
@@ -130,9 +130,9 @@ struct PluginInstance {
     bool gui_needs_to_handle_preset_name_change {}; // TODO: find other solution
 
     // ========================================================================
-    sample_lib_loader::Connection& sample_lib_loader_connection;
+    sample_lib_server::AsyncCommsChannel& sample_lib_server_async_channel;
 
-    DynamicArray<sample_lib_loader::RefCounted<sample_lib_loader::LoadedInstrument>> lifetime_extended_insts {
+    DynamicArray<sample_lib_server::RefCounted<LoadedInstrument>> lifetime_extended_insts {
         Malloc::Instance()};
 };
 
@@ -148,7 +148,7 @@ void LoadRandomInstrument(PluginInstance& plugin,
                           u32 layer_index,
                           bool allow_none_to_be_selected,
                           bool disallow_previous_result = true,
-                          sample_lib_loader::LoadRequest* add_to_existing_batch = nullptr);
+                          sample_lib_server::LoadRequest* add_to_existing_batch = nullptr);
 
 enum class CycleDirection { Forward, Backward };
 void CycleInstrument(PluginInstance& plugin, u32 layer_index, CycleDirection direction);

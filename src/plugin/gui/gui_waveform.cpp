@@ -525,7 +525,7 @@ void GUIDoSampleWaveform(Gui* g, PluginInstance::Layer* layer, Rect r) {
                                      rounding);
 
     bool is_loading = false;
-    if (g->plugin.sample_lib_loader_connection.instrument_loading_percents[(usize)layer->index].Load() !=
+    if (g->plugin.sample_lib_server_async_channel.instrument_loading_percents[(usize)layer->index].Load() !=
         -1) {
         labels::Label(g, r, "Loading...", labels::WaveformLoadingLabel(g->imgui));
         is_loading = true;

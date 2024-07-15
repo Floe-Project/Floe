@@ -437,7 +437,7 @@ static void TriggerVoicesIfNeeded(LayerProcessor& layer,
         GetVelocityRegionLevel(layer, note_vel_float, velocity_to_volume_01);
 
     VoiceStartParams p {.params = VoiceStartParams::SamplerParams {}};
-    if (auto i_ptr = layer.inst.TryGet<sample_lib_loader::LoadedInstrument const*>()) {
+    if (auto i_ptr = layer.inst.TryGet<LoadedInstrument const*>()) {
         auto inst = *i_ptr;
         p.params = VoiceStartParams::SamplerParams {
             .initial_sample_offset01 = layer.sample_offset_01,

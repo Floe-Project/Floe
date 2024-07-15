@@ -13,7 +13,7 @@
 #include "processing/midi.hpp"
 #include "processing/peak_meter.hpp"
 #include "processing/volume_fade.hpp"
-#include "sample_library_loader.hpp"
+#include "sample_library_server.hpp"
 #include "smoothed_value_system.hpp"
 
 struct EqBand {
@@ -181,7 +181,7 @@ struct LayerProcessor {
 
     using InstrumentUnion =
         TaggedUnion<InstrumentType,
-                    TypeAndTag<sample_lib_loader::LoadedInstrument const*, InstrumentType::Sampler>,
+                    TypeAndTag<LoadedInstrument const*, InstrumentType::Sampler>,
                     TypeAndTag<WaveformType, InstrumentType::WaveformSynth>>;
 
     InstrumentUnion inst = InstrumentType::None;
@@ -192,7 +192,7 @@ struct LayerProcessor {
     struct DesiredInst {
         static constexpr u64 k_consumed = 1;
         void Set(WaveformType w) { value.Store(ValForWaveform(w)); }
-        void Set(sample_lib_loader::LoadedInstrument const* i) { value.Store((uintptr)i); }
+        void Set(LoadedInstrument const* i) { value.Store((uintptr)i); }
         void SetNone() { value.Store(0); }
         Optional<InstrumentUnion> Consume() {
             auto v = value.Exchange(k_consumed);
@@ -200,11 +200,11 @@ struct LayerProcessor {
             if (v == 0) return InstrumentType::None;
             for (auto const w : Range((u64)WaveformType::Count))
                 if (v == ValForWaveform((WaveformType)w)) return (WaveformType)w;
-            return (sample_lib_loader::LoadedInstrument const*)v;
+            return (LoadedInstrument const*)v;
         }
         static constexpr u64 ValForWaveform(WaveformType w) {
-            auto const v = 1 + alignof(sample_lib_loader::LoadedInstrument) * ((u64)w + 1);
-            ASSERT(v % alignof(sample_lib_loader::LoadedInstrument) != 0, "needs to be an invalid ptr");
+            auto const v = 1 + alignof(LoadedInstrument) * ((u64)w + 1);
+            ASSERT(v % alignof(LoadedInstrument) != 0, "needs to be an invalid ptr");
             return v;
         }
         bool IsConsumed() const { return value.Load() == k_consumed; }

@@ -1,7 +1,7 @@
 // Copyright 2018-2024 Sam Windell
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "sample_library_loader.hpp"
+#include "sample_library_server.hpp"
 
 #include "foundation/foundation.hpp"
 #include "os/filesystem.hpp"
@@ -63,7 +63,7 @@ static sample_lib::Library* BuiltinLibrary() {
     return &builtin_library;
 }
 
-namespace sample_lib_loader {
+namespace sample_lib_server {
 
 namespace detail {
 u32 g_inst_debug_id = 0;
@@ -71,7 +71,7 @@ u32 g_inst_debug_id = 0;
 
 using namespace detail;
 
-constexpr String k_trace_category = "ASL";
+constexpr String k_trace_category = "SLL";
 constexpr u32 k_trace_colour = 0xfcba03;
 
 ListedAudioData::~ListedAudioData() {
@@ -257,111 +257,6 @@ static ListedInstrument* FetchOrCreateInstrument(LibrariesList::Node& lib_node,
     return new_inst;
 }
 
-AvailableLibraries::AvailableLibraries(Span<String const> always_scanned_folders,
-                                       ThreadsafeErrorNotifications& error_notifications)
-    : error_notifications(error_notifications) {
-    for (auto e : always_scanned_folders) {
-        auto node = scan_folders.AllocateUninitialised();
-        PLACEMENT_NEW(&node->value) AvailableLibraries::ScanFolder();
-        dyn::Assign(node->value.path, e);
-        node->value.source = AvailableLibraries::ScanFolder::Source::AlwaysScannedFolder;
-        node->value.state.raw = AvailableLibraries::ScanFolder::State::NotScanned;
-        scan_folders.Insert(node);
-    }
-}
-
-AvailableLibraries::~AvailableLibraries() {
-    scan_folders.RemoveAll();
-    scan_folders.DeleteRemovedAndUnreferenced();
-}
-
-void AvailableLibraries::SetExtraScanFolders(Span<String const> extra_folders) {
-    scan_folders_writer_mutex.Lock();
-    DEFER { scan_folders_writer_mutex.Unlock(); };
-
-    for (auto it = scan_folders.begin(); it != scan_folders.end();)
-        if (it->value.source == AvailableLibraries::ScanFolder::Source::ExtraFolder &&
-            !Find(extra_folders, it->value.path))
-            it = scan_folders.Remove(it);
-        else
-            ++it;
-
-    for (auto e : extra_folders) {
-        bool already_present = false;
-        for (auto& l : scan_folders)
-            if (l.value.path == e) already_present = true;
-        if (already_present) continue;
-
-        auto node = scan_folders.AllocateUninitialised();
-        PLACEMENT_NEW(&node->value) AvailableLibraries::ScanFolder();
-        dyn::Assign(node->value.path, e);
-        node->value.source = AvailableLibraries::ScanFolder::Source::ExtraFolder;
-        node->value.state.raw = AvailableLibraries::ScanFolder::State::NotScanned;
-        scan_folders.Insert(node);
-    }
-}
-
-void AvailableLibraries::AttachLoadingThread(LoadingThread* t) {
-    loading_thread = t;
-    for (auto& n : scan_folders)
-        if (auto f = n.TryScoped()) f->state.Store(AvailableLibraries::ScanFolder::State::NotScanned);
-
-    {
-        auto node = libraries.AllocateUninitialised();
-        PLACEMENT_NEW(&node->value)
-        ListedLibrary {.arena = PageAllocator::Instance(), .lib = BuiltinLibrary()};
-        libraries.Insert(node);
-
-        libraries_by_name.Insert(BuiltinLibrary()->name, node);
-    }
-}
-
-Span<RefCounted<sample_lib::Library>> AvailableLibraries::AllRetained(ArenaAllocator& arena) {
-    // PERF: is this inefficient?
-    {
-        bool any_rescan_requested = false;
-        for (auto& n : scan_folders)
-            if (auto f = n.TryScoped()) {
-                auto expected = AvailableLibraries::ScanFolder::State::NotScanned;
-                if (f->state.CompareExchangeStrong(expected,
-                                                   AvailableLibraries::ScanFolder::State::RescanRequested))
-                    any_rescan_requested = true;
-            }
-        if (any_rescan_requested && loading_thread) loading_thread->work_signaller.Signal();
-    }
-
-    DynamicArray<RefCounted<sample_lib::Library>> result(arena);
-    for (auto& i : libraries) {
-        if (i.TryRetain()) {
-            auto ref = RefCounted<sample_lib::Library>(*i.value.lib, i.reader_uses, nullptr);
-            dyn::Append(result, ref);
-        }
-    }
-    return result.ToOwnedSpan();
-}
-
-RefCounted<sample_lib::Library> AvailableLibraries::FindRetained(String name) {
-    // PERF: is this inefficient?
-    {
-        bool any_rescan_requested = false;
-        for (auto& n : scan_folders)
-            if (auto f = n.TryScoped()) {
-                auto expected = AvailableLibraries::ScanFolder::State::NotScanned;
-                if (f->state.CompareExchangeStrong(expected,
-                                                   AvailableLibraries::ScanFolder::State::RescanRequested))
-                    any_rescan_requested = true;
-            }
-        if (any_rescan_requested && loading_thread) loading_thread->work_signaller.Signal();
-    }
-    libraries_by_name_mutex.Lock();
-    DEFER { libraries_by_name_mutex.Unlock(); };
-    auto l = libraries_by_name.Find(name);
-    if (!l) return {};
-    auto& node = **l;
-    if (!node.TryRetain()) return {};
-    return RefCounted<sample_lib::Library>(*node.value.lib, node.reader_uses, nullptr);
-}
-
 // short-lived helper for tracking asynchronous library scanning/reading
 struct LibrariesAsyncContext {
     struct Job {
@@ -384,7 +279,7 @@ struct LibrariesAsyncContext {
 
         struct ScanFolder {
             struct Args {
-                AvailableLibraries::ScanFolderList::Node* folder;
+                ScanFolderList::Node* folder;
             };
             struct Result {
                 ErrorCodeOr<void> outcome {};
@@ -558,19 +453,18 @@ RereadLibraryAsync(LibrariesAsyncContext& async_ctx, LibrariesList& lib_list, Li
                      lib_node->value.lib->file_format_specifics.tag);
 }
 
-// loader-thread
-static void UpdateAvailableLibraries(AvailableLibraries& libs,
-                                     LibrariesAsyncContext& async_ctx,
-                                     ArenaAllocator& scratch_arena,
-                                     Optional<DirectoryWatcher>& watcher) {
+// server-thread
+static void UpdateLoadingThread(Server& server,
+                                LibrariesAsyncContext& async_ctx,
+                                ArenaAllocator& scratch_arena,
+                                Optional<DirectoryWatcher>& watcher) {
     ZoneNamed(outer, true);
 
     // trigger folder scanning if any are marked as 'rescan-requested'
-    for (auto& node : libs.scan_folders) {
+    for (auto& node : server.scan_folders) {
         if (auto f = node.TryScoped()) {
-            auto expected = AvailableLibraries::ScanFolder::State::RescanRequested;
-            auto const exchanged =
-                f->state.CompareExchangeStrong(expected, AvailableLibraries::ScanFolder::State::Scanning);
+            auto expected = ScanFolder::State::RescanRequested;
+            auto const exchanged = f->state.CompareExchangeStrong(expected, ScanFolder::State::Scanning);
             if (!exchanged) continue;
         }
 
@@ -589,7 +483,7 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
             };
         }
 
-        AddAsyncJob(async_ctx, libs.libraries, scan_job);
+        AddAsyncJob(async_ctx, server.libraries, scan_job);
     }
 
     // handle async jobs that have completed
@@ -629,29 +523,29 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
 
                         // only allow one with the same name or path, and only if it isn't already present
                         bool already_exists = false;
-                        for (auto it = libs.libraries.begin(); it != libs.libraries.end();) {
+                        for (auto it = server.libraries.begin(); it != server.libraries.end();) {
                             if (it->value.lib->file_hash == lib->file_hash) already_exists = true;
                             if (it->value.lib->name == lib->name ||
                                 path::Equal(it->value.lib->path, lib->path))
-                                it = libs.libraries.Remove(it);
+                                it = server.libraries.Remove(it);
                             else
                                 ++it;
                         }
                         if (already_exists) break;
 
-                        auto new_node = libs.libraries.AllocateUninitialised();
+                        auto new_node = server.libraries.AllocateUninitialised();
                         PLACEMENT_NEW(&new_node->value)
                         ListedLibrary {.arena = Move(j.result.arena), .lib = lib};
-                        libs.libraries.Insert(new_node);
+                        server.libraries.Insert(new_node);
 
-                        libs.error_notifications.RemoveError(error_id);
+                        server.error_notifications.RemoveError(error_id);
                         break;
                     }
                     case ResultType::Error: {
                         auto const error = outcome.GetFromTag<ResultType::Error>();
                         if (error.code == FilesystemError::PathDoesNotExist) return;
 
-                        auto item = libs.error_notifications.NewError();
+                        auto item = server.error_notifications.NewError();
                         item->value = {
                             .title = "Failed to read library"_s,
                             .message = {},
@@ -661,7 +555,7 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
                         if (j.args.path_or_memory.Is<String>())
                             fmt::Append(item->value.message, "{}\n", j.args.path_or_memory.Get<String>());
                         if (error.message.size) fmt::Append(item->value.message, "{}\n", error.message);
-                        libs.error_notifications.AddOrUpdateError(item);
+                        server.error_notifications.AddOrUpdateError(item);
                         break;
                     }
                 }
@@ -679,24 +573,22 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
 
                     if (j.result.outcome.HasError()) {
                         auto const is_always_scanned_folder =
-                            folder->source == AvailableLibraries::ScanFolder::Source::AlwaysScannedFolder;
+                            folder->source == ScanFolder::Source::AlwaysScannedFolder;
                         if (!(is_always_scanned_folder &&
                               j.result.outcome.Error() == FilesystemError::PathDoesNotExist)) {
-                            auto item = libs.error_notifications.NewError();
+                            auto item = server.error_notifications.NewError();
                             item->value = {
                                 .title = "Failed to scan library folder"_s,
                                 .message = String(path),
                                 .error_code = j.result.outcome.Error(),
                                 .id = folder_error_id,
                             };
-                            libs.error_notifications.AddOrUpdateError(item);
+                            server.error_notifications.AddOrUpdateError(item);
                         }
-                        folder->state.Store(AvailableLibraries::ScanFolder::State::ScanFailed,
-                                            MemoryOrder::Release);
+                        folder->state.Store(ScanFolder::State::ScanFailed, MemoryOrder::Release);
                     } else {
-                        libs.error_notifications.RemoveError(folder_error_id);
-                        folder->state.Store(AvailableLibraries::ScanFolder::State::ScannedSuccessfully,
-                                            MemoryOrder::Release);
+                        server.error_notifications.RemoveError(folder_error_id);
+                        folder->state.Store(ScanFolder::State::ScannedSuccessfully, MemoryOrder::Release);
                     }
                 }
                 break;
@@ -710,10 +602,9 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
 
         auto const dirs_to_watch = ({
             DynamicArray<DirectoryToWatch> dirs {scratch_arena};
-            for (auto& node : libs.scan_folders) {
+            for (auto& node : server.scan_folders) {
                 if (auto f = node.TryRetain()) {
-                    if (f->state.Load(MemoryOrder::Relaxed) ==
-                        AvailableLibraries::ScanFolder::State::ScannedSuccessfully)
+                    if (f->state.Load(MemoryOrder::Relaxed) == ScanFolder::State::ScannedSuccessfully)
                         dyn::Append(dirs,
                                     {
                                         .path = f->path,
@@ -728,7 +619,7 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
         });
         DEFER {
             for (auto& d : dirs_to_watch)
-                ((AvailableLibraries::ScanFolderList::Node*)d.user_data)->Release();
+                ((ScanFolderList::Node*)d.user_data)->Release();
         };
 
         if (auto const outcome = PollDirectoryChanges(*watcher,
@@ -745,8 +636,7 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
             auto const dir_changes_span = outcome.Value();
             for (auto const& dir_changes : dir_changes_span) {
                 auto& scan_folder =
-                    ((AvailableLibraries::ScanFolderList::Node*)dir_changes.linked_dir_to_watch->user_data)
-                        ->value;
+                    ((ScanFolderList::Node*)dir_changes.linked_dir_to_watch->user_data)->value;
 
                 if (dir_changes.error) {
                     // IMPROVE: handle this
@@ -758,7 +648,7 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
 
                 for (auto const& subpath_changeset : dir_changes.subpath_changesets) {
                     if (subpath_changeset.changes & DirectoryWatcher::ChangeType::ManualRescanNeeded) {
-                        scan_folder.state.Store(AvailableLibraries::ScanFolder::State::RescanRequested);
+                        scan_folder.state.Store(ScanFolder::State::RescanRequested);
                         continue;
                     }
 
@@ -777,28 +667,28 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
                     if (path::Depth(subpath_changeset.subpath) == 0) {
                         bool modified_existing_lib = false;
                         if (subpath_changeset.changes & DirectoryWatcher::ChangeType::Modified)
-                            for (auto& lib_node : libs.libraries) {
+                            for (auto& lib_node : server.libraries) {
                                 auto const& lib = *lib_node.value.lib;
                                 if (path::Equal(lib.path, full_path)) {
                                     DebugLn("  Rereading library: {}", lib.name);
-                                    RereadLibraryAsync(async_ctx, libs.libraries, &lib_node);
+                                    RereadLibraryAsync(async_ctx, server.libraries, &lib_node);
                                     modified_existing_lib = true;
                                     break;
                                 }
                             }
                         if (!modified_existing_lib) {
                             DebugLn("  Rescanning folder: {}", scan_folder.path);
-                            scan_folder.state.Store(AvailableLibraries::ScanFolder::State::RescanRequested);
+                            scan_folder.state.Store(ScanFolder::State::RescanRequested);
                         }
                     } else {
-                        for (auto& lib_node : libs.libraries) {
+                        for (auto& lib_node : server.libraries) {
                             auto const& lib = *lib_node.value.lib;
                             if (lib.file_format_specifics.tag == sample_lib::FileFormat::Lua) {
                                 // get the directory of the library (the directory of the config.lua)
                                 auto const dir = path::Directory(lib.path);
                                 if (dir && path::IsWithinDirectory(full_path, *dir)) {
                                     DebugLn("  Rereading library: {}", lib.name);
-                                    RereadLibraryAsync(async_ctx, libs.libraries, &lib_node);
+                                    RereadLibraryAsync(async_ctx, server.libraries, &lib_node);
                                     break;
                                 }
                             }
@@ -813,14 +703,14 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
     // feels totally seamless
 
     // remove libraries that are not in any active scan-folders
-    for (auto it = libs.libraries.begin(); it != libs.libraries.end();) {
+    for (auto it = server.libraries.begin(); it != server.libraries.end();) {
         auto const& lib = *it->value.lib;
 
         bool within_any_folder = false;
         if (lib.name == k_builtin_library_name)
             within_any_folder = true;
         else
-            for (auto& sn : libs.scan_folders) {
+            for (auto& sn : server.scan_folders) {
                 if (auto folder = sn.TryScoped()) {
                     if (path::IsWithinDirectory(lib.path, folder->path)) {
                         within_any_folder = true;
@@ -830,7 +720,7 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
             }
 
         if (!within_any_folder)
-            it = libs.libraries.Remove(it);
+            it = server.libraries.Remove(it);
         else
             ++it;
     }
@@ -838,11 +728,11 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
     // update libraries_by_name
     {
         ZoneNamedN(rebuild_htab, "rehash", true);
-        libs.libraries_by_name_mutex.Lock();
-        DEFER { libs.libraries_by_name_mutex.Unlock(); };
-        auto& libs_by_name = libs.libraries_by_name;
+        server.libraries_by_name_mutex.Lock();
+        DEFER { server.libraries_by_name_mutex.Unlock(); };
+        auto& libs_by_name = server.libraries_by_name;
         libs_by_name.DeleteAll();
-        for (auto& n : libs.libraries) {
+        for (auto& n : server.libraries) {
             auto const& lib = *n.value.lib;
             auto const inserted = libs_by_name.Insert(lib.name, &n);
             ASSERT(inserted);
@@ -851,28 +741,26 @@ static void UpdateAvailableLibraries(AvailableLibraries& libs,
 
     // remove scan-folders that are no longer used
     {
-        libs.scan_folders_writer_mutex.Lock();
-        DEFER { libs.scan_folders_writer_mutex.Unlock(); };
-        libs.scan_folders.DeleteRemovedAndUnreferenced();
+        server.scan_folders_writer_mutex.Lock();
+        DEFER { server.scan_folders_writer_mutex.Unlock(); };
+        server.scan_folders.DeleteRemovedAndUnreferenced();
     }
 }
 
-static void RemoveUnreferencedObjects(LoadingThread& thread,
-                                      LibrariesList& libraries,
-                                      ArenaList<ListedAudioData, true>& audio_datas) {
+static void RemoveUnreferencedObjects(Server& server, ArenaList<ListedAudioData, true>& audio_datas) {
     ZoneScoped;
-    thread.connections.Use([](auto& connections) {
-        connections.RemoveIf([](Connection const& h) { return !h.used.Load(MemoryOrder::Relaxed); });
+    server.channels.Use([](auto& channels) {
+        channels.RemoveIf([](AsyncCommsChannel const& h) { return !h.used.Load(MemoryOrder::Relaxed); });
     });
 
-    for (auto& l : libraries)
+    for (auto& l : server.libraries)
         l.value.instruments.RemoveIf([](ListedInstrument const& i) { return i.refs.Load() == 0; });
-    for (auto n = libraries.dead_list; n != nullptr; n = n->writer_next)
+    for (auto n = server.libraries.dead_list; n != nullptr; n = n->writer_next)
         n->value.instruments.RemoveIf([](ListedInstrument const& i) { return i.refs.Load() == 0; });
 
     audio_datas.RemoveIf([](ListedAudioData const& a) { return a.refs.Load() == 0; });
 
-    libraries.DeleteRemovedAndUnreferenced();
+    server.libraries.DeleteRemovedAndUnreferenced();
 }
 
 static void CancelLoadingAudioForInstrumentIfPossible(ListedInstrument* i, uintptr_t trace_id) {
@@ -904,7 +792,7 @@ static void CancelLoadingAudioForInstrumentIfPossible(ListedInstrument* i, uintp
                    num_cancelled);
 }
 
-static void LoadingThreadLoop(LoadingThread& thread) {
+static void LoadingThreadLoop(Server& server) {
     ZoneScoped;
     ArenaAllocator scratch_arena {PageAllocator::Instance(), Kb(128)};
     ArenaList<ListedAudioData, true> audio_datas {PageAllocator::Instance()};
@@ -915,27 +803,39 @@ static void LoadingThreadLoop(LoadingThread& thread) {
         auto watcher_outcome = CreateDirectoryWatcher(PageAllocator::Instance());
         auto const error_id = U64FromChars("libwatch");
         if (!watcher_outcome.HasError()) {
-            thread.available_libraries.error_notifications.RemoveError(error_id);
+            server.error_notifications.RemoveError(error_id);
             watcher.Emplace(watcher_outcome.ReleaseValue());
         } else {
             DebugLn("Failed to create directory watcher: {}", watcher_outcome.Error());
-            auto node = thread.available_libraries.error_notifications.NewError();
+            auto node = server.error_notifications.NewError();
             node->value = {
                 .title = "Warning: unable to monitor library folders"_s,
                 .message = {},
                 .error_code = watcher_outcome.Error(),
                 .id = error_id,
             };
-            thread.available_libraries.error_notifications.AddOrUpdateError(node);
+            server.error_notifications.AddOrUpdateError(node);
         }
     }
     DEFER {
         if (watcher) DestoryDirectoryWatcher(*watcher);
     };
 
-    thread.available_libraries.AttachLoadingThread(&thread);
+    {
+        for (auto& n : server.scan_folders)
+            if (auto f = n.TryScoped()) f->state.Store(ScanFolder::State::NotScanned);
 
-    while (!thread.end_thread.Load()) {
+        {
+            auto node = server.libraries.AllocateUninitialised();
+            PLACEMENT_NEW(&node->value)
+            ListedLibrary {.arena = PageAllocator::Instance(), .lib = BuiltinLibrary()};
+            server.libraries.Insert(node);
+
+            server.libraries_by_name.Insert(BuiltinLibrary()->name, node);
+        }
+    }
+
+    while (!server.end_thread.Load()) {
         struct PendingResult {
             enum class State {
                 AwaitingLibrary,
@@ -945,51 +845,54 @@ static void LoadingThreadLoop(LoadingThread& thread) {
                 CompletedSuccessfully,
             };
 
-            using LoadingAsset = TaggedUnion<AssetType,
-                                             TypeAndTag<ListedInstrument*, AssetType::Instrument>,
-                                             TypeAndTag<ListedAudioData*, AssetType::Ir>>;
+            using LoadingAsset = TaggedUnion<LoadRequestType,
+                                             TypeAndTag<ListedInstrument*, LoadRequestType::Instrument>,
+                                             TypeAndTag<ListedAudioData*, LoadRequestType::Ir>>;
 
             using StateUnion = TaggedUnion<State,
                                            TypeAndTag<LoadingAsset, State::AwaitingAudio>,
                                            TypeAndTag<ErrorCode, State::Failed>,
-                                           TypeAndTag<AssetRefUnion, State::CompletedSuccessfully>>;
+                                           TypeAndTag<RefUnion, State::CompletedSuccessfully>>;
 
             u32 LayerIndex() const {
-                if (auto i = request.request.TryGet<InstrumentIdWithLayer>()) return i->layer_index;
+                if (auto i = request.request.TryGet<LoadRequestInstrumentIdWithLayer>())
+                    return i->layer_index;
                 PanicIfReached();
                 return 0;
             }
             bool IsDesired() const {
                 return state.Get<LoadingAsset>().Get<ListedInstrument*>() ==
-                       request.connection.desired_inst[LayerIndex()];
+                       request.async_comms_channel.desired_inst[LayerIndex()];
             }
-            auto& LoadingPercent() { return request.connection.instrument_loading_percents[LayerIndex()]; }
+            auto& LoadingPercent() {
+                return request.async_comms_channel.instrument_loading_percents[LayerIndex()];
+            }
 
             StateUnion state {State::AwaitingLibrary};
-            LoadingThread::QueuedRequest request;
+            QueuedRequest request;
             uintptr_t debug_id;
 
             PendingResult* next = nullptr;
         };
 
         LibrariesAsyncContext libs_async_ctx {
-            .thread_pool = thread.thread_pool,
-            .work_signaller = thread.work_signaller,
+            .thread_pool = server.thread_pool,
+            .work_signaller = server.work_signaller,
         };
 
         IntrusiveSinglyLinkedList<PendingResult> pending_results {};
         AtomicCountdown thread_pool_jobs {0};
 
         ThreadPoolContext thread_pool_ctx {
-            .pool = thread.thread_pool,
+            .pool = server.thread_pool,
             .num_thread_pool_jobs = thread_pool_jobs,
-            .completed_signaller = thread.work_signaller,
+            .completed_signaller = server.work_signaller,
         };
 
         do {
-            thread.work_signaller.WaitUntilSignalledOrSpurious(250u);
+            server.work_signaller.WaitUntilSignalledOrSpurious(250u);
 
-            if (thread.debug_dump_current_state.Exchange(false)) {
+            if (server.request_debug_dump_current_state.Exchange(false)) {
                 ZoneNamedN(dump, "dump", true);
                 DebugLn("Dumping current state of loading thread");
                 DebugLn("Libraries currently loading: {}", libs_async_ctx.num_uncompleted_jobs.Load());
@@ -1002,7 +905,7 @@ static void LoadingThreadLoop(LoadingThread& thread) {
                         case PendingResult::State::AwaitingAudio: {
                             auto& asset = pending_result.state.Get<PendingResult::LoadingAsset>();
                             switch (asset.tag) {
-                                case AssetType::Instrument: {
+                                case LoadRequestType::Instrument: {
                                     auto inst = asset.Get<ListedInstrument*>();
                                     DebugLn("    Awaiting audio for instrument {}",
                                             inst->inst.instrument.name);
@@ -1013,7 +916,7 @@ static void LoadingThreadLoop(LoadingThread& thread) {
                                     }
                                     break;
                                 }
-                                case AssetType::Ir: {
+                                case LoadRequestType::Ir: {
                                     auto ir = asset.Get<ListedAudioData*>();
                                     DebugLn("    Awaiting audio for IR {}", ir->path);
                                     DebugLn("      Audio data: {}, {}",
@@ -1032,7 +935,7 @@ static void LoadingThreadLoop(LoadingThread& thread) {
                     }
                 }
                 DebugLn("\nAvailable Libraries:");
-                for (auto& lib : thread.available_libraries.libraries) {
+                for (auto& lib : server.libraries) {
                     DebugLn("  Library: {}", lib.value.lib->name);
                     for (auto& inst : lib.value.instruments)
                         DebugLn("    Instrument: {}", inst.inst.instrument.name);
@@ -1046,18 +949,16 @@ static void LoadingThreadLoop(LoadingThread& thread) {
                            thread_pool_jobs.counter.Load());
 
             // consume any incoming requests
-            while (auto queued_request = thread.request_queue.TryPop()) {
+            while (auto queued_request = server.request_queue.TryPop()) {
                 ZoneNamedN(req, "request", true);
 
-                if (!queued_request->connection.used.Load(MemoryOrder::Relaxed)) continue;
+                if (!queued_request->async_comms_channel.used.Load(MemoryOrder::Relaxed)) continue;
 
                 // Only once we have a request do we initiate the scanning
-                for (auto& n : thread.available_libraries.scan_folders) {
+                for (auto& n : server.scan_folders) {
                     if (auto f = n.TryScoped()) {
-                        auto expected = AvailableLibraries::ScanFolder::State::NotScanned;
-                        f->state.CompareExchangeStrong(
-                            expected,
-                            AvailableLibraries::ScanFolder::State::RescanRequested);
+                        auto expected = ScanFolder::State::NotScanned;
+                        f->state.CompareExchangeStrong(expected, ScanFolder::State::RescanRequested);
                     }
                 }
 
@@ -1074,7 +975,7 @@ static void LoadingThreadLoop(LoadingThread& thread) {
                                "pending result added");
             }
 
-            UpdateAvailableLibraries(thread.available_libraries, libs_async_ctx, scratch_arena, watcher);
+            UpdateLoadingThread(server, libs_async_ctx, scratch_arena, watcher);
 
             if (!pending_results.Empty()) {
                 // Fill in library
@@ -1084,11 +985,11 @@ static void LoadingThreadLoop(LoadingThread& thread) {
                     auto const library_name = ({
                         String n {};
                         switch (pending_result.request.request.tag) {
-                            case AssetType::Instrument:
-                                n = pending_result.request.request.Get<InstrumentIdWithLayer>()
+                            case LoadRequestType::Instrument:
+                                n = pending_result.request.request.Get<LoadRequestInstrumentIdWithLayer>()
                                         .id.library_name;
                                 break;
-                            case AssetType::Ir:
+                            case LoadRequestType::Ir:
                                 n = pending_result.request.request.Get<sample_lib::IrId>().library_name;
                                 break;
                         }
@@ -1097,13 +998,13 @@ static void LoadingThreadLoop(LoadingThread& thread) {
                     ASSERT(library_name.size != 0);
 
                     LibrariesList::Node* lib {};
-                    if (auto l_ptr = thread.available_libraries.libraries_by_name.Find(library_name))
-                        lib = *l_ptr;
+                    if (auto l_ptr = server.libraries_by_name.Find(library_name)) lib = *l_ptr;
 
                     if (!lib) {
                         if (libs_async_ctx.num_uncompleted_jobs.Load(MemoryOrder::AcquireRelease) == 0) {
                             {
-                                auto item = pending_result.request.connection.error_notifications.NewError();
+                                auto item =
+                                    pending_result.request.async_comms_channel.error_notifications.NewError();
                                 item->value = {
                                     .title = {},
                                     .message = {},
@@ -1111,20 +1012,22 @@ static void LoadingThreadLoop(LoadingThread& thread) {
                                     .id = ThreadsafeErrorNotifications::Id("lib ", library_name),
                                 };
                                 fmt::Append(item->value.title, "{} not found", library_name);
-                                pending_result.request.connection.error_notifications.AddOrUpdateError(item);
+                                pending_result.request.async_comms_channel.error_notifications
+                                    .AddOrUpdateError(item);
                             }
                             pending_result.state = ErrorCode {CommonError::NotFound};
                         }
                     } else {
                         switch (pending_result.request.request.tag) {
-                            case AssetType::Instrument: {
-                                auto& load_inst = pending_result.request.request.Get<InstrumentIdWithLayer>();
+                            case LoadRequestType::Instrument: {
+                                auto& load_inst =
+                                    pending_result.request.request.Get<LoadRequestInstrumentIdWithLayer>();
                                 auto const inst_name = load_inst.id.inst_name;
 
                                 ASSERT(inst_name.size != 0);
 
                                 if (auto const i = lib->value.lib->insts_by_name.Find(inst_name)) {
-                                    pending_result.request.connection
+                                    pending_result.request.async_comms_channel
                                         .instrument_loading_percents[load_inst.layer_index]
                                         .Store(0);
 
@@ -1132,8 +1035,8 @@ static void LoadingThreadLoop(LoadingThread& thread) {
                                         FetchOrCreateInstrument(*lib, audio_datas, **i, thread_pool_ctx);
                                     ASSERT(inst);
 
-                                    pending_result.request.connection.desired_inst[load_inst.layer_index] =
-                                        inst;
+                                    pending_result.request.async_comms_channel
+                                        .desired_inst[load_inst.layer_index] = inst;
                                     pending_result.state = PendingResult::LoadingAsset {inst};
 
                                     TracyMessageEx(
@@ -1146,8 +1049,8 @@ static void LoadingThreadLoop(LoadingThread& thread) {
                                         inst_name);
                                 } else {
                                     {
-                                        auto const item =
-                                            pending_result.request.connection.error_notifications.NewError();
+                                        auto const item = pending_result.request.async_comms_channel
+                                                              .error_notifications.NewError();
                                         item->value = {
                                             .title = {},
                                             .message = {},
@@ -1157,14 +1060,14 @@ static void LoadingThreadLoop(LoadingThread& thread) {
                                         fmt::Append(item->value.title,
                                                     "Cannot find instrument \"{}\"",
                                                     inst_name);
-                                        pending_result.request.connection.error_notifications
+                                        pending_result.request.async_comms_channel.error_notifications
                                             .AddOrUpdateError(item);
                                     }
                                     pending_result.state = ErrorCode {CommonError::NotFound};
                                 }
                                 break;
                             }
-                            case AssetType::Ir: {
+                            case LoadRequestType::Ir: {
                                 auto const ir = pending_result.request.request.Get<sample_lib::IrId>();
 
                                 auto const ir_path = lib->value.lib->irs_by_name.Find(ir.ir_name);
@@ -1184,16 +1087,16 @@ static void LoadingThreadLoop(LoadingThread& thread) {
                                         ir.library_name,
                                         ir.ir_name);
                                 } else {
-                                    auto const err =
-                                        pending_result.request.connection.error_notifications.NewError();
+                                    auto const err = pending_result.request.async_comms_channel
+                                                         .error_notifications.NewError();
                                     err->value = {
                                         .title = "Failed to find IR"_s,
                                         .message = String(ir.ir_name),
                                         .error_code = CommonError::NotFound,
                                         .id = ThreadsafeErrorNotifications::Id("ir  ", ir.ir_name),
                                     };
-                                    pending_result.request.connection.error_notifications.AddOrUpdateError(
-                                        err);
+                                    pending_result.request.async_comms_channel.error_notifications
+                                        .AddOrUpdateError(err);
                                     pending_result.state = ErrorCode {CommonError::NotFound};
                                 }
                                 break;
@@ -1222,14 +1125,16 @@ static void LoadingThreadLoop(LoadingThread& thread) {
 
                     if (error) {
                         {
-                            auto item = pending_result.request.connection.error_notifications.NewError();
+                            auto item =
+                                pending_result.request.async_comms_channel.error_notifications.NewError();
                             item->value = {
                                 .title = "Failed to load audio"_s,
                                 .message = i->inst.instrument.name,
                                 .error_code = *error,
                                 .id = ThreadsafeErrorNotifications::Id("audi", i->inst.instrument.name),
                             };
-                            pending_result.request.connection.error_notifications.AddOrUpdateError(item);
+                            pending_result.request.async_comms_channel.error_notifications.AddOrUpdateError(
+                                item);
                         }
 
                         CancelLoadingAudioForInstrumentIfPossible(i, pending_result.debug_id);
@@ -1258,8 +1163,8 @@ static void LoadingThreadLoop(LoadingThread& thread) {
                         });
                         if (num_completed == i->audio_data_set.size) {
                             pending_result.LoadingPercent().Store(-1);
-                            pending_result.state = AssetRefUnion {
-                                RefCounted<LoadedInstrument> {i->inst, i->refs, &thread.work_signaller}};
+                            pending_result.state = RefUnion {
+                                RefCounted<LoadedInstrument> {i->inst, i->refs, &server.work_signaller}};
                         } else {
                             f32 const percent = 100.0f * ((f32)num_completed / (f32)i->audio_data_set.size);
                             pending_result.LoadingPercent().Store(RoundPositiveFloat(percent));
@@ -1270,7 +1175,7 @@ static void LoadingThreadLoop(LoadingThread& thread) {
                             bool desired = false;
                             for (auto& other_pending_result : pending_results) {
                                 for (auto other_desired :
-                                     other_pending_result.request.connection.desired_inst) {
+                                     other_pending_result.request.async_comms_channel.desired_inst) {
                                     if (other_desired == i) {
                                         desired = true;
                                         break;
@@ -1298,14 +1203,15 @@ static void LoadingThreadLoop(LoadingThread& thread) {
                     auto const& ir_data = *a;
                     switch (ir_data.state.Load()) {
                         case LoadingState::CompletedSucessfully: {
-                            pending_result.state = AssetRefUnion {
-                                RefCounted<AudioData> {a->audio_data, a->refs, &thread.work_signaller}};
+                            pending_result.state = RefUnion {
+                                RefCounted<AudioData> {a->audio_data, a->refs, &server.work_signaller}};
                             break;
                         }
                         case LoadingState::CompletedWithError: {
                             auto const ir_index = pending_result.request.request.Get<sample_lib::IrId>();
                             {
-                                auto item = pending_result.request.connection.error_notifications.NewError();
+                                auto item =
+                                    pending_result.request.async_comms_channel.error_notifications.NewError();
                                 item->value = {
                                     .title = "Failed to load IR"_s,
                                     .message = {},
@@ -1313,7 +1219,8 @@ static void LoadingThreadLoop(LoadingThread& thread) {
                                     .id = Hash("ir  "_s) + Hash(ir_index.library_name.Items()) +
                                           Hash(ir_index.ir_name.Items()),
                                 };
-                                pending_result.request.connection.error_notifications.AddOrUpdateError(item);
+                                pending_result.request.async_comms_channel.error_notifications
+                                    .AddOrUpdateError(item);
                             }
                             pending_result.state = *ir_data.error;
                             break;
@@ -1351,16 +1258,16 @@ static void LoadingThreadLoop(LoadingThread& thread) {
                                         r = pending_result.state.Get<ErrorCode>();
                                         break;
                                     case PendingResult::State::CompletedSuccessfully:
-                                        r = pending_result.state.Get<AssetRefUnion>();
+                                        r = pending_result.state.Get<RefUnion>();
                                         break;
                                 }
                                 r;
                             }),
                         };
 
-                        thread.connections.Use([&](auto&) {
-                            if (pending_result.request.connection.used.Load(MemoryOrder::Relaxed))
-                                pending_result.request.connection.completed_callback(result);
+                        server.channels.Use([&](auto&) {
+                            if (pending_result.request.async_comms_channel.used.Load(MemoryOrder::Relaxed))
+                                pending_result.request.async_comms_channel.completed_callback(result);
                         });
                         return true;
                     },
@@ -1373,7 +1280,7 @@ static void LoadingThreadLoop(LoadingThread& thread) {
                 u32 num_insts_loaded = 0;
                 u32 num_samples_loaded = 0;
                 u64 total_bytes_used = 0;
-                for (auto& i : thread.available_libraries.libraries) {
+                for (auto& i : server.libraries) {
                     for (auto& inst : i.value.instruments) {
                         (void)inst;
                         ++num_insts_loaded;
@@ -1384,9 +1291,9 @@ static void LoadingThreadLoop(LoadingThread& thread) {
                     if (audio.state.Load() == LoadingState::CompletedSucessfully)
                         total_bytes_used += audio.audio_data.RamUsageBytes();
                 }
-                thread.num_insts_loaded.Store(num_insts_loaded);
-                thread.num_samples_loaded.Store(num_samples_loaded);
-                thread.total_bytes_used_by_samples.Store(total_bytes_used);
+                server.num_insts_loaded.Store(num_insts_loaded);
+                server.num_samples_loaded.Store(num_samples_loaded);
+                server.total_bytes_used_by_samples.Store(total_bytes_used);
             }
         } while (!pending_results.Empty() ||
                  libs_async_ctx.num_uncompleted_jobs.Load(MemoryOrder::AcquireRelease));
@@ -1400,74 +1307,148 @@ static void LoadingThreadLoop(LoadingThread& thread) {
         // they rely on.
         thread_pool_jobs.WaitUntilZero();
 
-        RemoveUnreferencedObjects(thread, thread.available_libraries.libraries, audio_datas);
+        RemoveUnreferencedObjects(server, audio_datas);
         scratch_arena.ResetCursorAndConsolidateRegions();
     }
 
     // It's necessary to do this at the end of this function because it is not guaranteed to be called in the
     // loop; the 'end' boolean can be changed at a point where the loop ends before calling this.
-    RemoveUnreferencedObjects(thread, thread.available_libraries.libraries, audio_datas);
+    RemoveUnreferencedObjects(server, audio_datas);
 
-    thread.available_libraries.libraries.RemoveAll();
-    thread.available_libraries.libraries.DeleteRemovedAndUnreferenced();
-    thread.available_libraries.libraries_by_name.DeleteAll();
+    server.libraries.RemoveAll();
+    server.libraries.DeleteRemovedAndUnreferenced();
+    server.libraries_by_name.DeleteAll();
 }
 
-LoadingThread::LoadingThread(ThreadPool& pool, AvailableLibraries& libs)
-    : available_libraries(libs)
+Server::Server(ThreadPool& pool,
+               Span<String const> always_scanned_folders,
+               ThreadsafeErrorNotifications& error_notifications)
+    : error_notifications(error_notifications)
     , thread_pool(pool) {
-    thread.Start([this]() { LoadingThreadLoop(*this); }, "Sample lib loading");
+    for (auto e : always_scanned_folders) {
+        auto node = scan_folders.AllocateUninitialised();
+        PLACEMENT_NEW(&node->value) ScanFolder();
+        dyn::Assign(node->value.path, e);
+        node->value.source = ScanFolder::Source::AlwaysScannedFolder;
+        node->value.state.raw = ScanFolder::State::NotScanned;
+        scan_folders.Insert(node);
+    }
+    loading_thread.Start([this]() { LoadingThreadLoop(*this); }, "Sample lib loading");
 }
 
-LoadingThread::~LoadingThread() {
+Server::~Server() {
     end_thread.Store(true);
     work_signaller.Signal();
-    thread.Join();
-    ASSERT(connections.Use([](auto& h) { return h.Empty(); }), "missing connection close");
+    loading_thread.Join();
+    ASSERT(channels.Use([](auto& h) { return h.Empty(); }), "missing channel close");
+
+    scan_folders.RemoveAll();
+    scan_folders.DeleteRemovedAndUnreferenced();
 }
 
-Connection& OpenConnection(LoadingThread& thread,
-                           ThreadsafeErrorNotifications& error_notifications,
-                           LoadCompletedCallback&& callback) {
-    return thread.connections.Use([&](auto& connections) -> Connection& {
-        auto connection = connections.PrependUninitialised();
-        PLACEMENT_NEW(connection)
-        Connection {
+AsyncCommsChannel& OpenAsyncCommsChannel(Server& server,
+                                         ThreadsafeErrorNotifications& error_notifications,
+                                         LoadCompletedCallback&& callback) {
+    return server.channels.Use([&](auto& channels) -> AsyncCommsChannel& {
+        auto channel = channels.PrependUninitialised();
+        PLACEMENT_NEW(channel)
+        AsyncCommsChannel {
             .error_notifications = error_notifications,
             .completed_callback = Move(callback),
             .used = true,
         };
-        for (auto& p : connection->instrument_loading_percents)
+        for (auto& p : channel->instrument_loading_percents)
             p.raw = -1;
-        return *connection;
+        return *channel;
     });
 }
 
-void CloseConnection(LoadingThread& thread, Connection& connection) {
-    thread.connections.Use([&connection](auto& connections) {
-        (void)connections;
-        connection.used.Store(false, MemoryOrder::Relaxed);
+void CloseAsyncCommsChannel(Server& server, AsyncCommsChannel& channel) {
+    server.channels.Use([&channel](auto& channels) {
+        (void)channels;
+        channel.used.Store(false, MemoryOrder::Relaxed);
     });
 }
 
-RequestId SendLoadRequest(LoadingThread& thread, Connection& connection, LoadRequest const& request) {
-    LoadingThread::QueuedRequest const queued_request {
-        .id = thread.request_id_counter.FetchAdd(1),
+RequestId SendAsyncLoadRequest(Server& server, AsyncCommsChannel& channel, LoadRequest const& request) {
+    QueuedRequest const queued_request {
+        .id = server.request_id_counter.FetchAdd(1),
         .request = request,
-        .connection = connection,
+        .async_comms_channel = channel,
     };
-    thread.request_queue.Push(queued_request);
-    thread.work_signaller.Signal();
+    server.request_queue.Push(queued_request);
+    server.work_signaller.Signal();
     return queued_request.id;
 }
 
+void SetExtraScanFolders(Server& server, Span<String const> extra_folders) {
+    server.scan_folders_writer_mutex.Lock();
+    DEFER { server.scan_folders_writer_mutex.Unlock(); };
+
+    for (auto it = server.scan_folders.begin(); it != server.scan_folders.end();)
+        if (it->value.source == ScanFolder::Source::ExtraFolder && !Find(extra_folders, it->value.path))
+            it = server.scan_folders.Remove(it);
+        else
+            ++it;
+
+    for (auto e : extra_folders) {
+        bool already_present = false;
+        for (auto& l : server.scan_folders)
+            if (l.value.path == e) already_present = true;
+        if (already_present) continue;
+
+        auto node = server.scan_folders.AllocateUninitialised();
+        PLACEMENT_NEW(&node->value) ScanFolder();
+        dyn::Assign(node->value.path, e);
+        node->value.source = ScanFolder::Source::ExtraFolder;
+        node->value.state.raw = ScanFolder::State::NotScanned;
+        server.scan_folders.Insert(node);
+    }
+}
+
+static bool RequestScanningIfNeeded(ScanFolderList& scan_folders) {
+    bool any_rescan_requested = false;
+    for (auto& n : scan_folders)
+        if (auto f = n.TryScoped()) {
+            auto expected = ScanFolder::State::NotScanned;
+            if (f->state.CompareExchangeStrong(expected, ScanFolder::State::RescanRequested))
+                any_rescan_requested = true;
+        }
+    return any_rescan_requested;
+}
+
+Span<RefCounted<sample_lib::Library>> AllLibrariesRetained(Server& server, ArenaAllocator& arena) {
+    if (RequestScanningIfNeeded(server.scan_folders)) server.work_signaller.Signal();
+
+    DynamicArray<RefCounted<sample_lib::Library>> result(arena);
+    for (auto& i : server.libraries) {
+        if (i.TryRetain()) {
+            auto ref = RefCounted<sample_lib::Library>(*i.value.lib, i.reader_uses, nullptr);
+            dyn::Append(result, ref);
+        }
+    }
+    return result.ToOwnedSpan();
+}
+
+RefCounted<sample_lib::Library> FindLibraryRetained(Server& server, String name) {
+    if (RequestScanningIfNeeded(server.scan_folders)) server.work_signaller.Signal();
+
+    server.libraries_by_name_mutex.Lock();
+    DEFER { server.libraries_by_name_mutex.Unlock(); };
+    auto l = server.libraries_by_name.Find(name);
+    if (!l) return {};
+    auto& node = **l;
+    if (!node.TryRetain()) return {};
+    return RefCounted<sample_lib::Library>(*node.value.lib, node.reader_uses, nullptr);
+}
+
 void LoadResult::ChangeRefCount(RefCountChange t) const {
-    if (auto asset_union = result.TryGet<AssetRefUnion>()) {
+    if (auto asset_union = result.TryGet<RefUnion>()) {
         switch (asset_union->tag) {
-            case AssetType::Instrument:
+            case LoadRequestType::Instrument:
                 asset_union->Get<RefCounted<LoadedInstrument>>().ChangeRefCount(t);
                 break;
-            case AssetType::Ir:
+            case LoadRequestType::Ir:
                 break;
                 asset_union->Get<RefCounted<AudioData>>().ChangeRefCount(t);
                 break;
@@ -1488,12 +1469,12 @@ void LoadResult::ChangeRefCount(RefCountChange t) const {
 template <typename Type>
 static Type& ExtractSuccess(tests::Tester& tester, LoadResult const& result, LoadRequest const& request) {
     switch (request.tag) {
-        case AssetType::Instrument: {
-            auto inst = request.Get<InstrumentIdWithLayer>();
+        case LoadRequestType::Instrument: {
+            auto inst = request.Get<LoadRequestInstrumentIdWithLayer>();
             tester.log.DebugLn("Instrument: {} - {}", inst.id.library_name, inst.id.inst_name);
             break;
         }
-        case AssetType::Ir: {
+        case LoadRequestType::Ir: {
             auto ir = request.Get<sample_lib::IrId>();
             tester.log.DebugLn("Ir: {} - {}", ir.library_name, ir.ir_name);
             break;
@@ -1502,20 +1483,20 @@ static Type& ExtractSuccess(tests::Tester& tester, LoadResult const& result, Loa
 
     if (auto err = result.result.TryGet<ErrorCode>()) DebugLn("Error: {}", *err);
     REQUIRE_EQ(result.result.tag, LoadResult::ResultType::Success);
-    auto opt_r = result.result.Get<AssetRefUnion>().TryGetMut<Type>();
+    auto opt_r = result.result.Get<RefUnion>().TryGetMut<Type>();
     REQUIRE(opt_r);
     return *opt_r;
 }
 
 TEST_CASE(TestSampleLibraryLoader) {
     struct Fixture {
-        Fixture(tests::Tester&) : available_libs({}, error_notif) { thread_pool.Init("Thread Pool", 8u); }
+        Fixture(tests::Tester&) { thread_pool.Init("Thread Pool", 8u); }
         bool initialised = false;
         ArenaAllocatorWithInlineStorage<2000> arena;
         String test_lib_path;
         ThreadPool thread_pool;
         ThreadsafeErrorNotifications error_notif {};
-        AvailableLibraries available_libs;
+        DynamicArrayInline<String, 2> scan_folders;
     };
 
     auto& fixture = CreateOrFetchFixtureObject<Fixture>(tester);
@@ -1563,50 +1544,52 @@ TEST_CASE(TestSampleLibraryLoader) {
         fixture.test_lib_path = path::Join(fixture.arena, Array {lib_dir, "shared_files_test_lib.mdata"_s});
 
         DynamicArrayInline<String, 2> scan_folders;
-        dyn::Append(scan_folders, lib_dir);
-        if (auto dir = tests::BuildResourcesFolder(tester)) dyn::Append(scan_folders, *dir);
+        dyn::Append(scan_folders, fixture.arena.Clone(lib_dir));
+        if (auto dir = tests::BuildResourcesFolder(tester))
+            dyn::Append(scan_folders, fixture.arena.Clone(*dir));
 
-        fixture.available_libs.SetExtraScanFolders(scan_folders);
+        fixture.scan_folders = scan_folders;
     }
 
     auto& scratch_arena = tester.scratch_arena;
-    LoadingThread thread {fixture.thread_pool, fixture.available_libs};
+    Server server {fixture.thread_pool, {}, fixture.error_notif};
+    SetExtraScanFolders(server, fixture.scan_folders);
 
-    SUBCASE("single connection") {
-        auto& connection = OpenConnection(thread, fixture.error_notif, [](LoadResult) {});
-        CloseConnection(thread, connection);
+    SUBCASE("single channel") {
+        auto& channel = OpenAsyncCommsChannel(server, fixture.error_notif, [](LoadResult) {});
+        CloseAsyncCommsChannel(server, channel);
     }
 
-    SUBCASE("multiple connections") {
-        auto& connection1 = OpenConnection(thread, fixture.error_notif, [](LoadResult) {});
-        auto& connection2 = OpenConnection(thread, fixture.error_notif, [](LoadResult) {});
-        CloseConnection(thread, connection1);
-        CloseConnection(thread, connection2);
+    SUBCASE("multiple channels") {
+        auto& channel1 = OpenAsyncCommsChannel(server, fixture.error_notif, [](LoadResult) {});
+        auto& channel2 = OpenAsyncCommsChannel(server, fixture.error_notif, [](LoadResult) {});
+        CloseAsyncCommsChannel(server, channel1);
+        CloseAsyncCommsChannel(server, channel2);
     }
 
     SUBCASE("registering again after unregistering all") {
-        auto& connection1 = OpenConnection(thread, fixture.error_notif, [](LoadResult) {});
-        auto& connection2 = OpenConnection(thread, fixture.error_notif, [](LoadResult) {});
-        CloseConnection(thread, connection1);
-        CloseConnection(thread, connection2);
-        auto& connection3 = OpenConnection(thread, fixture.error_notif, [](LoadResult) {});
-        CloseConnection(thread, connection3);
+        auto& channel1 = OpenAsyncCommsChannel(server, fixture.error_notif, [](LoadResult) {});
+        auto& channel2 = OpenAsyncCommsChannel(server, fixture.error_notif, [](LoadResult) {});
+        CloseAsyncCommsChannel(server, channel1);
+        CloseAsyncCommsChannel(server, channel2);
+        auto& channel3 = OpenAsyncCommsChannel(server, fixture.error_notif, [](LoadResult) {});
+        CloseAsyncCommsChannel(server, channel3);
     }
 
-    SUBCASE("unregister a connection directly after sending a request") {
-        auto& connection = OpenConnection(thread, fixture.error_notif, [&](LoadResult) {});
+    SUBCASE("unregister a channel directly after sending a request") {
+        auto& channel = OpenAsyncCommsChannel(server, fixture.error_notif, [&](LoadResult) {});
 
-        SendLoadRequest(thread,
-                        connection,
-                        InstrumentIdWithLayer {
-                            .id =
-                                {
-                                    .library_name = "Test Lua"_s,
-                                    .inst_name = "Auto Mapped Samples"_s,
-                                },
-                            .layer_index = 0,
-                        });
-        CloseConnection(thread, connection);
+        SendAsyncLoadRequest(server,
+                             channel,
+                             LoadRequestInstrumentIdWithLayer {
+                                 .id =
+                                     {
+                                         .library_name = "Test Lua"_s,
+                                         .inst_name = "Auto Mapped Samples"_s,
+                                     },
+                                 .layer_index = 0,
+                             });
+        CloseAsyncCommsChannel(server, channel);
     }
 
     SUBCASE("loading works") {
@@ -1637,7 +1620,7 @@ TEST_CASE(TestSampleLibraryLoader) {
             dyn::Append(requests,
                         {
                             .request =
-                                InstrumentIdWithLayer {
+                                LoadRequestInstrumentIdWithLayer {
                                     .id =
                                         {
                                             .library_name = "SharedFilesMdata"_s,
@@ -1658,7 +1641,7 @@ TEST_CASE(TestSampleLibraryLoader) {
             dyn::Append(requests,
                         {
                             .request =
-                                InstrumentIdWithLayer {
+                                LoadRequestInstrumentIdWithLayer {
                                     .id =
                                         {
                                             .library_name = "Test Lua"_s,
@@ -1679,7 +1662,7 @@ TEST_CASE(TestSampleLibraryLoader) {
             dyn::Append(requests,
                         {
                             .request =
-                                InstrumentIdWithLayer {
+                                LoadRequestInstrumentIdWithLayer {
                                     .id =
                                         {
                                             .library_name = "SharedFilesMdata"_s,
@@ -1699,7 +1682,7 @@ TEST_CASE(TestSampleLibraryLoader) {
             dyn::Append(requests,
                         {
                             .request =
-                                InstrumentIdWithLayer {
+                                LoadRequestInstrumentIdWithLayer {
                                     .id =
                                         {
                                             .library_name = "SharedFilesMdata"_s,
@@ -1719,7 +1702,7 @@ TEST_CASE(TestSampleLibraryLoader) {
             dyn::Append(requests,
                         {
                             .request =
-                                InstrumentIdWithLayer {
+                                LoadRequestInstrumentIdWithLayer {
                                     .id =
                                         {
                                             .library_name = "SharedFilesMdata"_s,
@@ -1742,7 +1725,7 @@ TEST_CASE(TestSampleLibraryLoader) {
             dyn::Append(requests,
                         {
                             .request =
-                                InstrumentIdWithLayer {
+                                LoadRequestInstrumentIdWithLayer {
                                     .id =
                                         {
                                             .library_name = "SharedFilesMdata"_s,
@@ -1766,7 +1749,7 @@ TEST_CASE(TestSampleLibraryLoader) {
                 requests,
                 {
                     .request =
-                        InstrumentIdWithLayer {
+                        LoadRequestInstrumentIdWithLayer {
                             .id =
                                 {
                                     .library_name = "Core"_s,
@@ -1797,7 +1780,7 @@ TEST_CASE(TestSampleLibraryLoader) {
             dyn::Append(requests,
                         {
                             .request =
-                                InstrumentIdWithLayer {
+                                LoadRequestInstrumentIdWithLayer {
                                     .id =
                                         {
                                             .library_name = "foo"_s,
@@ -1817,7 +1800,7 @@ TEST_CASE(TestSampleLibraryLoader) {
             dyn::Append(requests,
                         {
                             .request =
-                                InstrumentIdWithLayer {
+                                LoadRequestInstrumentIdWithLayer {
                                     .id =
                                         {
                                             .library_name = "SharedFilesMdata"_s,
@@ -1836,7 +1819,7 @@ TEST_CASE(TestSampleLibraryLoader) {
 
         AtomicCountdown countdown {(u32)requests.size};
         DynamicArray<LoadResult> results {scratch_arena};
-        auto& connection = OpenConnection(thread, fixture.error_notif, [&](LoadResult r) {
+        auto& channel = OpenAsyncCommsChannel(server, fixture.error_notif, [&](LoadResult r) {
             r.Retain();
             dyn::Append(results, r); // don't need a mutex because only one thread can use this
             countdown.CountDown();
@@ -1844,12 +1827,12 @@ TEST_CASE(TestSampleLibraryLoader) {
         DEFER {
             for (auto& r : results)
                 r.Release();
-            CloseConnection(thread, connection);
+            CloseAsyncCommsChannel(server, channel);
         };
 
         if (requests.size) {
             for (auto& j : requests)
-                j.request_id = SendLoadRequest(thread, connection, j.request);
+                j.request_id = SendAsyncLoadRequest(server, channel, j.request);
 
             u32 const timeout_secs = 15;
             auto const countdown_result = countdown.WaitUntilZero(timeout_secs * 1000);
@@ -1857,17 +1840,27 @@ TEST_CASE(TestSampleLibraryLoader) {
             if (countdown_result == WaitResult::TimedOut) {
                 tester.log.ErrorLn("Timed out waiting for asset loading to complete");
                 DumpCurrentStackTraceToStderr();
-                thread.debug_dump_current_state.Store(true);
-                thread.work_signaller.Signal();
+                server.request_debug_dump_current_state.Store(true);
+                server.work_signaller.Signal();
                 SleepThisThread(1000);
-                // We need to hard-exit without cleaning up because the asset thread is probably deadlocked
+                // We need to hard-exit without cleaning up because the loading thread is probably deadlocked
                 __builtin_abort();
             }
 
             REQUIRE_EQ(results.size, requests.size);
             for (auto [index, request] : Enumerate(requests)) {
                 for (auto& r : results)
-                    if (r.id == request.request_id) request.check_result(r, request.request);
+                    if (r.id == request.request_id) {
+                        for (auto& n : fixture.error_notif.items) {
+                            if (auto e = n.TryScoped()) {
+                                tester.log.DebugLn("Error Notification  {}: {}: {}",
+                                                   e->title,
+                                                   e->message,
+                                                   e->error_code);
+                            }
+                        }
+                        request.check_result(r, request.request);
+                    }
             }
         }
     }
@@ -1898,7 +1891,7 @@ TEST_CASE(TestSampleLibraryLoader) {
         u64 random_seed = SeedFromTime();
         AtomicCountdown countdown {k_num_calls};
 
-        auto& connection = OpenConnection(thread, fixture.error_notif, [&](LoadResult r) {
+        auto& channel = OpenAsyncCommsChannel(server, fixture.error_notif, [&](LoadResult r) {
             if (RandomIntInRange(random_seed, 0, 4) == 0) {
                 r.Retain();
                 dyn::Append(retained_results, r);
@@ -1908,18 +1901,18 @@ TEST_CASE(TestSampleLibraryLoader) {
         DEFER {
             for (auto& r : retained_results)
                 r.Release();
-            CloseConnection(thread, connection);
+            CloseAsyncCommsChannel(server, channel);
         };
 
-        // We sporadically rename the library file to test the error handling of the asset thread
+        // We sporadically rename the library file to test the error handling of the loading thread
         DynamicArray<char> temp_rename {fixture.test_lib_path, scratch_arena};
         dyn::AppendSpan(temp_rename, ".foo");
         bool is_renamed = false;
 
         for (auto _ : Range(k_num_calls)) {
-            SendLoadRequest(
-                thread,
-                connection,
+            SendAsyncLoadRequest(
+                server,
+                channel,
                 (RandomIntInRange(random_seed, 0, 2) == 0)
                     ? LoadRequest {sample_lib::IrId {.library_name = k_builtin_library_name,
                                                      .ir_name = ({
@@ -1928,7 +1921,7 @@ TEST_CASE(TestSampleLibraryLoader) {
                                                              random_seed);
                                                          String {ele.name.data, ele.name.size};
                                                      })}}
-                    : LoadRequest {InstrumentIdWithLayer {
+                    : LoadRequest {LoadRequestInstrumentIdWithLayer {
                           .id = RandomElement(Span<sample_lib::InstrumentId const> {inst_ids}, random_seed),
                           .layer_index = RandomIntInRange<u32>(random_seed, 0, k_num_layers - 1)}});
 
@@ -1949,9 +1942,9 @@ TEST_CASE(TestSampleLibraryLoader) {
         if (countdown_result == WaitResult::TimedOut) {
             tester.log.ErrorLn("Timed out waiting for asset loading to complete");
             DumpCurrentStackTraceToStderr();
-            thread.debug_dump_current_state.Store(true);
+            server.request_debug_dump_current_state.Store(true);
             SleepThisThread(1000);
-            // We need to hard-exit without cleaning up because the asset thread is probably deadlocked
+            // We need to hard-exit without cleaning up because the loading thread is probably deadlocked
             __builtin_abort();
         }
     }
@@ -1959,8 +1952,8 @@ TEST_CASE(TestSampleLibraryLoader) {
     return k_success;
 }
 
-} // namespace sample_lib_loader
+} // namespace sample_lib_server
 
 TEST_REGISTRATION(RegisterSampleLibraryLoaderTests) {
-    REGISTER_TEST(sample_lib_loader::TestSampleLibraryLoader);
+    REGISTER_TEST(sample_lib_server::TestSampleLibraryLoader);
 }

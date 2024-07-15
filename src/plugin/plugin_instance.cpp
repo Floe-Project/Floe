@@ -15,7 +15,7 @@
 #include "layer_processor.hpp"
 #include "param_info.hpp"
 #include "plugin.hpp"
-#include "sample_library_loader.hpp"
+#include "sample_library_server.hpp"
 #include "settings/settings_file.hpp"
 #include "state/state_coding.hpp"
 #include "state/state_snapshot.hpp"
@@ -168,7 +168,7 @@ static void SetDesiredInstrument(PluginInstance& plugin,
                                  u32 layer_index,
                                  PluginInstance::Layer::Instrument const& instrument,
                                  bool notify_audio_thread) {
-    using namespace sample_lib_loader;
+    using namespace sample_lib_server;
     DebugAssertMainThread(plugin.host);
 
     // We keep the instrument alive by putting it in this storage and cleaning up at a later time.
@@ -201,7 +201,7 @@ static void SetDesiredInstrument(PluginInstance& plugin,
     }
 }
 
-static void AssetLoadedJobCompleted(PluginInstance& plugin, sample_lib_loader::LoadResult result) {
+static void AssetLoadedJobCompleted(PluginInstance& plugin, sample_lib_server::LoadResult result) {
     ZoneScoped;
     DebugAssertMainThread(plugin.host);
 
@@ -222,13 +222,11 @@ static void AssetLoadedJobCompleted(PluginInstance& plugin, sample_lib_loader::L
 
     switch (source) {
         case ResultSource::OneOff: {
-            if (result.result.tag == sample_lib_loader::LoadResult::ResultType::Success) {
-                auto asset_union = result.result.Get<sample_lib_loader::AssetRefUnion>();
+            if (result.result.tag == sample_lib_server::LoadResult::ResultType::Success) {
+                auto asset_union = result.result.Get<sample_lib_server::RefUnion>();
                 switch (asset_union.tag) {
-                    case sample_lib_loader::AssetType::Instrument: {
-                        auto loaded_inst =
-                            asset_union
-                                .Get<sample_lib_loader::RefCounted<sample_lib_loader::LoadedInstrument>>();
+                    case sample_lib_server::LoadRequestType::Instrument: {
+                        auto loaded_inst = asset_union.Get<sample_lib_server::RefCounted<LoadedInstrument>>();
                         for (auto [layer_index, l] : Enumerate<u32>(plugin.layers)) {
                             if (auto i = l.desired_instrument.TryGet<sample_lib::InstrumentId>()) {
                                 if (i->library_name == loaded_inst->instrument.library.name &&
@@ -239,8 +237,8 @@ static void AssetLoadedJobCompleted(PluginInstance& plugin, sample_lib_loader::L
                         }
                         break;
                     }
-                    case sample_lib_loader::AssetType::Ir: {
-                        auto audio_data = asset_union.Get<sample_lib_loader::RefCounted<AudioData>>();
+                    case sample_lib_server::LoadRequestType::Ir: {
+                        auto audio_data = asset_union.Get<sample_lib_server::RefCounted<AudioData>>();
                         SetDesiredConvolutionIr(plugin, &*audio_data, true);
                         break;
                     }
@@ -260,9 +258,9 @@ Optional<u64> SetConvolutionIr(PluginInstance& plugin, Optional<sample_lib::IrId
     plugin.processor.convo.ir_index = ir_id;
 
     if (ir_id)
-        return SendLoadRequest(plugin.shared_data.sample_library_loader,
-                               plugin.sample_lib_loader_connection,
-                               *ir_id);
+        return SendAsyncLoadRequest(plugin.shared_data.sample_library_server,
+                                    plugin.sample_lib_server_async_channel,
+                                    *ir_id);
     else
         SetDesiredConvolutionIr(plugin, nullptr, true);
     return nullopt;
@@ -274,12 +272,12 @@ Optional<u64> SetInstrument(PluginInstance& plugin, u32 layer_index, InstrumentI
     layer.desired_instrument = inst;
 
     if (auto sample_inst = inst.TryGet<sample_lib::InstrumentId>())
-        return SendLoadRequest(plugin.shared_data.sample_library_loader,
-                               plugin.sample_lib_loader_connection,
-                               sample_lib_loader::InstrumentIdWithLayer {
-                                   .id = *sample_inst,
-                                   .layer_index = layer_index,
-                               });
+        return SendAsyncLoadRequest(plugin.shared_data.sample_library_server,
+                                    plugin.sample_lib_server_async_channel,
+                                    sample_lib_server::LoadRequestInstrumentIdWithLayer {
+                                        .id = *sample_inst,
+                                        .layer_index = layer_index,
+                                    });
     else {
         switch (inst.tag) {
             case InstrumentType::Sampler: PanicIfReached(); break;
@@ -299,7 +297,7 @@ void LoadRandomInstrument(PluginInstance& plugin,
                           u32 layer_index,
                           bool allow_none_to_be_selected,
                           bool disallow_previous_result,
-                          sample_lib_loader::LoadRequest* add_to_existing_batch) {
+                          sample_lib_server::LoadRequest* add_to_existing_batch) {
     // TODO(1.0)
     (void)plugin;
     (void)layer_index;
@@ -676,17 +674,17 @@ PluginInstance::PluginInstance(clap_host const& host, CrossInstanceSystems& shar
     : shared_data(shared_data)
     , host(host)
     , processor(host)
-    , sample_lib_loader_connection(
-          OpenConnection(shared_data.sample_library_loader,
-                         error_notifications,
-                         [&plugin = *this](sample_lib_loader::LoadResult result) {
-                             result.Retain();
-                             plugin.main_thread_sample_lib_load_completed_callbacks.Push([&plugin, result]() {
-                                 if (!plugin.in_destructor) AssetLoadedJobCompleted(plugin, result);
-                                 result.Release();
-                             });
-                             plugin.host.request_callback(&plugin.host);
-                         })) {
+    , sample_lib_server_async_channel(sample_lib_server::OpenAsyncCommsChannel(
+          shared_data.sample_library_server,
+          error_notifications,
+          [&plugin = *this](sample_lib_server::LoadResult result) {
+              result.Retain();
+              plugin.main_thread_sample_lib_load_completed_callbacks.Push([&plugin, result]() {
+                  if (!plugin.in_destructor) AssetLoadedJobCompleted(plugin, result);
+                  result.Release();
+              });
+              plugin.host.request_callback(&plugin.host);
+          })) {
 
     { latest_snapshot.state = CurrentStateSnapshot(*this); }
 
@@ -720,7 +718,8 @@ PluginInstance::~PluginInstance() {
     for (auto& i : lifetime_extended_insts)
         i.Release();
 
-    CloseConnection(shared_data.sample_library_loader, sample_lib_loader_connection);
+    sample_lib_server::CloseAsyncCommsChannel(shared_data.sample_library_server,
+                                              sample_lib_server_async_channel);
 
     ArenaAllocatorWithInlineStorage<4000> scratch_arena {};
     while (auto f = main_thread_sample_lib_load_completed_callbacks.TryPop(scratch_arena))
@@ -730,8 +729,7 @@ PluginInstance::~PluginInstance() {
 usize MegabytesUsedBySamples(PluginInstance const& plugin) {
     usize result = 0;
     for (auto& l : plugin.layers) {
-        if (auto i =
-                l.instrument.TryGet<sample_lib_loader::RefCounted<sample_lib_loader::LoadedInstrument>>())
+        if (auto i = l.instrument.TryGet<sample_lib_server::RefCounted<LoadedInstrument>>())
             for (auto& d : (*i)->audio_datas)
                 result += d->RamUsageBytes();
     }

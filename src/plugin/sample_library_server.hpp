@@ -11,6 +11,7 @@
 
 #include "audio_data.hpp"
 #include "common/constants.hpp"
+#include "sample_library/loaded_instrument.hpp"
 #include "sample_library/sample_library.hpp"
 
 // Requirements:
@@ -21,26 +22,25 @@
 // 5. Each asset should not be duplicated in memory
 // 6. Unused assets should be freed
 
-namespace sample_lib_loader {
+namespace sample_lib_server {
+
+// forward declarations
+namespace detail {
+struct ListedInstrument;
+}
 
 using RequestId = u64;
 
-struct LoadedInstrument {
-    sample_lib::Instrument const& instrument;
-    Span<AudioData const*> audio_datas {}; // parallel to instrument.regions
-    AudioData const* file_for_gui_waveform {};
-};
+enum class LoadRequestType { Instrument, Ir };
 
-enum class AssetType { Instrument, Ir };
-
-struct InstrumentIdWithLayer {
+struct LoadRequestInstrumentIdWithLayer {
     sample_lib::InstrumentId id;
     u32 layer_index;
 };
 
-using LoadRequest = TaggedUnion<AssetType,
-                                TypeAndTag<InstrumentIdWithLayer, AssetType::Instrument>,
-                                TypeAndTag<sample_lib::IrId, AssetType::Ir>>;
+using LoadRequest = TaggedUnion<LoadRequestType,
+                                TypeAndTag<LoadRequestInstrumentIdWithLayer, LoadRequestType::Instrument>,
+                                TypeAndTag<sample_lib::IrId, LoadRequestType::Ir>>;
 
 enum class RefCountChange { Retain, Release };
 
@@ -83,14 +83,14 @@ struct RefCounted {
     WorkSignaller* m_work_signaller {};
 };
 
-using AssetRefUnion = TaggedUnion<AssetType,
-                                  TypeAndTag<RefCounted<LoadedInstrument>, AssetType::Instrument>,
-                                  TypeAndTag<RefCounted<AudioData>, AssetType::Ir>>;
+using RefUnion = TaggedUnion<LoadRequestType,
+                             TypeAndTag<RefCounted<LoadedInstrument>, LoadRequestType::Instrument>,
+                             TypeAndTag<RefCounted<AudioData>, LoadRequestType::Ir>>;
 
 struct LoadResult {
     enum class ResultType { Success, Error, Cancelled };
     using Result = TaggedUnion<ResultType,
-                               TypeAndTag<AssetRefUnion, ResultType::Success>,
+                               TypeAndTag<RefUnion, ResultType::Success>,
                                TypeAndTag<ErrorCode, ResultType::Error>>;
 
     void ChangeRefCount(RefCountChange t) const;
@@ -99,6 +99,19 @@ struct LoadResult {
 
     RequestId id;
     Result result;
+};
+
+using LoadCompletedCallback = TrivialFixedSizeFunction<40, void(LoadResult)>;
+
+struct AsyncCommsChannel {
+    // -1 if not valid, else 0 to 100
+    Array<Atomic<s32>, k_num_layers> instrument_loading_percents {};
+
+    // private
+    ThreadsafeErrorNotifications& error_notifications;
+    Array<detail::ListedInstrument*, k_num_layers> desired_inst {};
+    LoadCompletedCallback completed_callback;
+    Atomic<bool> used {};
 };
 
 namespace detail {
@@ -150,103 +163,81 @@ struct ListedLibrary {
 
 using LibrariesList = AtomicRefList<ListedLibrary>;
 
+struct ScanFolder {
+    enum class Source { AlwaysScannedFolder, ExtraFolder };
+    enum class State { NotScanned, RescanRequested, Scanning, ScannedSuccessfully, ScanFailed };
+    DynamicArray<char> path {Malloc::Instance()};
+    Source source {};
+    Atomic<State> state {State::NotScanned};
+};
+
+using ScanFolderList = AtomicRefList<ScanFolder>;
+
+struct QueuedRequest {
+    RequestId id;
+    LoadRequest request;
+    AsyncCommsChannel& async_comms_channel;
+};
+
 } // namespace detail
 
-using LoadCompletedCallback = TrivialFixedSizeFunction<40, void(LoadResult)>;
-
-struct Connection {
-    // -1 if not valid, else 0 to 100
-    Array<Atomic<s32>, k_num_layers> instrument_loading_percents {};
-
-    // private
-    ThreadsafeErrorNotifications& error_notifications;
-    Array<detail::ListedInstrument*, k_num_layers> desired_inst {};
-    LoadCompletedCallback completed_callback;
-    Atomic<bool> used {};
-};
-
-struct LoadingThread;
-
-struct AvailableLibraries {
-    struct ScanFolder {
-        enum class Source { AlwaysScannedFolder, ExtraFolder };
-        enum class State { NotScanned, RescanRequested, Scanning, ScannedSuccessfully, ScanFailed };
-        DynamicArray<char> path {Malloc::Instance()};
-        Source source {};
-        Atomic<State> state {State::NotScanned};
-    };
-
-    using ScanFolderList = AtomicRefList<ScanFolder>;
-
-    AvailableLibraries(Span<String const> always_scanned_folders,
-                       ThreadsafeErrorNotifications& error_notifications);
-    ~AvailableLibraries();
-
-    // threadsafe
-    void SetExtraScanFolders(Span<String const>);
-
-    // main-thread, you must call Release on all results
-    Span<RefCounted<sample_lib::Library>> AllRetained(ArenaAllocator& arena);
-    RefCounted<sample_lib::Library> FindRetained(String name);
-
-    // loading-thread
-    void AttachLoadingThread(LoadingThread* t);
-
-    // internal
-    LoadingThread* loading_thread {};
-    Mutex scan_folders_writer_mutex;
-    ScanFolderList scan_folders;
-    ThreadsafeErrorNotifications& error_notifications;
-    detail::LibrariesList libraries;
-    Mutex libraries_by_name_mutex;
-    DynamicHashTable<String, detail::LibrariesList::Node*> libraries_by_name {Malloc::Instance()};
-};
-
-struct LoadingThread {
-    struct QueuedRequest {
-        RequestId id;
-        LoadRequest request;
-        Connection& connection;
-    };
-
-    LoadingThread(ThreadPool& pool, AvailableLibraries& libs);
-    ~LoadingThread();
+struct Server {
+    Server(ThreadPool& pool,
+           Span<String const> always_scanned_folders,
+           ThreadsafeErrorNotifications& connection_independent_error_notif);
+    ~Server();
 
     Atomic<u64> total_bytes_used_by_samples {};
     Atomic<u32> num_insts_loaded {};
     Atomic<u32> num_samples_loaded {};
 
     // internal
-    AvailableLibraries& available_libraries;
+    Mutex scan_folders_writer_mutex;
+    detail::ScanFolderList scan_folders;
+    detail::LibrariesList libraries;
+    Mutex libraries_by_name_mutex;
+    DynamicHashTable<String, detail::LibrariesList::Node*> libraries_by_name {Malloc::Instance()};
+
+    // Connection independent. If you have access to a channel, you can use their error_notifications
+    // instead.
+    ThreadsafeErrorNotifications& error_notifications;
+
     ThreadPool& thread_pool;
     Atomic<RequestId> request_id_counter {};
-    MutexProtected<ArenaList<Connection, true>> connections {Malloc::Instance()};
-    Thread thread {};
+    MutexProtected<ArenaList<AsyncCommsChannel, true>> channels {Malloc::Instance()};
+    Thread loading_thread {};
     Atomic<bool> end_thread {false};
-    ThreadsafeQueue<QueuedRequest> request_queue {PageAllocator::Instance()};
+    ThreadsafeQueue<detail::QueuedRequest> request_queue {PageAllocator::Instance()};
     WorkSignaller work_signaller {};
-    Atomic<bool> debug_dump_current_state {false};
+    Atomic<bool> request_debug_dump_current_state {false};
 };
+
+// The server owns the channel, you just get a reference to it that will be valid until you close it. The
+// callback will be called whenever a request from this channel is completed. If you want to keep any of
+// the assets that are contained in the LoadResult, you must 'retain' them in the callback. You can release
+// them at any point after that. The callback is called from the server thread; you should not do any really
+// slow operations in it because it will block the server thread from processing other requests.
+AsyncCommsChannel& OpenAsyncCommsChannel(Server& server,
+                                         ThreadsafeErrorNotifications& error_notifications,
+                                         LoadCompletedCallback&& completed_callback);
+
+void CloseAsyncCommsChannel(Server& server, AsyncCommsChannel& channel);
+
+// If you send a request when there's already another loading with the same layer_index and channel, the
+// old will be aborted, provided it's not needed by anything else.
+// threadsafe
+RequestId SendAsyncLoadRequest(Server& server, AsyncCommsChannel& channel, LoadRequest const& request);
+
+// threadsafe
+void SetExtraScanFolders(Server& server, Span<String const> folders);
+
+// main-thread, you must call Release on all results
+Span<RefCounted<sample_lib::Library>> AllLibrariesRetained(Server& server, ArenaAllocator& arena);
+RefCounted<sample_lib::Library> FindLibraryRetained(Server& server, String name);
 
 inline void ReleaseAll(Span<RefCounted<sample_lib::Library>> libs) {
     for (auto& l : libs)
         l.Release();
 }
 
-// The loading thread owns the connection, you just get a reference to it that will be valid until you call
-// CloseConnection. The callback will be called whenever a request from this connection is completed. If you
-// want to keep any of the assets that are contained in the LoadResult, you must 'retain' them in the
-// callback. You can release them at any point after that. The callback is called from the asset thread; you
-// should not do any really slow operations in it because it will block the asset thread from processing other
-// requests.
-Connection& OpenConnection(LoadingThread& thread,
-                           ThreadsafeErrorNotifications& error_notifications,
-                           LoadCompletedCallback&& completed_callback);
-
-void CloseConnection(LoadingThread& thread, Connection& connection);
-
-// If you send another request while one is already pending with the same connection, the instrument loading
-// of the previous request, with the same layer_index will be aborted if needed.
-RequestId SendLoadRequest(LoadingThread& thread, Connection& connection, LoadRequest const& request);
-
-} // namespace sample_lib_loader
+} // namespace sample_lib_server

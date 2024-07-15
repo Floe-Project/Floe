@@ -23,7 +23,7 @@
 #include "plugin.hpp"
 #include "plugin_instance.hpp"
 #include "presets_folder.hpp"
-#include "sample_library_loader.hpp"
+#include "sample_library_server.hpp"
 #include "settings/settings_file.hpp"
 #include "settings/settings_filesystem.hpp"
 #include "settings/settings_gui.hpp"
@@ -309,7 +309,7 @@ void DoMetricsStandalone(Gui* g) {
         f32 y_pos = 0;
         StandalonePopupHeading(g, y_pos, "Metrics");
 
-        auto& sample_library_loader = g->plugin.shared_data.sample_library_loader;
+        auto& sample_library_server = g->plugin.shared_data.sample_library_server;
         DoLabelLine(imgui,
                     y_pos,
                     "Number of active voices:",
@@ -323,15 +323,15 @@ void DoMetricsStandalone(Gui* g) {
                     "Memory (all instances):",
                     fmt::Format(g->scratch_arena,
                                 "{} MB",
-                                sample_library_loader.total_bytes_used_by_samples.Load() / (1024 * 1024)));
+                                sample_library_server.total_bytes_used_by_samples.Load() / (1024 * 1024)));
         DoLabelLine(imgui,
                     y_pos,
                     "Num Loaded Instruments:",
-                    fmt::Format(g->scratch_arena, "{}", sample_library_loader.num_insts_loaded.Load()));
+                    fmt::Format(g->scratch_arena, "{}", sample_library_server.num_insts_loaded.Load()));
         DoLabelLine(imgui,
                     y_pos,
                     "Num Loaded Samples:",
-                    fmt::Format(g->scratch_arena, "{}", sample_library_loader.num_samples_loaded.Load()));
+                    fmt::Format(g->scratch_arena, "{}", sample_library_server.num_samples_loaded.Load()));
 
         imgui.EndWindow();
     }

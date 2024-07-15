@@ -9,7 +9,7 @@
 #include "common/paths.hpp"
 #include "plugin.hpp"
 #include "presets_folder.hpp"
-#include "sample_library_loader.hpp"
+#include "sample_library_server.hpp"
 #include "settings/settings_file.hpp"
 
 struct CrossInstanceSystems {
@@ -25,6 +25,5 @@ struct CrossInstanceSystems {
     ThreadPool thread_pool;
     PresetsListing preset_listing {paths.always_scanned_folders[ToInt(ScanFolderType::Presets)],
                                    error_notifications};
-    sample_lib_loader::AvailableLibraries available_libraries;
-    sample_lib_loader::LoadingThread sample_library_loader;
+    sample_lib_server::Server sample_library_server;
 };

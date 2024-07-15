@@ -26,8 +26,9 @@ static void LayerInstrumentMenuItems(Gui* g, PluginInstance::Layer* layer) {
     auto const scratch_cursor = g->scratch_arena.TotalUsed();
     DEFER { g->scratch_arena.TryShrinkTotalUsed(scratch_cursor); };
 
-    auto libs = g->plugin.shared_data.available_libraries.AllRetained(g->scratch_arena);
-    DEFER { sample_lib_loader::ReleaseAll(libs); };
+    auto libs = sample_lib_server::AllLibrariesRetained(g->plugin.shared_data.sample_library_server,
+                                                        g->scratch_arena);
+    DEFER { sample_lib_server::ReleaseAll(libs); };
 
     StartFloeMenu(g);
     DEFER { EndFloeMenu(g); };
@@ -530,7 +531,9 @@ void Draw(Gui* g,
 
         auto const& r = window->bounds;
 
-        auto background_lib = g->plugin.shared_data.available_libraries.FindRetained(*desired_lib_name);
+        auto background_lib =
+            sample_lib_server::FindLibraryRetained(g->plugin.shared_data.sample_library_server,
+                                                   *desired_lib_name);
         DEFER { background_lib.Release(); };
 
         auto const panel_rounding = LiveSize(imgui, UiSizeId::BlurredPanelRounding);
@@ -631,7 +634,7 @@ void Draw(Gui* g,
 
         DoInstSelectorGUI(g, selector_menu_r, layer->index);
         if (auto percent =
-                g->plugin.sample_lib_loader_connection.instrument_loading_percents[(usize)layer->index]
+                g->plugin.sample_lib_server_async_channel.instrument_loading_percents[(usize)layer->index]
                     .Load();
             percent != -1) {
             f32 const load_percent = (f32)percent / 100.0f;

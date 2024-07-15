@@ -1487,7 +1487,7 @@ pub fn build(b: *std.Build) void {
                     plugin_path ++ "/processing/midi.cpp",
                     plugin_path ++ "/processing/volume_fade.cpp",
                     plugin_path ++ "/processor.cpp",
-                    plugin_path ++ "/sample_library_loader.cpp",
+                    plugin_path ++ "/sample_library_server.cpp",
                     plugin_path ++ "/scanned_folder.cpp",
                     plugin_path ++ "/voices.cpp",
                     plugin_path ++ "/settings/settings_file.cpp",

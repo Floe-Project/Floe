@@ -25,7 +25,7 @@
 #include "gui_widget_helpers.hpp"
 #include "plugin.hpp"
 #include "plugin_instance.hpp"
-#include "sample_library_loader.hpp"
+#include "sample_library_server.hpp"
 #include "settings/settings_filesystem.hpp"
 #include "settings/settings_gui.hpp"
 
@@ -92,7 +92,8 @@ ImagePixelsFromLibrary(Gui* g, sample_lib::Library const& lib, LibraryImageType 
 
     // The core library contains many images for older libraries, we simple look in the core library 'images'
     // folder to see if it contains an image that we're looking for
-    auto core = g->plugin.shared_data.available_libraries.FindRetained(k_core_library_name);
+    auto core = sample_lib_server::FindLibraryRetained(g->plugin.shared_data.sample_library_server,
+                                                       k_core_library_name);
     if (core) {
         DEFER { core.Release(); };
 
@@ -769,7 +770,9 @@ void GUIUpdate(Gui* g) {
 
         auto const first_lib_name = g->plugin.layers[0].LibName();
         if (first_lib_name) {
-            auto background_lib = g->plugin.shared_data.available_libraries.FindRetained(*first_lib_name);
+            auto background_lib =
+                sample_lib_server::FindLibraryRetained(g->plugin.shared_data.sample_library_server,
+                                                       *first_lib_name);
             DEFER { background_lib.Release(); };
             if (background_lib && !settings.high_contrast_gui) {
                 auto imgs = LoadLibraryBackgroundAndIconIfNeeded(g, *background_lib);

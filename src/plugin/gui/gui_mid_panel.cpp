@@ -53,7 +53,9 @@ void MidPanel(Gui* g) {
             if (first_lib_name) {
                 auto const& r = window->bounds;
 
-                auto background_lib = g->plugin.shared_data.available_libraries.FindRetained(*first_lib_name);
+                auto background_lib =
+                    sample_lib_server::FindLibraryRetained(g->plugin.shared_data.sample_library_server,
+                                                           *first_lib_name);
                 DEFER { background_lib.Release(); };
 
                 if (background_lib && !g->settings.settings.gui.high_contrast_gui) {
@@ -180,7 +182,9 @@ void MidPanel(Gui* g) {
             if (first_lib_name) {
                 auto const& r = window->bounds;
 
-                auto background_lib = g->plugin.shared_data.available_libraries.FindRetained(*first_lib_name);
+                auto background_lib =
+                    sample_lib_server::FindLibraryRetained(g->plugin.shared_data.sample_library_server,
+                                                           *first_lib_name);
                 DEFER { background_lib.Release(); };
 
                 if (background_lib && !g->settings.settings.gui.high_contrast_gui) {

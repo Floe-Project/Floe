@@ -179,10 +179,9 @@ struct LayerProcessor {
     Atomic<u32> note_on_rr_pos = 0;
     Atomic<u32> note_off_rr_pos = 0;
 
-    using InstrumentUnion =
-        TaggedUnion<InstrumentType,
-                    TypeAndTag<LoadedInstrument const*, InstrumentType::Sampler>,
-                    TypeAndTag<WaveformType, InstrumentType::WaveformSynth>>;
+    using InstrumentUnion = TaggedUnion<InstrumentType,
+                                        TypeAndTag<LoadedInstrument const*, InstrumentType::Sampler>,
+                                        TypeAndTag<WaveformType, InstrumentType::WaveformSynth>>;
 
     InstrumentUnion inst = InstrumentType::None;
 

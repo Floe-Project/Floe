@@ -1266,8 +1266,11 @@ static void LoadingThreadLoop(Server& server) {
                         };
 
                         server.channels.Use([&](auto&) {
-                            if (pending_result.request.async_comms_channel.used.Load(MemoryOrder::Relaxed))
-                                pending_result.request.async_comms_channel.completed_callback(result);
+                            if (pending_result.request.async_comms_channel.used.Load(MemoryOrder::Relaxed)) {
+                                result.Retain();
+                                pending_result.request.async_comms_channel.results.Push(result);
+                                pending_result.request.async_comms_channel.result_added_callback();
+                            }
                         });
                         return true;
                     },
@@ -1310,6 +1313,8 @@ static void LoadingThreadLoop(Server& server) {
         RemoveUnreferencedObjects(server, audio_datas);
         scratch_arena.ResetCursorAndConsolidateRegions();
     }
+
+    DebugLn("Ending server thread loop");
 
     // It's necessary to do this at the end of this function because it is not guaranteed to be called in the
     // loop; the 'end' boolean can be changed at a point where the loop ends before calling this.
@@ -1354,7 +1359,7 @@ AsyncCommsChannel& OpenAsyncCommsChannel(Server& server,
         PLACEMENT_NEW(channel)
         AsyncCommsChannel {
             .error_notifications = error_notifications,
-            .completed_callback = Move(callback),
+            .result_added_callback = Move(callback),
             .used = true,
         };
         for (auto& p : channel->instrument_loading_percents)
@@ -1367,6 +1372,8 @@ void CloseAsyncCommsChannel(Server& server, AsyncCommsChannel& channel) {
     server.channels.Use([&channel](auto& channels) {
         (void)channels;
         channel.used.Store(false, MemoryOrder::Relaxed);
+        while (auto r = channel.results.TryPop())
+            r->Release();
     });
 }
 
@@ -1556,28 +1563,28 @@ TEST_CASE(TestSampleLibraryLoader) {
     SetExtraScanFolders(server, fixture.scan_folders);
 
     SUBCASE("single channel") {
-        auto& channel = OpenAsyncCommsChannel(server, fixture.error_notif, [](LoadResult) {});
+        auto& channel = OpenAsyncCommsChannel(server, fixture.error_notif, []() {});
         CloseAsyncCommsChannel(server, channel);
     }
 
     SUBCASE("multiple channels") {
-        auto& channel1 = OpenAsyncCommsChannel(server, fixture.error_notif, [](LoadResult) {});
-        auto& channel2 = OpenAsyncCommsChannel(server, fixture.error_notif, [](LoadResult) {});
+        auto& channel1 = OpenAsyncCommsChannel(server, fixture.error_notif, []() {});
+        auto& channel2 = OpenAsyncCommsChannel(server, fixture.error_notif, []() {});
         CloseAsyncCommsChannel(server, channel1);
         CloseAsyncCommsChannel(server, channel2);
     }
 
     SUBCASE("registering again after unregistering all") {
-        auto& channel1 = OpenAsyncCommsChannel(server, fixture.error_notif, [](LoadResult) {});
-        auto& channel2 = OpenAsyncCommsChannel(server, fixture.error_notif, [](LoadResult) {});
+        auto& channel1 = OpenAsyncCommsChannel(server, fixture.error_notif, []() {});
+        auto& channel2 = OpenAsyncCommsChannel(server, fixture.error_notif, []() {});
         CloseAsyncCommsChannel(server, channel1);
         CloseAsyncCommsChannel(server, channel2);
-        auto& channel3 = OpenAsyncCommsChannel(server, fixture.error_notif, [](LoadResult) {});
+        auto& channel3 = OpenAsyncCommsChannel(server, fixture.error_notif, []() {});
         CloseAsyncCommsChannel(server, channel3);
     }
 
     SUBCASE("unregister a channel directly after sending a request") {
-        auto& channel = OpenAsyncCommsChannel(server, fixture.error_notif, [&](LoadResult) {});
+        auto& channel = OpenAsyncCommsChannel(server, fixture.error_notif, [&]() {});
 
         SendAsyncLoadRequest(server,
                              channel,
@@ -1818,17 +1825,8 @@ TEST_CASE(TestSampleLibraryLoader) {
         }
 
         AtomicCountdown countdown {(u32)requests.size};
-        DynamicArray<LoadResult> results {scratch_arena};
-        auto& channel = OpenAsyncCommsChannel(server, fixture.error_notif, [&](LoadResult r) {
-            r.Retain();
-            dyn::Append(results, r); // don't need a mutex because only one thread can use this
-            countdown.CountDown();
-        });
-        DEFER {
-            for (auto& r : results)
-                r.Release();
-            CloseAsyncCommsChannel(server, channel);
-        };
+        auto& channel = OpenAsyncCommsChannel(server, fixture.error_notif, [&]() { countdown.CountDown(); });
+        DEFER { CloseAsyncCommsChannel(server, channel); };
 
         if (requests.size) {
             for (auto& j : requests)
@@ -1847,10 +1845,11 @@ TEST_CASE(TestSampleLibraryLoader) {
                 __builtin_abort();
             }
 
-            REQUIRE_EQ(results.size, requests.size);
-            for (auto [index, request] : Enumerate(requests)) {
-                for (auto& r : results)
-                    if (r.id == request.request_id) {
+            usize num_results = 0;
+            while (auto r = channel.results.TryPop()) {
+                DEFER { r->Release(); };
+                for (auto const& request : requests) {
+                    if (r->id == request.request_id) {
                         for (auto& n : fixture.error_notif.items) {
                             if (auto e = n.TryScoped()) {
                                 tester.log.DebugLn("Error Notification  {}: {}: {}",
@@ -1859,9 +1858,12 @@ TEST_CASE(TestSampleLibraryLoader) {
                                                    e->error_code);
                             }
                         }
-                        request.check_result(r, request.request);
+                        request.check_result(*r, request.request);
                     }
+                }
+                ++num_results;
             }
+            REQUIRE_EQ(num_results, requests.size);
         }
     }
 
@@ -1887,22 +1889,11 @@ TEST_CASE(TestSampleLibraryLoader) {
         auto const builtin_irs = EmbeddedIrs();
 
         constexpr u32 k_num_calls = 200;
-        DynamicArrayInline<LoadResult, k_num_calls> retained_results;
         u64 random_seed = SeedFromTime();
         AtomicCountdown countdown {k_num_calls};
 
-        auto& channel = OpenAsyncCommsChannel(server, fixture.error_notif, [&](LoadResult r) {
-            if (RandomIntInRange(random_seed, 0, 4) == 0) {
-                r.Retain();
-                dyn::Append(retained_results, r);
-            }
-            countdown.CountDown();
-        });
-        DEFER {
-            for (auto& r : retained_results)
-                r.Release();
-            CloseAsyncCommsChannel(server, channel);
-        };
+        auto& channel = OpenAsyncCommsChannel(server, fixture.error_notif, [&]() { countdown.CountDown(); });
+        DEFER { CloseAsyncCommsChannel(server, channel); };
 
         // We sporadically rename the library file to test the error handling of the loading thread
         DynamicArray<char> temp_rename {fixture.test_lib_path, scratch_arena};
@@ -1927,6 +1918,7 @@ TEST_CASE(TestSampleLibraryLoader) {
 
             SleepThisThread(RandomIntInRange(random_seed, 0, 3));
 
+            // Let's make this a bit more interesting by simulating a file rename mid-move
             if (RandomIntInRange(random_seed, 0, 4) == 0) {
                 if (is_renamed)
                     TRY(MoveFile(temp_rename, fixture.test_lib_path, ExistingDestinationHandling::Fail));
@@ -1934,6 +1926,9 @@ TEST_CASE(TestSampleLibraryLoader) {
                     TRY(MoveFile(fixture.test_lib_path, temp_rename, ExistingDestinationHandling::Fail));
                 is_renamed = !is_renamed;
             }
+
+            // Additionally, let's release one the results to test ref-counting/reuse
+            if (auto r = channel.results.TryPop()) r->Release();
         }
 
         constexpr u32 k_timeout_secs = 25;

@@ -41,14 +41,12 @@ struct PluginInstance {
     struct Layer {
         Layer(u32 index, LayerProcessor& p) : index(index), processor(p) {}
         ~Layer() {
-            if (auto sampled_inst =
-                    instrument.TryGet<sample_lib_server::RefCounted<LoadedInstrument>>())
+            if (auto sampled_inst = instrument.TryGet<sample_lib_server::RefCounted<LoadedInstrument>>())
                 sampled_inst->Release();
         }
 
         AudioData const* GetSampleForGUIWaveform() const {
-            if (auto sampled_inst =
-                    instrument.TryGet<sample_lib_server::RefCounted<LoadedInstrument>>()) {
+            if (auto sampled_inst = instrument.TryGet<sample_lib_server::RefCounted<LoadedInstrument>>()) {
                 if (*sampled_inst) return (*sampled_inst)->file_for_gui_waveform;
             } else {
                 // TODO: get waveform audio data
@@ -62,9 +60,7 @@ struct PluginInstance {
                     return k_waveform_type_names[ToInt(instrument.Get<WaveformType>())];
                 }
                 case InstrumentType::Sampler: {
-                    return instrument
-                        .Get<sample_lib_server::RefCounted<LoadedInstrument>>()
-                        ->instrument.name;
+                    return instrument.Get<sample_lib_server::RefCounted<LoadedInstrument>>()->instrument.name;
                 }
                 case InstrumentType::None: return "None"_s;
             }
@@ -73,8 +69,7 @@ struct PluginInstance {
 
         Optional<String> LibName() const {
             if (instrument.tag != InstrumentType::Sampler) return nullopt;
-            return instrument.Get<sample_lib_server::RefCounted<LoadedInstrument>>()
-                ->instrument.library.name;
+            return instrument.Get<sample_lib_server::RefCounted<LoadedInstrument>>()->instrument.library.name;
         }
 
         u32 index = (u32)-1;
@@ -83,8 +78,7 @@ struct PluginInstance {
 
         using Instrument =
             TaggedUnion<InstrumentType,
-                        TypeAndTag<sample_lib_server::RefCounted<LoadedInstrument>,
-                                   InstrumentType::Sampler>,
+                        TypeAndTag<sample_lib_server::RefCounted<LoadedInstrument>, InstrumentType::Sampler>,
                         TypeAndTag<WaveformType, InstrumentType::WaveformSynth>>;
 
         Instrument instrument {InstrumentType::None};
@@ -109,8 +103,6 @@ struct PluginInstance {
     bool in_destructor = false;
 
     ThreadsafeFunctionQueue main_thread_callbacks {.arena = {PageAllocator::Instance()}};
-    ThreadsafeFunctionQueue main_thread_sample_lib_load_completed_callbacks {
-        .arena = {PageAllocator::Instance()}};
 
     // State
     // ========================================================================

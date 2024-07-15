@@ -101,17 +101,22 @@ struct LoadResult {
     Result result;
 };
 
-using LoadCompletedCallback = TrivialFixedSizeFunction<40, void(LoadResult)>;
+using LoadCompletedCallback = TrivialFixedSizeFunction<8, void()>;
 
 struct AsyncCommsChannel {
     // -1 if not valid, else 0 to 100
     Array<Atomic<s32>, k_num_layers> instrument_loading_percents {};
 
+    // Threadsafe. These are the retained results. You should pop these and then Release() when you're done
+    // with them.
+    ThreadsafeQueue<LoadResult> results {Malloc::Instance()};
+
     // private
     ThreadsafeErrorNotifications& error_notifications;
     Array<detail::ListedInstrument*, k_num_layers> desired_inst {};
-    LoadCompletedCallback completed_callback;
+    LoadCompletedCallback result_added_callback;
     Atomic<bool> used {};
+    AsyncCommsChannel* next {};
 };
 
 namespace detail {
@@ -198,7 +203,7 @@ struct Server {
     Mutex libraries_by_name_mutex;
     DynamicHashTable<String, detail::LibrariesList::Node*> libraries_by_name {Malloc::Instance()};
 
-    // Connection independent. If you have access to a channel, you can use their error_notifications
+    // Connection independent. If we have access to a channel, we post to the channel's error_notifications
     // instead.
     ThreadsafeErrorNotifications& error_notifications;
 
@@ -217,21 +222,28 @@ struct Server {
 // the assets that are contained in the LoadResult, you must 'retain' them in the callback. You can release
 // them at any point after that. The callback is called from the server thread; you should not do any really
 // slow operations in it because it will block the server thread from processing other requests.
+// [threadsafe]
 AsyncCommsChannel& OpenAsyncCommsChannel(Server& server,
                                          ThreadsafeErrorNotifications& error_notifications,
                                          LoadCompletedCallback&& completed_callback);
 
+// You will not receive any more results after this is called. Results that are still in the channel's queue
+// will be released at some point after this is called.
+// [threadsafe]
 void CloseAsyncCommsChannel(Server& server, AsyncCommsChannel& channel);
 
-// If you send a request when there's already another loading with the same layer_index and channel, the
-// old will be aborted, provided it's not needed by anything else.
-// threadsafe
+// You'll receive a callback when the request is completed. After that you should consume all the results in
+// your channel's results field (threadsafe). Each result is already retained so you must Release() them when
+// you're done with them. If you send a request when there's already another loading with the same layer_index
+// and channel, the old will be aborted, provided it's not needed by anything else.
+// [threadsafe]
 RequestId SendAsyncLoadRequest(Server& server, AsyncCommsChannel& channel, LoadRequest const& request);
 
-// threadsafe
+// [threadsafe]
 void SetExtraScanFolders(Server& server, Span<String const> folders);
 
-// main-thread, you must call Release on all results
+// You must call Release() on all results
+// [main-thread]
 Span<RefCounted<sample_lib::Library>> AllLibrariesRetained(Server& server, ArenaAllocator& arena);
 RefCounted<sample_lib::Library> FindLibraryRetained(Server& server, String name);
 

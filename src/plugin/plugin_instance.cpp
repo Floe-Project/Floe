@@ -352,8 +352,11 @@ static void OnMainThread(PluginInstance& plugin, bool& update_gui) {
     ArenaAllocatorWithInlineStorage<4000> scratch_arena {};
     while (auto f = plugin.main_thread_callbacks.TryPop(scratch_arena))
         (*f)();
-    while (auto f = plugin.main_thread_sample_lib_load_completed_callbacks.TryPop(scratch_arena))
-        (*f)();
+
+    while (auto f = plugin.sample_lib_server_async_channel.results.TryPop()) {
+        AssetLoadedJobCompleted(plugin, *f);
+        f->Release();
+    }
 }
 
 void SetAllParametersToDefaultValues(PluginInstance& plugin) {
@@ -677,14 +680,7 @@ PluginInstance::PluginInstance(clap_host const& host, CrossInstanceSystems& shar
     , sample_lib_server_async_channel(sample_lib_server::OpenAsyncCommsChannel(
           shared_data.sample_library_server,
           error_notifications,
-          [&plugin = *this](sample_lib_server::LoadResult result) {
-              result.Retain();
-              plugin.main_thread_sample_lib_load_completed_callbacks.Push([&plugin, result]() {
-                  if (!plugin.in_destructor) AssetLoadedJobCompleted(plugin, result);
-                  result.Release();
-              });
-              plugin.host.request_callback(&plugin.host);
-          })) {
+          [&plugin = *this]() { plugin.host.request_callback(&plugin.host); })) {
 
     { latest_snapshot.state = CurrentStateSnapshot(*this); }
 
@@ -720,10 +716,6 @@ PluginInstance::~PluginInstance() {
 
     sample_lib_server::CloseAsyncCommsChannel(shared_data.sample_library_server,
                                               sample_lib_server_async_channel);
-
-    ArenaAllocatorWithInlineStorage<4000> scratch_arena {};
-    while (auto f = main_thread_sample_lib_load_completed_callbacks.TryPop(scratch_arena))
-        (*f)();
 }
 
 usize MegabytesUsedBySamples(PluginInstance const& plugin) {

@@ -21,6 +21,42 @@
 // - SUBCASEs work the same as Catch2/doctest: the test case is repeatidly called, with each time a different
 //   branch of SUBCASEs are executed.
 // - You can install fixtures; these are persistent for every iteration of a test case.
+//
+// Example of how the SUBCASE system repeatidly calls the test case:
+// (based on doctest's example)
+// clang-format off
+// ---------------------------------------------------------------------------
+// Example:                                                     |   Output:
+// ---------------------------------------------------------------------------              
+//                                                              |   root
+//                                                              |   1
+//                                                              |   1.1
+//  TEST_CASE(MyTest) {                                         |          
+//      printf("root\n");                                       |   root
+//      SUBCASE("") {                                           |   2
+//          printf("1\n");                                      |   2.1
+//          SUBCASE("") { printf("1.1\n"); }                    |          
+//      }                                                       |   root
+//      SUBCASE("") {                                           |   2
+//          printf("2\n");                                      |   2.2
+//          SUBCASE("") { printf("2.1\n"); }                    |   2.2.1
+//          SUBCASE("") {                                       |   2.2.1.1
+//              printf("2.2\n");                                |          
+//              SUBCASE("") {                                   |   root
+//                  printf("2.2.1\n");                          |   2
+//                  SUBCASE("") { printf("2.2.1.1\n"); }        |   2.2
+//                  SUBCASE("") { printf("2.2.1.2\n"); }        |   2.2.1
+//              }                                               |   2.2.1.2
+//          }                                                   |          
+//          SUBCASE("") { printf("2.3\n"); }                    |   root
+//          SUBCASE("") { printf("2.4\n"); }                    |   2
+//      }                                                       |   2.3
+//  }                                                           |          
+//                                                              |   root
+//                                                              |   2
+//                                                              |   2.4    
+// ---------------------------------------------------------------------------
+// clang-format on
 
 template <typename FloatType>
 constexpr bool ApproxEqual(FloatType a, FloatType b, FloatType epsilon) {

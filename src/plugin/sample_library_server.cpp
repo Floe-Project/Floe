@@ -16,6 +16,13 @@
 #include "sample_library/sample_library.hpp"
 #include "xxhash/xxhash.h"
 
+namespace sample_lib_server {
+
+using namespace detail;
+
+constexpr String k_trace_category = "SLL";
+constexpr u32 k_trace_colour = 0xfcba03;
+
 inline String ToString(EmbeddedString s) { return {s.data, s.size}; }
 
 // not threadsafe
@@ -63,17 +70,6 @@ static sample_lib::Library* BuiltinLibrary() {
     return &builtin_library;
 }
 
-namespace sample_lib_server {
-
-namespace detail {
-u32 g_inst_debug_id = 0;
-}
-
-using namespace detail;
-
-constexpr String k_trace_category = "SLL";
-constexpr u32 k_trace_colour = 0xfcba03;
-
 ListedAudioData::~ListedAudioData() {
     ZoneScoped;
     auto const s = state.Load();
@@ -90,17 +86,11 @@ ListedInstrument::~ListedInstrument() {
     library_refs.FetchSub(1);
 }
 
-// NOTE: it's important that we pass this around by value because the point at which num_thread_pool_jobs == 0
-// the original object will be destroyed. But if it's passed by value then it doesn't matter because the value
-// is copied and the references within the object are still valid.
+// Just a little helper that we pass around when working with the thread pool.
 struct ThreadPoolContext {
     ThreadPool& pool;
     AtomicCountdown& num_thread_pool_jobs;
     WorkSignaller& completed_signaller;
-};
-
-struct LoadAudioAsyncArgs {
-    ListedAudioData& audio_data;
 };
 
 static void LoadAudioAsync(ListedAudioData& audio_data,
@@ -111,6 +101,12 @@ static void LoadAudioAsync(ListedAudioData& audio_data,
         ZoneScoped;
         DEFER {
             thread_pool_ctx.num_thread_pool_jobs.CountDown();
+
+            // TODO: This is not right. It's possible that completed_signaller will be destroyed at this point
+            // because as soon as num_thread_pool_jobs equals 0 the server could shut down. It's very unlikely
+            // because there's a lot of other things that happen before that point and so this thread, in all
+            // liklihoods, runs first, but we shouldn't count on it. The 2 methods of signalling completion
+            // need to be unified somehow.
             thread_pool_ctx.completed_signaller.Signal();
         };
 
@@ -218,9 +214,12 @@ static ListedInstrument* FetchOrCreateInstrument(LibrariesList::Node& lib_node,
             return &i;
         }
 
+    static u32 g_inst_debug_id {};
+
     auto new_inst = lib.instruments.PrependUninitialised();
     PLACEMENT_NEW(new_inst)
     ListedInstrument {
+        .debug_id = g_inst_debug_id++,
         .inst = {inst},
         .refs = 0u,
         .library_refs = lib_node.reader_uses,
@@ -453,11 +452,23 @@ RereadLibraryAsync(LibrariesAsyncContext& async_ctx, LibrariesList& lib_list, Li
                      lib_node->value.lib->file_format_specifics.tag);
 }
 
+// threadsafe
+static bool RequestScanningFoldersIfNeeded(ScanFolderList& scan_folders) {
+    bool any_rescan_requested = false;
+    for (auto& n : scan_folders)
+        if (auto f = n.TryScoped()) {
+            auto expected = ScanFolder::State::NotScanned;
+            if (f->state.CompareExchangeStrong(expected, ScanFolder::State::RescanRequested))
+                any_rescan_requested = true;
+        }
+    return any_rescan_requested;
+}
+
 // server-thread
-static void UpdateLoadingThread(Server& server,
-                                LibrariesAsyncContext& async_ctx,
-                                ArenaAllocator& scratch_arena,
-                                Optional<DirectoryWatcher>& watcher) {
+static bool UpdateLibraryLoading(Server& server,
+                                 LibrariesAsyncContext& async_ctx,
+                                 ArenaAllocator& scratch_arena,
+                                 Optional<DirectoryWatcher>& watcher) {
     ZoneNamed(outer, true);
 
     // trigger folder scanning if any are marked as 'rescan-requested'
@@ -509,7 +520,7 @@ static void UpdateLoadingThread(Server& server,
                     TracyMessageEx({k_trace_category, k_trace_colour, {}},
                                    "skipping {}, it already exists",
                                    path::Filename(path));
-                    return;
+                    continue;
                 }
                 auto const& outcome = *j.result.result;
 
@@ -543,7 +554,7 @@ static void UpdateLoadingThread(Server& server,
                     }
                     case ResultType::Error: {
                         auto const error = outcome.GetFromTag<ResultType::Error>();
-                        if (error.code == FilesystemError::PathDoesNotExist) return;
+                        if (error.code == FilesystemError::PathDoesNotExist) continue;
 
                         auto item = server.error_notifications.NewError();
                         item->value = {
@@ -745,9 +756,13 @@ static void UpdateLoadingThread(Server& server,
         DEFER { server.scan_folders_writer_mutex.Unlock(); };
         server.scan_folders.DeleteRemovedAndUnreferenced();
     }
+
+    auto const library_work_still_pending =
+        async_ctx.num_uncompleted_jobs.Load(MemoryOrder::AcquireRelease) != 0;
+    return library_work_still_pending;
 }
 
-static void RemoveUnreferencedObjects(Server& server, ArenaList<ListedAudioData, true>& audio_datas) {
+static void RemoveUnreferencedObjects(Server& server) {
     ZoneScoped;
     server.channels.Use([](auto& channels) {
         channels.RemoveIf([](AsyncCommsChannel const& h) { return !h.used.Load(MemoryOrder::Relaxed); });
@@ -758,12 +773,13 @@ static void RemoveUnreferencedObjects(Server& server, ArenaList<ListedAudioData,
     for (auto n = server.libraries.dead_list; n != nullptr; n = n->writer_next)
         n->value.instruments.RemoveIf([](ListedInstrument const& i) { return i.refs.Load() == 0; });
 
-    audio_datas.RemoveIf([](ListedAudioData const& a) { return a.refs.Load() == 0; });
+    server.audio_datas.RemoveIf([](ListedAudioData const& a) { return a.refs.Load() == 0; });
 
     server.libraries.DeleteRemovedAndUnreferenced();
 }
 
 static void CancelLoadingAudioForInstrumentIfPossible(ListedInstrument* i, uintptr_t trace_id) {
+    ASSERT(i);
     ZoneScoped;
     TracyMessageEx({k_trace_category, k_trace_colour, trace_id},
                    "cancel instID:{}, num audio: {}",
@@ -792,148 +808,482 @@ static void CancelLoadingAudioForInstrumentIfPossible(ListedInstrument* i, uintp
                    num_cancelled);
 }
 
-static void LoadingThreadLoop(Server& server) {
-    ZoneScoped;
-    ArenaAllocator scratch_arena {PageAllocator::Instance(), Kb(128)};
-    ArenaList<ListedAudioData, true> audio_datas {PageAllocator::Instance()};
-    uintptr_t debug_result_id = 0;
-
-    Optional<DirectoryWatcher> watcher = {};
-    {
-        auto watcher_outcome = CreateDirectoryWatcher(PageAllocator::Instance());
-        auto const error_id = U64FromChars("libwatch");
-        if (!watcher_outcome.HasError()) {
-            server.error_notifications.RemoveError(error_id);
-            watcher.Emplace(watcher_outcome.ReleaseValue());
-        } else {
-            DebugLn("Failed to create directory watcher: {}", watcher_outcome.Error());
-            auto node = server.error_notifications.NewError();
-            node->value = {
-                .title = "Warning: unable to monitor library folders"_s,
-                .message = {},
-                .error_code = watcher_outcome.Error(),
-                .id = error_id,
-            };
-            server.error_notifications.AddOrUpdateError(node);
-        }
-    }
-    DEFER {
-        if (watcher) DestoryDirectoryWatcher(*watcher);
-    };
-
-    {
-        for (auto& n : server.scan_folders)
-            if (auto f = n.TryScoped()) f->state.Store(ScanFolder::State::NotScanned);
-
-        {
-            auto node = server.libraries.AllocateUninitialised();
-            PLACEMENT_NEW(&node->value)
-            ListedLibrary {.arena = PageAllocator::Instance(), .lib = BuiltinLibrary()};
-            server.libraries.Insert(node);
-
-            server.libraries_by_name.Insert(BuiltinLibrary()->name, node);
-        }
-    }
-
-    while (!server.end_thread.Load()) {
-        struct PendingResult {
-            enum class State {
-                AwaitingLibrary,
-                AwaitingAudio,
-                Cancelled,
-                Failed,
-                CompletedSuccessfully,
-            };
-
-            using LoadingAsset = TaggedUnion<LoadRequestType,
-                                             TypeAndTag<ListedInstrument*, LoadRequestType::Instrument>,
-                                             TypeAndTag<ListedAudioData*, LoadRequestType::Ir>>;
-
-            using StateUnion = TaggedUnion<State,
-                                           TypeAndTag<LoadingAsset, State::AwaitingAudio>,
-                                           TypeAndTag<ErrorCode, State::Failed>,
-                                           TypeAndTag<RefUnion, State::CompletedSuccessfully>>;
-
-            u32 LayerIndex() const {
-                if (auto i = request.request.TryGet<LoadRequestInstrumentIdWithLayer>())
-                    return i->layer_index;
-                PanicIfReached();
-                return 0;
-            }
-            bool IsDesired() const {
-                return state.Get<LoadingAsset>().Get<ListedInstrument*>() ==
-                       request.async_comms_channel.desired_inst[LayerIndex()];
-            }
-            auto& LoadingPercent() {
-                return request.async_comms_channel.instrument_loading_percents[LayerIndex()];
-            }
-
-            StateUnion state {State::AwaitingLibrary};
-            QueuedRequest request;
-            uintptr_t debug_id;
-
-            PendingResult* next = nullptr;
+struct ServerThread {
+    struct PendingResult {
+        enum class State {
+            AwaitingLibrary,
+            AwaitingAudio,
+            Cancelled,
+            Failed,
+            CompletedSuccessfully,
         };
 
+        using LoadingAsset = TaggedUnion<LoadRequestType,
+                                         TypeAndTag<ListedInstrument*, LoadRequestType::Instrument>,
+                                         TypeAndTag<ListedAudioData*, LoadRequestType::Ir>>;
+
+        using StateUnion = TaggedUnion<State,
+                                       TypeAndTag<LoadingAsset, State::AwaitingAudio>,
+                                       TypeAndTag<ErrorCode, State::Failed>,
+                                       TypeAndTag<RefUnion, State::CompletedSuccessfully>>;
+
+        u32 LayerIndex() const {
+            if (auto i = request.request.TryGet<LoadRequestInstrumentIdWithLayer>()) return i->layer_index;
+            PanicIfReached();
+            return 0;
+        }
+        bool IsDesired() const {
+            return state.Get<LoadingAsset>().Get<ListedInstrument*>() ==
+                   request.async_comms_channel.desired_inst[LayerIndex()];
+        }
+        auto& LoadingPercent() {
+            return request.async_comms_channel.instrument_loading_percents[LayerIndex()];
+        }
+
+        StateUnion state {State::AwaitingLibrary};
+        QueuedRequest request;
+        uintptr_t debug_id;
+
+        PendingResult* next = nullptr;
+    };
+
+    struct PendingResults {
+        IntrusiveSinglyLinkedList<PendingResult> list {};
+        AtomicCountdown thread_pool_jobs {0};
+    };
+
+    ArenaAllocator scratch_arena {PageAllocator::Instance(), Kb(128)};
+    Optional<DirectoryWatcher> watcher = {};
+};
+
+static Optional<DirectoryWatcher> CreateDirectoryWatcher(ThreadsafeErrorNotifications& error_notifications) {
+    Optional<DirectoryWatcher> watcher;
+    auto watcher_outcome = CreateDirectoryWatcher(PageAllocator::Instance());
+    auto const error_id = U64FromChars("libwatch");
+    if (!watcher_outcome.HasError()) {
+        error_notifications.RemoveError(error_id);
+        watcher.Emplace(watcher_outcome.ReleaseValue());
+    } else {
+        DebugLn("Failed to create directory watcher: {}", watcher_outcome.Error());
+        auto node = error_notifications.NewError();
+        node->value = {
+            .title = "Warning: unable to monitor library folders"_s,
+            .message = {},
+            .error_code = watcher_outcome.Error(),
+            .id = error_id,
+        };
+        error_notifications.AddOrUpdateError(node);
+    }
+    return watcher;
+}
+
+static void DumpPendingResultsDebugInfo(ServerThread::PendingResults& pending_results) {
+    DebugLn("Thread pool jobs: {}", pending_results.thread_pool_jobs.counter.Load());
+    DebugLn("\nPending results:");
+    for (auto& pending_result : pending_results.list) {
+        DebugLn("  Pending result: {}", pending_result.debug_id);
+        switch (pending_result.state.tag) {
+            case ServerThread::PendingResult::State::AwaitingLibrary: DebugLn("    Awaiting library"); break;
+            case ServerThread::PendingResult::State::AwaitingAudio: {
+                auto& asset = pending_result.state.Get<ServerThread::PendingResult::LoadingAsset>();
+                switch (asset.tag) {
+                    case LoadRequestType::Instrument: {
+                        auto inst = asset.Get<ListedInstrument*>();
+                        DebugLn("    Awaiting audio for instrument {}", inst->inst.instrument.name);
+                        for (auto& audio_data : inst->audio_data_set) {
+                            DebugLn("      Audio data: {}, {}",
+                                    audio_data->audio_data.hash,
+                                    EnumToString(audio_data->state.Load()));
+                        }
+                        break;
+                    }
+                    case LoadRequestType::Ir: {
+                        auto ir = asset.Get<ListedAudioData*>();
+                        DebugLn("    Awaiting audio for IR {}", ir->path);
+                        DebugLn("      Audio data: {}, {}",
+                                ir->audio_data.hash,
+                                EnumToString(ir->state.Load()));
+                        break;
+                    }
+                }
+                break;
+            }
+            case ServerThread::PendingResult::State::Cancelled: DebugLn("    Cancelled"); break;
+            case ServerThread::PendingResult::State::Failed: DebugLn("    Failed"); break;
+            case ServerThread::PendingResult::State::CompletedSuccessfully:
+                DebugLn("    Completed successfully");
+                break;
+        }
+    }
+}
+
+static bool ConsumeRequestsIntoPendingResults(ServerThread::PendingResults& pending_results,
+                                              ArenaAllocator& arena,
+                                              ThreadsafeQueue<QueuedRequest>& request_queue) {
+    bool any_requests = false;
+    while (auto queued_request = request_queue.TryPop()) {
+        ZoneNamedN(req, "request", true);
+
+        if (!queued_request->async_comms_channel.used.Load(MemoryOrder::Relaxed)) continue;
+
+        static uintptr debug_result_id = 0;
+        auto pending_result = arena.NewUninitialised<ServerThread::PendingResult>();
+        PLACEMENT_NEW(pending_result)
+        ServerThread::PendingResult {
+            .state = ServerThread::PendingResult::State::AwaitingLibrary,
+            .request = *queued_request,
+            .debug_id = debug_result_id++,
+        };
+        SinglyLinkedListPrepend(pending_results.list.first, pending_result);
+        any_requests = true;
+
+        TracyMessageEx({k_trace_category, k_trace_colour, pending_result->debug_id}, "pending result added");
+    }
+    return any_requests;
+}
+
+static bool UpdatePendingResults(ServerThread::PendingResults& pending_results,
+                                 Server& server,
+                                 bool libraries_are_still_loading) {
+    if (pending_results.list.Empty()) return false;
+
+    ThreadPoolContext thread_pool_ctx {
+        .pool = server.thread_pool,
+        .num_thread_pool_jobs = pending_results.thread_pool_jobs,
+        .completed_signaller = server.work_signaller,
+    };
+
+    // Fill in library
+    for (auto& pending_result : pending_results.list) {
+        if (pending_result.state != ServerThread::PendingResult::State::AwaitingLibrary) continue;
+
+        auto const library_name = ({
+            String n {};
+            switch (pending_result.request.request.tag) {
+                case LoadRequestType::Instrument:
+                    n = pending_result.request.request.Get<LoadRequestInstrumentIdWithLayer>()
+                            .id.library_name;
+                    break;
+                case LoadRequestType::Ir:
+                    n = pending_result.request.request.Get<sample_lib::IrId>().library_name;
+                    break;
+            }
+            n;
+        });
+        ASSERT(library_name.size != 0);
+
+        LibrariesList::Node* lib {};
+        if (auto l_ptr = server.libraries_by_name.Find(library_name)) lib = *l_ptr;
+
+        if (!lib) {
+            if (!libraries_are_still_loading) {
+                {
+                    auto item = pending_result.request.async_comms_channel.error_notifications.NewError();
+                    item->value = {
+                        .title = {},
+                        .message = {},
+                        .error_code = CommonError::NotFound,
+                        .id = ThreadsafeErrorNotifications::Id("lib ", library_name),
+                    };
+                    fmt::Append(item->value.title, "{} not found", library_name);
+                    pending_result.request.async_comms_channel.error_notifications.AddOrUpdateError(item);
+                }
+                pending_result.state = ErrorCode {CommonError::NotFound};
+            }
+        } else {
+            switch (pending_result.request.request.tag) {
+                case LoadRequestType::Instrument: {
+                    auto const& load_inst =
+                        pending_result.request.request.Get<LoadRequestInstrumentIdWithLayer>();
+                    auto const inst_name = load_inst.id.inst_name;
+
+                    ASSERT(inst_name.size != 0);
+
+                    if (auto const i = lib->value.lib->insts_by_name.Find(inst_name)) {
+                        pending_result.request.async_comms_channel
+                            .instrument_loading_percents[load_inst.layer_index]
+                            .Store(0);
+
+                        auto inst = FetchOrCreateInstrument(*lib, server.audio_datas, **i, thread_pool_ctx);
+                        ASSERT(inst);
+
+                        pending_result.request.async_comms_channel.desired_inst[load_inst.layer_index] = inst;
+                        pending_result.state = ServerThread::PendingResult::LoadingAsset {inst};
+
+                        TracyMessageEx({k_trace_category, k_trace_colour, pending_result.debug_id},
+                                       "option: instID:{} load Sampler inst[{}], {}, {}, {}",
+                                       inst->debug_id,
+                                       load_inst.layer_index,
+                                       (void const*)inst,
+                                       lib->value.lib->name,
+                                       inst_name);
+                    } else {
+                        auto const err =
+                            pending_result.request.async_comms_channel.error_notifications.NewError();
+                        err->value = {
+                            .title = {},
+                            .message = {},
+                            .error_code = CommonError::NotFound,
+                            .id = ThreadsafeErrorNotifications::Id("inst", inst_name),
+                        };
+                        fmt::Append(err->value.title, "Cannot find instrument \"{}\"", inst_name);
+                        pending_result.request.async_comms_channel.error_notifications.AddOrUpdateError(err);
+                        pending_result.state = ErrorCode {CommonError::NotFound};
+                    }
+                    break;
+                }
+                case LoadRequestType::Ir: {
+                    auto const ir = pending_result.request.request.Get<sample_lib::IrId>();
+                    auto const ir_path = lib->value.lib->irs_by_name.Find(ir.ir_name);
+
+                    if (ir_path) {
+                        auto audio_data = FetchOrCreateAudioData(server.audio_datas,
+                                                                 *lib->value.lib,
+                                                                 (*ir_path)->path,
+                                                                 thread_pool_ctx,
+                                                                 999999);
+
+                        pending_result.state = ServerThread::PendingResult::LoadingAsset {audio_data};
+
+                        TracyMessageEx({k_trace_category, k_trace_colour, pending_result.debug_id},
+                                       "option: load IR, {}, {}",
+                                       ir.library_name,
+                                       ir.ir_name);
+                    } else {
+                        auto const err =
+                            pending_result.request.async_comms_channel.error_notifications.NewError();
+                        err->value = {
+                            .title = "Failed to find IR"_s,
+                            .message = String(ir.ir_name),
+                            .error_code = CommonError::NotFound,
+                            .id = ThreadsafeErrorNotifications::Id("ir  ", ir.ir_name),
+                        };
+                        pending_result.request.async_comms_channel.error_notifications.AddOrUpdateError(err);
+                        pending_result.state = ErrorCode {CommonError::NotFound};
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    // For each inst, check for errors
+    for (auto& pending_result : pending_results.list) {
+        if (pending_result.state.tag != ServerThread::PendingResult::State::AwaitingAudio) continue;
+
+        auto i_ptr =
+            pending_result.state.Get<ServerThread::PendingResult::LoadingAsset>().TryGet<ListedInstrument*>();
+        if (!i_ptr) continue;
+        auto i = *i_ptr;
+
+        ASSERT(i->audio_data_set.size);
+
+        Optional<ErrorCode> error {};
+        for (auto a : i->audio_data_set) {
+            if (a->state.Load() == LoadingState::CompletedWithError) {
+                error = a->error;
+                break;
+            }
+        }
+
+        if (error) {
+            {
+                auto item = pending_result.request.async_comms_channel.error_notifications.NewError();
+                item->value = {
+                    .title = "Failed to load audio"_s,
+                    .message = i->inst.instrument.name,
+                    .error_code = *error,
+                    .id = ThreadsafeErrorNotifications::Id("audi", i->inst.instrument.name),
+                };
+                pending_result.request.async_comms_channel.error_notifications.AddOrUpdateError(item);
+            }
+
+            CancelLoadingAudioForInstrumentIfPossible(i, pending_result.debug_id);
+            if (pending_result.IsDesired()) pending_result.LoadingPercent().Store(-1);
+            pending_result.state = *error;
+        }
+    }
+
+    // For each inst, check if it's still needed, and cancel if not. And update percent
+    // markers
+    for (auto& pending_result : pending_results.list) {
+        if (pending_result.state.tag != ServerThread::PendingResult::State::AwaitingAudio) continue;
+
+        auto i_ptr =
+            pending_result.state.Get<ServerThread::PendingResult::LoadingAsset>().TryGet<ListedInstrument*>();
+        if (!i_ptr) continue;
+        auto i = *i_ptr;
+
+        if (pending_result.IsDesired()) {
+            auto const num_completed = ({
+                u32 n = 0;
+                for (auto& a : i->audio_data_set) {
+                    auto const state = a->state.Load();
+                    if (state == LoadingState::CompletedSucessfully) ++n;
+                }
+                n;
+            });
+            if (num_completed == i->audio_data_set.size) {
+                pending_result.LoadingPercent().Store(-1);
+                pending_result.state =
+                    RefUnion {RefCounted<LoadedInstrument> {i->inst, i->refs, &server.work_signaller}};
+            } else {
+                f32 const percent = 100.0f * ((f32)num_completed / (f32)i->audio_data_set.size);
+                pending_result.LoadingPercent().Store(RoundPositiveFloat(percent));
+            }
+        } else {
+            // If it's not desired by any others it can be cancelled
+            bool const is_desired_by_another = ({
+                bool desired = false;
+                for (auto& other_pending_result : pending_results.list) {
+                    for (auto other_desired : other_pending_result.request.async_comms_channel.desired_inst) {
+                        if (other_desired == i) {
+                            desired = true;
+                            break;
+                        }
+                    }
+                    if (desired) break;
+                }
+                desired;
+            });
+            if (!is_desired_by_another) CancelLoadingAudioForInstrumentIfPossible(i, pending_result.debug_id);
+
+            pending_result.state = ServerThread::PendingResult::State::Cancelled;
+        }
+    }
+
+    // Store the result of the IR load in the result, if needed
+    for (auto& pending_result : pending_results.list) {
+        if (pending_result.state.tag != ServerThread::PendingResult::State::AwaitingAudio) continue;
+
+        auto a_ptr =
+            pending_result.state.Get<ServerThread::PendingResult::LoadingAsset>().TryGet<ListedAudioData*>();
+        if (!a_ptr) continue;
+        auto a = *a_ptr;
+
+        auto const& ir_data = *a;
+        switch (ir_data.state.Load()) {
+            case LoadingState::CompletedSucessfully: {
+                pending_result.state =
+                    RefUnion {RefCounted<AudioData> {a->audio_data, a->refs, &server.work_signaller}};
+                break;
+            }
+            case LoadingState::CompletedWithError: {
+                auto const ir_index = pending_result.request.request.Get<sample_lib::IrId>();
+                {
+                    auto item = pending_result.request.async_comms_channel.error_notifications.NewError();
+                    item->value = {
+                        .title = "Failed to load IR"_s,
+                        .message = {},
+                        .error_code = *ir_data.error,
+                        .id = Hash("ir  "_s) + Hash(ir_index.library_name.Items()) +
+                              Hash(ir_index.ir_name.Items()),
+                    };
+                    pending_result.request.async_comms_channel.error_notifications.AddOrUpdateError(item);
+                }
+                pending_result.state = *ir_data.error;
+                break;
+            }
+            case LoadingState::PendingLoad:
+            case LoadingState::Loading: break;
+            case LoadingState::PendingCancel:
+            case LoadingState::CompletedCancelled: PanicIfReached(); break;
+            case LoadingState::Count: PanicIfReached(); break;
+        }
+    }
+
+    // For each result, check if all loading has completed and if so, dispatch the result
+    // and remove it from the pending list
+    SinglyLinkedListRemoveIf(
+        pending_results.list.first,
+        [&](ServerThread::PendingResult const& pending_result) {
+            switch (pending_result.state.tag) {
+                case ServerThread::PendingResult::State::AwaitingLibrary:
+                case ServerThread::PendingResult::State::AwaitingAudio: return false;
+                case ServerThread::PendingResult::State::Cancelled:
+                case ServerThread::PendingResult::State::Failed:
+                case ServerThread::PendingResult::State::CompletedSuccessfully: break;
+            }
+
+            LoadResult result {
+                .id = pending_result.request.id,
+                .result = ({
+                    LoadResult::Result r {LoadResult::ResultType::Cancelled};
+                    switch (pending_result.state.tag) {
+                        case ServerThread::PendingResult::State::AwaitingLibrary:
+                        case ServerThread::PendingResult::State::AwaitingAudio: PanicIfReached(); break;
+                        case ServerThread::PendingResult::State::Cancelled: break;
+                        case ServerThread::PendingResult::State::Failed:
+                            r = pending_result.state.Get<ErrorCode>();
+                            break;
+                        case ServerThread::PendingResult::State::CompletedSuccessfully:
+                            r = pending_result.state.Get<RefUnion>();
+                            break;
+                    }
+                    r;
+                }),
+            };
+
+            server.channels.Use([&](auto&) {
+                if (pending_result.request.async_comms_channel.used.Load(MemoryOrder::Relaxed)) {
+                    result.Retain();
+                    pending_result.request.async_comms_channel.results.Push(result);
+                    pending_result.request.async_comms_channel.result_added_callback();
+                }
+            });
+            return true;
+        },
+        [](ServerThread::PendingResult*) {
+            // delete function
+        });
+
+    return !pending_results.list.Empty();
+}
+
+static void ServerThreadUpdateMetrics(Server& server) {
+    u32 num_insts_loaded = 0;
+    u32 num_samples_loaded = 0;
+    u64 total_bytes_used = 0;
+    for (auto& i : server.libraries) {
+        for (auto& inst : i.value.instruments) {
+            (void)inst;
+            ++num_insts_loaded;
+        }
+    }
+    for (auto& audio : server.audio_datas) {
+        ++num_samples_loaded;
+        if (audio.state.Load() == LoadingState::CompletedSucessfully)
+            total_bytes_used += audio.audio_data.RamUsageBytes();
+    }
+    server.num_insts_loaded.Store(num_insts_loaded);
+    server.num_samples_loaded.Store(num_samples_loaded);
+    server.total_bytes_used_by_samples.Store(total_bytes_used);
+}
+
+static void ServerThreadProc(Server& server) {
+    ZoneScoped;
+
+    ServerThread server_thread;
+    server_thread.watcher = CreateDirectoryWatcher(server.error_notifications);
+    DEFER {
+        if (server_thread.watcher) DestoryDirectoryWatcher(*server_thread.watcher);
+    };
+
+    while (!server.end_thread.Load()) {
+        ServerThread::PendingResults pending_results {};
         LibrariesAsyncContext libs_async_ctx {
             .thread_pool = server.thread_pool,
             .work_signaller = server.work_signaller,
         };
 
-        IntrusiveSinglyLinkedList<PendingResult> pending_results {};
-        AtomicCountdown thread_pool_jobs {0};
-
-        ThreadPoolContext thread_pool_ctx {
-            .pool = server.thread_pool,
-            .num_thread_pool_jobs = thread_pool_jobs,
-            .completed_signaller = server.work_signaller,
-        };
-
-        do {
+        while (true) {
             server.work_signaller.WaitUntilSignalledOrSpurious(250u);
 
             if (server.request_debug_dump_current_state.Exchange(false)) {
                 ZoneNamedN(dump, "dump", true);
                 DebugLn("Dumping current state of loading thread");
                 DebugLn("Libraries currently loading: {}", libs_async_ctx.num_uncompleted_jobs.Load());
-                DebugLn("Thread pool jobs: {}", thread_pool_jobs.counter.Load());
-                DebugLn("\nPending results:");
-                for (auto& pending_result : pending_results) {
-                    DebugLn("  Pending result: {}", pending_result.debug_id);
-                    switch (pending_result.state.tag) {
-                        case PendingResult::State::AwaitingLibrary: DebugLn("    Awaiting library"); break;
-                        case PendingResult::State::AwaitingAudio: {
-                            auto& asset = pending_result.state.Get<PendingResult::LoadingAsset>();
-                            switch (asset.tag) {
-                                case LoadRequestType::Instrument: {
-                                    auto inst = asset.Get<ListedInstrument*>();
-                                    DebugLn("    Awaiting audio for instrument {}",
-                                            inst->inst.instrument.name);
-                                    for (auto& audio_data : inst->audio_data_set) {
-                                        DebugLn("      Audio data: {}, {}",
-                                                audio_data->audio_data.hash,
-                                                EnumToString(audio_data->state.Load()));
-                                    }
-                                    break;
-                                }
-                                case LoadRequestType::Ir: {
-                                    auto ir = asset.Get<ListedAudioData*>();
-                                    DebugLn("    Awaiting audio for IR {}", ir->path);
-                                    DebugLn("      Audio data: {}, {}",
-                                            ir->audio_data.hash,
-                                            EnumToString(ir->state.Load()));
-                                    break;
-                                }
-                            }
-                            break;
-                        }
-                        case PendingResult::State::Cancelled: DebugLn("    Cancelled"); break;
-                        case PendingResult::State::Failed: DebugLn("    Failed"); break;
-                        case PendingResult::State::CompletedSuccessfully:
-                            DebugLn("    Completed successfully");
-                            break;
-                    }
-                }
+                DumpPendingResultsDebugInfo(pending_results);
                 DebugLn("\nAvailable Libraries:");
                 for (auto& lib : server.libraries) {
                     DebugLn("  Library: {}", lib.value.lib->name);
@@ -946,379 +1296,47 @@ static void LoadingThreadLoop(Server& server) {
 
             TracyMessageEx({k_trace_category, k_trace_colour, {}},
                            "poll, thread_pool_jobs: {}",
-                           thread_pool_jobs.counter.Load());
+                           pending_results.thread_pool_jobs.counter.Load());
 
-            // consume any incoming requests
-            while (auto queued_request = server.request_queue.TryPop()) {
-                ZoneNamedN(req, "request", true);
-
-                if (!queued_request->async_comms_channel.used.Load(MemoryOrder::Relaxed)) continue;
-
-                // Only once we have a request do we initiate the scanning
-                for (auto& n : server.scan_folders) {
-                    if (auto f = n.TryScoped()) {
-                        auto expected = ScanFolder::State::NotScanned;
-                        f->state.CompareExchangeStrong(expected, ScanFolder::State::RescanRequested);
-                    }
-                }
-
-                auto pending_result = scratch_arena.NewUninitialised<PendingResult>();
-                PLACEMENT_NEW(pending_result)
-                PendingResult {
-                    .state = PendingResult::State::AwaitingLibrary,
-                    .request = *queued_request,
-                    .debug_id = debug_result_id++,
-                };
-                SinglyLinkedListPrepend(pending_results.first, pending_result);
-
-                TracyMessageEx({k_trace_category, k_trace_colour, pending_result->debug_id},
-                               "pending result added");
+            if (ConsumeRequestsIntoPendingResults(pending_results,
+                                                  server_thread.scratch_arena,
+                                                  server.request_queue)) {
+                // For quick initialisation, we load libraries only when there's been a request.
+                RequestScanningFoldersIfNeeded(server.scan_folders);
             }
 
-            UpdateLoadingThread(server, libs_async_ctx, scratch_arena, watcher);
+            // There's 2 separate systems here. The library loading, and then the audio loading (which
+            // includes Instruments and IRs). Before we can fulfill a request for an instrument or IR, we need
+            // to have a loaded library. The library contains the information needed to locate the audio.
 
-            if (!pending_results.Empty()) {
-                // Fill in library
-                for (auto& pending_result : pending_results) {
-                    if (pending_result.state != PendingResult::State::AwaitingLibrary) continue;
+            auto const libraries_are_still_loading = UpdateLibraryLoading(server,
+                                                                          libs_async_ctx,
+                                                                          server_thread.scratch_arena,
+                                                                          server_thread.watcher);
 
-                    auto const library_name = ({
-                        String n {};
-                        switch (pending_result.request.request.tag) {
-                            case LoadRequestType::Instrument:
-                                n = pending_result.request.request.Get<LoadRequestInstrumentIdWithLayer>()
-                                        .id.library_name;
-                                break;
-                            case LoadRequestType::Ir:
-                                n = pending_result.request.request.Get<sample_lib::IrId>().library_name;
-                                break;
-                        }
-                        n;
-                    });
-                    ASSERT(library_name.size != 0);
+            auto const audio_is_still_loading =
+                UpdatePendingResults(pending_results, server, libraries_are_still_loading);
 
-                    LibrariesList::Node* lib {};
-                    if (auto l_ptr = server.libraries_by_name.Find(library_name)) lib = *l_ptr;
+            ServerThreadUpdateMetrics(server);
 
-                    if (!lib) {
-                        if (libs_async_ctx.num_uncompleted_jobs.Load(MemoryOrder::AcquireRelease) == 0) {
-                            {
-                                auto item =
-                                    pending_result.request.async_comms_channel.error_notifications.NewError();
-                                item->value = {
-                                    .title = {},
-                                    .message = {},
-                                    .error_code = CommonError::NotFound,
-                                    .id = ThreadsafeErrorNotifications::Id("lib ", library_name),
-                                };
-                                fmt::Append(item->value.title, "{} not found", library_name);
-                                pending_result.request.async_comms_channel.error_notifications
-                                    .AddOrUpdateError(item);
-                            }
-                            pending_result.state = ErrorCode {CommonError::NotFound};
-                        }
-                    } else {
-                        switch (pending_result.request.request.tag) {
-                            case LoadRequestType::Instrument: {
-                                auto& load_inst =
-                                    pending_result.request.request.Get<LoadRequestInstrumentIdWithLayer>();
-                                auto const inst_name = load_inst.id.inst_name;
-
-                                ASSERT(inst_name.size != 0);
-
-                                if (auto const i = lib->value.lib->insts_by_name.Find(inst_name)) {
-                                    pending_result.request.async_comms_channel
-                                        .instrument_loading_percents[load_inst.layer_index]
-                                        .Store(0);
-
-                                    auto inst =
-                                        FetchOrCreateInstrument(*lib, audio_datas, **i, thread_pool_ctx);
-                                    ASSERT(inst);
-
-                                    pending_result.request.async_comms_channel
-                                        .desired_inst[load_inst.layer_index] = inst;
-                                    pending_result.state = PendingResult::LoadingAsset {inst};
-
-                                    TracyMessageEx(
-                                        {k_trace_category, k_trace_colour, pending_result.debug_id},
-                                        "option: instID:{} load Sampler inst[{}], {}, {}, {}",
-                                        inst->debug_id,
-                                        load_inst.layer_index,
-                                        (void const*)inst,
-                                        lib->value.lib->name,
-                                        inst_name);
-                                } else {
-                                    {
-                                        auto const item = pending_result.request.async_comms_channel
-                                                              .error_notifications.NewError();
-                                        item->value = {
-                                            .title = {},
-                                            .message = {},
-                                            .error_code = CommonError::NotFound,
-                                            .id = ThreadsafeErrorNotifications::Id("inst", inst_name),
-                                        };
-                                        fmt::Append(item->value.title,
-                                                    "Cannot find instrument \"{}\"",
-                                                    inst_name);
-                                        pending_result.request.async_comms_channel.error_notifications
-                                            .AddOrUpdateError(item);
-                                    }
-                                    pending_result.state = ErrorCode {CommonError::NotFound};
-                                }
-                                break;
-                            }
-                            case LoadRequestType::Ir: {
-                                auto const ir = pending_result.request.request.Get<sample_lib::IrId>();
-
-                                auto const ir_path = lib->value.lib->irs_by_name.Find(ir.ir_name);
-
-                                if (ir_path) {
-                                    auto audio_data = FetchOrCreateAudioData(audio_datas,
-                                                                             *lib->value.lib,
-                                                                             (*ir_path)->path,
-                                                                             thread_pool_ctx,
-                                                                             999999);
-
-                                    pending_result.state = PendingResult::LoadingAsset {audio_data};
-
-                                    TracyMessageEx(
-                                        {k_trace_category, k_trace_colour, pending_result.debug_id},
-                                        "option: load IR, {}, {}",
-                                        ir.library_name,
-                                        ir.ir_name);
-                                } else {
-                                    auto const err = pending_result.request.async_comms_channel
-                                                         .error_notifications.NewError();
-                                    err->value = {
-                                        .title = "Failed to find IR"_s,
-                                        .message = String(ir.ir_name),
-                                        .error_code = CommonError::NotFound,
-                                        .id = ThreadsafeErrorNotifications::Id("ir  ", ir.ir_name),
-                                    };
-                                    pending_result.request.async_comms_channel.error_notifications
-                                        .AddOrUpdateError(err);
-                                    pending_result.state = ErrorCode {CommonError::NotFound};
-                                }
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                // For each inst, check for errors
-                for (auto& pending_result : pending_results) {
-                    if (pending_result.state.tag != PendingResult::State::AwaitingAudio) continue;
-                    auto i_ptr =
-                        pending_result.state.Get<PendingResult::LoadingAsset>().TryGet<ListedInstrument*>();
-                    if (!i_ptr) continue;
-                    auto i = *i_ptr;
-
-                    ASSERT(i->audio_data_set.size);
-
-                    Optional<ErrorCode> error {};
-                    for (auto a : i->audio_data_set) {
-                        if (a->state.Load() == LoadingState::CompletedWithError) {
-                            error = a->error;
-                            break;
-                        }
-                    }
-
-                    if (error) {
-                        {
-                            auto item =
-                                pending_result.request.async_comms_channel.error_notifications.NewError();
-                            item->value = {
-                                .title = "Failed to load audio"_s,
-                                .message = i->inst.instrument.name,
-                                .error_code = *error,
-                                .id = ThreadsafeErrorNotifications::Id("audi", i->inst.instrument.name),
-                            };
-                            pending_result.request.async_comms_channel.error_notifications.AddOrUpdateError(
-                                item);
-                        }
-
-                        CancelLoadingAudioForInstrumentIfPossible(i, pending_result.debug_id);
-                        if (pending_result.IsDesired()) pending_result.LoadingPercent().Store(-1);
-                        pending_result.state = *error;
-                    }
-                }
-
-                // For each inst, check if it's still needed, and cancel if not. And update percent
-                // markers
-                for (auto& pending_result : pending_results) {
-                    if (pending_result.state.tag != PendingResult::State::AwaitingAudio) continue;
-                    auto i_ptr =
-                        pending_result.state.Get<PendingResult::LoadingAsset>().TryGet<ListedInstrument*>();
-                    if (!i_ptr) continue;
-                    auto i = *i_ptr;
-
-                    if (pending_result.IsDesired()) {
-                        auto const num_completed = ({
-                            u32 n = 0;
-                            for (auto& a : i->audio_data_set) {
-                                auto const state = a->state.Load();
-                                if (state == LoadingState::CompletedSucessfully) ++n;
-                            }
-                            n;
-                        });
-                        if (num_completed == i->audio_data_set.size) {
-                            pending_result.LoadingPercent().Store(-1);
-                            pending_result.state = RefUnion {
-                                RefCounted<LoadedInstrument> {i->inst, i->refs, &server.work_signaller}};
-                        } else {
-                            f32 const percent = 100.0f * ((f32)num_completed / (f32)i->audio_data_set.size);
-                            pending_result.LoadingPercent().Store(RoundPositiveFloat(percent));
-                        }
-                    } else {
-                        // If it's not desired by any others it can be cancelled
-                        bool const is_desired_by_another = ({
-                            bool desired = false;
-                            for (auto& other_pending_result : pending_results) {
-                                for (auto other_desired :
-                                     other_pending_result.request.async_comms_channel.desired_inst) {
-                                    if (other_desired == i) {
-                                        desired = true;
-                                        break;
-                                    }
-                                }
-                                if (desired) break;
-                            }
-                            desired;
-                        });
-                        if (!is_desired_by_another)
-                            CancelLoadingAudioForInstrumentIfPossible(i, pending_result.debug_id);
-
-                        pending_result.state = PendingResult::State::Cancelled;
-                    }
-                }
-
-                // Store the result of the IR load in the result, if needed
-                for (auto& pending_result : pending_results) {
-                    if (pending_result.state.tag != PendingResult::State::AwaitingAudio) continue;
-                    auto a_ptr =
-                        pending_result.state.Get<PendingResult::LoadingAsset>().TryGet<ListedAudioData*>();
-                    if (!a_ptr) continue;
-                    auto a = *a_ptr;
-
-                    auto const& ir_data = *a;
-                    switch (ir_data.state.Load()) {
-                        case LoadingState::CompletedSucessfully: {
-                            pending_result.state = RefUnion {
-                                RefCounted<AudioData> {a->audio_data, a->refs, &server.work_signaller}};
-                            break;
-                        }
-                        case LoadingState::CompletedWithError: {
-                            auto const ir_index = pending_result.request.request.Get<sample_lib::IrId>();
-                            {
-                                auto item =
-                                    pending_result.request.async_comms_channel.error_notifications.NewError();
-                                item->value = {
-                                    .title = "Failed to load IR"_s,
-                                    .message = {},
-                                    .error_code = *ir_data.error,
-                                    .id = Hash("ir  "_s) + Hash(ir_index.library_name.Items()) +
-                                          Hash(ir_index.ir_name.Items()),
-                                };
-                                pending_result.request.async_comms_channel.error_notifications
-                                    .AddOrUpdateError(item);
-                            }
-                            pending_result.state = *ir_data.error;
-                            break;
-                        }
-                        case LoadingState::PendingLoad:
-                        case LoadingState::Loading: break;
-                        case LoadingState::PendingCancel:
-                        case LoadingState::CompletedCancelled: PanicIfReached(); break;
-                        case LoadingState::Count: PanicIfReached(); break;
-                    }
-                }
-
-                // For each inst, check if all loading has completed and if so, dispatch the result
-                // and remove it from the pending list
-                SinglyLinkedListRemoveIf(
-                    pending_results.first,
-                    [&](PendingResult const& pending_result) {
-                        switch (pending_result.state.tag) {
-                            case PendingResult::State::AwaitingLibrary:
-                            case PendingResult::State::AwaitingAudio: return false;
-                            case PendingResult::State::Cancelled:
-                            case PendingResult::State::Failed:
-                            case PendingResult::State::CompletedSuccessfully: break;
-                        }
-
-                        LoadResult result {
-                            .id = pending_result.request.id,
-                            .result = ({
-                                LoadResult::Result r {LoadResult::ResultType::Cancelled};
-                                switch (pending_result.state.tag) {
-                                    case PendingResult::State::AwaitingLibrary:
-                                    case PendingResult::State::AwaitingAudio: PanicIfReached(); break;
-                                    case PendingResult::State::Cancelled: break;
-                                    case PendingResult::State::Failed:
-                                        r = pending_result.state.Get<ErrorCode>();
-                                        break;
-                                    case PendingResult::State::CompletedSuccessfully:
-                                        r = pending_result.state.Get<RefUnion>();
-                                        break;
-                                }
-                                r;
-                            }),
-                        };
-
-                        server.channels.Use([&](auto&) {
-                            if (pending_result.request.async_comms_channel.used.Load(MemoryOrder::Relaxed)) {
-                                result.Retain();
-                                pending_result.request.async_comms_channel.results.Push(result);
-                                pending_result.request.async_comms_channel.result_added_callback();
-                            }
-                        });
-                        return true;
-                    },
-                    [](PendingResult*) {
-                        // delete function
-                    });
-            }
-
-            {
-                u32 num_insts_loaded = 0;
-                u32 num_samples_loaded = 0;
-                u64 total_bytes_used = 0;
-                for (auto& i : server.libraries) {
-                    for (auto& inst : i.value.instruments) {
-                        (void)inst;
-                        ++num_insts_loaded;
-                    }
-                }
-                for (auto& audio : audio_datas) {
-                    ++num_samples_loaded;
-                    if (audio.state.Load() == LoadingState::CompletedSucessfully)
-                        total_bytes_used += audio.audio_data.RamUsageBytes();
-                }
-                server.num_insts_loaded.Store(num_insts_loaded);
-                server.num_samples_loaded.Store(num_samples_loaded);
-                server.total_bytes_used_by_samples.Store(total_bytes_used);
-            }
-        } while (!pending_results.Empty() ||
-                 libs_async_ctx.num_uncompleted_jobs.Load(MemoryOrder::AcquireRelease));
+            if (!audio_is_still_loading && !libraries_are_still_loading) break;
+        }
 
         ZoneNamedN(post_inner, "post inner", true);
 
         TracyMessageEx({k_trace_category, k_trace_colour, -1u}, "poll completed");
 
-        // We have completed all of the asset loading requests, but there might still be audio data that
-        // is in the thread pool. We need for them to finish before we potentially delete the memory that
-        // they rely on.
-        thread_pool_jobs.WaitUntilZero();
+        // We have completed all of the loading requests, but there might still be audio data that is in the
+        // thread pool. We need for them to finish before we potentially delete the memory that they rely on.
+        pending_results.thread_pool_jobs.WaitUntilZero();
 
-        RemoveUnreferencedObjects(server, audio_datas);
-        scratch_arena.ResetCursorAndConsolidateRegions();
+        RemoveUnreferencedObjects(server);
+        server_thread.scratch_arena.ResetCursorAndConsolidateRegions();
     }
-
-    DebugLn("Ending server thread loop");
 
     // It's necessary to do this at the end of this function because it is not guaranteed to be called in the
     // loop; the 'end' boolean can be changed at a point where the loop ends before calling this.
-    RemoveUnreferencedObjects(server, audio_datas);
+    RemoveUnreferencedObjects(server);
 
     server.libraries.RemoveAll();
     server.libraries.DeleteRemovedAndUnreferenced();
@@ -1338,13 +1356,23 @@ Server::Server(ThreadPool& pool,
         node->value.state.raw = ScanFolder::State::NotScanned;
         scan_folders.Insert(node);
     }
-    loading_thread.Start([this]() { LoadingThreadLoop(*this); }, "Sample lib loading");
+
+    {
+        auto node = libraries.AllocateUninitialised();
+        PLACEMENT_NEW(&node->value)
+        ListedLibrary {.arena = PageAllocator::Instance(), .lib = BuiltinLibrary()};
+        libraries.Insert(node);
+
+        libraries_by_name.Insert(BuiltinLibrary()->name, node);
+    }
+
+    thread.Start([this]() { ServerThreadProc(*this); }, "Sample lib loading");
 }
 
 Server::~Server() {
     end_thread.Store(true);
     work_signaller.Signal();
-    loading_thread.Join();
+    thread.Join();
     ASSERT(channels.Use([](auto& h) { return h.Empty(); }), "missing channel close");
 
     scan_folders.RemoveAll();
@@ -1353,7 +1381,7 @@ Server::~Server() {
 
 AsyncCommsChannel& OpenAsyncCommsChannel(Server& server,
                                          ThreadsafeErrorNotifications& error_notifications,
-                                         LoadCompletedCallback&& callback) {
+                                         AsyncCommsChannel::ResultAddedCallback&& callback) {
     return server.channels.Use([&](auto& channels) -> AsyncCommsChannel& {
         auto channel = channels.PrependUninitialised();
         PLACEMENT_NEW(channel)
@@ -1413,19 +1441,9 @@ void SetExtraScanFolders(Server& server, Span<String const> extra_folders) {
     }
 }
 
-static bool RequestScanningIfNeeded(ScanFolderList& scan_folders) {
-    bool any_rescan_requested = false;
-    for (auto& n : scan_folders)
-        if (auto f = n.TryScoped()) {
-            auto expected = ScanFolder::State::NotScanned;
-            if (f->state.CompareExchangeStrong(expected, ScanFolder::State::RescanRequested))
-                any_rescan_requested = true;
-        }
-    return any_rescan_requested;
-}
-
 Span<RefCounted<sample_lib::Library>> AllLibrariesRetained(Server& server, ArenaAllocator& arena) {
-    if (RequestScanningIfNeeded(server.scan_folders)) server.work_signaller.Signal();
+    // IMPROVE: is this slow to do at every request for a library?
+    if (RequestScanningFoldersIfNeeded(server.scan_folders)) server.work_signaller.Signal();
 
     DynamicArray<RefCounted<sample_lib::Library>> result(arena);
     for (auto& i : server.libraries) {
@@ -1438,7 +1456,8 @@ Span<RefCounted<sample_lib::Library>> AllLibrariesRetained(Server& server, Arena
 }
 
 RefCounted<sample_lib::Library> FindLibraryRetained(Server& server, String name) {
-    if (RequestScanningIfNeeded(server.scan_folders)) server.work_signaller.Signal();
+    // IMPROVE: is this slow to do at every request for a library?
+    if (RequestScanningFoldersIfNeeded(server.scan_folders)) server.work_signaller.Signal();
 
     server.libraries_by_name_mutex.Lock();
     DEFER { server.libraries_by_name_mutex.Unlock(); };

@@ -14,21 +14,26 @@
 #include "sample_library/loaded_instrument.hpp"
 #include "sample_library/sample_library.hpp"
 
-// Requirements:
-// 1. Asynchronous
-// 2. Fast; especially for already-loaded assets
-// 3. In-progress loads that are no longer needed should be aborted
-// 4. The main-thread should be able to retrieve the loading percentage for instruments
-// 5. Each asset should not be duplicated in memory
-// 6. Unused assets should be freed
+// Sample library server
+// A centralised manager for sample libraries that multiple plugins/systems can use at once.
+//
+// - Manages loading, unloading and storage of sample libraries (including instruments, irs, etc)
+// - Provides an asynchronous request-response API (we tend to call response 'result')
+// - Very quick for assets that are already loaded
+// - Scans library folders and watches for file changes in them
+// - Has its own dedicated server thread but also makes use of a thread pool for loading big files
+// - Instantly aborts any pending loads that are no longer needed
+// - No duplication of assets in memory
+// - Provides progress/status metrics for other threads to read
 
 namespace sample_lib_server {
 
-// forward declarations
 namespace detail {
 struct ListedInstrument;
 }
 
+// Requests
+// ==========================================================================================================
 using RequestId = u64;
 
 enum class LoadRequestType { Instrument, Ir };
@@ -42,6 +47,8 @@ using LoadRequest = TaggedUnion<LoadRequestType,
                                 TypeAndTag<LoadRequestInstrumentIdWithLayer, LoadRequestType::Instrument>,
                                 TypeAndTag<sample_lib::IrId, LoadRequestType::Ir>>;
 
+// Results
+// ==========================================================================================================
 enum class RefCountChange { Retain, Release };
 
 template <typename Type>
@@ -101,9 +108,11 @@ struct LoadResult {
     Result result;
 };
 
-using LoadCompletedCallback = TrivialFixedSizeFunction<8, void()>;
-
+// Communication channel
+// ==========================================================================================================
 struct AsyncCommsChannel {
+    using ResultAddedCallback = TrivialFixedSizeFunction<8, void()>;
+
     // -1 if not valid, else 0 to 100
     Array<Atomic<s32>, k_num_layers> instrument_loading_percents {};
 
@@ -114,14 +123,14 @@ struct AsyncCommsChannel {
     // private
     ThreadsafeErrorNotifications& error_notifications;
     Array<detail::ListedInstrument*, k_num_layers> desired_inst {};
-    LoadCompletedCallback result_added_callback;
+    ResultAddedCallback result_added_callback;
     Atomic<bool> used {};
     AsyncCommsChannel* next {};
 };
 
+// Internal details
+// ==========================================================================================================
 namespace detail {
-
-extern u32 g_inst_debug_id;
 
 enum class LoadingState : u32 {
     PendingLoad,
@@ -149,7 +158,7 @@ struct ListedAudioData {
 struct ListedInstrument {
     ~ListedInstrument();
 
-    u32 debug_id {g_inst_debug_id++};
+    u32 debug_id;
     LoadedInstrument inst;
     Atomic<u32> refs {};
     Atomic<u32>& library_refs;
@@ -186,6 +195,8 @@ struct QueuedRequest {
 
 } // namespace detail
 
+// Server struct
+// ==========================================================================================================
 struct Server {
     Server(ThreadPool& pool,
            Span<String const> always_scanned_folders,
@@ -203,19 +214,23 @@ struct Server {
     Mutex libraries_by_name_mutex;
     DynamicHashTable<String, detail::LibrariesList::Node*> libraries_by_name {Malloc::Instance()};
 
-    // Connection independent. If we have access to a channel, we post to the channel's error_notifications
-    // instead.
+    // Connection-independent errors. If we have access to a channel, we post to the channel's
+    // error_notifications instead of this.
     ThreadsafeErrorNotifications& error_notifications;
 
     ThreadPool& thread_pool;
     Atomic<RequestId> request_id_counter {};
     MutexProtected<ArenaList<AsyncCommsChannel, true>> channels {Malloc::Instance()};
-    Thread loading_thread {};
+    Thread thread {};
     Atomic<bool> end_thread {false};
     ThreadsafeQueue<detail::QueuedRequest> request_queue {PageAllocator::Instance()};
     WorkSignaller work_signaller {};
     Atomic<bool> request_debug_dump_current_state {false};
+    ArenaList<detail::ListedAudioData, true> audio_datas {PageAllocator::Instance()};
 };
+
+// Public API
+// ==========================================================================================================
 
 // The server owns the channel, you just get a reference to it that will be valid until you close it. The
 // callback will be called whenever a request from this channel is completed. If you want to keep any of
@@ -225,7 +240,7 @@ struct Server {
 // [threadsafe]
 AsyncCommsChannel& OpenAsyncCommsChannel(Server& server,
                                          ThreadsafeErrorNotifications& error_notifications,
-                                         LoadCompletedCallback&& completed_callback);
+                                         AsyncCommsChannel::ResultAddedCallback&& completed_callback);
 
 // You will not receive any more results after this is called. Results that are still in the channel's queue
 // will be released at some point after this is called.
@@ -233,9 +248,9 @@ AsyncCommsChannel& OpenAsyncCommsChannel(Server& server,
 void CloseAsyncCommsChannel(Server& server, AsyncCommsChannel& channel);
 
 // You'll receive a callback when the request is completed. After that you should consume all the results in
-// your channel's results field (threadsafe). Each result is already retained so you must Release() them when
-// you're done with them. If you send a request when there's already another loading with the same layer_index
-// and channel, the old will be aborted, provided it's not needed by anything else.
+// your channel's 'results' field (threadsafe). Each result is already retained so you must Release() them
+// when you're done with them. The server monitors the layer_index of each of your requests and works out if
+// any currently-loading assets are no longer needed and aborts their loading.
 // [threadsafe]
 RequestId SendAsyncLoadRequest(Server& server, AsyncCommsChannel& channel, LoadRequest const& request);
 

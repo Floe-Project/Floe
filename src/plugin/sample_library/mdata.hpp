@@ -15,9 +15,7 @@ structs; they are used directly when deserialising. It assumes little-endian eve
 2. After that is the HeaderID_InfoJson which is a JSON string containing various info about the
 library
 3. Next is the HeaderID_StringPool chunk which can be used by any subsequent chunks
-4. Any other chunks can be in any order, or not present at all. NOTE: prior to
-c37879b38a98b99718865d389939663b8d04b036 (version 1.2.0) there was a bug in the code path for ignoring
-unrecognised chunks which caused a crash.
+4. Any other chunks can be in any order, or not present at all.
 
 */
 

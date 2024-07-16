@@ -19,12 +19,15 @@
 //
 // - Manages loading, unloading and storage of sample libraries (including instruments, irs, etc)
 // - Provides an asynchronous request-response API (we tend to call response 'result')
-// - Very quick for assets that are already loaded
+// - Very quick for resources that are already loaded
 // - Scans library folders and watches for file changes in them
 // - Has its own dedicated server thread but also makes use of a thread pool for loading big files
 // - Instantly aborts any pending loads that are no longer needed
-// - No duplication of assets in memory
+// - No duplication of resources in memory
 // - Provides progress/status metrics for other threads to read
+//
+// We use the term 'resource' for loadable things from a library, such as an Instrument, IR, audio data,
+// image, etc.
 
 namespace sample_lib_server {
 
@@ -32,7 +35,7 @@ namespace detail {
 struct ListedInstrument;
 }
 
-// Requests
+// Request
 // ==========================================================================================================
 using RequestId = u64;
 
@@ -47,21 +50,26 @@ using LoadRequest = TaggedUnion<LoadRequestType,
                                 TypeAndTag<LoadRequestInstrumentIdWithLayer, LoadRequestType::Instrument>,
                                 TypeAndTag<sample_lib::IrId, LoadRequestType::Ir>>;
 
-// Results
+// Result
 // ==========================================================================================================
 enum class RefCountChange { Retain, Release };
 
+// NOTE: this doesn't do reference counting automatically. You must use Retain() and Release() manually.
+// Things can get messy and inefficient using copy/move constructors and assignment operators.
 template <typename Type>
 struct RefCounted {
     RefCounted() = default;
-    RefCounted(Type& t, Atomic<u32>& r, WorkSignaller* s) : m_data(&t), m_refs(&r), m_work_signaller(s) {}
+    RefCounted(Type& t, Atomic<u32>& r, WorkSignaller* s)
+        : m_data(&t)
+        , m_ref_count(&r)
+        , m_work_signaller(s) {}
 
     void Retain() const {
-        if (m_refs) m_refs->FetchAdd(1, MemoryOrder::Relaxed);
+        if (m_ref_count) m_ref_count->FetchAdd(1, MemoryOrder::Relaxed);
     }
     void Release() const {
-        if (m_refs) {
-            auto prev = m_refs->SubFetch(1, MemoryOrder::AcquireRelease);
+        if (m_ref_count) {
+            auto prev = m_ref_count->SubFetch(1, MemoryOrder::AcquireRelease);
             ASSERT(prev != ~(u32)0);
             if (prev == 0 && m_work_signaller) m_work_signaller->Signal();
         }
@@ -70,7 +78,7 @@ struct RefCounted {
         Release();
         other.Retain();
         m_data = other.m_data;
-        m_refs = other.m_refs;
+        m_ref_count = other.m_ref_count;
         m_work_signaller = other.m_work_signaller;
     }
     void ChangeRefCount(RefCountChange t) const {
@@ -86,18 +94,18 @@ struct RefCounted {
 
   private:
     Type const* m_data {};
-    Atomic<u32>* m_refs {};
+    Atomic<u32>* m_ref_count {};
     WorkSignaller* m_work_signaller {};
 };
 
-using RefUnion = TaggedUnion<LoadRequestType,
+using Resource = TaggedUnion<LoadRequestType,
                              TypeAndTag<RefCounted<LoadedInstrument>, LoadRequestType::Instrument>,
                              TypeAndTag<RefCounted<AudioData>, LoadRequestType::Ir>>;
 
 struct LoadResult {
     enum class ResultType { Success, Error, Cancelled };
     using Result = TaggedUnion<ResultType,
-                               TypeAndTag<RefUnion, ResultType::Success>,
+                               TypeAndTag<Resource, ResultType::Success>,
                                TypeAndTag<ErrorCode, ResultType::Error>>;
 
     void ChangeRefCount(RefCountChange t) const;
@@ -132,7 +140,7 @@ struct AsyncCommsChannel {
 // ==========================================================================================================
 namespace detail {
 
-enum class LoadingState : u32 {
+enum class FileLoadingState : u32 {
     PendingLoad,
     PendingCancel,
     Loading,
@@ -142,16 +150,14 @@ enum class LoadingState : u32 {
     Count,
 };
 
-using AudioDataAllocator = PageAllocator;
-
 struct ListedAudioData {
     ~ListedAudioData();
 
     DynamicArrayInline<char, k_max_library_name_size> library_name {};
     String path;
     AudioData audio_data;
-    Atomic<u32> refs {};
-    Atomic<LoadingState> state {LoadingState::PendingLoad};
+    Atomic<u32> ref_count {};
+    Atomic<FileLoadingState> state {FileLoadingState::PendingLoad};
     Optional<ErrorCode> error {};
 };
 
@@ -160,8 +166,8 @@ struct ListedInstrument {
 
     u32 debug_id;
     LoadedInstrument inst;
-    Atomic<u32> refs {};
-    Atomic<u32>& library_refs;
+    Atomic<u32> ref_count {};
+    Atomic<u32>& library_ref_count;
     Span<ListedAudioData*> audio_data_set {};
     ArenaAllocator arena {PageAllocator::Instance()};
 };
@@ -195,33 +201,34 @@ struct QueuedRequest {
 
 } // namespace detail
 
-// Server struct
+// Public API
 // ==========================================================================================================
+
 struct Server {
     Server(ThreadPool& pool,
            Span<String const> always_scanned_folders,
            ThreadsafeErrorNotifications& connection_independent_error_notif);
     ~Server();
 
+    // public
     Atomic<u64> total_bytes_used_by_samples {};
     Atomic<u32> num_insts_loaded {};
     Atomic<u32> num_samples_loaded {};
 
-    // internal
+    // private
     Mutex scan_folders_writer_mutex;
     detail::ScanFolderList scan_folders;
     detail::LibrariesList libraries;
     Mutex libraries_by_name_mutex;
     DynamicHashTable<String, detail::LibrariesList::Node*> libraries_by_name {Malloc::Instance()};
-
     // Connection-independent errors. If we have access to a channel, we post to the channel's
     // error_notifications instead of this.
     ThreadsafeErrorNotifications& error_notifications;
-
     ThreadPool& thread_pool;
     Atomic<RequestId> request_id_counter {};
     MutexProtected<ArenaList<AsyncCommsChannel, true>> channels {Malloc::Instance()};
     Thread thread {};
+    u64 server_thread_id {};
     Atomic<bool> end_thread {false};
     ThreadsafeQueue<detail::QueuedRequest> request_queue {PageAllocator::Instance()};
     WorkSignaller work_signaller {};
@@ -229,12 +236,9 @@ struct Server {
     ArenaList<detail::ListedAudioData, true> audio_datas {PageAllocator::Instance()};
 };
 
-// Public API
-// ==========================================================================================================
-
 // The server owns the channel, you just get a reference to it that will be valid until you close it. The
 // callback will be called whenever a request from this channel is completed. If you want to keep any of
-// the assets that are contained in the LoadResult, you must 'retain' them in the callback. You can release
+// the resources that are contained in the LoadResult, you must 'retain' them in the callback. You can release
 // them at any point after that. The callback is called from the server thread; you should not do any really
 // slow operations in it because it will block the server thread from processing other requests.
 // [threadsafe]
@@ -250,7 +254,7 @@ void CloseAsyncCommsChannel(Server& server, AsyncCommsChannel& channel);
 // You'll receive a callback when the request is completed. After that you should consume all the results in
 // your channel's 'results' field (threadsafe). Each result is already retained so you must Release() them
 // when you're done with them. The server monitors the layer_index of each of your requests and works out if
-// any currently-loading assets are no longer needed and aborts their loading.
+// any currently-loading resources are no longer needed and aborts their loading.
 // [threadsafe]
 RequestId SendAsyncLoadRequest(Server& server, AsyncCommsChannel& channel, LoadRequest const& request);
 

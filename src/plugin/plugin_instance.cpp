@@ -201,32 +201,31 @@ static void SetDesiredInstrument(PluginInstance& plugin,
     }
 }
 
-static void AssetLoadedJobCompleted(PluginInstance& plugin, sample_lib_server::LoadResult result) {
+static void SampleLibraryResourceLoaded(PluginInstance& plugin, sample_lib_server::LoadResult result) {
     ZoneScoped;
     DebugAssertMainThread(plugin.host);
 
-    enum class ResultSource { OneOff, PartOfPendingStateChange, LastInPendingStateChange };
+    enum class Source { OneOff, PartOfPendingStateChange, LastInPendingStateChange };
 
     auto const source = ({
-        ResultSource s {ResultSource::OneOff};
+        Source s {Source::OneOff};
         if (plugin.pending_sample_lib_request_ids) {
             if (auto opt_index = Find(*plugin.pending_sample_lib_request_ids, result.id)) {
-                s = ResultSource::PartOfPendingStateChange;
+                s = Source::PartOfPendingStateChange;
                 dyn::Remove(*plugin.pending_sample_lib_request_ids, *opt_index);
-                if (plugin.pending_sample_lib_request_ids->size == 0)
-                    s = ResultSource::LastInPendingStateChange;
+                if (plugin.pending_sample_lib_request_ids->size == 0) s = Source::LastInPendingStateChange;
             }
         }
         s;
     });
 
     switch (source) {
-        case ResultSource::OneOff: {
+        case Source::OneOff: {
             if (result.result.tag == sample_lib_server::LoadResult::ResultType::Success) {
-                auto asset_union = result.result.Get<sample_lib_server::RefUnion>();
-                switch (asset_union.tag) {
+                auto resource = result.result.Get<sample_lib_server::Resource>();
+                switch (resource.tag) {
                     case sample_lib_server::LoadRequestType::Instrument: {
-                        auto loaded_inst = asset_union.Get<sample_lib_server::RefCounted<LoadedInstrument>>();
+                        auto loaded_inst = resource.Get<sample_lib_server::RefCounted<LoadedInstrument>>();
                         for (auto [layer_index, l] : Enumerate<u32>(plugin.layers)) {
                             if (auto i = l.desired_instrument.TryGet<sample_lib::InstrumentId>()) {
                                 if (i->library_name == loaded_inst->instrument.library.name &&
@@ -238,7 +237,7 @@ static void AssetLoadedJobCompleted(PluginInstance& plugin, sample_lib_server::L
                         break;
                     }
                     case sample_lib_server::LoadRequestType::Ir: {
-                        auto audio_data = asset_union.Get<sample_lib_server::RefCounted<AudioData>>();
+                        auto audio_data = resource.Get<sample_lib_server::RefCounted<AudioData>>();
                         SetDesiredConvolutionIr(plugin, &*audio_data, true);
                         break;
                     }
@@ -246,8 +245,8 @@ static void AssetLoadedJobCompleted(PluginInstance& plugin, sample_lib_server::L
             }
             break;
         }
-        case ResultSource::PartOfPendingStateChange: break;
-        case ResultSource::LastInPendingStateChange: PresetLoadComplete(plugin); break;
+        case Source::PartOfPendingStateChange: break;
+        case Source::LastInPendingStateChange: PresetLoadComplete(plugin); break;
     }
 
     plugin.processor.for_main_thread.flags.FetchOr(AudioProcessor::MainThreadCallbackFlagsRedrawGui);
@@ -354,7 +353,7 @@ static void OnMainThread(PluginInstance& plugin, bool& update_gui) {
         (*f)();
 
     while (auto f = plugin.sample_lib_server_async_channel.results.TryPop()) {
-        AssetLoadedJobCompleted(plugin, *f);
+        SampleLibraryResourceLoaded(plugin, *f);
         f->Release();
     }
 }

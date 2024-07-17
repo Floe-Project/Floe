@@ -187,10 +187,10 @@ void GuiPlatform::Update() {
 
     auto start_counter = TimePoint::Now();
 
-    if ((cursor_pos.x < 0 && cursor_pos.y < 0) || (cursor_prev.x < 0 && cursor_prev.y < 0)) {
+    if (All(cursor_pos < f32x2 {0, 0} || cursor_prev < f32x2 {0, 0})) {
         // if mouse just appeared or disappeared (negative coordinate) we cancel out movement by setting to
         // zero
-        cursor_delta = {0.0f, 0.0f};
+        cursor_delta = {0, 0};
     } else {
         cursor_delta = cursor_pos - cursor_prev;
     }
@@ -201,10 +201,7 @@ void GuiPlatform::Update() {
         delta_time = 0;
 
     for (usize i = 0; i < ArraySize(mouse_down); i++) {
-        if (mouse_down[i] &&
-            (last_mouse_down_point[i].x != cursor_pos.x || last_mouse_down_point[i].y != cursor_pos.y)) {
-            mouse_is_dragging[i] = true;
-        }
+        if (All(mouse_down[i] && last_mouse_down_point[i] != cursor_pos)) mouse_is_dragging[i] = true;
         if (!mouse_down[i]) mouse_is_dragging[i] = false;
     }
     current_time = TimePoint::Now();

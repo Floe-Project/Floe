@@ -148,7 +148,7 @@ static void DrawKnob(Gui* g, imgui::Id id, Rect r, f32 percent, Style const& sty
 
 static imgui::SliderSettings KnobSettings(Gui* g, Style const& style) {
     auto settings = imgui::DefSlider();
-    settings.flags = {.slower_with_shift = true, .default_on_ctrl = true};
+    settings.flags = {.slower_with_shift = true, .default_on_modifer = true};
     settings.draw = [g, &style](IMGUI_DRAW_SLIDER_ARGS) { DrawKnob(g, id, r, percent, style); };
     return settings;
 }

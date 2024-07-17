@@ -140,7 +140,7 @@ Optional<KeyboardGuiKeyPressed> KeyboardGui(Gui* g, Rect r, int starting_octave)
         overlay_key(this_abs_note, key_r, UiColMap::KeyboardBlackVoiceOverlay);
     }
 
-    if (!imgui.platform->mouse.is_down[0] && g->midi_keyboard_note_held_with_mouse) {
+    if (!imgui.platform->mouse_buttons[0].is_down && g->midi_keyboard_note_held_with_mouse) {
         result =
             KeyboardGuiKeyPressed {.is_down = false, .note = g->midi_keyboard_note_held_with_mouse.Value()};
         g->midi_keyboard_note_held_with_mouse = {};

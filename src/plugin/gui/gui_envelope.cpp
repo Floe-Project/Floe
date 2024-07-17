@@ -92,7 +92,7 @@ void GUIDoEnvelope(Gui* g,
                                  new_value,
                                  attack_param.DefaultLinearValue(),
                                  att_rel_slider_sensitivity,
-                                 {.slower_with_shift = true, .default_on_ctrl = true})) {
+                                 {.slower_with_shift = true, .default_on_modifer = true})) {
             changed = true;
         }
 
@@ -231,7 +231,7 @@ void GUIDoEnvelope(Gui* g,
                                  new_value,
                                  release_param.DefaultLinearValue(),
                                  att_rel_slider_sensitivity,
-                                 {.slower_with_shift = true, .default_on_ctrl = true})) {
+                                 {.slower_with_shift = true, .default_on_modifer = true})) {
             changed = true;
         }
 

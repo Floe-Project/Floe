@@ -35,11 +35,20 @@ enum class KeyCode : u32 {
     F1,
     F2,
     F3,
-    Ctrl,
-    Shift,
-    Alt,
-    Count
+    Count,
 };
+
+enum class ModifierKey : u32 {
+    Shift,
+    Ctrl,
+    Alt,
+    Super,
+    Count,
+
+    Modifer = IS_MACOS ? Super : Ctrl,
+};
+
+enum class MouseButton : u32 { Left, Right, Middle, Count };
 
 struct MouseTrackedRegion {
     Rect r;
@@ -86,14 +95,27 @@ struct GuiUpdateRequirements {
         Malloc::Instance()}; // set this to the text that you want put into the OS clipboard
 };
 
-constexpr u32 k_num_mouse_buttons = 3;
-
 struct GuiPlatform {
+    struct MouseButtonState {
+        bool is_down {};
+        bool pressed {}; // cleared every frame
+        bool released {}; // cleared every frame
+        bool is_dragging {};
+        bool dragging_started {}; // cleared every frame
+        bool dragging_ended {}; // cleared every frame
+        f32x2 pressed_point {};
+        TimePoint pressed_time {};
+    };
+
+    struct ModifierKeyState {
+        u8 is_down; // we use an int to incr/decr because modifier keys can have both left and right keys
+        bool pressed;
+        bool released;
+    };
+
     GuiPlatform(TrivialFixedSizeFunction<16, void()>&& update, Logger& logger)
         : update(Move(update))
         , logger(logger) {}
-
-    virtual ~GuiPlatform() {}
 
     void SetGUIDirty() { gui_update_requirements.mark_gui_dirty = true; }
 
@@ -107,26 +129,34 @@ struct GuiPlatform {
         return !IsKeyDown(keycode) && keys_down_prev.Get(ToInt(keycode)) && update_guicall_count == 0;
     }
 
-    // n for mouse button number
-    bool MouseJustWentDown(u32 n) { return mouse.is_down[n] && !mouse_prev.is_down[n]; }
-    bool MouseJustWentUp(u32 n) { return !mouse.is_down[n] && mouse_prev.is_down[n]; }
-    bool MouseJustWentDownInRegion(u32 n, Rect r) { return MouseJustWentDown(n) && ContainsCursor(r); }
-    bool MouseJustWentUpInRegion(u32 n, Rect r) { return MouseJustWentUp(n) && ContainsCursor(r); }
-    bool MouseJustWentDownAndUpInRegion(u32 n, Rect r) {
-        return MouseJustWentUpInRegion(n, r) && r.Contains(last_mouse_down_point[n]);
+    bool MouseJustWentDownInRegion(MouseButton n, Rect r) {
+        return mouse_buttons[ToInt(n)].pressed && ContainsCursor(r);
     }
-    bool MouseIsDragging(u32 n) { return mouse.is_dragging[n]; }
-    bool MouseJustStartedDragging(u32 n) { return mouse.is_dragging[n] && !mouse_prev.is_dragging[n]; }
-    bool MouseJustFinishedDragging(u32 n) { return !mouse.is_down[n] && mouse_prev.is_dragging[n]; }
-    f64 SecondsSinceMouseDown(u32 n) { return current_time - time_at_mouse_down[n]; }
-    f32x2 DeltaFromMouseDown(u32 n) { return cursor_pos - last_mouse_down_point[n]; }
+    bool MouseJustWentUpInRegion(MouseButton n, Rect r) {
+        return mouse_buttons[ToInt(n)].released && ContainsCursor(r);
+    }
+    bool MouseJustWentDownAndUpInRegion(MouseButton n, Rect r) {
+        return MouseJustWentUpInRegion(n, r) && r.Contains(mouse_buttons[ToInt(n)].pressed_point);
+    }
+    f64 SecondsSinceMouseDown(MouseButton n) { return current_time - mouse_buttons[ToInt(n)].pressed_time; }
+    f32x2 DeltaFromMouseDown(MouseButton n) { return cursor_pos - mouse_buttons[ToInt(n)].pressed_point; }
+
+    MouseButtonState& MouseLeft() { return mouse_buttons[ToInt(MouseButton::Left)]; }
+    MouseButtonState& MouseRight() { return mouse_buttons[ToInt(MouseButton::Right)]; }
+    MouseButtonState& MouseMiddle() { return mouse_buttons[ToInt(MouseButton::Middle)]; }
+
+    ModifierKeyState& Shift() { return modifier_keys[ToInt(ModifierKey::Shift)]; }
+    ModifierKeyState& Ctrl() { return modifier_keys[ToInt(ModifierKey::Ctrl)]; }
+    ModifierKeyState& Alt() { return modifier_keys[ToInt(ModifierKey::Alt)]; }
+    ModifierKeyState& Super() { return modifier_keys[ToInt(ModifierKey::Super)]; }
+    ModifierKeyState& Modifier() { return modifier_keys[ToInt(ModifierKey::Modifer)]; }
 
     //
     // Called by platform specific code
     // ======================================================================================================
     bool HandleMouseWheel(f32 delta);
     bool HandleMouseMoved(f32 cursor_x, f32 cursor_y);
-    bool HandleMouseClicked(u32 button, bool is_down);
+    bool HandleMouseClicked(MouseButton button, bool is_down);
     bool HandleDoubleLeftClick();
     bool HandleKeyPressed(KeyCode code, bool is_down);
     bool HandleInputChar(u32 utf32_codepoint);
@@ -146,21 +176,10 @@ struct GuiPlatform {
     // ======================================================================================================
     f32x2 cursor_pos {};
     f32x2 cursor_delta {};
-    f32x2 cursor_prev {};
-    f32 mouse_scroll_in_lines {};
+    f32x2 cursor_pos_prev {};
+    f32 mouse_scroll_delta_in_lines {};
 
-    // TODO: We need to track presses and releases rather than just the current state because at the moment
-    // it's technically possible that a click-and-release could occur between frames and we'd miss it.
-    struct MouseState {
-        Array<bool, k_num_mouse_buttons> is_down {}; // the current state of the button
-        Array<bool, k_num_mouse_buttons> pressed {}; // indicates a key has been pressed since last frame
-        Array<bool, k_num_mouse_buttons> is_dragging {};
-    };
-
-    MouseState mouse {};
-    MouseState mouse_prev {};
-    Array<f32x2, 3> last_mouse_down_point {};
-    Array<TimePoint, 3> time_at_mouse_down {};
+    Array<MouseButtonState, ToInt(MouseButton::Count)> mouse_buttons {};
 
     bool double_left_click {};
 
@@ -180,13 +199,12 @@ struct GuiPlatform {
     DynamicArrayInline<u32, 16> input_chars {};
 
     uint64_t update_count {};
-    int update_guicall_count {}; // update gui is sometimes called 2 times in one frame
-    bool is_window_open {};
+    int update_guicall_count {}; // update() is sometimes called 2 times in one frame
     f32 display_ratio {};
 
-    bool currently_updating {};
-
     void* native_window {};
+
+    Array<ModifierKeyState, ToInt(ModifierKey::Count)> modifier_keys {};
 
     //
     // Internals

@@ -79,7 +79,7 @@ struct ButtonFlags {
     u32 middle_mouse : 1;
     u32 triggers_on_mouse_down : 1;
     u32 triggers_on_mouse_up : 1;
-    u32 requires_ctrl : 1;
+    u32 requires_modifer : 1;
     u32 requires_shift : 1;
     u32 requires_alt : 1;
     u32 disabled : 1;
@@ -90,7 +90,7 @@ struct ButtonFlags {
 
 struct SliderFlags {
     u32 slower_with_shift : 1;
-    u32 default_on_ctrl : 1;
+    u32 default_on_modifer : 1;
 };
 
 struct TextInputFlags {
@@ -911,7 +911,7 @@ PUBLIC ButtonSettings DefButtonPopup() {
 
 PUBLIC SliderSettings DefSlider() {
     SliderSettings s = {};
-    s.flags = {.slower_with_shift = true, .default_on_ctrl = true};
+    s.flags = {.slower_with_shift = true, .default_on_modifer = true};
     s.sensitivity = 500;
     s.draw = DefaultDrawSlider;
     return s;
@@ -928,7 +928,7 @@ PUBLIC TextInputSettings DefTextInput() {
 
 PUBLIC TextInputDraggerSettings DefTextInputDraggerInt() {
     TextInputDraggerSettings s;
-    s.slider_settings.flags = {.slower_with_shift = true, .default_on_ctrl = true};
+    s.slider_settings.flags = {.slower_with_shift = true, .default_on_modifer = true};
     s.slider_settings.draw = [](IMGUI_DRAW_SLIDER_ARGS) {};
     s.slider_settings.sensitivity = 500;
     s.text_input_settings.button_flags = {.double_left_mouse = true, .triggers_on_mouse_down = true};

@@ -136,8 +136,6 @@ struct PuglPlatform {
         //     Panic("Host does not support timer extension");
         // }
 
-        platform.is_window_open = true;
-
         return view;
     }
     bool DestroyView() {
@@ -148,7 +146,6 @@ struct PuglPlatform {
         }
         puglFreeView(view);
 
-        platform.is_window_open = false;
         if (--g_counter == 0) {
             if (g_world) {
                 puglFreeWorld(g_world);
@@ -219,15 +216,6 @@ struct PuglPlatform {
             case PUGL_KEY_F1: return KeyCode::F1;
             case PUGL_KEY_F2: return KeyCode::F2;
             case PUGL_KEY_F3: return KeyCode::F3;
-
-            // TODO: this isn't quite right, we are combining the left and right keys meaning releasing
-            // one turns the total 'ctrl' state off.
-            case PUGL_KEY_CTRL_L:
-            case PUGL_KEY_CTRL_R: return KeyCode::Ctrl;
-            case PUGL_KEY_SHIFT_L:
-            case PUGL_KEY_SHIFT_R: return KeyCode::Shift;
-            case PUGL_KEY_ALT_L:
-            case PUGL_KEY_ALT_R: return KeyCode::Alt;
             case 'a': return KeyCode::A;
             case 'c': return KeyCode::C;
             case 'v': return KeyCode::V;
@@ -238,9 +226,40 @@ struct PuglPlatform {
         return nullopt;
     }
 
+    static Optional<ModifierKey> ModKey(u32 key) {
+        switch (key) {
+            case PUGL_KEY_SHIFT_L:
+            case PUGL_KEY_SHIFT_R: return ModifierKey::Shift;
+            case PUGL_KEY_CTRL_L:
+            case PUGL_KEY_CTRL_R: return ModifierKey::Ctrl;
+            case PUGL_KEY_ALT_L:
+            case PUGL_KEY_ALT_R: return ModifierKey::Alt;
+            case PUGL_KEY_SUPER_L:
+            case PUGL_KEY_SUPER_R: return ModifierKey::Super;
+        }
+        return nullopt;
+    }
+
+    static Optional<MouseButton> ConvertMouseButton(u32 button) {
+        switch (button) {
+            case 0: return MouseButton::Left;
+            case 1: return MouseButton::Right;
+            case 2: return MouseButton::Middle;
+        }
+        return nullopt;
+    }
+
     static PuglStatus OnEvent(PuglView* view, PuglEvent const* event) {
         if (event->type != PUGL_UPDATE && event->type != PUGL_TIMER) printEvent(event, "PUGL: ", true);
         auto& self = *(PuglPlatform*)puglGetHandle(view);
+
+        // I'm not sure if pugl handles this for us or not, but let's just be safe. On Windows at least, it's
+        // possible to receive events from within an event if you're doing certain operation that trigger the
+        // event loop to pump again.
+        if (self.processing_events) return PUGL_SUCCESS;
+        self.processing_events = true;
+        DEFER { self.processing_events = false; };
+
         auto& platform = self.platform;
         switch (event->type) {
             case PUGL_NOTHING: break;
@@ -252,7 +271,6 @@ struct PuglPlatform {
                     platform.graphics_ctx->CreateDeviceObjects((void*)puglGetNativeView(view));
                 ASSERT(!outcome.HasError()); // TODO: handle error
                 platform.display_ratio = 1; // TODO: display_ratio
-                platform.currently_updating = false;
 
                 break;
             }
@@ -322,12 +340,20 @@ struct PuglPlatform {
             case PUGL_KEY_PRESS: {
                 if (auto const key = ConvertKeyCode(event->key.key)) {
                     if (platform.HandleKeyPressed(*key, true)) puglPostRedisplay(view);
+                } else if (auto mod_key = self.ModKey(event->key.key)) {
+                    auto& mod = platform.modifier_keys[ToInt(*mod_key)];
+                    if (!mod.is_down) mod.pressed = true;
+                    ++mod.is_down;
                 }
                 break;
             }
             case PUGL_KEY_RELEASE: {
                 if (auto const key = ConvertKeyCode(event->key.key)) {
                     if (platform.HandleKeyPressed(*key, false)) puglPostRedisplay(view);
+                } else if (auto mod_key = self.ModKey(event->key.key)) {
+                    auto& mod = platform.modifier_keys[ToInt(*mod_key)];
+                    --mod.is_down;
+                    if (mod.is_down == 0) mod.released = true;
                 }
                 break;
             }
@@ -341,14 +367,14 @@ struct PuglPlatform {
                 break;
             }
             case PUGL_BUTTON_PRESS: {
-                if (event->button.button >= 0 && event->button.button < 3) {
-                    if (platform.HandleMouseClicked(event->button.button, true)) puglPostRedisplay(view);
+                if (auto const button = ConvertMouseButton(event->button.button)) {
+                    if (platform.HandleMouseClicked(*button, true)) puglPostRedisplay(view);
                 }
                 break;
             }
             case PUGL_BUTTON_RELEASE: {
-                if (event->button.button >= 0 && event->button.button < 3) {
-                    if (platform.HandleMouseClicked(event->button.button, false)) puglPostRedisplay(view);
+                if (auto const button = ConvertMouseButton(event->button.button)) {
+                    if (platform.HandleMouseClicked(*button, false)) puglPostRedisplay(view);
                 }
                 break;
             }
@@ -405,6 +431,7 @@ struct PuglPlatform {
     bool realised = false;
     PuglWorld* world;
     PuglView* view;
+    bool processing_events = false;
     Optional<CursorType> current_cursor {};
 };
 

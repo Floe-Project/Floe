@@ -280,30 +280,20 @@ void Context::SetHotRaw(Id id) {
 
 // check the modifier key flags to see if the click is allowed
 static bool CheckModifierKeys(ButtonFlags flags, GuiPlatform* io) {
-    bool result = false;
-    if (!(flags.requires_ctrl || flags.requires_shift || flags.requires_alt))
-        result = true;
-    else if (flags.requires_ctrl && io->IsKeyDown(KeyCode::Ctrl))
-        result = true;
-    else if (flags.requires_shift && io->IsKeyDown(KeyCode::Shift))
-        result = true;
-    else if (flags.requires_alt && io->IsKeyDown(KeyCode::Alt))
-        result = true;
-    return result;
+    if (!(flags.requires_modifer || flags.requires_shift || flags.requires_alt)) return true;
+    if (flags.requires_modifer && io->Modifier().is_down) return true;
+    if (flags.requires_shift && io->Shift().is_down) return true;
+    if (flags.requires_alt && io->Alt().is_down) return true;
+    return false;
 }
 
 // use the flags to check whether a click is allowed
 static bool CheckForValidMouseDown(ButtonFlags flags, GuiPlatform* io) {
-    bool result = false;
-    if (io->mouse.is_down[0] && flags.left_mouse)
-        result = CheckModifierKeys(flags, io);
-    else if (io->mouse.is_down[1] && flags.right_mouse)
-        result = CheckModifierKeys(flags, io);
-    else if (io->mouse.is_down[2] && flags.middle_mouse)
-        result = CheckModifierKeys(flags, io);
-    else if (io->double_left_click && flags.double_left_mouse)
-        result = CheckModifierKeys(flags, io);
-    return result;
+    if (io->mouse_buttons[0].is_down && flags.left_mouse) return CheckModifierKeys(flags, io);
+    if (io->mouse_buttons[1].is_down && flags.right_mouse) return CheckModifierKeys(flags, io);
+    if (io->mouse_buttons[2].is_down && flags.middle_mouse) return CheckModifierKeys(flags, io);
+    if (io->double_left_click && flags.double_left_mouse) return CheckModifierKeys(flags, io);
+    return false;
 }
 
 Context::ScrollbarResult Context::Scrollbar(Window* window,
@@ -669,7 +659,7 @@ void Context::Begin(WindowSettings settings) {
     }
     dyn::Clear(sorted_windows);
 
-    if (platform->mouse_scroll_in_lines != 0 && hovered_window) {
+    if (platform->mouse_scroll_delta_in_lines != 0 && hovered_window) {
         Window* window = hovered_window;
         Window* final_window = nullptr;
         while (true) {
@@ -683,7 +673,7 @@ void Context::Begin(WindowSettings settings) {
         if (final_window && platform->update_guicall_count == 0) {
             f32 const k_pixels_per_line = 20; // IMPROVE: this should be a setting so, for example, popups
                                               // can scroll in increments of each item
-            f32 const lines = -platform->mouse_scroll_in_lines;
+            f32 const lines = -platform->mouse_scroll_delta_in_lines;
             f32 const new_scroll = lines * k_pixels_per_line + final_window->scroll_offset.y;
             final_window->scroll_offset.y = Round(Clamp(new_scroll, 0.0f, final_window->scroll_max.y));
         }
@@ -841,7 +831,7 @@ void Context::End(ArenaAllocator& scratch_arena) {
     draw_data.total_vtx_count += overlay_graphics.vtx_buffer.Size();
     draw_data.total_idx_count += overlay_graphics.idx_buffer.Size();
 
-    if (platform->MouseJustWentDown(0) && temp_active_item.id == 0 && temp_hot_item == 0) {
+    if (platform->MouseLeft().pressed && temp_active_item.id == 0 && temp_hot_item == 0) {
         if (hovered_window != nullptr) {
             Window* window = hovered_window;
             bool const closes_popups = (window->flags & WindowFlags_NeverClosesPopup) == 0;
@@ -1029,18 +1019,18 @@ bool Context::SliderUnboundedBehavior(Rect r,
     constexpr f32 k_size = 64;
 
     if (ButtonBehavior(r, id, {.left_mouse = true, .triggers_on_mouse_down = true})) {
-        if ((flags.default_on_ctrl) && platform->IsKeyDown(KeyCode::Ctrl)) val = default_val;
+        if ((flags.default_on_modifer) && platform->Modifier().is_down) val = default_val;
         val_at_click = val;
         start_location = platform->cursor_pos;
     }
 
     if (IsActive(id)) {
         if (flags.slower_with_shift) {
-            if (platform->KeyJustWentDown(KeyCode::Shift) || platform->KeyJustWentUp(KeyCode::Shift)) {
+            if (platform->Shift().pressed || platform->Shift().released) {
                 val_at_click = val;
                 start_location = platform->cursor_pos;
             }
-            if (platform->IsKeyDown(KeyCode::Shift)) sensitivity /= 6;
+            if (platform->Shift().is_down) sensitivity /= 6;
         }
         if (platform->cursor_pos.x != -1 && platform->cursor_pos.y != -1) {
             auto d = platform->cursor_pos - start_location;
@@ -1255,7 +1245,7 @@ TextInputResult Context::SingleLineTextInput(Rect r,
 
     auto x_offset = get_offset(textedit_text_utf8);
 
-    if (platform->MouseJustWentDown(0)) {
+    if (platform->MouseLeft().pressed) {
         text_input_selector_flags = {.left_mouse = true, .triggers_on_mouse_down = true};
         if (!TextInputJustFocused(id) && result.HasSelection() &&
             result.GetSelectionRect().Contains(platform->cursor_pos)) {
@@ -1266,7 +1256,7 @@ TextInputResult Context::SingleLineTextInput(Rect r,
     }
 
     if (ButtonBehavior(r, id, text_input_selector_flags)) {
-        if (text_input_selector_flags.triggers_on_mouse_up && platform->MouseJustFinishedDragging(0)) {
+        if (text_input_selector_flags.triggers_on_mouse_up && platform->MouseLeft().dragging_ended) {
         } else {
             auto rel_pos = get_rel_click_point(r.pos, x_offset);
             stb_textedit_click(this, &stb_state, rel_pos.x, rel_pos.y);
@@ -1274,15 +1264,15 @@ TextInputResult Context::SingleLineTextInput(Rect r,
         }
     }
     if (IsActive(id)) {
-        if (!platform->mouse.is_down[0]) {
+        if (!platform->mouse_buttons[0].is_down) {
             SetActiveIDZero();
         } else if (!WasJustActivated(id)) {
             if (active_item.button_flags.triggers_on_mouse_down) {
-                if (platform->MouseJustStartedDragging(0)) {
+                if (platform->MouseLeft().dragging_started) {
                     auto rel_pos = get_rel_click_point(r.pos, x_offset);
                     stb_textedit_click(this, &stb_state, rel_pos.x, rel_pos.y);
                     reset_cursor = true;
-                } else if (platform->mouse.is_dragging[0]) {
+                } else if (platform->mouse_buttons[0].is_dragging) {
                     auto rel_pos = get_rel_click_point(r.pos, x_offset);
                     stb_textedit_drag(this, &stb_state, rel_pos.x, rel_pos.y);
                 }
@@ -1292,7 +1282,7 @@ TextInputResult Context::SingleLineTextInput(Rect r,
 
     if (IsHotOrActive(id)) platform->gui_update_requirements.cursor_type = CursorType::IBeam;
 
-    u32 const shift_bit = platform->IsKeyDown(KeyCode::Shift) ? STB_TEXTEDIT_K_SHIFT : 0;
+    u32 const shift_bit = platform->Shift().is_down ? STB_TEXTEDIT_K_SHIFT : 0;
 
     if (platform->IsKeyPressed(KeyCode::Backspace)) {
         stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_BACKSPACE | shift_bit));
@@ -1308,26 +1298,26 @@ TextInputResult Context::SingleLineTextInput(Rect r,
     } else if (platform->IsKeyPressed(KeyCode::Home)) {
         stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_LINESTART | shift_bit));
         result.buffer_changed = true;
-    } else if (platform->IsKeyPressed(KeyCode::Z) && platform->IsKeyDown(KeyCode::Ctrl)) {
+    } else if (platform->IsKeyPressed(KeyCode::Z) && platform->Modifier().is_down) {
         stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_UNDO | shift_bit));
         result.buffer_changed = true;
 
-    } else if (platform->IsKeyPressed(KeyCode::Y) && platform->IsKeyDown(KeyCode::Ctrl)) {
+    } else if (platform->IsKeyPressed(KeyCode::Y) && platform->Modifier().is_down) {
         stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_REDO | shift_bit));
         result.buffer_changed = true;
     } else if (platform->IsKeyPressed(KeyCode::LeftArrow)) {
         reset_cursor = true;
-        if (platform->IsKeyDown(KeyCode::Ctrl))
+        if (platform->Modifier().is_down)
             stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_WORDLEFT | shift_bit));
         else
             stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_LEFT | shift_bit));
     } else if (platform->IsKeyPressed(KeyCode::RightArrow)) {
         reset_cursor = true;
-        if (platform->IsKeyDown(KeyCode::Ctrl))
+        if (platform->Modifier().is_down)
             stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_WORDRIGHT | shift_bit));
         else
             stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_RIGHT | shift_bit));
-    } else if (platform->IsKeyPressed(KeyCode::V) && platform->IsKeyDown(KeyCode::Ctrl)) {
+    } else if (platform->IsKeyPressed(KeyCode::V) && platform->Modifier().is_down) {
         platform->gui_update_requirements.wants_clipboard_paste = true;
     } else if (platform->clipboard_data.size) {
         ArenaAllocatorWithInlineStorage<2000> allocator;
@@ -1343,7 +1333,7 @@ TextInputResult Context::SingleLineTextInput(Rect r,
         stb_textedit_paste(this, &stb_state, w_text.data, (int)w_text.size);
         result.buffer_changed = true;
     } else if ((platform->IsKeyPressed(KeyCode::C) || platform->IsKeyPressed(KeyCode::X)) &&
-               platform->IsKeyDown(KeyCode::Ctrl)) {
+               platform->Modifier().is_down) {
         if (stb_state.select_start != stb_state.select_end) {
             auto const min = (usize)::Min(stb_state.select_start, stb_state.select_end);
             auto const max = (usize)::Max(stb_state.select_start, stb_state.select_end);
@@ -1366,7 +1356,7 @@ TextInputResult Context::SingleLineTextInput(Rect r,
 
     if (platform->IsKeyPressed(KeyCode::Enter)) result.enter_pressed = true;
 
-    bool const modifier_down = platform->IsKeyDown(KeyCode::Ctrl);
+    bool const modifier_down = platform->Modifier().is_down;
     if (platform->input_chars.size && !modifier_down) {
         for (auto c : platform->input_chars) {
             if (InputTextFilterCharacter(&c, flags)) {
@@ -1487,6 +1477,7 @@ bool Context::ButtonBehavior(Rect r, Id id, ButtonFlags flags) {
     }
 
     if (SetHot(r, id, (flags.is_non_window_content) != 0)) {
+        // IMPROVE: check for mouse-pressed not just mouse-down
         bool const clicked = CheckForValidMouseDown(flags, platform);
 
         if (clicked) {
@@ -2152,9 +2143,10 @@ void Context::DebugWindow(Rect r) {
 
     if (DebugTextHeading(debug_general, "General")) {
         DebugTextItem("Update", "%llu:%d", platform->update_count, platform->update_guicall_count);
-        DebugTextItem("Key shift", "%d", (int)platform->IsKeyDown(KeyCode::Shift));
-        DebugTextItem("Key ctrl", "%d", (int)platform->IsKeyDown(KeyCode::Ctrl));
-        DebugTextItem("Key alt", "%d", (int)platform->IsKeyDown(KeyCode::Alt));
+        DebugTextItem("Key shift", "%d", (int)platform->Shift().is_down);
+        DebugTextItem("Key ctrl", "%d", (int)platform->Ctrl().is_down);
+        DebugTextItem("Key modifer", "%d", (int)platform->Modifier().is_down);
+        DebugTextItem("Key alt", "%d", (int)platform->Alt().is_down);
         DebugTextItem("Time", "%lld", platform->current_time);
         DebugTextItem("WindowSize", "%hu, %hu", platform->window_size.width, platform->window_size.height);
         DebugTextItem("DisplayRatio", "%.2f", (f64)platform->display_ratio);

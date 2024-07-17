@@ -116,7 +116,7 @@ void DoStandaloneErrorGUI(Gui* g) {
     }
     if (floe_ext->standalone_midi_device_error) {
         platform->gui_update_requirements.wants_keyboard_input = true;
-        if (platform->IsKeyDown(KeyCode::Shift)) {
+        if (platform->Shift().is_down) {
             auto gen_midi_message = [&](bool on, u7 key) {
                 if (on)
                     plugin.processor.events_for_audio_thread.Push(

@@ -127,7 +127,7 @@ static void GUIDoSampleWaveformOverlay(Gui* g, PluginInstance::Layer* layer, Rec
                                                        value,
                                                        default_val,
                                                        slider_sensitivity,
-                                                       {.slower_with_shift = true, .default_on_ctrl = true});
+                                                       {.slower_with_shift = true, .default_on_modifer = true});
 
         if (imgui.IsHotOrActive(id)) {
             imgui.platform->gui_update_requirements.cursor_type = CursorType::HorizontalArrows;

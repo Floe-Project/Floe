@@ -22,7 +22,7 @@ Style DefaultStyle(imgui::Context const& imgui) {
 
 bool Dragger(Gui* g, imgui::Id id, Rect r, int min, int max, int& value, Style const& style) {
     auto settings = imgui::DefTextInputDraggerInt();
-    settings.slider_settings.flags = {.slower_with_shift = true, .default_on_ctrl = true};
+    settings.slider_settings.flags = {.slower_with_shift = true, .default_on_modifer = true};
     settings.slider_settings.sensitivity = style.sensitivity;
     settings.format = style.always_show_plus ? "{+}"_s : "{}"_s;
     settings.slider_settings.draw = [](IMGUI_DRAW_SLIDER_ARGS) {};

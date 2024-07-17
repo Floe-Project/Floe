@@ -10,7 +10,7 @@
 #include "tracy/Tracy.hpp"
 
 bool GuiPlatform::HandleMouseWheel(f32 delta_lines) {
-    mouse_scroll_in_lines += delta_lines;
+    mouse_scroll_delta_in_lines += delta_lines;
     if (gui_update_requirements.wants_mouse_scroll) return true;
     return false;
 }
@@ -19,6 +19,13 @@ bool GuiPlatform::HandleMouseMoved(f32 cursor_x, f32 cursor_y) {
     bool result = false;
     cursor_pos.x = cursor_x;
     cursor_pos.y = cursor_y;
+
+    for (auto& btn : mouse_buttons) {
+        if (btn.is_down) {
+            if (!btn.is_dragging) btn.dragging_started = true;
+            btn.is_dragging = true;
+        }
+    }
 
     if (gui_update_requirements.mouse_tracked_regions.size == 0 ||
         gui_update_requirements.wants_mouse_capture) {
@@ -46,19 +53,24 @@ bool GuiPlatform::HandleMouseMoved(f32 cursor_x, f32 cursor_y) {
     return result;
 }
 
-bool GuiPlatform::HandleMouseClicked(u32 button, bool is_down) {
-    mouse.is_down[button] = is_down;
+bool GuiPlatform::HandleMouseClicked(MouseButton button, bool is_down) {
+    mouse_buttons[ToInt(button)].is_down = is_down;
     if (is_down) {
-        time_at_mouse_down[button] = TimePoint::Now();
-        last_mouse_down_point[button] = cursor_pos;
+        mouse_buttons[ToInt(button)].pressed = true;
+        mouse_buttons[ToInt(button)].pressed_point = cursor_pos;
+        mouse_buttons[ToInt(button)].pressed_time = TimePoint::Now();
+    } else {
+        mouse_buttons[ToInt(button)].released = true;
+        if (mouse_buttons[ToInt(button)].is_dragging) mouse_buttons[ToInt(button)].dragging_ended = true;
+        mouse_buttons[ToInt(button)].is_dragging = false;
     }
 
     bool result = false;
     if (gui_update_requirements.mouse_tracked_regions.size == 0 ||
         gui_update_requirements.wants_mouse_capture ||
-        (gui_update_requirements.wants_all_left_clicks && button == 0) ||
-        (gui_update_requirements.wants_all_right_clicks && button == 1) ||
-        (gui_update_requirements.wants_all_middle_clicks && button == 2)) {
+        (gui_update_requirements.wants_all_left_clicks && button == MouseButton::Left) ||
+        (gui_update_requirements.wants_all_right_clicks && button == MouseButton::Right) ||
+        (gui_update_requirements.wants_all_middle_clicks && button == MouseButton::Middle)) {
         result = true;
     } else {
         for (auto const i : Range(gui_update_requirements.mouse_tracked_regions.size)) {
@@ -75,7 +87,7 @@ bool GuiPlatform::HandleMouseClicked(u32 button, bool is_down) {
 }
 
 bool GuiPlatform::HandleDoubleLeftClick() {
-    HandleMouseClicked(0, true);
+    HandleMouseClicked(MouseButton::Left, true);
     double_left_click = true;
     return true;
 }
@@ -120,10 +132,6 @@ bool GuiPlatform::CheckForTimerRedraw() {
 void GuiPlatform::Update() {
     ZoneScopedN("GUI Update");
 
-    if (currently_updating) return;
-    currently_updating = true;
-    DEFER { currently_updating = false; };
-
     if (!graphics_ctx) return;
 
     DEFER { update_count++; };
@@ -136,12 +144,12 @@ void GuiPlatform::Update() {
         }
     };
 
-    if (All(cursor_pos < f32x2 {0, 0} || cursor_prev < f32x2 {0, 0})) {
+    if (All(cursor_pos < f32x2 {0, 0} || cursor_pos_prev < f32x2 {0, 0})) {
         // if mouse just appeared or disappeared (negative coordinate) we cancel out movement by setting to
         // zero
         cursor_delta = {0, 0};
     } else {
-        cursor_delta = cursor_pos - cursor_prev;
+        cursor_delta = cursor_pos - cursor_pos_prev;
     }
 
     if (time_at_last_update)
@@ -149,11 +157,6 @@ void GuiPlatform::Update() {
     else
         delta_time = 0;
 
-    for (usize button = 0; button < k_num_mouse_buttons; button++) {
-        if (All(mouse.is_down[button] && last_mouse_down_point[button] != cursor_pos))
-            mouse.is_dragging[button] = true;
-        if (!mouse.is_down[button]) mouse.is_dragging[button] = false;
-    }
     current_time = TimePoint::Now();
     display_ratio = 1; // TODO: display ratio
 
@@ -163,14 +166,34 @@ void GuiPlatform::Update() {
     update_guicall_count = 0;
     for (auto _ : Range(4)) {
         ZoneNamedN(repeat, "repeat", true);
+
+        for (auto const& btn : mouse_buttons) {
+            DebugLn("Mouse button[{}]: down: {}, pressed: {}, released: {}",
+                    &btn - mouse_buttons.data,
+                    btn.is_down,
+                    btn.pressed,
+                    btn.released);
+        }
+
         update();
 
-        mouse_prev = mouse;
         input_chars = {};
+        for (auto& btn : mouse_buttons) {
+            btn.pressed = false;
+            btn.released = false;
+            btn.dragging_started = false;
+            btn.dragging_ended = false;
+        }
+
+        for (auto& mod : modifier_keys) {
+            mod.pressed = false;
+            mod.released = false;
+        }
+
         keys_down_prev = keys_down;
         keys_pressed = {};
         double_left_click = false;
-        mouse_scroll_in_lines = 0;
+        mouse_scroll_delta_in_lines = 0;
         dyn::Clear(clipboard_data);
 
         update_guicall_count++;
@@ -189,6 +212,6 @@ void GuiPlatform::Update() {
         if (o.HasError()) logger.ErrorLn("GUI render failed: {}", o.Error());
     }
 
-    cursor_prev = cursor_pos;
+    cursor_pos_prev = cursor_pos;
     time_at_last_update = TimePoint::Now();
 }

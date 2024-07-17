@@ -598,7 +598,7 @@ static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
                 .title = "Select Floe Library Folder",
                 .default_path = default_folder,
                 .filters = {},
-                .parent_window = g->gui_platform.GetWindow(),
+                .parent_window = g->gui_platform.native_window,
             }));
             if (opt_path) {
                 auto const path = *opt_path;
@@ -618,7 +618,7 @@ static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
                 .title = "Select Floe Presets Folder",
                 .default_path = default_folder,
                 .filters = {},
-                .parent_window = g->gui_platform.GetWindow(),
+                .parent_window = g->gui_platform.native_window,
             }));
             if (opt_path) {
                 auto const path = *opt_path;
@@ -649,7 +649,7 @@ static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
                     .title = "Load Floe Preset",
                     .default_path = default_path,
                     .filters = filters.Items(),
-                    .parent_window = g->gui_platform.GetWindow(),
+                    .parent_window = g->gui_platform.native_window,
                 }));
                 if (opt_path) LoadPresetFromFile(g->plugin, *opt_path);
             } else if (type == DialogType::SavePreset) {
@@ -659,7 +659,7 @@ static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
                     .title = "Save Floe Preset",
                     .default_path = default_path,
                     .filters = filters.Items(),
-                    .parent_window = g->gui_platform.GetWindow(),
+                    .parent_window = g->gui_platform.native_window,
                 }));
                 if (opt_path) SaveCurrentStateToFile(g->plugin, *opt_path);
             } else {

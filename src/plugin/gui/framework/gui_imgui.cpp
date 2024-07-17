@@ -1327,7 +1327,7 @@ TextInputResult Context::SingleLineTextInput(Rect r,
         else
             stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_RIGHT | shift_bit));
     } else if (platform->IsKeyPressed(KeyCodeV) && platform->key_ctrl) {
-        platform->RequestClipboardPaste();
+        platform->gui_update_requirements.wants_clipboard_paste = true;
 
     } else if (platform->clipboard_data.size) {
         ArenaAllocatorWithInlineStorage<2000> allocator;
@@ -1347,8 +1347,7 @@ TextInputResult Context::SingleLineTextInput(Rect r,
             auto const min = (usize)::Min(stb_state.select_start, stb_state.select_end);
             auto const max = (usize)::Max(stb_state.select_start, stb_state.select_end);
 
-            ArenaAllocatorWithInlineStorage<2000> allocator;
-            DynamicArray<char> clipboard {allocator};
+            auto& clipboard = platform->gui_update_requirements.set_clipboard_text;
             dyn::Resize(clipboard, (((max + 1) - min) * 4) + 1); // 1 utf32 could at most be 4 utf8 bytes
 
             dyn::Resize(clipboard,
@@ -1357,8 +1356,6 @@ TextInputResult Context::SingleLineTextInput(Rect r,
                                                 textedit_text.data + min,
                                                 textedit_text.data + max + 1));
 
-            // IMPROVE: handle error
-            [[maybe_unused]] auto set_clip_outcome = platform->SetClipboard("text/plain", clipboard);
             if (platform->IsKeyPressed(KeyCodeX)) {
                 stb_textedit_cut(this, &stb_state);
                 result.buffer_changed = true;

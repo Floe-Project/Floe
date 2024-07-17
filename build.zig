@@ -1522,7 +1522,6 @@ pub fn build(b: *std.Build) void {
                     plugin_path ++ "/gui/gui_widget_helpers.cpp",
                     plugin_path ++ "/gui/gui_window.cpp",
                     plugin_path ++ "/gui/framework/draw_list_opengl.cpp",
-                    plugin_path ++ "/gui/framework/gui_platform_pugl.cpp",
                 }),
                 .flags = cpp_fp_flags,
             });

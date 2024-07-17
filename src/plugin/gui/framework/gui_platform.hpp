@@ -49,7 +49,7 @@ struct RedrawTime {
     bool operator==(RedrawTime const& other) { return time.Raw() == other.time.Raw(); }
 };
 
-enum class CursorType { Default, Hand, IBeam, AllArrows, HorizontalArrows, VerticalArrows, Hidden, Count };
+enum class CursorType { Default, Hand, IBeam, AllArrows, HorizontalArrows, VerticalArrows, Count };
 
 struct GuiUpdateRequirements {
     void Reset() {
@@ -77,30 +77,18 @@ struct GuiUpdateRequirements {
     bool wants_all_right_clicks = false;
     bool wants_all_middle_clicks = false;
     bool requires_another_update = false;
+    bool wants_clipboard_paste = false; // set this if you'd like to recieve text from the clipboard
     CursorType cursor_type = CursorType::Default;
+    DynamicArray<char> set_clipboard_text {
+        Malloc::Instance()}; // set this to the text that you want put into the OS clipboard
 };
 
-#define GUI_PLATFORM_ARGS                                                                                    \
-    const clap_host &host, TrivialFixedSizeFunction<16, void()>&&update, Logger &logger,                     \
-        SettingsFile &settings
-#define GUI_PLATFORM_FORWARD_ARGS host, Move(update), logger, settings
-
 struct GuiPlatform {
-    GuiPlatform(GUI_PLATFORM_ARGS) : host(host), update(Move(update)), logger(logger), settings(settings) {}
+    GuiPlatform(TrivialFixedSizeFunction<16, void()>&& update, Logger& logger)
+        : update(Move(update))
+        , logger(logger) {}
 
     virtual ~GuiPlatform() {}
-    virtual f32 GetDisplayRatio() { return 1; }
-
-    virtual void* OpenWindow() = 0;
-    virtual bool CloseWindow() = 0;
-    virtual void* GetWindow() = 0;
-    virtual void PollAndUpdate() {}
-    virtual void SetParent(clap_window_t const* window) = 0;
-    virtual bool SetTransient(clap_window_t const*) { return false; }
-    virtual void SetVisible(bool visible) = 0;
-    virtual bool SetSize(UiSize new_size) = 0;
-    virtual bool SetClipboard(String mime_type, String data) = 0;
-    virtual bool RequestClipboardPaste() = 0;
 
     void SetGUIDirty() { gui_update_requirements.mark_gui_dirty = true; }
 
@@ -140,10 +128,6 @@ struct GuiPlatform {
     //
     // Called by platform specific code
     // ======================================================================================================
-    ErrorCodeOr<void> InitGraphics(void* object_needed_for_device);
-    void WindowWasResized(UiSize new_size);
-    void DestroyGraphics();
-
     void SetStateChanged(char const* reason) {
         platform_state_changed = true;
         platform_state_changed_reason = reason;
@@ -193,7 +177,11 @@ struct GuiPlatform {
     bool key_ctrl {};
     bool key_shift {};
     bool key_alt {};
+    bool key_ctrl_prev {};
+    bool key_shift_prev {};
+    bool key_alt_prev {};
 
+    // may contain text from the clipboard - following from a wants_clipboard_paste request
     DynamicArray<char> clipboard_data {PageAllocator::Instance()};
 
     int input_chars[16] {};
@@ -205,13 +193,13 @@ struct GuiPlatform {
 
     bool currently_updating {};
 
+    void* native_window {};
+
     //
     // Internals
     // ======================================================================================================
-    clap_host const& host;
     TrivialFixedSizeFunction<16, void()> update;
     Logger& logger;
-    SettingsFile& settings;
 
 #if !PRODUCTION_BUILD
     f32 paint_time_average[256] {};
@@ -221,13 +209,7 @@ struct GuiPlatform {
     f32 render_prev_time {};
     f32 update_prev_time {};
 #endif
-    TimePoint time_at_last_paint {};
     bool platform_state_changed {};
     char const* platform_state_changed_reason = "";
-    bool key_ctrl_prev {};
-    bool key_shift_prev {};
-    bool key_alt_prev {};
+    TimePoint time_at_last_paint {};
 };
-
-GuiPlatform* CreateGuiPlatform(GUI_PLATFORM_ARGS);
-void DestroyGuiPlatform(GuiPlatform* platform);

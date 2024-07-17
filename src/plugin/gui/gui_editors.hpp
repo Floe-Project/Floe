@@ -166,7 +166,7 @@ static void DoCommandPanel(Gui* g, Rect r) {
             .title = "Select background JPG",
             .default_path = nullopt,
             .filters = filters.Items(),
-            .parent_window = g->gui_platform.GetWindow(),
+            .parent_window = g->gui_platform.native_window,
         });
         if (outcome.HasValue()) {
             auto const opt_path = outcome.Value();

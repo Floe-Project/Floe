@@ -9,35 +9,8 @@
 
 #include "tracy/Tracy.hpp"
 
-ErrorCodeOr<void> GuiPlatform::InitGraphics(void* object_needed_for_device) {
-    ZoneScoped;
-    graphics_ctx = graphics::CreateNewDrawContext();
-    TRY(graphics_ctx->CreateDeviceObjects(object_needed_for_device));
-    display_ratio = GetDisplayRatio();
-    SetStateChanged("Init graphics");
-    currently_updating = false;
-
-    return k_success;
-}
-
-void GuiPlatform::DestroyGraphics() {
-    ZoneScoped;
-    if (graphics_ctx) {
-        graphics_ctx->DestroyDeviceObjects();
-        graphics_ctx->fonts.Clear();
-        delete graphics_ctx;
-        graphics_ctx = nullptr;
-    }
-}
-
-void GuiPlatform::WindowWasResized(UiSize new_size) {
-    window_size = new_size;
-    if (!graphics_ctx) return;
-    graphics_ctx->Resize(new_size);
-}
-
 bool GuiPlatform::HandleMouseWheel(f32 delta_lines) {
-    mouse_scroll_in_lines = delta_lines;
+    mouse_scroll_in_lines += delta_lines;
     if (gui_update_requirements.wants_mouse_scroll) {
         SetStateChanged(__FUNCTION__);
         return true;
@@ -205,7 +178,7 @@ void GuiPlatform::Update() {
         if (!mouse_down[i]) mouse_is_dragging[i] = false;
     }
     current_time = TimePoint::Now();
-    display_ratio = GetDisplayRatio();
+    display_ratio = 1; // TODO: display ratio
 
     //
     //

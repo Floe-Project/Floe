@@ -194,7 +194,9 @@ constexpr auto NumVectorElements() {
     return sizeof(VecType) / sizeof(UnderlyingTypeOfVec<VecType>);
 }
 
-// Return true all elements are non-zero. The code generation is perfect when optimisations are on.
+// The code generation for these is perfect when optimisations are on - just 3 or so instructions.
+
+// Returns true if all elements are non-zero.
 template <Vector VecType>
 __attribute__((always_inline)) inline bool All(VecType x) {
     for (usize i = 0; i < NumVectorElements<VecType>(); ++i)
@@ -202,7 +204,7 @@ __attribute__((always_inline)) inline bool All(VecType x) {
     return true;
 }
 
-// Return true if any element is non-zero. The code generation is perfect when optimisations are on.
+// Returns true if any element is non-zero.
 template <Vector VecType>
 __attribute__((always_inline)) inline bool Any(VecType x) {
     for (usize i = 0; i < NumVectorElements<VecType>(); ++i)

@@ -84,7 +84,7 @@ struct PuglPlatform {
         , host(host)
         , settings(settings) {}
 
-    void* OpenWindow() {
+    void* CreateView() {
         g_counter++;
         if (auto const floe_host =
                 (FloeClapExtensionHost const*)host.get_extension(&host, k_floe_clap_extension_id);
@@ -140,7 +140,7 @@ struct PuglPlatform {
 
         return view;
     }
-    bool CloseWindow() {
+    bool DestroyView() {
         if (realised) {
             puglStopTimer(view, k_timer_id);
             puglUnrealize(view);
@@ -158,7 +158,6 @@ struct PuglPlatform {
         }
         return true;
     }
-    void* GetWindow() { return view; }
     void PollAndUpdate() { puglUpdate(world, 0); }
     void SetParent(clap_window_t const* window) {
         auto const status = puglSetParentWindow(view, (uintptr_t)window->ptr);
@@ -201,38 +200,46 @@ struct PuglPlatform {
         return puglSetClipboard(view, NullTerminated(mime_type, allocator), data.data, data.size) ==
                PUGL_SUCCESS;
     }
-    bool RequestClipboardPaste() { return puglPaste(view) == PUGL_SUCCESS; }
 
-    static Optional<KeyCodes> ConvertKeyCode(u32 key) {
+    static Optional<KeyCode> ConvertKeyCode(u32 key) {
         switch (key) {
-            case PUGL_KEY_TAB: return KeyCodeTab;
-            case PUGL_KEY_LEFT: return KeyCodeLeftArrow;
-            case PUGL_KEY_RIGHT: return KeyCodeRightArrow;
-            case PUGL_KEY_UP: return KeyCodeUpArrow;
-            case PUGL_KEY_DOWN: return KeyCodeDownArrow;
-            case PUGL_KEY_PAGE_UP: return KeyCodePageUp;
-            case PUGL_KEY_PAGE_DOWN: return KeyCodePageDown;
-            case PUGL_KEY_HOME: return KeyCodeHome;
-            case PUGL_KEY_END: return KeyCodeEnd;
-            case PUGL_KEY_DELETE: return KeyCodeDelete;
-            case PUGL_KEY_BACKSPACE: return KeyCodeBackspace;
-            case PUGL_KEY_ENTER: return KeyCodeEnter;
-            case PUGL_KEY_ESCAPE: return KeyCodeEscape;
-            case PUGL_KEY_F1: return KeyCodeF1;
-            case PUGL_KEY_F2: return KeyCodeF2;
-            case PUGL_KEY_F3: return KeyCodeF3;
-            case 'a': return KeyCodeA;
-            case 'c': return KeyCodeC;
-            case 'v': return KeyCodeV;
-            case 'x': return KeyCodeX;
-            case 'y': return KeyCodeY;
-            case 'z': return KeyCodeZ;
+            case PUGL_KEY_TAB: return KeyCode::Tab;
+            case PUGL_KEY_LEFT: return KeyCode::LeftArrow;
+            case PUGL_KEY_RIGHT: return KeyCode::RightArrow;
+            case PUGL_KEY_UP: return KeyCode::UpArrow;
+            case PUGL_KEY_DOWN: return KeyCode::DownArrow;
+            case PUGL_KEY_PAGE_UP: return KeyCode::PageUp;
+            case PUGL_KEY_PAGE_DOWN: return KeyCode::PageDown;
+            case PUGL_KEY_HOME: return KeyCode::Home;
+            case PUGL_KEY_END: return KeyCode::End;
+            case PUGL_KEY_DELETE: return KeyCode::Delete;
+            case PUGL_KEY_BACKSPACE: return KeyCode::Backspace;
+            case PUGL_KEY_ENTER: return KeyCode::Enter;
+            case PUGL_KEY_ESCAPE: return KeyCode::Escape;
+            case PUGL_KEY_F1: return KeyCode::F1;
+            case PUGL_KEY_F2: return KeyCode::F2;
+            case PUGL_KEY_F3: return KeyCode::F3;
+
+            // TODO: this isn't quite right, we are combining the left and right keys meaning releasing
+            // one turns the total 'ctrl' state off.
+            case PUGL_KEY_CTRL_L:
+            case PUGL_KEY_CTRL_R: return KeyCode::Ctrl;
+            case PUGL_KEY_SHIFT_L:
+            case PUGL_KEY_SHIFT_R: return KeyCode::Shift;
+            case PUGL_KEY_ALT_L:
+            case PUGL_KEY_ALT_R: return KeyCode::Alt;
+            case 'a': return KeyCode::A;
+            case 'c': return KeyCode::C;
+            case 'v': return KeyCode::V;
+            case 'x': return KeyCode::X;
+            case 'y': return KeyCode::Y;
+            case 'z': return KeyCode::Z;
         }
         return nullopt;
     }
 
     static PuglStatus OnEvent(PuglView* view, PuglEvent const* event) {
-        // if (event->type != PUGL_UPDATE && event->type != PUGL_TIMER) printEvent(event, "PUGL: ", true);
+        if (event->type != PUGL_UPDATE && event->type != PUGL_TIMER) printEvent(event, "PUGL: ", true);
         auto& self = *(PuglPlatform*)puglGetHandle(view);
         auto& platform = self.platform;
         switch (event->type) {
@@ -245,7 +252,6 @@ struct PuglPlatform {
                     platform.graphics_ctx->CreateDeviceObjects((void*)puglGetNativeView(view));
                 ASSERT(!outcome.HasError()); // TODO: handle error
                 platform.display_ratio = 1; // TODO: display_ratio
-                platform.SetStateChanged("Init graphics");
                 platform.currently_updating = false;
 
                 break;
@@ -296,7 +302,7 @@ struct PuglPlatform {
 
                 if (platform.gui_update_requirements.wants_clipboard_paste) {
                     platform.gui_update_requirements.wants_clipboard_paste = false;
-                    self.RequestClipboardPaste();
+                    puglPaste(view);
                 }
 
                 if (platform.gui_update_requirements.set_clipboard_text.size) {
@@ -321,13 +327,12 @@ struct PuglPlatform {
             }
             case PUGL_KEY_RELEASE: {
                 if (auto const key = ConvertKeyCode(event->key.key)) {
-                    if (platform.HandleKeyPressed(*key, true)) puglPostRedisplay(view);
+                    if (platform.HandleKeyPressed(*key, false)) puglPostRedisplay(view);
                 }
                 break;
             }
             case PUGL_TEXT: {
-                if (platform.HandleInputChar(CheckedCast<int>(event->text.character)))
-                    puglPostRedisplay(view);
+                if (platform.HandleInputChar(event->text.character)) puglPostRedisplay(view);
                 break;
             }
             case PUGL_POINTER_IN:
@@ -337,14 +342,13 @@ struct PuglPlatform {
             }
             case PUGL_BUTTON_PRESS: {
                 if (event->button.button >= 0 && event->button.button < 3) {
-                    if (platform.HandleMouseClicked((int)event->button.button, true)) puglPostRedisplay(view);
+                    if (platform.HandleMouseClicked(event->button.button, true)) puglPostRedisplay(view);
                 }
                 break;
             }
             case PUGL_BUTTON_RELEASE: {
                 if (event->button.button >= 0 && event->button.button < 3) {
-                    if (platform.HandleMouseClicked((int)event->button.button, false))
-                        puglPostRedisplay(view);
+                    if (platform.HandleMouseClicked(event->button.button, false)) puglPostRedisplay(view);
                 }
                 break;
             }
@@ -512,7 +516,7 @@ clap_plugin_gui const floe_gui {
             gui_settings::WindowSize(g_cross_instance_systems->settings.settings.gui);
 
         floe.pugl_platform.Emplace(*floe.gui_platform, floe.host, g_cross_instance_systems->settings);
-        floe.pugl_platform->OpenWindow();
+        floe.pugl_platform->CreateView();
 
         floe.gui_platform->native_window = (void*)puglGetNativeView(floe.pugl_platform->view);
 
@@ -528,7 +532,7 @@ clap_plugin_gui const floe_gui {
             DebugAssertMainThread(floe.host);
             ZoneScopedMessage(floe.trace_config, "gui destroy");
             floe.gui.Clear();
-            floe.pugl_platform->CloseWindow();
+            floe.pugl_platform->DestroyView();
             floe.pugl_platform.Clear();
             floe.gui_platform.Clear();
         },
@@ -970,7 +974,7 @@ clap_plugin const floe_plugin {
             if (floe.gui) {
                 // TODO: I'm not entirely sure if this is ok or not. But I do want to avoid the GUI being
                 // active when the audio plugin is deactivate.
-                floe.pugl_platform->CloseWindow();
+                floe.pugl_platform->DestroyView();
             }
             auto& processor = floe.plugin->processor;
             processor.processor_callbacks.deactivate(processor);

@@ -116,7 +116,7 @@ void DoStandaloneErrorGUI(Gui* g) {
     }
     if (floe_ext->standalone_midi_device_error) {
         platform->gui_update_requirements.wants_keyboard_input = true;
-        if (platform->key_shift) {
+        if (platform->IsKeyDown(KeyCode::Shift)) {
             auto gen_midi_message = [&](bool on, u7 key) {
                 if (on)
                     plugin.processor.events_for_audio_thread.Push(
@@ -126,14 +126,14 @@ void DoStandaloneErrorGUI(Gui* g) {
             };
 
             struct Key {
-                KeyCodes key;
+                KeyCode key;
                 u7 midi_key;
             };
             static Key const keys[] = {
-                {KeyCodeLeftArrow, 60},
-                {KeyCodeRightArrow, 63},
-                {KeyCodeUpArrow, 80},
-                {KeyCodeDownArrow, 45},
+                {KeyCode::LeftArrow, 60},
+                {KeyCode::RightArrow, 63},
+                {KeyCode::UpArrow, 80},
+                {KeyCode::DownArrow, 45},
             };
 
             for (auto& i : keys) {

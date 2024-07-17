@@ -191,10 +191,10 @@ static void DoWholeEditor(Gui* g) {
 
     g->gui_platform.gui_update_requirements.wants_keyboard_input = true; // for debug panel open/close
 
-    if (g->gui_platform.KeyJustWentDown(KeyCodeF1)) g_show_editor = !g_show_editor;
+    if (g->gui_platform.KeyJustWentDown(KeyCode::F1)) g_show_editor = !g_show_editor;
 
     if (g_show_editor) {
-        if (g->gui_platform.KeyJustWentDown(KeyCodeF2)) g_show_editor_on_left = !g_show_editor_on_left;
+        if (g->gui_platform.KeyJustWentDown(KeyCode::F2)) g_show_editor_on_left = !g_show_editor_on_left;
         g->gui_platform.graphics_ctx->PushDefaultFont();
         auto const half_w = (f32)(int)(imgui.Width() / 2);
         Rect debug_r;

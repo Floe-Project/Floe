@@ -359,10 +359,10 @@ DirectoryListing::Entry const*
 PresetBrowser::HandleKeyPresses(DirectoryListing::Entry const* current_selected_folder) {
     if (imgui.GetTextInput()) return {};
 
-    bool const left = g->gui_platform.IsKeyPressed(KeyCodeLeftArrow);
-    bool const right = g->gui_platform.IsKeyPressed(KeyCodeRightArrow);
-    bool const up = g->gui_platform.IsKeyPressed(KeyCodeUpArrow);
-    bool const down = g->gui_platform.IsKeyPressed(KeyCodeDownArrow);
+    bool const left = g->gui_platform.IsKeyPressed(KeyCode::LeftArrow);
+    bool const right = g->gui_platform.IsKeyPressed(KeyCode::RightArrow);
+    bool const up = g->gui_platform.IsKeyPressed(KeyCode::UpArrow);
+    bool const down = g->gui_platform.IsKeyPressed(KeyCode::DownArrow);
 
     if (left || right || up || down) {
         DynamicArray<Array<FileBrowserGUIItem, k_preset_browser_num_columns>> rows {g->scratch_arena};

@@ -61,6 +61,9 @@ using s4 = signed _BitInt(4);
 //   supports, and based on that select the appropriate codepath that uses the intrinsics for that
 //   architecture. For example for supporting AVX2 on x86_64, we'd use the <immintrin.h> header. NOTE: we
 //   might consider using __builtin_cpu_supports to detect CPU features on x86_64.
+// - Comparison operators work for floats/ints. They return a vector of signed integers where each element is
+//   ~0 (all 1 bits) if the comparison is true else 0. See the All() and Any() helpers for getting a scalar
+//   bool from the vector.
 
 using f32x2 = __attribute__((ext_vector_type(2))) f32;
 using f32x4 = __attribute__((ext_vector_type(4))) f32;
@@ -189,6 +192,22 @@ concept FunctionWithSignature = requires(Functor f) {
 template <typename VecType>
 constexpr auto NumVectorElements() {
     return sizeof(VecType) / sizeof(UnderlyingTypeOfVec<VecType>);
+}
+
+// Return true all elements are non-zero. The code generation is perfect when optimisations are on.
+template <Vector VecType>
+__attribute__((always_inline)) inline bool All(VecType x) {
+    for (usize i = 0; i < NumVectorElements<VecType>(); ++i)
+        if (x[0] == 0) return false;
+    return true;
+}
+
+// Return true if any element is non-zero. The code generation is perfect when optimisations are on.
+template <Vector VecType>
+__attribute__((always_inline)) inline bool Any(VecType x) {
+    for (usize i = 0; i < NumVectorElements<VecType>(); ++i)
+        if (x[0] != 0) return true;
+    return false;
 }
 
 // Template helpers

@@ -28,6 +28,32 @@ The work from Mirage (the old project) to Floe v1.0 has been related to building
 
 Additionally, once we reach v1.0, we'd like to expand the number of sample libraries available and update Mirage libraries to Floe's new sample library format.
 
+## Status towards v1.0
+1. 🟦 Completed for the current requirements with good design
+2. 🟩 Works well-enough but doesn't handle everything
+3. 🟨 Mostly works but some aspects are missing or broken
+4. 🟥 Fundamentally broken or not-yet-implemented
+
+| Module                      | Description                                          | Status |
+| --------------------------- | ---------------------------------------------------- | ------ |
+| Sample library server       | Async loading & scanning of libraries                | 🟦     |
+| Directory watcher           | Cross-platform API for watching for file changes     | 🟦     |
+| CI & CD                     | Continuous integration and deployment                | 🟦     |
+| State serialisation         | Saving/loading plugin state to DAW or preset         | 🟦     |
+| Lua sample library format   | Sample library Lua API                               | 🟩     |
+| MDATA sample library format | Legacy binary sample library format                  | 🟩     |
+| Settings file               | Saving/loading settings from file                    | 🟩     |
+| GUI                         | Graphical user interface                             | 🟩     |
+| Audio/GUI communication     | Communication between audio and GUI threads          | 🟩     |
+| Audio parameters            | System for configuring/using audio plugin parameters | 🟩     |
+| Audio processing pipeline   | Sound shaping, MIDI, modulation, effects, etc.       | 🟨     |
+| CLAP format                 | CLAP                                                 | 🟨     |
+| VST3 format                 | VST3                                                 | 🟥     |
+| AUv2 format                 | Audio Unit (v2)                                      | 🟥     |
+| Presets server              | Async loading & scanning of presets                  | 🟥     |
+| User manual                 | Comprehensive documentation                          | 🟥     |
+
+
 ## Previously known as Mirage
 Floe is backwards-compatible with Mirage's libraries and presets. See more information about this in the [user manual](https://floe-synth.github.io/Floe/mirage.html).
 

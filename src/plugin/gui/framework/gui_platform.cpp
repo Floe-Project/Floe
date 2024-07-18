@@ -15,10 +15,9 @@ bool GuiPlatform::HandleMouseWheel(f32 delta_lines) {
     return false;
 }
 
-bool GuiPlatform::HandleMouseMoved(f32 cursor_x, f32 cursor_y) {
+bool GuiPlatform::HandleMouseMoved(f32x2 new_cursor_pos) {
     bool result = false;
-    cursor_pos.x = cursor_x;
-    cursor_pos.y = cursor_y;
+    cursor_pos = new_cursor_pos;
 
     for (auto& btn : mouse_buttons) {
         if (btn.is_down) {
@@ -35,7 +34,7 @@ bool GuiPlatform::HandleMouseMoved(f32 cursor_x, f32 cursor_y) {
     } else {
         for (auto const i : Range(gui_update_requirements.mouse_tracked_regions.size)) {
             auto& item = gui_update_requirements.mouse_tracked_regions[i];
-            bool const mouse_over = item.r.Contains({cursor_x, cursor_y});
+            bool const mouse_over = item.r.Contains(cursor_pos);
             if (mouse_over && !item.mouse_over) {
                 // cursor just entered
                 item.mouse_over = mouse_over;
@@ -58,7 +57,6 @@ bool GuiPlatform::HandleMouseClicked(MouseButton button, MouseButtonState::Event
     btn.is_down = is_down;
     if (is_down) {
         btn.last_pressed_point = event.point;
-        btn.last_pressed_time = event.time;
     } else {
         if (btn.is_dragging) btn.dragging_ended = true;
         btn.is_dragging = false;
@@ -135,86 +133,62 @@ bool GuiPlatform::CheckForTimerRedraw() {
     return redraw_needed;
 }
 
-void GuiPlatform::Update() {
-    ZoneScopedN("GUI Update");
+void GuiPlatform::BeginUpdate() {
+    gui_update_requirements.requires_another_update = false;
+    dyn::Clear(gui_update_requirements.mouse_tracked_regions);
+    gui_update_requirements.wants_just_arrow_keys = false;
+    gui_update_requirements.wants_keyboard_input = false;
+    gui_update_requirements.wants_mouse_capture = false;
+    gui_update_requirements.wants_mouse_scroll = false;
+    gui_update_requirements.wants_all_left_clicks = false;
+    gui_update_requirements.wants_all_right_clicks = false;
+    gui_update_requirements.wants_all_middle_clicks = false;
+    gui_update_requirements.requires_another_update = false;
+    gui_update_requirements.cursor_type = CursorType::Default;
 
-    if (!graphics_ctx) return;
-
-    DEFER { update_count++; };
-
-    auto const start_counter = TimePoint::Now();
-    DEFER {
-        if constexpr (!PRODUCTION_BUILD) {
-            if (auto const diff_ms = SecondsToMilliseconds(start_counter.SecondsFromNow()); diff_ms >= 35)
-                DebugLn("{} very slow update: {} ms", __FUNCTION__, diff_ms);
-        }
-    };
+    display_ratio = 1; // TODO: display ratio
 
     if (All(cursor_pos < f32x2 {0, 0} || cursor_pos_prev < f32x2 {0, 0})) {
-        // if mouse just appeared or disappeared (negative coordinate) we cancel out movement by setting to
-        // zero
+        // if mouse just appeared or disappeared (negative coordinate) we cancel out movement by setting
+        // to zero
         cursor_delta = {0, 0};
     } else {
         cursor_delta = cursor_pos - cursor_pos_prev;
     }
-
-    if (time_prev)
-        delta_time = (f32)time_prev.SecondsFromNow();
-    else
-        delta_time = 0;
+    cursor_pos_prev = cursor_pos;
 
     current_time = TimePoint::Now();
-    display_ratio = 1; // TODO: display ratio
 
-    //
-    //
-    //
-    update_guicall_count = 0;
-    for (auto _ : Range(4)) {
-        ZoneNamedN(repeat, "repeat", true);
+    if (time_prev)
+        delta_time = (f32)(current_time - time_prev);
+    else
+        delta_time = 0;
+    time_prev = current_time;
+}
 
-        update();
-
-        for (auto& btn : mouse_buttons) {
-            btn.dragging_started = false;
-            btn.dragging_ended = false;
-            btn.presses.Clear();
-            btn.releases.Clear();
-        }
-
-        for (auto& mod : modifier_keys) {
-            mod.presses = 0;
-            mod.releases = 0;
-        }
-
-        for (auto& key : keys) {
-            key.presses.Clear();
-            key.releases.Clear();
-            key.presses_or_repeats.Clear();
-        }
-
-        input_chars = {};
-        double_left_click = false;
-        mouse_scroll_delta_in_lines = 0;
-        dyn::Clear(clipboard_data);
-        event_arena.ResetCursorAndConsolidateRegions();
-
-        update_guicall_count++;
-
-        if (!gui_update_requirements.requires_another_update) break;
+void GuiPlatform::EndUpdate() {
+    for (auto& btn : mouse_buttons) {
+        btn.dragging_started = false;
+        btn.dragging_ended = false;
+        btn.presses.Clear();
+        btn.releases.Clear();
     }
 
-    //
-    //
-    //
-
-    if (draw_data.cmd_lists_count) {
-        ZoneNamedN(render, "render", true);
-        auto o =
-            graphics_ctx->Render(draw_data, window_size, display_ratio, Rect(0, 0, window_size.ToFloat2()));
-        if (o.HasError()) logger.ErrorLn("GUI render failed: {}", o.Error());
+    for (auto& mod : modifier_keys) {
+        mod.presses = 0;
+        mod.releases = 0;
     }
 
-    cursor_pos_prev = cursor_pos;
-    time_prev = TimePoint::Now();
+    for (auto& key : keys) {
+        key.presses.Clear();
+        key.releases.Clear();
+        key.presses_or_repeats.Clear();
+    }
+
+    input_chars = {};
+    double_left_click = false;
+    mouse_scroll_delta_in_lines = 0;
+    dyn::Clear(clipboard_data);
+    event_arena.ResetCursorAndConsolidateRegions();
+    ++update_count;
 }

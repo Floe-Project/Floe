@@ -32,9 +32,8 @@ void Context::Trace(u32 type, char const* function, char const* fmt, ...) {
 
     static char buffer[512];
     stbsp_sprintf(buffer,
-                  "[Imgui] %llu:%d %s %s - ",
+                  "[Imgui] %llu %s %s - ",
                   (unsigned long long)platform->update_count,
-                  platform->update_guicall_count,
                   type_name,
                   function);
 
@@ -638,9 +637,8 @@ void Context::Begin(WindowSettings settings) {
     draw_data.cmd_lists_count = 0;
     draw_data.total_vtx_count = 0;
     draw_data.total_idx_count = 0;
-    platform->gui_update_requirements.Reset();
 
-    if (platform->update_guicall_count == 0) tab_just_used_to_focus = false;
+    tab_just_used_to_focus = false;
     frame_counter++;
     window_just_created = nullptr;
     curr_window = nullptr;
@@ -670,7 +668,7 @@ void Context::Begin(WindowSettings settings) {
             if (window == window->root_window) break;
             window = window->parent_window;
         }
-        if (final_window && platform->update_guicall_count == 0) {
+        if (final_window) {
             f32 const k_pixels_per_line = 20; // IMPROVE: this should be a setting so, for example, popups
                                               // can scroll in increments of each item
             f32 const lines = -platform->mouse_scroll_delta_in_lines;
@@ -1219,7 +1217,7 @@ TextInputResult Context::SingleLineTextInput(Rect r,
     if (IsHot(id)) platform->gui_update_requirements.cursor_type = CursorType::IBeam;
 
     if (TextInputHasFocus(id)) {
-        if (platform->Key(KeyCode::Tab).presses.size && (flags.tab_focuses_next_input) &&
+        if (platform->Key(KeyCode::Tab).presses.size && flags.tab_focuses_next_input &&
             !tab_just_used_to_focus) {
             tab_to_focus_next_input = true;
             tab_just_used_to_focus = true;
@@ -2152,7 +2150,7 @@ void Context::DebugWindow(Rect r) {
     DebugButton("Toggle Registered Widget Overlay");
 
     if (DebugTextHeading(debug_general, "General")) {
-        DebugTextItem("Update", "%llu:%d", platform->update_count, platform->update_guicall_count);
+        DebugTextItem("Update", "%llu", platform->update_count);
         DebugTextItem("Key shift", "%d", (int)platform->Key(ModifierKey::Shift).is_down);
         DebugTextItem("Key ctrl", "%d", (int)platform->Key(ModifierKey::Ctrl).is_down);
         DebugTextItem("Key modifer", "%d", (int)platform->Key(ModifierKey::Modifier).is_down);

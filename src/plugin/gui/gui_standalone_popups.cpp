@@ -137,8 +137,8 @@ void DoStandaloneErrorGUI(Gui* g) {
             };
 
             for (auto& i : keys) {
-                if (platform->KeyJustWentDown(i.key)) gen_midi_message(true, i.midi_key);
-                if (platform->KeyJustWentUp(i.key)) gen_midi_message(false, i.midi_key);
+                if (platform->Key(i.key).presses.size) gen_midi_message(true, i.midi_key);
+                if (platform->Key(i.key).releases.size) gen_midi_message(false, i.midi_key);
             }
         }
     }

@@ -680,7 +680,7 @@ void Gui::OpenDialog(DialogType type) {
 Gui::Gui(GuiPlatform& platform, PluginInstance& plugin)
     : gui_platform(platform)
     , plugin(plugin)
-    , logger(platform.logger)
+    , logger(plugin.shared_data.logger)
     , settings(plugin.shared_data.settings) {
     g_log_file.TraceLn();
     imgui.platform = &platform;

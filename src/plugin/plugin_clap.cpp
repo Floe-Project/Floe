@@ -72,14 +72,17 @@ static u16 g_floe_instance_id_counter = 0;
 // TODO(1.0): go over the API docs and review usage
 // TODO(1.0): add error handling
 // TODO(1.0): integrate this with the clap interface, there's no need having an abstraction layer here
+// TODO: rename
+// TODO: maybe make a separate file for this and move GuiPlatform's Handle* methods as static functions there?
+// GuiPlatfrom can just be a simple struct
 
 struct PuglPlatform {
-    PuglPlatform(GuiPlatform& platform, clap_host const& host, SettingsFile& settings)
-        : platform(platform)
-        , host(host)
-        , settings(settings) {}
+    PuglPlatform(clap_host const& host, SettingsFile& settings, Logger& logger)
+        : host(host)
+        , settings(settings)
+        , logger(logger) {}
 
-    void* CreateView() {
+    void* CreateView(PluginInstance& plugin) {
         g_counter++;
         if (auto const floe_host =
                 (FloeClapExtensionHost const*)host.get_extension(&host, k_floe_clap_extension_id);
@@ -109,10 +112,16 @@ struct PuglPlatform {
         puglSetViewHint(view, PUGL_RESIZABLE, true);
         auto const size = gui_settings::WindowSize(settings.settings.gui);
         puglSetSize(view, size.width, size.height);
+        platform.window_size = size;
+
+        gui.Emplace(platform, plugin);
 
         return view;
     }
+
     bool DestroyView() {
+        gui.Clear();
+
         if (realised) {
             puglStopTimer(view, k_timer_id);
             puglUnrealize(view);
@@ -129,7 +138,9 @@ struct PuglPlatform {
         }
         return true;
     }
+
     void PollAndUpdate() { puglUpdate(world, 0); }
+
     void SetParent(clap_window_t const* window) {
         auto const status = puglSetParentWindow(view, (uintptr_t)window->ptr);
         puglSetPosition(view, 0, 0);
@@ -139,10 +150,12 @@ struct PuglPlatform {
             TODO("handle error");
         }
     }
+
     bool SetTransient(clap_window_t const* window) {
         puglSetTransientParent(view, (uintptr_t)window->ptr);
         return true;
     }
+
     void SetVisible(bool visible) {
         if (visible) {
             if (!realised) {
@@ -161,11 +174,13 @@ struct PuglPlatform {
         } else
             puglHide(view);
     }
+
     bool SetSize(UiSize new_size) {
         DebugLn("SetSize: {}x{}", new_size.width, new_size.height);
         puglSetSize(view, new_size.width, new_size.height);
         return true;
     }
+
     bool SetClipboard(String mime_type, String data) {
         ArenaAllocatorWithInlineStorage<250> allocator;
         return puglSetClipboard(view, NullTerminated(mime_type, allocator), data.data, data.size) ==
@@ -237,8 +252,8 @@ struct PuglPlatform {
         auto& self = *(PuglPlatform*)puglGetHandle(view);
 
         // I'm not sure if pugl handles this for us or not, but let's just be safe. On Windows at least, it's
-        // possible to receive events from within an event if you're doing certain operation that trigger the
-        // event loop to pump again.
+        // possible to receive events from within an event if you're doing certain, blocking operations that
+        // trigger the event loop to pump again.
         if (self.processing_events) return PUGL_SUCCESS;
         self.processing_events = true;
         DEFER { self.processing_events = false; };
@@ -249,21 +264,19 @@ struct PuglPlatform {
 
             case PUGL_REALIZE: {
                 ZoneNamed("PUGL_REALIZE", true);
-                platform.graphics_ctx = graphics::CreateNewDrawContext();
-                auto const outcome =
-                    platform.graphics_ctx->CreateDeviceObjects((void*)puglGetNativeView(view));
+                self.graphics_ctx = graphics::CreateNewDrawContext();
+                auto const outcome = self.graphics_ctx->CreateDeviceObjects((void*)puglGetNativeView(view));
                 ASSERT(!outcome.HasError()); // TODO: handle error
-                platform.display_ratio = 1; // TODO: display_ratio
 
                 break;
             }
             case PUGL_UNREALIZE: {
                 ZoneNamed("PUGL_UNREALIZE", true);
-                if (platform.graphics_ctx) {
-                    platform.graphics_ctx->DestroyDeviceObjects();
-                    platform.graphics_ctx->fonts.Clear();
-                    delete platform.graphics_ctx;
-                    platform.graphics_ctx = nullptr;
+                if (self.graphics_ctx) {
+                    self.graphics_ctx->DestroyDeviceObjects();
+                    self.graphics_ctx->fonts.Clear();
+                    delete self.graphics_ctx;
+                    self.graphics_ctx = nullptr;
                 }
 
                 break;
@@ -278,7 +291,7 @@ struct PuglPlatform {
                     UiSize new_size {CheckedCast<u16>(event->configure.width),
                                      CheckedCast<u16>(event->configure.height)};
                     platform.window_size = new_size;
-                    if (platform.graphics_ctx) platform.graphics_ctx->Resize(new_size);
+                    if (self.graphics_ctx) self.graphics_ctx->Resize(new_size);
                 }
                 break;
             }
@@ -288,30 +301,61 @@ struct PuglPlatform {
             }
 
             case PUGL_EXPOSE: {
-                platform.Update();
+                ZoneNamed("PUGL_EXPOSE", true);
+                if (!self.graphics_ctx) break;
 
-                if (platform.gui_update_requirements.cursor_type != self.current_cursor) {
-                    self.current_cursor = platform.gui_update_requirements.cursor_type;
-                    switch (platform.gui_update_requirements.cursor_type) {
-                        case CursorType::Default: puglSetCursor(view, PUGL_CURSOR_ARROW); break;
-                        case CursorType::Hand: puglSetCursor(view, PUGL_CURSOR_HAND); break;
-                        case CursorType::IBeam: puglSetCursor(view, PUGL_CURSOR_CARET); break;
-                        case CursorType::AllArrows: puglSetCursor(view, PUGL_CURSOR_ALL_SCROLL); break;
-                        case CursorType::HorizontalArrows: puglSetCursor(view, PUGL_CURSOR_LEFT_RIGHT); break;
-                        case CursorType::VerticalArrows: puglSetCursor(view, PUGL_CURSOR_UP_DOWN); break;
-                        case CursorType::Count: break;
+                platform.graphics_ctx = self.graphics_ctx;
+                platform.native_window = (void*)puglGetNativeView(self.view);
+
+                // Mostly we'd only expect 1 or 2 updates but we set a hard limit of 4 as a fallback.
+                for (auto _ : Range(4)) {
+                    ZoneNamedN(repeat, "Update", true);
+
+                    platform.BeginUpdate();
+                    GUIUpdate(&*self.gui);
+
+                    if (platform.gui_update_requirements.cursor_type != self.current_cursor) {
+                        self.current_cursor = platform.gui_update_requirements.cursor_type;
+                        switch (platform.gui_update_requirements.cursor_type) {
+                            case CursorType::Default: puglSetCursor(view, PUGL_CURSOR_ARROW); break;
+                            case CursorType::Hand: puglSetCursor(view, PUGL_CURSOR_HAND); break;
+                            case CursorType::IBeam: puglSetCursor(view, PUGL_CURSOR_CARET); break;
+                            case CursorType::AllArrows: puglSetCursor(view, PUGL_CURSOR_ALL_SCROLL); break;
+                            case CursorType::HorizontalArrows:
+                                puglSetCursor(view, PUGL_CURSOR_LEFT_RIGHT);
+                                break;
+                            case CursorType::VerticalArrows: puglSetCursor(view, PUGL_CURSOR_UP_DOWN); break;
+                            case CursorType::Count: break;
+                        }
                     }
+
+                    if (platform.gui_update_requirements.wants_clipboard_paste) {
+                        platform.gui_update_requirements.wants_clipboard_paste = false;
+                        puglPaste(view);
+                    }
+
+                    if (platform.gui_update_requirements.set_clipboard_text.size) {
+                        self.SetClipboard("text/plain", platform.gui_update_requirements.set_clipboard_text);
+                        dyn::Clear(platform.gui_update_requirements.set_clipboard_text);
+                    }
+
+                    platform.EndUpdate();
+
+                    // Our GUI code sets this flag if it wants another update immediately. It's an ad-hoc
+                    // system really. Often it marks the flag when things on the GUI have resized or changed.
+                    // A more robust, deterministic system would be better.
+                    if (!platform.gui_update_requirements.requires_another_update) break;
                 }
 
-                if (platform.gui_update_requirements.wants_clipboard_paste) {
-                    platform.gui_update_requirements.wants_clipboard_paste = false;
-                    puglPaste(view);
+                if (platform.draw_data.cmd_lists_count) {
+                    ZoneNamedN(render, "render", true);
+                    auto o = self.graphics_ctx->Render(platform.draw_data,
+                                                       platform.window_size,
+                                                       platform.display_ratio,
+                                                       Rect(0, 0, platform.window_size.ToFloat2()));
+                    if (o.HasError()) self.logger.ErrorLn("GUI render failed: {}", o.Error());
                 }
 
-                if (platform.gui_update_requirements.set_clipboard_text.size) {
-                    self.SetClipboard("text/plain", platform.gui_update_requirements.set_clipboard_text);
-                    dyn::Clear(platform.gui_update_requirements.set_clipboard_text);
-                }
                 break;
             }
 
@@ -320,8 +364,10 @@ struct PuglPlatform {
                 if (host_gui) host_gui->closed(&self.host, false);
                 break;
             }
+
             case PUGL_FOCUS_IN:
-            case PUGL_FOCUS_OUT:
+            case PUGL_FOCUS_OUT: break;
+
             case PUGL_KEY_PRESS: {
                 if (auto const key = ConvertKeyCode(event->key.key)) {
                     if (platform.HandleKeyPressed(*key, ConvertModifierFlags(event->key.state), true))
@@ -333,6 +379,7 @@ struct PuglPlatform {
                 }
                 break;
             }
+
             case PUGL_KEY_RELEASE: {
                 if (auto const key = ConvertKeyCode(event->key.key)) {
                     if (platform.HandleKeyPressed(*key, ConvertModifierFlags(event->key.state), false))
@@ -371,10 +418,11 @@ struct PuglPlatform {
             }
 
             case PUGL_MOTION: {
-                if (platform.HandleMouseMoved((f32)event->motion.x, (f32)event->motion.y))
+                if (platform.HandleMouseMoved({(f32)event->motion.x, (f32)event->motion.y}))
                     puglPostRedisplay(view);
                 break;
             }
+
             case PUGL_SCROLL: {
                 if (event->scroll.direction == PUGL_SCROLL_UP ||
                     event->scroll.direction == PUGL_SCROLL_DOWN) {
@@ -382,6 +430,7 @@ struct PuglPlatform {
                 }
                 break;
             }
+
             case PUGL_CLIENT:
             case PUGL_TIMER: {
                 if (event->timer.id == k_timer_id) {
@@ -389,6 +438,7 @@ struct PuglPlatform {
                 }
                 break;
             }
+
             case PUGL_DATA_OFFER: {
                 u32 const num_types = puglGetNumClipboardTypes(view);
                 for (auto const t : Range(num_types)) {
@@ -397,6 +447,7 @@ struct PuglPlatform {
                 }
                 break;
             }
+
             case PUGL_DATA: {
                 uint32_t const type_index = event->data.typeIndex;
 
@@ -410,6 +461,7 @@ struct PuglPlatform {
                 }
                 break;
             }
+
             case PUGL_LOOP_ENTER:
             case PUGL_LOOP_LEAVE: break;
         }
@@ -421,14 +473,17 @@ struct PuglPlatform {
     static int g_counter;
     static PuglWorld* g_world;
 
-    GuiPlatform& platform;
     clap_host const& host;
     SettingsFile& settings;
+    Logger& logger;
     bool realised = false;
     PuglWorld* world;
     PuglView* view;
     bool processing_events = false;
     Optional<CursorType> current_cursor {};
+    graphics::DrawContext* graphics_ctx {};
+    GuiPlatform platform {};
+    Optional<Gui> gui;
 };
 
 int PuglPlatform::g_counter = 0;
@@ -458,9 +513,7 @@ struct FloeInstance {
 
     Optional<PluginInstance> plugin {};
 
-    Optional<GuiPlatform> gui_platform {};
     Optional<PuglPlatform> pugl_platform {};
-    Optional<Gui> gui {};
 };
 
 static u16 g_num_instances = 0;
@@ -536,17 +589,11 @@ clap_plugin_gui const floe_gui {
         ZoneScopedMessage(floe.trace_config, "gui create");
         DebugAssertMainThread(floe.host);
 
-        floe.gui_platform.Emplace([&floe]() { GUIUpdate(&*floe.gui); }, g_cross_instance_systems->logger);
+        floe.pugl_platform.Emplace(floe.host,
+                                   g_cross_instance_systems->settings,
+                                   g_cross_instance_systems->logger);
+        floe.pugl_platform->CreateView(*floe.plugin);
 
-        floe.gui_platform->window_size =
-            gui_settings::WindowSize(g_cross_instance_systems->settings.settings.gui);
-
-        floe.pugl_platform.Emplace(*floe.gui_platform, floe.host, g_cross_instance_systems->settings);
-        floe.pugl_platform->CreateView();
-
-        floe.gui_platform->native_window = (void*)puglGetNativeView(floe.pugl_platform->view);
-
-        floe.gui.Emplace(*floe.gui_platform, *floe.plugin);
         return true;
     },
 
@@ -557,10 +604,8 @@ clap_plugin_gui const floe_gui {
             auto& floe = *(FloeInstance*)plugin->plugin_data;
             DebugAssertMainThread(floe.host);
             ZoneScopedMessage(floe.trace_config, "gui destroy");
-            floe.gui.Clear();
             floe.pugl_platform->DestroyView();
             floe.pugl_platform.Clear();
-            floe.gui_platform.Clear();
         },
 
     // Set the absolute GUI scaling factor, and override any OS info.
@@ -590,8 +635,8 @@ clap_plugin_gui const floe_gui {
     .get_size = [](clap_plugin_t const* plugin, u32* width, u32* height) -> bool {
         auto& floe = *(FloeInstance*)plugin->plugin_data;
         DebugAssertMainThread(floe.host);
-        *width = floe.gui_platform->window_size.width;
-        *height = floe.gui_platform->window_size.height;
+        *width = floe.pugl_platform->platform.window_size.width;
+        *height = floe.pugl_platform->platform.window_size.height;
         return true;
     },
 
@@ -683,7 +728,7 @@ clap_plugin_gui const floe_gui {
             shown_graphics_info = true;
             g_cross_instance_systems->logger.InfoLn(
                 "{}",
-                floe.gui_platform->graphics_ctx->graphics_device_info.Items());
+                floe.pugl_platform->graphics_ctx->graphics_device_info.Items());
         }
         return true;
     },
@@ -946,9 +991,7 @@ clap_plugin const floe_plugin {
             ZoneScopedMessage(floe.trace_config, "plugin destroy (init:{})", floe.initialised);
 
             if (floe.initialised) {
-                floe.gui.Clear();
                 floe.pugl_platform.Clear();
-                floe.gui_platform.Clear();
 
                 floe.plugin.Clear();
 
@@ -997,7 +1040,7 @@ clap_plugin const floe_plugin {
             DebugAssertMainThread(floe.host);
             ASSERT(floe.active);
             if (!floe.active) return;
-            if (floe.gui) {
+            if (floe.pugl_platform) {
                 // TODO: I'm not entirely sure if this is ok or not. But I do want to avoid the GUI being
                 // active when the audio plugin is deactivate.
                 floe.pugl_platform->DestroyView();
@@ -1100,7 +1143,7 @@ clap_plugin const floe_plugin {
                 auto& processor = floe.plugin->processor;
                 processor.processor_callbacks.on_main_thread(processor, update_gui);
                 PluginInstanceCallbacks().on_main_thread(*floe.plugin, update_gui);
-                if (update_gui && floe.gui_platform) floe.gui_platform->SetGUIDirty();
+                if (update_gui && floe.pugl_platform) floe.pugl_platform->platform.SetGUIDirty();
             }
         },
 };

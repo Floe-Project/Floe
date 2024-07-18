@@ -1078,7 +1078,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
                           labels::Parameter(imgui));
 
             if (dragging_fx &&
-                (imgui.platform->ContainsCursor(converted_slot_r) || dragging_fx->drop_slot == slot)) {
+                (converted_slot_r.Contains(imgui.platform->cursor_pos) || dragging_fx->drop_slot == slot)) {
                 if (dragging_fx->drop_slot != slot)
                     imgui.platform->gui_update_requirements.requires_another_update = true;
                 dragging_fx->drop_slot = slot;
@@ -1107,7 +1107,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
                     auto converted_grabber_r = imgui.GetRegisteredAndConvertedRect(grabber_r);
                     imgui.RegisterRegionForMouseTracking(&converted_grabber_r);
 
-                    if (g->gui_platform.ContainsCursor(converted_grabber_r))
+                    if (converted_grabber_r.Contains(g->gui_platform.cursor_pos))
                         g->gui_platform.gui_update_requirements.cursor_type = CursorType::AllArrows;
                 }
 

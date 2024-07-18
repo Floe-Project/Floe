@@ -21,7 +21,7 @@ imgui::WindowSettings PopupWindowSettings(imgui::Context const& imgui) {
         imgui.graphics->AddRectFilled(bounds.Min(),
                                       bounds.Max(),
                                       LiveCol(imgui, UiColMap::PopupScrollbarBack));
-        uint32_t handle_col = LiveCol(imgui, UiColMap::PopupScrollbarHandle);
+        u32 handle_col = LiveCol(imgui, UiColMap::PopupScrollbarHandle);
         if (imgui.IsHotOrActive(id)) handle_col = LiveCol(imgui, UiColMap::PopupScrollbarHandleHover);
         imgui.graphics->AddRectFilled(handle_rect.Min(),
                                       handle_rect.Max(),
@@ -58,7 +58,7 @@ FloeWindowSettings(imgui::Context const& imgui,
                                       bounds.Max(),
                                       LiveCol(imgui, UiColMap::ScrollbarBack),
                                       rounding);
-        uint32_t handle_col = LiveCol(imgui, UiColMap::ScrollbarHandle);
+        u32 handle_col = LiveCol(imgui, UiColMap::ScrollbarHandle);
         if (imgui.IsHot(id))
             handle_col = LiveCol(imgui, UiColMap::ScrollbarHandleHover);
         else if (imgui.IsActive(id))

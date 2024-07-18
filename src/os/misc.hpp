@@ -149,8 +149,9 @@ class TimePoint {
     f64 SecondsFromNow() const { return Now() - *this; }
     s64 Raw() const { return m_time; }
 
+    // returns seconds
     friend f64 operator-(TimePoint lhs, TimePoint rhs);
-    friend TimePoint operator+(TimePoint t, f64 s);
+    friend TimePoint operator+(TimePoint t, f64 seconds);
 
     explicit operator bool() const { return m_time != 0; }
 

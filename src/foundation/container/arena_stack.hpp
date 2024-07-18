@@ -10,8 +10,8 @@
 template <typename Type>
 struct ArenaStack {
     struct Node {
-        Node* next {};
         Type data;
+        Node* next {};
     };
 
     using Iterator = SinglyLinkedListIterator<Node, Type>;

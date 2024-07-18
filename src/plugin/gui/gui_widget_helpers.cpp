@@ -443,7 +443,7 @@ bool DoOverlayClickableBackground(Gui* g) {
 
     if (imgui.IsWindowHovered(invis_window)) {
         imgui.platform->gui_update_requirements.cursor_type = CursorType::Hand;
-        if (imgui.platform->MouseLeft().pressed) clicked = true;
+        if (imgui.platform->Mouse(MouseButton::Left).presses.size) clicked = true;
     }
 
     imgui.EndWindow();

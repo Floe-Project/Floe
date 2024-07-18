@@ -120,14 +120,15 @@ static void GUIDoSampleWaveformOverlay(Gui* g, PluginInstance::Layer* layer, Rec
         if (tooltip_param) MidiLearnMenu(g, *tooltip_param, grabber_unregistered);
         imgui.RegisterAndConvertRect(&grabber_r);
 
-        bool const changed = imgui.SliderRangeBehavior(grabber_r,
-                                                       id,
-                                                       invert_slider ? 1.0f : 0.0f,
-                                                       invert_slider ? 0.0f : 1.0f,
-                                                       value,
-                                                       default_val,
-                                                       slider_sensitivity,
-                                                       {.slower_with_shift = true, .default_on_modifer = true});
+        bool const changed =
+            imgui.SliderRangeBehavior(grabber_r,
+                                      id,
+                                      invert_slider ? 1.0f : 0.0f,
+                                      invert_slider ? 0.0f : 1.0f,
+                                      value,
+                                      default_val,
+                                      slider_sensitivity,
+                                      {.slower_with_shift = true, .default_on_modifer = true});
 
         if (imgui.IsHotOrActive(id)) {
             imgui.platform->gui_update_requirements.cursor_type = CursorType::HorizontalArrows;

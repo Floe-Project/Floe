@@ -69,11 +69,6 @@ UninitialisedGlobalObj<CrossInstanceSystems> g_cross_instance_systems {};
 
 static u16 g_floe_instance_id_counter = 0;
 
-static int g_counter = 0;
-PuglWorld* g_world {};
-
-constexpr uintptr_t k_timer_id = 200;
-
 // TODO(1.0): go over the API docs and review usage
 // TODO(1.0): add error handling
 // TODO(1.0): integrate this with the clap interface, there's no need having an abstraction layer here
@@ -102,39 +97,18 @@ struct PuglPlatform {
         }
 
         view = puglNewView(world);
+        puglSetHandle(view, this);
+        puglSetEventFunc(view, OnEvent);
+
         puglSetBackend(view, puglGlBackend());
         puglSetViewHint(view, PUGL_CONTEXT_VERSION_MAJOR, 3);
         puglSetViewHint(view, PUGL_CONTEXT_VERSION_MINOR, 3);
         puglSetViewHint(view, PUGL_CONTEXT_PROFILE, PUGL_OPENGL_COMPATIBILITY_PROFILE);
-        puglSetHandle(view, this);
-        puglSetEventFunc(view, OnEvent);
-        puglSetViewHint(view, PUGL_RESIZABLE, true);
-
-        auto const ratio = gui_settings::CurrentAspectRatio(settings.settings.gui);
-        auto const min_size = gui_settings::CreateFromWidth(500, ratio);
-        auto const max_size = gui_settings::CreateFromWidth(2000, ratio);
-        puglSetSizeHint(view, PUGL_DEFAULT_SIZE, platform.window_size.width, platform.window_size.height);
-        puglSetSizeHint(view, PUGL_MIN_SIZE, min_size.width, min_size.height);
-        puglSetSizeHint(view, PUGL_MAX_SIZE, max_size.width, max_size.height);
-        puglSetSizeHint(view,
-                        PUGL_FIXED_ASPECT,
-                        ratio.width,
-                        ratio.height); // TODO: what if the plugin changes shape?
-        puglSetSize(view, platform.window_size.width, platform.window_size.height);
-
         puglSetViewHint(view, PUGL_CONTEXT_DEBUG, RUNTIME_SAFETY_CHECKS_ON);
 
-        // TODO: do we need to register clap_host_posix_fs_support?
-
-        // constexpr auto interval_ms = (u32)(1000.0 / (f64)k_gui_platform_timer_hz);
-        // const auto host_timer =
-        //     (const clap_host_timer_support *)host.get_extension(&host, CLAP_EXT_TIMER_SUPPORT);
-        // if (host_timer) {
-        //     if (!host_timer->register_timer(&host, interval_ms, &timer_id)) Panic("Failed to register
-        //     timer");
-        // } else {
-        //     Panic("Host does not support timer extension");
-        // }
+        puglSetViewHint(view, PUGL_RESIZABLE, true);
+        auto const size = gui_settings::WindowSize(settings.settings.gui);
+        puglSetSize(view, size.width, size.height);
 
         return view;
     }
@@ -249,8 +223,17 @@ struct PuglPlatform {
         return nullopt;
     }
 
+    static ModifierFlags ConvertModifierFlags(u32 flags) {
+        ModifierFlags result {};
+        if (flags & PUGL_MOD_SHIFT) result.Set(ModifierKey::Shift);
+        if (flags & PUGL_MOD_CTRL) result.Set(ModifierKey::Ctrl);
+        if (flags & PUGL_MOD_ALT) result.Set(ModifierKey::Alt);
+        if (flags & PUGL_MOD_SUPER) result.Set(ModifierKey::Super);
+        return result;
+    }
+
     static PuglStatus OnEvent(PuglView* view, PuglEvent const* event) {
-        if (event->type != PUGL_UPDATE && event->type != PUGL_TIMER) printEvent(event, "PUGL: ", true);
+        // if (event->type != PUGL_UPDATE && event->type != PUGL_TIMER) printEvent(event, "PUGL: ", true);
         auto& self = *(PuglPlatform*)puglGetHandle(view);
 
         // I'm not sure if pugl handles this for us or not, but let's just be safe. On Windows at least, it's
@@ -286,6 +269,7 @@ struct PuglPlatform {
                 break;
             }
 
+            // resized or moved
             case PUGL_CONFIGURE: {
                 auto const current_size = platform.window_size;
                 if (current_size.width != event->configure.width ||
@@ -305,6 +289,7 @@ struct PuglPlatform {
 
             case PUGL_EXPOSE: {
                 platform.Update();
+
                 if (platform.gui_update_requirements.cursor_type != self.current_cursor) {
                     self.current_cursor = platform.gui_update_requirements.cursor_type;
                     switch (platform.gui_update_requirements.cursor_type) {
@@ -339,42 +324,48 @@ struct PuglPlatform {
             case PUGL_FOCUS_OUT:
             case PUGL_KEY_PRESS: {
                 if (auto const key = ConvertKeyCode(event->key.key)) {
-                    if (platform.HandleKeyPressed(*key, true)) puglPostRedisplay(view);
+                    if (platform.HandleKeyPressed(*key, ConvertModifierFlags(event->key.state), true))
+                        puglPostRedisplay(view);
                 } else if (auto mod_key = self.ModKey(event->key.key)) {
                     auto& mod = platform.modifier_keys[ToInt(*mod_key)];
-                    if (!mod.is_down) mod.pressed = true;
+                    if (!mod.is_down) mod.presses = true;
                     ++mod.is_down;
                 }
                 break;
             }
             case PUGL_KEY_RELEASE: {
                 if (auto const key = ConvertKeyCode(event->key.key)) {
-                    if (platform.HandleKeyPressed(*key, false)) puglPostRedisplay(view);
+                    if (platform.HandleKeyPressed(*key, ConvertModifierFlags(event->key.state), false))
+                        puglPostRedisplay(view);
                 } else if (auto mod_key = self.ModKey(event->key.key)) {
                     auto& mod = platform.modifier_keys[ToInt(*mod_key)];
                     --mod.is_down;
-                    if (mod.is_down == 0) mod.released = true;
+                    if (mod.is_down == 0) mod.releases = true;
                 }
                 break;
             }
+
             case PUGL_TEXT: {
                 if (platform.HandleInputChar(event->text.character)) puglPostRedisplay(view);
                 break;
             }
+
             case PUGL_POINTER_IN:
             case PUGL_POINTER_OUT: {
                 puglPostRedisplay(view);
                 break;
             }
-            case PUGL_BUTTON_PRESS: {
-                if (auto const button = ConvertMouseButton(event->button.button)) {
-                    if (platform.HandleMouseClicked(*button, true)) puglPostRedisplay(view);
-                }
-                break;
-            }
+
+            case PUGL_BUTTON_PRESS:
             case PUGL_BUTTON_RELEASE: {
                 if (auto const button = ConvertMouseButton(event->button.button)) {
-                    if (platform.HandleMouseClicked(*button, false)) puglPostRedisplay(view);
+                    GuiPlatform::MouseButtonState::Event const e {
+                        .point = {(f32)event->button.x, (f32)event->button.y},
+                        .time = TimePoint::Now(),
+                        .modifiers = ConvertModifierFlags(event->button.state),
+                    };
+                    if (platform.HandleMouseClicked(*button, e, event->type == PUGL_BUTTON_PRESS))
+                        puglPostRedisplay(view);
                 }
                 break;
             }
@@ -425,6 +416,11 @@ struct PuglPlatform {
         return PUGL_SUCCESS;
     }
 
+    static constexpr uintptr_t k_timer_id = 200;
+
+    static int g_counter;
+    static PuglWorld* g_world;
+
     GuiPlatform& platform;
     clap_host const& host;
     SettingsFile& settings;
@@ -434,6 +430,9 @@ struct PuglPlatform {
     bool processing_events = false;
     Optional<CursorType> current_cursor {};
 };
+
+int PuglPlatform::g_counter = 0;
+PuglWorld* PuglPlatform::g_world = nullptr;
 
 struct FloeInstance {
     FloeInstance(clap_host const* clap_host);

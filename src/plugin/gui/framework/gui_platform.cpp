@@ -53,17 +53,17 @@ bool GuiPlatform::HandleMouseMoved(f32 cursor_x, f32 cursor_y) {
     return result;
 }
 
-bool GuiPlatform::HandleMouseClicked(MouseButton button, bool is_down) {
-    mouse_buttons[ToInt(button)].is_down = is_down;
+bool GuiPlatform::HandleMouseClicked(MouseButton button, MouseButtonState::Event event, bool is_down) {
+    auto& btn = mouse_buttons[ToInt(button)];
+    btn.is_down = is_down;
     if (is_down) {
-        mouse_buttons[ToInt(button)].pressed = true;
-        mouse_buttons[ToInt(button)].pressed_point = cursor_pos;
-        mouse_buttons[ToInt(button)].pressed_time = TimePoint::Now();
+        btn.last_pressed_point = event.point;
+        btn.last_pressed_time = event.time;
     } else {
-        mouse_buttons[ToInt(button)].released = true;
-        if (mouse_buttons[ToInt(button)].is_dragging) mouse_buttons[ToInt(button)].dragging_ended = true;
-        mouse_buttons[ToInt(button)].is_dragging = false;
+        if (btn.is_dragging) btn.dragging_ended = true;
+        btn.is_dragging = false;
     }
+    btn.presses.Append(event, event_arena);
 
     bool result = false;
     if (gui_update_requirements.mouse_tracked_regions.size == 0 ||
@@ -87,15 +87,21 @@ bool GuiPlatform::HandleMouseClicked(MouseButton button, bool is_down) {
 }
 
 bool GuiPlatform::HandleDoubleLeftClick() {
-    HandleMouseClicked(MouseButton::Left, true);
+    HandleMouseClicked(MouseButton::Left, {}, true); // TODO: we have no event
     double_left_click = true;
     return true;
 }
 
-bool GuiPlatform::HandleKeyPressed(KeyCode key_code, bool is_down) {
-    DebugLn("Key: {} {}", EnumToString(key_code), is_down);
-    keys_down.SetToValue(ToInt(key_code), is_down);
-    if (is_down) keys_pressed.SetToValue(ToInt(key_code), true);
+bool GuiPlatform::HandleKeyPressed(KeyCode key_code, ModifierFlags modifiers, bool is_down) {
+    auto& key = keys[ToInt(key_code)];
+    if (is_down) {
+        key.presses_or_repeats.Append({modifiers}, event_arena);
+        if (!key.is_down) key.presses.Append({modifiers}, event_arena);
+    } else {
+        key.releases.Append({modifiers}, event_arena);
+    }
+    key.is_down = is_down;
+
     if (gui_update_requirements.wants_keyboard_input) return true;
     if (gui_update_requirements.wants_just_arrow_keys &&
         (key_code == KeyCode::UpArrow || key_code == KeyCode::DownArrow || key_code == KeyCode::LeftArrow ||
@@ -152,8 +158,8 @@ void GuiPlatform::Update() {
         cursor_delta = cursor_pos - cursor_pos_prev;
     }
 
-    if (time_at_last_update)
-        delta_time = (f32)time_at_last_update.SecondsFromNow();
+    if (time_prev)
+        delta_time = (f32)time_prev.SecondsFromNow();
     else
         delta_time = 0;
 
@@ -167,34 +173,31 @@ void GuiPlatform::Update() {
     for (auto _ : Range(4)) {
         ZoneNamedN(repeat, "repeat", true);
 
-        for (auto const& btn : mouse_buttons) {
-            DebugLn("Mouse button[{}]: down: {}, pressed: {}, released: {}",
-                    &btn - mouse_buttons.data,
-                    btn.is_down,
-                    btn.pressed,
-                    btn.released);
-        }
-
         update();
 
-        input_chars = {};
         for (auto& btn : mouse_buttons) {
-            btn.pressed = false;
-            btn.released = false;
             btn.dragging_started = false;
             btn.dragging_ended = false;
+            btn.presses.Clear();
+            btn.releases.Clear();
         }
 
         for (auto& mod : modifier_keys) {
-            mod.pressed = false;
-            mod.released = false;
+            mod.presses = 0;
+            mod.releases = 0;
         }
 
-        keys_down_prev = keys_down;
-        keys_pressed = {};
+        for (auto& key : keys) {
+            key.presses.Clear();
+            key.releases.Clear();
+            key.presses_or_repeats.Clear();
+        }
+
+        input_chars = {};
         double_left_click = false;
         mouse_scroll_delta_in_lines = 0;
         dyn::Clear(clipboard_data);
+        event_arena.ResetCursorAndConsolidateRegions();
 
         update_guicall_count++;
 
@@ -213,5 +216,5 @@ void GuiPlatform::Update() {
     }
 
     cursor_pos_prev = cursor_pos;
-    time_at_last_update = TimePoint::Now();
+    time_prev = TimePoint::Now();
 }

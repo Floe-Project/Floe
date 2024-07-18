@@ -41,11 +41,18 @@ enum class KeyCode : u32 {
 enum class ModifierKey : u32 {
     Shift,
     Ctrl,
-    Alt,
-    Super,
+    Alt, // 'Option' on macOS
+    Super, // 'Cmd' on macOS, else Super/Windows-key
     Count,
 
-    Modifer = IS_MACOS ? Super : Ctrl,
+    // alias
+    Modifier = IS_MACOS ? Super : Ctrl,
+};
+
+struct ModifierFlags {
+    bool Get(ModifierKey k) const { return flags & (1 << ToInt(k)); }
+    void Set(ModifierKey k) { flags |= (1 << ToInt(k)); }
+    u8 flags;
 };
 
 enum class MouseButton : u32 { Left, Right, Middle, Count };
@@ -97,20 +104,37 @@ struct GuiUpdateRequirements {
 
 struct GuiPlatform {
     struct MouseButtonState {
-        bool is_down {};
-        bool pressed {}; // cleared every frame
-        bool released {}; // cleared every frame
+        struct Event {
+            f32x2 point {};
+            TimePoint time {};
+            ModifierFlags modifiers {};
+        };
+
+        ArenaStack<Event> presses {}; // mouse-down events since last frame, cleared every frame
+        ArenaStack<Event> releases {}; // mouse-up events since last frame, cleared every frame
+        f32x2 last_pressed_point {}; // the last known point where the mouse was pressed
+        TimePoint last_pressed_time {}; // the last known time when the mouse was pressed
+        bool is_down {}; // current state
         bool is_dragging {};
         bool dragging_started {}; // cleared every frame
         bool dragging_ended {}; // cleared every frame
-        f32x2 pressed_point {};
-        TimePoint pressed_time {};
     };
 
     struct ModifierKeyState {
         u8 is_down; // we use an int to incr/decr because modifier keys can have both left and right keys
-        bool pressed;
-        bool released;
+        u8 presses; // key-down events since last frame, zeroed every frame
+        u8 releases; // key-up events since last frame, zeroed every frame
+    };
+
+    struct KeyState {
+        struct Event {
+            ModifierFlags modifiers;
+        };
+
+        bool is_down;
+        ArenaStack<Event> presses_or_repeats; // key-down or repeats since last frame, cleared every frame
+        ArenaStack<Event> presses; // key-down events since last frame, zeroed every frame
+        ArenaStack<Event> releases; // key-up events since last frame, zeroed every frame
     };
 
     GuiPlatform(TrivialFixedSizeFunction<16, void()>&& update, Logger& logger)
@@ -120,45 +144,37 @@ struct GuiPlatform {
     void SetGUIDirty() { gui_update_requirements.mark_gui_dirty = true; }
 
     bool ContainsCursor(Rect r) { return r.Contains(cursor_pos); }
-    bool IsKeyPressed(KeyCode keycode) { return keys_pressed.Get(ToInt(keycode)); }
-    bool IsKeyDown(KeyCode keycode) { return keys_down.Get(ToInt(keycode)); }
-    bool KeyJustWentDown(KeyCode keycode) {
-        return IsKeyDown(keycode) && !keys_down_prev.Get(ToInt(keycode)) && update_guicall_count == 0;
-    }
-    bool KeyJustWentUp(KeyCode keycode) {
-        return !IsKeyDown(keycode) && keys_down_prev.Get(ToInt(keycode)) && update_guicall_count == 0;
-    }
+    bool KeyJustWentDown(KeyCode keycode) { return keys[ToInt(keycode)].presses.size; } // TODO: remove
+    bool KeyJustWentUp(KeyCode keycode) { return keys[ToInt(keycode)].releases.size; } // TODO: remove
 
     bool MouseJustWentDownInRegion(MouseButton n, Rect r) {
-        return mouse_buttons[ToInt(n)].pressed && ContainsCursor(r);
+        return mouse_buttons[ToInt(n)].presses.size && ContainsCursor(r);
     }
     bool MouseJustWentUpInRegion(MouseButton n, Rect r) {
-        return mouse_buttons[ToInt(n)].released && ContainsCursor(r);
+        return mouse_buttons[ToInt(n)].releases.size && ContainsCursor(r);
     }
     bool MouseJustWentDownAndUpInRegion(MouseButton n, Rect r) {
-        return MouseJustWentUpInRegion(n, r) && r.Contains(mouse_buttons[ToInt(n)].pressed_point);
+        return MouseJustWentUpInRegion(n, r) && r.Contains(mouse_buttons[ToInt(n)].last_pressed_point);
     }
-    f64 SecondsSinceMouseDown(MouseButton n) { return current_time - mouse_buttons[ToInt(n)].pressed_time; }
-    f32x2 DeltaFromMouseDown(MouseButton n) { return cursor_pos - mouse_buttons[ToInt(n)].pressed_point; }
+    f64 SecondsSinceMouseDown(MouseButton n) {
+        return current_time - mouse_buttons[ToInt(n)].last_pressed_time;
+    }
+    f32x2 DeltaFromMouseDown(MouseButton n) {
+        return cursor_pos - mouse_buttons[ToInt(n)].last_pressed_point;
+    }
 
-    MouseButtonState& MouseLeft() { return mouse_buttons[ToInt(MouseButton::Left)]; }
-    MouseButtonState& MouseRight() { return mouse_buttons[ToInt(MouseButton::Right)]; }
-    MouseButtonState& MouseMiddle() { return mouse_buttons[ToInt(MouseButton::Middle)]; }
-
-    ModifierKeyState& Shift() { return modifier_keys[ToInt(ModifierKey::Shift)]; }
-    ModifierKeyState& Ctrl() { return modifier_keys[ToInt(ModifierKey::Ctrl)]; }
-    ModifierKeyState& Alt() { return modifier_keys[ToInt(ModifierKey::Alt)]; }
-    ModifierKeyState& Super() { return modifier_keys[ToInt(ModifierKey::Super)]; }
-    ModifierKeyState& Modifier() { return modifier_keys[ToInt(ModifierKey::Modifer)]; }
+    MouseButtonState& Mouse(MouseButton n) { return mouse_buttons[ToInt(n)]; }
+    ModifierKeyState& Key(ModifierKey n) { return modifier_keys[ToInt(n)]; }
+    KeyState& Key(KeyCode n) { return keys[ToInt(n)]; }
 
     //
     // Called by platform specific code
     // ======================================================================================================
     bool HandleMouseWheel(f32 delta);
     bool HandleMouseMoved(f32 cursor_x, f32 cursor_y);
-    bool HandleMouseClicked(MouseButton button, bool is_down);
+    bool HandleMouseClicked(MouseButton button, MouseButtonState::Event event, bool is_down);
     bool HandleDoubleLeftClick();
-    bool HandleKeyPressed(KeyCode code, bool is_down);
+    bool HandleKeyPressed(KeyCode code, ModifierFlags modifiers, bool is_down);
     bool HandleInputChar(u32 utf32_codepoint);
     bool CheckForTimerRedraw();
 
@@ -175,23 +191,18 @@ struct GuiPlatform {
     // Read these at any time when the window is open
     // ======================================================================================================
     f32x2 cursor_pos {};
-    f32x2 cursor_delta {};
     f32x2 cursor_pos_prev {};
+    f32x2 cursor_delta {};
     f32 mouse_scroll_delta_in_lines {};
-
     Array<MouseButtonState, ToInt(MouseButton::Count)> mouse_buttons {};
-
     bool double_left_click {};
 
-    UiSize window_size {};
-    f32 delta_time {};
     TimePoint current_time {};
+    TimePoint time_prev {};
+    f32 delta_time {};
 
-    Bitset<ToInt(KeyCode::Count)> keys_down {}; // the state of the key
-    Bitset<ToInt(KeyCode::Count)> keys_down_prev {};
-
-    Bitset<ToInt(KeyCode::Count)> keys_pressed {}; // indicates the a key has just be pressed (include
-                                                   // key repeats), reset every frame
+    Array<KeyState, ToInt(KeyCode::Count)> keys {};
+    Array<ModifierKeyState, ToInt(ModifierKey::Count)> modifier_keys {};
 
     // may contain text from the clipboard - following from a wants_clipboard_paste request
     DynamicArray<char> clipboard_data {PageAllocator::Instance()};
@@ -200,17 +211,16 @@ struct GuiPlatform {
 
     uint64_t update_count {};
     int update_guicall_count {}; // update() is sometimes called 2 times in one frame
+
     f32 display_ratio {};
+    UiSize window_size {};
 
     void* native_window {};
-
-    Array<ModifierKeyState, ToInt(ModifierKey::Count)> modifier_keys {};
 
     //
     // Internals
     // ======================================================================================================
     TrivialFixedSizeFunction<16, void()> update;
     Logger& logger;
-
-    TimePoint time_at_last_update {};
+    ArenaAllocator event_arena {Malloc::Instance(), 256};
 };

@@ -1634,7 +1634,7 @@ pub fn build(b: *std.Build) void {
             {
                 // disabling pulse audio because it was causing lots of stutters on my machine
                 miniaudio.addCSourceFiles(.{
-                    .files = &.{"third_party_libs/miniaudio/miniaudio.c"},
+                    .files = &.{"third_party_libs/miniaudio.c"},
                     .flags = genericFlags(&build_context, target, &.{"-DMA_NO_PULSEAUDIO"}) catch @panic("OOM"),
                 });
                 miniaudio.linkLibC();

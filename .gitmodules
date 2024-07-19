@@ -43,3 +43,6 @@
 [submodule "third_party_libs/IconFontCppHeaders"]
 	path = third_party_libs/IconFontCppHeaders
 	url = https://github.com/juliettef/IconFontCppHeaders
+[submodule "third_party_libs/miniaudio"]
+	path = third_party_libs/miniaudio
+	url = https://github.com/mackron/miniaudio

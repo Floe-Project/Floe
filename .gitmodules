@@ -34,3 +34,6 @@
 [submodule "third_party_libs/AudioUnitSDK"]
 	path = third_party_libs/AudioUnitSDK
 	url = https://github.com/apple/AudioUnitSDK
+[submodule "third_party_libs/miniz"]
+	path = third_party_libs/miniz
+	url = https://github.com/richgel999/miniz

@@ -1,175 +1,586 @@
-// Copyright 2018-2024 Sam Windell
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 #pragma once
 #include "foundation/foundation.hpp"
-#include "os/misc.hpp"
+#include "utils/debug/debug.hpp"
 
-#include "draw_list.hpp"
+#include "clap/host.h"
+#include "gui/gui.hpp"
+#include "gui_frame.hpp"
+#include "plugin_instance.hpp"
+#include "pugl/gl.h" // on windows this includes windows.h
+#include "pugl/pugl.h"
+#include "settings/settings_gui.hpp"
+#include "third_party_libs/pugl/test/test_utils.h"
 
-// TODO: rename this file
+// TODO: go over the API docs and review usage
+// TODO: add error handling
+// TODO: refactor, use free functions, one contained function for each event, maybe pull out Gui struct
 
-static constexpr int k_gui_platform_timer_hz = 60;
-
-enum class KeyCode : u32 {
-    Tab,
-    LeftArrow,
-    RightArrow,
-    UpArrow,
-    DownArrow,
-    PageUp,
-    PageDown,
-    Home,
-    End,
-    Delete,
-    Backspace,
-    Enter,
-    Escape,
-    A,
-    C,
-    V,
-    X,
-    Y,
-    Z,
-    F1,
-    F2,
-    F3,
-    Count,
-};
-
-enum class ModifierKey : u32 {
-    Shift,
-    Ctrl,
-    Alt, // 'Option' on macOS
-    Super, // 'Cmd' on macOS, else Super/Windows-key
-    Count,
-
-    // alias
-    Modifier = IS_MACOS ? Super : Ctrl,
-};
-
-struct ModifierFlags {
-    bool Get(ModifierKey k) const { return flags & (1 << ToInt(k)); }
-    void Set(ModifierKey k) { flags |= (1 << ToInt(k)); }
-    u8 flags;
-};
-
-enum class MouseButton : u32 { Left, Right, Middle, Count };
-
-struct MouseTrackedRegion {
-    Rect r;
-    bool mouse_over;
-};
-
-struct RedrawTime {
-    TimePoint time;
-    char const* debug_name;
-    bool operator==(RedrawTime const& other) { return time.Raw() == other.time.Raw(); }
-};
-
-enum class CursorType { Default, Hand, IBeam, AllArrows, HorizontalArrows, VerticalArrows, Count };
-
-// TODO: new name
-struct GuiUpdateRequirements {
-    // IMPROVE: use arena
-    DynamicArray<MouseTrackedRegion> mouse_tracked_regions {Malloc::Instance()};
-    DynamicArray<RedrawTime> redraw_times {Malloc::Instance()};
-    bool mark_gui_dirty = false;
-    bool wants_keyboard_input = false;
-    bool wants_just_arrow_keys = false;
-    bool wants_mouse_capture = false;
-    bool wants_mouse_scroll = false;
-    bool wants_all_left_clicks = false;
-    bool wants_all_right_clicks = false;
-    bool wants_all_middle_clicks = false;
-    bool requires_another_update = false;
-    bool wants_clipboard_paste = false; // set this if you'd like to recieve text from the clipboard
-    CursorType cursor_type = CursorType::Default;
-    DynamicArray<char> set_clipboard_text {
-        Malloc::Instance()}; // set this to the text that you want put into the OS clipboard
-};
-
-// TODO: needs a new name. GuiContext, UpdateInfo, GuiUpdateArgs, GuiUpdateInfo, GuiUpdateState, GuiState
 struct GuiPlatform {
-    struct MouseButtonState {
-        struct Event {
-            f32x2 point {};
-            TimePoint time {};
-            ModifierFlags modifiers {};
-        };
+    GuiPlatform(clap_host const& host, SettingsFile& settings, Logger& logger)
+        : host(host)
+        , settings(settings)
+        , logger(logger) {}
 
-        ArenaStack<Event> presses {}; // mouse-down events since last frame, cleared every frame
-        ArenaStack<Event> releases {}; // mouse-up events since last frame, cleared every frame
-        f32x2 last_pressed_point {}; // the last known point where the mouse was pressed
-        bool is_down {}; // current state
-        bool is_dragging {};
-        bool dragging_started {}; // cleared every frame
-        bool dragging_ended {}; // cleared every frame
-    };
+    void* CreateView(PluginInstance& plugin) {
+        g_counter++;
+        if (auto const floe_host =
+                (FloeClapExtensionHost const*)host.get_extension(&host, k_floe_clap_extension_id);
+            floe_host != nullptr) {
+            world = (PuglWorld*)floe_host->pugl_world;
+            ASSERT(world != nullptr);
+        } else if (g_counter == 1) {
+            ASSERT(g_world == nullptr);
+            g_world = puglNewWorld(PUGL_MODULE, 0);
+            puglSetWorldString(g_world, PUGL_CLASS_NAME, "Floe");
+            world = g_world;
+        } else {
+            ASSERT(g_world != nullptr);
+            world = g_world;
+        }
 
-    struct ModifierKeyState {
-        u8 is_down; // we use an int to incr/decr because modifier keys can have both left and right keys
-        u8 presses; // key-down events since last frame, zeroed every frame
-        u8 releases; // key-up events since last frame, zeroed every frame
-    };
+        view = puglNewView(world);
+        puglSetHandle(view, this);
+        puglSetEventFunc(view, OnEvent);
 
-    struct KeyState {
-        struct Event {
-            ModifierFlags modifiers;
-        };
+        // IMPROVE: we might want a DirectX backend for Windows
+        puglSetBackend(view, puglGlBackend());
+        puglSetViewHint(view, PUGL_CONTEXT_VERSION_MAJOR, 3);
+        puglSetViewHint(view, PUGL_CONTEXT_VERSION_MINOR, 3);
+        puglSetViewHint(view, PUGL_CONTEXT_PROFILE, PUGL_OPENGL_COMPATIBILITY_PROFILE);
+        puglSetViewHint(view, PUGL_CONTEXT_DEBUG, RUNTIME_SAFETY_CHECKS_ON);
 
-        bool is_down;
-        ArenaStack<Event> presses_or_repeats; // key-down or repeats since last frame, cleared every frame
-        ArenaStack<Event> presses; // key-down events since last frame, zeroed every frame
-        ArenaStack<Event> releases; // key-up events since last frame, zeroed every frame
-    };
+        puglSetViewHint(view, PUGL_RESIZABLE, true);
+        auto const size = gui_settings::WindowSize(settings.settings.gui);
+        puglSetSize(view, size.width, size.height);
 
-    void SetGUIDirty() { gui_update_requirements.mark_gui_dirty = true; }
+        gui.Emplace(frame_state, plugin);
 
-    MouseButtonState& Mouse(MouseButton n) { return mouse_buttons[ToInt(n)]; }
-    ModifierKeyState& Key(ModifierKey n) { return modifier_keys[ToInt(n)]; }
-    KeyState& Key(KeyCode n) { return keys[ToInt(n)]; }
+        return view;
+    }
 
-    // Called by platform specific code
-    bool HandleMouseWheel(f32 delta);
-    bool HandleMouseMoved(f32x2 cursor_pos);
-    bool HandleMouseClicked(MouseButton button, MouseButtonState::Event event, bool is_down);
-    bool HandleDoubleLeftClick();
-    bool HandleKeyPressed(KeyCode code, ModifierFlags modifiers, bool is_down);
-    bool HandleInputChar(u32 utf32_codepoint);
-    bool CheckForTimerRedraw();
-    void BeginUpdate();
-    void EndUpdate();
+    bool DestroyView() {
+        gui.Clear();
 
-    // In: graphics/drawing API
+        if (realised) {
+            puglStopTimer(view, k_timer_id);
+            puglUnrealize(view);
+            realised = false;
+        }
+        puglFreeView(view);
+
+        if (--g_counter == 0) {
+            if (g_world) {
+                puglFreeWorld(g_world);
+                g_world = nullptr;
+            }
+            world = nullptr;
+        }
+        return true;
+    }
+
+    void PollAndUpdate() { puglUpdate(world, 0); }
+
+    void SetParent(clap_window_t const* window) {
+        auto const status = puglSetParentWindow(view, (uintptr_t)window->ptr);
+        puglSetPosition(view, 0, 0);
+        if (status != PUGL_SUCCESS) {
+            auto const status_error = puglStrerror(status);
+            DebugLn("puglSetParentWindow failed: {}", FromNullTerminated(status_error));
+            TODO("handle error");
+        }
+    }
+
+    bool SetTransient(clap_window_t const* window) {
+        puglSetTransientParent(view, (uintptr_t)window->ptr);
+        return true;
+    }
+
+    void SetVisible(bool visible) {
+        if (visible) {
+            if (!realised) {
+                if (auto const status = puglRealize(view); status != PUGL_SUCCESS) {
+                    auto const status_error = puglStrerror(status);
+                    DebugLn("puglRealize failed: {}", FromNullTerminated(status_error));
+                    TODO("handle error");
+                }
+                if (auto const status = puglStartTimer(view, k_timer_id, 1.0 / (f64)k_gui_refresh_rate_hz);
+                    status != PUGL_SUCCESS) {
+                    TODO("handle error");
+                }
+                realised = true;
+            }
+            puglShow(view, PUGL_SHOW_PASSIVE);
+        } else
+            puglHide(view);
+    }
+
+    bool SetSize(UiSize new_size) {
+        DebugLn("SetSize: {}x{}", new_size.width, new_size.height);
+        puglSetSize(view, new_size.width, new_size.height);
+        return true;
+    }
+
+    bool SetClipboard(String mime_type, String data) {
+        ArenaAllocatorWithInlineStorage<250> allocator;
+        return puglSetClipboard(view, NullTerminated(mime_type, allocator), data.data, data.size) ==
+               PUGL_SUCCESS;
+    }
+
+    UiSize WindowSize() {
+        auto const frame = puglGetFrame(view);
+        return {frame.width, frame.height};
+    }
+
+    static Optional<KeyCode> ConvertKeyCode(u32 key) {
+        switch (key) {
+            case PUGL_KEY_TAB: return KeyCode::Tab;
+            case PUGL_KEY_LEFT: return KeyCode::LeftArrow;
+            case PUGL_KEY_RIGHT: return KeyCode::RightArrow;
+            case PUGL_KEY_UP: return KeyCode::UpArrow;
+            case PUGL_KEY_DOWN: return KeyCode::DownArrow;
+            case PUGL_KEY_PAGE_UP: return KeyCode::PageUp;
+            case PUGL_KEY_PAGE_DOWN: return KeyCode::PageDown;
+            case PUGL_KEY_HOME: return KeyCode::Home;
+            case PUGL_KEY_END: return KeyCode::End;
+            case PUGL_KEY_DELETE: return KeyCode::Delete;
+            case PUGL_KEY_BACKSPACE: return KeyCode::Backspace;
+            case PUGL_KEY_ENTER: return KeyCode::Enter;
+            case PUGL_KEY_ESCAPE: return KeyCode::Escape;
+            case PUGL_KEY_F1: return KeyCode::F1;
+            case PUGL_KEY_F2: return KeyCode::F2;
+            case PUGL_KEY_F3: return KeyCode::F3;
+            case 'a': return KeyCode::A;
+            case 'c': return KeyCode::C;
+            case 'v': return KeyCode::V;
+            case 'x': return KeyCode::X;
+            case 'y': return KeyCode::Y;
+            case 'z': return KeyCode::Z;
+        }
+        return nullopt;
+    }
+
+    static Optional<ModifierKey> ModKey(u32 key) {
+        switch (key) {
+            case PUGL_KEY_SHIFT_L:
+            case PUGL_KEY_SHIFT_R: return ModifierKey::Shift;
+            case PUGL_KEY_CTRL_L:
+            case PUGL_KEY_CTRL_R: return ModifierKey::Ctrl;
+            case PUGL_KEY_ALT_L:
+            case PUGL_KEY_ALT_R: return ModifierKey::Alt;
+            case PUGL_KEY_SUPER_L:
+            case PUGL_KEY_SUPER_R: return ModifierKey::Super;
+        }
+        return nullopt;
+    }
+
+    static Optional<MouseButton> ConvertMouseButton(u32 button) {
+        switch (button) {
+            case 0: return MouseButton::Left;
+            case 1: return MouseButton::Right;
+            case 2: return MouseButton::Middle;
+        }
+        return nullopt;
+    }
+
+    static ModifierFlags ConvertModifierFlags(u32 flags) {
+        ModifierFlags result {};
+        if (flags & PUGL_MOD_SHIFT) result.Set(ModifierKey::Shift);
+        if (flags & PUGL_MOD_CTRL) result.Set(ModifierKey::Ctrl);
+        if (flags & PUGL_MOD_ALT) result.Set(ModifierKey::Alt);
+        if (flags & PUGL_MOD_SUPER) result.Set(ModifierKey::Super);
+        return result;
+    }
+
+    static PuglStatus OnEvent(PuglView* view, PuglEvent const* event) {
+        if (event->type != PUGL_UPDATE && event->type != PUGL_TIMER) printEvent(event, "PUGL: ", true);
+        auto& self = *(GuiPlatform*)puglGetHandle(view);
+
+        // I'm not sure if pugl handles this for us or not, but let's just be safe. On Windows at least, it's
+        // possible to receive events from within an event if you're doing certain, blocking operations that
+        // trigger the event loop to pump again.
+        if (self.processing_events) return PUGL_SUCCESS;
+        self.processing_events = true;
+        DEFER { self.processing_events = false; };
+
+        switch (event->type) {
+            case PUGL_NOTHING: break;
+
+            case PUGL_REALIZE: {
+                ZoneNamed("PUGL_REALIZE", true);
+                self.graphics_ctx = graphics::CreateNewDrawContext();
+                auto const outcome = self.graphics_ctx->CreateDeviceObjects((void*)puglGetNativeView(view));
+                ASSERT(!outcome.HasError()); // TODO: handle error
+
+                break;
+            }
+            case PUGL_UNREALIZE: {
+                ZoneNamed("PUGL_UNREALIZE", true);
+                if (self.graphics_ctx) {
+                    self.graphics_ctx->DestroyDeviceObjects();
+                    self.graphics_ctx->fonts.Clear();
+                    delete self.graphics_ctx;
+                    self.graphics_ctx = nullptr;
+                }
+
+                break;
+            }
+
+            // resized or moved
+            case PUGL_CONFIGURE: {
+                if (self.graphics_ctx)
+                    self.graphics_ctx->Resize({event->configure.width, event->configure.height});
+                break;
+            }
+
+            case PUGL_UPDATE: {
+                break;
+            }
+
+            case PUGL_EXPOSE: {
+                ZoneNamed("PUGL_EXPOSE", true);
+                if (!self.graphics_ctx) break;
+
+                auto const window_size = self.WindowSize();
+
+                self.frame_state.graphics_ctx = self.graphics_ctx;
+                self.frame_state.native_window = (void*)puglGetNativeView(self.view);
+                self.frame_state.window_size = window_size;
+
+                // Mostly we'd only expect 1 or 2 updates but we set a hard limit of 4 as a fallback.
+                for (auto _ : Range(4)) {
+                    ZoneNamedN(repeat, "Update", true);
+
+                    self.BeginFrame();
+                    self.last_result = GUIUpdate(&*self.gui);
+
+                    if (self.last_result.cursor_type != self.current_cursor) {
+                        self.current_cursor = self.last_result.cursor_type;
+                        switch (self.last_result.cursor_type) {
+                            case CursorType::Default: puglSetCursor(view, PUGL_CURSOR_ARROW); break;
+                            case CursorType::Hand: puglSetCursor(view, PUGL_CURSOR_HAND); break;
+                            case CursorType::IBeam: puglSetCursor(view, PUGL_CURSOR_CARET); break;
+                            case CursorType::AllArrows: puglSetCursor(view, PUGL_CURSOR_ALL_SCROLL); break;
+                            case CursorType::HorizontalArrows:
+                                puglSetCursor(view, PUGL_CURSOR_LEFT_RIGHT);
+                                break;
+                            case CursorType::VerticalArrows: puglSetCursor(view, PUGL_CURSOR_UP_DOWN); break;
+                            case CursorType::Count: break;
+                        }
+                    }
+
+                    if (self.last_result.wants_clipboard_text_paste) puglPaste(view);
+
+                    if (auto cb = self.last_result.set_clipboard_text; cb.size)
+                        puglSetClipboard(view, "text/plain", cb.data, cb.size);
+
+                    self.EndFrame();
+
+                    if (self.last_result.status != GuiFrameResult::Status::ImmediatelyUpdate) break;
+                }
+
+                if (self.last_result.draw_data.draw_lists.size) {
+                    ZoneNamedN(render, "render", true);
+                    auto o = self.graphics_ctx->Render(self.last_result.draw_data,
+                                                       window_size,
+                                                       self.frame_state.display_ratio,
+                                                       Rect(0, 0, window_size.ToFloat2()));
+                    if (o.HasError()) self.logger.ErrorLn("GUI render failed: {}", o.Error());
+                }
+
+                break;
+            }
+
+            case PUGL_CLOSE: {
+                auto const host_gui = (clap_host_gui const*)self.host.get_extension(&self.host, CLAP_EXT_GUI);
+                if (host_gui) host_gui->closed(&self.host, false);
+                break;
+            }
+
+            case PUGL_FOCUS_IN:
+            case PUGL_FOCUS_OUT: break;
+
+            case PUGL_KEY_PRESS: {
+                if (auto const key = ConvertKeyCode(event->key.key)) {
+                    if (self.HandleKeyPressed(*key, ConvertModifierFlags(event->key.state), true))
+                        puglPostRedisplay(view);
+                } else if (auto mod_key = self.ModKey(event->key.key)) {
+                    auto& mod = self.frame_state.modifier_keys[ToInt(*mod_key)];
+                    if (!mod.is_down) mod.presses = true;
+                    ++mod.is_down;
+                }
+                break;
+            }
+
+            case PUGL_KEY_RELEASE: {
+                if (auto const key = ConvertKeyCode(event->key.key)) {
+                    if (self.HandleKeyPressed(*key, ConvertModifierFlags(event->key.state), false))
+                        puglPostRedisplay(view);
+                } else if (auto mod_key = self.ModKey(event->key.key)) {
+                    auto& mod = self.frame_state.modifier_keys[ToInt(*mod_key)];
+                    --mod.is_down;
+                    if (mod.is_down == 0) mod.releases = true;
+                }
+                break;
+            }
+
+            case PUGL_TEXT: {
+                if (self.HandleInputChar(event->text.character)) puglPostRedisplay(view);
+                break;
+            }
+
+            case PUGL_POINTER_IN:
+            case PUGL_POINTER_OUT: {
+                puglPostRedisplay(view);
+                break;
+            }
+
+            case PUGL_BUTTON_PRESS:
+            case PUGL_BUTTON_RELEASE: {
+                if (auto const button = ConvertMouseButton(event->button.button)) {
+                    GuiFrameInput::MouseButtonState::Event const e {
+                        .point = {(f32)event->button.x, (f32)event->button.y},
+                        .time = TimePoint::Now(),
+                        .modifiers = ConvertModifierFlags(event->button.state),
+                    };
+                    if (self.HandleMouseClicked(*button, e, event->type == PUGL_BUTTON_PRESS))
+                        puglPostRedisplay(view);
+                }
+                break;
+            }
+
+            case PUGL_MOTION: {
+                if (self.HandleMouseMoved({(f32)event->motion.x, (f32)event->motion.y}))
+                    puglPostRedisplay(view);
+                break;
+            }
+
+            case PUGL_SCROLL: {
+                if (event->scroll.direction == PUGL_SCROLL_UP ||
+                    event->scroll.direction == PUGL_SCROLL_DOWN) {
+                    if (self.HandleMouseWheel((f32)event->scroll.dy)) puglPostRedisplay(view);
+                }
+                break;
+            }
+
+            case PUGL_CLIENT:
+            case PUGL_TIMER: {
+                if (event->timer.id == k_timer_id) {
+                    if (self.IsUpdateNeeded()) puglPostRedisplay(view);
+                }
+                break;
+            }
+
+            case PUGL_DATA_OFFER: {
+                u32 const num_types = puglGetNumClipboardTypes(view);
+                for (auto const t : Range(num_types)) {
+                    char const* type = puglGetClipboardType(view, t);
+                    if (NullTermStringsEqual(type, "text/plain")) puglAcceptOffer(view, &event->offer, t);
+                }
+                break;
+            }
+
+            case PUGL_DATA: {
+                uint32_t const type_index = event->data.typeIndex;
+
+                char const* type = puglGetClipboardType(view, type_index);
+
+                if (NullTermStringsEqual(type, "text/plain")) {
+                    size_t len = 0;
+                    void const* data = puglGetClipboard(view, type_index, &len);
+
+                    dyn::Assign(self.frame_state.clipboard_text, String {(char const*)data, len});
+                }
+                break;
+            }
+
+            case PUGL_LOOP_ENTER:
+            case PUGL_LOOP_LEAVE: break;
+        }
+        return PUGL_SUCCESS;
+    }
+
+    bool HandleMouseWheel(f32 delta_lines) {
+        frame_state.mouse_scroll_delta_in_lines += delta_lines;
+        if (last_result.wants_mouse_scroll) return true;
+        return false;
+    }
+
+    bool HandleMouseMoved(f32x2 new_cursor_pos) {
+        bool result = false;
+        frame_state.cursor_pos = new_cursor_pos;
+
+        for (auto& btn : frame_state.mouse_buttons) {
+            if (btn.is_down) {
+                if (!btn.is_dragging) btn.dragging_started = true;
+                btn.is_dragging = true;
+            }
+        }
+
+        if (last_result.mouse_tracked_rects.size == 0 || last_result.wants_mouse_capture) {
+            result = true;
+        } else if (IsUpdateNeeded()) {
+            return true;
+        } else {
+            for (auto const i : Range(last_result.mouse_tracked_rects.size)) {
+                auto& item = last_result.mouse_tracked_rects[i];
+                bool const mouse_over = item.rect.Contains(frame_state.cursor_pos);
+                if (mouse_over && !item.mouse_over) {
+                    // cursor just entered
+                    item.mouse_over = mouse_over;
+                    result = true;
+                    break;
+                } else if (!mouse_over && item.mouse_over) {
+                    // cursor just left
+                    item.mouse_over = mouse_over;
+                    result = true;
+                    break;
+                }
+            }
+        }
+
+        return result;
+    }
+
+    bool HandleMouseClicked(MouseButton button, GuiFrameInput::MouseButtonState::Event event, bool is_down) {
+        auto& btn = frame_state.mouse_buttons[ToInt(button)];
+        btn.is_down = is_down;
+        if (is_down) {
+            if ((event.time - btn.last_pressed_time) <= k_double_click_interval_seconds)
+                btn.double_click = true;
+            btn.last_pressed_point = event.point;
+            btn.last_pressed_time = event.time;
+        } else {
+            if (btn.is_dragging) btn.dragging_ended = true;
+            btn.is_dragging = false;
+        }
+        btn.presses.Append(event, frame_state.event_arena);
+
+        bool result = false;
+        if (last_result.mouse_tracked_rects.size == 0 || last_result.wants_mouse_capture ||
+            (last_result.wants_all_left_clicks && button == MouseButton::Left) ||
+            (last_result.wants_all_right_clicks && button == MouseButton::Right) ||
+            (last_result.wants_all_middle_clicks && button == MouseButton::Middle)) {
+            result = true;
+        } else {
+            for (auto const i : Range(last_result.mouse_tracked_rects.size)) {
+                auto& item = last_result.mouse_tracked_rects[i];
+                bool const mouse_over = item.rect.Contains(frame_state.cursor_pos);
+                if (mouse_over) {
+                    result = true;
+                    break;
+                }
+            }
+        }
+
+        return result;
+    }
+
+    bool HandleKeyPressed(KeyCode key_code, ModifierFlags modifiers, bool is_down) {
+        auto& key = frame_state.keys[ToInt(key_code)];
+        if (is_down) {
+            key.presses_or_repeats.Append({modifiers}, frame_state.event_arena);
+            if (!key.is_down) key.presses.Append({modifiers}, frame_state.event_arena);
+        } else {
+            key.releases.Append({modifiers}, frame_state.event_arena);
+        }
+        key.is_down = is_down;
+
+        if (last_result.wants_keyboard_input) return true;
+        if (last_result.wants_just_arrow_keys &&
+            (key_code == KeyCode::UpArrow || key_code == KeyCode::DownArrow ||
+             key_code == KeyCode::LeftArrow || key_code == KeyCode::RightArrow)) {
+            return true;
+        }
+        return false;
+    }
+
+    bool HandleInputChar(u32 utf32_codepoint) {
+        dyn::Append(frame_state.input_utf32_chars, utf32_codepoint);
+        if (last_result.wants_keyboard_input) return true;
+        return false;
+    }
+
+    bool IsUpdateNeeded() {
+        bool update_needed = false;
+
+        if (last_result.status > GuiFrameResult::Status::Sleep) update_needed = true;
+
+        if (last_result.timed_wakeups) {
+            for (usize i = 0; i < last_result.timed_wakeups->size;) {
+                auto& t = (*last_result.timed_wakeups)[i];
+                if (TimePoint::Now() >= t) {
+                    update_needed = true;
+                    dyn::Remove(*last_result.timed_wakeups, i);
+                } else {
+                    ++i;
+                }
+            }
+        }
+
+        return update_needed;
+    }
+
+    void BeginFrame() {
+        if (All(frame_state.cursor_pos < f32x2 {0, 0} || frame_state.cursor_pos_prev < f32x2 {0, 0})) {
+            // if mouse just appeared or disappeared (negative coordinate) we cancel out movement by setting
+            // to zero
+            frame_state.cursor_delta = {0, 0};
+        } else {
+            frame_state.cursor_delta = frame_state.cursor_pos - frame_state.cursor_pos_prev;
+        }
+        frame_state.cursor_pos_prev = frame_state.cursor_pos;
+
+        frame_state.current_time = TimePoint::Now();
+
+        if (frame_state.time_prev)
+            frame_state.delta_time = (f32)(frame_state.current_time - frame_state.time_prev);
+        else
+            frame_state.delta_time = 0;
+        frame_state.time_prev = frame_state.current_time;
+    }
+
+    void EndFrame() {
+        for (auto& btn : frame_state.mouse_buttons) {
+            btn.dragging_started = false;
+            btn.dragging_ended = false;
+            btn.double_click = false;
+            btn.presses.Clear();
+            btn.releases.Clear();
+        }
+
+        for (auto& mod : frame_state.modifier_keys) {
+            mod.presses = 0;
+            mod.releases = 0;
+        }
+
+        for (auto& key : frame_state.keys) {
+            key.presses.Clear();
+            key.releases.Clear();
+            key.presses_or_repeats.Clear();
+        }
+
+        frame_state.input_utf32_chars = {};
+        frame_state.mouse_scroll_delta_in_lines = 0;
+        dyn::Clear(frame_state.clipboard_text);
+        frame_state.event_arena.ResetCursorAndConsolidateRegions();
+        ++frame_state.update_count;
+    }
+
+    static constexpr uintptr_t k_timer_id = 200;
+
+    static int g_counter;
+    static PuglWorld* g_world;
+
+    clap_host const& host;
+    SettingsFile& settings;
+    Logger& logger;
+    bool realised = false;
+    PuglWorld* world;
+    PuglView* view;
+    bool processing_events = false;
+    Optional<CursorType> current_cursor {};
     graphics::DrawContext* graphics_ctx {};
-
-    // Out: result of the update call
-    GuiUpdateRequirements gui_update_requirements {};
-    graphics::DrawData draw_data {};
-
-    // In: user input
-    f32x2 cursor_pos {};
-    f32x2 cursor_pos_prev {};
-    f32x2 cursor_delta {};
-    f32 mouse_scroll_delta_in_lines {};
-    Array<MouseButtonState, ToInt(MouseButton::Count)> mouse_buttons {};
-    bool double_left_click {};
-    Array<KeyState, ToInt(KeyCode::Count)> keys {};
-    Array<ModifierKeyState, ToInt(ModifierKey::Count)> modifier_keys {};
-    // may contain text from the clipboard - following from a wants_clipboard_paste request
-    DynamicArray<char> clipboard_data {PageAllocator::Instance()};
-    DynamicArrayInline<u32, 16> input_chars {};
-
-    // In: frame info
-    TimePoint current_time {};
-    TimePoint time_prev {};
-    f32 delta_time {};
-    u64 update_count {};
-    f32 display_ratio {};
-    UiSize window_size {};
-    void* native_window {}; // HWND, NSView*, etc.
-
-    // internal
-    ArenaAllocator event_arena {Malloc::Instance(), 256};
+    GuiFrameResult last_result;
+    GuiFrameInput frame_state;
+    Optional<Gui> gui;
 };

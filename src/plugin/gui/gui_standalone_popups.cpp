@@ -11,7 +11,7 @@
 #include "common/constants.hpp"
 #include "common/paths.hpp"
 #include "framework/gui_live_edit.hpp"
-#include "framework/gui_platform.hpp"
+#include "framework/gui_frame.hpp"
 #include "gui.hpp"
 #include "gui/framework/draw_list.hpp"
 #include "gui/gui_button_widgets.hpp"
@@ -28,7 +28,7 @@
 #include "settings/settings_filesystem.hpp"
 #include "settings/settings_gui.hpp"
 
-imgui::Id GetStandaloneID(StandaloneWindows type) { return (imgui::Id)(type + 666); }
+imgui::Id GetStandaloneID(StandaloneWindows type) { return (imgui::Id)(type + 1000); }
 
 bool IsAnyStandloneOpen(imgui::Context& imgui) {
     for (auto const i : Range(ToInt(StandaloneWindowsCount)))
@@ -89,10 +89,10 @@ void DoStandaloneErrorGUI(Gui* g) {
     auto const floe_ext = (FloeClapExtensionHost const*)host.get_extension(&host, k_floe_clap_extension_id);
     if (!floe_ext) return;
 
-    g->gui_platform.graphics_ctx->PushFont(g->roboto_small);
-    DEFER { g->gui_platform.graphics_ctx->PopFont(); };
+    g->frame_input.graphics_ctx->PushFont(g->roboto_small);
+    DEFER { g->frame_input.graphics_ctx->PopFont(); };
     auto& imgui = g->imgui;
-    auto platform = &g->gui_platform;
+    auto platform = &g->frame_input;
     static bool error_window_open = true;
 
     bool const there_is_an_error =
@@ -115,7 +115,7 @@ void DoStandaloneErrorGUI(Gui* g) {
         imgui.EndWindow();
     }
     if (floe_ext->standalone_midi_device_error) {
-        platform->gui_update_requirements.wants_keyboard_input = true;
+        imgui.frame_output.wants_keyboard_input = true;
         if (platform->Key(ModifierKey::Shift).is_down) {
             auto gen_midi_message = [&](bool on, u7 key) {
                 if (on)
@@ -145,8 +145,8 @@ void DoStandaloneErrorGUI(Gui* g) {
 }
 
 void DoErrorsStandalone(Gui* g) {
-    g->gui_platform.graphics_ctx->PushFont(g->roboto_small);
-    DEFER { g->gui_platform.graphics_ctx->PopFont(); };
+    g->frame_input.graphics_ctx->PushFont(g->roboto_small);
+    DEFER { g->frame_input.graphics_ctx->PopFont(); };
     auto& imgui = g->imgui;
     auto popup_w = LiveSize(imgui, UiSizeId::ErrorWindowWidth);
     auto popup_h = LiveSize(imgui, UiSizeId::ErrorWindowHeight);
@@ -154,8 +154,8 @@ void DoErrorsStandalone(Gui* g) {
     auto settings = StandalonePopupSettings(g->imgui);
 
     Rect r;
-    r.x = (f32)(int)((f32)g->gui_platform.window_size.width / 2 - popup_w / 2);
-    r.y = (f32)(int)((f32)g->gui_platform.window_size.height / 2 - popup_h / 2);
+    r.x = (f32)(int)((f32)g->frame_input.window_size.width / 2 - popup_w / 2);
+    r.y = (f32)(int)((f32)g->frame_input.window_size.height / 2 - popup_h / 2);
     r.w = popup_w;
     r.h = popup_h;
 
@@ -290,8 +290,8 @@ void DoErrorsStandalone(Gui* g) {
 
 void DoMetricsStandalone(Gui* g) {
     auto a = &g->plugin;
-    g->gui_platform.graphics_ctx->PushFont(g->roboto_small);
-    DEFER { g->gui_platform.graphics_ctx->PopFont(); };
+    g->frame_input.graphics_ctx->PushFont(g->roboto_small);
+    DEFER { g->frame_input.graphics_ctx->PopFont(); };
     auto& imgui = g->imgui;
     auto popup_w = LiveSize(imgui, UiSizeId::MetricsWindowWidth);
     auto popup_h = LiveSize(imgui, UiSizeId::MetricsWindowHeight);
@@ -299,8 +299,8 @@ void DoMetricsStandalone(Gui* g) {
     auto settings = StandalonePopupSettings(g->imgui);
 
     Rect r;
-    r.x = (f32)(int)((f32)g->gui_platform.window_size.width / 2 - popup_w / 2);
-    r.y = (f32)(int)((f32)g->gui_platform.window_size.height / 2 - popup_h / 2);
+    r.x = (f32)(int)((f32)g->frame_input.window_size.width / 2 - popup_w / 2);
+    r.y = (f32)(int)((f32)g->frame_input.window_size.height / 2 - popup_h / 2);
     r.w = popup_w;
     r.h = popup_h;
 
@@ -338,8 +338,8 @@ void DoMetricsStandalone(Gui* g) {
 }
 
 void DoAboutStandalone(Gui* g) {
-    g->gui_platform.graphics_ctx->PushFont(g->roboto_small);
-    DEFER { g->gui_platform.graphics_ctx->PopFont(); };
+    g->frame_input.graphics_ctx->PushFont(g->roboto_small);
+    DEFER { g->frame_input.graphics_ctx->PopFont(); };
     auto& imgui = g->imgui;
     auto popup_w = LiveSize(imgui, UiSizeId::AboutWindowWidth);
     auto popup_h = LiveSize(imgui, UiSizeId::AboutWindowHeight);
@@ -347,8 +347,8 @@ void DoAboutStandalone(Gui* g) {
     auto settings = StandalonePopupSettings(g->imgui);
 
     Rect r;
-    r.x = (f32)(int)((f32)g->gui_platform.window_size.width / 2 - popup_w / 2);
-    r.y = (f32)(int)((f32)g->gui_platform.window_size.height / 2 - popup_h / 2);
+    r.x = (f32)(int)((f32)g->frame_input.window_size.width / 2 - popup_w / 2);
+    r.y = (f32)(int)((f32)g->frame_input.window_size.height / 2 - popup_h / 2);
     r.w = popup_w;
     r.h = popup_h;
 
@@ -378,8 +378,8 @@ void DoAboutStandalone(Gui* g) {
 }
 
 void DoLoadingOverlay(Gui* g) {
-    g->gui_platform.graphics_ctx->PushFont(g->roboto_small);
-    DEFER { g->gui_platform.graphics_ctx->PopFont(); };
+    g->frame_input.graphics_ctx->PushFont(g->roboto_small);
+    DEFER { g->frame_input.graphics_ctx->PopFont(); };
     auto& imgui = g->imgui;
 
     auto popup_w = LiveSize(imgui, UiSizeId::LoadingOverlayBoxWidth);
@@ -388,8 +388,8 @@ void DoLoadingOverlay(Gui* g) {
     auto settings = StandalonePopupSettings(g->imgui);
 
     Rect r;
-    r.x = (f32)(int)((f32)g->gui_platform.window_size.width / 2 - popup_w / 2);
-    r.y = (f32)(int)((f32)g->gui_platform.window_size.height / 2 - popup_h / 2);
+    r.x = (f32)(int)((f32)g->frame_input.window_size.width / 2 - popup_w / 2);
+    r.y = (f32)(int)((f32)g->frame_input.window_size.height / 2 - popup_h / 2);
     r.w = popup_w;
     r.h = popup_h;
 
@@ -407,8 +407,8 @@ void DoLoadingOverlay(Gui* g) {
 }
 
 void DoInstrumentInfoStandalone(Gui* g) {
-    g->gui_platform.graphics_ctx->PushFont(g->roboto_small);
-    DEFER { g->gui_platform.graphics_ctx->PopFont(); };
+    g->frame_input.graphics_ctx->PushFont(g->roboto_small);
+    DEFER { g->frame_input.graphics_ctx->PopFont(); };
     auto& imgui = g->imgui;
     auto popup_w = LiveSize(imgui, UiSizeId::InfoWindowWidth);
     auto popup_h = LiveSize(imgui, UiSizeId::InfoWindowHeight);
@@ -416,8 +416,8 @@ void DoInstrumentInfoStandalone(Gui* g) {
     auto settings = StandalonePopupSettings(g->imgui);
 
     Rect r;
-    r.x = (f32)(int)((f32)g->gui_platform.window_size.width / 2 - popup_w / 2);
-    r.y = (f32)(int)((f32)g->gui_platform.window_size.height / 2 - popup_h / 2);
+    r.x = (f32)(int)((f32)g->frame_input.window_size.width / 2 - popup_w / 2);
+    r.y = (f32)(int)((f32)g->frame_input.window_size.height / 2 - popup_h / 2);
     r.w = popup_w;
     r.h = popup_h;
 
@@ -434,8 +434,8 @@ void DoInstrumentInfoStandalone(Gui* g) {
 }
 
 void DoSettingsStandalone(Gui* g) {
-    g->gui_platform.graphics_ctx->PushFont(g->roboto_small);
-    DEFER { g->gui_platform.graphics_ctx->PopFont(); };
+    g->frame_input.graphics_ctx->PushFont(g->roboto_small);
+    DEFER { g->frame_input.graphics_ctx->PopFont(); };
     auto& imgui = g->imgui;
     auto popup_w = LiveSize(imgui, UiSizeId::SettingsWindowWidth);
     auto popup_h = LiveSize(imgui, UiSizeId::SettingsWindowHeight);
@@ -443,8 +443,8 @@ void DoSettingsStandalone(Gui* g) {
     auto settings = StandalonePopupSettings(g->imgui);
 
     Rect r;
-    r.x = (f32)(int)((f32)g->gui_platform.window_size.width / 2 - popup_w / 2);
-    r.y = (f32)(int)((f32)g->gui_platform.window_size.height / 2 - popup_h / 2);
+    r.x = (f32)(int)((f32)g->frame_input.window_size.width / 2 - popup_w / 2);
+    r.y = (f32)(int)((f32)g->frame_input.window_size.height / 2 - popup_h / 2);
     r.w = popup_w;
     r.h = popup_h;
 
@@ -516,7 +516,7 @@ void DoSettingsStandalone(Gui* g) {
             auto const id = imgui.GetID(icon);
             bool const clicked =
                 imgui.ButtonBehavior(r, id, {.left_mouse = true, .triggers_on_mouse_up = true});
-            g->gui_platform.graphics_ctx->PushFont(g->icons);
+            g->frame_input.graphics_ctx->PushFont(g->icons);
             g->imgui.graphics->AddTextJustified(r,
                                                 icon,
                                                 !imgui.IsHot(id)
@@ -525,7 +525,7 @@ void DoSettingsStandalone(Gui* g) {
                                                 TextJustification::CentredLeft,
                                                 TextOverflowType::AllowOverflow,
                                                 0.9f);
-            g->gui_platform.graphics_ctx->PopFont();
+            g->frame_input.graphics_ctx->PopFont();
 
             Tooltip(g, id, r, tooltip, true);
             return clicked;
@@ -733,8 +733,8 @@ void DoLicencesStandalone(Gui* g) {
 #include "third_party_licence_text.hpp"
     static bool open[ArraySize(k_third_party_licence_texts)];
 
-    g->gui_platform.graphics_ctx->PushFont(g->roboto_small);
-    DEFER { g->gui_platform.graphics_ctx->PopFont(); };
+    g->frame_input.graphics_ctx->PushFont(g->roboto_small);
+    DEFER { g->frame_input.graphics_ctx->PopFont(); };
     auto& imgui = g->imgui;
     auto popup_w = LiveSize(imgui, UiSizeId::LicencesWindowWidth);
     auto popup_h = LiveSize(imgui, UiSizeId::LicencesWindowHeight);
@@ -742,8 +742,8 @@ void DoLicencesStandalone(Gui* g) {
     auto settings = StandalonePopupSettings(g->imgui);
 
     Rect r;
-    r.x = (f32)(int)((f32)g->gui_platform.window_size.width / 2 - popup_w / 2);
-    r.y = (f32)(int)((f32)g->gui_platform.window_size.height / 2 - popup_h / 2);
+    r.x = (f32)(int)((f32)g->frame_input.window_size.width / 2 - popup_w / 2);
+    r.y = (f32)(int)((f32)g->frame_input.window_size.height / 2 - popup_h / 2);
     r.w = popup_w;
     r.h = popup_h;
 

@@ -139,7 +139,7 @@ ImagePixelsFromLibrary(Gui* g, sample_lib::Library const& lib, LibraryImageType 
 graphics::ImageID CopyPixelsToGpuLoadedImage(Gui* g, ImagePixelsRgba const& px) {
     ASSERT(px.data);
     auto const id = ({
-        auto const outcome = g->gui_platform.graphics_ctx->CreateImageID(px.data, px.size, 4);
+        auto const outcome = g->frame_input.graphics_ctx->CreateImageID(px.data, px.size, 4);
         if (outcome.HasError()) {
             g->logger.ErrorLn("Failed to create a texture (size {}x{}): {}",
                               px.size.width,
@@ -283,7 +283,7 @@ static void BoxBlur(u8 const* in, u8* out, int width, int height, int radius) {
 
 LibraryImages LoadLibraryBackgroundAndIconIfNeeded(Gui* g, sample_lib::Library const& lib) {
     // IMPROVE: this function is very confused as to what int types it's using
-    auto& ctx = g->gui_platform.graphics_ctx;
+    auto& ctx = g->frame_input.graphics_ctx;
     auto const lib_name = lib.name;
 
     auto opt_index =
@@ -337,11 +337,11 @@ LibraryImages LoadLibraryBackgroundAndIconIfNeeded(Gui* g, sample_lib::Library c
 
         // If the image is quite a lot larger than we need, resize it down to avoid storing a huge image
         // on the GPU
-        if (background_size.width > (u16)(g->gui_platform.window_size.width * 1.3f)) {
-            auto const desired_width = (int)g->gui_platform.window_size.width;
+        if (background_size.width > (u16)(g->frame_input.window_size.width * 1.3f)) {
+            auto const desired_width = (int)g->frame_input.window_size.width;
             auto const desired_height =
                 (int)((f32)background_size.height *
-                      (g->gui_platform.window_size.width / (f32)background_size.width));
+                      (g->frame_input.window_size.width / (f32)background_size.width));
             auto background_buf =
                 arena.AllocateBytesForTypeOversizeAllowed<u8>((usize)(desired_width * desired_height * 4));
 
@@ -362,7 +362,7 @@ LibraryImages LoadLibraryBackgroundAndIconIfNeeded(Gui* g, sample_lib::Library c
         if (reload_background) {
             DebugLn("reloading background for {}", lib_name);
             imgs.background =
-                g->gui_platform.graphics_ctx->CreateImageID(background_rgba, background_size, k_channels)
+                g->frame_input.graphics_ctx->CreateImageID(background_rgba, background_size, k_channels)
                     .OrElse([g](ErrorCode error) {
                         g->logger.ErrorLn("Failed to create background image texture: {}", error);
                         return graphics::ImageID {};
@@ -377,7 +377,7 @@ LibraryImages LoadLibraryBackgroundAndIconIfNeeded(Gui* g, sample_lib::Library c
             auto blur_img_size = background_size;
             auto blurred_image_num_bytes = usize(blur_img_size.width * blur_img_size.height * k_channels);
 
-            auto const window_size = g->gui_platform.window_size.ToFloat2() * 0.5f;
+            auto const window_size = g->frame_input.window_size.ToFloat2() * 0.5f;
             if ((int)window_size.x < background_size.width && (int)window_size.x < background_size.height) {
                 auto const downscale_factor =
                     LiveSize(g->imgui, UiSizeId::BackgroundBlurringDownscaleFactor) / 100.0f;
@@ -508,7 +508,7 @@ LibraryImages LoadLibraryBackgroundAndIconIfNeeded(Gui* g, sample_lib::Library c
             }
 
             imgs.blurred_background =
-                g->gui_platform.graphics_ctx
+                g->frame_input.graphics_ctx
                     ->CreateImageID(blurred_image_buffer.data, blur_img_size, blur_img_channels)
                     .OrElse([g](ErrorCode error) {
                         g->logger.ErrorLn("Failed to create blurred background texture: {}", error);
@@ -526,7 +526,7 @@ static void CreateFontsIfNeeded(Gui* g) {
     //
     // Fonts
     //
-    auto& graphics_ctx = g->gui_platform.graphics_ctx;
+    auto& graphics_ctx = g->frame_input.graphics_ctx;
 
     if (graphics_ctx->fonts.tex_id == nullptr) {
         graphics_ctx->fonts.Clear();
@@ -545,7 +545,7 @@ static void CreateFontsIfNeeded(Gui* g) {
             config.font_data_reference_only = true; // we handle it in font_arena
             auto font = graphics_ctx->fonts.AddFontFromMemoryTTF((void*)data.data,
                                                                  (int)data.size,
-                                                                 size * g->gui_platform.display_ratio,
+                                                                 size * g->frame_input.display_ratio,
                                                                  &config,
                                                                  ranges);
             ASSERT(font != nullptr);
@@ -598,7 +598,7 @@ static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
                 .title = "Select Floe Library Folder",
                 .default_path = default_folder,
                 .filters = {},
-                .parent_window = g->gui_platform.native_window,
+                .parent_window = g->frame_input.native_window,
             }));
             if (opt_path) {
                 auto const path = *opt_path;
@@ -618,7 +618,7 @@ static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
                 .title = "Select Floe Presets Folder",
                 .default_path = default_folder,
                 .filters = {},
-                .parent_window = g->gui_platform.native_window,
+                .parent_window = g->frame_input.native_window,
             }));
             if (opt_path) {
                 auto const path = *opt_path;
@@ -649,7 +649,7 @@ static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
                     .title = "Load Floe Preset",
                     .default_path = default_path,
                     .filters = filters.Items(),
-                    .parent_window = g->gui_platform.native_window,
+                    .parent_window = g->frame_input.native_window,
                 }));
                 if (opt_path) LoadPresetFromFile(g->plugin, *opt_path);
             } else if (type == DialogType::SavePreset) {
@@ -659,7 +659,7 @@ static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
                     .title = "Save Floe Preset",
                     .default_path = default_path,
                     .filters = filters.Items(),
-                    .parent_window = g->gui_platform.native_window,
+                    .parent_window = g->frame_input.native_window,
                 }));
                 if (opt_path) SaveCurrentStateToFile(g->plugin, *opt_path);
             } else {
@@ -677,13 +677,13 @@ void Gui::OpenDialog(DialogType type) {
     if (outcome.HasError()) logger.ErrorLn("Failed to create dialog: {}", outcome.Error());
 }
 
-Gui::Gui(GuiPlatform& platform, PluginInstance& plugin)
-    : gui_platform(platform)
+Gui::Gui(GuiFrameInput& frame_input, PluginInstance& plugin)
+    : frame_input(frame_input)
     , plugin(plugin)
     , logger(plugin.shared_data.logger)
-    , settings(plugin.shared_data.settings) {
+    , settings(plugin.shared_data.settings)
+    , imgui(frame_input, frame_output) {
     g_log_file.TraceLn();
-    imgui.platform = &platform;
 
     editor.imgui = &imgui;
     imgui.user_callback_data = this;
@@ -692,7 +692,6 @@ Gui::Gui(GuiPlatform& platform, PluginInstance& plugin)
 
     m_window_size_listener_id =
         plugin.shared_data.settings.tracking.window_size_change_listeners.Add([this]() {
-            gui_platform.SetGUIDirty();
             auto const& host = this->plugin.host;
             auto const host_gui = (clap_host_gui const*)host.get_extension(&host, CLAP_EXT_GUI);
             if (host_gui) {
@@ -730,9 +729,11 @@ f32x2 GetMaxUVToMaintainAspectRatio(graphics::ImageID img, f32x2 container_size)
     return uv;
 }
 
-void GUIUpdate(Gui* g) {
+GuiFrameResult GUIUpdate(Gui* g) {
     ZoneScoped;
     DebugAssertMainThread(g->plugin.host);
+
+    g->frame_output = {};
 
     live_edit::g_high_contrast_gui = g->settings.settings.gui.high_contrast_gui; // IMRPOVE: hacky
     g->scratch_arena.ResetCursorAndConsolidateRegions();
@@ -741,7 +742,7 @@ void GUIUpdate(Gui* g) {
     imgui.SetPixelsPerPoint(PixelsPerPoint(g));
 
     g->waveforms.StartFrame();
-    DEFER { g->waveforms.EndFrame(*g->gui_platform.graphics_ctx); };
+    DEFER { g->waveforms.EndFrame(*g->frame_input.graphics_ctx); };
 
     if (Exchange(g->plugin.gui_needs_to_handle_preset_name_change, false))
         g->preset_browser_data.scroll_to_show_current_preset = true;
@@ -750,13 +751,13 @@ void GUIUpdate(Gui* g) {
     whole_window_sets.draw_routine_window_background = [&](IMGUI_DRAW_WINDOW_BG_ARGS_TYPES) {};
     imgui.Begin(whole_window_sets);
 
-    g->gui_platform.graphics_ctx->PushFont(g->fira_sans);
-    DEFER { g->gui_platform.graphics_ctx->PopFont(); };
+    g->frame_input.graphics_ctx->PushFont(g->fira_sans);
+    DEFER { g->frame_input.graphics_ctx->PopFont(); };
 
     auto& settings = g->settings.settings.gui;
     auto const top_h = LiveSize(imgui, UiSizeId::Top2Height);
     auto const bot_h = settings.show_keyboard ? gui_settings::KeyboardHeight(g->settings.settings.gui) : 0;
-    auto const mid_h = (f32)g->gui_platform.window_size.height - (top_h + bot_h);
+    auto const mid_h = (f32)g->frame_input.window_size.height - (top_h + bot_h);
 
     auto draw_top_window = [](IMGUI_DRAW_WINDOW_BG_ARGS) {
         auto r = window->unpadded_bounds;
@@ -777,7 +778,7 @@ void GUIUpdate(Gui* g) {
             if (background_lib && !settings.high_contrast_gui) {
                 auto imgs = LoadLibraryBackgroundAndIconIfNeeded(g, *background_lib);
                 if (imgs.background) {
-                    auto tex = g->gui_platform.graphics_ctx->GetTextureFromImage(*imgs.background);
+                    auto tex = g->frame_input.graphics_ctx->GetTextureFromImage(*imgs.background);
                     if (tex) {
                         imgui.graphics->AddImage(*tex,
                                                  r.Min(),
@@ -879,4 +880,6 @@ void GUIUpdate(Gui* g) {
         };
         g->plugin.error_notifications.AddOrUpdateError(item);
     }
+
+    return g->frame_output;
 }

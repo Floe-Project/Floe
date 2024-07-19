@@ -98,14 +98,14 @@ static void GUIDoSampleWaveformOverlay(Gui* g, PluginInstance::Layer* layer, Rec
                                       imgui.IsHotOrActive(id) ? back_hover_col : back_col,
                                       6,
                                       (int)rounding_corners);
-        if (g->icons) g->gui_platform.graphics_ctx->PushFont(g->icons);
+        if (g->icons) g->frame_input.graphics_ctx->PushFont(g->icons);
         imgui.graphics->AddTextJustified(r,
                                          text,
                                          text_col,
                                          TextJustification::Centred,
                                          TextOverflowType::AllowOverflow,
                                          0.5f);
-        if (g->icons) g->gui_platform.graphics_ctx->PopFont();
+        if (g->icons) g->frame_input.graphics_ctx->PopFont();
     };
 
     auto do_handle_slider = [&](imgui::Id id,
@@ -131,8 +131,8 @@ static void GUIDoSampleWaveformOverlay(Gui* g, PluginInstance::Layer* layer, Rec
                                       {.slower_with_shift = true, .default_on_modifer = true});
 
         if (imgui.IsHotOrActive(id)) {
-            imgui.platform->gui_update_requirements.cursor_type = CursorType::HorizontalArrows;
-            if (imgui.platform->double_left_click) g->param_text_editor_to_open = params[0];
+            imgui.frame_output.cursor_type = CursorType::HorizontalArrows;
+            if (imgui.frame_input.Mouse(MouseButton::Left).double_click) g->param_text_editor_to_open = params[0];
         }
 
         if (imgui.WasJustActivated(id))
@@ -493,7 +493,7 @@ static void GUIDoSampleWaveformOverlay(Gui* g, PluginInstance::Layer* layer, Rec
                                   imgui.WindowPosToScreenPos(waveform_r.pos).x,
                                   {},
                                   intensity);
-            g->gui_platform.SetGUIDirty();
+            g->frame_output.IncreaseStatus(GuiFrameResult::Status::Animate);
         }
     }
 
@@ -571,11 +571,11 @@ void GUIDoSampleWaveform(Gui* g, PluginInstance::Layer* layer, Rect r) {
         waveform_r.h = Round(waveform_r.h);
         r.w = Round(r.w);
 
-        auto tex = g->waveforms.FetchOrCreate(*g->gui_platform.graphics_ctx,
+        auto tex = g->waveforms.FetchOrCreate(*g->frame_input.graphics_ctx,
                                               *audio_file,
                                               r.w,
                                               r.h,
-                                              g->gui_platform.display_ratio);
+                                              g->frame_input.display_ratio);
         if (tex.HasValue()) {
             g->imgui.graphics->AddImage(tex.Value(),
                                         waveform_r.Min() + f32x2 {offset * r.w, 0},

@@ -16,7 +16,7 @@
 
 struct PluginInstance;
 struct FloeInstance;
-struct GuiPlatform;
+struct GuiFrameInput;
 
 struct ImagePixelsRgba {
     NON_COPYABLE(ImagePixelsRgba);
@@ -119,7 +119,7 @@ struct InstInfo {
 };
 
 struct Gui {
-    Gui(GuiPlatform& gui_platform, PluginInstance& plugin);
+    Gui(GuiFrameInput& frame_input, PluginInstance& plugin);
     ~Gui();
 
     void OpenDialog(DialogType type);
@@ -131,13 +131,14 @@ struct Gui {
     bool show_news = false;
     u64 m_window_size_listener_id {};
 
-    GuiPlatform& gui_platform;
+    GuiFrameInput& frame_input;
+    GuiFrameResult frame_output;
     PluginInstance& plugin;
     Logger& logger;
     SettingsFile& settings;
 
     Layout layout = {};
-    imgui::Context imgui = {};
+    imgui::Context imgui {frame_input, frame_output};
     EditorGUI editor = {};
     // TODO: really weird crash where this becomes null mid-frame
     // probably some undefined behaviour somewhere or a threading issue, I can't think what else would cause
@@ -182,7 +183,7 @@ graphics::ImageID CopyPixelsToGpuLoadedImage(Gui* g, ImagePixelsRgba const& px);
 LibraryImages LoadLibraryBackgroundAndIconIfNeeded(Gui* g, sample_lib::Library const& lib);
 
 void GUIPresetLoaded(Gui* g, PluginInstance* a, bool is_first_preset);
-void GUIUpdate(Gui* g);
+GuiFrameResult GUIUpdate(Gui* g);
 void TopPanel(Gui* g);
 void MidPanel(Gui* g);
 void BotPanel(Gui* g);

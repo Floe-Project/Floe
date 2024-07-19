@@ -102,7 +102,7 @@ struct OpenGLDrawContext : public DrawContext {
 
     ErrorCodeOr<void> Render(DrawData draw_data, UiSize window_size, f32 display_ratio, Rect) override {
         ZoneScoped;
-        if (draw_data.cmd_lists_count == 0 || draw_data.cmd_lists == nullptr) return k_success;
+        if (draw_data.draw_lists.size == 0) return k_success;
 
         ScaleClipRects(draw_data, display_ratio);
 
@@ -145,11 +145,10 @@ struct OpenGLDrawContext : public DrawContext {
         glClearColor(0, 0, 0, 1);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        for (int n = 0; n < draw_data.cmd_lists_count; n++) {
-            DrawList const* cmd_list = draw_data.cmd_lists[n];
-            if (cmd_list->idx_buffer.size == 0 || cmd_list->idx_buffer.size == 0) continue;
-            DrawVert const* vtx_buffer = cmd_list->vtx_buffer.data;
-            DrawIdx const* idx_buffer = cmd_list->idx_buffer.data;
+        for (auto const& draw_list : draw_data.draw_lists) {
+            if (draw_list->idx_buffer.size == 0 || draw_list->idx_buffer.size == 0) continue;
+            DrawVert const* vtx_buffer = draw_list->vtx_buffer.data;
+            DrawIdx const* idx_buffer = draw_list->idx_buffer.data;
             glVertexPointer(2,
                             GL_FLOAT,
                             sizeof(DrawVert),
@@ -163,10 +162,10 @@ struct OpenGLDrawContext : public DrawContext {
                            sizeof(DrawVert),
                            (void*)((char*)vtx_buffer + offsetof(DrawVert, col)));
 
-            for (int cmd_i = 0; cmd_i < cmd_list->cmd_buffer.size; cmd_i++) {
-                DrawCmd const* pcmd = &cmd_list->cmd_buffer[cmd_i];
+            for (int cmd_i = 0; cmd_i < draw_list->cmd_buffer.size; cmd_i++) {
+                DrawCmd const* pcmd = &draw_list->cmd_buffer[cmd_i];
                 if (pcmd->user_callback) {
-                    pcmd->user_callback(cmd_list, pcmd);
+                    pcmd->user_callback(draw_list, pcmd);
                 } else {
                     glBindTexture(GL_TEXTURE_2D, (GLuint)(intptr_t)pcmd->texture_id);
                     glScissor((int)pcmd->clip_rect.x,

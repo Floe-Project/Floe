@@ -159,6 +159,7 @@ class TimePoint {
     constexpr bool operator<=(TimePoint const& other) const { return m_time <= other.m_time; }
     constexpr bool operator>(TimePoint const& other) const { return m_time > other.m_time; }
     constexpr bool operator>=(TimePoint const& other) const { return m_time >= other.m_time; }
+    constexpr bool operator==(TimePoint const& other) const { return m_time == other.m_time; }
 
   private:
     s64 m_time {};

@@ -85,7 +85,7 @@ Optional<KeyboardGuiKeyPressed> KeyboardGui(Gui* g, Rect r, int starting_octave)
         if (!keyboard.Get((usize)this_abs_note)) {
             if (imgui.ButtonBehavior(key_r, id, {.left_mouse = true, .triggers_on_mouse_down = true})) {
                 g->midi_keyboard_note_held_with_mouse = CheckedCast<u7>(this_abs_note);
-                f32 const rel_yclick_pos = imgui.platform->cursor_pos.y - key_r.y;
+                f32 const rel_yclick_pos = imgui.frame_input.cursor_pos.y - key_r.y;
                 result = KeyboardGuiKeyPressed {.is_down = true,
                                                 .note = CheckedCast<u7>(this_abs_note),
                                                 .velocity = (rel_yclick_pos / key_r.h)};
@@ -119,7 +119,7 @@ Optional<KeyboardGuiKeyPressed> KeyboardGui(Gui* g, Rect r, int starting_octave)
         if (!keyboard.Get((usize)this_abs_note)) {
             if (imgui.ButtonBehavior(key_r, id, {.left_mouse = true, .triggers_on_mouse_down = true})) {
                 g->midi_keyboard_note_held_with_mouse = CheckedCast<u7>(this_abs_note);
-                f32 const rel_yclick_pos = imgui.platform->cursor_pos.y - key_r.y;
+                f32 const rel_yclick_pos = imgui.frame_input.cursor_pos.y - key_r.y;
                 result = KeyboardGuiKeyPressed {.is_down = true,
                                                 .note = CheckedCast<u7>(this_abs_note),
                                                 .velocity = (rel_yclick_pos / key_r.h)};
@@ -140,7 +140,7 @@ Optional<KeyboardGuiKeyPressed> KeyboardGui(Gui* g, Rect r, int starting_octave)
         overlay_key(this_abs_note, key_r, UiColMap::KeyboardBlackVoiceOverlay);
     }
 
-    if (!imgui.platform->mouse_buttons[0].is_down && g->midi_keyboard_note_held_with_mouse) {
+    if (!imgui.frame_input.mouse_buttons[0].is_down && g->midi_keyboard_note_held_with_mouse) {
         result =
             KeyboardGuiKeyPressed {.is_down = false, .note = g->midi_keyboard_note_held_with_mouse.Value()};
         g->midi_keyboard_note_held_with_mouse = {};

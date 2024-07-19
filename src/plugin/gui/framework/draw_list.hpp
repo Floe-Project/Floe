@@ -358,11 +358,9 @@ struct Font {
 struct DrawList;
 
 struct DrawData {
-    // IMPROVE: use a Span
-    DrawList** cmd_lists;
-    int cmd_lists_count;
-    int total_vtx_count; // For convenience, sum of all cmd_lists vtx_buffer.size
-    int total_idx_count; // For convenience, sum of all cmd_lists idx_buffer.size
+    Span<DrawList*> draw_lists;
+    int total_vtx_count; // For convenience, sum of all draw_lists vtx_buffer.size
+    int total_idx_count; // For convenience, sum of all draw_lists idx_buffer.size
 };
 
 struct DrawContext {

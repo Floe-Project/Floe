@@ -219,7 +219,7 @@ struct AudioProcessor {
     Bitset<k_num_parameters> pending_param_changes;
 
     enum MainThreadCallbackFlags {
-        MainThreadCallbackFlagsRedrawGui = 1 << 0,
+        MainThreadCallbackFlagsUpdateGui = 1 << 0,
         MainThreadCallbackFlagsRescanParameters = 1 << 1,
     };
 

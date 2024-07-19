@@ -58,7 +58,7 @@ void DoTooltipText(Gui* g, String str, Rect r, bool rect_is_window_pos) {
 
     popup_r.pos = imgui::BestPopupPos(popup_r,
                                       {abs_pos.x, abs_pos.y, r.w, r.h},
-                                      g->gui_platform.window_size.ToFloat2(),
+                                      g->frame_input.window_size.ToFloat2(),
                                       false);
 
     f32x2 text_start;
@@ -86,7 +86,7 @@ bool Tooltip(Gui* g, imgui::Id id, Rect r, String str, bool rect_is_window_pos) 
 
     auto& imgui = g->imgui;
     f64 const delay {0.5};
-    if (imgui.WasJustMadeHot(id)) imgui.AddRedrawTimeToList(g->gui_platform.current_time + delay, "Tooltip");
+    if (imgui.WasJustMadeHot(id)) imgui.AddTimedWakeup(g->frame_input.current_time + delay, "Tooltip");
     auto hot_seconds = imgui.SecondsSpentHot();
     if (imgui.IsHot(id) && hot_seconds >= delay) {
         DoTooltipText(g, str, r, rect_is_window_pos);
@@ -110,7 +110,7 @@ void ParameterValuePopup(Gui* g, Span<Parameter const*> params, imgui::Id id, Re
             break;
         }
     }
-    if (cc_just_moved_param) imgui.RedrawAtIntervalSeconds(g->redraw_counter, 0.04);
+    if (cc_just_moved_param) imgui.WakeupAtTimedInterval(g->redraw_counter, 0.04);
 
     if (imgui.IsActive(id) || cc_just_moved_param) {
         if (params.size == 1) {
@@ -195,7 +195,7 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
 
     auto popup_pos = imgui::BestPopupPos(Rect {centred_x, r.y, item_width, item_height * (f32)num_items},
                                          r,
-                                         g->gui_platform.window_size.ToFloat2(),
+                                         g->frame_input.window_size.ToFloat2(),
                                          false);
     Rect const popup_r(popup_pos, 0, 0);
 
@@ -442,8 +442,8 @@ bool DoOverlayClickableBackground(Gui* g) {
     auto invis_window = imgui.CurrentWindow();
 
     if (imgui.IsWindowHovered(invis_window)) {
-        imgui.platform->gui_update_requirements.cursor_type = CursorType::Hand;
-        if (imgui.platform->Mouse(MouseButton::Left).presses.size) clicked = true;
+        imgui.frame_output.cursor_type = CursorType::Hand;
+        if (imgui.frame_input.Mouse(MouseButton::Left).presses.size) clicked = true;
     }
 
     imgui.EndWindow();

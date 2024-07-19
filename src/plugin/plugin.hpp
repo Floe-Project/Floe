@@ -89,7 +89,7 @@ struct FloeClapExtensionHost {
     void* pugl_world;
 };
 
-struct GuiPlatform;
+struct GuiFrameInput;
 
 inline void DebugAssertMainThread(clap_host const& host) {
     if constexpr (PRODUCTION_BUILD) return;

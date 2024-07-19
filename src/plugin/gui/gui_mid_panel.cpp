@@ -63,7 +63,7 @@ void MidPanel(Gui* g) {
                     if (imgs.blurred_background) {
 
                         if (auto tex =
-                                g->gui_platform.graphics_ctx->GetTextureFromImage(imgs.blurred_background);
+                                g->frame_input.graphics_ctx->GetTextureFromImage(imgs.blurred_background);
                             tex && !g->settings.settings.gui.high_contrast_gui) {
                             f32x2 min_uv;
                             f32x2 max_uv;
@@ -191,7 +191,7 @@ void MidPanel(Gui* g) {
                     auto imgs = LoadLibraryBackgroundAndIconIfNeeded(g, *background_lib);
                     if (imgs.blurred_background) {
                         if (auto tex =
-                                g->gui_platform.graphics_ctx->GetTextureFromImage(*imgs.blurred_background)) {
+                                g->frame_input.graphics_ctx->GetTextureFromImage(*imgs.blurred_background)) {
                             f32x2 min_uv;
                             f32x2 max_uv;
                             get_background_uvs(imgs, r, window, min_uv, max_uv);

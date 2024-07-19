@@ -79,7 +79,7 @@ void ApplyNewState(PluginInstance& plugin,
     plugin.latest_snapshot.metadata = state_metadata.Clone(plugin.latest_snapshot_arena);
 
     plugin.gui_needs_to_handle_preset_name_change = true;
-    plugin.processor.for_main_thread.flags.FetchOr(AudioProcessor::MainThreadCallbackFlagsRedrawGui);
+    plugin.processor.for_main_thread.flags.FetchOr(AudioProcessor::MainThreadCallbackFlagsUpdateGui);
     plugin.host.request_callback(&plugin.host);
 
     if (state) {
@@ -249,7 +249,7 @@ static void SampleLibraryResourceLoaded(PluginInstance& plugin, sample_lib_serve
         case Source::LastInPendingStateChange: PresetLoadComplete(plugin); break;
     }
 
-    plugin.processor.for_main_thread.flags.FetchOr(AudioProcessor::MainThreadCallbackFlagsRedrawGui);
+    plugin.processor.for_main_thread.flags.FetchOr(AudioProcessor::MainThreadCallbackFlagsUpdateGui);
 }
 
 Optional<u64> SetConvolutionIr(PluginInstance& plugin, Optional<sample_lib::IrId> ir_id) {

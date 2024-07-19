@@ -413,7 +413,7 @@ static void ProcessClapNoteOrMidi(AudioProcessor& processor,
             auto type = message.Type();
             if (type == MidiMessageType::NoteOn || type == MidiMessageType::NoteOff ||
                 type == MidiMessageType::ControlChange) {
-                processor.for_main_thread.flags.FetchOr(AudioProcessor::MainThreadCallbackFlagsRedrawGui);
+                processor.for_main_thread.flags.FetchOr(AudioProcessor::MainThreadCallbackFlagsUpdateGui);
                 request_main_thread_callback = true;
             }
 
@@ -961,7 +961,7 @@ clap_process_status Process(AudioProcessor& processor, clap_process const& proce
         for (auto& layer : processor.layer_processors)
             if (!layer.peak_meter.Silent()) mark_gui_dirty = true;
         if (mark_gui_dirty) {
-            processor.for_main_thread.flags.FetchOr(AudioProcessor::MainThreadCallbackFlagsRedrawGui);
+            processor.for_main_thread.flags.FetchOr(AudioProcessor::MainThreadCallbackFlagsUpdateGui);
             request_main_thread_callback = true;
         }
     }
@@ -986,7 +986,7 @@ static void OnMainThread(AudioProcessor& processor, bool& update_gui) {
             (clap_host_params const*)processor.host.get_extension(&processor.host, CLAP_EXT_PARAMS);
         if (host_params) host_params->rescan(&processor.host, CLAP_PARAM_RESCAN_VALUES);
     }
-    if (flags & AudioProcessor::MainThreadCallbackFlagsRedrawGui) update_gui = true;
+    if (flags & AudioProcessor::MainThreadCallbackFlagsUpdateGui) update_gui = true;
 }
 
 AudioProcessor::AudioProcessor(clap_host const& host)

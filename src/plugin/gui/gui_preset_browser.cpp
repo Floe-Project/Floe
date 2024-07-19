@@ -110,7 +110,7 @@ PresetBrowser::DoPresetFolderRecurse(DirectoryListing::Entry const* f, f32& ypos
             if (!f->HasChildren()) dyn::AppendSpan(name, " <empty>"_s);
             if (buttons::Toggle(g, imgui_id, r, state, name, buttons::PresetsBrowserFolderButton(imgui)))
                 clicked_preset_folder = f;
-            auto const rel_pos = imgui.ScreenPosToWindowPos(imgui.platform->cursor_pos);
+            auto const rel_pos = imgui.ScreenPosToWindowPos(imgui.frame_input.cursor_pos);
             if (persistent_data.current_dragging_preset) {
                 if (imgui.WasJustDeactivated(persistent_data.current_dragging_preset->imgui_id) &&
                     r.Contains(rel_pos)) {
@@ -275,7 +275,7 @@ DirectoryListing::Entry const* PresetBrowser::DoPresetFilesRecurse(DirectoryList
                                 .imgui_id = imgui_id,
                             };
                     }
-                    if (imgui.platform->double_left_click && imgui.IsHot(imgui_id))
+                    if (imgui.frame_input.Mouse(MouseButton::Left).double_click && imgui.IsHot(imgui_id))
                         persistent_data.show_preset_panel = false;
 
                     DynamicArray<char> tooltip {g->scratch_arena};
@@ -360,10 +360,10 @@ PresetBrowser::HandleKeyPresses(DirectoryListing::Entry const* current_selected_
     if (imgui.GetTextInput()) return {};
 
     // IMPROVE: we are not handling repeated key presses here
-    bool const left = g->gui_platform.Key(KeyCode::LeftArrow).presses_or_repeats.size;
-    bool const right = g->gui_platform.Key(KeyCode::RightArrow).presses_or_repeats.size;
-    bool const up = g->gui_platform.Key(KeyCode::UpArrow).presses_or_repeats.size;
-    bool const down = g->gui_platform.Key(KeyCode::DownArrow).presses_or_repeats.size;
+    bool const left = g->frame_input.Key(KeyCode::LeftArrow).presses_or_repeats.size;
+    bool const right = g->frame_input.Key(KeyCode::RightArrow).presses_or_repeats.size;
+    bool const up = g->frame_input.Key(KeyCode::UpArrow).presses_or_repeats.size;
+    bool const down = g->frame_input.Key(KeyCode::DownArrow).presses_or_repeats.size;
 
     if (left || right || up || down) {
         DynamicArray<Array<FileBrowserGUIItem, k_preset_browser_num_columns>> rows {g->scratch_arena};
@@ -450,7 +450,7 @@ void PresetBrowser::DoAllPresetFiles() {
                       "Loading...",
                       labels::PresetBrowserFolder(imgui));
         imgui.graphics->context->PopFont();
-        imgui.RedrawAtIntervalSeconds(g->redraw_counter, 0.5);
+        imgui.WakeupAtTimedInterval(g->redraw_counter, 0.5);
     }
 
     if (!listing.listing) return;
@@ -483,7 +483,7 @@ void PresetBrowser::DoAllPresetFiles() {
 
 void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
     if (persistent_data.show_preset_panel) {
-        g->gui_platform.gui_update_requirements.wants_just_arrow_keys = true;
+        g->frame_output.wants_just_arrow_keys = true;
 
         if (DoOverlayClickableBackground(g)) g->preset_browser_data.show_preset_panel = false;
 

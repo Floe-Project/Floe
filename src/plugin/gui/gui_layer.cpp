@@ -541,7 +541,7 @@ void Draw(Gui* g,
         if (background_lib && !g->settings.settings.gui.high_contrast_gui) {
             auto imgs = LoadLibraryBackgroundAndIconIfNeeded(g, *background_lib);
             if (imgs.blurred_background) {
-                if (auto tex = g->gui_platform.graphics_ctx->GetTextureFromImage(*imgs.blurred_background)) {
+                if (auto tex = g->frame_input.graphics_ctx->GetTextureFromImage(*imgs.blurred_background)) {
                     f32x2 min_uv;
                     f32x2 max_uv;
                     get_background_uvs(imgs, r, window, min_uv, max_uv);
@@ -639,7 +639,7 @@ void Draw(Gui* g,
             percent != -1) {
             f32 const load_percent = (f32)percent / 100.0f;
             DrawSelectorProgressBar(imgui, registered_selector_box_r, load_percent);
-            g->imgui.RedrawAtIntervalSeconds(g->redraw_counter, 0.1);
+            g->imgui.WakeupAtTimedInterval(g->redraw_counter, 0.1);
         }
 
         if (buttons::Button(g,
@@ -916,7 +916,7 @@ void Draw(Gui* g,
                         label_r,
                         layer->processor.params[ToInt(LayerParamIndex::MidiTranspose)].info.tooltip);
                 if (imgui.IsHot(label_id))
-                    imgui.platform->gui_update_requirements.cursor_type = CursorType::Default;
+                    imgui.frame_output.cursor_type = CursorType::Default;
             }
 
             buttons::Toggle(g,
@@ -982,7 +982,7 @@ void Draw(Gui* g,
                         "each layer should be given a different velocity mapping option so that the loudness "
                         "of each layer is controlled by the MIDI velocity."_s);
                 if (imgui.IsHot(label_id))
-                    imgui.platform->gui_update_requirements.cursor_type = CursorType::Default;
+                    imgui.frame_output.cursor_type = CursorType::Default;
             }
 
             break;

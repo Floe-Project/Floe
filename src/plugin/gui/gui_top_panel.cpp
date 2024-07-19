@@ -178,7 +178,7 @@ void TopPanel(Gui* g) {
             preset_load_criteria = DirectoryListing::AdjacentDirection::Next;
         Tooltip(g, btn_id, preset_left_r, "Load next preset"_s);
     }
-    if (g->icons) g->gui_platform.graphics_ctx->PushFont(g->icons);
+    if (g->icons) g->frame_input.graphics_ctx->PushFont(g->icons);
 
     auto& settings = g->settings.settings.gui;
     {
@@ -264,7 +264,7 @@ void TopPanel(Gui* g) {
         Tooltip(g, btn_id, preset_save_r, "Save the current state as a preset"_s);
     }
 
-    if (g->icons) g->gui_platform.graphics_ctx->PopFont();
+    if (g->icons) g->frame_input.graphics_ctx->PopFont();
     {
         auto btn_id = imgui.GetID("rand_pre_menu");
         auto pop_id = imgui.GetID("rand_pre_menu_pop");
@@ -370,7 +370,7 @@ void TopPanel(Gui* g) {
                         knobs::DefaultKnob(imgui));
             g->dynamics_slider_is_held = imgui.IsActive(id);
             if (imgui.WasJustActivated(id))
-                g->imgui.platform->gui_update_requirements.requires_another_update = true;
+                g->imgui.frame_output.IncreaseStatus(GuiFrameResult::Status::ImmediatelyUpdate);
         } else {
             auto knob_r = lay.GetRect(dyn.control);
             knobs::FakeKnob(g, knob_r);
@@ -382,7 +382,7 @@ void TopPanel(Gui* g) {
                 id,
                 knob_r,
                 "Dynamics: no currently loaded instruments have dynamics information; this knob is inactive"_s);
-            if (imgui.IsHot(id)) imgui.platform->gui_update_requirements.cursor_type = CursorType::Default;
+            if (imgui.IsHot(id)) imgui.frame_output.cursor_type = CursorType::Default;
         }
         labels::Label(g,
                       plugin.processor.params[ToInt(ParamIndex::MasterDynamics)],

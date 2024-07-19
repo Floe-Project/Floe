@@ -15,12 +15,12 @@ namespace buttons {
 struct ScopedFont {
     ScopedFont(Gui* g, graphics::Font* font) : m_g(g) {
         if (font) {
-            g->gui_platform.graphics_ctx->PushFont(font);
+            g->frame_input.graphics_ctx->PushFont(font);
             pushed_font = true;
         }
     }
     ~ScopedFont() {
-        if (pushed_font) m_g->gui_platform.graphics_ctx->PopFont();
+        if (pushed_font) m_g->frame_input.graphics_ctx->PopFont();
     }
     Gui* m_g;
     bool pushed_font = false;

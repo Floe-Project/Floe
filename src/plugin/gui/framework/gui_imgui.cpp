@@ -7,7 +7,7 @@
 #include "os/misc.hpp"
 #include "utils/debug/debug.hpp"
 
-#include "gui_platform.hpp"
+#include "gui_frame.hpp"
 #include "stb/stb_sprintf.h"
 
 namespace imgui {
@@ -33,7 +33,7 @@ void Context::Trace(u32 type, char const* function, char const* fmt, ...) {
     static char buffer[512];
     stbsp_sprintf(buffer,
                   "[Imgui] %llu %s %s - ",
-                  (unsigned long long)platform->update_count,
+                  (unsigned long long)frame_input.update_count,
                   type_name,
                   function);
 
@@ -51,7 +51,7 @@ void Context::Trace(u32 type, char const* function, char const* fmt, ...) {
 
 #define SET_ONE_MORE_FRAME(...)                                                                              \
     do {                                                                                                     \
-        platform->gui_update_requirements.requires_another_update = true;                                    \
+        frame_output.IncreaseStatus(GuiFrameResult::Status::ImmediatelyUpdate);                              \
         IMGUI_TRACE_MSG(TraceTypeRequiresUpdate, __VA_ARGS__);                                               \
     } while (0)
 
@@ -278,20 +278,21 @@ void Context::SetHotRaw(Id id) {
 }
 
 // check the modifier key flags to see if the click is allowed
-static bool CheckModifierKeys(ButtonFlags flags, GuiPlatform* io) {
+static bool CheckModifierKeys(ButtonFlags flags, GuiFrameInput const& io) {
     if (!(flags.requires_modifer || flags.requires_shift || flags.requires_alt)) return true;
-    if (flags.requires_modifer && io->Key(ModifierKey::Modifier).is_down) return true;
-    if (flags.requires_shift && io->Key(ModifierKey::Shift).is_down) return true;
-    if (flags.requires_alt && io->Key(ModifierKey::Alt).is_down) return true;
+    if (flags.requires_modifer && io.Key(ModifierKey::Modifier).is_down) return true;
+    if (flags.requires_shift && io.Key(ModifierKey::Shift).is_down) return true;
+    if (flags.requires_alt && io.Key(ModifierKey::Alt).is_down) return true;
     return false;
 }
 
 // use the flags to check whether a click is allowed
-static bool CheckForValidMouseDown(ButtonFlags flags, GuiPlatform* io) {
-    if (io->mouse_buttons[0].is_down && flags.left_mouse) return CheckModifierKeys(flags, io);
-    if (io->mouse_buttons[1].is_down && flags.right_mouse) return CheckModifierKeys(flags, io);
-    if (io->mouse_buttons[2].is_down && flags.middle_mouse) return CheckModifierKeys(flags, io);
-    if (io->double_left_click && flags.double_left_mouse) return CheckModifierKeys(flags, io);
+static bool CheckForValidMouseDown(ButtonFlags flags, GuiFrameInput const& io) {
+    if (io.Mouse(MouseButton::Left).is_down && flags.left_mouse) return CheckModifierKeys(flags, io);
+    if (io.Mouse(MouseButton::Right).is_down && flags.right_mouse) return CheckModifierKeys(flags, io);
+    if (io.Mouse(MouseButton::Middle).is_down && flags.middle_mouse) return CheckModifierKeys(flags, io);
+    if (io.Mouse(MouseButton::Left).double_click && flags.double_left_mouse)
+        return CheckModifierKeys(flags, io);
     return false;
 }
 
@@ -385,7 +386,7 @@ void Context::HandleHoverPopupOpeningAndClosing(Id id) {
 
         if (id != creator_of_next) {
             if (WasJustMadeHot(id))
-                AddRedrawTimeToList(platform->current_time + k_popup_open_and_close_delay_sec, "Popup close");
+                AddTimedWakeup(frame_input.current_time + k_popup_open_and_close_delay_sec, "Popup close");
             if (SecondsSpentHot() >= k_popup_open_and_close_delay_sec)
                 ClosePopupToLevel((int)current_popup_stack.size);
         }
@@ -533,19 +534,19 @@ static u32 ImguiHash(void const* data, int data_size, u32 seed = 0) {
     return ~crc;
 }
 
-bool Context::RedrawAtIntervalSeconds(TimePoint& counter, f64 interval_seconds) {
+bool Context::WakeupAtTimedInterval(TimePoint& counter, f64 interval_seconds) {
     bool triggered = false;
-    if (platform->current_time >= counter) {
-        counter = platform->current_time + interval_seconds;
+    if (frame_input.current_time >= counter) {
+        counter = frame_input.current_time + interval_seconds;
         triggered = true;
     }
-    dyn::AppendIfNotAlreadyThere(platform->gui_update_requirements.redraw_times,
-                                 RedrawTime {counter, __FUNCTION__});
+    AddTimedWakeup(counter, __FUNCTION__);
     return triggered;
 }
 
-void Context::AddRedrawTimeToList(TimePoint time, char const* timer_name) {
-    dyn::Append(platform->gui_update_requirements.redraw_times, RedrawTime {time, timer_name});
+void Context::AddTimedWakeup(TimePoint time, char const* timer_name) {
+    (void)timer_name;
+    dyn::Append(timed_wakeups, time);
 }
 
 void Context::PushID(String str) { dyn::Append(id_stack, GetID(str)); }
@@ -593,7 +594,9 @@ Id Context::GetID(void const* ptr) {
     return result;
 }
 
-Context::Context() {
+Context::Context(GuiFrameInput& frame_input, GuiFrameResult& frame_output)
+    : frame_input(frame_input)
+    , frame_output(frame_output) {
     dyn::Append(id_stack, 0u);
     PushScissorStack();
     windows.Reserve(64);
@@ -633,10 +636,12 @@ void Context::Begin(WindowSettings settings) {
     ASSERT(window_stack.size == 0);
     ASSERT(current_popup_stack.size == 0);
 
-    draw_data.cmd_lists = nullptr;
-    draw_data.cmd_lists_count = 0;
+    draw_data.draw_lists = {};
     draw_data.total_vtx_count = 0;
     draw_data.total_idx_count = 0;
+
+    dyn::Clear(mouse_tracked_rects);
+    dyn::Clear(clipboard_for_os);
 
     tab_just_used_to_focus = false;
     frame_counter++;
@@ -648,16 +653,16 @@ void Context::Begin(WindowSettings settings) {
 
     for (usize i = sorted_windows.size; i-- > 0;) {
         auto window = sorted_windows[i];
-        if (window->visible_bounds.Contains(platform->cursor_pos)) {
+        if (window->visible_bounds.Contains(frame_input.cursor_pos)) {
             if (window->flags & WindowFlags_DrawingOnly) continue;
-            if (window->clipping_rect.Contains(platform->cursor_pos)) hovered_window_content = window;
+            if (window->clipping_rect.Contains(frame_input.cursor_pos)) hovered_window_content = window;
             hovered_window = window;
             break;
         }
     }
     dyn::Clear(sorted_windows);
 
-    if (platform->mouse_scroll_delta_in_lines != 0 && hovered_window) {
+    if (frame_input.mouse_scroll_delta_in_lines != 0 && hovered_window) {
         Window* window = hovered_window;
         Window* final_window = nullptr;
         while (true) {
@@ -671,7 +676,7 @@ void Context::Begin(WindowSettings settings) {
         if (final_window) {
             f32 const k_pixels_per_line = 20; // IMPROVE: this should be a setting so, for example, popups
                                               // can scroll in increments of each item
-            f32 const lines = -platform->mouse_scroll_delta_in_lines;
+            f32 const lines = -frame_input.mouse_scroll_delta_in_lines;
             f32 const new_scroll = lines * k_pixels_per_line + final_window->scroll_offset.y;
             final_window->scroll_offset.y = Round(Clamp(new_scroll, 0.0f, final_window->scroll_max.y));
         }
@@ -683,7 +688,7 @@ void Context::Begin(WindowSettings settings) {
 
     // Debug
     debug_window_to_inspect = nullptr;
-    if (platform->Key(KeyCode::A).presses.size) debug_window_to_inspect = hovered_window;
+    if (frame_input.Key(KeyCode::A).presses.size) debug_window_to_inspect = hovered_window;
 
     //
     // Reset stuff
@@ -705,7 +710,7 @@ void Context::Begin(WindowSettings settings) {
     hot_item = temp_hot_item;
     hovered_item = temp_hovered_item;
     if (hot_item != 0) {
-        if (WasJustMadeHot(hot_item)) time_when_turned_hot = platform->current_time;
+        if (WasJustMadeHot(hot_item)) time_when_turned_hot = frame_input.current_time;
     } else {
         time_when_turned_hot = TimePoint {};
     }
@@ -715,7 +720,7 @@ void Context::Begin(WindowSettings settings) {
     temp_hovered_item = 0;
 
     if (GetActive() && active_item.check_for_release &&
-        !CheckForValidMouseDown(active_item.button_flags, platform)) {
+        !CheckForValidMouseDown(active_item.button_flags, frame_input)) {
 
         IMGUI_TRACE_MSG(TraceTypeActiveId, "SetActiveID(0)");
         SetActiveIDZero();
@@ -723,12 +728,12 @@ void Context::Begin(WindowSettings settings) {
 
     next_window_contents_size = {0, 0};
 
-    overlay_graphics.context = platform->graphics_ctx;
+    overlay_graphics.context = frame_input.graphics_ctx;
     overlay_graphics.BeginDraw();
 
     BeginWindow(settings,
                 k_imgui_app_window_id,
-                Rect(0, 0, platform->window_size.ToFloat2()),
+                Rect(0, 0, frame_input.window_size.ToFloat2()),
                 "ApplicationWindow");
 }
 
@@ -738,10 +743,10 @@ void Context::End(ArenaAllocator& scratch_arena) {
     ASSERT(current_popup_stack.size == 0);
 
     if (debug_show_register_widget_overlay) {
-        for (auto& w : platform->gui_update_requirements.mouse_tracked_regions) {
+        for (auto& w : frame_output.mouse_tracked_rects) {
             auto col = 0xffff00ff;
             if (w.mouse_over) col = 0xff00ffff;
-            overlay_graphics.AddRect(w.r.Min(), w.r.Max(), col);
+            overlay_graphics.AddRect(w.rect.Min(), w.rect.Max(), col);
         }
     }
 
@@ -829,7 +834,7 @@ void Context::End(ArenaAllocator& scratch_arena) {
     draw_data.total_vtx_count += overlay_graphics.vtx_buffer.Size();
     draw_data.total_idx_count += overlay_graphics.idx_buffer.Size();
 
-    if (platform->Mouse(MouseButton::Left).presses.size && temp_active_item.id == 0 && temp_hot_item == 0) {
+    if (frame_input.Mouse(MouseButton::Left).presses.size && temp_active_item.id == 0 && temp_hot_item == 0) {
         if (hovered_window != nullptr) {
             Window* window = hovered_window;
             bool const closes_popups = (window->flags & WindowFlags_NeverClosesPopup) == 0;
@@ -887,27 +892,25 @@ void Context::End(ArenaAllocator& scratch_arena) {
     prev_popup_menu_just_created = popup_menu_just_created;
     popup_menu_just_created = 0;
 
-    if (!platform->gui_update_requirements.wants_keyboard_input) {
+    if (!frame_output.wants_keyboard_input) {
         bool const wants_keyboard_input = active_text_input != 0;
-        if (wants_keyboard_input != platform->gui_update_requirements.wants_keyboard_input) {
+        if (wants_keyboard_input != frame_output.wants_keyboard_input) {
         }
-        platform->gui_update_requirements.wants_keyboard_input = wants_keyboard_input;
+        frame_output.wants_keyboard_input = wants_keyboard_input;
     }
-    if (!platform->gui_update_requirements.wants_mouse_capture)
-        platform->gui_update_requirements.wants_mouse_capture = AnItemIsActive();
-    if (!platform->gui_update_requirements.wants_mouse_scroll)
-        platform->gui_update_requirements.wants_mouse_scroll = true;
-    if (!platform->gui_update_requirements.wants_all_left_clicks)
-        platform->gui_update_requirements.wants_all_left_clicks =
-            focused_popup_window != nullptr || GetTextInput();
-    if (!platform->gui_update_requirements.wants_all_right_clicks)
-        platform->gui_update_requirements.wants_all_right_clicks = false;
-    if (!platform->gui_update_requirements.wants_all_middle_clicks)
-        platform->gui_update_requirements.wants_all_middle_clicks = false;
+    if (!frame_output.wants_mouse_capture) frame_output.wants_mouse_capture = AnItemIsActive();
+    if (!frame_output.wants_mouse_scroll) frame_output.wants_mouse_scroll = true;
+    if (!frame_output.wants_all_left_clicks)
+        frame_output.wants_all_left_clicks = focused_popup_window != nullptr || GetTextInput();
+    if (!frame_output.wants_all_right_clicks) frame_output.wants_all_right_clicks = false;
+    if (!frame_output.wants_all_middle_clicks) frame_output.wants_all_middle_clicks = false;
 
-    draw_data.cmd_lists = output_draw_lists.data;
-    draw_data.cmd_lists_count = (int)output_draw_lists.size;
-    platform->draw_data = draw_data;
+    draw_data.draw_lists = output_draw_lists;
+    frame_output.draw_data = draw_data;
+
+    frame_output.mouse_tracked_rects = mouse_tracked_rects;
+    frame_output.set_clipboard_text = clipboard_for_os;
+    frame_output.timed_wakeups = &timed_wakeups;
 
     active_item_last_frame = active_item.id;
     hot_item_last_frame = hot_item;
@@ -1017,21 +1020,21 @@ bool Context::SliderUnboundedBehavior(Rect r,
     constexpr f32 k_size = 64;
 
     if (ButtonBehavior(r, id, {.left_mouse = true, .triggers_on_mouse_down = true})) {
-        if ((flags.default_on_modifer) && platform->Key(ModifierKey::Modifier).is_down) val = default_val;
+        if ((flags.default_on_modifer) && frame_input.Key(ModifierKey::Modifier).is_down) val = default_val;
         val_at_click = val;
-        start_location = platform->cursor_pos;
+        start_location = frame_input.cursor_pos;
     }
 
     if (IsActive(id)) {
         if (flags.slower_with_shift) {
-            if (platform->Key(ModifierKey::Shift).presses || platform->Key(ModifierKey::Shift).releases) {
+            if (frame_input.Key(ModifierKey::Shift).presses || frame_input.Key(ModifierKey::Shift).releases) {
                 val_at_click = val;
-                start_location = platform->cursor_pos;
+                start_location = frame_input.cursor_pos;
             }
-            if (platform->Key(ModifierKey::Shift).is_down) sensitivity /= 6;
+            if (frame_input.Key(ModifierKey::Shift).is_down) sensitivity /= 6;
         }
-        if (platform->cursor_pos.x != -1 && platform->cursor_pos.y != -1) {
-            auto d = platform->cursor_pos - start_location;
+        if (frame_input.cursor_pos.x != -1 && frame_input.cursor_pos.y != -1) {
+            auto d = frame_input.cursor_pos - start_location;
             d.x = -d.x;
             auto distance_from_drag_start = d.x + d.y;
             // I'm pretty sure it would make sense to do sqrt of the sum of the squares
@@ -1116,10 +1119,10 @@ bool Context::RegisterRegionForMouseTracking(Rect* r, bool check_intersection) {
     if (focused_popup_window != nullptr && !this_window_is_apopup) return false;
     if (check_intersection && !Rect::Intersection(*r, GetCurrentClipRect())) return false;
 
-    MouseTrackedRegion widget = {};
-    widget.r = *r;
-    widget.mouse_over = r->Contains(platform->cursor_pos);
-    dyn::Append(platform->gui_update_requirements.mouse_tracked_regions, widget);
+    MouseTrackedRect widget = {};
+    widget.rect = *r;
+    widget.mouse_over = r->Contains(frame_input.cursor_pos);
+    dyn::Append(mouse_tracked_rects, widget);
     return true;
 }
 
@@ -1152,7 +1155,7 @@ bool Context::SetHot(Rect r, Id id, bool is_not_window_content) {
 
     // only bother to check if the cursor is in the same window
     if ((curr_window == hovered_window_content || (is_not_window_content && curr_window == hovered_window)) &&
-        r.Contains(platform->cursor_pos)) {
+        r.Contains(frame_input.cursor_pos)) {
         temp_hovered_item = id;
         if (GetActive() == 0) {
             // only allow it if there is not active item (for example a disallow when a slider is held down)
@@ -1176,7 +1179,7 @@ TextInputResult Context::SingleLineTextInput(Rect r,
     bool reset_cursor = false;
 
     auto get_rel_click_point = [this](f32x2 pos, f32 offset) {
-        f32x2 relative_click = platform->cursor_pos - pos;
+        f32x2 relative_click = frame_input.cursor_pos - pos;
         relative_click.x -= offset;
         relative_click.y = graphics->context->CurrentFontSize() / 2;
         return relative_click;
@@ -1214,10 +1217,10 @@ TextInputResult Context::SingleLineTextInput(Rect r,
         return x_offset;
     };
 
-    if (IsHot(id)) platform->gui_update_requirements.cursor_type = CursorType::IBeam;
+    if (IsHot(id)) frame_output.cursor_type = CursorType::IBeam;
 
     if (TextInputHasFocus(id)) {
-        if (platform->Key(KeyCode::Tab).presses.size && flags.tab_focuses_next_input &&
+        if (frame_input.Key(KeyCode::Tab).presses.size && flags.tab_focuses_next_input &&
             !tab_just_used_to_focus) {
             tab_to_focus_next_input = true;
             tab_just_used_to_focus = true;
@@ -1227,7 +1230,7 @@ TextInputResult Context::SingleLineTextInput(Rect r,
         if ((active_item.id && active_item.id != id) || (temp_active_item.id && temp_active_item.id != id))
             SetTextInputFocus(0, {});
 
-        if (platform->Key(KeyCode::Enter).presses.size) {
+        if (frame_input.Key(KeyCode::Enter).presses.size) {
             result.enter_pressed = true;
             SetTextInputFocus(0, {});
         }
@@ -1243,10 +1246,10 @@ TextInputResult Context::SingleLineTextInput(Rect r,
 
     auto x_offset = get_offset(textedit_text_utf8);
 
-    if (platform->Mouse(MouseButton::Left).presses.size) {
+    if (frame_input.Mouse(MouseButton::Left).presses.size) {
         text_input_selector_flags = {.left_mouse = true, .triggers_on_mouse_down = true};
         if (!TextInputJustFocused(id) && result.HasSelection() &&
-            result.GetSelectionRect().Contains(platform->cursor_pos)) {
+            result.GetSelectionRect().Contains(frame_input.cursor_pos)) {
             // if the mouse was clicked on a selected bit of text we only remove the selection on a mouse
             // up
             text_input_selector_flags = {.left_mouse = true, .triggers_on_mouse_up = true};
@@ -1255,7 +1258,7 @@ TextInputResult Context::SingleLineTextInput(Rect r,
 
     if (ButtonBehavior(r, id, text_input_selector_flags)) {
         if (text_input_selector_flags.triggers_on_mouse_up &&
-            platform->Mouse(MouseButton::Left).dragging_ended) {
+            frame_input.Mouse(MouseButton::Left).dragging_ended) {
         } else {
             auto rel_pos = get_rel_click_point(r.pos, x_offset);
             stb_textedit_click(this, &stb_state, rel_pos.x, rel_pos.y);
@@ -1263,15 +1266,15 @@ TextInputResult Context::SingleLineTextInput(Rect r,
         }
     }
     if (IsActive(id)) {
-        if (!platform->mouse_buttons[0].is_down) {
+        if (!frame_input.mouse_buttons[0].is_down) {
             SetActiveIDZero();
         } else if (!WasJustActivated(id)) {
             if (active_item.button_flags.triggers_on_mouse_down) {
-                if (platform->Mouse(MouseButton::Left).dragging_started) {
+                if (frame_input.Mouse(MouseButton::Left).dragging_started) {
                     auto rel_pos = get_rel_click_point(r.pos, x_offset);
                     stb_textedit_click(this, &stb_state, rel_pos.x, rel_pos.y);
                     reset_cursor = true;
-                } else if (platform->mouse_buttons[0].is_dragging) {
+                } else if (frame_input.mouse_buttons[0].is_dragging) {
                     auto rel_pos = get_rel_click_point(r.pos, x_offset);
                     stb_textedit_drag(this, &stb_state, rel_pos.x, rel_pos.y);
                 }
@@ -1279,35 +1282,35 @@ TextInputResult Context::SingleLineTextInput(Rect r,
         }
     }
 
-    if (IsHotOrActive(id)) platform->gui_update_requirements.cursor_type = CursorType::IBeam;
+    if (IsHotOrActive(id)) frame_output.cursor_type = CursorType::IBeam;
 
-    u32 const shift_bit = platform->Key(ModifierKey::Shift).is_down ? STB_TEXTEDIT_K_SHIFT : 0;
+    u32 const shift_bit = frame_input.Key(ModifierKey::Shift).is_down ? STB_TEXTEDIT_K_SHIFT : 0;
 
-    if (auto backspaces = platform->Key(KeyCode::Backspace).presses_or_repeats; backspaces.size) {
+    if (auto backspaces = frame_input.Key(KeyCode::Backspace).presses_or_repeats; backspaces.size) {
         for (auto _ : Range(backspaces.size))
             stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_BACKSPACE | shift_bit));
         result.buffer_changed = true;
         reset_cursor = true;
-    } else if (auto deletes = platform->Key(KeyCode::Delete).presses_or_repeats; deletes.size) {
+    } else if (auto deletes = frame_input.Key(KeyCode::Delete).presses_or_repeats; deletes.size) {
         for (auto _ : Range(deletes.size))
             stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_DELETE | shift_bit));
         result.buffer_changed = true;
         reset_cursor = true;
-    } else if (platform->Key(KeyCode::End).presses.size) {
+    } else if (frame_input.Key(KeyCode::End).presses.size) {
         stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_LINEEND | shift_bit));
         result.buffer_changed = true;
-    } else if (platform->Key(KeyCode::Home).presses.size) {
+    } else if (frame_input.Key(KeyCode::Home).presses.size) {
         stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_LINESTART | shift_bit));
         result.buffer_changed = true;
-    } else if (platform->Key(KeyCode::Z).presses.size && platform->Key(ModifierKey::Modifier).is_down) {
+    } else if (frame_input.Key(KeyCode::Z).presses.size && frame_input.Key(ModifierKey::Modifier).is_down) {
         // IMRPOVE: handle key repeats
         stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_UNDO | shift_bit));
         result.buffer_changed = true;
 
-    } else if (platform->Key(KeyCode::Y).presses.size && platform->Key(ModifierKey::Modifier).is_down) {
+    } else if (frame_input.Key(KeyCode::Y).presses.size && frame_input.Key(ModifierKey::Modifier).is_down) {
         stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_REDO | shift_bit));
         result.buffer_changed = true;
-    } else if (auto lefts = platform->Key(KeyCode::LeftArrow).presses_or_repeats; lefts.size) {
+    } else if (auto lefts = frame_input.Key(KeyCode::LeftArrow).presses_or_repeats; lefts.size) {
         reset_cursor = true;
         for (auto event : lefts)
             stb_textedit_key(this,
@@ -1315,7 +1318,7 @@ TextInputResult Context::SingleLineTextInput(Rect r,
                              (int)((event.modifiers.Get(ModifierKey::Modifier) ? STB_TEXTEDIT_K_WORDLEFT
                                                                                : STB_TEXTEDIT_K_LEFT) |
                                    shift_bit));
-    } else if (auto rights = platform->Key(KeyCode::RightArrow).presses_or_repeats; rights.size) {
+    } else if (auto rights = frame_input.Key(KeyCode::RightArrow).presses_or_repeats; rights.size) {
         reset_cursor = true;
         // IMPROVE: this is not perfect, we're using the current state of the modifier key rather than the
         // state of the modifier key when the key was pressed. Our current GUI system doesn't support this.
@@ -1325,48 +1328,48 @@ TextInputResult Context::SingleLineTextInput(Rect r,
                              (int)((event.modifiers.Get(ModifierKey::Modifier) ? STB_TEXTEDIT_K_WORDRIGHT
                                                                                : STB_TEXTEDIT_K_RIGHT) |
                                    shift_bit));
-    } else if (platform->Key(KeyCode::V).presses.size && platform->Key(ModifierKey::Modifier).is_down) {
-        platform->gui_update_requirements.wants_clipboard_paste = true;
-    } else if (platform->clipboard_data.size) {
+    } else if (frame_input.Key(KeyCode::V).presses.size && frame_input.Key(ModifierKey::Modifier).is_down) {
+        frame_output.wants_clipboard_text_paste = true;
+    } else if (frame_input.clipboard_text.size) {
         ArenaAllocatorWithInlineStorage<2000> allocator;
         DynamicArray<Char32> w_text {allocator};
-        dyn::Resize(w_text, platform->clipboard_data.size + 1);
+        dyn::Resize(w_text, frame_input.clipboard_text.size + 1);
         dyn::Resize(w_text,
                     (usize)imstring::Widen(w_text.data,
                                            (int)w_text.size,
-                                           platform->clipboard_data.data,
-                                           platform->clipboard_data.data + platform->clipboard_data.size,
+                                           frame_input.clipboard_text.data,
+                                           frame_input.clipboard_text.data + frame_input.clipboard_text.size,
                                            nullptr));
 
         stb_textedit_paste(this, &stb_state, w_text.data, (int)w_text.size);
         result.buffer_changed = true;
-    } else if ((platform->Key(KeyCode::C).presses.size || platform->Key(KeyCode::X).presses.size) &&
-               platform->Key(ModifierKey::Modifier).is_down) {
+    } else if ((frame_input.Key(KeyCode::C).presses.size || frame_input.Key(KeyCode::X).presses.size) &&
+               frame_input.Key(ModifierKey::Modifier).is_down) {
         if (stb_state.select_start != stb_state.select_end) {
             auto const min = (usize)::Min(stb_state.select_start, stb_state.select_end);
             auto const max = (usize)::Max(stb_state.select_start, stb_state.select_end);
 
-            auto& clipboard = platform->gui_update_requirements.set_clipboard_text;
-            dyn::Resize(clipboard, (((max + 1) - min) * 4) + 1); // 1 utf32 could at most be 4 utf8 bytes
+            dyn::Resize(clipboard_for_os,
+                        (((max + 1) - min) * 4) + 1); // 1 utf32 could at most be 4 utf8 bytes
 
-            dyn::Resize(clipboard,
-                        (usize)imstring::Narrow(clipboard.data,
-                                                (int)clipboard.size,
+            dyn::Resize(clipboard_for_os,
+                        (usize)imstring::Narrow(clipboard_for_os.data,
+                                                (int)clipboard_for_os.size,
                                                 textedit_text.data + min,
                                                 textedit_text.data + max + 1));
 
-            if (platform->Key(KeyCode::X).presses.size) {
+            if (frame_input.Key(KeyCode::X).presses.size) {
                 stb_textedit_cut(this, &stb_state);
                 result.buffer_changed = true;
             }
         }
     }
 
-    if (platform->Key(KeyCode::Enter).presses.size) result.enter_pressed = true;
+    if (frame_input.Key(KeyCode::Enter).presses.size) result.enter_pressed = true;
 
-    bool const modifier_down = platform->Key(ModifierKey::Modifier).is_down;
-    if (platform->input_chars.size && !modifier_down) {
-        for (auto c : platform->input_chars) {
+    bool const modifier_down = frame_input.Key(ModifierKey::Modifier).is_down;
+    if (frame_input.input_utf32_chars.size && !modifier_down) {
+        for (auto c : frame_input.input_utf32_chars) {
             if (InputTextFilterCharacter(&c, flags)) {
                 stb_textedit_key(this, &stb_state, (int)c);
                 result.buffer_changed = true;
@@ -1438,7 +1441,7 @@ TextInputResult Context::SingleLineTextInput(Rect r,
     if (!result.HasSelection()) {
         if (starting_cursor != stb_state.cursor || reset_cursor)
             ResetTextInputCursorAnim();
-        else if (RedrawAtIntervalSeconds(cursor_blink_counter, k_text_cursor_blink_rate))
+        else if (WakeupAtTimedInterval(cursor_blink_counter, k_text_cursor_blink_rate))
             text_cursor_is_shown = !text_cursor_is_shown;
     }
 
@@ -1462,7 +1465,7 @@ bool Context::PopupButtonBehavior(Rect r, Id button_id, Id popup_id, ButtonFlags
     } else {
         if (ButtonBehavior(r, button_id, flags)) just_clicked = true;
         if (WasJustMadeHot(button_id))
-            AddRedrawTimeToList(platform->current_time + k_popup_open_and_close_delay_sec, "Popup open");
+            AddTimedWakeup(frame_input.current_time + k_popup_open_and_close_delay_sec, "Popup open");
         if ((just_clicked || (IsHot(button_id) && SecondsSpentHot() >= k_popup_open_and_close_delay_sec)) &&
             !IsPopupOpen(popup_id)) {
             ClosePopupToLevel((int)current_popup_stack.size);
@@ -1481,28 +1484,28 @@ bool Context::ButtonBehavior(Rect r, Id id, ButtonFlags flags) {
     if (flags.disabled) return false;
 
     if (flags.hold_to_repeat && IsActive(id)) {
-        if (RedrawAtIntervalSeconds(button_repeat_counter, button_repeat_rate)) result = true;
+        if (WakeupAtTimedInterval(button_repeat_counter, button_repeat_rate)) result = true;
     }
 
     if (SetHot(r, id, (flags.is_non_window_content) != 0)) {
         // IMPROVE: check for mouse-pressed not just mouse-down
-        bool const clicked = CheckForValidMouseDown(flags, platform);
+        bool const clicked = CheckForValidMouseDown(flags, frame_input);
 
         if (clicked) {
             IMGUI_TRACE_MSG(TraceTypeActiveId, "SetActiveID(%u)", id);
             SetActiveID(id, (flags.closes_popups), flags, !(flags.dont_check_for_release));
 
             button_repeat_counter = {};
-            if (flags.hold_to_repeat) RedrawAtIntervalSeconds(button_repeat_counter, button_repeat_rate);
+            if (flags.hold_to_repeat) WakeupAtTimedInterval(button_repeat_counter, button_repeat_rate);
             if (!(flags.triggers_on_mouse_up)) result = true;
         }
     }
-    if ((flags.triggers_on_mouse_up) && r.Contains(platform->cursor_pos) && WasJustDeactivated(id)) {
+    if ((flags.triggers_on_mouse_up) && r.Contains(frame_input.cursor_pos) && WasJustDeactivated(id)) {
         // the cursor is still over the rectangle and and mouse has just been released
         result = true;
     }
 
-    if (IsHotOrActive(id)) platform->gui_update_requirements.cursor_type = CursorType::Hand;
+    if (IsHotOrActive(id)) frame_output.cursor_type = CursorType::Hand;
 
     if (result && (flags.closes_popups)) CloseCurrentPopup();
 
@@ -1574,7 +1577,7 @@ void Context::BeginWindow(WindowSettings settings, Window* window, Rect r, Strin
     window->flags = flags;
     window->is_open = true;
     window->style = settings;
-    window->local_graphics.context = platform->graphics_ctx;
+    window->local_graphics.context = frame_input.graphics_ctx;
 
     if (next_window_contents_size.x != 0) window->prev_content_size.x = next_window_contents_size.x;
     if (next_window_contents_size.y != 0) window->prev_content_size.y = next_window_contents_size.y;
@@ -1633,7 +1636,7 @@ void Context::BeginWindow(WindowSettings settings, Window* window, Rect r, Strin
             }
 
             auto avoid_r = rect_to_avoid;
-            auto window_size = platform->window_size.ToFloat2();
+            auto window_size = frame_input.window_size.ToFloat2();
 
             r.pos = BestPopupPos(base_r, avoid_r, window_size, has_parent_popup);
             r.pos = {(f32)(int)r.x, (f32)(int)r.y};
@@ -1647,8 +1650,8 @@ void Context::BeginWindow(WindowSettings settings, Window* window, Rect r, Strin
     //
 
     if (!(is_apopup || draw_on_top) && curr_window) RegisterAndConvertRect(&r);
-    if (r.Bottom() > (f32)platform->window_size.height && is_apopup) {
-        r.SetBottomByResizing((f32)platform->window_size.height - 1);
+    if (r.Bottom() > (f32)frame_input.window_size.height && is_apopup) {
+        r.SetBottomByResizing((f32)frame_input.window_size.height - 1);
         f32 const scrollbar_size = window->style.scrollbar_width + window->style.scrollbar_padding;
         r.w += scrollbar_size;
         // IMPROVE: test properly sort what happens when a window is bigger than the screen
@@ -1782,7 +1785,7 @@ void Context::BeginWindow(WindowSettings settings, Window* window, Rect r, Strin
                                       window->prev_content_size.y,
                                       window->scroll_offset.y,
                                       window->scroll_max.y,
-                                      platform->cursor_pos.y);
+                                      frame_input.cursor_pos.y);
         window->scroll_offset.y = result.new_scroll_value;
         window->scroll_max.y = result.new_scroll_max;
 
@@ -1801,7 +1804,7 @@ void Context::BeginWindow(WindowSettings settings, Window* window, Rect r, Strin
                                       window->prev_content_size.x,
                                       window->scroll_offset.x,
                                       window->scroll_max.x,
-                                      platform->cursor_pos.x);
+                                      frame_input.cursor_pos.x);
         window->scroll_offset.x = result.new_scroll_value;
         window->scroll_max.x = result.new_scroll_max;
 
@@ -1955,7 +1958,7 @@ void Context::SetTextInputFocus(Id id, String new_text) {
 
 void Context::ResetTextInputCursorAnim() {
     text_cursor_is_shown = true;
-    cursor_blink_counter = platform->current_time + k_text_cursor_blink_rate;
+    cursor_blink_counter = frame_input.current_time + k_text_cursor_blink_rate;
 }
 
 void Context::TextInputSelectAll() {
@@ -2143,28 +2146,31 @@ void Context::DebugWindow(Rect r) {
     sets.flags = 0;
     BeginWindow(sets, r, "TextWindow");
 
-    platform->gui_update_requirements.wants_keyboard_input = true;
+    frame_output.wants_keyboard_input = true;
 
     debug_y_pos = 0;
 
     DebugButton("Toggle Registered Widget Overlay");
 
     if (DebugTextHeading(debug_general, "General")) {
-        DebugTextItem("Update", "%llu", platform->update_count);
-        DebugTextItem("Key shift", "%d", (int)platform->Key(ModifierKey::Shift).is_down);
-        DebugTextItem("Key ctrl", "%d", (int)platform->Key(ModifierKey::Ctrl).is_down);
-        DebugTextItem("Key modifer", "%d", (int)platform->Key(ModifierKey::Modifier).is_down);
-        DebugTextItem("Key alt", "%d", (int)platform->Key(ModifierKey::Alt).is_down);
-        DebugTextItem("Time", "%lld", platform->current_time);
-        DebugTextItem("WindowSize", "%hu, %hu", platform->window_size.width, platform->window_size.height);
-        DebugTextItem("DisplayRatio", "%.2f", (f64)platform->display_ratio);
-        DebugTextItem("Widgets", "%d", (int)platform->gui_update_requirements.mouse_tracked_regions.size);
+        DebugTextItem("Update", "%llu", frame_input.update_count);
+        DebugTextItem("Key shift", "%d", (int)frame_input.Key(ModifierKey::Shift).is_down);
+        DebugTextItem("Key ctrl", "%d", (int)frame_input.Key(ModifierKey::Ctrl).is_down);
+        DebugTextItem("Key modifer", "%d", (int)frame_input.Key(ModifierKey::Modifier).is_down);
+        DebugTextItem("Key alt", "%d", (int)frame_input.Key(ModifierKey::Alt).is_down);
+        DebugTextItem("Time", "%lld", frame_input.current_time);
+        DebugTextItem("WindowSize",
+                      "%hu, %hu",
+                      frame_input.window_size.width,
+                      frame_input.window_size.height);
+        DebugTextItem("DisplayRatio", "%.2f", (f64)frame_input.display_ratio);
+        DebugTextItem("Widgets", "%d", (int)frame_output.mouse_tracked_rects.size);
 
         debug_y_pos += graphics->context->CurrentFontSize() * 2;
 
         DebugTextItem("Timers:", "");
-        for (auto& t : platform->gui_update_requirements.redraw_times)
-            DebugTextItem("Name,Time:", "%s %lld", t.debug_name, t.time);
+        for (auto& t : timed_wakeups)
+            DebugTextItem("Time:", "%lld", t);
     }
 
     if (DebugTextHeading(debug_ids, "IDs")) {

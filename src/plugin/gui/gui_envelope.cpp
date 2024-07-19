@@ -97,8 +97,9 @@ void GUIDoEnvelope(Gui* g,
         }
 
         if (imgui.IsHotOrActive(attack_imgui_id)) {
-            imgui.platform->gui_update_requirements.cursor_type = CursorType::HorizontalArrows;
-            if (imgui.platform->double_left_click) g->param_text_editor_to_open = attack_param_id;
+            imgui.frame_output.cursor_type = CursorType::HorizontalArrows;
+            if (imgui.frame_input.Mouse(MouseButton::Left).double_click)
+                g->param_text_editor_to_open = attack_param_id;
         }
 
         if (imgui.WasJustActivated(attack_imgui_id))
@@ -155,12 +156,13 @@ void GUIDoEnvelope(Gui* g,
         if (imgui.ButtonBehavior(grabber,
                                  dec_sus_imgui_id,
                                  {.left_mouse = true, .triggers_on_mouse_down = true})) {
-            rel_click_pos = imgui.platform->cursor_pos - imgui.WindowPosToScreenPos(decay_point);
+            rel_click_pos = imgui.frame_input.cursor_pos - imgui.WindowPosToScreenPos(decay_point);
         }
 
         if (imgui.IsHotOrActive(dec_sus_imgui_id)) {
-            imgui.platform->gui_update_requirements.cursor_type = CursorType::AllArrows;
-            if (imgui.platform->double_left_click) g->param_text_editor_to_open = decay_id;
+            imgui.frame_output.cursor_type = CursorType::AllArrows;
+            if (imgui.frame_input.Mouse(MouseButton::Left).double_click)
+                g->param_text_editor_to_open = decay_id;
         }
 
         if (imgui.WasJustActivated(dec_sus_imgui_id)) {
@@ -171,7 +173,7 @@ void GUIDoEnvelope(Gui* g,
             {
                 auto const min_pixels_pos = imgui.WindowPosToScreenPos({get_x_coord_at_percent(0), 0}).x;
                 auto const max_pixels_pos = imgui.WindowPosToScreenPos({get_x_coord_at_percent(1), 0}).x;
-                auto curr_pos = imgui.platform->cursor_pos.x - rel_click_pos.x;
+                auto curr_pos = imgui.frame_input.cursor_pos.x - rel_click_pos.x;
 
                 curr_pos = Clamp(curr_pos, min_pixels_pos, max_pixels_pos);
                 auto const curr_pos_percent = MapTo01(curr_pos, min_pixels_pos, max_pixels_pos);
@@ -181,7 +183,7 @@ void GUIDoEnvelope(Gui* g,
             {
                 auto const min_pixels_pos = imgui.WindowPosToScreenPos({0, get_y_coord_at_percent(0)}).y;
                 auto const max_pixels_pos = imgui.WindowPosToScreenPos({0, get_y_coord_at_percent(1)}).y;
-                auto curr_pos = imgui.platform->cursor_pos.y - rel_click_pos.y;
+                auto curr_pos = imgui.frame_input.cursor_pos.y - rel_click_pos.y;
 
                 curr_pos = Clamp(curr_pos, min_pixels_pos, max_pixels_pos);
                 auto const curr_pos_percent = MapTo01(curr_pos, min_pixels_pos, max_pixels_pos);
@@ -236,8 +238,9 @@ void GUIDoEnvelope(Gui* g,
         }
 
         if (imgui.IsHotOrActive(release_imgui_id)) {
-            imgui.platform->gui_update_requirements.cursor_type = CursorType::HorizontalArrows;
-            if (imgui.platform->double_left_click) g->param_text_editor_to_open = release_param_id;
+            imgui.frame_output.cursor_type = CursorType::HorizontalArrows;
+            if (imgui.frame_input.Mouse(MouseButton::Left).double_click)
+                g->param_text_editor_to_open = release_param_id;
         }
 
         if (imgui.WasJustActivated(release_imgui_id))

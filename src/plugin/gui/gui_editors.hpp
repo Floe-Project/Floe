@@ -111,7 +111,7 @@ static void TakeScreenshot(Gui* g) {
         }
     }
 
-    g->gui_platform.graphics_ctx->RequestScreenshotImage([g](u8 const* data, int width, int height) {
+    g->frame_input.graphics_ctx->RequestScreenshotImage([g](u8 const* data, int width, int height) {
         auto path = DynamicArray<char>::FromOwnedSpan(
             KnownDirectoryWithSubdirectories(g->scratch_arena, KnownDirectories::Data, Array {"Floe"_s})
                 .Value(),
@@ -166,14 +166,13 @@ static void DoCommandPanel(Gui* g, Rect r) {
             .title = "Select background JPG",
             .default_path = nullopt,
             .filters = filters.Items(),
-            .parent_window = g->gui_platform.native_window,
+            .parent_window = g->frame_input.native_window,
         });
         if (outcome.HasValue()) {
             auto const opt_path = outcome.Value();
             if (opt_path) {
                 CopyStringIntoBufferWithNullTerm(g_background_filepath, *opt_path);
-
-                g->gui_platform.SetGUIDirty();
+                g->frame_output.IncreaseStatus(GuiFrameResult::Status::Animate);
             }
         } else {
             PanicIfReached();
@@ -189,13 +188,13 @@ static void DoWholeEditor(Gui* g) {
     if constexpr (!FLOE_EDITOR_ENABLED) return;
     auto& imgui = g->imgui;
 
-    g->gui_platform.gui_update_requirements.wants_keyboard_input = true; // for debug panel open/close
+    g->frame_output.wants_keyboard_input = true; // for debug panel open/close
 
-    if (g->gui_platform.Key(KeyCode::F1).presses.size) g_show_editor = !g_show_editor;
+    if (g->frame_input.Key(KeyCode::F1).presses.size) g_show_editor = !g_show_editor;
 
     if (g_show_editor) {
-        if (g->gui_platform.Key(KeyCode::F2).presses.size) g_show_editor_on_left = !g_show_editor_on_left;
-        g->gui_platform.graphics_ctx->PushDefaultFont();
+        if (g->frame_input.Key(KeyCode::F2).presses.size) g_show_editor_on_left = !g_show_editor_on_left;
+        g->frame_input.graphics_ctx->PushDefaultFont();
         auto const half_w = (f32)(int)(imgui.Width() / 2);
         Rect debug_r;
         if (g_show_editor_on_left)
@@ -242,6 +241,6 @@ static void DoWholeEditor(Gui* g) {
         }
 
         imgui.EndWindow();
-        g->gui_platform.graphics_ctx->PopFont();
+        g->frame_input.graphics_ctx->PopFont();
     }
 }

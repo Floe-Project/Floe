@@ -280,7 +280,7 @@ PUBLIC constexpr Optional<usize> FindLast(ContiguousContainer auto const& data, 
 }
 
 PUBLIC constexpr Optional<usize>
-Find(ContiguousContainer auto const& data, auto&& search_item, usize start = 0) {
+Find(ContiguousContainer auto const& data, auto const& search_item, usize start = 0) {
     for (usize i = start; i < data.size; ++i)
         if (data[i] == search_item) return i;
     return nullopt;

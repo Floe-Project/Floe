@@ -5,8 +5,8 @@
 #include "foundation/foundation.hpp"
 
 #include "draw_list.hpp"
+#include "gui_frame.hpp"
 #include "gui_live_edit.hpp"
-#include "gui_platform.hpp"
 
 namespace imgui {
 
@@ -285,7 +285,7 @@ struct TextInputResult {
 };
 
 struct Context {
-    Context();
+    Context(GuiFrameInput& frame_input, GuiFrameResult& frame_output);
     ~Context();
 
     void Begin(WindowSettings settings); // Call at the start of the frame
@@ -381,11 +381,11 @@ struct Context {
 
     void SetYScroll(Window* window, f32 val) {
         window->scroll_offset.y = val;
-        platform->gui_update_requirements.requires_another_update = true;
+        frame_output.IncreaseStatus(GuiFrameResult::Status::ImmediatelyUpdate);
     }
     void SetXScroll(Window* window, f32 val) {
         window->scroll_offset.x = val;
-        platform->gui_update_requirements.requires_another_update = true;
+        frame_output.IncreaseStatus(GuiFrameResult::Status::ImmediatelyUpdate);
     }
     bool ScrollWindowToShowRectangle(Rect r);
 
@@ -454,7 +454,9 @@ struct Context {
     bool WasJustMadeUnhot(Id id);
     bool AnItemIsHot();
     Id GetHot() { return hot_item; }
-    f64 SecondsSpentHot() { return time_when_turned_hot ? platform->current_time - time_when_turned_hot : 0; }
+    f64 SecondsSpentHot() {
+        return time_when_turned_hot ? frame_input.current_time - time_when_turned_hot : 0;
+    }
 
     bool IsHotOrActive(Id id) const { return IsHot(id) || IsActive(id); }
 
@@ -498,8 +500,8 @@ struct Context {
     Rect GetRegisteredAndConvertedRect(Rect r);
     void RegisterAndConvertRect(Rect* r);
 
-    void AddRedrawTimeToList(TimePoint time_ms, char const* timer_name);
-    bool RedrawAtIntervalSeconds(TimePoint& counter, f64 interval_seconds); // Returns true when it ticks
+    void AddTimedWakeup(TimePoint time_ms, char const* timer_name);
+    bool WakeupAtTimedInterval(TimePoint& counter, f64 interval_seconds); // Returns true when it ticks
 
     //
     // > High level funcs
@@ -619,7 +621,12 @@ struct Context {
     f32 pixels_per_point = 1.0f;
 
     graphics::DrawList* graphics = nullptr; // Shortcut to the current windows graphics
-    GuiPlatform* platform = nullptr;
+    GuiFrameInput& frame_input;
+    GuiFrameResult& frame_output;
+
+    DynamicArray<MouseTrackedRect> mouse_tracked_rects {Malloc::Instance()}; // internal
+    DynamicArray<char> clipboard_for_os {Malloc::Instance()}; // internal
+    DynamicArray<TimePoint> timed_wakeups {Malloc::Instance()}; // internal
 
     u32 frame_counter = 0;
 
@@ -691,7 +698,7 @@ struct Context {
            // a stack of ids in order to ensure DidPopupMenuJustOpen performs correctly
     Id prev_popup_menu_just_created = 0;
     Id prevprev_popup_menu_just_created = 0;
-    int64_t popup_hover_counter = 0;
+    s64 popup_hover_counter = 0;
     // ID next_idopens_apopup = 0; // push and pop this value so that any ids behave correctly with popup
     // hover to open int64_t popup_opened_timer = 0; Window *new_popup_window = nullptr; ID
     // popup_opened_timer_id = 0; ID id_that_just_opened_apopup = 0; bool inside_popup_triangle = false;
@@ -801,7 +808,7 @@ PUBLIC IMGUI_DRAW_BUTTON(DefaultDrawButton) {
     imgui.graphics->AddRectFilled(r.Min(), r.Max(), col);
 
     auto font_size = imgui.graphics->context->CurrentFontSize();
-    auto pad = (f32)imgui.platform->window_size.width / 200.0f;
+    auto pad = (f32)imgui.frame_input.window_size.width / 200.0f;
     imgui.graphics->AddText(f32x2 {r.x + pad, r.y + (r.h / 2 - font_size / 2)}, 0xff000000, str);
 }
 

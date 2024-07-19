@@ -37,3 +37,6 @@
 [submodule "third_party_libs/miniz"]
 	path = third_party_libs/miniz
 	url = https://github.com/richgel999/miniz
+[submodule "third_party_libs/dr_libs"]
+	path = third_party_libs/dr_libs
+	url = https://github.com/mackron/dr_libs

@@ -1360,7 +1360,7 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = build_context.optimise,
         });
-        dr_wav.addCSourceFile(.{ .file = b.path("third_party_libs/dr_wav/dr_wav_implementation.c") });
+        dr_wav.addCSourceFile(.{ .file = b.path("third_party_libs/dr_wav_implementation.c") });
         dr_wav.linkLibC();
 
         const flac = b.addStaticLibrary(.{ .name = "flac", .target = target, .optimize = build_context.optimise });

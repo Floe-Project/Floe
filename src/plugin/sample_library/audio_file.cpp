@@ -5,7 +5,7 @@
 
 #include <FLAC/ordinals.h>
 #include <FLAC/stream_decoder.h>
-#include <dr_wav/dr_wav.h>
+#include <dr_libs/dr_wav.h>
 #include <xxhash/xxhash.h>
 
 #include "foundation/foundation.hpp"
@@ -228,7 +228,8 @@ static ErrorCodeOr<AudioData> DecodeWav(Reader& reader, Allocator& allocator) {
             }
             return DRWAV_TRUE;
         },
-        &context);
+        &context,
+        nullptr);
     if (!init_success) {
         if (context.error_code) return *context.error_code;
         return ErrorCode {AudioFileError::FileHasInvalidData};

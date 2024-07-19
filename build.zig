@@ -709,7 +709,7 @@ fn buildLua(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.built
     };
 
     // compile as C++ so as to use exceptions
-    lib.addCSourceFile(.{ .file = b.path(b.pathJoin(&.{ lua_dir, "onelua.cpp" })), .flags = &flags });
+    lib.addCSourceFile(.{ .file = b.path("third_party_libs/lua.cpp"), .flags = &flags });
     lib.linkLibC();
 
     return lib;

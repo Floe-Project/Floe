@@ -1110,7 +1110,7 @@ LibraryPtrOrError ReadLua(Reader& reader,
     // allocation into an arena. The docs say that lua_close will: "close all active to-be-closed variables in
     // the main thread, release all objects in the given Lua state (calling the corresponding
     // garbage-collection metamethods, if any), and frees all dynamic memory used by this state."
-    ctx.lua = lua_newstate(k_arena_alloc_fuction, &ctx);
+    ctx.lua = lua_newstate(k_arena_alloc_fuction, &ctx, 45398932);
     if (!ctx.lua) {
         return ErrorAndNotify(ctx, LuaErrorCode::Memory, [](DynamicArray<char>& message) {
             dyn::AppendSpan(message, "Sorry, there's a bug. Please report this.");

@@ -46,3 +46,6 @@
 [submodule "third_party_libs/miniaudio"]
 	path = third_party_libs/miniaudio
 	url = https://github.com/mackron/miniaudio
+[submodule "third_party_libs/lua"]
+	path = third_party_libs/lua
+	url = https://github.com/lua/lua

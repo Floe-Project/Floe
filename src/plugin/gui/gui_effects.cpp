@@ -4,7 +4,7 @@
 #include "gui_effects.hpp"
 
 #include <float.h>
-#include <icons-fa/IconsFontAwesome5.h>
+#include <IconFontCppHeaders/IconsFontAwesome5.h>
 
 #include "effects/effect.hpp"
 #include "framework/gui_live_edit.hpp"

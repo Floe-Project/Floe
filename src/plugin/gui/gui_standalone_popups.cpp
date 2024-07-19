@@ -3,7 +3,7 @@
 
 #include "gui_standalone_popups.hpp"
 
-#include <icons-fa/IconsFontAwesome5.h>
+#include <IconFontCppHeaders/IconsFontAwesome5.h>
 
 #include "foundation/foundation.hpp"
 #include "os/misc.hpp"

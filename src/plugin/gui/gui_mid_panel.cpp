@@ -6,7 +6,7 @@
 #include "gui_effects.hpp"
 #include "gui_widget_helpers.hpp"
 #include "gui_window.hpp"
-#include "icons-fa/IconsFontAwesome5.h"
+#include "IconFontCppHeaders/IconsFontAwesome5.h"
 
 void MidPanel(Gui* g) {
     auto& imgui = g->imgui;

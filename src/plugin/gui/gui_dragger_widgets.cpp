@@ -6,7 +6,7 @@
 #include "framework/gui_live_edit.hpp"
 #include "gui.hpp"
 #include "gui_widget_helpers.hpp"
-#include "icons-fa/IconsFontAwesome5.h"
+#include "IconFontCppHeaders/IconsFontAwesome5.h"
 
 namespace draggers {
 

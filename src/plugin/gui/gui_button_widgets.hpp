@@ -6,7 +6,7 @@
 #include "framework/draw_list.hpp"
 #include "framework/gui_imgui.hpp"
 #include "gui_fwd.hpp"
-#include "icons-fa/IconsFontAwesome5.h"
+#include "IconFontCppHeaders/IconsFontAwesome5.h"
 #include "layout.hpp"
 #include "param_info.hpp"
 

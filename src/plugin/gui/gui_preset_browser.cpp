@@ -14,7 +14,7 @@
 #include "gui_drawing_helpers.hpp"
 #include "gui_widget_helpers.hpp"
 #include "gui_window.hpp"
-#include "icons-fa/IconsFontAwesome5.h"
+#include "IconFontCppHeaders/IconsFontAwesome5.h"
 #include "presets_folder.hpp"
 
 PresetBrowser::PresetBrowser(Gui* g, PresetBrowserPersistentData& persistent_data, bool force_listing_fetch)

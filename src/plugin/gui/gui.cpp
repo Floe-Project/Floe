@@ -4,7 +4,7 @@
 
 #include "gui.hpp"
 
-#include <icons-fa/IconsFontAwesome5.h>
+#include <IconFontCppHeaders/IconsFontAwesome5.h>
 #include <stb/stb_image.h>
 #include <stb/stb_image_resize.h>
 

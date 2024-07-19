@@ -16,7 +16,7 @@
 #include "gui_widget_compounds.hpp"
 #include "gui_widget_helpers.hpp"
 #include "gui_window.hpp"
-#include "icons-fa/IconsFontAwesome5.h"
+#include "IconFontCppHeaders/IconsFontAwesome5.h"
 #include "layer_processor.hpp"
 #include "plugin_instance.hpp"
 

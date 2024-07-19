@@ -40,3 +40,6 @@
 [submodule "third_party_libs/dr_libs"]
 	path = third_party_libs/dr_libs
 	url = https://github.com/mackron/dr_libs
+[submodule "third_party_libs/IconFontCppHeaders"]
+	path = third_party_libs/IconFontCppHeaders
+	url = https://github.com/juliettef/IconFontCppHeaders

@@ -7,7 +7,7 @@
 #include "gui_standalone_popups.hpp"
 #include "gui_widget_compounds.hpp"
 #include "gui_widget_helpers.hpp"
-#include "icons-fa/IconsFontAwesome5.h"
+#include "IconFontCppHeaders/IconsFontAwesome5.h"
 #include "plugin_instance.hpp"
 #include "presets_folder.hpp"
 #include "state/state_snapshot.hpp"

@@ -3,7 +3,7 @@
 
 #include "gui_waveform.hpp"
 
-#include <icons-fa/IconsFontAwesome5.h>
+#include <IconFontCppHeaders/IconsFontAwesome5.h>
 
 #include "common/constants.hpp"
 #include "framework/gui_live_edit.hpp"

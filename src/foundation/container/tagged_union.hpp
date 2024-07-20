@@ -238,5 +238,5 @@ class TaggedUnion {
     // don't modify these directly, use the methods
     // ===========================================================
     TagType tag {};
-    alignas(k_data_align) u8 storage[k_data_size];
+    alignas(k_data_align) u8 storage[k_data_size] {};
 };

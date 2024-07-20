@@ -549,6 +549,7 @@ clap_plugin const floe_plugin {
             ___tracy_startup_profiler();
             tracy::SetThreadName("Main");
 #endif
+            StartupCrashHandler();
         }
 
         if (first_instance) g_cross_instance_systems.Init();

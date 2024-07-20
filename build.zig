@@ -546,6 +546,11 @@ fn genericFlags(context: *BuildContext, target: std.Build.ResolvedTarget, extra_
     try flags.append("-D_FILE_OFFSET_BITS=64");
     try flags.append("-ftime-trace");
 
+    try flags.append("-DMINIZ_USE_UNALIGNED_LOADS_AND_STORES=0");
+    try flags.append("-DMINIZ_NO_STDIO");
+    try flags.append(context.b.fmt("-DMINIZ_LITTLE_ENDIAN={d}", .{@intFromBool(target.result.cpu.arch.endian() == .little)}));
+    try flags.append("-DMINIZ_HAS_64BIT_REGISTERS=1");
+
     if (target.result.os.tag == .linux) {
         // NOTE(Sam, June 2024): workaround for a bug in Zig (most likely) where our shared library always causes a crash after dlclose(), as described here: https://github.com/ziglang/zig/issues/17908
         // The workaround involves adding this flag and also adding a custom bit of code using __attribute__((destructor)) to manually call __cxa_finalize(): https://stackoverflow.com/questions/34308720/where-is-dso-handle-defined/48256026#48256026
@@ -1346,14 +1351,6 @@ pub fn build(b: *std.Build) void {
         });
         stb_image.addCSourceFile(.{ .file = b.path("third_party_libs/stb/stb_image_impls.c") });
         stb_image.linkLibC();
-
-        var miniz = b.addObject(.{
-            .name = "miniz",
-            .target = target,
-            .optimize = build_context.optimise,
-        });
-        miniz.addCSourceFile(.{ .file = b.path("third_party_libs/miniz/miniz.c") });
-        miniz.linkLibC();
 
         var dr_wav = b.addObject(.{
             .name = "dr_wav",
@@ -2179,6 +2176,30 @@ pub fn build(b: *std.Build) void {
         }
 
         if (target.result.os.tag == .windows) {
+            var miniz = b.addStaticLibrary(.{
+                .name = "miniz",
+                .target = target,
+                .optimize = build_context.optimise,
+            });
+            miniz.addCSourceFiles(.{
+                .files = &.{
+                    "third_party_libs/miniz/miniz.c",
+                    "third_party_libs/miniz/miniz_tdef.c",
+                    "third_party_libs/miniz/miniz_tinfl.c",
+                    "third_party_libs/miniz/miniz_zip.c",
+                },
+                .flags = generic_flags,
+            });
+            miniz.addIncludePath(b.path("third_party_libs/miniz"));
+            miniz.linkLibC();
+            const miniz_config = b.addConfigHeader(.{
+                .style = .blank,
+                .include_path = "miniz_export.h",
+            }, .{
+                .MINIZ_EXPORT = {}, // just defined - no value
+            });
+            miniz.addConfigHeader(miniz_config);
+
             const installer_path = "src/windows_installer";
 
             // the logos probably have a different license to the rest of the codebase, so we keep them separate and optional
@@ -2300,7 +2321,8 @@ pub fn build(b: *std.Build) void {
                 win_installer.addIncludePath(b.path("src"));
                 win_installer.addObject(stb_image);
                 win_installer.linkLibrary(library);
-                win_installer.addObject(miniz);
+                win_installer.linkLibrary(miniz);
+                win_installer.addConfigHeader(miniz_config);
                 applyUniversalSettings(&build_context, win_installer);
 
                 // everything needs to be installed before we compile the installer because it needs to embed the plugins

@@ -4,7 +4,7 @@
 // Misc helper info:
 // - GitHub allows you to get a tar.gz of a specific commit: https://docs.github.com/en/repositories/working-with-files/using-files/downloading-source-code-archives#source-code-archive-urls
 // - If you omit the .hash field, zig will error and tell you the hash you need
-// - Zig supports git+https://domain/path#commit
+// - Zig supports git+https://domain/path#commit: https://github.com/ziglang/zig/commit/9a001e1f7cc878579f1c0a614ac0124bfdc58332
 
 .{
     .name = "Floe",
@@ -57,6 +57,30 @@
         .lua = .{
             .url = "https://github.com/lua/lua/archive/refs/tags/v5.4.7.tar.gz",
             .hash = "1220c8a30a9f05d36e186274ddbf9a7af94f211dd368557792727dd73353beff155c",
+        },
+        .pugl = .{
+            .url = "git+https://github.com/lv2/pugl#f7b3fe466e7c443b4ec60901899fc538b66c0cc1",
+            .hash = "12204d8c6054a2b2a39c6d6d7f5b47bdfbc93bc5709a240f1eed1187df06175ce59a",
+        },
+        .pffft = .{
+            .url = "https://bitbucket.org/jpommier/pffft/get/fbc405860280.zip",
+            .hash = "122029473fd091f5e677fe91244cf5261e185f7130bda43f668971d811c360278f45",
+        },
+        .valgrind_h = .{
+            .url = "https://github.com/allyourcodebase/valgrind.h/archive/refs/tags/3.23.0.tar.gz",
+            .hash = "12207d68a1e77210037b9a27012baf12a01e4513bb022d684eecd6b1134ba886fe3a",
+        },
+        .portmidi = .{
+            .url = "git+https://github.com/PortMidi/portmidi#8efac0cfe6c245aeb2ce5122aa2b82fb79e91463",
+            .hash = "1220f5d96c857e20be7ed56e7d613fb320fca16a92511cae78679cd4755bdc14b045",
+        },
+        .tracy = .{
+            .url = "https://github.com/wolfpld/tracy/archive/refs/tags/v0.10.tar.gz",
+            .hash = "12202aac930cebaf2b57f443cacc2483478580a72f1316b4f0a720ddd91246fce69d",
+        },
+        .vst3_sdk = .{
+            .url = "https://github.com/Floe-Synth/vst3sdk/archive/refs/tags/v3.7.9.tar.gz",
+            .hash = "122082706afde70c8430ef4cc5d77331bf6b1a9c5feb22c11222046a72c66abd2f67",
         },
     },
     .paths = .{""},

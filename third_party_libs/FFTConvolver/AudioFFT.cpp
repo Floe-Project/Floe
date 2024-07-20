@@ -18,7 +18,7 @@
   #include <fftw3.h>
 #elif defined (AUDIOFFT_PFFFT)
   #define AUDIOFFT_PFFFT_USED
-  #include <pffft/pffft.h>
+  #include <pffft.h>
 #else
   #if !defined(AUDIOFFT_OOURA)
     #define AUDIOFFT_OOURA

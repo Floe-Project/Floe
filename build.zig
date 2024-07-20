@@ -547,6 +547,12 @@ const BuildContext = struct {
     dep_miniz: *std.Build.Dependency,
     dep_libbacktrace: *std.Build.Dependency,
     dep_lua: *std.Build.Dependency,
+    dep_pugl: *std.Build.Dependency,
+    dep_pffft: *std.Build.Dependency,
+    dep_valgrind_h: *std.Build.Dependency,
+    dep_portmidi: *std.Build.Dependency,
+    dep_tracy: *std.Build.Dependency,
+    dep_vst3_sdk: *std.Build.Dependency,
 };
 
 fn genericFlags(context: *BuildContext, target: std.Build.ResolvedTarget, extra_flags: []const []const u8) ![][]const u8 {
@@ -683,13 +689,15 @@ fn applyUniversalSettings(context: *BuildContext, step: *std.Build.Step.Compile)
     step.addIncludePath(context.dep_flac.path("include"));
     step.addIncludePath(context.dep_libbacktrace.path(""));
     step.addIncludePath(context.dep_lua.path(""));
+    step.addIncludePath(context.dep_pugl.path("include"));
+    step.addIncludePath(context.dep_pugl.path("test")); // bit of a hack but there's handy debug headers here
+    step.addIncludePath(context.dep_tracy.path("public"));
+    step.addIncludePath(context.dep_valgrind_h.path(""));
+    step.addIncludePath(context.dep_portmidi.path("pm_common"));
 
     step.addIncludePath(b.path("."));
     step.addIncludePath(b.path("src"));
     step.addIncludePath(b.path("third_party_libs"));
-    step.addIncludePath(b.path("third_party_libs/tracy/public"));
-    step.addIncludePath(b.path("third_party_libs/pugl/include"));
-    step.addIncludePath(b.path("third_party_libs/portmidi/pm_common"));
 
     if (step.rootModuleTarget().isDarwin()) {
         const sdk_root = b.graph.env_map.get("MACOSX_SDK_SYSROOT");
@@ -874,6 +882,12 @@ pub fn build(b: *std.Build) void {
         .dep_miniz = b.dependency("miniz", .{}),
         .dep_libbacktrace = b.dependency("libbacktrace", .{}),
         .dep_lua = b.dependency("lua", .{}),
+        .dep_pugl = b.dependency("pugl", .{}),
+        .dep_pffft = b.dependency("pffft", .{}),
+        .dep_valgrind_h = b.dependency("valgrind_h", .{}),
+        .dep_portmidi = b.dependency("portmidi", .{}),
+        .dep_tracy = b.dependency("tracy", .{}),
+        .dep_vst3_sdk = b.dependency("vst3_sdk", .{}),
     };
 
     const user_given_target_presets = b.option([]const u8, "targets", "Target operating system");
@@ -1013,8 +1027,8 @@ pub fn build(b: *std.Build) void {
             .optimize = build_context.optimise,
         });
         {
-            tracy.addCSourceFiles(.{
-                .files = &.{"third_party_libs/tracy/public/TracyClient.cpp"},
+            tracy.addCSourceFile(.{
+                .file = build_context.dep_tracy.path("public/TracyClient.cpp"),
                 .flags = cpp_flags,
             });
 
@@ -1198,56 +1212,69 @@ pub fn build(b: *std.Build) void {
             .optimize = build_context.optimise,
         });
         {
-            const pugl_path = "third_party_libs/pugl";
+            const pugl_path = build_context.dep_pugl.path("src");
 
-            pugl.addCSourceFiles(.{ .files = &.{
-                pugl_path ++ "/src/common.c",
-                pugl_path ++ "/src/internal.c",
-                pugl_path ++ "/src/internal.c",
-            } });
+            pugl.addCSourceFiles(.{
+                .root = pugl_path,
+                .files = &.{
+                    "common.c",
+                    "internal.c",
+                    "internal.c",
+                },
+            });
 
             switch (target.result.os.tag) {
                 .windows => {
-                    pugl.addCSourceFiles(.{ .files = &.{
-                        pugl_path ++ "/src/win.c",
-                        pugl_path ++ "/src/win_gl.c",
-                        pugl_path ++ "/src/win_stub.c",
-                    } });
+                    pugl.addCSourceFiles(.{
+                        .root = pugl_path,
+                        .files = &.{
+                            "win.c",
+                            "win_gl.c",
+                            "win_stub.c",
+                        },
+                    });
                     pugl.linkSystemLibrary("opengl32");
                     pugl.linkSystemLibrary("gdi32");
                     pugl.linkSystemLibrary("dwmapi");
                 },
                 .macos => {
-                    pugl.addCSourceFiles(.{ .files = &.{
-                        pugl_path ++ "/src/mac.m",
-                        pugl_path ++ "/src/mac_gl.m",
-                        pugl_path ++ "/src/mac_stub.m",
-                    }, .flags = &.{
-                        b.fmt("-DPuglWindow=PuglWindowFPFloe{}{}{}", .{
-                            floe_version.major,
-                            floe_version.minor,
-                            floe_version.patch,
-                        }),
-                        b.fmt("-DPuglWrapperView=PuglWrapperViewFPFloe{}{}{}", .{
-                            floe_version.major,
-                            floe_version.minor,
-                            floe_version.patch,
-                        }),
-                        b.fmt("-DPuglOpenGLView=PuglOpenGLViewFPFloe{}{}{}", .{
-                            floe_version.major,
-                            floe_version.minor,
-                            floe_version.patch,
-                        }),
-                    } });
+                    pugl.addCSourceFiles(.{
+                        .root = pugl_path,
+                        .files = &.{
+                            "mac.m",
+                            "mac_gl.m",
+                            "mac_stub.m",
+                        },
+                        .flags = &.{
+                            b.fmt("-DPuglWindow=PuglWindowFPFloe{}{}{}", .{
+                                floe_version.major,
+                                floe_version.minor,
+                                floe_version.patch,
+                            }),
+                            b.fmt("-DPuglWrapperView=PuglWrapperViewFPFloe{}{}{}", .{
+                                floe_version.major,
+                                floe_version.minor,
+                                floe_version.patch,
+                            }),
+                            b.fmt("-DPuglOpenGLView=PuglOpenGLViewFPFloe{}{}{}", .{
+                                floe_version.major,
+                                floe_version.minor,
+                                floe_version.patch,
+                            }),
+                        },
+                    });
                     pugl.linkFramework("OpenGL");
                     pugl.linkFramework("CoreVideo");
                 },
                 else => {
-                    pugl.addCSourceFiles(.{ .files = &.{
-                        pugl_path ++ "/src/x11.c",
-                        pugl_path ++ "/src/x11_gl.c",
-                        pugl_path ++ "/src/x11_stub.c",
-                    } });
+                    pugl.addCSourceFiles(.{
+                        .root = pugl_path,
+                        .files = &.{
+                            "x11.c",
+                            "x11_gl.c",
+                            "x11_stub.c",
+                        },
+                    });
                     pugl.root_module.addCMacro("USE_XRANDR", "0");
                     pugl.root_module.addCMacro("USE_XSYNC", "1");
                     pugl.root_module.addCMacro("USE_XCURSOR", "1");
@@ -1453,7 +1480,7 @@ pub fn build(b: *std.Build) void {
                 fft_convolver.linkFramework("Accelerate");
                 fft_flags = &.{ "-DAUDIOFFT_APPLE_ACCELERATE", "-ObjC++" };
             } else {
-                fft_convolver.addCSourceFiles(.{ .files = &.{"third_party_libs/pffft/pffft.c"}, .flags = &.{} });
+                fft_convolver.addCSourceFile(.{ .file = build_context.dep_pffft.path("pffft.c"), .flags = &.{} });
                 fft_flags = &.{"-DAUDIOFFT_PFFFT"};
             }
 
@@ -1465,6 +1492,7 @@ pub fn build(b: *std.Build) void {
                 "third_party_libs/FFTConvolver/wrapper.cpp",
             }, .flags = fft_flags });
             fft_convolver.linkLibCpp();
+            fft_convolver.addIncludePath(build_context.dep_pffft.path(""));
             applyUniversalSettings(&build_context, fft_convolver);
         }
 
@@ -1688,37 +1716,54 @@ pub fn build(b: *std.Build) void {
                 .version = floe_version,
             });
             {
-                portmidi.addCSourceFiles(.{ .files = &.{
-                    "third_party_libs/portmidi/pm_common/portmidi.c",
-                    "third_party_libs/portmidi/pm_common/pmutil.c",
-                    "third_party_libs/portmidi/porttime/porttime.c",
-                }, .flags = generic_flags });
+                const pm_root = build_context.dep_portmidi.path("");
+                portmidi.addCSourceFiles(.{
+                    .root = pm_root,
+                    .files = &.{
+                        "pm_common/portmidi.c",
+                        "pm_common/pmutil.c",
+                        "porttime/porttime.c",
+                    },
+                    .flags = generic_flags,
+                });
                 switch (target.result.os.tag) {
                     .macos => {
-                        portmidi.addCSourceFiles(.{ .files = &.{
-                            "third_party_libs/portmidi/pm_mac/pmmacosxcm.c",
-                            "third_party_libs/portmidi/pm_mac/pmmac.c",
-                            "third_party_libs/portmidi/porttime/ptmacosx_cf.c",
-                            "third_party_libs/portmidi/porttime/ptmacosx_mach.c",
-                        }, .flags = generic_flags });
+                        portmidi.addCSourceFiles(.{
+                            .root = pm_root,
+                            .files = &.{
+                                "pm_mac/pmmacosxcm.c",
+                                "pm_mac/pmmac.c",
+                                "porttime/ptmacosx_cf.c",
+                                "porttime/ptmacosx_mach.c",
+                            },
+                            .flags = generic_flags,
+                        });
                         portmidi.linkFramework("CoreAudio");
                         portmidi.linkFramework("CoreMIDI");
                         applyUniversalSettings(&build_context, portmidi);
                     },
                     .windows => {
-                        portmidi.addCSourceFiles(.{ .files = &.{
-                            "third_party_libs/portmidi/pm_win/pmwin.c",
-                            "third_party_libs/portmidi/pm_win/pmwinmm.c",
-                            "third_party_libs/portmidi/porttime/ptwinmm.c",
-                        }, .flags = generic_flags });
+                        portmidi.addCSourceFiles(.{
+                            .root = pm_root,
+                            .files = &.{
+                                "pm_win/pmwin.c",
+                                "pm_win/pmwinmm.c",
+                                "porttime/ptwinmm.c",
+                            },
+                            .flags = generic_flags,
+                        });
                         portmidi.linkSystemLibrary("winmm");
                     },
                     .linux => {
-                        portmidi.addCSourceFiles(.{ .files = &.{
-                            "third_party_libs/portmidi/pm_linux/pmlinux.c",
-                            "third_party_libs/portmidi/pm_linux/pmlinuxalsa.c",
-                            "third_party_libs/portmidi/porttime/ptlinux.c",
-                        }, .flags = genericFlags(&build_context, target, &.{"-DPMALSA"}) catch @panic("OOM") });
+                        portmidi.addCSourceFiles(.{
+                            .root = pm_root,
+                            .files = &.{
+                                "pm_linux/pmlinux.c",
+                                "pm_linux/pmlinuxalsa.c",
+                                "porttime/ptlinux.c",
+                            },
+                            .flags = genericFlags(&build_context, target, &.{"-DPMALSA"}) catch @panic("OOM"),
+                        });
                         portmidi.linkSystemLibrary2("alsa", .{ .use_pkg_config = use_pkg_config });
                     },
                     else => {
@@ -1727,8 +1772,8 @@ pub fn build(b: *std.Build) void {
                 }
 
                 portmidi.linkLibC();
-                portmidi.addIncludePath(b.path("third_party_libs/portmidi/porttime"));
-                portmidi.addIncludePath(b.path("third_party_libs/portmidi/pm_common"));
+                portmidi.addIncludePath(build_context.dep_portmidi.path("porttime"));
+                portmidi.addIncludePath(build_context.dep_portmidi.path("pm_common"));
             }
 
             const floe_standalone = b.addExecutable(.{
@@ -1767,7 +1812,6 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = build_context.optimise,
         });
-        const vst3_path = "third_party_libs/vst3";
         {
             var extra_flags = std.ArrayList([]const u8).init(b.allocator);
             defer extra_flags.deinit();
@@ -1779,50 +1823,54 @@ pub fn build(b: *std.Build) void {
             const flags = cppFlags(b, generic_flags, extra_flags.items) catch unreachable;
 
             {
-                vst3_sdk.addCSourceFiles(.{ .files = &.{
-                    vst3_path ++ "/base/source/baseiids.cpp",
-                    vst3_path ++ "/base/source/fbuffer.cpp",
-                    vst3_path ++ "/base/source/fdebug.cpp",
-                    vst3_path ++ "/base/source/fdynlib.cpp",
-                    vst3_path ++ "/base/source/fobject.cpp",
-                    vst3_path ++ "/base/source/fstreamer.cpp",
-                    vst3_path ++ "/base/source/fstring.cpp",
-                    vst3_path ++ "/base/source/timer.cpp",
-                    vst3_path ++ "/base/source/updatehandler.cpp",
+                vst3_sdk.addCSourceFiles(.{
+                    .root = build_context.dep_vst3_sdk.path(""),
+                    .files = &.{
+                        "base/source/baseiids.cpp",
+                        "base/source/fbuffer.cpp",
+                        "base/source/fdebug.cpp",
+                        "base/source/fdynlib.cpp",
+                        "base/source/fobject.cpp",
+                        "base/source/fstreamer.cpp",
+                        "base/source/fstring.cpp",
+                        "base/source/timer.cpp",
+                        "base/source/updatehandler.cpp",
 
-                    vst3_path ++ "/base/thread/source/fcondition.cpp",
-                    vst3_path ++ "/base/thread/source/flock.cpp",
+                        "base/thread/source/fcondition.cpp",
+                        "base/thread/source/flock.cpp",
 
-                    vst3_path ++ "/public.sdk/source/common/commoniids.cpp",
-                    vst3_path ++ "/public.sdk/source/common/memorystream.cpp",
-                    vst3_path ++ "/public.sdk/source/common/openurl.cpp",
-                    vst3_path ++ "/public.sdk/source/common/pluginview.cpp",
-                    vst3_path ++ "/public.sdk/source/common/readfile.cpp",
-                    vst3_path ++ "/public.sdk/source/common/systemclipboard_linux.cpp",
-                    vst3_path ++ "/public.sdk/source/common/systemclipboard_mac.mm",
-                    vst3_path ++ "/public.sdk/source/common/systemclipboard_win32.cpp",
-                    vst3_path ++ "/public.sdk/source/common/threadchecker_linux.cpp",
-                    vst3_path ++ "/public.sdk/source/common/threadchecker_mac.mm",
-                    vst3_path ++ "/public.sdk/source/common/threadchecker_win32.cpp",
+                        "public.sdk/source/common/commoniids.cpp",
+                        "public.sdk/source/common/memorystream.cpp",
+                        "public.sdk/source/common/openurl.cpp",
+                        "public.sdk/source/common/pluginview.cpp",
+                        "public.sdk/source/common/readfile.cpp",
+                        "public.sdk/source/common/systemclipboard_linux.cpp",
+                        "public.sdk/source/common/systemclipboard_mac.mm",
+                        "public.sdk/source/common/systemclipboard_win32.cpp",
+                        "public.sdk/source/common/threadchecker_linux.cpp",
+                        "public.sdk/source/common/threadchecker_mac.mm",
+                        "public.sdk/source/common/threadchecker_win32.cpp",
 
-                    vst3_path ++ "/pluginterfaces/base/conststringtable.cpp",
-                    vst3_path ++ "/pluginterfaces/base/coreiids.cpp",
-                    vst3_path ++ "/pluginterfaces/base/funknown.cpp",
-                    vst3_path ++ "/pluginterfaces/base/ustring.cpp",
+                        "pluginterfaces/base/conststringtable.cpp",
+                        "pluginterfaces/base/coreiids.cpp",
+                        "pluginterfaces/base/funknown.cpp",
+                        "pluginterfaces/base/ustring.cpp",
 
-                    vst3_path ++ "/public.sdk/source/main/pluginfactory.cpp",
-                    vst3_path ++ "/public.sdk/source/main/moduleinit.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/vstinitiids.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/vstnoteexpressiontypes.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/vstsinglecomponenteffect.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/vstaudioeffect.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/vstcomponent.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/vstsinglecomponenteffect.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/vstcomponentbase.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/vstbus.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/vstparameters.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/utility/stringconvert.cpp",
-                }, .flags = flags });
+                        "public.sdk/source/main/pluginfactory.cpp",
+                        "public.sdk/source/main/moduleinit.cpp",
+                        "public.sdk/source/vst/vstinitiids.cpp",
+                        "public.sdk/source/vst/vstnoteexpressiontypes.cpp",
+                        "public.sdk/source/vst/vstsinglecomponenteffect.cpp",
+                        "public.sdk/source/vst/vstaudioeffect.cpp",
+                        "public.sdk/source/vst/vstcomponent.cpp",
+                        "public.sdk/source/vst/vstsinglecomponenteffect.cpp",
+                        "public.sdk/source/vst/vstcomponentbase.cpp",
+                        "public.sdk/source/vst/vstbus.cpp",
+                        "public.sdk/source/vst/vstparameters.cpp",
+                        "public.sdk/source/vst/utility/stringconvert.cpp",
+                    },
+                    .flags = flags,
+                });
 
                 switch (target.result.os.tag) {
                     .windows => {},
@@ -1834,94 +1882,104 @@ pub fn build(b: *std.Build) void {
                     else => {},
                 }
 
-                vst3_sdk.addIncludePath(b.path(vst3_path));
+                vst3_sdk.addIncludePath(build_context.dep_vst3_sdk.path(""));
                 vst3_sdk.linkLibCpp();
                 applyUniversalSettings(&build_context, vst3_sdk);
             }
 
             {
-                vst3_validator.addCSourceFiles(.{ .files = &.{
-                    vst3_path ++ "/public.sdk/source/common/memorystream.cpp",
-                    vst3_path ++ "/public.sdk/source/main/moduleinit.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/moduleinfo/moduleinfoparser.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/hosting/test/connectionproxytest.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/hosting/test/eventlisttest.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/hosting/test/hostclassestest.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/hosting/test/parameterchangestest.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/hosting/test/pluginterfacesupporttest.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/hosting/test/processdatatest.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/hosting/plugprovider.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/testsuite/bus/busactivation.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/testsuite/bus/busconsistency.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/testsuite/bus/businvalidindex.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/testsuite/bus/checkaudiobusarrangement.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/testsuite/bus/scanbusses.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/testsuite/bus/sidechainarrangement.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/testsuite/general/editorclasses.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/testsuite/general/midilearn.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/testsuite/general/midimapping.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/testsuite/general/plugcompat.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/testsuite/general/scanparameters.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/testsuite/general/suspendresume.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/testsuite/general/terminit.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/testsuite/noteexpression/keyswitch.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/testsuite/noteexpression/noteexpression.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/testsuite/processing/automation.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/testsuite/processing/process.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/testsuite/processing/processcontextrequirements.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/testsuite/processing/processformat.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/testsuite/processing/processinputoverwriting.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/testsuite/processing/processtail.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/testsuite/processing/processthreaded.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/testsuite/processing/silenceflags.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/testsuite/processing/silenceprocessing.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/testsuite/processing/speakerarrangement.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/testsuite/processing/variableblocksize.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/testsuite/state/bypasspersistence.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/testsuite/state/invalidstatetransition.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/testsuite/state/repeatidenticalstatetransition.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/testsuite/state/validstatetransition.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/testsuite/testbase.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/testsuite/unit/checkunitstructure.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/testsuite/unit/scanprograms.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/testsuite/unit/scanunits.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/testsuite/vsttestsuite.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/utility/testing.cpp",
-                    vst3_path ++ "/public.sdk/samples/vst-hosting/validator/source/main.cpp",
-                    vst3_path ++ "/public.sdk/samples/vst-hosting/validator/source/usediids.cpp",
-                    vst3_path ++ "/public.sdk/samples/vst-hosting/validator/source/validator.cpp",
+                vst3_validator.addCSourceFiles(.{
+                    .root = build_context.dep_vst3_sdk.path(""),
+                    .files = &.{
+                        "public.sdk/source/common/memorystream.cpp",
+                        "public.sdk/source/main/moduleinit.cpp",
+                        "public.sdk/source/vst/moduleinfo/moduleinfoparser.cpp",
+                        "public.sdk/source/vst/hosting/test/connectionproxytest.cpp",
+                        "public.sdk/source/vst/hosting/test/eventlisttest.cpp",
+                        "public.sdk/source/vst/hosting/test/hostclassestest.cpp",
+                        "public.sdk/source/vst/hosting/test/parameterchangestest.cpp",
+                        "public.sdk/source/vst/hosting/test/pluginterfacesupporttest.cpp",
+                        "public.sdk/source/vst/hosting/test/processdatatest.cpp",
+                        "public.sdk/source/vst/hosting/plugprovider.cpp",
+                        "public.sdk/source/vst/testsuite/bus/busactivation.cpp",
+                        "public.sdk/source/vst/testsuite/bus/busconsistency.cpp",
+                        "public.sdk/source/vst/testsuite/bus/businvalidindex.cpp",
+                        "public.sdk/source/vst/testsuite/bus/checkaudiobusarrangement.cpp",
+                        "public.sdk/source/vst/testsuite/bus/scanbusses.cpp",
+                        "public.sdk/source/vst/testsuite/bus/sidechainarrangement.cpp",
+                        "public.sdk/source/vst/testsuite/general/editorclasses.cpp",
+                        "public.sdk/source/vst/testsuite/general/midilearn.cpp",
+                        "public.sdk/source/vst/testsuite/general/midimapping.cpp",
+                        "public.sdk/source/vst/testsuite/general/plugcompat.cpp",
+                        "public.sdk/source/vst/testsuite/general/scanparameters.cpp",
+                        "public.sdk/source/vst/testsuite/general/suspendresume.cpp",
+                        "public.sdk/source/vst/testsuite/general/terminit.cpp",
+                        "public.sdk/source/vst/testsuite/noteexpression/keyswitch.cpp",
+                        "public.sdk/source/vst/testsuite/noteexpression/noteexpression.cpp",
+                        "public.sdk/source/vst/testsuite/processing/automation.cpp",
+                        "public.sdk/source/vst/testsuite/processing/process.cpp",
+                        "public.sdk/source/vst/testsuite/processing/processcontextrequirements.cpp",
+                        "public.sdk/source/vst/testsuite/processing/processformat.cpp",
+                        "public.sdk/source/vst/testsuite/processing/processinputoverwriting.cpp",
+                        "public.sdk/source/vst/testsuite/processing/processtail.cpp",
+                        "public.sdk/source/vst/testsuite/processing/processthreaded.cpp",
+                        "public.sdk/source/vst/testsuite/processing/silenceflags.cpp",
+                        "public.sdk/source/vst/testsuite/processing/silenceprocessing.cpp",
+                        "public.sdk/source/vst/testsuite/processing/speakerarrangement.cpp",
+                        "public.sdk/source/vst/testsuite/processing/variableblocksize.cpp",
+                        "public.sdk/source/vst/testsuite/state/bypasspersistence.cpp",
+                        "public.sdk/source/vst/testsuite/state/invalidstatetransition.cpp",
+                        "public.sdk/source/vst/testsuite/state/repeatidenticalstatetransition.cpp",
+                        "public.sdk/source/vst/testsuite/state/validstatetransition.cpp",
+                        "public.sdk/source/vst/testsuite/testbase.cpp",
+                        "public.sdk/source/vst/testsuite/unit/checkunitstructure.cpp",
+                        "public.sdk/source/vst/testsuite/unit/scanprograms.cpp",
+                        "public.sdk/source/vst/testsuite/unit/scanunits.cpp",
+                        "public.sdk/source/vst/testsuite/vsttestsuite.cpp",
+                        "public.sdk/source/vst/utility/testing.cpp",
+                        "public.sdk/samples/vst-hosting/validator/source/main.cpp",
+                        "public.sdk/samples/vst-hosting/validator/source/usediids.cpp",
+                        "public.sdk/samples/vst-hosting/validator/source/validator.cpp",
 
-                    vst3_path ++ "/public.sdk/source/vst/hosting/connectionproxy.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/hosting/eventlist.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/hosting/hostclasses.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/hosting/module.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/hosting/parameterchanges.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/hosting/pluginterfacesupport.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/hosting/processdata.cpp",
-                    vst3_path ++ "/public.sdk/source/vst/vstpresetfile.cpp",
-                }, .flags = flags });
+                        "public.sdk/source/vst/hosting/connectionproxy.cpp",
+                        "public.sdk/source/vst/hosting/eventlist.cpp",
+                        "public.sdk/source/vst/hosting/hostclasses.cpp",
+                        "public.sdk/source/vst/hosting/module.cpp",
+                        "public.sdk/source/vst/hosting/parameterchanges.cpp",
+                        "public.sdk/source/vst/hosting/pluginterfacesupport.cpp",
+                        "public.sdk/source/vst/hosting/processdata.cpp",
+                        "public.sdk/source/vst/vstpresetfile.cpp",
+                    },
+                    .flags = flags,
+                });
 
                 switch (target.result.os.tag) {
                     .windows => {
-                        vst3_validator.addCSourceFiles(.{ .files = &.{
-                            vst3_path ++ "/public.sdk/source/vst/hosting/module_win32.cpp",
-                        }, .flags = flags });
+                        vst3_validator.addCSourceFiles(.{
+                            .root = build_context.dep_vst3_sdk.path(""),
+                            .files = &.{"public.sdk/source/vst/hosting/module_win32.cpp"},
+                            .flags = flags,
+                        });
                         vst3_validator.linkSystemLibrary("ole32");
                     },
                     .linux => {
-                        vst3_validator.addCSourceFiles(.{ .files = &.{
-                            vst3_path ++ "/public.sdk/source/vst/hosting/module_linux.cpp",
-                        }, .flags = flags });
+                        vst3_validator.addCSourceFiles(.{
+                            .root = build_context.dep_vst3_sdk.path(""),
+                            .files = &.{"public.sdk/source/vst/hosting/module_linux.cpp"},
+                            .flags = flags,
+                        });
                     },
                     .macos => {
-                        vst3_validator.addCSourceFiles(.{ .files = &.{
-                            vst3_path ++ "/public.sdk/source/vst/hosting/module_mac.mm",
-                        }, .flags = objcpp_flags });
+                        vst3_validator.addCSourceFiles(.{
+                            .root = build_context.dep_vst3_sdk.path(""),
+                            .files = &.{"public.sdk/source/vst/hosting/module_mac.mm"},
+                            .flags = objcpp_flags,
+                        });
                     },
                     else => {},
                 }
 
-                vst3_validator.addIncludePath(b.path(vst3_path));
+                vst3_validator.addIncludePath(build_context.dep_vst3_sdk.path(""));
                 vst3_validator.linkLibCpp();
                 vst3_validator.linkLibrary(vst3_sdk);
                 vst3_validator.linkLibrary(library); // for ubsan runtime
@@ -1997,7 +2055,8 @@ pub fn build(b: *std.Build) void {
                         .flags = flags,
                     });
                     vst3.addCSourceFiles(.{
-                        .files = &.{vst3_path ++ "/public.sdk/source/main/dllmain.cpp"},
+                        .root = build_context.dep_vst3_sdk.path(""),
+                        .files = &.{"public.sdk/source/main/dllmain.cpp"},
                         .flags = flags,
                     });
                 },
@@ -2007,7 +2066,8 @@ pub fn build(b: *std.Build) void {
                         .flags = flags,
                     });
                     vst3.addCSourceFiles(.{
-                        .files = &.{vst3_path ++ "/public.sdk/source/main/linuxmain.cpp"},
+                        .root = build_context.dep_vst3_sdk.path(""),
+                        .files = &.{"public.sdk/source/main/linuxmain.cpp"},
                         .flags = flags,
                     });
                 },
@@ -2021,17 +2081,17 @@ pub fn build(b: *std.Build) void {
                         .flags = flags,
                     });
                     vst3.addCSourceFiles(.{
-                        .files = &.{vst3_path ++ "/public.sdk/source/main/macmain.cpp"},
+                        .root = build_context.dep_vst3_sdk.path(""),
+                        .files = &.{"public.sdk/source/main/macmain.cpp"},
                         .flags = flags,
                     });
                 },
                 else => {},
             }
 
-            vst3.addIncludePath(b.path("third_party_libs/clap/include"));
             vst3.addIncludePath(build_context.dep_clap_wrapper.path("include"));
             vst3.addIncludePath(build_context.dep_clap_wrapper.path("libs/fmt"));
-            vst3.addIncludePath(b.path("third_party_libs/vst3"));
+            vst3.addIncludePath(build_context.dep_vst3_sdk.path(""));
             vst3.linkLibCpp();
 
             vst3.linkLibrary(plugin);

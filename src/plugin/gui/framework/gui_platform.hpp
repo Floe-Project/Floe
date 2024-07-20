@@ -2,17 +2,19 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #pragma once
+#include <pugl/gl.h> // on windows this includes windows.h
+#include <pugl/pugl.h>
+#include <test_utils.h> // pugl - bit of a hack including it this way
+
 #include "foundation/foundation.hpp"
+#include "os/undef_windows_macros.h"
 #include "utils/debug/debug.hpp"
 
 #include "clap/host.h"
 #include "gui/gui.hpp"
 #include "gui_frame.hpp"
 #include "plugin_instance.hpp"
-#include "pugl/gl.h" // on windows this includes windows.h
-#include "pugl/pugl.h"
 #include "settings/settings_gui.hpp"
-#include "third_party_libs/pugl/test/test_utils.h"
 
 // TODO: go over the API docs and review usage
 // TODO: add error handling

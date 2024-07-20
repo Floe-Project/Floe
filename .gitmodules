@@ -55,3 +55,6 @@
 [submodule "third_party_libs/xxHash"]
 	path = third_party_libs/xxHash
 	url = https://github.com/Cyan4973/xxHash
+[submodule "third_party_libs/pffft"]
+	path = third_party_libs/pffft
+	url = https://bitbucket.org/jpommier/pffft

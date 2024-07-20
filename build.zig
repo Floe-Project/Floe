@@ -1003,7 +1003,7 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = build_context.optimise,
         });
-        xxhash.addCSourceFile(.{ .file = b.path("third_party_libs/xxhash/xxhash.c") });
+        xxhash.addCSourceFile(.{ .file = b.path("third_party_libs/xxHash/xxhash.c") });
         xxhash.linkLibC();
 
         const tracy = b.addStaticLibrary(.{

@@ -52,3 +52,6 @@
 [submodule "third_party_libs/valgrind"]
 	path = third_party_libs/valgrind
 	url = https://github.com/allyourcodebase/valgrind.h
+[submodule "third_party_libs/xxHash"]
+	path = third_party_libs/xxHash
+	url = https://github.com/Cyan4973/xxHash

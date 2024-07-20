@@ -6,7 +6,7 @@
 #include <FLAC/ordinals.h>
 #include <FLAC/stream_decoder.h>
 #include <dr_libs/dr_wav.h>
-#include <xxhash/xxhash.h>
+#include <xxHash/xxhash.h>
 
 #include "foundation/foundation.hpp"
 #include "tests/framework.hpp"

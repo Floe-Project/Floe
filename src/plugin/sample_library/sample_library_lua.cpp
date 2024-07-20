@@ -4,7 +4,7 @@
 #include <lua/lauxlib.h>
 #include <lua/lua.h>
 #include <lua/lualib.h>
-#include <xxhash/xxhash.h>
+#include <xxHash/xxhash.h>
 
 #include "foundation/foundation.hpp"
 #include "foundation/utils/format.hpp"

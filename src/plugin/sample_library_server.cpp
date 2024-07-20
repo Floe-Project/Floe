@@ -14,7 +14,7 @@
 #include "common/common_errors.hpp"
 #include "sample_library/audio_file.hpp"
 #include "sample_library/sample_library.hpp"
-#include "xxhash/xxhash.h"
+#include "xxHash/xxhash.h"
 
 namespace sample_lib_server {
 

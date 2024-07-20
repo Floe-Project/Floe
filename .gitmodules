@@ -58,3 +58,6 @@
 [submodule "third_party_libs/pffft"]
 	path = third_party_libs/pffft
 	url = https://bitbucket.org/jpommier/pffft
+[submodule "third_party_libs/stb"]
+	path = third_party_libs/stb
+	url = https://github.com/nothings/stb

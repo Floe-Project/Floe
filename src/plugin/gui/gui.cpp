@@ -6,7 +6,7 @@
 
 #include <IconFontCppHeaders/IconsFontAwesome5.h>
 #include <stb/stb_image.h>
-#include <stb/stb_image_resize.h>
+#include <stb/stb_image_resize2.h>
 
 #include "foundation/foundation.hpp"
 #include "os/filesystem.hpp"
@@ -47,12 +47,14 @@ static ErrorCodeOr<ImagePixelsRgba> DecodeJpgOrPng(Span<u8 const> image_data) {
     int actual_number_channels;
     int width;
     int height;
+    constexpr int k_output_channels = 4;
+    // always returns rgba because we specify 4 as the output channels
     result.data = stbi_load_from_memory(image_data.data,
                                         (int)image_data.size,
                                         &width,
                                         &height,
                                         &actual_number_channels,
-                                        4);
+                                        k_output_channels);
     if (!result.data) return ErrorCode(CommonError::FileFormatIsInvalid);
     result.size = {CheckedCast<u16>(width), CheckedCast<u16>(height)};
     result.free_data = [](u8* data) { stbi_image_free(data); };
@@ -342,18 +344,25 @@ LibraryImages LoadLibraryBackgroundAndIconIfNeeded(Gui* g, sample_lib::Library c
             auto const desired_height =
                 (int)((f32)background_size.height *
                       (g->frame_input.window_size.width / (f32)background_size.width));
-            auto background_buf =
-                arena.AllocateBytesForTypeOversizeAllowed<u8>((usize)(desired_width * desired_height * 4));
+            auto background_buf = arena.AllocateBytesForTypeOversizeAllowed<u8>(
+                (usize)(desired_width * desired_height * k_channels));
 
-            stbir_resize_uint8(background_rgba,
-                               background_size.width,
-                               background_size.height,
-                               0,
-                               background_buf.data,
-                               desired_width,
-                               desired_height,
-                               0,
-                               k_channels);
+            DebugLn("Resizing background for {} from {}x{} to {}x{}",
+                    lib_name,
+                    background_size.width,
+                    background_size.height,
+                    desired_width,
+                    desired_height);
+
+            stbir_resize_uint8_linear(background_rgba,
+                                      background_size.width,
+                                      background_size.height,
+                                      0,
+                                      background_buf.data,
+                                      desired_width,
+                                      desired_height,
+                                      0,
+                                      (stbir_pixel_layout)k_channels);
 
             background_rgba = background_buf.data;
             background_size = {CheckedCast<u16>(desired_width), CheckedCast<u16>(desired_height)};
@@ -381,21 +390,35 @@ LibraryImages LoadLibraryBackgroundAndIconIfNeeded(Gui* g, sample_lib::Library c
             if ((int)window_size.x < background_size.width && (int)window_size.x < background_size.height) {
                 auto const downscale_factor =
                     LiveSize(g->imgui, UiSizeId::BackgroundBlurringDownscaleFactor) / 100.0f;
+                ASSERT(downscale_factor > 0.0f && downscale_factor <= 1.0f);
 
                 blur_img_size = {(u16)(window_size.x * downscale_factor),
                                  (u16)(window_size.y * downscale_factor)};
                 blurred_image_num_bytes = (usize)(blur_img_size.width * blur_img_size.height * k_channels);
                 blurred_image_buffer = arena.AllocateBytesForTypeOversizeAllowed<u8>(blurred_image_num_bytes);
 
-                stbir_resize_uint8(background_rgba,
-                                   (int)background_size.width,
-                                   (int)background_size.height,
-                                   0,
-                                   blurred_image_buffer.data,
-                                   blur_img_size.width,
-                                   blur_img_size.height,
-                                   0,
-                                   k_channels);
+                DebugLn("Resizing blurred background for {} from {}x{} to {}x{}",
+                        lib_name,
+                        background_size.width,
+                        background_size.height,
+                        blur_img_size.width,
+                        blur_img_size.height);
+
+                for (auto i : Range(blurred_image_num_bytes))
+                    blurred_image_buffer[i] = 0;
+
+                for (auto i : Range(background_size.width * background_size.height * k_channels))
+                    background_rgba[i] = background_rgba[i];
+
+                stbir_resize_uint8_linear(background_rgba,
+                                          (int)background_size.width,
+                                          (int)background_size.height,
+                                          0,
+                                          blurred_image_buffer.data,
+                                          blur_img_size.width,
+                                          blur_img_size.height,
+                                          0,
+                                          (stbir_pixel_layout)k_channels);
 
             } else {
                 blurred_image_buffer =

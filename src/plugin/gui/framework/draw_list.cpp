@@ -1494,6 +1494,11 @@ void DrawList::AddImageRounded(TextureHandle user_texture_id,
 #define STBTT_ifloor(x)    ((int)Floor(x))
 #define STBTT_iceil(x)     ((int)Ceil(x))
 #define STBTT_sqrt(x)      Sqrt(x)
+#define STBTT_pow(x, y)    Pow(x, y)
+#define STBTT_fabs(x)      Fabs(x)
+#define STBTT_fmod(x, y)   Fmod(x, y)
+#define STBTT_cos(x)       Cos(x)
+#define STBTT_acos(x)      Acos(x)
 #define STBTT_fabs(x)      Fabs(x)
 #define STBTT_malloc(x, u) ((void)(u), GpaAlloc(x))
 #define STBTT_free(x, u)   ((void)(u), GpaFree(x))
@@ -1505,6 +1510,7 @@ void DrawList::AddImageRounded(TextureHandle user_texture_id,
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wconversion"
 #pragma clang diagnostic ignored "-Wimplicit-fallthrough"
+#pragma clang diagnostic ignored "-Wdouble-promotion"
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb/stb_truetype.h"
 #pragma clang diagnostic pop

@@ -3,4 +3,4 @@
 
 #define STB_SPRINTF_IMPLEMENTATION
 #define STB_SPRINTF_NOUNALIGNED // UBSan doesn't like unaligned reads
-#include "stb_sprintf.h"
+#include "stb/stb_sprintf.h"

@@ -995,7 +995,7 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = build_context.optimise,
         });
-        stb_sprintf.addCSourceFile(.{ .file = b.path("third_party_libs/stb/stb_sprintf.c") });
+        stb_sprintf.addCSourceFile(.{ .file = b.path("third_party_libs/stb_sprintf.c") });
         stb_sprintf.linkLibC();
 
         var xxhash = b.addObject(.{
@@ -1349,7 +1349,7 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = build_context.optimise,
         });
-        stb_image.addCSourceFile(.{ .file = b.path("third_party_libs/stb/stb_image_impls.c") });
+        stb_image.addCSourceFile(.{ .file = b.path("third_party_libs/stb_image_impls.c") });
         stb_image.linkLibC();
 
         var dr_wav = b.addObject(.{

@@ -265,10 +265,16 @@ static bool STB_TEXTEDIT_INSERTCHARS(STB_TEXTEDIT_STRING* imgui, //
 #define STB_TEXTEDIT_K_REDO      0x1000B // keyboard input to perform redo
 #define STB_TEXTEDIT_K_WORDLEFT  0x1000C // keyboard input to move cursor left one word
 #define STB_TEXTEDIT_K_WORDRIGHT 0x1000D // keyboard input to move cursor right one word
+#define STB_TEXTEDIT_K_PGUP      0x1000E // keyboard input to move cursor up a page
+#define STB_TEXTEDIT_K_PGDOWN    0x1000F // keyboard input to move cursor down a page
 #define STB_TEXTEDIT_K_SHIFT     0x20000
 
 #define STB_TEXTEDIT_IMPLEMENTATION
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wconversion"
 #include "stb/stb_textedit.h"
+#pragma clang diagnostic pop
 
 } // namespace stb
 

@@ -1,0 +1,11 @@
+Copyright Sam Windell
+This file provides reuse-tool with the license information for some git submodules that it otherwise has a problem with.
+
+Valgrind:
+SPDX-License-Identifier: LicenseRef-Valgrind-BSD
+
+FFTPack/pffft:
+SPDX-License-Identifier: LicenseRef-FFTPACK
+
+xxHash:
+SPDX-License-Identifier: BSD-2-Clause

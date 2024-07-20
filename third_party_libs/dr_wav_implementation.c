@@ -6,7 +6,7 @@
 #pragma clang diagnostic ignored "-Wimplicit-fallthrough"
 
 #define DR_WAV_IMPLEMENTATION
-#include "dr_libs/dr_wav.h"
+#include <dr_wav.h>
 #undef DR_WAV_IMPLEMENTATION
 
 #pragma clang diagnostic pop

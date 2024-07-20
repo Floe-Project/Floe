@@ -1,10 +1,10 @@
 // Copyright 2018-2024 Sam Windell
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include <lua/lauxlib.h>
-#include <lua/lua.h>
-#include <lua/lualib.h>
-#include <xxHash/xxhash.h>
+#include <lauxlib.h>
+#include <lua.h>
+#include <lualib.h>
+#include <xxhash.h>
 
 #include "foundation/foundation.hpp"
 #include "foundation/utils/format.hpp"
@@ -1110,7 +1110,7 @@ LibraryPtrOrError ReadLua(Reader& reader,
     // allocation into an arena. The docs say that lua_close will: "close all active to-be-closed variables in
     // the main thread, release all objects in the given Lua state (calling the corresponding
     // garbage-collection metamethods, if any), and frees all dynamic memory used by this state."
-    ctx.lua = lua_newstate(k_arena_alloc_fuction, &ctx, 45398932);
+    ctx.lua = lua_newstate(k_arena_alloc_fuction, &ctx);
     if (!ctx.lua) {
         return ErrorAndNotify(ctx, LuaErrorCode::Memory, [](DynamicArray<char>& message) {
             dyn::AppendSpan(message, "Sorry, there's a bug. Please report this.");

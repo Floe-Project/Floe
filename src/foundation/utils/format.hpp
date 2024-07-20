@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #pragma once
+#include <stb_sprintf.h>
+
 #include "foundation/container/dynamic_array.hpp"
 #include "foundation/container/span.hpp"
 #include "foundation/error/error_code.hpp"
 #include "foundation/universal_defs.hpp"
 #include "foundation/utils/string.hpp"
 #include "foundation/utils/writer.hpp"
-
-#include "stb/stb_sprintf.h"
 
 namespace fmt {
 

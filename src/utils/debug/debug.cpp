@@ -5,6 +5,7 @@
 
 #include "debug.hpp"
 
+#include <backtrace.h>
 #include <cxxabi.h>
 #include <stdlib.h> // free
 
@@ -12,8 +13,6 @@
 #include "os/filesystem.hpp"
 #include "os/misc.hpp"
 #include "tests/framework.hpp"
-
-#include "libbacktrace/backtrace.h"
 
 [[noreturn]] void DefaultPanicHandler(char const* message, SourceLocation loc) {
     auto const filename = path::Filename(FromNullTerminated(loc.file));

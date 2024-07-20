@@ -9,7 +9,7 @@
 #include <clap/host.h>
 #include <clap/plugin.h>
 #include <clap/process.h>
-#include <miniaudio/miniaudio.h>
+#include <miniaudio.h>
 #include <portmidi.h>
 #include <pugl/pugl.h>
 #include <pugl/stub.h>

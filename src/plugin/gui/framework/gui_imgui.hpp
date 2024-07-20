@@ -27,7 +27,7 @@ using WindowFlags = u32;
 #undef INCLUDE_STB_TEXTEDIT_H
 #undef STB_TEXTEDIT_IMPLEMENTATION
 namespace stb {
-#include "stb/stb_textedit.h"
+#include <stb_textedit.h>
 }
 
 constexpr Id k_imgui_misc_id = 1; // something we dont care about was clicked (eg. background)

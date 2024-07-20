@@ -1,12 +1,13 @@
 // Copyright 2018-2024 Sam Windell
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <IconsFontAwesome5.h>
+
 #include "framework/gui_live_edit.hpp"
 #include "gui.hpp"
 #include "gui_effects.hpp"
 #include "gui_widget_helpers.hpp"
 #include "gui_window.hpp"
-#include "IconFontCppHeaders/IconsFontAwesome5.h"
 
 void MidPanel(Gui* g) {
     auto& imgui = g->imgui;

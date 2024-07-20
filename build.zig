@@ -535,6 +535,18 @@ const BuildContext = struct {
     test_step: *std.Build.Step,
     optimise: std.builtin.OptimizeMode,
     external_build_resources_subdir: ?[]const u8,
+    dep_xxhash: *std.Build.Dependency,
+    dep_stb: *std.Build.Dependency,
+    dep_au_sdk: *std.Build.Dependency,
+    dep_miniaudio: *std.Build.Dependency,
+    dep_clap: *std.Build.Dependency,
+    dep_clap_wrapper: *std.Build.Dependency,
+    dep_dr_libs: *std.Build.Dependency,
+    dep_flac: *std.Build.Dependency,
+    dep_icon_font_cpp_headers: *std.Build.Dependency,
+    dep_miniz: *std.Build.Dependency,
+    dep_libbacktrace: *std.Build.Dependency,
+    dep_lua: *std.Build.Dependency,
 };
 
 fn genericFlags(context: *BuildContext, target: std.Build.ResolvedTarget, extra_flags: []const []const u8) ![][]const u8 {
@@ -664,13 +676,19 @@ fn applyUniversalSettings(context: *BuildContext, step: *std.Build.Step.Compile)
     step.rdynamic = context.build_mode != .production;
     step.linkLibC();
 
+    step.addIncludePath(context.dep_xxhash.path(""));
+    step.addIncludePath(context.dep_stb.path(""));
+    step.addIncludePath(context.dep_clap.path("include"));
+    step.addIncludePath(context.dep_dr_libs.path(""));
+    step.addIncludePath(context.dep_flac.path("include"));
+    step.addIncludePath(context.dep_libbacktrace.path(""));
+    step.addIncludePath(context.dep_lua.path(""));
+
     step.addIncludePath(b.path("."));
     step.addIncludePath(b.path("src"));
     step.addIncludePath(b.path("third_party_libs"));
-    step.addIncludePath(b.path("third_party_libs/clap/include"));
     step.addIncludePath(b.path("third_party_libs/tracy/public"));
     step.addIncludePath(b.path("third_party_libs/pugl/include"));
-    step.addIncludePath(b.path("third_party_libs/flac/include"));
     step.addIncludePath(b.path("third_party_libs/portmidi/pm_common"));
 
     if (step.rootModuleTarget().isDarwin()) {
@@ -688,36 +706,6 @@ fn applyUniversalSettings(context: *BuildContext, step: *std.Build.Step.Compile)
         step.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ sdk_root.?, "/usr/lib" }) });
         step.addFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ sdk_root.?, "/System/Library/Frameworks" }) });
     }
-}
-
-fn buildLua(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) *std.Build.Step.Compile {
-    const lib_opts = .{
-        .name = "lua",
-        .target = target,
-        .optimize = optimize,
-        .version = std.SemanticVersion{ .major = 5, .minor = 4, .patch = 6 },
-    };
-    const lib = b.addStaticLibrary(lib_opts);
-
-    const lua_dir = "third_party_libs/lua";
-
-    lib.addIncludePath(b.path(lua_dir));
-
-    const flags = [_][]const u8{
-        switch (target.result.os.tag) {
-            .linux => "-DLUA_USE_LINUX",
-            .macos => "-DLUA_USE_MACOSX",
-            .windows => "-DLUA_USE_WINDOWS",
-            else => "-DLUA_USE_POSIX",
-        },
-        if (optimize == .Debug) "-DLUA_USE_APICHECK" else "",
-    };
-
-    // compile as C++ so as to use exceptions
-    lib.addCSourceFile(.{ .file = b.path("third_party_libs/lua.cpp"), .flags = &flags });
-    lib.linkLibC();
-
-    return lib;
 }
 
 fn getTargets(b: *std.Build, user_given_target_presets: ?[]const u8) !std.ArrayList(std.Build.ResolvedTarget) {
@@ -874,6 +862,18 @@ pub fn build(b: *std.Build) void {
             .performance_profiling, .production => std.builtin.OptimizeMode.ReleaseSafe,
         },
         .external_build_resources_subdir = b.option([]const u8, "external-resources", "Path relative to build.zig that contains external build resources"),
+        .dep_xxhash = b.dependency("xxhash", .{}),
+        .dep_stb = b.dependency("stb", .{}),
+        .dep_au_sdk = b.dependency("audio_unit_sdk", .{}),
+        .dep_miniaudio = b.dependency("miniaudio", .{}),
+        .dep_clap = b.dependency("clap", .{}),
+        .dep_clap_wrapper = b.dependency("clap_wrapper", .{}),
+        .dep_dr_libs = b.dependency("dr_libs", .{}),
+        .dep_flac = b.dependency("flac", .{}),
+        .dep_icon_font_cpp_headers = b.dependency("icon_font_cpp_headers", .{}),
+        .dep_miniz = b.dependency("miniz", .{}),
+        .dep_libbacktrace = b.dependency("libbacktrace", .{}),
+        .dep_lua = b.dependency("lua", .{}),
     };
 
     const user_given_target_presets = b.option([]const u8, "targets", "Target operating system");
@@ -996,6 +996,7 @@ pub fn build(b: *std.Build) void {
             .optimize = build_context.optimise,
         });
         stb_sprintf.addCSourceFile(.{ .file = b.path("third_party_libs/stb_sprintf.c") });
+        stb_sprintf.addIncludePath(build_context.dep_stb.path(""));
         stb_sprintf.linkLibC();
 
         var xxhash = b.addObject(.{
@@ -1003,7 +1004,7 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = build_context.optimise,
         });
-        xxhash.addCSourceFile(.{ .file = b.path("third_party_libs/xxHash/xxhash.c") });
+        xxhash.addCSourceFile(.{ .file = build_context.dep_xxhash.path("xxhash.c") });
         xxhash.linkLibC();
 
         const tracy = b.addStaticLibrary(.{
@@ -1079,22 +1080,24 @@ pub fn build(b: *std.Build) void {
             .strip = false,
         });
         if (true) {
+            const libbacktrace_root_path = build_context.dep_libbacktrace.path("");
             const posix_sources = .{
-                "third_party_libs/libbacktrace/mmap.c",
-                "third_party_libs/libbacktrace/mmapio.c",
+                "mmap.c",
+                "mmapio.c",
             };
 
             libbacktrace.addCSourceFiles(.{
+                .root = libbacktrace_root_path,
                 .files = &.{
-                    "third_party_libs/libbacktrace/backtrace.c",
-                    "third_party_libs/libbacktrace/dwarf.c",
-                    "third_party_libs/libbacktrace/fileline.c",
-                    "third_party_libs/libbacktrace/print.c",
-                    "third_party_libs/libbacktrace/read.c",
-                    "third_party_libs/libbacktrace/simple.c",
-                    "third_party_libs/libbacktrace/sort.c",
-                    "third_party_libs/libbacktrace/state.c",
-                    "third_party_libs/libbacktrace/posix.c",
+                    "backtrace.c",
+                    "dwarf.c",
+                    "fileline.c",
+                    "print.c",
+                    "read.c",
+                    "simple.c",
+                    "sort.c",
+                    "state.c",
+                    "posix.c",
                 },
             });
 
@@ -1149,10 +1152,13 @@ pub fn build(b: *std.Build) void {
                         .HAVE_WINDOWS_H = 1,
                     });
 
-                    libbacktrace.addCSourceFiles(.{ .files = &.{
-                        "third_party_libs/libbacktrace/pecoff.c",
-                        "third_party_libs/libbacktrace/alloc.c",
-                    } });
+                    libbacktrace.addCSourceFiles(.{
+                        .root = libbacktrace_root_path,
+                        .files = &.{
+                            "pecoff.c",
+                            "alloc.c",
+                        },
+                    });
                 },
                 .macos => {
                     config_header.addValues(.{
@@ -1160,8 +1166,8 @@ pub fn build(b: *std.Build) void {
                         .HAVE_FCNTL = 1,
                     });
 
-                    libbacktrace.addCSourceFiles(.{ .files = &posix_sources });
-                    libbacktrace.addCSourceFiles(.{ .files = &.{"third_party_libs/libbacktrace/macho.c"} });
+                    libbacktrace.addCSourceFiles(.{ .root = libbacktrace_root_path, .files = &posix_sources });
+                    libbacktrace.addCSourceFiles(.{ .root = libbacktrace_root_path, .files = &.{"macho.c"} });
                 },
                 .linux => {
                     config_header.addValues(.{
@@ -1172,8 +1178,8 @@ pub fn build(b: *std.Build) void {
                         .HAVE_FCNTL = 1,
                     });
 
-                    libbacktrace.addCSourceFiles(.{ .files = &.{"third_party_libs/libbacktrace/elf.c"} });
-                    libbacktrace.addCSourceFiles(.{ .files = &posix_sources });
+                    libbacktrace.addCSourceFiles(.{ .root = libbacktrace_root_path, .files = &.{"elf.c"} });
+                    libbacktrace.addCSourceFiles(.{ .root = libbacktrace_root_path, .files = &posix_sources });
                 },
                 else => {
                     unreachable;
@@ -1350,6 +1356,7 @@ pub fn build(b: *std.Build) void {
             .optimize = build_context.optimise,
         });
         stb_image.addCSourceFile(.{ .file = b.path("third_party_libs/stb_image_impls.c") });
+        stb_image.addIncludePath(build_context.dep_stb.path(""));
         stb_image.linkLibC();
 
         var dr_wav = b.addObject(.{
@@ -1358,50 +1365,49 @@ pub fn build(b: *std.Build) void {
             .optimize = build_context.optimise,
         });
         dr_wav.addCSourceFile(.{ .file = b.path("third_party_libs/dr_wav_implementation.c") });
+        dr_wav.addIncludePath(build_context.dep_dr_libs.path(""));
         dr_wav.linkLibC();
 
         const flac = b.addStaticLibrary(.{ .name = "flac", .target = target, .optimize = build_context.optimise });
         {
-            const flac_path = "third_party_libs/flac/";
-            const sources = &[_][]const u8{
-                flac_path ++ "src/libFLAC/bitmath.c",
-                flac_path ++ "src/libFLAC/bitreader.c",
-                flac_path ++ "src/libFLAC/bitwriter.c",
-                flac_path ++ "src/libFLAC/cpu.c",
-                flac_path ++ "src/libFLAC/crc.c",
-                flac_path ++ "src/libFLAC/fixed.c",
-                flac_path ++ "src/libFLAC/fixed_intrin_sse2.c",
-                flac_path ++ "src/libFLAC/fixed_intrin_ssse3.c",
-                flac_path ++ "src/libFLAC/fixed_intrin_sse42.c",
-                flac_path ++ "src/libFLAC/fixed_intrin_avx2.c",
-                flac_path ++ "src/libFLAC/float.c",
-                flac_path ++ "src/libFLAC/format.c",
-                flac_path ++ "src/libFLAC/lpc.c",
-                flac_path ++ "src/libFLAC/lpc_intrin_neon.c",
-                flac_path ++ "src/libFLAC/lpc_intrin_sse2.c",
-                flac_path ++ "src/libFLAC/lpc_intrin_sse41.c",
-                flac_path ++ "src/libFLAC/lpc_intrin_avx2.c",
-                flac_path ++ "src/libFLAC/lpc_intrin_fma.c",
-                flac_path ++ "src/libFLAC/md5.c",
-                flac_path ++ "src/libFLAC/memory.c",
-                flac_path ++ "src/libFLAC/metadata_iterators.c",
-                flac_path ++ "src/libFLAC/metadata_object.c",
-                flac_path ++ "src/libFLAC/stream_decoder.c",
-                flac_path ++ "src/libFLAC/stream_encoder.c",
-                flac_path ++ "src/libFLAC/stream_encoder_intrin_sse2.c",
-                flac_path ++ "src/libFLAC/stream_encoder_intrin_ssse3.c",
-                flac_path ++ "src/libFLAC/stream_encoder_intrin_avx2.c",
-                flac_path ++ "src/libFLAC/stream_encoder_framing.c",
-                flac_path ++ "src/libFLAC/window.c",
-            };
-
-            const sources_windows = &[_][]const u8{
-                flac_path ++ "src/share/win_utf8_io/win_utf8_io.c",
-            };
+            flac.addCSourceFiles(.{
+                .root = build_context.dep_flac.path("src/libFLAC"),
+                .files = &.{
+                    "bitmath.c",
+                    "bitreader.c",
+                    "bitwriter.c",
+                    "cpu.c",
+                    "crc.c",
+                    "fixed.c",
+                    "fixed_intrin_sse2.c",
+                    "fixed_intrin_ssse3.c",
+                    "fixed_intrin_sse42.c",
+                    "fixed_intrin_avx2.c",
+                    "float.c",
+                    "format.c",
+                    "lpc.c",
+                    "lpc_intrin_neon.c",
+                    "lpc_intrin_sse2.c",
+                    "lpc_intrin_sse41.c",
+                    "lpc_intrin_avx2.c",
+                    "lpc_intrin_fma.c",
+                    "md5.c",
+                    "memory.c",
+                    "metadata_iterators.c",
+                    "metadata_object.c",
+                    "stream_decoder.c",
+                    "stream_encoder.c",
+                    "stream_encoder_intrin_sse2.c",
+                    "stream_encoder_intrin_ssse3.c",
+                    "stream_encoder_intrin_avx2.c",
+                    "stream_encoder_framing.c",
+                    "window.c",
+                },
+            });
 
             const config_header = b.addConfigHeader(
                 .{
-                    .style = .{ .cmake = b.path(flac_path ++ "config.cmake.h.in") },
+                    .style = .{ .cmake = build_context.dep_flac.path("config.cmake.h.in") },
                     .include_path = "config.h",
                 },
                 .{
@@ -1428,12 +1434,11 @@ pub fn build(b: *std.Build) void {
             flac.linkLibC();
             flac.defineCMacro("HAVE_CONFIG_H", null);
             flac.addConfigHeader(config_header);
-            flac.addIncludePath(b.path(flac_path ++ "include"));
-            flac.addIncludePath(b.path(flac_path ++ "src/libFLAC/include"));
-            flac.addCSourceFiles(.{ .files = sources, .flags = &.{} });
+            flac.addIncludePath(build_context.dep_flac.path("include"));
+            flac.addIncludePath(build_context.dep_flac.path("src/libFLAC/include"));
             if (target.result.os.tag == .windows) {
                 flac.defineCMacro("FLAC__NO_DLL", null);
-                flac.addCSourceFiles(.{ .files = sources_windows, .flags = &.{} });
+                flac.addCSourceFile(.{ .file = build_context.dep_flac.path("src/share/win_utf8_io/win_utf8_io.c") });
             }
         }
 
@@ -1469,6 +1474,28 @@ pub fn build(b: *std.Build) void {
             .optimize = build_context.optimise,
         });
         {
+            const lua = b.addStaticLibrary(.{
+                .name = "lua",
+                .target = target,
+                .optimize = build_context.optimise,
+            });
+            {
+                const flags = [_][]const u8{
+                    switch (target.result.os.tag) {
+                        .linux => "-DLUA_USE_LINUX",
+                        .macos => "-DLUA_USE_MACOSX",
+                        .windows => "-DLUA_USE_WINDOWS",
+                        else => "-DLUA_USE_POSIX",
+                    },
+                    if (build_context.optimise == .Debug) "-DLUA_USE_APICHECK" else "",
+                };
+
+                // compile as C++ so it uses exceptions instead of setjmp/longjmp
+                lua.addCSourceFile(.{ .file = b.path("third_party_libs/lua.cpp"), .flags = &flags });
+                lua.addIncludePath(build_context.dep_lua.path(""));
+                lua.linkLibC();
+            }
+
             const plugin_path = "src/plugin";
 
             plugin.addCSourceFiles(.{
@@ -1539,6 +1566,7 @@ pub fn build(b: *std.Build) void {
 
             plugin.addIncludePath(b.path("src/plugin"));
             plugin.addIncludePath(b.path("src"));
+            plugin.addIncludePath(build_context.dep_icon_font_cpp_headers.path(""));
             plugin.addConfigHeader(build_config_step);
             plugin.linkLibrary(library);
             plugin.linkLibrary(fft_convolver);
@@ -1559,7 +1587,7 @@ pub fn build(b: *std.Build) void {
             plugin.linkLibrary(flac);
             plugin.addObject(dr_wav);
             plugin.addObject(xxhash);
-            plugin.linkLibrary(buildLua(b, target, build_context.optimise));
+            plugin.linkLibrary(lua);
             plugin.linkLibrary(vitfx);
             applyUniversalSettings(&build_context, plugin);
             join_compile_commands.step.dependOn(&plugin.step);
@@ -1630,11 +1658,12 @@ pub fn build(b: *std.Build) void {
             const miniaudio = b.addStaticLibrary(.{ .name = "miniaudio", .target = target, .optimize = build_context.optimise });
             {
                 // disabling pulse audio because it was causing lots of stutters on my machine
-                miniaudio.addCSourceFiles(.{
-                    .files = &.{"third_party_libs/miniaudio.c"},
+                miniaudio.addCSourceFile(.{
+                    .file = b.path("third_party_libs/miniaudio.c"),
                     .flags = genericFlags(&build_context, target, &.{"-DMA_NO_PULSEAUDIO"}) catch @panic("OOM"),
                 });
                 miniaudio.linkLibC();
+                miniaudio.addIncludePath(build_context.dep_miniaudio.path(""));
                 switch (target.result.os.tag) {
                     .macos => {
                         applyUniversalSettings(&build_context, miniaudio);
@@ -1721,6 +1750,7 @@ pub fn build(b: *std.Build) void {
             floe_standalone.addIncludePath(b.path("src"));
             floe_standalone.linkLibrary(portmidi);
             floe_standalone.linkLibrary(miniaudio);
+            floe_standalone.addIncludePath(build_context.dep_miniaudio.path(""));
             floe_standalone.linkLibrary(plugin);
             b.getInstallStep().dependOn(&b.addInstallArtifact(floe_standalone, .{ .dest_dir = install_subfolder }).step);
             join_compile_commands.step.dependOn(&floe_standalone.step);
@@ -1942,47 +1972,66 @@ pub fn build(b: *std.Build) void {
                 "src/plugin/plugin_clap_entry.cpp",
             }, .flags = cpp_fp_flags });
 
-            const wrapper_path = "third_party_libs/clap-wrapper";
-            vst3.addCSourceFiles(.{ .files = &.{
-                wrapper_path ++ "/src/wrapasvst3.cpp",
-                wrapper_path ++ "/src/wrapasvst3_entry.cpp",
-                wrapper_path ++ "/src/wrapasvst3_export_entry.cpp",
-                wrapper_path ++ "/src/detail/vst3/parameter.cpp",
-                wrapper_path ++ "/src/detail/vst3/plugview.cpp",
-                wrapper_path ++ "/src/detail/vst3/process.cpp",
-                wrapper_path ++ "/src/detail/vst3/categories.cpp",
-                wrapper_path ++ "/src/clap_proxy.cpp",
-                wrapper_path ++ "/src/detail/shared/sha1.cpp",
-                wrapper_path ++ "/src/detail/clap/fsutil.cpp",
-            }, .flags = flags });
+            const wrapper_src_path = build_context.dep_clap_wrapper.path("src");
+            vst3.addCSourceFiles(.{
+                .root = wrapper_src_path,
+                .files = &.{
+                    "wrapasvst3.cpp",
+                    "wrapasvst3_entry.cpp",
+                    "wrapasvst3_export_entry.cpp",
+                    "detail/vst3/parameter.cpp",
+                    "detail/vst3/plugview.cpp",
+                    "detail/vst3/process.cpp",
+                    "detail/vst3/categories.cpp",
+                    "clap_proxy.cpp",
+                    "detail/shared/sha1.cpp",
+                    "detail/clap/fsutil.cpp",
+                },
+                .flags = flags,
+            });
 
             switch (target.result.os.tag) {
                 .windows => {
-                    vst3.addCSourceFiles(.{ .files = &.{
-                        wrapper_path ++ "/src/detail/os/windows.cpp",
-                        vst3_path ++ "/public.sdk/source/main/dllmain.cpp",
-                    }, .flags = flags });
+                    vst3.addCSourceFile(.{
+                        .file = build_context.dep_clap_wrapper.path("src/detail/os/windows.cpp"),
+                        .flags = flags,
+                    });
+                    vst3.addCSourceFiles(.{
+                        .files = &.{vst3_path ++ "/public.sdk/source/main/dllmain.cpp"},
+                        .flags = flags,
+                    });
                 },
                 .linux => {
-                    vst3.addCSourceFiles(.{ .files = &.{
-                        wrapper_path ++ "/src/detail/os/linux.cpp",
-                        vst3_path ++ "/public.sdk/source/main/linuxmain.cpp",
-                    }, .flags = flags });
+                    vst3.addCSourceFile(.{
+                        .file = build_context.dep_clap_wrapper.path("src/detail/os/linux.cpp"),
+                        .flags = flags,
+                    });
+                    vst3.addCSourceFiles(.{
+                        .files = &.{vst3_path ++ "/public.sdk/source/main/linuxmain.cpp"},
+                        .flags = flags,
+                    });
                 },
                 .macos => {
-                    vst3.addCSourceFiles(.{ .files = &.{
-                        wrapper_path ++ "/src/detail/os/macos.mm",
-                        wrapper_path ++ "/src/detail/clap/mac_helpers.mm",
-                        vst3_path ++ "/public.sdk/source/main/macmain.cpp",
-                    }, .flags = flags });
+                    vst3.addCSourceFiles(.{
+                        .root = wrapper_src_path,
+                        .files = &.{
+                            "detail/os/macos.mm",
+                            "detail/clap/mac_helpers.mm",
+                        },
+                        .flags = flags,
+                    });
+                    vst3.addCSourceFiles(.{
+                        .files = &.{vst3_path ++ "/public.sdk/source/main/macmain.cpp"},
+                        .flags = flags,
+                    });
                 },
                 else => {},
             }
 
             vst3.addIncludePath(b.path("third_party_libs/clap/include"));
-            vst3.addIncludePath(b.path("third_party_libs/clap-wrapper/include"));
+            vst3.addIncludePath(build_context.dep_clap_wrapper.path("include"));
+            vst3.addIncludePath(build_context.dep_clap_wrapper.path("libs/fmt"));
             vst3.addIncludePath(b.path("third_party_libs/vst3"));
-            vst3.addIncludePath(b.path("third_party_libs/clap-wrapper/libs/fmt"));
             vst3.linkLibCpp();
 
             vst3.linkLibrary(plugin);
@@ -2023,25 +2072,25 @@ pub fn build(b: *std.Build) void {
                 .optimize = build_context.optimise,
             });
             {
-                const au_path = "third_party_libs/AudioUnitSDK";
                 au_sdk.addCSourceFiles(.{
+                    .root = build_context.dep_au_sdk.path("src/AudioUnitSDK"),
                     .files = &.{
-                        au_path ++ "/src/AudioUnitSDK/AUBuffer.cpp",
-                        au_path ++ "/src/AudioUnitSDK/AUBufferAllocator.cpp",
-                        au_path ++ "/src/AudioUnitSDK/AUEffectBase.cpp",
-                        au_path ++ "/src/AudioUnitSDK/AUInputElement.cpp",
-                        au_path ++ "/src/AudioUnitSDK/AUMIDIBase.cpp",
-                        au_path ++ "/src/AudioUnitSDK/AUBase.cpp",
-                        au_path ++ "/src/AudioUnitSDK/AUMIDIEffectBase.cpp",
-                        au_path ++ "/src/AudioUnitSDK/AUOutputElement.cpp",
-                        au_path ++ "/src/AudioUnitSDK/AUPlugInDispatch.cpp",
-                        au_path ++ "/src/AudioUnitSDK/AUScopeElement.cpp",
-                        au_path ++ "/src/AudioUnitSDK/ComponentBase.cpp",
-                        au_path ++ "/src/AudioUnitSDK/MusicDeviceBase.cpp",
+                        "AUBuffer.cpp",
+                        "AUBufferAllocator.cpp",
+                        "AUEffectBase.cpp",
+                        "AUInputElement.cpp",
+                        "AUMIDIBase.cpp",
+                        "AUBase.cpp",
+                        "AUMIDIEffectBase.cpp",
+                        "AUOutputElement.cpp",
+                        "AUPlugInDispatch.cpp",
+                        "AUScopeElement.cpp",
+                        "ComponentBase.cpp",
+                        "MusicDeviceBase.cpp",
                     },
                     .flags = cpp_flags,
                 });
-                au_sdk.addIncludePath(b.path(au_path ++ "/include"));
+                au_sdk.addIncludePath(build_context.dep_au_sdk.path("include"));
                 au_sdk.linkLibCpp();
                 applyUniversalSettings(&build_context, au_sdk);
             }
@@ -2082,18 +2131,22 @@ pub fn build(b: *std.Build) void {
                     "src/plugin/plugin_clap_entry.cpp",
                 }, .flags = cpp_fp_flags });
 
-                const wrapper_path = "third_party_libs/clap-wrapper";
-                au.addCSourceFiles(.{ .files = &.{
-                    wrapper_path ++ "/src/clap_proxy.cpp",
-                    wrapper_path ++ "/src/detail/shared/sha1.cpp",
-                    wrapper_path ++ "/src/detail/clap/fsutil.cpp",
-                    wrapper_path ++ "/src/detail/os/macos.mm",
-                    wrapper_path ++ "/src/detail/clap/mac_helpers.mm",
-                    wrapper_path ++ "/src/wrapasauv2.cpp",
-                    wrapper_path ++ "/src/detail/auv2/process.cpp",
-                    wrapper_path ++ "/src/detail/auv2/wrappedview.mm",
-                    wrapper_path ++ "/src/detail/auv2/parameter.cpp",
-                }, .flags = flags });
+                const wrapper_src_path = build_context.dep_clap_wrapper.path("src");
+                au.addCSourceFiles(.{
+                    .root = wrapper_src_path,
+                    .files = &.{
+                        "clap_proxy.cpp",
+                        "detail/shared/sha1.cpp",
+                        "detail/clap/fsutil.cpp",
+                        "detail/os/macos.mm",
+                        "detail/clap/mac_helpers.mm",
+                        "wrapasauv2.cpp",
+                        "detail/auv2/process.cpp",
+                        "detail/auv2/wrappedview.mm",
+                        "detail/auv2/parameter.cpp",
+                    },
+                    .flags = flags,
+                });
 
                 {
                     const file = std.fs.createFileAbsolute(b.pathJoin(&.{ rootdir, build_gen_relative, "generated_entrypoints.hxx" }), .{ .truncate = true }) catch @panic("could not create file");
@@ -2138,11 +2191,11 @@ pub fn build(b: *std.Build) void {
                 }
 
                 au.addIncludePath(b.path("third_party_libs/clap/include"));
-                au.addIncludePath(b.path("third_party_libs/clap-wrapper/include"));
-                au.addIncludePath(b.path("third_party_libs/AudioUnitSDK/include"));
-                au.addIncludePath(b.path("third_party_libs/clap-wrapper/libs/fmt"));
+                au.addIncludePath(build_context.dep_au_sdk.path("include"));
+                au.addIncludePath(build_context.dep_clap_wrapper.path("include"));
+                au.addIncludePath(build_context.dep_clap_wrapper.path("libs/fmt"));
+                au.addIncludePath(build_context.dep_clap_wrapper.path("src"));
                 au.addIncludePath(b.path(build_gen_relative));
-                au.addIncludePath(b.path(wrapper_path ++ "/src"));
                 au.linkLibCpp();
 
                 au.linkLibrary(plugin);
@@ -2182,15 +2235,16 @@ pub fn build(b: *std.Build) void {
                 .optimize = build_context.optimise,
             });
             miniz.addCSourceFiles(.{
+                .root = build_context.dep_miniz.path(""),
                 .files = &.{
-                    "third_party_libs/miniz/miniz.c",
-                    "third_party_libs/miniz/miniz_tdef.c",
-                    "third_party_libs/miniz/miniz_tinfl.c",
-                    "third_party_libs/miniz/miniz_zip.c",
+                    "miniz.c",
+                    "miniz_tdef.c",
+                    "miniz_tinfl.c",
+                    "miniz_zip.c",
                 },
                 .flags = generic_flags,
             });
-            miniz.addIncludePath(b.path("third_party_libs/miniz"));
+            miniz.addIncludePath(build_context.dep_miniz.path(""));
             miniz.linkLibC();
             const miniz_config = b.addConfigHeader(.{
                 .style = .blank,
@@ -2323,6 +2377,7 @@ pub fn build(b: *std.Build) void {
                 win_installer.linkLibrary(library);
                 win_installer.linkLibrary(miniz);
                 win_installer.addConfigHeader(miniz_config);
+                win_installer.addIncludePath(build_context.dep_miniz.path(""));
                 applyUniversalSettings(&build_context, win_installer);
 
                 // everything needs to be installed before we compile the installer because it needs to embed the plugins

@@ -3,6 +3,8 @@
 
 #include "sample_library_server.hpp"
 
+#include <xxhash.h>
+
 #include "foundation/foundation.hpp"
 #include "os/filesystem.hpp"
 #include "os/threading.hpp"
@@ -14,7 +16,6 @@
 #include "common/common_errors.hpp"
 #include "sample_library/audio_file.hpp"
 #include "sample_library/sample_library.hpp"
-#include "xxHash/xxhash.h"
 
 namespace sample_lib_server {
 

@@ -3,10 +3,11 @@
 
 #include "gui_dragger_widgets.hpp"
 
+#include <IconsFontAwesome5.h>
+
 #include "framework/gui_live_edit.hpp"
 #include "gui.hpp"
 #include "gui_widget_helpers.hpp"
-#include "IconFontCppHeaders/IconsFontAwesome5.h"
 
 namespace draggers {
 

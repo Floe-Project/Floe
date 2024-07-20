@@ -1512,7 +1512,7 @@ void DrawList::AddImageRounded(TextureHandle user_texture_id,
 #pragma clang diagnostic ignored "-Wimplicit-fallthrough"
 #pragma clang diagnostic ignored "-Wdouble-promotion"
 #define STB_TRUETYPE_IMPLEMENTATION
-#include "stb/stb_truetype.h"
+#include <stb_truetype.h>
 #pragma clang diagnostic pop
 
 void FontAtlas::ClearInputData() {

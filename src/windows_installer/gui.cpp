@@ -13,6 +13,7 @@
 #include <errhandlingapi.h>
 #include <richedit.h>
 #include <shellapi.h>
+#include <stb_image.h>
 #include <wingdi.h>
 
 #include "foundation/foundation.hpp"
@@ -21,7 +22,6 @@
 #include "os/threading.hpp"
 
 #include "gui.hpp"
-#include "stb/stb_image.h"
 
 constexpr auto k_page_class_name = L"floe-page";
 constexpr auto k_divider_class_name = L"floe-divider";

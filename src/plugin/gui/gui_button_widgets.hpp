@@ -3,10 +3,11 @@
 
 #pragma once
 
+#include <IconsFontAwesome5.h>
+
 #include "framework/draw_list.hpp"
 #include "framework/gui_imgui.hpp"
 #include "gui_fwd.hpp"
-#include "IconFontCppHeaders/IconsFontAwesome5.h"
 #include "layout.hpp"
 #include "param_info.hpp"
 

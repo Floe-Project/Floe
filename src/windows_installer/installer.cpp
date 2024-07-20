@@ -3,8 +3,8 @@
 
 #include "installer.hpp"
 
-#include <miniz/miniz.h>
-#include <stb/stb_image.h>
+#include <miniz.h>
+#include <stb_image.h>
 #include <windows.h>
 
 //

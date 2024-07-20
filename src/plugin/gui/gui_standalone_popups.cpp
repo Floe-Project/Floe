@@ -3,15 +3,15 @@
 
 #include "gui_standalone_popups.hpp"
 
-#include <IconFontCppHeaders/IconsFontAwesome5.h>
+#include <IconsFontAwesome5.h>
 
 #include "foundation/foundation.hpp"
 #include "os/misc.hpp"
 
 #include "common/constants.hpp"
 #include "common/paths.hpp"
-#include "framework/gui_live_edit.hpp"
 #include "framework/gui_frame.hpp"
+#include "framework/gui_live_edit.hpp"
 #include "gui.hpp"
 #include "gui/framework/draw_list.hpp"
 #include "gui/gui_button_widgets.hpp"

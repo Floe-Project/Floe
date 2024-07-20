@@ -3,6 +3,8 @@
 
 #include "gui_layer.hpp"
 
+#include <IconsFontAwesome5.h>
+
 #include "framework/gui_live_edit.hpp"
 #include "gui.hpp"
 #include "gui_button_widgets.hpp"
@@ -16,7 +18,6 @@
 #include "gui_widget_compounds.hpp"
 #include "gui_widget_helpers.hpp"
 #include "gui_window.hpp"
-#include "IconFontCppHeaders/IconsFontAwesome5.h"
 #include "layer_processor.hpp"
 #include "plugin_instance.hpp"
 
@@ -915,8 +916,7 @@ void Draw(Gui* g,
                         label_id,
                         label_r,
                         layer->processor.params[ToInt(LayerParamIndex::MidiTranspose)].info.tooltip);
-                if (imgui.IsHot(label_id))
-                    imgui.frame_output.cursor_type = CursorType::Default;
+                if (imgui.IsHot(label_id)) imgui.frame_output.cursor_type = CursorType::Default;
             }
 
             buttons::Toggle(g,
@@ -981,8 +981,7 @@ void Draw(Gui* g,
                         "low velocity to high velocity. To do this, 2 or more layers should be used, and "
                         "each layer should be given a different velocity mapping option so that the loudness "
                         "of each layer is controlled by the MIDI velocity."_s);
-                if (imgui.IsHot(label_id))
-                    imgui.frame_output.cursor_type = CursorType::Default;
+                if (imgui.IsHot(label_id)) imgui.frame_output.cursor_type = CursorType::Default;
             }
 
             break;

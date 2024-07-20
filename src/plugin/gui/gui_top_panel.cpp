@@ -1,13 +1,14 @@
 // Copyright 2018-2024 Sam Windell
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <IconsFontAwesome5.h>
+
 #include "gui_button_widgets.hpp"
 #include "gui_menu.hpp"
 #include "gui_peak_meter_widget.hpp"
 #include "gui_standalone_popups.hpp"
 #include "gui_widget_compounds.hpp"
 #include "gui_widget_helpers.hpp"
-#include "IconFontCppHeaders/IconsFontAwesome5.h"
 #include "plugin_instance.hpp"
 #include "presets_folder.hpp"
 #include "state/state_snapshot.hpp"

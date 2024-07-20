@@ -3,7 +3,7 @@
 
 #include "gui_waveform.hpp"
 
-#include <IconFontCppHeaders/IconsFontAwesome5.h>
+#include <IconsFontAwesome5.h>
 
 #include "common/constants.hpp"
 #include "framework/gui_live_edit.hpp"
@@ -132,7 +132,8 @@ static void GUIDoSampleWaveformOverlay(Gui* g, PluginInstance::Layer* layer, Rec
 
         if (imgui.IsHotOrActive(id)) {
             imgui.frame_output.cursor_type = CursorType::HorizontalArrows;
-            if (imgui.frame_input.Mouse(MouseButton::Left).double_click) g->param_text_editor_to_open = params[0];
+            if (imgui.frame_input.Mouse(MouseButton::Left).double_click)
+                g->param_text_editor_to_open = params[0];
         }
 
         if (imgui.WasJustActivated(id))

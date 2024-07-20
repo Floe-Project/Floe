@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <foundation/foundation.hpp>
-#include <lua/lua.h>
+#include <lua.h>
 #include <os/misc.hpp>
 
 #include "utils/logger/logger.hpp"

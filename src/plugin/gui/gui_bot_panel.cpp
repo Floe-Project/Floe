@@ -1,7 +1,7 @@
 // Copyright 2018-2024 Sam Windell
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include <IconFontCppHeaders/IconsFontAwesome5.h>
+#include <IconsFontAwesome5.h>
 
 #include "framework/gui_live_edit.hpp"
 #include "gui.hpp"

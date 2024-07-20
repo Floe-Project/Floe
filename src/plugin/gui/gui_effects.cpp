@@ -3,8 +3,8 @@
 
 #include "gui_effects.hpp"
 
+#include <IconsFontAwesome5.h>
 #include <float.h>
-#include <IconFontCppHeaders/IconsFontAwesome5.h>
 
 #include "effects/effect.hpp"
 #include "framework/gui_live_edit.hpp"
@@ -1076,9 +1076,10 @@ void DoEffectsWindow(Gui* g, Rect r) {
                           fmt::Format(g->scratch_arena, "{}", slot + 1),
                           labels::Parameter(imgui));
 
-            if (dragging_fx && (converted_slot_r.Contains(imgui.frame_input.cursor_pos) ||
-                                dragging_fx->drop_slot == slot)) {
-                if (dragging_fx->drop_slot != slot) imgui.frame_output.IncreaseStatus(GuiFrameResult::Status::ImmediatelyUpdate);
+            if (dragging_fx &&
+                (converted_slot_r.Contains(imgui.frame_input.cursor_pos) || dragging_fx->drop_slot == slot)) {
+                if (dragging_fx->drop_slot != slot)
+                    imgui.frame_output.IncreaseStatus(GuiFrameResult::Status::ImmediatelyUpdate);
                 dragging_fx->drop_slot = slot;
                 imgui.graphics->AddRectFilled(converted_slot_r.Min(),
                                               converted_slot_r.Max(),

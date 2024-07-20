@@ -3,12 +3,13 @@
 
 #include "gui_imgui.hpp"
 
+#include <stb_sprintf.h>
+
 #include "foundation/foundation.hpp"
 #include "os/misc.hpp"
 #include "utils/debug/debug.hpp"
 
 #include "gui_frame.hpp"
-#include "stb/stb_sprintf.h"
 
 namespace imgui {
 
@@ -273,7 +274,7 @@ static bool STB_TEXTEDIT_INSERTCHARS(STB_TEXTEDIT_STRING* imgui, //
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wconversion"
-#include "stb/stb_textedit.h"
+#include <stb_textedit.h>
 #pragma clang diagnostic pop
 
 } // namespace stb

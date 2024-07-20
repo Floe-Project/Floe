@@ -3,4 +3,4 @@
 
 // We compile as C++ so Lua uses C++ exceptions instead of setjmp/longjmp
 #define MAKE_LIB
-#include "lua/onelua.c"
+#include <onelua.c>

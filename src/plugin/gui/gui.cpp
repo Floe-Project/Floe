@@ -4,9 +4,9 @@
 
 #include "gui.hpp"
 
-#include <IconFontCppHeaders/IconsFontAwesome5.h>
-#include <stb/stb_image.h>
-#include <stb/stb_image_resize2.h>
+#include <IconsFontAwesome5.h>
+#include <stb_image.h>
+#include <stb_image_resize2.h>
 
 #include "foundation/foundation.hpp"
 #include "os/filesystem.hpp"

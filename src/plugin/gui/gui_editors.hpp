@@ -3,12 +3,13 @@
 
 #pragma once
 
+#include <stb_image_write.h>
+
 #include "os/filesystem.hpp"
 
 #include "framework/gui_live_edit.hpp"
 #include "gui.hpp"
 #include "gui_editor_widgets.hpp"
-#include "stb/stb_image_write.h"
 
 static void DoProfileGUI(Gui* g, Rect r) {
     auto& imgui = g->imgui;

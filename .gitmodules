@@ -49,3 +49,6 @@
 [submodule "third_party_libs/lua"]
 	path = third_party_libs/lua
 	url = https://github.com/lua/lua
+[submodule "third_party_libs/valgrind"]
+	path = third_party_libs/valgrind
+	url = https://github.com/allyourcodebase/valgrind.h

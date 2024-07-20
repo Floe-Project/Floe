@@ -12,7 +12,7 @@
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
-#include <valgrind/valgrind.h>
+#include <valgrind/valgrind/valgrind.h>
 
 #include "foundation/foundation.hpp"
 #include "os/misc.hpp"

@@ -14,7 +14,7 @@ class Delay final : public Effect {
 
     void ResetInternal() override { vitfx::delay::HardReset(*delay); }
 
-    virtual void PrepareToPlay(AudioProcessingContext const& context) override {
+    void PrepareToPlay(AudioProcessingContext const& context) override {
         vitfx::delay::SetSampleRate(*delay, (int)context.sample_rate);
     }
 

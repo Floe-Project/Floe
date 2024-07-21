@@ -13,7 +13,7 @@ class Reverb final : public Effect {
 
     void ResetInternal() override { vitfx::reverb::HardReset(*reverb); }
 
-    virtual void PrepareToPlay(AudioProcessingContext const& context) override {
+    void PrepareToPlay(AudioProcessingContext const& context) override {
         vitfx::reverb::SetSampleRate(*reverb, (int)context.sample_rate);
     }
 

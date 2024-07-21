@@ -13,7 +13,7 @@ class Phaser final : public Effect {
 
     void ResetInternal() override { vitfx::phaser::HardReset(*phaser); }
 
-    virtual void PrepareToPlay(AudioProcessingContext const& context) override {
+    void PrepareToPlay(AudioProcessingContext const& context) override {
         vitfx::phaser::SetSampleRate(*phaser, (int)context.sample_rate);
     }
 

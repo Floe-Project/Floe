@@ -153,7 +153,7 @@ class Chorus final : public Effect {
         return m_wet_dry.MixStereo(m_smoothed_value_system, frame_index, out, in);
     }
 
-    virtual void ResetInternal() override {
+    void ResetInternal() override {
         for (auto const i : Range(ToInt(ChorusIndexes::Count)))
             m_c[i].Reset();
     }

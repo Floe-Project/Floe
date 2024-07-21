@@ -739,41 +739,46 @@ struct Context {
     DynamicArray<Id> id_stack {Malloc::Instance()};
 
 #if !FLOE_EDITOR_ENABLED
-    static constexpr
+    // WARNING: this is broken - possibily a bug in Clang's constexpr handling because the non-constexpr
+    // version works fine. It results in really strange memory corruption when the constexpr version is used.
+    //
+    // TODO: maybe make this global again rather than a member of Context because it's a huge amount of memory
+    //
+    // static constexpr
 #endif
-        // NOLINTNEXTLINE(readability-identifier-naming)
-        LiveEditGui live_edit_values {
-            .ui_sizes =
-                {
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    LiveEditGui live_edit_values {
+        .ui_sizes =
+            {
 #define GUI_SIZE(cat, n, v, unit) v,
 #include SIZES_DEF_FILENAME
 #undef GUI_SIZE
-                },
-            .ui_sizes_units =
-                {
+            },
+        .ui_sizes_units =
+            {
 #define GUI_SIZE(cat, n, v, unit) UiSizeUnit::unit,
 #include SIZES_DEF_FILENAME
 #undef GUI_SIZE
-                },
-            .ui_sizes_names =
-                {
+            },
+        .ui_sizes_names =
+            {
 #define GUI_SIZE(cat, n, v, unit) #n,
 #include SIZES_DEF_FILENAME
 #undef GUI_SIZE
-                },
-            .ui_cols =
-                {
+            },
+        .ui_cols =
+            {
 #define GUI_COL(name, val, based_on, bright, alpha) {String(name), val, String(based_on), bright, alpha},
 #include COLOURS_DEF_FILENAME
 #undef GUI_COL
-                },
-            .ui_col_map =
-                {
+            },
+        .ui_col_map =
+            {
 #define GUI_COL_MAP(cat, n, col, high_contrast_col) {String(col), String(high_contrast_col)},
 #include COLOUR_MAP_DEF_FILENAME
 #undef GUI_COL_MAP
-                },
-        };
+            },
+    };
 };
 
 f32x2 BestPopupPos(Rect base_r, Rect avoid_r, f32x2 window_size, bool find_left_or_right);

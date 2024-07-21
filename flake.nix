@@ -161,7 +161,7 @@
             pkgs.patchelf
             pkgs.valgrind
 
-            # These 2 utilities ensure that we can run the binaries that we build regardless of the system outside of
+            # These following 2 'patch' utilities ensure that we can run the binaries that we build regardless of the system outside of
             # this nix devshell. For example on Ubuntu CI machines we don't have to manage what dependencies are 
             # installed on the system via apt.
 

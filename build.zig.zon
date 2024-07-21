@@ -4,6 +4,7 @@
 // Misc helper info:
 // - GitHub allows you to get a tar.gz of a specific commit: https://docs.github.com/en/repositories/working-with-files/using-files/downloading-source-code-archives#source-code-archive-urls
 // - If you omit the .hash field, zig will error and tell you the hash you need
+// - IMPORTANT: if you use the same hash for multiple dependencies you will silently get problems: https://github.com/ziglang/zig/issues/16679
 // - Zig supports git+https://domain/path#commit: https://github.com/ziglang/zig/commit/9a001e1f7cc878579f1c0a614ac0124bfdc58332
 
 .{
@@ -19,8 +20,8 @@
             .hash = "1220ecdfd02d7b2ec56d4d64b681e0e6b742128885db3bb250b73798a69e75c67337",
         },
         .audio_unit_sdk = .{
-            .url = "https://github.com/apple/AudioUnitSDK/archive/refs/tags/AudioUnitSDK-1.1.0.tar.gz",
-            .hash = "1220091aa4777c87d0f393b52998dbd88dda9383c746f372f965748a4783e782472c",
+            .url = "https://github.com/Floe-Synth/AudioUnitSDK/archive/refs/tags/v1.1.0.tar.gz",
+            .hash = "12208f7bcf60ae38c05e372f98ac2d487a3ed1bc79ef413820661fd04311b496f1e5",
         },
         .miniaudio = .{
             .url = "https://github.com/mackron/miniaudio/archive/refs/tags/0.11.21.tar.gz",

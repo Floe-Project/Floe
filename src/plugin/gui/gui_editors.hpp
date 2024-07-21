@@ -173,7 +173,7 @@ static void DoCommandPanel(Gui* g, Rect r) {
             auto const opt_path = outcome.Value();
             if (opt_path) {
                 CopyStringIntoBufferWithNullTerm(g_background_filepath, *opt_path);
-                g->frame_output.IncreaseStatus(GuiFrameResult::Status::Animate);
+                g->frame_output.ElevateUpdateRequest(GuiFrameResult::UpdateRequest::Animate);
             }
         } else {
             PanicIfReached();

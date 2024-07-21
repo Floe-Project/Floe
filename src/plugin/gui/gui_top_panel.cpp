@@ -371,7 +371,7 @@ void TopPanel(Gui* g) {
                         knobs::DefaultKnob(imgui));
             g->dynamics_slider_is_held = imgui.IsActive(id);
             if (imgui.WasJustActivated(id))
-                g->imgui.frame_output.IncreaseStatus(GuiFrameResult::Status::ImmediatelyUpdate);
+                g->imgui.frame_output.ElevateUpdateRequest(GuiFrameResult::UpdateRequest::ImmediatelyUpdate);
         } else {
             auto knob_r = lay.GetRect(dyn.control);
             knobs::FakeKnob(g, knob_r);

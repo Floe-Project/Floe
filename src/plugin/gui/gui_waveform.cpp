@@ -494,7 +494,7 @@ static void GUIDoSampleWaveformOverlay(Gui* g, PluginInstance::Layer* layer, Rec
                                   imgui.WindowPosToScreenPos(waveform_r.pos).x,
                                   {},
                                   intensity);
-            g->frame_output.IncreaseStatus(GuiFrameResult::Status::Animate);
+            g->frame_output.ElevateUpdateRequest(GuiFrameResult::UpdateRequest::Animate);
         }
     }
 

@@ -130,9 +130,9 @@ struct MouseTrackedRect {
 
 enum class CursorType { Default, Hand, IBeam, AllArrows, HorizontalArrows, VerticalArrows, Count };
 
-// Reset this at the start of each frame
+// Fill this struct every frame to instruct the caller about the GUI's needs.
 struct GuiFrameResult {
-    enum class Status {
+    enum class UpdateRequest {
         // 1. GUI will sleep until there's user iteraction or a timed wakeup fired
         Sleep,
 
@@ -145,11 +145,11 @@ struct GuiFrameResult {
     };
 
     // only sets the status if it's more important than the current status
-    void IncreaseStatus(Status s) {
-        if (ToInt(s) > ToInt(status)) status = s;
+    void ElevateUpdateRequest(UpdateRequest r) {
+        if (ToInt(r) > ToInt(update_request)) update_request = r;
     }
 
-    Status status {Status::Sleep};
+    UpdateRequest update_request {UpdateRequest::Sleep};
 
     // Set this if you want to be woken up at certain times in the future. Out-of-date wakeups will be removed
     // for you.

@@ -381,11 +381,11 @@ struct Context {
 
     void SetYScroll(Window* window, f32 val) {
         window->scroll_offset.y = val;
-        frame_output.IncreaseStatus(GuiFrameResult::Status::ImmediatelyUpdate);
+        frame_output.ElevateUpdateRequest(GuiFrameResult::UpdateRequest::ImmediatelyUpdate);
     }
     void SetXScroll(Window* window, f32 val) {
         window->scroll_offset.x = val;
-        frame_output.IncreaseStatus(GuiFrameResult::Status::ImmediatelyUpdate);
+        frame_output.ElevateUpdateRequest(GuiFrameResult::UpdateRequest::ImmediatelyUpdate);
     }
     bool ScrollWindowToShowRectangle(Rect r);
 

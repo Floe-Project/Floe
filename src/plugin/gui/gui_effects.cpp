@@ -666,7 +666,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
 
         ASSERT(closest_slot <= ordered_effects.size);
         if (dragging_fx_unit->drop_slot != closest_slot)
-            imgui.frame_output.IncreaseStatus(GuiFrameResult::Status::ImmediatelyUpdate);
+            imgui.frame_output.ElevateUpdateRequest(GuiFrameResult::UpdateRequest::ImmediatelyUpdate);
         dragging_fx_unit->drop_slot = closest_slot;
     }
 
@@ -731,7 +731,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
 
                 if (imgui.WasJustActivated(id)) {
                     dragging_fx_unit = DraggingFX {id, &fx, FindSlotInEffects(ordered_effects, &fx), {}};
-                    imgui.frame_output.IncreaseStatus(GuiFrameResult::Status::ImmediatelyUpdate);
+                    imgui.frame_output.ElevateUpdateRequest(GuiFrameResult::UpdateRequest::ImmediatelyUpdate);
                 }
 
                 if (imgui.IsHotOrActive(id)) g->frame_output.cursor_type = CursorType::AllArrows;
@@ -1079,7 +1079,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
             if (dragging_fx &&
                 (converted_slot_r.Contains(imgui.frame_input.cursor_pos) || dragging_fx->drop_slot == slot)) {
                 if (dragging_fx->drop_slot != slot)
-                    imgui.frame_output.IncreaseStatus(GuiFrameResult::Status::ImmediatelyUpdate);
+                    imgui.frame_output.ElevateUpdateRequest(GuiFrameResult::UpdateRequest::ImmediatelyUpdate);
                 dragging_fx->drop_slot = slot;
                 imgui.graphics->AddRectFilled(converted_slot_r.Min(),
                                               converted_slot_r.Max(),

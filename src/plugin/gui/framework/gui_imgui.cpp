@@ -52,7 +52,7 @@ void Context::Trace(u32 type, char const* function, char const* fmt, ...) {
 
 #define SET_ONE_MORE_FRAME(...)                                                                              \
     do {                                                                                                     \
-        frame_output.IncreaseStatus(GuiFrameResult::Status::ImmediatelyUpdate);                              \
+        frame_output.ElevateUpdateRequest(GuiFrameResult::UpdateRequest::ImmediatelyUpdate);                 \
         IMGUI_TRACE_MSG(TraceTypeRequiresUpdate, __VA_ARGS__);                                               \
     } while (0)
 

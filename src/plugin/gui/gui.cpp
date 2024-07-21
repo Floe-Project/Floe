@@ -5,8 +5,8 @@
 #include "gui.hpp"
 
 #include <IconsFontAwesome5.h>
+#include <deprecated/stb_image_resize.h>
 #include <stb_image.h>
-#include <stb_image_resize2.h>
 
 #include "foundation/foundation.hpp"
 #include "os/filesystem.hpp"
@@ -354,15 +354,15 @@ LibraryImages LoadLibraryBackgroundAndIconIfNeeded(Gui* g, sample_lib::Library c
                     desired_width,
                     desired_height);
 
-            stbir_resize_uint8_linear(background_rgba,
-                                      background_size.width,
-                                      background_size.height,
-                                      0,
-                                      background_buf.data,
-                                      desired_width,
-                                      desired_height,
-                                      0,
-                                      (stbir_pixel_layout)k_channels);
+            stbir_resize_uint8(background_rgba,
+                               background_size.width,
+                               background_size.height,
+                               0,
+                               background_buf.data,
+                               desired_width,
+                               desired_height,
+                               0,
+                               k_channels);
 
             background_rgba = background_buf.data;
             background_size = {CheckedCast<u16>(desired_width), CheckedCast<u16>(desired_height)};
@@ -410,15 +410,15 @@ LibraryImages LoadLibraryBackgroundAndIconIfNeeded(Gui* g, sample_lib::Library c
                 for (auto i : Range(background_size.width * background_size.height * k_channels))
                     background_rgba[i] = background_rgba[i];
 
-                stbir_resize_uint8_linear(background_rgba,
-                                          (int)background_size.width,
-                                          (int)background_size.height,
-                                          0,
-                                          blurred_image_buffer.data,
-                                          blur_img_size.width,
-                                          blur_img_size.height,
-                                          0,
-                                          (stbir_pixel_layout)k_channels);
+                stbir_resize_uint8(background_rgba,
+                                   (int)background_size.width,
+                                   (int)background_size.height,
+                                   0,
+                                   blurred_image_buffer.data,
+                                   blur_img_size.width,
+                                   blur_img_size.height,
+                                   0,
+                                   k_channels);
 
             } else {
                 blurred_image_buffer =

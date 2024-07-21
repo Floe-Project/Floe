@@ -5,6 +5,7 @@ SPDX-License-Identifier: CC0-1.0
 
 ![CI](https://github.com/Floe-Synth/Floe/actions/workflows/ci.yml/badge.svg)
 [![codecov](https://codecov.io/github/Floe-Synth/Floe/graph/badge.svg?token=7HEJ7SF75K)](https://codecov.io/github/Floe-Synth/Floe)
+[![CodeFactor](https://www.codefactor.io/repository/github/floe-synth/floe/badge/main)](https://www.codefactor.io/repository/github/floe-synth/floe/overview/main)
 
 # Floe Source Code
 

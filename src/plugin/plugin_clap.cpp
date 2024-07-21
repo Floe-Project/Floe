@@ -63,7 +63,7 @@ UninitialisedGlobalObj<CrossInstanceSystems> g_cross_instance_systems {};
 
 static u16 g_floe_instance_id_counter = 0;
 
-int GuiPlatform::g_counter = 0;
+int GuiPlatform::g_world_counter = 0;
 PuglWorld* GuiPlatform::g_world = nullptr;
 
 struct FloeInstance {
@@ -169,9 +169,7 @@ clap_plugin_gui const floe_gui {
         floe.pugl_platform.Emplace(floe.host,
                                    g_cross_instance_systems->settings,
                                    g_cross_instance_systems->logger);
-        floe.pugl_platform->CreateView(*floe.plugin);
-
-        return true;
+        return !CreateView(*floe.pugl_platform, *floe.plugin).HasError();
     },
 
     // Free all resources associated with the gui.

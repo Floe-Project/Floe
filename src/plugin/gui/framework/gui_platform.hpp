@@ -26,43 +26,6 @@ struct GuiPlatform {
         , settings(settings)
         , logger(logger) {}
 
-    void* CreateView(PluginInstance& plugin) {
-        g_counter++;
-        if (auto const floe_host =
-                (FloeClapExtensionHost const*)host.get_extension(&host, k_floe_clap_extension_id);
-            floe_host != nullptr) {
-            world = (PuglWorld*)floe_host->pugl_world;
-            ASSERT(world != nullptr);
-        } else if (g_counter == 1) {
-            ASSERT(g_world == nullptr);
-            g_world = puglNewWorld(PUGL_MODULE, 0);
-            puglSetWorldString(g_world, PUGL_CLASS_NAME, "Floe");
-            world = g_world;
-        } else {
-            ASSERT(g_world != nullptr);
-            world = g_world;
-        }
-
-        view = puglNewView(world);
-        puglSetHandle(view, this);
-        puglSetEventFunc(view, OnEvent);
-
-        // IMPROVE: we might want a DirectX backend for Windows
-        puglSetBackend(view, puglGlBackend());
-        puglSetViewHint(view, PUGL_CONTEXT_VERSION_MAJOR, 3);
-        puglSetViewHint(view, PUGL_CONTEXT_VERSION_MINOR, 3);
-        puglSetViewHint(view, PUGL_CONTEXT_PROFILE, PUGL_OPENGL_COMPATIBILITY_PROFILE);
-        puglSetViewHint(view, PUGL_CONTEXT_DEBUG, RUNTIME_SAFETY_CHECKS_ON);
-
-        puglSetViewHint(view, PUGL_RESIZABLE, true);
-        auto const size = gui_settings::WindowSize(settings.settings.gui);
-        puglSetSize(view, size.width, size.height);
-
-        gui.Emplace(frame_state, plugin);
-
-        return view;
-    }
-
     bool DestroyView() {
         gui.Clear();
 
@@ -73,7 +36,7 @@ struct GuiPlatform {
         }
         puglFreeView(view);
 
-        if (--g_counter == 0) {
+        if (--g_world_counter == 0) {
             if (g_world) {
                 puglFreeWorld(g_world);
                 g_world = nullptr;
@@ -260,17 +223,25 @@ struct GuiPlatform {
 
                     if (self.last_result.cursor_type != self.current_cursor) {
                         self.current_cursor = self.last_result.cursor_type;
-                        switch (self.last_result.cursor_type) {
-                            case CursorType::Default: puglSetCursor(view, PUGL_CURSOR_ARROW); break;
-                            case CursorType::Hand: puglSetCursor(view, PUGL_CURSOR_HAND); break;
-                            case CursorType::IBeam: puglSetCursor(view, PUGL_CURSOR_CARET); break;
-                            case CursorType::AllArrows: puglSetCursor(view, PUGL_CURSOR_ALL_SCROLL); break;
-                            case CursorType::HorizontalArrows:
-                                puglSetCursor(view, PUGL_CURSOR_LEFT_RIGHT);
-                                break;
-                            case CursorType::VerticalArrows: puglSetCursor(view, PUGL_CURSOR_UP_DOWN); break;
-                            case CursorType::Count: break;
-                        }
+                        puglSetCursor(view, ({
+                                          PuglCursor cursor = PUGL_CURSOR_ARROW;
+                                          switch (self.last_result.cursor_type) {
+                                              case CursorType::Default: cursor = PUGL_CURSOR_ARROW; break;
+                                              case CursorType::Hand: cursor = PUGL_CURSOR_HAND; break;
+                                              case CursorType::IBeam: cursor = PUGL_CURSOR_CARET; break;
+                                              case CursorType::AllArrows:
+                                                  cursor = PUGL_CURSOR_ALL_SCROLL;
+                                                  break;
+                                              case CursorType::HorizontalArrows:
+                                                  cursor = PUGL_CURSOR_LEFT_RIGHT;
+                                                  break;
+                                              case CursorType::VerticalArrows:
+                                                  cursor = PUGL_CURSOR_UP_DOWN;
+                                                  break;
+                                              case CursorType::Count: break;
+                                          }
+                                          cursor;
+                                      }));
                     }
 
                     if (self.last_result.wants_clipboard_text_paste) puglPaste(view);
@@ -573,7 +544,7 @@ struct GuiPlatform {
 
     static constexpr uintptr_t k_timer_id = 200;
 
-    static int g_counter;
+    static int g_world_counter;
     static PuglWorld* g_world;
 
     clap_host const& host;
@@ -583,9 +554,99 @@ struct GuiPlatform {
     PuglWorld* world;
     PuglView* view;
     bool processing_events = false;
-    Optional<CursorType> current_cursor {};
+    CursorType current_cursor {CursorType::Default};
     graphics::DrawContext* graphics_ctx {};
     GuiFrameResult last_result;
     GuiFrameInput frame_state;
     Optional<Gui> gui;
 };
+
+enum class GuiPlatformErrorCode {
+    UnknownError,
+    Unsupported,
+    BackendFailed,
+    RegistrationFailed,
+    RealizeFailed,
+    SetFormatFailed,
+    CreateContextFailed,
+};
+static ErrorCodeCategory const gui_platform_error_code {
+    .category_id = "GUIP",
+    .message = [](Writer const& writer, ErrorCode code) -> ErrorCodeOr<void> {
+        String str {};
+        switch ((GuiPlatformErrorCode)code.code) {
+            case GuiPlatformErrorCode::UnknownError: str = "Unknown error"; break;
+            case GuiPlatformErrorCode::Unsupported: str = "Unsupported"; break;
+            case GuiPlatformErrorCode::BackendFailed: str = "Backend init failed"; break;
+            case GuiPlatformErrorCode::RegistrationFailed: str = "Registration failed"; break;
+            case GuiPlatformErrorCode::RealizeFailed: str = "Realize failed"; break;
+            case GuiPlatformErrorCode::SetFormatFailed: str = "Set format failed"; break;
+            case GuiPlatformErrorCode::CreateContextFailed: str = "Create context failed"; break;
+        }
+        return writer.WriteChars(str);
+    },
+};
+inline ErrorCodeCategory const& ErrorCategoryForEnum(GuiPlatformErrorCode) { return gui_platform_error_code; }
+
+static ErrorCodeOr<void> Required(PuglStatus status) {
+    switch (status) {
+        case PUGL_SUCCESS: return k_success;
+
+        case PUGL_UNSUPPORTED: return ErrorCode {GuiPlatformErrorCode::Unsupported};
+        case PUGL_FAILURE:
+        case PUGL_UNKNOWN_ERROR: return ErrorCode {GuiPlatformErrorCode::UnknownError};
+        case PUGL_BACKEND_FAILED: return ErrorCode {GuiPlatformErrorCode::BackendFailed};
+        case PUGL_REGISTRATION_FAILED: return ErrorCode {GuiPlatformErrorCode::RegistrationFailed};
+        case PUGL_REALIZE_FAILED: return ErrorCode {GuiPlatformErrorCode::RealizeFailed};
+        case PUGL_SET_FORMAT_FAILED: return ErrorCode {GuiPlatformErrorCode::SetFormatFailed};
+        case PUGL_CREATE_CONTEXT_FAILED: return ErrorCode {GuiPlatformErrorCode::CreateContextFailed};
+
+        // Bugs
+        case PUGL_BAD_BACKEND: Panic("Invalid or missing backend");
+        case PUGL_BAD_CONFIGURATION: Panic("Invalid view configuration");
+        case PUGL_BAD_PARAMETER: Panic("Invalid parameter");
+        case PUGL_NO_MEMORY: Panic("Failed to allocate memory");
+    }
+    return k_success;
+}
+
+PUBLIC ErrorCodeOr<void> CreateView(GuiPlatform& platform, PluginInstance& plugin) {
+    platform.g_world_counter++;
+    if (auto const floe_host =
+            (FloeClapExtensionHost const*)platform.host.get_extension(&platform.host,
+                                                                      k_floe_clap_extension_id);
+        floe_host != nullptr) {
+        platform.world = (PuglWorld*)floe_host->pugl_world;
+        ASSERT(platform.world != nullptr);
+    } else if (platform.g_world_counter == 1) {
+        ASSERT(platform.g_world == nullptr);
+        platform.g_world = puglNewWorld(PUGL_MODULE, 0);
+        if (platform.g_world == nullptr) Panic("out of memory");
+        puglSetWorldString(platform.g_world, PUGL_CLASS_NAME, "Floe");
+        platform.world = platform.g_world;
+    } else {
+        ASSERT(platform.g_world != nullptr);
+        platform.world = platform.g_world;
+    }
+
+    platform.view = puglNewView(platform.world);
+    if (platform.view == nullptr) Panic("out of memory");
+
+    puglSetHandle(platform.view, &platform);
+    TRY(Required(puglSetEventFunc(platform.view, GuiPlatform::OnEvent)));
+
+    // IMPROVE: we might want a DirectX backend for Windows
+    TRY(Required(puglSetBackend(platform.view, puglGlBackend())));
+    TRY(Required(puglSetViewHint(platform.view, PUGL_CONTEXT_VERSION_MAJOR, 3)));
+    TRY(Required(puglSetViewHint(platform.view, PUGL_CONTEXT_VERSION_MINOR, 3)));
+    TRY(Required(puglSetViewHint(platform.view, PUGL_CONTEXT_PROFILE, PUGL_OPENGL_COMPATIBILITY_PROFILE)));
+    puglSetViewHint(platform.view, PUGL_CONTEXT_DEBUG, RUNTIME_SAFETY_CHECKS_ON);
+
+    puglSetViewHint(platform.view, PUGL_RESIZABLE, true);
+    auto const size = gui_settings::WindowSize(platform.settings.settings.gui);
+    TRY(Required(puglSetSize(platform.view, size.width, size.height)));
+
+    platform.gui.Emplace(platform.frame_state, plugin);
+
+    return k_success;
+}

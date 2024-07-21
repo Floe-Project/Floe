@@ -202,7 +202,6 @@ static f32x2 InputTextCalcTextSizeW(Context* imgui,
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void STB_TEXTEDIT_LAYOUTROW(StbTexteditRow* r, STB_TEXTEDIT_STRING* imgui, int line_index) {
-
     Char32 const* text = imgui->textedit_text.data;
     Char32 const* text_remaining = nullptr;
     auto size = InputTextCalcTextSizeW(imgui,

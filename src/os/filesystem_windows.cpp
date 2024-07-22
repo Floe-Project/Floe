@@ -759,12 +759,8 @@ static ErrorCodeOr<WindowsWatchedDirectory*> WatchDirectory(DirectoryWatcher::Wa
     windows_dir->handle = handle;
     windows_dir->overlapped = {};
 
-<<<<<<< HEAD
-    windows_dir->overlapped.hEvent = CreateEventW(nullptr, FALSE, 0, nullptr);
-=======
-    watch->overlapped.hEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-    ASSERT(watch->overlapped.hEvent);
->>>>>>> 685cdc0 (fix nullptr dereference)
+    windows_dir->overlapped.hEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+    ASSERT(windows_dir->overlapped.hEvent);
 
     auto const succeeded = ReadDirectoryChangesW(handle,
                                                  windows_dir->buffer.data,
@@ -775,12 +771,8 @@ static ErrorCodeOr<WindowsWatchedDirectory*> WatchDirectory(DirectoryWatcher::Wa
                                                  &windows_dir->overlapped,
                                                  nullptr);
     if (!succeeded) {
-<<<<<<< HEAD
         UnwatchDirectory(windows_dir);
-=======
->>>>>>> 685cdc0 (fix nullptr dereference)
         auto const error = GetLastError();
-        UnwatchDirectory(watch);
         return FilesystemWin32ErrorCode(error);
     }
 
@@ -837,11 +829,6 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                 auto const* end = Min<u8 const*>(base + bytes_transferred, windows_dir.buffer.end());
                 auto const min_chunk_size = sizeof(FILE_NOTIFY_INFORMATION);
 
-<<<<<<< HEAD
-                ASSERT(base <= end);
-
-=======
->>>>>>> 685cdc0 (fix nullptr dereference)
                 bool error = false;
 
                 while (true) {

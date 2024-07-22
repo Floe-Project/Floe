@@ -121,6 +121,10 @@ fn tryConcatCompileCommands(step: *std.Build.Step) !void {
                         if (std.mem.eql(u8, arg, "-ftime-trace"))
                             try to_remove.append(index);
 
+                        // windows WSL clangd doesn't like this flag being there
+                        if (std.mem.eql(u8, arg, "-fsanitize=thread"))
+                            try to_remove.append(index);
+
                         // clang-tidy doesn't like this
                         if (std.mem.eql(u8, arg, "-ObjC++"))
                             try to_remove.append(index);

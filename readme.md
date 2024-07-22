@@ -8,29 +8,25 @@ SPDX-License-Identifier: CC0-1.0
 [![CodeFactor](https://www.codefactor.io/repository/github/floe-synth/floe/badge/main)](https://www.codefactor.io/repository/github/floe-synth/floe/overview/main)
 
 # Floe Source Code
-
 ___IMPORTANT: Large-scale changes are underway, many things are missing and broken for now.___
 
 ### Sample-based synthesiser plugin
-
 This is the source code for Floe, a sample-based synthesiser plugin. It's [free software](https://fsfe.org/freesoftware/freesoftware.en.html) software developed by [FrozenPlain](https://frozenplain.com). It's available as a CLAP, VST3 or AU audio plugin for Windows and macOS. Linux is supported only for development purposes.
 
 Floe requires sample libraries. These are created using the Lua programming language. Alternatively, FrozenPlain offer sample libraries to buy, and a few free ones.
 
 ## Documentation
-We aim to offer comprehensive documentation in the form of a user manual. We use mdbook to generate this based on the markdown files in this repository.
-
 [Online user manual](https://floe-synth.github.io/Floe/)
 
 ## Roadmap
-We want Floe to be a constantly evolving and improving project with regular stable, backwards-compatible releases. Currently we are working towards the first stable version, 1.0. We use GitHub issues to track the [milestones](https://github.com/Floe-Synth/Floe/milestones?direction=asc&sort=title&state=open) towards that.
+Floe will be updated and deployed regularly with stable, backwards-compatible releases. Currently we are working towards the first stable version, 1.0. We use GitHub issues to track the [milestones](https://github.com/Floe-Synth/Floe/milestones?direction=asc&sort=title&state=open) towards that.
 
-The work from Mirage (the old project) to Floe v1.0 has been related to building infrastructure for long-term, sustainable development. New features and improvements will be coming once we have a strong foundation.
+The work so far from Mirage (the old project) to Floe v1.0 has been related to building infrastructure for long-term, sustainable development. New features and improvements will be coming once we have a strong foundation.
 
 Additionally, once we reach v1.0, we'd like to expand the number of sample libraries available and update Mirage libraries to Floe's new sample library format.
 
 ## Status towards v1.0
-1. 🟦 Completed for the current requirements with good design
+1. 🟦 Completed for the current requirements
 2. 🟩 Works well-enough but doesn't handle everything
 3. 🟨 Mostly works but some aspects are missing or broken
 4. 🟥 Fundamentally broken or not-yet-implemented

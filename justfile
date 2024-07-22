@@ -158,18 +158,22 @@ test-windows-vst3-val:
 [linux, windows]
 test-windows-pluginval:
   #!/usr/bin/env bash
-  if [[ ! -f {{cache_dir}}/pluginval.exe ]]; then
+  exe="{{cache_dir}}/pluginval.exe"
+  if [[ ! -f "$exe" ]]; then
     just _download-and-unzip-to-cache-dir "https://github.com/Tracktion/pluginval/releases/download/v1.0.3/pluginval_Windows.zip"
+    chmod +x "$exe"
   fi
-  {{run_windows_program}} {{cache_dir}}/pluginval.exe --verbose --validate zig-out/x86_64-windows/Floe.vst3
+  {{run_windows_program}} "$exe" --verbose --validate zig-out/x86_64-windows/Floe.vst3
 
 [linux, windows]
 test-windows-clap-val:
   #!/usr/bin/env bash
-  if [[ ! -f {{cache_dir}}/clap-validator.exe ]]; then
+  exe="{{cache_dir}}/clap-validator.exe"
+  if [[ ! -f "$exe" ]]; then
     just _download-and-unzip-to-cache-dir  "https://github.com/free-audio/clap-validator/releases/download/0.3.2/clap-validator-0.3.2-windows.zip"
+    chmod +x "$exe"
   fi
-  {{run_windows_program}} {{cache_dir}}/clap-validator.exe validate zig-out/x86_64-windows/Floe.clap
+  {{run_windows_program}} "$exe" validate zig-out/x86_64-windows/Floe.clap
 
 [linux]
 coverage build="": (_build_if_requested build "native")

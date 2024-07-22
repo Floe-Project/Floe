@@ -8,17 +8,12 @@
 
 #include "foundation/foundation.hpp"
 #include "os/undef_windows_macros.h"
-#include "utils/debug/debug.hpp"
 
 #include "clap/host.h"
 #include "gui/gui.hpp"
 #include "gui_frame.hpp"
 #include "plugin_instance.hpp"
 #include "settings/settings_gui.hpp"
-
-// TODO: go over the API docs and review usage
-// TODO: add error handling
-// TODO: refactor, use free functions, one contained function for each event, maybe pull out Gui struct
 
 struct GuiPlatform {
     static constexpr uintptr_t k_timer_id = 200;
@@ -448,7 +443,6 @@ static bool EventDataOffer(GuiPlatform& platform, PuglDataOfferEvent const& data
 static bool EventData(GuiPlatform& platform, PuglDataEvent const& data_event) {
     auto const type_index = data_event.typeIndex;
     auto const type = puglGetClipboardType(platform.view, type_index);
-
     if (NullTermStringsEqual(type, "text/plain")) {
         usize size = 0;
         void const* data = puglGetClipboard(platform.view, type_index, &size);
@@ -571,7 +565,6 @@ static void UpdateAndRender(GuiPlatform& platform) {
         // it's important to do this after clearing the impermanent state because this might add new events to
         // the frame
         HandlePostUpdateRequests(platform);
-
     } while (platform.last_result.update_request == GuiFrameResult::UpdateRequest::ImmediatelyUpdate);
 
     if (platform.last_result.draw_data.draw_lists.size) {

@@ -433,6 +433,33 @@ static void DestroyGraphicsContext(GuiPlatform& platform) {
     }
 }
 
+static bool EventDataOffer(GuiPlatform& platform, PuglDataOfferEvent const& data_offer) {
+    bool result = false;
+    for (auto const type_index : Range(puglGetNumClipboardTypes(platform.view))) {
+        auto const type = puglGetClipboardType(platform.view, type_index);
+        if (NullTermStringsEqual(type, "text/plain")) {
+            puglAcceptOffer(platform.view, &data_offer, type_index);
+            result = true;
+        }
+    }
+    return result;
+}
+
+static bool EventData(GuiPlatform& platform, PuglDataEvent const& data_event) {
+    auto const type_index = data_event.typeIndex;
+    auto const type = puglGetClipboardType(platform.view, type_index);
+
+    if (NullTermStringsEqual(type, "text/plain")) {
+        usize size = 0;
+        void const* data = puglGetClipboard(platform.view, type_index, &size);
+        if (data && size) {
+            dyn::Assign(platform.frame_state.clipboard_text, String {(char const*)data, size});
+            return true;
+        }
+    }
+    return false;
+}
+
 static void BeginFrame(GuiFrameInput& frame_state) {
     if (All(frame_state.cursor_pos < f32x2 {0, 0} || frame_state.cursor_pos_prev < f32x2 {0, 0})) {
         // if mouse just appeared or disappeared (negative coordinate) we cancel out movement by setting
@@ -450,33 +477,6 @@ static void BeginFrame(GuiFrameInput& frame_state) {
     else
         frame_state.delta_time = 0;
     frame_state.time_prev = frame_state.current_time;
-}
-
-static bool EventDataOffer(GuiPlatform& platform, PuglDataOfferEvent const& data_offer) {
-    bool result = false;
-    for (auto const type_index : Range(puglGetNumClipboardTypes(platform.view))) {
-        auto const type = puglGetClipboardType(platform.view, type_index);
-        DebugLn("{} Clipboard type: {}", __FUNCTION__, type);
-        if (NullTermStringsEqual(type, "text/plain")) {
-            puglAcceptOffer(platform.view, &data_offer, type_index);
-            result = true;
-        }
-    }
-    return result;
-}
-
-static bool EventData(GuiPlatform& platform, PuglDataEvent const& data_event) {
-    uint32_t const type_index = data_event.typeIndex;
-    auto const type = puglGetClipboardType(platform.view, type_index);
-
-    if (NullTermStringsEqual(type, "text/plain")) {
-        size_t len = 0;
-        void const* data = puglGetClipboard(platform.view, type_index, &len);
-
-        dyn::Assign(platform.frame_state.clipboard_text, String {(char const*)data, len});
-        return true;
-    }
-    return false;
 }
 
 static void ClearImpermanentState(GuiFrameInput& frame_state) {
@@ -506,8 +506,44 @@ static void ClearImpermanentState(GuiFrameInput& frame_state) {
     ++frame_state.update_count;
 }
 
+static void HandlePostUpdateRequests(GuiPlatform& platform) {
+    if (platform.last_result.cursor_type != platform.current_cursor) {
+        platform.current_cursor = platform.last_result.cursor_type;
+        puglSetCursor(platform.view, ({
+                          PuglCursor cursor = PUGL_CURSOR_ARROW;
+                          switch (platform.last_result.cursor_type) {
+                              case CursorType::Default: cursor = PUGL_CURSOR_ARROW; break;
+                              case CursorType::Hand: cursor = PUGL_CURSOR_HAND; break;
+                              case CursorType::IBeam: cursor = PUGL_CURSOR_CARET; break;
+                              case CursorType::AllArrows: cursor = PUGL_CURSOR_ALL_SCROLL; break;
+                              case CursorType::HorizontalArrows: cursor = PUGL_CURSOR_LEFT_RIGHT; break;
+                              case CursorType::VerticalArrows: cursor = PUGL_CURSOR_UP_DOWN; break;
+                              case CursorType::Count: break;
+                          }
+                          cursor;
+                      }));
+    }
+
+    if (platform.last_result.wants_clipboard_text_paste) {
+        // IMPORTANT: this will call into our event handler function right from here rather than queue things
+        // up
+        puglPaste(platform.view);
+    }
+
+    if (auto const cb = platform.last_result.set_clipboard_text; cb.size) {
+        // we can re-use the 'paste' clipboard buffer even though this is a 'copy' operation
+        auto& buffer = platform.frame_state.clipboard_text;
+        dyn::Assign(buffer, cb);
+        // IMPORTANT: pugl needs a null terminator despite also taking a size
+        dyn::Append(buffer, '\0');
+
+        puglSetClipboard(platform.view, "text/plain", buffer.data, buffer.size);
+    }
+}
+
 static void UpdateAndRender(GuiPlatform& platform) {
     if (!platform.graphics_ctx) return;
+    if (!puglGetVisible(platform.view)) return;
 
     auto const window_size = WindowSize(platform);
 
@@ -517,42 +553,25 @@ static void UpdateAndRender(GuiPlatform& platform) {
 
     u32 num_repeats = 0;
     do {
+        // Mostly we'd only expect 1 or 2 updates but we set a hard limit of 4 as a fallback.
+        if (num_repeats++ >= 4) {
+            platform.logger.WarningLn("GUI update loop repeated too many times");
+            break;
+        }
+
         ZoneNamedN(repeat, "Update", true);
 
         BeginFrame(platform.frame_state);
 
         platform.last_result = GuiUpdate(&*platform.gui);
 
-        if (platform.last_result.cursor_type != platform.current_cursor) {
-            platform.current_cursor = platform.last_result.cursor_type;
-            puglSetCursor(platform.view, ({
-                              PuglCursor cursor = PUGL_CURSOR_ARROW;
-                              switch (platform.last_result.cursor_type) {
-                                  case CursorType::Default: cursor = PUGL_CURSOR_ARROW; break;
-                                  case CursorType::Hand: cursor = PUGL_CURSOR_HAND; break;
-                                  case CursorType::IBeam: cursor = PUGL_CURSOR_CARET; break;
-                                  case CursorType::AllArrows: cursor = PUGL_CURSOR_ALL_SCROLL; break;
-                                  case CursorType::HorizontalArrows: cursor = PUGL_CURSOR_LEFT_RIGHT; break;
-                                  case CursorType::VerticalArrows: cursor = PUGL_CURSOR_UP_DOWN; break;
-                                  case CursorType::Count: break;
-                              }
-                              cursor;
-                          }));
-        }
-
-        if (platform.last_result.wants_clipboard_text_paste) puglPaste(platform.view);
-
-        if (auto cb = platform.last_result.set_clipboard_text; cb.size)
-            puglSetClipboard(platform.view, "text/plain", cb.data, cb.size);
-
         // clear the state ready for new events, and to ensure they're only processed once
         ClearImpermanentState(platform.frame_state);
 
-        // Mostly we'd only expect 1 or 2 updates but we set a hard limit of 4 as a fallback.
-        if (++num_repeats >= 4) {
-            platform.logger.WarningLn("GUI update loop repeated too many times");
-            break;
-        }
+        // it's important to do this after clearing the impermanent state because this might add new events to
+        // the frame
+        HandlePostUpdateRequests(platform);
+
     } while (platform.last_result.update_request == GuiFrameResult::UpdateRequest::ImmediatelyUpdate);
 
     if (platform.last_result.draw_data.draw_lists.size) {

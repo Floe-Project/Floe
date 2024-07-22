@@ -929,7 +929,7 @@ void Context::End(ArenaAllocator& scratch_arena) {
         SET_ONE_MORE_FRAME("item just activated");
     }
     if (tab_to_focus_next_input) SET_ONE_MORE_FRAME("tab_to_focus_next_input");
-} // namespace imgui
+}
 
 bool Context::TextInputHasFocus(Id id) const { return active_text_input && active_text_input == id; }
 
@@ -1289,6 +1289,9 @@ TextInputResult Context::SingleLineTextInput(Rect r,
     }
 
     if (IsHotOrActive(id)) frame_output.cursor_type = CursorType::IBeam;
+
+    // IMPROVE: we should be checking the modifier keys of the event rather than the current state of the
+    // modifier
 
     u32 const shift_bit = frame_input.Key(ModifierKey::Shift).is_down ? STB_TEXTEDIT_K_SHIFT : 0;
 

@@ -71,16 +71,17 @@ struct GuiFrameInput {
         f32x2 last_pressed_point {}; // the last known point where the mouse was pressed
         TimePoint last_pressed_time {}; // the last known time when the mouse was pressed
         bool is_down {}; // current state
-        bool double_click {};
+        bool double_click {}; // cleared every frame
         bool is_dragging {};
         bool dragging_started {}; // cleared every frame
         bool dragging_ended {}; // cleared every frame
     };
 
     struct ModifierKeyState {
-        u8 is_down; // we use an int to incr/decr because modifier keys can have both left and right keys
-        u8 presses; // key-down events since last frame, zeroed every frame
-        u8 releases; // key-up events since last frame, zeroed every frame
+        u8 is_down; // bool, but we use an int to incr/decr to correctly handle when there's both a left and
+                    // right key on the keyboard and they're used together
+        u8 presses; // key-down events since last frame, cleared every frame
+        u8 releases; // key-up events since last frame, cleared every frame
     };
 
     struct KeyState {
@@ -90,8 +91,8 @@ struct GuiFrameInput {
 
         bool is_down;
         ArenaStack<Event> presses_or_repeats; // key-down or repeats since last frame, cleared every frame
-        ArenaStack<Event> presses; // key-down events since last frame, zeroed every frame
-        ArenaStack<Event> releases; // key-up events since last frame, zeroed every frame
+        ArenaStack<Event> presses; // key-down events since last frame, cleared every frame
+        ArenaStack<Event> releases; // key-up events since last frame, cleared every frame
     };
 
     auto const& Mouse(MouseButton n) const { return mouse_buttons[ToInt(n)]; }
@@ -168,6 +169,7 @@ struct GuiFrameResult {
     bool wants_all_right_clicks = false;
     bool wants_all_middle_clicks = false;
 
+    // Set this to the cursor that you want
     CursorType cursor_type = CursorType::Default;
 
     // Set this if you want text from the OS clipboard, it will be given to you in an upcoming frame

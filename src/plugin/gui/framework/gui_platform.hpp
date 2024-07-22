@@ -21,11 +21,6 @@
 // TODO: refactor, use free functions, one contained function for each event, maybe pull out Gui struct
 
 struct GuiPlatform {
-    GuiPlatform(clap_host const& host, SettingsFile& settings, Logger& logger)
-        : host(host)
-        , settings(settings)
-        , logger(logger) {}
-
     static constexpr uintptr_t k_timer_id = 200;
 
     static int g_world_counter;
@@ -35,14 +30,14 @@ struct GuiPlatform {
     SettingsFile& settings;
     Logger& logger;
     bool realised = false;
-    PuglWorld* world;
-    PuglView* view;
+    PuglWorld* world {};
+    PuglView* view {};
     bool processing_events = false;
     CursorType current_cursor {CursorType::Default};
     graphics::DrawContext* graphics_ctx {};
-    GuiFrameResult last_result;
-    GuiFrameInput frame_state;
-    Optional<Gui> gui;
+    GuiFrameResult last_result {};
+    GuiFrameInput frame_state {};
+    Optional<Gui> gui {};
 };
 
 // Public API
@@ -205,66 +200,6 @@ PUBLIC UiSize WindowSize(GuiPlatform& platform) {
 
 namespace detail {
 
-static Optional<KeyCode> RemapKeyCode(u32 pugl_key) {
-    switch (pugl_key) {
-        case PUGL_KEY_TAB: return KeyCode::Tab;
-        case PUGL_KEY_LEFT: return KeyCode::LeftArrow;
-        case PUGL_KEY_RIGHT: return KeyCode::RightArrow;
-        case PUGL_KEY_UP: return KeyCode::UpArrow;
-        case PUGL_KEY_DOWN: return KeyCode::DownArrow;
-        case PUGL_KEY_PAGE_UP: return KeyCode::PageUp;
-        case PUGL_KEY_PAGE_DOWN: return KeyCode::PageDown;
-        case PUGL_KEY_HOME: return KeyCode::Home;
-        case PUGL_KEY_END: return KeyCode::End;
-        case PUGL_KEY_DELETE: return KeyCode::Delete;
-        case PUGL_KEY_BACKSPACE: return KeyCode::Backspace;
-        case PUGL_KEY_ENTER: return KeyCode::Enter;
-        case PUGL_KEY_ESCAPE: return KeyCode::Escape;
-        case PUGL_KEY_F1: return KeyCode::F1;
-        case PUGL_KEY_F2: return KeyCode::F2;
-        case PUGL_KEY_F3: return KeyCode::F3;
-        case 'a': return KeyCode::A;
-        case 'c': return KeyCode::C;
-        case 'v': return KeyCode::V;
-        case 'x': return KeyCode::X;
-        case 'y': return KeyCode::Y;
-        case 'z': return KeyCode::Z;
-    }
-    return nullopt;
-}
-
-static Optional<ModifierKey> RemapModKey(u32 pugl_key) {
-    switch (pugl_key) {
-        case PUGL_KEY_SHIFT_L:
-        case PUGL_KEY_SHIFT_R: return ModifierKey::Shift;
-        case PUGL_KEY_CTRL_L:
-        case PUGL_KEY_CTRL_R: return ModifierKey::Ctrl;
-        case PUGL_KEY_ALT_L:
-        case PUGL_KEY_ALT_R: return ModifierKey::Alt;
-        case PUGL_KEY_SUPER_L:
-        case PUGL_KEY_SUPER_R: return ModifierKey::Super;
-    }
-    return nullopt;
-}
-
-static Optional<MouseButton> RemapMouseButton(u32 button) {
-    switch (button) {
-        case 0: return MouseButton::Left;
-        case 1: return MouseButton::Right;
-        case 2: return MouseButton::Middle;
-    }
-    return nullopt;
-}
-
-static ModifierFlags CreateModifierFlags(u32 flags) {
-    ModifierFlags result {};
-    if (flags & PUGL_MOD_SHIFT) result.Set(ModifierKey::Shift);
-    if (flags & PUGL_MOD_CTRL) result.Set(ModifierKey::Ctrl);
-    if (flags & PUGL_MOD_ALT) result.Set(ModifierKey::Alt);
-    if (flags & PUGL_MOD_SUPER) result.Set(ModifierKey::Super);
-    return result;
-}
-
 static bool IsUpdateNeeded(GuiPlatform& platform) {
     bool update_needed = false;
 
@@ -283,6 +218,15 @@ static bool IsUpdateNeeded(GuiPlatform& platform) {
     }
 
     return update_needed;
+}
+
+static ModifierFlags CreateModifierFlags(u32 flags) {
+    ModifierFlags result {};
+    if (flags & PUGL_MOD_SHIFT) result.Set(ModifierKey::Shift);
+    if (flags & PUGL_MOD_CTRL) result.Set(ModifierKey::Ctrl);
+    if (flags & PUGL_MOD_ALT) result.Set(ModifierKey::Alt);
+    if (flags & PUGL_MOD_SUPER) result.Set(ModifierKey::Super);
+    return result;
 }
 
 static bool EventWheel(GuiPlatform& platform, PuglScrollEvent const& scroll_event) {
@@ -330,6 +274,15 @@ static bool EventMotion(GuiPlatform& platform, PuglMotionEvent const& motion_eve
     }
 
     return result;
+}
+
+static Optional<MouseButton> RemapMouseButton(u32 button) {
+    switch (button) {
+        case 0: return MouseButton::Left;
+        case 1: return MouseButton::Right;
+        case 2: return MouseButton::Middle;
+    }
+    return nullopt;
 }
 
 static bool EventMouseButton(GuiPlatform& platform, PuglButtonEvent const& button_event, bool is_down) {
@@ -393,6 +346,48 @@ static bool EventKeyRegular(GuiPlatform& platform, KeyCode key_code, bool is_dow
     return false;
 }
 
+static Optional<KeyCode> RemapKeyCode(u32 pugl_key) {
+    switch (pugl_key) {
+        case PUGL_KEY_TAB: return KeyCode::Tab;
+        case PUGL_KEY_LEFT: return KeyCode::LeftArrow;
+        case PUGL_KEY_RIGHT: return KeyCode::RightArrow;
+        case PUGL_KEY_UP: return KeyCode::UpArrow;
+        case PUGL_KEY_DOWN: return KeyCode::DownArrow;
+        case PUGL_KEY_PAGE_UP: return KeyCode::PageUp;
+        case PUGL_KEY_PAGE_DOWN: return KeyCode::PageDown;
+        case PUGL_KEY_HOME: return KeyCode::Home;
+        case PUGL_KEY_END: return KeyCode::End;
+        case PUGL_KEY_DELETE: return KeyCode::Delete;
+        case PUGL_KEY_BACKSPACE: return KeyCode::Backspace;
+        case PUGL_KEY_ENTER: return KeyCode::Enter;
+        case PUGL_KEY_ESCAPE: return KeyCode::Escape;
+        case PUGL_KEY_F1: return KeyCode::F1;
+        case PUGL_KEY_F2: return KeyCode::F2;
+        case PUGL_KEY_F3: return KeyCode::F3;
+        case 'a': return KeyCode::A;
+        case 'c': return KeyCode::C;
+        case 'v': return KeyCode::V;
+        case 'x': return KeyCode::X;
+        case 'y': return KeyCode::Y;
+        case 'z': return KeyCode::Z;
+    }
+    return nullopt;
+}
+
+static Optional<ModifierKey> RemapModKey(u32 pugl_key) {
+    switch (pugl_key) {
+        case PUGL_KEY_SHIFT_L:
+        case PUGL_KEY_SHIFT_R: return ModifierKey::Shift;
+        case PUGL_KEY_CTRL_L:
+        case PUGL_KEY_CTRL_R: return ModifierKey::Ctrl;
+        case PUGL_KEY_ALT_L:
+        case PUGL_KEY_ALT_R: return ModifierKey::Alt;
+        case PUGL_KEY_SUPER_L:
+        case PUGL_KEY_SUPER_R: return ModifierKey::Super;
+    }
+    return nullopt;
+}
+
 static bool EventKeyModifier(GuiPlatform& platform, ModifierKey mod_key, bool is_down) {
     auto& mod = platform.frame_state.modifier_keys[ToInt(mod_key)];
     if (is_down) {
@@ -438,6 +433,32 @@ static void BeginFrame(GuiFrameInput& frame_state) {
     frame_state.time_prev = frame_state.current_time;
 }
 
+static bool EventDataOffer(GuiPlatform& platform, PuglDataOfferEvent const& data_offer) {
+    bool result = false;
+    for (auto const type_index : Range(puglGetNumClipboardTypes(platform.view))) {
+        auto const type = puglGetClipboardType(platform.view, type_index);
+        if (NullTermStringsEqual(type, "text/plain")) {
+            puglAcceptOffer(platform.view, &data_offer, type_index);
+            result = true;
+        }
+    }
+    return result;
+}
+
+static bool EventData(GuiPlatform& platform, PuglDataEvent const& data_event) {
+    uint32_t const type_index = data_event.typeIndex;
+    auto const type = puglGetClipboardType(platform.view, type_index);
+
+    if (NullTermStringsEqual(type, "text/plain")) {
+        size_t len = 0;
+        void const* data = puglGetClipboard(platform.view, type_index, &len);
+
+        dyn::Assign(platform.frame_state.clipboard_text, String {(char const*)data, len});
+        return true;
+    }
+    return false;
+}
+
 static void ClearImpermanentState(GuiFrameInput& frame_state) {
     for (auto& btn : frame_state.mouse_buttons) {
         btn.dragging_started = false;
@@ -472,13 +493,13 @@ static void UpdateAndRender(GuiPlatform& platform) {
     platform.frame_state.native_window = (void*)puglGetNativeView(platform.view);
     platform.frame_state.window_size = window_size;
 
-    // Mostly we'd only expect 1 or 2 updates but we set a hard limit of 4 as a fallback.
-    for (auto _ : Range(4)) {
+    u32 num_repeats = 0;
+    do {
         ZoneNamedN(repeat, "Update", true);
 
         BeginFrame(platform.frame_state);
 
-        platform.last_result = GUIUpdate(&*platform.gui);
+        platform.last_result = GuiUpdate(&*platform.gui);
 
         if (platform.last_result.cursor_type != platform.current_cursor) {
             platform.current_cursor = platform.last_result.cursor_type;
@@ -505,8 +526,12 @@ static void UpdateAndRender(GuiPlatform& platform) {
         // clear the state ready for new events, and to ensure they're only processed once
         ClearImpermanentState(platform.frame_state);
 
-        if (platform.last_result.update_request != GuiFrameResult::UpdateRequest::ImmediatelyUpdate) break;
-    }
+        // Mostly we'd only expect 1 or 2 updates but we set a hard limit of 4 as a fallback.
+        if (++num_repeats >= 4) {
+            platform.logger.WarningLn("GUI update loop repeated too many times");
+            break;
+        }
+    } while (platform.last_result.update_request == GuiFrameResult::UpdateRequest::ImmediatelyUpdate);
 
     if (platform.last_result.draw_data.draw_lists.size) {
         ZoneNamedN(render, "render", true);
@@ -620,35 +645,22 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
             break;
         }
 
-        case PUGL_CLIENT: break;
-
         case PUGL_TIMER: {
             if (event->timer.id == platform.k_timer_id) post_redisplay = IsUpdateNeeded(platform);
             break;
         }
 
         case PUGL_DATA_OFFER: {
-            u32 const num_types = puglGetNumClipboardTypes(view);
-            for (auto const t : Range(num_types)) {
-                char const* type = puglGetClipboardType(view, t);
-                if (NullTermStringsEqual(type, "text/plain")) puglAcceptOffer(view, &event->offer, t);
-            }
+            post_redisplay = EventDataOffer(platform, event->offer);
             break;
         }
 
         case PUGL_DATA: {
-            uint32_t const type_index = event->data.typeIndex;
-
-            char const* type = puglGetClipboardType(view, type_index);
-
-            if (NullTermStringsEqual(type, "text/plain")) {
-                size_t len = 0;
-                void const* data = puglGetClipboard(view, type_index, &len);
-
-                dyn::Assign(platform.frame_state.clipboard_text, String {(char const*)data, len});
-            }
+            post_redisplay = EventData(platform, event->data);
             break;
         }
+
+        case PUGL_CLIENT: break;
 
         case PUGL_LOOP_ENTER:
         case PUGL_LOOP_LEAVE: break;

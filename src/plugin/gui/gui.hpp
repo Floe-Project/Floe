@@ -183,7 +183,7 @@ graphics::ImageID CopyPixelsToGpuLoadedImage(Gui* g, ImagePixelsRgba const& px);
 LibraryImages LoadLibraryBackgroundAndIconIfNeeded(Gui* g, sample_lib::Library const& lib);
 
 void GUIPresetLoaded(Gui* g, PluginInstance* a, bool is_first_preset);
-GuiFrameResult GUIUpdate(Gui* g);
+GuiFrameResult GuiUpdate(Gui* g);
 void TopPanel(Gui* g);
 void MidPanel(Gui* g);
 void BotPanel(Gui* g);

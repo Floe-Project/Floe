@@ -1336,19 +1336,6 @@ TextInputResult Context::SingleLineTextInput(Rect r,
                                    shift_bit));
     } else if (frame_input.Key(KeyCode::V).presses.size && frame_input.Key(ModifierKey::Modifier).is_down) {
         frame_output.wants_clipboard_text_paste = true;
-    } else if (frame_input.clipboard_text.size) {
-        ArenaAllocatorWithInlineStorage<2000> allocator;
-        DynamicArray<Char32> w_text {allocator};
-        dyn::Resize(w_text, frame_input.clipboard_text.size + 1);
-        dyn::Resize(w_text,
-                    (usize)imstring::Widen(w_text.data,
-                                           (int)w_text.size,
-                                           frame_input.clipboard_text.data,
-                                           frame_input.clipboard_text.data + frame_input.clipboard_text.size,
-                                           nullptr));
-
-        stb_textedit_paste(this, &stb_state, w_text.data, (int)w_text.size);
-        result.buffer_changed = true;
     } else if ((frame_input.Key(KeyCode::C).presses.size || frame_input.Key(KeyCode::X).presses.size) &&
                frame_input.Key(ModifierKey::Modifier).is_down) {
         if (stb_state.select_start != stb_state.select_end) {
@@ -1369,6 +1356,21 @@ TextInputResult Context::SingleLineTextInput(Rect r,
                 result.buffer_changed = true;
             }
         }
+    }
+
+    if (frame_input.clipboard_text.size) {
+        ArenaAllocatorWithInlineStorage<2000> allocator;
+        DynamicArray<Char32> w_text {allocator};
+        dyn::Resize(w_text, frame_input.clipboard_text.size + 1);
+        dyn::Resize(w_text,
+                    (usize)imstring::Widen(w_text.data,
+                                           (int)w_text.size,
+                                           frame_input.clipboard_text.data,
+                                           frame_input.clipboard_text.data + frame_input.clipboard_text.size,
+                                           nullptr));
+
+        stb_textedit_paste(this, &stb_state, w_text.data, (int)w_text.size);
+        result.buffer_changed = true;
     }
 
     if (frame_input.Key(KeyCode::Enter).presses.size) result.enter_pressed = true;

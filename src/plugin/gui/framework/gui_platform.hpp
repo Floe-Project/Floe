@@ -32,7 +32,6 @@ struct GuiPlatform {
     bool realised = false;
     PuglWorld* world {};
     PuglView* view {};
-    bool processing_events = false;
     CursorType current_cursor {CursorType::Default};
     graphics::DrawContext* graphics_ctx {};
     GuiFrameResult last_result {};
@@ -414,6 +413,26 @@ static bool EventText(GuiPlatform& platform, PuglTextEvent const& text_event) {
     return false;
 }
 
+static void CreateGraphicsContext(GuiPlatform& platform) {
+    auto graphics_ctx = graphics::CreateNewDrawContext();
+    auto const outcome = graphics_ctx->CreateDeviceObjects((void*)puglGetNativeView(platform.view));
+    if (outcome.HasError()) {
+        platform.logger.ErrorLn("Failed to create graphics context: {}", outcome.Error());
+        delete graphics_ctx;
+        return;
+    }
+    platform.graphics_ctx = graphics_ctx;
+}
+
+static void DestroyGraphicsContext(GuiPlatform& platform) {
+    if (platform.graphics_ctx) {
+        platform.graphics_ctx->DestroyDeviceObjects();
+        platform.graphics_ctx->fonts.Clear();
+        delete platform.graphics_ctx;
+        platform.graphics_ctx = nullptr;
+    }
+}
+
 static void BeginFrame(GuiFrameInput& frame_state) {
     if (All(frame_state.cursor_pos < f32x2 {0, 0} || frame_state.cursor_pos_prev < f32x2 {0, 0})) {
         // if mouse just appeared or disappeared (negative coordinate) we cancel out movement by setting
@@ -437,6 +456,7 @@ static bool EventDataOffer(GuiPlatform& platform, PuglDataOfferEvent const& data
     bool result = false;
     for (auto const type_index : Range(puglGetNumClipboardTypes(platform.view))) {
         auto const type = puglGetClipboardType(platform.view, type_index);
+        DebugLn("{} Clipboard type: {}", __FUNCTION__, type);
         if (NullTermStringsEqual(type, "text/plain")) {
             puglAcceptOffer(platform.view, &data_offer, type_index);
             result = true;
@@ -487,6 +507,8 @@ static void ClearImpermanentState(GuiFrameInput& frame_state) {
 }
 
 static void UpdateAndRender(GuiPlatform& platform) {
+    if (!platform.graphics_ctx) return;
+
     auto const window_size = WindowSize(platform);
 
     platform.frame_state.graphics_ctx = platform.graphics_ctx;
@@ -547,36 +569,19 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
     if (event->type != PUGL_UPDATE && event->type != PUGL_TIMER) printEvent(event, "PUGL: ", true);
     auto& platform = *(GuiPlatform*)puglGetHandle(view);
 
-    // I'm not sure if pugl handles this for us or not, but let's just be safe. On Windows at least, it's
-    // possible to receive events from within an event if you're doing certain, blocking operations that
-    // trigger the event loop to pump again.
-    if (platform.processing_events) return PUGL_SUCCESS;
-    platform.processing_events = true;
-    DEFER { platform.processing_events = false; };
-
     bool post_redisplay = false;
 
     switch (event->type) {
         case PUGL_NOTHING: break;
 
         case PUGL_REALIZE: {
-            // TODO: pull these out into separate functions
-            ZoneNamed("PUGL_REALIZE", true);
-            platform.graphics_ctx = graphics::CreateNewDrawContext();
-            auto const outcome = platform.graphics_ctx->CreateDeviceObjects((void*)puglGetNativeView(view));
-            ASSERT(!outcome.HasError()); // TODO: handle error
-
+            puglGrabFocus(platform.view);
+            CreateGraphicsContext(platform);
             break;
         }
-        case PUGL_UNREALIZE: {
-            ZoneNamed("PUGL_UNREALIZE", true);
-            if (platform.graphics_ctx) {
-                platform.graphics_ctx->DestroyDeviceObjects();
-                platform.graphics_ctx->fonts.Clear();
-                delete platform.graphics_ctx;
-                platform.graphics_ctx = nullptr;
-            }
 
+        case PUGL_UNREALIZE: {
+            DestroyGraphicsContext(platform);
             break;
         }
 
@@ -592,8 +597,6 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
         }
 
         case PUGL_EXPOSE: {
-            ZoneNamed("PUGL_EXPOSE", true);
-            if (!platform.graphics_ctx) break;
             UpdateAndRender(platform);
             break;
         }
@@ -623,9 +626,8 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
             break;
         }
 
-        case PUGL_POINTER_IN:
+        case PUGL_POINTER_IN: puglGrabFocus(platform.view); break;
         case PUGL_POINTER_OUT: {
-            post_redisplay = true;
             break;
         }
 
@@ -670,4 +672,5 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
 
     return PUGL_SUCCESS;
 }
+
 } // namespace detail

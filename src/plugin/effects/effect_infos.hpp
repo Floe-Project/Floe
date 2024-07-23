@@ -7,7 +7,7 @@
 #include "param_info.hpp"
 
 // These are not ordered
-enum class EffectType : u32 {
+enum class EffectType : u8 {
     Distortion,
     BitCrush,
     Compressor,

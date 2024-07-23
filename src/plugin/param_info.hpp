@@ -227,7 +227,7 @@ using ParamModules = Array<ParameterModule, 4>;
 
 namespace param_values {
 
-enum class EqType { // never reorder
+enum class EqType : u8 { // never reorder
     Peak,
     LowShelf,
     HighShelf,
@@ -240,7 +240,7 @@ constexpr auto k_eq_type_strings = ArrayT<String>({
 });
 static_assert(k_eq_type_strings.size == ToInt(EqType::Count));
 
-enum class LoopMode {
+enum class LoopMode : u8 {
     InstrumentDefault,
     None,
     Regular,
@@ -255,7 +255,7 @@ constexpr auto k_loop_mode_strings = ArrayT<String>({
 });
 static_assert(k_loop_mode_strings.size == ToInt(LoopMode::Count));
 
-enum class LfoSyncedRate { // never reorder
+enum class LfoSyncedRate : u8 { // never reorder
     // NOLINTBEGIN(readability-identifier-naming)
     _1_64T,
     _1_64,
@@ -294,7 +294,7 @@ constexpr auto k_lfo_synced_rate_strings = ArrayT<String>({
 });
 static_assert(k_lfo_synced_rate_strings.size == ToInt(LfoSyncedRate::Count));
 
-enum class LfoRestartMode { // never reorder
+enum class LfoRestartMode : u8 { // never reorder
     Retrigger,
     Free,
     Count,
@@ -305,7 +305,7 @@ constexpr auto k_lfo_restart_mode_strings = ArrayT<String>({
 });
 static_assert(k_lfo_restart_mode_strings.size == ToInt(LfoRestartMode::Count));
 
-enum class LfoDestination { // never reorder
+enum class LfoDestination : u8 { // never reorder
     Volume,
     Filter,
     Pan,
@@ -320,7 +320,7 @@ constexpr auto k_lfo_destinations_strings = ArrayT<String>({
 });
 static_assert(k_lfo_destinations_strings.size == ToInt(LfoDestination::Count));
 
-enum class LfoShape { // never reorder
+enum class LfoShape : u8 { // never reorder
     Sine,
     Triangle,
     Sawtooth,
@@ -335,7 +335,7 @@ constexpr auto k_lfo_shape_strings = ArrayT<String>({
 });
 static_assert(k_lfo_shape_strings.size == ToInt(LfoShape::Count));
 
-enum class LayerFilterType { // never reorder
+enum class LayerFilterType : u8 { // never reorder
     Lowpass,
     Bandpass,
     Highpass,
@@ -358,7 +358,7 @@ constexpr auto k_layer_filter_type_strings = ArrayT<String>({
 });
 static_assert(k_layer_filter_type_strings.size == ToInt(LayerFilterType::Count));
 
-enum class EffectFilterType { // never reorder
+enum class EffectFilterType : u8 { // never reorder
     LowPass,
     HighPass,
     BandPass,
@@ -379,7 +379,7 @@ constexpr auto k_effect_filter_type_strings = ArrayT<String>({
 });
 static_assert(k_effect_filter_type_strings.size == ToInt(EffectFilterType::Count));
 
-enum class DistortionType { // never reorder
+enum class DistortionType : u8 { // never reorder
     TubeLog,
     TubeAsym3,
     Sine,
@@ -400,7 +400,7 @@ constexpr auto k_distortion_type_strings = ArrayT<String>({
 });
 static_assert(k_distortion_type_strings.size == ToInt(DistortionType::Count));
 
-enum class DelaySyncedTime { // never reorder
+enum class DelaySyncedTime : u8 { // never reorder
     // NOLINTBEGIN(readability-identifier-naming)
     _1_64T,
     _1_64,
@@ -432,7 +432,7 @@ constexpr auto k_delay_synced_time_strings = ArrayT<String>({
 });
 static_assert(k_delay_synced_time_strings.size == ToInt(DelaySyncedTime::Count));
 
-enum class DelayMode { // never reorder
+enum class DelayMode : u8 { // never reorder
     Mono,
     Stereo,
     PingPong,
@@ -447,7 +447,7 @@ constexpr auto k_new_delay_mode_strings = ArrayT<String>({
 });
 static_assert(k_new_delay_mode_strings.size == ToInt(DelayMode::Count));
 
-enum class VelocityMappingMode { // never reorder
+enum class VelocityMappingMode : u8 { // never reorder
     None,
     TopToBottom,
     BottomToTop,
@@ -469,7 +469,7 @@ static_assert(k_velocity_mapping_mode_strings.size == ToInt(VelocityMappingMode:
 } // namespace param_values
 
 struct ParameterInfo {
-    enum class MenuType {
+    enum class MenuType : u8 {
         None,
         LoopMode,
         EqType,

@@ -6,6 +6,7 @@
 
 #include "foundation/container/dynamic_array.hpp"
 #include "foundation/container/span.hpp"
+#include "foundation/container/tagged_union.hpp"
 #include "foundation/error/error_code.hpp"
 #include "foundation/universal_defs.hpp"
 #include "foundation/utils/string.hpp"
@@ -146,7 +147,7 @@ PUBLIC constexpr DynamicArrayInline<char, 32> IntToString(IntType num, IntToStri
     return result;
 }
 
-template <typename T>
+template <Struct T>
 struct DumpStructWrapper {
     T const& value;
 };
@@ -253,6 +254,12 @@ PUBLIC ErrorCodeOr<void> ValueToString(Writer writer, T const& value, FormatOpti
         TRY(PadToRequiredWidthIfNeeded(writer, options, str.size));
         TRY(writer.WriteChars(str));
         return k_success;
+    }
+
+    else if constexpr (IsSpecializationOf<Type, TaggedUnion>) {
+        ErrorCodeOr<void> result = k_success;
+        value.Visit([&](auto const& x) { result = ValueToString(writer, x, options); });
+        return result;
     }
 
     else if constexpr (Integral<Type> || Enum<Type> || Convertible<AddConst<Type>, void const*>) {

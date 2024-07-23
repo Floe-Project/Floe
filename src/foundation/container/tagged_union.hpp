@@ -111,6 +111,11 @@ class TaggedUnion {
     static constexpr usize k_data_size = LargestValueInTemplateArgs<sizeof(typename Ts::Type)...>::value;
     static constexpr usize k_data_align = LargestValueInTemplateArgs<alignof(typename Ts::Type)...>::value;
 
+    template <TagType k_wanted_tag>
+    constexpr void CallIfTypesMatch(auto&& function) const {
+        if (k_wanted_tag == tag) return function(GetFromTypeIndex<TagToType<k_wanted_tag>::k_index>());
+    }
+
   public:
     TaggedUnion(TaggedUnion const& other) = default;
     TaggedUnion& operator=(TaggedUnion const& other) = default;
@@ -234,6 +239,9 @@ class TaggedUnion {
     typename TypeAtIndex<TagToType<k_wanted_tag>::k_index>::Type const& GetFromTag() const {
         return GetFromTypeIndex<TagToType<k_wanted_tag>::k_index>();
     }
+
+    // ===========================================================
+    void Visit(auto&& function) const { (CallIfTypesMatch<Ts::k_tag>(function), ...); }
 
     // don't modify these directly, use the methods
     // ===========================================================

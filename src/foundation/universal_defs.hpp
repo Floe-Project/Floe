@@ -150,6 +150,7 @@ template <typename T> concept Void = __is_void(T);
 template <typename T> concept Nullptr = __is_nullptr(T);
 template <typename T> concept FunctionType = __is_function(T);
 template <typename T> concept Arithmetic = __is_arithmetic(T);
+template <typename T> concept Struct = __is_class(T);
 template <typename T> concept Scalar = __is_scalar(T);
 template <typename T> concept Fundamental = __is_fundamental(T);
 template <typename T> concept MoveConstructible = ConstructibleWithArgs<T, AddRvalueReference<T>>;

@@ -6,6 +6,28 @@
 #include "tests/framework.hpp"
 #include "utils/leak_detecting_allocator.hpp"
 
+TEST_CASE(TestTaggedUnion) {
+    enum class E {
+        A,
+        B,
+        C,
+    };
+    TaggedUnion<E, TypeAndTag<int, E::A>, TypeAndTag<float, E::B>, TypeAndTag<String, E::C>> u {int {}};
+
+    u = 999;
+    u.Visit([&](auto const& arg) { tester.log.DebugLn("Tagged union value is: {}", arg); });
+
+    u = 3.14f;
+    u.Visit([&](auto const& arg) { tester.log.DebugLn("Tagged union value is: {}", arg); });
+
+    u = "hello"_s;
+    u.Visit([&](auto const& arg) { tester.log.DebugLn("Tagged union value is: {}", arg); });
+
+    tester.log.DebugLn("Formatting a tagged union: {}", u);
+
+    return k_success;
+}
+
 TEST_CASE(TestBitset) {
     {
         Bitset<65> b;
@@ -2719,58 +2741,59 @@ TEST_CASE(TestArenaAllocatorCursor) {
 }
 
 TEST_REGISTRATION(RegisterFoundationTests) {
-    REGISTER_TEST(TestAllocatorTypes<FixedSizeAllocator<1>>);
-    REGISTER_TEST(TestAllocatorTypes<FixedSizeAllocator<16>>);
-    REGISTER_TEST(TestAllocatorTypes<FixedSizeAllocator<1000>>);
-    REGISTER_TEST(TestAllocatorTypes<Malloc>);
-    REGISTER_TEST(TestAllocatorTypes<PageAllocator>);
+    REGISTER_TEST(TestAllocatorTypes<ArenaAllocatorBigBuf>);
     REGISTER_TEST(TestAllocatorTypes<ArenaAllocatorMalloc>);
     REGISTER_TEST(TestAllocatorTypes<ArenaAllocatorPage>);
-    REGISTER_TEST(TestAllocatorTypes<ArenaAllocatorBigBuf>);
+    REGISTER_TEST(TestAllocatorTypes<FixedSizeAllocator<1000>>);
+    REGISTER_TEST(TestAllocatorTypes<FixedSizeAllocator<16>>);
+    REGISTER_TEST(TestAllocatorTypes<FixedSizeAllocator<1>>);
     REGISTER_TEST(TestAllocatorTypes<LeakDetectingAllocator>);
+    REGISTER_TEST(TestAllocatorTypes<Malloc>);
+    REGISTER_TEST(TestAllocatorTypes<PageAllocator>);
     REGISTER_TEST(TestArenaAllocatorCursor);
-    REGISTER_TEST(TestParseCommandLineArgs);
-    REGISTER_TEST(TestAsciiToUppercase);
     REGISTER_TEST(TestAsciiToLowercase);
-    REGISTER_TEST(TestNullTermStringsEqual);
-    REGISTER_TEST(TestSplitWithIterator);
-    REGISTER_TEST(TestSplit);
-    REGISTER_TEST(TestParseInt);
-    REGISTER_TEST(TestParseFloat);
-    REGISTER_TEST(TestNarrowWiden);
-    REGISTER_TEST(TestCopyStringIntoBuffer);
-    REGISTER_TEST(TestMatchWildcard);
-    REGISTER_TEST(TestStringAlgorithms);
-    REGISTER_TEST(TestMemoryUtils);
-    REGISTER_TEST(TestVersion);
-    REGISTER_TEST(TestRandomFloatGenerator<f32>);
-    REGISTER_TEST(TestRandomFloatGenerator<f64>);
-    REGISTER_TEST(TestRandomIntGeneratorUnsigned);
-    REGISTER_TEST(TestPath);
-    REGISTER_TEST(TestTrigLookupTable);
-    REGISTER_TEST(TestMathsTrigTurns);
-    REGISTER_TEST(TestRect);
-    REGISTER_TEST(TestFormat);
-    REGISTER_TEST(TestFormatStringReplace);
-    REGISTER_TEST(TestIntToString);
-    REGISTER_TEST(TestSort);
-    REGISTER_TEST(TestStringSearching);
+    REGISTER_TEST(TestAsciiToUppercase);
     REGISTER_TEST(TestBinarySearch);
-    REGISTER_TEST(TestOptional<int>);
-    REGISTER_TEST(TestOptional<AllocedString>);
+    REGISTER_TEST(TestBitset);
     REGISTER_TEST(TestCircularBuffer);
     REGISTER_TEST(TestCircularBufferRefType);
-    REGISTER_TEST(TestDynamicArrayBasics<int>);
+    REGISTER_TEST(TestCopyStringIntoBuffer);
     REGISTER_TEST(TestDynamicArrayBasics<AllocedString>);
     REGISTER_TEST(TestDynamicArrayBasics<Optional<AllocedString>>);
-    REGISTER_TEST(TestDynamicArrayClone);
-    REGISTER_TEST(TestDynamicArrayString);
-    REGISTER_TEST(TestLinkedList);
-    REGISTER_TEST(TestWriter);
-    REGISTER_TEST(TestBitset);
-    REGISTER_TEST(TestDynamicArrayInlineBasics);
+    REGISTER_TEST(TestDynamicArrayBasics<int>);
     REGISTER_TEST(TestDynamicArrayChar);
+    REGISTER_TEST(TestDynamicArrayClone);
+    REGISTER_TEST(TestDynamicArrayInlineBasics);
+    REGISTER_TEST(TestDynamicArrayString);
+    REGISTER_TEST(TestFormat);
+    REGISTER_TEST(TestFormatStringReplace);
     REGISTER_TEST(TestFunction);
     REGISTER_TEST(TestFunctionQueue);
     REGISTER_TEST(TestHashTable);
+    REGISTER_TEST(TestIntToString);
+    REGISTER_TEST(TestLinkedList);
+    REGISTER_TEST(TestMatchWildcard);
+    REGISTER_TEST(TestMathsTrigTurns);
+    REGISTER_TEST(TestMemoryUtils);
+    REGISTER_TEST(TestNarrowWiden);
+    REGISTER_TEST(TestNullTermStringsEqual);
+    REGISTER_TEST(TestOptional<AllocedString>);
+    REGISTER_TEST(TestOptional<int>);
+    REGISTER_TEST(TestParseCommandLineArgs);
+    REGISTER_TEST(TestParseFloat);
+    REGISTER_TEST(TestParseInt);
+    REGISTER_TEST(TestPath);
+    REGISTER_TEST(TestRandomFloatGenerator<f32>);
+    REGISTER_TEST(TestRandomFloatGenerator<f64>);
+    REGISTER_TEST(TestRandomIntGeneratorUnsigned);
+    REGISTER_TEST(TestRect);
+    REGISTER_TEST(TestSort);
+    REGISTER_TEST(TestSplit);
+    REGISTER_TEST(TestSplitWithIterator);
+    REGISTER_TEST(TestStringAlgorithms);
+    REGISTER_TEST(TestStringSearching);
+    REGISTER_TEST(TestTaggedUnion);
+    REGISTER_TEST(TestTrigLookupTable);
+    REGISTER_TEST(TestVersion);
+    REGISTER_TEST(TestWriter);
 }

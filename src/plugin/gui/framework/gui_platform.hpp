@@ -15,6 +15,8 @@
 #include "plugin_instance.hpp"
 #include "settings/settings_gui.hpp"
 
+constexpr bool k_debug_gui_platform = false;
+
 struct GuiPlatform {
     static constexpr uintptr_t k_timer_id = 200;
 
@@ -578,7 +580,8 @@ static void UpdateAndRender(GuiPlatform& platform) {
 }
 
 static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
-    if (event->type != PUGL_UPDATE && event->type != PUGL_TIMER) printEvent(event, "PUGL: ", true);
+    if constexpr (k_debug_gui_platform)
+        if (event->type != PUGL_UPDATE && event->type != PUGL_TIMER) printEvent(event, "PUGL: ", true);
     auto& platform = *(GuiPlatform*)puglGetHandle(view);
 
     bool post_redisplay = false;

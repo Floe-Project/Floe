@@ -576,14 +576,16 @@ ListedAudioData::~ListedAudioData() {
            s == FileLoadingState::CompletedSucessfully);
     if (audio_data.interleaved_samples.size)
         AudioDataAllocator::Instance().Free(audio_data.interleaved_samples.ToByteSpan());
+    library_ref_count.FetchSub(1);
 }
 
 ListedInstrument::~ListedInstrument() {
     ZoneScoped;
     for (auto a : audio_data_set)
         a->ref_count.FetchSub(1);
-    library_ref_count.FetchSub(1);
 }
+
+ListedImpulseResponse::~ListedImpulseResponse() { audio_data->ref_count.FetchSub(1); }
 
 // Just a little helper that we pass around when working with the thread pool.
 struct ThreadPoolArgs {
@@ -671,35 +673,36 @@ static void TriggerReloadIfAudioIsCancelled(ListedAudioData& audio_data,
            audio_data.state.Load() != FileLoadingState::PendingCancel);
 }
 
-static ListedAudioData* FetchOrCreateAudioData(ArenaList<ListedAudioData, true>& audio_datas,
-                                               sample_lib::Library const& lib,
+static ListedAudioData* FetchOrCreateAudioData(LibrariesList::Node& lib_node,
                                                String path,
                                                ThreadPoolArgs thread_pool_args,
                                                u32 debug_inst_id) {
-    for (auto& d : audio_datas) {
+    auto const& lib = *lib_node.value.lib;
+    for (auto& d : lib_node.value.audio_datas) {
         if (lib.name == d.library_name && d.path == path) {
             TriggerReloadIfAudioIsCancelled(d, lib, thread_pool_args, debug_inst_id);
             return &d;
         }
     }
 
-    auto audio_data = audio_datas.PrependUninitialised();
+    auto audio_data = lib_node.value.audio_datas.PrependUninitialised();
     PLACEMENT_NEW(audio_data)
     ListedAudioData {
         .library_name = lib.name,
         .path = path,
         .audio_data = {},
         .ref_count = 0u,
+        .library_ref_count = lib_node.reader_uses,
         .state = FileLoadingState::PendingLoad,
         .error = {},
     };
+    lib_node.reader_uses.FetchAdd(1);
 
     LoadAudioAsync(*audio_data, lib, thread_pool_args);
     return audio_data;
 }
 
 static ListedInstrument* FetchOrCreateInstrument(LibrariesList::Node& lib_node,
-                                                 ArenaList<ListedAudioData, true>& audio_datas,
                                                  sample_lib::Instrument const& inst,
                                                  ThreadPoolArgs thread_pool_args) {
     auto& lib = lib_node.value;
@@ -720,9 +723,7 @@ static ListedInstrument* FetchOrCreateInstrument(LibrariesList::Node& lib_node,
         .debug_id = g_inst_debug_id++,
         .inst = {inst},
         .ref_count = 0u,
-        .library_ref_count = lib_node.reader_uses,
     };
-    lib_node.reader_uses.FetchAdd(1);
 
     DynamicArray<ListedAudioData*> audio_data_set {new_inst->arena};
 
@@ -732,11 +733,8 @@ static ListedInstrument* FetchOrCreateInstrument(LibrariesList::Node& lib_node,
         auto& region_info = inst.regions[region_index];
         auto& audio_data = new_inst->inst.audio_datas[region_index];
 
-        auto ref_audio_data = FetchOrCreateAudioData(audio_datas,
-                                                     *lib.lib,
-                                                     region_info.file.path,
-                                                     thread_pool_args,
-                                                     new_inst->debug_id);
+        auto ref_audio_data =
+            FetchOrCreateAudioData(lib_node, region_info.file.path, thread_pool_args, new_inst->debug_id);
         audio_data = &ref_audio_data->audio_data;
 
         dyn::AppendIfNotAlreadyThere(audio_data_set, ref_audio_data);
@@ -752,6 +750,22 @@ static ListedInstrument* FetchOrCreateInstrument(LibrariesList::Node& lib_node,
     new_inst->audio_data_set = audio_data_set.ToOwnedSpan();
 
     return new_inst;
+}
+
+static ListedImpulseResponse* FetchOrCreateImpulseResponse(LibrariesList::Node& lib_node,
+                                                           sample_lib::ImpulseResponse const& ir,
+                                                           ThreadPoolArgs thread_pool_args) {
+    auto audio_data = FetchOrCreateAudioData(lib_node, ir.path, thread_pool_args, 999999);
+    audio_data->ref_count.FetchAdd(1);
+
+    auto new_ir = lib_node.value.irs.PrependUninitialised();
+    PLACEMENT_NEW(new_ir)
+    ListedImpulseResponse {
+        .ir = {ir, &audio_data->audio_data},
+        .audio_data = audio_data,
+        .ref_count = 0u,
+    };
+    return new_ir;
 }
 
 static void CancelLoadingAudioForInstrumentIfPossible(ListedInstrument const* i, uintptr_t trace_id) {
@@ -795,7 +809,7 @@ struct PendingResource {
 
     using ListedPointer = TaggedUnion<LoadRequestType,
                                       TypeAndTag<ListedInstrument*, LoadRequestType::Instrument>,
-                                      TypeAndTag<ListedAudioData*, LoadRequestType::Ir>>;
+                                      TypeAndTag<ListedImpulseResponse*, LoadRequestType::Ir>>;
 
     using StateUnion = TaggedUnion<State,
                                    TypeAndTag<ListedPointer, State::AwaitingAudio>,
@@ -848,11 +862,11 @@ static void DumpPendingResourcesDebugInfo(PendingResources& pending_resources) {
                         break;
                     }
                     case LoadRequestType::Ir: {
-                        auto ir = resource.Get<ListedAudioData*>();
-                        DebugLn("    Awaiting audio for IR {}", ir->path);
+                        auto ir = resource.Get<ListedImpulseResponse*>();
+                        DebugLn("    Awaiting audio for IR {}", ir->ir.ir.path);
                         DebugLn("      Audio data: {}, {}",
-                                ir->audio_data.hash,
-                                EnumToString(ir->state.Load()));
+                                ir->audio_data->audio_data.hash,
+                                EnumToString(ir->audio_data->state.Load()));
                         break;
                     }
                 }
@@ -956,7 +970,7 @@ static bool UpdatePendingResources(PendingResources& pending_resources,
                             .instrument_loading_percents[load_inst.layer_index]
                             .Store(0);
 
-                        auto inst = FetchOrCreateInstrument(*lib, server.audio_datas, **i, thread_pool_args);
+                        auto inst = FetchOrCreateInstrument(*lib, **i, thread_pool_args);
                         ASSERT(inst);
 
                         pending_resource.request.async_comms_channel.desired_inst[load_inst.layer_index] =
@@ -987,30 +1001,26 @@ static bool UpdatePendingResources(PendingResources& pending_resources,
                     break;
                 }
                 case LoadRequestType::Ir: {
-                    auto const ir = pending_resource.request.request.Get<sample_lib::IrId>();
-                    auto const ir_path = lib->value.lib->irs_by_name.Find(ir.ir_name);
+                    auto const ir_id = pending_resource.request.request.Get<sample_lib::IrId>();
+                    auto const ir = lib->value.lib->irs_by_name.Find(ir_id.ir_name);
 
-                    if (ir_path) {
-                        auto audio_data = FetchOrCreateAudioData(server.audio_datas,
-                                                                 *lib->value.lib,
-                                                                 (*ir_path)->path,
-                                                                 thread_pool_args,
-                                                                 999999);
+                    if (ir) {
+                        auto listed_ir = FetchOrCreateImpulseResponse(*lib, **ir, thread_pool_args);
 
-                        pending_resource.state = PendingResource::ListedPointer {audio_data};
+                        pending_resource.state = PendingResource::ListedPointer {listed_ir};
 
                         TracyMessageEx({k_trace_category, k_trace_colour, pending_resource.debug_id},
                                        "option: load IR, {}, {}",
-                                       ir.library_name,
-                                       ir.ir_name);
+                                       ir_id.library_name,
+                                       ir_id.ir_name);
                     } else {
                         auto const err =
                             pending_resource.request.async_comms_channel.error_notifications.NewError();
                         err->value = {
                             .title = "Failed to find IR"_s,
-                            .message = String(ir.ir_name),
+                            .message = String(ir_id.ir_name),
                             .error_code = CommonError::NotFound,
-                            .id = ThreadsafeErrorNotifications::Id("ir  ", ir.ir_name),
+                            .id = ThreadsafeErrorNotifications::Id("ir  ", ir_id.ir_name),
                         };
                         pending_resource.request.async_comms_channel.error_notifications.AddOrUpdateError(
                             err);
@@ -1110,15 +1120,21 @@ static bool UpdatePendingResources(PendingResources& pending_resources,
     for (auto& pending_resource : pending_resources.list) {
         if (pending_resource.state.tag != PendingResource::State::AwaitingAudio) continue;
 
-        auto a_ptr = pending_resource.state.Get<PendingResource::ListedPointer>().TryGet<ListedAudioData*>();
-        if (!a_ptr) continue;
-        auto a = *a_ptr;
+        auto ir_ptr_ptr =
+            pending_resource.state.Get<PendingResource::ListedPointer>().TryGet<ListedImpulseResponse*>();
+        if (!ir_ptr_ptr) continue;
+        auto ir_ptr = *ir_ptr_ptr;
 
-        auto const& ir_data = *a;
-        switch (ir_data.state.Load()) {
+        auto const& ir = *ir_ptr;
+        switch (ir.audio_data->state.Load()) {
             case FileLoadingState::CompletedSucessfully: {
-                pending_resource.state =
-                    Resource {RefCounted<AudioData> {a->audio_data, a->ref_count, &server.work_signaller}};
+                pending_resource.state = Resource {
+                    RefCounted<LoadedIr> {
+                        ir_ptr->ir,
+                        ir_ptr->ref_count,
+                        &server.work_signaller,
+                    },
+                };
                 break;
             }
             case FileLoadingState::CompletedWithError: {
@@ -1129,13 +1145,13 @@ static bool UpdatePendingResources(PendingResources& pending_resources,
                     err->value = {
                         .title = "Failed to load IR"_s,
                         .message = {},
-                        .error_code = *ir_data.error,
+                        .error_code = *ir.audio_data->error,
                         .id = Hash("ir  "_s) + Hash(ir_index.library_name.Items()) +
                               Hash(ir_index.ir_name.Items()),
                     };
                     pending_resource.request.async_comms_channel.error_notifications.AddOrUpdateError(err);
                 }
-                pending_resource.state = *ir_data.error;
+                pending_resource.state = *ir.audio_data->error;
                 break;
             }
             case FileLoadingState::PendingLoad:
@@ -1199,25 +1215,22 @@ static bool UpdatePendingResources(PendingResources& pending_resources,
 
 static void ServerThreadUpdateMetrics(Server& server) {
     ASSERT(CurrentThreadID() == server.server_thread_id);
-    {
-        u32 num_insts_loaded = 0;
-        for (auto& i : server.libraries)
-            for (auto& _ : i.value.instruments)
-                ++num_insts_loaded;
-        server.num_insts_loaded.Store(num_insts_loaded);
-    }
-
-    {
-        u32 num_samples_loaded = 0;
-        u64 total_bytes_used = 0;
-        for (auto& audio : server.audio_datas) {
+    u32 num_insts_loaded = 0;
+    u32 num_samples_loaded = 0;
+    u64 total_bytes_used = 0;
+    for (auto& i : server.libraries) {
+        for (auto& _ : i.value.instruments)
+            ++num_insts_loaded;
+        for (auto const& audio : i.value.audio_datas) {
             ++num_samples_loaded;
             if (audio.state.Load() == FileLoadingState::CompletedSucessfully)
                 total_bytes_used += audio.audio_data.RamUsageBytes();
         }
-        server.num_samples_loaded.Store(num_samples_loaded);
-        server.total_bytes_used_by_samples.Store(total_bytes_used);
     }
+
+    server.num_insts_loaded.Store(num_insts_loaded);
+    server.num_samples_loaded.Store(num_samples_loaded);
+    server.total_bytes_used_by_samples.Store(total_bytes_used);
 }
 
 static void RemoveUnreferencedObjects(Server& server) {
@@ -1228,12 +1241,19 @@ static void RemoveUnreferencedObjects(Server& server) {
         channels.RemoveIf([](AsyncCommsChannel const& h) { return !h.used.Load(MemoryOrder::Relaxed); });
     });
 
-    for (auto& l : server.libraries)
-        l.value.instruments.RemoveIf([](ListedInstrument const& i) { return i.ref_count.Load() == 0; });
-    for (auto n = server.libraries.dead_list; n != nullptr; n = n->writer_next)
-        n->value.instruments.RemoveIf([](ListedInstrument const& i) { return i.ref_count.Load() == 0; });
+    auto remove_unreferenced_in_lib = [](auto& lib) {
+        auto remove_unreferenced = [](auto& list) {
+            list.RemoveIf([](auto const& n) { return n.ref_count.Load() == 0; });
+        };
+        remove_unreferenced(lib.instruments);
+        remove_unreferenced(lib.irs);
+        remove_unreferenced(lib.audio_datas);
+    };
 
-    server.audio_datas.RemoveIf([](ListedAudioData const& a) { return a.ref_count.Load() == 0; });
+    for (auto& l : server.libraries)
+        remove_unreferenced_in_lib(l.value);
+    for (auto n = server.libraries.dead_list; n != nullptr; n = n->writer_next)
+        remove_unreferenced_in_lib(n->value);
 
     server.libraries.DeleteRemovedAndUnreferenced();
 }
@@ -1349,10 +1369,12 @@ static sample_lib::Library* BuiltinLibrary() {
 
     static bool init = false;
     if (!Exchange(init, true)) {
-        static Array<sample_lib::ImpulseResponse, EmbeddedIr_Count> irs;
+        static UninitialisedArray<sample_lib::ImpulseResponse, EmbeddedIr_Count> irs;
         for (auto const i : Range(ToInt(EmbeddedIr_Count))) {
             auto const& embedded = EmbeddedIrs().irs[i];
-            irs[i] = sample_lib::ImpulseResponse {
+            PLACEMENT_NEW(&irs[i])
+            sample_lib::ImpulseResponse {
+                .library = builtin_library,
                 .name = ToString(embedded.name),
                 .path = ToString(embedded.filename),
             };
@@ -1503,7 +1525,7 @@ void LoadResult::ChangeRefCount(RefCountChange t) const {
                 break;
             case LoadRequestType::Ir:
                 break;
-                resource_union->Get<RefCounted<AudioData>>().ChangeRefCount(t);
+                resource_union->Get<RefCounted<LoadedIr>>().ChangeRefCount(t);
                 break;
         }
     }
@@ -1655,18 +1677,17 @@ TEST_CASE(TestSampleLibraryLoader) {
 
         SUBCASE("ir") {
             auto const builtin_ir = EmbeddedIrs().irs[0];
-            dyn::Append(
-                requests,
-                {
-                    .request =
-                        sample_lib::IrId {.library_name = k_builtin_library_name,
-                                          .ir_name = String {builtin_ir.name.data, builtin_ir.name.size}},
-                    .check_result =
-                        [&](LoadResult const& r, LoadRequest const& request) {
-                            auto audio_data = ExtractSuccess<RefCounted<AudioData>>(tester, r, request);
-                            CHECK(audio_data->interleaved_samples.size);
-                        },
-                });
+            dyn::Append(requests,
+                        {
+                            .request = sample_lib::IrId {.library_name = k_builtin_library_name,
+                                                         .ir_name = String {builtin_ir.name.data,
+                                                                            builtin_ir.name.size}},
+                            .check_result =
+                                [&](LoadResult const& r, LoadRequest const& request) {
+                                    auto ir = ExtractSuccess<RefCounted<LoadedIr>>(tester, r, request);
+                                    CHECK(ir->audio_data->interleaved_samples.size);
+                                },
+                        });
         }
 
         SUBCASE("library and instrument") {

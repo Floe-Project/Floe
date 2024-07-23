@@ -253,6 +253,58 @@ static void Deactivate(AudioProcessor& processor) {
     }
 }
 
+void SetInstrument(AudioProcessor& processor, u32 layer_index, Instrument const& instrument) {
+    DebugAssertMainThread(processor.host);
+
+    switch (instrument.tag) {
+        case InstrumentType::Sampler: {
+            auto& sampler_inst = instrument.Get<sample_lib_server::RefCounted<LoadedInstrument>>();
+            processor.layer_processors[layer_index].desired_inst.Set(&*sampler_inst);
+            break;
+        }
+        case InstrumentType::WaveformSynth: {
+            auto& w = instrument.Get<WaveformType>();
+            processor.layer_processors[layer_index].desired_inst.Set(w);
+            break;
+        }
+        case InstrumentType::None: {
+            processor.layer_processors[layer_index].desired_inst.SetNone();
+            break;
+        }
+    }
+
+    processor.events_for_audio_thread.Push(LayerInstrumentChanged {.layer_index = layer_index});
+    processor.host.request_process(&processor.host);
+}
+
+void SetConvolutionIr(AudioProcessor& processor, AudioData const* audio_data) {
+    DebugAssertMainThread(processor.host);
+    processor.convo.ConvolutionIrDataLoaded(audio_data);
+    processor.events_for_audio_thread.Push(EventForAudioThreadType::ConvolutionIRChanged);
+    processor.host.request_process(&processor.host);
+}
+
+void ApplyNewState(AudioProcessor& processor, StateSnapshot const& state, StateSource source) {
+    if (source == StateSource::Daw)
+        for (auto [i, cc] : Enumerate(processor.param_learned_ccs))
+            cc.AssignBlockwise(state.param_learned_ccs[i]);
+
+    for (auto const i : Range(k_num_parameters))
+        processor.params[i].SetLinearValue(state.param_values[i]);
+
+    processor.desired_effects_order.Store(EncodeEffectsArray(state.fx_order));
+    processor.engine_version.Store(state.engine_version);
+
+    // reload everything
+    {
+        if (auto const host_params =
+                (clap_host_params const*)processor.host.get_extension(&processor.host, CLAP_EXT_PARAMS))
+            host_params->rescan(&processor.host, CLAP_PARAM_RESCAN_VALUES);
+        processor.events_for_audio_thread.Push(EventForAudioThreadType::ReloadAllAudioState);
+        processor.host.request_process(&processor.host);
+    }
+}
+
 inline void
 ResetProcessor(AudioProcessor& processor, Bitset<k_num_parameters> processing_change, u32 num_frames) {
     processor.whole_engine_volume_fade.ForceSetFullVolume();

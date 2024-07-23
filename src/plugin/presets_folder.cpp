@@ -177,7 +177,7 @@ PresetsFolderScanResult FetchOrRescanPresetsFolder(PresetsListing& listing,
 
                         auto result = arena.New<PresetMetadata>();
                         PLACEMENT_NEW(result) PresetMetadata();
-                        for (auto& i : state.insts) {
+                        for (auto& i : state.inst_ids) {
                             if (auto s = i.TryGet<sample_lib::InstrumentId>()) {
                                 if (!Find(result->used_libraries, s->library_name))
                                     dyn::Append(result->used_libraries, arena.Clone(s->library_name));

@@ -11,7 +11,7 @@
 
 #include "audio_data.hpp"
 #include "common/constants.hpp"
-#include "sample_library/loaded_instrument.hpp"
+#include "sample_library/loaded_resources.hpp"
 #include "sample_library/sample_library.hpp"
 
 // Sample library server
@@ -100,7 +100,7 @@ struct RefCounted {
 
 using Resource = TaggedUnion<LoadRequestType,
                              TypeAndTag<RefCounted<LoadedInstrument>, LoadRequestType::Instrument>,
-                             TypeAndTag<RefCounted<AudioData>, LoadRequestType::Ir>>;
+                             TypeAndTag<RefCounted<LoadedIr>, LoadRequestType::Ir>>;
 
 struct LoadResult {
     enum class ResultType { Success, Error, Cancelled };
@@ -112,11 +112,17 @@ struct LoadResult {
     void Retain() const { ChangeRefCount(RefCountChange::Retain); }
     void Release() const { ChangeRefCount(RefCountChange::Release); }
 
+    template <typename T>
+    T const* TryExtract() const {
+        if (result.tag == ResultType::Success) return result.Get<Resource>().TryGet<T>();
+        return nullptr;
+    }
+
     RequestId id;
     Result result;
 };
 
-// Communication channel
+// Asynchronous communication channel
 // ==========================================================================================================
 struct AsyncCommsChannel {
     using ResultAddedCallback = TrivialFixedSizeFunction<8, void()>;
@@ -153,10 +159,11 @@ enum class FileLoadingState : u32 {
 struct ListedAudioData {
     ~ListedAudioData();
 
-    DynamicArrayInline<char, k_max_library_name_size> library_name {};
+    String library_name;
     String path;
     AudioData audio_data;
     Atomic<u32> ref_count {};
+    Atomic<u32>& library_ref_count;
     Atomic<FileLoadingState> state {FileLoadingState::PendingLoad};
     Optional<ErrorCode> error {};
 };
@@ -167,9 +174,16 @@ struct ListedInstrument {
     u32 debug_id;
     LoadedInstrument inst;
     Atomic<u32> ref_count {};
-    Atomic<u32>& library_ref_count;
     Span<ListedAudioData*> audio_data_set {};
     ArenaAllocator arena {PageAllocator::Instance()};
+};
+
+struct ListedImpulseResponse {
+    ~ListedImpulseResponse();
+
+    LoadedIr ir;
+    ListedAudioData* audio_data {};
+    Atomic<u32> ref_count {};
 };
 
 struct ListedLibrary {
@@ -178,7 +192,9 @@ struct ListedLibrary {
     ArenaAllocator arena;
     sample_lib::Library* lib {};
 
+    ArenaList<ListedAudioData, true> audio_datas {arena};
     ArenaList<ListedInstrument, false> instruments {arena};
+    ArenaList<ListedImpulseResponse, false> irs {arena};
 };
 
 using LibrariesList = AtomicRefList<ListedLibrary>;
@@ -233,7 +249,6 @@ struct Server {
     ThreadsafeQueue<detail::QueuedRequest> request_queue {PageAllocator::Instance()};
     WorkSignaller work_signaller {};
     Atomic<bool> request_debug_dump_current_state {false};
-    ArenaList<detail::ListedAudioData, true> audio_datas {PageAllocator::Instance()};
 };
 
 // The server owns the channel, you just get a reference to it that will be valid until you close it. The

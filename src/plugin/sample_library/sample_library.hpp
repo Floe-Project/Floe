@@ -88,6 +88,8 @@ struct Instrument {
 };
 
 struct ImpulseResponse {
+    Library const& library;
+
     String name {};
     String path {};
 };

@@ -148,11 +148,11 @@ static void ImpulseResponseMenuItems(Gui* g) {
     }
 
     if (DoMultipleMenuItems(g, items, current)) {
-        auto _ = SetConvolutionIr(g->plugin,
-                                  sample_lib::IrId {
-                                      .library_name = String(k_core_library_name),
-                                      .ir_name = items[(usize)current],
-                                  });
+        auto _ = LoadConvolutionIr(g->plugin,
+                                   sample_lib::IrId {
+                                       .library_name = String(k_core_library_name),
+                                       .ir_name = items[(usize)current],
+                                   });
     }
 }
 

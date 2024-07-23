@@ -251,6 +251,7 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
                     auto ir = arena.NewUninitialised<ImpulseResponse>();
                     PLACEMENT_NEW(ir)
                     ImpulseResponse {
+                        .library = library,
                         .name = name,
                         .path = path,
                     };

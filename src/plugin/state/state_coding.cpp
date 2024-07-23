@@ -366,25 +366,25 @@ class JsonStateParser {
 
                                 ASSERT(name.size <= k_max_instrument_name_size);
 
-                                m_state.insts[m_inst_index] = sample_lib::InstrumentId {
+                                m_state.inst_ids[m_inst_index] = sample_lib::InstrumentId {
                                     .library_name = {}, // filled in later
                                     .inst_name = name,
                                 };
                                 break;
                             }
                             case mdata::SpecialAudioDataTypeSine:
-                                m_state.insts[m_inst_index] = WaveformType::Sine;
+                                m_state.inst_ids[m_inst_index] = WaveformType::Sine;
                                 break;
                             case mdata::SpecialAudioDataTypeWhiteNoiseStereo:
-                                m_state.insts[m_inst_index] = WaveformType::WhiteNoiseStereo;
+                                m_state.inst_ids[m_inst_index] = WaveformType::WhiteNoiseStereo;
                                 break;
                             case mdata::SpecialAudioDataTypeWhiteNoiseMono:
-                                m_state.insts[m_inst_index] = WaveformType::WhiteNoiseMono;
+                                m_state.inst_ids[m_inst_index] = WaveformType::WhiteNoiseMono;
                                 break;
                             case mdata::SpecialAudioDataTypeCount: PanicIfReached(); break;
                         }
                     } else {
-                        m_state.insts[m_inst_index] = InstrumentType::None;
+                        m_state.inst_ids[m_inst_index] = InstrumentType::None;
                     }
                     return true;
                 }
@@ -461,9 +461,9 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
             f = 999999999.f;
         for (auto& t : state.fx_order)
             t = (EffectType)k_num_effect_types;
-        for (auto& i : state.insts)
+        for (auto& i : state.inst_ids)
             i = sample_lib::InstrumentId {"foo"_s, "bar"_s};
-        state.ir_index = sample_lib::IrId {
+        state.ir_id = sample_lib::IrId {
             .library_name = k_core_library_name,
             .ir_name = "Formant 1"_s,
         };
@@ -480,10 +480,10 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
     if (json_parse_outcome.HasError()) return ErrorCode {CommonError::FileFormatIsInvalid};
 
     if (parser.library_name == "None"_s || parser.library_name == ""_s) {
-        for (auto& i : state.insts)
+        for (auto& i : state.inst_ids)
             i = InstrumentType::None;
     } else {
-        for (auto& i : state.insts)
+        for (auto& i : state.inst_ids)
             if (auto s = i.TryGet<sample_lib::InstrumentId>()) s->library_name = parser.library_name;
     }
 
@@ -514,7 +514,7 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
     for (auto [index, param_value] : Enumerate(parser.non_existent_params)) {
         switch ((NoLongerExistingParam)index) {
             case NoLongerExistingParam::ConvolutionLegacyCoreIrName: {
-                state.ir_index = nullopt;
+                state.ir_id = nullopt;
 
                 if (param_value.tag == JsonStateParser::ParamValueType::String) {
                     auto const ir_name = param_value.Get<String>();
@@ -523,7 +523,7 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
                         // Some IRs there were in the 'Core' library are now builtin
                         for (auto const& ir : EmbeddedIrs().irs) {
                             if (String {ir.legacy_name.data, ir.legacy_name.size} == ir_name) {
-                                state.ir_index = sample_lib::IrId {
+                                state.ir_id = sample_lib::IrId {
                                     .library_name = k_builtin_library_name,
                                     .ir_name =
                                         path::FilenameWithoutExtension(String {ir.name.data, ir.name.size}),
@@ -532,8 +532,8 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
                             }
                         }
 
-                        if (!state.ir_index) {
-                            state.ir_index = sample_lib::IrId {
+                        if (!state.ir_id) {
+                            state.ir_id = sample_lib::IrId {
                                 .library_name = k_core_library_name,
                                 .ir_name = ir_name,
                             };
@@ -1079,14 +1079,14 @@ ErrorCodeOr<void> CodeState(StateSnapshot& state, CodeStateOptions const& option
             sample_lib::InstrumentId sampler_info {};
 
             if (coder.IsWriting()) {
-                switch (state.insts[i].tag) {
+                switch (state.inst_ids[i].tag) {
                     case InstrumentType::Sampler: {
                         type = Type::Sampler;
-                        sampler_info = state.insts[i].Get<sample_lib::InstrumentId>();
+                        sampler_info = state.inst_ids[i].Get<sample_lib::InstrumentId>();
                         break;
                     }
                     case InstrumentType::WaveformSynth: {
-                        switch (state.insts[i].Get<WaveformType>()) {
+                        switch (state.inst_ids[i].Get<WaveformType>()) {
                             case WaveformType::Sine: type = Type::WaveformSine; break;
                             case WaveformType::WhiteNoiseMono: type = Type::WaveformWhiteNoiseMono; break;
                             case WaveformType::WhiteNoiseStereo: type = Type::WaveformWhiteNoiseStereo; break;
@@ -1109,12 +1109,12 @@ ErrorCodeOr<void> CodeState(StateSnapshot& state, CodeStateOptions const& option
 
             if (coder.IsReading()) {
                 switch (type) {
-                    case Type::None: state.insts[i] = InstrumentType::None; break;
-                    case Type::Sampler: state.insts[i] = sampler_info; break;
-                    case Type::WaveformSine: state.insts[i] = WaveformType::Sine; break;
-                    case Type::WaveformWhiteNoiseMono: state.insts[i] = WaveformType::WhiteNoiseMono; break;
+                    case Type::None: state.inst_ids[i] = InstrumentType::None; break;
+                    case Type::Sampler: state.inst_ids[i] = sampler_info; break;
+                    case Type::WaveformSine: state.inst_ids[i] = WaveformType::Sine; break;
+                    case Type::WaveformWhiteNoiseMono: state.inst_ids[i] = WaveformType::WhiteNoiseMono; break;
                     case Type::WaveformWhiteNoiseStereo:
-                        state.insts[i] = WaveformType::WhiteNoiseStereo;
+                        state.inst_ids[i] = WaveformType::WhiteNoiseStereo;
                         break;
                 }
             }
@@ -1168,13 +1168,13 @@ ErrorCodeOr<void> CodeState(StateSnapshot& state, CodeStateOptions const& option
     // =======================================================================================================
     {
         bool has_ir {};
-        if (coder.IsWriting()) has_ir = state.ir_index.HasValue();
+        if (coder.IsWriting()) has_ir = state.ir_id.HasValue();
         TRY(coder.CodeNumber(has_ir, StateVersion::Initial));
 
         if (has_ir) {
-            if (coder.IsReading()) state.ir_index = sample_lib::IrId {};
-            TRY(coder.CodeDynArray(state.ir_index->library_name, StateVersion::Initial));
-            TRY(coder.CodeDynArray(state.ir_index->ir_name, StateVersion::Initial));
+            if (coder.IsReading()) state.ir_id = sample_lib::IrId {};
+            TRY(coder.CodeDynArray(state.ir_id->library_name, StateVersion::Initial));
+            TRY(coder.CodeDynArray(state.ir_id->ir_name, StateVersion::Initial));
         }
     }
 
@@ -1365,7 +1365,7 @@ static void CheckStateIsValid(tests::Tester& tester, StateSnapshot const& state)
         dyn::AppendIfNotAlreadyThere(effects, fx);
     CHECK_EQ(effects.size, k_num_effect_types);
 
-    for (auto& i : state.insts) {
+    for (auto& i : state.inst_ids) {
         switch (i.tag) {
             case InstrumentType::None: {
                 break;
@@ -1449,11 +1449,11 @@ TEST_CASE(TestNewSerialisation) {
             type = (EffectType)i;
         Shuffle(state.fx_order, random_seed);
 
-        state.ir_index = sample_lib::IrId {
+        state.ir_id = sample_lib::IrId {
             .library_name = "irlib"_s,
             .ir_name = "irfile"_s,
         };
-        for (auto [index, inst] : Enumerate(state.insts)) {
+        for (auto [index, inst] : Enumerate(state.inst_ids)) {
             inst = sample_lib::InstrumentId {
                 .library_name = String(fmt::Format(scratch_arena, "TestLib{}", index)),
                 .inst_name = String(fmt::Format(scratch_arena, "Test/Path{}", index)),
@@ -1659,25 +1659,25 @@ TEST_CASE(TestLoadingOldFiles) {
     SUBCASE("stress-test.mirage-phoenix") {
         auto const state = TRY(decode_file("stress-test.mirage-phoenix"));
 
-        CHECK(state.insts[0].tag == InstrumentType::Sampler);
-        CHECK(state.insts[1].tag == InstrumentType::Sampler);
-        CHECK(state.insts[2].tag == InstrumentType::Sampler);
-        if (auto i = state.insts[0].TryGet<sample_lib::InstrumentId>()) {
+        CHECK(state.inst_ids[0].tag == InstrumentType::Sampler);
+        CHECK(state.inst_ids[1].tag == InstrumentType::Sampler);
+        CHECK(state.inst_ids[2].tag == InstrumentType::Sampler);
+        if (auto i = state.inst_ids[0].TryGet<sample_lib::InstrumentId>()) {
             CHECK_EQ(i->library_name, "Phoenix"_s);
             CHECK_EQ(i->inst_name, "Strings"_s);
         }
-        if (auto i = state.insts[1].TryGet<sample_lib::InstrumentId>()) {
+        if (auto i = state.inst_ids[1].TryGet<sample_lib::InstrumentId>()) {
             CHECK_EQ(i->library_name, "Phoenix"_s);
             CHECK_EQ(i->inst_name, "Strings"_s);
         }
-        if (auto i = state.insts[2].TryGet<sample_lib::InstrumentId>()) {
+        if (auto i = state.inst_ids[2].TryGet<sample_lib::InstrumentId>()) {
             CHECK_EQ(i->library_name, "Phoenix"_s);
             CHECK_EQ(i->inst_name, "Choir"_s);
         }
-        CHECK(state.ir_index.HasValue());
-        if (state.ir_index.HasValue()) {
-            CHECK_EQ(state.ir_index->library_name, "Core"_s);
-            CHECK_EQ(state.ir_index->ir_name, "5s Shimmer"_s);
+        CHECK(state.ir_id.HasValue());
+        if (state.ir_id.HasValue()) {
+            CHECK_EQ(state.ir_id->library_name, "Core"_s);
+            CHECK_EQ(state.ir_id->ir_name, "5s Shimmer"_s);
         }
 
         CHECK_APPROX_EQ(ProjectedLayerValue(state, 0, LayerParamIndex::Volume), DbToAmp(-6.0f), 0.01f);
@@ -1701,13 +1701,13 @@ TEST_CASE(TestLoadingOldFiles) {
     SUBCASE("sine.mirage-wraith") {
         auto const state = TRY(decode_file("sine.mirage-wraith"));
 
-        CHECK(state.insts[0].tag == InstrumentType::WaveformSynth);
-        CHECK(state.insts[1].tag == InstrumentType::None);
-        CHECK(state.insts[2].tag == InstrumentType::None);
+        CHECK(state.inst_ids[0].tag == InstrumentType::WaveformSynth);
+        CHECK(state.inst_ids[1].tag == InstrumentType::None);
+        CHECK(state.inst_ids[2].tag == InstrumentType::None);
 
-        if (auto w = state.insts[0].TryGet<WaveformType>()) CHECK_EQ(*w, WaveformType::Sine);
+        if (auto w = state.inst_ids[0].TryGet<WaveformType>()) CHECK_EQ(*w, WaveformType::Sine);
 
-        CHECK(!state.ir_index.HasValue());
+        CHECK(!state.ir_id.HasValue());
 
         CHECK_EQ(state.fx_order[0], EffectType::Distortion);
         CHECK_EQ(state.fx_order[1], EffectType::BitCrush);

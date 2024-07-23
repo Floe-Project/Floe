@@ -16,8 +16,8 @@ struct StateSnapshot {
 
     Array<f32, k_num_parameters> param_values {};
     Array<EffectType, k_num_effect_types> fx_order {};
-    Optional<sample_lib::IrId> ir_index {};
-    InitialisedArray<InstrumentId, k_num_layers> insts {InstrumentType::None};
+    Optional<sample_lib::IrId> ir_id {};
+    InitialisedArray<InstrumentId, k_num_layers> inst_ids {InstrumentType::None};
     u8 engine_version {};
 
     Array<Bitset<128>, k_num_parameters> param_learned_ccs {};

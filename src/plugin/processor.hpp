@@ -28,6 +28,7 @@
 #include "plugin.hpp"
 #include "processing/smoothed_value_system.hpp"
 #include "processing/volume_fade.hpp"
+#include "state/state_snapshot.hpp"
 #include "voices.hpp"
 
 enum class EventForAudioThreadType : u8 {
@@ -262,6 +263,18 @@ struct AudioProcessor {
 
     PluginCallbacks<AudioProcessor> processor_callbacks;
 };
+
+using Instrument =
+    TaggedUnion<InstrumentType,
+                TypeAndTag<sample_lib_server::RefCounted<LoadedInstrument>, InstrumentType::Sampler>,
+                TypeAndTag<WaveformType, InstrumentType::WaveformSynth>>;
+
+void SetInstrument(AudioProcessor& processor, u32 layer_index, Instrument const& instrument);
+void SetConvolutionIr(AudioProcessor& processor, AudioData const* audio_data);
+
+// doesn't set instruments or convolution because they require loaded audio data which is often available at a
+// later time
+void ApplyNewState(AudioProcessor& processor, StateSnapshot const& state, StateSource source);
 
 void ParameterJustStartedMoving(AudioProcessor& processor, ParamIndex index);
 void ParameterJustStoppedMoving(AudioProcessor& processor, ParamIndex index);

@@ -940,7 +940,9 @@ static int AddIr(lua_State* lua) {
     auto ptr = ctx.result_arena.NewUninitialised<LightUserDataWrapper<ImpulseResponse>>();
     ptr->type = UserdataTypes::Ir;
     PLACEMENT_NEW(&ptr->obj)
-    ImpulseResponse {};
+    ImpulseResponse {
+        .library = *library,
+    };
     lua_pushlightuserdata(ctx.lua, ptr);
     auto& ir = ptr->obj;
     InterpretTable<ImpulseResponse>(ctx, 2, ir);

@@ -3,6 +3,7 @@
 
 #pragma once
 #include "foundation/foundation.hpp"
+#include "utils/debug/debug.hpp"
 
 #include "common/constants.hpp"
 #include "cross_instance_systems.hpp"
@@ -76,13 +77,8 @@ struct PluginInstance {
         LayerProcessor& processor;
         RandomIntGenerator<mdata::Index> inst_index_generator {};
 
-        using Instrument =
-            TaggedUnion<InstrumentType,
-                        TypeAndTag<sample_lib_server::RefCounted<LoadedInstrument>, InstrumentType::Sampler>,
-                        TypeAndTag<WaveformType, InstrumentType::WaveformSynth>>;
-
         Instrument instrument {InstrumentType::None};
-        InstrumentId desired_instrument {InstrumentType::None};
+        InstrumentId instrument_id {InstrumentType::None};
     };
 
     PluginInstance(clap_host const& host, CrossInstanceSystems& shared_data);
@@ -96,9 +92,11 @@ struct PluginInstance {
 
     u64 random_seed = SeedFromTime();
 
-    Layer layers[k_num_layers] {{0, processor.layer_processors[0]},
-                                {1, processor.layer_processors[1]},
-                                {2, processor.layer_processors[2]}};
+    Layer layers[k_num_layers] {
+        {0, processor.layer_processors[0]},
+        {1, processor.layer_processors[1]},
+        {2, processor.layer_processors[2]},
+    };
 
     bool in_destructor = false;
 
@@ -109,21 +107,12 @@ struct PluginInstance {
     struct PendingStateChange {
         ~PendingStateChange() {
             for (auto& r : retained_results)
-                r.result.Release();
+                r.Release();
         }
 
-        struct Request {
-            sample_lib_server::RequestId id;
-            Optional<u32> layer_index;
-        };
-        struct Result {
-            sample_lib_server::LoadResult result;
-            Optional<u32> layer_index;
-        };
-
         ArenaAllocator arena {PageAllocator::Instance()};
-        DynamicArrayInline<Request, k_num_layers + 1> requests;
-        DynamicArrayInline<Result, k_num_layers + 1> retained_results;
+        DynamicArrayInline<sample_lib_server::RequestId, k_num_layers + 1> requests;
+        DynamicArrayInline<sample_lib_server::LoadResult, k_num_layers + 1> retained_results;
         StateSnapshotWithMetadata snapshot;
         StateSource source;
     };
@@ -151,9 +140,9 @@ PluginCallbacks<PluginInstance> PluginInstanceCallbacks();
 
 void RunFunctionOnMainThread(PluginInstance& plugin, ThreadsafeFunctionQueue::Function function);
 
-Optional<u64> SetConvolutionIr(PluginInstance& plugin, Optional<sample_lib::IrId> ir);
+Optional<u64> LoadConvolutionIr(PluginInstance& plugin, Optional<sample_lib::IrId> ir);
 
-Optional<u64> SetInstrument(PluginInstance& plugin, u32 layer_index, InstrumentId instrument_info);
+Optional<u64> LoadInstrument(PluginInstance& plugin, u32 layer_index, InstrumentId instrument_info);
 
 void LoadRandomInstrument(PluginInstance& plugin,
                           u32 layer_index,

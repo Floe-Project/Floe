@@ -179,11 +179,12 @@ struct LayerProcessor {
     Atomic<u32> note_on_rr_pos = 0;
     Atomic<u32> note_off_rr_pos = 0;
 
-    using InstrumentUnion = TaggedUnion<InstrumentType,
-                                        TypeAndTag<LoadedInstrument const*, InstrumentType::Sampler>,
-                                        TypeAndTag<WaveformType, InstrumentType::WaveformSynth>>;
+    // We want to just store a raw pointer for the instrument, not the RefCounted wrapper.
+    using InstrumentUnwrapped = TaggedUnion<InstrumentType,
+                                            TypeAndTag<LoadedInstrument const*, InstrumentType::Sampler>,
+                                            TypeAndTag<WaveformType, InstrumentType::WaveformSynth>>;
 
-    InstrumentUnion inst = InstrumentType::None;
+    InstrumentUnwrapped inst = InstrumentType::None;
 
     // Encodes possible instruments into a single atomic u64. We use the fact that pointers must be aligned to
     // the type they point to, and therefore we can unaligned numbers to represent other things.
@@ -192,7 +193,7 @@ struct LayerProcessor {
         void Set(WaveformType w) { value.Store(ValForWaveform(w)); }
         void Set(LoadedInstrument const* i) { value.Store((uintptr)i); }
         void SetNone() { value.Store(0); }
-        Optional<InstrumentUnion> Consume() {
+        Optional<InstrumentUnwrapped> Consume() {
             auto v = value.Exchange(k_consumed);
             if (v == k_consumed) return nullopt;
             if (v == 0) return InstrumentType::None;

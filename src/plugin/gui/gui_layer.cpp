@@ -50,7 +50,7 @@ static void LayerInstrumentMenuItems(Gui* g, PluginInstance::Layer* layer) {
         for (auto [key, inst_ptr] : l->insts_by_name) {
             auto const lib_name = l->name;
             auto const inst_name = key;
-            if (auto desired_sampled = layer->desired_instrument.TryGet<sample_lib::InstrumentId>()) {
+            if (auto desired_sampled = layer->instrument_id.TryGet<sample_lib::InstrumentId>()) {
                 if (desired_sampled->library_name == lib_name && desired_sampled->inst_name == inst_name)
                     current = (int)insts.size;
             }
@@ -69,11 +69,11 @@ static void LayerInstrumentMenuItems(Gui* g, PluginInstance::Layer* layer) {
 
     if (DoMultipleMenuItems(g, insts, current)) {
         if (current == 0)
-            auto _ = SetInstrument(g->plugin, layer->index, InstrumentId {InstrumentType::None});
+            auto _ = LoadInstrument(g->plugin, layer->index, InstrumentId {InstrumentType::None});
         else if (current >= 1 && current <= (int)WaveformType::Count)
-            auto _ = SetInstrument(g->plugin, layer->index, InstrumentId {(WaveformType)(current - 1)});
+            auto _ = LoadInstrument(g->plugin, layer->index, InstrumentId {(WaveformType)(current - 1)});
         else
-            auto _ = SetInstrument(g->plugin, layer->index, InstrumentId {inst_info[(usize)current]});
+            auto _ = LoadInstrument(g->plugin, layer->index, InstrumentId {inst_info[(usize)current]});
     }
 }
 
@@ -92,7 +92,7 @@ static void DoInstSelectorGUI(Gui* g, Rect r, u32 layer) {
         imgui.EndWindow();
     }
 
-    if (layer_obj->desired_instrument.tag == InstrumentType::None) {
+    if (layer_obj->instrument_id.tag == InstrumentType::None) {
         Tooltip(g, imgui_id, r, "Select the instrument for this layer"_s);
     } else {
         Tooltip(g,

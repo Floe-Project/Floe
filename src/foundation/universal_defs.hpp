@@ -184,6 +184,9 @@ concept FunctionWithSignature = requires(Functor f) {
     { f(Declval<Args>()...) } -> Same<ReturnType>;
 };
 
+template <typename T>
+concept EnumWithCount = ScopedEnum<T> && requires { T::Count; };
+
 // Vector helpers
 // ================================================================================================
 // Like doing a cast for each element. The target type must have the same number of elements as the source.

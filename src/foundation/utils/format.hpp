@@ -248,6 +248,13 @@ PUBLIC ErrorCodeOr<void> ValueToString(Writer writer, T const& value, FormatOpti
         return k_success;
     }
 
+    else if constexpr (EnumWithCount<Type>) {
+        auto const str = EnumToString(value);
+        TRY(PadToRequiredWidthIfNeeded(writer, options, str.size));
+        TRY(writer.WriteChars(str));
+        return k_success;
+    }
+
     else if constexpr (Integral<Type> || Enum<Type> || Convertible<AddConst<Type>, void const*>) {
         char buffer[32] {};
         auto const size = IntToString(ScalarToInt(value),

@@ -675,7 +675,7 @@ PUBLIC HashTable<String, String> ParseCommandLineArgs(ArenaAllocator& arena, Spa
 // https://blog.rink.nu/2023/02/12/behind-the-magic-of-magic_enum/
 
 template <auto e>
-requires(Enum<decltype(e)>)
+requires(EnumWithCount<decltype(e)>)
 consteval auto StringifyEnumValue() {
     constexpr auto k_raw = String(__PRETTY_FUNCTION__);
     constexpr auto k_str = [&]() {

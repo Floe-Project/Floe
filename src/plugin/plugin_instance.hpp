@@ -106,13 +106,32 @@ struct PluginInstance {
 
     // State
     // ========================================================================
-    using StateChangePendingJobs = DynamicArrayInline<sample_lib_server::RequestId, k_num_layers + 1>;
-    ArenaAllocatorWithInlineStorage<1000> latest_snapshot_arena {};
-    Optional<StateChangePendingJobs> pending_sample_lib_request_ids {};
-    StateSnapshotWithMetadata latest_snapshot {
+    struct PendingStateChange {
+        ~PendingStateChange() {
+            for (auto& r : retained_results)
+                r.result.Release();
+        }
+
+        struct Request {
+            sample_lib_server::RequestId id;
+            Optional<u32> layer_index;
+        };
+        struct Result {
+            sample_lib_server::LoadResult result;
+            Optional<u32> layer_index;
+        };
+
+        ArenaAllocator arena {PageAllocator::Instance()};
+        DynamicArrayInline<Request, k_num_layers + 1> requests;
+        DynamicArrayInline<Result, k_num_layers + 1> retained_results;
+        StateSnapshotWithMetadata snapshot;
+        StateSource source;
+    };
+    Optional<PendingStateChange> pending_state_change {};
+    ArenaAllocatorWithInlineStorage<1000> last_snapshot_metadata_arena {};
+    StateSnapshotWithMetadata last_snapshot {
         .metadata = {.name_or_path = "Default"},
     };
-    int preset_is_loading {};
 
     // Presets
     // ========================================================================
@@ -152,10 +171,7 @@ void RandomiseAllLayerInsts(PluginInstance& plugin);
 StateSnapshot CurrentStateSnapshot(PluginInstance& plugin);
 bool StateChangedSinceLastSnapshot(PluginInstance& plugin);
 
-void ApplyNewState(PluginInstance& plugin,
-                   StateSnapshot const* state,
-                   StateSnapshotMetadata const& metadata,
-                   StateSource source);
+void ApplyNewState(PluginInstance& plugin, StateSnapshotMetadata const& metadata, StateSource source);
 
 void LoadPresetFromListing(PluginInstance& plugin,
                            PresetSelectionCriteria const& selection_criteria,

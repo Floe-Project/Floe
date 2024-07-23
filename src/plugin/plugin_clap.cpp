@@ -373,8 +373,8 @@ clap_plugin_params const floe_params {
         auto const opt_index = ParamIdToIndex(param_id);
         if (!opt_index) return false;
         auto const index = (usize)*opt_index;
-        if (floe.plugin->preset_is_loading)
-            *out_value = (f64)floe.plugin->latest_snapshot.state.param_values[index];
+        if (floe.plugin->pending_state_change)
+            *out_value = (f64)floe.plugin->last_snapshot.state.param_values[index];
         else
             *out_value = (f64)floe.plugin->processor.params[index].value.Load();
         return true;

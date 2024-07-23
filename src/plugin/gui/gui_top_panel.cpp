@@ -18,7 +18,7 @@ static void PresetsWindowButton(Gui* g, PluginInstance* a, Rect r) {
 
     auto button_id = imgui.GetID("PresetMenu");
 
-    DynamicArrayInline<char, 100> preset_text {a->latest_snapshot.metadata.Name()};
+    DynamicArrayInline<char, 100> preset_text {a->last_snapshot.metadata.Name()};
     if (StateChangedSinceLastSnapshot(*a)) dyn::AppendSpan(preset_text, " (modified)"_s);
 
     if (buttons::Button(g, button_id, r, preset_text, buttons::PresetsPopupButton(g->imgui))) {
@@ -249,8 +249,8 @@ void TopPanel(Gui* g) {
         if (buttons::Popup(g, btn_id, pop_id, preset_save_r, ICON_FA_SAVE, large_icon_button_style)) {
             auto save_over_text = fmt::Format(g->scratch_arena,
                                               "Save (Overwrite \"{}\")",
-                                              g->plugin.latest_snapshot.metadata.Name());
-            auto const existing_path = g->plugin.latest_snapshot.metadata.Path();
+                                              g->plugin.last_snapshot.metadata.Name());
+            auto const existing_path = g->plugin.last_snapshot.metadata.Path();
             auto ptr = existing_path ? String(save_over_text) : "Save Preset As"_s;
 
             PopupMenuItems items(g, {&ptr, 1});

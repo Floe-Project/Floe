@@ -393,7 +393,7 @@ void DoLoadingOverlay(Gui* g) {
     r.w = popup_w;
     r.h = popup_h;
 
-    if (g->plugin.preset_is_loading ||
+    if (g->plugin.pending_state_change ||
         FetchOrRescanPresetsFolder(g->plugin.shared_data.preset_listing,
                                    RescanMode::DontRescan,
                                    g->settings.settings.filesystem.extra_presets_scan_folders,

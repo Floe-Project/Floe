@@ -185,9 +185,8 @@ struct LayerProcessor {
 
     InstrumentUnion inst = InstrumentType::None;
 
-    // Encodes possible instruments into a single atomic u64. We use the fact that pointers must be numbers
-    // that are aligned to the type they point to, and therefore we can use the values in between to
-    // represent other things.
+    // Encodes possible instruments into a single atomic u64. We use the fact that pointers must be aligned to
+    // the type they point to, and therefore we can unaligned numbers to represent other things.
     struct DesiredInst {
         static constexpr u64 k_consumed = 1;
         void Set(WaveformType w) { value.Store(ValForWaveform(w)); }

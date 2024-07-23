@@ -175,7 +175,8 @@ class ConvolutionReverb final : public Effect {
 
     StereoConvolver* m_convolver {}; // audio-thread only
 
-    static constexpr uintptr k_desired_convolver_consumed = 1; // must be an invalid pointer
+    static constexpr uintptr k_desired_convolver_consumed =
+        1; // must be an invalid m_desired_convolver pointer
     Atomic<StereoConvolver*> m_desired_convolver {};
 
     static constexpr usize k_max_num_convolvers = 8;

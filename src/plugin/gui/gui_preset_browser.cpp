@@ -30,8 +30,8 @@ PresetBrowser::PresetBrowser(Gui* g, PresetBrowserPersistentData& persistent_dat
                                              &g->plugin.shared_data.thread_pool);
     }
     if (listing.listing) {
-        current_preset = g->plugin.latest_snapshot.metadata.Path()
-                             ? listing.listing->Find(*g->plugin.latest_snapshot.metadata.Path())
+        current_preset = g->plugin.last_snapshot.metadata.Path()
+                             ? listing.listing->Find(*g->plugin.last_snapshot.metadata.Path())
                              : nullptr;
         selected_folder = listing.listing->Find(g->plugin.preset_browser_filters.selected_folder_hash);
     }
@@ -389,7 +389,7 @@ PresetBrowser::HandleKeyPresses(DirectoryListing::Entry const* current_selected_
                 }
             }
         }
-        ASSERT(found);
+        if (!found) return nullptr;
 
         DirectoryListing::Entry const* preset_to_load = nullptr;
         if (left) {
@@ -456,6 +456,10 @@ void PresetBrowser::DoAllPresetFiles() {
 
     if (!listing.listing) return;
 
+    if (g->plugin.preset_browser_filters.selected_folder_hash == 0) {
+        g->plugin.preset_browser_filters.selected_folder_hash = listing.listing->MasterRoot()->Hash();
+        selected_folder = listing.listing->MasterRoot();
+    }
     auto const selected_preset_folder =
         listing.listing->Find(g->plugin.preset_browser_filters.selected_folder_hash);
 

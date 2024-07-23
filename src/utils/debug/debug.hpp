@@ -31,8 +31,11 @@ PUBLIC inline void DebugLoc(SourceLocation loc = SourceLocation::Current()) {
     if constexpr (!PRODUCTION_BUILD) DebugLn("{}, {}({})", loc.function, loc.file, loc.line);
 }
 
-#define DBG_PRINT_EXPR(x)   DebugLn("DBG {} = {}", #x, x)
-#define DBG_PRINT_STRUCT(x) DebugLn("DBG {} = {}", #x, fmt::DumpStruct(x))
+#define DBG_PRINT_EXPR(x)     DebugLn("DBG: {}: {} = {}", __FUNCTION__, #x, x)
+#define DBG_PRINT_EXPR2(x, y) DebugLn("DBG: {}: {} = {}, {} = {}", __FUNCTION__, #x, x, #y, y)
+#define DBG_PRINT_EXPR3(x, y, z)                                                                             \
+    DebugLn("DBG: {}: {} = {}, {} = {}, {} = {}", __FUNCTION__, #x, x, #y, y, #z, z)
+#define DBG_PRINT_STRUCT(x) DebugLn("DBG: {}: {} = {}", __FUNCTION__, #x, fmt::DumpStruct(x))
 
 // Sometimes don't want to depend on our usual string formatting because that code could be cause of the
 // problem we're trying to debug.

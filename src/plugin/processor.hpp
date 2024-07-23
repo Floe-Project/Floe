@@ -264,6 +264,9 @@ struct AudioProcessor {
     PluginCallbacks<AudioProcessor> processor_callbacks;
 };
 
+// IMPROVE: the wording here is confusing, we have an umbrella term 'instrument' which can be a
+// sampled-instrument or a waveform. It's easy to get it confused with the sampled-instrument, can we come up
+// with a better term for a sampled-instrument? or the umbrella term?
 using Instrument =
     TaggedUnion<InstrumentType,
                 TypeAndTag<sample_lib_server::RefCounted<LoadedInstrument>, InstrumentType::Sampler>,

@@ -8,12 +8,15 @@ namespace mdata {
 
 /*
 
-MDATA file format. It's similar to RIFF but a little different. Don't change the size or layout of these
-structs; they are used directly when deserialising. It assumes little-endian everywhere.
+MDATA file format. Binary, chunk-based, similar to RIFF. This exists purely for backwards-compatibility
+reasons: it's not very well designed.
+
+Don't change the size or layout of these structs; they are used directly when deserialising. It assumes
+little-endian everywhere.
 
 1. First thing in the file is the MasterHeader
-2. After that is the HeaderID_InfoJson which is a JSON string containing various info about the
-library
+2. After that is the HeaderIDInfoJson which is a JSON string containing various info about the
+   library
 3. Next is the HeaderID_StringPool chunk which can be used by any subsequent chunks
 4. Any other chunks can be in any order, or not present at all.
 

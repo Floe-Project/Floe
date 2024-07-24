@@ -539,7 +539,8 @@ static void HandlePostUpdateRequests(GuiPlatform& platform) {
 
 static void UpdateAndRender(GuiPlatform& platform) {
     if (!platform.graphics_ctx) return;
-    if (!puglGetVisible(platform.view)) return;
+    if constexpr (!IS_MACOS) // doesn't seem to work on macOS
+        if (!puglGetVisible(platform.view)) return;
 
     auto const window_size = WindowSize(platform);
 

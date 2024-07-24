@@ -602,21 +602,6 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
                 }
             }
 
-            if constexpr (RUNTIME_SAFETY_CHECKS_ON) {
-                auto const opt_linear_value = k_param_infos[index].LineariseValue(v, false);
-                if (!opt_linear_value) {
-                    auto const& info = k_param_infos[index];
-                    auto const range = info.ProjectionRange();
-                    DebugLn("Param \"{} {}\" value ({}) is outside of the expected "
-                            "range: ({}, {}), default: {}",
-                            info.ModuleString(),
-                            info.name,
-                            v,
-                            range.min,
-                            range.max,
-                            info.DefaultProjectedValue());
-                }
-            }
             v = k_param_infos[index].LineariseValue(v, true).Value();
         } else {
             // The loaded data might be from an older version of Floe that didn't
@@ -916,6 +901,23 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
         }
     }
 
+    if constexpr (RUNTIME_SAFETY_CHECKS_ON) {
+        for (auto const i : Range(k_num_parameters)) {
+            auto const& info = k_param_infos[i];
+            auto const v = state.param_values[i];
+            if (v < info.linear_range.min || v > info.linear_range.max) {
+                DebugLn("Param \"{} {}\" value ({}) is outside of the expected "
+                        "range: ({}, {})",
+                        info.ModuleString(),
+                        info.name,
+                        v,
+                        info.linear_range.min,
+                        info.linear_range.max);
+                PanicIfReached();
+            }
+        }
+    }
+
     return k_success;
 }
 
@@ -1112,7 +1114,9 @@ ErrorCodeOr<void> CodeState(StateSnapshot& state, CodeStateOptions const& option
                     case Type::None: state.inst_ids[i] = InstrumentType::None; break;
                     case Type::Sampler: state.inst_ids[i] = sampler_info; break;
                     case Type::WaveformSine: state.inst_ids[i] = WaveformType::Sine; break;
-                    case Type::WaveformWhiteNoiseMono: state.inst_ids[i] = WaveformType::WhiteNoiseMono; break;
+                    case Type::WaveformWhiteNoiseMono:
+                        state.inst_ids[i] = WaveformType::WhiteNoiseMono;
+                        break;
                     case Type::WaveformWhiteNoiseStereo:
                         state.inst_ids[i] = WaveformType::WhiteNoiseStereo;
                         break;

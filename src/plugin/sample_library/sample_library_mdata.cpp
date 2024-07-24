@@ -208,12 +208,11 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
                 TRY(reader.Read(mdata_info.file_infos.data, size_bytes_of_following_data));
 
                 for (auto& f : mdata_info.file_infos) {
-                    auto const path = GetString(library, f.virtual_filepath);
                     if (f.file_type == mdata::FileTypeRawAudioSamples) {
                         // Confusingly, the file extension of raw audio samples was still wav, we amend that
                         // here. There could be various forms of raw samples, but in reality only 1 type was
                         // used.
-                        auto ext = path::Extension(path);
+                        auto const ext = path::Extension(GetString(library, f.virtual_filepath));
                         ASSERT(ext == ".wav"_s);
                         ASSERT(f.channels == 2);
                         ASSERT(f.audio_format == mdata::AudioFileTypeRaw16Pcm);
@@ -334,8 +333,6 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
                 ASSERT(region_info.loop_end <= (s32)file_info.num_frames);
 
                 auto const file_path = GetString(library, file_info.virtual_filepath);
-                if (i.sampler_region_index_for_gui_waveform == region_index)
-                    inst->audio_file_path_for_waveform = file_path;
 
                 if (group_info.round_robin_or_xfade_index > (s32)max_rr_pos)
                     max_rr_pos = CheckedCast<u32>(group_info.round_robin_or_xfade_index);
@@ -398,13 +395,27 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
 
         inst->max_rr_pos = max_rr_pos;
 
+        // The MDATA format does have a value to tell us what audio file to use for the GUI waveform but for
+        // whatever reason I can't extract the value correctly. It's really not important though, just taking
+        // the region closest to the middle of the keyboard works great.
+        {
+            int closest_to_mid = 1000;
+            for (auto const& region : inst->regions) {
+                auto const distance = Abs(region.file.root_key - 60);
+                if (distance < closest_to_mid) {
+                    closest_to_mid = distance;
+                    inst->audio_file_path_for_waveform = region.file.path;
+                }
+            }
+        }
+
         ASSERT(name.size <= k_max_instrument_name_size);
         auto const inserted = library.insts_by_name.InsertWithoutGrowing(name, inst);
         ASSERT(inserted);
     }
 
     // In the MDATA format when velocity-feathering was enabled for an instrument, adjacent velocity layers
-    // were automatically made to overlap. We recreate that old behaviour here taking into account that now
+    // were automatically made to overlap. We recreate that old behaviour here, taking into account that now
     // velocity feathering is a per-region setting.
     for (auto [key, inst_ptr_ptr] : library.insts_by_name) {
         auto inst = *inst_ptr_ptr;

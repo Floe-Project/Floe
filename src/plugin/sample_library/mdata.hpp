@@ -201,6 +201,9 @@ struct InstrumentInfo {
 
     // Confusingly, this points into the array of sampler regions, rather than the array of files. But for
     // backwards compatibility we can't change it.
+    // NOTE(Sam, July 2024): despite the comment above, I'm getting unexpected results when I try to use this.
+    // For now, I'm going to ignore this and just use the audio file of the instrument most-middle region -
+    // this works great anyways.
     Index sampler_region_index_for_gui_waveform = k_invalid_md_index;
 };
 

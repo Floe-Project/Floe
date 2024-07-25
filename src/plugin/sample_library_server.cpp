@@ -126,7 +126,12 @@ static void DoScanFolderJob(PendingLibraryJobs::Job::ScanFolder& job,
     ZoneText(path.data, path.size);
 
     auto const try_job = [&]() -> ErrorCodeOr<void> {
-        auto it = TRY(RecursiveDirectoryIterator::Create(scratch_arena, path, "*"));
+        auto it = TRY(RecursiveDirectoryIterator::Create(scratch_arena,
+                                                         path,
+                                                         {
+                                                             .wildcard = "*",
+                                                             .get_file_size = false,
+                                                         }));
         while (it.HasMoreFiles()) {
             auto const& entry = it.Get();
             if (path::Extension(entry.path) == ".mdata") {

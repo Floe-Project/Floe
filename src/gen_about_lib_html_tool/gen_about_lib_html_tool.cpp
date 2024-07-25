@@ -25,7 +25,12 @@ ErrorCodeOr<Paths> ScanLibraryFolder(ArenaAllocator& arena, String library_folde
 
     Paths result {};
 
-    auto it = TRY(DirectoryIterator::Create(arena, library_folder, "*"));
+    auto it = TRY(DirectoryIterator::Create(arena,
+                                            library_folder,
+                                            {
+                                                .wildcard = "*",
+                                                .get_file_size = false,
+                                            }));
     while (it.HasMoreFiles()) {
         auto const& entry = it.Get();
         if (sample_lib::FilenameIsFloeLuaFile(entry.path))

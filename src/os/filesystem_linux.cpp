@@ -384,7 +384,12 @@ static ErrorCodeOr<LinuxWatchedDirectory*> WatchDirectory(DirectoryWatcher::Watc
     PathPool path_pool {};
     if (recursive) {
         auto const try_watch_subdirs = [&]() -> ErrorCodeOr<void> {
-            auto it = TRY(RecursiveDirectoryIterator::Create(scratch_arena, dir.path, "*"));
+            auto it = TRY(RecursiveDirectoryIterator::Create(scratch_arena,
+                                                             dir.path,
+                                                             {
+                                                                 .wildcard = "*",
+                                                                 .get_file_size = false,
+                                                             }));
             DynamicArray<char> full_subpath {dir.path, scratch_arena};
             while (it.HasMoreFiles()) {
                 auto const& entry = it.Get();
@@ -677,7 +682,12 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                     // we also need to check the contents of the new directory, it might have already have
                     // files or subdirectories added
                     {
-                        auto it = TRY(RecursiveDirectoryIterator::Create(args.scratch_arena, full_path, "*"));
+                        auto it = TRY(RecursiveDirectoryIterator::Create(args.scratch_arena,
+                                                                         full_path,
+                                                                         {
+                                                                             .wildcard = "*",
+                                                                             .get_file_size = false,
+                                                                         }));
                         while (it.HasMoreFiles()) {
                             auto& entry = it.Get();
 

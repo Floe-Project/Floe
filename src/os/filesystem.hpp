@@ -230,6 +230,12 @@ struct DirectoryEntry {
     FileType type {FileType::Directory};
 };
 
+struct DirectoryIteratorOptions {
+    String wildcard = "*";
+    bool get_file_size = false;
+    bool skip_dot_files = true;
+};
+
 class DirectoryIterator {
   public:
     NON_COPYABLE(DirectoryIterator);
@@ -240,7 +246,7 @@ class DirectoryIterator {
     ~DirectoryIterator();
 
     static ErrorCodeOr<DirectoryIterator>
-    Create(Allocator& a, String path, String wildcard = "*", bool get_file_size = false);
+    Create(Allocator& a, String path, DirectoryIteratorOptions options = {});
 
     DirectoryEntry const& Get() const { return m_e; }
     bool HasMoreFiles() const { return !m_reached_end; }
@@ -255,12 +261,13 @@ class DirectoryIterator {
     usize m_base_path_size {};
     DynamicArray<char> m_wildcard;
     bool m_get_file_size {};
+    bool m_skip_dot_files {};
 };
 
 class RecursiveDirectoryIterator {
   public:
     static ErrorCodeOr<RecursiveDirectoryIterator>
-    Create(Allocator& allocator, String path, String filename_wildcard = "*", bool get_file_size = false);
+    Create(Allocator& allocator, String path, DirectoryIteratorOptions options = {});
 
     DirectoryEntry const& Get() const { return Last(m_stack).Get(); }
     bool HasMoreFiles() const { return m_stack.size; }

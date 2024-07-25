@@ -181,13 +181,24 @@ TEST_CASE(TestFilesystem) {
                 }
 
                 SUBCASE("no files matching pattern") {
-                    auto it = DirectoryIterator::Create(a, dir, "sef9823ksdjf39s*");
+                    auto it = DirectoryIterator::Create(a,
+                                                        dir,
+                                                        {
+                                                            .wildcard = "sef9823ksdjf39s*",
+                                                            .get_file_size = false,
+                                                        });
                     REQUIRE(it.HasValue());
                     REQUIRE(!it.Value().HasMoreFiles());
                 }
 
                 SUBCASE("non existent dir") {
-                    REQUIRE(DirectoryIterator::Create(a, "C:/seflskflks"_s, "*").HasError());
+                    REQUIRE(DirectoryIterator::Create(a,
+                                                      "C:/seflskflks"_s,
+                                                      {
+                                                          .wildcard = "*",
+                                                          .get_file_size = false,
+                                                      })
+                                .HasError());
                 }
 
             } else {

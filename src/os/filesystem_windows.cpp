@@ -527,17 +527,18 @@ FillDirectoryEntry(DirectoryEntry& e, const WIN32_FIND_DATAW& data, usize base_p
     return k_success;
 }
 
-static bool ShouldSkipFile(const WCHAR* null_term_filename) {
+static bool ShouldSkipFile(const WCHAR* null_term_filename, bool skip_dot_files) {
     auto const filename = FromNullTerminated(null_term_filename);
-    return filename == L"."_s || filename == L".."_s || filename == L".git";
+    return filename == L"."_s || filename == L".."_s ||
+           (skip_dot_files && filename.size && filename[0] == L'.');
 }
 
 ErrorCodeOr<DirectoryIterator>
-DirectoryIterator::Create(Allocator& a, String path, String wildcard, bool get_file_size) {
-    ASSERT(wildcard.size);
+DirectoryIterator::Create(Allocator& a, String path, DirectoryIteratorOptions options) {
+    ASSERT(options.wildcard.size);
 
     PathArena temp_path_arena;
-    auto path_with_wildcard = path::Join(temp_path_arena, Array {path, wildcard});
+    auto path_with_wildcard = path::Join(temp_path_arena, Array {path, options.wildcard});
 
     DirectoryIterator result {path, a};
 
@@ -560,9 +561,10 @@ DirectoryIterator::Create(Allocator& a, String path, String wildcard, bool get_f
 
     result.m_handle = handle;
     result.m_base_path_size = result.m_e.path.size;
-    result.m_get_file_size = get_file_size;
+    result.m_get_file_size = options.get_file_size;
+    result.m_skip_dot_files = options.skip_dot_files;
 
-    if (ShouldSkipFile(data.cFileName))
+    if (ShouldSkipFile(data.cFileName, result.m_skip_dot_files))
         TRY(result.Increment());
     else
         TRY(FillDirectoryEntry(result.m_e, data, result.m_base_path_size));
@@ -586,7 +588,7 @@ ErrorCodeOr<void> DirectoryIterator::Increment() {
         }
     }
 
-    if (ShouldSkipFile(data.cFileName)) return Increment();
+    if (ShouldSkipFile(data.cFileName, m_skip_dot_files)) return Increment();
 
     TRY(FillDirectoryEntry(m_e, data, m_base_path_size));
     return k_success;

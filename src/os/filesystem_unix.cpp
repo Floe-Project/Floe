@@ -42,7 +42,7 @@ ErrorCodeOr<s64> LastWriteTime(String path) {
 }
 
 ErrorCodeOr<DirectoryIterator>
-DirectoryIterator::Create(Allocator& allocator, String path, String wildcard, bool get_file_size) {
+DirectoryIterator::Create(Allocator& allocator, String path, DirectoryIteratorOptions options) {
     PathArena temp_path_allocator;
     auto handle = ::opendir(NullTerminated(path, temp_path_allocator));
     if (!handle) return FilesystemErrnoErrorCode(errno, "opendir");
@@ -50,8 +50,9 @@ DirectoryIterator::Create(Allocator& allocator, String path, String wildcard, bo
     DirectoryIterator result {path, allocator};
     result.m_handle = handle;
     result.m_base_path_size = result.m_e.path.size;
-    dyn::Assign(result.m_wildcard, wildcard);
-    result.m_get_file_size = get_file_size;
+    dyn::Assign(result.m_wildcard, options.wildcard);
+    result.m_get_file_size = options.get_file_size;
+    result.m_skip_dot_files = options.skip_dot_files;
 
     TRY(result.Increment());
     return result;
@@ -74,7 +75,7 @@ ErrorCodeOr<void> DirectoryIterator::Increment() {
         if (entry) {
             auto entry_name = FromNullTerminated(entry->d_name);
             if (!MatchWildcard(m_wildcard, entry_name) || entry_name == "."_s || entry_name == ".."_s ||
-                (!PRODUCTION_BUILD && entry_name == ".git"_s)) {
+                (m_skip_dot_files && entry_name.size && entry_name[0] == '.')) {
                 skip = true;
             } else {
                 dyn::Resize(m_e.path, m_base_path_size);

@@ -116,7 +116,12 @@ MoveDirectoryContents(String source_dir, String destination_directory, ExistingD
         // Do a dry-run and see if there would be any conflicts
 
         ArenaAllocatorWithInlineStorage<4000> temp_allocator;
-        auto it = TRY(RecursiveDirectoryIterator::Create(temp_allocator, source_dir));
+        auto it = TRY(RecursiveDirectoryIterator::Create(temp_allocator,
+                                                         source_dir,
+                                                         {
+                                                             .wildcard = "*",
+                                                             .get_file_size = false,
+                                                         }));
         while (it.HasMoreFiles()) {
             auto const& entry = it.Get();
 
@@ -137,7 +142,12 @@ MoveDirectoryContents(String source_dir, String destination_directory, ExistingD
 
     {
         ArenaAllocatorWithInlineStorage<4000> temp_allocator;
-        auto it = TRY(RecursiveDirectoryIterator::Create(temp_allocator, source_dir));
+        auto it = TRY(RecursiveDirectoryIterator::Create(temp_allocator,
+                                                         source_dir,
+                                                         {
+                                                             .wildcard = "*",
+                                                             .get_file_size = false,
+                                                         }));
         while (it.HasMoreFiles()) {
             auto const& entry = it.Get();
 
@@ -192,7 +202,12 @@ AppendFilesForFolder(ArenaAllocator& a, DynamicArray<MutableString>& output, Str
     }
 
     {
-        auto it = TRY(DirectoryIterator::Create(temp_allocator, folder, wildcard));
+        auto it = TRY(DirectoryIterator::Create(temp_allocator,
+                                                folder,
+                                                {
+                                                    .wildcard = wildcard,
+                                                    .get_file_size = false,
+                                                }));
         while (it.HasMoreFiles()) {
             auto const& entry = it.Get();
             dyn::Append(output, MutableString(entry.path).Clone(a));
@@ -244,15 +259,15 @@ IncrementToNextThatMatchesPattern(DirectoryIterator& it, String wildcard, bool a
 }
 
 ErrorCodeOr<RecursiveDirectoryIterator>
-RecursiveDirectoryIterator::Create(Allocator& allocator, String path, String wildcard, bool get_file_size) {
+RecursiveDirectoryIterator::Create(Allocator& allocator, String path, DirectoryIteratorOptions options) {
     // We do not pass the wildcard into the sub iterators because we need to get the folders, not just paths
     // that match the pattern.
     auto it = TRY(DirectoryIterator::Create(allocator, path));
-    TRY(IncrementToNextThatMatchesPattern(it, wildcard, false));
+    TRY(IncrementToNextThatMatchesPattern(it, options.wildcard, false));
 
     RecursiveDirectoryIterator result {allocator};
-    dyn::Assign(result.m_wildcard, wildcard);
-    result.m_get_file_size = get_file_size;
+    dyn::Assign(result.m_wildcard, options.wildcard);
+    result.m_get_file_size = options.get_file_size;
     if (it.HasMoreFiles()) dyn::Append(result.m_stack, Move(it));
 
     return result;

@@ -14,7 +14,7 @@
 #include "sample_library_server.hpp"
 #include "state/state_snapshot.hpp"
 
-// TODO(1.0): Core-Library Repo: tag all IRs in the config.lua
+// TODO(1.0): Core-Library Repo: tag all IRs in the floe.lua
 //
 // TODO(1.0): fetch the IRs dynamically once we have the new library infrastructure
 constexpr auto k_core_version_1_irs = Array {

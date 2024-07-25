@@ -169,6 +169,8 @@ struct TryHelpersOutcomeToError {
 
 using LibraryPtrOrError = ValueOrError<Library*, Error>;
 
+inline bool PathIsFloeLuaFile(String path) { return path == "floe.lua" || EndsWithSpan(path, ".floe.lua"_s); }
+
 LibraryPtrOrError ReadLua(Reader& reader,
                           String lua_filepath,
                           ArenaAllocator& result_arena,

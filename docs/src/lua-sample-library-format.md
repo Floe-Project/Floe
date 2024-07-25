@@ -8,17 +8,17 @@ SPDX-License-Identifier: GPL-3.0-or-later
 ## Overview
 Sample libraries in Floe are created using the Lua programming language (version {{#include ../mdbook_config.txt:lua-version}}). Lua is a simple, lightweight language that's used in many applications. 
 
-Let's start with a simple example `config.lua` sample library configuration file.
+Let's start with a simple example `floe.lua` sample library configuration file.
 ```lua
 {{#include ../sample-library-example-no-comments.lua}}
 ```
 
-As you can see, a `config.lua` can be very simple, almost like a JSON, XML or YAML file. But when needed, you have the power of a full programming language to easily create more complicated configurations - you can use arrays, loops, functions, etc.
+As you can see, a `floe.lua` can be very simple, almost like a JSON, XML or YAML file. But when needed, you have the power of a full programming language to easily create more complicated configurations - you can use arrays, loops, functions, etc.
 
 Unlike something like [SFZ](https://en.wikipedia.org/wiki/SFZ_(file_format)), this format is only concerned with mapping and configuring audio-files. Sound shaping is provided by Floe's GUI.
 
 ## How it works
-Floe automatically scans for `config.lua` files in your sample library folders and re-reads them whenever they change. To instruct Floe what to do with this file, you must use a set of functions that Floe provides. These are available as `floe.<name>` and are described in detail below.
+Floe automatically scans for `floe.lua` files in your sample library folders and re-reads them whenever they change. To instruct Floe what to do with this file, you must use a set of functions that Floe provides. These are available as `floe.<name>` and are described in detail below.
 
 ## `floe.new_library`
 Creates a new library. It takes one parameter: a table of configuration and returns a new library object. You should only call this once.

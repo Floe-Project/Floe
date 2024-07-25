@@ -126,21 +126,19 @@ static void DoScanFolderJob(PendingLibraryJobs::Job::ScanFolder& job,
     ZoneText(path.data, path.size);
 
     auto const try_job = [&]() -> ErrorCodeOr<void> {
-        auto it = TRY(DirectoryIterator::Create(scratch_arena, path, "*"));
+        auto it = TRY(RecursiveDirectoryIterator::Create(scratch_arena, path, "*"));
         while (it.HasMoreFiles()) {
             auto const& entry = it.Get();
-            auto const ext = path::Extension(entry.path);
-            if (ext == ".mdata") {
+            if (path::Extension(entry.path) == ".mdata") {
                 ReadLibraryAsync(pending_library_jobs,
                                  lib_list,
                                  String(entry.path),
                                  sample_lib::FileFormat::Mdata);
-            } else if (entry.type == FileType::Directory) {
-                String const lua_path = path::Join(scratch_arena, Array {String(entry.path), "config.lua"});
-                if (auto const ft_outcome = GetFileType(lua_path);
-                    ft_outcome.HasValue() && ft_outcome.Value() == FileType::File) {
-                    ReadLibraryAsync(pending_library_jobs, lib_list, lua_path, sample_lib::FileFormat::Lua);
-                }
+            } else if (sample_lib::PathIsFloeLuaFile(entry.path)) {
+                ReadLibraryAsync(pending_library_jobs,
+                                 lib_list,
+                                 String(entry.path),
+                                 sample_lib::FileFormat::Lua);
             }
             TRY(it.Increment());
         }
@@ -476,7 +474,7 @@ static bool UpdateLibraryJobs(Server& server,
                         for (auto& lib_node : server.libraries) {
                             auto const& lib = *lib_node.value.lib;
                             if (lib.file_format_specifics.tag == sample_lib::FileFormat::Lua) {
-                                // get the directory of the library (the directory of the config.lua)
+                                // get the directory of the library (the directory of the floe.lua)
                                 auto const dir = path::Directory(lib.path);
                                 if (dir && path::IsWithinDirectory(full_path, *dir)) {
                                     DebugLn("  Rereading library: {}", lib.name);

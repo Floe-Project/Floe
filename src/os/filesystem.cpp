@@ -260,14 +260,17 @@ IncrementToNextThatMatchesPattern(DirectoryIterator& it, String wildcard, bool a
 
 ErrorCodeOr<RecursiveDirectoryIterator>
 RecursiveDirectoryIterator::Create(Allocator& allocator, String path, DirectoryIteratorOptions options) {
+    auto inner_options = options;
     // We do not pass the wildcard into the sub iterators because we need to get the folders, not just paths
     // that match the pattern.
-    auto it = TRY(DirectoryIterator::Create(allocator, path));
+    inner_options.wildcard = "*";
+    auto it = TRY(DirectoryIterator::Create(allocator, path, inner_options));
     TRY(IncrementToNextThatMatchesPattern(it, options.wildcard, false));
 
     RecursiveDirectoryIterator result {allocator};
     dyn::Assign(result.m_wildcard, options.wildcard);
     result.m_get_file_size = options.get_file_size;
+    result.m_skip_dot_files = options.skip_dot_files;
     if (it.HasMoreFiles()) dyn::Append(result.m_stack, Move(it));
 
     return result;
@@ -282,7 +285,14 @@ ErrorCodeOr<void> RecursiveDirectoryIterator::Increment() {
         auto& it = Last(m_stack);
 
         if (it.Get().type == FileType::Directory) {
-            auto sub_it = TRY(DirectoryIterator::Create(m_a, it.Get().path));
+            // We do not pass the wildcard into the sub iterators because we need to get the folders, not just
+            // paths that match the pattern.
+            auto const inner_options = DirectoryIteratorOptions {
+                .wildcard = "*",
+                .get_file_size = m_get_file_size,
+                .skip_dot_files = m_skip_dot_files,
+            };
+            auto sub_it = TRY(DirectoryIterator::Create(m_a, it.Get().path, inner_options));
             TRY(IncrementToNextThatMatchesPattern(sub_it, m_wildcard, false));
             if (sub_it.HasMoreFiles()) dyn::Append(m_stack, Move(sub_it));
         }

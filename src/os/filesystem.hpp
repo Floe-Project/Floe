@@ -236,6 +236,9 @@ struct DirectoryIteratorOptions {
     bool skip_dot_files = true;
 };
 
+// TODO: tidy up the usage of the options - we seem to be needlessly spliting them out into individual fields
+// when we could just keep the struct
+
 class DirectoryIterator {
   public:
     NON_COPYABLE(DirectoryIterator);
@@ -280,6 +283,7 @@ class RecursiveDirectoryIterator {
     DynamicArray<char> m_wildcard;
     DynamicArray<DirectoryIterator> m_stack;
     bool m_get_file_size {};
+    bool m_skip_dot_files {};
 };
 
 // Directory watcher

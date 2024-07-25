@@ -53,7 +53,7 @@ struct Logger {
 
     void Debug(String str) {
         if (LogLevel::Debug < max_level_allowed) return;
-        LogFunction(str, LogLevel::Info, false);
+        LogFunction(str, LogLevel::Debug, false);
     }
     void Info(String str) {
         if (LogLevel::Info < max_level_allowed) return;
@@ -61,16 +61,16 @@ struct Logger {
     }
     void Warning(String str) {
         if (LogLevel::Warning < max_level_allowed) return;
-        LogFunction(str, LogLevel::Info, false);
+        LogFunction(str, LogLevel::Warning, false);
     }
     void Error(String str) {
         if (LogLevel::Error < max_level_allowed) return;
-        LogFunction(str, LogLevel::Info, false);
+        LogFunction(str, LogLevel::Error, false);
     }
 
     void DebugLn(String str) {
         if (LogLevel::Debug < max_level_allowed) return;
-        LogFunction(str, LogLevel::Info, true);
+        LogFunction(str, LogLevel::Debug, true);
     }
     void InfoLn(String str) {
         if (LogLevel::Info < max_level_allowed) return;
@@ -78,11 +78,11 @@ struct Logger {
     }
     void WarningLn(String str) {
         if (LogLevel::Warning < max_level_allowed) return;
-        LogFunction(str, LogLevel::Info, true);
+        LogFunction(str, LogLevel::Warning, true);
     }
     void ErrorLn(String str) {
         if (LogLevel::Error < max_level_allowed) return;
-        LogFunction(str, LogLevel::Info, true);
+        LogFunction(str, LogLevel::Error, true);
     }
 
     template <typename... Args>

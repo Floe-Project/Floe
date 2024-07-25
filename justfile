@@ -398,7 +398,7 @@ _try-add-core-library-to-zip zip-path:
     core_dirname=$(dirname "{{core_library_abs_dir}}")
     core_filename=$(basename "{{core_library_abs_dir}}")
     pushd "$core_dirname"
-    zip -r "$full_zip_path" "$core_filename"
+    zip -r "$full_zip_path" "$core_filename" -x "*/\.*" # exclude hidden files
     popd
   fi
 
@@ -635,6 +635,7 @@ macos-build-installer:
     install_folder="Library/Application Support/Floe/Libraries"
     mkdir -p "$install_folder"
     cp -r "{{core_library_abs_dir}}" "$install_folder"
+    find "$install_folder" -name ".*" -exec rm -rf {} \;
     popd
     pkgbuild --root core_library --identifier com.Floe.Core --install-location / --version "$version" core_library.pkg
 

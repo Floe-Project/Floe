@@ -134,7 +134,7 @@ static void DoScanFolderJob(PendingLibraryJobs::Job::ScanFolder& job,
                                  lib_list,
                                  String(entry.path),
                                  sample_lib::FileFormat::Mdata);
-            } else if (sample_lib::PathIsFloeLuaFile(entry.path)) {
+            } else if (sample_lib::FilenameIsFloeLuaFile(path::Filename(entry.path))) {
                 ReadLibraryAsync(pending_library_jobs,
                                  lib_list,
                                  String(entry.path),

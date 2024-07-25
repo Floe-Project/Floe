@@ -20,7 +20,9 @@ const builtin = @import("builtin");
 const floe_description = "Sample-based synth plugin";
 const floe_copyright = "Sam Windell";
 const floe_vendor = "Floe";
-const floe_url = "https://github.com/Floe-Synth/Floe";
+const floe_homepage_url = "https://github.com/Floe-Synth/Floe";
+const floe_manual_url = "https://github.com/Floe-Synth/Floe";
+const floe_download_url = "https://github.com/Floe-Synth/Floe";
 const floe_au_factory_function = "FloeFactoryFunction";
 const min_macos_version = "11.0.0"; // use 3-part version for plist
 const min_windows_version = "win10";
@@ -999,7 +1001,9 @@ pub fn build(b: *std.Build) void {
             .FLOE_PATCH_VERSION = floe_version_patch,
             .FLOE_VERSION_STRING = floe_version_string,
             .FLOE_DESCRIPTION = floe_description,
-            .FLOE_URL = floe_url,
+            .FLOE_HOMEPAGE_URL = floe_homepage_url,
+            .FLOE_MANUAL_URL = floe_manual_url,
+            .FLOE_DOWNLOAD_URL = floe_download_url,
             .FLOE_VENDOR = floe_vendor,
             .IS_WINDOWS = target.result.os.tag == .windows,
             .IS_MACOS = target.result.os.tag == .macos,

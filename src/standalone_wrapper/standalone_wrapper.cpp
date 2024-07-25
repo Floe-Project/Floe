@@ -88,7 +88,7 @@ struct Standalone {
         .host_data = this,
         .name = k_floe_standalone_host_name,
         .vendor = FLOE_VENDOR,
-        .url = FLOE_URL,
+        .url = FLOE_HOMEPAGE_URL,
         .version = "1",
 
         .get_extension = [](clap_host_t const* ch, char const* extension_id) -> void const* {

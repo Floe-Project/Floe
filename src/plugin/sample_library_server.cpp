@@ -1349,7 +1349,7 @@ static sample_lib::Library* BuiltinLibrary() {
     static sample_lib::Library builtin_library {
         .name = k_builtin_library_name,
         .tagline = "Built-in library",
-        .url = FLOE_URL,
+        .url = FLOE_HOMEPAGE_URL,
         .author = FLOE_VENDOR,
         .minor_version = 1,
         .background_image_path = nullopt,

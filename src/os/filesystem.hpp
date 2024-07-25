@@ -53,9 +53,9 @@ struct File {
     ErrorCodeOr<void> Flush();
 
     void* NativeFileHandle();
-    ErrorCodeOr<String>
+    ErrorCodeOr<MutableString>
     ReadSectionOfFile(usize const bytes_offset_from_file_start, usize const size_in_bytes, Allocator& a);
-    ErrorCodeOr<String> ReadWholeFile(Allocator& a);
+    ErrorCodeOr<MutableString> ReadWholeFile(Allocator& a);
 
     ErrorCodeOr<usize> Read(void* data, usize num_bytes);
 
@@ -84,11 +84,11 @@ struct File {
 };
 
 ErrorCodeOr<File> OpenFile(String filename, FileMode mode);
-ErrorCodeOr<String> ReadEntireFile(String filename, Allocator& a);
-ErrorCodeOr<String> ReadSectionOfFile(String filename,
-                                      usize const bytes_offset_from_file_start,
-                                      usize const size_in_bytes,
-                                      Allocator& a);
+ErrorCodeOr<MutableString> ReadEntireFile(String filename, Allocator& a);
+ErrorCodeOr<MutableString> ReadSectionOfFile(String filename,
+                                             usize const bytes_offset_from_file_start,
+                                             usize const size_in_bytes,
+                                             Allocator& a);
 
 ErrorCodeOr<u64> FileSize(String filename);
 

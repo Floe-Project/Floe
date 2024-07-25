@@ -307,15 +307,15 @@ ErrorCodeOr<usize> AppendFile(String filename, Span<u8 const> data) {
     return file.Value().Write(data);
 }
 
-ErrorCodeOr<String> ReadEntireFile(String filename, Allocator& a) {
+ErrorCodeOr<MutableString> ReadEntireFile(String filename, Allocator& a) {
     auto file = TRY(OpenFile(filename, FileMode::Read));
     return file.ReadWholeFile(a);
 }
 
-ErrorCodeOr<String> ReadSectionOfFile(String filename,
-                                      usize const bytes_offset_from_file_start,
-                                      usize const size_in_bytes,
-                                      Allocator& a) {
+ErrorCodeOr<MutableString> ReadSectionOfFile(String filename,
+                                             usize const bytes_offset_from_file_start,
+                                             usize const size_in_bytes,
+                                             Allocator& a) {
     auto file = TRY(OpenFile(filename, FileMode::Read));
     return file.ReadSectionOfFile(bytes_offset_from_file_start, size_in_bytes, a);
 }
@@ -326,17 +326,17 @@ ErrorCodeOr<u64> FileSize(String filename) {
     return file.Value().FileSize();
 }
 
-ErrorCodeOr<String>
+ErrorCodeOr<MutableString>
 File::ReadSectionOfFile(usize const bytes_offset_from_file_start, usize const size_in_bytes, Allocator& a) {
     TRY(Seek((s64)bytes_offset_from_file_start, SeekOrigin::Start));
     auto result = a.AllocateExactSizeUninitialised<u8>(size_in_bytes);
     auto const num_read = TRY(Read(result.data, size_in_bytes));
     if (num_read != size_in_bytes)
         result = a.Resize({.allocation = result.ToByteSpan(), .new_size = num_read});
-    return String {(char const*)result.data, result.size};
+    return MutableString {(char*)result.data, result.size};
 }
 
-ErrorCodeOr<String> File::ReadWholeFile(Allocator& a) {
+ErrorCodeOr<MutableString> File::ReadWholeFile(Allocator& a) {
     auto const file_size = TRY(FileSize());
     return ReadSectionOfFile(0, (usize)file_size, a);
 }

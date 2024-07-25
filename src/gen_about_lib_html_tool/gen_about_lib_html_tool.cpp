@@ -80,7 +80,7 @@ static ErrorCodeOr<MutableString> HtmlTemplate(ArenaAllocator& arena) {
     return TRY(ReadEntireFile(html_path, arena));
 }
 
-constexpr String k_metadata_ini_filename = "metadata.ini"_s;
+constexpr String k_metadata_ini_filename = ".metadata.ini"_s;
 
 static ErrorCodeOr<String> MetadataIni(String library_folder, ArenaAllocator& arena) {
     auto const metadata_ini_path = path::Join(arena, Array {library_folder, k_metadata_ini_filename});
@@ -169,7 +169,7 @@ static ErrorCodeOr<void> Main(String library_folder) {
     auto const html_template = TRY(HtmlTemplate(arena));
     auto const metadata = TRY(ReadMetadata(library_folder, arena));
 
-    auto const result =
+    auto const result_html =
         fmt::FormatStringReplace(arena,
                                  html_template,
                                  ArrayT<fmt::StringReplacement>({
@@ -182,7 +182,10 @@ static ErrorCodeOr<void> Main(String library_folder) {
                                      {"__LIBRARY_DESCRIPTION_HTML__", metadata.description_html},
                                  }));
 
-    DebugLn("{}", result);
+    auto const output_path =
+        path::Join(arena, Array {library_folder, fmt::Format(arena, "About {}.html"_s, lib->name)});
+    TRY(WriteFile(output_path, result_html));
+    stdout_log.InfoLn("Successfully wrote '{}'", output_path);
 
     return k_success;
 }

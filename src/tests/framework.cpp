@@ -59,24 +59,12 @@ static Optional<String> SearchUpwardsFromExeForFolder(Tester& tester, String fol
         return nullopt;
     }
 
-    auto dir = String(path_outcome.Value());
-    DynamicArray<char> buf {dir, tester.scratch_arena};
-
-    constexpr usize k_max_folder_heirarchy = 20;
-    for (auto _ : Range(k_max_folder_heirarchy)) {
-        auto const opt_dir = path::Directory(dir);
-        if (!opt_dir.HasValue()) break;
-        ASSERT(dir.size != opt_dir->size);
-        dir = *opt_dir;
-
-        dyn::Resize(buf, dir.size);
-        path::JoinAppend(buf, folder_name);
-        if (auto const o = GetFileType(buf); o.HasValue() && o.Value() == FileType::Directory)
-            return tester.arena.Clone(buf);
+    auto result = SearchForExistingFolderUpwards(path_outcome.Value(), folder_name, tester.arena);
+    if (!result) {
+        tester.log.ErrorLn("failed to find {} folder", folder_name);
+        return nullopt;
     }
-
-    tester.log.ErrorLn("cannot find {} folder", folder_name);
-    return nullopt;
+    return result;
 }
 
 String TestFilesFolder(Tester& tester) {

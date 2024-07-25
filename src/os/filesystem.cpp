@@ -364,3 +364,25 @@ ErrorCodeOr<void> ReadSectionOfFileAndWriteToOtherFile(File& file_to_read_from,
     }
     return k_success;
 }
+
+Optional<String>
+SearchForExistingFolderUpwards(String dir, String folder_name_to_find, Allocator& allocator) {
+    ArenaAllocatorWithInlineStorage<4000> scratch_arena;
+    DynamicArray<char> buf {dir, scratch_arena};
+    dyn::AppendSpan(buf, "/.");
+
+    constexpr usize k_max_folder_heirarchy = 20;
+    for (auto _ : Range(k_max_folder_heirarchy)) {
+        auto const opt_dir = path::Directory(dir);
+        if (!opt_dir.HasValue()) break;
+        ASSERT(dir.size != opt_dir->size);
+        dir = *opt_dir;
+
+        dyn::Resize(buf, dir.size);
+        path::JoinAppend(buf, folder_name_to_find);
+        if (auto const o = GetFileType(buf); o.HasValue() && o.Value() == FileType::Directory)
+            return Optional<String> {allocator.Clone(buf)};
+    }
+
+    return nullopt;
+}

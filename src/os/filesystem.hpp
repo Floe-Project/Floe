@@ -187,6 +187,8 @@ Optional<Version> MacosBundleVersion(String path);
 ErrorCodeOr<DynamicArrayInline<char, 200>> NameOfRunningExecutableOrLibrary();
 ErrorCodeOr<MutableString> CurrentExecutablePath(Allocator& a);
 
+Optional<String> SearchForExistingFolderUpwards(String dir, String folder_name_to_find, Allocator& allocator);
+
 struct DialogOptions {
     enum class Type { SaveFile, OpenFile, SelectFolder };
     struct FileFilter {

@@ -11,9 +11,9 @@
 
 #include "common/common_errors.hpp"
 
-// This tool generates an 'About' HTML file for a Floe library. This file is packaged with the library to give
-// the library files context and to help get users started. Additionally, this tool validates that the Lua
-// file is correct and that a license file is present.
+// This tool generates an 'About' HTML file for a Floe library. This file is intended to be packaged with the
+// library to give context to the library's files and to help get users started using it. Additionally, this
+// tool validates that the Lua file is correct and that there's a license file.
 
 struct Paths {
     String lua;
@@ -28,7 +28,7 @@ ErrorCodeOr<Paths> ScanLibraryFolder(ArenaAllocator& arena, String library_folde
     auto it = TRY(DirectoryIterator::Create(arena, library_folder, "*"));
     while (it.HasMoreFiles()) {
         auto const& entry = it.Get();
-        if (sample_lib::PathIsFloeLuaFile(entry.path))
+        if (sample_lib::FilenameIsFloeLuaFile(entry.path))
             result.lua = arena.Clone(entry.path);
         else if (Contains(k_license_filenames, path::Filename(entry.path)))
             result.license = arena.Clone(entry.path);
@@ -80,24 +80,106 @@ static ErrorCodeOr<MutableString> HtmlTemplate(ArenaAllocator& arena) {
     return TRY(ReadEntireFile(html_path, arena));
 }
 
+constexpr String k_metadata_ini_filename = "metadata.ini"_s;
+
+static ErrorCodeOr<String> MetadataIni(String library_folder, ArenaAllocator& arena) {
+    auto const metadata_ini_path = path::Join(arena, Array {library_folder, k_metadata_ini_filename});
+    return TRY(ReadEntireFile(metadata_ini_path, arena));
+}
+
+struct Metadata {
+    String description_html;
+};
+
+// INI-like file format:
+// - Key = Value
+// - Lines starting with ';' are comments
+// - Multiline values are supported with triple quotes
+struct MetadataParser {
+    struct KeyVal {
+        String key, value;
+    };
+
+    ErrorCodeOr<Optional<KeyVal>> ReadLine() {
+        while (cursor) {
+            auto const line = WhitespaceStripped(SplitWithIterator(ini, cursor, '\n'));
+
+            if (line.size == 0) continue;
+            if (StartsWith(line, ';')) continue;
+
+            auto const equals_pos = Find(line, '=');
+            if (!equals_pos) {
+                stdout_log.ErrorLn("Invalid line in {}: {}", k_metadata_ini_filename, line);
+                return ErrorCode {CommonError::FileFormatIsInvalid};
+            }
+
+            auto const key = WhitespaceStrippedEnd(line.SubSpan(0, *equals_pos));
+            auto value = WhitespaceStrippedStart(line.SubSpan(*equals_pos + 1));
+
+            if (StartsWithSpan(value, k_multiline_delim)) {
+                cursor = (usize)(value.data - ini.data) + k_multiline_delim.size;
+                auto const end = FindSpan(ini, k_multiline_delim, *cursor);
+                if (!end) {
+                    stdout_log.ErrorLn("Unterminated multiline value in {}: {}",
+                                       k_metadata_ini_filename,
+                                       key);
+                    return ErrorCode {CommonError::FileFormatIsInvalid};
+                }
+
+                value = ini.SubSpan(*cursor, *end - *cursor);
+                cursor = *end;
+                SplitWithIterator(ini, cursor, '\n');
+            }
+
+            return KeyVal {key, value};
+        }
+
+        return nullopt;
+    }
+
+    static constexpr String k_multiline_delim = "\"\"\"";
+
+    String const ini;
+    Optional<usize> cursor = 0uz;
+};
+
+static ErrorCodeOr<Metadata> ReadMetadata(String library_folder, ArenaAllocator& arena) {
+    Metadata result {};
+    MetadataParser parser {TRY(MetadataIni(library_folder, arena))};
+
+    while (auto const opt_line = TRY(parser.ReadLine())) {
+        auto const& [key, value] = *opt_line;
+
+        if (key == "description-html") {
+            result.description_html = WhitespaceStripped(value);
+        } else {
+            stdout_log.ErrorLn("Unknown key in {}: {}", k_metadata_ini_filename, key);
+            return ErrorCode {CommonError::FileFormatIsInvalid};
+        }
+    }
+
+    return result;
+}
+
 static ErrorCodeOr<void> Main(String library_folder) {
     ArenaAllocator arena {PageAllocator::Instance()};
 
     auto const paths = TRY(ScanLibraryFolder(arena, library_folder));
     auto const lib = TRY(ReadLua(paths.lua, arena));
     auto const html_template = TRY(HtmlTemplate(arena));
+    auto const metadata = TRY(ReadMetadata(library_folder, arena));
 
     auto const result =
         fmt::FormatStringReplace(arena,
                                  html_template,
                                  ArrayT<fmt::StringReplacement>({
-                                     {"__LIBRARY_NAME__"_s, lib->name},
-                                     {"__LUA_FILENAME__"_s, path::Filename(paths.lua)},
-                                     {"__LICENSE_FILENAME__"_s, path::Filename(paths.license)},
-                                     {"__FLOE_HOMEPAGE_URL__"_s, FLOE_HOMEPAGE_URL},
-                                     {"__FLOE_MANUAL_URL__"_s, FLOE_MANUAL_URL},
-                                     {"__FLOE_DOWNLOAD_URL__"_s, FLOE_DOWNLOAD_URL},
-                                     {"__DESCRIPTION_HTML__"_s, ""}, // TODO: get this somehow
+                                     {"__LIBRARY_NAME__", lib->name},
+                                     {"__LUA_FILENAME__", path::Filename(paths.lua)},
+                                     {"__LICENSE_FILENAME__", path::Filename(paths.license)},
+                                     {"__FLOE_HOMEPAGE_URL__", FLOE_HOMEPAGE_URL},
+                                     {"__FLOE_MANUAL_URL__", FLOE_MANUAL_URL},
+                                     {"__FLOE_DOWNLOAD_URL__", FLOE_DOWNLOAD_URL},
+                                     {"__LIBRARY_DESCRIPTION_HTML__", metadata.description_html},
                                  }));
 
     DebugLn("{}", result);

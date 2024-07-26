@@ -543,7 +543,7 @@ PUBLIC constexpr bool StartsWithCaseInsensitiveAscii(String str, String other) {
     return IsEqualToCaseInsensitiveAscii(str.SubSpan(0, other.size), other);
 }
 
-PUBLIC constexpr bool EndsWithCaseInsensitive(String str, String other) {
+PUBLIC constexpr bool EndsWithCaseInsensitiveAscii(String str, String other) {
     if (other.size > str.size) return false;
     return IsEqualToCaseInsensitiveAscii(str.SubSpan(str.size - other.size), other);
 }

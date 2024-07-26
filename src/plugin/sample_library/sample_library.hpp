@@ -170,7 +170,8 @@ struct TryHelpersOutcomeToError {
 using LibraryPtrOrError = ValueOrError<Library*, Error>;
 
 inline bool FilenameIsFloeLuaFile(String path) {
-    return path == "floe.lua" || EndsWithSpan(path, ".floe.lua"_s);
+    return IsEqualToCaseInsensitiveAscii(path, "floe.lua") ||
+           EndsWithCaseInsensitiveAscii(path, ".floe.lua"_s);
 }
 
 LibraryPtrOrError ReadLua(Reader& reader,

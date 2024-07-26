@@ -89,7 +89,12 @@ constexpr String k_metadata_ini_filename = ".metadata.ini"_s;
 
 static ErrorCodeOr<String> MetadataIni(String library_folder, ArenaAllocator& arena) {
     auto const metadata_ini_path = path::Join(arena, Array {library_folder, k_metadata_ini_filename});
-    return TRY(ReadEntireFile(metadata_ini_path, arena));
+    auto const outcome = ReadEntireFile(metadata_ini_path, arena);
+    if (outcome.HasError()) {
+        stdout_log.ErrorLn("ERROR {}: {}", metadata_ini_path, outcome.Error());
+        return outcome.Error();
+    }
+    return outcome.Value();
 }
 
 struct Metadata {

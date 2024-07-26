@@ -1648,22 +1648,24 @@ pub fn build(b: *std.Build) void {
             b.getInstallStep().dependOn(&b.addInstallArtifact(gen_docs, .{ .dest_dir = install_subfolder }).step);
         }
 
-        var gen_about_lib_html = b.addExecutable(.{
-            .name = "gen_about_lib_html_tool",
-            .target = target,
-            .optimize = build_context.optimise,
-        });
-        const gen_about_lib_html_path = "src/gen_about_lib_html_tool";
-        gen_about_lib_html.addCSourceFiles(.{ .files = &.{
-            gen_about_lib_html_path ++ "/gen_about_lib_html_tool.cpp",
-        }, .flags = cpp_fp_flags });
-        gen_about_lib_html.linkLibrary(plugin);
-        gen_about_lib_html.addIncludePath(b.path("src"));
-        gen_about_lib_html.addIncludePath(b.path("src/plugin"));
-        gen_about_lib_html.addConfigHeader(build_config_step);
-        join_compile_commands.step.dependOn(&gen_about_lib_html.step);
-        applyUniversalSettings(&build_context, gen_about_lib_html);
-        b.getInstallStep().dependOn(&b.addInstallArtifact(gen_about_lib_html, .{ .dest_dir = install_subfolder }).step);
+        {
+            var gen_about_lib_html = b.addExecutable(.{
+                .name = "gen_about_lib_html_tool",
+                .target = target,
+                .optimize = build_context.optimise,
+            });
+            const gen_about_lib_html_path = "src/gen_about_lib_html_tool";
+            gen_about_lib_html.addCSourceFiles(.{ .files = &.{
+                gen_about_lib_html_path ++ "/gen_about_lib_html_tool.cpp",
+            }, .flags = cpp_fp_flags });
+            gen_about_lib_html.linkLibrary(plugin);
+            gen_about_lib_html.addIncludePath(b.path("src"));
+            gen_about_lib_html.addIncludePath(b.path("src/plugin"));
+            gen_about_lib_html.addConfigHeader(build_config_step);
+            join_compile_commands.step.dependOn(&gen_about_lib_html.step);
+            applyUniversalSettings(&build_context, gen_about_lib_html);
+            b.getInstallStep().dependOn(&b.addInstallArtifact(gen_about_lib_html, .{ .dest_dir = install_subfolder }).step);
+        }
 
         var clap_post_install_step = b.allocator.create(PostInstallStep) catch @panic("OOM");
         {

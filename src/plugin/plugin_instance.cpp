@@ -11,7 +11,6 @@
 #include "common/common_errors.hpp"
 #include "common/constants.hpp"
 #include "cross_instance_systems.hpp"
-#include "effects/effect.hpp"
 #include "instrument.hpp"
 #include "layer_processor.hpp"
 #include "param_info.hpp"
@@ -21,46 +20,19 @@
 #include "state/state_coding.hpp"
 #include "state/state_snapshot.hpp"
 
-bool StateChangedSinceLastSnapshot(PluginInstance const& plugin) {
-    return !(plugin.last_snapshot.state == CurrentStateSnapshot(plugin));
-}
-
-StateSnapshot CurrentStateSnapshot(PluginInstance const& plugin) {
-    if (plugin.pending_state_change) return plugin.pending_state_change->snapshot.state;
-    return MakeStateSnapshot(plugin.processor);
-}
-
-static void SetInstrument(PluginInstance& plugin, u32 layer_index, Instrument const& instrument) {
-    ZoneScoped;
-    ASSERT(IsMainThread(plugin.host));
-
-    // If we currently have a sampler instrument, we keep it alive by putting it in this storage and cleaning
-    // up at a later time.
-    if (auto current = plugin.Layer(layer_index)
-                           .instrument.TryGet<sample_lib_server::RefCounted<sample_lib::LoadedInstrument>>())
-        dyn::Append(plugin.lifetime_extended_insts, *current);
-
-    // Retain the new instrument
-    if (auto sampled_inst = instrument.TryGet<sample_lib_server::RefCounted<sample_lib::LoadedInstrument>>())
-        sampled_inst->Retain();
-
-    SetInstrument(plugin.processor, layer_index, instrument);
+static void RequestGuiRedraw(PluginInstance& plugin) {
+    plugin.processor.for_main_thread.flags.FetchOr(AudioProcessor::MainThreadCallbackFlagsUpdateGui);
+    plugin.processor.host.request_callback(&plugin.host);
 }
 
 static void SetLastSnapshot(PluginInstance& plugin, StateSnapshotWithMetadata const& state) {
-    ZoneScoped;
-    ASSERT(IsMainThread(plugin.host));
-
     plugin.last_snapshot.Set(state);
-    plugin.gui_needs_to_handle_preset_name_change = true;
-    plugin.processor.for_main_thread.flags.FetchOr(AudioProcessor::MainThreadCallbackFlagsUpdateGui);
-    plugin.processor.host.request_callback(&plugin.host);
-
+    RequestGuiRedraw(plugin);
     // do this at the end because the pending state could be the arg of this function
     plugin.pending_state_change.Clear();
 }
 
-void LoadNewState(PluginInstance& plugin, StateSnapshotWithMetadata const& state, StateSource source) {
+static void LoadNewState(PluginInstance& plugin, StateSnapshotWithMetadata const& state, StateSource source) {
     ZoneScoped;
     ASSERT(IsMainThread(plugin.host));
 
@@ -80,9 +52,13 @@ void LoadNewState(PluginInstance& plugin, StateSnapshotWithMetadata const& state
         for (auto [layer_index, i] : Enumerate<u32>(plugin.last_snapshot.state.inst_ids)) {
             plugin.processor.layer_processors[layer_index].instrument_id = i;
             switch (i.tag) {
-                case InstrumentType::None: SetInstrument(plugin, layer_index, InstrumentType::None); break;
+                case InstrumentType::None:
+                    SetInstrument(plugin.processor, layer_index, InstrumentType::None);
+                    break;
                 case InstrumentType::WaveformSynth:
-                    SetInstrument(plugin, layer_index, i.GetFromTag<InstrumentType::WaveformSynth>());
+                    SetInstrument(plugin.processor,
+                                  layer_index,
+                                  i.GetFromTag<InstrumentType::WaveformSynth>());
                     break;
                 case InstrumentType::Sampler: PanicIfReached(); break;
             }
@@ -126,56 +102,175 @@ void LoadNewState(PluginInstance& plugin, StateSnapshotWithMetadata const& state
     }
 }
 
+static Instrument InstrumentFromPendingState(PluginInstance::PendingStateChange const& pending_state_change,
+                                             u32 layer_index) {
+    auto const inst_id = pending_state_change.snapshot.state.inst_ids[layer_index];
+
+    Instrument instrument = InstrumentType::None;
+    switch (inst_id.tag) {
+        case InstrumentType::None: break;
+        case InstrumentType::WaveformSynth: {
+            instrument = inst_id.GetFromTag<InstrumentType::WaveformSynth>();
+            break;
+        }
+        case InstrumentType::Sampler: {
+            for (auto const& r : pending_state_change.retained_results) {
+                auto const loaded_inst =
+                    r.TryExtract<sample_lib_server::RefCounted<sample_lib::LoadedInstrument>>();
+
+                if (loaded_inst && inst_id.GetFromTag<InstrumentType::Sampler>() == **loaded_inst)
+                    instrument = *loaded_inst;
+            }
+            break;
+        }
+    }
+    return instrument;
+}
+
+static AudioData const*
+IrAudioDataFromPendingState(PluginInstance::PendingStateChange const& pending_state_change) {
+    auto const ir_id = pending_state_change.snapshot.state.ir_id;
+    if (!ir_id) return nullptr;
+    for (auto const& r : pending_state_change.retained_results) {
+        auto const loaded_ir = r.TryExtract<sample_lib_server::RefCounted<sample_lib::LoadedIr>>();
+        if (loaded_ir && *ir_id == **loaded_ir) return (*loaded_ir)->audio_data;
+    }
+    return nullptr;
+}
+
 static void ApplyNewStateFromPending(PluginInstance& plugin) {
     ZoneScoped;
     ASSERT(IsMainThread(plugin.host));
 
-    DebugLoc();
+    auto const& pending_state_change = *plugin.pending_state_change;
 
-    for (auto const layer_index : Range(k_num_layers)) {
-        auto const inst_id = plugin.pending_state_change->snapshot.state.inst_ids[layer_index];
-
-        Instrument instrument = InstrumentType::None;
-
-        switch (inst_id.tag) {
-            case InstrumentType::None: break;
-            case InstrumentType::WaveformSynth: {
-                instrument = inst_id.GetFromTag<InstrumentType::WaveformSynth>();
-                break;
-            }
-            case InstrumentType::Sampler: {
-                for (auto const& r : plugin.pending_state_change->retained_results) {
-                    auto const loaded_inst =
-                        r.TryExtract<sample_lib_server::RefCounted<sample_lib::LoadedInstrument>>();
-
-                    if (loaded_inst && inst_id.GetFromTag<InstrumentType::Sampler>() == **loaded_inst)
-                        instrument = *loaded_inst;
-                }
-                break;
-            }
-        }
-
-        SetInstrument(plugin, layer_index, instrument);
-    }
-
-    {
-        AudioData const* ir_audio_data = nullptr;
-        if (auto const ir_id = plugin.pending_state_change->snapshot.state.ir_id; ir_id) {
-            for (auto const& r : plugin.pending_state_change->retained_results) {
-                auto const loaded_ir = r.TryExtract<sample_lib_server::RefCounted<sample_lib::LoadedIr>>();
-                if (loaded_ir && *ir_id == **loaded_ir) ir_audio_data = (*loaded_ir)->audio_data;
-            }
-        }
-
-        SetConvolutionIrAudioData(plugin.processor, ir_audio_data);
-    }
-
-    ApplyNewState(plugin.processor,
-                  plugin.pending_state_change->snapshot.state,
-                  plugin.pending_state_change->source);
+    for (auto const layer_index : Range(k_num_layers))
+        SetInstrument(plugin.processor,
+                      layer_index,
+                      InstrumentFromPendingState(pending_state_change, layer_index));
+    SetConvolutionIrAudioData(plugin.processor, IrAudioDataFromPendingState(pending_state_change));
+    ApplyNewState(plugin.processor, pending_state_change.snapshot.state, pending_state_change.source);
 
     // do it last because it clears pending_state_change
-    SetLastSnapshot(plugin, plugin.pending_state_change->snapshot);
+    SetLastSnapshot(plugin, pending_state_change.snapshot);
+}
+
+static void SampleLibraryResourceLoaded(PluginInstance& plugin, sample_lib_server::LoadResult result) {
+    ZoneScoped;
+    ASSERT(IsMainThread(plugin.host));
+
+    enum class Source : u32 { OneOff, PartOfPendingStateChange, LastInPendingStateChange, Count };
+
+    auto const source = ({
+        Source s {Source::OneOff};
+        if (plugin.pending_state_change) {
+            auto& requests = plugin.pending_state_change->requests;
+            if (auto const opt_index = FindIf(requests, [&](sample_lib_server::RequestId const& id) {
+                    return id == result.id;
+                })) {
+                s = Source::PartOfPendingStateChange;
+                dyn::Remove(requests, *opt_index);
+                if (requests.size == 0) s = Source::LastInPendingStateChange;
+            }
+        }
+        s;
+    });
+
+    DBG_PRINT_EXPR(source);
+
+    switch (source) {
+        case Source::OneOff: {
+            if (result.result.tag != sample_lib_server::LoadResult::ResultType::Success) break;
+
+            auto const resource = result.result.Get<sample_lib_server::Resource>();
+            switch (resource.tag) {
+                case sample_lib_server::LoadRequestType::Instrument: {
+                    auto const loaded_inst =
+                        resource.Get<sample_lib_server::RefCounted<sample_lib::LoadedInstrument>>();
+
+                    for (auto [layer_index, l] : Enumerate<u32>(plugin.processor.layer_processors)) {
+                        if (auto const i = l.instrument_id.TryGet<sample_lib::InstrumentId>()) {
+                            if (*i == *loaded_inst) SetInstrument(plugin.processor, layer_index, loaded_inst);
+                        }
+                    }
+                    break;
+                }
+                case sample_lib_server::LoadRequestType::Ir: {
+                    auto const loaded_ir =
+                        resource.Get<sample_lib_server::RefCounted<sample_lib::LoadedIr>>();
+
+                    auto const current_ir_id = plugin.processor.convo.ir_id;
+                    if (current_ir_id.HasValue()) {
+                        if (*current_ir_id == *loaded_ir)
+                            SetConvolutionIrAudioData(plugin.processor, loaded_ir->audio_data);
+                    }
+                    break;
+                }
+            }
+            break;
+        }
+        case Source::PartOfPendingStateChange: {
+            result.Retain();
+            dyn::Append(plugin.pending_state_change->retained_results, result);
+            break;
+        }
+        case Source::LastInPendingStateChange: {
+            result.Retain();
+            dyn::Append(plugin.pending_state_change->retained_results, result);
+            ApplyNewStateFromPending(plugin);
+            break;
+        }
+        case Source::Count: PanicIfReached(); break;
+    }
+
+    plugin.processor.for_main_thread.flags.FetchOr(AudioProcessor::MainThreadCallbackFlagsUpdateGui);
+}
+
+StateSnapshot CurrentStateSnapshot(PluginInstance const& plugin) {
+    if (plugin.pending_state_change) return plugin.pending_state_change->snapshot.state;
+    return MakeStateSnapshot(plugin.processor);
+}
+
+bool StateChangedSinceLastSnapshot(PluginInstance const& plugin) {
+    return !(plugin.last_snapshot.state == CurrentStateSnapshot(plugin));
+}
+
+// one-off load
+Optional<u64> LoadConvolutionIr(PluginInstance& plugin, Optional<sample_lib::IrId> ir_id) {
+    ASSERT(IsMainThread(plugin.host));
+    plugin.processor.convo.ir_id = ir_id;
+
+    if (ir_id)
+        return SendAsyncLoadRequest(plugin.shared_data.sample_library_server,
+                                    plugin.sample_lib_server_async_channel,
+                                    *ir_id);
+    else
+        SetConvolutionIrAudioData(plugin.processor, nullptr);
+    return nullopt;
+}
+
+// one-off load
+Optional<u64> LoadInstrument(PluginInstance& plugin, u32 layer_index, InstrumentId inst_id) {
+    ASSERT(IsMainThread(plugin.host));
+    plugin.processor.layer_processors[layer_index].instrument_id = inst_id;
+
+    switch (inst_id.tag) {
+        case InstrumentType::Sampler:
+            return SendAsyncLoadRequest(plugin.shared_data.sample_library_server,
+                                        plugin.sample_lib_server_async_channel,
+                                        sample_lib_server::LoadRequestInstrumentIdWithLayer {
+                                            .id = inst_id.GetFromTag<InstrumentType::Sampler>(),
+                                            .layer_index = layer_index,
+                                        });
+        case InstrumentType::None: {
+            SetInstrument(plugin.processor, layer_index, InstrumentType::None);
+            break;
+        }
+        case InstrumentType::WaveformSynth:
+            SetInstrument(plugin.processor, layer_index, inst_id.Get<WaveformType>());
+            break;
+    }
+    return nullopt;
 }
 
 void LoadPresetFromListing(PluginInstance& plugin,
@@ -232,115 +327,6 @@ void SaveCurrentStateToFile(PluginInstance& plugin, String path) {
     }
 }
 
-static void SampleLibraryResourceLoaded(PluginInstance& plugin, sample_lib_server::LoadResult result) {
-    ZoneScoped;
-    ASSERT(IsMainThread(plugin.host));
-
-    enum class Source : u32 { OneOff, PartOfPendingStateChange, LastInPendingStateChange, Count };
-
-    auto const source = ({
-        Source s {Source::OneOff};
-        if (plugin.pending_state_change) {
-            auto& requests = plugin.pending_state_change->requests;
-            if (auto const opt_index = FindIf(requests, [&](sample_lib_server::RequestId const& id) {
-                    return id == result.id;
-                })) {
-                s = Source::PartOfPendingStateChange;
-                dyn::Remove(requests, *opt_index);
-                if (requests.size == 0) s = Source::LastInPendingStateChange;
-            }
-        }
-        s;
-    });
-
-    DBG_PRINT_EXPR(source);
-
-    switch (source) {
-        case Source::OneOff: {
-            if (result.result.tag != sample_lib_server::LoadResult::ResultType::Success) break;
-
-            auto const resource = result.result.Get<sample_lib_server::Resource>();
-            switch (resource.tag) {
-                case sample_lib_server::LoadRequestType::Instrument: {
-                    auto const loaded_inst =
-                        resource.Get<sample_lib_server::RefCounted<sample_lib::LoadedInstrument>>();
-
-                    for (auto [layer_index, l] : Enumerate<u32>(plugin.processor.layer_processors)) {
-                        if (auto const i = l.instrument_id.TryGet<sample_lib::InstrumentId>()) {
-                            if (*i == *loaded_inst) SetInstrument(plugin, layer_index, loaded_inst);
-                        }
-                    }
-                    break;
-                }
-                case sample_lib_server::LoadRequestType::Ir: {
-                    auto const loaded_ir =
-                        resource.Get<sample_lib_server::RefCounted<sample_lib::LoadedIr>>();
-
-                    auto const current_ir_id = plugin.processor.convo.ir_id;
-                    if (current_ir_id.HasValue()) {
-                        if (*current_ir_id == *loaded_ir)
-                            SetConvolutionIrAudioData(plugin.processor, loaded_ir->audio_data);
-                    }
-                    break;
-                }
-            }
-            break;
-        }
-        case Source::PartOfPendingStateChange: {
-            result.Retain();
-            dyn::Append(plugin.pending_state_change->retained_results, result);
-            break;
-        }
-        case Source::LastInPendingStateChange: {
-            result.Retain();
-            dyn::Append(plugin.pending_state_change->retained_results, result);
-            ApplyNewStateFromPending(plugin);
-            break;
-        }
-        case Source::Count: PanicIfReached(); break;
-    }
-
-    plugin.processor.for_main_thread.flags.FetchOr(AudioProcessor::MainThreadCallbackFlagsUpdateGui);
-}
-
-// one-off load
-Optional<u64> LoadConvolutionIr(PluginInstance& plugin, Optional<sample_lib::IrId> ir_id) {
-    ASSERT(IsMainThread(plugin.host));
-    plugin.processor.convo.ir_id = ir_id;
-
-    if (ir_id)
-        return SendAsyncLoadRequest(plugin.shared_data.sample_library_server,
-                                    plugin.sample_lib_server_async_channel,
-                                    *ir_id);
-    else
-        SetConvolutionIrAudioData(plugin.processor, nullptr);
-    return nullopt;
-}
-
-// one-off load
-Optional<u64> LoadInstrument(PluginInstance& plugin, u32 layer_index, InstrumentId inst_id) {
-    ASSERT(IsMainThread(plugin.host));
-    plugin.processor.layer_processors[layer_index].instrument_id = inst_id;
-
-    switch (inst_id.tag) {
-        case InstrumentType::Sampler:
-            return SendAsyncLoadRequest(plugin.shared_data.sample_library_server,
-                                        plugin.sample_lib_server_async_channel,
-                                        sample_lib_server::LoadRequestInstrumentIdWithLayer {
-                                            .id = inst_id.GetFromTag<InstrumentType::Sampler>(),
-                                            .layer_index = layer_index,
-                                        });
-        case InstrumentType::None: {
-            SetInstrument(plugin, layer_index, InstrumentType::None);
-            break;
-        }
-        case InstrumentType::WaveformSynth:
-            SetInstrument(plugin, layer_index, inst_id.Get<WaveformType>());
-            break;
-    }
-    return nullopt;
-}
-
 void LoadRandomInstrument(PluginInstance& plugin,
                           u32 layer_index,
                           bool allow_none_to_be_selected,
@@ -380,22 +366,6 @@ void RunFunctionOnMainThread(PluginInstance& plugin, ThreadsafeFunctionQueue::Fu
 
 static void OnMainThread(PluginInstance& plugin, bool& update_gui) {
     (void)update_gui;
-    // Clear any instruments that aren't used anymore. The audio thread will request this callback after it
-    // swaps any instruments.
-    if (plugin.lifetime_extended_insts.size) {
-        bool all_layers_have_completed_swap = true;
-        for (auto& l : plugin.processor.layer_processors) {
-            if (!l.desired_inst.IsConsumed()) {
-                all_layers_have_completed_swap = false;
-                break;
-            }
-        }
-        if (all_layers_have_completed_swap) {
-            for (auto& i : plugin.lifetime_extended_insts)
-                i.Release();
-            dyn::Clear(plugin.lifetime_extended_insts);
-        }
-    }
 
     ArenaAllocatorWithInlineStorage<4000> scratch_arena {};
     while (auto f = plugin.main_thread_callbacks.TryPop(scratch_arena))
@@ -408,13 +378,8 @@ static void OnMainThread(PluginInstance& plugin, bool& update_gui) {
 }
 
 PluginInstance::PluginInstance(clap_host const& host, CrossInstanceSystems& shared_data)
-    : shared_data(shared_data)
-    , host(host)
-    , processor(host)
-    , sample_lib_server_async_channel(sample_lib_server::OpenAsyncCommsChannel(
-          shared_data.sample_library_server,
-          error_notifications,
-          [&plugin = *this]() { plugin.host.request_callback(&plugin.host); })) {
+    : host(host)
+    , shared_data(shared_data) {
 
     last_snapshot.state = CurrentStateSnapshot(*this);
 
@@ -443,9 +408,6 @@ PluginInstance::PluginInstance(clap_host const& host, CrossInstanceSystems& shar
 
 PluginInstance::~PluginInstance() {
     shared_data.preset_listing.scanned_folder.listeners.Remove(presets_folder_listener_id);
-
-    for (auto& i : lifetime_extended_insts)
-        i.Release();
 
     sample_lib_server::CloseAsyncCommsChannel(shared_data.sample_library_server,
                                               sample_lib_server_async_channel);

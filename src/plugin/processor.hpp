@@ -179,6 +179,7 @@ class AtomicBitset {
 
 struct AudioProcessor {
     AudioProcessor(clap_host const& host);
+    ~AudioProcessor();
 
     clap_host const& host;
 
@@ -236,10 +237,12 @@ struct AudioProcessor {
     Parameters params;
 
     Array<LayerProcessor, k_num_layers> layer_processors {
-        LayerProcessor {smoothed_value_system, 0, params.data, host},
-        LayerProcessor {smoothed_value_system, 1, params.data + k_num_layer_parameters, host},
+        LayerProcessor {smoothed_value_system, 0, params.data + k_num_layer_parameters * 0, host},
+        LayerProcessor {smoothed_value_system, 1, params.data + k_num_layer_parameters * 1, host},
         LayerProcessor {smoothed_value_system, 2, params.data + k_num_layer_parameters * 2, host},
     };
+    DynamicArray<sample_lib_server::RefCounted<sample_lib::LoadedInstrument>> lifetime_extended_insts {
+        Malloc::Instance()};
 
     FloeSmoothedValueSystem::FloatId const master_vol_smoother_id {smoothed_value_system.CreateSmoother()};
 

@@ -570,6 +570,16 @@ static void Deactivate(AudioProcessor& processor) {
 void SetInstrument(AudioProcessor& processor, u32 layer_index, Instrument const& instrument) {
     ASSERT(IsMainThread(processor.host));
 
+    // If we currently have a sampler instrument, we keep it alive by storing it and releasing at a later
+    // time.
+    if (auto current = processor.layer_processors[layer_index]
+                           .instrument.TryGet<sample_lib_server::RefCounted<sample_lib::LoadedInstrument>>())
+        dyn::Append(processor.lifetime_extended_insts, *current);
+
+    // Retain the new instrument
+    if (auto sampled_inst = instrument.TryGet<sample_lib_server::RefCounted<sample_lib::LoadedInstrument>>())
+        sampled_inst->Retain();
+
     processor.layer_processors[layer_index].instrument = instrument;
 
     switch (instrument.tag) {
@@ -1377,6 +1387,23 @@ static void OnMainThread(AudioProcessor& processor, bool& update_gui) {
         if (host_params) host_params->rescan(&processor.host, CLAP_PARAM_RESCAN_VALUES);
     }
     if (flags & AudioProcessor::MainThreadCallbackFlagsUpdateGui) update_gui = true;
+
+    // Clear any instruments that aren't used anymore. The audio thread will request this callback after it
+    // swaps any instruments.
+    if (processor.lifetime_extended_insts.size) {
+        bool all_layers_have_completed_swap = true;
+        for (auto& l : processor.layer_processors) {
+            if (!l.desired_inst.IsConsumed()) {
+                all_layers_have_completed_swap = false;
+                break;
+            }
+        }
+        if (all_layers_have_completed_swap) {
+            for (auto& i : processor.lifetime_extended_insts)
+                i.Release();
+            dyn::Clear(processor.lifetime_extended_insts);
+        }
+    }
 }
 
 AudioProcessor::AudioProcessor(clap_host const& host)
@@ -1425,4 +1452,9 @@ AudioProcessor::AudioProcessor(clap_host const& host)
         .flush_parameter_events = FlushParameterEvents,
         .on_main_thread = OnMainThread,
     };
+}
+
+AudioProcessor::~AudioProcessor() {
+    for (auto& i : lifetime_extended_insts)
+        i.Release();
 }

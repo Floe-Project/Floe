@@ -764,9 +764,6 @@ GuiFrameResult GuiUpdate(Gui* g) {
     g->waveforms.StartFrame();
     DEFER { g->waveforms.EndFrame(*g->frame_input.graphics_ctx); };
 
-    if (Exchange(g->plugin.gui_needs_to_handle_preset_name_change, false))
-        g->preset_browser_data.scroll_to_show_current_preset = true;
-
     auto whole_window_sets = imgui::DefMainWindow();
     whole_window_sets.draw_routine_window_background = [&](IMGUI_DRAW_WINDOW_BG_ARGS_TYPES) {};
     imgui.Begin(whole_window_sets);

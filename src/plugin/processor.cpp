@@ -258,7 +258,8 @@ void SetInstrument(AudioProcessor& processor, u32 layer_index, Instrument const&
 
     switch (instrument.tag) {
         case InstrumentType::Sampler: {
-            auto& sampler_inst = instrument.Get<sample_lib_server::RefCounted<LoadedInstrument>>();
+            auto& sampler_inst =
+                instrument.Get<sample_lib_server::RefCounted<sample_lib::LoadedInstrument>>();
             processor.layer_processors[layer_index].desired_inst.Set(&*sampler_inst);
             break;
         }

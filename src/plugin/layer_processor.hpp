@@ -5,7 +5,7 @@
 #include "foundation/foundation.hpp"
 
 #include "audio_processing_context.hpp"
-#include "instrument_type.hpp"
+#include "instrument.hpp"
 #include "param.hpp"
 #include "param_info.hpp"
 #include "processing/adsr.hpp"
@@ -179,11 +179,6 @@ struct LayerProcessor {
     Atomic<u32> note_on_rr_pos = 0;
     Atomic<u32> note_off_rr_pos = 0;
 
-    // We want to just store a raw pointer for the instrument, not the RefCounted wrapper.
-    using InstrumentUnwrapped = TaggedUnion<InstrumentType,
-                                            TypeAndTag<LoadedInstrument const*, InstrumentType::Sampler>,
-                                            TypeAndTag<WaveformType, InstrumentType::WaveformSynth>>;
-
     InstrumentUnwrapped inst = InstrumentType::None;
 
     // Encodes possible instruments into a single atomic u64. We use the fact that pointers must be aligned to
@@ -191,7 +186,7 @@ struct LayerProcessor {
     struct DesiredInst {
         static constexpr u64 k_consumed = 1;
         void Set(WaveformType w) { value.Store(ValForWaveform(w)); }
-        void Set(LoadedInstrument const* i) { value.Store((uintptr)i); }
+        void Set(sample_lib::LoadedInstrument const* i) { value.Store((uintptr)i); }
         void SetNone() { value.Store(0); }
         Optional<InstrumentUnwrapped> Consume() {
             auto v = value.Exchange(k_consumed);
@@ -199,11 +194,11 @@ struct LayerProcessor {
             if (v == 0) return InstrumentType::None;
             for (auto const w : Range((u64)WaveformType::Count))
                 if (v == ValForWaveform((WaveformType)w)) return (WaveformType)w;
-            return (LoadedInstrument const*)v;
+            return (sample_lib::LoadedInstrument const*)v;
         }
         static constexpr u64 ValForWaveform(WaveformType w) {
-            auto const v = 1 + alignof(LoadedInstrument) * ((u64)w + 1);
-            ASSERT(v % alignof(LoadedInstrument) != 0, "needs to be an invalid ptr");
+            auto const v = 1 + alignof(sample_lib::LoadedInstrument) * ((u64)w + 1);
+            ASSERT(v % alignof(sample_lib::LoadedInstrument) != 0, "needs to be an invalid ptr");
             return v;
         }
         bool IsConsumed() const { return value.Load() == k_consumed; }

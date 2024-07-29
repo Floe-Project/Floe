@@ -7,7 +7,7 @@
 
 #include "audio_processing_context.hpp"
 #include "common/constants.hpp"
-#include "instrument_type.hpp"
+#include "instrument.hpp"
 #include "processing/adsr.hpp"
 #include "processing/filters.hpp"
 #include "processing/lfo.hpp"

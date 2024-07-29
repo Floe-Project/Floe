@@ -12,7 +12,7 @@
 #include "common/constants.hpp"
 #include "cross_instance_systems.hpp"
 #include "effects/effect.hpp"
-#include "instrument_type.hpp"
+#include "instrument.hpp"
 #include "layer_processor.hpp"
 #include "param_info.hpp"
 #include "plugin.hpp"
@@ -60,10 +60,12 @@ static void SetInstrument(PluginInstance& plugin, u32 layer_index, Instrument co
     using namespace sample_lib_server;
 
     // We keep the instrument alive by putting it in this storage and cleaning up at a later time.
-    if (auto current = plugin.layers[layer_index].instrument.TryGet<RefCounted<LoadedInstrument>>())
+    if (auto current =
+            plugin.layers[layer_index].instrument.TryGet<RefCounted<sample_lib::LoadedInstrument>>())
         dyn::Append(plugin.lifetime_extended_insts, *current);
 
-    if (auto sampled_inst = instrument.TryGet<RefCounted<LoadedInstrument>>()) sampled_inst->Retain();
+    if (auto sampled_inst = instrument.TryGet<RefCounted<sample_lib::LoadedInstrument>>())
+        sampled_inst->Retain();
 
     plugin.layers[layer_index].instrument = instrument;
 
@@ -153,11 +155,12 @@ void LoadNewState(PluginInstance& plugin, StateSnapshotWithMetadata const& state
 }
 
 static bool InstMatches(sample_lib::InstrumentId const& id,
-                        sample_lib_server::RefCounted<LoadedInstrument> const& inst) {
+                        sample_lib_server::RefCounted<sample_lib::LoadedInstrument> const& inst) {
     return id.library_name == inst->instrument.library.name && id.inst_name == inst->instrument.name;
 }
 
-static bool IrMatches(sample_lib::IrId const& id, sample_lib_server::RefCounted<LoadedIr> const& ir) {
+static bool IrMatches(sample_lib::IrId const& id,
+                      sample_lib_server::RefCounted<sample_lib::LoadedIr> const& ir) {
     return id.library_name == ir->ir.library.name && id.ir_name == ir->ir.name;
 }
 
@@ -180,7 +183,8 @@ static void ApplyNewStateFromPending(PluginInstance& plugin) {
             }
             case InstrumentType::Sampler: {
                 for (auto const& r : plugin.pending_state_change->retained_results) {
-                    auto const loaded_inst = r.TryExtract<sample_lib_server::RefCounted<LoadedInstrument>>();
+                    auto const loaded_inst =
+                        r.TryExtract<sample_lib_server::RefCounted<sample_lib::LoadedInstrument>>();
 
                     if (loaded_inst &&
                         InstMatches(inst_id.GetFromTag<InstrumentType::Sampler>(), *loaded_inst))
@@ -199,7 +203,7 @@ static void ApplyNewStateFromPending(PluginInstance& plugin) {
         AudioData const* ir_audio_data = nullptr;
         if (ir_id) {
             for (auto const& r : plugin.pending_state_change->retained_results) {
-                auto const loaded_ir = r.TryExtract<sample_lib_server::RefCounted<LoadedIr>>();
+                auto const loaded_ir = r.TryExtract<sample_lib_server::RefCounted<sample_lib::LoadedIr>>();
                 if (loaded_ir && IrMatches(*ir_id, *loaded_ir)) ir_audio_data = (*loaded_ir)->audio_data;
             }
         }
@@ -301,7 +305,8 @@ static void SampleLibraryResourceLoaded(PluginInstance& plugin, sample_lib_serve
             auto const resource = result.result.Get<sample_lib_server::Resource>();
             switch (resource.tag) {
                 case sample_lib_server::LoadRequestType::Instrument: {
-                    auto const loaded_inst = resource.Get<sample_lib_server::RefCounted<LoadedInstrument>>();
+                    auto const loaded_inst =
+                        resource.Get<sample_lib_server::RefCounted<sample_lib::LoadedInstrument>>();
 
                     for (auto [layer_index, l] : Enumerate<u32>(plugin.layers)) {
                         if (auto const i = l.instrument_id.TryGet<sample_lib::InstrumentId>()) {
@@ -311,7 +316,8 @@ static void SampleLibraryResourceLoaded(PluginInstance& plugin, sample_lib_serve
                     break;
                 }
                 case sample_lib_server::LoadRequestType::Ir: {
-                    auto const loaded_ir = resource.Get<sample_lib_server::RefCounted<LoadedIr>>();
+                    auto const loaded_ir =
+                        resource.Get<sample_lib_server::RefCounted<sample_lib::LoadedIr>>();
 
                     auto const current_ir_id = plugin.processor.convo.ir_index;
                     if (current_ir_id.HasValue()) {
@@ -808,7 +814,7 @@ PluginInstance::~PluginInstance() {
 usize MegabytesUsedBySamples(PluginInstance const& plugin) {
     usize result = 0;
     for (auto& l : plugin.layers) {
-        if (auto i = l.instrument.TryGet<sample_lib_server::RefCounted<LoadedInstrument>>())
+        if (auto i = l.instrument.TryGet<sample_lib_server::RefCounted<sample_lib::LoadedInstrument>>())
             for (auto& d : (*i)->audio_datas)
                 result += d->RamUsageBytes();
     }

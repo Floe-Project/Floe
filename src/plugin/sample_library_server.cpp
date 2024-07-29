@@ -1090,8 +1090,8 @@ static bool UpdatePendingResources(PendingResources& pending_resources,
             });
             if (num_completed == i->audio_data_set.size) {
                 pending_resource.LoadingPercent().Store(-1);
-                pending_resource.state =
-                    Resource {RefCounted<LoadedInstrument> {i->inst, i->ref_count, &server.work_signaller}};
+                pending_resource.state = Resource {
+                    RefCounted<sample_lib::LoadedInstrument> {i->inst, i->ref_count, &server.work_signaller}};
             } else {
                 f32 const percent = 100.0f * ((f32)num_completed / (f32)i->audio_data_set.size);
                 pending_resource.LoadingPercent().Store(RoundPositiveFloat(percent));
@@ -1132,7 +1132,7 @@ static bool UpdatePendingResources(PendingResources& pending_resources,
         switch (ir.audio_data->state.Load()) {
             case FileLoadingState::CompletedSucessfully: {
                 pending_resource.state = Resource {
-                    RefCounted<LoadedIr> {
+                    RefCounted<sample_lib::LoadedIr> {
                         ir_ptr->ir,
                         ir_ptr->ref_count,
                         &server.work_signaller,
@@ -1524,11 +1524,11 @@ void LoadResult::ChangeRefCount(RefCountChange t) const {
     if (auto resource_union = result.TryGet<Resource>()) {
         switch (resource_union->tag) {
             case LoadRequestType::Instrument:
-                resource_union->Get<RefCounted<LoadedInstrument>>().ChangeRefCount(t);
+                resource_union->Get<RefCounted<sample_lib::LoadedInstrument>>().ChangeRefCount(t);
                 break;
             case LoadRequestType::Ir:
                 break;
-                resource_union->Get<RefCounted<LoadedIr>>().ChangeRefCount(t);
+                resource_union->Get<RefCounted<sample_lib::LoadedIr>>().ChangeRefCount(t);
                 break;
         }
     }
@@ -1680,145 +1680,156 @@ TEST_CASE(TestSampleLibraryLoader) {
 
         SUBCASE("ir") {
             auto const builtin_ir = EmbeddedIrs().irs[0];
-            dyn::Append(requests,
-                        {
-                            .request = sample_lib::IrId {.library_name = k_builtin_library_name,
-                                                         .ir_name = String {builtin_ir.name.data,
-                                                                            builtin_ir.name.size}},
-                            .check_result =
-                                [&](LoadResult const& r, LoadRequest const& request) {
-                                    auto ir = ExtractSuccess<RefCounted<LoadedIr>>(tester, r, request);
-                                    CHECK(ir->audio_data->interleaved_samples.size);
-                                },
-                        });
+            dyn::Append(
+                requests,
+                {
+                    .request =
+                        sample_lib::IrId {.library_name = k_builtin_library_name,
+                                          .ir_name = String {builtin_ir.name.data, builtin_ir.name.size}},
+                    .check_result =
+                        [&](LoadResult const& r, LoadRequest const& request) {
+                            auto ir = ExtractSuccess<RefCounted<sample_lib::LoadedIr>>(tester, r, request);
+                            CHECK(ir->audio_data->interleaved_samples.size);
+                        },
+                });
         }
 
         SUBCASE("library and instrument") {
-            dyn::Append(requests,
-                        {
-                            .request =
-                                LoadRequestInstrumentIdWithLayer {
-                                    .id =
-                                        {
-                                            .library_name = "SharedFilesMdata"_s,
-                                            .inst_name = "Groups And Refs"_s,
-                                        },
-                                    .layer_index = 0,
+            dyn::Append(
+                requests,
+                {
+                    .request =
+                        LoadRequestInstrumentIdWithLayer {
+                            .id =
+                                {
+                                    .library_name = "SharedFilesMdata"_s,
+                                    .inst_name = "Groups And Refs"_s,
                                 },
-                            .check_result =
-                                [&](LoadResult const& r, LoadRequest const& request) {
-                                    auto inst =
-                                        ExtractSuccess<RefCounted<LoadedInstrument>>(tester, r, request);
-                                    CHECK(inst->audio_datas.size);
-                                },
-                        });
+                            .layer_index = 0,
+                        },
+                    .check_result =
+                        [&](LoadResult const& r, LoadRequest const& request) {
+                            auto inst =
+                                ExtractSuccess<RefCounted<sample_lib::LoadedInstrument>>(tester, r, request);
+                            CHECK(inst->audio_datas.size);
+                        },
+                });
         }
 
         SUBCASE("library and instrument (lua)") {
-            dyn::Append(requests,
-                        {
-                            .request =
-                                LoadRequestInstrumentIdWithLayer {
-                                    .id =
-                                        {
-                                            .library_name = "Test Lua"_s,
-                                            .inst_name = "Single Sample"_s,
-                                        },
-                                    .layer_index = 0,
+            dyn::Append(
+                requests,
+                {
+                    .request =
+                        LoadRequestInstrumentIdWithLayer {
+                            .id =
+                                {
+                                    .library_name = "Test Lua"_s,
+                                    .inst_name = "Single Sample"_s,
                                 },
-                            .check_result =
-                                [&](LoadResult const& r, LoadRequest const& request) {
-                                    auto inst =
-                                        ExtractSuccess<RefCounted<LoadedInstrument>>(tester, r, request);
-                                    CHECK(inst->audio_datas.size);
-                                },
-                        });
+                            .layer_index = 0,
+                        },
+                    .check_result =
+                        [&](LoadResult const& r, LoadRequest const& request) {
+                            auto inst =
+                                ExtractSuccess<RefCounted<sample_lib::LoadedInstrument>>(tester, r, request);
+                            CHECK(inst->audio_datas.size);
+                        },
+                });
         }
 
         SUBCASE("audio file shared across insts") {
-            dyn::Append(requests,
-                        {
-                            .request =
-                                LoadRequestInstrumentIdWithLayer {
-                                    .id =
-                                        {
-                                            .library_name = "SharedFilesMdata"_s,
-                                            .inst_name = "Groups And Refs"_s,
-                                        },
-                                    .layer_index = 0,
+            dyn::Append(
+                requests,
+                {
+                    .request =
+                        LoadRequestInstrumentIdWithLayer {
+                            .id =
+                                {
+                                    .library_name = "SharedFilesMdata"_s,
+                                    .inst_name = "Groups And Refs"_s,
                                 },
-                            .check_result =
-                                [&](LoadResult const& r, LoadRequest const& request) {
-                                    auto i = ExtractSuccess<RefCounted<LoadedInstrument>>(tester, r, request);
-                                    CHECK_EQ(i->instrument.name, "Groups And Refs"_s);
-                                    CHECK_EQ(i->audio_datas.size, 4u);
-                                    for (auto& d : i->audio_datas)
-                                        CHECK_NEQ(d->interleaved_samples.size, 0u);
+                            .layer_index = 0,
+                        },
+                    .check_result =
+                        [&](LoadResult const& r, LoadRequest const& request) {
+                            auto i =
+                                ExtractSuccess<RefCounted<sample_lib::LoadedInstrument>>(tester, r, request);
+                            CHECK_EQ(i->instrument.name, "Groups And Refs"_s);
+                            CHECK_EQ(i->audio_datas.size, 4u);
+                            for (auto& d : i->audio_datas)
+                                CHECK_NEQ(d->interleaved_samples.size, 0u);
+                        },
+                });
+            dyn::Append(
+                requests,
+                {
+                    .request =
+                        LoadRequestInstrumentIdWithLayer {
+                            .id =
+                                {
+                                    .library_name = "SharedFilesMdata"_s,
+                                    .inst_name = "Groups And Refs (copy)"_s,
                                 },
-                        });
-            dyn::Append(requests,
-                        {
-                            .request =
-                                LoadRequestInstrumentIdWithLayer {
-                                    .id =
-                                        {
-                                            .library_name = "SharedFilesMdata"_s,
-                                            .inst_name = "Groups And Refs (copy)"_s,
-                                        },
-                                    .layer_index = 1,
+                            .layer_index = 1,
+                        },
+                    .check_result =
+                        [&](LoadResult const& r, LoadRequest const& request) {
+                            auto i =
+                                ExtractSuccess<RefCounted<sample_lib::LoadedInstrument>>(tester, r, request);
+                            CHECK_EQ(i->instrument.name, "Groups And Refs (copy)"_s);
+                            CHECK_EQ(i->audio_datas.size, 4u);
+                            for (auto& d : i->audio_datas)
+                                CHECK_NEQ(d->interleaved_samples.size, 0u);
+                        },
+                });
+            dyn::Append(
+                requests,
+                {
+                    .request =
+                        LoadRequestInstrumentIdWithLayer {
+                            .id =
+                                {
+                                    .library_name = "SharedFilesMdata"_s,
+                                    .inst_name = "Single Sample"_s,
                                 },
-                            .check_result =
-                                [&](LoadResult const& r, LoadRequest const& request) {
-                                    auto i = ExtractSuccess<RefCounted<LoadedInstrument>>(tester, r, request);
-                                    CHECK_EQ(i->instrument.name, "Groups And Refs (copy)"_s);
-                                    CHECK_EQ(i->audio_datas.size, 4u);
-                                    for (auto& d : i->audio_datas)
-                                        CHECK_NEQ(d->interleaved_samples.size, 0u);
-                                },
-                        });
-            dyn::Append(requests,
-                        {
-                            .request =
-                                LoadRequestInstrumentIdWithLayer {
-                                    .id =
-                                        {
-                                            .library_name = "SharedFilesMdata"_s,
-                                            .inst_name = "Single Sample"_s,
-                                        },
-                                    .layer_index = 2,
-                                },
-                            .check_result =
-                                [&](LoadResult const& r, LoadRequest const& request) {
-                                    auto i = ExtractSuccess<RefCounted<LoadedInstrument>>(tester, r, request);
-                                    CHECK_EQ(i->instrument.name, "Single Sample"_s);
-                                    CHECK_EQ(i->audio_datas.size, 1u);
-                                    for (auto& d : i->audio_datas)
-                                        CHECK_NEQ(d->interleaved_samples.size, 0u);
-                                },
-                        });
+                            .layer_index = 2,
+                        },
+                    .check_result =
+                        [&](LoadResult const& r, LoadRequest const& request) {
+                            auto i =
+                                ExtractSuccess<RefCounted<sample_lib::LoadedInstrument>>(tester, r, request);
+                            CHECK_EQ(i->instrument.name, "Single Sample"_s);
+                            CHECK_EQ(i->audio_datas.size, 1u);
+                            for (auto& d : i->audio_datas)
+                                CHECK_NEQ(d->interleaved_samples.size, 0u);
+                        },
+                });
         }
 
         SUBCASE("audio files shared within inst") {
-            dyn::Append(requests,
-                        {
-                            .request =
-                                LoadRequestInstrumentIdWithLayer {
-                                    .id =
-                                        {
-                                            .library_name = "SharedFilesMdata"_s,
-                                            .inst_name = "Same Sample Twice"_s,
-                                        },
-                                    .layer_index = 0,
+            dyn::Append(
+                requests,
+                {
+                    .request =
+                        LoadRequestInstrumentIdWithLayer {
+                            .id =
+                                {
+                                    .library_name = "SharedFilesMdata"_s,
+                                    .inst_name = "Same Sample Twice"_s,
                                 },
-                            .check_result =
-                                [&](LoadResult const& r, LoadRequest const& request) {
-                                    auto i = ExtractSuccess<RefCounted<LoadedInstrument>>(tester, r, request);
-                                    CHECK_EQ(i->instrument.name, "Same Sample Twice"_s);
-                                    CHECK_EQ(i->audio_datas.size, 2u);
-                                    for (auto& d : i->audio_datas)
-                                        CHECK_NEQ(d->interleaved_samples.size, 0u);
-                                },
-                        });
+                            .layer_index = 0,
+                        },
+                    .check_result =
+                        [&](LoadResult const& r, LoadRequest const& request) {
+                            auto i =
+                                ExtractSuccess<RefCounted<sample_lib::LoadedInstrument>>(tester, r, request);
+                            CHECK_EQ(i->instrument.name, "Same Sample Twice"_s);
+                            CHECK_EQ(i->audio_datas.size, 2u);
+                            for (auto& d : i->audio_datas)
+                                CHECK_NEQ(d->interleaved_samples.size, 0u);
+                        },
+                });
         };
 
         SUBCASE("core library") {

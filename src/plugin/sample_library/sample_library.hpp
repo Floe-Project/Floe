@@ -5,6 +5,7 @@
 #include "foundation/foundation.hpp"
 #include "utils/reader.hpp"
 
+#include "audio_data.hpp"
 #include "common/constants.hpp"
 #include "mdata.hpp"
 
@@ -87,11 +88,24 @@ struct Instrument {
     u32 max_rr_pos {};
 };
 
+// An instrument that has all it's audio data loaded into memory.
+struct LoadedInstrument {
+    Instrument const& instrument;
+    Span<AudioData const*> audio_datas {}; // parallel to instrument.regions
+    AudioData const* file_for_gui_waveform {};
+};
+
 struct ImpulseResponse {
     Library const& library;
 
     String name {};
     String path {};
+};
+
+// An impulse response that has all it's audio data loaded into memory.
+struct LoadedIr {
+    ImpulseResponse const& ir;
+    AudioData const* audio_data;
 };
 
 enum class FileFormat { Mdata, Lua };

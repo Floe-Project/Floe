@@ -11,7 +11,6 @@
 
 #include "audio_data.hpp"
 #include "common/constants.hpp"
-#include "sample_library/loaded_resources.hpp"
 #include "sample_library/sample_library.hpp"
 
 // Sample library server
@@ -30,10 +29,6 @@
 // image, etc.
 
 namespace sample_lib_server {
-
-namespace detail {
-struct ListedInstrument;
-}
 
 // Request
 // ==========================================================================================================
@@ -55,7 +50,9 @@ using LoadRequest = TaggedUnion<LoadRequestType,
 enum class RefCountChange { Retain, Release };
 
 // NOTE: this doesn't do reference counting automatically. You must use Retain() and Release() manually.
-// Things can get messy and inefficient using copy/move constructors and assignment operators.
+// We do this because things can get messy and inefficient doing ref-counting automatically in copy/move
+// constructors and assignment operators. You will get assertion failures if you have mismatched
+// retain/release.
 template <typename Type>
 struct RefCounted {
     RefCounted() = default;
@@ -98,9 +95,10 @@ struct RefCounted {
     WorkSignaller* m_work_signaller {};
 };
 
-using Resource = TaggedUnion<LoadRequestType,
-                             TypeAndTag<RefCounted<LoadedInstrument>, LoadRequestType::Instrument>,
-                             TypeAndTag<RefCounted<LoadedIr>, LoadRequestType::Ir>>;
+using Resource =
+    TaggedUnion<LoadRequestType,
+                TypeAndTag<RefCounted<sample_lib::LoadedInstrument>, LoadRequestType::Instrument>,
+                TypeAndTag<RefCounted<sample_lib::LoadedIr>, LoadRequestType::Ir>>;
 
 struct LoadResult {
     enum class ResultType { Success, Error, Cancelled };
@@ -121,6 +119,10 @@ struct LoadResult {
     RequestId id;
     Result result;
 };
+
+namespace detail {
+struct ListedInstrument;
+}
 
 // Asynchronous communication channel
 // ==========================================================================================================
@@ -172,7 +174,7 @@ struct ListedInstrument {
     ~ListedInstrument();
 
     u32 debug_id;
-    LoadedInstrument inst;
+    sample_lib::LoadedInstrument inst;
     Atomic<u32> ref_count {};
     Span<ListedAudioData*> audio_data_set {};
     ArenaAllocator arena {PageAllocator::Instance()};
@@ -181,7 +183,7 @@ struct ListedInstrument {
 struct ListedImpulseResponse {
     ~ListedImpulseResponse();
 
-    LoadedIr ir;
+    sample_lib::LoadedIr ir;
     ListedAudioData* audio_data {};
     Atomic<u32> ref_count {};
 };

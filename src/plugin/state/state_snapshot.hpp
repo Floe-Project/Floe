@@ -5,7 +5,7 @@
 #include "foundation/foundation.hpp"
 
 #include "effects/effect_infos.hpp"
-#include "instrument_type.hpp"
+#include "instrument.hpp"
 #include "param_info.hpp"
 
 struct StateSnapshot {

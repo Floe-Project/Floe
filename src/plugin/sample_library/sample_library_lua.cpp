@@ -419,7 +419,7 @@ struct TableFields<Region::Options> {
                     .name = "auto_map_key_range_group",
                     .description_sentence =
                         "For every region that matches this group, automatically set the start and end values for each region's key range based on its root key. Only works if all region's velocity range are the same.",
-                    .example = "rr1",
+                    .example = "group1",
                     .default_value = "no auto-map",
                     .lua_type = LUA_TSTRING,
                     .required = false,
@@ -431,7 +431,7 @@ struct TableFields<Region::Options> {
                     .name = "feather_overlapping_velocity_regions",
                     .description_sentence =
                         "If another region is triggered at the same time as this one and is overlapping this, then both regions will play crossfaded together. This smooths the transitions between velocity layers.",
-                    .example = "true",
+                    .example = "false",
                     .default_value = "false",
                     .lua_type = LUA_TBOOLEAN,
                     .required = false,
@@ -658,7 +658,7 @@ struct TableFields<Instrument> {
                 return {
                     .name = "name",
                     .description_sentence = "The name of the instrument. Must be unique.",
-                    .example = "Glimmering Tones",
+                    .example = "Metal Fence Strike",
                     .lua_type = LUA_TSTRING,
                     .required = true,
                     .set =
@@ -675,7 +675,7 @@ struct TableFields<Instrument> {
                     .name = "folders",
                     .description_sentence =
                         "Words separated by slashes used to hierarchically categorise the instrument.",
-                    .example = "Bass/Dark",
+                    .example = "Fences/Steel",
                     .default_value = "no folders",
                     .lua_type = LUA_TSTRING,
                     .required = false,
@@ -685,7 +685,7 @@ struct TableFields<Instrument> {
                 return {
                     .name = "description",
                     .description_sentence = "A description of the instrument.",
-                    .example = "Multi-sampled music box with 4 round robin layers.",
+                    .example = "Tonal pluck metallic pluck made from striking a steel fence.",
                     .default_value = "no description",
                     .lua_type = LUA_TSTRING,
                     .required = false,
@@ -695,7 +695,7 @@ struct TableFields<Instrument> {
                 return {
                     .name = "tags",
                     .description_sentence = "An array of strings to denote properties of the instrument.",
-                    .example = "{ \"Texture\", \"Bright\", \"Airy\" }",
+                    .example = "{ \"Pluck\", \"Metallic\", \"Organic\" }",
                     .default_value = "no tags",
                     .lua_type = LUA_TTABLE,
                     .required = false,
@@ -743,7 +743,7 @@ struct TableFields<Library> {
                 return {
                     .name = "name",
                     .description_sentence = "The name of the library.",
-                    .example = "Rhythmic Evo",
+                    .example = "Iron Vibrations",
                     .lua_type = LUA_TSTRING,
                     .required = true,
                     .set =
@@ -759,7 +759,7 @@ struct TableFields<Library> {
                 return {
                     .name = "tagline",
                     .description_sentence = "A few words to describe the library.",
-                    .example = "Oscillating audio arabesque",
+                    .example = "Organic sounds from resonating metal objects.",
                     .lua_type = LUA_TSTRING,
                     .required = true,
                     .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.tagline = StringFromTop(ctx); },
@@ -768,7 +768,7 @@ struct TableFields<Library> {
                 return {
                     .name = "url",
                     .description_sentence = "The URL associated with the library.",
-                    .example = "https://example.com/product",
+                    .example = "https://example.com/iron-vibrations",
                     .default_value = "no url",
                     .lua_type = LUA_TSTRING,
                     .required = false,
@@ -778,7 +778,7 @@ struct TableFields<Library> {
                 return {
                     .name = "author",
                     .description_sentence = "The name of the creator of this library.",
-                    .example = "Example Name",
+                    .example = "Found-sound Labs",
                     .lua_type = LUA_TSTRING,
                     .required = true,
                     .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.author = StringFromTop(ctx); },

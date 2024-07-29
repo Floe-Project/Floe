@@ -174,10 +174,8 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
 
     if (loop_points_editable) {
         auto const loop_start = layer->params[ToInt(LayerParamIndex::LoopStart)].LinearValue();
-        auto const loop_end =
-            Max(layer->params[ToInt(LayerParamIndex::LoopEnd)].LinearValue(), loop_start);
-        auto const raw_crossfade_size =
-            layer->params[ToInt(LayerParamIndex::LoopCrossfade)].LinearValue();
+        auto const loop_end = Max(layer->params[ToInt(LayerParamIndex::LoopEnd)].LinearValue(), loop_start);
+        auto const raw_crossfade_size = layer->params[ToInt(LayerParamIndex::LoopCrossfade)].LinearValue();
         loop_xfade_size =
             ClampCrossfadeSize<f32>(raw_crossfade_size, loop_start, loop_end, 1.0f, ping_pong) * r.w;
         auto loop_start_pos = loop_start * r.w;
@@ -359,8 +357,7 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
     Rect offs_handle;
     auto const offs_imgui_id = imgui.GetID("offset");
     {
-        auto const sample_offset =
-            layer->params[ToInt(LayerParamIndex::SampleOffset)].LinearValue();
+        auto const sample_offset = layer->params[ToInt(LayerParamIndex::SampleOffset)].LinearValue();
         auto const param_id = ParamIndexFromLayerParamIndex(layer->index, LayerParamIndex::SampleOffset);
         auto const& param = plugin.processor.params[ToInt(param_id)];
 
@@ -535,8 +532,7 @@ void GUIDoSampleWaveform(Gui* g, LayerProcessor* layer, Rect r) {
         auto const offset = layer->params[ToInt(LayerParamIndex::SampleOffset)].LinearValue();
         auto const loop_start = layer->params[ToInt(LayerParamIndex::LoopStart)].LinearValue();
         auto const reverse = layer->params[ToInt(LayerParamIndex::Reverse)].ValueAsBool();
-        auto const loop_end =
-            Max(layer->params[ToInt(LayerParamIndex::LoopEnd)].LinearValue(), loop_start);
+        auto const loop_end = Max(layer->params[ToInt(LayerParamIndex::LoopEnd)].LinearValue(), loop_start);
         using namespace loop_and_reverse_flags;
         auto const loop_mode =
             layer->params[ToInt(LayerParamIndex::LoopMode)].ValueAsInt<param_values::LoopMode>();

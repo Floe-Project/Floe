@@ -272,7 +272,8 @@ void MidPanel(Gui* g) {
         }
 
         // randomise button
-        if (do_randomise_button("Randomise all of the effects")) RandomiseAllEffectParameterValues(plugin);
+        if (do_randomise_button("Randomise all of the effects"))
+            RandomiseAllEffectParameterValues(plugin.processor);
 
         DoEffectsWindow(g,
                         {0, mid_panel_title_height, imgui.Width(), imgui.Height() - mid_panel_title_height});

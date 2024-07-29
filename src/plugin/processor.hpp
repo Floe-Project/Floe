@@ -266,11 +266,13 @@ struct AudioProcessor {
 };
 
 void SetInstrument(AudioProcessor& processor, u32 layer_index, Instrument const& instrument);
-void SetConvolutionIr(AudioProcessor& processor, AudioData const* audio_data);
+void SetConvolutionIrAudioData(AudioProcessor& processor, AudioData const* audio_data);
 
 // doesn't set instruments or convolution because they require loaded audio data which is often available at a
 // later time
 void ApplyNewState(AudioProcessor& processor, StateSnapshot const& state, StateSource source);
+
+StateSnapshot MakeStateSnapshot(AudioProcessor const& processor);
 
 void ParameterJustStartedMoving(AudioProcessor& processor, ParamIndex index);
 void ParameterJustStoppedMoving(AudioProcessor& processor, ParamIndex index);
@@ -280,6 +282,10 @@ struct ParamChangeFlags {
 };
 
 bool SetParameterValue(AudioProcessor& processor, ParamIndex index, f32 value, ParamChangeFlags flags);
+
+void SetAllParametersToDefaultValues(AudioProcessor&);
+void RandomiseAllParameterValues(AudioProcessor&);
+void RandomiseAllEffectParameterValues(AudioProcessor&);
 
 bool IsMidiCCLearnActive(AudioProcessor const& processor);
 void LearnMidiCC(AudioProcessor& processor, ParamIndex param);

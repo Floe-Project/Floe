@@ -52,8 +52,6 @@ struct PluginInstance {
 
     u64 random_seed = SeedFromTime();
 
-    bool in_destructor = false;
-
     ThreadsafeFunctionQueue main_thread_callbacks {.arena = {PageAllocator::Instance()}};
 
     // State
@@ -94,9 +92,9 @@ PluginCallbacks<PluginInstance> PluginInstanceCallbacks();
 
 void RunFunctionOnMainThread(PluginInstance& plugin, ThreadsafeFunctionQueue::Function function);
 
+// one-off loading of a ir or instrument
 Optional<u64> LoadConvolutionIr(PluginInstance& plugin, Optional<sample_lib::IrId> ir);
-
-Optional<u64> LoadInstrument(PluginInstance& plugin, u32 layer_index, InstrumentId instrument_info);
+Optional<u64> LoadInstrument(PluginInstance& plugin, u32 layer_index, InstrumentId instrument_id);
 
 void LoadRandomInstrument(PluginInstance& plugin,
                           u32 layer_index,
@@ -111,8 +109,8 @@ usize MegabytesUsedBySamples(PluginInstance const& plugin);
 
 void RandomiseAllLayerInsts(PluginInstance& plugin);
 
-StateSnapshot CurrentStateSnapshot(PluginInstance& plugin);
-bool StateChangedSinceLastSnapshot(PluginInstance& plugin);
+StateSnapshot CurrentStateSnapshot(PluginInstance const& plugin);
+bool StateChangedSinceLastSnapshot(PluginInstance const& plugin);
 
 void ApplyNewState(PluginInstance& plugin, StateSnapshotMetadata const& metadata, StateSource source);
 
@@ -123,8 +121,3 @@ void LoadPresetFromListing(PluginInstance& plugin,
 void LoadPresetFromFile(PluginInstance& plugin, String path);
 
 void SaveCurrentStateToFile(PluginInstance& plugin, String path);
-
-void SetAllParametersToDefaultValues(PluginInstance& plugin);
-
-void RandomiseAllParameterValues(PluginInstance& plugin);
-void RandomiseAllEffectParameterValues(PluginInstance& plugin);

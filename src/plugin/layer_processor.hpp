@@ -108,11 +108,6 @@ struct EqBands {
 
 // audio-thread data that voices use to control their sound
 struct VoiceProcessingController {
-    VoiceProcessingController(FloeSmoothedValueSystem& s, u8 index)
-        : smoothing_system(s)
-        , layer_index(index)
-        , pan_pos_smoother_id(s.CreateSmoother()) {}
-
     FloeSmoothedValueSystem& smoothing_system;
 
     f32 velocity_volume_modifier = 0.5f;
@@ -154,7 +149,6 @@ struct VoiceProcessingController {
 
 struct VoicePool;
 
-// audio-thread data for controlling the layer
 struct LayerProcessor {
     LayerProcessor(FloeSmoothedValueSystem& system,
                    u8 index,
@@ -164,7 +158,9 @@ struct LayerProcessor {
         , smoothed_value_system(system)
         , host(host)
         , index(index)
-        , voice_controller(system, index)
+        , voice_controller({.smoothing_system = system,
+                            .layer_index = index,
+                            .pan_pos_smoother_id = system.CreateSmoother()})
         , vol_smoother_id(smoothed_value_system.CreateSmoother())
         , mute_solo_mix_smoother_id(smoothed_value_system.CreateSmoother())
         , eq_bands(smoothed_value_system) {}
@@ -176,7 +172,7 @@ struct LayerProcessor {
     }
 
     AudioData const* GetSampleForGUIWaveform() const {
-        DebugAssertMainThread(host);
+        ASSERT(IsMainThread(host));
         if (auto sampled_inst = instrument.TryGetFromTag<InstrumentType::Sampler>()) {
             return (*sampled_inst)->file_for_gui_waveform;
         } else {
@@ -186,7 +182,7 @@ struct LayerProcessor {
     }
 
     String InstName() const {
-        DebugAssertMainThread(host);
+        ASSERT(IsMainThread(host));
         switch (instrument.tag) {
             case InstrumentType::WaveformSynth: {
                 return k_waveform_type_names[ToInt(instrument.Get<WaveformType>())];
@@ -201,7 +197,7 @@ struct LayerProcessor {
     }
 
     Optional<String> LibName() const {
-        DebugAssertMainThread(host);
+        ASSERT(IsMainThread(host));
         if (auto sampled_inst = instrument.TryGetFromTag<InstrumentType::Sampler>())
             return (*sampled_inst)->instrument.library.name;
         return nullopt;
@@ -233,9 +229,9 @@ struct LayerProcessor {
     // things.
     struct DesiredInst {
         static constexpr u64 k_consumed = 1;
-        void Set(WaveformType w) { value.Store(ValForWaveform(w)); }
-        void Set(sample_lib::LoadedInstrument const* i) { value.Store((uintptr)i); }
-        void SetNone() { value.Store(0); }
+        void Set(WaveformType w) { value.Store(ValForWaveform(w), MemoryOrder::Release); }
+        void Set(sample_lib::LoadedInstrument const* i) { value.Store((uintptr)i, MemoryOrder::Release); }
+        void SetNone() { value.Store(0, MemoryOrder::Release); }
         Optional<InstrumentUnwrapped> Consume() {
             auto v = value.Exchange(k_consumed);
             if (v == k_consumed) return nullopt;
@@ -249,7 +245,7 @@ struct LayerProcessor {
             ASSERT(v % alignof(sample_lib::LoadedInstrument) != 0, "needs to be an invalid ptr");
             return v;
         }
-        bool IsConsumed() const { return value.Load() == k_consumed; }
+        bool IsConsumed() const { return value.Load(MemoryOrder::Acquire) == k_consumed; }
 
         Atomic<u64> value {0};
     };

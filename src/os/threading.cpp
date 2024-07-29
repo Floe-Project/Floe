@@ -42,3 +42,8 @@ void DebugSetThreadAsMainThread() {
 
     g_main_thread_id = CurrentThreadID();
 }
+
+bool IsMainThread() {
+    ASSERT(g_main_thread_id != 0, "Main thread has not been set");
+    return g_main_thread_id == CurrentThreadID();
+}

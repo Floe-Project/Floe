@@ -1069,7 +1069,7 @@ ErrorCodeOr<void> CodeState(StateSnapshot& state, CodeStateOptions const& option
                       "You will need to bump the state version "
                       "number and change the code below");
 
-        for (auto const i : Range(3u)) {
+        for (auto const i : Range(k_num_layers)) {
             enum class Type : u8 {
                 None = 0,
                 Sampler = 1,
@@ -1078,13 +1078,13 @@ ErrorCodeOr<void> CodeState(StateSnapshot& state, CodeStateOptions const& option
                 WaveformWhiteNoiseStereo = 4,
             };
             Type type {};
-            sample_lib::InstrumentId sampler_info {};
+            sample_lib::InstrumentId sampler_inst_id {};
 
             if (coder.IsWriting()) {
                 switch (state.inst_ids[i].tag) {
                     case InstrumentType::Sampler: {
                         type = Type::Sampler;
-                        sampler_info = state.inst_ids[i].Get<sample_lib::InstrumentId>();
+                        sampler_inst_id = state.inst_ids[i].Get<sample_lib::InstrumentId>();
                         break;
                     }
                     case InstrumentType::WaveformSynth: {
@@ -1105,14 +1105,14 @@ ErrorCodeOr<void> CodeState(StateSnapshot& state, CodeStateOptions const& option
 
             TRY(coder.CodeNumber((UnderlyingType<Type>&)type, StateVersion::Initial));
             if (type == Type::Sampler) {
-                TRY(coder.CodeDynArray(sampler_info.library_name, StateVersion::Initial));
-                TRY(coder.CodeDynArray(sampler_info.inst_name, StateVersion::Initial));
+                TRY(coder.CodeDynArray(sampler_inst_id.library_name, StateVersion::Initial));
+                TRY(coder.CodeDynArray(sampler_inst_id.inst_name, StateVersion::Initial));
             }
 
             if (coder.IsReading()) {
                 switch (type) {
                     case Type::None: state.inst_ids[i] = InstrumentType::None; break;
-                    case Type::Sampler: state.inst_ids[i] = sampler_info; break;
+                    case Type::Sampler: state.inst_ids[i] = sampler_inst_id; break;
                     case Type::WaveformSine: state.inst_ids[i] = WaveformType::Sine; break;
                     case Type::WaveformWhiteNoiseMono:
                         state.inst_ids[i] = WaveformType::WhiteNoiseMono;

@@ -751,7 +751,7 @@ f32x2 GetMaxUVToMaintainAspectRatio(graphics::ImageID img, f32x2 container_size)
 
 GuiFrameResult GuiUpdate(Gui* g) {
     ZoneScoped;
-    DebugAssertMainThread(g->plugin.host);
+    ASSERT(IsMainThread(g->plugin.host));
 
     g->frame_output = {};
 

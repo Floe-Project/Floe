@@ -142,7 +142,7 @@ static void ImpulseResponseMenuItems(Gui* g) {
     dyn::AppendSpan(items, k_core_version_1_irs);
 
     int current = 0;
-    if (auto ir = g->plugin.processor.convo.ir_index) {
+    if (auto ir = g->plugin.processor.convo.ir_id) {
         auto const found = Find(items, String(ir->ir_name));
         if (found) current = (int)*found;
     }
@@ -161,7 +161,7 @@ static void DoImpulseResponseMenu(Gui* g, LayID lay_id) {
 
     auto id = g->imgui.GetID("Impulse");
     auto const ir_name =
-        g->plugin.processor.convo.ir_index ? String(g->plugin.processor.convo.ir_index->ir_name) : "None"_s;
+        g->plugin.processor.convo.ir_id ? String(g->plugin.processor.convo.ir_id->ir_name) : "None"_s;
     if (buttons::Popup(g, id, id + 1, r, ir_name, buttons::ParameterPopupButton(g->imgui))) {
         ImpulseResponseMenuItems(g);
         g->imgui.EndWindow();

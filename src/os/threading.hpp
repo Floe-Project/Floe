@@ -49,8 +49,8 @@ void SetThreadName(String name);
 String ThreadName();
 
 // Does nothing on end-user builds
-void DebugAssertMainThread();
 void DebugSetThreadAsMainThread();
+bool IsMainThread();
 
 struct ThreadStartOptions {
     Optional<usize> stack_size {};

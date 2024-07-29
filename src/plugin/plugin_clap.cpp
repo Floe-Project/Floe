@@ -102,7 +102,7 @@ clap_plugin_state const floe_plugin_state {
     .save = [](clap_plugin const* plugin, clap_ostream const* stream) -> bool {
         auto& floe = *(FloeInstance*)plugin->plugin_data;
         ZoneScopedMessage(floe.trace_config, "state save");
-        DebugAssertMainThread(floe.host);
+        ASSERT(IsMainThread(floe.host));
 
         if (!PluginInstanceCallbacks().save_state(*floe.plugin, *stream)) return false;
         return true;
@@ -114,7 +114,7 @@ clap_plugin_state const floe_plugin_state {
     .load = [](clap_plugin const* plugin, clap_istream const* stream) -> bool {
         auto& floe = *(FloeInstance*)plugin->plugin_data;
         ZoneScopedMessage(floe.trace_config, "state load");
-        DebugAssertMainThread(floe.host);
+        ASSERT(IsMainThread(floe.host));
 
         if (!PluginInstanceCallbacks().load_state(*floe.plugin, *stream)) return false;
         return true;
@@ -137,7 +137,7 @@ clap_plugin_gui const floe_gui {
     .is_api_supported = [](clap_plugin_t const* plugin, char const* api, bool is_floating) -> bool {
         (void)is_floating;
         auto& floe = *(FloeInstance*)plugin->plugin_data;
-        DebugAssertMainThread(floe.host);
+        ASSERT(IsMainThread(floe.host));
         return NullTermStringsEqual(k_supported_gui_api, api);
     },
 
@@ -148,7 +148,7 @@ clap_plugin_gui const floe_gui {
     // [main-thread]
     .get_preferred_api = [](clap_plugin_t const* plugin, char const** api, bool* is_floating) -> bool {
         auto& floe = *(FloeInstance*)plugin->plugin_data;
-        DebugAssertMainThread(floe.host);
+        ASSERT(IsMainThread(floe.host));
         if (is_floating) *is_floating = false;
         if (api) *api = k_supported_gui_api;
         return true;
@@ -172,7 +172,7 @@ clap_plugin_gui const floe_gui {
         ASSERT(!is_floating); // not supported
         auto& floe = *(FloeInstance*)plugin->plugin_data;
         ZoneScopedMessage(floe.trace_config, "gui create");
-        DebugAssertMainThread(floe.host);
+        ASSERT(IsMainThread(floe.host));
 
         floe.pugl_platform.Emplace(floe.host,
                                    g_cross_instance_systems->settings,
@@ -188,7 +188,7 @@ clap_plugin_gui const floe_gui {
     .destroy =
         [](clap_plugin_t const* plugin) {
             auto& floe = *(FloeInstance*)plugin->plugin_data;
-            DebugAssertMainThread(floe.host);
+            ASSERT(IsMainThread(floe.host));
             ZoneScopedMessage(floe.trace_config, "gui destroy");
             DestroyView(*floe.pugl_platform);
             floe.pugl_platform.Clear();
@@ -220,7 +220,7 @@ clap_plugin_gui const floe_gui {
     // [main-thread]
     .get_size = [](clap_plugin_t const* plugin, u32* width, u32* height) -> bool {
         auto& floe = *(FloeInstance*)plugin->plugin_data;
-        DebugAssertMainThread(floe.host);
+        ASSERT(IsMainThread(floe.host));
         auto size = WindowSize(*floe.pugl_platform);
         *width = size.width;
         *height = size.height;
@@ -268,7 +268,7 @@ clap_plugin_gui const floe_gui {
     .set_size = [](clap_plugin_t const* plugin, u32 width, u32 height) -> bool {
         auto& floe = *(FloeInstance*)plugin->plugin_data;
         ZoneScopedMessage(floe.trace_config, "gui set_size {} {}", width, height);
-        DebugAssertMainThread(floe.host);
+        ASSERT(IsMainThread(floe.host));
         return SetSize(*floe.pugl_platform, {CheckedCast<u16>(width), CheckedCast<u16>(height)});
     },
 
@@ -279,7 +279,7 @@ clap_plugin_gui const floe_gui {
     .set_parent = [](clap_plugin_t const* plugin, clap_window_t const* window) -> bool {
         auto& floe = *(FloeInstance*)plugin->plugin_data;
         ZoneScopedMessage(floe.trace_config, "gui set_parent");
-        DebugAssertMainThread(floe.host);
+        ASSERT(IsMainThread(floe.host));
         return LogIfError(SetParent(*floe.pugl_platform, *window),
                           g_cross_instance_systems->logger,
                           "SetParent");
@@ -292,7 +292,7 @@ clap_plugin_gui const floe_gui {
     .set_transient = [](clap_plugin_t const* plugin, clap_window_t const* window) -> bool {
         auto& floe = *(FloeInstance*)plugin->plugin_data;
         ZoneScopedMessage(floe.trace_config, "gui set_transient");
-        DebugAssertMainThread(floe.host);
+        ASSERT(IsMainThread(floe.host));
         return LogIfError(SetTransient(*floe.pugl_platform, *window),
                           g_cross_instance_systems->logger,
                           "SetTransient");
@@ -310,7 +310,7 @@ clap_plugin_gui const floe_gui {
     .show = [](clap_plugin_t const* plugin) -> bool {
         auto& floe = *(FloeInstance*)plugin->plugin_data;
         ZoneScopedMessage(floe.trace_config, "gui show");
-        DebugAssertMainThread(floe.host);
+        ASSERT(IsMainThread(floe.host));
         bool const result =
             LogIfError(SetVisible(*floe.pugl_platform, true), g_cross_instance_systems->logger, "SetVisible");
         if (result) {
@@ -333,7 +333,7 @@ clap_plugin_gui const floe_gui {
     .hide = [](clap_plugin_t const* plugin) -> bool {
         auto& floe = *(FloeInstance*)plugin->plugin_data;
         ZoneScopedMessage(floe.trace_config, "gui hide");
-        DebugAssertMainThread(floe.host);
+        ASSERT(IsMainThread(floe.host));
         return LogIfError(SetVisible(*floe.pugl_platform, false),
                           g_cross_instance_systems->logger,
                           "SetVisible");
@@ -369,7 +369,7 @@ clap_plugin_params const floe_params {
     // [main-thread]
     .get_value = [](clap_plugin_t const* plugin, clap_id param_id, f64* out_value) -> bool {
         auto& floe = *(FloeInstance*)plugin->plugin_data;
-        DebugAssertMainThread(floe.host);
+        ASSERT(IsMainThread(floe.host));
         auto const opt_index = ParamIdToIndex(param_id);
         if (!opt_index) return false;
         auto const index = (usize)*opt_index;
@@ -427,7 +427,7 @@ clap_plugin_params const floe_params {
         [](clap_plugin_t const* plugin, clap_input_events_t const* in, clap_output_events_t const* out) {
             ZoneScopedN("clap_plugin_params flush");
             auto& floe = *(FloeInstance*)plugin->plugin_data;
-            if (!floe.active) DebugAssertMainThread(floe.host);
+            if (!floe.active) ASSERT(IsMainThread(floe.host));
             if (!in || !out) return;
             auto& processor = floe.plugin->processor;
             processor.processor_callbacks.flush_parameter_events(processor, *in, *out);
@@ -503,7 +503,7 @@ clap_plugin_timer_support const floe_timer {
         [](clap_plugin_t const* plugin, clap_id timer_id) {
             ZoneScopedN("clap_plugin_timer_support on_timer");
             auto& floe = *(FloeInstance*)plugin->plugin_data;
-            DebugAssertMainThread(floe.host);
+            ASSERT(IsMainThread(floe.host));
             (void)timer_id;
             // At the moment we are only ever using timer for GUI stuff, so we don't need to
             // check for specific timer ids.
@@ -522,7 +522,7 @@ clap_plugin_posix_fd_support const floe_posix_fd {
         [](clap_plugin_t const* plugin, int fd, clap_posix_fd_flags_t flags) {
             ZoneScopedN("clap_plugin_posix_fd_support on_fd");
             auto& floe = *(FloeInstance*)plugin->plugin_data;
-            DebugAssertMainThread(floe.host);
+            ASSERT(IsMainThread(floe.host));
             (void)flags;
             (void)fd;
             // At the moment we are only ever using posix fd for GUI stuff, so we don't need to
@@ -613,7 +613,7 @@ clap_plugin const floe_plugin {
         auto& floe = *(FloeInstance*)plugin->plugin_data;
         ZoneScopedMessage(floe.trace_config, "plugin activate");
 
-        DebugAssertMainThread(floe.host);
+        ASSERT(IsMainThread(floe.host));
         ASSERT(!floe.active);
         if (floe.active) return false;
         auto& processor = floe.plugin->processor;
@@ -630,7 +630,7 @@ clap_plugin const floe_plugin {
             auto& floe = *(FloeInstance*)plugin->plugin_data;
             ZoneScopedMessage(floe.trace_config, "plugin activate");
 
-            DebugAssertMainThread(floe.host);
+            ASSERT(IsMainThread(floe.host));
             ASSERT(floe.active);
             if (!floe.active) return;
             if (floe.pugl_platform) {
@@ -729,7 +729,7 @@ clap_plugin const floe_plugin {
         [](clap_plugin const* plugin) {
             auto& floe = *(FloeInstance*)plugin->plugin_data;
             ZoneScopedMessage(floe.trace_config, "plugin on_main_thread");
-            DebugAssertMainThread(floe.host);
+            ASSERT(IsMainThread(floe.host));
             if (floe.plugin) {
                 bool update_gui = false;
 

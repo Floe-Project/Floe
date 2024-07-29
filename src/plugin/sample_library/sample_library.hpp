@@ -11,18 +11,6 @@
 
 namespace sample_lib {
 
-struct IrId {
-    bool operator==(IrId const& other) const = default;
-    DynamicArrayInline<char, k_max_library_name_size> library_name;
-    DynamicArrayInline<char, k_max_ir_name_size> ir_name;
-};
-
-struct InstrumentId {
-    bool operator==(InstrumentId const& other) const = default;
-    DynamicArrayInline<char, k_max_library_name_size> library_name;
-    DynamicArrayInline<char, k_max_instrument_name_size> inst_name;
-};
-
 struct Range {
     constexpr bool operator==(Range const& other) const = default;
     constexpr u8 Size() const {
@@ -95,6 +83,13 @@ struct LoadedInstrument {
     AudioData const* file_for_gui_waveform {};
 };
 
+struct InstrumentId {
+    bool operator==(InstrumentId const& other) const = default;
+    inline bool operator==(LoadedInstrument const& inst) const;
+    DynamicArrayInline<char, k_max_library_name_size> library_name;
+    DynamicArrayInline<char, k_max_instrument_name_size> inst_name;
+};
+
 struct ImpulseResponse {
     Library const& library;
 
@@ -106,6 +101,13 @@ struct ImpulseResponse {
 struct LoadedIr {
     ImpulseResponse const& ir;
     AudioData const* audio_data;
+};
+
+struct IrId {
+    bool operator==(IrId const& other) const = default;
+    inline bool operator==(LoadedIr const& ir) const;
+    DynamicArrayInline<char, k_max_library_name_size> library_name;
+    DynamicArrayInline<char, k_max_ir_name_size> ir_name;
 };
 
 enum class FileFormat { Mdata, Lua };
@@ -139,6 +141,13 @@ struct Library {
     ErrorCodeOr<Reader> (*create_file_reader)(Library const&, String path) {};
     FileFormatSpecifics file_format_specifics;
 };
+
+inline bool InstrumentId::operator==(LoadedInstrument const& inst) const {
+    return library_name == inst.instrument.library.name && inst_name == inst.instrument.name;
+}
+inline bool IrId::operator==(LoadedIr const& ir) const {
+    return library_name == ir.ir.library.name && ir_name == ir.ir.name;
+}
 
 // only honoured by the lua system
 struct Options {

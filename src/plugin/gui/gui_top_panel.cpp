@@ -32,8 +32,8 @@ static void DoSettingsMenuItems(Gui* g) {
     String const longest_string_in_menu = "Randomise All Parameters";
     PopupMenuItems top_menu(g, {&longest_string_in_menu, 1});
 
-    if (top_menu.DoButton("Reset All Parameters")) SetAllParametersToDefaultValues(g->plugin);
-    if (top_menu.DoButton("Randomise All Parameters")) RandomiseAllParameterValues(g->plugin);
+    if (top_menu.DoButton("Reset All Parameters")) SetAllParametersToDefaultValues(g->plugin.processor);
+    if (top_menu.DoButton("Randomise All Parameters")) RandomiseAllParameterValues(g->plugin.processor);
     top_menu.Divider();
 
     if (top_menu.DoSubMenuButton("Information", g->imgui.GetID("about"))) {

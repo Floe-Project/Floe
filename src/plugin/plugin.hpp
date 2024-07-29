@@ -91,13 +91,14 @@ struct FloeClapExtensionHost {
 
 struct GuiFrameInput;
 
-inline void DebugAssertMainThread(clap_host const& host) {
-    if constexpr (PRODUCTION_BUILD) return;
-    auto const thread_check = (clap_host_thread_check const*)host.get_extension(&host, CLAP_EXT_THREAD_CHECK);
-    if (thread_check)
-        ASSERT(thread_check->is_main_thread(&host));
+inline bool IsMainThread(clap_host const& host) {
+    if constexpr (PRODUCTION_BUILD) return true;
+    if (auto const thread_check =
+            (clap_host_thread_check const*)host.get_extension(&host, CLAP_EXT_THREAD_CHECK);
+        thread_check)
+        return thread_check->is_main_thread(&host);
     else
-        DebugAssertMainThread();
+        return IsMainThread();
 }
 
 static constexpr char const* k_features[] = {CLAP_PLUGIN_FEATURE_INSTRUMENT,

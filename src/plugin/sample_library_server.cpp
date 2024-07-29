@@ -1457,7 +1457,6 @@ void CloseAsyncCommsChannel(Server& server, AsyncCommsChannel& channel) {
 }
 
 RequestId SendAsyncLoadRequest(Server& server, AsyncCommsChannel& channel, LoadRequest const& request) {
-    DebugLoc();
     QueuedRequest const queued_request {
         .id = server.request_id_counter.FetchAdd(1),
         .request = request,

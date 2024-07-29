@@ -570,6 +570,8 @@ static void Deactivate(AudioProcessor& processor) {
 void SetInstrument(AudioProcessor& processor, u32 layer_index, Instrument const& instrument) {
     ASSERT(IsMainThread(processor.host));
 
+    processor.layer_processors[layer_index].instrument = instrument;
+
     switch (instrument.tag) {
         case InstrumentType::Sampler: {
             auto& sampler_inst =

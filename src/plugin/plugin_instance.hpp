@@ -38,6 +38,22 @@ constexpr auto k_core_version_1_irs = Array {
     "Realistic Subtle",
 };
 
+struct LastSnapshot : StateSnapshotWithMetadata {
+    LastSnapshot() { metadata.name_or_path = "Default"; }
+
+    void Set(StateSnapshotWithMetadata const& snapshot) {
+        state = snapshot.state;
+        metadata = snapshot.metadata.Clone(metadata_arena);
+    }
+
+    void SetMetadata(StateSnapshotMetadata const& metadata) {
+        metadata_arena.ResetCursorAndConsolidateRegions();
+        this->metadata = metadata.Clone(metadata_arena);
+    }
+
+    ArenaAllocatorWithInlineStorage<1000> metadata_arena {};
+};
+
 struct PluginInstance {
     PluginInstance(clap_host const& host, CrossInstanceSystems& shared_data);
     ~PluginInstance();
@@ -69,10 +85,8 @@ struct PluginInstance {
         StateSource source;
     };
     Optional<PendingStateChange> pending_state_change {};
-    ArenaAllocatorWithInlineStorage<1000> last_snapshot_metadata_arena {};
-    StateSnapshotWithMetadata last_snapshot {
-        .metadata = {.name_or_path = "Default"},
-    };
+
+    LastSnapshot last_snapshot {};
 
     // Presets
     // ========================================================================

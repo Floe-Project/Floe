@@ -34,17 +34,15 @@ static void SetInstrument(PluginInstance& plugin, u32 layer_index, Instrument co
     ZoneScoped;
     ASSERT(IsMainThread(plugin.host));
 
-    using namespace sample_lib_server;
-
-    // We keep the instrument alive by putting it in this storage and cleaning up at a later time.
-    if (auto current = plugin.processor.layer_processors[layer_index]
-                           .instrument.TryGet<RefCounted<sample_lib::LoadedInstrument>>())
+    // If we currently have a sampler instrument, we keep it alive by putting it in this storage and cleaning
+    // up at a later time.
+    if (auto current = plugin.Layer(layer_index)
+                           .instrument.TryGet<sample_lib_server::RefCounted<sample_lib::LoadedInstrument>>())
         dyn::Append(plugin.lifetime_extended_insts, *current);
 
-    if (auto sampled_inst = instrument.TryGet<RefCounted<sample_lib::LoadedInstrument>>())
+    // Retain the new instrument
+    if (auto sampled_inst = instrument.TryGet<sample_lib_server::RefCounted<sample_lib::LoadedInstrument>>())
         sampled_inst->Retain();
-
-    plugin.processor.layer_processors[layer_index].instrument = instrument;
 
     SetInstrument(plugin.processor, layer_index, instrument);
 }
@@ -53,9 +51,7 @@ static void SetLastSnapshot(PluginInstance& plugin, StateSnapshotWithMetadata co
     ZoneScoped;
     ASSERT(IsMainThread(plugin.host));
 
-    plugin.last_snapshot.state = state.state;
-    plugin.last_snapshot_metadata_arena.ResetCursorAndConsolidateRegions();
-    plugin.last_snapshot.metadata = state.metadata.Clone(plugin.last_snapshot_metadata_arena);
+    plugin.last_snapshot.Set(state);
     plugin.gui_needs_to_handle_preset_name_change = true;
     plugin.processor.for_main_thread.flags.FetchOr(AudioProcessor::MainThreadCallbackFlagsUpdateGui);
     plugin.processor.host.request_callback(&plugin.host);
@@ -84,9 +80,7 @@ void LoadNewState(PluginInstance& plugin, StateSnapshotWithMetadata const& state
         for (auto [layer_index, i] : Enumerate<u32>(plugin.last_snapshot.state.inst_ids)) {
             plugin.processor.layer_processors[layer_index].instrument_id = i;
             switch (i.tag) {
-                case InstrumentType::None:
-                    SetInstrument(plugin, layer_index, i.GetFromTag<InstrumentType::None>());
-                    break;
+                case InstrumentType::None: SetInstrument(plugin, layer_index, InstrumentType::None); break;
                 case InstrumentType::WaveformSynth:
                     SetInstrument(plugin, layer_index, i.GetFromTag<InstrumentType::WaveformSynth>());
                     break;
@@ -225,9 +219,7 @@ void LoadPresetFromFile(PluginInstance& plugin, String path) {
 
 void SaveCurrentStateToFile(PluginInstance& plugin, String path) {
     if (auto outcome = SavePresetFile(path, CurrentStateSnapshot(plugin)); outcome.Succeeded()) {
-        plugin.last_snapshot_metadata_arena.ResetCursorAndConsolidateRegions();
-        plugin.last_snapshot.metadata =
-            StateSnapshotMetadata {.name_or_path = path}.Clone(plugin.last_snapshot_metadata_arena);
+        plugin.last_snapshot.SetMetadata(StateSnapshotMetadata {.name_or_path = path});
     } else {
         auto item = plugin.error_notifications.NewError();
         item->value = {

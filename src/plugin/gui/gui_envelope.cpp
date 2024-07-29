@@ -10,7 +10,7 @@
 #include "gui_widget_helpers.hpp"
 
 void GUIDoEnvelope(Gui* g,
-                   PluginInstance::Layer* layer,
+                   LayerProcessor* layer,
                    Rect r,
                    bool greyed_out,
                    Array<LayerParamIndex, 4> adsr_layer_params,

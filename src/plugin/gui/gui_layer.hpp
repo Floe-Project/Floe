@@ -104,7 +104,7 @@ struct LayerLayout {
 };
 
 void Layout(Gui* g,
-            PluginInstance::Layer* layer,
+            LayerProcessor* layer,
             LayerLayoutTempIDs& ids,
             LayerLayout* layer_gui,
             f32 width,
@@ -113,7 +113,7 @@ void Layout(Gui* g,
 void Draw(Gui* g,
           PluginInstance* a,
           Rect r,
-          PluginInstance::Layer* layer,
+          LayerProcessor* layer,
           LayerLayoutTempIDs& ids,
           LayerLayout* layer_gui);
 

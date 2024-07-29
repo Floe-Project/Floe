@@ -23,7 +23,7 @@
 
 namespace layer_gui {
 
-static void LayerInstrumentMenuItems(Gui* g, PluginInstance::Layer* layer) {
+static void LayerInstrumentMenuItems(Gui* g, LayerProcessor* layer) {
     auto const scratch_cursor = g->scratch_arena.TotalUsed();
     DEFER { g->scratch_arena.TryShrinkTotalUsed(scratch_cursor); };
 
@@ -84,7 +84,7 @@ static void DoInstSelectorGUI(Gui* g, Rect r, u32 layer) {
     DEFER { imgui.PopID(); };
     auto imgui_id = imgui.GetID((u64)layer);
 
-    auto layer_obj = &plugin.layers[layer];
+    auto layer_obj = &plugin.Layer(layer);
     auto const inst_name = layer_obj->InstName();
 
     if (buttons::Popup(g, imgui_id, imgui_id + 1, r, inst_name, buttons::InstSelectorPopupButton(imgui))) {
@@ -117,7 +117,7 @@ static String GetPageTitle(PageType type) {
 }
 
 void Layout(Gui* g,
-            PluginInstance::Layer* layer,
+            LayerProcessor* layer,
             LayerLayoutTempIDs& c,
             LayerLayout* layer_gui,
             f32 width,
@@ -198,7 +198,7 @@ void Layout(Gui* g,
         LayoutParameterComponent(g,
                                  subcontainer_2,
                                  c.knob1,
-                                 layer->processor.params[ToInt(LayerParamIndex::TuneSemitone)],
+                                 layer->params[ToInt(LayerParamIndex::TuneSemitone)],
                                  LayerPitchMarginLR);
         auto const layer_pitch_width = LiveSize(imgui, LayerPitchWidth);
         auto const layer_pitch_height = LiveSize(imgui, LayerPitchHeight);
@@ -211,12 +211,12 @@ void Layout(Gui* g,
         LayoutParameterComponent(g,
                                  subcontainer_2,
                                  c.knob2,
-                                 layer->processor.params[ToInt(LayerParamIndex::TuneCents)],
+                                 layer->params[ToInt(LayerParamIndex::TuneCents)],
                                  LayerMixerKnobGapX);
         LayoutParameterComponent(g,
                                  subcontainer_2,
                                  c.knob3,
-                                 layer->processor.params[ToInt(LayerParamIndex::Pan)],
+                                 layer->params[ToInt(LayerParamIndex::Pan)],
                                  LayerMixerKnobGapX);
     }
 
@@ -327,17 +327,17 @@ void Layout(Gui* g,
                 LayoutParameterComponent(g,
                                          filter_knobs_container,
                                          c.filter.cutoff,
-                                         layer->processor.params[ToInt(LayerParamIndex::FilterCutoff)],
+                                         layer->params[ToInt(LayerParamIndex::FilterCutoff)],
                                          Page_3KnobGapX);
                 LayoutParameterComponent(g,
                                          filter_knobs_container,
                                          c.filter.reso,
-                                         layer->processor.params[ToInt(LayerParamIndex::FilterResonance)],
+                                         layer->params[ToInt(LayerParamIndex::FilterResonance)],
                                          Page_3KnobGapX);
                 LayoutParameterComponent(g,
                                          filter_knobs_container,
                                          c.filter.env_amount,
-                                         layer->processor.params[ToInt(LayerParamIndex::FilterEnvAmount)],
+                                         layer->params[ToInt(LayerParamIndex::FilterEnvAmount)],
                                          Page_3KnobGapX);
 
                 auto const filter_envelope_margin_lr = LiveSize(imgui, Filter_EnvelopeMarginLR);
@@ -369,17 +369,17 @@ void Layout(Gui* g,
                     LayoutParameterComponent(g,
                                              knob_container,
                                              c.eq.freq[0],
-                                             layer->processor.params[ToInt(LayerParamIndex::EqFreq1)],
+                                             layer->params[ToInt(LayerParamIndex::EqFreq1)],
                                              Page_3KnobGapX);
                     LayoutParameterComponent(g,
                                              knob_container,
                                              c.eq.reso[0],
-                                             layer->processor.params[ToInt(LayerParamIndex::EqResonance1)],
+                                             layer->params[ToInt(LayerParamIndex::EqResonance1)],
                                              Page_3KnobGapX);
                     LayoutParameterComponent(g,
                                              knob_container,
                                              c.eq.gain[0],
-                                             layer->processor.params[ToInt(LayerParamIndex::EqGain1)],
+                                             layer->params[ToInt(LayerParamIndex::EqGain1)],
                                              Page_3KnobGapX);
                     lay.SetBottomMargin(knob_container, eq_band_gap_y);
                 }
@@ -398,17 +398,17 @@ void Layout(Gui* g,
                     LayoutParameterComponent(g,
                                              knob_container,
                                              c.eq.freq[1],
-                                             layer->processor.params[ToInt(LayerParamIndex::EqFreq2)],
+                                             layer->params[ToInt(LayerParamIndex::EqFreq2)],
                                              Page_3KnobGapX);
                     LayoutParameterComponent(g,
                                              knob_container,
                                              c.eq.reso[1],
-                                             layer->processor.params[ToInt(LayerParamIndex::EqResonance2)],
+                                             layer->params[ToInt(LayerParamIndex::EqResonance2)],
                                              Page_3KnobGapX);
                     LayoutParameterComponent(g,
                                              knob_container,
                                              c.eq.gain[1],
-                                             layer->processor.params[ToInt(LayerParamIndex::EqGain2)],
+                                             layer->params[ToInt(LayerParamIndex::EqGain2)],
                                              Page_3KnobGapX);
                 }
 
@@ -478,14 +478,13 @@ void Layout(Gui* g,
                 LayoutParameterComponent(g,
                                          knob_container,
                                          c.lfo.amount,
-                                         layer->processor.params[ToInt(LayerParamIndex::LfoAmount)],
+                                         layer->params[ToInt(LayerParamIndex::LfoAmount)],
                                          Page_2KnobGapX);
 
                 auto& rate_param =
-                    layer->processor
-                        .params[layer->processor.params[ToInt(LayerParamIndex::LfoSyncSwitch)].ValueAsBool()
-                                    ? ToInt(LayerParamIndex::LfoRateTempoSynced)
-                                    : ToInt(LayerParamIndex::LfoRateHz)];
+                    layer->params[layer->params[ToInt(LayerParamIndex::LfoSyncSwitch)].ValueAsBool()
+                                      ? ToInt(LayerParamIndex::LfoRateTempoSynced)
+                                      : ToInt(LayerParamIndex::LfoRateHz)];
                 LayoutParameterComponent(g, knob_container, c.lfo.rate, rate_param, Page_2KnobGapX, true);
                 break;
             }
@@ -505,7 +504,7 @@ static void DrawSelectorProgressBar(imgui::Context const& imgui, Rect r, f32 loa
 void Draw(Gui* g,
           PluginInstance* plugin,
           Rect r,
-          PluginInstance::Layer* layer,
+          LayerProcessor* layer,
           LayerLayoutTempIDs& c,
           LayerLayout* layer_gui) {
     using enum UiSizeId;
@@ -704,7 +703,7 @@ void Draw(Gui* g,
                                   volume_name_h};
 
         KnobAndLabel(g,
-                     layer->processor.params[ToInt(LayerParamIndex::Volume)],
+                     layer->params[ToInt(LayerParamIndex::Volume)],
                      volume_knob_r,
                      volume_name_r,
                      knobs::DefaultKnob(imgui));
@@ -730,12 +729,12 @@ void Draw(Gui* g,
                                 col_border);
 
         buttons::Toggle(g,
-                        layer->processor.params[ToInt(LayerParamIndex::Mute)],
+                        layer->params[ToInt(LayerParamIndex::Mute)],
                         mute_r,
                         "M",
                         buttons::IconButton(imgui));
         buttons::Toggle(g,
-                        layer->processor.params[ToInt(LayerParamIndex::Solo)],
+                        layer->params[ToInt(LayerParamIndex::Solo)],
                         solo_r,
                         "S",
                         buttons::IconButton(imgui));
@@ -746,22 +745,19 @@ void Draw(Gui* g,
         auto semitone_style = draggers::DefaultStyle(imgui);
         semitone_style.always_show_plus = true;
         draggers::Dragger(g,
-                          layer->processor.params[ToInt(LayerParamIndex::TuneSemitone)],
+                          layer->params[ToInt(LayerParamIndex::TuneSemitone)],
                           c.knob1.control,
                           semitone_style);
         labels::Label(g,
-                      layer->processor.params[ToInt(LayerParamIndex::TuneSemitone)],
+                      layer->params[ToInt(LayerParamIndex::TuneSemitone)],
                       c.knob1.label,
                       labels::ParameterCentred(imgui));
 
         KnobAndLabel(g,
-                     layer->processor.params[ToInt(LayerParamIndex::TuneCents)],
+                     layer->params[ToInt(LayerParamIndex::TuneCents)],
                      c.knob2,
                      knobs::BidirectionalKnob(imgui));
-        KnobAndLabel(g,
-                     layer->processor.params[ToInt(LayerParamIndex::Pan)],
-                     c.knob3,
-                     knobs::BidirectionalKnob(imgui));
+        KnobAndLabel(g, layer->params[ToInt(LayerParamIndex::Pan)], c.knob3, knobs::BidirectionalKnob(imgui));
     }
 
     draw_divider(c.divider2);
@@ -774,12 +770,12 @@ void Draw(Gui* g,
                 GUIDoSampleWaveform(g, layer, lay.GetRect(c.main.waveform));
 
                 buttons::Toggle(g,
-                                layer->processor.params[ToInt(LayerParamIndex::Reverse)],
+                                layer->params[ToInt(LayerParamIndex::Reverse)],
                                 c.main.reverse,
                                 buttons::ParameterToggleButton(imgui));
 
                 buttons::PopupWithItems(g,
-                                        layer->processor.params[ToInt(LayerParamIndex::LoopMode)],
+                                        layer->params[ToInt(LayerParamIndex::LoopMode)],
                                         c.main.loop_mode,
                                         buttons::ParameterPopupButton(imgui));
             }
@@ -789,10 +785,10 @@ void Draw(Gui* g,
             // env
             {
                 buttons::Toggle(g,
-                                layer->processor.params[ToInt(LayerParamIndex::VolEnvOn)],
+                                layer->params[ToInt(LayerParamIndex::VolEnvOn)],
                                 c.main.env_on,
                                 buttons::LayerHeadingButton(imgui));
-                bool const env_on = layer->processor.params[ToInt(LayerParamIndex::VolEnvOn)].ValueAsBool();
+                bool const env_on = layer->params[ToInt(LayerParamIndex::VolEnvOn)].ValueAsBool();
                 GUIDoEnvelope(g,
                               layer,
                               lay.GetRect(c.main.envelope),
@@ -807,92 +803,91 @@ void Draw(Gui* g,
             break;
         }
         case PageType::Filter: {
-            bool const greyed_out = !layer->processor.params[ToInt(LayerParamIndex::FilterOn)].ValueAsBool();
+            bool const greyed_out = !layer->params[ToInt(LayerParamIndex::FilterOn)].ValueAsBool();
             buttons::Toggle(g,
-                            layer->processor.params[ToInt(LayerParamIndex::FilterOn)],
+                            layer->params[ToInt(LayerParamIndex::FilterOn)],
                             c.filter.filter_on,
                             buttons::LayerHeadingButton(imgui));
 
             buttons::PopupWithItems(g,
-                                    layer->processor.params[ToInt(LayerParamIndex::FilterType)],
+                                    layer->params[ToInt(LayerParamIndex::FilterType)],
                                     c.filter.filter_type,
                                     buttons::ParameterPopupButton(imgui, greyed_out));
 
             KnobAndLabel(g,
-                         layer->processor.params[ToInt(LayerParamIndex::FilterCutoff)],
+                         layer->params[ToInt(LayerParamIndex::FilterCutoff)],
                          c.filter.cutoff,
                          knobs::DefaultKnob(imgui),
                          greyed_out);
             KnobAndLabel(g,
-                         layer->processor.params[ToInt(LayerParamIndex::FilterResonance)],
+                         layer->params[ToInt(LayerParamIndex::FilterResonance)],
                          c.filter.reso,
                          knobs::DefaultKnob(imgui),
                          greyed_out);
             KnobAndLabel(g,
-                         layer->processor.params[ToInt(LayerParamIndex::FilterEnvAmount)],
+                         layer->params[ToInt(LayerParamIndex::FilterEnvAmount)],
                          c.filter.env_amount,
                          knobs::BidirectionalKnob(imgui),
                          greyed_out);
 
-            GUIDoEnvelope(
-                g,
-                layer,
-                lay.GetRect(c.filter.envelope),
-                greyed_out ||
-                    (layer->processor.params[ToInt(LayerParamIndex::FilterEnvAmount)].LinearValue() == 0),
-                {LayerParamIndex::FilterAttack,
-                 LayerParamIndex::FilterDecay,
-                 LayerParamIndex::FilterSustain,
-                 LayerParamIndex::FilterRelease},
-                GuiEnvelopeType::Filter);
+            GUIDoEnvelope(g,
+                          layer,
+                          lay.GetRect(c.filter.envelope),
+                          greyed_out ||
+                              (layer->params[ToInt(LayerParamIndex::FilterEnvAmount)].LinearValue() == 0),
+                          {LayerParamIndex::FilterAttack,
+                           LayerParamIndex::FilterDecay,
+                           LayerParamIndex::FilterSustain,
+                           LayerParamIndex::FilterRelease},
+                          GuiEnvelopeType::Filter);
 
             break;
         }
         case PageType::Eq: {
-            bool const greyed_out = !layer->processor.params[ToInt(LayerParamIndex::EqOn)].ValueAsBool();
+            bool const greyed_out = !layer->params[ToInt(LayerParamIndex::EqOn)].ValueAsBool();
             buttons::Toggle(g,
-                            layer->processor.params[ToInt(LayerParamIndex::EqOn)],
+                            layer->params[ToInt(LayerParamIndex::EqOn)],
                             lay.GetRect(c.eq.on),
                             buttons::LayerHeadingButton(imgui));
 
             buttons::PopupWithItems(g,
-                                    layer->processor.params[ToInt(LayerParamIndex::EqType1)],
+                                    layer->params[ToInt(LayerParamIndex::EqType1)],
                                     lay.GetRect(c.eq.type[0]),
                                     buttons::ParameterPopupButton(imgui, greyed_out));
 
             KnobAndLabel(g,
-                         layer->processor.params[ToInt(LayerParamIndex::EqFreq1)],
+                         layer->params[ToInt(LayerParamIndex::EqFreq1)],
                          c.eq.freq[0],
                          knobs::DefaultKnob(imgui),
                          greyed_out);
             KnobAndLabel(g,
-                         layer->processor.params[ToInt(LayerParamIndex::EqResonance1)],
+                         layer->params[ToInt(LayerParamIndex::EqResonance1)],
                          c.eq.reso[0],
                          knobs::DefaultKnob(imgui),
                          greyed_out);
             KnobAndLabel(g,
-                         layer->processor.params[ToInt(LayerParamIndex::EqGain1)],
+                         layer->params[ToInt(LayerParamIndex::EqGain1)],
                          c.eq.gain[0],
                          knobs::BidirectionalKnob(imgui),
                          greyed_out);
 
             buttons::PopupWithItems(g,
-                                    layer->processor.params[ToInt(LayerParamIndex::EqType2)],
+                                    layer->params[ToInt(LayerParamIndex::EqType2)],
                                     lay.GetRect(c.eq.type[1]),
                                     buttons::ParameterPopupButton(imgui, greyed_out));
 
             KnobAndLabel(g,
-                         layer->processor.params[ToInt(LayerParamIndex::EqFreq2)],
+                         layer->params[ToInt(LayerParamIndex::EqFreq2)],
                          c.eq.freq[1],
                          knobs::DefaultKnob(imgui),
                          greyed_out);
             KnobAndLabel(g,
-                         layer->processor.params[ToInt(LayerParamIndex::EqResonance2)],
+                         layer->params[ToInt(LayerParamIndex::EqResonance2)],
                          c.eq.reso[1],
                          knobs::DefaultKnob(imgui),
                          greyed_out);
             KnobAndLabel(g,
-                         layer->processor.params[ToInt(LayerParamIndex::EqGain2)],
+                         layer->params[ToInt(LayerParamIndex::EqGain2)],
                          c.eq.gain[1],
                          knobs::BidirectionalKnob(imgui),
                          greyed_out);
@@ -901,11 +896,11 @@ void Draw(Gui* g,
         }
         case PageType::Midi: {
             draggers::Dragger(g,
-                              layer->processor.params[ToInt(LayerParamIndex::MidiTranspose)],
+                              layer->params[ToInt(LayerParamIndex::MidiTranspose)],
                               c.midi.transpose,
                               draggers::DefaultStyle(imgui));
             labels::Label(g,
-                          layer->processor.params[ToInt(LayerParamIndex::MidiTranspose)],
+                          layer->params[ToInt(LayerParamIndex::MidiTranspose)],
                           c.midi.transpose_name,
                           labels::Parameter(imgui));
             {
@@ -915,20 +910,20 @@ void Draw(Gui* g,
                 Tooltip(g,
                         label_id,
                         label_r,
-                        layer->processor.params[ToInt(LayerParamIndex::MidiTranspose)].info.tooltip);
+                        layer->params[ToInt(LayerParamIndex::MidiTranspose)].info.tooltip);
                 if (imgui.IsHot(label_id)) imgui.frame_output.cursor_type = CursorType::Default;
             }
 
             buttons::Toggle(g,
-                            layer->processor.params[ToInt(LayerParamIndex::Keytrack)],
+                            layer->params[ToInt(LayerParamIndex::Keytrack)],
                             c.midi.keytrack,
                             buttons::MidiButton(imgui));
             buttons::Toggle(g,
-                            layer->processor.params[ToInt(LayerParamIndex::Monophonic)],
+                            layer->params[ToInt(LayerParamIndex::Monophonic)],
                             c.midi.mono,
                             buttons::MidiButton(imgui));
             buttons::Toggle(g,
-                            layer->processor.params[ToInt(LayerParamIndex::CC64Retrigger)],
+                            layer->params[ToInt(LayerParamIndex::CC64Retrigger)],
                             c.midi.retrig,
                             buttons::MidiButton(imgui));
 
@@ -940,7 +935,7 @@ void Draw(Gui* g,
                     lay.GetRect(c.midi.velo_buttons).CutRight(btn_gap * 2).CutBottom(btn_gap);
 
                 for (auto const btn_ind : Range(k_num_btns)) {
-                    bool state = ToInt(layer->processor.GetVelocityMode()) == btn_ind;
+                    bool state = ToInt(layer->GetVelocityMode()) == btn_ind;
                     auto imgui_id = imgui.GetID(layer_gui::k_velo_btn_tooltips[(usize)btn_ind]);
 
                     Rect btn_r {whole_velo_r.x + (whole_velo_r.w / 3) * (btn_ind % 3),
@@ -967,7 +962,7 @@ void Draw(Gui* g,
                 }
 
                 labels::Label(g,
-                              layer->processor.params[ToInt(LayerParamIndex::VelocityMapping)],
+                              layer->params[ToInt(LayerParamIndex::VelocityMapping)],
                               c.midi.velo_name,
                               labels::Parameter(imgui));
 
@@ -988,53 +983,53 @@ void Draw(Gui* g,
         }
         case PageType::Lfo: {
             buttons::Toggle(g,
-                            layer->processor.params[ToInt(LayerParamIndex::LfoOn)],
+                            layer->params[ToInt(LayerParamIndex::LfoOn)],
                             c.lfo.on,
                             buttons::LayerHeadingButton(imgui));
-            auto const greyed_out = !layer->processor.params[ToInt(LayerParamIndex::LfoOn)].ValueAsBool();
+            auto const greyed_out = !layer->params[ToInt(LayerParamIndex::LfoOn)].ValueAsBool();
 
             buttons::PopupWithItems(g,
-                                    layer->processor.params[ToInt(LayerParamIndex::LfoDestination)],
+                                    layer->params[ToInt(LayerParamIndex::LfoDestination)],
                                     c.lfo.target,
                                     buttons::ParameterPopupButton(imgui, greyed_out));
             labels::Label(g,
-                          layer->processor.params[ToInt(LayerParamIndex::LfoDestination)],
+                          layer->params[ToInt(LayerParamIndex::LfoDestination)],
                           c.lfo.target_name,
                           labels::Parameter(imgui));
 
             buttons::PopupWithItems(g,
-                                    layer->processor.params[ToInt(LayerParamIndex::LfoRestart)],
+                                    layer->params[ToInt(LayerParamIndex::LfoRestart)],
                                     c.lfo.mode,
                                     buttons::ParameterPopupButton(imgui, greyed_out));
             labels::Label(g,
-                          layer->processor.params[ToInt(LayerParamIndex::LfoRestart)],
+                          layer->params[ToInt(LayerParamIndex::LfoRestart)],
                           c.lfo.mode_name,
                           labels::Parameter(imgui));
 
             buttons::PopupWithItems(g,
-                                    layer->processor.params[ToInt(LayerParamIndex::LfoShape)],
+                                    layer->params[ToInt(LayerParamIndex::LfoShape)],
                                     c.lfo.shape,
                                     buttons::ParameterPopupButton(imgui, greyed_out));
             labels::Label(g,
-                          layer->processor.params[ToInt(LayerParamIndex::LfoShape)],
+                          layer->params[ToInt(LayerParamIndex::LfoShape)],
                           c.lfo.shape_name,
                           labels::Parameter(imgui));
 
             KnobAndLabel(g,
-                         layer->processor.params[ToInt(LayerParamIndex::LfoAmount)],
+                         layer->params[ToInt(LayerParamIndex::LfoAmount)],
                          c.lfo.amount,
                          knobs::BidirectionalKnob(imgui),
                          greyed_out);
 
             Parameter const* rate_param;
-            if (layer->processor.params[ToInt(LayerParamIndex::LfoSyncSwitch)].ValueAsBool()) {
-                rate_param = &layer->processor.params[ToInt(LayerParamIndex::LfoRateTempoSynced)];
+            if (layer->params[ToInt(LayerParamIndex::LfoSyncSwitch)].ValueAsBool()) {
+                rate_param = &layer->params[ToInt(LayerParamIndex::LfoRateTempoSynced)];
                 buttons::PopupWithItems(g,
                                         *rate_param,
                                         c.lfo.rate.control,
                                         buttons::ParameterPopupButton(imgui, greyed_out));
             } else {
-                rate_param = &layer->processor.params[ToInt(LayerParamIndex::LfoRateHz)];
+                rate_param = &layer->params[ToInt(LayerParamIndex::LfoRateHz)];
                 knobs::Knob(g,
                             *rate_param,
                             c.lfo.rate.control,
@@ -1053,7 +1048,7 @@ void Draw(Gui* g,
                                lfo_sync_switch_width,
                                lfo_sync_switch_height};
             buttons::Toggle(g,
-                            layer->processor.params[ToInt(LayerParamIndex::LfoSyncSwitch)],
+                            layer->params[ToInt(LayerParamIndex::LfoSyncSwitch)],
                             sync_r,
                             buttons::ParameterToggleButton(imgui));
 
@@ -1069,12 +1064,11 @@ void Draw(Gui* g,
         auto const id = imgui.GetID((u64)i);
         auto const tab_r = lay.GetRect(c.tabs[i]);
         auto const name {GetPageTitle(page_type)};
-        bool const has_dot = (page_type == PageType::Filter &&
-                              layer->processor.params[ToInt(LayerParamIndex::FilterOn)].ValueAsBool()) ||
-                             (page_type == PageType::Lfo &&
-                              layer->processor.params[ToInt(LayerParamIndex::LfoOn)].ValueAsBool()) ||
-                             (page_type == PageType::Eq &&
-                              layer->processor.params[ToInt(LayerParamIndex::EqOn)].ValueAsBool());
+        bool const has_dot =
+            (page_type == PageType::Filter &&
+             layer->params[ToInt(LayerParamIndex::FilterOn)].ValueAsBool()) ||
+            (page_type == PageType::Lfo && layer->params[ToInt(LayerParamIndex::LfoOn)].ValueAsBool()) ||
+            (page_type == PageType::Eq && layer->params[ToInt(LayerParamIndex::EqOn)].ValueAsBool());
         if (buttons::Toggle(g, id, tab_r, state, name, buttons::LayerTabButton(imgui, has_dot)))
             layer_gui->selected_page = page_type;
         Tooltip(g, id, tab_r, fmt::Format(g->scratch_arena, "Open {} tab", name));

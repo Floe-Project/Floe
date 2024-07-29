@@ -236,9 +236,10 @@ struct AudioProcessor {
     Parameters params;
 
     Array<LayerProcessor, k_num_layers> layer_processors {
-        LayerProcessor {smoothed_value_system, 0, params.data},
-        LayerProcessor {smoothed_value_system, 1, params.data + k_num_layer_parameters},
-        LayerProcessor {smoothed_value_system, 2, params.data + k_num_layer_parameters * 2}};
+        LayerProcessor {smoothed_value_system, 0, params.data, host},
+        LayerProcessor {smoothed_value_system, 1, params.data + k_num_layer_parameters, host},
+        LayerProcessor {smoothed_value_system, 2, params.data + k_num_layer_parameters * 2, host},
+    };
 
     FloeSmoothedValueSystem::FloatId const master_vol_smoother_id {smoothed_value_system.CreateSmoother()};
 

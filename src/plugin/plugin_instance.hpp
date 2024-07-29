@@ -39,52 +39,10 @@ constexpr auto k_core_version_1_irs = Array {
 };
 
 struct PluginInstance {
-    struct Layer {
-        Layer(u32 index, LayerProcessor& p) : index(index), processor(p) {}
-        ~Layer() {
-            if (auto sampled_inst =
-                    instrument.TryGet<sample_lib_server::RefCounted<sample_lib::LoadedInstrument>>())
-                sampled_inst->Release();
-        }
-
-        AudioData const* GetSampleForGUIWaveform() const {
-            if (auto sampled_inst = instrument.TryGetFromTag<InstrumentType::Sampler>()) {
-                return (*sampled_inst)->file_for_gui_waveform;
-            } else {
-                // TODO: get waveform audio data
-            }
-            return nullptr;
-        }
-
-        String InstName() const {
-            switch (instrument.tag) {
-                case InstrumentType::WaveformSynth: {
-                    return k_waveform_type_names[ToInt(instrument.Get<WaveformType>())];
-                }
-                case InstrumentType::Sampler: {
-                    return instrument.Get<sample_lib_server::RefCounted<sample_lib::LoadedInstrument>>()
-                        ->instrument.name;
-                }
-                case InstrumentType::None: return "None"_s;
-            }
-            return {};
-        }
-
-        Optional<String> LibName() const {
-            if (auto sampled_inst = instrument.TryGetFromTag<InstrumentType::Sampler>())
-                return (*sampled_inst)->instrument.library.name;
-            return nullopt;
-        }
-
-        u32 index = (u32)-1;
-        LayerProcessor& processor;
-
-        Instrument instrument {InstrumentType::None};
-        InstrumentId instrument_id {InstrumentType::None};
-    };
-
     PluginInstance(clap_host const& host, CrossInstanceSystems& shared_data);
     ~PluginInstance();
+
+    auto& Layer(u32 index) { return processor.layer_processors[index]; }
 
     CrossInstanceSystems& shared_data;
     ArenaAllocator error_arena {PageAllocator::Instance()};
@@ -93,12 +51,6 @@ struct PluginInstance {
     AudioProcessor processor;
 
     u64 random_seed = SeedFromTime();
-
-    Layer layers[k_num_layers] {
-        {0, processor.layer_processors[0]},
-        {1, processor.layer_processors[1]},
-        {2, processor.layer_processors[2]},
-    };
 
     bool in_destructor = false;
 

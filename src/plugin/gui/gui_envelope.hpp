@@ -5,19 +5,19 @@
 #include "foundation/foundation.hpp"
 
 #include "gui_fwd.hpp"
+#include "layer_processor.hpp"
 #include "param_info.hpp"
-#include "plugin_instance.hpp"
 #include "processing/smoothed_value.hpp"
 
 enum class GuiEnvelopeType { Volume, Filter, Count };
 
 struct GuiEnvelopeCursor {
     SmoothedValueFilter smoother {};
-    u64 marker_id {UINT64_MAX};
+    u64 marker_id {(u64)-1};
 };
 
 void GUIDoEnvelope(Gui* g,
-                   PluginInstance::Layer* layer,
+                   LayerProcessor* layer,
                    Rect r,
                    bool greyed_out,
                    Array<LayerParamIndex, 4> adsr_layer_params,

@@ -15,7 +15,7 @@
 #include "param_info.hpp"
 #include "sample_processing.hpp"
 
-static void GUIDoSampleWaveformOverlay(Gui* g, PluginInstance::Layer* layer, Rect r, Rect waveform_r) {
+static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Rect waveform_r) {
     auto& plugin = g->plugin;
     auto& imgui = g->imgui;
 
@@ -26,9 +26,9 @@ static void GUIDoSampleWaveformOverlay(Gui* g, PluginInstance::Layer* layer, Rec
 
     using namespace loop_and_reverse_flags;
 
-    auto const reverse = layer->processor.params[ToInt(LayerParamIndex::Reverse)].ValueAsBool();
+    auto const reverse = layer->params[ToInt(LayerParamIndex::Reverse)].ValueAsBool();
     auto const loop_mode =
-        layer->processor.params[ToInt(LayerParamIndex::LoopMode)].ValueAsInt<param_values::LoopMode>();
+        layer->params[ToInt(LayerParamIndex::LoopMode)].ValueAsInt<param_values::LoopMode>();
     auto const ping_pong = loop_mode == param_values::LoopMode::PingPong;
     bool const loop_points_editable =
         loop_mode == param_values::LoopMode::Regular || loop_mode == param_values::LoopMode::PingPong;
@@ -173,11 +173,11 @@ static void GUIDoSampleWaveformOverlay(Gui* g, PluginInstance::Layer* layer, Rec
     auto const loop_region_id = imgui.GetID("region");
 
     if (loop_points_editable) {
-        auto const loop_start = layer->processor.params[ToInt(LayerParamIndex::LoopStart)].LinearValue();
+        auto const loop_start = layer->params[ToInt(LayerParamIndex::LoopStart)].LinearValue();
         auto const loop_end =
-            Max(layer->processor.params[ToInt(LayerParamIndex::LoopEnd)].LinearValue(), loop_start);
+            Max(layer->params[ToInt(LayerParamIndex::LoopEnd)].LinearValue(), loop_start);
         auto const raw_crossfade_size =
-            layer->processor.params[ToInt(LayerParamIndex::LoopCrossfade)].LinearValue();
+            layer->params[ToInt(LayerParamIndex::LoopCrossfade)].LinearValue();
         loop_xfade_size =
             ClampCrossfadeSize<f32>(raw_crossfade_size, loop_start, loop_end, 1.0f, ping_pong) * r.w;
         auto loop_start_pos = loop_start * r.w;
@@ -210,7 +210,7 @@ static void GUIDoSampleWaveformOverlay(Gui* g, PluginInstance::Layer* layer, Rec
             auto clamped_xfade = ClampCrossfadeSize(
                 xfade,
                 loop_start,
-                Max(layer->processor.params[ToInt(LayerParamIndex::LoopEnd)].LinearValue(), loop_start),
+                Max(layer->params[ToInt(LayerParamIndex::LoopEnd)].LinearValue(), loop_start),
                 1.0f,
                 ping_pong);
             if (xfade > clamped_xfade) {
@@ -360,7 +360,7 @@ static void GUIDoSampleWaveformOverlay(Gui* g, PluginInstance::Layer* layer, Rec
     auto const offs_imgui_id = imgui.GetID("offset");
     {
         auto const sample_offset =
-            layer->processor.params[ToInt(LayerParamIndex::SampleOffset)].LinearValue();
+            layer->params[ToInt(LayerParamIndex::SampleOffset)].LinearValue();
         auto const param_id = ParamIndexFromLayerParamIndex(layer->index, LayerParamIndex::SampleOffset);
         auto const& param = plugin.processor.params[ToInt(param_id)];
 
@@ -500,17 +500,17 @@ static void GUIDoSampleWaveformOverlay(Gui* g, PluginInstance::Layer* layer, Rec
 
     if (g->param_text_editor_to_open) {
         ParamIndex const waveform_params[] = {
-            layer->processor.params[ToInt(LayerParamIndex::LoopStart)].info.index,
-            layer->processor.params[ToInt(LayerParamIndex::LoopEnd)].info.index,
-            layer->processor.params[ToInt(LayerParamIndex::LoopCrossfade)].info.index,
-            layer->processor.params[ToInt(LayerParamIndex::SampleOffset)].info.index,
+            layer->params[ToInt(LayerParamIndex::LoopStart)].info.index,
+            layer->params[ToInt(LayerParamIndex::LoopEnd)].info.index,
+            layer->params[ToInt(LayerParamIndex::LoopCrossfade)].info.index,
+            layer->params[ToInt(LayerParamIndex::SampleOffset)].info.index,
         };
         auto const cut = r.w / 3;
         HandleShowingTextEditorForParams(g, r.CutLeft(cut).CutRight(cut), waveform_params);
     }
 }
 
-void GUIDoSampleWaveform(Gui* g, PluginInstance::Layer* layer, Rect r) {
+void GUIDoSampleWaveform(Gui* g, LayerProcessor* layer, Rect r) {
     auto& imgui = g->imgui;
     auto reg_r = r;
     g->imgui.RegisterAndConvertRect(&reg_r);
@@ -532,14 +532,14 @@ void GUIDoSampleWaveform(Gui* g, PluginInstance::Layer* layer, Rect r) {
         labels::Label(g, r, "Loading...", labels::WaveformLoadingLabel(g->imgui));
         is_loading = true;
     } else if (auto audio_file = layer->GetSampleForGUIWaveform()) {
-        auto const offset = layer->processor.params[ToInt(LayerParamIndex::SampleOffset)].LinearValue();
-        auto const loop_start = layer->processor.params[ToInt(LayerParamIndex::LoopStart)].LinearValue();
-        auto const reverse = layer->processor.params[ToInt(LayerParamIndex::Reverse)].ValueAsBool();
+        auto const offset = layer->params[ToInt(LayerParamIndex::SampleOffset)].LinearValue();
+        auto const loop_start = layer->params[ToInt(LayerParamIndex::LoopStart)].LinearValue();
+        auto const reverse = layer->params[ToInt(LayerParamIndex::Reverse)].ValueAsBool();
         auto const loop_end =
-            Max(layer->processor.params[ToInt(LayerParamIndex::LoopEnd)].LinearValue(), loop_start);
+            Max(layer->params[ToInt(LayerParamIndex::LoopEnd)].LinearValue(), loop_start);
         using namespace loop_and_reverse_flags;
         auto const loop_mode =
-            layer->processor.params[ToInt(LayerParamIndex::LoopMode)].ValueAsInt<param_values::LoopMode>();
+            layer->params[ToInt(LayerParamIndex::LoopMode)].ValueAsInt<param_values::LoopMode>();
         bool const loop_points_editable =
             loop_mode == param_values::LoopMode::Regular || loop_mode == param_values::LoopMode::PingPong;
 

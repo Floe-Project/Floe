@@ -35,7 +35,7 @@ StateSnapshot CurrentStateSnapshot(PluginInstance& plugin) {
     for (auto const i : Range(k_num_layers))
         result.inst_ids[i] = plugin.pending_state_change
                                  ? plugin.pending_state_change->snapshot.state.inst_ids[i]
-                                 : plugin.layers[i].instrument_id;
+                                 : plugin.processor.layer_processors[i].instrument_id;
 
     result.ir_id = plugin.pending_state_change ? plugin.pending_state_change->snapshot.state.ir_id
                                                : plugin.processor.convo.ir_index;
@@ -60,14 +60,14 @@ static void SetInstrument(PluginInstance& plugin, u32 layer_index, Instrument co
     using namespace sample_lib_server;
 
     // We keep the instrument alive by putting it in this storage and cleaning up at a later time.
-    if (auto current =
-            plugin.layers[layer_index].instrument.TryGet<RefCounted<sample_lib::LoadedInstrument>>())
+    if (auto current = plugin.processor.layer_processors[layer_index]
+                           .instrument.TryGet<RefCounted<sample_lib::LoadedInstrument>>())
         dyn::Append(plugin.lifetime_extended_insts, *current);
 
     if (auto sampled_inst = instrument.TryGet<RefCounted<sample_lib::LoadedInstrument>>())
         sampled_inst->Retain();
 
-    plugin.layers[layer_index].instrument = instrument;
+    plugin.processor.layer_processors[layer_index].instrument = instrument;
 
     SetInstrument(plugin.processor, layer_index, instrument);
 }
@@ -105,7 +105,7 @@ void LoadNewState(PluginInstance& plugin, StateSnapshotWithMetadata const& state
 
     if (!async) {
         for (auto [layer_index, i] : Enumerate<u32>(plugin.last_snapshot.state.inst_ids)) {
-            plugin.layers[layer_index].instrument_id = i;
+            plugin.processor.layer_processors[layer_index].instrument_id = i;
             switch (i.tag) {
                 case InstrumentType::None:
                     SetInstrument(plugin, layer_index, i.GetFromTag<InstrumentType::None>());
@@ -132,7 +132,7 @@ void LoadNewState(PluginInstance& plugin, StateSnapshotWithMetadata const& state
         for (auto [layer_index, i] : Enumerate<u32>(state.state.inst_ids)) {
             if (i.tag != InstrumentType::Sampler) continue;
 
-            plugin.layers[layer_index].instrument_id = i;
+            plugin.processor.layer_processors[layer_index].instrument_id = i;
             auto const async_id =
                 sample_lib_server::SendAsyncLoadRequest(plugin.shared_data.sample_library_server,
                                                         plugin.sample_lib_server_async_channel,
@@ -308,7 +308,7 @@ static void SampleLibraryResourceLoaded(PluginInstance& plugin, sample_lib_serve
                     auto const loaded_inst =
                         resource.Get<sample_lib_server::RefCounted<sample_lib::LoadedInstrument>>();
 
-                    for (auto [layer_index, l] : Enumerate<u32>(plugin.layers)) {
+                    for (auto [layer_index, l] : Enumerate<u32>(plugin.processor.layer_processors)) {
                         if (auto const i = l.instrument_id.TryGet<sample_lib::InstrumentId>()) {
                             if (InstMatches(*i, loaded_inst)) SetInstrument(plugin, layer_index, loaded_inst);
                         }
@@ -364,8 +364,7 @@ Optional<u64> LoadConvolutionIr(PluginInstance& plugin, Optional<sample_lib::IrI
 Optional<u64> LoadInstrument(PluginInstance& plugin, u32 layer_index, InstrumentId inst) {
     DebugLoc();
     DebugAssertMainThread(plugin.host);
-    auto& layer = plugin.layers[layer_index];
-    layer.instrument_id = inst;
+    plugin.processor.layer_processors[layer_index].instrument_id = inst;
 
     switch (inst.tag) {
         case InstrumentType::Sampler:
@@ -813,8 +812,9 @@ PluginInstance::~PluginInstance() {
 
 usize MegabytesUsedBySamples(PluginInstance const& plugin) {
     usize result = 0;
-    for (auto& l : plugin.layers) {
-        if (auto i = l.instrument.TryGet<sample_lib_server::RefCounted<sample_lib::LoadedInstrument>>())
+    for (auto& l : plugin.processor.layer_processors) {
+        if (auto i =
+                l.instrument.TryGet<sample_lib_server::RefCounted<sample_lib::LoadedInstrument>>())
             for (auto& d : (*i)->audio_datas)
                 result += d->RamUsageBytes();
     }

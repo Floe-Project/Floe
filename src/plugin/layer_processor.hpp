@@ -5,9 +5,11 @@
 #include "foundation/foundation.hpp"
 
 #include "audio_processing_context.hpp"
+#include "clap/host.h"
 #include "instrument.hpp"
 #include "param.hpp"
 #include "param_info.hpp"
+#include "plugin.hpp"
 #include "processing/adsr.hpp"
 #include "processing/filters.hpp"
 #include "processing/midi.hpp"
@@ -106,14 +108,15 @@ struct EqBands {
 
 // audio-thread data that voices use to control their sound
 struct VoiceProcessingController {
-    VoiceProcessingController(FloeSmoothedValueSystem& s)
+    VoiceProcessingController(FloeSmoothedValueSystem& s, u8 index)
         : smoothing_system(s)
+        , layer_index(index)
         , pan_pos_smoother_id(s.CreateSmoother()) {}
 
     FloeSmoothedValueSystem& smoothing_system;
 
     f32 velocity_volume_modifier = 0.5f;
-    int layer_index = -1;
+    u8 const layer_index;
 
     struct {
         bool on;
@@ -154,15 +157,54 @@ struct VoicePool;
 // audio-thread data for controlling the layer
 struct LayerProcessor {
     LayerProcessor(FloeSmoothedValueSystem& system,
-                   int index,
-                   StaticSpan<Parameter, k_num_layer_parameters> params)
+                   u8 index,
+                   StaticSpan<Parameter, k_num_layer_parameters> params,
+                   clap_host const& host)
         : params(params)
         , smoothed_value_system(system)
-        , voice_controller(system)
+        , host(host)
+        , index(index)
+        , voice_controller(system, index)
         , vol_smoother_id(smoothed_value_system.CreateSmoother())
         , mute_solo_mix_smoother_id(smoothed_value_system.CreateSmoother())
-        , eq_bands(smoothed_value_system) {
-        voice_controller.layer_index = index;
+        , eq_bands(smoothed_value_system) {}
+
+    ~LayerProcessor() {
+        if (auto sampled_inst =
+                instrument.TryGet<sample_lib_server::RefCounted<sample_lib::LoadedInstrument>>())
+            sampled_inst->Release();
+    }
+
+    AudioData const* GetSampleForGUIWaveform() const {
+        DebugAssertMainThread(host);
+        if (auto sampled_inst = instrument.TryGetFromTag<InstrumentType::Sampler>()) {
+            return (*sampled_inst)->file_for_gui_waveform;
+        } else {
+            // TODO: get waveform audio data
+        }
+        return nullptr;
+    }
+
+    String InstName() const {
+        DebugAssertMainThread(host);
+        switch (instrument.tag) {
+            case InstrumentType::WaveformSynth: {
+                return k_waveform_type_names[ToInt(instrument.Get<WaveformType>())];
+            }
+            case InstrumentType::Sampler: {
+                return instrument.Get<sample_lib_server::RefCounted<sample_lib::LoadedInstrument>>()
+                    ->instrument.name;
+            }
+            case InstrumentType::None: return "None"_s;
+        }
+        return {};
+    }
+
+    Optional<String> LibName() const {
+        DebugAssertMainThread(host);
+        if (auto sampled_inst = instrument.TryGetFromTag<InstrumentType::Sampler>())
+            return (*sampled_inst)->instrument.library.name;
+        return nullopt;
     }
 
     param_values::VelocityMappingMode GetVelocityMode() const {
@@ -173,16 +215,22 @@ struct LayerProcessor {
     StaticSpan<Parameter, k_num_layer_parameters> params {nullptr};
 
     FloeSmoothedValueSystem& smoothed_value_system;
+    clap_host const& host;
 
+    u8 const index;
     VoiceProcessingController voice_controller;
 
     Atomic<u32> note_on_rr_pos = 0;
     Atomic<u32> note_off_rr_pos = 0;
 
+    Instrument instrument {InstrumentType::None};
+    InstrumentId instrument_id {InstrumentType::None};
+
     InstrumentUnwrapped inst = InstrumentType::None;
 
-    // Encodes possible instruments into a single atomic u64. We use the fact that pointers must be aligned to
-    // the type they point to, and therefore we can unaligned numbers to represent other things.
+    // Encodes possible instruments into a single atomic u64. We use the fact that the pointer's value must be
+    // aligned to the type they point to, and therefore we can use unaligned numbers to represent other
+    // things.
     struct DesiredInst {
         static constexpr u64 k_consumed = 1;
         void Set(WaveformType w) { value.Store(ValForWaveform(w)); }

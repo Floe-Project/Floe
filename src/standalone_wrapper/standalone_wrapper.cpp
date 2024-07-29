@@ -156,6 +156,8 @@ AudioCallback(ma_device* device, void* output_buffer, void const* input, ma_uint
         return;
     }
 
+    if (standalone->audio_stream_state.Load() != Standalone::AudioStreamState::Open) return;
+
     f32* channels[2];
     channels[0] = standalone->audio_buffers[0].data;
     channels[1] = standalone->audio_buffers[1].data;

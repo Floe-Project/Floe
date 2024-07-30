@@ -628,7 +628,7 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
         auto const old_settings_dry_01 = old_p(NoLongerExistingParam::ReverbDryPercent).ValueOr(100) / 100.0f;
         auto const old_settings_wet_01 =
             uses_freeverb ? old_p(NoLongerExistingParam::ReverbFreeverbWetPercent).ValueOr(0) / 100.0f
-                          : DbToAmp(old_p(NoLongerExistingParam::ReverbSvWetDb).ValueOr(-90));
+                          : Min(1.0f, DbToAmp(old_p(NoLongerExistingParam::ReverbSvWetDb).ValueOr(-90)));
         auto const old_settings_size_01 =
             old_p(NoLongerExistingParam::ReverbSizePercent).ValueOr(40) / 100.0f;
         auto const old_settings_pre_delay_ms = old_p(NoLongerExistingParam::ReverbSvPreDelayMs).ValueOr(0);

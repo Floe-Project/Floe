@@ -13,13 +13,13 @@ struct StateSnapshot {
     f32 LinearParam(ParamIndex index) const { return param_values[ToInt(index)]; }
 
     bool operator==(StateSnapshot const& other) const = default;
+    bool operator!=(StateSnapshot const& other) const = default;
 
-    Array<f32, k_num_parameters> param_values {};
-    Array<EffectType, k_num_effect_types> fx_order {};
     Optional<sample_lib::IrId> ir_id {};
     InitialisedArray<InstrumentId, k_num_layers> inst_ids {InstrumentType::None};
+    Array<f32, k_num_parameters> param_values {};
+    Array<EffectType, k_num_effect_types> fx_order {};
     u8 engine_version {};
-
     Array<Bitset<128>, k_num_parameters> param_learned_ccs {};
 };
 

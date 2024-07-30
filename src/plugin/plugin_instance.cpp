@@ -232,7 +232,7 @@ StateSnapshot CurrentStateSnapshot(PluginInstance const& plugin) {
 }
 
 bool StateChangedSinceLastSnapshot(PluginInstance const& plugin) {
-    return !(plugin.last_snapshot.state == CurrentStateSnapshot(plugin));
+    return plugin.last_snapshot.state != CurrentStateSnapshot(plugin);
 }
 
 // one-off load
@@ -461,7 +461,7 @@ static bool PluginSaveState(PluginInstance& plugin, clap_ostream const& stream) 
 
 static bool PluginLoadState(PluginInstance& plugin, clap_istream const& stream) {
     StateSnapshot state {};
-    auto outcome =
+    auto const outcome =
         CodeState(state,
                   CodeStateOptions {
                       .mode = CodeStateOptions::Mode::Decode,
@@ -482,7 +482,7 @@ static bool PluginLoadState(PluginInstance& plugin, clap_istream const& stream) 
                   });
 
     if (outcome.HasError()) {
-        auto item = plugin.error_notifications.NewError();
+        auto const item = plugin.error_notifications.NewError();
         item->value = {
             .title = "Failed to load DAW state"_s,
             .message = {},

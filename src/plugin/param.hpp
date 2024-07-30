@@ -53,7 +53,6 @@ class ChangedParamsTemplate {
 
     auto Params() { return m_params; }
 
-  private:
     StaticSpan<Parameter const, k_num_params> m_params;
     Bitset<k_num_params> m_changed;
 };

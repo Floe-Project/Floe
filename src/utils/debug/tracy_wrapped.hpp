@@ -8,4 +8,5 @@
 #pragma clang diagnostic ignored "-Wunused-parameter"
 #pragma clang diagnostic ignored "-Wextra-semi"
 #include "tracy/Tracy.hpp" // IWYU pragma: export
+#include "tracy/TracyC.h" // IWYU pragma: export
 #pragma clang diagnostic pop

@@ -407,6 +407,7 @@ static void TriggerVoicesIfNeeded(LayerProcessor& layer,
                                   u32 offset,
                                   f32 dynamics_param_value_01,
                                   f32 velocity_to_volume_01) {
+    ZoneScoped;
     if (layer.inst.tag == InstrumentType::None) return;
 
     ASSERT_HOT(note_vel_float >= 0 && note_vel_float <= 1);
@@ -590,6 +591,7 @@ void LayerHandleNoteOn(LayerProcessor& layer,
 }
 
 bool ChangeInstrumentIfNeededAndReset(LayerProcessor& layer, VoicePool& voice_pool) {
+    ZoneScoped;
     auto desired_inst = layer.desired_inst.Consume();
 
     DEFER { ResetLayerAudioProcessing(layer); };
@@ -616,6 +618,9 @@ ProcessResult ProcessLayer(LayerProcessor& layer,
                            u32 num_frames,
                            bool start_fade_out,
                            Span<f32> buffer) {
+    ZoneScoped;
+    ZoneValue(layer.index);
+
     constexpr f32 k_inst_change_fade_ms = 100;
 
     ProcessResult result {};

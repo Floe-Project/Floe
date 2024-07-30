@@ -33,6 +33,7 @@ class ConvolutionReverb final : public Effect {
                                           Span<StereoAudioFrame> io_frames,
                                           ScratchBuffers scratch_buffers,
                                           bool start_fade_out) {
+        ZoneScoped;
         ProcessResult result;
         if (!ShouldProcessBlock()) {
             result.changed_ir = SwapConvolversIfNeeded();
@@ -85,6 +86,7 @@ class ConvolutionReverb final : public Effect {
 
     // [audio-thread]
     bool SwapConvolversIfNeeded() {
+        ZoneScoped;
         auto new_convolver = m_desired_convolver.Exchange((StereoConvolver*)k_desired_convolver_consumed);
         if ((uintptr)new_convolver == k_desired_convolver_consumed) return false;
 

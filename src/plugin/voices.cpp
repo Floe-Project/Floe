@@ -437,6 +437,7 @@ class ChunkwiseVoiceProcessor {
     }
 
     bool Process(u32 num_frames) {
+        ZoneNamedN(process, "Voice Process", true);
         u32 samples_written = 0;
         Span<f32> write_buffer = m_voice.pool.buffer_pool[m_voice.index];
 
@@ -454,6 +455,8 @@ class ChunkwiseVoiceProcessor {
 
         while (num_frames) {
             u32 const chunk_size = Min(num_frames, k_num_frames_in_voice_processing_chunk);
+            ZoneNamedN(chunk, "Voice Chunk", true);
+            ZoneValueV(chunk, chunk_size);
 
             m_voice.smoothing_system.ProcessBlock(chunk_size);
 
@@ -685,6 +688,7 @@ class ChunkwiseVoiceProcessor {
     }
 
     void FillBufferWithSampleData(u32 num_frames) {
+        ZoneScoped;
         ZeroChunkBuffer(num_frames);
         for (auto& s : m_voice.voice_samples) {
             if (!s.is_active) continue;
@@ -757,6 +761,7 @@ class ChunkwiseVoiceProcessor {
     }
 
     void ApplyVolumeLFO(u32 num_frames) {
+        ZoneScoped;
         usize sample_pos = 0;
         f32 v1 = 1;
         if (HasVolumeLfo()) {
@@ -782,6 +787,7 @@ class ChunkwiseVoiceProcessor {
     }
 
     u32 ApplyVolumeEnvelope(u32 num_frames) {
+        ZoneScoped;
         auto vol_env = m_voice.vol_env;
         auto env_on = m_voice.controller->vol_env_on;
         auto vol_env_params = m_voice.controller->vol_env;
@@ -808,6 +814,7 @@ class ChunkwiseVoiceProcessor {
     }
 
     u32 ApplyGain(u32 num_frames) {
+        ZoneScoped;
         usize sample_pos = 0;
         f32 fade1 {};
         for (u32 frame = 0; frame < num_frames; frame += 2) {
@@ -829,6 +836,7 @@ class ChunkwiseVoiceProcessor {
     }
 
     void ApplyPan(u32 num_frames) {
+        ZoneScoped;
         usize sample_pos = 0;
         for (auto const frame : Range(num_frames)) {
             auto pan_pos = m_voice.controller->smoothing_system.Value(m_voice.controller->pan_pos_smoother_id,
@@ -850,6 +858,7 @@ class ChunkwiseVoiceProcessor {
     }
 
     void ApplyFilter(u32 num_frames) {
+        ZoneScoped;
         auto const filter_type = m_voice.controller->filter_type;
 
         auto fil_env = m_voice.fil_env;
@@ -912,6 +921,7 @@ class ChunkwiseVoiceProcessor {
     }
 
     void FillLFOBuffer(u32 num_frames) {
+        ZoneScoped;
         for (auto const i : Range(num_frames)) {
             auto v = m_voice.lfo.Tick();
             constexpr f32 k_lfo_lowpass_smoothing = 0.9f;
@@ -951,6 +961,7 @@ Array<Span<f32>, k_num_layers> ProcessVoices(VoicePool& pool,
                                              u32 num_frames,
                                              AudioProcessingContext const& context,
                                              HostThreadPool* thread_pool) {
+    ZoneScoped;
     if (pool.num_active_voices.Load() == 0) return {};
 
     {

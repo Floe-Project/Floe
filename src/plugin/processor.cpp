@@ -383,6 +383,9 @@ void RandomiseAllParameterValues(AudioProcessor& processor) {
 }
 
 static void ProcessorOnParamChange(AudioProcessor& processor, ChangedParams changed_params) {
+    ZoneScoped;
+    ZoneValue(changed_params.m_changed.NumSet());
+
     if (auto p = changed_params.Param(ParamIndex::MasterVolume)) {
         processor.smoothed_value_system.SetVariableLength(processor.master_vol_smoother_id,
                                                           p->ProjectedValue(),
@@ -655,6 +658,7 @@ StateSnapshot MakeStateSnapshot(AudioProcessor const& processor) {
 
 inline void
 ResetProcessor(AudioProcessor& processor, Bitset<k_num_parameters> processing_change, u32 num_frames) {
+    ZoneScoped;
     processor.whole_engine_volume_fade.ForceSetFullVolume();
 
     // Set pending parameter changes
@@ -935,6 +939,7 @@ static void ProcessClapNoteOrMidi(AudioProcessor& processor,
 static void ConsumeParamEventsFromHost(Parameters& params,
                                        clap_input_events const& events,
                                        Bitset<k_num_parameters>& params_changed) {
+    ZoneScoped;
     // IMPROVE: support sample-accurate value changes
     for (auto const event_index : Range(events.size(&events))) {
         auto e = events.get(&events, event_index);
@@ -959,6 +964,7 @@ static void ConsumeParamEventsFromHost(Parameters& params,
 static void ConsumeParamEventsFromGui(AudioProcessor& processor,
                                       clap_output_events const& out,
                                       Bitset<k_num_parameters>& params_changed) {
+    ZoneScoped;
     for (auto const& e : processor.param_events_for_audio_thread.PopAll()) {
         switch (e.tag) {
             case EventForAudioThreadType::ParamChanged: {
@@ -1378,6 +1384,7 @@ static void Reset(AudioProcessor&) {
 }
 
 static void OnMainThread(AudioProcessor& processor, bool& update_gui) {
+    ZoneScoped;
     processor.convo.DeletedUnusedConvolvers();
 
     auto flags = processor.for_main_thread.flags.Exchange(0);

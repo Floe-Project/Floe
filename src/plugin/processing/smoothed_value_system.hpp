@@ -3,6 +3,7 @@
 
 #pragma once
 #include "foundation/foundation.hpp"
+#include "utils/debug/tracy_wrapped.hpp"
 
 #include "filters.hpp"
 
@@ -110,6 +111,7 @@ class SmoothedValueSystem {
     }
 
     void ProcessBlock(u32 block_size) {
+        ZoneNamedN(process_block, "SmoothedValueSystem ProcessBlock", true);
         m_float_smoothers.ProcessBlock(block_size);
         m_double_smoothers.ProcessBlock(block_size);
 

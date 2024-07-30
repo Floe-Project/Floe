@@ -123,6 +123,7 @@ static void DoScanFolderJob(PendingLibraryJobs::Job::ScanFolder& job,
     if (!folder) job.result.outcome = k_success;
 
     auto const& path = folder->path;
+    ZoneScoped;
     ZoneText(path.data, path.size);
 
     auto const try_job = [&]() -> ErrorCodeOr<void> {

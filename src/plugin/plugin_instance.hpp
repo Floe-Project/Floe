@@ -87,6 +87,7 @@ struct PluginInstance {
 
     Optional<PendingStateChange> pending_state_change {};
     LastSnapshot last_snapshot {};
+
     sample_lib_server::AsyncCommsChannel& sample_lib_server_async_channel {
         sample_lib_server::OpenAsyncCommsChannel(
             shared_data.sample_library_server,

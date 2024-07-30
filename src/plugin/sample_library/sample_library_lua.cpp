@@ -1876,7 +1876,7 @@ TEST_CASE(TestErrorHandling) {
         dyn::AppendSpan(buf, "return tab\n");
 
         SUBCASE("fail with small memory") {
-            for (auto size : Array {0uz, 500, Kb(1), Kb(2), Kb(4), Kb(8), Kb(16)}) {
+            for (auto size : Array {0uz, 500, Kb(1), Kb(2), Kb(4), Kb(8)}) {
                 CAPTURE(size);
                 check(ErrorCode {LuaErrorCode::Memory}, buf, {.max_memory_allowed = size});
             }

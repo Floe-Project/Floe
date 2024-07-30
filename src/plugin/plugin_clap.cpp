@@ -3,6 +3,7 @@
 
 #include "foundation/foundation.hpp"
 #include "utils/debug/debug.hpp"
+#include "utils/debug/tracy_wrapped.hpp"
 
 #include "clap/ext/audio-ports.h"
 #include "clap/ext/note-ports.h"
@@ -22,7 +23,6 @@
 #include "processing/scoped_denormals.hpp"
 #include "processor.hpp"
 #include "settings/settings_file.hpp"
-#include "tracy/TracyC.h"
 
 //
 #include "os/undef_windows_macros.h"
@@ -93,7 +93,7 @@ struct FloeInstance {
     Optional<GuiPlatform> pugl_platform {};
 };
 
-static u16 g_num_instances = 0;
+static u16 g_num_init_plugins = 0;
 
 clap_plugin_state const floe_plugin_state {
     // Saves the plugin state into stream.
@@ -546,27 +546,16 @@ clap_plugin const floe_plugin {
         ASSERT(!floe.initialised);
         if (floe.initialised) return false;
 
-        bool const first_instance = g_num_instances == 0;
-        ++g_num_instances;
-
         ZoneScopedMessage(floe.trace_config, "plugin init");
 
-        if (first_instance) {
-            g_panic_handler = [](char const* message, SourceLocation loc) {
-                g_log_file.ErrorLn("{}: {}", loc, message);
-                DefaultPanicHandler(message, loc);
-            };
-
+        if (g_num_init_plugins++ == 0) {
             DebugSetThreadAsMainThread();
             SetThreadName("Main");
 #ifdef TRACY_ENABLE
-            ___tracy_startup_profiler();
             tracy::SetThreadName("Main");
 #endif
-            StartupCrashHandler();
+            g_cross_instance_systems.Init();
         }
-
-        if (first_instance) g_cross_instance_systems.Init();
 
         floe.plugin.Emplace(floe.host, *g_cross_instance_systems);
 
@@ -588,14 +577,7 @@ clap_plugin const floe_plugin {
 
                 floe.plugin.Clear();
 
-                if (--g_num_instances == 0) {
-                    g_cross_instance_systems.Uninit();
-
-                    ShutdownCrashHandler();
-#ifdef TRACY_ENABLE
-                    ___tracy_shutdown_profiler();
-#endif
-                }
+                if (--g_num_init_plugins == 0) g_cross_instance_systems.Uninit();
             }
 
             PageAllocator::Instance().Delete(&floe);

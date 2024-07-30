@@ -4,14 +4,16 @@
 #include <clap/entry.h>
 #include <stdio.h>
 
+#include "utils/debug/debug.hpp"
+#include "utils/debug/tracy_wrapped.hpp"
 #include "utils/logger/logger.hpp"
 
 #include "clap/factory/plugin-factory.h"
 #include "plugin.hpp"
 
-static clap_plugin_factory_t const factory = {
-    .get_plugin_count = [](clap_plugin_factory_t const*) -> uint32_t { return 1; },
-    .get_plugin_descriptor = [](clap_plugin_factory_t const*, uint32_t) { return &k_plugin_info; },
+static clap_plugin_factory const factory = {
+    .get_plugin_count = [](clap_plugin_factory const*) -> uint32_t { return 1; },
+    .get_plugin_descriptor = [](clap_plugin_factory const*, uint32_t) { return &k_plugin_info; },
     .create_plugin = [](clap_plugin_factory const*,
                         clap_host_t const* host,
                         char const* plugin_id) -> clap_plugin_t const* {
@@ -34,10 +36,38 @@ __attribute__((destructor)) void ZigBugWorkaround() {
 // NOLINTEND
 #endif
 
-extern "C" CLAP_EXPORT const clap_plugin_entry_t clap_entry = {
+static u16 g_init_count = 0;
+
+extern "C" CLAP_EXPORT const clap_plugin_entry clap_entry = {
     .clap_version = CLAP_VERSION,
-    .init = [](char const*) -> bool { return true; },
-    .deinit = []() {},
+
+    // init and deinit are never called at the same time as any other clap function, including itself.
+    // Might be called more than once. See the clap docs for full details.
+    .init = [](char const*) -> bool {
+        if (g_init_count++ == 0) {
+            g_panic_handler = [](char const* message, SourceLocation loc) {
+                g_log_file.ErrorLn("{}: {}", loc, message);
+                DefaultPanicHandler(message, loc);
+            };
+#ifdef TRACY_ENABLE
+            ___tracy_startup_profiler();
+#endif
+            // after tracy
+            StartupCrashHandler();
+        }
+
+        return true;
+    },
+    .deinit =
+        []() {
+            if (--g_init_count == 0) {
+                ShutdownCrashHandler();
+#ifdef TRACY_ENABLE
+                ___tracy_shutdown_profiler();
+#endif
+            }
+        },
+
     .get_factory = [](char const* factory_id) -> void const* {
         g_log_file.DebugLn("get_factory");
         if (NullTermStringsEqual(factory_id, CLAP_PLUGIN_FACTORY_ID)) return &factory;

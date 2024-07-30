@@ -411,7 +411,7 @@ ErrorCodeOr<Optional<MutableString>> FilesystemDialog(DialogOptions options) {
 // EFSW library: https://github.com/SpartanJ/efsw/blob/master/src/efsw/WatcherFSEvents.cpp
 // Atom file watcher: https://github.com/atom/watcher/blob/master/docs/macos.md
 
-constexpr bool k_debug_fsevents = true;
+constexpr bool k_debug_fsevents = false;
 
 struct MacWatcher {
     FSEventStreamRef stream {};

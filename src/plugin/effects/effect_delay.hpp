@@ -12,7 +12,13 @@ class Delay final : public Effect {
     Delay(FloeSmoothedValueSystem& s) : Effect(s, EffectType::Delay), delay(vitfx::delay::Create()) {}
     ~Delay() override { vitfx::delay::Destroy(delay); }
 
-    void ResetInternal() override { vitfx::delay::HardReset(*delay); }
+    void ResetInternal() override {
+        if (reset) return;
+        ZoneNamedN(hard_reset, "Delay HardReset", true);
+        vitfx::delay::HardReset(*delay);
+        reset = true;
+        silent_seconds = 0;
+    }
 
     void PrepareToPlay(AudioProcessingContext const& context) override {
         vitfx::delay::SetSampleRate(*delay, (int)context.sample_rate);
@@ -20,8 +26,13 @@ class Delay final : public Effect {
 
     bool ProcessBlock(Span<StereoAudioFrame> io_frames,
                       ScratchBuffers scratch_buffers,
-                      AudioProcessingContext const&) override {
+                      AudioProcessingContext const& context) override {
+        ZoneNamedN(process_block, "Delay ProcessBlock", true);
         if (!ShouldProcessBlock()) return false;
+
+        reset = false;
+
+        UpdateSilentSeconds(silent_seconds, io_frames, context.sample_rate);
 
         auto wet = scratch_buffers.buf1.Interleaved();
         wet.size = io_frames.size;
@@ -32,12 +43,9 @@ class Delay final : public Effect {
         while (num_frames) {
             u32 const chunk_size = Min(num_frames, 64u);
 
-            vitfx::delay::ProcessDelayArgs args {
-                .num_frames = (int)chunk_size,
-                .in_interleaved = (f32*)(io_frames.data + pos),
-                .out_interleaved = (f32*)(wet.data + pos),
-            };
-            CopyMemory(args.params, params, sizeof(params));
+            args.num_frames = (int)chunk_size;
+            args.in_interleaved = (f32*)(io_frames.data + pos);
+            args.out_interleaved = (f32*)(wet.data + pos);
 
             vitfx::delay::Process(*delay, args);
 
@@ -90,7 +98,7 @@ class Delay final : public Effect {
         if (auto p = changed_params.Param(ParamIndex::DelayTimeSyncSwitch)) is_synced = p->ValueAsBool();
 
         if (auto p = changed_params.Param(ParamIndex::DelayFeedback))
-            params[ToInt(Params::Feedback)] = p->ProjectedValue();
+            args.params[ToInt(Params::Feedback)] = p->ProjectedValue();
 
         if (auto p = changed_params.Param(ParamIndex::DelayTimeSyncedL)) {
             synced_time_l = ToSyncedTime(p->ValueAsInt<param_values::DelaySyncedTime>());
@@ -114,33 +122,42 @@ class Delay final : public Effect {
 
         if (auto p = changed_params.Param(ParamIndex::DelayMode)) {
             auto mode = p->ValueAsInt<param_values::DelayMode>();
-            params[ToInt(Params::Mode)] = (f32)mode;
+            args.params[ToInt(Params::Mode)] = (f32)mode;
         }
 
         if (auto p = changed_params.Param(ParamIndex::DelayFilterCutoffSemitones))
-            params[ToInt(Params::FilterCutoffSemitones)] = p->ProjectedValue();
+            args.params[ToInt(Params::FilterCutoffSemitones)] = p->ProjectedValue();
         if (auto p = changed_params.Param(ParamIndex::DelayFilterSpread))
-            params[ToInt(Params::FilterSpread)] = p->ProjectedValue();
+            args.params[ToInt(Params::FilterSpread)] = p->ProjectedValue();
         if (auto p = changed_params.Param(ParamIndex::DelayMix))
-            params[ToInt(Params::Mix)] = p->ProjectedValue();
+            args.params[ToInt(Params::Mix)] = p->ProjectedValue();
         if (auto p = changed_params.Param(ParamIndex::DelayFeedback))
-            params[ToInt(Params::Feedback)] = p->ProjectedValue();
+            args.params[ToInt(Params::Feedback)] = p->ProjectedValue();
 
         if (update_time_l) {
-            params[ToInt(Params::TimeLeftHz)] =
+            args.params[ToInt(Params::TimeLeftHz)] =
                 is_synced ? SyncedTimeToHz(context.tempo, synced_time_l) : free_time_hz_l;
         }
         if (update_time_r) {
-            params[ToInt(Params::TimeRightHz)] =
+            args.params[ToInt(Params::TimeRightHz)] =
                 is_synced ? SyncedTimeToHz(context.tempo, synced_time_r) : free_time_hz_r;
         }
     }
 
+    inline bool IsSilent() const {
+        constexpr f32 k_extra_seconds = 0.1f; // ensure that we detect echos in the buffer
+        return silent_seconds > ((1.0f / Max(args.params[ToInt(vitfx::delay::Params::TimeLeftHz)],
+                                             args.params[ToInt(vitfx::delay::Params::TimeRightHz)])) +
+                                 k_extra_seconds);
+    }
+
+    f32 silent_seconds = 0;
+    bool reset = true;
     vitfx::delay::Delay* delay {};
     SyncedTimes synced_time_l {};
     SyncedTimes synced_time_r {};
     f32 free_time_hz_l {};
     f32 free_time_hz_r {};
     bool is_synced = false;
-    f32 params[ToInt(vitfx::delay::Params::Count)] {};
+    vitfx::delay::ProcessDelayArgs args {};
 };

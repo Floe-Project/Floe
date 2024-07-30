@@ -1347,7 +1347,8 @@ clap_process_status Process(AudioProcessor& processor, clap_process const& proce
 
         // TODO(1.0): review new delay/reverb tails and see if there's any issues
         processor.fx_need_another_frame_of_processing =
-            any_fx_processed && (!processor.peak_meter.Silent() || !processor.convo.IsSilent());
+            any_fx_processed && (!processor.peak_meter.Silent() || !processor.convo.IsSilent() ||
+                                 !processor.reverb.IsSilent() || !processor.new_delay.IsSilent());
     } else {
         processor.peak_meter.Zero();
         for (auto& l : processor.layer_processors)

@@ -3,6 +3,7 @@
 
 #pragma once
 #include "foundation/foundation.hpp"
+#include "utils/debug/debug.hpp"
 
 #include "audio_processing_context.hpp"
 #include "effect_infos.hpp"
@@ -15,6 +16,19 @@ struct ParamState {
     ParamIndex index;
     f32 value;
 };
+
+inline void UpdateSilentSeconds(f32& silent_seconds, Span<StereoAudioFrame const> frames, f32 sample_rate) {
+    bool all_silent = true;
+    for (auto const& f : frames)
+        if (!f.IsSilent()) {
+            all_silent = false;
+            break;
+        }
+    if (all_silent)
+        silent_seconds += (f32)frames.size / sample_rate;
+    else
+        silent_seconds = 0;
+}
 
 struct EffectWetDryHelper {
     EffectWetDryHelper(FloeSmoothedValueSystem& s)

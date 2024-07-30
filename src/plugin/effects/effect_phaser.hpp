@@ -11,7 +11,12 @@ class Phaser final : public Effect {
     Phaser(FloeSmoothedValueSystem& s) : Effect(s, EffectType::Phaser), phaser(vitfx::phaser::Create()) {}
     ~Phaser() override { vitfx::phaser::Destroy(phaser); }
 
-    void ResetInternal() override { vitfx::phaser::HardReset(*phaser); }
+    void ResetInternal() override {
+        if (reset) return;
+        ZoneNamedN(hard_reset, "Phaser HardReset", true);
+        vitfx::phaser::HardReset(*phaser);
+        reset = true;
+    }
 
     void PrepareToPlay(AudioProcessingContext const& context) override {
         vitfx::phaser::SetSampleRate(*phaser, (int)context.sample_rate);
@@ -20,7 +25,10 @@ class Phaser final : public Effect {
     bool ProcessBlock(Span<StereoAudioFrame> io_frames,
                       ScratchBuffers scratch_buffers,
                       AudioProcessingContext const&) override {
+        ZoneNamedN(process_block, "Phaser ProcessBlock", true);
         if (!ShouldProcessBlock()) return false;
+
+        reset = false;
 
         auto wet = scratch_buffers.buf1.Interleaved();
         wet.size = io_frames.size;
@@ -31,12 +39,9 @@ class Phaser final : public Effect {
         while (num_frames) {
             u32 const chunk_size = Min(num_frames, 64u);
 
-            vitfx::phaser::ProcessPhaserArgs args {
-                .num_frames = (int)chunk_size,
-                .in_interleaved = (f32*)(io_frames.data + pos),
-                .out_interleaved = (f32*)(wet.data + pos),
-            };
-            CopyMemory(args.params, params, sizeof(params));
+            args.num_frames = (int)chunk_size;
+            args.in_interleaved = (f32*)(io_frames.data + pos);
+            args.out_interleaved = (f32*)(wet.data + pos);
             // TODO(1.0): use center_semitones_buffered
 
             vitfx::phaser::Process(*phaser, args);
@@ -55,21 +60,22 @@ class Phaser final : public Effect {
         using namespace vitfx::phaser;
 
         if (auto p = changed_params.Param(ParamIndex::PhaserFeedback))
-            params[ToInt(Params::FeedbackAmount)] = p->ProjectedValue();
+            args.params[ToInt(Params::FeedbackAmount)] = p->ProjectedValue();
         if (auto p = changed_params.Param(ParamIndex::PhaserModFreqHz))
-            params[ToInt(Params::FrequencyHz)] = p->ProjectedValue();
+            args.params[ToInt(Params::FrequencyHz)] = p->ProjectedValue();
         if (auto p = changed_params.Param(ParamIndex::PhaserCenterSemitones))
-            params[ToInt(Params::CenterSemitones)] = p->ProjectedValue();
+            args.params[ToInt(Params::CenterSemitones)] = p->ProjectedValue();
         if (auto p = changed_params.Param(ParamIndex::PhaserShape))
-            params[ToInt(Params::Blend)] = p->ProjectedValue() * 2;
+            args.params[ToInt(Params::Blend)] = p->ProjectedValue() * 2;
         if (auto p = changed_params.Param(ParamIndex::PhaserModDepth))
-            params[ToInt(Params::ModDepthSemitones)] = p->ProjectedValue();
+            args.params[ToInt(Params::ModDepthSemitones)] = p->ProjectedValue();
         if (auto p = changed_params.Param(ParamIndex::PhaserStereoAmount))
-            params[ToInt(Params::PhaseOffset)] = p->ProjectedValue() / 2;
+            args.params[ToInt(Params::PhaseOffset)] = p->ProjectedValue() / 2;
         if (auto p = changed_params.Param(ParamIndex::PhaserMix))
-            params[ToInt(Params::Mix)] = p->ProjectedValue();
+            args.params[ToInt(Params::Mix)] = p->ProjectedValue();
     }
 
+    bool reset = true;
     vitfx::phaser::Phaser* phaser {};
-    f32 params[ToInt(vitfx::phaser::Params::Count)] {};
+    vitfx::phaser::ProcessPhaserArgs args {};
 };

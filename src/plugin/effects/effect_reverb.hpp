@@ -4,6 +4,9 @@
 #pragma once
 #include <vitfx/wrapper.hpp>
 
+#include "utils/debug/debug.hpp"
+#include "utils/debug/tracy_wrapped.hpp"
+
 #include "effects/effect.hpp"
 
 class Reverb final : public Effect {
@@ -11,7 +14,13 @@ class Reverb final : public Effect {
     Reverb(FloeSmoothedValueSystem& s) : Effect(s, EffectType::Reverb), reverb(vitfx::reverb::Create()) {}
     ~Reverb() override { vitfx::reverb::Destroy(reverb); }
 
-    void ResetInternal() override { vitfx::reverb::HardReset(*reverb); }
+    void ResetInternal() override {
+        if (reset) return;
+        ZoneNamedN(hard_reset, "Reverb HardReset", true);
+        vitfx::reverb::HardReset(*reverb);
+        reset = true;
+        silent_seconds = 0;
+    }
 
     void PrepareToPlay(AudioProcessingContext const& context) override {
         vitfx::reverb::SetSampleRate(*reverb, (int)context.sample_rate);
@@ -19,8 +28,13 @@ class Reverb final : public Effect {
 
     bool ProcessBlock(Span<StereoAudioFrame> io_frames,
                       ScratchBuffers scratch_buffers,
-                      AudioProcessingContext const&) override {
+                      AudioProcessingContext const& context) override {
+        ZoneNamedN(process_block, "Reverb ProcessBlock", true);
         if (!ShouldProcessBlock()) return false;
+
+        reset = false;
+
+        UpdateSilentSeconds(silent_seconds, io_frames, context.sample_rate);
 
         auto wet = scratch_buffers.buf1.Interleaved();
         wet.size = io_frames.size;
@@ -29,14 +43,13 @@ class Reverb final : public Effect {
         auto num_frames = (u32)io_frames.size;
         u32 pos = 0;
         while (num_frames) {
+            ZoneNamedN(in_chunk, "Reverb chunk", true);
             u32 const chunk_size = Min(num_frames, 64u);
+            ZoneValueV(in_chunk, chunk_size);
 
-            vitfx::reverb::ProcessReverbArgs args {
-                .num_frames = (int)chunk_size,
-                .in_interleaved = (f32*)(io_frames.data + pos),
-                .out_interleaved = (f32*)(wet.data + pos),
-            };
-            CopyMemory(args.params, params, sizeof(params));
+            args.num_frames = (int)chunk_size;
+            args.in_interleaved = (f32*)(io_frames.data + pos);
+            args.out_interleaved = (f32*)(wet.data + pos);
 
             vitfx::reverb::Process(*reverb, args);
 
@@ -53,31 +66,37 @@ class Reverb final : public Effect {
     void OnParamChangeInternal(ChangedParams changed_params, AudioProcessingContext const&) override {
         using namespace vitfx::reverb;
         if (auto p = changed_params.Param(ParamIndex::ReverbDecayTimeMs))
-            params[ToInt(Params::DecayTimeSeconds)] = p->ProjectedValue() / 1000.0f;
+            args.params[ToInt(Params::DecayTimeSeconds)] = p->ProjectedValue() / 1000.0f;
         if (auto p = changed_params.Param(ParamIndex::ReverbPreLowPassCutoff))
-            params[ToInt(Params::PreLowPassCutoffSemitones)] = p->ProjectedValue();
+            args.params[ToInt(Params::PreLowPassCutoffSemitones)] = p->ProjectedValue();
         if (auto p = changed_params.Param(ParamIndex::ReverbPreHighPassCutoff))
-            params[ToInt(Params::PreHighPassCutoffSemitones)] = p->ProjectedValue();
+            args.params[ToInt(Params::PreHighPassCutoffSemitones)] = p->ProjectedValue();
         if (auto p = changed_params.Param(ParamIndex::ReverbLowShelfCutoff))
-            params[ToInt(Params::LowShelfCutoffSemitones)] = p->ProjectedValue();
+            args.params[ToInt(Params::LowShelfCutoffSemitones)] = p->ProjectedValue();
         if (auto p = changed_params.Param(ParamIndex::ReverbLowShelfGain))
-            params[ToInt(Params::LowShelfGainDb)] = p->ProjectedValue();
+            args.params[ToInt(Params::LowShelfGainDb)] = p->ProjectedValue();
         if (auto p = changed_params.Param(ParamIndex::ReverbHighShelfCutoff))
-            params[ToInt(Params::HighShelfCutoffSemitones)] = p->ProjectedValue();
+            args.params[ToInt(Params::HighShelfCutoffSemitones)] = p->ProjectedValue();
         if (auto p = changed_params.Param(ParamIndex::ReverbHighShelfGain))
-            params[ToInt(Params::HighShelfGainDb)] = p->ProjectedValue();
+            args.params[ToInt(Params::HighShelfGainDb)] = p->ProjectedValue();
         if (auto p = changed_params.Param(ParamIndex::ReverbChorusAmount))
-            params[ToInt(Params::ChorusAmount)] = p->ProjectedValue();
+            args.params[ToInt(Params::ChorusAmount)] = p->ProjectedValue();
         if (auto p = changed_params.Param(ParamIndex::ReverbChorusFrequency))
-            params[ToInt(Params::ChorusFrequency)] = p->ProjectedValue();
+            args.params[ToInt(Params::ChorusFrequency)] = p->ProjectedValue();
         if (auto p = changed_params.Param(ParamIndex::ReverbSize))
-            params[ToInt(Params::Size)] = p->ProjectedValue();
+            args.params[ToInt(Params::Size)] = p->ProjectedValue();
         if (auto p = changed_params.Param(ParamIndex::ReverbDelay))
-            params[ToInt(Params::DelaySeconds)] = p->ProjectedValue() / 1000.0f;
+            args.params[ToInt(Params::DelaySeconds)] = p->ProjectedValue() / 1000.0f;
         if (auto p = changed_params.Param(ParamIndex::ReverbMix))
-            params[ToInt(Params::Mix)] = p->ProjectedValue();
+            args.params[ToInt(Params::Mix)] = p->ProjectedValue();
     }
 
+    bool IsSilent() const {
+        return silent_seconds > args.params[ToInt(vitfx::reverb::Params::DecayTimeSeconds)];
+    }
+
+    f32 silent_seconds = 0;
+    bool reset = true;
     vitfx::reverb::Reverb* reverb {};
-    f32 params[ToInt(vitfx::reverb::Params::Count)] {};
+    vitfx::reverb::ProcessReverbArgs args {};
 };

@@ -30,7 +30,7 @@ ErrorCodeCategory const lua_error_category {
             case LuaErrorCode::Syntax: str = "Lua syntax error"; break;
             case LuaErrorCode::Runtime: str = "Lua runtime error"; break;
             case LuaErrorCode::Timeout: str = "Lua script took too long"; break;
-            case LuaErrorCode::Unexpected: str = "something unexpected happened"; break;
+            case LuaErrorCode::Unexpected: str = "Something unexpected happened"; break;
         }
         return writer.WriteChars(str);
     },
@@ -863,16 +863,14 @@ void InterpretTable(LuaState& ctx, int stack_index, Type& result) {
     }
 }
 
-// We don't use io, os or debug or because we don't won't to give too much power to the lua
-// program. We also made a change to the package source code to remove the loadlib function.
+// We only add a few standard libraries at the moment because some libraries aren't useful for creating sample
+// library configurations and give too much power to the lua (os.execute, etc.).
 static constexpr luaL_Reg k_lua_standard_libs[] = {
     {LUA_GNAME, luaopen_base},
     {LUA_TABLIBNAME, luaopen_table},
     {LUA_STRLIBNAME, luaopen_string},
     {LUA_MATHLIBNAME, luaopen_math},
     {LUA_UTF8LIBNAME, luaopen_utf8},
-    {LUA_LOADLIBNAME, luaopen_package}, // NOTE: we modified the available functions in this library
-    {LUA_COLIBNAME, luaopen_coroutine},
 };
 
 static ErrorCodeOr<Reader> CreateLuaFileReader(Library const& library, String path) {

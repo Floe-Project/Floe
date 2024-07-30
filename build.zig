@@ -1812,10 +1812,10 @@ pub fn build(b: *std.Build) void {
                 .version = floe_version,
             });
 
-            const standalone_path = "src/standalone_wrapper";
             floe_standalone.addCSourceFiles(.{
                 .files = &.{
-                    standalone_path ++ "/standalone_wrapper.cpp",
+                    "src/standalone_wrapper/standalone_wrapper.cpp",
+                    "src/plugin/plugin_clap_entry.cpp",
                 },
                 .flags = cpp_fp_flags,
             });

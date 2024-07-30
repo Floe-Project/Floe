@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <clap/audio-buffer.h>
+#include <clap/entry.h>
 #include <clap/events.h>
 #include <clap/ext/gui.h>
 #include <clap/ext/params.h>
 #include <clap/ext/thread-check.h>
+#include <clap/factory/plugin-factory.h>
 #include <clap/host.h>
 #include <clap/plugin.h>
 #include <clap/process.h>
@@ -430,9 +432,16 @@ inline ErrorCodeCategory const& ErrorCategoryForEnum(StandaloneError) { return s
         if (!CONCAT(st, __LINE__)) return ErrorCode {StandaloneError::PlugnInterfaceError};                  \
     })
 
+extern clap_plugin_entry const clap_entry;
+
 static ErrorCodeOr<void> Main() {
+    clap_entry.init("plugin-path");
+    DEFER { clap_entry.deinit(); };
+
+    auto const factory = (clap_plugin_factory const*)clap_entry.get_factory(CLAP_PLUGIN_FACTORY_ID);
+
     Standalone standalone {
-        .plugin = CreatePlugin(&standalone.host),
+        .plugin = *factory->create_plugin(factory, &standalone.host, k_plugin_info.id),
     };
 
     standalone.plugin.init(&standalone.plugin);

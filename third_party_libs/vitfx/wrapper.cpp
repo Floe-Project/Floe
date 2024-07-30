@@ -8,6 +8,7 @@
 #include "src/synthesis/effects/delay.h"
 #include "src/synthesis/effects/phaser.h"
 #include "src/synthesis/effects/reverb.h"
+#include "tracy/Tracy.hpp"
 
 namespace vitfx {
 
@@ -48,23 +49,32 @@ void Destroy(Reverb* reverb) { delete reverb; }
 void Process(Reverb& reverb, ProcessReverbArgs args) {
     assert(args.num_frames <= vital::kMaxBufferSize);
 
-    for (int i = 0; i < (int)Params::Count; ++i) {
-        // The chorus amount parameter behaves more pleasingly with a strong exponential curve
-        if (i == (int)Params::ChorusAmount) args.params[i] = powf(args.params[i], 5.0f);
+    {
+        ZoneNamedN(setup, "Reverb setup", true);
+        for (int i = 0; i < (int)Params::Count; ++i) {
+            // The chorus amount parameter behaves more pleasingly with a strong exponential curve
+            if (i == (int)Params::ChorusAmount) args.params[i] = powf(args.params[i], 5.0f);
 
-        // The reverb module only ever looks at the first value in the buffer
-        reverb.in_params[i].buffer[0] = vital::poly_float::init(args.params[i]);
+            // The reverb module only ever looks at the first value in the buffer
+            reverb.in_params[i].buffer[0] = vital::poly_float::init(args.params[i]);
+        }
+
+        for (int i = 0; i < args.num_frames; ++i)
+            reverb.in_buffer[i] = vital::utils::toPolyFloatFromUnaligned(&args.in_interleaved[i * 2]);
     }
 
-    for (int i = 0; i < args.num_frames; ++i)
-        reverb.in_buffer[i] = vital::utils::toPolyFloatFromUnaligned(&args.in_interleaved[i * 2]);
+    {
+        ZoneNamedN(process, "Reverb processWithInput", true);
+        reverb.reverb.processWithInput(reverb.in_buffer, args.num_frames);
+    }
 
-    reverb.reverb.processWithInput(reverb.in_buffer, args.num_frames);
-
-    for (int i = 0; i < args.num_frames; ++i) {
-        auto const& o = reverb.reverb.output()->buffer[i];
-        args.out_interleaved[i * 2 + 0] = o[0];
-        args.out_interleaved[i * 2 + 1] = o[1];
+    {
+        ZoneNamedN(copy, "Reverb copy output", true);
+        for (int i = 0; i < args.num_frames; ++i) {
+            auto const& o = reverb.reverb.output()->buffer[i];
+            args.out_interleaved[i * 2 + 0] = o[0];
+            args.out_interleaved[i * 2 + 1] = o[1];
+        }
     }
 }
 

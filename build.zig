@@ -1092,6 +1092,8 @@ pub fn build(b: *std.Build) void {
             vitfx.addIncludePath(b.path(vitfx_path ++ "/src/common"));
             vitfx.linkLibCpp();
 
+            vitfx.addIncludePath(build_context.dep_tracy.path("public"));
+
             b.getInstallStep().dependOn(&b.addInstallArtifact(vitfx, .{ .dest_dir = install_subfolder }).step);
         }
 

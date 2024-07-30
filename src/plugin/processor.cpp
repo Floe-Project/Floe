@@ -1348,7 +1348,7 @@ clap_process_status Process(AudioProcessor& processor, clap_process const& proce
         // TODO(1.0): review new delay/reverb tails and see if there's any issues
         processor.fx_need_another_frame_of_processing =
             any_fx_processed && (!processor.peak_meter.Silent() || !processor.convo.IsSilent() ||
-                                 !processor.reverb.IsSilent() || !processor.new_delay.IsSilent());
+                                 !processor.reverb.IsSilent() || !processor.delay.IsSilent());
     } else {
         processor.peak_meter.Zero();
         for (auto& l : processor.layer_processors)
@@ -1423,7 +1423,7 @@ AudioProcessor::AudioProcessor(clap_host const& host)
     , stereo_widen(smoothed_value_system)
     , chorus(smoothed_value_system)
     , reverb(smoothed_value_system)
-    , new_delay(smoothed_value_system)
+    , delay(smoothed_value_system)
     , phaser(smoothed_value_system)
     , convo(smoothed_value_system)
     , effects_ordered_by_type(OrderEffectsToEnum(EffectsArray {
@@ -1434,7 +1434,7 @@ AudioProcessor::AudioProcessor(clap_host const& host)
           &stereo_widen,
           &chorus,
           &reverb,
-          &new_delay,
+          &delay,
           &phaser,
           &convo,
       })) {

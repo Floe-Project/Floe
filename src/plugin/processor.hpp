@@ -253,7 +253,7 @@ struct AudioProcessor {
     StereoWiden stereo_widen;
     Chorus chorus;
     Reverb reverb;
-    Delay new_delay;
+    Delay delay;
     Phaser phaser;
     ConvolutionReverb convo;
 

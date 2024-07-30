@@ -24,7 +24,7 @@ constexpr auto k_reverb_params = ComptimeParamSearch<ComptimeParamSearchOptions 
     .skip = ParamIndex::ReverbOn,
 }>();
 
-constexpr auto k_new_phaser_params = ComptimeParamSearch<ComptimeParamSearchOptions {
+constexpr auto k_phaser_params = ComptimeParamSearch<ComptimeParamSearchOptions {
     .modules = {ParameterModule::Effect, ParameterModule::Phaser},
     .skip = ParamIndex::PhaserOn,
 }>();
@@ -79,42 +79,12 @@ struct EffectIDs {
         } chorus;
 
         struct {
-            LayIDPair freq;
-            LayIDPair mod_freq;
-            LayIDPair mod_depth;
-            LayIDPair feedback;
-            LayIDPair stages;
-            LayID mod_stereo;
-            LayIDPair wet;
-            LayIDPair dry;
-        } phaser;
-
-        struct {
             Array<LayIDPair, k_reverb_params.size> ids;
         } reverb;
 
         struct {
-            Array<LayIDPair, k_new_phaser_params.size> ids;
-        } new_phaser;
-
-        struct {
-            LayID legacy_btn;
-            bool is_legacy;
-            LayIDPair feedback;
-            LayIDPair left;
-            LayIDPair right;
-            LayIDPair wet;
-            LayID sync_btn;
-            union {
-                struct {
-                    LayIDPair damp;
-                } old;
-                struct {
-                    LayIDPair mode;
-                    LayIDPair filter;
-                } sinevibes;
-            };
-        } delay;
+            Array<LayIDPair, k_phaser_params.size> ids;
+        } phaser;
 
         struct {
             LayIDPair feedback;
@@ -125,7 +95,7 @@ struct EffectIDs {
             LayIDPair filter_spread;
             LayIDPair mode;
             LayID sync_btn;
-        } new_delay;
+        } delay;
 
         struct {
             LayIDPair ir;
@@ -542,7 +512,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
             case EffectType::Phaser: {
                 auto ids = create_fx_ids(plugin.processor.phaser, nullptr);
 
-                layout_all(ids.new_phaser.ids, k_new_phaser_params);
+                layout_all(ids.phaser.ids, k_phaser_params);
 
                 ids.divider = create_divider_id();
                 dyn::Append(effects, ids);
@@ -551,13 +521,13 @@ void DoEffectsWindow(Gui* g, Rect r) {
 
             case EffectType::Delay: {
                 LayID heading_container;
-                auto ids = create_fx_ids(plugin.processor.new_delay, &heading_container);
+                auto ids = create_fx_ids(plugin.processor.delay, &heading_container);
                 auto param_container = create_param_container();
 
-                ids.new_delay.sync_btn = lay.CreateChildItem(heading_container,
-                                                             fx_delay_sync_btn_width,
-                                                             fx_param_button_height,
-                                                             0);
+                ids.delay.sync_btn = lay.CreateChildItem(heading_container,
+                                                         fx_delay_sync_btn_width,
+                                                         fx_param_button_height,
+                                                         0);
 
                 auto left = &plugin.processor.params[ToInt(ParamIndex::DelayTimeSyncedL)];
                 auto right = &plugin.processor.params[ToInt(ParamIndex::DelayTimeSyncedR)];
@@ -565,40 +535,34 @@ void DoEffectsWindow(Gui* g, Rect r) {
                     left = &plugin.processor.params[ToInt(ParamIndex::DelayTimeLMs)];
                     right = &plugin.processor.params[ToInt(ParamIndex::DelayTimeRMs)];
                 }
-                LayoutParameterComponent(g, param_container, ids.new_delay.left, *left, nullopt, false, true);
-                LayoutParameterComponent(g,
-                                         param_container,
-                                         ids.new_delay.right,
-                                         *right,
-                                         nullopt,
-                                         false,
-                                         true);
+                LayoutParameterComponent(g, param_container, ids.delay.left, *left, nullopt, false, true);
+                LayoutParameterComponent(g, param_container, ids.delay.right, *right, nullopt, false, true);
                 {
                     LayoutParameterComponent(g,
                                              param_container,
-                                             ids.new_delay.feedback,
+                                             ids.delay.feedback,
                                              plugin.processor.params[ToInt(ParamIndex::DelayFeedback)]);
                 }
                 {
                     auto const id =
                         LayoutParameterComponent(g,
                                                  param_container,
-                                                 ids.new_delay.mode,
+                                                 ids.delay.mode,
                                                  plugin.processor.params[ToInt(ParamIndex::DelayMode)]);
                     lay_set_behave(&lay.ctx, id, LAY_BREAK);
                 }
                 LayoutParameterComponent(
                     g,
                     param_container,
-                    ids.new_delay.filter_cutoff,
+                    ids.delay.filter_cutoff,
                     plugin.processor.params[ToInt(ParamIndex::DelayFilterCutoffSemitones)]);
                 LayoutParameterComponent(g,
                                          param_container,
-                                         ids.new_delay.filter_spread,
+                                         ids.delay.filter_spread,
                                          plugin.processor.params[ToInt(ParamIndex::DelayFilterSpread)]);
                 LayoutParameterComponent(g,
                                          param_container,
-                                         ids.new_delay.mix,
+                                         ids.delay.mix,
                                          plugin.processor.params[ToInt(ParamIndex::DelayMix)]);
 
                 ids.divider = create_divider_id();
@@ -915,76 +879,75 @@ void DoEffectsWindow(Gui* g, Rect r) {
             case EffectType::Phaser: {
                 auto const cols = GetFxCols(imgui, ids.type);
                 do_heading(plugin.processor.phaser, cols.back);
-                do_all_ids(ids.new_phaser.ids, k_new_phaser_params, cols);
+                do_all_ids(ids.phaser.ids, k_phaser_params, cols);
                 break;
             }
 
             case EffectType::Delay: {
                 auto const cols = GetFxCols(imgui, ids.type);
-                do_heading(plugin.processor.new_delay, cols.back);
+                do_heading(plugin.processor.delay, cols.back);
                 auto const knob_style = knobs::DefaultKnob(imgui, cols.highlight);
 
                 if (plugin.processor.params[ToInt(ParamIndex::DelayTimeSyncSwitch)].ValueAsBool()) {
                     buttons::PopupWithItems(g,
                                             plugin.processor.params[ToInt(ParamIndex::DelayTimeSyncedL)],
-                                            ids.new_delay.left.control,
+                                            ids.delay.left.control,
                                             buttons::ParameterPopupButton(imgui));
                     buttons::PopupWithItems(g,
                                             plugin.processor.params[ToInt(ParamIndex::DelayTimeSyncedR)],
-                                            ids.new_delay.right.control,
+                                            ids.delay.right.control,
                                             buttons::ParameterPopupButton(imgui));
                     labels::Label(g,
                                   plugin.processor.params[ToInt(ParamIndex::DelayTimeSyncedL)],
-                                  ids.new_delay.left.label,
+                                  ids.delay.left.label,
                                   labels::ParameterCentred(imgui));
                     labels::Label(g,
                                   plugin.processor.params[ToInt(ParamIndex::DelayTimeSyncedR)],
-                                  ids.new_delay.right.label,
+                                  ids.delay.right.label,
                                   labels::ParameterCentred(imgui));
                 } else {
                     KnobAndLabel(g,
                                  plugin.processor.params[ToInt(ParamIndex::DelayTimeLMs)],
-                                 ids.new_delay.left,
+                                 ids.delay.left,
                                  knob_style);
                     KnobAndLabel(g,
                                  plugin.processor.params[ToInt(ParamIndex::DelayTimeRMs)],
-                                 ids.new_delay.right,
+                                 ids.delay.right,
                                  knob_style);
                 }
-                draw_knob_joining_line(ids.new_delay.left.control, ids.new_delay.right.control);
+                draw_knob_joining_line(ids.delay.left.control, ids.delay.right.control);
 
                 buttons::Toggle(g,
                                 plugin.processor.params[ToInt(ParamIndex::DelayTimeSyncSwitch)],
-                                ids.new_delay.sync_btn,
+                                ids.delay.sync_btn,
                                 buttons::ParameterToggleButton(imgui, cols.highlight));
 
                 buttons::PopupWithItems(g,
                                         plugin.processor.params[ToInt(ParamIndex::DelayMode)],
-                                        ids.new_delay.mode.control,
+                                        ids.delay.mode.control,
                                         buttons::ParameterPopupButton(imgui));
                 labels::Label(g,
                               plugin.processor.params[ToInt(ParamIndex::DelayMode)],
-                              ids.new_delay.mode.label,
+                              ids.delay.mode.label,
                               labels::ParameterCentred(imgui));
 
                 KnobAndLabel(g,
                              plugin.processor.params[ToInt(ParamIndex::DelayFeedback)],
-                             ids.new_delay.feedback,
+                             ids.delay.feedback,
                              knob_style);
                 KnobAndLabel(g,
                              plugin.processor.params[ToInt(ParamIndex::DelayMix)],
-                             ids.new_delay.mix,
+                             ids.delay.mix,
                              knob_style);
                 KnobAndLabel(g,
                              plugin.processor.params[ToInt(ParamIndex::DelayFilterCutoffSemitones)],
-                             ids.new_delay.filter_cutoff,
+                             ids.delay.filter_cutoff,
                              knob_style);
                 KnobAndLabel(g,
                              plugin.processor.params[ToInt(ParamIndex::DelayFilterSpread)],
-                             ids.new_delay.filter_spread,
+                             ids.delay.filter_spread,
                              knob_style);
-                draw_knob_joining_line(ids.new_delay.filter_cutoff.control,
-                                       ids.new_delay.filter_spread.control);
+                draw_knob_joining_line(ids.delay.filter_cutoff.control, ids.delay.filter_spread.control);
 
                 break;
             }

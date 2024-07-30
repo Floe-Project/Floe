@@ -439,13 +439,13 @@ enum class DelayMode : u8 { // never reorder
     MidPingPong,
     Count,
 };
-constexpr auto k_new_delay_mode_strings = ArrayT<String>({
+constexpr auto k_delay_mode_strings = ArrayT<String>({
     "Mono",
     "Stereo",
     "Ping-pong",
     "Mid ping-pong",
 });
-static_assert(k_new_delay_mode_strings.size == ToInt(DelayMode::Count));
+static_assert(k_delay_mode_strings.size == ToInt(DelayMode::Count));
 
 enum class VelocityMappingMode : u8 { // never reorder
     None,
@@ -686,7 +686,7 @@ constexpr Span<String const> MenuItems(ParameterInfo::MenuType type) {
         case ParameterInfo::MenuType::EffectFilterType: return k_effect_filter_type_strings;
         case ParameterInfo::MenuType::DistortionType: return k_distortion_type_strings;
         case ParameterInfo::MenuType::DelaySyncedTime: return k_delay_synced_time_strings;
-        case ParameterInfo::MenuType::DelayMode: return k_new_delay_mode_strings;
+        case ParameterInfo::MenuType::DelayMode: return k_delay_mode_strings;
         case ParameterInfo::MenuType::VelocityMappingMode: return k_velocity_mapping_mode_strings;
         case ParameterInfo::MenuType::None:
         case ParameterInfo::MenuType::Count: break;
@@ -1452,7 +1452,7 @@ consteval auto CreateParams() {
         .value_config = val_config_helpers::Bool({.default_state = false}),
         .modules = {ParameterModule::Effect, ParameterModule::Phaser},
         .name = "On"_s,
-        .gui_label = "New Phaser"_s,
+        .gui_label = "Phaser"_s,
         .tooltip = "Enable/disable the phaser effect"_s,
     };
 
@@ -1632,7 +1632,7 @@ consteval auto CreateParams() {
         .value_config = val_config_helpers::Bool({.default_state = false}),
         .modules = {ParameterModule::Effect, ParameterModule::Reverb},
         .name = "On"_s,
-        .gui_label = "New Reverb"_s,
+        .gui_label = "Reverb"_s,
         .tooltip = "Enable/disable the new reverb effect"_s,
     };
 

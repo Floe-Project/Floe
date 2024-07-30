@@ -54,16 +54,12 @@ static void LayerInstrumentMenuItems(Gui* g, LayerProcessor* layer) {
                 if (desired_sampled->library_name == lib_name && desired_sampled->inst_name == inst_name)
                     current = (int)insts.size;
             }
-            // if (lib_name == "Arctic Strings" || lib_name == "Terracotta" ||
-            //     lib_name == "Music Box Suite Free" || lib_name == "Wraith Demo" ||
-            //     lib_name == "New Wraith Demo") {
             dyn::Append(insts, fmt::Format(g->scratch_arena, "{}: {}", lib_name, inst_name));
             dyn::Append(inst_info,
                         sample_lib::InstrumentId {
                             .library_name = lib_name,
                             .inst_name = inst_name,
                         });
-            // }
         }
     }
 

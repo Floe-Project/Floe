@@ -117,7 +117,7 @@ consteval auto CreateEffectInfos() {
             case EffectType::Phaser:
                 info = {
                     .description = "Modulate the sound using a series of moving filters",
-                    .name = "New Phaser",
+                    .name = "Phaser",
                     .id = 9, // never change
                     .on_param_index = ParamIndex::PhaserOn,
                 };

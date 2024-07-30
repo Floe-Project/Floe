@@ -584,7 +584,7 @@ fn genericFlags(context: *BuildContext, target: std.Build.ResolvedTarget, extra_
     if (context.build_mode == .production) {
         try flags.append("-fmacro-prefix-map=" ++ "=/"); // make the __FILE__ macro non-absolute
         try flags.append("-fvisibility=hidden");
-    } else if (target.query.isNative() and context.enable_tracy) {
+    } else if (target.query.isNativeOs() and context.enable_tracy) {
         try flags.append("-DTRACY_ENABLE");
         try flags.append("-DTRACY_MANUAL_LIFETIME");
         try flags.append("-DTRACY_DELAYED_INIT");

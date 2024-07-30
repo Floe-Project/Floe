@@ -16,9 +16,6 @@
 #include "common/constants.hpp"
 #include "sample_library.hpp"
 
-// IMPROVE: offer a custom library to the lua code for reading/writing files. But we probably only want to
-// allow filesystem access to certain places rather than everywhere.
-
 namespace sample_lib {
 
 ErrorCodeCategory const lua_error_category {
@@ -1016,22 +1013,18 @@ static const struct luaL_Reg k_floe_lib[] = {
     {nullptr, nullptr},
 };
 
-static VoidOrError<Error> OpenFloeLuaLibrary(LuaState& ctx) {
-    luaL_newlib(ctx.lua, k_floe_lib); // puts functions into an table on the top of the stack
-    lua_setglobal(ctx.lua, "floe"); // pops top stack value and assigns it to global name
-
-    // IMPROVE: rename to tbl_extend?
-    TRY(TryRunLuaCode(ctx, luaL_dostring(ctx.lua, R"aaa(floe.apply_prototype = function(prototype_table, t)
+constexpr char const* k_floe_lua_helpers = R"aaa(
+floe.extend_table = function(base_table, t)
     if not t then
         t = {}
     end
 
-    for key, value in pairs(prototype_table) do
+    for key, value in pairs(base_table) do
         if type(value) == "table" then
             -- Recursively handle sub-tables
-            t[key] = floe.apply_prototype(value, t[key])
+            t[key] = floe.extend_table(value, t[key])
         else
-            -- If key doesn't exist in t, copy from prototype_table
+            -- If key doesn't exist in t, copy from base_table
             if t[key] == nil then
                 t[key] = value
             end
@@ -1039,7 +1032,14 @@ static VoidOrError<Error> OpenFloeLuaLibrary(LuaState& ctx) {
     end
 
     return t
-end)aaa")));
+end
+)aaa";
+
+static VoidOrError<Error> OpenFloeLuaLibrary(LuaState& ctx) {
+    luaL_newlib(ctx.lua, k_floe_lib); // puts functions into an table on the top of the stack
+    lua_setglobal(ctx.lua, "floe"); // pops top stack value and assigns it to global name
+
+    TRY(TryRunLuaCode(ctx, luaL_dostring(ctx.lua, k_floe_lua_helpers)));
 
     return k_success;
 }
@@ -1437,68 +1437,6 @@ struct LuaCodePrinter {
     }
 
     ErrorCodeOr<void> PrintWholeLua(Writer writer, PrintMode mode) {
-        if (mode.mode_flags & PrintModeFlagsDocumentedExample) {
-            // TODO: pull out information about the lua standard libraries and the apply_prototype function
-            // for mdbook
-            constexpr String k_documentation_preamble =
-                R"aaa(Floe Library configuration script
-
-Note there there is no 'group' structure as is often found in other sample-mapping formats such as SFZ. Instead we can create functions or use loops to apply similar configuration to a set of regions. Additionally, Floe offers a helper function called floe.<PROTO_FUNC>(prototype, tbl) which allows new tables to be created that are based off an existing table. The first argument is the prototype table, and the second argument is another table that is filled with values from the prototype if they don't already exist in the second table. The modified second argument is returned. This function works in a 'deep' way - meaning that sub-tables are also handed in the same way.
-
-Example usage of floe.<PROTO_FUNC>:
-
-  local round_robin_1 = {
-    trigger_criteria = {
-      round_robin_index = 0,
-    },
-    options = {
-      auto_map_key_range_group = "rr1",
-    },
-  }
-
-  -- Here, the table that's passed to add_region is round_robin_1 but with the second table laid on top of it
-  floe.add_region(instrument, floe.<PROTO_FUNC>(round_robin_1, {
-    file = {
-      path = "samples/file_c3.flac",
-      root_key = 60,
-    },
-  }))
-
-  floe.add_region(instrument, floe.<PROTO_FUNC>(round_robin_1, {
-    file = {
-      path = "samples/file_c#3.flac",
-      root_key = 61,
-    },
-  }))
-)aaa";
-            ArenaAllocatorWithInlineStorage<4000> arena;
-            auto preamble = fmt::FormatStringReplace(arena,
-                                                     k_documentation_preamble,
-                                                     ArrayT<fmt::StringReplacement>({
-                                                         {"<PROTO_FUNC>", "apply_prototype"},
-                                                     }));
-
-            TRY(PrintWordwrappedComment(writer, preamble, 0));
-        }
-
-        if (mode.mode_flags & PrintModeFlagsDocumentedExample) {
-            ArenaAllocatorWithInlineStorage<4000> arena;
-            DynamicArray<char> buffer {"Most of Lua's standard libraries are accessible to this script: ",
-                                       arena};
-            for (auto& l : k_lua_standard_libs) {
-                auto const name = FromNullTerminated(l.name);
-                if (name == LUA_GNAME) continue;
-                dyn::AppendSpan(buffer, name);
-                dyn::AppendSpan(buffer, ", ");
-            }
-            dyn::Pop(buffer, 2);
-            dyn::AppendSpan(
-                buffer,
-                ". However, some libraries are not available to improve the safety of running Lua code from unknown sources. packages.loadlib is also not available.");
-            TRY(WordWrap(buffer, writer, LuaCodePrinter::k_word_wrap_width, "-- "));
-            TRY(writer.WriteChars("\n\n"));
-        }
-
         auto begin_function = [&](String name) -> ErrorCodeOr<void> {
             if (mode.mode_flags & PrintModeFlagsDocumentedExample)
                 if (mode.mode_flags & PrintModeFlagsDocumentedExample)
@@ -1529,6 +1467,17 @@ Example usage of floe.<PROTO_FUNC>:
         TRY(PrintStruct(writer, InterpretedTypes::Region, mode, 1));
         TRY(writer.WriteChars("})\n"));
         TRY(end_function("add_region"));
+
+        if (mode.mode_flags & LuaCodePrinter::PrintModeFlagsDocumentedExample) {
+            TRY(begin_function("extend_table"));
+            TRY(writer.WriteChars("local common_region_config = {\n"));
+            TRY(PrintStruct(writer, InterpretedTypes::Region, {.mode_flags = {}}, 1));
+            TRY(writer.WriteChars("}\n"));
+            TRY(writer.WriteChars("floe.add_region(instrument, floe.extend_table(common_region_config, {\n"));
+            TRY(writer.WriteChars("    file = { path = \"One-shots/Sheet Vibration.flac\" }\n"));
+            TRY(writer.WriteChars("}))\n"));
+            TRY(end_function("extend_table"));
+        }
 
         TRY(begin_function("add_ir"));
         TRY(writer.WriteChars("floe.add_ir(library, {\n"));
@@ -1672,7 +1621,7 @@ TEST_CASE(TestAutoMapKeyRange) {
         return library)aaa";
 
         String const region_def_pattern = R"aaa(
-        floe.add_region(instrument, floe.apply_prototype(group, {
+        floe.add_region(instrument, floe.extend_table(group, {
             file = {
                 path = "f",
                 root_key = <ROOT_KEY>,
@@ -1740,8 +1689,8 @@ TEST_CASE(TestBasicFile) {
         name = "Lib",
         tagline = "tagline",
         author = "Sam",
-        background_image_path = "",
-        icon_image_path = "",
+        background_image_path = "images/background.jpg",
+        icon_image_path = "image/icon.png",
     })
     local instrument = floe.new_instrument(library, {
         name = "Inst1",
@@ -1757,15 +1706,13 @@ TEST_CASE(TestBasicFile) {
         root_key = 10,            -- MIDI note number
         loop = { 3000, 9000, 2, false }, -- start, end, xfade, or can be nil
     }
-
     local proto = {
         trigger_criteria = {},
         options = {
             auto_map_key_range_group = "group1",
         },
     }
-
-    floe.add_region(instrument, floe.apply_prototype(proto, {
+    floe.add_region(instrument, floe.extend_table(proto, {
         file = file,
     }))
     return library

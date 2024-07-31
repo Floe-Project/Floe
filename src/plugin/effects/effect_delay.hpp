@@ -22,11 +22,11 @@ class Delay final : public Effect {
         vitfx::delay::SetSampleRate(*delay, (int)context.sample_rate);
     }
 
-    bool ProcessBlock(Span<StereoAudioFrame> io_frames,
-                      ScratchBuffers scratch_buffers,
-                      AudioProcessingContext const& context) override {
+    ProcessResult ProcessBlock(Span<StereoAudioFrame> io_frames,
+                                    ScratchBuffers scratch_buffers,
+                                    AudioProcessingContext const& context) override {
         ZoneNamedN(process_block, "Delay ProcessBlock", true);
-        if (!ShouldProcessBlock()) return false;
+        if (!ShouldProcessBlock()) return ProcessResult::Done;
 
         auto wet = scratch_buffers.buf1.Interleaved();
         wet.size = io_frames.size;
@@ -53,7 +53,7 @@ class Delay final : public Effect {
         // check for silence on the output
         UpdateSilentSeconds(silent_seconds, io_frames, context.sample_rate);
 
-        return true;
+        return IsSilent() ? ProcessResult::Done : ProcessResult::ProcessingTail;
     }
 
     static SyncedTimes ToSyncedTime(param_values::DelaySyncedTime t) {

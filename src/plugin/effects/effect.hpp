@@ -68,21 +68,26 @@ struct ScratchBuffers {
     Buffer buf1, buf2;
 };
 
+enum class ProcessResult {
+    Done, // no more processing needed
+    ProcessingTail, // processing needed
+};
+
 // Base class for effects.
 // The subclass can either override ProcessFrame or ProcessBlock
 class Effect {
   public:
     Effect(FloeSmoothedValueSystem& s, EffectType type)
-        : type(type)
-        , m_smoothed_value_system(s)
-        , m_mix_smoother_id(m_smoothed_value_system.CreateSmoother()) {}
+        : smoothed_value_system(s)
+        , type(type)
+        , mix_smoother_id(smoothed_value_system.CreateSmoother()) {}
 
     virtual ~Effect() {}
 
     // audio-thread
     void OnParamChange(ChangedParams changed_params, AudioProcessingContext const& context) {
         if (auto p = changed_params.Param(k_effect_info[(u32)type].on_param_index))
-            m_smoothed_value_system.Set(m_mix_smoother_id, p->ValueAsBool() ? 1.0f : 0.0f, 4);
+            smoothed_value_system.Set(mix_smoother_id, p->ValueAsBool() ? 1.0f : 0.0f, 4);
         OnParamChangeInternal(changed_params, context);
     }
 
@@ -93,42 +98,39 @@ class Effect {
     virtual void SetTempo(f64) {}
 
     // audio-thread
-    virtual bool ProcessBlock(Span<StereoAudioFrame> frames,
-                              [[maybe_unused]] ScratchBuffers scratch_buffers,
-                              AudioProcessingContext const& context) {
-        if (!ShouldProcessBlock()) return false;
-
-        for (auto [i, frame] : Enumerate<u32>(frames)) {
-            auto const mix = m_smoothed_value_system.Value(m_mix_smoother_id, i);
-            frame = LinearInterpolate(mix, frame, ProcessFrame(context, frame, i));
-        }
-        return true;
+    virtual ProcessResult ProcessBlock(Span<StereoAudioFrame> frames,
+                                       [[maybe_unused]] ScratchBuffers scratch_buffers,
+                                       AudioProcessingContext const& context) {
+        if (!ShouldProcessBlock()) return ProcessResult::Done;
+        for (auto [i, frame] : Enumerate<u32>(frames))
+            frame = MixOnOffSmoothing(ProcessFrame(context, frame, i), frame, i);
+        return ProcessResult::Done;
     }
 
     // audio-thread
     void Reset() {
-        if (!m_state_is_reset) ResetInternal();
-        m_state_is_reset = true;
+        if (!is_reset) ResetInternal();
+        is_reset = true;
     }
 
-    EffectType const type;
-
+    // audio-thread
     bool ShouldProcessBlock() {
-        if (m_smoothed_value_system.Value(m_mix_smoother_id, 0) == 0 &&
-            m_smoothed_value_system.TargetValue(m_mix_smoother_id) == 0)
+        if (smoothed_value_system.Value(mix_smoother_id, 0) == 0 &&
+            smoothed_value_system.TargetValue(mix_smoother_id) == 0)
             return false;
-        m_state_is_reset = false;
+        is_reset = false;
         return true;
     }
 
+    // audio-thread
     StereoAudioFrame MixOnOffSmoothing(StereoAudioFrame wet, StereoAudioFrame dry, u32 frame_index) {
-        return LinearInterpolate(m_smoothed_value_system.Value(m_mix_smoother_id, frame_index), dry, wet);
+        return LinearInterpolate(smoothed_value_system.Value(mix_smoother_id, frame_index), dry, wet);
     }
 
-    FloeSmoothedValueSystem& m_smoothed_value_system;
-
+    // Internals
     virtual StereoAudioFrame
     ProcessFrame(AudioProcessingContext const&, StereoAudioFrame in, u32 frame_index) {
+        PanicIfReached();
         (void)frame_index;
         return in;
     }
@@ -138,6 +140,8 @@ class Effect {
 
     virtual void ResetInternal() {}
 
-    FloeSmoothedValueSystem::FloatId const m_mix_smoother_id;
-    bool m_state_is_reset = true;
+    FloeSmoothedValueSystem& smoothed_value_system;
+    EffectType const type;
+    FloeSmoothedValueSystem::FloatId const mix_smoother_id;
+    bool is_reset = true;
 };

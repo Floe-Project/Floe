@@ -118,7 +118,7 @@ class Chorus final : public Effect {
         }
         if (auto p = changed_params.Param(ParamIndex::ChorusHighpass)) {
             auto const val = p->ProjectedValue();
-            m_smoothed_value_system.Set(m_highpass_filter_coeffs_smoother_id,
+            smoothed_value_system.Set(m_highpass_filter_coeffs_smoother_id,
                                         rbj_filter::Type::HighPass,
                                         context.sample_rate,
                                         val,
@@ -126,18 +126,18 @@ class Chorus final : public Effect {
                                         0);
         }
         if (auto p = changed_params.Param(ParamIndex::ChorusDepth))
-            m_smoothed_value_system.SetVariableLength(m_depth_01_smoother_id, p->ProjectedValue(), 3, 25, 1);
+            smoothed_value_system.SetVariableLength(m_depth_01_smoother_id, p->ProjectedValue(), 3, 25, 1);
         if (auto p = changed_params.Param(ParamIndex::ChorusWet))
-            m_wet_dry.SetWet(m_smoothed_value_system, p->ProjectedValue());
+            m_wet_dry.SetWet(smoothed_value_system, p->ProjectedValue());
         if (auto p = changed_params.Param(ParamIndex::ChorusDry))
-            m_wet_dry.SetDry(m_smoothed_value_system, p->ProjectedValue());
+            m_wet_dry.SetDry(smoothed_value_system, p->ProjectedValue());
     }
 
     StereoAudioFrame
     ProcessFrame(AudioProcessingContext const&, StereoAudioFrame in, u32 frame_index) override {
-        auto const depth = m_smoothed_value_system.Value(m_depth_01_smoother_id, frame_index);
+        auto const depth = smoothed_value_system.Value(m_depth_01_smoother_id, frame_index);
         auto [highpass_coeffs, filter_mix] =
-            m_smoothed_value_system.Value(m_highpass_filter_coeffs_smoother_id, frame_index);
+            smoothed_value_system.Value(m_highpass_filter_coeffs_smoother_id, frame_index);
         auto chorus_in = in * filter_mix;
 
         auto out = chorus_in;
@@ -150,7 +150,7 @@ class Chorus final : public Effect {
                                                          m_lowpass_filter_coeffs,
                                                          highpass_coeffs) /
                2;
-        return m_wet_dry.MixStereo(m_smoothed_value_system, frame_index, out, in);
+        return m_wet_dry.MixStereo(smoothed_value_system, frame_index, out, in);
     }
 
     void ResetInternal() override {

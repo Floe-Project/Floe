@@ -35,7 +35,7 @@ class StereoWiden final : public Effect {
 
     StereoAudioFrame
     ProcessFrame(AudioProcessingContext const&, StereoAudioFrame in, u32 frame_index) override {
-        return DoStereoWiden(m_smoothed_value_system.Value(m_width_smoother_id, frame_index), in);
+        return DoStereoWiden(smoothed_value_system.Value(m_width_smoother_id, frame_index), in);
     }
     void OnParamChangeInternal(ChangedParams changed_params, AudioProcessingContext const&) override {
         if (auto p = changed_params.Param(ParamIndex::StereoWidenWidth)) {
@@ -46,7 +46,7 @@ class StereoWiden final : public Effect {
             else
                 v = MapFrom01(val, 1, 4);
 
-            m_smoothed_value_system.Set(m_width_smoother_id, v, 4);
+            smoothed_value_system.Set(m_width_smoother_id, v, 4);
         }
     }
 

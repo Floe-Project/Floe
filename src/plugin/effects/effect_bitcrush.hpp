@@ -45,7 +45,7 @@ class BitCrush final : public Effect {
     ProcessFrame(AudioProcessingContext const& context, StereoAudioFrame in, u32 frame_index) override {
         auto const v = m_bit_crusher.BitCrush({in.l, in.r}, context.sample_rate, m_bit_depth, m_bit_rate);
         StereoAudioFrame const wet {v[0], v[1]};
-        return m_wet_dry.MixStereo(m_smoothed_value_system, frame_index, wet, in);
+        return m_wet_dry.MixStereo(smoothed_value_system, frame_index, wet, in);
     }
 
     void OnParamChangeInternal(ChangedParams changed_params, AudioProcessingContext const&) override {
@@ -53,9 +53,9 @@ class BitCrush final : public Effect {
         if (auto p = changed_params.Param(ParamIndex::BitCrushBitRate))
             m_bit_rate = (int)(p->ProjectedValue() + 0.5f);
         if (auto p = changed_params.Param(ParamIndex::BitCrushWet))
-            m_wet_dry.SetWet(m_smoothed_value_system, p->ProjectedValue());
+            m_wet_dry.SetWet(smoothed_value_system, p->ProjectedValue());
         if (auto p = changed_params.Param(ParamIndex::BitCrushDry))
-            m_wet_dry.SetDry(m_smoothed_value_system, p->ProjectedValue());
+            m_wet_dry.SetDry(smoothed_value_system, p->ProjectedValue());
     }
 
     int m_bit_depth, m_bit_rate;

@@ -1317,7 +1317,7 @@ clap_process_status Process(AudioProcessor& processor, clap_process const& proce
             processor.voice_pool.buffer_pool[(usize)unused_buffer_indexes[0]].data,
             processor.voice_pool.buffer_pool[(usize)unused_buffer_indexes[1]].data);
 
-        bool any_fx_processed = false;
+        bool any_fx_still_processing = false;
         for (auto fx : processor.actual_fx_order) {
             if (fx->type == EffectType::ConvolutionReverb) {
                 auto const r = ((ConvolutionReverb*)fx)
@@ -1325,12 +1325,14 @@ clap_process_status Process(AudioProcessor& processor, clap_process const& proce
                                                              interleaved_stereo_samples,
                                                              scratch_buffers,
                                                              mark_convolution_for_fade_out);
-                any_fx_processed |= r.did_any_processing;
+                if (r.effect_process_state == ProcessResult::ProcessingTail)
+                    any_fx_still_processing = true;
                 if (r.changed_ir) request_main_thread_callback = true;
             } else {
-                any_fx_processed |= fx->ProcessBlock(interleaved_stereo_samples,
-                                                     scratch_buffers,
-                                                     processor.audio_processing_context);
+                auto const r = fx->ProcessBlock(interleaved_stereo_samples,
+                                                scratch_buffers,
+                                                processor.audio_processing_context);
+                if (r == ProcessResult::ProcessingTail) any_fx_still_processing = true;
             }
         }
 
@@ -1345,10 +1347,8 @@ clap_process_status Process(AudioProcessor& processor, clap_process const& proce
         }
         processor.peak_meter.AddBuffer(interleaved_stereo_samples);
 
-        // TODO(1.0): review new delay/reverb tails and see if there's any issues
         processor.fx_need_another_frame_of_processing =
-            any_fx_processed && (!processor.peak_meter.Silent() || !processor.convo.IsSilent() ||
-                                 !processor.reverb.IsSilent() || !processor.delay.IsSilent());
+            any_fx_still_processing && !processor.peak_meter.Silent();
     } else {
         processor.peak_meter.Zero();
         for (auto& l : processor.layer_processors)

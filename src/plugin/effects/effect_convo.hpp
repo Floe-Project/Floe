@@ -24,7 +24,7 @@ class ConvolutionReverb final : public Effect {
     ~ConvolutionReverb() { DeletedUnusedConvolvers(); }
 
     struct ProcessResult {
-        bool did_any_processing = false;
+        ProcessResult effect_process_state = ProcessResult::Done;
         bool changed_ir = false;
     };
 
@@ -59,10 +59,9 @@ class ConvolutionReverb final : public Effect {
 
         for (auto [frame_index, frame] : Enumerate<u32>(io_frames)) {
             StereoAudioFrame wet(wet_channels, frame_index);
-            auto [filter_coeffs, mix] =
-                m_smoothed_value_system.Value(m_filter_coeffs_smoother_id, frame_index);
+            auto [filter_coeffs, mix] = smoothed_value_system.Value(m_filter_coeffs_smoother_id, frame_index);
             wet = Process(m_filter, filter_coeffs, wet * mix);
-            wet = m_wet_dry.MixStereo(m_smoothed_value_system, frame_index, wet, frame);
+            wet = m_wet_dry.MixStereo(smoothed_value_system, frame_index, wet, frame);
 
             if (auto f = m_fade.GetFade(); f != 1) wet = LinearInterpolate(f, frame, wet);
 
@@ -77,7 +76,8 @@ class ConvolutionReverb final : public Effect {
             wet = MixOnOffSmoothing(wet, frame, frame_index);
             frame = wet;
         }
-        result.did_any_processing = true;
+        result.effect_process_state =
+            IsSilent() ? ProcessResult::Done : ProcessResult::ProcessingTail;
         return result;
     }
 
@@ -150,16 +150,16 @@ class ConvolutionReverb final : public Effect {
 
     void OnParamChangeInternal(ChangedParams changed_params, AudioProcessingContext const& context) override {
         if (auto p = changed_params.Param(ParamIndex::ConvolutionReverbHighpass))
-            m_smoothed_value_system.Set(m_filter_coeffs_smoother_id,
-                                        rbj_filter::Type::HighPass,
-                                        context.sample_rate,
-                                        p->ProjectedValue(),
-                                        1,
-                                        0);
+            smoothed_value_system.Set(m_filter_coeffs_smoother_id,
+                                      rbj_filter::Type::HighPass,
+                                      context.sample_rate,
+                                      p->ProjectedValue(),
+                                      1,
+                                      0);
         if (auto p = changed_params.Param(ParamIndex::ConvolutionReverbWet))
-            m_wet_dry.SetWet(m_smoothed_value_system, p->ProjectedValue());
+            m_wet_dry.SetWet(smoothed_value_system, p->ProjectedValue());
         if (auto p = changed_params.Param(ParamIndex::ConvolutionReverbDry))
-            m_wet_dry.SetDry(m_smoothed_value_system, p->ProjectedValue());
+            m_wet_dry.SetDry(smoothed_value_system, p->ProjectedValue());
     }
 
     void ResetInternal() override {

@@ -108,7 +108,7 @@ class Distortion final : public Effect {
   private:
     StereoAudioFrame
     ProcessFrame(AudioProcessingContext const&, StereoAudioFrame in, u32 frame_index) override {
-        auto const amt = m_smoothed_value_system.Value(m_amount_smoother_id, frame_index);
+        auto const amt = smoothed_value_system.Value(m_amount_smoother_id, frame_index);
         StereoAudioFrame out {m_processor_l.Saturate(in.l, m_type, amt),
                               m_processor_r.Saturate(in.r, m_type, amt)};
         return out;
@@ -132,7 +132,7 @@ class Distortion final : public Effect {
 
         if (auto p = changed_params.Param(ParamIndex::DistortionDrive)) {
             constexpr f32 k_smoothing_ms = 10;
-            m_smoothed_value_system.Set(m_amount_smoother_id, p->ProjectedValue(), k_smoothing_ms);
+            smoothed_value_system.Set(m_amount_smoother_id, p->ProjectedValue(), k_smoothing_ms);
         }
     }
 

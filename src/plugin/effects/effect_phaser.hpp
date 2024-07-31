@@ -20,11 +20,11 @@ class Phaser final : public Effect {
         vitfx::phaser::SetSampleRate(*phaser, (int)context.sample_rate);
     }
 
-    bool ProcessBlock(Span<StereoAudioFrame> io_frames,
-                      ScratchBuffers scratch_buffers,
-                      AudioProcessingContext const&) override {
+    ProcessResult ProcessBlock(Span<StereoAudioFrame> io_frames,
+                                    ScratchBuffers scratch_buffers,
+                                    AudioProcessingContext const&) override {
         ZoneNamedN(process_block, "Phaser ProcessBlock", true);
-        if (!ShouldProcessBlock()) return false;
+        if (!ShouldProcessBlock()) return ProcessResult::Done;
 
         auto wet = scratch_buffers.buf1.Interleaved();
         wet.size = io_frames.size;
@@ -49,7 +49,7 @@ class Phaser final : public Effect {
         for (auto const frame_index : Range((u32)io_frames.size))
             io_frames[frame_index] = MixOnOffSmoothing(wet[frame_index], io_frames[frame_index], frame_index);
 
-        return true;
+        return ProcessResult::Done;
     }
 
     void OnParamChangeInternal(ChangedParams changed_params, AudioProcessingContext const&) override {

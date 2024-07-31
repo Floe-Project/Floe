@@ -112,7 +112,7 @@ class TaggedUnion {
     static constexpr usize k_data_align = LargestValueInTemplateArgs<alignof(typename Ts::Type)...>::value;
 
     template <TagType k_wanted_tag>
-    constexpr void CallIfTypesMatch(auto&& function) const {
+    constexpr inline void CallWithTypeIfTagMatches(auto&& function) const {
         if (k_wanted_tag == tag) return function(GetFromTypeIndex<TagToType<k_wanted_tag>::k_index>());
     }
 
@@ -172,7 +172,27 @@ class TaggedUnion {
         return TypeToTag<Type>() == tag;
     }
 
-    bool operator==(TaggedUnion const& other) const = default;
+    bool operator==(TaggedUnion const& other) const {
+        if (tag != other.tag) return false;
+
+        Optional<bool> result;
+        Visit([&](auto const& v) { result = v == other.Get<RemoveCVReference<decltype(v)>>(); });
+
+        // If the tag has no associated data, we just compare the tags (which we already did)
+        if (!result) return true;
+        return *result;
+    }
+
+    bool operator!=(TaggedUnion const& other) const {
+        if (tag != other.tag) return true;
+
+        Optional<bool> result;
+        Visit([&](auto const& v) { result = v != other.Get<RemoveCVReference<decltype(v)>>(); });
+
+        // If the tag has no associated data, we just compare the tags (which we already did)
+        if (!result) return false;
+        return *result;
+    }
 
     bool operator==(TagType t) const {
         if constexpr (RUNTIME_SAFETY_CHECKS_ON) (AssertTagIsntAssociatedWithData<Ts>(t), ...);
@@ -241,7 +261,7 @@ class TaggedUnion {
     }
 
     // ===========================================================
-    void Visit(auto&& function) const { (CallIfTypesMatch<Ts::k_tag>(function), ...); }
+    inline void Visit(auto&& function) const { (CallWithTypeIfTagMatches<Ts::k_tag>(function), ...); }
 
     // don't modify these directly, use the methods
     // ===========================================================

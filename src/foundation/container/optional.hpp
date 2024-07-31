@@ -60,6 +60,11 @@ class [[nodiscard]] Optional<Type> {
         return has_value == other.has_value;
     }
 
+    constexpr bool operator==(Type const& other) const {
+        if (has_value) return value == other;
+        return false;
+    }
+
     constexpr Type* NullableValue() {
         if (has_value) return &value;
         return nullptr;
@@ -251,6 +256,11 @@ class [[nodiscard]] Optional<Type> {
     constexpr bool operator==(Optional const& other) const {
         if (m_has_value && other.m_has_value) return Value() == other.Value();
         return !m_has_value && !other.m_has_value;
+    }
+
+    constexpr bool operator==(Type const& other) const {
+        if (m_has_value) return Value() == other;
+        return false;
     }
 
   private:

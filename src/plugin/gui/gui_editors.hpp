@@ -49,6 +49,7 @@ static void DoAudioDebugPanel(Gui* g, Rect r) {
                            "Master Audio Processing: {}",
                            plugin.processor.fx_need_another_frame_of_processing));
 
+    EditorText(&g->editor, fmt::Format(g->scratch_arena, "State diff: {}", plugin.state_change_description));
     imgui.EndWindow();
 }
 

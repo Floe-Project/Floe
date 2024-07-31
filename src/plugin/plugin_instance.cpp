@@ -231,11 +231,74 @@ StateSnapshot CurrentStateSnapshot(PluginInstance const& plugin) {
     return MakeStateSnapshot(plugin.processor);
 }
 
-bool StateChangedSinceLastSnapshot(PluginInstance const& plugin) {
+static auto PrintInstrumentId(InstrumentId id) {
+    DynamicArrayInline<char, 100> result {};
+    switch (id.tag) {
+        case InstrumentType::None: fmt::Append(result, "None"_s); break;
+        case InstrumentType::WaveformSynth:
+            fmt::Append(result, "WaveformSynth: {}"_s, id.Get<WaveformType>());
+            break;
+        case InstrumentType::Sampler:
+            fmt::Append(result,
+                        "Sampler: {}:{}"_s,
+                        id.Get<sample_lib::InstrumentId>().library_name,
+                        id.Get<sample_lib::InstrumentId>().inst_name);
+            break;
+    }
+    return result;
+}
+
+static void AssignDiffDescription(dyn::DynArray auto& diff_desc,
+                                  StateSnapshot const& old_state,
+                                  StateSnapshot const& new_state) {
+    dyn::Clear(diff_desc);
+
+    if (old_state.ir_id != new_state.ir_id) {
+        fmt::Append(diff_desc,
+                    "IR changed: {}:{} vs {}:{}\n"_s,
+                    old_state.ir_id.HasValue() ? old_state.ir_id.Value().library_name.Items() : "null"_s,
+                    old_state.ir_id.HasValue() ? old_state.ir_id.Value().ir_name.Items() : "null"_s,
+                    new_state.ir_id.HasValue() ? new_state.ir_id.Value().library_name.Items() : "null"_s,
+                    new_state.ir_id.HasValue() ? new_state.ir_id.Value().ir_name.Items() : "null"_s);
+    }
+
+    for (auto layer_index : Range(k_num_layers)) {
+        if (old_state.inst_ids[layer_index] != new_state.inst_ids[layer_index]) {
+            fmt::Append(diff_desc,
+                        "Layer {}: {} vs {}\n"_s,
+                        layer_index,
+                        PrintInstrumentId(old_state.inst_ids[layer_index]),
+                        PrintInstrumentId(new_state.inst_ids[layer_index]));
+        }
+    }
+
+    for (auto param_index : Range(k_num_parameters)) {
+        if (old_state.param_values[param_index] != new_state.param_values[param_index]) {
+            fmt::Append(diff_desc,
+                        "Param {}: {} vs {}\n"_s,
+                        k_param_infos[param_index].name,
+                        old_state.param_values[param_index],
+                        new_state.param_values[param_index]);
+        }
+    }
+
+    if (old_state.fx_order != new_state.fx_order) fmt::Append(diff_desc, "FX order changed\n"_s);
+}
+
+bool StateChangedSinceLastSnapshot(PluginInstance& plugin) {
     auto current = CurrentStateSnapshot(plugin);
     // we don't check the params ccs for changes
     current.param_learned_ccs = plugin.last_snapshot.state.param_learned_ccs;
-    return plugin.last_snapshot.state != current;
+    bool const changed = plugin.last_snapshot.state != current;
+
+    if constexpr (!PRODUCTION_BUILD) {
+        if (changed)
+            AssignDiffDescription(plugin.state_change_description, plugin.last_snapshot.state, current);
+        else
+            dyn::Clear(plugin.state_change_description);
+    }
+
+    return changed;
 }
 
 // one-off load

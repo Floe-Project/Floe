@@ -83,6 +83,9 @@ struct PluginInstance {
 
     u64 random_seed = SeedFromTime();
 
+    // IMPORTANT: debug-only, remove this
+    DynamicArrayInline<char, 200> state_change_description {};
+
     ThreadsafeFunctionQueue main_thread_callbacks {.arena = {PageAllocator::Instance()}};
 
     Optional<PendingStateChange> pending_state_change {};
@@ -123,7 +126,7 @@ usize MegabytesUsedBySamples(PluginInstance const& plugin);
 void RandomiseAllLayerInsts(PluginInstance& plugin);
 
 StateSnapshot CurrentStateSnapshot(PluginInstance const& plugin);
-bool StateChangedSinceLastSnapshot(PluginInstance const& plugin);
+bool StateChangedSinceLastSnapshot(PluginInstance& plugin);
 
 void LoadPresetFromListing(PluginInstance& plugin,
                            PresetSelectionCriteria const& selection_criteria,

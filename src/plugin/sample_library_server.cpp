@@ -495,7 +495,7 @@ static bool UpdateLibraryJobs(Server& server,
         }
     }
 
-    // TODO(1.0): if a library/instrument has changed trigger a reload for all clients of this loader so it
+    // TODO(1.0): if a library/instrument has changed, trigger a reload for all clients of this loader so it
     // feels totally seamless
 
     // remove libraries that are not in any active scan-folders
@@ -1158,6 +1158,11 @@ static bool UpdatePendingResources(PendingResources& pending_resources,
                         .id = Hash("ir  "_s) + Hash(ir_index.library_name.Items()) +
                               Hash(ir_index.ir_name.Items()),
                     };
+                    fmt::Assign(err->value.message,
+                                "File '{}', in library {} failed to load. Check your Lua file: {}",
+                                ir_ptr->ir.ir.path,
+                                ir_index.library_name,
+                                ir_ptr->ir.ir.library.path);
                     pending_resource.request.async_comms_channel.error_notifications.AddOrUpdateError(err);
                 }
                 pending_resource.state = *ir.audio_data->error;

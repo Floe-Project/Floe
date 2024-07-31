@@ -41,7 +41,8 @@ class ChangedParamsTemplate {
         , m_changed(changed) {}
 
     Parameter const* Param(IndexType index) const {
-        return m_changed.Get(ToInt(index)) ? &m_params[ToInt(index)] : nullptr;
+        auto const i = ToInt(index);
+        return m_changed.Get(i) ? &m_params[i] : nullptr;
     }
 
     template <usize k_result_size>

@@ -128,91 +128,130 @@ Optional<f32> ParameterInfo::StringToLinearValue(String str) const {
     return {};
 }
 
+static bool NumberStartsWithNegativeZero(String str) {
+    if (str[0] == '-') {
+        usize zero_end_index = 1;
+        for (auto const i : ::Range(1uz, str.size))
+            if (str[i] == '0' || str[i] == '.')
+                zero_end_index++;
+            else
+                break;
+        if (zero_end_index == str.size || str[zero_end_index] == ' ') return true;
+    }
+    return false;
+}
+
+TEST_CASE(TestNumberStartsWithNegativeZero) {
+    CHECK(NumberStartsWithNegativeZero("-0"_s));
+    CHECK(NumberStartsWithNegativeZero("-0.0"_s));
+    CHECK(NumberStartsWithNegativeZero("-0.000"_s));
+    CHECK(NumberStartsWithNegativeZero("-0.000 "_s));
+    CHECK(NumberStartsWithNegativeZero("-0.000  "_s));
+    CHECK(NumberStartsWithNegativeZero("-0.000 1"_s));
+    CHECK(!NumberStartsWithNegativeZero("-0.0001"_s));
+    CHECK(!NumberStartsWithNegativeZero("-0.0001 "_s));
+    CHECK(!NumberStartsWithNegativeZero("-0.0001  "_s));
+    return k_success;
+}
+
 Optional<DynamicArrayInline<char, 128>> ParameterInfo::LinearValueToString(f32 linear_value) const {
     constexpr usize k_size = 128;
     using ResultType = DynamicArrayInline<char, k_size>;
+    ResultType result;
     auto const value = ProjectValue(linear_value);
 
     switch (display_format) {
         case ParamDisplayFormat::None: {
             switch (value_type) {
                 case ParamValueType::Float: {
-                    return fmt::FormatInline<k_size>("{.1}", value);
+                    result = fmt::FormatInline<k_size>("{.1}", value);
+                    break;
                 }
                 case ParamValueType::Menu: {
-                    return ParameterMenuItems(
+                    result = ParameterMenuItems(
                         ParamIdToIndex(id).Value())[CheckedCast<u32>(ParamToInt<u32>(linear_value))];
                     break;
                 }
                 case ParamValueType::Bool: {
-                    return ResultType {(value >= 0.5f) ? "On"_s : "Off"_s};
+                    result = ResultType {(value >= 0.5f) ? "On"_s : "Off"_s};
                     break;
                 }
                 case ParamValueType::Int: {
-                    return fmt::FormatInline<k_size>("{}", ParamToInt<int>(linear_value));
+                    result = fmt::FormatInline<k_size>("{}", ParamToInt<int>(linear_value));
                     break;
                 }
             }
+            break;
         }
         case ParamDisplayFormat::Percent: {
-            return fmt::FormatInline<k_size>("{.0}%", value * 100.0f);
+            result = fmt::FormatInline<k_size>("{.0}%", value * 100.0f);
+            break;
         }
         case ParamDisplayFormat::Pan: {
             auto const scaled_value = value * 100.0f;
             if (scaled_value > -0.5f && scaled_value < 0.5f)
-                return ResultType("0");
+                result = ResultType("0");
             else if (scaled_value < 0)
-                return fmt::FormatInline<k_size>("{.0} L", -scaled_value);
+                result = fmt::FormatInline<k_size>("{.0} L", -scaled_value);
             else
-                return fmt::FormatInline<k_size>("{.0} R", scaled_value);
+                result = fmt::FormatInline<k_size>("{.0} R", scaled_value);
+            break;
         }
         case ParamDisplayFormat::SinevibesFilter: {
             auto const scaled_value = value * 100.0f;
             if (scaled_value > -0.5f && scaled_value < 0.5f)
-                return ResultType {"Off"};
+                result = ResultType {"Off"};
             else if (scaled_value < 0)
-                return fmt::FormatInline<k_size>("Lo-cut {.0}%", -scaled_value);
+                result = fmt::FormatInline<k_size>("Lo-cut {.0}%", -scaled_value);
             else
-                return fmt::FormatInline<k_size>("Hi-cut {.0}%", scaled_value);
+                result = fmt::FormatInline<k_size>("Hi-cut {.0}%", scaled_value);
+            break;
         }
         case ParamDisplayFormat::Ms: {
             if (RoundPositiveFloat(value) >= 1000)
-                return fmt::FormatInline<k_size>("{.1} s", value / 1000);
+                result = fmt::FormatInline<k_size>("{.1} s", value / 1000);
             else
-                return fmt::FormatInline<k_size>("{.0} ms", value);
+                result = fmt::FormatInline<k_size>("{.0} ms", value);
+            break;
         }
         case ParamDisplayFormat::VolumeAmp: {
             if (value > k_silence_amp_80) {
-                auto const result = fmt::FormatInline<k_size>("{.1} dB", AmpToDb(value));
-                if (StartsWithSpan(result, "-0.0"_s)) return ResultType("0.0 dB");
-                return result;
+                result = fmt::FormatInline<k_size>("{.1} dB", AmpToDb(value));
+                break;
             } else
-                return ResultType("-\u221E");
+                result = ResultType("-\u221E");
+            break;
         }
         case ParamDisplayFormat::Hz: {
             if (RoundPositiveFloat(value) >= 1000)
-                return fmt::FormatInline<k_size>("{.1} kHz", value / 1000);
+                result = fmt::FormatInline<k_size>("{.1} kHz", value / 1000);
             else if (projection->range.Delta() > 100)
-                return fmt::FormatInline<k_size>("{.0} Hz", value);
+                result = fmt::FormatInline<k_size>("{.0} Hz", value);
             else if (projection->range.min < 0.01f)
-                return fmt::FormatInline<k_size>("{.3} Hz", value);
+                result = fmt::FormatInline<k_size>("{.3} Hz", value);
             else
-                return fmt::FormatInline<k_size>("{.1} Hz", value);
+                result = fmt::FormatInline<k_size>("{.1} Hz", value);
+            break;
         }
         case ParamDisplayFormat::VolumeDbRange: {
-            auto const result = fmt::FormatInline<k_size>("{.1} dB", value);
-            if (StartsWithSpan(result, "-0.0"_s)) return ResultType("0.0 dB");
-            return result;
+            result = fmt::FormatInline<k_size>("{.1} dB", value);
+            break;
         }
         case ParamDisplayFormat::Cents: {
-            return fmt::FormatInline<k_size>("{.0} cents", value);
+            result = fmt::FormatInline<k_size>("{.0} cents", value);
+            break;
         }
         case ParamDisplayFormat::FilterSemitones: {
-            return fmt::FormatInline<k_size>("{.0} semitones", value);
+            result = fmt::FormatInline<k_size>("{.0} semitones", value);
+            break;
         }
     }
 
-    return fmt::FormatInline<k_size>("{.1}", value);
+    if (!result.size) result = fmt::FormatInline<k_size>("{.1}", value);
+
+    if (NumberStartsWithNegativeZero(result)) dyn::Remove(result, 0);
+
+    return result;
 }
 
 String ParamMenuText(ParamIndex index, f32 value) {
@@ -233,7 +272,7 @@ struct LayerParamId {
 };
 
 // The legacy layer parameter were prefixed with L0, L1, L2, etc., where the number is the layer index. In
-// this array we just store the suffixes. The prefix is programmatically accounted for.
+// this array we just store the suffixes. The prefix is programmatically handled when needed.
 constexpr auto k_layer_params = ArrayT<LayerParamId>({
     {"Vol", LayerParamIndex::Volume},
     {"Mute", LayerParamIndex::Mute},
@@ -432,15 +471,28 @@ Optional<LegacyParam> ParamFromLegacyId(String id) {
 }
 
 TEST_CASE(TestParamStringConversion) {
-    auto const& attack_param =
-        k_param_infos[ToInt(ParamIndexFromLayerParamIndex(0, LayerParamIndex::VolumeAttack))];
-    tester.log.DebugLn("Attack param id: {}", attack_param.id);
-    auto const str = attack_param.LinearValueToString(0.4708353049341293f);
-    REQUIRE(str);
-    auto const val = attack_param.StringToLinearValue(*str);
-    REQUIRE(val);
-    auto const str2 = attack_param.LinearValueToString(*val);
-    tester.log.DebugLn("Attack param str: {}, value: {}, str2: {}", *str, *val, *str2);
+    {
+        auto const& attack_param =
+            k_param_infos[ToInt(ParamIndexFromLayerParamIndex(0, LayerParamIndex::VolumeAttack))];
+        tester.log.DebugLn("Attack param id: {}", attack_param.id);
+        auto const str = attack_param.LinearValueToString(0.4708353049341293f);
+        REQUIRE(str);
+        auto const val = attack_param.StringToLinearValue(*str);
+        REQUIRE(val);
+        auto const str2 = attack_param.LinearValueToString(*val);
+        tester.log.DebugLn("Attack param str: {}, value: {}, str2: {}", *str, *val, *str2);
+    }
+    {
+        auto const& detune_param =
+            k_param_infos[ToInt(ParamIndexFromLayerParamIndex(0, LayerParamIndex::TuneCents))];
+        tester.log.DebugLn("Detune param id: {}", detune_param.id);
+        auto const str = detune_param.LinearValueToString(-0.010595884688319623f);
+        REQUIRE(str);
+        auto const val = detune_param.StringToLinearValue(*str);
+        REQUIRE(val);
+        auto const str2 = detune_param.LinearValueToString(*val);
+        tester.log.DebugLn("Detune param str: {}, value: {}, str2: {}", *str, *val, *str2);
+    }
     return k_success;
 }
 
@@ -457,6 +509,7 @@ TEST_CASE(TestLegacyConversion) {
 }
 
 TEST_REGISTRATION(RegisterParamInfoTests) {
+    REGISTER_TEST(TestNumberStartsWithNegativeZero);
     REGISTER_TEST(TestLegacyConversion);
     REGISTER_TEST(TestParamStringConversion);
 }

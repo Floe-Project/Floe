@@ -384,7 +384,7 @@ constexpr auto k_params = ArrayT<NoLongerExistsParam>({
     {"RvDamp", NoLongerExistingParam::ReverbFreeverbDampingPercent},
     {"RvWidth", NoLongerExistingParam::ReverbFreeverbWidthPercent},
     {"RvWet", NoLongerExistingParam::ReverbFreeverbWetPercent},
-    {"RvDry", NoLongerExistingParam::ReverbDryPercent},
+    {"RvDry", NoLongerExistingParam::ReverbDryDb},
     {"RvSize", NoLongerExistingParam::ReverbSizePercent},
     {"RvOn", NoLongerExistingParam::ReverbOnSwitch},
     {"RvLeg", NoLongerExistingParam::ReverbUseFreeverbSwitch},

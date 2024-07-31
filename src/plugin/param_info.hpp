@@ -2216,7 +2216,7 @@ enum class NoLongerExistingParam : u16 {
     // Reverb had 2 modes: freeverb or sv
     // Params affecting both modes:
     ReverbOnSwitch,
-    ReverbDryPercent,
+    ReverbDryDb,
     ReverbSizePercent,
     ReverbUseFreeverbSwitch,
     // Freeverb mode:

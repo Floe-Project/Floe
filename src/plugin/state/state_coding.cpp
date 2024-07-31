@@ -350,8 +350,10 @@ class JsonStateParser {
                                 // names have to be unique within a library.
                                 //
                                 // These are the handful of conflicts that existed in the MDATA libraries, and
-                                // the new names that we use to identify them. This is pretty hacky; it's
-                                // parrelleled with the renaming code in the sample_library files.
+                                // the new names that we use to identify them.
+                                //
+                                // IMPORTANT: This is pretty hacky; it's parrelleled with the renaming code in
+                                // the sample_library files. You must keep them in sync.
                                 if (path == "sampler/Rhythmic Movement/Strange Movements"_s)
                                     name = "Strange Movements 2"_s;
                                 else if (path ==
@@ -554,10 +556,11 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
         auto const uses_freeverb = old_p(NoLongerExistingParam::ReverbUseFreeverbSwitch).ValueOr(1) > 0.5f;
 
         auto const old_settings_on = old_p(NoLongerExistingParam::ReverbOnSwitch).ValueOr(0) != 0;
-        auto const old_settings_dry_01 = old_p(NoLongerExistingParam::ReverbDryPercent).ValueOr(100) / 100.0f;
+        auto const old_settings_dry_01 = DbToAmp(old_p(NoLongerExistingParam::ReverbDryDb).ValueOr(0));
         auto const old_settings_wet_01 =
             uses_freeverb ? old_p(NoLongerExistingParam::ReverbFreeverbWetPercent).ValueOr(0) / 100.0f
-                          : Min(1.0f, DbToAmp(old_p(NoLongerExistingParam::ReverbSvWetDb).ValueOr(-90)));
+                          : DbToAmp(old_p(NoLongerExistingParam::ReverbSvWetDb).ValueOr(-90));
+
         auto const old_settings_size_01 =
             old_p(NoLongerExistingParam::ReverbSizePercent).ValueOr(40) / 100.0f;
         auto const old_settings_pre_delay_ms = old_p(NoLongerExistingParam::ReverbSvPreDelayMs).ValueOr(0);

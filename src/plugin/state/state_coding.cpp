@@ -1737,7 +1737,7 @@ TEST_CASE(TestLoadingOldFiles) {
         CHECK_APPROX_EQ(ProjectedValue(state, ParamIndex::ReverbPreHighPassCutoff), 0.0f, 1.0f);
         CHECK_APPROX_EQ(ProjectedValue(state, ParamIndex::ReverbHighShelfGain), 0.0f, 1.0f);
         CHECK_APPROX_EQ(ProjectedValue(state, ParamIndex::ReverbLowShelfGain), 0.0f, 1.0f);
-        CHECK_APPROX_EQ(state.param_values[ToInt(ParamIndex::ReverbMix)], 1.0f, 0.2f);
+        CHECK_APPROX_EQ(state.param_values[ToInt(ParamIndex::ReverbMix)], 0.3f, 0.02f);
 
         CHECK_EQ(state.param_values[ToInt(ParamIndex::PhaserOn)], 1.0f);
         CHECK_APPROX_EQ(ProjectedValue(state, ParamIndex::PhaserCenterSemitones),

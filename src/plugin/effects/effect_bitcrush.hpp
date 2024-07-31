@@ -7,8 +7,6 @@
 #include "smoothed_value_system.hpp"
 
 struct BitCrushProcessor {
-    static f32 Round(f32 f) { return (f > 0.0f) ? Floor(f + 0.5f) : Ceil(f - 0.5f); }
-
     static s64 IntegerPowerBase2(s64 exponent) {
         s64 i = 1;
         for (int j = 1; j <= exponent; j++)
@@ -16,7 +14,7 @@ struct BitCrushProcessor {
         return i;
     }
 
-    f32 BitCrush(f32 input, f32 sample_rate, int bit_depth, int bit_rate) {
+    f32x2 BitCrush(f32x2 input, f32 sample_rate, int bit_depth, int bit_rate) {
         auto resolution = IntegerPowerBase2(bit_depth) - 1;
         auto step = (int)(sample_rate / (f32)bit_rate);
 
@@ -35,7 +33,7 @@ struct BitCrushProcessor {
     }
 
     int pos = 0;
-    f32 held_sample = 0;
+    f32x2 held_sample = 0;
 };
 
 class BitCrush final : public Effect {
@@ -45,9 +43,8 @@ class BitCrush final : public Effect {
   private:
     StereoAudioFrame
     ProcessFrame(AudioProcessingContext const& context, StereoAudioFrame in, u32 frame_index) override {
-        StereoAudioFrame const wet {
-            m_bit_crusher_l.BitCrush(in.l, context.sample_rate, m_bit_depth, m_bit_rate),
-            m_bit_crusher_r.BitCrush(in.r, context.sample_rate, m_bit_depth, m_bit_rate)};
+        auto const v = m_bit_crusher.BitCrush({in.l, in.r}, context.sample_rate, m_bit_depth, m_bit_rate);
+        StereoAudioFrame const wet {v[0], v[1]};
         return m_wet_dry.MixStereo(m_smoothed_value_system, frame_index, wet, in);
     }
 
@@ -62,6 +59,6 @@ class BitCrush final : public Effect {
     }
 
     int m_bit_depth, m_bit_rate;
-    BitCrushProcessor m_bit_crusher_l, m_bit_crusher_r;
+    BitCrushProcessor m_bit_crusher;
     EffectWetDryHelper m_wet_dry;
 };

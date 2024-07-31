@@ -15,10 +15,8 @@ class Reverb final : public Effect {
     ~Reverb() override { vitfx::reverb::Destroy(reverb); }
 
     void ResetInternal() override {
-        if (reset) return;
         ZoneNamedN(hard_reset, "Reverb HardReset", true);
         vitfx::reverb::HardReset(*reverb);
-        reset = true;
         silent_seconds = 0;
     }
 
@@ -31,8 +29,6 @@ class Reverb final : public Effect {
                       AudioProcessingContext const& context) override {
         ZoneNamedN(process_block, "Reverb ProcessBlock", true);
         if (!ShouldProcessBlock()) return false;
-
-        reset = false;
 
         UpdateSilentSeconds(silent_seconds, io_frames, context.sample_rate);
 
@@ -96,7 +92,6 @@ class Reverb final : public Effect {
     }
 
     f32 silent_seconds = 0;
-    bool reset = true;
     vitfx::reverb::Reverb* reverb {};
     vitfx::reverb::ProcessReverbArgs args {};
 };

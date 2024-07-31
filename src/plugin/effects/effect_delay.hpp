@@ -13,10 +13,8 @@ class Delay final : public Effect {
     ~Delay() override { vitfx::delay::Destroy(delay); }
 
     void ResetInternal() override {
-        if (reset) return;
         ZoneNamedN(hard_reset, "Delay HardReset", true);
         vitfx::delay::HardReset(*delay);
-        reset = true;
         silent_seconds = 0;
     }
 
@@ -29,8 +27,6 @@ class Delay final : public Effect {
                       AudioProcessingContext const& context) override {
         ZoneNamedN(process_block, "Delay ProcessBlock", true);
         if (!ShouldProcessBlock()) return false;
-
-        reset = false;
 
         auto wet = scratch_buffers.buf1.Interleaved();
         wet.size = io_frames.size;
@@ -153,7 +149,6 @@ class Delay final : public Effect {
     }
 
     f32 silent_seconds = 0;
-    bool reset = true;
     vitfx::delay::Delay* delay {};
     SyncedTimes synced_time_l {};
     SyncedTimes synced_time_r {};

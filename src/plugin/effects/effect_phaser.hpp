@@ -12,10 +12,8 @@ class Phaser final : public Effect {
     ~Phaser() override { vitfx::phaser::Destroy(phaser); }
 
     void ResetInternal() override {
-        if (reset) return;
         ZoneNamedN(hard_reset, "Phaser HardReset", true);
         vitfx::phaser::HardReset(*phaser);
-        reset = true;
     }
 
     void PrepareToPlay(AudioProcessingContext const& context) override {
@@ -27,8 +25,6 @@ class Phaser final : public Effect {
                       AudioProcessingContext const&) override {
         ZoneNamedN(process_block, "Phaser ProcessBlock", true);
         if (!ShouldProcessBlock()) return false;
-
-        reset = false;
 
         auto wet = scratch_buffers.buf1.Interleaved();
         wet.size = io_frames.size;
@@ -75,7 +71,6 @@ class Phaser final : public Effect {
             args.params[ToInt(Params::Mix)] = p->ProjectedValue();
     }
 
-    bool reset = true;
     vitfx::phaser::Phaser* phaser {};
     vitfx::phaser::ProcessPhaserArgs args {};
 };

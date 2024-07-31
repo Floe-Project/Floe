@@ -8,14 +8,8 @@
 #include "audio_processing_context.hpp"
 #include "effect_infos.hpp"
 #include "param.hpp"
-#include "param_info.hpp"
 #include "processing/stereo_audio_frame.hpp"
 #include "smoothed_value_system.hpp"
-
-struct ParamState {
-    ParamIndex index;
-    f32 value;
-};
 
 inline void UpdateSilentSeconds(f32& silent_seconds, Span<StereoAudioFrame const> frames, f32 sample_rate) {
     bool all_silent = true;
@@ -55,8 +49,6 @@ struct EffectWetDryHelper {
     FloeSmoothedValueSystem::FloatId const m_wet_smoother_id;
     FloeSmoothedValueSystem::FloatId const m_dry_smoother_id;
 };
-
-class EffectLegacyModeHelper;
 
 struct ScratchBuffers {
     class Buffer {
@@ -121,9 +113,6 @@ class Effect {
 
     EffectType const type;
 
-    friend class EffectLegacyModeHelper;
-
-  protected:
     bool ShouldProcessBlock() {
         if (m_smoothed_value_system.Value(m_mix_smoother_id, 0) == 0 &&
             m_smoothed_value_system.TargetValue(m_mix_smoother_id) == 0)
@@ -138,7 +127,6 @@ class Effect {
 
     FloeSmoothedValueSystem& m_smoothed_value_system;
 
-  private:
     virtual StereoAudioFrame
     ProcessFrame(AudioProcessingContext const&, StereoAudioFrame in, u32 frame_index) {
         (void)frame_index;

@@ -688,7 +688,7 @@ class FixedSizeAllocator final : public Allocator {
 
 // IMRPOVE: make a proper specialisation of this; there's lots of room for more efficiency
 template <usize static_size>
-struct ArenaAllocatorWithInlineStorage : public ArenaAllocator {
+struct ArenaAllocatorWithInlineStorage final : public ArenaAllocator {
     ArenaAllocatorWithInlineStorage() : ArenaAllocator(inline_allocator) {
         CreateAndPrependRegionToList(static_size, 0);
     }

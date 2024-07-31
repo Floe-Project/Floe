@@ -1022,10 +1022,15 @@ static bool UpdatePendingResources(PendingResources& pending_resources,
                             pending_resource.request.async_comms_channel.error_notifications.NewError();
                         err->value = {
                             .title = "Failed to find IR"_s,
-                            .message = String(ir_id.ir_name),
+                            .message = {},
                             .error_code = CommonError::NotFound,
-                            .id = ThreadsafeErrorNotifications::Id("ir  ", ir_id.ir_name),
+                            .id = {},
                         };
+                        fmt::Assign(err->value.message,
+                                    "Could not find reverb impulse response: {}, in library: {}",
+                                    ir_id.ir_name,
+                                    library_name);
+                        err->value.id = ThreadsafeErrorNotifications::Id("ir  ", err->value.message),
                         pending_resource.request.async_comms_channel.error_notifications.AddOrUpdateError(
                             err);
                         pending_resource.state = *err->value.error_code;

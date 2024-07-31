@@ -307,15 +307,15 @@ void LayerHandleNoteOff(LayerProcessor& layer,
                         f32 dynamic_param_value_01,
                         f32 velocity_to_volume_01);
 
-struct ProcessResult {
+struct LayerProcessResult {
     bool instrument_swapped;
     bool did_any_processing;
 };
 
-ProcessResult ProcessLayer(LayerProcessor& layer,
-                           AudioProcessingContext const& context,
-                           VoicePool& voice_pool,
-                           u32 num_frames,
-                           bool start_fade_out,
-                           Span<f32> buffer);
+LayerProcessResult ProcessLayer(LayerProcessor& layer,
+                                AudioProcessingContext const& context,
+                                VoicePool& voice_pool,
+                                u32 num_frames,
+                                bool start_fade_out,
+                                Span<f32> buffer);
 void ResetLayerAudioProcessing(LayerProcessor& layer);

@@ -24,11 +24,11 @@ class Reverb final : public Effect {
         vitfx::reverb::SetSampleRate(*reverb, (int)context.sample_rate);
     }
 
-    ProcessResult ProcessBlock(Span<StereoAudioFrame> io_frames,
-                                    ScratchBuffers scratch_buffers,
-                                    AudioProcessingContext const& context) override {
+    EffectProcessResult ProcessBlock(Span<StereoAudioFrame> io_frames,
+                                     ScratchBuffers scratch_buffers,
+                                     AudioProcessingContext const& context) override {
         ZoneNamedN(process_block, "Reverb ProcessBlock", true);
-        if (!ShouldProcessBlock()) return ProcessResult::Done;
+        if (!ShouldProcessBlock()) return EffectProcessResult::Done;
 
         UpdateSilentSeconds(silent_seconds, io_frames, context.sample_rate);
 
@@ -56,7 +56,7 @@ class Reverb final : public Effect {
         for (auto const frame_index : Range((u32)io_frames.size))
             io_frames[frame_index] = MixOnOffSmoothing(wet[frame_index], io_frames[frame_index], frame_index);
 
-        return IsSilent() ? ProcessResult::Done : ProcessResult::ProcessingTail;
+        return IsSilent() ? EffectProcessResult::Done : EffectProcessResult::ProcessingTail;
     }
 
     void OnParamChangeInternal(ChangedParams changed_params, AudioProcessingContext const&) override {

@@ -119,11 +119,11 @@ class Chorus final : public Effect {
         if (auto p = changed_params.Param(ParamIndex::ChorusHighpass)) {
             auto const val = p->ProjectedValue();
             smoothed_value_system.Set(m_highpass_filter_coeffs_smoother_id,
-                                        rbj_filter::Type::HighPass,
-                                        context.sample_rate,
-                                        val,
-                                        1,
-                                        0);
+                                      rbj_filter::Type::HighPass,
+                                      context.sample_rate,
+                                      val,
+                                      1,
+                                      0);
         }
         if (auto p = changed_params.Param(ParamIndex::ChorusDepth))
             smoothed_value_system.SetVariableLength(m_depth_01_smoother_id, p->ProjectedValue(), 3, 25, 1);

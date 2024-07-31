@@ -612,18 +612,18 @@ bool ChangeInstrumentIfNeededAndReset(LayerProcessor& layer, VoicePool& voice_po
     return true;
 }
 
-ProcessResult ProcessLayer(LayerProcessor& layer,
-                           AudioProcessingContext const& context,
-                           VoicePool& voice_pool,
-                           u32 num_frames,
-                           bool start_fade_out,
-                           Span<f32> buffer) {
+LayerProcessResult ProcessLayer(LayerProcessor& layer,
+                                AudioProcessingContext const& context,
+                                VoicePool& voice_pool,
+                                u32 num_frames,
+                                bool start_fade_out,
+                                Span<f32> buffer) {
     ZoneScoped;
     ZoneValue(layer.index);
 
     constexpr f32 k_inst_change_fade_ms = 100;
 
-    ProcessResult result {};
+    LayerProcessResult result {};
 
     // NOTE: we want to trigger a fade out regardless of whether or not this layer is actually processing
     // audio at the moment because we want the swapping of instruments to be in sync with any other layers

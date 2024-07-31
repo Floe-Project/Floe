@@ -15,8 +15,8 @@ struct BitCrushProcessor {
     }
 
     f32x2 BitCrush(f32x2 input, f32 sample_rate, int bit_depth, int bit_rate) {
-        auto resolution = IntegerPowerBase2(bit_depth) - 1;
-        auto step = (int)(sample_rate / (f32)bit_rate);
+        auto const resolution = IntegerPowerBase2(bit_depth) - 1;
+        auto const step = (int)(sample_rate / (f32)bit_rate);
 
         if (pos % step == 0) {
             if (bit_depth < 32)

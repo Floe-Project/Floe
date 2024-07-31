@@ -68,7 +68,7 @@ struct ScratchBuffers {
     Buffer buf1, buf2;
 };
 
-enum class ProcessResult {
+enum class EffectProcessResult {
     Done, // no more processing needed
     ProcessingTail, // processing needed
 };
@@ -98,13 +98,13 @@ class Effect {
     virtual void SetTempo(f64) {}
 
     // audio-thread
-    virtual ProcessResult ProcessBlock(Span<StereoAudioFrame> frames,
-                                       [[maybe_unused]] ScratchBuffers scratch_buffers,
-                                       AudioProcessingContext const& context) {
-        if (!ShouldProcessBlock()) return ProcessResult::Done;
+    virtual EffectProcessResult ProcessBlock(Span<StereoAudioFrame> frames,
+                                             [[maybe_unused]] ScratchBuffers scratch_buffers,
+                                             AudioProcessingContext const& context) {
+        if (!ShouldProcessBlock()) return EffectProcessResult::Done;
         for (auto [i, frame] : Enumerate<u32>(frames))
             frame = MixOnOffSmoothing(ProcessFrame(context, frame, i), frame, i);
-        return ProcessResult::Done;
+        return EffectProcessResult::Done;
     }
 
     // audio-thread

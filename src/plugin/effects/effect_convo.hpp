@@ -23,18 +23,21 @@ class ConvolutionReverb final : public Effect {
         , m_wet_dry(s) {}
     ~ConvolutionReverb() { DeletedUnusedConvolvers(); }
 
-    struct ProcessResult {
-        ProcessResult effect_process_state = ProcessResult::Done;
-        bool changed_ir = false;
+    struct ConvoProcessResult {
+        EffectProcessResult effect_process_state;
+        bool changed_ir;
     };
 
     // audio-thread, instead of the virtual function
-    ProcessResult ProcessBlockConvolution(AudioProcessingContext const& context,
-                                          Span<StereoAudioFrame> io_frames,
-                                          ScratchBuffers scratch_buffers,
-                                          bool start_fade_out) {
+    ConvoProcessResult ProcessBlockConvolution(AudioProcessingContext const& context,
+                                               Span<StereoAudioFrame> io_frames,
+                                               ScratchBuffers scratch_buffers,
+                                               bool start_fade_out) {
         ZoneScoped;
-        ProcessResult result;
+        ConvoProcessResult result {
+            .effect_process_state = EffectProcessResult::Done,
+            .changed_ir = false,
+        };
         if (!ShouldProcessBlock()) {
             result.changed_ir = SwapConvolversIfNeeded();
             return result;
@@ -77,7 +80,7 @@ class ConvolutionReverb final : public Effect {
             frame = wet;
         }
         result.effect_process_state =
-            IsSilent() ? ProcessResult::Done : ProcessResult::ProcessingTail;
+            IsSilent() ? EffectProcessResult::Done : EffectProcessResult::ProcessingTail;
         return result;
     }
 

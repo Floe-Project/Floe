@@ -1325,14 +1325,14 @@ clap_process_status Process(AudioProcessor& processor, clap_process const& proce
                                                              interleaved_stereo_samples,
                                                              scratch_buffers,
                                                              mark_convolution_for_fade_out);
-                if (r.effect_process_state == ProcessResult::ProcessingTail)
+                if (r.effect_process_state == EffectProcessResult::ProcessingTail)
                     any_fx_still_processing = true;
                 if (r.changed_ir) request_main_thread_callback = true;
             } else {
                 auto const r = fx->ProcessBlock(interleaved_stereo_samples,
                                                 scratch_buffers,
                                                 processor.audio_processing_context);
-                if (r == ProcessResult::ProcessingTail) any_fx_still_processing = true;
+                if (r == EffectProcessResult::ProcessingTail) any_fx_still_processing = true;
             }
         }
 

@@ -1035,6 +1035,33 @@ floe.extend_table = function(base_table, t)
 end
 )aaa";
 
+constexpr String k_example_extend_table_usage = R"aaa(
+local group1 = {
+    trigger_criteria = {
+        trigger_event = "note-on",
+        velocity_range = { 0, 100 },
+    },
+    options = {
+        auto_map_key_range_group = "group1",
+        feather_overlapping_velocity_regions = false,
+    },
+}
+
+floe.add_region(instrument, floe.extend_table(group1, {
+    file = {
+        path = "One-shots/Resonating String 2.flac",
+        root_key = 65,
+    },
+}))
+
+floe.add_region(instrument, floe.extend_table(group1, {
+    file = {
+        path = "One-shots/Resonating String 3.flac",
+        root_key = 68,
+    },
+}))
+)aaa";
+
 static VoidOrError<Error> OpenFloeLuaLibrary(LuaState& ctx) {
     luaL_newlib(ctx.lua, k_floe_lib); // puts functions into an table on the top of the stack
     lua_setglobal(ctx.lua, "floe"); // pops top stack value and assigns it to global name
@@ -1470,12 +1497,7 @@ struct LuaCodePrinter {
 
         if (mode.mode_flags & LuaCodePrinter::PrintModeFlagsDocumentedExample) {
             TRY(begin_function("extend_table"));
-            TRY(writer.WriteChars("local common_region_config = {\n"));
-            TRY(PrintStruct(writer, InterpretedTypes::Region, {.mode_flags = {}}, 1));
-            TRY(writer.WriteChars("}\n"));
-            TRY(writer.WriteChars("floe.add_region(instrument, floe.extend_table(common_region_config, {\n"));
-            TRY(writer.WriteChars("    file = { path = \"One-shots/Sheet Vibration.flac\" }\n"));
-            TRY(writer.WriteChars("}))\n"));
+            TRY(writer.WriteChars(k_example_extend_table_usage));
             TRY(end_function("extend_table"));
         }
 

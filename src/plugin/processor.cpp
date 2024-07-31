@@ -1315,7 +1315,7 @@ clap_process_status Process(AudioProcessor& processor, clap_process const& proce
             processor.voice_pool.buffer_pool[(usize)unused_buffer_indexes[0]].data,
             processor.voice_pool.buffer_pool[(usize)unused_buffer_indexes[1]].data);
 
-        bool any_fx_still_processing = false;
+        bool fx_need_another_frame_of_processing = false;
         for (auto fx : processor.actual_fx_order) {
             if (fx->type == EffectType::ConvolutionReverb) {
                 auto const r = ((ConvolutionReverb*)fx)
@@ -1324,15 +1324,16 @@ clap_process_status Process(AudioProcessor& processor, clap_process const& proce
                                                              scratch_buffers,
                                                              mark_convolution_for_fade_out);
                 if (r.effect_process_state == EffectProcessResult::ProcessingTail)
-                    any_fx_still_processing = true;
+                    fx_need_another_frame_of_processing = true;
                 if (r.changed_ir) request_main_thread_callback = true;
             } else {
                 auto const r = fx->ProcessBlock(interleaved_stereo_samples,
                                                 scratch_buffers,
                                                 processor.audio_processing_context);
-                if (r == EffectProcessResult::ProcessingTail) any_fx_still_processing = true;
+                if (r == EffectProcessResult::ProcessingTail) fx_need_another_frame_of_processing = true;
             }
         }
+        processor.fx_need_another_frame_of_processing = fx_need_another_frame_of_processing;
 
         // Master
         // ==================================================================================================
@@ -1344,9 +1345,6 @@ clap_process_status Process(AudioProcessor& processor, clap_process const& proce
             frame *= processor.whole_engine_volume_fade.GetFade();
         }
         processor.peak_meter.AddBuffer(interleaved_stereo_samples);
-
-        processor.fx_need_another_frame_of_processing =
-            any_fx_still_processing && !processor.peak_meter.Silent();
     } else {
         processor.peak_meter.Zero();
         for (auto& l : processor.layer_processors)

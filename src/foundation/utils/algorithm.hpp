@@ -361,3 +361,11 @@ PUBLIC constexpr bool operator==(TypeA const& a, TypeB const& b) {
         if (a[i] != b[i]) return false;
     return true;
 }
+
+template <ContiguousContainer TypeA, ContiguousContainerSimilarTo<TypeA> TypeB>
+PUBLIC constexpr bool operator!=(TypeA const& a, TypeB const& b) {
+    if (a.size != b.size) return true;
+    for (auto const i : Range(a.size))
+        if (a[i] != b[i]) return true;
+    return false;
+}

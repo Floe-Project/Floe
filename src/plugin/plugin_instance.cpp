@@ -232,7 +232,10 @@ StateSnapshot CurrentStateSnapshot(PluginInstance const& plugin) {
 }
 
 bool StateChangedSinceLastSnapshot(PluginInstance const& plugin) {
-    return plugin.last_snapshot.state != CurrentStateSnapshot(plugin);
+    auto current = CurrentStateSnapshot(plugin);
+    // we don't check the params ccs for changes
+    current.param_learned_ccs = plugin.last_snapshot.state.param_learned_ccs;
+    return plugin.last_snapshot.state != current;
 }
 
 // one-off load

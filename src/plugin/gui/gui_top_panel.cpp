@@ -103,7 +103,6 @@ void TopPanel(Gui* g) {
 
     auto cog = lay.CreateChildItem(right_container, icon_width, icon_height, LAY_VCENTER);
     auto menu = lay.CreateChildItem(right_container, icon_width, icon_height, LAY_VCENTER);
-    auto engine_version_lay_id = lay.CreateChildItem(right_container, icon_width, icon_height, LAY_VCENTER);
 
     auto knob_container = lay.CreateParentItem(right_container, 0, 0, LAY_VCENTER, LAY_ROW);
     lay.SetMargins(knob_container, knobs_margin_l, 0, knobs_margin_r, 0);
@@ -316,35 +315,6 @@ void TopPanel(Gui* g) {
             imgui.EndWindow();
         }
         Tooltip(g, additional_menu_id, additonal_menu_r, "Additional functions and information"_s);
-    }
-
-    {
-        auto btn_id = imgui.GetID("enginever");
-        auto btn_r = lay.GetRect(engine_version_lay_id);
-        auto popup_id = imgui.GetID("engverMenuPopup");
-        auto engine_version = plugin.processor.engine_version.Load();
-        if (buttons::Popup(g,
-                           btn_id,
-                           popup_id,
-                           btn_r,
-                           fmt::Format(g->scratch_arena, "v{}", engine_version),
-                           large_icon_button_style)) {
-            DynamicArrayInline<String, k_latest_engine_version> items {};
-            dyn::Append(items, fmt::Format(g->scratch_arena, "Latest Engine (v{})", engine_version));
-            ASSERT(k_latest_engine_version >= 1);
-            for (u8 i = k_latest_engine_version - 1; i != 0; --i)
-                dyn::Append(items, fmt::Format(g->scratch_arena, "Compatibility Mode {}", i));
-
-            int current_index = k_latest_engine_version - engine_version;
-            if (DoMultipleMenuItems(g, items, current_index)) {
-                auto new_version = k_latest_engine_version - current_index;
-                ASSERT(new_version >= 1 && new_version <= k_latest_engine_version);
-                plugin.processor.engine_version.Store((u8)new_version);
-                plugin.processor.events_for_audio_thread.Push(EventForAudioThreadType::ReloadAllAudioState);
-            }
-            imgui.EndWindow();
-        }
-        Tooltip(g, btn_id, btn_r, "Open settings window"_s);
     }
 
     imgui.graphics->context->PopFont();

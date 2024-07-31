@@ -26,7 +26,6 @@ constexpr usize k_max_library_name_size = 64;
 constexpr usize k_max_instrument_name_size = 64;
 constexpr usize k_max_ir_name_size = 64;
 constexpr f32 k_erroneous_sample_value = 1000.0f;
-constexpr u8 k_latest_engine_version = 2; // shown on the GUI as compatibility mode
 constexpr String k_core_library_name = "Core";
 constexpr String k_builtin_library_name = "Built-in";
 

@@ -4,7 +4,6 @@
 #pragma once
 #include "foundation/foundation.hpp"
 
-#include "common/constants.hpp"
 #include "processing/midi.hpp"
 
 struct MidiNoteState {
@@ -46,7 +45,6 @@ struct MidiNoteState {
 };
 
 struct AudioProcessingContext {
-    u8 engine_version {k_latest_engine_version};
     f32 sample_rate = 44100;
     u32 process_block_size_max = 512;
     f64 tempo = 120;

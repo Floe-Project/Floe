@@ -13,12 +13,10 @@ enum class LayerParamIndex : u16 {
     Pan,
     TuneCents,
     TuneSemitone,
-    EngineV1LoopOn,
     LoopMode,
     LoopStart,
     LoopEnd,
     LoopCrossfade,
-    EngineV1LoopPingPong, // TODO: remove this
     SampleOffset,
     Reverse,
     VolEnvOn,
@@ -1723,14 +1721,6 @@ consteval auto CreateParams() {
         };
 
         // =================================================================================================
-        lp(EngineV1LoopOn) = Args {
-            .id = id(region, 6), // never change
-            .value_config = val_config_helpers::Bool({.default_state = false}),
-            .modules = {layer_module, ParameterModule::Loop},
-            .name = "On"_s,
-            .gui_label = "Loop"_s,
-            .tooltip = "The mode for looping the instrument samples"_s,
-        };
         lp(LoopMode) = Args {
             .id = id(region, 49), // never change
             .value_config = val_config_helpers::Menu({
@@ -1765,15 +1755,6 @@ consteval auto CreateParams() {
             .name = "Crossfade Size"_s,
             .gui_label = "XFade"_s,
             .tooltip = "Crossfade length; this smooths the transition from the loop-end to the loop-start"_s,
-        };
-        // TODO: remove ping pong param
-        lp(EngineV1LoopPingPong) = Args {
-            .id = id(region, 10), // never change
-            .value_config = val_config_helpers::Bool({.default_state = false}),
-            .modules = {layer_module, ParameterModule::Loop},
-            .name = "Ping Pong On"_s,
-            .gui_label = "Ping Pong"_s,
-            .tooltip = "not used"_s,
         };
         lp(SampleOffset) = Args {
             .id = id(region, 11), // never change
@@ -2224,6 +2205,13 @@ Type ParamToInt(f32 value) {
 
 enum class NoLongerExistingParam : u16 {
     ConvolutionLegacyCoreIrName,
+
+    Layer1LoopOnSwitch,
+    Layer1LoopPingPongOnSwitch,
+    Layer2LoopOnSwitch,
+    Layer2LoopPingPongOnSwitch,
+    Layer3LoopOnSwitch,
+    Layer3LoopPingPongOnSwitch,
 
     // Reverb had 2 modes: freeverb or sv
     // Params affecting both modes:

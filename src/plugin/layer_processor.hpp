@@ -259,8 +259,6 @@ struct LayerProcessor {
     f32 tune_cents = 0;
     f32 sample_offset_01 = 0;
 
-    bool engine_v1_loop_on {};
-    bool engine_v1_loop_ping_pong {};
     bool sustain_pedal_retrigger {};
     bool monophonic {};
 

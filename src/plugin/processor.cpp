@@ -623,7 +623,6 @@ void ApplyNewState(AudioProcessor& processor, StateSnapshot const& state, StateS
         processor.params[i].SetLinearValue(state.param_values[i]);
 
     processor.desired_effects_order.Store(EncodeEffectsArray(state.fx_order));
-    processor.engine_version.Store(state.engine_version);
 
     // reload everything
     {
@@ -1042,7 +1041,6 @@ clap_process_status Process(AudioProcessor& processor, clap_process const& proce
     clap_process_status result = CLAP_PROCESS_CONTINUE;
     auto const num_sample_frames = process.frames_count;
     auto outputs = process.audio_outputs->data32;
-    processor.audio_processing_context.engine_version = processor.engine_version.Load();
 
     // Handle transport changes
     {

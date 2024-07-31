@@ -350,28 +350,6 @@ void OnParamChange(LayerProcessor& layer,
             update_loop_info = true;
             vmst.reverse = p->ValueAsBool();
         }
-        if (context.engine_version == 1) {
-            bool set_loop_mode_from_engine_v1_params = false;
-            if (auto p = changed_params.Param(LayerParamIndex::EngineV1LoopOn)) {
-                update_loop_info = true;
-                set_loop_mode_from_engine_v1_params = true;
-                layer.engine_v1_loop_on = p->ValueAsBool();
-            }
-            if (auto p = changed_params.Param(LayerParamIndex::EngineV1LoopPingPong)) {
-                update_loop_info = true;
-                set_loop_mode_from_engine_v1_params = true;
-                layer.engine_v1_loop_ping_pong = p->ValueAsBool();
-            }
-            if (set_loop_mode_from_engine_v1_params) {
-                if (layer.engine_v1_loop_on)
-                    if (!layer.engine_v1_loop_ping_pong)
-                        vmst.loop_mode = param_values::LoopMode::Regular;
-                    else
-                        vmst.loop_mode = param_values::LoopMode::PingPong;
-                else
-                    vmst.loop_mode = param_values::LoopMode::InstrumentDefault;
-            }
-        }
         if (auto p = changed_params.Param(LayerParamIndex::LoopMode)) {
             update_loop_info = true;
             vmst.loop_mode = p->ValueAsInt<param_values::LoopMode>();

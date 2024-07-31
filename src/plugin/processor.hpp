@@ -187,8 +187,6 @@ struct AudioProcessor {
     ArenaAllocator audio_data_allocator {PageAllocator::Instance()};
     AudioProcessingContext audio_processing_context {};
 
-    Atomic<u8> engine_version {k_latest_engine_version};
-
     int restart_voices_for_layer_bitset {};
     bool fx_need_another_frame_of_processing = {};
 

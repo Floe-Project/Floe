@@ -241,11 +241,9 @@ constexpr auto k_layer_params = ArrayT<LayerParamId>({
     {"Pan", LayerParamIndex::Pan},
     {"Detune", LayerParamIndex::TuneCents},
     {"Pitch", LayerParamIndex::TuneSemitone},
-    {"LpOn", LayerParamIndex::EngineV1LoopOn},
     {"LpStrt", LayerParamIndex::LoopStart},
     {"LpEnd", LayerParamIndex::LoopEnd},
     {"LpXf", LayerParamIndex::LoopCrossfade},
-    {"LpPP", LayerParamIndex::EngineV1LoopPingPong},
     {"Offs", LayerParamIndex::SampleOffset},
     {"Rev", LayerParamIndex::Reverse},
     {"VlEnOn", LayerParamIndex::VolEnvOn},
@@ -337,6 +335,12 @@ struct NoLongerExistsParam {
 };
 
 constexpr auto k_params = ArrayT<NoLongerExistsParam>({
+    {"L0LpOn", NoLongerExistingParam::Layer1LoopOnSwitch},
+    {"L0LpPP", NoLongerExistingParam::Layer1LoopPingPongOnSwitch},
+    {"L1LpOn", NoLongerExistingParam::Layer2LoopOnSwitch},
+    {"L1LpPP", NoLongerExistingParam::Layer2LoopPingPongOnSwitch},
+    {"L2LpOn", NoLongerExistingParam::Layer3LoopOnSwitch},
+    {"L2LpPP", NoLongerExistingParam::Layer3LoopPingPongOnSwitch},
     {"ConvIR", NoLongerExistingParam::ConvolutionLegacyCoreIrName},
     {"RvDamp", NoLongerExistingParam::ReverbFreeverbDampingPercent},
     {"RvWidth", NoLongerExistingParam::ReverbFreeverbWidthPercent},

@@ -487,108 +487,6 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
             if (auto s = i.TryGet<sample_lib::InstrumentId>()) s->library_name = parser.library_name;
     }
 
-    state.engine_version = 1; // because the state is JSON, it must be old (version 1)
-
-    // Handle the parameters that are no longer in the engine
-    // ======================================================================================================
-#if 0
-    // IMPROVE: use this method of getting old effects perhaps?
-    struct OldReverbEffect {
-        bool on = false;
-        f32 dry_01 = 1.0f;
-        f32 wet_01 = 0.0f;
-        f32 size_01 = 0.4f;
-        f32 pre_delay_ms = 0.0f;
-        f32 mod_freq_hz = 0.1f;
-        f32 mod_depth_01 = 0.0f;
-        f32 filter_bidirectional_01 = 0;
-    };
-    Optional<OldReverbEffect> old_reverb_effect = nullopt;
-
-            // case NoLongerExistingParam::ReverbOnSwitch: {
-            //     old_reverb_effect.ValueOrCreate().on = param_value.TryGetOpt<f32>().ValueOr(0) != 0;
-            //     break;
-            // }
-#endif
-
-    for (auto [index, param_value] : Enumerate(parser.non_existent_params)) {
-        switch ((NoLongerExistingParam)index) {
-            case NoLongerExistingParam::ConvolutionLegacyCoreIrName: {
-                state.ir_id = nullopt;
-
-                if (param_value.tag == JsonStateParser::ParamValueType::String) {
-                    auto const ir_name = param_value.Get<String>();
-                    if (ir_name.size && ir_name != "None"_s) {
-
-                        // Some IRs there were in the 'Core' library are now builtin
-                        for (auto const& ir : EmbeddedIrs().irs) {
-                            if (String {ir.legacy_name.data, ir.legacy_name.size} == ir_name) {
-                                state.ir_id = sample_lib::IrId {
-                                    .library_name = k_builtin_library_name,
-                                    .ir_name =
-                                        path::FilenameWithoutExtension(String {ir.name.data, ir.name.size}),
-                                };
-                                break;
-                            }
-                        }
-
-                        if (!state.ir_id) {
-                            state.ir_id = sample_lib::IrId {
-                                .library_name = k_core_library_name,
-                                .ir_name = ir_name,
-                            };
-                        }
-                    }
-                }
-
-                break;
-            }
-
-            case NoLongerExistingParam::Count: {
-                PanicIfReached();
-                break;
-            }
-
-            case NoLongerExistingParam::ReverbOnSwitch:
-            case NoLongerExistingParam::ReverbFreeverbDampingPercent:
-            case NoLongerExistingParam::ReverbFreeverbWidthPercent:
-            case NoLongerExistingParam::ReverbFreeverbWetPercent:
-            case NoLongerExistingParam::ReverbDryPercent:
-            case NoLongerExistingParam::ReverbSizePercent:
-            case NoLongerExistingParam::ReverbUseFreeverbSwitch:
-            case NoLongerExistingParam::ReverbSvPreDelayMs:
-            case NoLongerExistingParam::ReverbSvModFreqHz:
-            case NoLongerExistingParam::ReverbSvModDepthPercent:
-            case NoLongerExistingParam::ReverbSvFilterBidirectionalPercent:
-            case NoLongerExistingParam::ReverbSvWetDb: break;
-
-            case NoLongerExistingParam::SvPhaserFreqHz:
-            case NoLongerExistingParam::SvPhaserModFreqHz:
-            case NoLongerExistingParam::SvPhaserModDepth:
-            case NoLongerExistingParam::SvPhaserFeedback:
-            case NoLongerExistingParam::SvPhaserNumStages:
-            case NoLongerExistingParam::SvPhaserModStereo:
-            case NoLongerExistingParam::SvPhaserWet:
-            case NoLongerExistingParam::SvPhaserDry:
-            case NoLongerExistingParam::SvPhaserOn: break;
-
-            case NoLongerExistingParam::DelayOldDelayTimeLMs:
-            case NoLongerExistingParam::DelayOldDelayTimeRMs:
-            case NoLongerExistingParam::DelayOldDamping:
-            case NoLongerExistingParam::DelayTimeSyncedL:
-            case NoLongerExistingParam::DelayTimeSyncedR:
-            case NoLongerExistingParam::DelayFeedback:
-            case NoLongerExistingParam::DelayTimeSyncSwitch:
-            case NoLongerExistingParam::DelayWet:
-            case NoLongerExistingParam::DelayOn:
-            case NoLongerExistingParam::DelayLegacyAlgorithm:
-            case NoLongerExistingParam::DelaySinevibesMode:
-            case NoLongerExistingParam::DelaySinevibesDelayTimeLMs:
-            case NoLongerExistingParam::DelaySinevibesDelayTimeRMs:
-            case NoLongerExistingParam::DelaySinevibesFilter: break;
-        }
-    }
-
     // Fill in missing values and convert the existing ones into their new formats
     // ======================================================================================================
     for (auto [index, v] : Enumerate<u16>(state.param_values)) {
@@ -618,6 +516,37 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
         if (old_param.tag == JsonStateParser::ParamValueType::Float) return old_param.Get<f32>();
         return nullopt;
     };
+
+    // Set the convolution IR based on the no-longer-existing param
+    // ======================================================================================================
+    {
+        state.ir_id = nullopt;
+        auto const old_param =
+            parser.non_existent_params[ToInt(NoLongerExistingParam::ConvolutionLegacyCoreIrName)];
+        if (old_param.tag == JsonStateParser::ParamValueType::String) {
+            auto const ir_name = old_param.Get<String>();
+            if (ir_name.size && ir_name != "None"_s) {
+
+                // Some IRs there were in the 'Core' library are now builtin
+                for (auto const& ir : EmbeddedIrs().irs) {
+                    if (String {ir.legacy_name.data, ir.legacy_name.size} == ir_name) {
+                        state.ir_id = sample_lib::IrId {
+                            .library_name = k_builtin_library_name,
+                            .ir_name = path::FilenameWithoutExtension(String {ir.name.data, ir.name.size}),
+                        };
+                        break;
+                    }
+                }
+
+                if (!state.ir_id) {
+                    state.ir_id = sample_lib::IrId {
+                        .library_name = k_core_library_name,
+                        .ir_name = ir_name,
+                    };
+                }
+            }
+        }
+    }
 
     // Set the reverb parameters based on the no-longer-existing params
     // ======================================================================================================
@@ -673,6 +602,8 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
             ParamInfo(ParamIndex::ReverbHighShelfGain).LineariseValue(k_zero_db, false).Value();
     }
 
+    // Set the phaser parameters based on the no-longer-existing params
+    // ======================================================================================================
     {
         auto const old_settings_on = old_p(NoLongerExistingParam::SvPhaserOn).ValueOr(0) != 0;
         auto const old_setting_dry_01 = DbToAmp(old_p(NoLongerExistingParam::SvPhaserDry).ValueOr(0));
@@ -696,6 +627,8 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
             FrequencyToMidiNote(old_setting_centre_freq_hz);
     }
 
+    // Set the delay parameters based on the no-longer-existing params
+    // ======================================================================================================
     {
         auto const uses_legacy = old_p(NoLongerExistingParam::DelayLegacyAlgorithm).ValueOr(1) > 0.5f;
 
@@ -775,6 +708,43 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
         state.LinearParam(ParamIndex::DelayFeedback) = old_settings_feedback;
     }
 
+    // Set the layer loop-on parameters based on the no-longer-existing params
+    // ======================================================================================================
+    {
+        struct LoopSwitches {
+            NoLongerExistingParam loop_on;
+            NoLongerExistingParam ping_pong_on;
+            u32 layer_index;
+        };
+
+        for (auto const l : ArrayT<LoopSwitches>({
+                 {NoLongerExistingParam::Layer1LoopOnSwitch,
+                  NoLongerExistingParam::Layer1LoopPingPongOnSwitch,
+                  0},
+                 {NoLongerExistingParam::Layer2LoopOnSwitch,
+                  NoLongerExistingParam::Layer2LoopPingPongOnSwitch,
+                  1},
+                 {NoLongerExistingParam::Layer3LoopOnSwitch,
+                  NoLongerExistingParam::Layer3LoopPingPongOnSwitch,
+                  2},
+             })) {
+            auto const old_layer1_loop_on = old_p(l.loop_on).ValueOr(0) != 0;
+            auto const old_layer1_ping_pong = old_p(l.ping_pong_on).ValueOr(0) != 0;
+
+            param_values::LoopMode mode = param_values::LoopMode::InstrumentDefault;
+            if (old_layer1_loop_on)
+                if (!old_layer1_ping_pong)
+                    mode = param_values::LoopMode::Regular;
+                else
+                    mode = param_values::LoopMode::PingPong;
+            else
+                mode = param_values::LoopMode::InstrumentDefault;
+
+            state.LinearParam(ParamIndexFromLayerParamIndex(l.layer_index, LayerParamIndex::LoopMode)) =
+                (f32)mode;
+        }
+    }
+
     // Ensure there are no missing effects in the fx order
     // ======================================================================================================
     {
@@ -830,14 +800,13 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
         }
     }
 
-    // Ensure backwards compatibility by recreating old bug behaviour
+    // Ensure backwards compatibility by recreating old Mirage bug behaviour
     // ======================================================================================================
     {
         auto const mirage_preset_version_hex = parser.mirage_version.ValueOr({}).Packed();
 
-        // Prior to 1.2.0 the behaviour was the same as if Param_CC64Retrigger was
-        // turned off. If we have gotten here, the state we are trying to load must
-        // be from pre-1.2.0.
+        // Prior to 1.2.0 the behaviour was the same as if Param_CC64Retrigger was turned off. If we have
+        // gotten here, the state we are trying to load must be from pre-1.2.0.
         constexpr auto k_version_that_added_cc64_retrig = PackVersionIntoU32(2, 0, 0);
         if (mirage_preset_version_hex < k_version_that_added_cc64_retrig) {
             static constexpr f32 k_value_for_backwards_compat = 0;
@@ -852,10 +821,9 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
             return state.param_values[ToInt(ParamIndexFromLayerParamIndex(layer_index, param))];
         };
 
-        // The pitch/detune sliders of a layer that was set to 'no key tracking'
-        // used to do nothing. This was a bug. In order to not change the behaviour
-        // of people's old DAW projects, we recreate this behaviour by setting those
-        // values to 0 here.
+        // The pitch/detune sliders of a layer that was set to 'no key tracking' used to do nothing. This was
+        // a bug. In order to not change the behaviour of people's old DAW projects, we recreate this
+        // behaviour by setting those values to 0 here.
         constexpr auto k_version_that_fixed_no_key_tracking_tuning_bug = PackVersionIntoU32(1, 2, 0);
         if (mirage_preset_version_hex < k_version_that_fixed_no_key_tracking_tuning_bug) {
             for (auto const layer_index : Range(k_num_layers)) {
@@ -867,17 +835,14 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
             }
         }
 
-        // There was a bug where if the sample offset position was more than twice
-        // the loop-end position, the sound would be silent. In order to not change
-        // the behaviour of people's old DAW projects, we recreate this behaviour by
-        // muting the layer.
+        // There was a bug where if the sample offset position was more than twice the loop-end position of a
+        // ping-pong loop, the sound would be silent. In order to not change the behaviour of people's old DAW
+        // projects, we recreate this behaviour by muting the layer.
         constexpr auto k_version_that_fixed_start_offset_past_ping_pong_silent = PackVersionIntoU32(1, 2, 0);
         if (mirage_preset_version_hex < k_version_that_fixed_start_offset_past_ping_pong_silent) {
             for (auto const layer_index : Range(k_num_layers)) {
-                auto const loop_on = layer_param_value(layer_index, LayerParamIndex::EngineV1LoopOn) >= 0.5f;
-                auto const ping_pong_on =
-                    layer_param_value(layer_index, LayerParamIndex::EngineV1LoopPingPong) >= 0.5f;
-                if (loop_on && ping_pong_on) {
+                if ((param_values::LoopMode)layer_param_value(layer_index, LayerParamIndex::LoopMode) ==
+                    param_values::LoopMode::PingPong) {
                     // the start can be larger than the end
                     auto const max_loop_pos = Max(layer_param_value(layer_index, LayerParamIndex::LoopStart),
                                                   layer_param_value(layer_index, LayerParamIndex::LoopEnd));
@@ -887,14 +852,13 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
             }
         }
 
-        // Prior to 2.0.3, there was no such thing as a ping-pong crossfade - it was
-        // equivalent to being set to 0. We recreate that behaviour here so as to
-        // maintain backwards compatibility.
+        // Prior to 2.0.3, there was no such thing as a ping-pong crossfade - it was equivalent to being set
+        // to 0. We recreate that behaviour here so as to maintain backwards compatibility.
         constexpr auto k_version_that_added_ping_pong_xfade = PackVersionIntoU32(2, 0, 3);
         if (mirage_preset_version_hex < k_version_that_added_ping_pong_xfade) {
             for (auto const layer_index : Range(k_num_layers)) {
-                if (layer_param_value(layer_index, LayerParamIndex::EngineV1LoopOn) >= 0.5f &&
-                    layer_param_value(layer_index, LayerParamIndex::EngineV1LoopPingPong) >= 0.5f) {
+                if ((param_values::LoopMode)layer_param_value(layer_index, LayerParamIndex::LoopMode) ==
+                    param_values::LoopMode::PingPong) {
                     layer_param_value(layer_index, LayerParamIndex::LoopCrossfade) = 0;
                 }
             }
@@ -1131,9 +1095,6 @@ ErrorCodeOr<void> CodeState(StateSnapshot& state, CodeStateOptions const& option
     }
 
     // =======================================================================================================
-    TRY(coder.CodeNumber(state.engine_version, StateVersion::Initial));
-
-    // =======================================================================================================
     {
         u16 num_params {};
         if (coder.IsWriting()) num_params = CheckedCast<u16>(k_num_parameters);
@@ -1159,7 +1120,7 @@ ErrorCodeOr<void> CodeState(StateSnapshot& state, CodeStateOptions const& option
         }
 
         if (num_params != (u32)k_num_parameters) {
-            static_assert(k_num_parameters == 215,
+            static_assert(k_num_parameters == 209,
                           "You have changed the number of parameters. You must now bump the "
                           "state version number and handle setting any new parameters to "
                           "backwards-compatible states. In other words, these new parameters "

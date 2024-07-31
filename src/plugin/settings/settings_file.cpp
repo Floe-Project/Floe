@@ -180,7 +180,7 @@ static bool ParseLegacyJsonFile(Settings& content,
     DynamicArray<String> folders {content_arena};
     for (auto p : parser.libraries) {
         auto const dir = path::Directory(p);
-        if (!Find(paths.always_scanned_folders[ToInt(ScanFolderType::Libraries)], dir))
+        if (dir && !Find(paths.always_scanned_folders[ToInt(ScanFolderType::Libraries)], *dir))
             if (auto const d = path::Directory(p)) dyn::AppendIfNotAlreadyThere(folders, *d);
     }
     content.filesystem.extra_libraries_scan_folders = folders.ToOwnedSpan();

@@ -1,17 +1,8 @@
 {
  "layers": [
-  {
-   "name": "White Noise",
-   "path": "#Special: White Noise"
-  },
-  {
-   "name": "White Noise",
-   "path": "#Special: White Noise"
-  },
-  {
-   "name": "White Noise (Mono)",
-   "path": "#Special: White Noise (Mono)"
-  }
+  { "name": "White Noise", "path": "#Special: White Noise" },
+  { "name": "White Noise", "path": "#Special: White Noise" },
+  { "name": "White Noise (Mono)", "path": "#Special: White Noise (Mono)" }
  ],
  "library": {
   "id": 632999892,
@@ -26,890 +17,182 @@
   "version": 65792
  },
  "params": [
-  {
-   "ccs": null,
-   "name": "L0Vol",
-   "value": -6.0
-  },
-  {
-   "ccs": null,
-   "name": "L0Mute",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L0Solo",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L0Pan",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L0Detune",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L0Pitch",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L0Vel",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L0VlEnOn",
-   "value": 1.0
-  },
-  {
-   "ccs": null,
-   "name": "L0Att",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L0Dec",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L0Sus",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L0Rel",
-   "value": 800.0
-  },
-  {
-   "ccs": null,
-   "name": "L0FlOn",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L0FlCut",
-   "value": 6000.0
-  },
-  {
-   "ccs": null,
-   "name": "L0FfRes",
-   "value": 25.0
-  },
-  {
-   "ccs": null,
-   "name": "L0FlTy",
-   "value": "Lowpass"
-  },
-  {
-   "ccs": null,
-   "name": "L0LfoOn",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L0LfoSh",
-   "value": "Sine"
-  },
-  {
-   "ccs": null,
-   "name": "L0LfoMd",
-   "value": "Retrigger"
-  },
-  {
-   "ccs": null,
-   "name": "L0LfoAm",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L0LfoTg",
-   "value": "Volume"
-  },
-  {
-   "ccs": null,
-   "name": "L0LfoSyt",
-   "value": "1/4"
-  },
-  {
-   "ccs": null,
-   "name": "L0LfoHZ",
-   "value": 5.0
-  },
-  {
-   "ccs": null,
-   "name": "L0LfoSyO",
-   "value": 1.0
-  },
-  {
-   "ccs": null,
-   "name": "L0LpOn",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L0LpStrt",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L0LpEnd",
-   "value": 100.0
-  },
-  {
-   "ccs": null,
-   "name": "L0LpXf",
-   "value": 1.0
-  },
-  {
-   "ccs": null,
-   "name": "L0LpPP",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L0Offs",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L0Rev",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L0EqOn",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L0EqFr0",
-   "value": 8000.0
-  },
-  {
-   "ccs": null,
-   "name": "L0EqRs0",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L0EqGn0",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L0EqTy0",
-   "value": "Peaking"
-  },
-  {
-   "ccs": null,
-   "name": "L0EqFr1",
-   "value": 8000.0
-  },
-  {
-   "ccs": null,
-   "name": "L0EqRs1",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L0EqGn1",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L0EqTy1",
-   "value": "Peaking"
-  },
-  {
-   "ccs": null,
-   "name": "L0KTr",
-   "value": 1.0
-  },
-  {
-   "ccs": null,
-   "name": "L0Mono",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L0Trn",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L1Vol",
-   "value": -6.0
-  },
-  {
-   "ccs": null,
-   "name": "L1Mute",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L1Solo",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L1Pan",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L1Detune",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L1Pitch",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L1Vel",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L1VlEnOn",
-   "value": 1.0
-  },
-  {
-   "ccs": null,
-   "name": "L1Att",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L1Dec",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L1Sus",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L1Rel",
-   "value": 800.0
-  },
-  {
-   "ccs": null,
-   "name": "L1FlOn",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L1FlCut",
-   "value": 6000.0
-  },
-  {
-   "ccs": null,
-   "name": "L1FfRes",
-   "value": 25.0
-  },
-  {
-   "ccs": null,
-   "name": "L1FlTy",
-   "value": "Lowpass"
-  },
-  {
-   "ccs": null,
-   "name": "L1LfoOn",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L1LfoSh",
-   "value": "Sine"
-  },
-  {
-   "ccs": null,
-   "name": "L1LfoMd",
-   "value": "Retrigger"
-  },
-  {
-   "ccs": null,
-   "name": "L1LfoAm",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L1LfoTg",
-   "value": "Volume"
-  },
-  {
-   "ccs": null,
-   "name": "L1LfoSyt",
-   "value": "1/4"
-  },
-  {
-   "ccs": null,
-   "name": "L1LfoHZ",
-   "value": 5.0
-  },
-  {
-   "ccs": null,
-   "name": "L1LfoSyO",
-   "value": 1.0
-  },
-  {
-   "ccs": null,
-   "name": "L1LpOn",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L1LpStrt",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L1LpEnd",
-   "value": 100.0
-  },
-  {
-   "ccs": null,
-   "name": "L1LpXf",
-   "value": 1.0
-  },
-  {
-   "ccs": null,
-   "name": "L1LpPP",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L1Offs",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L1Rev",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L1EqOn",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L1EqFr0",
-   "value": 8000.0
-  },
-  {
-   "ccs": null,
-   "name": "L1EqRs0",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L1EqGn0",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L1EqTy0",
-   "value": "Peaking"
-  },
-  {
-   "ccs": null,
-   "name": "L1EqFr1",
-   "value": 8000.0
-  },
-  {
-   "ccs": null,
-   "name": "L1EqRs1",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L1EqGn1",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L1EqTy1",
-   "value": "Peaking"
-  },
-  {
-   "ccs": null,
-   "name": "L1KTr",
-   "value": 1.0
-  },
-  {
-   "ccs": null,
-   "name": "L1Mono",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L1Trn",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L2Vol",
-   "value": -6.0
-  },
-  {
-   "ccs": null,
-   "name": "L2Mute",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L2Solo",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L2Pan",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L2Detune",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L2Pitch",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L2Vel",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L2VlEnOn",
-   "value": 1.0
-  },
-  {
-   "ccs": null,
-   "name": "L2Att",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L2Dec",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L2Sus",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L2Rel",
-   "value": 800.0
-  },
-  {
-   "ccs": null,
-   "name": "L2FlOn",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L2FlCut",
-   "value": 6000.0
-  },
-  {
-   "ccs": null,
-   "name": "L2FfRes",
-   "value": 25.0
-  },
-  {
-   "ccs": null,
-   "name": "L2FlTy",
-   "value": "Lowpass"
-  },
-  {
-   "ccs": null,
-   "name": "L2LfoOn",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L2LfoSh",
-   "value": "Sine"
-  },
-  {
-   "ccs": null,
-   "name": "L2LfoMd",
-   "value": "Retrigger"
-  },
-  {
-   "ccs": null,
-   "name": "L2LfoAm",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L2LfoTg",
-   "value": "Volume"
-  },
-  {
-   "ccs": null,
-   "name": "L2LfoSyt",
-   "value": "1/4"
-  },
-  {
-   "ccs": null,
-   "name": "L2LfoHZ",
-   "value": 5.0
-  },
-  {
-   "ccs": null,
-   "name": "L2LfoSyO",
-   "value": 1.0
-  },
-  {
-   "ccs": null,
-   "name": "L2LpOn",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L2LpStrt",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L2LpEnd",
-   "value": 100.0
-  },
-  {
-   "ccs": null,
-   "name": "L2LpXf",
-   "value": 1.0
-  },
-  {
-   "ccs": null,
-   "name": "L2LpPP",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L2Offs",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L2Rev",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L2EqOn",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L2EqFr0",
-   "value": 8000.0
-  },
-  {
-   "ccs": null,
-   "name": "L2EqRs0",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L2EqGn0",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L2EqTy0",
-   "value": "Peaking"
-  },
-  {
-   "ccs": null,
-   "name": "L2EqFr1",
-   "value": 8000.0
-  },
-  {
-   "ccs": null,
-   "name": "L2EqRs1",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L2EqGn1",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L2EqTy1",
-   "value": "Peaking"
-  },
-  {
-   "ccs": null,
-   "name": "L2KTr",
-   "value": 1.0
-  },
-  {
-   "ccs": null,
-   "name": "L2Mono",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "L2Trn",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "MastVol",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "MastVel",
-   "value": 70.0
-  },
-  {
-   "ccs": null,
-   "name": "DistType",
-   "value": "Tube Log"
-  },
-  {
-   "ccs": null,
-   "name": "DistDrive",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "DistOn",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "BitcBits",
-   "value": 32.0
-  },
-  {
-   "ccs": null,
-   "name": "BitcRate",
-   "value": 44100.0
-  },
-  {
-   "ccs": null,
-   "name": "BitcWet",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "BitcDry",
-   "value": -80.0
-  },
-  {
-   "ccs": null,
-   "name": "BitcOn",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "CompThr",
-   "value": -12.0
-  },
-  {
-   "ccs": null,
-   "name": "CompRt",
-   "value": 2.0
-  },
-  {
-   "ccs": null,
-   "name": "CompGain",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "CompAuto",
-   "value": 1.0
-  },
-  {
-   "ccs": null,
-   "name": "CompOn",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "FlOn",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "FlCut",
-   "value": 5000.0
-  },
-  {
-   "ccs": null,
-   "name": "FlRes",
-   "value": 30.0
-  },
-  {
-   "ccs": null,
-   "name": "FlGain",
-   "value": -6.0
-  },
-  {
-   "ccs": null,
-   "name": "FlType",
-   "value": "Low Pass"
-  },
-  {
-   "ccs": null,
-   "name": "SterWd",
-   "value": 15.0
-  },
-  {
-   "ccs": null,
-   "name": "SterOn",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "ChorRate",
-   "value": 2.0
-  },
-  {
-   "ccs": null,
-   "name": "ChorHP",
-   "value": 30.0
-  },
-  {
-   "ccs": null,
-   "name": "ChorDpth",
-   "value": 1.0
-  },
-  {
-   "ccs": null,
-   "name": "ChorWet",
-   "value": -6.0
-  },
-  {
-   "ccs": null,
-   "name": "ChorDry",
-   "value": -6.0
-  },
-  {
-   "ccs": null,
-   "name": "ChorOn",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "RvSize",
-   "value": 60.0
-  },
-  {
-   "ccs": null,
-   "name": "RvDamp",
-   "value": 50.0
-  },
-  {
-   "ccs": null,
-   "name": "RvWidth",
-   "value": 100.0
-  },
-  {
-   "ccs": null,
-   "name": "RvDry",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "RvWet",
-   "value": 25.0
-  },
-  {
-   "ccs": null,
-   "name": "RvOn",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "DlMsL",
-   "value": 470.0
-  },
-  {
-   "ccs": null,
-   "name": "DlMsR",
-   "value": 490.0
-  },
-  {
-   "ccs": null,
-   "name": "DlSyncL",
-   "value": "1/4"
-  },
-  {
-   "ccs": null,
-   "name": "DlSyncR",
-   "value": "1/8"
-  },
-  {
-   "ccs": null,
-   "name": "DlSyncOn",
-   "value": 1.0
-  },
-  {
-   "ccs": null,
-   "name": "DlFeed",
-   "value": 50.0
-  },
-  {
-   "ccs": null,
-   "name": "DlDamp",
-   "value": 50.0
-  },
-  {
-   "ccs": null,
-   "name": "DlWet",
-   "value": -6.0
-  },
-  {
-   "ccs": null,
-   "name": "DlOn",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "ConvIR",
-   "value": "None"
-  },
-  {
-   "ccs": null,
-   "name": "ConvHP",
-   "value": 30.0
-  },
-  {
-   "ccs": null,
-   "name": "ConvWet",
-   "value": -30.0
-  },
-  {
-   "ccs": null,
-   "name": "ConvDry",
-   "value": 0.0
-  },
-  {
-   "ccs": null,
-   "name": "ConvOn",
-   "value": 0.0
-  }
+  { "ccs": null, "name": "L0Vol", "value": -6.0 },
+  { "ccs": null, "name": "L0Mute", "value": 0.0 },
+  { "ccs": null, "name": "L0Solo", "value": 0.0 },
+  { "ccs": null, "name": "L0Pan", "value": 0.0 },
+  { "ccs": null, "name": "L0Detune", "value": 0.0 },
+  { "ccs": null, "name": "L0Pitch", "value": 0.0 },
+  { "ccs": null, "name": "L0Vel", "value": 0.0 },
+  { "ccs": null, "name": "L0VlEnOn", "value": 1.0 },
+  { "ccs": null, "name": "L0Att", "value": 0.0 },
+  { "ccs": null, "name": "L0Dec", "value": 0.0 },
+  { "ccs": null, "name": "L0Sus", "value": 0.0 },
+  { "ccs": null, "name": "L0Rel", "value": 800.0 },
+  { "ccs": null, "name": "L0FlOn", "value": 0.0 },
+  { "ccs": null, "name": "L0FlCut", "value": 6000.0 },
+  { "ccs": null, "name": "L0FfRes", "value": 25.0 },
+  { "ccs": null, "name": "L0FlTy", "value": "Lowpass" },
+  { "ccs": null, "name": "L0LfoOn", "value": 0.0 },
+  { "ccs": null, "name": "L0LfoSh", "value": "Sine" },
+  { "ccs": null, "name": "L0LfoMd", "value": "Retrigger" },
+  { "ccs": null, "name": "L0LfoAm", "value": 0.0 },
+  { "ccs": null, "name": "L0LfoTg", "value": "Volume" },
+  { "ccs": null, "name": "L0LfoSyt", "value": "1/4" },
+  { "ccs": null, "name": "L0LfoHZ", "value": 5.0 },
+  { "ccs": null, "name": "L0LfoSyO", "value": 1.0 },
+  { "ccs": null, "name": "L0LpOn", "value": 0.0 },
+  { "ccs": null, "name": "L0LpStrt", "value": 0.0 },
+  { "ccs": null, "name": "L0LpEnd", "value": 100.0 },
+  { "ccs": null, "name": "L0LpXf", "value": 1.0 },
+  { "ccs": null, "name": "L0LpPP", "value": 0.0 },
+  { "ccs": null, "name": "L0Offs", "value": 0.0 },
+  { "ccs": null, "name": "L0Rev", "value": 0.0 },
+  { "ccs": null, "name": "L0EqOn", "value": 0.0 },
+  { "ccs": null, "name": "L0EqFr0", "value": 8000.0 },
+  { "ccs": null, "name": "L0EqRs0", "value": 0.0 },
+  { "ccs": null, "name": "L0EqGn0", "value": 0.0 },
+  { "ccs": null, "name": "L0EqTy0", "value": "Peaking" },
+  { "ccs": null, "name": "L0EqFr1", "value": 8000.0 },
+  { "ccs": null, "name": "L0EqRs1", "value": 0.0 },
+  { "ccs": null, "name": "L0EqGn1", "value": 0.0 },
+  { "ccs": null, "name": "L0EqTy1", "value": "Peaking" },
+  { "ccs": null, "name": "L0KTr", "value": 1.0 },
+  { "ccs": null, "name": "L0Mono", "value": 0.0 },
+  { "ccs": null, "name": "L0Trn", "value": 0.0 },
+  { "ccs": null, "name": "L1Vol", "value": -6.0 },
+  { "ccs": null, "name": "L1Mute", "value": 0.0 },
+  { "ccs": null, "name": "L1Solo", "value": 0.0 },
+  { "ccs": null, "name": "L1Pan", "value": 0.0 },
+  { "ccs": null, "name": "L1Detune", "value": 0.0 },
+  { "ccs": null, "name": "L1Pitch", "value": 0.0 },
+  { "ccs": null, "name": "L1Vel", "value": 0.0 },
+  { "ccs": null, "name": "L1VlEnOn", "value": 1.0 },
+  { "ccs": null, "name": "L1Att", "value": 0.0 },
+  { "ccs": null, "name": "L1Dec", "value": 0.0 },
+  { "ccs": null, "name": "L1Sus", "value": 0.0 },
+  { "ccs": null, "name": "L1Rel", "value": 800.0 },
+  { "ccs": null, "name": "L1FlOn", "value": 0.0 },
+  { "ccs": null, "name": "L1FlCut", "value": 6000.0 },
+  { "ccs": null, "name": "L1FfRes", "value": 25.0 },
+  { "ccs": null, "name": "L1FlTy", "value": "Lowpass" },
+  { "ccs": null, "name": "L1LfoOn", "value": 0.0 },
+  { "ccs": null, "name": "L1LfoSh", "value": "Sine" },
+  { "ccs": null, "name": "L1LfoMd", "value": "Retrigger" },
+  { "ccs": null, "name": "L1LfoAm", "value": 0.0 },
+  { "ccs": null, "name": "L1LfoTg", "value": "Volume" },
+  { "ccs": null, "name": "L1LfoSyt", "value": "1/4" },
+  { "ccs": null, "name": "L1LfoHZ", "value": 5.0 },
+  { "ccs": null, "name": "L1LfoSyO", "value": 1.0 },
+  { "ccs": null, "name": "L1LpOn", "value": 0.0 },
+  { "ccs": null, "name": "L1LpStrt", "value": 0.0 },
+  { "ccs": null, "name": "L1LpEnd", "value": 100.0 },
+  { "ccs": null, "name": "L1LpXf", "value": 1.0 },
+  { "ccs": null, "name": "L1LpPP", "value": 0.0 },
+  { "ccs": null, "name": "L1Offs", "value": 0.0 },
+  { "ccs": null, "name": "L1Rev", "value": 0.0 },
+  { "ccs": null, "name": "L1EqOn", "value": 0.0 },
+  { "ccs": null, "name": "L1EqFr0", "value": 8000.0 },
+  { "ccs": null, "name": "L1EqRs0", "value": 0.0 },
+  { "ccs": null, "name": "L1EqGn0", "value": 0.0 },
+  { "ccs": null, "name": "L1EqTy0", "value": "Peaking" },
+  { "ccs": null, "name": "L1EqFr1", "value": 8000.0 },
+  { "ccs": null, "name": "L1EqRs1", "value": 0.0 },
+  { "ccs": null, "name": "L1EqGn1", "value": 0.0 },
+  { "ccs": null, "name": "L1EqTy1", "value": "Peaking" },
+  { "ccs": null, "name": "L1KTr", "value": 1.0 },
+  { "ccs": null, "name": "L1Mono", "value": 0.0 },
+  { "ccs": null, "name": "L1Trn", "value": 0.0 },
+  { "ccs": null, "name": "L2Vol", "value": -6.0 },
+  { "ccs": null, "name": "L2Mute", "value": 0.0 },
+  { "ccs": null, "name": "L2Solo", "value": 0.0 },
+  { "ccs": null, "name": "L2Pan", "value": 0.0 },
+  { "ccs": null, "name": "L2Detune", "value": 0.0 },
+  { "ccs": null, "name": "L2Pitch", "value": 0.0 },
+  { "ccs": null, "name": "L2Vel", "value": 0.0 },
+  { "ccs": null, "name": "L2VlEnOn", "value": 1.0 },
+  { "ccs": null, "name": "L2Att", "value": 0.0 },
+  { "ccs": null, "name": "L2Dec", "value": 0.0 },
+  { "ccs": null, "name": "L2Sus", "value": 0.0 },
+  { "ccs": null, "name": "L2Rel", "value": 800.0 },
+  { "ccs": null, "name": "L2FlOn", "value": 0.0 },
+  { "ccs": null, "name": "L2FlCut", "value": 6000.0 },
+  { "ccs": null, "name": "L2FfRes", "value": 25.0 },
+  { "ccs": null, "name": "L2FlTy", "value": "Lowpass" },
+  { "ccs": null, "name": "L2LfoOn", "value": 0.0 },
+  { "ccs": null, "name": "L2LfoSh", "value": "Sine" },
+  { "ccs": null, "name": "L2LfoMd", "value": "Retrigger" },
+  { "ccs": null, "name": "L2LfoAm", "value": 0.0 },
+  { "ccs": null, "name": "L2LfoTg", "value": "Volume" },
+  { "ccs": null, "name": "L2LfoSyt", "value": "1/4" },
+  { "ccs": null, "name": "L2LfoHZ", "value": 5.0 },
+  { "ccs": null, "name": "L2LfoSyO", "value": 1.0 },
+  { "ccs": null, "name": "L2LpOn", "value": 0.0 },
+  { "ccs": null, "name": "L2LpStrt", "value": 0.0 },
+  { "ccs": null, "name": "L2LpEnd", "value": 100.0 },
+  { "ccs": null, "name": "L2LpXf", "value": 1.0 },
+  { "ccs": null, "name": "L2LpPP", "value": 0.0 },
+  { "ccs": null, "name": "L2Offs", "value": 0.0 },
+  { "ccs": null, "name": "L2Rev", "value": 0.0 },
+  { "ccs": null, "name": "L2EqOn", "value": 0.0 },
+  { "ccs": null, "name": "L2EqFr0", "value": 8000.0 },
+  { "ccs": null, "name": "L2EqRs0", "value": 0.0 },
+  { "ccs": null, "name": "L2EqGn0", "value": 0.0 },
+  { "ccs": null, "name": "L2EqTy0", "value": "Peaking" },
+  { "ccs": null, "name": "L2EqFr1", "value": 8000.0 },
+  { "ccs": null, "name": "L2EqRs1", "value": 0.0 },
+  { "ccs": null, "name": "L2EqGn1", "value": 0.0 },
+  { "ccs": null, "name": "L2EqTy1", "value": "Peaking" },
+  { "ccs": null, "name": "L2KTr", "value": 1.0 },
+  { "ccs": null, "name": "L2Mono", "value": 0.0 },
+  { "ccs": null, "name": "L2Trn", "value": 0.0 },
+  { "ccs": null, "name": "MastVol", "value": 0.0 },
+  { "ccs": null, "name": "MastVel", "value": 70.0 },
+  { "ccs": null, "name": "DistType", "value": "Tube Log" },
+  { "ccs": null, "name": "DistDrive", "value": 0.0 },
+  { "ccs": null, "name": "DistOn", "value": 0.0 },
+  { "ccs": null, "name": "BitcBits", "value": 32.0 },
+  { "ccs": null, "name": "BitcRate", "value": 44100.0 },
+  { "ccs": null, "name": "BitcWet", "value": 0.0 },
+  { "ccs": null, "name": "BitcDry", "value": -80.0 },
+  { "ccs": null, "name": "BitcOn", "value": 0.0 },
+  { "ccs": null, "name": "CompThr", "value": -12.0 },
+  { "ccs": null, "name": "CompRt", "value": 2.0 },
+  { "ccs": null, "name": "CompGain", "value": 0.0 },
+  { "ccs": null, "name": "CompAuto", "value": 1.0 },
+  { "ccs": null, "name": "CompOn", "value": 0.0 },
+  { "ccs": null, "name": "FlOn", "value": 0.0 },
+  { "ccs": null, "name": "FlCut", "value": 5000.0 },
+  { "ccs": null, "name": "FlRes", "value": 30.0 },
+  { "ccs": null, "name": "FlGain", "value": -6.0 },
+  { "ccs": null, "name": "FlType", "value": "Low Pass" },
+  { "ccs": null, "name": "SterWd", "value": 15.0 },
+  { "ccs": null, "name": "SterOn", "value": 0.0 },
+  { "ccs": null, "name": "ChorRate", "value": 2.0 },
+  { "ccs": null, "name": "ChorHP", "value": 30.0 },
+  { "ccs": null, "name": "ChorDpth", "value": 1.0 },
+  { "ccs": null, "name": "ChorWet", "value": -6.0 },
+  { "ccs": null, "name": "ChorDry", "value": -6.0 },
+  { "ccs": null, "name": "ChorOn", "value": 0.0 },
+  { "ccs": null, "name": "RvSize", "value": 60.0 },
+  { "ccs": null, "name": "RvDamp", "value": 50.0 },
+  { "ccs": null, "name": "RvWidth", "value": 100.0 },
+  { "ccs": null, "name": "RvDry", "value": 0.0 },
+  { "ccs": null, "name": "RvWet", "value": 25.0 },
+  { "ccs": null, "name": "RvOn", "value": 0.0 },
+  { "ccs": null, "name": "DlMsL", "value": 470.0 },
+  { "ccs": null, "name": "DlMsR", "value": 490.0 },
+  { "ccs": null, "name": "DlSyncL", "value": "1/4" },
+  { "ccs": null, "name": "DlSyncR", "value": "1/8" },
+  { "ccs": null, "name": "DlSyncOn", "value": 1.0 },
+  { "ccs": null, "name": "DlFeed", "value": 50.0 },
+  { "ccs": null, "name": "DlDamp", "value": 50.0 },
+  { "ccs": null, "name": "DlWet", "value": -6.0 },
+  { "ccs": null, "name": "DlOn", "value": 0.0 },
+  { "ccs": null, "name": "ConvIR", "value": "None" },
+  { "ccs": null, "name": "ConvHP", "value": 30.0 },
+  { "ccs": null, "name": "ConvWet", "value": -30.0 },
+  { "ccs": null, "name": "ConvDry", "value": 0.0 },
+  { "ccs": null, "name": "ConvOn", "value": 0.0 }
  ]
 }

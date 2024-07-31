@@ -1663,6 +1663,27 @@ TEST_CASE(TestLoadingOldFiles) {
 
         CHECK_APPROX_EQ(ProjectedLayerValue(state, 1, LayerParamIndex::Volume), DbToAmp(-6.0f), 0.01f);
         CHECK_APPROX_EQ(ProjectedLayerValue(state, 2, LayerParamIndex::Volume), DbToAmp(-6.0f), 0.01f);
+
+        CHECK_EQ(ProjectedLayerValue(state, 0, LayerParamIndex::LoopMode),
+                 (f32)param_values::LoopMode::Regular);
+        CHECK_APPROX_EQ(ProjectedLayerValue(state, 0, LayerParamIndex::LoopStart), 0.07f, 0.01f);
+        CHECK_APPROX_EQ(ProjectedLayerValue(state, 0, LayerParamIndex::LoopEnd), 0.20f, 0.01f);
+        CHECK_APPROX_EQ(ProjectedLayerValue(state, 0, LayerParamIndex::LoopCrossfade), 0.27f, 0.01f);
+
+        // Delay
+        CHECK_EQ(state.param_values[ToInt(ParamIndex::DelayOn)], 1.0f);
+        CHECK_EQ(state.param_values[ToInt(ParamIndex::DelayTimeSyncSwitch)], 1.0f);
+        CHECK_EQ(state.param_values[ToInt(ParamIndex::DelayTimeSyncedL)],
+                 (f32)param_values::DelaySyncedTime::_1_4);
+        CHECK_EQ(state.param_values[ToInt(ParamIndex::DelayTimeSyncedR)],
+                 (f32)param_values::DelaySyncedTime::_1_8);
+        CHECK_APPROX_EQ(state.param_values[ToInt(ParamIndex::DelayFeedback)], 0.5f, 0.01f);
+        CHECK_APPROX_EQ(state.param_values[ToInt(ParamIndex::DelayFilterCutoffSemitones)], 60.0f, 3.0f);
+
+        // Reverb
+        CHECK_EQ(state.param_values[ToInt(ParamIndex::ReverbOn)], 1.0f);
+        CHECK_APPROX_EQ(state.param_values[ToInt(ParamIndex::ReverbSize)], 0.6f, 0.01f);
+        CHECK_APPROX_EQ(state.param_values[ToInt(ParamIndex::ReverbMix)], 0.25f, 0.2f);
     }
 
     // Pre-Sv effects
@@ -1711,14 +1732,6 @@ TEST_CASE(TestLoadingOldFiles) {
         CHECK_EQ(state.param_values[ToInt(ParamIndex::ReverbOn)], 0.0f);
         CHECK_APPROX_EQ(state.param_values[ToInt(ParamIndex::ReverbSize)], 0.6f, 0.001f);
 
-        // CHECK_EQ(
-        //     ParamToInt<param_values::DelaySyncedTime>(ProjectedValue(state, ParamIndex::DelayTimeSyncedL)),
-        //     param_values::DelaySyncedTime::_1_4);
-        // CHECK_EQ(
-        //     ParamToInt<param_values::DelaySyncedTime>(ProjectedValue(state, ParamIndex::DelayTimeSyncedR)),
-        //     param_values::DelaySyncedTime::_1_8);
-        // CHECK_APPROX_EQ(ProjectedValue(state, ParamIndex::DelayOldDelayTimeLMs), 470.0f, 0.1f);
-        // CHECK_APPROX_EQ(ProjectedValue(state, ParamIndex::DelayOldDelayTimeRMs), 490.0f, 0.1f);
         CHECK_EQ(ParamToInt<param_values::DistortionType>(ProjectedValue(state, ParamIndex::DistortionType)),
                  param_values::DistortionType::TubeLog);
     }
@@ -1727,6 +1740,7 @@ TEST_CASE(TestLoadingOldFiles) {
     SUBCASE("stress-test.mirage-wraith") {
         auto const state = TRY(decode_file("stress-test.mirage-wraith"));
 
+        // Reverb
         CHECK_EQ(state.param_values[ToInt(ParamIndex::ReverbOn)], 1.0f);
         CHECK_APPROX_EQ(state.param_values[ToInt(ParamIndex::ReverbSize)], 0.6f, 0.01f);
         CHECK_APPROX_EQ(state.param_values[ToInt(ParamIndex::ReverbDecayTimeMs)], 0.6f, 0.01f);
@@ -1739,6 +1753,7 @@ TEST_CASE(TestLoadingOldFiles) {
         CHECK_APPROX_EQ(ProjectedValue(state, ParamIndex::ReverbLowShelfGain), 0.0f, 1.0f);
         CHECK_APPROX_EQ(state.param_values[ToInt(ParamIndex::ReverbMix)], 0.3f, 0.02f);
 
+        // Phaser
         CHECK_EQ(state.param_values[ToInt(ParamIndex::PhaserOn)], 1.0f);
         CHECK_APPROX_EQ(ProjectedValue(state, ParamIndex::PhaserCenterSemitones),
                         FrequencyToMidiNote(3000),
@@ -1749,7 +1764,16 @@ TEST_CASE(TestLoadingOldFiles) {
         CHECK_APPROX_EQ(state.param_values[ToInt(ParamIndex::PhaserStereoAmount)], 0.0f, 0.01f);
         CHECK_LT(state.param_values[ToInt(ParamIndex::PhaserMix)], 0.5f);
 
-        // TODO(1.0): test new delay param remapping
+        // Delay
+        CHECK_EQ(state.param_values[ToInt(ParamIndex::DelayOn)], 1.0f);
+        CHECK_EQ(state.param_values[ToInt(ParamIndex::DelayTimeSyncSwitch)], 1.0f);
+        CHECK_EQ(state.param_values[ToInt(ParamIndex::DelayTimeSyncedL)],
+                 (f32)param_values::DelaySyncedTime::_1_4);
+        CHECK_EQ(state.param_values[ToInt(ParamIndex::DelayTimeSyncedR)],
+                 (f32)param_values::DelaySyncedTime::_1_8);
+        CHECK_APPROX_EQ(state.param_values[ToInt(ParamIndex::DelayFeedback)], 0.5f, 0.01f);
+        CHECK_APPROX_EQ(state.param_values[ToInt(ParamIndex::DelayFilterCutoffSemitones)], 60.0f, 3.0f);
+        CHECK_APPROX_EQ(state.param_values[ToInt(ParamIndex::DelayMix)], 0.5f, 0.1f);
     }
 
     return k_success;

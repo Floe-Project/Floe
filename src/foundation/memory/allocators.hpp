@@ -1,8 +1,6 @@
 // Copyright 2018-2024 Sam Windell
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// IWYU pragma: private; include "foundation/foundation.hpp"
-
 #pragma once
 #include "foundation/container/span.hpp"
 #include "foundation/container/tagged_union.hpp"

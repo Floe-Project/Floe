@@ -32,8 +32,6 @@ class Delay final : public Effect {
 
         reset = false;
 
-        UpdateSilentSeconds(silent_seconds, io_frames, context.sample_rate);
-
         auto wet = scratch_buffers.buf1.Interleaved();
         wet.size = io_frames.size;
         CopyMemory(wet.data, io_frames.data, io_frames.size * sizeof(StereoAudioFrame));
@@ -55,6 +53,9 @@ class Delay final : public Effect {
 
         for (auto const frame_index : Range((u32)io_frames.size))
             io_frames[frame_index] = MixOnOffSmoothing(wet[frame_index], io_frames[frame_index], frame_index);
+
+        // check for silence on the output
+        UpdateSilentSeconds(silent_seconds, io_frames, context.sample_rate);
 
         return true;
     }

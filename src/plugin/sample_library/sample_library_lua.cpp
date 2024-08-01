@@ -1737,6 +1737,10 @@ TEST_CASE(TestBasicFile) {
     floe.add_region(instrument, floe.extend_table(proto, {
         file = file,
     }))
+    floe.add_ir(library, {
+        name = "IR1",
+        path = "bar/bar.flac",
+    })
     return library
     )aaa",
                      "test.lua",
@@ -1785,6 +1789,13 @@ TEST_CASE(TestBasicFile) {
         CHECK_EQ(loop.start_frame, 3000u);
         CHECK_EQ(loop.end_frame, 9000u);
         CHECK_EQ(loop.crossfade_frames, 2u);
+    }
+
+    {
+        auto ir = lib.irs_by_name.Find("IR1");
+        REQUIRE(ir);
+        CHECK_EQ((*ir)->name, "IR1"_s);
+        CHECK_EQ((*ir)->path, "bar/bar.flac"_s);
     }
 
     return k_success;

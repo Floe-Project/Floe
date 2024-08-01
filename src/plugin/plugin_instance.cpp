@@ -78,9 +78,10 @@ static void LoadNewState(PluginInstance& plugin, StateSnapshotWithMetadata const
         pending.source = source;
 
         for (auto [layer_index, i] : Enumerate<u32>(state.state.inst_ids)) {
+            plugin.processor.layer_processors[layer_index].instrument_id = i;
+
             if (i.tag != InstrumentType::Sampler) continue;
 
-            plugin.processor.layer_processors[layer_index].instrument_id = i;
             auto const async_id =
                 sample_lib_server::SendAsyncLoadRequest(plugin.shared_data.sample_library_server,
                                                         plugin.sample_lib_server_async_channel,
@@ -91,8 +92,8 @@ static void LoadNewState(PluginInstance& plugin, StateSnapshotWithMetadata const
             dyn::Append(pending.requests, async_id);
         }
 
+        plugin.processor.convo.ir_id = state.state.ir_id;
         if (state.state.ir_id) {
-            plugin.processor.convo.ir_id = state.state.ir_id;
             auto const async_id =
                 sample_lib_server::SendAsyncLoadRequest(plugin.shared_data.sample_library_server,
                                                         plugin.sample_lib_server_async_channel,
@@ -253,7 +254,7 @@ static void AssignDiffDescription(dyn::DynArray auto& diff_desc,
 
     if (old_state.ir_id != new_state.ir_id) {
         fmt::Append(diff_desc,
-                    "IR changed: {}:{} vs {}:{}\n"_s,
+                    "IR changed, old: {}:{} vs new: {}:{}\n"_s,
                     old_state.ir_id.HasValue() ? old_state.ir_id.Value().library_name.Items() : "null"_s,
                     old_state.ir_id.HasValue() ? old_state.ir_id.Value().ir_name.Items() : "null"_s,
                     new_state.ir_id.HasValue() ? new_state.ir_id.Value().library_name.Items() : "null"_s,

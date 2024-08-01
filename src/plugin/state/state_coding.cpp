@@ -524,7 +524,7 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
     {
         state.ir_id = nullopt;
         auto const old_param =
-            parser.non_existent_params[ToInt(NoLongerExistingParam::ConvolutionLegacyCoreIrName)];
+            parser.non_existent_params[ToInt(NoLongerExistingParam::ConvolutionLegacyMirageIrName)];
         if (old_param.tag == JsonStateParser::ParamValueType::String) {
             auto const ir_name = old_param.Get<String>();
             if (ir_name.size && ir_name != "None"_s) {
@@ -1630,7 +1630,7 @@ TEST_CASE(TestLoadingOldFiles) {
         }
         CHECK(state.ir_id.HasValue());
         if (state.ir_id.HasValue()) {
-            CHECK_EQ(state.ir_id->library_name, "Core"_s);
+            CHECK_EQ(state.ir_id->library_name, k_mirage_compat_library_name);
             CHECK_EQ(state.ir_id->ir_name, "5s Shimmer"_s);
         }
 

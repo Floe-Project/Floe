@@ -2204,7 +2204,7 @@ Type ParamToInt(f32 value) {
 }
 
 enum class NoLongerExistingParam : u16 {
-    ConvolutionLegacyCoreIrName,
+    ConvolutionLegacyMirageIrName,
 
     Layer1LoopOnSwitch,
     Layer1LoopPingPongOnSwitch,

@@ -380,7 +380,7 @@ constexpr auto k_params = ArrayT<NoLongerExistsParam>({
     {"L1LpPP", NoLongerExistingParam::Layer2LoopPingPongOnSwitch},
     {"L2LpOn", NoLongerExistingParam::Layer3LoopOnSwitch},
     {"L2LpPP", NoLongerExistingParam::Layer3LoopPingPongOnSwitch},
-    {"ConvIR", NoLongerExistingParam::ConvolutionLegacyCoreIrName},
+    {"ConvIR", NoLongerExistingParam::ConvolutionLegacyMirageIrName},
     {"RvDamp", NoLongerExistingParam::ReverbFreeverbDampingPercent},
     {"RvWidth", NoLongerExistingParam::ReverbFreeverbWidthPercent},
     {"RvWet", NoLongerExistingParam::ReverbFreeverbWetPercent},

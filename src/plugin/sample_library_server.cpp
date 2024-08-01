@@ -956,7 +956,16 @@ static bool UpdatePendingResources(PendingResources& pending_resources,
                     .error_code = CommonError::NotFound,
                     .id = ThreadsafeErrorNotifications::Id("lib ", library_name),
                 };
-                fmt::Append(err->value.title, "{} not found", library_name);
+                fmt::Append(err->value.title, "{} library not found", library_name);
+                fmt::Append(
+                    err->value.message,
+                    "\"{}\" is not installed or is otherwise unavailable. Check your settings or consult the library installation instructions.",
+                    library_name);
+                if (library_name == k_mirage_compat_library_name) {
+                    fmt::Append(
+                        err->value.message,
+                        " For compatibility with Mirage please install the Mirage Compatibility library (freely available from FrozenPlain).");
+                }
                 pending_resource.request.async_comms_channel.error_notifications.AddOrUpdateError(err);
                 pending_resource.state = ErrorCode {CommonError::NotFound};
             }

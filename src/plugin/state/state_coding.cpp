@@ -466,7 +466,7 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
         for (auto& i : state.inst_ids)
             i = sample_lib::InstrumentId {"foo"_s, "bar"_s};
         state.ir_id = sample_lib::IrId {
-            .library_name = k_core_library_name,
+            .library_name = k_mirage_compat_library_name,
             .ir_name = "Formant 1"_s,
         };
     }
@@ -528,24 +528,10 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
         if (old_param.tag == JsonStateParser::ParamValueType::String) {
             auto const ir_name = old_param.Get<String>();
             if (ir_name.size && ir_name != "None"_s) {
-
-                // Some IRs there were in the 'Core' library are now builtin
-                for (auto const& ir : EmbeddedIrs().irs) {
-                    if (String {ir.legacy_name.data, ir.legacy_name.size} == ir_name) {
-                        state.ir_id = sample_lib::IrId {
-                            .library_name = k_builtin_library_name,
-                            .ir_name = path::FilenameWithoutExtension(String {ir.name.data, ir.name.size}),
-                        };
-                        break;
-                    }
-                }
-
-                if (!state.ir_id) {
-                    state.ir_id = sample_lib::IrId {
-                        .library_name = k_core_library_name,
-                        .ir_name = ir_name,
-                    };
-                }
+                state.ir_id = sample_lib::IrId {
+                    .library_name = k_mirage_compat_library_name,
+                    .ir_name = ir_name,
+                };
             }
         }
     }

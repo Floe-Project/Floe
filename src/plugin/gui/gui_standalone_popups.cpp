@@ -208,7 +208,7 @@ void DoErrorsStandalone(Gui* g) {
                             dyn::AppendSpan(error_text, e.message);
                             dyn::Append(error_text, '\n');
                         }
-                        if (e.error_code) fmt::Append(error_text, "{}", *e.error_code);
+                        if (e.error_code) fmt::Append(error_text, "\n{}", *e.error_code);
 
                         auto const max_width = imgui.Width() * 0.95f;
                         auto const size = draw::GetTextSize(font, error_text, max_width);

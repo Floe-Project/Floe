@@ -10,12 +10,12 @@ extern "C" {
 #endif
 
 typedef struct {
-    const char *data;
+    char const* data;
     uint64_t size;
 } EmbeddedString;
 
 typedef struct {
-    const uint8_t *data;
+    uint8_t const* data;
     uint64_t size;
     EmbeddedString name;
     EmbeddedString legacy_name;

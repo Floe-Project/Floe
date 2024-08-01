@@ -95,14 +95,19 @@ ImagePixelsFromLibrary(Gui* g, sample_lib::Library const& lib, LibraryImageType 
     if (lib.file_format_specifics.tag == sample_lib::FileFormat::Mdata) {
         // Back in the Mirage days, some libraries didn't embed their own images, but instead got them from a
         // shared pool. We replicate that behaviour here.
-        for (auto const& dir :
-             g->plugin.shared_data.paths.always_scanned_folders[ToInt(ScanFolderType::Libraries)]) {
-            String const dir_to_search_in = lib.name == "Wraith Demo" ? "Wraith" : lib.name;
-            auto const path =
-                path::Join(g->scratch_arena,
-                           Array {dir, "Floe-Mirage-Compat", "images"_s, dir_to_search_in, filename});
-            auto outcome = DecodeImageFromFile(path);
-            if (outcome.HasValue()) return outcome.ReleaseValue();
+        auto mirage_compat_lib =
+            sample_lib_server::FindLibraryRetained(g->plugin.shared_data.sample_library_server,
+                                                   k_mirage_compat_library_name);
+        DEFER { mirage_compat_lib.Release(); };
+
+        if (mirage_compat_lib) {
+            if (auto const dir = path::Directory(mirage_compat_lib->path); dir) {
+                String const library_subdir = lib.name == "Wraith Demo" ? "Wraith" : lib.name;
+                auto const path =
+                    path::Join(g->scratch_arena, Array {*dir, "images"_s, library_subdir, filename});
+                auto outcome = DecodeImageFromFile(path);
+                if (outcome.HasValue()) return outcome.ReleaseValue();
+            }
         }
     }
 

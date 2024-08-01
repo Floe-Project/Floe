@@ -1537,7 +1537,6 @@ void LoadResult::ChangeRefCount(RefCountChange t) const {
                 resource_union->Get<RefCounted<sample_lib::LoadedInstrument>>().ChangeRefCount(t);
                 break;
             case LoadRequestType::Ir:
-                break;
                 resource_union->Get<RefCounted<sample_lib::LoadedIr>>().ChangeRefCount(t);
                 break;
         }

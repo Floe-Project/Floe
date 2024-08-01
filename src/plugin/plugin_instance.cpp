@@ -176,8 +176,6 @@ static void SampleLibraryResourceLoaded(PluginInstance& plugin, sample_lib_serve
         s;
     });
 
-    DBG_PRINT_EXPR(source);
-
     switch (source) {
         case Source::OneOff: {
             if (result.result.tag != sample_lib_server::LoadResult::ResultType::Success) break;

@@ -15,7 +15,7 @@ int NumFrames(StereoConvolver& convolver) { return convolver.num_frames; }
 void DestroyStereoConvolver(StereoConvolver* convolver) { delete convolver; }
 
 void Init(StereoConvolver& convolver, float const* interleaved_stereo, int num_frames) {
-    // IMPROVE: this is slow?
+    convolver.num_frames = num_frames;
 
     auto samples = new float[(unsigned)num_frames];
 

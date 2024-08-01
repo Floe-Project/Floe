@@ -54,7 +54,7 @@ class ConvolutionReverb final : public Effect {
                     input_channels[0],
                     input_channels[1],
                     wet_channels[0],
-                    wet_channels[0],
+                    wet_channels[1],
                     (int)io_frames.size);
         } else {
             SimdZeroAlignedBuffer(wet_channels[0], io_frames.size * 2);
@@ -79,6 +79,7 @@ class ConvolutionReverb final : public Effect {
             wet = MixOnOffSmoothing(wet, frame, frame_index);
             frame = wet;
         }
+
         result.effect_process_state =
             IsSilent() ? EffectProcessResult::Done : EffectProcessResult::ProcessingTail;
         return result;

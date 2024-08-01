@@ -8,35 +8,10 @@
 #include "common/constants.hpp"
 #include "cross_instance_systems.hpp"
 #include "instrument.hpp"
-#include "layer_processor.hpp"
 #include "plugin.hpp"
 #include "processor.hpp"
 #include "sample_library_server.hpp"
 #include "state/state_snapshot.hpp"
-
-// TODO(1.0): Core-Library Repo: tag all IRs in the floe.lua
-//
-// TODO(1.0): fetch the IRs dynamically once we have the new library infrastructure
-constexpr auto k_core_version_1_irs = Array {
-    "2s Airy 1"_s,
-    "2s Rough Crackle",
-    "3s Creaky Door 2",
-    "3s Crunchy",
-    "3s Rattle",
-    "3s Shivering Cold",
-    "3s Smooooth",
-    "4s Space Didgeridoo",
-    "4s Standard Bright",
-    "4s Wind",
-    "5s Shimmer",
-    "Ambi 4 Fade",
-    "Formant 1",
-    "Realistic Cathedral A",
-    "Realistic Cathedral B",
-    "Realistic Large A",
-    "Realistic Large B",
-    "Realistic Subtle",
-};
 
 struct PluginInstance {
     struct PendingStateChange {

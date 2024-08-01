@@ -107,22 +107,41 @@ struct EffectIDs {
 };
 
 static void ImpulseResponseMenuItems(Gui* g) {
-    DynamicArrayInline<String, k_core_version_1_irs.size + 1> items;
-    dyn::Append(items, "None");
-    dyn::AppendSpan(items, k_core_version_1_irs);
+    auto const scratch_cursor = g->scratch_arena.TotalUsed();
+    DEFER { g->scratch_arena.TryShrinkTotalUsed(scratch_cursor); };
 
+    auto libs = sample_lib_server::AllLibrariesRetained(g->plugin.shared_data.sample_library_server,
+                                                        g->scratch_arena);
+    DEFER { sample_lib_server::ReleaseAll(libs); };
+
+    StartFloeMenu(g);
+    DEFER { EndFloeMenu(g); };
+
+    // TODO(1.0): this is not production-ready code. We need a new powerful database-like browser GUI
     int current = 0;
-    if (auto ir = g->plugin.processor.convo.ir_id) {
-        auto const found = Find(items, String(ir->ir_name));
-        if (found) current = (int)*found;
+    DynamicArray<String> irs {g->scratch_arena};
+    DynamicArray<sample_lib::IrId> ir_ids {g->scratch_arena};
+    dyn::Append(irs, "None");
+    dyn::Append(ir_ids, {});
+
+    for (auto l : libs) {
+        for (auto const ir : l->irs_by_name) {
+            auto const ir_id = sample_lib::IrId {
+                .library_name = l->name,
+                .ir_name = ir.key,
+            };
+
+            if (g->plugin.processor.convo.ir_id == ir_id) current = (int)irs.size;
+            dyn::Append(irs, fmt::Format(g->scratch_arena, "{}: {}", l->name, ir.key));
+            dyn::Append(ir_ids, ir_id);
+        }
     }
 
-    if (DoMultipleMenuItems(g, items, current)) {
-        auto _ = LoadConvolutionIr(g->plugin,
-                                   sample_lib::IrId {
-                                       .library_name = String(k_core_library_name),
-                                       .ir_name = items[(usize)current],
-                                   });
+    if (DoMultipleMenuItems(g, irs, current)) {
+        if (current == 0)
+            auto _ = LoadConvolutionIr(g->plugin, nullopt);
+        else
+            auto _ = LoadConvolutionIr(g->plugin, ir_ids[(usize)current]);
     }
 }
 

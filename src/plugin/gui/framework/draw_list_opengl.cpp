@@ -100,21 +100,20 @@ struct OpenGLDrawContext : public DrawContext {
 
     void Resize(UiSize) override { DestroyDeviceObjects(); }
 
-    ErrorCodeOr<void> Render(DrawData draw_data, UiSize window_size, f32 display_ratio, Rect) override {
+    ErrorCodeOr<void> Render(DrawData draw_data, UiSize window_size, f32 draw_scale_factor) override {
         ZoneScoped;
         if (draw_data.draw_lists.size == 0) return k_success;
 
-        ScaleClipRects(draw_data, display_ratio);
+        ScaleClipRects(draw_data, draw_scale_factor);
 
-        // We are using the OpenGL fixed pipeline to make the example code simpler to read!
-        // Setup render state: alpha-blending enabled, no face culling, no depth testing, scissor enabled,
-        // vertex/texcoord/color pointers.
+#if 0
         GLint last_texture;
         glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture);
         GLint last_viewport[4];
         glGetIntegerv(GL_VIEWPORT, last_viewport);
         GLint last_scissor_box[4];
         glGetIntegerv(GL_SCISSOR_BOX, last_scissor_box);
+#endif
         glPushAttrib(GL_ENABLE_BIT | GL_COLOR_BUFFER_BIT | GL_TRANSFORM_BIT);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -126,14 +125,12 @@ struct OpenGLDrawContext : public DrawContext {
         glEnableClientState(GL_COLOR_ARRAY);
         glEnable(GL_TEXTURE_2D);
         // glHint( GL_POLYGON_SMOOTH_HINT, GL_NICEST );
-        // glUseProgram(0); // You may want this if using this code in an OpenGL 3+ context
 
         // Setup viewport, orthographic projection matrix
-        // glViewport(0, 0, (GLsizei)(window_w * display_ratio), (GLsizei)(window_h * display_ratio));
         glViewport(0,
                    0,
-                   (GLsizei)(window_size.width * display_ratio),
-                   (GLsizei)(window_size.height * display_ratio));
+                   (GLsizei)(window_size.width * draw_scale_factor),
+                   (GLsizei)(window_size.height * draw_scale_factor));
         glMatrixMode(GL_PROJECTION);
         glPushMatrix();
         glLoadIdentity();
@@ -169,7 +166,7 @@ struct OpenGLDrawContext : public DrawContext {
                 } else {
                     glBindTexture(GL_TEXTURE_2D, (GLuint)(intptr_t)pcmd->texture_id);
                     glScissor((int)pcmd->clip_rect.x,
-                              (int)((window_size.height * display_ratio) - pcmd->clip_rect.w),
+                              (int)((window_size.height * draw_scale_factor) - pcmd->clip_rect.w),
                               (int)(pcmd->clip_rect.z - pcmd->clip_rect.x),
                               (int)(pcmd->clip_rect.w - pcmd->clip_rect.y));
                     glDrawElements(GL_TRIANGLES,
@@ -181,6 +178,7 @@ struct OpenGLDrawContext : public DrawContext {
             }
         }
 
+#if 0
         // Restore modified state
         glDisableClientState(GL_COLOR_ARRAY);
         glDisableClientState(GL_TEXTURE_COORD_ARRAY);
@@ -196,6 +194,7 @@ struct OpenGLDrawContext : public DrawContext {
                   last_scissor_box[1],
                   (GLsizei)last_scissor_box[2],
                   (GLsizei)last_scissor_box[3]);
+#endif
 
         glFlush();
 

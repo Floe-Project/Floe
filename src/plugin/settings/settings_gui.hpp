@@ -29,8 +29,18 @@ constexpr UiSize CreateFromWidth(u16 target_width, UiSize aspect_ratio) {
         return {high_width, (u16)(high_index * aspect_ratio.height)};
 }
 
-PUBLIC UiSize ConstrainWindowSizeToAspectRatio(UiSize size, UiSize aspect_ratio) {
-    return CreateFromWidth(size.width, aspect_ratio);
+PUBLIC UiSize GetNearestAspectRatioSizeInsideSize(UiSize size, UiSize aspect_ratio) {
+    u16 const low_index = size.width / aspect_ratio.width;
+    u16 const low_width = aspect_ratio.width * low_index;
+    auto const height_by_width = (u16)(low_index * aspect_ratio.height);
+
+    if (height_by_width <= size.height)
+        return {low_width, height_by_width};
+    else {
+        u16 const height_low_index = size.height / aspect_ratio.height;
+        u16 const height_low_height = aspect_ratio.height * height_low_index;
+        return {(u16)(aspect_ratio.width * height_low_index), height_low_height};
+    }
 }
 
 PUBLIC UiSize CurrentAspectRatio(Settings::Gui const& gui) {

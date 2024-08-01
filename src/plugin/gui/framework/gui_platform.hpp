@@ -15,7 +15,7 @@
 #include "plugin_instance.hpp"
 #include "settings/settings_gui.hpp"
 
-constexpr bool k_debug_gui_platform = false;
+constexpr bool k_debug_gui_platform = true;
 
 struct GuiPlatform {
     static constexpr uintptr_t k_timer_id = 200;
@@ -128,6 +128,7 @@ PUBLIC ErrorCodeOr<void> CreateView(GuiPlatform& platform, PluginInstance& plugi
     puglSetViewHint(platform.view, PUGL_RESIZABLE, true);
     auto const size = gui_settings::WindowSize(platform.settings.settings.gui);
     TRY(Required(puglSetSize(platform.view, size.width, size.height)));
+    DebugLn("CreateView size: {}x{}", size.width, size.height);
 
     platform.gui.Emplace(platform.frame_state, plugin);
 
@@ -216,12 +217,12 @@ static bool IsUpdateNeeded(GuiPlatform& platform) {
     return update_needed;
 }
 
-static ModifierFlags CreateModifierFlags(u32 flags) {
+static ModifierFlags CreateModifierFlags(u32 pugl_mod_flags) {
     ModifierFlags result {};
-    if (flags & PUGL_MOD_SHIFT) result.Set(ModifierKey::Shift);
-    if (flags & PUGL_MOD_CTRL) result.Set(ModifierKey::Ctrl);
-    if (flags & PUGL_MOD_ALT) result.Set(ModifierKey::Alt);
-    if (flags & PUGL_MOD_SUPER) result.Set(ModifierKey::Super);
+    if (pugl_mod_flags & PUGL_MOD_SHIFT) result.Set(ModifierKey::Shift);
+    if (pugl_mod_flags & PUGL_MOD_CTRL) result.Set(ModifierKey::Ctrl);
+    if (pugl_mod_flags & PUGL_MOD_ALT) result.Set(ModifierKey::Alt);
+    if (pugl_mod_flags & PUGL_MOD_SUPER) result.Set(ModifierKey::Super);
     return result;
 }
 
@@ -543,10 +544,12 @@ static void UpdateAndRender(GuiPlatform& platform) {
         if (!puglGetVisible(platform.view)) return;
 
     auto const window_size = WindowSize(platform);
+    auto const scale_factor = 1.0;
 
     platform.frame_state.graphics_ctx = platform.graphics_ctx;
     platform.frame_state.native_window = (void*)puglGetNativeView(platform.view);
     platform.frame_state.window_size = window_size;
+    platform.frame_state.draw_scale_factor = (f32)scale_factor;
 
     u32 num_repeats = 0;
     do {
@@ -571,18 +574,19 @@ static void UpdateAndRender(GuiPlatform& platform) {
     } while (platform.last_result.update_request == GuiFrameResult::UpdateRequest::ImmediatelyUpdate);
 
     if (platform.last_result.draw_data.draw_lists.size) {
+        DebugLn("Rendering at size: {}x{}", window_size.width, window_size.height);
         ZoneNamedN(render, "render", true);
         auto o = platform.graphics_ctx->Render(platform.last_result.draw_data,
                                                window_size,
-                                               platform.frame_state.display_ratio,
-                                               Rect(0, 0, window_size.ToFloat2()));
+                                               platform.frame_state.draw_scale_factor);
         if (o.HasError()) platform.logger.ErrorLn("GUI render failed: {}", o.Error());
     }
 }
 
 static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
     if constexpr (k_debug_gui_platform)
-        if (event->type != PUGL_UPDATE && event->type != PUGL_TIMER) printEvent(event, "PUGL: ", true);
+        if (event->type != PUGL_UPDATE && event->type != PUGL_TIMER && event->type != PUGL_MOTION)
+            printEvent(event, "PUGL: ", true);
     auto& platform = *(GuiPlatform*)puglGetHandle(view);
 
     bool post_redisplay = false;
@@ -605,6 +609,9 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
         case PUGL_CONFIGURE: {
             if (platform.graphics_ctx)
                 platform.graphics_ctx->Resize({event->configure.width, event->configure.height});
+            gui_settings::SetWindowSize(platform.settings.settings.gui,
+                                        platform.settings.tracking,
+                                        CheckedCast<u16>(event->configure.width));
             break;
         }
 

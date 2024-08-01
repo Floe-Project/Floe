@@ -206,11 +206,9 @@ clap_plugin_gui const floe_gui {
     // Returns false if the call was ignored, or the scaling could not be applied.
     // [main-thread]
     .set_scale = [](clap_plugin_t const* plugin, f64 scale) -> bool {
-        //  IMPROVE: support this (hi DPI)
-        (void)scale;
-        auto& floe = *(FloeInstance*)plugin->plugin_data;
-        TracyMessageEx(floe.trace_config, "gui set_scale");
-        return false;
+        (void)plugin;
+        DebugLn("clap: set_scale {}", scale);
+        return false; // we (pugl) negotiate this with the OS ourselves
     },
 
     // Get the current size of the plugin UI.
@@ -224,6 +222,7 @@ clap_plugin_gui const floe_gui {
         auto size = WindowSize(*floe.pugl_platform);
         *width = size.width;
         *height = size.height;
+        DebugLn("clap: get_size {} {}", *width, *height);
         return true;
     },
 
@@ -241,6 +240,7 @@ clap_plugin_gui const floe_gui {
         auto const ratio = gui_settings::CurrentAspectRatio(g_cross_instance_systems->settings.settings.gui);
         hints->aspect_ratio_width = ratio.width;
         hints->aspect_ratio_height = ratio.height;
+        DebugLn("clap: get_resize_hints {}x{}", hints->aspect_ratio_width, hints->aspect_ratio_height);
         return true;
     },
 
@@ -253,9 +253,10 @@ clap_plugin_gui const floe_gui {
     // Returns true if the plugin could adjust the given size.
     // [main-thread]
     .adjust_size = [](clap_plugin_t const*, u32* width, u32* height) -> bool {
-        auto const sz = gui_settings::ConstrainWindowSizeToAspectRatio(
+        auto const sz = gui_settings::GetNearestAspectRatioSizeInsideSize(
             {CheckedCast<u16>(*width), CheckedCast<u16>(*height)},
             gui_settings::CurrentAspectRatio(g_cross_instance_systems->settings.settings.gui));
+        DebugLn("clap: adjust_size in: {}x{}, out: {}x{}", *width, *height, sz.width, sz.height);
         *width = sz.width;
         *height = sz.height;
         return true;
@@ -269,6 +270,17 @@ clap_plugin_gui const floe_gui {
         auto& floe = *(FloeInstance*)plugin->plugin_data;
         ZoneScopedMessage(floe.trace_config, "gui set_size {} {}", width, height);
         ASSERT(IsMainThread(floe.host));
+        auto const aspect_ratio_conformed_size = gui_settings::GetNearestAspectRatioSizeInsideSize(
+            {CheckedCast<u16>(width), CheckedCast<u16>(height)},
+            gui_settings::CurrentAspectRatio(g_cross_instance_systems->settings.settings.gui));
+        DebugLn("clap:    set_size in: {}x{}, constrained {}x{}, result: {}",
+                width,
+                height,
+                aspect_ratio_conformed_size.width,
+                aspect_ratio_conformed_size.height,
+                aspect_ratio_conformed_size.width == width && aspect_ratio_conformed_size.height == height);
+        if (aspect_ratio_conformed_size.width != width || aspect_ratio_conformed_size.height != height)
+            return false;
         return SetSize(*floe.pugl_platform, {CheckedCast<u16>(width), CheckedCast<u16>(height)});
     },
 

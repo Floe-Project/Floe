@@ -570,7 +570,7 @@ static void CreateFontsIfNeeded(Gui* g) {
             config.font_data_reference_only = true; // we handle it in font_arena
             auto font = graphics_ctx->fonts.AddFontFromMemoryTTF((void*)data.data,
                                                                  (int)data.size,
-                                                                 size * g->frame_input.display_ratio,
+                                                                 size * g->frame_input.draw_scale_factor,
                                                                  &config,
                                                                  ranges);
             ASSERT(font != nullptr);

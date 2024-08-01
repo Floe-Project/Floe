@@ -572,7 +572,7 @@ void GUIDoSampleWaveform(Gui* g, LayerProcessor* layer, Rect r) {
                                               *audio_file,
                                               r.w,
                                               r.h,
-                                              g->frame_input.display_ratio);
+                                              g->frame_input.draw_scale_factor);
         if (tex.HasValue()) {
             g->imgui.graphics->AddImage(tex.Value(),
                                         waveform_r.Min() + f32x2 {offset * r.w, 0},

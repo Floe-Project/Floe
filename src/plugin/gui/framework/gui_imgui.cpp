@@ -2174,7 +2174,7 @@ void Context::DebugWindow(Rect r) {
                       "%hu, %hu",
                       frame_input.window_size.width,
                       frame_input.window_size.height);
-        DebugTextItem("DisplayRatio", "%.2f", (f64)frame_input.display_ratio);
+        DebugTextItem("DisplayRatio", "%.2f", (f64)frame_input.draw_scale_factor);
         DebugTextItem("Widgets", "%d", (int)frame_output.mouse_tracked_rects.size);
 
         debug_y_pos += graphics->context->CurrentFontSize() * 2;

@@ -116,7 +116,7 @@ struct GuiFrameInput {
     TimePoint time_prev {};
     f32 delta_time {};
     u64 update_count {};
-    f32 display_ratio {1}; // TODO: do we need to set this properly for high-dpi displays?
+    f32 draw_scale_factor {1}; // TODO: I think we can remove this since pugl always provides us with pixels
     UiSize window_size {};
     void* native_window {}; // HWND, NSView*, etc.
 

@@ -376,8 +376,7 @@ struct DrawContext {
     CreateTexture(unsigned char* data, UiSize size, u16 bytes_per_pixel) = 0;
     virtual void DestroyTexture(TextureHandle& id) = 0;
 
-    virtual ErrorCodeOr<void>
-    Render(DrawData draw_data, UiSize window_size, f32 display_ratio, Rect rect) = 0;
+    virtual ErrorCodeOr<void> Render(DrawData draw_data, UiSize window_size, f32 display_ratio) = 0;
     virtual void Resize(UiSize) {}
 
     void

@@ -27,39 +27,7 @@
 //
 #include "os/undef_windows_macros.h"
 
-template <typename Type>
-class UninitialisedGlobalObj {
-  public:
-    template <typename... Args>
-    requires(ConstructibleWithArgs<Type, Args...>)
-    constexpr void Init(Args&&... args) {
-        ASSERT(!HasValue());
-        PLACEMENT_NEW(m_storage) Type(Forward<Args>(args)...);
-        m_has_value = true;
-    }
-
-    constexpr void Uninit() {
-        ASSERT(HasValue());
-        Value().~Type();
-        m_has_value = false;
-    }
-
-    constexpr Type& Value() { return *(Type*)m_storage; }
-
-    constexpr bool HasValue() const { return m_has_value; }
-    constexpr explicit operator bool() const { return HasValue(); }
-
-    constexpr Type* operator->() { return &Value(); }
-    constexpr Type& operator*() { return Value(); }
-    constexpr Type const* operator->() const { return &Value(); }
-    constexpr Type const& operator*() const { return Value(); }
-
-  private:
-    alignas(Type) u8 m_storage[sizeof(Type)];
-    bool m_has_value;
-};
-
-UninitialisedGlobalObj<CrossInstanceSystems> g_cross_instance_systems {};
+[[clang::no_destroy]] Optional<CrossInstanceSystems> g_cross_instance_systems {};
 
 static u16 g_floe_instance_id_counter = 0;
 
@@ -175,8 +143,8 @@ clap_plugin_gui const floe_gui {
         ASSERT(IsMainThread(floe.host));
 
         floe.gui_platform.Emplace(floe.host,
-                                   g_cross_instance_systems->settings,
-                                   g_cross_instance_systems->logger);
+                                  g_cross_instance_systems->settings,
+                                  g_cross_instance_systems->logger);
 
         return LogIfError(CreateView(*floe.gui_platform, *floe.plugin),
                           g_cross_instance_systems->logger,
@@ -253,12 +221,16 @@ clap_plugin_gui const floe_gui {
     // Returns true if the plugin could adjust the given size.
     // [main-thread]
     .adjust_size = [](clap_plugin_t const*, u32* width, u32* height) -> bool {
-        auto const sz = gui_settings::GetNearestAspectRatioSizeInsideSize(
+        auto const aspect_ratio_conformed_size = gui_settings::GetNearestAspectRatioSizeInsideSize(
             {CheckedCast<u16>(*width), CheckedCast<u16>(*height)},
             gui_settings::CurrentAspectRatio(g_cross_instance_systems->settings.settings.gui));
-        DebugLn("clap: adjust_size in: {}x{}, out: {}x{}", *width, *height, sz.width, sz.height);
-        *width = sz.width;
-        *height = sz.height;
+        DebugLn("clap: adjust_size in: {}x{}, out: {}x{}",
+                *width,
+                *height,
+                aspect_ratio_conformed_size.width,
+                aspect_ratio_conformed_size.height);
+        *width = aspect_ratio_conformed_size.width;
+        *height = aspect_ratio_conformed_size.height;
         return true;
     },
 
@@ -552,7 +524,7 @@ clap_plugin const floe_plugin {
 #ifdef TRACY_ENABLE
             tracy::SetThreadName("Main");
 #endif
-            g_cross_instance_systems.Init();
+            g_cross_instance_systems.Emplace();
         }
 
         floe.plugin.Emplace(floe.host, *g_cross_instance_systems);
@@ -575,7 +547,7 @@ clap_plugin const floe_plugin {
 
                 floe.plugin.Clear();
 
-                if (--g_num_init_plugins == 0) g_cross_instance_systems.Uninit();
+                if (--g_num_init_plugins == 0) g_cross_instance_systems.Clear();
             }
 
             PageAllocator::Instance().Delete(&floe);

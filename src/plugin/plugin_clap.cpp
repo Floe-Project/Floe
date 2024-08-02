@@ -90,7 +90,7 @@ struct FloeInstance {
 
     Optional<PluginInstance> plugin {};
 
-    Optional<GuiPlatform> pugl_platform {};
+    Optional<GuiPlatform> gui_platform {};
 };
 
 static u16 g_num_init_plugins = 0;
@@ -174,11 +174,11 @@ clap_plugin_gui const floe_gui {
         ZoneScopedMessage(floe.trace_config, "gui create");
         ASSERT(IsMainThread(floe.host));
 
-        floe.pugl_platform.Emplace(floe.host,
+        floe.gui_platform.Emplace(floe.host,
                                    g_cross_instance_systems->settings,
                                    g_cross_instance_systems->logger);
 
-        return LogIfError(CreateView(*floe.pugl_platform, *floe.plugin),
+        return LogIfError(CreateView(*floe.gui_platform, *floe.plugin),
                           g_cross_instance_systems->logger,
                           "CreateView");
     },
@@ -190,8 +190,8 @@ clap_plugin_gui const floe_gui {
             auto& floe = *(FloeInstance*)plugin->plugin_data;
             ASSERT(IsMainThread(floe.host));
             ZoneScopedMessage(floe.trace_config, "gui destroy");
-            DestroyView(*floe.pugl_platform);
-            floe.pugl_platform.Clear();
+            DestroyView(*floe.gui_platform);
+            floe.gui_platform.Clear();
         },
 
     // Set the absolute GUI scaling factor, and override any OS info.
@@ -219,7 +219,7 @@ clap_plugin_gui const floe_gui {
     .get_size = [](clap_plugin_t const* plugin, u32* width, u32* height) -> bool {
         auto& floe = *(FloeInstance*)plugin->plugin_data;
         ASSERT(IsMainThread(floe.host));
-        auto size = WindowSize(*floe.pugl_platform);
+        auto size = WindowSize(*floe.gui_platform);
         *width = size.width;
         *height = size.height;
         DebugLn("clap: get_size {} {}", *width, *height);
@@ -281,7 +281,7 @@ clap_plugin_gui const floe_gui {
                 aspect_ratio_conformed_size.width == width && aspect_ratio_conformed_size.height == height);
         if (aspect_ratio_conformed_size.width != width || aspect_ratio_conformed_size.height != height)
             return false;
-        return SetSize(*floe.pugl_platform, {CheckedCast<u16>(width), CheckedCast<u16>(height)});
+        return SetSize(*floe.gui_platform, {CheckedCast<u16>(width), CheckedCast<u16>(height)});
     },
 
     // Embeds the plugin window into the given window.
@@ -292,7 +292,7 @@ clap_plugin_gui const floe_gui {
         auto& floe = *(FloeInstance*)plugin->plugin_data;
         ZoneScopedMessage(floe.trace_config, "gui set_parent");
         ASSERT(IsMainThread(floe.host));
-        return LogIfError(SetParent(*floe.pugl_platform, *window),
+        return LogIfError(SetParent(*floe.gui_platform, *window),
                           g_cross_instance_systems->logger,
                           "SetParent");
     },
@@ -305,7 +305,7 @@ clap_plugin_gui const floe_gui {
         auto& floe = *(FloeInstance*)plugin->plugin_data;
         ZoneScopedMessage(floe.trace_config, "gui set_transient");
         ASSERT(IsMainThread(floe.host));
-        return LogIfError(SetTransient(*floe.pugl_platform, *window),
+        return LogIfError(SetTransient(*floe.gui_platform, *window),
                           g_cross_instance_systems->logger,
                           "SetTransient");
     },
@@ -324,14 +324,14 @@ clap_plugin_gui const floe_gui {
         ZoneScopedMessage(floe.trace_config, "gui show");
         ASSERT(IsMainThread(floe.host));
         bool const result =
-            LogIfError(SetVisible(*floe.pugl_platform, true), g_cross_instance_systems->logger, "SetVisible");
+            LogIfError(SetVisible(*floe.gui_platform, true), g_cross_instance_systems->logger, "SetVisible");
         if (result) {
             static bool shown_graphics_info = false;
             if (!shown_graphics_info) {
                 shown_graphics_info = true;
                 g_cross_instance_systems->logger.InfoLn(
                     "{}",
-                    floe.pugl_platform->graphics_ctx->graphics_device_info.Items());
+                    floe.gui_platform->graphics_ctx->graphics_device_info.Items());
             }
         }
         return result;
@@ -346,7 +346,7 @@ clap_plugin_gui const floe_gui {
         auto& floe = *(FloeInstance*)plugin->plugin_data;
         ZoneScopedMessage(floe.trace_config, "gui hide");
         ASSERT(IsMainThread(floe.host));
-        return LogIfError(SetVisible(*floe.pugl_platform, false),
+        return LogIfError(SetVisible(*floe.gui_platform, false),
                           g_cross_instance_systems->logger,
                           "SetVisible");
     },
@@ -510,38 +510,22 @@ clap_plugin_thread_pool const floe_thread_pool {
 };
 
 clap_plugin_timer_support const floe_timer {
-    // [main-thread]
     .on_timer =
         [](clap_plugin_t const* plugin, clap_id timer_id) {
             ZoneScopedN("clap_plugin_timer_support on_timer");
             auto& floe = *(FloeInstance*)plugin->plugin_data;
             ASSERT(IsMainThread(floe.host));
-            (void)timer_id;
-            // TODO: send this as-is to the gui_platform
-            // At the moment we are only ever using timer for GUI stuff, so we don't need to
-            // check for specific timer ids.
-            PollAndUpdate(*floe.pugl_platform);
+            if (floe.gui_platform) OnClapTimer(*floe.gui_platform, timer_id);
         },
 };
 
 clap_plugin_posix_fd_support const floe_posix_fd {
-    // This callback is "level-triggered".
-    // It means that a writable fd will continuously produce "on_fd()" events;
-    // don't forget using modify_fd() to remove the write notification once you're
-    // done writing.
-    //
-    // [main-thread]
     .on_fd =
-        [](clap_plugin_t const* plugin, int fd, clap_posix_fd_flags_t flags) {
+        [](clap_plugin_t const* plugin, int fd, clap_posix_fd_flags_t) {
             ZoneScopedN("clap_plugin_posix_fd_support on_fd");
             auto& floe = *(FloeInstance*)plugin->plugin_data;
             ASSERT(IsMainThread(floe.host));
-            (void)flags;
-            (void)fd;
-            // TODO: send this as-is to the gui_platform
-            // At the moment we are only ever using posix fd for GUI stuff, so we don't need to
-            // check for specific fd values or flags.
-            PollAndUpdate(*floe.pugl_platform);
+            if (floe.gui_platform) OnPosixFd(*floe.gui_platform, fd);
         },
 };
 
@@ -587,7 +571,7 @@ clap_plugin const floe_plugin {
             ZoneScopedMessage(floe.trace_config, "plugin destroy (init:{})", floe.initialised);
 
             if (floe.initialised) {
-                floe.pugl_platform.Clear();
+                floe.gui_platform.Clear();
 
                 floe.plugin.Clear();
 
@@ -629,10 +613,10 @@ clap_plugin const floe_plugin {
             ASSERT(IsMainThread(floe.host));
             ASSERT(floe.active);
             if (!floe.active) return;
-            if (floe.pugl_platform) {
+            if (floe.gui_platform) {
                 // TODO: I'm not entirely sure if this is ok or not. But I do want to avoid the GUI being
                 // active when the audio plugin is deactivate.
-                DestroyView(*floe.pugl_platform);
+                DestroyView(*floe.gui_platform);
             }
             auto& processor = floe.plugin->processor;
             processor.processor_callbacks.deactivate(processor);
@@ -732,8 +716,8 @@ clap_plugin const floe_plugin {
                 auto& processor = floe.plugin->processor;
                 processor.processor_callbacks.on_main_thread(processor, update_gui);
                 PluginInstanceCallbacks().on_main_thread(*floe.plugin, update_gui);
-                if (update_gui && floe.pugl_platform)
-                    floe.pugl_platform->last_result.ElevateUpdateRequest(
+                if (update_gui && floe.gui_platform)
+                    floe.gui_platform->last_result.ElevateUpdateRequest(
                         GuiFrameResult::UpdateRequest::Animate);
             }
         },

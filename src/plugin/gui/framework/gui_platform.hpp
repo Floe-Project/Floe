@@ -194,7 +194,13 @@ PUBLIC void DestroyView(GuiPlatform& platform) {
     }
 }
 
-PUBLIC void PollAndUpdate(GuiPlatform& platform) { puglUpdate(platform.world, 0); }
+PUBLIC void OnClapTimer(GuiPlatform& platform, clap_id timer_id) {
+    if (platform.timer_id && *platform.timer_id == timer_id) puglUpdate(platform.world, 0);
+}
+
+PUBLIC void OnPosixFd(GuiPlatform& platform, int fd) {
+    if (fd == FdFromPuglWorld(platform.world)) puglUpdate(platform.world, 0);
+}
 
 PUBLIC ErrorCodeOr<void> SetParent(GuiPlatform& platform, clap_window_t const& window) {
     TRY(Required(puglSetParentWindow(platform.view, (uintptr_t)window.ptr)));

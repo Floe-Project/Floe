@@ -517,6 +517,7 @@ clap_plugin_timer_support const floe_timer {
             auto& floe = *(FloeInstance*)plugin->plugin_data;
             ASSERT(IsMainThread(floe.host));
             (void)timer_id;
+            // TODO: send this as-is to the gui_platform
             // At the moment we are only ever using timer for GUI stuff, so we don't need to
             // check for specific timer ids.
             PollAndUpdate(*floe.pugl_platform);
@@ -537,6 +538,7 @@ clap_plugin_posix_fd_support const floe_posix_fd {
             ASSERT(IsMainThread(floe.host));
             (void)flags;
             (void)fd;
+            // TODO: send this as-is to the gui_platform
             // At the moment we are only ever using posix fd for GUI stuff, so we don't need to
             // check for specific fd values or flags.
             PollAndUpdate(*floe.pugl_platform);

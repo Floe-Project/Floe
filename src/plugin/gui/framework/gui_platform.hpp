@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #pragma once
+#include <clap/ext/posix-fd-support.h>
+#include <clap/ext/timer-support.h>
+#include <clap/host.h>
 #include <pugl/gl.h> // on windows this includes windows.h
 #include <pugl/pugl.h>
 #include <test_utils.h> // pugl - bit of a hack including it this way
@@ -9,7 +12,6 @@
 #include "foundation/foundation.hpp"
 #include "os/undef_windows_macros.h"
 
-#include "clap/host.h"
 #include "gui/gui.hpp"
 #include "gui_frame.hpp"
 #include "plugin_instance.hpp"
@@ -34,6 +36,7 @@ struct GuiPlatform {
     GuiFrameResult last_result {};
     GuiFrameInput frame_state {};
     Optional<Gui> gui {};
+    Optional<clap_id> timer_id = {};
 };
 
 // Public API
@@ -93,6 +96,10 @@ namespace detail {
 static PuglStatus EventHandler(PuglView* view, PuglEvent const* event);
 }
 
+// Linux only, we need a way get the file descriptor from the X11 Display, but there's all kinds of macro
+// problems if we directly include X11 headers here, so we'll do it in a separate translation unit
+int FdFromPuglWorld(PuglWorld* world);
+
 PUBLIC ErrorCodeOr<void> CreateView(GuiPlatform& platform, PluginInstance& plugin) {
     platform.g_world_counter++;
     if (auto const floe_host =
@@ -132,11 +139,44 @@ PUBLIC ErrorCodeOr<void> CreateView(GuiPlatform& platform, PluginInstance& plugi
 
     platform.gui.Emplace(platform.frame_state, plugin);
 
+    if constexpr (IS_LINUX) {
+        // https://nakst.gitlab.io/tutorial/clap-part-3.html
+        auto const posix_fd =
+            (clap_host_posix_fd_support const*)platform.host.get_extension(&platform.host,
+                                                                           CLAP_EXT_POSIX_FD_SUPPORT);
+        if (posix_fd)
+            posix_fd->register_fd(&platform.host, FdFromPuglWorld(platform.world), CLAP_POSIX_FD_READ);
+
+        auto const timer_support =
+            (clap_host_timer_support const*)platform.host.get_extension(&platform.host,
+                                                                        CLAP_EXT_TIMER_SUPPORT);
+        if (timer_support) {
+            clap_id timer_id;
+            if (timer_support->register_timer(&platform.host, 1000 / k_gui_refresh_rate_hz, &timer_id))
+                platform.timer_id = timer_id;
+        }
+    }
+
     return k_success;
 }
 
 PUBLIC void DestroyView(GuiPlatform& platform) {
     platform.gui.Clear();
+
+    if constexpr (IS_LINUX) {
+        auto const posix_fd =
+            (clap_host_posix_fd_support const*)platform.host.get_extension(&platform.host,
+                                                                           CLAP_EXT_POSIX_FD_SUPPORT);
+        if (posix_fd) posix_fd->unregister_fd(&platform.host, FdFromPuglWorld(platform.world));
+
+        auto const timer_support =
+            (clap_host_timer_support const*)platform.host.get_extension(&platform.host,
+                                                                        CLAP_EXT_TIMER_SUPPORT);
+        if (timer_support && platform.timer_id) {
+            timer_support->unregister_timer(&platform.host, *platform.timer_id);
+            platform.timer_id = nullopt;
+        }
+    }
 
     if (platform.realised) {
         puglStopTimer(platform.view, platform.k_timer_id);
@@ -574,7 +614,6 @@ static void UpdateAndRender(GuiPlatform& platform) {
     } while (platform.last_result.update_request == GuiFrameResult::UpdateRequest::ImmediatelyUpdate);
 
     if (platform.last_result.draw_data.draw_lists.size) {
-        DebugLn("Rendering at size: {}x{}", window_size.width, window_size.height);
         ZoneNamedN(render, "render", true);
         auto o = platform.graphics_ctx->Render(platform.last_result.draw_data,
                                                window_size,

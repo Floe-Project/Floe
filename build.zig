@@ -1560,6 +1560,7 @@ pub fn build(b: *std.Build) void {
                     plugin_path ++ "/state/state_coding.cpp",
                     plugin_path ++ "/gui/framework/draw_list.cpp",
                     plugin_path ++ "/gui/framework/gui_imgui.cpp",
+                    plugin_path ++ "/gui/framework/gui_platform_native_helpers.cpp",
                     plugin_path ++ "/gui/gui.cpp",
                     plugin_path ++ "/gui/gui_bot_panel.cpp",
                     plugin_path ++ "/gui/gui_button_widgets.cpp",

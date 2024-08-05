@@ -5,7 +5,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Summary
 
-[Introduction](./introduction.md)
+[Home](./home.md)
 [Previously known as Mirage](./mirage.md)
 
 # Installation

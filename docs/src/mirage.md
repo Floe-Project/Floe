@@ -5,7 +5,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Previously known as Mirage
 
-Floe is a continuation of FrozenPlain's Mirage plugin (developed from 2018 to 2023). It adds new features and improvements but is based on the same core architecture. Mirage will no longer be developed. Floe starts from version 0.0.1 rather than continuing from Mirage's version number.
+Floe is a continuation of FrozenPlain's Mirage plugin (developed from 2018 to 2023). It adds new features and improvements but is based on the same core architecture. Mirage will no longer be developed. Floe starts from version 1.0 rather than continuing from Mirage's version number.
 
 ### Why the name change?
 The project has taken a new direction and so we decided to give it a new name.

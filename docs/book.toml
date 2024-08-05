@@ -8,7 +8,8 @@ authors = ["Sam Windell"]
 language = "en"
 multilingual = false
 src = "src"
-title = "Floe User Manual"
+title = "Floe"
+description = "Floe is a free, open-source sample library engine. Available as an audio plugin for Windows and macOS."
 
 [output.html]
 default-theme = "rust"

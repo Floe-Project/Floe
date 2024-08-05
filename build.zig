@@ -2347,8 +2347,8 @@ pub fn build(b: *std.Build) void {
             const installer_path = "src/windows_installer";
 
             // the logos probably have a different license to the rest of the codebase, so we keep them separate and optional
-            const logo_image = getExternalResource(&build_context, "Logos/icon.ico");
-            const sidebar_image = getExternalResource(&build_context, "Logos/icon-with-text-100px.png");
+            const logo_image = getExternalResource(&build_context, "Logos/release/icon.ico");
+            const sidebar_image = getExternalResource(&build_context, "Logos/release/win-installer-sidebar.png");
 
             {
                 const win_installer_description = "Installer for Floe plugins";

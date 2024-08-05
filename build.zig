@@ -17,7 +17,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-const floe_description = "Sample-based synth plugin";
+const floe_description = "Sample library engine";
 const floe_copyright = "Sam Windell";
 const floe_vendor = "Floe";
 const floe_homepage_url = "https://floe.audio";

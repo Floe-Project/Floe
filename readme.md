@@ -7,6 +7,8 @@ SPDX-License-Identifier: CC0-1.0
 [![codecov](https://codecov.io/github/Floe-Project/Floe/graph/badge.svg?token=7HEJ7SF75K)](https://codecov.io/github/Floe-Project/Floe)
 [![CodeFactor](https://www.codefactor.io/repository/github/floe-project/floe/badge/main)](https://www.codefactor.io/repository/github/floe-project/floe/overview/main)
 
+![floe-logo](https://raw.githubusercontent.com/Floe-Project/Floe-Logos/main/icon.svg)
+
 # Floe Source Code
 ___IMPORTANT: Large-scale changes are underway, many things are missing and broken for now.___
 

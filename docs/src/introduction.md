@@ -19,7 +19,7 @@ This manual contains information for Floe version {{#include ../../version.txt}}
 If you're viewing this online, you might find the search feature useful: open it by clicking the magnifying glass icon at the top of the page. Additionally, there is a printer icon in the top right for either printing this book, or saving it to a PDF.
 
 ## What is Floe?
-Floe is a sample-based synthesis plugin developed by [FrozenPlain](https://frozenplain.com). It's free and open-source and developed separately from FrozenPlain's commercial products. The project is hosted on [GitHub](https://github.com/Floe-Synth/Floe).
+Floe is a sample-based synthesis plugin developed by [FrozenPlain](https://frozenplain.com). It's free and open-source and developed separately from FrozenPlain's commercial products. The project is hosted on [GitHub](https://github.com/Floe-Project/Floe).
 
 Floe requires sample libraries. These are not included with the plugin. At the moment only FrozenPlain offer paid and free sample libraries, but we are looking to rapidly expand the number of libraries available, both free and paid. You can also make your own sample libraries using our Lua sample-library format.
 

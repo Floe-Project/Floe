@@ -384,11 +384,11 @@ _fetch-external-github-repo owner repo destination:
   mv "{{repo}}-main" "{{destination}}"
 
 [unix]
-fetch-core-library: (_fetch-external-github-repo "Floe-Synth" "Core-Library" core_library_abs_dir)
+fetch-core-library: (_fetch-external-github-repo "Floe-Project" "Core-Library" core_library_abs_dir)
 
 # NOTE: the logos probably have reserved copyright
 [unix]
-fetch-logos: (_fetch-external-github-repo "Floe-Synth" "Floe-Logos" logos_abs_dir)
+fetch-logos: (_fetch-external-github-repo "Floe-Project" "Floe-Logos" logos_abs_dir)
 
 [unix, no-cd]
 _try-add-core-library-to-zip zip-path:
@@ -412,7 +412,7 @@ _create-manual-install-readme os_name:
   echo "It's normally easier to use the installer instead of these manual-install files." >> readme.txt
   echo "The installer is a separate download to this." >> readme.txt
   echo "" >> readme.txt
-  echo "Installation instructions: https://floe-synth.github.io/Floe/" >> readme.txt
+  echo "Installation instructions: https://floe-project.github.io/Floe/" >> readme.txt
 
 [unix, no-cd]
 windows-codesign-file file description:
@@ -430,7 +430,7 @@ windows-codesign-file file description:
     -pkcs12 $cert_file \
     -pass "$WINDOWS_CODESIGN_CERT_PFX_PASSWORD" \
     -n "{{description}}" \
-    -i https://github.com/Floe-Synth/Floe \
+    -i https://github.com/Floe-Project/Floe \
     -t http://timestamp.sectigo.com \
     -in "{{file}}" \
     -out "{{file}}.signed"

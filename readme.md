@@ -3,9 +3,9 @@ SPDX-FileCopyrightText: 2018-2024 Sam Windell
 SPDX-License-Identifier: CC0-1.0
 -->
 
-![CI](https://github.com/Floe-Synth/Floe/actions/workflows/ci.yml/badge.svg)
-[![codecov](https://codecov.io/github/Floe-Synth/Floe/graph/badge.svg?token=7HEJ7SF75K)](https://codecov.io/github/Floe-Synth/Floe)
-[![CodeFactor](https://www.codefactor.io/repository/github/floe-synth/floe/badge/main)](https://www.codefactor.io/repository/github/floe-synth/floe/overview/main)
+![CI](https://github.com/Floe-Project/Floe/actions/workflows/ci.yml/badge.svg)
+[![codecov](https://codecov.io/github/Floe-Project/Floe/graph/badge.svg?token=7HEJ7SF75K)](https://codecov.io/github/Floe-Project/Floe)
+[![CodeFactor](https://www.codefactor.io/repository/github/floe-project/floe/badge/main)](https://www.codefactor.io/repository/github/floe-project/floe/overview/main)
 
 # Floe Source Code
 ___IMPORTANT: Large-scale changes are underway, many things are missing and broken for now.___
@@ -16,10 +16,10 @@ This is the source code for Floe, a sample-based synthesiser plugin. It's [free 
 Floe requires sample libraries. These are created using the Lua programming language. Alternatively, FrozenPlain offer sample libraries to buy, and a few free ones.
 
 ## Documentation
-[Online user manual](https://floe-synth.github.io/Floe/)
+[Online user manual](https://floe-project.github.io/Floe/)
 
 ## Roadmap
-Floe will be updated and deployed regularly with stable, backwards-compatible releases. Currently we are working towards the first stable version, 1.0. We use GitHub issues to track the [milestones](https://github.com/Floe-Synth/Floe/milestones?direction=asc&sort=title&state=open) towards that.
+Floe will be updated and deployed regularly with stable, backwards-compatible releases. Currently we are working towards the first stable version, 1.0. We use GitHub issues to track the [milestones](https://github.com/Floe-Project/Floe/milestones?direction=asc&sort=title&state=open) towards that.
 
 The work so far from Mirage (the old project) to Floe v1.0 has been related to building infrastructure for long-term, sustainable development. New features and improvements will be coming once we have a strong foundation.
 
@@ -52,7 +52,7 @@ Additionally, once we reach v1.0, we'd like to expand the number of sample libra
 
 
 ## Previously known as Mirage
-Floe is backwards-compatible with Mirage's libraries and presets. See more information about this in the [user manual](https://floe-synth.github.io/Floe/mirage.html).
+Floe is backwards-compatible with Mirage's libraries and presets. See more information about this in the [user manual](https://floe-project.github.io/Floe/mirage.html).
 
 ## License
 This project is licensed under GPL version 3 or later. See the LICENCES folder for the full licence text. We follow the [REUSE](https://reuse.software/) recommendations for this repository.

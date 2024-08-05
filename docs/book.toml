@@ -15,4 +15,4 @@ default-theme = "rust"
 preferred-dark-theme = "coal"
 smart-punctuation = true
 site-url = "/Floe/"
-git-repository-url = "https://github.com/Floe-Synth/Floe"
+git-repository-url = "https://github.com/Floe-Project/Floe"

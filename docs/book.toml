@@ -15,3 +15,4 @@ default-theme = "rust"
 preferred-dark-theme = "coal"
 smart-punctuation = true
 git-repository-url = "https://github.com/Floe-Project/Floe"
+cname = "floe.audio"

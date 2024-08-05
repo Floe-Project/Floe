@@ -412,7 +412,7 @@ _create-manual-install-readme os_name:
   echo "It's normally easier to use the installer instead of these manual-install files." >> readme.txt
   echo "The installer is a separate download to this." >> readme.txt
   echo "" >> readme.txt
-  echo "Installation instructions: https://floe-project.github.io/Floe/" >> readme.txt
+  echo "Installation instructions: https://floe.audio/" >> readme.txt
 
 [unix, no-cd]
 windows-codesign-file file description:

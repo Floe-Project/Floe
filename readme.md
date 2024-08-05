@@ -16,7 +16,7 @@ This is the source code for Floe, a sample-based synthesiser plugin. It's [free 
 Floe requires sample libraries. These are created using the Lua programming language. Alternatively, FrozenPlain offer sample libraries to buy, and a few free ones.
 
 ## Documentation
-[Online user manual](https://floe-project.github.io/Floe/)
+[Online user manual](https://floe.audio/)
 
 ## Roadmap
 Floe will be updated and deployed regularly with stable, backwards-compatible releases. Currently we are working towards the first stable version, 1.0. We use GitHub issues to track the [milestones](https://github.com/Floe-Project/Floe/milestones?direction=asc&sort=title&state=open) towards that.
@@ -52,7 +52,7 @@ Additionally, once we reach v1.0, we'd like to expand the number of sample libra
 
 
 ## Previously known as Mirage
-Floe is backwards-compatible with Mirage's libraries and presets. See more information about this in the [user manual](https://floe-project.github.io/Floe/mirage.html).
+Floe is backwards-compatible with Mirage's libraries and presets. See more information about this in the [user manual](https://floe.audio/mirage.html).
 
 ## License
 This project is licensed under GPL version 3 or later. See the LICENCES folder for the full licence text. We follow the [REUSE](https://reuse.software/) recommendations for this repository.

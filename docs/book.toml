@@ -14,5 +14,4 @@ title = "Floe User Manual"
 default-theme = "rust"
 preferred-dark-theme = "coal"
 smart-punctuation = true
-site-url = "/Floe/"
 git-repository-url = "https://github.com/Floe-Project/Floe"

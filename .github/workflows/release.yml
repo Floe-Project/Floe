@@ -109,7 +109,7 @@ jobs:
 
           mkdir -p "$RELEASE_ARTIFACTS_FOLDER"
           cd "$RELEASE_ARTIFACTS_FOLDER"
-          wget "https://github.com/Floe-Synth/Core-Library/archive/refs/heads/main.zip"
+          wget "https://github.com/Floe-Project/Core-Library/archive/refs/heads/main.zip"
           unzip "main.zip"
           rm "main.zip"
           mv "Core-Library-main" "Core"

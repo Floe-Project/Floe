@@ -3,17 +3,24 @@ SPDX-FileCopyrightText: 2024 Sam Windell
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
-# Lua Sample Library Format
+# Floe Library Format
 
 ## Overview
-Sample libraries in Floe are created using the Lua programming language[^MDATA] (version {{#include ../mdbook_config.txt:lua-version}}).
 
-Let's start with a simple example `floe.lua` file.
+Floe sample libraries are plain, open folders of audio files (FLAC or WAV). They are accompanied by a `floe.lua` file that describes how the samples are mapped and configured.
+
+It is a new format, along the same lines as SFZ or DecentSampler but focusing on ease-of-use and extensibility, and bringing the power of a full programming language to ease developing complicated library configurations.
+
+## Developer documentation
+
+Sample libraries are configured using a file written in the Lua programming language[^MDATA] (version {{#include ../mdbook_config.txt:lua-version}}).
+
+Let's start with a simple example of one of these `floe.lua` files:
 ```lua
 {{#include ../sample-library-example-no-comments.lua}}
 ```
 
-A `floe.lua` file can be very simple, but when needed, you have the power of a full programming language (variables, arrays, loops, functions, etc.) to easily create more complicated configurations.
+It's a simple format, but when needed, you have the power of a full programming language (variables, arrays, loops, functions, etc.) to easily create more complicated configurations.
 
 Floe automatically scans for Lua files in its sample library folders (these are configurable in the settings). It looks for files called `floe.lua`, or files ending with `.floe.lua`; for example, `woodwind-textures.floe.lua`. Floe automatically detects when files are added, removed or changed, and will immediately apply the changes.
 

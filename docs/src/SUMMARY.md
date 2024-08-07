@@ -16,7 +16,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 - [Uninstalling](./installation/uninstalling.md)
 
 # Sample Library Development
-- [Lua Libraries](./lua-sample-library-format.md)
+- [Floe Sample Libraries](./sample-library-format.md)
 
 -----------
 

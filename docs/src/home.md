@@ -10,47 +10,60 @@ Some things may be incorrect, missing or broken. We are bit-by-bit filling in th
 
 </div>
 
-<img class="right" src="https://raw.githubusercontent.com/Floe-Project/Floe-Logos/main/icon.svg" alt="Floe logo">
+<style>
+.logo-image {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  width: 10%;
+}
+</style>
 
-# Floe 
+<img class="logo-image" src="https://raw.githubusercontent.com/Floe-Project/Floe-Logos/main/icon.svg" alt="Floe logo">
 
-![floe-gui](https://frozenplain.com/wp-content/uploads/2019/09/wraith-2.jpg)
+<h1 style="text-align:center; font-size: 40px">No-hassle sample library player: free for all</h1>
+<p style="text-align:center; margin-bottom: 40px;">Floe is a free, open-source sample library engine in CLAP, VST3 and AU audio plugin formats. It provides expressive playback and sound-shaping of sample libraries in the [Floe format](./sample-library-format.md).</p>
+
+![Floe's GUI](https://frozenplain.com/wp-content/uploads/2019/09/wraith-2.jpg)
 
 ## Overview
 
 Floe is a free, open-source sample library engine.
 
-It loads sample libraries in the [Floe format](./lua-sample-library-format.md): supporting both realistic virtual instruments and sample-based synthesis. Sample libraries are installed separately from Floe.
+It loads sample libraries in the [Floe format](./sample-library-format.md): supporting both realistic virtual instruments and sample-based synthesis. Sample libraries are installed separately from Floe.
 
 Floe is a CLAP, VST3 or AU plugin on <i class="fa fa-windows"></i> Windows and <i class="fa fa-apple"></i> macOS.
 
 Developed by [FrozenPlain](https://frozenplain.com). Floe's ancestor, [Mirage](./mirage.md), has been used by thousands of musicians and producers in 13 products.
 
 > ### Floe's mission
-> 1. Make sample libraries more expressive, playable and effective in music production
-> 1. Lengthen the lifespan of sample libraries by providing a modern, open-source platform for them
-> 1. Prioritise helping users make meaningful music, not technical hassle, commercial pressure or passing trends
+> 1. Make sample libraries more expressive, playable and effective in music production.
+> 1. Lengthen the lifespan of sample libraries by providing a open-source platform for them with no lock-in.
+> 1. Prioritise helping users make meaningful music; not technical hassle, commercial pressure or unnecessary complexity.
 
 ### Key features
 
 #### Simple and effective 
 - Three-layer architecture for blending timbres into new sounds
 - Sound-shaping parameters: envelopes, filters, LFOs and an effects rack
-- Supports realistic multi-sampled instruments: velocity layers, round-robin, crossfade layers
-- Supports sample-based synthesis: using samples like 'oscillators' including sound-looping features
-- Powerful tag-based browsers for finding new sounds and presets [coming soon]
+- Supports realistic multi-sampled instruments: velocity layers, round-robin, crossfade layers **[coming soon]**
+- Supports sample-based synthesis: using samples like 'oscillators' with sound-looping features
+- Powerful tag-based browsers for finding new sounds and presets **[coming soon]**
+- Make samples come alive with MIDI MPE support **[coming soon]**
 - Combine sounds across all sample libraries
 - CPU-efficient
-- Floe sample libraries are open packs of FLAC/WAV files, use them in other software too
 
 #### Focused on helping you make music
 - 100% free: no lock-in, no sign-up, no nagging, no features behind a paywall
-- 'Organic' software: made by a developer who cares about making great software and is always open to feedback
-- Open source ([free software](https://fsfe.org/freesoftware/freesoftware.en.html)): GPL license always guarentees anyone can use, modify and share the code
+- 'Organic' software: made by a passionate developer who cares about making great software and is always open to feedback
+- [Open-source](https://github.com/Floe-Project/Floe), [free software](https://fsfe.org/freesoftware/freesoftware.en.html). Floe is always yours: the GPL license guarantees anyone can use, modify and share the code
+- Floe sample libraries are open packs of FLAC/WAV files: use them in other software too
+- Thoughtfully designed; thoroughly documented
 
 #### Sample library development
 - Create your own sample libraries using Lua scripts
 - Great developer-experience for creating sample libraries; just write Lua code and Floe instantly applies the changes
+- No recreating GUIs: Floe provides a powerful GUI for your sample library (GUI customisation will be added in the future)
 
 #### Continuously improving
 - Regular updates 

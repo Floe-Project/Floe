@@ -61,7 +61,7 @@ However, Linux is only provided for development purposes at the moment, and you 
 - Run `just build native`. Alternative options instead of `native` are: `linux`, `windows`, `mac_arm`, `mac_x86`, `mac_ub` (universal binary)
 
 ## Development philosophy
-- No frameworks, just a handlful of libraries for specific tasks.
+- No frameworks, just a handful of libraries for specific tasks.
 - In general, we prefer a more C-style of C++: structs and functions, memory arenas instead of new/delete/smart-pointers.
 - Compile times are pretty fast and we do our best to keep them that way.
 - We don't use the C++ standard library, and only sparingly use the C standard library.

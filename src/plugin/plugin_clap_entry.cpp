@@ -55,11 +55,13 @@ extern "C" CLAP_EXPORT const clap_plugin_entry clap_entry = {
             // after tracy
             StartupCrashHandler();
         }
+        g_log_file.DebugLn("init");
 
         return true;
     },
     .deinit =
         []() {
+            g_log_file.DebugLn("deinit");
             if (--g_init_count == 0) {
                 ShutdownCrashHandler();
 #ifdef TRACY_ENABLE

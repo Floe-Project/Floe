@@ -148,9 +148,13 @@ clap_plugin_gui const floe_gui {
                                   g_cross_instance_systems->settings,
                                   g_cross_instance_systems->logger);
 
-        return LogIfError(CreateView(*floe.gui_platform, *floe.plugin),
-                          g_cross_instance_systems->logger,
-                          "CreateView");
+        auto const result = LogIfError(CreateView(*floe.gui_platform, *floe.plugin),
+                                       g_cross_instance_systems->logger,
+                                       "CreateView");
+
+        g_log_file.DebugLn("gui create: {}", result);
+
+        return result;
     },
 
     // Free all resources associated with the gui.
@@ -162,6 +166,7 @@ clap_plugin_gui const floe_gui {
             ZoneScopedMessage(floe.trace_config, "gui destroy");
             DestroyView(*floe.gui_platform);
             floe.gui_platform.Clear();
+            g_log_file.DebugLn("gui destroy");
         },
 
     // Set the absolute GUI scaling factor, and override any OS info.
@@ -178,6 +183,7 @@ clap_plugin_gui const floe_gui {
     .set_scale = [](clap_plugin_t const* plugin, f64 scale) -> bool {
         (void)plugin;
         DebugLn("clap: set_scale {}", scale);
+        g_log_file.DebugLn("clap: set_scale {}", scale);
         return false; // we (pugl) negotiate this with the OS ourselves
     },
 
@@ -193,6 +199,7 @@ clap_plugin_gui const floe_gui {
         *width = size.width;
         *height = size.height;
         DebugLn("clap: get_size {} {}", *width, *height);
+        g_log_file.DebugLn("clap: get_size {} {}", *width, *height);
         return true;
     },
 
@@ -211,6 +218,9 @@ clap_plugin_gui const floe_gui {
         hints->aspect_ratio_width = ratio.width;
         hints->aspect_ratio_height = ratio.height;
         DebugLn("clap: get_resize_hints {}x{}", hints->aspect_ratio_width, hints->aspect_ratio_height);
+        g_log_file.DebugLn("clap: get_resize_hints {}x{}",
+                           hints->aspect_ratio_width,
+                           hints->aspect_ratio_height);
         return true;
     },
 
@@ -234,6 +244,11 @@ clap_plugin_gui const floe_gui {
                 *height,
                 aspect_ratio_conformed_size.width,
                 aspect_ratio_conformed_size.height);
+        g_log_file.DebugLn("clap: adjust_size in: {}x{}, out: {}x{}",
+                           *width,
+                           *height,
+                           aspect_ratio_conformed_size.width,
+                           aspect_ratio_conformed_size.height);
         *width = aspect_ratio_conformed_size.width;
         *height = aspect_ratio_conformed_size.height;
         return true;
@@ -260,6 +275,13 @@ clap_plugin_gui const floe_gui {
                 aspect_ratio_conformed_size.width,
                 aspect_ratio_conformed_size.height,
                 aspect_ratio_conformed_size.width == width && aspect_ratio_conformed_size.height == height);
+        g_log_file.DebugLn("clap:    set_size in: {}x{}, constrained {}x{}, result: {}",
+                           width,
+                           height,
+                           aspect_ratio_conformed_size.width,
+                           aspect_ratio_conformed_size.height,
+                           aspect_ratio_conformed_size.width == width &&
+                               aspect_ratio_conformed_size.height == height);
         if (aspect_ratio_conformed_size.width != width || aspect_ratio_conformed_size.height != height)
             return false;
         return SetSize(*floe.gui_platform, {CheckedCast<u16>(width), CheckedCast<u16>(height)});
@@ -317,6 +339,7 @@ clap_plugin_gui const floe_gui {
                     floe.gui_platform->graphics_ctx->graphics_device_info.Items());
             }
         }
+        g_log_file.DebugLn("gui show: {}", result);
         return result;
     },
 
@@ -329,6 +352,7 @@ clap_plugin_gui const floe_gui {
         auto& floe = *(FloeInstance*)plugin->plugin_data;
         ZoneScopedMessage(floe.trace_config, "gui hide");
         ASSERT(IsMainThread(floe.host));
+        g_log_file.DebugLn("gui hide");
         return LogIfError(SetVisible(*floe.gui_platform, false),
                           g_cross_instance_systems->logger,
                           "SetVisible");
@@ -575,6 +599,7 @@ clap_plugin const floe_plugin {
         [](clap_plugin const* plugin, f64 sample_rate, u32 min_frames_count, u32 max_frames_count) -> bool {
         auto& floe = *(FloeInstance*)plugin->plugin_data;
         ZoneScopedMessage(floe.trace_config, "plugin activate");
+        g_log_file.DebugLn("plugin activate");
 
         ASSERT(IsMainThread(floe.host));
         ASSERT(!floe.active);
@@ -592,6 +617,7 @@ clap_plugin const floe_plugin {
         [](clap_plugin const* plugin) {
             auto& floe = *(FloeInstance*)plugin->plugin_data;
             ZoneScopedMessage(floe.trace_config, "plugin activate");
+            g_log_file.DebugLn("plugin deactivate");
 
             ASSERT(IsMainThread(floe.host));
             ASSERT(floe.active);
@@ -673,6 +699,7 @@ clap_plugin const floe_plugin {
     // [thread-safe]
     .get_extension = [](clap_plugin const* plugin, char const* id) -> void const* {
         auto& floe = *(FloeInstance*)plugin->plugin_data;
+        g_log_file.DebugLn("plugin get_extension {}", id);
         ZoneScopedMessage(floe.trace_config, "plugin get_extension");
         if (NullTermStringsEqual(id, CLAP_EXT_STATE)) return &floe_plugin_state;
         if (NullTermStringsEqual(id, CLAP_EXT_GUI)) return &floe_gui;

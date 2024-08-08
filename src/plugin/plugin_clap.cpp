@@ -97,6 +97,8 @@ static bool LogIfError(ErrorCodeOr<void> const& ec, Logger& logger, String name)
     return true;
 }
 
+constexpr u32 k_largest_gui_size = LargestRepresentableValue<u16>();
+
 // Size (width, height) is in pixels; the corresponding windowing system extension is
 // responsible for defining if it is physical pixels or logical pixels.
 clap_plugin_gui const floe_gui {
@@ -221,6 +223,9 @@ clap_plugin_gui const floe_gui {
     // Returns true if the plugin could adjust the given size.
     // [main-thread]
     .adjust_size = [](clap_plugin_t const*, u32* width, u32* height) -> bool {
+        *width = Clamp<u32>(*width, 1, k_largest_gui_size);
+        *height = Clamp<u32>(*height, 1, k_largest_gui_size);
+
         auto const aspect_ratio_conformed_size = gui_settings::GetNearestAspectRatioSizeInsideSize(
             {CheckedCast<u16>(*width), CheckedCast<u16>(*height)},
             gui_settings::CurrentAspectRatio(g_cross_instance_systems->settings.settings.gui));
@@ -242,6 +247,10 @@ clap_plugin_gui const floe_gui {
         auto& floe = *(FloeInstance*)plugin->plugin_data;
         ZoneScopedMessage(floe.trace_config, "gui set_size {} {}", width, height);
         ASSERT(IsMainThread(floe.host));
+
+        if (width == 0 || height == 0) return false;
+        if (width > k_largest_gui_size || height > k_largest_gui_size) return false;
+
         auto const aspect_ratio_conformed_size = gui_settings::GetNearestAspectRatioSizeInsideSize(
             {CheckedCast<u16>(width), CheckedCast<u16>(height)},
             gui_settings::CurrentAspectRatio(g_cross_instance_systems->settings.settings.gui));
@@ -264,9 +273,11 @@ clap_plugin_gui const floe_gui {
         auto& floe = *(FloeInstance*)plugin->plugin_data;
         ZoneScopedMessage(floe.trace_config, "gui set_parent");
         ASSERT(IsMainThread(floe.host));
-        return LogIfError(SetParent(*floe.gui_platform, *window),
-                          g_cross_instance_systems->logger,
-                          "SetParent");
+        auto const result =
+            LogIfError(SetParent(*floe.gui_platform, *window), g_cross_instance_systems->logger, "SetParent");
+        // Bitwig never calls show()
+        auto _ = SetVisible(*floe.gui_platform, true);
+        return result;
     },
 
     // Set the plugin floating window to stay above the given window.

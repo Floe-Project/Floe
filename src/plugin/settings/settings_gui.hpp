@@ -29,17 +29,39 @@ constexpr UiSize CreateFromWidth(u16 target_width, UiSize aspect_ratio) {
         return {high_width, (u16)(high_index * aspect_ratio.height)};
 }
 
-PUBLIC UiSize GetNearestAspectRatioSizeInsideSize(UiSize size, UiSize aspect_ratio) {
-    u16 const low_index = size.width / aspect_ratio.width;
-    u16 const low_width = aspect_ratio.width * low_index;
-    auto const height_by_width = (u16)(low_index * aspect_ratio.height);
+constexpr auto GreatestCommonDivisor(auto a, auto b) {
+    while (b != 0) {
+        auto const t = b;
+        b = a % b;
+        a = t;
+    }
+    return a;
+}
 
-    if (height_by_width <= size.height)
-        return {low_width, height_by_width};
-    else {
-        u16 const height_low_index = size.height / aspect_ratio.height;
-        u16 const height_low_height = aspect_ratio.height * height_low_index;
-        return {(u16)(aspect_ratio.width * height_low_index), height_low_height};
+constexpr UiSize SimplifyAspectRatio(UiSize aspect_ratio) {
+    auto const gcd = GreatestCommonDivisor(aspect_ratio.width, aspect_ratio.height);
+    return {(u16)(aspect_ratio.width / gcd), (u16)(aspect_ratio.height / gcd)};
+}
+
+constexpr UiSize GetNearestAspectRatioSizeInsideSize(UiSize size, UiSize aspect_ratio) {
+    aspect_ratio = SimplifyAspectRatio(aspect_ratio);
+
+    if (aspect_ratio.width == 0 || aspect_ratio.height == 0) return {0, 0};
+    if (aspect_ratio.width > size.width || aspect_ratio.height > size.height) return {0, 0};
+
+    u32 const low_index = size.width / aspect_ratio.width;
+    u32 const low_width = aspect_ratio.width * low_index;
+    auto const height_by_width = low_index * aspect_ratio.height;
+
+    if (height_by_width <= size.height) {
+        ASSERT(height_by_width <= LargestRepresentableValue<u16>());
+        return {(u16)low_width, (u16)height_by_width};
+    } else {
+        u32 const height_low_index = size.height / aspect_ratio.height;
+        u32 const low_height = aspect_ratio.height * height_low_index;
+        auto const width_by_height = height_low_index * aspect_ratio.width;
+        ASSERT(width_by_height <= size.width);
+        return {(u16)width_by_height, (u16)low_height};
     }
 }
 

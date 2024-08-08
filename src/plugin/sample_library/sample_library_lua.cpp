@@ -235,6 +235,14 @@ static String StringFromTop(LuaState& ctx) {
     return ctx.result_arena.Clone(FromNullTerminated(luaL_checkstring(ctx.lua, -1)));
 }
 
+static String PathFromTop(LuaState& ctx) {
+    auto const path = FromNullTerminated(luaL_checkstring(ctx.lua, -1));
+    // we wan't Floe libraries to be portable and therefore they shouldn't reference files outside the library
+    if (path::IsAbsolute(path) || StartsWithSpan(path, ".."_s))
+        luaL_error(ctx.lua, "Path '{}' must be a relaive path to within the folder of floe.lua", path);
+    return ctx.result_arena.Clone(path);
+}
+
 template <typename Type>
 static Type NumberFromTop(LuaState& ctx, FieldInfo field_info) {
     f64 const val = Integral<Type> ? (f64)luaL_checkinteger(ctx.lua, -1) : luaL_checknumber(ctx.lua, -1);
@@ -317,7 +325,7 @@ struct TableFields<Region::File> {
                     .example = "One-shots/Resonating String.flac",
                     .lua_type = LUA_TSTRING,
                     .required = true,
-                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.path = StringFromTop(ctx); },
+                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.path = PathFromTop(ctx); },
                 };
             case Field::RootKey:
                 return {
@@ -629,7 +637,7 @@ struct TableFields<ImpulseResponse> {
                     .example = "irs/cathedral.flac",
                     .lua_type = LUA_TSTRING,
                     .required = true,
-                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.path = StringFromTop(ctx); },
+                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.path = PathFromTop(ctx); },
                 };
             case Field::Count: break;
         }
@@ -710,7 +718,7 @@ struct TableFields<Instrument> {
                     .required = false,
                     .set =
                         [](SET_FIELD_VALUE_ARGS) {
-                            FIELD_OBJ.audio_file_path_for_waveform = StringFromTop(ctx);
+                            FIELD_OBJ.audio_file_path_for_waveform = PathFromTop(ctx);
                         },
                 };
             case Field::Count: break;
@@ -800,7 +808,7 @@ struct TableFields<Library> {
                     .example = "images/background.jpg",
                     .lua_type = LUA_TSTRING,
                     .required = false,
-                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.background_image_path = StringFromTop(ctx); },
+                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.background_image_path = PathFromTop(ctx); },
                 };
             case Field::IconImagePath:
                 return {
@@ -810,7 +818,7 @@ struct TableFields<Library> {
                     .example = "images/icon.png",
                     .lua_type = LUA_TSTRING,
                     .required = false,
-                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.icon_image_path = StringFromTop(ctx); },
+                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.icon_image_path = PathFromTop(ctx); },
                 };
             case Field::Count: break;
         }

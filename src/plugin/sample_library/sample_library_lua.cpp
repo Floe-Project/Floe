@@ -764,7 +764,7 @@ struct TableFields<Library> {
                 return {
                     .name = "tagline",
                     .description_sentence = "A few words to describe the library.",
-                    .example = "Organic sounds from resonating metal objects.",
+                    .example = "Organic sounds from resonating metal objects",
                     .lua_type = LUA_TSTRING,
                     .required = true,
                     .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.tagline = StringFromTop(ctx); },
@@ -786,7 +786,14 @@ struct TableFields<Library> {
                     .example = "Found-sound Labs",
                     .lua_type = LUA_TSTRING,
                     .required = true,
-                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.author = StringFromTop(ctx); },
+                    .set =
+                        [](SET_FIELD_VALUE_ARGS) {
+                            FIELD_OBJ.author = StringFromTop(ctx);
+                            if (FIELD_OBJ.author.size > k_max_library_author_size)
+                                luaL_error(ctx.lua,
+                                           "Library author must be less than %d characters long.",
+                                           (int)k_max_library_author_size);
+                        },
                 };
             case Field::MinorVersion:
                 return {

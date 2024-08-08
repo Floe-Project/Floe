@@ -369,7 +369,7 @@ class JsonStateParser {
                                 ASSERT(name.size <= k_max_instrument_name_size);
 
                                 m_state.inst_ids[m_inst_index] = sample_lib::InstrumentId {
-                                    .library_name = {}, // filled in later
+                                    .library = {}, // filled in later
                                     .inst_name = name,
                                 };
                                 break;
@@ -464,9 +464,10 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
         for (auto& t : state.fx_order)
             t = (EffectType)k_num_effect_types;
         for (auto& i : state.inst_ids)
-            i = sample_lib::InstrumentId {"foo"_s, "bar"_s};
+            i = sample_lib::InstrumentId {.library = {.author = "foo"_s, .name = "foo"_s},
+                                          .inst_name = "bar"_s};
         state.ir_id = sample_lib::IrId {
-            .library_name = k_mirage_compat_library_name,
+            .library = sample_lib::LibraryId::FromRef(sample_lib::k_mirage_compat_library_id),
             .ir_name = "Formant 1"_s,
         };
     }
@@ -486,7 +487,8 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
             i = InstrumentType::None;
     } else {
         for (auto& i : state.inst_ids)
-            if (auto s = i.TryGet<sample_lib::InstrumentId>()) s->library_name = parser.library_name;
+            if (auto s = i.TryGet<sample_lib::InstrumentId>())
+                s->library = {.author = sample_lib::k_mdata_library_author, .name = parser.library_name};
     }
 
     // Fill in missing values and convert the existing ones into their new formats
@@ -529,7 +531,7 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
             auto const ir_name = old_param.Get<String>();
             if (ir_name.size && ir_name != "None"_s) {
                 state.ir_id = sample_lib::IrId {
-                    .library_name = k_mirage_compat_library_name,
+                    .library = sample_lib::LibraryId::FromRef(sample_lib::k_mirage_compat_library_id),
                     .ir_name = ir_name,
                 };
             }
@@ -1058,7 +1060,8 @@ ErrorCodeOr<void> CodeState(StateSnapshot& state, CodeStateOptions const& option
 
             TRY(coder.CodeNumber((UnderlyingType<Type>&)type, StateVersion::Initial));
             if (type == Type::Sampler) {
-                TRY(coder.CodeDynArray(sampler_inst_id.library_name, StateVersion::Initial));
+                TRY(coder.CodeDynArray(sampler_inst_id.library.author, StateVersion::Initial));
+                TRY(coder.CodeDynArray(sampler_inst_id.library.name, StateVersion::Initial));
                 TRY(coder.CodeDynArray(sampler_inst_id.inst_name, StateVersion::Initial));
             }
 
@@ -1127,7 +1130,8 @@ ErrorCodeOr<void> CodeState(StateSnapshot& state, CodeStateOptions const& option
 
         if (has_ir) {
             if (coder.IsReading()) state.ir_id = sample_lib::IrId {};
-            TRY(coder.CodeDynArray(state.ir_id->library_name, StateVersion::Initial));
+            TRY(coder.CodeDynArray(state.ir_id->library.author, StateVersion::Initial));
+            TRY(coder.CodeDynArray(state.ir_id->library.name, StateVersion::Initial));
             TRY(coder.CodeDynArray(state.ir_id->ir_name, StateVersion::Initial));
         }
     }
@@ -1331,7 +1335,8 @@ static void CheckStateIsValid(tests::Tester& tester, StateSnapshot const& state)
             }
             case InstrumentType::Sampler: {
                 auto& s = i.Get<sample_lib::InstrumentId>();
-                CHECK(s.library_name.size);
+                CHECK(s.library.name.size);
+                CHECK(s.library.author.size);
                 CHECK(s.inst_name.size);
                 break;
             }
@@ -1404,12 +1409,16 @@ TEST_CASE(TestNewSerialisation) {
         Shuffle(state.fx_order, random_seed);
 
         state.ir_id = sample_lib::IrId {
-            .library_name = "irlib"_s,
+            .library = {.author = "irlibname"_s, .name = "irlib"_s},
             .ir_name = "irfile"_s,
         };
         for (auto [index, inst] : Enumerate(state.inst_ids)) {
             inst = sample_lib::InstrumentId {
-                .library_name = String(fmt::Format(scratch_arena, "TestLib{}", index)),
+                .library =
+                    {
+                        .author = String(fmt::Format(scratch_arena, "TestAuthor{}", index)),
+                        .name = String(fmt::Format(scratch_arena, "TestLib{}", index)),
+                    },
                 .inst_name = String(fmt::Format(scratch_arena, "Test/Path{}", index)),
             };
         }
@@ -1617,20 +1626,23 @@ TEST_CASE(TestLoadingOldFiles) {
         CHECK(state.inst_ids[1].tag == InstrumentType::Sampler);
         CHECK(state.inst_ids[2].tag == InstrumentType::Sampler);
         if (auto i = state.inst_ids[0].TryGet<sample_lib::InstrumentId>()) {
-            CHECK_EQ(i->library_name, "Phoenix"_s);
+            CHECK_EQ(i->library.name, "Phoenix"_s);
+            CHECK_EQ(i->library.author, sample_lib::k_mdata_library_author);
             CHECK_EQ(i->inst_name, "Strings"_s);
         }
         if (auto i = state.inst_ids[1].TryGet<sample_lib::InstrumentId>()) {
-            CHECK_EQ(i->library_name, "Phoenix"_s);
+            CHECK_EQ(i->library.name, "Phoenix"_s);
+            CHECK_EQ(i->library.author, sample_lib::k_mdata_library_author);
             CHECK_EQ(i->inst_name, "Strings"_s);
         }
         if (auto i = state.inst_ids[2].TryGet<sample_lib::InstrumentId>()) {
-            CHECK_EQ(i->library_name, "Phoenix"_s);
+            CHECK_EQ(i->library.name, "Phoenix"_s);
+            CHECK_EQ(i->library.author, sample_lib::k_mdata_library_author);
             CHECK_EQ(i->inst_name, "Choir"_s);
         }
         CHECK(state.ir_id.HasValue());
         if (state.ir_id.HasValue()) {
-            CHECK_EQ(state.ir_id->library_name, k_mirage_compat_library_name);
+            CHECK_EQ(state.ir_id->library, sample_lib::k_mirage_compat_library_id);
             CHECK_EQ(state.ir_id->ir_name, "5s Shimmer"_s);
         }
 

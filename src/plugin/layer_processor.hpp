@@ -196,10 +196,10 @@ struct LayerProcessor {
         return {};
     }
 
-    Optional<String> LibName() const {
+    Optional<sample_lib::LibraryIdRef> LibId() const {
         ASSERT(IsMainThread(host));
         if (auto sampled_inst = instrument.TryGetFromTag<InstrumentType::Sampler>())
-            return (*sampled_inst)->instrument.library.name;
+            return (*sampled_inst)->instrument.library.Id();
         return nullopt;
     }
 

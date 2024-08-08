@@ -161,7 +161,7 @@ enum class FileLoadingState : u32 {
 struct ListedAudioData {
     ~ListedAudioData();
 
-    String library_name;
+    sample_lib::LibraryIdRef library;
     String path;
     AudioData audio_data;
     Atomic<u32> ref_count {};
@@ -217,6 +217,8 @@ struct QueuedRequest {
     AsyncCommsChannel& async_comms_channel;
 };
 
+inline u64 HashLibraryRef(sample_lib::LibraryIdRef id) { return Hash(id.name), Hash(id.author); }
+
 } // namespace detail
 
 // Public API
@@ -237,8 +239,9 @@ struct Server {
     Mutex scan_folders_writer_mutex;
     detail::ScanFolderList scan_folders;
     detail::LibrariesList libraries;
-    Mutex libraries_by_name_mutex;
-    DynamicHashTable<String, detail::LibrariesList::Node*> libraries_by_name {Malloc::Instance()};
+    Mutex libraries_by_id_mutex;
+    DynamicHashTable<sample_lib::LibraryIdRef, detail::LibrariesList::Node*, detail::HashLibraryRef>
+        libraries_by_id {Malloc::Instance()};
     // Connection-independent errors. If we have access to a channel, we post to the channel's
     // error_notifications instead of this.
     ThreadsafeErrorNotifications& error_notifications;
@@ -281,7 +284,7 @@ void SetExtraScanFolders(Server& server, Span<String const> folders);
 // You must call Release() on all results
 // [main-thread]
 Span<RefCounted<sample_lib::Library>> AllLibrariesRetained(Server& server, ArenaAllocator& arena);
-RefCounted<sample_lib::Library> FindLibraryRetained(Server& server, String name);
+RefCounted<sample_lib::Library> FindLibraryRetained(Server& server, sample_lib::LibraryIdRef id);
 
 inline void ReleaseAll(Span<RefCounted<sample_lib::Library>> libs) {
     for (auto& l : libs)

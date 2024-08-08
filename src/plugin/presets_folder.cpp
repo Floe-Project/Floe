@@ -99,7 +99,7 @@ DirectoryListing::Entry const* SelectPresetFromListing(DirectoryListing const& l
                                     if (entry.Metadata()) {
                                         auto const& meta = *(PresetMetadata const*)entry.Metadata();
                                         for (auto& l : meta.used_libraries)
-                                            if (l == library_info.name) return true;
+                                            if (l == library_info.library_id) return true;
                                     }
 
                                     if (EndsWithSpan(entry.Path(), library_info.file_extension)) return true;
@@ -179,8 +179,8 @@ PresetsFolderScanResult FetchOrRescanPresetsFolder(PresetsListing& listing,
                         PLACEMENT_NEW(result) PresetMetadata();
                         for (auto& i : state.inst_ids) {
                             if (auto s = i.TryGet<sample_lib::InstrumentId>()) {
-                                if (!Find(result->used_libraries, s->library_name))
-                                    dyn::Append(result->used_libraries, arena.Clone(s->library_name));
+                                if (!Find(result->used_libraries, s->library))
+                                    dyn::Append(result->used_libraries, s->library.Ref().Clone(arena));
                             }
                         }
                         return (void*)result;

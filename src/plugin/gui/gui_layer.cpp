@@ -48,16 +48,16 @@ static void LayerInstrumentMenuItems(Gui* g, LayerProcessor* layer) {
 
     for (auto l : libs) {
         for (auto [key, inst_ptr] : l->insts_by_name) {
-            auto const lib_name = l->name;
+            auto const lib_id = l->Id();
             auto const inst_name = key;
             if (auto desired_sampled = layer->instrument_id.TryGet<sample_lib::InstrumentId>()) {
-                if (desired_sampled->library_name == lib_name && desired_sampled->inst_name == inst_name)
+                if (desired_sampled->library == l->Id() && desired_sampled->inst_name == inst_name)
                     current = (int)insts.size;
             }
-            dyn::Append(insts, fmt::Format(g->scratch_arena, "{}: {}", lib_name, inst_name));
+            dyn::Append(insts, fmt::Format(g->scratch_arena, "{}: {}", lib_id, inst_name));
             dyn::Append(inst_info,
                         sample_lib::InstrumentId {
-                            .library_name = lib_name,
+                            .library = sample_lib::LibraryId::FromRef(lib_id),
                             .inst_name = inst_name,
                         });
         }
@@ -509,7 +509,7 @@ void Draw(Gui* g,
     auto& imgui = g->imgui;
 
     auto settings = FloeWindowSettings(imgui, [&](IMGUI_DRAW_WINDOW_BG_ARGS) {
-        auto desired_lib_name = layer->LibName();
+        auto desired_lib_name = layer->LibId();
         if (!desired_lib_name) return;
         auto const get_background_uvs = [&](LibraryImages const& imgs,
                                             Rect r,

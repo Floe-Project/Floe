@@ -50,7 +50,7 @@ void MidPanel(Gui* g) {
 
     {
         auto settings = FloeWindowSettings(imgui, [&](IMGUI_DRAW_WINDOW_BG_ARGS) {
-            auto const first_lib_name = g->plugin.Layer(0).LibName();
+            auto const first_lib_name = g->plugin.Layer(0).LibId();
             if (first_lib_name) {
                 auto const& r = window->bounds;
 
@@ -179,7 +179,7 @@ void MidPanel(Gui* g) {
 
     {
         auto settings = FloeWindowSettings(imgui, [&](IMGUI_DRAW_WINDOW_BG_ARGS) {
-            auto const first_lib_name = g->plugin.Layer(0).LibName();
+            auto const first_lib_name = g->plugin.Layer(0).LibId();
             if (first_lib_name) {
                 auto const& r = window->bounds;
 

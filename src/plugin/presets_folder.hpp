@@ -9,6 +9,7 @@
 
 #include "common/constants.hpp"
 #include "rescan_mode.hpp"
+#include "sample_library/sample_library.hpp"
 #include "scanned_folder.hpp"
 
 // TODO(1.0): this needs entirely replacing: use new ReadDirectoryChanges, AssetRefList, HashTable, etc
@@ -30,7 +31,7 @@ struct PresetsListing {
 };
 
 struct PresetMetadata {
-    DynamicArrayInline<String, k_num_layers> used_libraries {};
+    DynamicArrayInline<sample_lib::LibraryIdRef, k_num_layers> used_libraries {};
 };
 
 struct PresetBrowserFilters {
@@ -55,7 +56,7 @@ enum class PresetRandomiseMode {
 };
 
 struct PresetLibraryInfo {
-    DynamicArrayInline<char, k_max_library_name_size> name;
+    sample_lib::LibraryId library_id;
     DynamicArrayInline<char, 32> file_extension;
 };
 

@@ -83,13 +83,6 @@ struct LoadedInstrument {
     AudioData const* file_for_gui_waveform {};
 };
 
-struct InstrumentId {
-    bool operator==(InstrumentId const& other) const = default;
-    inline bool operator==(LoadedInstrument const& inst) const;
-    DynamicArrayInline<char, k_max_library_name_size> library_name;
-    DynamicArrayInline<char, k_max_instrument_name_size> inst_name;
-};
-
 struct ImpulseResponse {
     Library const& library;
 
@@ -101,13 +94,6 @@ struct ImpulseResponse {
 struct LoadedIr {
     ImpulseResponse const& ir;
     AudioData const* audio_data;
-};
-
-struct IrId {
-    bool operator==(IrId const& other) const = default;
-    inline bool operator==(LoadedIr const& ir) const;
-    DynamicArrayInline<char, k_max_library_name_size> library_name;
-    DynamicArrayInline<char, k_max_ir_name_size> ir_name;
 };
 
 enum class FileFormat { Mdata, Lua };
@@ -126,7 +112,17 @@ using FileFormatSpecifics = TaggedUnion<FileFormat,
                                         TypeAndTag<MdataSpecifics, FileFormat::Mdata>,
                                         TypeAndTag<LuaSpecifics, FileFormat::Lua>>;
 
+struct LibraryIdRef {
+    bool operator==(LibraryIdRef const& other) const = default;
+    LibraryIdRef Clone(Allocator& arena, CloneType _ = CloneType::Shallow) const {
+        return {.author = arena.Clone(author), .name = arena.Clone(name)};
+    }
+    String author;
+    String name;
+};
+
 struct Library {
+    LibraryIdRef Id() const { return {.author = author, .name = name}; }
     String name {};
     String tagline {};
     Optional<String> url {};
@@ -142,12 +138,41 @@ struct Library {
     FileFormatSpecifics file_format_specifics;
 };
 
-inline bool InstrumentId::operator==(LoadedInstrument const& inst) const {
-    return library_name == inst.instrument.library.name && inst_name == inst.instrument.name;
-}
-inline bool IrId::operator==(LoadedIr const& ir) const {
-    return library_name == ir.ir.library.name && ir_name == ir.ir.name;
-}
+constexpr LibraryIdRef k_builtin_library_id = {.author = "Floe"_s, .name = "Built-in"};
+
+// MDATA libraries didn't have an author field
+constexpr String k_mdata_library_author = "FrozenPlain"_s;
+constexpr LibraryIdRef k_mirage_compat_library_id = {.author = k_mdata_library_author,
+                                                     .name = "Mirage Compatibility"};
+
+struct LibraryId {
+    static LibraryId FromRef(LibraryIdRef const& ref) { return {.author = ref.author, .name = ref.name}; }
+    static LibraryId FromLibrary(Library const& lib) { return {.author = lib.author, .name = lib.name}; }
+    LibraryIdRef Ref() const { return {.author = author, .name = name}; }
+    bool operator==(LibraryId const& other) const = default;
+    operator LibraryIdRef() const { return Ref(); }
+    DynamicArrayInline<char, k_max_library_author_size> author;
+    DynamicArrayInline<char, k_max_library_name_size> name;
+};
+
+struct InstrumentId {
+    bool operator==(InstrumentId const& other) const = default;
+    bool operator==(LoadedInstrument const& inst) const {
+        return library == LibraryId::FromLibrary(inst.instrument.library) &&
+               inst_name == inst.instrument.name;
+    }
+    LibraryId library;
+    DynamicArrayInline<char, k_max_instrument_name_size> inst_name;
+};
+
+struct IrId {
+    bool operator==(IrId const& other) const = default;
+    bool operator==(LoadedIr const& ir) const {
+        return library == LibraryId::FromLibrary(ir.ir.library) && ir_name == ir.ir.name;
+    }
+    LibraryId library;
+    DynamicArrayInline<char, k_max_ir_name_size> ir_name;
+};
 
 // only honoured by the lua system
 struct Options {
@@ -222,3 +247,24 @@ inline LibraryPtrOrError Read(Reader& reader,
 ErrorCodeOr<void> WriteDocumentedLuaExample(Writer writer, bool include_comments = true);
 
 } // namespace sample_lib
+
+PUBLIC ErrorCodeOr<void>
+CustomValueToString(Writer writer, sample_lib::LibraryIdRef id, fmt::FormatOptions options) {
+    auto const sep = " - "_s;
+    TRY(PadToRequiredWidthIfNeeded(writer, options, id.author.size + sep.size + id.name.size));
+    TRY(writer.WriteChars(id.author));
+    TRY(writer.WriteChars(sep));
+    return writer.WriteChars(id.name);
+}
+
+PUBLIC u64 Hash(sample_lib::LibraryIdRef const& id) {
+    // FNV-1a https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function#FNV-1a_hash
+    u64 hash = 0xcbf29ce484222325;
+    for (auto str : Array {id.author, "|", id.name}) {
+        for (auto c : str) {
+            hash ^= (u8)c;
+            hash *= 0x100000001b3;
+        }
+    }
+    return hash;
+}

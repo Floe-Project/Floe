@@ -97,7 +97,7 @@ ImagePixelsFromLibrary(Gui* g, sample_lib::Library const& lib, LibraryImageType 
         // shared pool. We replicate that behaviour here.
         auto mirage_compat_lib =
             sample_lib_server::FindLibraryRetained(g->plugin.shared_data.sample_library_server,
-                                                   k_mirage_compat_library_name);
+                                                   sample_lib::k_mirage_compat_library_id);
         DEFER { mirage_compat_lib.Release(); };
 
         if (mirage_compat_lib) {
@@ -791,7 +791,7 @@ GuiFrameResult GuiUpdate(Gui* g) {
         bool has_image_bg = false;
         auto r = window->unpadded_bounds;
 
-        auto const first_lib_name = g->plugin.Layer(0).LibName();
+        auto const first_lib_name = g->plugin.Layer(0).LibId();
         if (first_lib_name) {
             auto background_lib =
                 sample_lib_server::FindLibraryRetained(g->plugin.shared_data.sample_library_server,

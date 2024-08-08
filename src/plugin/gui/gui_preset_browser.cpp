@@ -287,7 +287,7 @@ DirectoryListing::Entry const* PresetBrowser::DoPresetFilesRecurse(DirectoryList
                             dyn::AppendSpan(tooltip, "Libraries: "_s);
                             auto const divider = ", "_s;
                             for (auto l : meta.used_libraries) {
-                                dyn::AppendSpan(tooltip, l);
+                                dyn::AppendSpan(tooltip, l.name);
                                 dyn::AppendSpan(tooltip, divider);
                             }
                             dyn::Resize(tooltip, tooltip.size - divider.size);

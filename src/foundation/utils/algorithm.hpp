@@ -4,6 +4,7 @@
 #pragma once
 #include "foundation/container/contiguous.hpp"
 #include "foundation/container/optional.hpp"
+#include "foundation/container/span.hpp"
 #include "foundation/universal_defs.hpp"
 
 PUBLIC constexpr u32 U32FromChars(char const (&data)[5]) {
@@ -15,11 +16,8 @@ PUBLIC constexpr u64 U64FromChars(char const (&data)[9]) {
            ((u64)(data[4]) << 32) | ((u64)(data[5]) << 40) | ((u64)(data[6]) << 48) | ((u64)(data[7]) << 56);
 }
 
-// IMPORTANT: be careful with ToByteSpan(), the padding bytes in a struct are not necessarily zeroed and
-// therefore you may get inconsistent results if you are reading it as a block of memory
-// IMPROVE: bugprone: review uses of ToByteSpan() and perhaps come up with a different solution
-
-PUBLIC constexpr u64 HashFnv1a(auto data) {
+template <Fundamental T>
+PUBLIC constexpr u64 HashFnv1a(Span<T const> data) {
     // FNV-1a https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function#FNV-1a_hash
     u64 hash = 0xcbf29ce484222325;
     for (auto& byte : data.ToByteSpan()) {
@@ -29,7 +27,21 @@ PUBLIC constexpr u64 HashFnv1a(auto data) {
     return hash;
 }
 
-PUBLIC constexpr u32 HashDbj(auto data) {
+template <Fundamental T>
+PUBLIC constexpr u64 HashMultipleFnv1a(Span<Span<T const> const> datas) {
+    // FNV-1a https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function#FNV-1a_hash
+    u64 hash = 0xcbf29ce484222325;
+    for (auto data : datas) {
+        for (auto& byte : data.ToByteSpan()) {
+            hash ^= byte;
+            hash *= 0x100000001b3;
+        }
+    }
+    return hash;
+}
+
+template <Fundamental T>
+PUBLIC constexpr u32 HashDbj(Span<T const> data) {
     // Dbj
     u32 hash = 5381;
     for (auto& byte : data.ToByteSpan())
@@ -37,8 +49,20 @@ PUBLIC constexpr u32 HashDbj(auto data) {
     return hash;
 }
 
+template <Fundamental T>
+PUBLIC constexpr u32 HashMultipleDbj(Span<Span<T const> const> datas) {
+    // Dbj
+    u32 hash = 5381;
+    for (auto data : datas)
+        for (auto& byte : data.ToByteSpan())
+            hash = ((hash << 5) + hash) + (u32)byte;
+    return hash;
+}
+
 PUBLIC constexpr u64 Hash(auto data) { return HashFnv1a(data); }
 PUBLIC constexpr u32 Hash32(auto data) { return HashDbj(data); }
+PUBLIC constexpr u64 HashMultiple(auto data) { return HashMultipleFnv1a(data); }
+PUBLIC constexpr u32 HashMultiple32(auto data) { return HashMultipleDbj(data); }
 
 template <typename T>
 PUBLIC constexpr auto Begin(T& c) -> decltype(c.begin()) {

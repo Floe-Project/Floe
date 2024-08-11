@@ -141,7 +141,7 @@ class Delay final : public Effect {
         }
     }
 
-    inline bool IsSilent() const {
+    bool IsSilent() const {
         constexpr f32 k_extra_seconds = 0.1f; // ensure that we detect echos in the buffer
         return silent_seconds > ((1.0f / Max(args.params[ToInt(vitfx::delay::Params::TimeLeftHz)],
                                              args.params[ToInt(vitfx::delay::Params::TimeRightHz)])) +

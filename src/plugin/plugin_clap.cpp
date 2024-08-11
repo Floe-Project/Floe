@@ -101,6 +101,7 @@ constexpr u32 k_largest_gui_size = LargestRepresentableValue<u16>();
 
 // Size (width, height) is in pixels; the corresponding windowing system extension is
 // responsible for defining if it is physical pixels or logical pixels.
+// NOLINTNEXTLINE(cppcoreguidelines-interfaces-global-init)
 clap_plugin_gui const floe_gui {
     // Returns true if the requested gui api is supported
     // [main-thread]

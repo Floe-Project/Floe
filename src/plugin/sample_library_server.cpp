@@ -1679,7 +1679,7 @@ TEST_CASE(TestSampleLibraryLoader) {
                              LoadRequestInstrumentIdWithLayer {
                                  .id =
                                      {
-                                         .library = {.author = "Tester"_s, .name = "Test Lua"_s},
+                                         .library = {{.author = "Tester"_s, .name = "Test Lua"_s}},
                                          .inst_name = "Auto Mapped Samples"_s,
                                      },
                                  .layer_index = 0,
@@ -1701,9 +1701,8 @@ TEST_CASE(TestSampleLibraryLoader) {
                 requests,
                 {
                     .request =
-                        sample_lib::IrId {
-                            .library = sample_lib::LibraryId::FromRef(sample_lib::k_builtin_library_id),
-                            .ir_name = String {builtin_ir.name.data, builtin_ir.name.size}},
+                        sample_lib::IrId {.library = sample_lib::k_builtin_library_id,
+                                          .ir_name = String {builtin_ir.name.data, builtin_ir.name.size}},
                     .check_result =
                         [&](LoadResult const& r, LoadRequest const& request) {
                             auto ir = ExtractSuccess<RefCounted<sample_lib::LoadedIr>>(tester, r, request);
@@ -1720,8 +1719,8 @@ TEST_CASE(TestSampleLibraryLoader) {
                         LoadRequestInstrumentIdWithLayer {
                             .id =
                                 {
-                                    .library = {.author = sample_lib::k_mdata_library_author,
-                                                .name = "SharedFilesMdata"_s},
+                                    .library = {{.author = sample_lib::k_mdata_library_author,
+                                                 .name = "SharedFilesMdata"_s}},
                                     .inst_name = "Groups And Refs"_s,
                                 },
                             .layer_index = 0,
@@ -1743,7 +1742,7 @@ TEST_CASE(TestSampleLibraryLoader) {
                         LoadRequestInstrumentIdWithLayer {
                             .id =
                                 {
-                                    .library = {.author = "Tester"_s, .name = "Test Lua"_s},
+                                    .library = {{.author = "Tester"_s, .name = "Test Lua"_s}},
                                     .inst_name = "Single Sample"_s,
                                 },
                             .layer_index = 0,
@@ -1765,11 +1764,10 @@ TEST_CASE(TestSampleLibraryLoader) {
                         LoadRequestInstrumentIdWithLayer {
                             .id =
                                 {
-                                    .library =
-                                        {
-                                            .author = sample_lib::k_mdata_library_author,
-                                            .name = "SharedFilesMdata"_s,
-                                        },
+                                    .library = {{
+                                        .author = sample_lib::k_mdata_library_author,
+                                        .name = "SharedFilesMdata"_s,
+                                    }},
                                     .inst_name = "Groups And Refs"_s,
                                 },
                             .layer_index = 0,
@@ -1791,11 +1789,10 @@ TEST_CASE(TestSampleLibraryLoader) {
                         LoadRequestInstrumentIdWithLayer {
                             .id =
                                 {
-                                    .library =
-                                        {
-                                            .author = sample_lib::k_mdata_library_author,
-                                            .name = "SharedFilesMdata"_s,
-                                        },
+                                    .library = {{
+                                        .author = sample_lib::k_mdata_library_author,
+                                        .name = "SharedFilesMdata"_s,
+                                    }},
                                     .inst_name = "Groups And Refs (copy)"_s,
                                 },
                             .layer_index = 1,
@@ -1817,11 +1814,10 @@ TEST_CASE(TestSampleLibraryLoader) {
                         LoadRequestInstrumentIdWithLayer {
                             .id =
                                 {
-                                    .library =
-                                        {
-                                            .author = sample_lib::k_mdata_library_author,
-                                            .name = "SharedFilesMdata"_s,
-                                        },
+                                    .library = {{
+                                        .author = sample_lib::k_mdata_library_author,
+                                        .name = "SharedFilesMdata"_s,
+                                    }},
                                     .inst_name = "Single Sample"_s,
                                 },
                             .layer_index = 2,
@@ -1846,11 +1842,10 @@ TEST_CASE(TestSampleLibraryLoader) {
                         LoadRequestInstrumentIdWithLayer {
                             .id =
                                 {
-                                    .library =
-                                        {
-                                            .author = sample_lib::k_mdata_library_author,
-                                            .name = "SharedFilesMdata"_s,
-                                        },
+                                    .library = {{
+                                        .author = sample_lib::k_mdata_library_author,
+                                        .name = "SharedFilesMdata"_s,
+                                    }},
                                     .inst_name = "Same Sample Twice"_s,
                                 },
                             .layer_index = 0,
@@ -1909,7 +1904,7 @@ TEST_CASE(TestSampleLibraryLoader) {
                                 LoadRequestInstrumentIdWithLayer {
                                     .id =
                                         {
-                                            .library = {.author = "foo"_s, .name = "bar"_s},
+                                            .library = {{.author = "foo"_s, .name = "bar"_s}},
                                             .inst_name = "bar"_s,
                                         },
                                     .layer_index = 0,
@@ -1929,8 +1924,8 @@ TEST_CASE(TestSampleLibraryLoader) {
                                 LoadRequestInstrumentIdWithLayer {
                                     .id =
                                         {
-                                            .library = {.author = sample_lib::k_mdata_library_author,
-                                                        .name = "SharedFilesMdata"_s},
+                                            .library = {{.author = sample_lib::k_mdata_library_author,
+                                                         .name = "SharedFilesMdata"_s}},
                                             .inst_name = "bar"_s,
                                         },
                                     .layer_index = 0,
@@ -1990,19 +1985,19 @@ TEST_CASE(TestSampleLibraryLoader) {
     SUBCASE("randomly send lots of requests") {
         sample_lib::InstrumentId const inst_ids[] {
             {
-                .library = {.author = sample_lib::k_mdata_library_author, .name = "SharedFilesMdata"_s},
+                .library = {{.author = sample_lib::k_mdata_library_author, .name = "SharedFilesMdata"_s}},
                 .inst_name = "Groups And Refs"_s,
             },
             {
-                .library = {.author = sample_lib::k_mdata_library_author, .name = "SharedFilesMdata"_s},
+                .library = {{.author = sample_lib::k_mdata_library_author, .name = "SharedFilesMdata"_s}},
                 .inst_name = "Groups And Refs (copy)"_s,
             },
             {
-                .library = {.author = sample_lib::k_mdata_library_author, .name = "SharedFilesMdata"_s},
+                .library = {{.author = sample_lib::k_mdata_library_author, .name = "SharedFilesMdata"_s}},
                 .inst_name = "Single Sample"_s,
             },
             {
-                .library = {.author = "Tester"_s, .name = "Test Lua"_s},
+                .library = {{.author = "Tester"_s, .name = "Test Lua"_s}},
                 .inst_name = "Auto Mapped Samples"_s,
             },
         };
@@ -2025,13 +2020,13 @@ TEST_CASE(TestSampleLibraryLoader) {
                 server,
                 channel,
                 (RandomIntInRange(random_seed, 0, 2) == 0)
-                    ? LoadRequest {sample_lib::IrId {
-                          .library = sample_lib::LibraryId::FromRef(sample_lib::k_builtin_library_id),
-                          .ir_name = ({
-                              auto const ele =
-                                  RandomElement(Span<BinaryData const> {builtin_irs.irs}, random_seed);
-                              String {ele.name.data, ele.name.size};
-                          })}}
+                    ? LoadRequest {sample_lib::IrId {.library = sample_lib::k_builtin_library_id,
+                                                     .ir_name = ({
+                                                         auto const ele = RandomElement(
+                                                             Span<BinaryData const> {builtin_irs.irs},
+                                                             random_seed);
+                                                         String {ele.name.data, ele.name.size};
+                                                     })}}
                     : LoadRequest {LoadRequestInstrumentIdWithLayer {
                           .id = RandomElement(Span<sample_lib::InstrumentId const> {inst_ids}, random_seed),
                           .layer_index = RandomIntInRange<u32>(random_seed, 0, k_num_layers - 1)}});

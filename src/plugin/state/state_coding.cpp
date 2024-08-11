@@ -464,10 +464,11 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
         for (auto& t : state.fx_order)
             t = (EffectType)k_num_effect_types;
         for (auto& i : state.inst_ids)
-            i = sample_lib::InstrumentId {.library = {.author = "foo"_s, .name = "foo"_s},
+            i = sample_lib::InstrumentId {.library =
+                                              sample_lib::LibraryIdRef {.author = "foo"_s, .name = "foo"_s},
                                           .inst_name = "bar"_s};
         state.ir_id = sample_lib::IrId {
-            .library = sample_lib::LibraryId::FromRef(sample_lib::k_mirage_compat_library_id),
+            .library = sample_lib::k_mirage_compat_library_id,
             .ir_name = "Formant 1"_s,
         };
     }
@@ -488,7 +489,8 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
     } else {
         for (auto& i : state.inst_ids)
             if (auto s = i.TryGet<sample_lib::InstrumentId>())
-                s->library = {.author = sample_lib::k_mdata_library_author, .name = parser.library_name};
+                s->library = sample_lib::LibraryIdRef {.author = sample_lib::k_mdata_library_author,
+                                                       .name = parser.library_name};
     }
 
     // Fill in missing values and convert the existing ones into their new formats
@@ -531,7 +533,7 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
             auto const ir_name = old_param.Get<String>();
             if (ir_name.size && ir_name != "None"_s) {
                 state.ir_id = sample_lib::IrId {
-                    .library = sample_lib::LibraryId::FromRef(sample_lib::k_mirage_compat_library_id),
+                    .library = sample_lib::k_mirage_compat_library_id,
                     .ir_name = ir_name,
                 };
             }
@@ -1409,16 +1411,16 @@ TEST_CASE(TestNewSerialisation) {
         Shuffle(state.fx_order, random_seed);
 
         state.ir_id = sample_lib::IrId {
-            .library = {.author = "irlibname"_s, .name = "irlib"_s},
+            .library = {{.author = "irlibname"_s, .name = "irlib"_s}},
             .ir_name = "irfile"_s,
         };
         for (auto [index, inst] : Enumerate(state.inst_ids)) {
             inst = sample_lib::InstrumentId {
                 .library =
-                    {
+                {{
                         .author = String(fmt::Format(scratch_arena, "TestAuthor{}", index)),
                         .name = String(fmt::Format(scratch_arena, "TestLib{}", index)),
-                    },
+                    }},
                 .inst_name = String(fmt::Format(scratch_arena, "Test/Path{}", index)),
             };
         }

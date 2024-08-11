@@ -140,17 +140,20 @@ struct Library {
 
 constexpr LibraryIdRef k_builtin_library_id = {.author = "Floe"_s, .name = "Built-in"};
 
-// MDATA libraries didn't have an author field
+// MDATA libraries didn't have an author field, but they were all made by FrozenPlain.
 constexpr String k_mdata_library_author = "FrozenPlain"_s;
 constexpr LibraryIdRef k_mirage_compat_library_id = {.author = k_mdata_library_author,
                                                      .name = "Mirage Compatibility"};
 
 struct LibraryId {
-    static LibraryId FromRef(LibraryIdRef const& ref) { return {.author = ref.author, .name = ref.name}; }
-    static LibraryId FromLibrary(Library const& lib) { return {.author = lib.author, .name = lib.name}; }
+    LibraryId() = default;
+    LibraryId(LibraryIdRef ref) : author(ref.author), name(ref.name) {}
+
     LibraryIdRef Ref() const { return {.author = author, .name = name}; }
-    bool operator==(LibraryId const& other) const = default;
     operator LibraryIdRef() const { return Ref(); }
+    bool operator==(LibraryId const& other) const = default;
+    bool operator==(LibraryIdRef const& other) const { return Ref() == other; }
+
     DynamicArrayInline<char, k_max_library_author_size> author;
     DynamicArrayInline<char, k_max_library_name_size> name;
 };
@@ -158,8 +161,7 @@ struct LibraryId {
 struct InstrumentId {
     bool operator==(InstrumentId const& other) const = default;
     bool operator==(LoadedInstrument const& inst) const {
-        return library == LibraryId::FromLibrary(inst.instrument.library) &&
-               inst_name == inst.instrument.name;
+        return library == inst.instrument.library.Id() && inst_name == inst.instrument.name;
     }
     LibraryId library;
     DynamicArrayInline<char, k_max_instrument_name_size> inst_name;
@@ -168,7 +170,7 @@ struct InstrumentId {
 struct IrId {
     bool operator==(IrId const& other) const = default;
     bool operator==(LoadedIr const& ir) const {
-        return library == LibraryId::FromLibrary(ir.ir.library) && ir_name == ir.ir.name;
+        return library == ir.ir.library.Id() && ir_name == ir.ir.name;
     }
     LibraryId library;
     DynamicArrayInline<char, k_max_ir_name_size> ir_name;

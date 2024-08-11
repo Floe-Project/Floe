@@ -57,7 +57,7 @@ static void LayerInstrumentMenuItems(Gui* g, LayerProcessor* layer) {
             dyn::Append(insts, fmt::Format(g->scratch_arena, "{}: {}", lib_id, inst_name));
             dyn::Append(inst_info,
                         sample_lib::InstrumentId {
-                            .library = sample_lib::LibraryId::FromRef(lib_id),
+                            .library = lib_id,
                             .inst_name = inst_name,
                         });
         }

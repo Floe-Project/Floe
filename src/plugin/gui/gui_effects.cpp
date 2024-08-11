@@ -127,7 +127,7 @@ static void ImpulseResponseMenuItems(Gui* g) {
     for (auto l : libs) {
         for (auto const ir : l->irs_by_name) {
             auto const ir_id = sample_lib::IrId {
-                .library = sample_lib::LibraryId::FromRef(l->Id()),
+                .library = l->Id(),
                 .ir_name = ir.key,
             };
 

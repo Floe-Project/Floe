@@ -17,7 +17,7 @@
 #include "plugin_instance.hpp"
 #include "settings/settings_gui.hpp"
 
-constexpr bool k_debug_gui_platform = true;
+constexpr bool k_debug_gui_platform = false;
 
 struct GuiPlatform {
     static constexpr uintptr_t k_timer_id = 200;

@@ -16,6 +16,15 @@ PUBLIC constexpr u64 U64FromChars(char const (&data)[9]) {
            ((u64)(data[4]) << 32) | ((u64)(data[5]) << 40) | ((u64)(data[6]) << 48) | ((u64)(data[7]) << 56);
 }
 
+PUBLIC constexpr auto SpanFromContainerOfContainers(auto const& c_of_c) {
+    // We need to help with the type conversions
+    using OuterValueType = typename RemoveCVReference<RemoveCV<decltype(c_of_c)>>::ValueType;
+    Span<OuterValueType const> const t1 = c_of_c;
+    using InnerValueType = RemoveCV<typename OuterValueType::ValueType>;
+    Span<Span<InnerValueType const> const> const t2 = t1;
+    return t2;
+}
+
 template <Fundamental T>
 PUBLIC constexpr u64 HashFnv1a(Span<T const> data) {
     // FNV-1a https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function#FNV-1a_hash
@@ -27,12 +36,13 @@ PUBLIC constexpr u64 HashFnv1a(Span<T const> data) {
     return hash;
 }
 
-template <Fundamental T>
-PUBLIC constexpr u64 HashMultipleFnv1a(Span<Span<T const> const> datas) {
+PUBLIC constexpr u64 HashMultipleFnv1a(ContiguousContainerOfContiguousContainers auto const& c_of_c) {
+    auto datas = SpanFromContainerOfContainers(c_of_c);
     // FNV-1a https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function#FNV-1a_hash
     u64 hash = 0xcbf29ce484222325;
     for (auto data : datas) {
         for (auto& byte : data.ToByteSpan()) {
+            static_assert(Fundamental<RemoveReference<decltype(byte)>>);
             hash ^= byte;
             hash *= 0x100000001b3;
         }
@@ -49,20 +59,23 @@ PUBLIC constexpr u32 HashDbj(Span<T const> data) {
     return hash;
 }
 
-template <Fundamental T>
-PUBLIC constexpr u32 HashMultipleDbj(Span<Span<T const> const> datas) {
+PUBLIC constexpr u32 HashMultipleDbj(ContiguousContainerOfContiguousContainers auto const& c_of_c) {
+    auto datas = SpanFromContainerOfContainers(c_of_c);
     // Dbj
     u32 hash = 5381;
     for (auto data : datas)
-        for (auto& byte : data.ToByteSpan())
+        for (auto& byte : data.ToByteSpan()) {
+            static_assert(Fundamental<RemoveReference<decltype(byte)>>);
             hash = ((hash << 5) + hash) + (u32)byte;
+        }
     return hash;
 }
 
 PUBLIC constexpr u64 Hash(auto data) { return HashFnv1a(data); }
 PUBLIC constexpr u32 Hash32(auto data) { return HashDbj(data); }
-PUBLIC constexpr u64 HashMultiple(auto data) { return HashMultipleFnv1a(data); }
-PUBLIC constexpr u32 HashMultiple32(auto data) { return HashMultipleDbj(data); }
+
+PUBLIC constexpr u64 HashMultiple(auto const& data) { return HashMultipleFnv1a(data); }
+PUBLIC constexpr u32 HashMultiple32(auto const& data) { return HashMultipleDbj(data); }
 
 template <typename T>
 PUBLIC constexpr auto Begin(T& c) -> decltype(c.begin()) {

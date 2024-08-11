@@ -34,3 +34,7 @@ template <typename Container1, typename Container2>
 concept ContiguousContainerSimilarTo = ContiguousContainer<Container1> && ContiguousContainer<Container2> &&
                                        Same<RemoveCV<typename RemoveReference<Container1>::ValueType>,
                                             RemoveCV<typename RemoveReference<Container2>::ValueType>>;
+
+template <typename Container>
+concept ContiguousContainerOfContiguousContainers =
+    ContiguousContainer<Container> && ContiguousContainer<typename Container::ValueType>;

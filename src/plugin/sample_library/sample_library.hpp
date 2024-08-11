@@ -117,6 +117,11 @@ struct LibraryIdRef {
     LibraryIdRef Clone(Allocator& arena, CloneType _ = CloneType::Shallow) const {
         return {.author = arena.Clone(author), .name = arena.Clone(name)};
     }
+    u64 Hash() const { return HashMultiple(ArrayT<String const>({author, name})); }
+    u64 HashWithExtra(String extra) const {
+        return HashMultiple(ArrayT<String const>({extra, author, name}));
+    }
+
     String author;
     String name;
 };
@@ -151,6 +156,7 @@ struct LibraryId {
 
     LibraryIdRef Ref() const { return {.author = author, .name = name}; }
     operator LibraryIdRef() const { return Ref(); }
+    u64 Hash() const { return Ref().Hash(); }
     bool operator==(LibraryId const& other) const = default;
     bool operator==(LibraryIdRef const& other) const { return Ref() == other; }
 
@@ -163,6 +169,7 @@ struct InstrumentId {
     bool operator==(LoadedInstrument const& inst) const {
         return library == inst.instrument.library.Id() && inst_name == inst.instrument.name;
     }
+    u64 Hash() const { return library.Ref().HashWithExtra(inst_name); }
     LibraryId library;
     DynamicArrayInline<char, k_max_instrument_name_size> inst_name;
 };
@@ -172,6 +179,7 @@ struct IrId {
     bool operator==(LoadedIr const& ir) const {
         return library == ir.ir.library.Id() && ir_name == ir.ir.name;
     }
+    u64 Hash() const { return library.Ref().HashWithExtra(ir_name); }
     LibraryId library;
     DynamicArrayInline<char, k_max_ir_name_size> ir_name;
 };
@@ -257,16 +265,4 @@ CustomValueToString(Writer writer, sample_lib::LibraryIdRef id, fmt::FormatOptio
     TRY(writer.WriteChars(id.author));
     TRY(writer.WriteChars(sep));
     return writer.WriteChars(id.name);
-}
-
-PUBLIC u64 Hash(sample_lib::LibraryIdRef const& id) {
-    // FNV-1a https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function#FNV-1a_hash
-    u64 hash = 0xcbf29ce484222325;
-    for (auto str : Array {id.author, "|", id.name}) {
-        for (auto c : str) {
-            hash ^= (u8)c;
-            hash *= 0x100000001b3;
-        }
-    }
-    return hash;
 }

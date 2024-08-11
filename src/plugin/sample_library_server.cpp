@@ -954,7 +954,7 @@ static bool UpdatePendingResources(PendingResources& pending_resources,
                     .title = {},
                     .message = {},
                     .error_code = CommonError::NotFound,
-                    .id = Hash("lib"_s) + Hash(library_id.author.Items()) + Hash(library_id.name.Items()),
+                    .id = library_id.Hash(),
                 };
                 fmt::Append(err->value.title, "{} library not found", library_id);
                 fmt::Append(
@@ -1004,7 +1004,7 @@ static bool UpdatePendingResources(PendingResources& pending_resources,
                             .title = {},
                             .message = {},
                             .error_code = CommonError::NotFound,
-                            .id = ThreadsafeErrorNotifications::Id("inst", inst_name),
+                            .id = load_inst.id.Hash(),
                         };
                         fmt::Append(err->value.title, "Cannot find instrument \"{}\"", inst_name);
                         pending_resource.request.async_comms_channel.error_notifications.AddOrUpdateError(
@@ -1033,7 +1033,7 @@ static bool UpdatePendingResources(PendingResources& pending_resources,
                             .title = "Failed to find IR"_s,
                             .message = {},
                             .error_code = CommonError::NotFound,
-                            .id = {},
+                            .id = ir_id.Hash(),
                         };
                         fmt::Assign(err->value.message,
                                     "Could not find reverb impulse response: {}, in library: {}",
@@ -1156,7 +1156,7 @@ static bool UpdatePendingResources(PendingResources& pending_resources,
                 break;
             }
             case FileLoadingState::CompletedWithError: {
-                auto const ir_index = pending_resource.request.request.Get<sample_lib::IrId>();
+                auto const ir_id = pending_resource.request.request.Get<sample_lib::IrId>();
                 {
                     auto const err =
                         pending_resource.request.async_comms_channel.error_notifications.NewError();
@@ -1164,12 +1164,12 @@ static bool UpdatePendingResources(PendingResources& pending_resources,
                         .title = "Failed to load IR"_s,
                         .message = {},
                         .error_code = *ir.audio_data->error,
-                        .id = Hash("ir  "_s) + Hash(ir_index.library.Ref()),
+                        .id = ir_id.Hash(),
                     };
                     fmt::Assign(err->value.message,
                                 "File '{}', in library {} failed to load. Check your Lua file: {}",
                                 ir_ptr->ir.ir.path,
-                                ir_index.library,
+                                ir_id.library,
                                 ir_ptr->ir.ir.library.path);
                     pending_resource.request.async_comms_channel.error_notifications.AddOrUpdateError(err);
                 }

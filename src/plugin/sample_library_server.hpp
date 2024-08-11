@@ -217,7 +217,7 @@ struct QueuedRequest {
     AsyncCommsChannel& async_comms_channel;
 };
 
-inline u64 HashLibraryRef(sample_lib::LibraryIdRef id) { return Hash(id.name), Hash(id.author); }
+inline u64 HashLibraryRef(sample_lib::LibraryIdRef id) { return id.Hash(); }
 
 } // namespace detail
 

@@ -137,7 +137,7 @@ struct Library {
     Optional<String> icon_image_path {};
     HashTable<String, Instrument*> insts_by_name {};
     HashTable<String, ImpulseResponse*> irs_by_name {};
-    String path {}; // .mdata or .lua
+    String path {}; // path to mdata or lua file
     u64 file_hash {};
     ErrorCodeOr<Reader> (*create_file_reader)(Library const&, String path) {};
     FileFormatSpecifics file_format_specifics;
@@ -227,9 +227,20 @@ struct TryHelpersOutcomeToError {
 
 using LibraryPtrOrError = ValueOrError<Library*, Error>;
 
-inline bool FilenameIsFloeLuaFile(String path) {
-    return IsEqualToCaseInsensitiveAscii(path, "floe.lua") ||
-           EndsWithCaseInsensitiveAscii(path, ".floe.lua"_s);
+inline bool FilenameIsFloeLuaFile(String filename) {
+    return IsEqualToCaseInsensitiveAscii(filename, "floe.lua") ||
+           EndsWithCaseInsensitiveAscii(filename, ".floe.lua"_s);
+}
+
+inline bool FilenameIsMdataFile(String filename) {
+    return EndsWithCaseInsensitiveAscii(filename, ".mdata"_s);
+}
+
+inline Optional<FileFormat> DetermineFileFormat(String path) {
+    auto const filename = path::Filename(path);
+    if (FilenameIsFloeLuaFile(filename)) return FileFormat::Lua;
+    if (FilenameIsMdataFile(filename)) return FileFormat::Mdata;
+    return nullopt;
 }
 
 LibraryPtrOrError ReadLua(Reader& reader,

@@ -139,9 +139,9 @@ static void ImpulseResponseMenuItems(Gui* g) {
 
     if (DoMultipleMenuItems(g, irs, current)) {
         if (current == 0)
-            auto _ = LoadConvolutionIr(g->plugin, nullopt);
+            LoadConvolutionIr(g->plugin, nullopt);
         else
-            auto _ = LoadConvolutionIr(g->plugin, ir_ids[(usize)current]);
+            LoadConvolutionIr(g->plugin, ir_ids[(usize)current]);
     }
 }
 

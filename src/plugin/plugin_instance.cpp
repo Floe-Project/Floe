@@ -156,6 +156,22 @@ static void ApplyNewStateFromPending(PluginInstance& plugin) {
     SetLastSnapshot(plugin, pending_state_change.snapshot);
 }
 
+static void SampleLibraryChanged(PluginInstance& plugin, sample_lib::LibraryIdRef library_id) {
+    ZoneScoped;
+    ASSERT(IsMainThread(plugin.host));
+
+    auto const current_ir_id = plugin.processor.convo.ir_id;
+    if (current_ir_id.HasValue()) {
+        if (current_ir_id->library == library_id) LoadConvolutionIr(plugin, *current_ir_id);
+    }
+
+    for (auto [layer_index, l] : Enumerate<u32>(plugin.processor.layer_processors)) {
+        if (auto const i = l.instrument_id.TryGet<sample_lib::InstrumentId>()) {
+            if (i->library == library_id) LoadInstrument(plugin, layer_index, *i);
+        }
+    }
+}
+
 static void SampleLibraryResourceLoaded(PluginInstance& plugin, sample_lib_server::LoadResult result) {
     ZoneScoped;
     ASSERT(IsMainThread(plugin.host));
@@ -302,32 +318,32 @@ bool StateChangedSinceLastSnapshot(PluginInstance& plugin) {
 }
 
 // one-off load
-Optional<u64> LoadConvolutionIr(PluginInstance& plugin, Optional<sample_lib::IrId> ir_id) {
+void LoadConvolutionIr(PluginInstance& plugin, Optional<sample_lib::IrId> ir_id) {
     ASSERT(IsMainThread(plugin.host));
     plugin.processor.convo.ir_id = ir_id;
 
     if (ir_id)
-        return SendAsyncLoadRequest(plugin.shared_data.sample_library_server,
-                                    plugin.sample_lib_server_async_channel,
-                                    *ir_id);
+        SendAsyncLoadRequest(plugin.shared_data.sample_library_server,
+                             plugin.sample_lib_server_async_channel,
+                             *ir_id);
     else
         SetConvolutionIrAudioData(plugin.processor, nullptr);
-    return nullopt;
 }
 
 // one-off load
-Optional<u64> LoadInstrument(PluginInstance& plugin, u32 layer_index, InstrumentId inst_id) {
+void LoadInstrument(PluginInstance& plugin, u32 layer_index, InstrumentId inst_id) {
     ASSERT(IsMainThread(plugin.host));
     plugin.processor.layer_processors[layer_index].instrument_id = inst_id;
 
     switch (inst_id.tag) {
         case InstrumentType::Sampler:
-            return SendAsyncLoadRequest(plugin.shared_data.sample_library_server,
-                                        plugin.sample_lib_server_async_channel,
-                                        sample_lib_server::LoadRequestInstrumentIdWithLayer {
-                                            .id = inst_id.GetFromTag<InstrumentType::Sampler>(),
-                                            .layer_index = layer_index,
-                                        });
+            SendAsyncLoadRequest(plugin.shared_data.sample_library_server,
+                                 plugin.sample_lib_server_async_channel,
+                                 sample_lib_server::LoadRequestInstrumentIdWithLayer {
+                                     .id = inst_id.GetFromTag<InstrumentType::Sampler>(),
+                                     .layer_index = layer_index,
+                                 });
+            break;
         case InstrumentType::None: {
             SetInstrument(plugin.processor, layer_index, InstrumentType::None);
             break;
@@ -336,7 +352,6 @@ Optional<u64> LoadInstrument(PluginInstance& plugin, u32 layer_index, Instrument
             SetInstrument(plugin.processor, layer_index, inst_id.Get<WaveformType>());
             break;
     }
-    return nullopt;
 }
 
 void LoadPresetFromListing(PluginInstance& plugin,
@@ -445,7 +460,19 @@ static void OnMainThread(PluginInstance& plugin, bool& update_gui) {
 
 PluginInstance::PluginInstance(clap_host const& host, CrossInstanceSystems& shared_data)
     : host(host)
-    , shared_data(shared_data) {
+    , shared_data(shared_data)
+    , sample_lib_server_async_channel {sample_lib_server::OpenAsyncCommsChannel(
+          shared_data.sample_library_server,
+          {
+              .error_notifications = error_notifications,
+              .result_added_callback = [&plugin = *this]() { plugin.host.request_callback(&plugin.host); },
+              .library_changed_callback =
+                  [&plugin = *this](sample_lib::LibraryIdRef lib_id_ref) {
+                      sample_lib::LibraryId lib_id = lib_id_ref;
+                      plugin.main_thread_callbacks.Push(
+                          [lib_id, &plugin]() { SampleLibraryChanged(plugin, lib_id); });
+                  },
+          })} {
 
     last_snapshot.state = CurrentStateSnapshot(*this);
 

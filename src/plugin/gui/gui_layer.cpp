@@ -65,11 +65,11 @@ static void LayerInstrumentMenuItems(Gui* g, LayerProcessor* layer) {
 
     if (DoMultipleMenuItems(g, insts, current)) {
         if (current == 0)
-            auto _ = LoadInstrument(g->plugin, layer->index, InstrumentId {InstrumentType::None});
+            LoadInstrument(g->plugin, layer->index, InstrumentId {InstrumentType::None});
         else if (current >= 1 && current <= (int)WaveformType::Count)
-            auto _ = LoadInstrument(g->plugin, layer->index, InstrumentId {(WaveformType)(current - 1)});
+            LoadInstrument(g->plugin, layer->index, InstrumentId {(WaveformType)(current - 1)});
         else
-            auto _ = LoadInstrument(g->plugin, layer->index, InstrumentId {inst_info[(usize)current]});
+            LoadInstrument(g->plugin, layer->index, InstrumentId {inst_info[(usize)current]});
     }
 }
 

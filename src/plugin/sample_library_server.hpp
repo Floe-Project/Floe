@@ -128,6 +128,7 @@ struct ListedInstrument;
 // ==========================================================================================================
 struct AsyncCommsChannel {
     using ResultAddedCallback = TrivialFixedSizeFunction<8, void()>;
+    using LibraryChangedCallback = TrivialFixedSizeFunction<8, void(sample_lib::LibraryIdRef)>;
 
     // -1 if not valid, else 0 to 100
     Array<Atomic<s32>, k_num_layers> instrument_loading_percents {};
@@ -140,6 +141,7 @@ struct AsyncCommsChannel {
     ThreadsafeErrorNotifications& error_notifications;
     Array<detail::ListedInstrument*, k_num_layers> desired_inst {};
     ResultAddedCallback result_added_callback;
+    LibraryChangedCallback library_changed_callback;
     Atomic<bool> used {};
     AsyncCommsChannel* next {};
 };
@@ -161,8 +163,8 @@ enum class FileLoadingState : u32 {
 struct ListedAudioData {
     ~ListedAudioData();
 
-    sample_lib::LibraryIdRef library;
     String path;
+    bool file_modified {};
     AudioData audio_data;
     Atomic<u32> ref_count {};
     Atomic<u32>& library_ref_count;
@@ -193,6 +195,7 @@ struct ListedLibrary {
 
     ArenaAllocator arena;
     sample_lib::Library* lib {};
+    TimePoint scan_timepoint {};
 
     ArenaList<ListedAudioData, true> audio_datas {arena};
     ArenaList<ListedInstrument, false> instruments {arena};
@@ -262,9 +265,12 @@ struct Server {
 // them at any point after that. The callback is called from the server thread; you should not do any really
 // slow operations in it because it will block the server thread from processing other requests.
 // [threadsafe]
-AsyncCommsChannel& OpenAsyncCommsChannel(Server& server,
-                                         ThreadsafeErrorNotifications& error_notifications,
-                                         AsyncCommsChannel::ResultAddedCallback&& completed_callback);
+struct OpenAsyncCommsChannelArgs {
+    ThreadsafeErrorNotifications& error_notifications;
+    AsyncCommsChannel::ResultAddedCallback result_added_callback;
+    AsyncCommsChannel::LibraryChangedCallback library_changed_callback;
+};
+AsyncCommsChannel& OpenAsyncCommsChannel(Server& server, OpenAsyncCommsChannelArgs const& args);
 
 // You will not receive any more results after this is called. Results that are still in the channel's queue
 // will be released at some point after this is called.

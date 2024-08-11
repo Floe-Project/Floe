@@ -48,6 +48,7 @@ struct PendingLibraryJobs {
         struct ScanFolder {
             struct Args {
                 ScanFolderList::Node* folder;
+                LibrariesList& libraries;
             };
             struct Result {
                 ErrorCodeOr<void> outcome {};
@@ -103,7 +104,7 @@ static void DoReadLibraryJob(PendingLibraryJobs::Job::ReadLibrary& job, ArenaAll
 
         for (auto& node : args.libraries) {
             if (auto l = node.TryScoped()) {
-                if (l->lib->file_hash == file_hash) return nullopt;
+                if (l->lib->file_hash == file_hash && l->lib->path == path) return nullopt;
             }
         }
 
@@ -135,17 +136,10 @@ static void DoScanFolderJob(PendingLibraryJobs::Job::ScanFolder& job,
                                                          }));
         while (it.HasMoreFiles()) {
             auto const& entry = it.Get();
-            if (path::Extension(entry.path) == ".mdata") {
-                ReadLibraryAsync(pending_library_jobs,
-                                 lib_list,
-                                 String(entry.path),
-                                 sample_lib::FileFormat::Mdata);
-            } else if (sample_lib::FilenameIsFloeLuaFile(path::Filename(entry.path))) {
-                ReadLibraryAsync(pending_library_jobs,
-                                 lib_list,
-                                 String(entry.path),
-                                 sample_lib::FileFormat::Lua);
-            }
+
+            if (auto format = sample_lib::DetermineFileFormat(entry.path))
+                ReadLibraryAsync(pending_library_jobs, lib_list, String(entry.path), *format);
+
             TRY(it.Increment());
         }
         return k_success;
@@ -227,16 +221,6 @@ static void ReadLibraryAsync(PendingLibraryJobs& pending_library_jobs,
 }
 
 // threadsafe
-static void RereadLibraryAsync(PendingLibraryJobs& pending_library_jobs,
-                               LibrariesList& lib_list,
-                               LibrariesList::Node* lib_node) {
-    ReadLibraryAsync(pending_library_jobs,
-                     lib_list,
-                     lib_node->value.lib->path,
-                     lib_node->value.lib->file_format_specifics.tag);
-}
-
-// threadsafe
 static bool RequestLibraryFolderScanIfNeeded(ScanFolderList& scan_folders) {
     bool any_rescan_requested = false;
     for (auto& n : scan_folders)
@@ -246,6 +230,14 @@ static bool RequestLibraryFolderScanIfNeeded(ScanFolderList& scan_folders) {
                 any_rescan_requested = true;
         }
     return any_rescan_requested;
+}
+
+// server-thread
+static void NotifyAllChannelsOfLibraryChange(Server& server, sample_lib::LibraryIdRef library_id) {
+    server.channels.Use([&](ArenaList<AsyncCommsChannel, true>& channels) {
+        for (auto& c : channels)
+            if (c.used.Load(MemoryOrder::Relaxed)) c.library_changed_callback(library_id);
+    });
 }
 
 // server-thread
@@ -274,6 +266,7 @@ static bool UpdateLibraryJobs(Server& server,
                 .args =
                     {
                         .folder = &node,
+                        .libraries = server.libraries,
                     },
                 .result = {},
             };
@@ -317,21 +310,21 @@ static bool UpdateLibraryJobs(Server& server,
                                        "adding new library {}",
                                        path::Filename(path));
 
-                        // only allow one with the same name or path, and only if it isn't already present
-                        bool already_exists = false;
-                        for (auto it = server.libraries.begin(); it != server.libraries.end();) {
-                            if (it->value.lib->file_hash == lib->file_hash) already_exists = true;
-                            if (it->value.lib->name == lib->name ||
-                                path::Equal(it->value.lib->path, lib->path))
+                        // if one already exists with the same path, remove it and replace it with the new one
+                        for (auto it = server.libraries.begin(); it != server.libraries.end();)
+                            if (path::Equal(it->value.lib->path, lib->path)) {
                                 it = server.libraries.Remove(it);
-                            else
+                                NotifyAllChannelsOfLibraryChange(server, lib->Id());
+                            } else
                                 ++it;
-                        }
-                        if (already_exists) break;
 
                         auto new_node = server.libraries.AllocateUninitialised();
                         PLACEMENT_NEW(&new_node->value)
-                        ListedLibrary {.arena = Move(j.result.arena), .lib = lib};
+                        ListedLibrary {
+                            .arena = Move(j.result.arena),
+                            .lib = lib,
+                            .scan_timepoint = TimePoint::Now(),
+                        };
                         server.libraries.Insert(new_node);
 
                         server.error_notifications.RemoveError(error_id);
@@ -339,7 +332,14 @@ static bool UpdateLibraryJobs(Server& server,
                     }
                     case ResultType::Error: {
                         auto const error = outcome.GetFromTag<ResultType::Error>();
-                        if (error.code == FilesystemError::PathDoesNotExist) continue;
+                        if (error.code == FilesystemError::PathDoesNotExist) {
+                            for (auto it = server.libraries.begin(); it != server.libraries.end();)
+                                if (it->value.lib->path == path)
+                                    it = server.libraries.Remove(it);
+                                else
+                                    ++it;
+                            continue;
+                        }
 
                         auto const err = server.error_notifications.NewError();
                         err->value = {
@@ -418,6 +418,9 @@ static bool UpdateLibraryJobs(Server& server,
                 ((ScanFolderList::Node*)d.user_data)->Release();
         };
 
+        // we buffer these up so we don't spam the channels with notifications
+        DynamicArray<LibrariesList::Node*> libraries_that_changed {scratch_arena};
+
         if (auto const outcome = PollDirectoryChanges(*watcher,
                                                       {
                                                           .dirs_to_watch = dirs_to_watch,
@@ -451,41 +454,28 @@ static bool UpdateLibraryJobs(Server& server,
                     // changes to the watched directory itself
                     if (subpath_changeset.subpath.size == 0) continue;
 
-                    DebugLn("Scan-folder change: {} {} in {}",
-                            subpath_changeset.subpath,
-                            DirectoryWatcher::ChangeType::ToString(subpath_changeset.changes),
-                            scan_folder.path);
-
                     auto const full_path =
                         path::Join(scratch_arena,
                                    Array {(String)scan_folder.path, subpath_changeset.subpath});
 
-                    if (path::Depth(subpath_changeset.subpath) == 0) {
-                        bool modified_existing_lib = false;
-                        if (subpath_changeset.changes & DirectoryWatcher::ChangeType::Modified)
-                            for (auto& lib_node : server.libraries) {
-                                auto const& lib = *lib_node.value.lib;
-                                if (path::Equal(lib.path, full_path)) {
-                                    DebugLn("  Rereading library: {}", lib.name);
-                                    RereadLibraryAsync(pending_library_jobs, server.libraries, &lib_node);
-                                    modified_existing_lib = true;
-                                    break;
-                                }
-                            }
-                        if (!modified_existing_lib) {
-                            DebugLn("  Rescanning folder: {}", scan_folder.path);
-                            scan_folder.state.Store(ScanFolder::State::RescanRequested);
-                        }
+                    if (auto const lib_format = sample_lib::DetermineFileFormat(full_path)) {
+                        // We queue-up a scan of the file. It will handle new/deleted/modified.
+                        ReadLibraryAsync(pending_library_jobs,
+                                         server.libraries,
+                                         String(full_path),
+                                         *lib_format);
                     } else {
-                        for (auto& lib_node : server.libraries) {
-                            auto const& lib = *lib_node.value.lib;
-                            if (lib.file_format_specifics.tag == sample_lib::FileFormat::Lua) {
-                                // get the directory of the library (the directory of the floe.lua)
-                                auto const dir = path::Directory(lib.path);
-                                if (dir && path::IsWithinDirectory(full_path, *dir)) {
-                                    DebugLn("  Rereading library: {}", lib.name);
-                                    RereadLibraryAsync(pending_library_jobs, server.libraries, &lib_node);
-                                    break;
+                        for (auto& node : server.libraries) {
+                            auto const& lib = *node.value.lib;
+                            if (lib.file_format_specifics.tag != sample_lib::FileFormat::Lua) continue;
+                            if (path::IsWithinDirectory(full_path, path::Directory(lib.path).ValueOr(""_s))) {
+                                dyn::AppendIfNotAlreadyThere(libraries_that_changed, &node);
+
+                                for (auto& d : node.value.audio_datas) {
+                                    auto const full_audio_path =
+                                        path::Join(scratch_arena,
+                                                   Array {path::Directory(lib.path).ValueOr(""), d.path});
+                                    if (path::Equal(full_audio_path, full_path)) d.file_modified = true;
                                 }
                             }
                         }
@@ -493,10 +483,10 @@ static bool UpdateLibraryJobs(Server& server,
                 }
             }
         }
-    }
 
-    // TODO(1.0): if a library/instrument has changed, trigger a reload for all clients of this loader so it
-    // feels totally seamless
+        for (auto& l : libraries_that_changed)
+            NotifyAllChannelsOfLibraryChange(server, l->value.lib->Id());
+    }
 
     // remove libraries that are not in any active scan-folders
     for (auto it = server.libraries.begin(); it != server.libraries.end();) {
@@ -530,8 +520,13 @@ static bool UpdateLibraryJobs(Server& server,
         libs_by_name.DeleteAll();
         for (auto& n : server.libraries) {
             auto const& lib = *n.value.lib;
-            auto const inserted = libs_by_name.Insert(lib.Id(), &n);
-            ASSERT(inserted);
+
+            if (auto element = libs_by_name.FindElement(lib.Id())) {
+                // If it's already there, we replace it with the one that's more recent
+                if (n.value.scan_timepoint > element->data->value.scan_timepoint) element->data = &n;
+            } else {
+                libs_by_name.Insert(lib.Id(), &n);
+            }
         }
     }
 
@@ -683,17 +678,22 @@ static ListedAudioData* FetchOrCreateAudioData(LibrariesList::Node& lib_node,
                                                u32 debug_inst_id) {
     auto const& lib = *lib_node.value.lib;
     for (auto& d : lib_node.value.audio_datas) {
-        if (lib.Id() == d.library && d.path == path) {
+        // TODO: we need a better way to determine if the audio is the same. Because the file content might
+        // have change, and here we're just checking the path. Perhaps the hash of the file? Or the last
+        // modified time? Or just flag it as changed when we get a file change notification?
+        if (d.path == path && !d.file_modified) {
             TriggerReloadIfAudioIsCancelled(d, lib, thread_pool_args, debug_inst_id);
             return &d;
         }
     }
 
+    DebugLn("Creating new audio data for {}", path);
+
     auto audio_data = lib_node.value.audio_datas.PrependUninitialised();
     PLACEMENT_NEW(audio_data)
     ListedAudioData {
-        .library = lib.Id(),
         .path = path,
+        .file_modified = false,
         .audio_data = {},
         .ref_count = 0u,
         .library_ref_count = lib_node.reader_uses,
@@ -714,6 +714,15 @@ static ListedInstrument* FetchOrCreateInstrument(LibrariesList::Node& lib_node,
 
     for (auto& i : lib.instruments)
         if (i.inst.instrument.name == inst.name) {
+            bool any_modified = false;
+            for (auto d : i.audio_data_set) {
+                if (d->file_modified) {
+                    any_modified = true;
+                    break;
+                }
+            }
+            if (any_modified) break;
+
             for (auto d : i.audio_data_set)
                 TriggerReloadIfAudioIsCancelled(*d, *lib.lib, thread_pool_args, i.debug_id);
             return &i;
@@ -1063,9 +1072,11 @@ static bool UpdatePendingResources(PendingResources& pending_resources,
         ASSERT(listed_inst.audio_data_set.size);
 
         Optional<ErrorCode> error {};
+        Optional<String> audio_path {};
         for (auto a : listed_inst.audio_data_set) {
             if (a->state.Load() == FileLoadingState::CompletedWithError) {
                 error = a->error;
+                audio_path = a->path;
                 break;
             }
         }
@@ -1074,10 +1085,16 @@ static bool UpdatePendingResources(PendingResources& pending_resources,
             auto const err = pending_resource.request.async_comms_channel.error_notifications.NewError();
             err->value = {
                 .title = "Failed to load audio"_s,
-                .message = listed_inst.inst.instrument.name,
+                .message = {},
                 .error_code = *error,
                 .id = ThreadsafeErrorNotifications::Id("audi", listed_inst.inst.instrument.name),
             };
+            fmt::Assign(err->value.message,
+                        "Failed to load audio file '{}', part of instrument '{}', in library '{}'",
+                        *audio_path,
+                        listed_inst.inst.instrument.name,
+                        listed_inst.inst.instrument.library.Id());
+
             pending_resource.request.async_comms_channel.error_notifications.AddOrUpdateError(err);
 
             CancelLoadingAudioForInstrumentIfPossible(&listed_inst, pending_resource.debug_id);
@@ -1449,15 +1466,14 @@ Server::~Server() {
     scan_folders.DeleteRemovedAndUnreferenced();
 }
 
-AsyncCommsChannel& OpenAsyncCommsChannel(Server& server,
-                                         ThreadsafeErrorNotifications& error_notifications,
-                                         AsyncCommsChannel::ResultAddedCallback&& callback) {
+AsyncCommsChannel& OpenAsyncCommsChannel(Server& server, OpenAsyncCommsChannelArgs const& args) {
     return server.channels.Use([&](auto& channels) -> AsyncCommsChannel& {
         auto channel = channels.PrependUninitialised();
         PLACEMENT_NEW(channel)
         AsyncCommsChannel {
-            .error_notifications = error_notifications,
-            .result_added_callback = Move(callback),
+            .error_notifications = args.error_notifications,
+            .result_added_callback = Move(args.result_added_callback),
+            .library_changed_callback = Move(args.library_changed_callback),
             .used = true,
         };
         for (auto& p : channel->instrument_loading_percents)
@@ -1650,29 +1666,35 @@ TEST_CASE(TestSampleLibraryLoader) {
     Server server {fixture.thread_pool, {}, fixture.error_notif};
     SetExtraScanFolders(server, fixture.scan_folders);
 
+    auto const open_args = OpenAsyncCommsChannelArgs {
+        .error_notifications = fixture.error_notif,
+        .result_added_callback = []() {},
+        .library_changed_callback = [](sample_lib::LibraryIdRef) {},
+    };
+
     SUBCASE("single channel") {
-        auto& channel = OpenAsyncCommsChannel(server, fixture.error_notif, []() {});
+        auto& channel = OpenAsyncCommsChannel(server, open_args);
         CloseAsyncCommsChannel(server, channel);
     }
 
     SUBCASE("multiple channels") {
-        auto& channel1 = OpenAsyncCommsChannel(server, fixture.error_notif, []() {});
-        auto& channel2 = OpenAsyncCommsChannel(server, fixture.error_notif, []() {});
+        auto& channel1 = OpenAsyncCommsChannel(server, open_args);
+        auto& channel2 = OpenAsyncCommsChannel(server, open_args);
         CloseAsyncCommsChannel(server, channel1);
         CloseAsyncCommsChannel(server, channel2);
     }
 
     SUBCASE("registering again after unregistering all") {
-        auto& channel1 = OpenAsyncCommsChannel(server, fixture.error_notif, []() {});
-        auto& channel2 = OpenAsyncCommsChannel(server, fixture.error_notif, []() {});
+        auto& channel1 = OpenAsyncCommsChannel(server, open_args);
+        auto& channel2 = OpenAsyncCommsChannel(server, open_args);
         CloseAsyncCommsChannel(server, channel1);
         CloseAsyncCommsChannel(server, channel2);
-        auto& channel3 = OpenAsyncCommsChannel(server, fixture.error_notif, []() {});
+        auto& channel3 = OpenAsyncCommsChannel(server, open_args);
         CloseAsyncCommsChannel(server, channel3);
     }
 
     SUBCASE("unregister a channel directly after sending a request") {
-        auto& channel = OpenAsyncCommsChannel(server, fixture.error_notif, [&]() {});
+        auto& channel = OpenAsyncCommsChannel(server, open_args);
 
         SendAsyncLoadRequest(server,
                              channel,
@@ -1940,7 +1962,12 @@ TEST_CASE(TestSampleLibraryLoader) {
         }
 
         AtomicCountdown countdown {(u32)requests.size};
-        auto& channel = OpenAsyncCommsChannel(server, fixture.error_notif, [&]() { countdown.CountDown(); });
+        auto& channel = OpenAsyncCommsChannel(server,
+                                              {
+                                                  .error_notifications = fixture.error_notif,
+                                                  .result_added_callback = [&]() { countdown.CountDown(); },
+                                                  .library_changed_callback = [](sample_lib::LibraryIdRef) {},
+                                              });
         DEFER { CloseAsyncCommsChannel(server, channel); };
 
         if (requests.size) {
@@ -2007,7 +2034,12 @@ TEST_CASE(TestSampleLibraryLoader) {
         u64 random_seed = SeedFromTime();
         AtomicCountdown countdown {k_num_calls};
 
-        auto& channel = OpenAsyncCommsChannel(server, fixture.error_notif, [&]() { countdown.CountDown(); });
+        auto& channel = OpenAsyncCommsChannel(server,
+                                              {
+                                                  .error_notifications = fixture.error_notif,
+                                                  .result_added_callback = [&]() { countdown.CountDown(); },
+                                                  .library_changed_callback = [](sample_lib::LibraryIdRef) {},
+                                              });
         DEFER { CloseAsyncCommsChannel(server, channel); };
 
         // We sporadically rename the library file to test the error handling of the loading thread

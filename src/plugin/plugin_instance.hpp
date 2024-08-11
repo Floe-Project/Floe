@@ -66,12 +66,7 @@ struct PluginInstance {
     Optional<PendingStateChange> pending_state_change {};
     LastSnapshot last_snapshot {};
 
-    sample_lib_server::AsyncCommsChannel& sample_lib_server_async_channel {
-        sample_lib_server::OpenAsyncCommsChannel(
-            shared_data.sample_library_server,
-            error_notifications,
-            [&plugin = *this]() { plugin.host.request_callback(&plugin.host); })};
-
+    sample_lib_server::AsyncCommsChannel& sample_lib_server_async_channel;
     // Presets
     // ========================================================================
     PresetBrowserFilters preset_browser_filters;
@@ -84,8 +79,8 @@ PluginCallbacks<PluginInstance> PluginInstanceCallbacks();
 void RunFunctionOnMainThread(PluginInstance& plugin, ThreadsafeFunctionQueue::Function function);
 
 // one-off loading of a ir or instrument
-Optional<u64> LoadConvolutionIr(PluginInstance& plugin, Optional<sample_lib::IrId> ir);
-Optional<u64> LoadInstrument(PluginInstance& plugin, u32 layer_index, InstrumentId instrument_id);
+void LoadConvolutionIr(PluginInstance& plugin, Optional<sample_lib::IrId> ir);
+void LoadInstrument(PluginInstance& plugin, u32 layer_index, InstrumentId instrument_id);
 
 void LoadRandomInstrument(PluginInstance& plugin,
                           u32 layer_index,

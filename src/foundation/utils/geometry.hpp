@@ -57,7 +57,7 @@ struct Rect {
     Rect WithSize(f32x2 _size) const { return Rect(pos, _size); }
 
     Rect CutLeft(f32 cut_amount) const { return Rect(x + cut_amount, y, w - cut_amount, h); }
-    Rect CutTop(f32 cut_amount) const { return Rect(x, y - cut_amount, w, h - cut_amount); }
+    Rect CutTop(f32 cut_amount) const { return Rect(x, y + cut_amount, w, h - cut_amount); }
     Rect CutRight(f32 cut_amount) const { return Rect(x, y, w - cut_amount, h); }
     Rect CutBottom(f32 cut_amount) const { return Rect(x, y, w, h - cut_amount); }
 

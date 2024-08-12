@@ -9,15 +9,14 @@
 #include "gui_widget_helpers.hpp"
 #include "gui_window.hpp"
 
-void MidPanel(Gui* g) {
+void DoBlurredBackground(Gui* g,
+                         Rect r,
+                         Rect clipped_to,
+                         imgui::Window* window,
+                         sample_lib::LibraryIdRef library_id,
+                         f32x2 mid_panel_size) {
     auto& imgui = g->imgui;
-    auto& lay = g->layout;
-    auto& plugin = g->plugin;
-
-    auto const layer_width = LiveSize(imgui, UiSizeId::LayerWidth);
-    auto const total_layer_width = layer_width * k_num_layers;
-    auto const mid_panel_title_height = LiveSize(imgui, UiSizeId::MidPanelTitleHeight);
-    auto const mid_panel_size = imgui.Size();
+    auto const panel_rounding = LiveSize(imgui, UiSizeId::BlurredPanelRounding);
 
     auto const get_background_uvs =
         [&](LibraryImages const& imgs, Rect r, imgui::Window* window, f32x2& out_min_uv, f32x2& out_max_uv) {
@@ -30,6 +29,48 @@ void MidPanel(Gui* g) {
             out_max_uv = {whole_uv.x * (r.w + left_margin) / mid_panel_size.x,
                           whole_uv.y * (r.h + top_margin) / mid_panel_size.y};
         };
+
+    auto background_lib =
+        sample_lib_server::FindLibraryRetained(g->plugin.shared_data.sample_library_server, library_id);
+    DEFER { background_lib.Release(); };
+
+    if (background_lib && !g->settings.settings.gui.high_contrast_gui) {
+        auto imgs = LoadLibraryBackgroundAndIconIfNeeded(g, *background_lib);
+        if (imgs.blurred_background) {
+
+            if (auto tex = g->frame_input.graphics_ctx->GetTextureFromImage(imgs.blurred_background);
+                tex && !g->settings.settings.gui.high_contrast_gui) {
+                f32x2 min_uv;
+                f32x2 max_uv;
+                get_background_uvs(imgs, r, window, min_uv, max_uv);
+                imgui.graphics->PushClipRect(clipped_to.Min(), clipped_to.Max());
+                DEFER { imgui.graphics->PopClipRect(); };
+                imgui.graphics->AddImageRounded(*tex,
+                                                r.Min(),
+                                                r.Max(),
+                                                min_uv,
+                                                max_uv,
+                                                LiveCol(imgui, UiColMap::BlurredImageDrawColour),
+                                                panel_rounding);
+            } else {
+                imgui.graphics->AddRectFilled(r.Min(),
+                                              r.Max(),
+                                              LiveCol(imgui, UiColMap::BlurredImageFallback),
+                                              panel_rounding);
+            }
+        }
+    }
+}
+
+void MidPanel(Gui* g) {
+    auto& imgui = g->imgui;
+    auto& lay = g->layout;
+    auto& plugin = g->plugin;
+
+    auto const layer_width = LiveSize(imgui, UiSizeId::LayerWidth);
+    auto const total_layer_width = layer_width * k_num_layers;
+    auto const mid_panel_title_height = LiveSize(imgui, UiSizeId::MidPanelTitleHeight);
+    auto const mid_panel_size = imgui.Size();
 
     auto const panel_rounding = LiveSize(imgui, UiSizeId::BlurredPanelRounding);
 
@@ -50,82 +91,63 @@ void MidPanel(Gui* g) {
 
     {
         auto settings = FloeWindowSettings(imgui, [&](IMGUI_DRAW_WINDOW_BG_ARGS) {
-            auto const first_lib_name = g->plugin.Layer(0).LibId();
-            if (first_lib_name) {
-                auto const& r = window->bounds;
+            auto const& r = window->bounds;
 
-                auto background_lib =
-                    sample_lib_server::FindLibraryRetained(g->plugin.shared_data.sample_library_server,
-                                                           *first_lib_name);
-                DEFER { background_lib.Release(); };
+            // First layer controls overall background
+            auto const overall_lib_id = g->plugin.Layer(0).LibId();
+            if (overall_lib_id) DoBlurredBackground(g, r, r, window, *overall_lib_id, mid_panel_size);
 
-                if (background_lib && !g->settings.settings.gui.high_contrast_gui) {
-                    auto imgs = LoadLibraryBackgroundAndIconIfNeeded(g, *background_lib);
-                    if (imgs.blurred_background) {
-
-                        if (auto tex =
-                                g->frame_input.graphics_ctx->GetTextureFromImage(imgs.blurred_background);
-                            tex && !g->settings.settings.gui.high_contrast_gui) {
-                            f32x2 min_uv;
-                            f32x2 max_uv;
-                            get_background_uvs(imgs, r, window, min_uv, max_uv);
-                            imgui.graphics->AddImageRounded(*tex,
-                                                            r.Min(),
-                                                            r.Max(),
-                                                            min_uv,
-                                                            max_uv,
-                                                            LiveCol(imgui, UiColMap::BlurredImageDrawColour),
-                                                            panel_rounding);
-                        } else {
-                            imgui.graphics->AddRectFilled(r.Min(),
-                                                          r.Max(),
-                                                          LiveCol(imgui, UiColMap::BlurredImageFallback),
-                                                          panel_rounding);
-                        }
-
-                        {
-                            int const vtx_idx_0 = imgui.graphics->vtx_buffer.size;
-                            auto const pos = r.Min() + f32x2 {1, 1};
-                            auto const size = f32x2 {r.w, r.h / 2} - f32x2 {2, 2};
-                            imgui.graphics->AddRectFilled(pos, pos + size, 0xffffffff, panel_rounding);
-                            int const vtx_idx_1 = imgui.graphics->vtx_buffer.size;
-                            imgui.graphics->AddRectFilled(pos, pos + size, 0xffffffff, panel_rounding);
-                            int const vtx_idx_2 = imgui.graphics->vtx_buffer.size;
-
-                            graphics::DrawList::ShadeVertsLinearColorGradientSetAlpha(
-                                imgui.graphics,
-                                vtx_idx_0,
-                                vtx_idx_1,
-                                pos,
-                                pos + f32x2 {0, size.y},
-                                LiveCol(imgui, UiColMap::BlurredImageGradientOverlay),
-                                0);
-                            graphics::DrawList::ShadeVertsLinearColorGradientSetAlpha(
-                                imgui.graphics,
-                                vtx_idx_1,
-                                vtx_idx_2,
-                                pos + f32x2 {size.x, 0},
-                                pos + f32x2 {size.x, size.y},
-                                LiveCol(imgui, UiColMap::BlurredImageGradientOverlay),
-                                0);
-                        }
-
-                        imgui.graphics->AddRect(r.Min(),
-                                                r.Max(),
-                                                LiveCol(imgui, UiColMap::BlurredImageBorder),
-                                                panel_rounding);
-
-                        imgui.graphics->AddLine({r.x, r.y + mid_panel_title_height},
-                                                {r.Right(), r.y + mid_panel_title_height},
-                                                LiveCol(imgui, UiColMap::LayerDividerLine));
-                        for (u32 i = 1; i < k_num_layers; ++i) {
-                            auto const x_pos = r.x + (f32)i * (r.w / k_num_layers);
-                            imgui.graphics->AddLine({x_pos, r.y + mid_panel_title_height},
-                                                    {x_pos, r.Bottom()},
-                                                    LiveCol(imgui, UiColMap::LayerDividerLine));
-                        }
-                    }
+            auto const inner_layer_width = r.size.x / k_num_layers;
+            for (auto layer_index : Range<u32>(1, k_num_layers)) {
+                if (auto const lib_id = g->plugin.Layer(layer_index).LibId(); lib_id) {
+                    if (*lib_id == overall_lib_id) continue;
+                    auto const layer_r =
+                        Rect {r.x + (f32)layer_index * inner_layer_width, r.y, inner_layer_width, r.h}.CutTop(
+                            mid_panel_title_height);
+                    DoBlurredBackground(g, r, layer_r, window, *lib_id, mid_panel_size);
                 }
+            }
+
+            {
+                int const vtx_idx_0 = imgui.graphics->vtx_buffer.size;
+                auto const pos = r.Min() + f32x2 {1, 1};
+                auto const size = f32x2 {r.w, r.h / 2} - f32x2 {2, 2};
+                imgui.graphics->AddRectFilled(pos, pos + size, 0xffffffff, panel_rounding);
+                int const vtx_idx_1 = imgui.graphics->vtx_buffer.size;
+                imgui.graphics->AddRectFilled(pos, pos + size, 0xffffffff, panel_rounding);
+                int const vtx_idx_2 = imgui.graphics->vtx_buffer.size;
+
+                graphics::DrawList::ShadeVertsLinearColorGradientSetAlpha(
+                    imgui.graphics,
+                    vtx_idx_0,
+                    vtx_idx_1,
+                    pos,
+                    pos + f32x2 {0, size.y},
+                    LiveCol(imgui, UiColMap::BlurredImageGradientOverlay),
+                    0);
+                graphics::DrawList::ShadeVertsLinearColorGradientSetAlpha(
+                    imgui.graphics,
+                    vtx_idx_1,
+                    vtx_idx_2,
+                    pos + f32x2 {size.x, 0},
+                    pos + f32x2 {size.x, size.y},
+                    LiveCol(imgui, UiColMap::BlurredImageGradientOverlay),
+                    0);
+            }
+
+            imgui.graphics->AddRect(r.Min(),
+                                    r.Max(),
+                                    LiveCol(imgui, UiColMap::BlurredImageBorder),
+                                    panel_rounding);
+
+            imgui.graphics->AddLine({r.x, r.y + mid_panel_title_height},
+                                    {r.Right(), r.y + mid_panel_title_height},
+                                    LiveCol(imgui, UiColMap::LayerDividerLine));
+            for (u32 i = 1; i < k_num_layers; ++i) {
+                auto const x_pos = r.x + (f32)i * (r.w / k_num_layers);
+                imgui.graphics->AddLine({x_pos, r.y + mid_panel_title_height},
+                                        {x_pos, r.Bottom()},
+                                        LiveCol(imgui, UiColMap::LayerDividerLine));
             }
         });
 
@@ -179,75 +201,46 @@ void MidPanel(Gui* g) {
 
     {
         auto settings = FloeWindowSettings(imgui, [&](IMGUI_DRAW_WINDOW_BG_ARGS) {
+            auto const& r = window->bounds;
+
             auto const first_lib_name = g->plugin.Layer(0).LibId();
-            if (first_lib_name) {
-                auto const& r = window->bounds;
+            if (first_lib_name) DoBlurredBackground(g, r, r, window, *first_lib_name, mid_panel_size);
 
-                auto background_lib =
-                    sample_lib_server::FindLibraryRetained(g->plugin.shared_data.sample_library_server,
-                                                           *first_lib_name);
-                DEFER { background_lib.Release(); };
+            {
+                int const vtx_idx_0 = imgui.graphics->vtx_buffer.size;
+                auto const pos = r.Min() + f32x2 {1, 1};
+                auto const size = f32x2 {r.w, r.h / 2} - f32x2 {2, 2};
+                imgui.graphics->AddRectFilled(pos, pos + size, 0xffffffff, panel_rounding);
+                int const vtx_idx_1 = imgui.graphics->vtx_buffer.size;
+                imgui.graphics->AddRectFilled(pos, pos + size, 0xffffffff, panel_rounding);
+                int const vtx_idx_2 = imgui.graphics->vtx_buffer.size;
 
-                if (background_lib && !g->settings.settings.gui.high_contrast_gui) {
-                    auto imgs = LoadLibraryBackgroundAndIconIfNeeded(g, *background_lib);
-                    if (imgs.blurred_background) {
-                        if (auto tex =
-                                g->frame_input.graphics_ctx->GetTextureFromImage(*imgs.blurred_background)) {
-                            f32x2 min_uv;
-                            f32x2 max_uv;
-                            get_background_uvs(imgs, r, window, min_uv, max_uv);
-                            imgui.graphics->AddImageRounded(*tex,
-                                                            r.Min(),
-                                                            r.Max(),
-                                                            min_uv,
-                                                            max_uv,
-                                                            LiveCol(imgui, UiColMap::BlurredImageDrawColour),
-                                                            panel_rounding);
-                        } else {
-                            imgui.graphics->AddRectFilled(r.Min(),
-                                                          r.Max(),
-                                                          LiveCol(imgui, UiColMap::BlurredImageFallback),
-                                                          panel_rounding);
-                        }
-
-                        {
-                            int const vtx_idx_0 = imgui.graphics->vtx_buffer.size;
-                            auto const pos = r.Min() + f32x2 {1, 1};
-                            auto const size = f32x2 {r.w, r.h / 2} - f32x2 {2, 2};
-                            imgui.graphics->AddRectFilled(pos, pos + size, 0xffffffff, panel_rounding);
-                            int const vtx_idx_1 = imgui.graphics->vtx_buffer.size;
-                            imgui.graphics->AddRectFilled(pos, pos + size, 0xffffffff, panel_rounding);
-                            int const vtx_idx_2 = imgui.graphics->vtx_buffer.size;
-
-                            graphics::DrawList::ShadeVertsLinearColorGradientSetAlpha(
-                                imgui.graphics,
-                                vtx_idx_0,
-                                vtx_idx_1,
-                                pos,
-                                pos + f32x2 {0, size.y},
-                                LiveCol(imgui, UiColMap::BlurredImageGradientOverlay),
-                                0);
-                            graphics::DrawList::ShadeVertsLinearColorGradientSetAlpha(
-                                imgui.graphics,
-                                vtx_idx_1,
-                                vtx_idx_2,
-                                pos + f32x2 {size.x, 0},
-                                pos + f32x2 {size.x, size.y},
-                                LiveCol(imgui, UiColMap::BlurredImageGradientOverlay),
-                                0);
-                        }
-
-                        imgui.graphics->AddRect(r.Min(),
-                                                r.Max(),
-                                                LiveCol(imgui, UiColMap::BlurredImageBorder),
-                                                panel_rounding);
-
-                        imgui.graphics->AddLine({r.x, r.y + mid_panel_title_height},
-                                                {r.Right(), r.y + mid_panel_title_height},
-                                                LiveCol(imgui, UiColMap::LayerDividerLine));
-                    }
-                }
+                graphics::DrawList::ShadeVertsLinearColorGradientSetAlpha(
+                    imgui.graphics,
+                    vtx_idx_0,
+                    vtx_idx_1,
+                    pos,
+                    pos + f32x2 {0, size.y},
+                    LiveCol(imgui, UiColMap::BlurredImageGradientOverlay),
+                    0);
+                graphics::DrawList::ShadeVertsLinearColorGradientSetAlpha(
+                    imgui.graphics,
+                    vtx_idx_1,
+                    vtx_idx_2,
+                    pos + f32x2 {size.x, 0},
+                    pos + f32x2 {size.x, size.y},
+                    LiveCol(imgui, UiColMap::BlurredImageGradientOverlay),
+                    0);
             }
+
+            imgui.graphics->AddRect(r.Min(),
+                                    r.Max(),
+                                    LiveCol(imgui, UiColMap::BlurredImageBorder),
+                                    panel_rounding);
+
+            imgui.graphics->AddLine({r.x, r.y + mid_panel_title_height},
+                                    {r.Right(), r.y + mid_panel_title_height},
+                                    LiveCol(imgui, UiColMap::LayerDividerLine));
         });
         settings.pad_top_left.x = LiveSize(imgui, UiSizeId::FXListMarginL);
         settings.pad_top_left.y = LiveSize(imgui, UiSizeId::FXListMarginT);

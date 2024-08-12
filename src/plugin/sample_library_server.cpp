@@ -599,14 +599,11 @@ LoadAudioAsync(ListedAudioData& audio_data, sample_lib::Library const& lib, Thre
     thread_pool_args.pool.AddJob([&, thread_pool_args]() {
         ZoneScoped;
         DEFER {
-            thread_pool_args.num_thread_pool_jobs.CountDown();
-
-            // TODO: This is not right. It's possible that completed_signaller will be destroyed at this point
-            // because as soon as num_thread_pool_jobs equals 0 the server could shut down. It's very unlikely
-            // because there's a lot of other things that happen before that point and so this thread, in all
-            // liklihoods, runs first, but we shouldn't count on it. The 2 methods of signalling completion
-            // need to be unified somehow.
             thread_pool_args.completed_signaller.Signal();
+
+            // NOTE: it's important that we do this last, because once the number of thread pool jobs reaches
+            // 0, objects in the thread_pool_args could be destroyed.
+            thread_pool_args.num_thread_pool_jobs.CountDown();
         };
 
         {

@@ -1392,7 +1392,13 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = build_context.optimise,
         });
-        stb_image.addCSourceFile(.{ .file = b.path("third_party_libs/stb_image_impls.c") });
+        stb_image.addCSourceFile(.{
+            .file = b.path("third_party_libs/stb_image_impls.c"),
+            .flags = &.{
+                // stb_image_resize2 uses undefined behaviour and so we need to turn off zig's default-on UB sanitizer
+                "-fno-sanitize=undefined",
+            },
+        });
         stb_image.addIncludePath(build_context.dep_stb.path(""));
         stb_image.linkLibC();
 

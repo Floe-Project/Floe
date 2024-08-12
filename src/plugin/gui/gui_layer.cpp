@@ -44,14 +44,17 @@ static void LayerInstrumentMenuItems(Gui* g, LayerProcessor* layer) {
     for (auto const i : Range(ToInt(WaveformType::Count))) {
         dyn::Append(insts, k_waveform_type_names[i]);
         dyn::Append(inst_info, {});
+        if (auto current_id = layer->instrument_id.TryGet<WaveformType>()) {
+            if (*current_id == (WaveformType)i) current = (int)i + 1;
+        }
     }
 
     for (auto l : libs) {
         for (auto [key, inst_ptr] : l->insts_by_name) {
             auto const lib_id = l->Id();
             auto const inst_name = key;
-            if (auto desired_sampled = layer->instrument_id.TryGet<sample_lib::InstrumentId>()) {
-                if (desired_sampled->library == l->Id() && desired_sampled->inst_name == inst_name)
+            if (auto current_id = layer->instrument_id.TryGet<sample_lib::InstrumentId>()) {
+                if (current_id->library == l->Id() && current_id->inst_name == inst_name)
                     current = (int)insts.size;
             }
             dyn::Append(insts, fmt::Format(g->scratch_arena, "{}: {}", lib_id, inst_name));

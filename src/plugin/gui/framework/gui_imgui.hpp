@@ -990,10 +990,8 @@ inline u32 LiveCol(imgui::Context const& imgui, UiColMap type) {
 
     // NOTE: linear search but probably ok
     for (auto const i : Range(k_max_num_colours))
-        if (String(imgui.live_edit_values.ui_cols[i].name) == col_string) {
+        if (String(imgui.live_edit_values.ui_cols[i].name) == col_string)
             return imgui.live_edit_values.ui_cols[i].col;
-            break;
-        }
 
     return {};
 }

@@ -4,7 +4,12 @@
 #include "gui_editor_widgets.hpp"
 
 #include "foundation/foundation.hpp"
+#include "os/filesystem.hpp"
+#include "utils/debug/debug.hpp"
 
+#include "plugin/common/constants.hpp"
+
+#include "gui/framework/colours.hpp"
 #include "gui_window.hpp"
 
 void EditorReset(EditorGUI* g) {
@@ -200,7 +205,7 @@ static void WriteHeader(Writer writer) {
     // REUSE-IgnoreEnd
 }
 
-void WriteColoursFile() {
+static void WriteColoursFile(LiveEditGui const& gui) {
     PageAllocator page_allocator;
     ArenaAllocator scratch_arena {page_allocator};
     auto outcome = OpenFile(UiStyleFilepath(scratch_arena, COLOURS_DEF_FILENAME), FileMode::Write);
@@ -211,7 +216,7 @@ void WriteColoursFile() {
 
     WriteHeader(outcome.Value().Writer());
 
-    for (auto const& c : g_live_edit_gui.ui_cols) {
+    for (auto const& c : gui.ui_cols) {
         auto o = fmt::FormatToWriter(outcome.Value().Writer(),
                                      "GUI_COL(\"{}\", 0x{08x}, \"{}\", {.2}f, {.2}f)\n",
                                      String(c.name),
@@ -224,7 +229,7 @@ void WriteColoursFile() {
     }
 }
 
-void WriteSizesFile() {
+static void WriteSizesFile(LiveEditGui const& gui) {
     PageAllocator page_allocator;
     ArenaAllocator scratch_arena {page_allocator};
     auto outcome = OpenFile(UiStyleFilepath(scratch_arena, SIZES_DEF_FILENAME), FileMode::Write);
@@ -236,9 +241,9 @@ void WriteSizesFile() {
     WriteHeader(outcome.Value().Writer());
 
     for (auto const i : Range(ToInt(UiSizeId::Count))) {
-        auto const sz = g_live_edit_gui.ui_sizes[i];
-        String const name = g_live_edit_gui.ui_sizes_names[i];
-        auto unit_name = k_ui_size_units_text[ToInt(g_live_edit_gui.ui_sizes_units[i])];
+        auto const sz = gui.ui_sizes[i];
+        String const name = gui.ui_sizes_names[i];
+        auto unit_name = k_ui_size_units_text[ToInt(gui.ui_sizes_units[i])];
         auto cat = k_ui_sizes_categories[i];
         auto o = fmt::FormatToWriter(outcome.Value().Writer(),
                                      "GUI_SIZE({}, {}, {.6}f, {})\n",
@@ -250,7 +255,7 @@ void WriteSizesFile() {
     }
 }
 
-void WriteColourMapFile() {
+static void WriteColourMapFile(LiveEditGui const& gui) {
     PageAllocator page_allocator;
     ArenaAllocator scratch_arena {page_allocator};
     auto outcome = OpenFile(UiStyleFilepath(scratch_arena, COLOUR_MAP_DEF_FILENAME), FileMode::Write);
@@ -262,7 +267,7 @@ void WriteColourMapFile() {
     WriteHeader(outcome.Value().Writer());
 
     for (auto const i : Range(ToInt(UiColMap::Count))) {
-        auto const& v = g_live_edit_gui.ui_col_map[i];
+        auto const& v = gui.ui_col_map[i];
         auto name = k_ui_col_map_names[i];
         auto cat = k_ui_col_map_categories[i];
         auto o = fmt::FormatToWriter(outcome.Value().Writer(),
@@ -277,6 +282,7 @@ void WriteColourMapFile() {
 }
 
 void SizesGUISliders(EditorGUI* g, String search) {
+    auto& live_gui = g->imgui->live_edit_values;
     EditorHeading(g, "Sizes");
 
     static DynamicArrayInline<String, ToInt(UiSizeId::Count)> categories {};
@@ -292,7 +298,7 @@ void SizesGUISliders(EditorGUI* g, String search) {
         if (!contains_values) {
             for (auto const i : Range(ToInt(UiSizeId::Count))) {
                 if (k_ui_sizes_categories[i] != cat) continue;
-                if (!ContainsCaseInsensitiveAscii(g_live_edit_gui.ui_sizes_names[i], search)) continue;
+                if (!ContainsCaseInsensitiveAscii(live_gui.ui_sizes_names[i], search)) continue;
                 contains_values = true;
                 break;
             }
@@ -304,11 +310,11 @@ void SizesGUISliders(EditorGUI* g, String search) {
 
         for (auto const i : Range(ToInt(UiSizeId::Count))) {
             if (k_ui_sizes_categories[i] != cat) continue;
-            auto name = g_live_edit_gui.ui_sizes_names[i];
+            auto name = live_gui.ui_sizes_names[i];
             if (!ContainsCaseInsensitiveAscii(name, search) && !ContainsCaseInsensitiveAscii(cat, search))
                 continue;
 
-            f32 sz = g_live_edit_gui.ui_sizes[i];
+            f32 sz = live_gui.ui_sizes[i];
 
             Rect const label_r = EditorGetLeftR(g);
             Rect const sr = EditorGetRightR(g);
@@ -320,8 +326,8 @@ void SizesGUISliders(EditorGUI* g, String search) {
             EditorLabel(g, label_r, name, TextJustification::CentredRight);
 
             if (changed) {
-                g_live_edit_gui.ui_sizes[i] = sz;
-                WriteSizesFile();
+                live_gui.ui_sizes[i] = sz;
+                WriteSizesFile(live_gui);
             }
 
             EditorIncrementPos(g);
@@ -329,22 +335,29 @@ void SizesGUISliders(EditorGUI* g, String search) {
     }
 }
 
-static auto GetColourNames(bool include_none) {
+static auto GetColourNames(LiveEditGui const& gui, bool include_none) {
     DynamicArrayInline<String, k_max_num_colours + 1> colour_names;
     if (include_none) dyn::Append(colour_names, "---");
     for (auto const i : Range(k_max_num_colours))
-        dyn::Append(colour_names, g_live_edit_gui.ui_cols[i].name);
+        dyn::Append(colour_names, gui.ui_cols[i].name);
     return colour_names;
 }
 
+static int FindColourIndex(LiveEditGui const& gui, String col_string) {
+    for (auto const i : Range(k_max_num_colours))
+        if (String(gui.ui_cols[i].name) == col_string) return i;
+    return -1;
+}
+
 void ColourMapGUIMenus(EditorGUI* g, String search, String colour_search, bool high_contrast) {
+    auto& live_gui = g->imgui->live_edit_values;
     EditorHeading(g, "Colour Mapping");
 
     static DynamicArrayInline<String, ToInt(UiColMap::Count)> categories {};
     if (categories.size == 0)
         for (auto const i : Range(ToInt(UiColMap::Count)))
             dyn::AppendIfNotAlreadyThere(categories, k_ui_col_map_categories[i]);
-    auto col_names = GetColourNames(high_contrast);
+    auto col_names = GetColourNames(live_gui, high_contrast);
 
     for (auto cat : categories) {
         g->imgui->PushID(cat);
@@ -353,8 +366,8 @@ void ColourMapGUIMenus(EditorGUI* g, String search, String colour_search, bool h
         bool contains_values = search.size && ContainsCaseInsensitiveAscii(cat, search);
         if (!contains_values) {
             for (auto const i : Range(ToInt(UiColMap::Count))) {
-                auto& col_map = high_contrast ? g_live_edit_gui.ui_col_map[i].high_contrast_colour
-                                              : g_live_edit_gui.ui_col_map[i].colour;
+                auto& col_map = high_contrast ? live_gui.ui_col_map[i].high_contrast_colour
+                                              : live_gui.ui_col_map[i].colour;
 
                 if (k_ui_col_map_categories[i] != cat) continue;
                 if (!ContainsCaseInsensitiveAscii(k_ui_col_map_names[i], search)) continue;
@@ -369,8 +382,8 @@ void ColourMapGUIMenus(EditorGUI* g, String search, String colour_search, bool h
         EditorHeading(g, cat);
 
         for (auto const i : Range(ToInt(UiColMap::Count))) {
-            auto& col_map = high_contrast ? g_live_edit_gui.ui_col_map[i].high_contrast_colour
-                                          : g_live_edit_gui.ui_col_map[i].colour;
+            auto& col_map =
+                high_contrast ? live_gui.ui_col_map[i].high_contrast_colour : live_gui.ui_col_map[i].colour;
 
             if (k_ui_col_map_categories[i] != cat) continue;
             auto name = k_ui_col_map_names[i];
@@ -383,7 +396,7 @@ void ColourMapGUIMenus(EditorGUI* g, String search, String colour_search, bool h
             Rect const label_r = EditorGetLeftR(g);
             Rect const sr = EditorGetRightR(g);
 
-            int index = editor::FindColourIndex(col_map);
+            int index = FindColourIndex(live_gui, col_map);
             if (index == -1 && high_contrast) index = 0;
             bool const changed = EditorMenu(g, sr, col_names.Items(), index);
             EditorLabel(g, label_r, name, TextJustification::CentredRight);
@@ -392,8 +405,8 @@ void ColourMapGUIMenus(EditorGUI* g, String search, String colour_search, bool h
                 if (high_contrast && index == 0)
                     col_map.size = 0;
                 else
-                    col_map = String(g_live_edit_gui.ui_cols[index + high_contrast].name);
-                WriteColourMapFile();
+                    col_map = String(live_gui.ui_cols[index + high_contrast].name);
+                WriteColourMapFile(live_gui);
             }
 
             EditorIncrementPos(g);
@@ -409,6 +422,7 @@ static void RecalculateBasedOnCol(EditorCol& c, EditorCol const& other_c) {
 }
 
 void ColoursGUISliders(EditorGUI* gui, String search) {
+    auto& live_gui = gui->imgui->live_edit_values;
     auto imgui = gui->imgui;
     auto pad = 1.0f;
     auto h = gui->item_h;
@@ -416,7 +430,7 @@ void ColoursGUISliders(EditorGUI* gui, String search) {
     EditorHeading(gui, "Colours");
 
     for (auto const index : Range(k_max_num_colours)) {
-        auto& c = g_live_edit_gui.ui_cols[index];
+        auto& c = live_gui.ui_cols[index];
         if (c.name.size && !ContainsCaseInsensitiveAscii(c.name, search)) continue;
 
         colours::Col const col = colours::FromU32(c.col);
@@ -500,7 +514,7 @@ void ColoursGUISliders(EditorGUI* gui, String search) {
                     static_alpha = alpha;
                 }
 
-                f32 const pop_w = (f32)imgui->platform->window_size.width / 3.5f;
+                f32 const pop_w = (f32)imgui->frame_input.window_size.width / 3.5f;
                 f32 const text_size = pop_w / 4;
                 f32 const itm_w = (pop_w - text_size) / 3;
                 f32 pop_pos = 0;
@@ -589,16 +603,16 @@ void ColoursGUISliders(EditorGUI* gui, String search) {
         ColourString const starting_name = c.name;
         if (text_editor(label_r, imgui->GetID("name"), c.name)) {
             hex_code_changed = true;
-            for (auto& m : g_live_edit_gui.ui_col_map) {
+            for (auto& m : live_gui.ui_col_map) {
                 if (String(m.colour) == String(starting_name)) m.colour = String(c.name);
                 if (String(m.high_contrast_colour) == String(starting_name))
                     m.high_contrast_colour = String(c.name);
             }
-            for (auto& other_c : g_live_edit_gui.ui_cols)
+            for (auto& other_c : live_gui.ui_cols)
                 if (other_c.based_on.size && String(other_c.based_on) == String(starting_name))
                     other_c.based_on = String(c.name);
 
-            WriteColourMapFile();
+            WriteColourMapFile(live_gui);
         }
 
         bool recalculate_val = false;
@@ -608,7 +622,7 @@ void ColoursGUISliders(EditorGUI* gui, String search) {
         }
         if (text_editor(based_on_r, imgui->GetID("based"), c.based_on)) {
             bool valid = false;
-            for (auto const& other_c : g_live_edit_gui.ui_cols)
+            for (auto const& other_c : live_gui.ui_cols)
                 if (other_c.name.size && String(other_c.name) == String(c.based_on)) valid = true;
 
             if (!valid) c.based_on.size = 0;
@@ -618,7 +632,7 @@ void ColoursGUISliders(EditorGUI* gui, String search) {
 
         if (recalculate_val) {
             hex_code_changed = true;
-            for (auto const& other_c : g_live_edit_gui.ui_cols) {
+            for (auto const& other_c : live_gui.ui_cols) {
                 if (other_c.name.size && String(other_c.name) == String(c.based_on)) {
                     RecalculateBasedOnCol(c, other_c);
                     hex_code_changed = true;
@@ -628,12 +642,12 @@ void ColoursGUISliders(EditorGUI* gui, String search) {
         }
 
         if (hex_code_changed || hsv_changed) {
-            for (auto& other_c : g_live_edit_gui.ui_cols)
+            for (auto& other_c : live_gui.ui_cols)
                 if (other_c.based_on.size && String(other_c.based_on) == String(c.name))
                     RecalculateBasedOnCol(other_c, c);
 
-            WriteColoursFile();
-            imgui->platform->gui_update_requirements.requires_another_update = true;
+            WriteColoursFile(live_gui);
+            imgui->frame_output.ElevateUpdateRequest(GuiFrameResult::UpdateRequest::ImmediatelyUpdate);
         }
 
         EditorIncrementPos(gui);
@@ -642,10 +656,6 @@ void ColoursGUISliders(EditorGUI* gui, String search) {
 }
 
 #else
-
-void WriteColoursFile() {}
-void WriteSizesFile() {}
-void WriteColourMapFile() {}
 
 void SizesGUISliders(EditorGUI*, String) {}
 void ColourMapGUIMenus(EditorGUI*, String, String, bool) {}

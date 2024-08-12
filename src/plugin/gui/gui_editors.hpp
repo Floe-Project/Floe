@@ -187,7 +187,7 @@ static void DoCommandPanel(Gui* g, Rect r) {
 }
 
 static void DoWholeEditor(Gui* g) {
-    if constexpr (!FLOE_EDITOR_ENABLED) return;
+    if constexpr (!k_editor_enabled) return;
     auto& imgui = g->imgui;
 
     g->frame_output.wants_keyboard_input = true; // for debug panel open/close

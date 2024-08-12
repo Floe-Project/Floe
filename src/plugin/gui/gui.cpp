@@ -313,7 +313,7 @@ LibraryImages LoadLibraryBackgroundAndIconIfNeeded(Gui* g, sample_lib::Library c
     if (reload_background || reload_blurred_background) {
         ImagePixelsRgba const bg_pixels = ({
             Optional<ImagePixelsRgba> opt {};
-            if (FLOE_EDITOR_ENABLED && g_background_filepath[0]) {
+            if (k_editor_enabled && g_background_filepath[0]) {
                 auto const path = FromNullTerminated(g_background_filepath);
                 auto o = DecodeImageFromFile(path);
                 if (o.HasError()) {

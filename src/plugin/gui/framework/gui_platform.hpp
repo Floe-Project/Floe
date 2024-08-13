@@ -246,6 +246,8 @@ namespace detail {
 static bool IsUpdateNeeded(GuiPlatform& platform) {
     bool update_needed = false;
 
+    if (platform.frame_state.request_update.Exchange(false)) update_needed = true;
+
     if (platform.last_result.update_request > GuiFrameResult::UpdateRequest::Sleep) update_needed = true;
 
     if (platform.last_result.timed_wakeups) {

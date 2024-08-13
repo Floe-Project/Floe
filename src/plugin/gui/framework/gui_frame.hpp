@@ -120,6 +120,8 @@ struct GuiFrameInput {
     UiSize window_size {};
     void* native_window {}; // HWND, NSView*, etc.
 
+    Atomic<bool> request_update {false};
+
     // internal
     ArenaAllocator event_arena {Malloc::Instance(), 256};
 };

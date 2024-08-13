@@ -95,12 +95,15 @@ static void DoOverlayGradient(Gui* g, Rect r) {
                                                               0);
 }
 
+// reduces chance of floating point errors
+static f32 RoundUpToNearestMultiple(f32 value, f32 multiple) { return multiple * Ceil(value / multiple); }
+
 void MidPanel(Gui* g) {
     auto& imgui = g->imgui;
     auto& lay = g->layout;
     auto& plugin = g->plugin;
 
-    auto const layer_width = LiveSize(imgui, UiSizeId::LayerWidth);
+    auto const layer_width = RoundUpToNearestMultiple(LiveSize(imgui, UiSizeId::LayerWidth), k_num_layers);
     auto const total_layer_width = layer_width * k_num_layers;
     auto const mid_panel_title_height = LiveSize(imgui, UiSizeId::MidPanelTitleHeight);
     auto const mid_panel_size = imgui.Size();
@@ -126,7 +129,6 @@ void MidPanel(Gui* g) {
         auto settings = FloeWindowSettings(imgui, [&](IMGUI_DRAW_WINDOW_BG_ARGS) {
             auto const& r = window->bounds;
 
-            // First layer controls overall background
             auto const overall_lib = LibraryForOverallBackground(plugin);
             if (overall_lib)
                 DoBlurredBackground(g,
@@ -137,15 +139,17 @@ void MidPanel(Gui* g) {
                                     mid_panel_size,
                                     Clamp01(LiveSize(imgui, UiSizeId::BackgroundBlurringOpacity) / 100.0f));
 
-            auto const inner_layer_width = r.size.x / k_num_layers;
+            auto const layer_width_without_pad = RoundUpToNearestMultiple(r.w, k_num_layers) / k_num_layers;
             auto const layer_opacity =
                 Clamp01(LiveSize(imgui, UiSizeId::BackgroundBlurringOpacitySingleLayer) / 100.0f);
             for (auto layer_index : Range(k_num_layers)) {
                 if (auto const lib_id = g->plugin.Layer(layer_index).LibId(); lib_id) {
                     if (*lib_id == overall_lib) continue;
-                    auto const layer_r =
-                        Rect {r.x + (f32)layer_index * inner_layer_width, r.y, inner_layer_width, r.h}.CutTop(
-                            mid_panel_title_height);
+                    auto const layer_r = Rect {r.x + (f32)layer_index * layer_width_without_pad,
+                                               r.y,
+                                               layer_width_without_pad,
+                                               r.h}
+                                             .CutTop(mid_panel_title_height);
                     DoBlurredBackground(g, r, layer_r, window, *lib_id, mid_panel_size, layer_opacity);
                 }
             }
@@ -161,7 +165,7 @@ void MidPanel(Gui* g) {
                                     {r.Right(), r.y + mid_panel_title_height},
                                     LiveCol(imgui, UiColMap::LayerDividerLine));
             for (u32 i = 1; i < k_num_layers; ++i) {
-                auto const x_pos = r.x + (f32)i * (r.w / k_num_layers);
+                auto const x_pos = r.x + (f32)i * layer_width_without_pad - 1;
                 imgui.graphics->AddLine({x_pos, r.y + mid_panel_title_height},
                                         {x_pos, r.Bottom()},
                                         LiveCol(imgui, UiColMap::LayerDividerLine));

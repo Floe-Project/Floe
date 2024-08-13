@@ -78,12 +78,12 @@ PluginCallbacks<PluginInstance> PluginInstanceCallbacks();
 
 void RunFunctionOnMainThread(PluginInstance& plugin, ThreadsafeFunctionQueue::Function function);
 
-constexpr sample_lib::LibraryIdRef k_mixed_libraries_id = {
-    .author = "Floe",
-    .name = "Mixed-Libraries",
+constexpr sample_lib::LibraryIdRef k_default_background_lib_id = {
+    .author = "floe",
+    .name = "default-bg",
 };
 
-Optional<sample_lib::LibraryIdRef> OverallLibrary(PluginInstance const& plugin);
+Optional<sample_lib::LibraryIdRef> LibraryForOverallBackground(PluginInstance const& plugin);
 
 // one-off loading of a ir or instrument
 void LoadConvolutionIr(PluginInstance& plugin, Optional<sample_lib::IrId> ir);

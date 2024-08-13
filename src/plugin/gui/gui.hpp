@@ -183,7 +183,7 @@ struct Gui {
 //
 
 graphics::ImageID CopyPixelsToGpuLoadedImage(Gui* g, ImagePixelsRgba const& px);
-LibraryImages LoadMixedLibrariesBackgroundIfNeeded(Gui* g);
+LibraryImages LoadDefaultBackgroundIfNeeded(Gui* g);
 LibraryImages LoadLibraryBackgroundAndIconIfNeeded(Gui* g, sample_lib::Library const& lib);
 Optional<LibraryImages> LibraryImagesFromLibraryId(Gui* g, sample_lib::LibraryIdRef library_id);
 

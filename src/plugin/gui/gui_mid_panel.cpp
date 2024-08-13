@@ -127,7 +127,7 @@ void MidPanel(Gui* g) {
             auto const& r = window->bounds;
 
             // First layer controls overall background
-            auto const overall_lib = OverallLibrary(plugin);
+            auto const overall_lib = LibraryForOverallBackground(plugin);
             if (overall_lib)
                 DoBlurredBackground(g,
                                     r,
@@ -220,7 +220,7 @@ void MidPanel(Gui* g) {
         auto settings = FloeWindowSettings(imgui, [&](IMGUI_DRAW_WINDOW_BG_ARGS) {
             auto const& r = window->bounds;
 
-            auto const overall_lib = OverallLibrary(plugin);
+            auto const overall_lib = LibraryForOverallBackground(plugin);
             if (overall_lib)
                 DoBlurredBackground(g,
                                     r,

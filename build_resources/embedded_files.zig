@@ -32,8 +32,8 @@ export fn EmbeddedMada() c.BinaryData {
     return embeddedFile("fonts/Mada-SemiBold.ttf", "");
 }
 
-export fn EmbeddedMixedLibrariesBackground() c.BinaryData {
-    return embeddedFile("images/mixed-libraries-background.jpg", "");
+export fn EmbeddedDefaultBackground() c.BinaryData {
+    return embeddedFile("images/default-background.jpg", "");
 }
 
 export fn EmbeddedIrs() c.EmbeddedIrData {

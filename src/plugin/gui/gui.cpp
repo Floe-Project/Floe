@@ -508,7 +508,7 @@ void CreateLibraryBackgroundImageTextures(Gui* g,
 }
 
 Optional<LibraryImages> LibraryImagesFromLibraryId(Gui* g, sample_lib::LibraryIdRef library_id) {
-    if (library_id == k_mixed_libraries_id) return LoadMixedLibrariesBackgroundIfNeeded(g);
+    if (library_id == k_default_background_lib_id) return LoadDefaultBackgroundIfNeeded(g);
 
     auto background_lib =
         sample_lib_server::FindLibraryRetained(g->plugin.shared_data.sample_library_server, library_id);
@@ -518,12 +518,12 @@ Optional<LibraryImages> LibraryImagesFromLibraryId(Gui* g, sample_lib::LibraryId
     return LoadLibraryBackgroundAndIconIfNeeded(g, *background_lib);
 }
 
-LibraryImages LoadMixedLibrariesBackgroundIfNeeded(Gui* g) {
+LibraryImages LoadDefaultBackgroundIfNeeded(Gui* g) {
     auto& ctx = g->frame_input.graphics_ctx;
     auto opt_index = FindIf(g->library_images,
-                            [&](LibraryImages const& l) { return l.library_id == k_mixed_libraries_id; });
+                            [&](LibraryImages const& l) { return l.library_id == k_default_background_lib_id; });
     if (!opt_index) {
-        dyn::Append(g->library_images, {k_mixed_libraries_id});
+        dyn::Append(g->library_images, {k_default_background_lib_id});
         opt_index = g->library_images.size - 1;
     }
     auto& imgs = g->library_images[*opt_index];
@@ -533,14 +533,14 @@ LibraryImages LoadMixedLibrariesBackgroundIfNeeded(Gui* g) {
         !ctx->ImageIdIsValid(imgs.blurred_background) && !imgs.background_missing;
 
     if (reload_background || reload_blurred_background) {
-        auto image_data = EmbeddedMixedLibrariesBackground();
+        auto image_data = EmbeddedDefaultBackground();
         auto outcome = DecodeImage({image_data.data, image_data.size});
         ASSERT(!outcome.HasError());
         auto const bg_pixels = outcome.ReleaseValue();
         CreateLibraryBackgroundImageTextures(g,
                                              imgs,
                                              bg_pixels,
-                                             k_mixed_libraries_id,
+                                             k_default_background_lib_id,
                                              reload_background,
                                              reload_blurred_background);
     }
@@ -859,7 +859,7 @@ GuiFrameResult GuiUpdate(Gui* g) {
         auto r = window->unpadded_bounds;
 
         if (!settings.high_contrast_gui) {
-            auto overall_library = OverallLibrary(g->plugin);
+            auto overall_library = LibraryForOverallBackground(g->plugin);
             if (overall_library) {
                 auto imgs = LibraryImagesFromLibraryId(g, *overall_library);
                 if (imgs->background) {

@@ -20,7 +20,7 @@
 #include "state/state_coding.hpp"
 #include "state/state_snapshot.hpp"
 
-Optional<sample_lib::LibraryIdRef> OverallLibrary(PluginInstance const& plugin) {
+Optional<sample_lib::LibraryIdRef> LibraryForOverallBackground(PluginInstance const& plugin) {
     ASSERT(IsMainThread(plugin.host));
 
     Array<Optional<sample_lib::LibraryIdRef>, k_num_layers> lib_ids {};
@@ -36,11 +36,11 @@ Optional<sample_lib::LibraryIdRef> OverallLibrary(PluginInstance const& plugin) 
         }
     }
 
-    if (!first_lib_id) return nullopt;
+    if (!first_lib_id) return k_default_background_lib_id;
 
     for (auto const& lib_id : lib_ids) {
         if (!lib_id) continue;
-        if (*lib_id != *first_lib_id) return k_mixed_libraries_id;
+        if (*lib_id != *first_lib_id) return k_default_background_lib_id;
     }
 
     return *first_lib_id;

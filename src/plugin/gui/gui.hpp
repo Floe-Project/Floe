@@ -55,15 +55,29 @@ struct DraggingFX {
 class FloeWaveformImages {
   public:
     ErrorCodeOr<graphics::TextureHandle> FetchOrCreate(graphics::DrawContext& graphics,
-                                                       AudioData const& audio_file,
+                                                       WaveformAudioSource source,
                                                        f32 unscaled_width,
                                                        f32 unscaled_height,
                                                        f32 display_ratio) {
         UiSize const size {CheckedCast<u16>(unscaled_width * display_ratio),
                            CheckedCast<u16>(unscaled_height * display_ratio)};
 
+        u64 source_hash = 0;
+        switch (source.tag) {
+            case WaveformAudioSourceType::AudioData: {
+                auto const& audio_data = source.Get<AudioData const*>();
+                source_hash = audio_data->hash;
+                break;
+            }
+            case WaveformAudioSourceType::Sine:
+            case WaveformAudioSourceType::WhiteNoise: {
+                source_hash = (u64)source.tag + 1;
+                break;
+            }
+        }
+
         for (auto& w : m_waveforms) {
-            if (w.audio_data_hash == audio_file.hash && w.image_id.size == size) {
+            if (w.source_hash == source_hash && w.image_id.size == size) {
                 auto tex = graphics.GetTextureFromImage(w.image_id);
                 if (tex) {
                     w.used = true;
@@ -73,8 +87,8 @@ class FloeWaveformImages {
         }
 
         Waveform w {};
-        auto pixels = GetWaveformImageFromSample(audio_file, size);
-        w.audio_data_hash = audio_file.hash;
+        auto pixels = GetWaveformImageFromSample(source, size);
+        w.source_hash = source_hash;
         w.image_id = TRY(graphics.CreateImageID(pixels.data, size, 4));
         w.used = true;
 
@@ -103,7 +117,7 @@ class FloeWaveformImages {
 
   private:
     struct Waveform {
-        u64 audio_data_hash {};
+        u64 source_hash {};
         graphics::ImageID image_id = graphics::k_invalid_image_id;
         bool used {};
     };
@@ -140,10 +154,6 @@ struct Gui {
     Layout layout = {};
     imgui::Context imgui {frame_input, frame_output};
     EditorGUI editor = {};
-    // TODO: really weird crash where this becomes null mid-frame
-    // probably some undefined behaviour somewhere or a threading issue, I can't think what else would cause
-    // it even weirder: if these font fields are moved the top of this struct the crash doesn't happen. Could
-    // be UB in imgui::Context.
     graphics::Font* fira_sans {};
     graphics::Font* roboto_small {};
     graphics::Font* mada_big {};

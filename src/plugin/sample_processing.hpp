@@ -361,8 +361,14 @@ struct IntRange {
 
 inline int Overlap(IntRange a, IntRange b) { return Max(0, Min(a.hi, b.hi) - Max(a.lo, b.lo) + 1); }
 
-PUBLIC DynamicArray<u8> GetWaveformImageFromSample(AudioData const& audio_file, UiSize size) {
-    auto num_frames = audio_file.num_frames;
+enum class WaveformAudioSourceType { AudioData, Sine, WhiteNoise };
+
+using WaveformAudioSource =
+    TaggedUnion<WaveformAudioSourceType, TypeAndTag<AudioData const*, WaveformAudioSourceType::AudioData>>;
+
+PUBLIC DynamicArray<u8> GetWaveformImageFromSample(WaveformAudioSource source, UiSize size) {
+    u32 num_frames = 256;
+    if (auto const audio_file = source.TryGet<AudioData const*>()) num_frames = (*audio_file)->num_frames;
 
     auto const px_size = size.width * size.height * 4;
     DynamicArray<u8> px {PageAllocator::Instance()};
@@ -407,17 +413,31 @@ PUBLIC DynamicArray<u8> GetWaveformImageFromSample(AudioData const& audio_file, 
             for (int i = first_sample_x; i <= end_sample_x; i += step) {
                 f32 l;
                 f32 r;
-#if 1
-                auto frame_ptr = audio_file.interleaved_samples.data + (i * audio_file.channels);
-                l = frame_ptr[0];
-                if (audio_file.channels != 1)
-                    r = frame_ptr[1];
-                else
-                    r = l;
-#else
-                l = (f32)((f64)rand() / (f64)RAND_MAX) / 2;
-                r = (f32)((f64)rand() / (f64)RAND_MAX) / 2;
-#endif
+
+                switch (source.tag) {
+                    case WaveformAudioSourceType::AudioData: {
+                        auto const& audio_data = *source.Get<AudioData const*>();
+                        auto frame_ptr = audio_data.interleaved_samples.data + (i * audio_data.channels);
+                        l = frame_ptr[0];
+                        if (audio_data.channels != 1)
+                            r = frame_ptr[1];
+                        else
+                            r = l;
+                        break;
+                    }
+                    case WaveformAudioSourceType::Sine: {
+                        // TODO
+                        r = 0;
+                        l = 0;
+                        break;
+                    }
+                    case WaveformAudioSourceType::WhiteNoise: {
+                        // TODO
+                        r = 0;
+                        l = 0;
+                        break;
+                    }
+                }
 
                 avg_l += Abs(l);
                 avg_r += Abs(r);

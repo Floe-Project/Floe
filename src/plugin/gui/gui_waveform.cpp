@@ -528,7 +528,7 @@ void GUIDoSampleWaveform(Gui* g, LayerProcessor* layer, Rect r) {
         -1) {
         labels::Label(g, r, "Loading...", labels::WaveformLoadingLabel(g->imgui));
         is_loading = true;
-    } else if (auto audio_file = layer->GetSampleForGUIWaveform()) {
+    } else if (layer->instrument_id.tag != InstrumentType::None) {
         auto const offset = layer->params[ToInt(LayerParamIndex::SampleOffset)].LinearValue();
         auto const loop_start = layer->params[ToInt(LayerParamIndex::LoopStart)].LinearValue();
         auto const reverse = layer->params[ToInt(LayerParamIndex::Reverse)].ValueAsBool();
@@ -568,8 +568,30 @@ void GUIDoSampleWaveform(Gui* g, LayerProcessor* layer, Rect r) {
         waveform_r.h = Round(waveform_r.h);
         r.w = Round(r.w);
 
+        WaveformAudioSource waveform_source {WaveformAudioSourceType::Sine};
+        switch (layer->instrument.tag) {
+            case InstrumentType::None: PanicIfReached(); break;
+            case InstrumentType::Sampler: {
+                auto sampled_inst = layer->instrument.TryGetFromTag<InstrumentType::Sampler>();
+                waveform_source = (*sampled_inst)->file_for_gui_waveform;
+                break;
+            }
+            case InstrumentType::WaveformSynth: {
+                auto waveform_type = layer->instrument.GetFromTag<InstrumentType::WaveformSynth>();
+                switch (waveform_type) {
+                    case WaveformType::Sine: waveform_source = WaveformAudioSourceType::Sine; break;
+                    case WaveformType::WhiteNoiseStereo:
+                    case WaveformType::WhiteNoiseMono:
+                        waveform_source = WaveformAudioSourceType::WhiteNoise;
+                        break;
+                    default:
+                }
+                break;
+            }
+        }
+
         auto tex = g->waveforms.FetchOrCreate(*g->frame_input.graphics_ctx,
-                                              *audio_file,
+                                              waveform_source,
                                               r.w,
                                               r.h,
                                               g->frame_input.draw_scale_factor);

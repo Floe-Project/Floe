@@ -173,11 +173,6 @@ struct LayerProcessor {
 
     AudioData const* GetSampleForGUIWaveform() const {
         ASSERT(IsMainThread(host));
-        if (auto sampled_inst = instrument.TryGetFromTag<InstrumentType::Sampler>()) {
-            return (*sampled_inst)->file_for_gui_waveform;
-        } else {
-            // TODO: get waveform audio data
-        }
         return nullptr;
     }
 

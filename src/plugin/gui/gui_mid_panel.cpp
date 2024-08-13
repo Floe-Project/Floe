@@ -5,61 +5,94 @@
 
 #include "framework/gui_live_edit.hpp"
 #include "gui.hpp"
+#include "gui/framework/colours.hpp"
 #include "gui_effects.hpp"
 #include "gui_widget_helpers.hpp"
 #include "gui_window.hpp"
 
-void DoBlurredBackground(Gui* g,
-                         Rect r,
-                         Rect clipped_to,
-                         imgui::Window* window,
-                         sample_lib::LibraryIdRef library_id,
-                         f32x2 mid_panel_size) {
+static void DoBlurredBackground(Gui* g,
+                                Rect r,
+                                Rect clipped_to,
+                                imgui::Window* window,
+                                sample_lib::LibraryIdRef library_id,
+                                f32x2 mid_panel_size,
+                                f32 opacity) {
+    if (g->settings.settings.gui.high_contrast_gui) return;
     auto& imgui = g->imgui;
     auto const panel_rounding = LiveSize(imgui, UiSizeId::BlurredPanelRounding);
 
-    auto const get_background_uvs =
-        [&](LibraryImages const& imgs, Rect r, imgui::Window* window, f32x2& out_min_uv, f32x2& out_max_uv) {
-            auto const whole_uv = GetMaxUVToMaintainAspectRatio(*imgs.background, mid_panel_size);
+    auto imgs = LibraryImagesFromLibraryId(g, library_id);
+
+    if (imgs && imgs->blurred_background) {
+        if (auto tex = g->frame_input.graphics_ctx->GetTextureFromImage(imgs->blurred_background);
+            tex && !g->settings.settings.gui.high_contrast_gui) {
+
+            auto const whole_uv = GetMaxUVToMaintainAspectRatio(*imgs->background, mid_panel_size);
             auto const left_margin = r.x - window->parent_window->bounds.x;
             auto const top_margin = r.y - window->parent_window->bounds.y;
 
-            out_min_uv = {whole_uv.x * (left_margin / mid_panel_size.x),
-                          whole_uv.y * (top_margin / mid_panel_size.y)};
-            out_max_uv = {whole_uv.x * (r.w + left_margin) / mid_panel_size.x,
-                          whole_uv.y * (r.h + top_margin) / mid_panel_size.y};
-        };
+            f32x2 min_uv = {whole_uv.x * (left_margin / mid_panel_size.x),
+                            whole_uv.y * (top_margin / mid_panel_size.y)};
+            f32x2 max_uv = {whole_uv.x * (r.w + left_margin) / mid_panel_size.x,
+                            whole_uv.y * (r.h + top_margin) / mid_panel_size.y};
 
-    auto background_lib =
-        sample_lib_server::FindLibraryRetained(g->plugin.shared_data.sample_library_server, library_id);
-    DEFER { background_lib.Release(); };
+            imgui.graphics->PushClipRect(clipped_to.Min(), clipped_to.Max());
+            DEFER { imgui.graphics->PopClipRect(); };
 
-    if (background_lib && !g->settings.settings.gui.high_contrast_gui) {
-        auto imgs = LoadLibraryBackgroundAndIconIfNeeded(g, *background_lib);
-        if (imgs.blurred_background) {
+            auto const image_draw_colour = colours::ToU32({
+                .a = (u8)(opacity * 255),
+                .b = 255,
+                .g = 255,
+                .r = 255,
+            });
 
-            if (auto tex = g->frame_input.graphics_ctx->GetTextureFromImage(imgs.blurred_background);
-                tex && !g->settings.settings.gui.high_contrast_gui) {
-                f32x2 min_uv;
-                f32x2 max_uv;
-                get_background_uvs(imgs, r, window, min_uv, max_uv);
-                imgui.graphics->PushClipRect(clipped_to.Min(), clipped_to.Max());
-                DEFER { imgui.graphics->PopClipRect(); };
-                imgui.graphics->AddImageRounded(*tex,
-                                                r.Min(),
-                                                r.Max(),
-                                                min_uv,
-                                                max_uv,
-                                                LiveCol(imgui, UiColMap::BlurredImageDrawColour),
-                                                panel_rounding);
-            } else {
-                imgui.graphics->AddRectFilled(r.Min(),
-                                              r.Max(),
-                                              LiveCol(imgui, UiColMap::BlurredImageFallback),
-                                              panel_rounding);
-            }
+            imgui.graphics
+                ->AddImageRounded(*tex, r.Min(), r.Max(), min_uv, max_uv, image_draw_colour, panel_rounding);
+        } else {
+            imgui.graphics->AddRectFilled(r.Min(),
+                                          r.Max(),
+                                          LiveCol(imgui, UiColMap::BlurredImageFallback),
+                                          panel_rounding);
         }
     }
+}
+
+static void DoOverlayGradient(Gui* g, Rect r) {
+    auto& imgui = g->imgui;
+    auto const panel_rounding = LiveSize(imgui, UiSizeId::BlurredPanelRounding);
+
+    int const vtx_idx_0 = imgui.graphics->vtx_buffer.size;
+    auto const pos = r.Min() + f32x2 {1, 1};
+    auto const size = f32x2 {r.w, r.h / 2} - f32x2 {2, 2};
+    imgui.graphics->AddRectFilled(pos, pos + size, 0xffffffff, panel_rounding);
+    int const vtx_idx_1 = imgui.graphics->vtx_buffer.size;
+    imgui.graphics->AddRectFilled(pos, pos + size, 0xffffffff, panel_rounding);
+    int const vtx_idx_2 = imgui.graphics->vtx_buffer.size;
+
+    auto const col_value =
+        (u8)(Clamp01(LiveSize(imgui, UiSizeId::BackgroundBlurringOverlayGradientColour) / 100.0f) * 255);
+    auto const col = colours::ToU32({
+        .a =
+            (u8)(Clamp01(LiveSize(imgui, UiSizeId::BackgroundBlurringOverlayGradientOpacity) / 100.0f) * 255),
+        .b = col_value,
+        .g = col_value,
+        .r = col_value,
+    });
+
+    graphics::DrawList::ShadeVertsLinearColorGradientSetAlpha(imgui.graphics,
+                                                              vtx_idx_0,
+                                                              vtx_idx_1,
+                                                              pos,
+                                                              pos + f32x2 {0, size.y},
+                                                              col,
+                                                              0);
+    graphics::DrawList::ShadeVertsLinearColorGradientSetAlpha(imgui.graphics,
+                                                              vtx_idx_1,
+                                                              vtx_idx_2,
+                                                              pos + f32x2 {size.x, 0},
+                                                              pos + f32x2 {size.x, size.y},
+                                                              col,
+                                                              0);
 }
 
 void MidPanel(Gui* g) {
@@ -94,46 +127,30 @@ void MidPanel(Gui* g) {
             auto const& r = window->bounds;
 
             // First layer controls overall background
-            auto const overall_lib_id = g->plugin.Layer(0).LibId();
-            if (overall_lib_id) DoBlurredBackground(g, r, r, window, *overall_lib_id, mid_panel_size);
+            auto const overall_lib = OverallLibrary(plugin);
+            if (overall_lib)
+                DoBlurredBackground(g,
+                                    r,
+                                    r,
+                                    window,
+                                    *overall_lib,
+                                    mid_panel_size,
+                                    Clamp01(LiveSize(imgui, UiSizeId::BackgroundBlurringOpacity) / 100.0f));
 
             auto const inner_layer_width = r.size.x / k_num_layers;
-            for (auto layer_index : Range<u32>(1, k_num_layers)) {
+            auto const layer_opacity =
+                Clamp01(LiveSize(imgui, UiSizeId::BackgroundBlurringOpacitySingleLayer) / 100.0f);
+            for (auto layer_index : Range(k_num_layers)) {
                 if (auto const lib_id = g->plugin.Layer(layer_index).LibId(); lib_id) {
-                    if (*lib_id == overall_lib_id) continue;
+                    if (*lib_id == overall_lib) continue;
                     auto const layer_r =
                         Rect {r.x + (f32)layer_index * inner_layer_width, r.y, inner_layer_width, r.h}.CutTop(
                             mid_panel_title_height);
-                    DoBlurredBackground(g, r, layer_r, window, *lib_id, mid_panel_size);
+                    DoBlurredBackground(g, r, layer_r, window, *lib_id, mid_panel_size, layer_opacity);
                 }
             }
 
-            {
-                int const vtx_idx_0 = imgui.graphics->vtx_buffer.size;
-                auto const pos = r.Min() + f32x2 {1, 1};
-                auto const size = f32x2 {r.w, r.h / 2} - f32x2 {2, 2};
-                imgui.graphics->AddRectFilled(pos, pos + size, 0xffffffff, panel_rounding);
-                int const vtx_idx_1 = imgui.graphics->vtx_buffer.size;
-                imgui.graphics->AddRectFilled(pos, pos + size, 0xffffffff, panel_rounding);
-                int const vtx_idx_2 = imgui.graphics->vtx_buffer.size;
-
-                graphics::DrawList::ShadeVertsLinearColorGradientSetAlpha(
-                    imgui.graphics,
-                    vtx_idx_0,
-                    vtx_idx_1,
-                    pos,
-                    pos + f32x2 {0, size.y},
-                    LiveCol(imgui, UiColMap::BlurredImageGradientOverlay),
-                    0);
-                graphics::DrawList::ShadeVertsLinearColorGradientSetAlpha(
-                    imgui.graphics,
-                    vtx_idx_1,
-                    vtx_idx_2,
-                    pos + f32x2 {size.x, 0},
-                    pos + f32x2 {size.x, size.y},
-                    LiveCol(imgui, UiColMap::BlurredImageGradientOverlay),
-                    0);
-            }
+            DoOverlayGradient(g, r);
 
             imgui.graphics->AddRect(r.Min(),
                                     r.Max(),
@@ -203,35 +220,17 @@ void MidPanel(Gui* g) {
         auto settings = FloeWindowSettings(imgui, [&](IMGUI_DRAW_WINDOW_BG_ARGS) {
             auto const& r = window->bounds;
 
-            auto const first_lib_name = g->plugin.Layer(0).LibId();
-            if (first_lib_name) DoBlurredBackground(g, r, r, window, *first_lib_name, mid_panel_size);
+            auto const overall_lib = OverallLibrary(plugin);
+            if (overall_lib)
+                DoBlurredBackground(g,
+                                    r,
+                                    r,
+                                    window,
+                                    *overall_lib,
+                                    mid_panel_size,
+                                    Clamp01(LiveSize(imgui, UiSizeId::BackgroundBlurringOpacity) / 100.0f));
 
-            {
-                int const vtx_idx_0 = imgui.graphics->vtx_buffer.size;
-                auto const pos = r.Min() + f32x2 {1, 1};
-                auto const size = f32x2 {r.w, r.h / 2} - f32x2 {2, 2};
-                imgui.graphics->AddRectFilled(pos, pos + size, 0xffffffff, panel_rounding);
-                int const vtx_idx_1 = imgui.graphics->vtx_buffer.size;
-                imgui.graphics->AddRectFilled(pos, pos + size, 0xffffffff, panel_rounding);
-                int const vtx_idx_2 = imgui.graphics->vtx_buffer.size;
-
-                graphics::DrawList::ShadeVertsLinearColorGradientSetAlpha(
-                    imgui.graphics,
-                    vtx_idx_0,
-                    vtx_idx_1,
-                    pos,
-                    pos + f32x2 {0, size.y},
-                    LiveCol(imgui, UiColMap::BlurredImageGradientOverlay),
-                    0);
-                graphics::DrawList::ShadeVertsLinearColorGradientSetAlpha(
-                    imgui.graphics,
-                    vtx_idx_1,
-                    vtx_idx_2,
-                    pos + f32x2 {size.x, 0},
-                    pos + f32x2 {size.x, size.y},
-                    LiveCol(imgui, UiColMap::BlurredImageGradientOverlay),
-                    0);
-            }
+            DoOverlayGradient(g, r);
 
             imgui.graphics->AddRect(r.Min(),
                                     r.Max(),

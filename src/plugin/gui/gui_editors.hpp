@@ -103,7 +103,6 @@ static void DoGUISizeEditor(Gui* g, Rect r) {
 
 static bool g_show_editor = false;
 static bool g_show_editor_on_left = true;
-static char g_background_filepath[260];
 
 static void TakeScreenshot(Gui* g) {
     for (auto wnd : g->imgui.windows) {
@@ -149,39 +148,6 @@ static void DoCommandPanel(Gui* g, Rect r) {
         g_show_editor_on_left = !g_show_editor_on_left;
 
     if (EditorButton(&g->editor, "Take Screenshot", "Save Screenshot: F3")) TakeScreenshot(g);
-
-    auto const filters = Array<DialogOptions::FileFilter, 2> {{{
-                                                                   .description = "JPEG image"_s,
-                                                                   .wildcard_filter = "*.ppg"_s,
-                                                               },
-                                                               {
-                                                                   .description = "WEBP image",
-                                                                   .wildcard_filter = "*.webp"_s,
-                                                               }
-
-    }};
-
-    if (EditorButton(&g->editor, "Set Background Filepath", "Set the filepath for the background image")) {
-        auto outcome = FilesystemDialog(DialogOptions {
-            .type = DialogOptions::Type::OpenFile,
-            .allocator = g->scratch_arena,
-            .title = "Select background JPG",
-            .default_path = nullopt,
-            .filters = filters.Items(),
-            .parent_window = g->frame_input.native_window,
-        });
-        if (outcome.HasValue()) {
-            auto const opt_path = outcome.Value();
-            if (opt_path) {
-                CopyStringIntoBufferWithNullTerm(g_background_filepath, *opt_path);
-                g->frame_output.ElevateUpdateRequest(GuiFrameResult::UpdateRequest::Animate);
-            }
-        } else {
-            PanicIfReached();
-        }
-    }
-    if (EditorButton(&g->editor, "Remove Background Filepath", "Use the default background image"))
-        g_background_filepath[0] = 0;
 
     imgui.EndWindow();
 }

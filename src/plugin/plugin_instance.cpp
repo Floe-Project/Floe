@@ -20,6 +20,32 @@
 #include "state/state_coding.hpp"
 #include "state/state_snapshot.hpp"
 
+Optional<sample_lib::LibraryIdRef> OverallLibrary(PluginInstance const& plugin) {
+    ASSERT(IsMainThread(plugin.host));
+
+    Array<Optional<sample_lib::LibraryIdRef>, k_num_layers> lib_ids {};
+    for (auto [layer_index, l] : Enumerate<u32>(plugin.processor.layer_processors))
+        lib_ids[layer_index] = plugin.processor.layer_processors[layer_index].LibId();
+
+    Optional<sample_lib::LibraryIdRef> first_lib_id {};
+    for (auto const& lib_id : lib_ids) {
+        if (!lib_id) continue;
+        if (!first_lib_id) {
+            first_lib_id = *lib_id;
+            break;
+        }
+    }
+
+    if (!first_lib_id) return nullopt;
+
+    for (auto const& lib_id : lib_ids) {
+        if (!lib_id) continue;
+        if (*lib_id != *first_lib_id) return k_mixed_libraries_id;
+    }
+
+    return *first_lib_id;
+}
+
 static void RequestGuiRedraw(PluginInstance& plugin) {
     plugin.processor.for_main_thread.flags.FetchOr(AudioProcessor::MainThreadCallbackFlagsUpdateGui);
     plugin.processor.host.request_callback(&plugin.host);

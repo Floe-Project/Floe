@@ -37,7 +37,7 @@ struct ImagePixelsRgba {
 };
 
 struct LibraryImages {
-    DynamicArrayInline<char, k_max_library_name_size> library_name;
+    sample_lib::LibraryId library_id {};
     Optional<graphics::ImageID> icon {};
     Optional<graphics::ImageID> background {};
     Optional<graphics::ImageID> blurred_background {};
@@ -173,6 +173,9 @@ struct Gui {
     ArenaAllocator inst_info_arena {page_allocator};
     String inst_info_title {};
     DynamicArray<InstInfo> inst_info {inst_info_arena};
+
+    ThreadsafeFunctionQueue main_thread_callbacks {.arena = {PageAllocator::Instance()}};
+    sample_lib_server::AsyncCommsChannel& sample_lib_server_async_channel;
 };
 
 //
@@ -180,7 +183,9 @@ struct Gui {
 //
 
 graphics::ImageID CopyPixelsToGpuLoadedImage(Gui* g, ImagePixelsRgba const& px);
+LibraryImages LoadMixedLibrariesBackgroundIfNeeded(Gui* g);
 LibraryImages LoadLibraryBackgroundAndIconIfNeeded(Gui* g, sample_lib::Library const& lib);
+Optional<LibraryImages> LibraryImagesFromLibraryId(Gui* g, sample_lib::LibraryIdRef library_id);
 
 void GUIPresetLoaded(Gui* g, PluginInstance* a, bool is_first_preset);
 GuiFrameResult GuiUpdate(Gui* g);

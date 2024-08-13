@@ -38,6 +38,7 @@ BinaryData EmbeddedFontAwesome();
 BinaryData EmbeddedMada();
 BinaryData EmbeddedRoboto();
 BinaryData EmbeddedFiraSans();
+BinaryData EmbeddedMixedLibrariesBackground();
 
 EmbeddedIrData EmbeddedIrs();
 

@@ -84,36 +84,9 @@ void SetFilterRes(Voice& v, f32 res) {
     v.smoothing_system.Set(v.sv_filter_resonance_smoother_id, res, 10);
 }
 
-constexpr u8 k_waveform_root_note = 20;
-constexpr u32 k_waveform_num_frames = 1024;
-constexpr auto k_waveform_sample_rate = []() {
-    auto const desired_hz = (440.0 / 32.0) * constexpr_math::Pow(2.0, ((k_waveform_root_note - 9.0) / 12.0));
-    auto const t = 1.0 / desired_hz;
-    auto const srate = (f64)k_waveform_num_frames / t;
-    return (f32)srate;
-}();
-
-constexpr auto k_sine_samples_array = []() {
-    auto const samples_per_cycle = k_waveform_num_frames;
-    auto const last = samples_per_cycle - 1;
-    Array<f32, k_waveform_num_frames> buf {};
-    for (auto const i : Range(samples_per_cycle)) {
-        auto v = constexpr_math::Sin(2.0 * maths::k_pi<f64> * (i / (f64)last));
-        buf[i] = (f32)v * 0.2f;
-    }
-    return buf;
-}();
-
-constexpr AudioData k_sine_audio_data {
-    .channels = 1,
-    .sample_rate = k_waveform_sample_rate,
-    .num_frames = k_waveform_num_frames,
-    .interleaved_samples = k_sine_samples_array,
-};
+static f64 MidiNoteToFrequency(f64 note) { return 440.0 * Exp2((note - 69.0) / 12.0); }
 
 inline f64 CalculatePitchRatio(int note, VoiceSample const* s, f32 pitch, f32 sample_rate) {
-    f64 source_root_note {};
-    f64 source_sample_rate {};
     switch (s->generator) {
         case InstrumentType::None: {
             PanicIfReached();
@@ -121,20 +94,21 @@ inline f64 CalculatePitchRatio(int note, VoiceSample const* s, f32 pitch, f32 sa
         }
         case InstrumentType::Sampler: {
             auto const& sampler = s->sampler;
-            source_root_note = sampler.region->file.root_key;
-            source_sample_rate = (f64)sampler.data->sample_rate;
-            break;
+            auto const source_root_note = sampler.region->file.root_key;
+            auto const source_sample_rate = (f64)sampler.data->sample_rate;
+            auto const pitch_delta = (((f64)note + (f64)pitch) - source_root_note) / 12.0;
+            auto const exp = Exp2(pitch_delta);
+            auto const result = exp * source_sample_rate / (f64)sample_rate;
+            return result;
         }
         case InstrumentType::WaveformSynth: {
-            source_root_note = k_waveform_root_note;
-            source_sample_rate = (f64)k_waveform_sample_rate;
-            break;
+            auto const freq = MidiNoteToFrequency((f64)note + (f64)pitch);
+            auto const result = freq / (f64)sample_rate;
+            return result;
         }
     }
-    auto const pitch_delta = (((f64)note + (f64)pitch) - source_root_note) / 12.0;
-    auto const exp = Exp2(pitch_delta);
-    auto const result = exp * source_sample_rate / (f64)sample_rate;
-    return result;
+
+    return 1;
 }
 
 void SetVoicePitch(Voice& v, f32 pitch, f32 sample_rate) {
@@ -711,28 +685,13 @@ class ChunkwiseVoiceProcessor {
                             usize sample_pos = 0;
                             for (u32 frame = 0; frame < num_frames; frame += 2) {
                                 alignas(16) f32 samples[4];
-                                for (auto const i : Range(2)) {
-                                    constexpr NormalisedLoop k_loop {
-                                        .start = 0,
-                                        .end = k_sine_audio_data.num_frames,
-                                        .crossfade = 0,
-                                        .ping_pong = false,
-                                    };
 
-                                    // IMPROVE: use a technique that doesn't produce so much aliasing for
-                                    // waveforms. Here we are just using the same method as the sampler.
-
-                                    SampleGetData(k_sine_audio_data,
-                                                  k_loop,
-                                                  loop_and_reverse_flags::LoopedManyTimes,
-                                                  s.pos,
-                                                  samples[i * 2 + 0],
-                                                  samples[i * 2 + 1]);
-                                    auto const pitch_ratio = GetPitchRatio(s, frame);
-                                    s.pos += pitch_ratio;
-                                    if (s.pos >= k_loop.end)
-                                        s.pos = (f64)k_loop.start + (s.pos - (f64)k_loop.end);
-                                }
+                                samples[0] = trig_table_lookup::SinTurnsPositive((f32)s.pos);
+                                samples[1] = samples[0];
+                                s.pos += GetPitchRatio(s, frame);
+                                samples[2] = trig_table_lookup::SinTurnsPositive((f32)s.pos);
+                                samples[3] = samples[2];
+                                s.pos += GetPitchRatio(s, frame + 1);
 
                                 // sl2 and sl2 will be 0 if the second sample was not fetched so there is no
                                 // harm in adding that too

@@ -741,6 +741,7 @@ constexpr ValConfig CustomLinear(CustomLinearOptions opts) {
         .projection = nullopt,
         .default_linear_value = opts.default_val,
         .flags = opts.flags,
+        .value_type = opts.value_type,
     };
 }
 

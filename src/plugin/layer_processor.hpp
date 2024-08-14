@@ -171,11 +171,6 @@ struct LayerProcessor {
             sampled_inst->Release();
     }
 
-    AudioData const* GetSampleForGUIWaveform() const {
-        ASSERT(IsMainThread(host));
-        return nullptr;
-    }
-
     String InstName() const {
         ASSERT(IsMainThread(host));
         switch (instrument.tag) {

@@ -3,6 +3,7 @@
 
 #pragma once
 #include "foundation/foundation.hpp"
+#include "utils/logger/logger.hpp"
 #include "utils/reader.hpp"
 
 #include "audio_data.hpp"
@@ -267,6 +268,8 @@ inline LibraryPtrOrError Read(Reader& reader,
 }
 
 ErrorCodeOr<void> WriteDocumentedLuaExample(Writer writer, bool include_comments = true);
+
+bool CheckAllReferencedFilesExist(Library const& lib, Logger& logger);
 
 } // namespace sample_lib
 

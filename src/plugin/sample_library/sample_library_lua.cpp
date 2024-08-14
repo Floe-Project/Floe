@@ -1555,6 +1555,33 @@ ErrorCodeOr<void> WriteDocumentedLuaExample(Writer writer, bool include_comments
     return k_success;
 }
 
+bool CheckAllReferencedFilesExist(Library const& lib, Logger& logger) {
+    bool success = true;
+    auto check_file = [&](String path) {
+        auto outcome = lib.create_file_reader(lib, path);
+        if (outcome.HasError()) {
+            logger.ErrorLn("Error with file \"{}\" referenced in Lua. {}.", path, outcome.Error());
+            success = false;
+        }
+    };
+
+    if (lib.background_image_path) check_file(*lib.background_image_path);
+    if (lib.icon_image_path) check_file(*lib.icon_image_path);
+
+    for (auto [key, inst_ptr] : lib.insts_by_name) {
+        auto inst = *inst_ptr;
+        for (auto& region : inst->regions)
+            check_file(region.file.path);
+    }
+
+    for (auto [key, ir_ptr] : lib.irs_by_name) {
+        auto ir = *ir_ptr;
+        check_file(ir->path);
+    }
+
+    return success;
+}
+
 TEST_CASE(TestWordWrap) {
     DynamicArray<char> buffer {tester.scratch_arena};
     TRY(WordWrap(

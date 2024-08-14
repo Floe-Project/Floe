@@ -174,6 +174,7 @@ static ErrorCodeOr<void> Main(String library_folder) {
 
     auto const paths = TRY(ScanLibraryFolder(arena, library_folder));
     auto const lib = TRY(ReadLua(paths.lua, arena));
+    if (!sample_lib::CheckAllReferencedFilesExist(*lib, stdout_log)) return ErrorCode {CommonError::NotFound};
     auto const html_template = TRY(HtmlTemplate(arena));
     auto const metadata = TRY(ReadMetadata(library_folder, arena));
     (void)metadata; // NOTE: unused at the moment

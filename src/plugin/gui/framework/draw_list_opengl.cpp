@@ -45,6 +45,17 @@ static constexpr ErrorCodeCategory k_gl_error_category {
     },
 };
 
+ErrorCodeOr<void> CheckGLError(String function) {
+    ErrorCodeOr<void> err {};
+    GLenum gl_err;
+    while ((gl_err = glGetError()) != GL_NO_ERROR) {
+        err = ErrorCode(k_gl_error_category, gl_err);
+        DebugLn("GL Error: {}: {}", function, err.Error());
+    }
+    if (err.HasError()) return err;
+    return k_success;
+}
+
 struct OpenGLDrawContext : public DrawContext {
     ErrorCodeOr<void> CreateDeviceObjects(void* _window) override {
         DebugLoc();
@@ -106,14 +117,12 @@ struct OpenGLDrawContext : public DrawContext {
 
         ScaleClipRects(draw_data, draw_scale_factor);
 
-#if 0
         GLint last_texture;
         glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture);
         GLint last_viewport[4];
         glGetIntegerv(GL_VIEWPORT, last_viewport);
         GLint last_scissor_box[4];
         glGetIntegerv(GL_SCISSOR_BOX, last_scissor_box);
-#endif
         glPushAttrib(GL_ENABLE_BIT | GL_COLOR_BUFFER_BIT | GL_TRANSFORM_BIT);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -178,7 +187,6 @@ struct OpenGLDrawContext : public DrawContext {
             }
         }
 
-#if 0
         // Restore modified state
         glDisableClientState(GL_COLOR_ARRAY);
         glDisableClientState(GL_TEXTURE_COORD_ARRAY);
@@ -194,11 +202,10 @@ struct OpenGLDrawContext : public DrawContext {
                   last_scissor_box[1],
                   (GLsizei)last_scissor_box[2],
                   (GLsizei)last_scissor_box[3]);
-#endif
 
         glFlush();
 
-        if (auto gl_err = glGetError(); gl_err != GL_NO_ERROR) return ErrorCode(k_gl_error_category, gl_err);
+        TRY(CheckGLError("Render"));
 
         return k_success;
     }

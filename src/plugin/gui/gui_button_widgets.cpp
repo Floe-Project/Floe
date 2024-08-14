@@ -129,7 +129,7 @@ static void DrawIconAndTextButton(Gui* g, Style const& style, Rect r, imgui::Id 
 
     DrawBackground(g, style, r, id, state);
 
-    {
+    if (style.type != LayoutAndSizeType::IconAndTextInstSelector) {
         ScopedFont const icon_font(g, g->icons);
         auto just = TextJustification::CentredLeft;
         auto btn_r = r;
@@ -153,6 +153,9 @@ static void DrawIconAndTextButton(Gui* g, Style const& style, Rect r, imgui::Id 
                                      just,
                                      TextOverflowType::AllowOverflow,
                                      style.icon_scaling);
+    } else if (style.icon_and_text.icon_texture) {
+        auto const icon_r = Rect {r.x, r.y, r.h, r.h}.Reduced(r.h / 10);
+        s.graphics->AddImage(*style.icon_and_text.icon_texture, icon_r.Min(), icon_r.Max());
     }
 
     if (style.icon_and_text.capitalise) str = GetTempCapitalisedString(str);
@@ -167,6 +170,11 @@ static void DrawIconAndTextButton(Gui* g, Style const& style, Rect r, imgui::Id 
     } else if (style.type == LayoutAndSizeType::IconAndTextLayerTab) {
         text_offset = 0;
         just = TextJustification::Centred;
+    } else if (style.type == LayoutAndSizeType::IconAndTextInstSelector) {
+        if (style.icon_and_text.icon_texture)
+            text_offset = r.h + r.h / 5;
+        else
+            text_offset = LiveSize(s, UiSizeId::MenuButtonTextMarginL);
     }
     s.graphics->AddTextJustified(r.CutLeft(text_offset),
                                  str,
@@ -190,6 +198,7 @@ static bool ButtonInternal(Gui* g,
 
     s.draw = [g, &style](IMGUI_DRAW_BUTTON_ARGS) {
         switch (style.type) {
+            case LayoutAndSizeType::None: PanicIfReached(); break;
             case LayoutAndSizeType::IconOrTextKeyboardIcon: {
                 DrawKeyboardIcon(g, style, r, id, state);
                 break;
@@ -204,6 +213,7 @@ static bool ButtonInternal(Gui* g,
             case LayoutAndSizeType::IconAndTextSubMenuItem:
             case LayoutAndSizeType::IconAndTextMidiButton:
             case LayoutAndSizeType::IconAndTextLayerTab:
+            case LayoutAndSizeType::IconAndTextInstSelector:
             case LayoutAndSizeType::IconAndText: {
                 DrawIconAndTextButton(g, style, r, id, str, state);
                 break;
@@ -212,7 +222,6 @@ static bool ButtonInternal(Gui* g,
             case LayoutAndSizeType::VelocityButton:
                 GetVelocityButtonDrawingFunction(style.velocity_button.index)(imgui, r, id, str, state);
                 break;
-            default: PanicIfReached();
         }
     };
 

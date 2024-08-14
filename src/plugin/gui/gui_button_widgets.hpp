@@ -22,6 +22,7 @@ enum class LayoutAndSizeType {
     IconAndTextSubMenuItem,
     IconAndTextMidiButton,
     IconAndTextLayerTab,
+    IconAndTextInstSelector,
     VelocityButton
 };
 
@@ -84,6 +85,7 @@ struct Style {
     struct {
         String on_icon {};
         String off_icon {};
+        Optional<graphics::TextureHandle> icon_texture {};
         bool capitalise {};
     } icon_and_text;
 
@@ -228,10 +230,13 @@ PUBLIC Style ParameterPopupButton(imgui::Context const& imgui, bool _greyed_out 
     return s;
 }
 
-PUBLIC Style InstSelectorPopupButton(imgui::Context const& imgui) {
+PUBLIC Style InstSelectorPopupButton(imgui::Context const& imgui,
+                                     Optional<graphics::TextureHandle> icon_texture) {
     auto s = ParameterPopupButton(imgui);
     s.main_cols.grey_out_aware = false;
     s.back_cols = {};
+    s.icon_and_text.icon_texture = icon_texture;
+    s.type = LayoutAndSizeType::IconAndTextInstSelector;
     return s;
 }
 

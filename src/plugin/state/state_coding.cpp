@@ -1416,11 +1416,10 @@ TEST_CASE(TestNewSerialisation) {
         };
         for (auto [index, inst] : Enumerate(state.inst_ids)) {
             inst = sample_lib::InstrumentId {
-                .library =
-                {{
-                        .author = String(fmt::Format(scratch_arena, "TestAuthor{}", index)),
-                        .name = String(fmt::Format(scratch_arena, "TestLib{}", index)),
-                    }},
+                .library = {{
+                    .author = String(fmt::Format(scratch_arena, "TestAuthor{}", index)),
+                    .name = String(fmt::Format(scratch_arena, "TestLib{}", index)),
+                }},
                 .inst_name = String(fmt::Format(scratch_arena, "Test/Path{}", index)),
             };
         }

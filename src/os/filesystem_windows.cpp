@@ -40,6 +40,26 @@ static ErrorCode FilesystemWin32ErrorCode(DWORD win32_code,
     return Win32ErrorCode(win32_code, extra_debug_info, loc);
 }
 
+ErrorCodeOr<void> File::Lock(FileLockType type) {
+    DWORD flags = 0;
+    switch (type) {
+        case FileLockType::Exclusive: flags = LOCKFILE_EXCLUSIVE_LOCK; break;
+        case FileLockType::Shared: flags = 0; break;
+    }
+
+    OVERLAPPED overlapped {};
+    if (!LockFileEx(m_file, flags, 0, MAXDWORD, MAXDWORD, &overlapped))
+        return FilesystemWin32ErrorCode(GetLastError(), "LockFileEx");
+    return k_success;
+}
+
+ErrorCodeOr<void> File::Unlock() {
+    OVERLAPPED overlapped {};
+    if (!UnlockFileEx(m_file, 0, MAXDWORD, MAXDWORD, &overlapped))
+        return FilesystemWin32ErrorCode(GetLastError(), "UnlockFileEx");
+    return k_success;
+}
+
 void File::CloseFile() {
     if (m_file) CloseHandle(m_file);
 }

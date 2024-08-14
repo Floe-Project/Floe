@@ -328,6 +328,10 @@ ErrorCodeOr<void> WriteFile(Settings const& data, String path) {
                              });
 
     auto file = TRY(OpenFile(path, FileMode::Write));
+
+    TRY(file.Lock(FileLockType::Exclusive));
+    DEFER { auto _ = file.Unlock(); };
+
     auto writer = file.Writer();
 
     TRY(fmt::AppendLine(writer, "show_tooltips = {}", data.gui.show_tooltips));
@@ -436,7 +440,12 @@ Optional<Settings> FindAndReadSettingsFile(ArenaAllocator& a, FloePaths const& p
     String file_data {};
     bool is_json {};
     for (auto const p : paths.possible_settings_paths) {
-        auto read_outcome = ReadEntireFile(p, a);
+        auto file_outcome = OpenFile(p, FileMode::Read);
+        if (file_outcome.HasError()) continue;
+        auto& file = file_outcome.Value();
+        auto _ = file.Lock(FileLockType::Shared);
+        DEFER { auto _ = file.Unlock(); };
+        auto read_outcome = file.ReadWholeFile(a);
         if (read_outcome.HasError()) continue;
 
         is_json = path::Extension(p) == ".json"_s;

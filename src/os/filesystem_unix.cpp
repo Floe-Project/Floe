@@ -3,6 +3,7 @@
 
 #include <dirent.h>
 #include <errno.h>
+#include <sys/file.h>
 #include <sys/stat.h>
 #if __linux__
 #include <sys/stat.h>
@@ -96,6 +97,26 @@ ErrorCodeOr<void> DirectoryIterator::Increment() {
         }
     } while (skip);
 
+    return k_success;
+}
+
+ErrorCodeOr<void> File::Lock(FileLockType type) {
+    int const operation = ({
+        int r {LOCK_UN};
+        switch (type) {
+            case FileLockType::Shared: r = LOCK_SH; break;
+            case FileLockType::Exclusive: r = LOCK_EX; break;
+        }
+        r;
+    });
+    auto const result = flock(fileno((FILE*)m_file), operation);
+    if (result != 0) return FilesystemErrnoErrorCode(errno, "flock");
+    return k_success;
+}
+
+ErrorCodeOr<void> File::Unlock() {
+    auto const result = flock(fileno((FILE*)m_file), LOCK_UN);
+    if (result != 0) return FilesystemErrnoErrorCode(errno, "flock");
     return k_success;
 }
 

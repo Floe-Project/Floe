@@ -29,6 +29,11 @@ enum class FileMode {
     Append,
 };
 
+enum class FileLockType {
+    Exclusive,
+    Shared,
+};
+
 struct File {
     File(File&& other) {
         m_file = other.m_file;
@@ -51,6 +56,9 @@ struct File {
     ErrorCodeOr<u64> FileSize();
 
     ErrorCodeOr<void> Flush();
+
+    ErrorCodeOr<void> Lock(FileLockType type);
+    ErrorCodeOr<void> Unlock();
 
     void* NativeFileHandle();
     ErrorCodeOr<MutableString>

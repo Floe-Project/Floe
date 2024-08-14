@@ -365,6 +365,59 @@ ErrorCodeOr<void> WriteFile(Settings const& data, String path) {
 
 } // namespace ini
 
+void InitSettingsFile(SettingsFile& settings, FloePaths const& paths) {
+    bool file_is_new = false;
+    auto opt_data = FindAndReadSettingsFile(settings.arena, paths);
+    if (!opt_data)
+        file_is_new = true;
+    else
+        settings.settings = *opt_data;
+    if (InitialiseSettingsFileData(settings.settings, settings.arena, file_is_new))
+        settings.tracking.changed = true;
+
+    auto watcher = CreateDirectoryWatcher(settings.arena);
+    if (watcher.HasValue()) settings.watcher.Emplace(watcher.ReleaseValue());
+}
+
+void DeinitSettingsFile(SettingsFile& settings) {
+    if (settings.watcher.HasValue()) DestoryDirectoryWatcher(settings.watcher.Value());
+}
+
+// This is a simple implementation that should reduce the chances of the settings file being overwritten if
+// there are multiple processes of Floe running. I don't think this is a common scenario though, plugins tend
+// to be in the same process and therefore if we are using global memory, they share the same memory.
+void PollForSettingsFileChanges(SettingsFile& settings) {
+    ASSERT(IsMainThread());
+
+    if (settings.last_watch_time + 0.3 > TimePoint::Now()) return;
+    DEFER { settings.last_watch_time = TimePoint::Now(); };
+
+    if (!settings.watcher.HasValue()) return;
+
+    auto const dir = path::Directory(settings.paths.settings_write_path);
+    if (!dir) return;
+
+    DirectoryToWatch watch_dir {
+        .path = *dir,
+        .recursive = false,
+    };
+    auto const outcome = PollDirectoryChanges(settings.watcher.Value(),
+                                              {
+                                                  .dirs_to_watch = Array {watch_dir},
+                                                  .result_arena = settings.watcher_scratch,
+                                                  .scratch_arena = settings.watcher_scratch,
+                                              });
+    DEFER { settings.watcher_scratch.ResetCursorAndConsolidateRegions(); };
+
+    if (outcome.HasError()) return;
+    auto const& changes = outcome.Value();
+    for (auto const& _ : changes) {
+        settings.arena.ResetCursorAndConsolidateRegions();
+        auto data = FindAndReadSettingsFile(settings.arena, settings.paths);
+        if (data) settings.settings = *data;
+    }
+}
+
 bool InitialiseSettingsFileData(Settings& file, ArenaAllocator& arena, bool file_is_brand_new) {
     bool changed = false;
     changed = changed || midi_settings::Initialise(file.midi, arena, file_is_brand_new);

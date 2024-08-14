@@ -9,7 +9,7 @@
 #include "settings/settings_file.hpp"
 
 CrossInstanceSystems::CrossInstanceSystems()
-    : arena(PageAllocator::Instance(), Kb(16))
+    : arena(PageAllocator::Instance(), Kb(4))
     , logger(g_log_file)
     , paths(CreateFloePaths(arena))
     , settings(paths)
@@ -31,15 +31,7 @@ CrossInstanceSystems::CrossInstanceSystems()
         });
     thread_pool.Init("Global", {});
 
-    // =========
-    bool file_is_new = false;
-    auto opt_data = FindAndReadSettingsFile(settings.arena, paths);
-    if (!opt_data)
-        file_is_new = true;
-    else
-        settings.settings = *opt_data;
-    if (InitialiseSettingsFileData(settings.settings, settings.arena, file_is_new))
-        settings.tracking.changed = true;
+    InitSettingsFile(settings, paths);
 
     ASSERT(settings.settings.gui.window_width != 0);
 
@@ -48,6 +40,8 @@ CrossInstanceSystems::CrossInstanceSystems()
 }
 
 CrossInstanceSystems::~CrossInstanceSystems() {
+    DeinitSettingsFile(settings);
+
     {
         auto outcome = WriteSettingsFileIfChanged(settings);
         if (outcome.HasError()) logger.ErrorLn("Failed to write settings file: {}", outcome.Error());

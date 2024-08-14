@@ -7,7 +7,6 @@
 #include "utils/thread_extra/thread_pool.hpp"
 
 #include "common/paths.hpp"
-#include "plugin.hpp"
 #include "presets_folder.hpp"
 #include "sample_library_server.hpp"
 #include "settings/settings_file.hpp"

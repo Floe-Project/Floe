@@ -78,7 +78,14 @@ struct SettingsFile {
     ArenaAllocator arena {PageAllocator::Instance()};
     SettingsTracking tracking;
     Settings settings;
+    ArenaAllocator watcher_scratch {PageAllocator::Instance()};
+    Optional<DirectoryWatcher> watcher;
+    TimePoint last_watch_time {};
 };
+
+void InitSettingsFile(SettingsFile& settings, FloePaths const& paths);
+void DeinitSettingsFile(SettingsFile& settings);
+void PollForSettingsFileChanges(SettingsFile& settings);
 
 // The arena must outlive the Settings
 Optional<Settings> FindAndReadSettingsFile(ArenaAllocator& a, FloePaths const& paths);

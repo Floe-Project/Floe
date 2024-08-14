@@ -523,6 +523,7 @@ clap_plugin_timer_support const floe_timer {
             ZoneScopedN("clap_plugin_timer_support on_timer");
             auto& floe = *(FloeInstance*)plugin->plugin_data;
             ASSERT(IsMainThread(floe.host));
+            PollForSettingsFileChanges(g_cross_instance_systems->settings);
             if (floe.gui_platform) OnClapTimer(*floe.gui_platform, timer_id);
         },
 };
@@ -722,6 +723,8 @@ clap_plugin const floe_plugin {
             ZoneScopedMessage(floe.trace_config, "plugin on_main_thread");
             ASSERT(IsMainThread(floe.host));
             if (floe.plugin) {
+                PollForSettingsFileChanges(g_cross_instance_systems->settings);
+
                 bool update_gui = false;
 
                 auto& processor = floe.plugin->processor;

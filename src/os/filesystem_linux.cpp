@@ -317,9 +317,7 @@ struct LinuxWatchedDirectory {
     PathPool path_pool;
 };
 
-static ErrorCodeOr<int> InotifyWatch(int inotify_id, char const* path, ArenaAllocator& scratch_arena) {
-    auto const scratch_cursor = scratch_arena.TotalUsed();
-    DEFER { scratch_arena.TryShrinkTotalUsed(scratch_cursor); };
+static ErrorCodeOr<int> InotifyWatch(int inotify_id, char const* path) {
     ZoneScoped;
     auto const watch_id = inotify_add_watch(inotify_id,
                                             path,
@@ -375,7 +373,7 @@ static ErrorCodeOr<LinuxWatchedDirectory*> WatchDirectory(DirectoryWatcher::Watc
                                                           Allocator& allocator,
                                                           ArenaAllocator& scratch_arena) {
     bool success = false;
-    auto watch_id = TRY(InotifyWatch(inotify_id, NullTerminated(path, scratch_arena), scratch_arena));
+    auto watch_id = TRY(InotifyWatch(inotify_id, NullTerminated(path, scratch_arena)));
     DEFER {
         if (!success) InotifyUnwatch(inotify_id, watch_id);
     };
@@ -405,8 +403,7 @@ static ErrorCodeOr<LinuxWatchedDirectory*> WatchDirectory(DirectoryWatcher::Watc
                     auto subdir = subdirs.PrependUninitialised();
                     PLACEMENT_NEW(subdir)
                     LinuxWatchedDirectory::SubDir {
-                        .watch_id =
-                            TRY(InotifyWatch(inotify_id, dyn::NullTerminated(full_subpath), scratch_arena)),
+                        .watch_id = TRY(InotifyWatch(inotify_id, dyn::NullTerminated(full_subpath))),
                         .subpath = path_pool.Clone(subpath, dir.arena),
                         .watch_id_invalidated = false,
                     };
@@ -658,9 +655,8 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
 
                     // watch the created dir
                     {
-                        auto const watch_id_outcome = InotifyWatch(watcher.native_data.int_id,
-                                                                   dyn::NullTerminated(full_path),
-                                                                   args.scratch_arena);
+                        auto const watch_id_outcome =
+                            InotifyWatch(watcher.native_data.int_id, dyn::NullTerminated(full_path));
                         if (watch_id_outcome.HasError()) {
                             auto const err = watch_id_outcome.Error();
                             if (err == FilesystemError::PathDoesNotExist) {
@@ -706,8 +702,7 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                             if (entry.type == FileType::Directory) {
                                 auto const sub_watch_id_outcome =
                                     InotifyWatch(watcher.native_data.int_id,
-                                                 NullTerminated(entry.path, args.scratch_arena),
-                                                 args.scratch_arena);
+                                                 NullTerminated(entry.path, args.scratch_arena));
                                 bool skip = false;
                                 if (sub_watch_id_outcome.HasError()) {
                                     auto const err = sub_watch_id_outcome.Error();

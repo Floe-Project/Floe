@@ -98,7 +98,7 @@ static ErrorCodeOr<String> MetadataIni(String library_folder, ArenaAllocator& ar
 }
 
 struct Metadata {
-    String description_html;
+    // NOTE: empty at the moment
 };
 
 // INI-like file format:
@@ -160,9 +160,7 @@ static ErrorCodeOr<Metadata> ReadMetadata(String library_folder, ArenaAllocator&
     while (auto const opt_line = TRY(parser.ReadLine())) {
         auto const& [key, value] = *opt_line;
 
-        if (key == "description-html") {
-            result.description_html = WhitespaceStripped(value);
-        } else {
+        if (key.size) {
             stdout_log.ErrorLn("Unknown key in {}: {}", k_metadata_ini_filename, key);
             return ErrorCode {CommonError::FileFormatIsInvalid};
         }
@@ -178,6 +176,10 @@ static ErrorCodeOr<void> Main(String library_folder) {
     auto const lib = TRY(ReadLua(paths.lua, arena));
     auto const html_template = TRY(HtmlTemplate(arena));
     auto const metadata = TRY(ReadMetadata(library_folder, arena));
+    (void)metadata; // NOTE: unused at the moment
+
+    String description_html = {};
+    if (lib->description) description_html = fmt::Format(arena, "<p>{}</p>", *lib->description);
 
     auto const result_html =
         fmt::FormatStringReplace(arena,
@@ -189,7 +191,7 @@ static ErrorCodeOr<void> Main(String library_folder) {
                                      {"__FLOE_HOMEPAGE_URL__", FLOE_HOMEPAGE_URL},
                                      {"__FLOE_MANUAL_URL__", FLOE_MANUAL_URL},
                                      {"__FLOE_DOWNLOAD_URL__", FLOE_DOWNLOAD_URL},
-                                     {"__LIBRARY_DESCRIPTION_HTML__", metadata.description_html},
+                                     {"__LIBRARY_DESCRIPTION_HTML__", description_html},
                                  }));
 
     auto const output_path =

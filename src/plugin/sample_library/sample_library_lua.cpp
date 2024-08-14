@@ -735,6 +735,7 @@ struct TableFields<Library> {
         Name,
         Tagline,
         Url,
+        Description,
         Author,
         MinorVersion,
         BackgroundImagePath,
@@ -778,6 +779,17 @@ struct TableFields<Library> {
                     .lua_type = LUA_TSTRING,
                     .required = false,
                     .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.url = StringFromTop(ctx); },
+                };
+            case Field::Description:
+                return {
+                    .name = "description",
+                    .description_sentence = "A description of the library.",
+                    .example =
+                        "A collection of resonating metal objects sampled using a handheld stereo recorder.",
+                    .default_value = "no description",
+                    .lua_type = LUA_TSTRING,
+                    .required = false,
+                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.description = StringFromTop(ctx); },
                 };
             case Field::Author:
                 return {

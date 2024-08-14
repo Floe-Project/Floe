@@ -131,6 +131,7 @@ struct Library {
     String name {};
     String tagline {};
     Optional<String> url {};
+    Optional<String> description {};
     String author {};
     u32 minor_version {1};
     Optional<String> background_image_path {};

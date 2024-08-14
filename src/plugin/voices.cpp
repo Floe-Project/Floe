@@ -693,10 +693,13 @@ class ChunkwiseVoiceProcessor {
                                 samples[3] = samples[2];
                                 s.pos += GetPitchRatio(s, frame + 1);
 
-                                // sl2 and sl2 will be 0 if the second sample was not fetched so there is no
-                                // harm in adding that too
+                                // This is an arbitrary scale factor to make the sine more in line with other
+                                // waveform levels. It's important to keep this the same for backwards
+                                // compatibility.
+                                constexpr f32 k_sine_scale = 0.2f;
+
                                 auto v = LoadAlignedToType<f32x4>(samples);
-                                v *= s.amp;
+                                v *= s.amp * k_sine_scale;
                                 CopyVectorToBufferAtPos(sample_pos, v);
                                 sample_pos += 4;
                             }

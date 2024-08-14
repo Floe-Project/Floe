@@ -714,7 +714,14 @@ static void DoMultilineText(Gui* g, String text, f32& y_pos) {
     auto& imgui = g->imgui;
     auto font = imgui.graphics->context->CurrentFont();
     auto const line_height = imgui.graphics->context->CurrentFontSize();
-    auto size = draw::GetTextSize(font, text, imgui.Width());
+
+    // IMPORTANT: if the string is very long, it needs to be word-wrapped manually by including newlines in
+    // the text. This is necessary because our text rendering system is bad at doing huge amounts of
+    // word-wrapping. It still renders text that isn't visible unless there's no word-wrapping, in which case
+    // it's does skip rendering off-screen text.
+    f32 const wrap_width = text.size < 10000 ? imgui.Width() : 0.0f;
+
+    auto size = draw::GetTextSize(font, text, wrap_width);
 
     auto text_r = Rect {0, y_pos, size.x, size.y};
     y_pos += size.y + line_height / 2;
@@ -724,10 +731,8 @@ static void DoMultilineText(Gui* g, String text, f32& y_pos) {
                             text_r.pos,
                             LiveCol(imgui, UiColMap::PopupItemText),
                             text,
-                            imgui.Width());
+                            wrap_width);
 }
-
-// TODO(1.0): fix GPL licence text being cut short
 
 void DoLicencesStandalone(Gui* g) {
 #include "third_party_licence_text.hpp"

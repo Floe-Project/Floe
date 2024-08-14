@@ -507,21 +507,11 @@ void CreateLibraryBackgroundImageTextures(Gui* g,
     }
 }
 
-Optional<LibraryImages> LibraryImagesFromLibraryId(Gui* g, sample_lib::LibraryIdRef library_id) {
-    if (library_id == k_default_background_lib_id) return LoadDefaultBackgroundIfNeeded(g);
-
-    auto background_lib =
-        sample_lib_server::FindLibraryRetained(g->plugin.shared_data.sample_library_server, library_id);
-    DEFER { background_lib.Release(); };
-    if (!background_lib) return nullopt;
-
-    return LoadLibraryBackgroundAndIconIfNeeded(g, *background_lib);
-}
-
-LibraryImages LoadDefaultBackgroundIfNeeded(Gui* g) {
+static LibraryImages LoadDefaultBackgroundIfNeeded(Gui* g) {
     auto& ctx = g->frame_input.graphics_ctx;
-    auto opt_index = FindIf(g->library_images,
-                            [&](LibraryImages const& l) { return l.library_id == k_default_background_lib_id; });
+    auto opt_index = FindIf(g->library_images, [&](LibraryImages const& l) {
+        return l.library_id == k_default_background_lib_id;
+    });
     if (!opt_index) {
         dyn::Append(g->library_images, {k_default_background_lib_id});
         opt_index = g->library_images.size - 1;
@@ -548,7 +538,7 @@ LibraryImages LoadDefaultBackgroundIfNeeded(Gui* g) {
     return imgs;
 }
 
-LibraryImages LoadLibraryBackgroundAndIconIfNeeded(Gui* g, sample_lib::Library const& lib) {
+static LibraryImages LoadLibraryBackgroundAndIconIfNeeded(Gui* g, sample_lib::Library const& lib) {
     auto& ctx = g->frame_input.graphics_ctx;
     auto const lib_id = lib.Id();
 
@@ -592,6 +582,17 @@ LibraryImages LoadLibraryBackgroundAndIconIfNeeded(Gui* g, sample_lib::Library c
     }
 
     return imgs;
+}
+
+Optional<LibraryImages> LibraryImagesFromLibraryId(Gui* g, sample_lib::LibraryIdRef library_id) {
+    if (library_id == k_default_background_lib_id) return LoadDefaultBackgroundIfNeeded(g);
+
+    auto background_lib =
+        sample_lib_server::FindLibraryRetained(g->plugin.shared_data.sample_library_server, library_id);
+    DEFER { background_lib.Release(); };
+    if (!background_lib) return nullopt;
+
+    return LoadLibraryBackgroundAndIconIfNeeded(g, *background_lib);
 }
 
 static void CreateFontsIfNeeded(Gui* g) {

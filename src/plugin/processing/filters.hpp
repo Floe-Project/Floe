@@ -417,8 +417,9 @@ enum class Type {
     Peak,
 };
 
+template <ScalarOrVector<f32> FloatType>
 struct Data {
-    f32 z1_a = {}, z2_a = {}; // state variables (z^-1)
+    FloatType z1_a = {}, z2_a = {}; // state variables (z^-1)
 };
 
 inline f32 ResonanceToQ(f32 resonance) {
@@ -456,14 +457,15 @@ struct CachedHelpers {
     f32 h_2r, h_4r, h_2rag, divisor;
 };
 
-inline void Process(f32 in, f32& out, Data& d, Type type, CachedHelpers const& c) {
+template <ScalarOrVector<f32> FloatType>
+inline void Process(FloatType in, FloatType& out, Data<FloatType>& d, Type type, CachedHelpers const& c) {
     auto hp = (in - c.h_2rag * d.z1_a - d.z2_a) / c.divisor;
     auto g = c.g_coeff;
     auto bp = hp * g + d.z1_a;
     auto lp = bp * g + d.z2_a;
 
-    d.z1_a = g * hp + bp; // unit delay (state variable)
-    d.z2_a = g * bp + lp; // unit delay (state variable)
+    d.z1_a = g * hp + bp;
+    d.z2_a = g * bp + lp;
 
     switch (type) {
         case Type::Lowpass: {
@@ -505,16 +507,6 @@ inline void Process(f32 in, f32& out, Data& d, Type type, CachedHelpers const& c
             break;
         }
     }
-}
-
-PUBLIC inline void StereoProcess(f32* io, Data* d, Type type, CachedHelpers const& c) {
-    for (auto const i : Range(2))
-        Process(io[i], io[i], d[i], type, c);
-}
-
-inline void StereoProcess(f32 const* dry, f32* out, Data* d, Type type, CachedHelpers const& c) {
-    for (auto const i : Range(2))
-        Process(dry[i], out[i], d[i], type, c);
 }
 
 namespace detail {

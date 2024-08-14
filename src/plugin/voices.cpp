@@ -856,19 +856,19 @@ class ChunkwiseVoiceProcessor {
                 }
 
                 if (filter_mix != 1) {
-                    f32 wet_buf[2];
-                    StereoProcess(&m_buffer[sample_pos],
-                                  wet_buf,
-                                  m_filters.data,
-                                  filter_type,
-                                  m_filter_coeffs);
+                    auto const in = LoadUnalignedToType<f32x2>(&m_buffer[sample_pos]);
+                    f32x2 wet_buf;
+                    sv_filter::Process(in, wet_buf, m_filters, filter_type, m_filter_coeffs);
 
                     for (auto const i : Range(2u)) {
                         auto& samp = m_buffer[sample_pos + i];
                         samp = samp + filter_mix * (wet_buf[i] - samp);
                     }
                 } else {
-                    StereoProcess(&m_buffer[sample_pos], m_filters.data, filter_type, m_filter_coeffs);
+                    auto const in = LoadUnalignedToType<f32x2>(&m_buffer[sample_pos]);
+                    f32x2 out;
+                    sv_filter::Process(in, out, m_filters, filter_type, m_filter_coeffs);
+                    StoreToUnaligned(&m_buffer[sample_pos], out);
                 }
 
                 CheckSamplesAreValid(sample_pos, 2);

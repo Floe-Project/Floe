@@ -55,6 +55,7 @@ struct DraggingFX {
 class FloeWaveformImages {
   public:
     ErrorCodeOr<graphics::TextureHandle> FetchOrCreate(graphics::DrawContext& graphics,
+                                                       ArenaAllocator& scratch_arena,
                                                        WaveformAudioSource source,
                                                        f32 unscaled_width,
                                                        f32 unscaled_height,
@@ -86,8 +87,11 @@ class FloeWaveformImages {
             }
         }
 
+        auto const cursor = scratch_arena.TotalUsed();
+        DEFER { scratch_arena.TryShrinkTotalUsed(cursor); };
+
         Waveform w {};
-        auto pixels = GetWaveformImageFromSample(source, size);
+        auto pixels = CreateWaveformImage(source, size, scratch_arena, scratch_arena);
         w.source_hash = source_hash;
         w.image_id = TRY(graphics.CreateImageID(pixels.data, size, 4));
         w.used = true;

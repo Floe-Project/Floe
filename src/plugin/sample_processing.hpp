@@ -3,6 +3,7 @@
 
 #pragma once
 #include "foundation/foundation.hpp"
+#include "foundation/utils/random.hpp"
 #include "os/misc.hpp"
 
 #include "audio_data.hpp"
@@ -366,121 +367,102 @@ enum class WaveformAudioSourceType { AudioData, Sine, WhiteNoise };
 using WaveformAudioSource =
     TaggedUnion<WaveformAudioSourceType, TypeAndTag<AudioData const*, WaveformAudioSourceType::AudioData>>;
 
-PUBLIC DynamicArray<u8> GetWaveformImageFromSample(WaveformAudioSource source, UiSize size) {
-    u32 num_frames = 256;
-    if (auto const audio_file = source.TryGet<AudioData const*>()) num_frames = (*audio_file)->num_frames;
+PUBLIC Span<u8> CreateWaveformImage(WaveformAudioSource source,
+                                    UiSize size,
+                                    Allocator& a,
+                                    ArenaAllocator& scratch_allocator) {
 
-    auto const px_size = size.width * size.height * 4;
-    DynamicArray<u8> px {PageAllocator::Instance()};
-    dyn::Resize(px, (usize)px_size);
+    auto const px_size = (s32)(size.width * size.height * 4);
+    auto px = a.AllocateExactSizeUninitialised<u8>((usize)px_size);
+    ZeroMemory(px);
 
-    constexpr int k_supersample_scale = 10;
+    constexpr s32 k_supersample_scale = 10;
     auto const scaled_width = size.width * k_supersample_scale;
     auto const scaled_height = size.height * k_supersample_scale;
 
-    DynamicArray<IntRange> ranges {PageAllocator::Instance()};
-    ranges.Reserve((usize)scaled_width);
+    auto const ranges = scratch_allocator.AllocateExactSizeUninitialised<IntRange>((usize)scaled_width);
 
-    auto mid_y = (int)(scaled_height / 2);
-    auto samples_per_pixel = (f32)num_frames / ((f32)scaled_width);
-
-    int min_y = scaled_height - 1;
-    int max_y = 0;
-
-    sv_filter::CachedHelpers c_l {};
-    sv_filter::CachedHelpers c_r {};
-    sv_filter::Data d_l {};
-    sv_filter::Data d_r {};
-    c_l.Update(44100, 2000, 0.5f);
-    c_r.Update(44100, 2000, 0.5f);
+    auto const mid_y = scaled_height / 2;
+    s32 min_y = scaled_height - 1;
+    s32 max_y = 0;
 
     {
+        // audio data helpers
+        sv_filter::CachedHelpers filter_cache {};
+        sv_filter::Data<f32x2> filter_data {};
+        filter_cache.Update(44100, 2000, 0.5f);
+        auto const num_frames =
+            source.Is<AudioData const*>() ? source.Get<AudioData const*>()->num_frames : 0;
+        auto const samples_per_pixel = (f32)num_frames / ((f32)scaled_width);
         f32 first_sample = 0;
+
+        // other helpers
+        u64 random_seed = 1124;
+
         for (auto const x : Range(scaled_width)) {
-            f32 avg_l = 0;
-            f32 avg_r = 0;
+            f32x2 levels {};
+            switch (source.tag) {
+                case WaveformAudioSourceType::AudioData: {
+                    f32 const end_sample = first_sample + samples_per_pixel;
+                    int const first_sample_x = RoundPositiveFloat(first_sample);
+                    int const end_sample_x = Min((int)num_frames - 1, RoundPositiveFloat(end_sample));
+                    first_sample = end_sample;
+                    int const window_size = (end_sample_x + 1) - first_sample_x;
 
-            f32 const end_sample = first_sample + samples_per_pixel;
-            int const first_sample_x = RoundPositiveFloat(first_sample);
-            int const end_sample_x = Min((int)num_frames - 1, RoundPositiveFloat(end_sample));
-            first_sample = end_sample;
-            int const window_size = (end_sample_x + 1) - first_sample_x;
+                    f32 const max_samples_per_px = 8;
+                    int const step = Max(1, (int)((f32)window_size / max_samples_per_px));
+                    int num_sampled = 0;
 
-            f32 const max_samples_per_px = 8;
-            int const step = Max(1, (int)((f32)window_size / max_samples_per_px));
-            int num_sampled = 0;
-
-            for (int i = first_sample_x; i <= end_sample_x; i += step) {
-                f32 l;
-                f32 r;
-
-                switch (source.tag) {
-                    case WaveformAudioSourceType::AudioData: {
+                    for (int i = first_sample_x; i <= end_sample_x; i += step) {
                         auto const& audio_data = *source.Get<AudioData const*>();
-                        auto frame_ptr = audio_data.interleaved_samples.data + (i * audio_data.channels);
-                        l = frame_ptr[0];
-                        if (audio_data.channels != 1)
-                            r = frame_ptr[1];
-                        else
-                            r = l;
-                        break;
-                    }
-                    case WaveformAudioSourceType::Sine: {
-                        // TODO
-                        r = 0;
-                        l = 0;
-                        break;
-                    }
-                    case WaveformAudioSourceType::WhiteNoise: {
-                        // TODO
-                        r = 0;
-                        l = 0;
-                        break;
-                    }
-                }
+                        auto const frame_ptr =
+                            audio_data.interleaved_samples.data + (i * audio_data.channels);
+                        auto const audio = audio_data.channels == 2 ? LoadUnalignedToType<f32x2>(frame_ptr)
+                                                                    : f32x2(frame_ptr[0]);
+                        levels += Abs(audio);
 
-                avg_l += Abs(l);
-                avg_r += Abs(r);
-                num_sampled++;
+                        num_sampled++;
+                    }
+
+                    levels /= (f32)Max(1, num_sampled);
+
+                    if (x == 0) {
+                        // hard-set the history so that the filter doesn't have to ramp up and therefore
+                        // zero-out any initial peak in the audio file
+                        filter_data.z1_a = levels;
+                        filter_data.z2_a = levels;
+                    }
+                    sv_filter::Process(levels, levels, filter_data, sv_filter::Type::Lowpass, filter_cache);
+
+                    levels = Clamp01(levels);
+
+                    // arbitrary skew to make the waveform a bit more prominent
+                    levels = Pow(levels, f32x2(0.6f));
+
+                    ASSERT(levels.x >= 0 && levels.x <= 1);
+                    ASSERT(levels.y >= 0 && levels.y <= 1);
+                    break;
+                }
+                case WaveformAudioSourceType::Sine: {
+                    levels = trig_table_lookup::SinTurnsPositive((f32)x / (f32)scaled_width) / 2;
+                    break;
+                }
+                case WaveformAudioSourceType::WhiteNoise: {
+                    levels = {RandomFloat01<f32>(random_seed), RandomFloat01<f32>(random_seed)};
+                    levels = (0.6f + 0.4f * levels) * 0.8f; // arbitrary scaling to make it look better
+                    break;
+                }
             }
 
-            avg_l /= (f32)Max(1, num_sampled);
-            avg_r /= (f32)Max(1, num_sampled);
-            if (x == 0) {
-                f32 l;
-                f32 r;
-                for (auto _ : Range(150)) {
-                    sv_filter::Process(avg_l, l, d_l, sv_filter::Type::Lowpass, c_l);
-                    sv_filter::Process(avg_r, r, d_r, sv_filter::Type::Lowpass, c_r);
-                }
-            }
-            sv_filter::Process(avg_l, avg_l, d_l, sv_filter::Type::Lowpass, c_l);
-            sv_filter::Process(avg_r, avg_r, d_r, sv_filter::Type::Lowpass, c_r);
+            auto const fval = levels * (f32)scaled_height;
+            auto const val = Min(ConvertVector(fval, s32x2), s32x2(scaled_height));
 
-            avg_l = Clamp(avg_l, 0.0f, 1.0f);
-            avg_r = Clamp(avg_r, 0.0f, 1.0f);
-
-            // arbitrary skew to make the waveform a bit more prominent
-            avg_l = Pow(avg_l, 0.6f);
-            avg_r = Pow(avg_r, 0.6f);
-            ASSERT(avg_l >= 0 && avg_l <= 1);
-            ASSERT(avg_r >= 0 && avg_r <= 1);
-
-            struct FloatRange {
-                f32 lo;
-                f32 hi;
-            };
-            FloatRange const fval {avg_l * (f32)scaled_height, avg_r * (f32)scaled_height};
-
-            int const val_l = Min((int)fval.lo, scaled_height);
-            int const val_r = Min((int)fval.hi, scaled_height);
-
-            auto const start = (int)(mid_y - Abs(val_l / 2));
-            int end = (int)(mid_y + Abs(val_r / 2)) +
-                      1; // +1 because we always want the centre row of pixels to be filled
+            auto const start = (int)(mid_y - Abs(val.x / 2));
+            // +1 because we always want the centre row of pixels to be filled
+            auto end = (int)(mid_y + Abs(val.y / 2)) + 1;
             if (end >= scaled_height) end = scaled_height - 1;
 
-            dyn::Append(ranges, IntRange {start, end});
+            ranges[(usize)x] = IntRange {start, end};
             min_y = Min(min_y, start / k_supersample_scale);
             max_y = Max(max_y, end / k_supersample_scale);
         }

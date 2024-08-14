@@ -94,7 +94,7 @@ struct Voice {
 
     bool filter_changed = false;
     sv_filter::CachedHelpers filter_coeffs = {};
-    Array<sv_filter::Data, 2> filters = {};
+    sv_filter::Data<f32x2> filters = {};
     VoiceSmoothedValueSystem::FloatId const filter_mix_smoother_id = {smoothing_system.CreateSmoother()};
     VoiceSmoothedValueSystem::FloatId const sv_filter_linear_cutoff_smoother_id = {
         smoothing_system.CreateSmoother()};

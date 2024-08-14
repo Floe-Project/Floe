@@ -591,6 +591,7 @@ void GUIDoSampleWaveform(Gui* g, LayerProcessor* layer, Rect r) {
         }
 
         auto tex = g->waveforms.FetchOrCreate(*g->frame_input.graphics_ctx,
+                                              g->scratch_arena,
                                               waveform_source,
                                               r.w,
                                               r.h,

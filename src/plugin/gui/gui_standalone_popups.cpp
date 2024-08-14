@@ -681,7 +681,7 @@ void DoSettingsStandalone(Gui* g) {
         {
             auto edits = do_scan_folder_gui(
                 "Library scan-folders",
-                "Folders that contain libraries (scanned non-recursively)",
+                "Folders that contain libraries (scanned recursively)",
                 g->settings.settings.filesystem.extra_libraries_scan_folders,
                 g->plugin.shared_data.paths.always_scanned_folders[ToInt(ScanFolderType::Libraries)]);
 

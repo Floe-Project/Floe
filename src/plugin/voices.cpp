@@ -693,6 +693,10 @@ class ChunkwiseVoiceProcessor {
                                 samples[3] = samples[2];
                                 s.pos += GetPitchRatio(s, frame + 1);
 
+                                // prevent overflow
+                                if (s.pos > (1 << 24)) [[unlikely]]
+                                    s.pos -= (1 << 24);
+
                                 // This is an arbitrary scale factor to make the sine more in line with other
                                 // waveform levels. It's important to keep this the same for backwards
                                 // compatibility.

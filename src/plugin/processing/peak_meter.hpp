@@ -29,8 +29,8 @@ struct StereoPeakMeter {
         m_smoothed_levels = {};
         m_prev_levels = {};
         m_clipping_detection_counter = {};
-        m_clipping_detection_counter_atomic.Store(0);
-        m_snapshot.Store({});
+        m_clipping_detection_counter_atomic.Store(0, StoreMemoryOrder::Relaxed);
+        m_snapshot.Store({}, StoreMemoryOrder::Relaxed);
     }
 
     // not thread-safe
@@ -59,19 +59,23 @@ struct StereoPeakMeter {
             m_smoothed_levels[1] = SmoothOutput(m_levels[1], m_prev_levels[1]);
         }
 
-        m_snapshot.Store(Snapshot {
-            .levels = m_smoothed_levels,
-        });
-        m_clipping_detection_counter_atomic.Store(m_clipping_detection_counter);
+        m_snapshot.Store(
+            Snapshot {
+                .levels = m_smoothed_levels,
+            },
+            StoreMemoryOrder::Relaxed);
+        m_clipping_detection_counter_atomic.Store(m_clipping_detection_counter, StoreMemoryOrder::Relaxed);
     }
 
     // not thread-safe
     bool Silent() const { return m_levels[0] == 0 && m_levels[1] == 0; }
 
     // thread-safe
-    Snapshot GetSnapshot() const { return m_snapshot.Load(); }
+    Snapshot GetSnapshot() const { return m_snapshot.Load(LoadMemoryOrder::Relaxed); }
 
-    bool DidClipRecently() const { return m_clipping_detection_counter_atomic.Load() != 0; }
+    bool DidClipRecently() const {
+        return m_clipping_detection_counter_atomic.Load(LoadMemoryOrder::Relaxed) != 0;
+    }
 
   private:
     static f32 SmoothOutput(f32 output, f32& prev_output) {
@@ -89,6 +93,6 @@ struct StereoPeakMeter {
     u32 m_clipping_detection_start_counter {};
     u32 m_clipping_detection_counter {};
 
-    Atomic<u32> m_clipping_detection_counter_atomic;
-    Atomic<Snapshot> m_snapshot;
+    Atomic<u32> m_clipping_detection_counter_atomic {};
+    Atomic<Snapshot> m_snapshot {};
 };

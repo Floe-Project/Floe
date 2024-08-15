@@ -72,7 +72,10 @@ void FileLogger::LogFunction(String str, LogLevel level, bool add_newline) {
     // order.
 
     FileLogger::State ex = FileLogger::State::Uninitialised;
-    if (state.CompareExchangeStrong(ex, FileLogger::State::Initialising)) {
+    if (state.CompareExchangeStrong(ex,
+                                    FileLogger::State::Initialising,
+                                    RmwMemoryOrder::Acquire,
+                                    LoadMemoryOrder::Relaxed)) {
         ArenaAllocatorWithInlineStorage<1000> arena;
         auto outcome = KnownDirectoryWithSubdirectories(arena, KnownDirectories::Logs, Array {"Floe"_s});
         if (outcome.HasValue()) {
@@ -84,14 +87,14 @@ void FileLogger::LogFunction(String str, LogLevel level, bool add_newline) {
             dyn::Clear(filepath);
             DebugLn("failed to get logs known dir: {}", outcome.Error());
         }
-        state.Store(FileLogger::State::Initialised);
+        state.Store(FileLogger::State::Initialised, StoreMemoryOrder::Release);
     } else if (ex == FileLogger::State::Initialising) {
         do {
             SpinLoopPause();
-        } while (state.Load() == FileLogger::State::Initialising);
+        } while (state.Load(LoadMemoryOrder::Acquire) == FileLogger::State::Initialising);
     }
 
-    ASSERT(state.Load() == FileLogger::State::Initialised);
+    ASSERT(state.Load(LoadMemoryOrder::Relaxed) == FileLogger::State::Initialised);
 
     auto file = ({
         auto outcome = OpenFile(filepath, FileMode::Append);

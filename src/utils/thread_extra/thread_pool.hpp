@@ -26,12 +26,12 @@ struct ThreadPool {
 
     void StopAllThreads() {
         ZoneScoped;
-        m_thread_stop_requested.Store(true);
+        m_thread_stop_requested.Store(true, StoreMemoryOrder::Relaxed);
         m_cond_var.WakeAll();
         for (auto& t : m_workers)
             if (t.Joinable()) t.Join();
         dyn::Clear(m_workers);
-        m_thread_stop_requested.Store(false);
+        m_thread_stop_requested.Store(false, StoreMemoryOrder::Relaxed);
     }
 
     void AddJob(FunctionType f) {
@@ -52,13 +52,14 @@ struct ThreadPool {
             Optional<FunctionQueue<>::Function> f {};
             {
                 ScopedMutexLock lock(thread_pool->m_mutex);
-                while (thread_pool->m_job_queue.Empty() && !thread_pool->m_thread_stop_requested.Load())
+                while (thread_pool->m_job_queue.Empty() &&
+                       !thread_pool->m_thread_stop_requested.Load(LoadMemoryOrder::Relaxed))
                     thread_pool->m_cond_var.Wait(lock);
                 f = thread_pool->m_job_queue.TryPop(scratch_arena);
             }
             if (f) (*f)();
 
-            if (thread_pool->m_thread_stop_requested.Load()) return;
+            if (thread_pool->m_thread_stop_requested.Load(LoadMemoryOrder::Relaxed)) return;
             scratch_arena.ResetCursorAndConsolidateRegions();
         }
     }

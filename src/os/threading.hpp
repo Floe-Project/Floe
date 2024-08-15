@@ -123,7 +123,9 @@ class Semaphore {
 //
 // It's the same as the C/C++ memory model: https://en.cppreference.com/w/cpp/atomic/memory_order.
 //
-// Excellent article on atomics: https://accu.org/journals/overload/32/182/teodorescu/
+// Helpful articles on atomics and memory ordering:
+// - https://accu.org/journals/overload/32/182/teodorescu/
+// - https://dev.to/kprotty/understanding-atomics-and-memory-ordering-2mom
 //
 // NOTE: __ATOMIC_CONSUME is also available but we're not using it here. cppreference says "The specification
 // of release-consume ordering is being revised, and the use of memory_order_consume is temporarily
@@ -132,22 +134,24 @@ class Semaphore {
 enum class LoadMemoryOrder {
     Relaxed = __ATOMIC_RELAXED,
 
-    // ensures all memory operations declared after actually happen after it.
+    // Ensures all memory operations declared after actually happen after it.
     Acquire = __ATOMIC_ACQUIRE,
 
-    // same as Acquire, except guarantees a single total modification ordering of all the operations that are
-    // tagged
+    // Same as Acquire, except guarantees a single total modification ordering of all the operations that are
+    // tagged SequentiallyConsistent. Not commonly needed. It's useful when there's multiple atomic variables
+    // at play.
     SequentiallyConsistent = __ATOMIC_SEQ_CST,
 };
 
 enum class StoreMemoryOrder {
     Relaxed = __ATOMIC_RELAXED,
 
-    // ensures that all memory operations declared before it actually happen before it
+    // Ensures that all memory operations declared before it actually happen before it.
     Release = __ATOMIC_RELEASE,
 
-    // same as Release, except guarantees a single total modification ordering of all the operations that are
-    // tagged
+    // Same as Release, except guarantees a single total modification ordering of all the operations that are
+    // tagged SequentiallyConsistent. Not commonly needed. It's useful when there's multiple atomic variables
+    // at play.
     SequentiallyConsistent = __ATOMIC_SEQ_CST,
 };
 
@@ -159,6 +163,8 @@ enum class RmwMemoryOrder {
     AcquireRelease = __ATOMIC_ACQ_REL, // both acquire and release
     SequentiallyConsistent = __ATOMIC_SEQ_CST,
 };
+
+// TODO: remove SequentiallyConsistent as the default - we should be explicit
 
 template <typename Type>
 struct Atomic {

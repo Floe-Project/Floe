@@ -867,12 +867,12 @@ TEST_CASE(TestFutex) {
         thread.Start(
             [&]() {
                 SleepThisThread(1);
-                atomic.Store(1);
+                atomic.Store(1, StoreMemoryOrder::Relaxed);
                 WakeWaitingThreads(atomic, wake_mode);
             },
             "thread");
 
-        while (atomic.Load() == 1)
+        while (atomic.Load(LoadMemoryOrder::Relaxed) == 1)
             WaitIfValueIsExpected(atomic, 1, {});
 
         thread.Join();

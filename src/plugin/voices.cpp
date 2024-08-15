@@ -15,7 +15,7 @@
 static constexpr u32 k_num_frames_in_voice_processing_chunk = 64;
 
 static void FadeOutVoicesToEnsureMaxActive(VoicePool& pool, AudioProcessingContext const& context) {
-    if (pool.num_active_voices.Load() > k_max_num_active_voices) {
+    if (pool.num_active_voices.Load(LoadMemoryOrder::Relaxed) > k_max_num_active_voices) {
         auto oldest = LargestRepresentableValue<u64>();
         Voice* oldest_voice = nullptr;
         for (auto& v : pool.EnumerateActiveVoices()) {
@@ -463,27 +463,35 @@ class ChunkwiseVoiceProcessor {
             num_frames -= chunk_size;
             m_frame_index += chunk_size;
 
-            m_voice.pool.voice_waveform_markers_for_gui[m_voice.index].Store({
-                .layer_index = (u8)m_voice.controller->layer_index,
-                .position = (u16)(Clamp01(m_position_for_gui) * (f32)UINT16_MAX),
-                .intensity = (u16)(Clamp01(m_voice.current_gain) * (f32)UINT16_MAX),
-            });
-            m_voice.pool.voice_vol_env_markers_for_gui[m_voice.index].Store({
-                .on = m_voice.controller->vol_env_on && !m_voice.vol_env.IsIdle(),
-                .layer_index = (u8)m_voice.controller->layer_index,
-                .state = (u8)m_voice.vol_env.state,
-                .pos = (u16)(Clamp01(m_voice.vol_env.output) * (f32)UINT16_MAX),
-                .sustain_level = (u16)(Clamp01(m_voice.controller->vol_env.sustain_amount) * (f32)UINT16_MAX),
-                .id = m_voice.id,
-            });
-            m_voice.pool.voice_fil_env_markers_for_gui[m_voice.index].Store({
-                .on = m_voice.controller->fil_env_amount != 0 && !m_voice.fil_env.IsIdle(),
-                .layer_index = (u8)m_voice.controller->layer_index,
-                .state = (u8)m_voice.fil_env.state,
-                .pos = (u16)(Clamp01(m_voice.fil_env.output) * (f32)UINT16_MAX),
-                .sustain_level = (u16)(Clamp01(m_voice.controller->fil_env.sustain_amount) * (f32)UINT16_MAX),
-                .id = m_voice.id,
-            });
+            m_voice.pool.voice_waveform_markers_for_gui[m_voice.index].Store(
+                {
+                    .layer_index = (u8)m_voice.controller->layer_index,
+                    .position = (u16)(Clamp01(m_position_for_gui) * (f32)UINT16_MAX),
+                    .intensity = (u16)(Clamp01(m_voice.current_gain) * (f32)UINT16_MAX),
+                },
+                StoreMemoryOrder::Relaxed);
+            m_voice.pool.voice_vol_env_markers_for_gui[m_voice.index].Store(
+                {
+                    .on = m_voice.controller->vol_env_on && !m_voice.vol_env.IsIdle(),
+                    .layer_index = (u8)m_voice.controller->layer_index,
+                    .state = (u8)m_voice.vol_env.state,
+                    .pos = (u16)(Clamp01(m_voice.vol_env.output) * (f32)UINT16_MAX),
+                    .sustain_level =
+                        (u16)(Clamp01(m_voice.controller->vol_env.sustain_amount) * (f32)UINT16_MAX),
+                    .id = m_voice.id,
+                },
+                StoreMemoryOrder::Relaxed);
+            m_voice.pool.voice_fil_env_markers_for_gui[m_voice.index].Store(
+                {
+                    .on = m_voice.controller->fil_env_amount != 0 && !m_voice.fil_env.IsIdle(),
+                    .layer_index = (u8)m_voice.controller->layer_index,
+                    .state = (u8)m_voice.fil_env.state,
+                    .pos = (u16)(Clamp01(m_voice.fil_env.output) * (f32)UINT16_MAX),
+                    .sustain_level =
+                        (u16)(Clamp01(m_voice.controller->fil_env.sustain_amount) * (f32)UINT16_MAX),
+                    .id = m_voice.id,
+                },
+                StoreMemoryOrder::Relaxed);
 
             m_voice.current_gain = 1;
         }
@@ -928,7 +936,7 @@ Array<Span<f32>, k_num_layers> ProcessVoices(VoicePool& pool,
                                              AudioProcessingContext const& context,
                                              HostThreadPool* thread_pool) {
     ZoneScoped;
-    if (pool.num_active_voices.Load() == 0) return {};
+    if (pool.num_active_voices.Load(LoadMemoryOrder::Relaxed) == 0) return {};
 
     {
 
@@ -977,9 +985,9 @@ Array<Span<f32>, k_num_layers> ProcessVoices(VoicePool& pool,
                                      (usize)num_frames * 2);
             }
         } else {
-            pool.voice_waveform_markers_for_gui[v.index].Store({});
-            pool.voice_vol_env_markers_for_gui[v.index].Store({});
-            pool.voice_fil_env_markers_for_gui[v.index].Store({});
+            pool.voice_waveform_markers_for_gui[v.index].Store({}, StoreMemoryOrder::Relaxed);
+            pool.voice_vol_env_markers_for_gui[v.index].Store({}, StoreMemoryOrder::Relaxed);
+            pool.voice_fil_env_markers_for_gui[v.index].Store({}, StoreMemoryOrder::Relaxed);
         }
     }
 

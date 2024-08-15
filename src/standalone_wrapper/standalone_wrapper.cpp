@@ -115,7 +115,7 @@ struct Standalone {
         .request_callback =
             [](clap_host_t const* ch) {
                 auto h = (Standalone*)ch->host_data;
-                h->callback_requested.Store(true);
+                h->callback_requested.Store(true, StoreMemoryOrder::Relaxed);
             },
     };
 
@@ -149,16 +149,18 @@ AudioCallback(ma_device* device, void* output_buffer, void const* input, ma_uint
         standalone->audio_thread_id.Store(CurrentThreadID(), StoreMemoryOrder::Relaxed);
         SetThreadName("Audio");
         standalone->plugin.start_processing(&standalone->plugin);
-        standalone->audio_stream_state.Store(Standalone::AudioStreamState::Open);
+        standalone->audio_stream_state.Store(Standalone::AudioStreamState::Open, StoreMemoryOrder::Release);
     }
 
-    if (standalone->audio_stream_state.Load() == Standalone::AudioStreamState::CloseRequested) {
+    if (standalone->audio_stream_state.Load(LoadMemoryOrder::Acquire) ==
+        Standalone::AudioStreamState::CloseRequested) {
         standalone->plugin.stop_processing(&standalone->plugin);
-        standalone->audio_stream_state.Store(Standalone::AudioStreamState::Closed);
+        standalone->audio_stream_state.Store(Standalone::AudioStreamState::Closed, StoreMemoryOrder::Release);
         return;
     }
 
-    if (standalone->audio_stream_state.Load() != Standalone::AudioStreamState::Open) return;
+    if (standalone->audio_stream_state.Load(LoadMemoryOrder::Acquire) != Standalone::AudioStreamState::Open)
+        return;
 
     f32* channels[2];
     channels[0] = standalone->audio_buffers[0].data;
@@ -332,9 +334,10 @@ static bool OpenAudio(Standalone& standalone) {
 
 static void CloseAudio(Standalone& standalone) {
     ASSERT(standalone.audio_device);
-    if (standalone.audio_stream_state.Exchange(Standalone::AudioStreamState::CloseRequested) ==
-        Standalone::AudioStreamState::Open)
-        while (standalone.audio_stream_state.Load() != Standalone::AudioStreamState::Closed)
+    if (standalone.audio_stream_state.Exchange(Standalone::AudioStreamState::CloseRequested,
+                                               RmwMemoryOrder::Acquire) == Standalone::AudioStreamState::Open)
+        while (standalone.audio_stream_state.Load(LoadMemoryOrder::Relaxed) !=
+               Standalone::AudioStreamState::Closed)
             SleepThisThread(2);
 
     ma_device_uninit(&*standalone.audio_device);
@@ -505,7 +508,7 @@ static ErrorCodeOr<void> Main() {
     TRY_CLAP(gui->set_size(&standalone.plugin, width, height));
 
     while (!standalone.quit) {
-        if (standalone.callback_requested.Exchange(false))
+        if (standalone.callback_requested.Exchange(false, RmwMemoryOrder::Relaxed))
             standalone.plugin.on_main_thread(&standalone.plugin);
         auto const st = puglUpdate(standalone.gui_world, 0);
         if (st != PUGL_SUCCESS && st != PUGL_FAILURE) return ErrorCode {st};

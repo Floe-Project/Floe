@@ -303,8 +303,10 @@ void GUIDoEnvelope(Gui* g,
         for (auto const voice_index : ::Range(k_num_voices)) {
             auto envelope_marker =
                 type == GuiEnvelopeType::Volume
-                    ? plugin.processor.voice_pool.voice_vol_env_markers_for_gui[voice_index].Load()
-                    : plugin.processor.voice_pool.voice_fil_env_markers_for_gui[voice_index].Load();
+                    ? plugin.processor.voice_pool.voice_vol_env_markers_for_gui[voice_index].Load(
+                          LoadMemoryOrder::Relaxed)
+                    : plugin.processor.voice_pool.voice_fil_env_markers_for_gui[voice_index].Load(
+                          LoadMemoryOrder::Relaxed);
             if (envelope_marker.on && envelope_marker.layer_index == layer->index) {
                 f32 target_pos = 0;
                 f32 const env_pos = envelope_marker.pos / (f32)(UINT16_MAX);

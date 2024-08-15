@@ -6,6 +6,8 @@
 #include <IconsFontAwesome5.h>
 #include <float.h>
 
+#include "os/threading.hpp"
+
 #include "effects/effect.hpp"
 #include "framework/gui_live_edit.hpp"
 #include "gui.hpp"
@@ -360,8 +362,9 @@ void DoEffectsWindow(Gui* g, Rect r) {
         }
     };
 
-    auto ordered_effects = DecodeEffectsArray(plugin.processor.desired_effects_order.Load(),
-                                              plugin.processor.effects_ordered_by_type);
+    auto ordered_effects =
+        DecodeEffectsArray(plugin.processor.desired_effects_order.Load(LoadMemoryOrder::Relaxed),
+                           plugin.processor.effects_ordered_by_type);
 
     for (auto fx : ordered_effects) {
         if (!EffectIsOn(plugin.processor.params, fx)) continue;
@@ -1131,7 +1134,8 @@ void DoEffectsWindow(Gui* g, Rect r) {
     }
 
     if (effects_order_changed) {
-        plugin.processor.desired_effects_order.Store(EncodeEffectsArray(ordered_effects));
+        plugin.processor.desired_effects_order.Store(EncodeEffectsArray(ordered_effects),
+                                                     StoreMemoryOrder::Release);
         plugin.processor.events_for_audio_thread.Push(EventForAudioThreadType::FxOrderChanged);
     }
 }

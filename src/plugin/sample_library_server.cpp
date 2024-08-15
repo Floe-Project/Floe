@@ -805,8 +805,9 @@ static void CancelLoadingAudioForInstrumentIfPossible(ListedInstrument const* i,
 
     usize num_attempted_cancel = 0;
     for (auto audio_data : i->audio_data_set) {
-        ASSERT(audio_data->ref_count.Load() != 0);
-        if (audio_data->ref_count.Load() == 1) {
+        auto const audio_refs = audio_data->ref_count.Load(LoadMemoryOrder::Relaxed);
+        ASSERT(audio_refs != 0);
+        if (audio_refs == 1) {
             auto expected = FileLoadingState::PendingLoad;
             audio_data->state.CompareExchangeStrong(expected,
                                                     FileLoadingState::PendingCancel,
@@ -872,7 +873,8 @@ struct PendingResources {
 
 static void DumpPendingResourcesDebugInfo(PendingResources& pending_resources) {
     ASSERT(CurrentThreadID() == pending_resources.server_thread_id);
-    DebugLn("Thread pool jobs: {}", pending_resources.thread_pool_jobs.counter.Load());
+    DebugLn("Thread pool jobs: {}",
+            pending_resources.thread_pool_jobs.counter.Load(LoadMemoryOrder::Relaxed));
     DebugLn("\nPending results:");
     for (auto& pending_resource : pending_resources.list) {
         DebugLn("  Pending result: {}", pending_resource.debug_id);
@@ -1300,7 +1302,7 @@ static void RemoveUnreferencedObjects(Server& server) {
 
     auto remove_unreferenced_in_lib = [](auto& lib) {
         auto remove_unreferenced = [](auto& list) {
-            list.RemoveIf([](auto const& n) { return n.ref_count.Load() == 0; });
+            list.RemoveIf([](auto const& n) { return n.ref_count.Load(LoadMemoryOrder::Relaxed) == 0; });
         };
         remove_unreferenced(lib.instruments);
         remove_unreferenced(lib.irs);
@@ -1357,7 +1359,7 @@ static void ServerThreadProc(Server& server) {
 
             TracyMessageEx({k_trace_category, k_trace_colour, {}},
                            "poll, thread_pool_jobs: {}",
-                           pending_resources.thread_pool_jobs.counter.Load());
+                           pending_resources.thread_pool_jobs.counter.Load(LoadMemoryOrder::Relaxed));
 
             if (ConsumeResourceRequests(pending_resources, scratch_arena, server.request_queue)) {
                 // For quick initialisation, we load libraries only when there's been a request.

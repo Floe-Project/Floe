@@ -473,10 +473,10 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
     draw_handle(offs_handle, offs_imgui_id, HandleType::Offset, false);
 
     // cursors
-    if (plugin.processor.voice_pool.num_active_voices.Load()) {
+    if (plugin.processor.voice_pool.num_active_voices.Load(LoadMemoryOrder::Relaxed)) {
         for (auto const voice_index : Range(k_num_voices)) {
-            auto const marker =
-                plugin.processor.voice_pool.voice_waveform_markers_for_gui[voice_index].Load();
+            auto const marker = plugin.processor.voice_pool.voice_waveform_markers_for_gui[voice_index].Load(
+                LoadMemoryOrder::Relaxed);
             if (!marker.intensity || marker.layer_index != layer->index) continue;
 
             f32 position = (f32)marker.position / (f32)UINT16_MAX;
@@ -524,7 +524,7 @@ void GUIDoSampleWaveform(Gui* g, LayerProcessor* layer, Rect r) {
                                      rounding);
 
     bool is_loading = false;
-    if (g->plugin.sample_lib_server_async_channel.instrument_loading_percents[(usize)layer->index].Load() !=
+    if (g->plugin.sample_lib_server_async_channel.instrument_loading_percents[(usize)layer->index].Load(LoadMemoryOrder::Relaxed) !=
         -1) {
         labels::Label(g, r, "Loading...", labels::WaveformLoadingLabel(g->imgui));
         is_loading = true;

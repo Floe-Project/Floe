@@ -173,11 +173,9 @@ struct Atomic {
 
     NON_COPYABLE_AND_MOVEABLE(Atomic);
 
-    void Store(Type v, StoreMemoryOrder memory_order = StoreMemoryOrder::SequentiallyConsistent) {
-        __atomic_store(&raw, &v, (int)memory_order);
-    }
+    void Store(Type v, StoreMemoryOrder memory_order) { __atomic_store(&raw, &v, (int)memory_order); }
 
-    Type Load(LoadMemoryOrder memory_order = LoadMemoryOrder::SequentiallyConsistent) const {
+    Type Load(LoadMemoryOrder memory_order) const {
         Type result;
         __atomic_load(&raw, &result, (int)memory_order);
         return result;

@@ -153,7 +153,7 @@ struct AtomicQueue {
         // copy yet. If we increase the producer.tail, we will be broadcasting that there are new entries
         // available to pop, but they would not be the entries the we just wrote above, they would be the
         // other thread's incomplete entries.
-        while (producer.tail.Load() != producer_head)
+        while (producer.tail.Load(LoadMemoryOrder::Relaxed) != producer_head)
             SpinLoopPause();
 
         producer.tail.Store(new_producer_head, StoreMemoryOrder::Release);
@@ -197,7 +197,7 @@ struct AtomicQueue {
             out_buffer[i] = m_data[ring_index];
         }
 
-        while (consumer.tail.Load() != old_cons_head)
+        while (consumer.tail.Load(LoadMemoryOrder::Relaxed) != old_cons_head)
             SpinLoopPause();
 
         consumer.tail.Store(new_consumer_head, StoreMemoryOrder::Release);

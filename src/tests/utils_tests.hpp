@@ -16,11 +16,11 @@ struct StartingGun {
     void Wait() {
         while (true) {
             WaitIfValueIsExpected(value, 0);
-            if (value.Load() == 1) return;
+            if (value.Load(LoadMemoryOrder::Relaxed) == 1) return;
         }
     }
     void Fire() {
-        value.Store(1);
+        value.Store(1, StoreMemoryOrder::Relaxed);
         WakeWaitingThreads(value, NumWaitingThreads::All);
     }
     Atomic<u32> value {0};
@@ -37,11 +37,11 @@ TEST_CASE(TestErrorNotifications) {
     for (auto& p : producers) {
         p.Start(
             [&]() {
-                thread_ready.Store(true);
+                thread_ready.Store(true, StoreMemoryOrder::Relaxed);
                 starting_gun.Wait();
 
                 auto seed = SeedFromTime();
-                while (iterations.Load() < k_num_iterations) {
+                while (iterations.Load(LoadMemoryOrder::Relaxed) < k_num_iterations) {
                     auto const id = RandomIntInRange<u64>(seed, 0, 20);
                     if (RandomIntInRange<u32>(seed, 0, 5) == 0) {
                         no.RemoveError(id);
@@ -63,12 +63,12 @@ TEST_CASE(TestErrorNotifications) {
             "producer");
     }
 
-    while (!thread_ready.Load())
+    while (!thread_ready.Load(LoadMemoryOrder::Relaxed))
         YieldThisThread();
 
     starting_gun.Fire();
     auto seed = SeedFromTime();
-    while (iterations.Load() < k_num_iterations) {
+    while (iterations.Load(LoadMemoryOrder::Relaxed) < k_num_iterations) {
         for (auto& n : no.items) {
             if (auto error = n.TryRetain()) {
                 DEFER { n.Release(); };
@@ -207,7 +207,7 @@ void DoAtomicQueueTest(tests::Tester& tester, String name) {
             Atomic<bool> producer_ready {false};
             producer.Start(
                 [&]() {
-                    producer_ready.Store(true);
+                    producer_ready.Store(true, StoreMemoryOrder::Relaxed);
                     starting_gun.Wait();
                     for (auto const index : Range(k_num_values))
                         while (!q.Push(index))
@@ -215,7 +215,7 @@ void DoAtomicQueueTest(tests::Tester& tester, String name) {
                 },
                 "Producer");
 
-            while (!producer_ready.Load())
+            while (!producer_ready.Load(LoadMemoryOrder::Relaxed))
                 YieldThisThread();
 
             tester.log.DebugLn("Producer ready");
@@ -287,7 +287,7 @@ TEST_CASE(TestAtomicRefList) {
         {
             CHECK(map.dead_list == nullptr);
             CHECK(map.free_list == nullptr);
-            CHECK(map.live_list.Load() == nullptr);
+            CHECK(map.live_list.Load(LoadMemoryOrder::Relaxed) == nullptr);
         }
 
         // Allocate and insert
@@ -296,12 +296,12 @@ TEST_CASE(TestAtomicRefList) {
             REQUIRE(node);
             CHECK(map.dead_list == nullptr);
             CHECK(map.free_list == nullptr);
-            CHECK(map.live_list.Load() == nullptr);
+            CHECK(map.live_list.Load(LoadMemoryOrder::Relaxed) == nullptr);
             PLACEMENT_NEW(&node->value) MallocedObj('a');
             map.Insert(node);
             CHECK(map.dead_list == nullptr);
             CHECK(map.free_list == nullptr);
-            CHECK(map.live_list.Load() == node);
+            CHECK(map.live_list.Load(LoadMemoryOrder::Relaxed) == node);
         }
 
         // Retained iterator
@@ -397,7 +397,7 @@ TEST_CASE(TestAtomicRefList) {
             {
                 map.RemoveAll();
                 map.DeleteRemovedAndUnreferenced();
-                CHECK(map.live_list.Load() == nullptr);
+                CHECK(map.live_list.Load(LoadMemoryOrder::Relaxed) == nullptr);
                 CHECK(map.dead_list == nullptr);
             }
         }
@@ -412,7 +412,7 @@ TEST_CASE(TestAtomicRefList) {
 
         thread.Start(
             [&]() {
-                thread_ready.Store(true);
+                thread_ready.Store(true, StoreMemoryOrder::Relaxed);
                 starting_gun.Wait();
                 auto seed = SeedFromTime();
                 for (auto _ : Range(5000)) {
@@ -445,15 +445,15 @@ TEST_CASE(TestAtomicRefList) {
                     }
                     YieldThisThread();
                 }
-                done.Store(true);
+                done.Store(true, StoreMemoryOrder::Release);
             },
             "test thread");
 
-        while (!thread_ready.Load())
+        while (!thread_ready.Load(LoadMemoryOrder::Relaxed))
             YieldThisThread();
 
         starting_gun.Fire();
-        while (!done.Load()) {
+        while (!done.Load(LoadMemoryOrder::Relaxed)) {
             for (auto& i : map)
                 if (auto val = i.TryRetain()) {
                     CHECK(val->obj[0] >= 'a' && val->obj[0] <= 'z');
@@ -464,8 +464,9 @@ TEST_CASE(TestAtomicRefList) {
 
         thread.Join();
 
-        for (auto n = map.live_list.Load(); n != nullptr; n = n->next.Load())
-            CHECK_EQ(n->reader_uses.Load(), 0u);
+        for (auto n = map.live_list.Load(LoadMemoryOrder::Relaxed); n != nullptr;
+             n = n->next.Load(LoadMemoryOrder::Relaxed))
+            CHECK_EQ(n->reader_uses.Load(LoadMemoryOrder::Relaxed), 0u);
 
         map.RemoveAll();
         map.DeleteRemovedAndUnreferenced();

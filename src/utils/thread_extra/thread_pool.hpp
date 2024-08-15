@@ -26,12 +26,12 @@ struct ThreadPool {
 
     void StopAllThreads() {
         ZoneScoped;
-        m_thread_stop_requested.Store(true, StoreMemoryOrder::Relaxed);
+        m_thread_stop_requested.Store(true, StoreMemoryOrder::Release);
         m_cond_var.WakeAll();
         for (auto& t : m_workers)
             if (t.Joinable()) t.Join();
         dyn::Clear(m_workers);
-        m_thread_stop_requested.Store(false, StoreMemoryOrder::Relaxed);
+        m_thread_stop_requested.Store(false, StoreMemoryOrder::Release);
     }
 
     void AddJob(FunctionType f) {

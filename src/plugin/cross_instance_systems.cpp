@@ -19,7 +19,9 @@ CrossInstanceSystems::CrossInstanceSystems()
     folder_settings_listener_id =
         settings.tracking.filesystem_change_listeners.Add([this](ScanFolderType type) {
             switch (type) {
-                case ScanFolderType::Presets: preset_listing.scanned_folder.needs_rescan.Store(true); break;
+                case ScanFolderType::Presets:
+                    preset_listing.scanned_folder.needs_rescan.Store(true, StoreMemoryOrder::Relaxed);
+                    break;
                 case ScanFolderType::Libraries: {
                     sample_lib_server::SetExtraScanFolders(
                         sample_library_server,

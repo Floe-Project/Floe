@@ -154,7 +154,8 @@ struct VoicePool {
             };
 
             constexpr Iterator begin() {
-                if (k_early_out_if_none_active && pool.num_active_voices.Load() == 0) return end();
+                if (k_early_out_if_none_active && pool.num_active_voices.Load(LoadMemoryOrder::Relaxed) == 0)
+                    return end();
 
                 usize i = 0;
                 for (; i < k_num_voices; ++i)

@@ -91,7 +91,8 @@ class ConvolutionReverb final : public Effect {
     // [audio-thread]
     bool SwapConvolversIfNeeded() {
         ZoneScoped;
-        auto new_convolver = m_desired_convolver.Exchange((StereoConvolver*)k_desired_convolver_consumed);
+        auto new_convolver = m_desired_convolver.Exchange((StereoConvolver*)k_desired_convolver_consumed,
+                                                          RmwMemoryOrder::Relaxed);
         if ((uintptr)new_convolver == k_desired_convolver_consumed) return false;
 
         auto old_convolver = Exchange(m_convolver, new_convolver);
@@ -114,9 +115,9 @@ class ConvolutionReverb final : public Effect {
     void ConvolutionIrDataLoaded(AudioData const* audio_data) {
         DeletedUnusedConvolvers();
         if (audio_data)
-            m_desired_convolver.Store(CreateConvolver(*audio_data));
+            m_desired_convolver.Store(CreateConvolver(*audio_data), StoreMemoryOrder::Relaxed);
         else
-            m_desired_convolver.Store(nullptr);
+            m_desired_convolver.Store(nullptr, StoreMemoryOrder::Relaxed);
     }
 
     // [main-thread]. Call this periodically

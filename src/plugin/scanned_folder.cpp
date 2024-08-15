@@ -6,7 +6,7 @@
 ScannedFolder::ScannedFolder(bool recursive) : recursive(recursive) {}
 
 ScannedFolder::~ScannedFolder() {
-    while (async_scans.Load() != 0)
+    while (async_scans.Load(LoadMemoryOrder::Relaxed) != 0)
         SpinLoopPause();
 }
 
@@ -27,7 +27,7 @@ bool HandleRescanRequest(ScannedFolder& folder,
                          Span<String const> folders_to_scan,
                          TrivialFixedSizeFunction<16, void(Span<String const>)> const& scan) {
     if (mode != RescanMode::DontRescan) {
-        if (folder.needs_rescan.Exchange(false)) {
+        if (folder.needs_rescan.Exchange(false, RmwMemoryOrder::Relaxed)) {
             if (mode == RescanMode::RescanSyncIfNeeded) mode = RescanMode::RescanSync;
             if (mode == RescanMode::RescanAsyncIfNeeded) mode = RescanMode::RescanAsync;
         } else {
@@ -41,13 +41,13 @@ bool HandleRescanRequest(ScannedFolder& folder,
             break;
         }
         case RescanMode::RescanSync: {
-            folder.async_scans.FetchAdd(1);
+            folder.async_scans.FetchAdd(1, RmwMemoryOrder::Acquire);
             scan(folders_to_scan);
-            folder.async_scans.FetchSub(1);
+            folder.async_scans.FetchSub(1, RmwMemoryOrder::Release);
             break;
         }
         case RescanMode::RescanAsync: {
-            if (folder.async_scans.FetchAdd(1) == 0) {
+            if (folder.async_scans.FetchAdd(1, RmwMemoryOrder::Acquire) == 0) {
                 folder.thread_arena.ResetCursorAndConsolidateRegions();
                 ASSERT(thread_pool);
                 thread_pool->AddJob(
@@ -55,10 +55,10 @@ bool HandleRescanRequest(ScannedFolder& folder,
                      &folder,
                      scan = scan]() {
                         scan(folders_to_scan);
-                        folder.async_scans.FetchSub(1);
+                        folder.async_scans.FetchSub(1, RmwMemoryOrder::Release);
                     });
             } else {
-                folder.async_scans.FetchSub(1);
+                folder.async_scans.FetchSub(1, RmwMemoryOrder::Release);
             }
             break;
         }
@@ -69,5 +69,5 @@ bool HandleRescanRequest(ScannedFolder& folder,
         }
     }
 
-    return folder.async_scans.Load() != 0;
+    return folder.async_scans.Load(LoadMemoryOrder::Relaxed) != 0;
 }

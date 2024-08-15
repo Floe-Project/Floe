@@ -313,25 +313,33 @@ void DoMetricsStandalone(Gui* g) {
         DoLabelLine(imgui,
                     y_pos,
                     "Number of active voices:",
-                    fmt::Format(g->scratch_arena, "{}", a->processor.voice_pool.num_active_voices.Load()));
+                    fmt::Format(g->scratch_arena,
+                                "{}",
+                                a->processor.voice_pool.num_active_voices.Load(LoadMemoryOrder::Relaxed)));
         DoLabelLine(imgui,
                     y_pos,
                     "Memory:",
                     fmt::Format(g->scratch_arena, "{} MB", MegabytesUsedBySamples(*a)));
-        DoLabelLine(imgui,
-                    y_pos,
-                    "Memory (all instances):",
-                    fmt::Format(g->scratch_arena,
-                                "{} MB",
-                                sample_library_server.total_bytes_used_by_samples.Load() / (1024 * 1024)));
+        DoLabelLine(
+            imgui,
+            y_pos,
+            "Memory (all instances):",
+            fmt::Format(g->scratch_arena,
+                        "{} MB",
+                        sample_library_server.total_bytes_used_by_samples.Load(LoadMemoryOrder::Relaxed) /
+                            (1024 * 1024)));
         DoLabelLine(imgui,
                     y_pos,
                     "Num Loaded Instruments:",
-                    fmt::Format(g->scratch_arena, "{}", sample_library_server.num_insts_loaded.Load()));
+                    fmt::Format(g->scratch_arena,
+                                "{}",
+                                sample_library_server.num_insts_loaded.Load(LoadMemoryOrder::Relaxed)));
         DoLabelLine(imgui,
                     y_pos,
                     "Num Loaded Samples:",
-                    fmt::Format(g->scratch_arena, "{}", sample_library_server.num_samples_loaded.Load()));
+                    fmt::Format(g->scratch_arena,
+                                "{}",
+                                sample_library_server.num_samples_loaded.Load(LoadMemoryOrder::Relaxed)));
 
         imgui.EndWindow();
     }

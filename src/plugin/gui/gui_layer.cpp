@@ -571,7 +571,7 @@ void Draw(Gui* g,
         DoInstSelectorGUI(g, selector_menu_r, layer->index);
         if (auto percent =
                 g->plugin.sample_lib_server_async_channel.instrument_loading_percents[(usize)layer->index]
-                    .Load();
+                    .Load(LoadMemoryOrder::Relaxed);
             percent != -1) {
             f32 const load_percent = (f32)percent / 100.0f;
             DrawSelectorProgressBar(imgui, registered_selector_box_r, load_percent);
@@ -1012,7 +1012,7 @@ void Draw(Gui* g,
 
     // overlay
     auto const& layer_processor = plugin->processor.layer_processors[(usize)layer->index];
-    if (layer_processor.is_silent.Load()) {
+    if (layer_processor.is_silent.Load(LoadMemoryOrder::Relaxed)) {
         auto pos = imgui.curr_window->unpadded_bounds.pos;
         imgui.graphics->AddRectFilled(pos, pos + imgui.Size(), LiveCol(imgui, UiColMap::LayerMutedOverlay));
     }

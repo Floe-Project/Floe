@@ -137,7 +137,8 @@ class AtomicBitset {
 
     Bool64 Get(usize bit) const {
         ASSERT(bit < k_bits);
-        return m_data[bit / k_bits_per_element].Load() & (u64(1) << bit % k_bits_per_element);
+        return m_data[bit / k_bits_per_element].Load(LoadMemoryOrder::Relaxed) &
+               (u64(1) << bit % k_bits_per_element);
     }
 
     // NOTE: these Blockwise methods are not atomic in terms of the _whole_ bitset, but they will be atomic in
@@ -146,13 +147,13 @@ class AtomicBitset {
     void AssignBlockwise(Bitset<k_bits> other) {
         auto const other_raw = other.parts;
         for (auto const i : Range(m_data.size))
-            m_data[i].Store(other_raw[i]);
+            m_data[i].Store(other_raw[i], StoreMemoryOrder::Relaxed);
     }
 
     Bitset<k_bits> GetBlockwise() const {
         Bitset<k_bits> result;
         for (auto const i : Range(m_data.size))
-            result.parts[i] = m_data[i].Load();
+            result.parts[i] = m_data[i].Load(LoadMemoryOrder::Relaxed);
         return result;
     }
 

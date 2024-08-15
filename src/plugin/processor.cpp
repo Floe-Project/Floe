@@ -3,6 +3,8 @@
 
 #include "processor.hpp"
 
+#include "os/threading.hpp"
+
 #include "clap/ext/params.h"
 #include "param.hpp"
 #include "param_info.hpp"
@@ -15,17 +17,17 @@ bool EffectIsOn(Parameters const& params, Effect* effect) {
 
 bool IsMidiCCLearnActive(AudioProcessor const& processor) {
     ASSERT(IsMainThread(processor.host));
-    return processor.midi_learn_param_index.Load().HasValue();
+    return processor.midi_learn_param_index.Load(LoadMemoryOrder::Relaxed).HasValue();
 }
 
 void LearnMidiCC(AudioProcessor& processor, ParamIndex param) {
     ASSERT(IsMainThread(processor.host));
-    processor.midi_learn_param_index.Store((s32)param);
+    processor.midi_learn_param_index.Store((s32)param, StoreMemoryOrder::Relaxed);
 }
 
 void CancelMidiCCLearn(AudioProcessor& processor) {
     ASSERT(IsMainThread(processor.host));
-    processor.midi_learn_param_index.Store(nullopt);
+    processor.midi_learn_param_index.Store(nullopt, StoreMemoryOrder::Relaxed);
 }
 
 void UnlearnMidiCC(AudioProcessor& processor, ParamIndex param, u7 cc_num_to_remove) {
@@ -41,7 +43,8 @@ Bitset<128> GetLearnedCCsBitsetForParam(AudioProcessor const& processor, ParamIn
 
 bool CcControllerMovedParamRecently(AudioProcessor const& processor, ParamIndex param) {
     ASSERT(IsMainThread(processor.host));
-    return (processor.time_when_cc_moved_param[ToInt(param)].Load() + 0.4) > TimePoint::Now();
+    return (processor.time_when_cc_moved_param[ToInt(param)].Load(LoadMemoryOrder::Relaxed) + 0.4) >
+           TimePoint::Now();
 }
 
 static void HandleMuteSolo(AudioProcessor& processor) {
@@ -622,7 +625,7 @@ void ApplyNewState(AudioProcessor& processor, StateSnapshot const& state, StateS
     for (auto const i : Range(k_num_parameters))
         processor.params[i].SetLinearValue(state.param_values[i]);
 
-    processor.desired_effects_order.Store(EncodeEffectsArray(state.fx_order));
+    processor.desired_effects_order.Store(EncodeEffectsArray(state.fx_order), StoreMemoryOrder::Relaxed);
 
     // reload everything
     {
@@ -637,7 +640,8 @@ void ApplyNewState(AudioProcessor& processor, StateSnapshot const& state, StateS
 StateSnapshot MakeStateSnapshot(AudioProcessor const& processor) {
     StateSnapshot result {};
     auto const ordered_fx_pointers =
-        DecodeEffectsArray(processor.desired_effects_order.Load(), processor.effects_ordered_by_type);
+        DecodeEffectsArray(processor.desired_effects_order.Load(LoadMemoryOrder::Relaxed),
+                           processor.effects_ordered_by_type);
     for (auto [i, fx_pointer] : Enumerate(ordered_fx_pointers))
         result.fx_order[i] = fx_pointer->type;
 
@@ -674,7 +678,8 @@ ResetProcessor(AudioProcessor& processor, Bitset<k_num_parameters> processing_ch
 
     // Set the effects order
     processor.actual_fx_order =
-        DecodeEffectsArray(processor.desired_effects_order.Load(), processor.effects_ordered_by_type);
+        DecodeEffectsArray(processor.desired_effects_order.Load(LoadMemoryOrder::Relaxed),
+                           processor.effects_ordered_by_type);
 
     // Reset the effects
     for (auto fx : processor.actual_fx_order)
@@ -874,7 +879,8 @@ static void ProcessClapNoteOrMidi(AudioProcessor& processor,
                              Enumerate<u16>(processor.param_learned_ccs)) {
                             if (!param_ccs.Get(cc_num)) continue;
 
-                            processor.time_when_cc_moved_param[param_index].Store(TimePoint::Now());
+                            processor.time_when_cc_moved_param[param_index].Store(TimePoint::Now(),
+                                                                                  StoreMemoryOrder::Relaxed);
 
                             auto& info = processor.params[param_index].info;
                             auto const percent = (f32)cc_val / 127.0f;

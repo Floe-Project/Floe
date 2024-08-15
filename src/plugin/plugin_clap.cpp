@@ -396,7 +396,7 @@ clap_plugin_params const floe_params {
         if (floe.plugin->pending_state_change)
             *out_value = (f64)floe.plugin->last_snapshot.state.param_values[index];
         else
-            *out_value = (f64)floe.plugin->processor.params[index].value.Load();
+            *out_value = (f64)floe.plugin->processor.params[index].value.Load(LoadMemoryOrder::Relaxed);
         return true;
     },
 

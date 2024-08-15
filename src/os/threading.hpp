@@ -118,22 +118,46 @@ class Semaphore {
     OpaqueHandle<NativeHandleSizes().sema> m_sema;
 };
 
-// These atomics are just a wrapper around the compiler instrinsics. They follow the C++ memory model:
-// https://en.cppreference.com/w/cpp/atomic/memory_order. And so you can use them as you would std::atomic.
+// These atomics are just a wrapper around the compiler instrinsics:
+// https://gcc.gnu.org/onlinedocs/gcc-4.9.2/gcc/_005f_005fatomic-Builtins.html
+//
+// It's the same as the C/C++ memory model: https://en.cppreference.com/w/cpp/atomic/memory_order.
+//
+// Excellent article on atomics: https://accu.org/journals/overload/32/182/teodorescu/
+//
+// NOTE: __ATOMIC_CONSUME is also available but we're not using it here. cppreference says "The specification
+// of release-consume ordering is being revised, and the use of memory_order_consume is temporarily
+// discouraged"
 
-enum class MemoryOrder {
+enum class LoadMemoryOrder {
     Relaxed = __ATOMIC_RELAXED,
-    Consume = __ATOMIC_CONSUME, // load-consume
 
-    // Acquire goes on atomic loads and ensures all memory operations declared after actually happen after it.
+    // ensures all memory operations declared after actually happen after it.
     Acquire = __ATOMIC_ACQUIRE,
 
-    // Release goes on atomic stores and ensures that all memory operations declared before it actually happen
-    // before it
+    // same as Acquire, except guarantees a single total modification ordering of all the operations that are
+    // tagged
+    SequentiallyConsistent = __ATOMIC_SEQ_CST,
+};
+
+enum class StoreMemoryOrder {
+    Relaxed = __ATOMIC_RELAXED,
+
+    // ensures that all memory operations declared before it actually happen before it
     Release = __ATOMIC_RELEASE,
 
-    AcquireRelease = __ATOMIC_ACQ_REL, // store-release load-acquire
-    SequentiallyConsistent = __ATOMIC_SEQ_CST, // store-release load-acquire
+    // same as Release, except guarantees a single total modification ordering of all the operations that are
+    // tagged
+    SequentiallyConsistent = __ATOMIC_SEQ_CST,
+};
+
+// Read-Modify-Write memory order
+enum class RmwMemoryOrder {
+    Relaxed = __ATOMIC_RELAXED,
+    Acquire = __ATOMIC_ACQUIRE,
+    Release = __ATOMIC_RELEASE,
+    AcquireRelease = __ATOMIC_ACQ_REL, // both acquire and release
+    SequentiallyConsistent = __ATOMIC_SEQ_CST,
 };
 
 template <typename Type>
@@ -143,53 +167,59 @@ struct Atomic {
 
     NON_COPYABLE_AND_MOVEABLE(Atomic);
 
-    void Store(Type v, MemoryOrder memory_order = MemoryOrder::SequentiallyConsistent) {
-        __atomic_store(&raw, &v, int(memory_order));
+    void Store(Type v, StoreMemoryOrder memory_order = StoreMemoryOrder::SequentiallyConsistent) {
+        __atomic_store(&raw, &v, (int)memory_order);
     }
 
-    Type Load(MemoryOrder memory_order = MemoryOrder::SequentiallyConsistent) const {
+    Type Load(LoadMemoryOrder memory_order = LoadMemoryOrder::SequentiallyConsistent) const {
         Type result;
-        __atomic_load(&raw, &result, int(memory_order));
+        __atomic_load(&raw, &result, (int)memory_order);
         return result;
     }
 
-    Type Exchange(Type desired, MemoryOrder memory_order = MemoryOrder::SequentiallyConsistent) {
+    // Returns the previous value.
+    Type Exchange(Type desired, RmwMemoryOrder memory_order = RmwMemoryOrder::SequentiallyConsistent) {
         alignas(Type) unsigned char buf[sizeof(Type)];
         auto* ptr = reinterpret_cast<Type*>(buf);
-        __atomic_exchange(&raw, &desired, ptr, int(memory_order));
+        __atomic_exchange(&raw, &desired, ptr, (int)memory_order);
         return *ptr;
     }
 
-    // Returns true if the exchange succeeded.
-    bool CompareExchangeWeak(Type& expected,
-                             Type desired,
-                             MemoryOrder success_memory_order = MemoryOrder::SequentiallyConsistent,
-                             MemoryOrder failure_memory_order = MemoryOrder::SequentiallyConsistent) {
+    // CompareExchange:
+    // - Returns true if the exchange succeeded.
+    // - If expected != desired, 'expected' is updated with the actual value.
+    // - The failure memory order must not be stronger than the success memory order.
+    // - Weak may fail spuriously, strong will not. Use strong unless you are already in a loop that can
+    //   handle spurious failures.
+    bool
+    CompareExchangeWeak(Type& expected,
+                        Type desired,
+                        RmwMemoryOrder success_rmw_memory_order = RmwMemoryOrder::SequentiallyConsistent,
+                        LoadMemoryOrder failure_load_memory_order = LoadMemoryOrder::SequentiallyConsistent) {
         return __atomic_compare_exchange(&raw,
                                          &expected,
                                          &desired,
                                          true,
-                                         int(success_memory_order),
-                                         int(failure_memory_order));
+                                         (int)success_rmw_memory_order,
+                                         (int)failure_load_memory_order);
     }
-
-    // Returns true if the exchange succeeded.
-    bool CompareExchangeStrong(Type& expected,
-                               Type desired,
-                               MemoryOrder success_memory_order = MemoryOrder::SequentiallyConsistent,
-                               MemoryOrder failure_memory_order = MemoryOrder::SequentiallyConsistent) {
+    bool CompareExchangeStrong(
+        Type& expected,
+        Type desired,
+        RmwMemoryOrder success_rmw_memory_order = RmwMemoryOrder::SequentiallyConsistent,
+        LoadMemoryOrder failure_load_memory_order = LoadMemoryOrder::SequentiallyConsistent) {
         return __atomic_compare_exchange(&raw,
                                          &expected,
                                          &desired,
                                          false,
-                                         int(success_memory_order),
-                                         int(failure_memory_order));
+                                         (int)success_rmw_memory_order,
+                                         (int)failure_load_memory_order);
     }
 
 #define ATOMIC_INTEGER_METHOD(name, builtin)                                                                 \
     template <Integral U = Type>                                                                             \
-    inline Type name(Type v, MemoryOrder memory_order = MemoryOrder::SequentiallyConsistent) {               \
-        return builtin(&raw, v, int(memory_order));                                                          \
+    inline Type name(Type v, RmwMemoryOrder memory_order = RmwMemoryOrder::SequentiallyConsistent) {         \
+        return builtin(&raw, v, (int)memory_order);                                                          \
     }
 
     ATOMIC_INTEGER_METHOD(FetchAdd, __atomic_fetch_add)
@@ -238,10 +268,10 @@ inline static void SpinLoopPause() {
 
 class AtomicFlag {
   public:
-    bool ExchangeTrue(MemoryOrder mem_order = MemoryOrder::SequentiallyConsistent) {
+    bool ExchangeTrue(RmwMemoryOrder mem_order = RmwMemoryOrder::SequentiallyConsistent) {
         return __atomic_test_and_set(&m_flag, (int)mem_order);
     }
-    void StoreFalse(MemoryOrder mem_order = MemoryOrder::SequentiallyConsistent) {
+    void StoreFalse(StoreMemoryOrder mem_order = StoreMemoryOrder::SequentiallyConsistent) {
         __atomic_clear(&m_flag, (int)mem_order);
     }
 
@@ -255,7 +285,7 @@ struct AtomicCountdown {
     explicit AtomicCountdown(u32 initial_value) : counter(initial_value) {}
 
     void CountDown(u32 steps = 1) {
-        auto const current = counter.SubFetch(steps, MemoryOrder::AcquireRelease);
+        auto const current = counter.SubFetch(steps, RmwMemoryOrder::AcquireRelease);
         if (current == 0)
             WakeWaitingThreads(counter, NumWaitingThreads::All);
         else
@@ -264,11 +294,11 @@ struct AtomicCountdown {
 
     void Increase(u32 steps = 1) { counter.FetchAdd(steps); }
 
-    bool TryWait() const { return counter.Load(MemoryOrder::Acquire) == 0; }
+    bool TryWait() const { return counter.Load(LoadMemoryOrder::Acquire) == 0; }
 
     WaitResult WaitUntilZero(Optional<u32> timeout_ms = {}) {
         while (true) {
-            auto const current = counter.Load(MemoryOrder::Acquire);
+            auto const current = counter.Load(LoadMemoryOrder::Acquire);
             ASSERT(current < LargestRepresentableValue<u32>());
             if (current == 0) return WaitResult::WokenOrSpuriousOrNotExpected;
             if (WaitIfValueIsExpected(counter, current, timeout_ms) == WaitResult::TimedOut)
@@ -280,8 +310,8 @@ struct AtomicCountdown {
     Atomic<u32> counter;
 };
 
-inline void AtomicThreadFence(MemoryOrder memory_order) { __atomic_thread_fence(int(memory_order)); }
-inline void AtomicSignalFence(MemoryOrder memory_order) { __atomic_signal_fence(int(memory_order)); }
+inline void AtomicThreadFence(RmwMemoryOrder memory_order) { __atomic_thread_fence(int(memory_order)); }
+inline void AtomicSignalFence(RmwMemoryOrder memory_order) { __atomic_signal_fence(int(memory_order)); }
 
 struct WorkSignaller {
     void Signal() {
@@ -295,7 +325,7 @@ struct WorkSignaller {
     void WaitUntilSignalled(Optional<u32> timeout_milliseconds = {}) {
         if (flag.Exchange(k_not_signalled) == k_not_signalled) do {
                 WaitIfValueIsExpected(flag, k_not_signalled, timeout_milliseconds);
-            } while (flag.Load(MemoryOrder::Relaxed) == k_not_signalled);
+            } while (flag.Load(LoadMemoryOrder::Relaxed) == k_not_signalled);
     }
 
     static constexpr u32 k_signalled = 1;
@@ -388,11 +418,11 @@ class MutexProtected {
 class SpinLock {
   public:
     void Lock() {
-        while (m_lock_flag.ExchangeTrue(MemoryOrder::Acquire)) {
+        while (m_lock_flag.ExchangeTrue(RmwMemoryOrder::Acquire)) {
         }
     }
 
-    bool TryLock() { return !m_lock_flag.ExchangeTrue(MemoryOrder::Acquire); }
+    bool TryLock() { return !m_lock_flag.ExchangeTrue(RmwMemoryOrder::Acquire); }
 
     void Unlock() { m_lock_flag.StoreFalse(); }
 

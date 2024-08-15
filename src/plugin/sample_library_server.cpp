@@ -63,9 +63,9 @@ struct PendingLibraryJobs {
                                       TypeAndTag<ScanFolder*, Type::ScanFolder>>;
 
         DataUnion data;
-        Atomic<Job*> next {nullptr};
+        Job* next {nullptr};
         Atomic<bool> completed {false};
-        bool handled {};
+        bool result_handled {};
     };
 
     u64 server_thread_id;
@@ -162,13 +162,13 @@ static void AddAsyncJob(PendingLibraryJobs& pending_library_jobs,
         PLACEMENT_NEW(job)
         PendingLibraryJobs::Job {
             .data = data,
-            .next = pending_library_jobs.jobs.Load(MemoryOrder::Relaxed),
-            .handled = false,
+            .next = pending_library_jobs.jobs.Load(LoadMemoryOrder::Relaxed),
+            .result_handled = false,
         };
-        pending_library_jobs.jobs.Store(job, MemoryOrder::Release);
+        pending_library_jobs.jobs.Store(job, StoreMemoryOrder::Release);
     }
 
-    pending_library_jobs.num_uncompleted_jobs.FetchAdd(1, MemoryOrder::AcquireRelease);
+    pending_library_jobs.num_uncompleted_jobs.FetchAdd(1, RmwMemoryOrder::Relaxed);
 
     pending_library_jobs.thread_pool.AddJob([&pending_library_jobs, &job = *job, &lib_list]() {
         ZoneNamed(do_job, true);
@@ -187,7 +187,7 @@ static void AddAsyncJob(PendingLibraryJobs& pending_library_jobs,
             }
         }
 
-        job.completed.Store(true, MemoryOrder::SequentiallyConsistent);
+        job.completed.Store(true, StoreMemoryOrder::Release);
         pending_library_jobs.work_signaller.Signal();
     });
 }
@@ -226,7 +226,10 @@ static bool RequestLibraryFolderScanIfNeeded(ScanFolderList& scan_folders) {
     for (auto& n : scan_folders)
         if (auto f = n.TryScoped()) {
             auto expected = ScanFolder::State::NotScanned;
-            if (f->state.CompareExchangeStrong(expected, ScanFolder::State::RescanRequested))
+            if (f->state.CompareExchangeStrong(expected,
+                                               ScanFolder::State::RescanRequested,
+                                               RmwMemoryOrder::Relaxed,
+                                               LoadMemoryOrder::Relaxed))
                 any_rescan_requested = true;
         }
     return any_rescan_requested;
@@ -236,7 +239,7 @@ static bool RequestLibraryFolderScanIfNeeded(ScanFolderList& scan_folders) {
 static void NotifyAllChannelsOfLibraryChange(Server& server, sample_lib::LibraryIdRef library_id) {
     server.channels.Use([&](ArenaList<AsyncCommsChannel, true>& channels) {
         for (auto& c : channels)
-            if (c.used.Load(MemoryOrder::Relaxed)) c.library_changed_callback(library_id);
+            if (c.used.Load(LoadMemoryOrder::Relaxed)) c.library_changed_callback(library_id);
     });
 }
 
@@ -252,7 +255,10 @@ static bool UpdateLibraryJobs(Server& server,
     for (auto& node : server.scan_folders) {
         if (auto f = node.TryScoped()) {
             auto expected = ScanFolder::State::RescanRequested;
-            auto const exchanged = f->state.CompareExchangeStrong(expected, ScanFolder::State::Scanning);
+            auto const exchanged = f->state.CompareExchangeStrong(expected,
+                                                                  ScanFolder::State::Scanning,
+                                                                  RmwMemoryOrder::Relaxed,
+                                                                  LoadMemoryOrder::Relaxed);
             if (!exchanged) continue;
         }
 
@@ -276,14 +282,14 @@ static bool UpdateLibraryJobs(Server& server,
     }
 
     // handle async jobs that have completed
-    for (auto node = pending_library_jobs.jobs.Load(MemoryOrder::Acquire); node != nullptr;
-         node = node->next.Load(MemoryOrder::Relaxed)) {
-        if (node->handled) continue;
-        if (!node->completed.Load(MemoryOrder::Acquire)) continue;
+    for (auto node = pending_library_jobs.jobs.Load(LoadMemoryOrder::Relaxed); node != nullptr;
+         node = node->next) {
+        if (node->result_handled) continue;
+        if (!node->completed.Load(LoadMemoryOrder::Acquire)) continue;
 
         DEFER {
-            node->handled = true;
-            pending_library_jobs.num_uncompleted_jobs.FetchSub(1, MemoryOrder::AcquireRelease);
+            node->result_handled = true;
+            pending_library_jobs.num_uncompleted_jobs.FetchSub(1, RmwMemoryOrder::Relaxed);
         };
         auto const& job = *node;
         switch (job.data.tag) {
@@ -369,7 +375,8 @@ static bool UpdateLibraryJobs(Server& server,
 
                     if (!j.result.outcome.HasError()) {
                         server.error_notifications.RemoveError(folder_error_id);
-                        folder->state.Store(ScanFolder::State::ScannedSuccessfully, MemoryOrder::Release);
+                        folder->state.Store(ScanFolder::State::ScannedSuccessfully,
+                                            StoreMemoryOrder::Relaxed);
                     } else {
                         auto const is_always_scanned_folder =
                             folder->source == ScanFolder::Source::AlwaysScannedFolder;
@@ -384,7 +391,7 @@ static bool UpdateLibraryJobs(Server& server,
                             };
                             server.error_notifications.AddOrUpdateError(err);
                         }
-                        folder->state.Store(ScanFolder::State::ScanFailed, MemoryOrder::Release);
+                        folder->state.Store(ScanFolder::State::ScanFailed, StoreMemoryOrder::Relaxed);
                     }
                 }
                 break;
@@ -400,7 +407,7 @@ static bool UpdateLibraryJobs(Server& server,
             DynamicArray<DirectoryToWatch> dirs {scratch_arena};
             for (auto& node : server.scan_folders) {
                 if (auto f = node.TryRetain()) {
-                    if (f->state.Load(MemoryOrder::Relaxed) == ScanFolder::State::ScannedSuccessfully)
+                    if (f->state.Load(LoadMemoryOrder::Relaxed) == ScanFolder::State::ScannedSuccessfully)
                         dyn::Append(dirs,
                                     {
                                         .path = f->path,
@@ -447,7 +454,8 @@ static bool UpdateLibraryJobs(Server& server,
 
                 for (auto const& subpath_changeset : dir_changes.subpath_changesets) {
                     if (subpath_changeset.changes & DirectoryWatcher::ChangeType::ManualRescanNeeded) {
-                        scan_folder.state.Store(ScanFolder::State::RescanRequested);
+                        scan_folder.state.Store(ScanFolder::State::RescanRequested,
+                                                StoreMemoryOrder::Relaxed);
                         continue;
                     }
 
@@ -538,7 +546,7 @@ static bool UpdateLibraryJobs(Server& server,
     }
 
     auto const library_work_still_pending =
-        pending_library_jobs.num_uncompleted_jobs.Load(MemoryOrder::AcquireRelease) != 0;
+        pending_library_jobs.num_uncompleted_jobs.Load(LoadMemoryOrder::Relaxed) != 0;
     return library_work_still_pending;
 }
 
@@ -570,7 +578,7 @@ using AudioDataAllocator = PageAllocator;
 
 ListedAudioData::~ListedAudioData() {
     ZoneScoped;
-    auto const s = state.Load();
+    auto const s = state.Load(LoadMemoryOrder::Relaxed);
     ASSERT(s == FileLoadingState::CompletedCancelled || s == FileLoadingState::CompletedWithError ||
            s == FileLoadingState::CompletedSucessfully);
     if (audio_data.interleaved_samples.size)
@@ -607,7 +615,7 @@ LoadAudioAsync(ListedAudioData& audio_data, sample_lib::Library const& lib, Thre
         };
 
         {
-            auto state = audio_data.state.Load();
+            auto state = audio_data.state.Load(LoadMemoryOrder::Relaxed);
             FileLoadingState new_state;
             do {
                 if (state == FileLoadingState::PendingLoad)
@@ -616,12 +624,18 @@ LoadAudioAsync(ListedAudioData& audio_data, sample_lib::Library const& lib, Thre
                     new_state = FileLoadingState::CompletedCancelled;
                 else
                     PanicIfReached();
-            } while (!audio_data.state.CompareExchangeWeak(state, new_state));
+            } while (!audio_data.state.CompareExchangeWeak(state,
+                                                           new_state,
+                                                           RmwMemoryOrder::Acquire,
+                                                           LoadMemoryOrder::Relaxed));
 
             if (new_state == FileLoadingState::CompletedCancelled) return;
         }
 
-        ASSERT(audio_data.state.Load() == FileLoadingState::Loading);
+        // At this point we must be in the Loading state so other threads know not to interfere. The memory
+        // ordering used with the atomic 'state' variable reflects this: the Acquire memory order above, and
+        // the Release memory order at the end.
+        ASSERT(audio_data.state.Load(LoadMemoryOrder::Relaxed) == FileLoadingState::Loading);
 
         auto const outcome = [&audio_data, &lib]() -> ErrorCodeOr<AudioData> {
             auto reader = TRY(lib.create_file_reader(lib, audio_data.path));
@@ -636,7 +650,7 @@ LoadAudioAsync(ListedAudioData& audio_data, sample_lib::Library const& lib, Thre
             audio_data.error = outcome.Error();
             result = FileLoadingState::CompletedWithError;
         }
-        audio_data.state.Store(result);
+        audio_data.state.Store(result, StoreMemoryOrder::Release);
     });
 }
 
@@ -646,9 +660,12 @@ static void TriggerReloadIfAudioIsCancelled(ListedAudioData& audio_data,
                                             ThreadPoolArgs thread_pool_args,
                                             u32 debug_inst_id) {
     auto expected = FileLoadingState::PendingCancel;
-    if (!audio_data.state.CompareExchangeStrong(expected, FileLoadingState::PendingLoad)) {
+    if (!audio_data.state.CompareExchangeStrong(expected,
+                                                FileLoadingState::PendingLoad,
+                                                RmwMemoryOrder::Acquire,
+                                                LoadMemoryOrder::Relaxed)) {
         if (expected == FileLoadingState::CompletedCancelled) {
-            audio_data.state.Store(FileLoadingState::PendingLoad);
+            audio_data.state.Store(FileLoadingState::PendingLoad, StoreMemoryOrder::Release);
             TracyMessageEx({k_trace_category, k_trace_colour, -1u},
                            "instID:{}, reloading CompletedCancelled audio",
                            debug_inst_id);
@@ -665,8 +682,8 @@ static void TriggerReloadIfAudioIsCancelled(ListedAudioData& audio_data,
                        debug_inst_id);
     }
 
-    ASSERT(audio_data.state.Load() != FileLoadingState::CompletedCancelled &&
-           audio_data.state.Load() != FileLoadingState::PendingCancel);
+    ASSERT(audio_data.state.Load(LoadMemoryOrder::Relaxed) != FileLoadingState::CompletedCancelled &&
+           audio_data.state.Load(LoadMemoryOrder::Relaxed) != FileLoadingState::PendingCancel);
 }
 
 static ListedAudioData* FetchOrCreateAudioData(LibrariesList::Node& lib_node,
@@ -791,7 +808,10 @@ static void CancelLoadingAudioForInstrumentIfPossible(ListedInstrument const* i,
         ASSERT(audio_data->ref_count.Load() != 0);
         if (audio_data->ref_count.Load() == 1) {
             auto expected = FileLoadingState::PendingLoad;
-            audio_data->state.CompareExchangeStrong(expected, FileLoadingState::PendingCancel);
+            audio_data->state.CompareExchangeStrong(expected,
+                                                    FileLoadingState::PendingCancel,
+                                                    RmwMemoryOrder::Relaxed,
+                                                    LoadMemoryOrder::Relaxed);
 
             TracyMessageEx({k_trace_category, k_trace_colour, trace_id},
                            "instID:{} cancel attempt audio from state: {}",
@@ -867,7 +887,7 @@ static void DumpPendingResourcesDebugInfo(PendingResources& pending_resources) {
                         for (auto& audio_data : inst->audio_data_set) {
                             DebugLn("      Audio data: {}, {}",
                                     audio_data->audio_data.hash,
-                                    EnumToString(audio_data->state.Load()));
+                                    EnumToString(audio_data->state.Load(LoadMemoryOrder::Relaxed)));
                         }
                         break;
                     }
@@ -876,7 +896,7 @@ static void DumpPendingResourcesDebugInfo(PendingResources& pending_resources) {
                         DebugLn("    Awaiting audio for IR {}", ir->ir.ir.path);
                         DebugLn("      Audio data: {}, {}",
                                 ir->audio_data->audio_data.hash,
-                                EnumToString(ir->audio_data->state.Load()));
+                                EnumToString(ir->audio_data->state.Load(LoadMemoryOrder::Relaxed)));
                         break;
                     }
                 }
@@ -897,7 +917,7 @@ static bool ConsumeResourceRequests(PendingResources& pending_resources,
     while (auto queued_request = request_queue.TryPop()) {
         ZoneNamedN(req, "request", true);
 
-        if (!queued_request->async_comms_channel.used.Load(MemoryOrder::Relaxed)) continue;
+        if (!queued_request->async_comms_channel.used.Load(LoadMemoryOrder::Relaxed)) continue;
 
         static uintptr debug_result_id = 0;
         auto pending_resource = arena.NewUninitialised<PendingResource>();
@@ -987,7 +1007,7 @@ static bool UpdatePendingResources(PendingResources& pending_resources,
                     if (auto const i = lib->value.lib->insts_by_name.Find(inst_name)) {
                         pending_resource.request.async_comms_channel
                             .instrument_loading_percents[load_inst.layer_index]
-                            .Store(0);
+                            .Store(0, StoreMemoryOrder::Relaxed);
 
                         auto inst = FetchOrCreateInstrument(*lib, **i, thread_pool_args);
                         ASSERT(inst);
@@ -1071,7 +1091,7 @@ static bool UpdatePendingResources(PendingResources& pending_resources,
         Optional<ErrorCode> error {};
         Optional<String> audio_path {};
         for (auto a : listed_inst.audio_data_set) {
-            if (a->state.Load() == FileLoadingState::CompletedWithError) {
+            if (a->state.Load(LoadMemoryOrder::Relaxed) == FileLoadingState::CompletedWithError) {
                 error = a->error;
                 audio_path = a->path;
                 break;
@@ -1095,7 +1115,8 @@ static bool UpdatePendingResources(PendingResources& pending_resources,
             pending_resource.request.async_comms_channel.error_notifications.AddOrUpdateError(err);
 
             CancelLoadingAudioForInstrumentIfPossible(&listed_inst, pending_resource.debug_id);
-            if (pending_resource.IsDesired()) pending_resource.LoadingPercent().Store(-1);
+            if (pending_resource.IsDesired())
+                pending_resource.LoadingPercent().Store(-1, StoreMemoryOrder::Relaxed);
             pending_resource.state = *error;
         }
     }
@@ -1111,19 +1132,19 @@ static bool UpdatePendingResources(PendingResources& pending_resources,
         if (pending_resource.IsDesired()) {
             auto const num_completed = ({
                 u32 n = 0;
-                for (auto& a : i->audio_data_set) {
-                    auto const state = a->state.Load();
-                    if (state == FileLoadingState::CompletedSucessfully) ++n;
-                }
+                for (auto& a : i->audio_data_set)
+                    if (a->state.Load(LoadMemoryOrder::Relaxed) == FileLoadingState::CompletedSucessfully)
+                        ++n;
                 n;
             });
             if (num_completed == i->audio_data_set.size) {
-                pending_resource.LoadingPercent().Store(-1);
+                pending_resource.LoadingPercent().Store(-1, StoreMemoryOrder::Relaxed);
                 pending_resource.state = Resource {
                     RefCounted<sample_lib::LoadedInstrument> {i->inst, i->ref_count, &server.work_signaller}};
             } else {
                 f32 const percent = 100.0f * ((f32)num_completed / (f32)i->audio_data_set.size);
-                pending_resource.LoadingPercent().Store(RoundPositiveFloat(percent));
+                pending_resource.LoadingPercent().Store(RoundPositiveFloat(percent),
+                                                        StoreMemoryOrder::Relaxed);
             }
         } else {
             // If it's not desired by any others it can be cancelled
@@ -1158,7 +1179,7 @@ static bool UpdatePendingResources(PendingResources& pending_resources,
         auto ir_ptr = *ir_ptr_ptr;
 
         auto const& ir = *ir_ptr;
-        switch (ir.audio_data->state.Load()) {
+        switch (ir.audio_data->state.Load(LoadMemoryOrder::Relaxed)) {
             case FileLoadingState::CompletedSucessfully: {
                 pending_resource.state = Resource {
                     RefCounted<sample_lib::LoadedIr> {
@@ -1231,7 +1252,7 @@ static bool UpdatePendingResources(PendingResources& pending_resources,
             };
 
             server.channels.Use([&](auto&) {
-                if (pending_resource.request.async_comms_channel.used.Load(MemoryOrder::Relaxed)) {
+                if (pending_resource.request.async_comms_channel.used.Load(LoadMemoryOrder::Relaxed)) {
                     result.Retain();
                     pending_resource.request.async_comms_channel.results.Push(result);
                     pending_resource.request.async_comms_channel.result_added_callback();
@@ -1259,14 +1280,14 @@ static void ServerThreadUpdateMetrics(Server& server) {
             ++num_insts_loaded;
         for (auto const& audio : i.value.audio_datas) {
             ++num_samples_loaded;
-            if (audio.state.Load() == FileLoadingState::CompletedSucessfully)
+            if (audio.state.Load(LoadMemoryOrder::Relaxed) == FileLoadingState::CompletedSucessfully)
                 total_bytes_used += audio.audio_data.RamUsageBytes();
         }
     }
 
-    server.num_insts_loaded.Store(num_insts_loaded);
-    server.num_samples_loaded.Store(num_samples_loaded);
-    server.total_bytes_used_by_samples.Store(total_bytes_used);
+    server.num_insts_loaded.Store(num_insts_loaded, StoreMemoryOrder::Relaxed);
+    server.num_samples_loaded.Store(num_samples_loaded, StoreMemoryOrder::Relaxed);
+    server.total_bytes_used_by_samples.Store(total_bytes_used, StoreMemoryOrder::Relaxed);
 }
 
 static void RemoveUnreferencedObjects(Server& server) {
@@ -1274,7 +1295,7 @@ static void RemoveUnreferencedObjects(Server& server) {
     ASSERT(CurrentThreadID() == server.server_thread_id);
 
     server.channels.Use([](auto& channels) {
-        channels.RemoveIf([](AsyncCommsChannel const& h) { return !h.used.Load(MemoryOrder::Relaxed); });
+        channels.RemoveIf([](AsyncCommsChannel const& h) { return !h.used.Load(LoadMemoryOrder::Relaxed); });
     });
 
     auto remove_unreferenced_in_lib = [](auto& lib) {
@@ -1305,7 +1326,7 @@ static void ServerThreadProc(Server& server) {
         if (watcher) DestoryDirectoryWatcher(*watcher);
     };
 
-    while (!server.end_thread.Load()) {
+    while (!server.end_thread.Load(LoadMemoryOrder::Relaxed)) {
         PendingResources pending_resources {
             .server_thread_id = server.server_thread_id,
         };
@@ -1321,7 +1342,8 @@ static void ServerThreadProc(Server& server) {
             if (server.request_debug_dump_current_state.Exchange(false)) {
                 ZoneNamedN(dump, "dump", true);
                 DebugLn("Dumping current state of loading thread");
-                DebugLn("Libraries currently loading: {}", libs_async_ctx.num_uncompleted_jobs.Load());
+                DebugLn("Libraries currently loading: {}",
+                        libs_async_ctx.num_uncompleted_jobs.Load(LoadMemoryOrder::Relaxed));
                 DumpPendingResourcesDebugInfo(pending_resources);
                 DebugLn("\nAvailable Libraries:");
                 for (auto& lib : server.libraries) {
@@ -1454,7 +1476,7 @@ Server::Server(ThreadPool& pool,
 }
 
 Server::~Server() {
-    end_thread.Store(true);
+    end_thread.Store(true, StoreMemoryOrder::Release);
     work_signaller.Signal();
     thread.Join();
     ASSERT(channels.Use([](auto& h) { return h.Empty(); }), "missing channel close");
@@ -1482,7 +1504,7 @@ AsyncCommsChannel& OpenAsyncCommsChannel(Server& server, OpenAsyncCommsChannelAr
 void CloseAsyncCommsChannel(Server& server, AsyncCommsChannel& channel) {
     server.channels.Use([&channel](auto& channels) {
         (void)channels;
-        channel.used.Store(false, MemoryOrder::Relaxed);
+        channel.used.Store(false, StoreMemoryOrder::Relaxed);
         while (auto r = channel.results.TryPop())
             r->Release();
     });
@@ -1977,7 +1999,7 @@ TEST_CASE(TestSampleLibraryLoader) {
             if (countdown_result == WaitResult::TimedOut) {
                 tester.log.ErrorLn("Timed out waiting for library resource loading to complete");
                 DumpCurrentStackTraceToStderr();
-                server.request_debug_dump_current_state.Store(true);
+                server.request_debug_dump_current_state.Store(true, StoreMemoryOrder::Release);
                 server.work_signaller.Signal();
                 SleepThisThread(1000);
                 // We need to hard-exit without cleaning up because the loading thread is probably deadlocked
@@ -2081,7 +2103,7 @@ TEST_CASE(TestSampleLibraryLoader) {
         if (countdown_result == WaitResult::TimedOut) {
             tester.log.ErrorLn("Timed out waiting for library resource loading to complete");
             DumpCurrentStackTraceToStderr();
-            server.request_debug_dump_current_state.Store(true);
+            server.request_debug_dump_current_state.Store(true, StoreMemoryOrder::Release);
             SleepThisThread(1000);
             // We need to hard-exit without cleaning up because the loading thread is probably deadlocked
             __builtin_abort();

@@ -266,7 +266,7 @@ void DoErrorsStandalone(Gui* g) {
                     y_pos += (f32)error_window_button_h;
 
                     // divider line
-                    if (it->next.Load(MemoryOrder::Relaxed) != nullptr) {
+                    if (it->next.Load(LoadMemoryOrder::Relaxed) != nullptr) {
                         y_pos += (f32)error_window_gap_after_desc;
                         auto line_r = Rect {0, y_pos, imgui.Width(), 1};
                         imgui.RegisterAndConvertRect(&line_r);

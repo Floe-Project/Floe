@@ -62,11 +62,11 @@ struct RefCounted {
         , m_work_signaller(s) {}
 
     void Retain() const {
-        if (m_ref_count) m_ref_count->FetchAdd(1, MemoryOrder::Relaxed);
+        if (m_ref_count) m_ref_count->FetchAdd(1, RmwMemoryOrder::Relaxed);
     }
     void Release() const {
         if (m_ref_count) {
-            auto prev = m_ref_count->SubFetch(1, MemoryOrder::AcquireRelease);
+            auto prev = m_ref_count->SubFetch(1, RmwMemoryOrder::AcquireRelease);
             ASSERT(prev != ~(u32)0);
             if (prev == 0 && m_work_signaller) m_work_signaller->Signal();
         }

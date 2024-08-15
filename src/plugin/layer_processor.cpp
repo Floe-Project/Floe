@@ -436,11 +436,11 @@ static void TriggerVoicesIfNeeded(LayerProcessor& layer,
         });
 
         auto const rr_pos = ({
-            auto r = layer_rr->Load(MemoryOrder::Relaxed);
+            auto r = layer_rr->Load(LoadMemoryOrder::Relaxed);
             if (r > inst.instrument.max_rr_pos) r = 0;
             r;
         });
-        DEFER { layer_rr->Store(rr_pos + 1, MemoryOrder::Relaxed); };
+        DEFER { layer_rr->Store(rr_pos + 1, StoreMemoryOrder::Relaxed); };
 
         for (auto i : Range(inst.instrument.regions.size)) {
             auto const& region = inst.instrument.regions[i];

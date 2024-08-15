@@ -10,8 +10,8 @@
 // TODO: This should be replaced by a new system. The atomic operations here are sketchy and we want a new
 // system that is far more robust and support sample-accurate automation.
 struct Parameter {
-    f32 LinearValue() const { return value.Load(MemoryOrder::Relaxed); }
-    f32 ProjectedValue() const { return info.ProjectValue(value.Load(MemoryOrder::Relaxed)); }
+    f32 LinearValue() const { return value.Load(LoadMemoryOrder::Relaxed); }
+    f32 ProjectedValue() const { return info.ProjectValue(value.Load(LoadMemoryOrder::Relaxed)); }
     template <typename Type>
     Type ValueAsInt() const {
         return ParamToInt<Type>(LinearValue());
@@ -20,8 +20,8 @@ struct Parameter {
 
     bool SetLinearValue(f32 new_value) {
         ASSERT(info.linear_range.Contains(new_value));
-        auto const t = value.Load(MemoryOrder::Relaxed);
-        value.Store(new_value, MemoryOrder::Relaxed);
+        auto const t = value.Load(LoadMemoryOrder::Relaxed);
+        value.Store(new_value, StoreMemoryOrder::Relaxed);
         return t != new_value;
     }
 

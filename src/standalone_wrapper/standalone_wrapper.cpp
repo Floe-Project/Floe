@@ -81,7 +81,7 @@ struct Standalone {
         .is_audio_thread =
             [](clap_host_t const* h) {
                 auto standalone = (Standalone*)h->host_data;
-                return CurrentThreadID() == standalone->audio_thread_id.Load(MemoryOrder::Relaxed);
+                return CurrentThreadID() == standalone->audio_thread_id.Load(LoadMemoryOrder::Relaxed);
             },
     };
 
@@ -146,7 +146,7 @@ AudioCallback(ma_device* device, void* output_buffer, void const* input, ma_uint
     static bool called_before {false};
     if (!called_before) {
         called_before = true;
-        standalone->audio_thread_id.Store(CurrentThreadID(), MemoryOrder::Relaxed);
+        standalone->audio_thread_id.Store(CurrentThreadID(), StoreMemoryOrder::Relaxed);
         SetThreadName("Audio");
         standalone->plugin.start_processing(&standalone->plugin);
         standalone->audio_stream_state.Store(Standalone::AudioStreamState::Open);

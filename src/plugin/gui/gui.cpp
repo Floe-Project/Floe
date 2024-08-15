@@ -767,7 +767,7 @@ Gui::Gui(GuiFrameInput& frame_input, PluginInstance& plugin)
                   [gui = this](sample_lib::LibraryIdRef library_id_ref) {
                       sample_lib::LibraryId lib_id {library_id_ref};
                       gui->main_thread_callbacks.Push([gui, lib_id]() { SampleLibraryChanged(gui, lib_id); });
-                      gui->frame_input.request_update.Store(true, MemoryOrder::Relaxed);
+                      gui->frame_input.request_update.Store(true, StoreMemoryOrder::Relaxed);
                   },
           })) {
     g_log_file.TraceLn();

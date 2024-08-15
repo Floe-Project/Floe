@@ -219,9 +219,9 @@ struct LayerProcessor {
     // things.
     struct DesiredInst {
         static constexpr u64 k_consumed = 1;
-        void Set(WaveformType w) { value.Store(ValForWaveform(w), MemoryOrder::Release); }
-        void Set(sample_lib::LoadedInstrument const* i) { value.Store((uintptr)i, MemoryOrder::Release); }
-        void SetNone() { value.Store(0, MemoryOrder::Release); }
+        void Set(WaveformType w) { value.Store(ValForWaveform(w), StoreMemoryOrder::Release); }
+        void Set(sample_lib::LoadedInstrument const* i) { value.Store((uintptr)i, StoreMemoryOrder::Release); }
+        void SetNone() { value.Store(0, StoreMemoryOrder::Release); }
         Optional<InstrumentUnwrapped> Consume() {
             auto v = value.Exchange(k_consumed);
             if (v == k_consumed) return nullopt;
@@ -235,7 +235,7 @@ struct LayerProcessor {
             ASSERT(v % alignof(sample_lib::LoadedInstrument) != 0, "needs to be an invalid ptr");
             return v;
         }
-        bool IsConsumed() const { return value.Load(MemoryOrder::Acquire) == k_consumed; }
+        bool IsConsumed() const { return value.Load(LoadMemoryOrder::Acquire) == k_consumed; }
 
         Atomic<u64> value {0};
     };

@@ -35,9 +35,9 @@ struct AtomicRefList {
     struct Node {
         // reader
         [[nodiscard]] ValueType* TryRetain() {
-            auto const r = reader_uses.FetchAdd(1, MemoryOrder::Relaxed);
+            auto const r = reader_uses.FetchAdd(1, RmwMemoryOrder::Acquire);
             if (r & k_dead_bit) [[unlikely]] {
-                reader_uses.FetchSub(1, MemoryOrder::Release);
+                reader_uses.FetchSub(1, RmwMemoryOrder::Release);
                 return nullptr;
             }
             return &value;
@@ -45,7 +45,7 @@ struct AtomicRefList {
 
         // reader, if TryRetain() returned non-null
         void Release() {
-            auto const r = reader_uses.FetchSub(1, MemoryOrder::Release);
+            auto const r = reader_uses.FetchSub(1, RmwMemoryOrder::Release);
             ASSERT(r != 0);
         }
 
@@ -91,7 +91,7 @@ struct AtomicRefList {
         Node* operator->() const { return node; }
         Iterator& operator++() {
             prev = node;
-            node = node->next.Load(MemoryOrder::Relaxed);
+            node = node->next.Load(LoadMemoryOrder::Relaxed);
             return *this;
         }
         Node* node {};
@@ -102,14 +102,14 @@ struct AtomicRefList {
         // You should RemoveAll and DeleteRemovedAndUnreferenced before the object is destroyed. We don't want
         // to do that here because we want this object to be able to live on a reader thread instead of living
         // on a writer thread.
-        ASSERT(live_list.Load(MemoryOrder::Acquire) == nullptr);
+        ASSERT(live_list.Load(LoadMemoryOrder::Relaxed) == nullptr);
         ASSERT(dead_list == nullptr);
     }
 
     // reader or writer
     // If you are the reader the values should be consider weak references: you MUST call TryRetain (and
     // afterwards Release) on the object before using it.
-    Iterator begin() const { return Iterator(live_list.Load(MemoryOrder::Acquire), nullptr); }
+    Iterator begin() const { return Iterator(live_list.Load(LoadMemoryOrder::Acquire), nullptr); }
     Iterator end() const { return Iterator(nullptr, nullptr); }
 
     // writer, call placement-new on node->value
@@ -139,8 +139,8 @@ struct AtomicRefList {
         Node* insert_after {};
         {
             Node* prev {};
-            for (auto n = live_list.Load(MemoryOrder::Relaxed); n != nullptr;
-                 n = n->next.Load(MemoryOrder::Relaxed)) {
+            for (auto n = live_list.Load(LoadMemoryOrder::Relaxed); n != nullptr;
+                 n = n->next.Load(LoadMemoryOrder::Relaxed)) {
                 if (n > node) {
                     insert_after = prev;
                     break;
@@ -151,24 +151,24 @@ struct AtomicRefList {
 
         // put it into the live list
         if (insert_after) {
-            node->next.Store(insert_after->next.Load(MemoryOrder::Relaxed), MemoryOrder::Relaxed);
-            insert_after->next.Store(node, MemoryOrder::Release);
+            node->next.Store(insert_after->next.Load(LoadMemoryOrder::Relaxed), StoreMemoryOrder::Relaxed);
+            insert_after->next.Store(node, StoreMemoryOrder::Release);
             ASSERT(node > insert_after);
         } else {
-            node->next.Store(live_list.Load(MemoryOrder::Relaxed), MemoryOrder::Relaxed);
-            live_list.Store(node, MemoryOrder::Release);
+            node->next.Store(live_list.Load(LoadMemoryOrder::Relaxed), StoreMemoryOrder::Relaxed);
+            live_list.Store(node, StoreMemoryOrder::Release);
         }
 
         // signal that the readers can now use this node
-        node->reader_uses.FetchAnd(~Node::k_dead_bit, MemoryOrder::AcquireRelease);
+        node->reader_uses.FetchAnd(~Node::k_dead_bit, RmwMemoryOrder::AcquireRelease);
     }
 
     // writer, returns next iterator (i.e. instead of ++it in a loop)
     Iterator Remove(Iterator iterator) {
         if constexpr (RUNTIME_SAFETY_CHECKS_ON) {
             bool found = false;
-            for (auto n = live_list.Load(MemoryOrder::Relaxed); n != nullptr;
-                 n = n->next.Load(MemoryOrder::Relaxed)) {
+            for (auto n = live_list.Load(LoadMemoryOrder::Relaxed); n != nullptr;
+                 n = n->next.Load(LoadMemoryOrder::Relaxed)) {
                 if (n == iterator.node) {
                     found = true;
                     break;
@@ -179,9 +179,10 @@ struct AtomicRefList {
 
         // remove it from the live_list
         if (iterator.prev)
-            iterator.prev->next.Store(iterator.node->next.Load(MemoryOrder::Relaxed), MemoryOrder::Release);
+            iterator.prev->next.Store(iterator.node->next.Load(LoadMemoryOrder::Relaxed),
+                                      StoreMemoryOrder::Release);
         else
-            live_list.Store(iterator.node->next.Load(MemoryOrder::Relaxed), MemoryOrder::Release);
+            live_list.Store(iterator.node->next.Load(LoadMemoryOrder::Relaxed), StoreMemoryOrder::Release);
 
         // add it to the dead list. we use a separate 'next' variable for this because the reader still might
         // be using the node and it needs to know how to correctly iterate through the list rather than
@@ -194,10 +195,10 @@ struct AtomicRefList {
         // XADD instruction vs the CMPXCHG instruction. This is fine because we know that the dead bit isn't
         // already set and is a power-of-2 and so doing and ADD is the same as doing an OR.
         static_assert(IsPowerOfTwo(Node::k_dead_bit));
-        auto const u = iterator.node->reader_uses.FetchAdd(Node::k_dead_bit, MemoryOrder::AcquireRelease);
+        auto const u = iterator.node->reader_uses.FetchAdd(Node::k_dead_bit, RmwMemoryOrder::AcquireRelease);
         ASSERT((u & Node::k_dead_bit) == 0, "already dead");
 
-        return Iterator {.node = iterator.node->next.Load(MemoryOrder::Relaxed), .prev = iterator.prev};
+        return Iterator {.node = iterator.node->next.Load(LoadMemoryOrder::Relaxed), .prev = iterator.prev};
     }
 
     // writer
@@ -224,7 +225,12 @@ struct AtomicRefList {
             ASSERT(previous != i);
             if (previous) ASSERT(previous != i->writer_next);
 
-            if (i->reader_uses.Load(MemoryOrder::Acquire) == Node::k_dead_bit) {
+            // If reader_uses is just the dead bit, it means it's marked for deletion and there's no readers.
+            // It's possible that readers might still probe the node, but as soon as they see the dead bit
+            // they do not use it, so it's safe to delete the object. However, there is a very small window
+            // where a reader has incremented the value but not yet checked the dead bit. It's fine though
+            // because this function is called regularly and clean-up will happen eventually.
+            if (i->reader_uses.Load(LoadMemoryOrder::Relaxed) == Node::k_dead_bit) {
                 if (!previous)
                     dead_list = i->writer_next;
                 else

@@ -57,7 +57,7 @@ struct AtomicQueue {
     bool Push(Span<Type const> data) {
         // Step 1: copy into local variables and check for size
         auto const initial_producer_head = producer.head;
-        auto const consumer_tail = consumer.tail.Load(MemoryOrder::Acquire);
+        auto const consumer_tail = consumer.tail.Load(LoadMemoryOrder::Acquire);
 
         // Step 2: check for entries and return if we can't do the push
         auto const entries_to_add = (u32)data.size;
@@ -78,7 +78,7 @@ struct AtomicQueue {
 
         // Step 5: we've done the copy, we can now move the tail so that any consumer can access the objects
         // we've added
-        producer.tail.Store(new_producer_head, MemoryOrder::Release);
+        producer.tail.Store(new_producer_head, StoreMemoryOrder::Release);
         return true;
     }
 
@@ -88,7 +88,7 @@ struct AtomicQueue {
     u32 Pop(Span<Type> out_buffer) {
         // Step 1: copy into local variables
         auto const initial_consumer_head = consumer.head;
-        auto const producer_tail = producer.tail.Load(MemoryOrder::Acquire);
+        auto const producer_tail = producer.tail.Load(LoadMemoryOrder::Acquire);
 
         // Step 2: check for entries and ensure we only pop as many as are ready
         auto const ready_entries = producer_tail - initial_consumer_head;
@@ -107,7 +107,7 @@ struct AtomicQueue {
         }
 
         // Step 5: we've done the copy, we can now move the tail so that any producer can use the slots again
-        consumer.tail.Store(new_consumer_head, MemoryOrder::Release);
+        consumer.tail.Store(new_consumer_head, StoreMemoryOrder::Release);
         return entries_to_remove;
     }
 
@@ -116,14 +116,14 @@ struct AtomicQueue {
     bool Push(Span<Type const> data) {
         auto const desired_number_to_push = (u32)data.size;
 
-        auto producer_head = producer.head.Load(MemoryOrder::Relaxed);
+        auto producer_head = producer.head.Load(LoadMemoryOrder::Relaxed);
 
         u32 free_entries;
         u32 new_producer_head;
         while (true) {
-            AtomicThreadFence(MemoryOrder::Acquire);
+            AtomicThreadFence(RmwMemoryOrder::Acquire);
 
-            auto consumer_tail = consumer.tail.Load(MemoryOrder::Acquire);
+            auto consumer_tail = consumer.tail.Load(LoadMemoryOrder::Acquire);
 
             free_entries = k_size - (producer_head - consumer_tail);
             if (free_entries < desired_number_to_push) [[unlikely]]
@@ -136,8 +136,8 @@ struct AtomicQueue {
             // producer_head value in the failure case.
             if (producer.head.CompareExchangeWeak(producer_head,
                                                   new_producer_head,
-                                                  MemoryOrder::Relaxed,
-                                                  MemoryOrder::Relaxed))
+                                                  RmwMemoryOrder::Relaxed,
+                                                  LoadMemoryOrder::Relaxed))
                 break;
         }
 
@@ -156,7 +156,7 @@ struct AtomicQueue {
         while (producer.tail.Load() != producer_head)
             SpinLoopPause();
 
-        producer.tail.Store(new_producer_head, MemoryOrder::Release);
+        producer.tail.Store(new_producer_head, StoreMemoryOrder::Release);
         return true;
     }
 
@@ -165,14 +165,14 @@ struct AtomicQueue {
     u32 Pop(Span<Type> out_buffer) {
         auto const desired_number_to_pop = (u32)out_buffer.size;
 
-        auto old_cons_head = consumer.head.Load(MemoryOrder::Relaxed);
+        auto old_cons_head = consumer.head.Load(LoadMemoryOrder::Relaxed);
         u32 new_consumer_head;
         u32 ready_entries;
         u32 entries_to_pop;
         while (true) {
-            AtomicThreadFence(MemoryOrder::Acquire);
+            AtomicThreadFence(RmwMemoryOrder::Acquire);
 
-            auto prod_tail = producer.tail.Load(MemoryOrder::Acquire);
+            auto prod_tail = producer.tail.Load(LoadMemoryOrder::Acquire);
 
             ready_entries = prod_tail - old_cons_head;
 
@@ -183,12 +183,12 @@ struct AtomicQueue {
 
             if (consumer.head.CompareExchangeWeak(old_cons_head,
                                                   new_consumer_head,
-                                                  MemoryOrder::Relaxed,
-                                                  MemoryOrder::Relaxed))
+                                                  RmwMemoryOrder::Relaxed,
+                                                  LoadMemoryOrder::Relaxed))
                 break;
         }
 
-        ASSERT(entries_to_pop <= producer.tail.Load(MemoryOrder::Relaxed) - old_cons_head);
+        ASSERT(entries_to_pop <= producer.tail.Load(LoadMemoryOrder::Relaxed) - old_cons_head);
         ASSERT(entries_to_pop > 0 && entries_to_pop <= desired_number_to_pop);
         ASSERT(ready_entries >= entries_to_pop);
 
@@ -200,7 +200,7 @@ struct AtomicQueue {
         while (consumer.tail.Load() != old_cons_head)
             SpinLoopPause();
 
-        consumer.tail.Store(new_consumer_head, MemoryOrder::Release);
+        consumer.tail.Store(new_consumer_head, StoreMemoryOrder::Release);
         return entries_to_pop;
     }
 

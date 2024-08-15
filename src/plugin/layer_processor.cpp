@@ -417,7 +417,7 @@ static void TriggerVoicesIfNeeded(LayerProcessor& layer,
 
     VoiceStartParams p {.params = VoiceStartParams::SamplerParams {}};
     if (auto i_ptr = layer.inst.TryGet<sample_lib::LoadedInstrument const*>()) {
-        auto inst = *i_ptr;
+        auto const& inst = **i_ptr;
         p.params = VoiceStartParams::SamplerParams {
             .initial_sample_offset01 = layer.sample_offset_01,
             .initial_dynamics_01 = dynamics_param_value_01,
@@ -436,23 +436,25 @@ static void TriggerVoicesIfNeeded(LayerProcessor& layer,
         });
 
         auto const rr_pos = ({
-            auto r = layer_rr->Load();
-            if (r > inst->instrument.max_rr_pos) r = 0;
+            auto r = layer_rr->Load(MemoryOrder::Relaxed);
+            if (r > inst.instrument.max_rr_pos) r = 0;
             r;
         });
-        DEFER { layer_rr->Store(rr_pos + 1); };
+        DEFER { layer_rr->Store(rr_pos + 1, MemoryOrder::Relaxed); };
 
-        for (auto i : Range(inst->instrument.regions.size)) {
-            auto& region = inst->instrument.regions[i];
-            auto& audio_data = inst->audio_datas[i];
+        for (auto i : Range(inst.instrument.regions.size)) {
+            auto const& region = inst.instrument.regions[i];
+            auto const& audio_data = inst.audio_datas[i];
             if (region.trigger.key_range.Contains(note_for_samples) &&
                 region.trigger.velocity_range.Contains(note_vel) &&
                 (!region.trigger.round_robin_index || *region.trigger.round_robin_index == rr_pos) &&
                 region.trigger.event == trigger_event) {
-
-                VoiceStartParams::SamplerParams::Region reg {.region = region, .audio_data = *audio_data};
-                reg.amp = velocity_volume_modifier;
-                dyn::Append(sampler_params.voice_sample_params, reg);
+                dyn::Append(sampler_params.voice_sample_params,
+                            VoiceStartParams::SamplerParams::Region {
+                                .region = region,
+                                .audio_data = *audio_data,
+                                .amp = velocity_volume_modifier,
+                            });
             }
         }
 
@@ -485,8 +487,8 @@ static void TriggerVoicesIfNeeded(LayerProcessor& layer,
                 auto const overlap_size = overlap_high - overlap_low;
                 auto const pos = (note_vel - overlap_low) / (f32)overlap_size;
                 ASSERT(pos >= 0 && pos <= 1);
-                auto const amp1 = trig_table_lookup::SinTurns((1 - pos) * 0.25f);
-                auto const amp2 = trig_table_lookup::SinTurns(pos * 0.25f);
+                auto const amp1 = trig_table_lookup::SinTurnsPositive((1 - pos) * 0.25f);
+                auto const amp2 = trig_table_lookup::SinTurnsPositive(pos * 0.25f);
                 feather_region_1->amp *= amp1;
                 feather_region_2->amp *= amp2;
             }

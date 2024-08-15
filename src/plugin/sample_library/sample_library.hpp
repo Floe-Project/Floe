@@ -186,12 +186,6 @@ struct IrId {
     DynamicArrayInline<char, k_max_ir_name_size> ir_name;
 };
 
-// only honoured by the lua system
-struct Options {
-    usize max_memory_allowed = Mb(128);
-    f64 max_seconds_allowed = 20;
-};
-
 enum class LuaErrorCode {
     Memory,
     Syntax,
@@ -245,6 +239,12 @@ inline Optional<FileFormat> DetermineFileFormat(String path) {
     return nullopt;
 }
 
+// only honoured by the lua system
+struct Options {
+    usize max_memory_allowed = Mb(128);
+    f64 max_seconds_allowed = 20;
+};
+
 LibraryPtrOrError ReadLua(Reader& reader,
                           String lua_filepath,
                           ArenaAllocator& result_arena,
@@ -269,6 +269,7 @@ inline LibraryPtrOrError Read(Reader& reader,
 
 ErrorCodeOr<void> WriteDocumentedLuaExample(Writer writer, bool include_comments = true);
 
+// Lua only
 bool CheckAllReferencedFilesExist(Library const& lib, Logger& logger);
 
 } // namespace sample_lib

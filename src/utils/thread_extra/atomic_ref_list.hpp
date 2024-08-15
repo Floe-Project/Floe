@@ -193,6 +193,7 @@ struct AtomicRefList {
         // NOTE: we use the ADD operation here instead of bitwise-OR because it's probably faster on x86: the
         // XADD instruction vs the CMPXCHG instruction. This is fine because we know that the dead bit isn't
         // already set and is a power-of-2 and so doing and ADD is the same as doing an OR.
+        static_assert(IsPowerOfTwo(Node::k_dead_bit));
         auto const u = iterator.node->reader_uses.FetchAdd(Node::k_dead_bit, MemoryOrder::AcquireRelease);
         ASSERT((u & Node::k_dead_bit) == 0, "already dead");
 

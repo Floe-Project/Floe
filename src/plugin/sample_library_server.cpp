@@ -583,16 +583,18 @@ ListedAudioData::~ListedAudioData() {
            s == FileLoadingState::CompletedSucessfully);
     if (audio_data.interleaved_samples.size)
         AudioDataAllocator::Instance().Free(audio_data.interleaved_samples.ToByteSpan());
-    library_ref_count.FetchSub(1);
+    library_ref_count.FetchSub(1, RmwMemoryOrder::Relaxed);
 }
 
 ListedInstrument::~ListedInstrument() {
     ZoneScoped;
     for (auto a : audio_data_set)
-        a->ref_count.FetchSub(1);
+        a->ref_count.FetchSub(1, RmwMemoryOrder::Relaxed);
 }
 
-ListedImpulseResponse::~ListedImpulseResponse() { audio_data->ref_count.FetchSub(1); }
+ListedImpulseResponse::~ListedImpulseResponse() {
+    audio_data->ref_count.FetchSub(1, RmwMemoryOrder::Relaxed);
+}
 
 // Just a little helper that we pass around when working with the thread pool.
 struct ThreadPoolArgs {
@@ -714,7 +716,7 @@ static ListedAudioData* FetchOrCreateAudioData(LibrariesList::Node& lib_node,
         .state = FileLoadingState::PendingLoad,
         .error = {},
     };
-    lib_node.reader_uses.FetchAdd(1);
+    lib_node.reader_uses.FetchAdd(1, RmwMemoryOrder::Relaxed);
 
     LoadAudioAsync(*audio_data, lib, thread_pool_args);
     return audio_data;
@@ -771,7 +773,7 @@ static ListedInstrument* FetchOrCreateInstrument(LibrariesList::Node& lib_node,
     }
 
     for (auto d : audio_data_set)
-        d->ref_count.FetchAdd(1);
+        d->ref_count.FetchAdd(1, RmwMemoryOrder::Relaxed);
 
     ASSERT(audio_data_set.size);
     new_inst->audio_data_set = audio_data_set.ToOwnedSpan();
@@ -783,7 +785,7 @@ static ListedImpulseResponse* FetchOrCreateImpulseResponse(LibrariesList::Node& 
                                                            sample_lib::ImpulseResponse const& ir,
                                                            ThreadPoolArgs thread_pool_args) {
     auto audio_data = FetchOrCreateAudioData(lib_node, ir.path, thread_pool_args, 999999);
-    audio_data->ref_count.FetchAdd(1);
+    audio_data->ref_count.FetchAdd(1, RmwMemoryOrder::Relaxed);
 
     auto new_ir = lib_node.value.irs.PrependUninitialised();
     PLACEMENT_NEW(new_ir)
@@ -1341,7 +1343,7 @@ static void ServerThreadProc(Server& server) {
         while (true) {
             server.work_signaller.WaitUntilSignalledOrSpurious(250u);
 
-            if (server.request_debug_dump_current_state.Exchange(false)) {
+            if (server.request_debug_dump_current_state.Exchange(false, RmwMemoryOrder::Relaxed)) {
                 ZoneNamedN(dump, "dump", true);
                 DebugLn("Dumping current state of loading thread");
                 DebugLn("Libraries currently loading: {}",
@@ -1514,7 +1516,7 @@ void CloseAsyncCommsChannel(Server& server, AsyncCommsChannel& channel) {
 
 RequestId SendAsyncLoadRequest(Server& server, AsyncCommsChannel& channel, LoadRequest const& request) {
     QueuedRequest const queued_request {
-        .id = server.request_id_counter.FetchAdd(1),
+        .id = server.request_id_counter.FetchAdd(1, RmwMemoryOrder::Relaxed),
         .request = request,
         .async_comms_channel = channel,
     };

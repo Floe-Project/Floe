@@ -821,7 +821,8 @@ static void ProcessClapNoteOrMidi(AudioProcessor& processor,
             auto type = message.Type();
             if (type == MidiMessageType::NoteOn || type == MidiMessageType::NoteOff ||
                 type == MidiMessageType::ControlChange) {
-                processor.for_main_thread.flags.FetchOr(AudioProcessor::MainThreadCallbackFlagsUpdateGui);
+                processor.for_main_thread.flags.FetchOr(AudioProcessor::MainThreadCallbackFlagsUpdateGui,
+                                                        RmwMemoryOrder::Relaxed);
                 request_main_thread_callback = true;
             }
 
@@ -870,7 +871,8 @@ static void ProcessClapNoteOrMidi(AudioProcessor& processor,
                     }
 
                     if (k_midi_learn_controller_bitset.Get(cc_num)) {
-                        if (auto param_index = processor.midi_learn_param_index.Exchange(nullopt);
+                        if (auto param_index =
+                                processor.midi_learn_param_index.Exchange(nullopt, RmwMemoryOrder::Relaxed);
                             param_index.HasValue()) {
                             processor.param_learned_ccs[(usize)param_index.Value()].Set(cc_num);
                         }
@@ -1370,7 +1372,8 @@ clap_process_status Process(AudioProcessor& processor, clap_process const& proce
         for (auto& layer : processor.layer_processors)
             if (!layer.peak_meter.Silent()) mark_gui_dirty = true;
         if (mark_gui_dirty) {
-            processor.for_main_thread.flags.FetchOr(AudioProcessor::MainThreadCallbackFlagsUpdateGui);
+            processor.for_main_thread.flags.FetchOr(AudioProcessor::MainThreadCallbackFlagsUpdateGui,
+                                                    RmwMemoryOrder::Relaxed);
             request_main_thread_callback = true;
         }
     }
@@ -1390,7 +1393,7 @@ static void OnMainThread(AudioProcessor& processor, bool& update_gui) {
     ZoneScoped;
     processor.convo.DeletedUnusedConvolvers();
 
-    auto flags = processor.for_main_thread.flags.Exchange(0);
+    auto flags = processor.for_main_thread.flags.Exchange(0, RmwMemoryOrder::Relaxed);
     if (flags & AudioProcessor::MainThreadCallbackFlagsRescanParameters) {
         auto host_params =
             (clap_host_params const*)processor.host.get_extension(&processor.host, CLAP_EXT_PARAMS);

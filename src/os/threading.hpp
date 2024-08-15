@@ -164,8 +164,6 @@ enum class RmwMemoryOrder {
     SequentiallyConsistent = __ATOMIC_SEQ_CST,
 };
 
-// TODO: remove SequentiallyConsistent as the default - we should be explicit
-
 template <typename Type>
 struct Atomic {
     constexpr Atomic() = default;
@@ -182,7 +180,7 @@ struct Atomic {
     }
 
     // Returns the previous value.
-    Type Exchange(Type desired, RmwMemoryOrder memory_order = RmwMemoryOrder::SequentiallyConsistent) {
+    Type Exchange(Type desired, RmwMemoryOrder memory_order) {
         alignas(Type) unsigned char buf[sizeof(Type)];
         auto* ptr = reinterpret_cast<Type*>(buf);
         __atomic_exchange(&raw, &desired, ptr, (int)memory_order);
@@ -195,11 +193,10 @@ struct Atomic {
     // - The failure memory order must not be stronger than the success memory order.
     // - Weak may fail spuriously, strong will not. Use strong unless you are already in a loop that can
     //   handle spurious failures.
-    bool
-    CompareExchangeWeak(Type& expected,
-                        Type desired,
-                        RmwMemoryOrder success_rmw_memory_order = RmwMemoryOrder::SequentiallyConsistent,
-                        LoadMemoryOrder failure_load_memory_order = LoadMemoryOrder::SequentiallyConsistent) {
+    bool CompareExchangeWeak(Type& expected,
+                             Type desired,
+                             RmwMemoryOrder success_rmw_memory_order,
+                             LoadMemoryOrder failure_load_memory_order) {
         return __atomic_compare_exchange(&raw,
                                          &expected,
                                          &desired,
@@ -207,11 +204,10 @@ struct Atomic {
                                          (int)success_rmw_memory_order,
                                          (int)failure_load_memory_order);
     }
-    bool CompareExchangeStrong(
-        Type& expected,
-        Type desired,
-        RmwMemoryOrder success_rmw_memory_order = RmwMemoryOrder::SequentiallyConsistent,
-        LoadMemoryOrder failure_load_memory_order = LoadMemoryOrder::SequentiallyConsistent) {
+    bool CompareExchangeStrong(Type& expected,
+                               Type desired,
+                               RmwMemoryOrder success_rmw_memory_order,
+                               LoadMemoryOrder failure_load_memory_order) {
         return __atomic_compare_exchange(&raw,
                                          &expected,
                                          &desired,
@@ -222,7 +218,7 @@ struct Atomic {
 
 #define ATOMIC_INTEGER_METHOD(name, builtin)                                                                 \
     template <Integral U = Type>                                                                             \
-    inline Type name(Type v, RmwMemoryOrder memory_order = RmwMemoryOrder::SequentiallyConsistent) {         \
+    inline Type name(Type v, RmwMemoryOrder memory_order) {                                                  \
         return builtin(&raw, v, (int)memory_order);                                                          \
     }
 
@@ -272,12 +268,8 @@ inline static void SpinLoopPause() {
 
 class AtomicFlag {
   public:
-    bool ExchangeTrue(RmwMemoryOrder mem_order = RmwMemoryOrder::SequentiallyConsistent) {
-        return __atomic_test_and_set(&m_flag, (int)mem_order);
-    }
-    void StoreFalse(StoreMemoryOrder mem_order = StoreMemoryOrder::SequentiallyConsistent) {
-        __atomic_clear(&m_flag, (int)mem_order);
-    }
+    bool ExchangeTrue(RmwMemoryOrder mem_order) { return __atomic_test_and_set(&m_flag, (int)mem_order); }
+    void StoreFalse(StoreMemoryOrder mem_order) { __atomic_clear(&m_flag, (int)mem_order); }
 
   private:
     bool m_flag {};
@@ -296,7 +288,7 @@ struct AtomicCountdown {
             ASSERT(current < LargestRepresentableValue<u32>());
     }
 
-    void Increase(u32 steps = 1) { counter.FetchAdd(steps); }
+    void Increase(u32 steps = 1) { counter.FetchAdd(steps, RmwMemoryOrder::AcquireRelease); }
 
     bool TryWait() const { return counter.Load(LoadMemoryOrder::Acquire) == 0; }
 
@@ -319,15 +311,16 @@ inline void AtomicSignalFence(RmwMemoryOrder memory_order) { __atomic_signal_fen
 
 struct WorkSignaller {
     void Signal() {
-        if (flag.Exchange(k_signalled) == k_not_signalled) WakeWaitingThreads(flag, NumWaitingThreads::One);
+        if (flag.Exchange(k_signalled, RmwMemoryOrder::AcquireRelease) == k_not_signalled)
+            WakeWaitingThreads(flag, NumWaitingThreads::One);
     }
     void WaitUntilSignalledOrSpurious(Optional<u32> timeout_milliseconds = {}) {
-        if (flag.Exchange(k_not_signalled) == k_not_signalled)
+        if (flag.Exchange(k_not_signalled, RmwMemoryOrder::AcquireRelease) == k_not_signalled)
             WaitIfValueIsExpected(flag, k_not_signalled, timeout_milliseconds);
     }
 
     void WaitUntilSignalled(Optional<u32> timeout_milliseconds = {}) {
-        if (flag.Exchange(k_not_signalled) == k_not_signalled) do {
+        if (flag.Exchange(k_not_signalled, RmwMemoryOrder::AcquireRelease) == k_not_signalled) do {
                 WaitIfValueIsExpected(flag, k_not_signalled, timeout_milliseconds);
             } while (flag.Load(LoadMemoryOrder::Relaxed) == k_not_signalled);
     }
@@ -428,7 +421,7 @@ class SpinLock {
 
     bool TryLock() { return !m_lock_flag.ExchangeTrue(RmwMemoryOrder::Acquire); }
 
-    void Unlock() { m_lock_flag.StoreFalse(); }
+    void Unlock() { m_lock_flag.StoreFalse(StoreMemoryOrder::Release); }
 
   private:
     AtomicFlag m_lock_flag = {};

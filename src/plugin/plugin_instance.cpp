@@ -47,7 +47,8 @@ Optional<sample_lib::LibraryIdRef> LibraryForOverallBackground(PluginInstance co
 }
 
 static void RequestGuiRedraw(PluginInstance& plugin) {
-    plugin.processor.for_main_thread.flags.FetchOr(AudioProcessor::MainThreadCallbackFlagsUpdateGui);
+    plugin.processor.for_main_thread.flags.FetchOr(AudioProcessor::MainThreadCallbackFlagsUpdateGui,
+                                                   RmwMemoryOrder::Acquire);
     plugin.processor.host.request_callback(&plugin.host);
 }
 
@@ -264,7 +265,8 @@ static void SampleLibraryResourceLoaded(PluginInstance& plugin, sample_lib_serve
         case Source::Count: PanicIfReached(); break;
     }
 
-    plugin.processor.for_main_thread.flags.FetchOr(AudioProcessor::MainThreadCallbackFlagsUpdateGui);
+    plugin.processor.for_main_thread.flags.FetchOr(AudioProcessor::MainThreadCallbackFlagsUpdateGui,
+                                                   RmwMemoryOrder::Relaxed);
 }
 
 StateSnapshot CurrentStateSnapshot(PluginInstance const& plugin) {

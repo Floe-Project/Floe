@@ -56,7 +56,7 @@ TEST_CASE(TestErrorNotifications) {
                         no.AddOrUpdateError(item);
                     }
 
-                    iterations.FetchAdd(1);
+                    iterations.FetchAdd(1, RmwMemoryOrder::Release);
                     YieldThisThread();
                 }
             },

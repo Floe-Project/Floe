@@ -220,10 +220,12 @@ struct LayerProcessor {
     struct DesiredInst {
         static constexpr u64 k_consumed = 1;
         void Set(WaveformType w) { value.Store(ValForWaveform(w), StoreMemoryOrder::Release); }
-        void Set(sample_lib::LoadedInstrument const* i) { value.Store((uintptr)i, StoreMemoryOrder::Release); }
+        void Set(sample_lib::LoadedInstrument const* i) {
+            value.Store((uintptr)i, StoreMemoryOrder::Release);
+        }
         void SetNone() { value.Store(0, StoreMemoryOrder::Release); }
         Optional<InstrumentUnwrapped> Consume() {
-            auto v = value.Exchange(k_consumed);
+            auto v = value.Exchange(k_consumed, RmwMemoryOrder::Relaxed);
             if (v == k_consumed) return nullopt;
             if (v == 0) return InstrumentType::None;
             for (auto const w : Range((u64)WaveformType::Count))

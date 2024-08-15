@@ -120,19 +120,19 @@ class AtomicBitset {
     Bool64 Clear(usize bit) {
         ASSERT(bit < k_bits);
         auto const mask = u64(1) << (bit % k_bits_per_element);
-        return m_data[bit / k_bits_per_element].FetchAnd(~mask) & mask;
+        return m_data[bit / k_bits_per_element].FetchAnd(~mask, RmwMemoryOrder::Relaxed) & mask;
     }
 
     Bool64 Set(usize bit) {
         ASSERT(bit < k_bits);
         auto const mask = u64(1) << (bit % k_bits_per_element);
-        return m_data[bit / k_bits_per_element].FetchOr(mask) & mask;
+        return m_data[bit / k_bits_per_element].FetchOr(mask, RmwMemoryOrder::Relaxed) & mask;
     }
 
     Bool64 Flip(usize bit) {
         ASSERT(bit < k_bits);
         auto const mask = u64(1) << (bit % k_bits_per_element);
-        return m_data[bit / k_bits_per_element].FetchXor(mask) & mask;
+        return m_data[bit / k_bits_per_element].FetchXor(mask, RmwMemoryOrder::Relaxed) & mask;
     }
 
     Bool64 Get(usize bit) const {

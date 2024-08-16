@@ -4,6 +4,7 @@
 #include <dlfcn.h>
 #include <errno.h>
 #include <execinfo.h>
+#include <fcntl.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h> // strerror
@@ -15,6 +16,7 @@
 #include <valgrind/valgrind.h>
 
 #include "foundation/foundation.hpp"
+#include "os/filesystem.hpp"
 #include "os/misc.hpp"
 #include "utils/debug/debug.hpp"
 
@@ -152,6 +154,7 @@ static constexpr auto k_signals = Array {
 
 bool g_signals_installed = false;
 static struct sigaction g_previous_signal_actions[k_signals.size] {};
+static DynamicArrayInline<char, 200> g_crash_folder_path {};
 
 #if defined(__has_feature)
 #if __has_feature(undefined_behavior_sanitizer)
@@ -165,6 +168,65 @@ constexpr bool k_ubsan = true;
 constexpr bool k_ubsan = false;
 #endif
 
+static String SignalString(int signal_num, siginfo_t* info) {
+    String message = "Unknown signal";
+    switch (signal_num) {
+        case SIGILL:
+            message = "Illegal Instruction";
+            switch (info->si_code) {
+                case ILL_ILLOPC: message = "Illegal opcode"; break;
+                case ILL_ILLOPN: message = "Illegal operand"; break;
+                case ILL_ILLADR: message = "Illegal addressing mode"; break;
+                case ILL_ILLTRP: message = "Illegal trap"; break;
+                case ILL_PRVOPC: message = "Privileged opcode"; break;
+                case ILL_PRVREG: message = "Privileged register"; break;
+                case ILL_COPROC: message = "Coprocessor error"; break;
+                case ILL_BADSTK: message = "Internal stack error"; break;
+                default: break;
+            }
+            break;
+        case SIGFPE:
+            message = "Floating-point exception";
+            switch (info->si_code) {
+                case FPE_INTDIV: message = "Integer divide by zero"; break;
+                case FPE_INTOVF: message = "Integer overflow"; break;
+                case FPE_FLTDIV: message = "Floating-point divide by zero"; break;
+                case FPE_FLTOVF: message = "Floating-point overflow"; break;
+                case FPE_FLTUND: message = "Floating-point underflow"; break;
+                case FPE_FLTRES: message = "Floating-point inexact result"; break;
+                case FPE_FLTINV: message = "Floating-point invalid operation"; break;
+                case FPE_FLTSUB: message = "Subscript out of range"; break;
+                default: break;
+            }
+            break;
+        case SIGSEGV:
+            message = "Invalid memory reference";
+            switch (info->si_code) {
+                case SEGV_MAPERR: message = "Address not mapped to object"; break;
+                case SEGV_ACCERR: message = "Invalid permissions for mapped object"; break;
+                default: break;
+            }
+            break;
+        case SIGPIPE: message = "Broken pipe"; break;
+        case SIGBUS:
+            message = "Bus error";
+            switch (info->si_code) {
+                case BUS_ADRALN: message = "Invalid address alignment"; break;
+                case BUS_ADRERR: message = "Nonexistent physical address"; break;
+                case BUS_OBJERR: message = "Object-specific hardware error"; break;
+                default: break;
+            }
+            break;
+        case SIGTRAP: message = "Trace/breakpoint"; break;
+        case SIGABRT: message = "abort() called"; break;
+        case SIGTERM: message = "Termination request"; break;
+        case SIGINT: message = "Interactive attention signal"; break;
+    }
+    return message;
+}
+
+// remember we can only use async-signal-safe functions here:
+// https://man7.org/linux/man-pages/man7/signal-safety.7.html
 static void SignalHandler(int signal_num, siginfo_t* info, void* context) {
     static sig_atomic_t volatile first_call = 1;
 
@@ -174,61 +236,32 @@ static void SignalHandler(int signal_num, siginfo_t* info, void* context) {
 #if IS_LINUX
         psiginfo(info, nullptr);
 #else
-        String message {};
-        switch (signal_num) {
-            case SIGILL:
-                message = "Illegal Instruction";
-                switch (info->si_code) {
-                    case ILL_ILLOPC: message = "Illegal opcode"; break;
-                    case ILL_ILLOPN: message = "Illegal operand"; break;
-                    case ILL_ILLADR: message = "Illegal addressing mode"; break;
-                    case ILL_ILLTRP: message = "Illegal trap"; break;
-                    case ILL_PRVOPC: message = "Privileged opcode"; break;
-                    case ILL_PRVREG: message = "Privileged register"; break;
-                    case ILL_COPROC: message = "Coprocessor error"; break;
-                    case ILL_BADSTK: message = "Internal stack error"; break;
-                    default: break;
-                }
-                break;
-            case SIGFPE:
-                message = "Floating-point exception";
-                switch (info->si_code) {
-                    case FPE_INTDIV: message = "Integer divide by zero"; break;
-                    case FPE_INTOVF: message = "Integer overflow"; break;
-                    case FPE_FLTDIV: message = "Floating-point divide by zero"; break;
-                    case FPE_FLTOVF: message = "Floating-point overflow"; break;
-                    case FPE_FLTUND: message = "Floating-point underflow"; break;
-                    case FPE_FLTRES: message = "Floating-point inexact result"; break;
-                    case FPE_FLTINV: message = "Floating-point invalid operation"; break;
-                    case FPE_FLTSUB: message = "Subscript out of range"; break;
-                    default: break;
-                }
-                break;
-            case SIGSEGV:
-                message = "Invalid memory reference";
-                switch (info->si_code) {
-                    case SEGV_MAPERR: message = "Address not mapped to object"; break;
-                    case SEGV_ACCERR: message = "Invalid permissions for mapped object"; break;
-                    default: break;
-                }
-                break;
-            case SIGPIPE: message = "Broken pipe"; break;
-            case SIGBUS:
-                message = "Bus error";
-                switch (info->si_code) {
-                    case BUS_ADRALN: message = "Invalid address alignment"; break;
-                    case BUS_ADRERR: message = "Nonexistent physical address"; break;
-                    case BUS_OBJERR: message = "Object-specific hardware error"; break;
-                    default: break;
-                }
-                break;
-            case SIGTRAP: message = "Trace/breakpoint"; break;
-            case SIGABRT: message = "abort() called"; break;
-        }
-        ArenaAllocatorWithInlineStorage<200> scratch_arena;
-        StdPrint(StdStream::Err,
-                 fmt::Format(scratch_arena, "Received signal {} ({})\n", signal_num, message));
+        StdPrint(
+            StdStream::Err,
+            fmt::FormatInline<200>("Received signal {} ({})\n", signal_num, SignalString(signal_num, info)));
 #endif
+
+        {
+            auto const timestamp = Timestamp();
+            auto const file_path =
+                fmt::FormatInline<400>("{}/crash_{}.log\0", g_crash_folder_path, timestamp);
+            auto const fd = open(file_path.data, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+            DEFER { close(fd); };
+
+            auto const signal_num_str = fmt::FormatInline<50>("{} signal: {}\n", timestamp, signal_num);
+            write(fd, signal_num_str.data, signal_num_str.size);
+
+            auto const signal_string = SignalString(signal_num, info);
+            write(fd, signal_string.data, signal_string.size);
+            write(fd, "\n", 1);
+
+            FixedSizeAllocator<3000> local_buffer {nullptr};
+            auto const stack_trace = CurrentStacktraceString(local_buffer);
+            write(fd, stack_trace.data, stack_trace.size);
+            write(fd, "\n", 1);
+
+            fsync(fd);
+        }
 
         {
             bool possibly_ubsan_error = false;
@@ -342,6 +375,12 @@ static void SignalHandler(int signal_num, siginfo_t* info, void* context) {
 void StartupCrashHandler() {
     if (g_signals_installed) return;
     g_signals_installed = true;
+
+    ArenaAllocatorWithInlineStorage<500> scratch_arena;
+    if (auto const outcome =
+            KnownDirectoryWithSubdirectories(scratch_arena, KnownDirectories::Logs, Array {"Floe"_s});
+        outcome.HasValue())
+        dyn::Assign(g_crash_folder_path, outcome.Value());
 
     for (auto [index, signal] : Enumerate(k_signals)) {
         struct sigaction action {};

@@ -11,6 +11,7 @@
 
 #include "foundation/foundation.hpp"
 #include "os/undef_windows_macros.h"
+#include "utils/debug/debug.hpp"
 
 #include "gui/gui.hpp"
 #include "gui_frame.hpp"
@@ -101,6 +102,7 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event);
 int FdFromPuglWorld(PuglWorld* world);
 
 PUBLIC ErrorCodeOr<void> CreateView(GuiPlatform& platform, PluginInstance& plugin) {
+    DebugLoc();
     platform.g_world_counter++;
     if (auto const floe_host =
             (FloeClapExtensionHost const*)platform.host.get_extension(&platform.host,
@@ -161,6 +163,9 @@ PUBLIC ErrorCodeOr<void> CreateView(GuiPlatform& platform, PluginInstance& plugi
 }
 
 PUBLIC void DestroyView(GuiPlatform& platform) {
+    DebugLoc();
+    if (!platform.gui) return;
+
     platform.gui.Clear();
 
     if constexpr (IS_LINUX) {
@@ -184,6 +189,7 @@ PUBLIC void DestroyView(GuiPlatform& platform) {
         platform.realised = false;
     }
     puglFreeView(platform.view);
+    platform.view = nullptr;
 
     if (--platform.g_world_counter == 0) {
         if (platform.g_world) {
@@ -590,6 +596,12 @@ static void UpdateAndRender(GuiPlatform& platform) {
     if (!platform.graphics_ctx) return;
     if constexpr (!IS_MACOS) // doesn't seem to work on macOS
         if (!puglGetVisible(platform.view)) return;
+
+    Stopwatch sw {};
+    DEFER {
+        auto const elapsed = sw.MillisecondsElapsed();
+        if (elapsed > 10) platform.logger.WarningLn("GUI update took {}ms", elapsed);
+    };
 
     auto const window_size = WindowSize(platform);
     auto const scale_factor = 1.0;

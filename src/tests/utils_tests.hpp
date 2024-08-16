@@ -13,7 +13,7 @@
 #include "utils/thread_extra/atomic_queue.hpp"
 
 struct StartingGun {
-    void Wait() {
+    void WaitUntilFired() {
         while (true) {
             WaitIfValueIsExpected(value, 0);
             if (value.Load(LoadMemoryOrder::Relaxed) == 1) return;
@@ -38,7 +38,7 @@ TEST_CASE(TestErrorNotifications) {
         p.Start(
             [&]() {
                 thread_ready.Store(true, StoreMemoryOrder::Relaxed);
-                starting_gun.Wait();
+                starting_gun.WaitUntilFired();
 
                 auto seed = SeedFromTime();
                 while (iterations.Load(LoadMemoryOrder::Relaxed) < k_num_iterations) {
@@ -166,7 +166,7 @@ void DoAtomicQueueTest(tests::Tester& tester, String name) {
         auto const do_random_spamming = [](AtomicQueue<int, k_size, k_num_producers, k_num_consumers>& q,
                                            StartingGun& starting_gun,
                                            bool push) {
-            starting_gun.Wait();
+            starting_gun.WaitUntilFired();
             Array<int, 1> small_item {};
             Array<int, 4> big_item {};
             u64 seed = SeedFromTime();
@@ -208,7 +208,7 @@ void DoAtomicQueueTest(tests::Tester& tester, String name) {
             producer.Start(
                 [&]() {
                     producer_ready.Store(true, StoreMemoryOrder::Relaxed);
-                    starting_gun.Wait();
+                    starting_gun.WaitUntilFired();
                     for (auto const index : Range(k_num_values))
                         while (!q.Push(index))
                             YieldThisThread();
@@ -413,7 +413,7 @@ TEST_CASE(TestAtomicRefList) {
         thread.Start(
             [&]() {
                 thread_ready.Store(true, StoreMemoryOrder::Relaxed);
-                starting_gun.Wait();
+                starting_gun.WaitUntilFired();
                 auto seed = SeedFromTime();
                 for (auto _ : Range(5000)) {
                     for (char c = 'a'; c <= 'z'; ++c) {

@@ -231,8 +231,8 @@ struct Atomic {
     ATOMIC_INTEGER_METHOD(XorFetch, __atomic_xor_fetch)
     ATOMIC_INTEGER_METHOD(NandFetch, __atomic_nand_fetch)
 
-    // These additonal functions ensure that the atomic operations are handled using volatile pointers. This
-    // is the way libc++ does it.
+    // These additonal functions ensure that the atomic operations are handled using volatile pointers -
+    // important for correct code generation. This is the way libc++ does it.
     ALWAYS_INLINE static void
     AtomicStore(Atomic<Type> volatile* atomic, Type v, StoreMemoryOrder memory_order) {
         __atomic_store(&atomic->raw, &v, (int)memory_order);
@@ -299,7 +299,7 @@ class AtomicFlag {
     void StoreFalse(StoreMemoryOrder mem_order) { __atomic_clear(&m_flag, (int)mem_order); }
 
   private:
-    bool m_flag {};
+    bool volatile m_flag {};
 };
 
 struct AtomicCountdown {

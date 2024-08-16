@@ -16,8 +16,9 @@ constexpr bool k_tracy_enable = false;
 template <typename... Args>
 PUBLIC void DebugLn(String format, Args const&... args) {
     if constexpr (!PRODUCTION_BUILD) {
-        FixedSizeAllocator<1000> allocator;
-        DynamicArray<char> buffer {allocator};
+        DynamicArrayInline<char, 1500> buffer {};
+        dyn::AppendSpan(buffer, Timestamp());
+        dyn::Append(buffer, ' ');
         fmt::Append(buffer, format, args...);
         dyn::Append(buffer, '\n');
 

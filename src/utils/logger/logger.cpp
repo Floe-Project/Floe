@@ -11,13 +11,13 @@
 void Logger::TraceLn(String message, SourceLocation loc) {
     DynamicArrayInline<char, 1000> buf;
     fmt::Append(buf,
-                "Trace: {35}({3}), {}",
+                "trace: {}({}): {}",
                 path::Filename(FromNullTerminated(loc.file)),
                 loc.line,
                 loc.function);
-    if (message.size) fmt::Append(buf, " | {}", message);
+    if (message.size) fmt::Append(buf, ": {}", message);
 
-    LogFunction(buf, LogLevel::Info, true);
+    LogFunction(buf, LogLevel::Debug, true);
 }
 
 void StdoutLogger::LogFunction(String str, LogLevel level, bool add_newline) {
@@ -106,20 +106,11 @@ void FileLogger::LogFunction(String str, LogLevel level, bool add_newline) {
     });
 
     auto try_writing = [&](Writer writer) -> ErrorCodeOr<void> {
-        if (first_message) {
-            TRY(writer.WriteChars("=======================\n"_s));
+        TRY(writer.WriteChars(Timestamp()));
+        TRY(writer.WriteChar(' '));
 
-            auto const t = LocalTimeFromNanosecondsSinceEpoch(NanosecondsSinceEpoch());
-            TRY(fmt::FormatToWriter(writer,
-                                    "{} {} {} {} {}:{}:{}",
-                                    t.DayName(),
-                                    t.MonthName(),
-                                    t.day_of_month,
-                                    t.year,
-                                    t.hour,
-                                    t.minute,
-                                    t.second));
-            TRY(writer.WriteChar('\n'));
+        if (first_message) {
+            TRY(writer.WriteChars("======== new instance ========:\n"_s));
 
             TRY(fmt::FormatToWriter(writer,
                                     "Floe v{}.{}.{}\n",

@@ -207,7 +207,7 @@ static void BackgroundInstallingThread(Application& app) {
         app.installation_results.Use([i, outcome](InstallationResults& r) { r[i] = outcome; });
     }
     SleepThisThread(1500); // Intentional delay because it feels good
-    app.installing_completed.Store(true);
+    app.installing_completed.Store(true, StoreMemoryOrder::Release);
 }
 
 static void SwitchPage(Application& app, GuiFramework& framework, Pages page) {
@@ -299,7 +299,7 @@ static void SwitchPage(Application& app, GuiFramework& framework, Pages page) {
         case Pages::Configuration: break;
         case Pages::Installing: {
             if (app.installing_thread.Joinable()) app.installing_thread.Join();
-            app.installing_completed.Store(false);
+            app.installing_completed.Store(false, StoreMemoryOrder::Release);
             app.installing_thread.Start([&app]() { BackgroundInstallingThread(app); }, "Installing thread");
             break;
         }
@@ -571,7 +571,7 @@ void DestroyApplication(Application& app, GuiFramework&) {
 
 void OnTimer(Application& app, GuiFramework& framework) {
     if (app.current_page == Pages::Installing) {
-        if (app.installing_completed.Load())
+        if (app.installing_completed.Load(LoadMemoryOrder::Relaxed))
             SwitchPage(app, framework, Pages::Summary);
         else
             EditWidget(framework, app.installing_bar, {.progress_bar_pulse = true});

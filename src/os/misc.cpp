@@ -52,3 +52,15 @@ Mutex& StdStreamMutex(StdStream stream) {
 #if !IS_WINDOWS
 bool IsRunningUnderWine() { return false; }
 #endif
+
+DynamicArrayInline<char, k_timestamp_max_str_size> Timestamp() {
+    auto const t = LocalTimeFromNanosecondsSinceEpoch(NanosecondsSinceEpoch());
+    return fmt::FormatInline<k_timestamp_max_str_size>("{}-{02}-{02} {02}:{02}:{02}.{} ",
+                                                       t.year,
+                                                       t.months_since_jan + 1,
+                                                       t.day_of_month,
+                                                       t.hour,
+                                                       t.minute,
+                                                       t.second,
+                                                       t.millisecond);
+}

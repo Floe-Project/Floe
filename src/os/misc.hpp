@@ -139,6 +139,9 @@ struct DateAndTime {
 s128 NanosecondsSinceEpoch();
 DateAndTime LocalTimeFromNanosecondsSinceEpoch(s128 nanoseconds);
 
+constexpr auto k_timestamp_max_str_size = "2022-12-31 23:59:59.999"_s.size;
+DynamicArrayInline<char, k_timestamp_max_str_size> Timestamp();
+
 // A point in time. It has no defined reference. You can't get seconds-from-Epoch from it, for example.
 class TimePoint {
   public:

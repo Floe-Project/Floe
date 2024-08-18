@@ -665,14 +665,15 @@ fn cppFlags(b: *std.Build, generic_flags: [][]const u8, extra_flags: []const []c
     var flags = std.ArrayList([]const u8).init(b.allocator);
     try flags.appendSlice(generic_flags);
     try flags.appendSlice(extra_flags);
-    try flags.append("-std=c++2b");
+    try flags.append("-std=c++2c");
     return try flags.toOwnedSlice();
 }
 
-fn objcppFlags(b: *std.Build, cpp_flags: [][]const u8, extra_flags: []const []const u8) ![][]const u8 {
+fn objcppFlags(b: *std.Build, generic_flags: [][]const u8, extra_flags: []const []const u8) ![][]const u8 {
     var flags = std.ArrayList([]const u8).init(b.allocator);
-    try flags.appendSlice(cpp_flags);
+    try flags.appendSlice(generic_flags);
     try flags.appendSlice(extra_flags);
+    try flags.append("-std=c++2b");
     try flags.append("-ObjC++");
     try flags.append("-fobjc-arc");
     return try flags.toOwnedSlice();
@@ -983,8 +984,8 @@ pub fn build(b: *std.Build) void {
         }) catch unreachable;
         const cpp_flags = cppFlags(b, generic_flags, &.{}) catch unreachable;
         const cpp_fp_flags = cppFlags(b, generic_fp_flags, &.{}) catch unreachable;
-        const objcpp_flags = objcppFlags(b, cpp_flags, &.{}) catch unreachable;
-        const objcpp_fp_flags = objcppFlags(b, cpp_fp_flags, &.{}) catch unreachable;
+        const objcpp_flags = objcppFlags(b, generic_flags, &.{}) catch unreachable;
+        const objcpp_fp_flags = objcppFlags(b, generic_fp_flags, &.{}) catch unreachable;
 
         const floe_version_major: i64 = @intCast(floe_version.major);
         const floe_version_minor: i64 = @intCast(floe_version.minor);
@@ -1856,7 +1857,7 @@ pub fn build(b: *std.Build) void {
             } else {
                 extra_flags.append("-DRELEASE=1") catch unreachable;
             }
-            const flags = cppFlags(b, generic_flags, extra_flags.items) catch unreachable;
+            const flags = genericFlags(&build_context, target, extra_flags.items) catch unreachable;
 
             {
                 vst3_sdk.addCSourceFiles(.{
@@ -2199,29 +2200,29 @@ pub fn build(b: *std.Build) void {
                     .version = floe_version,
                     .pic = true,
                 });
-                var extra_flags = std.ArrayList([]const u8).init(b.allocator);
+                var flags = std.ArrayList([]const u8).init(b.allocator);
                 switch (target.result.os.tag) {
                     .windows => {
-                        extra_flags.append("-DWIN=1") catch unreachable;
+                        flags.append("-DWIN=1") catch unreachable;
                     },
                     .linux => {
-                        extra_flags.append("-DLIN=1") catch unreachable;
+                        flags.append("-DLIN=1") catch unreachable;
                     },
                     .macos => {
-                        extra_flags.append("-DMAC=1") catch unreachable;
+                        flags.append("-DMAC=1") catch unreachable;
                     },
                     else => {},
                 }
                 if (build_context.optimise == .Debug) {
-                    extra_flags.append("-DDEVELOPMENT=1") catch unreachable;
+                    flags.append("-DDEVELOPMENT=1") catch unreachable;
                 } else {
-                    extra_flags.append("-DRELEASE=1") catch unreachable;
+                    flags.append("-DRELEASE=1") catch unreachable;
                 }
-                extra_flags.append("-fno-char8_t") catch unreachable;
-                extra_flags.append("-DMACOS_USE_STD_FILESYSTEM=1") catch unreachable;
-                extra_flags.append("-DCLAP_WRAPPER_VERSION=\"0.9.1\"") catch unreachable;
-                extra_flags.append("-DSTATICALLY_LINKED_CLAP_ENTRY=1") catch unreachable;
-                const flags = cppFlags(b, generic_flags, extra_flags.items) catch unreachable;
+                flags.append("-fno-char8_t") catch unreachable;
+                flags.append("-DMACOS_USE_STD_FILESYSTEM=1") catch unreachable;
+                flags.append("-DCLAP_WRAPPER_VERSION=\"0.9.1\"") catch unreachable;
+                flags.append("-DSTATICALLY_LINKED_CLAP_ENTRY=1") catch unreachable;
+                flags.appendSlice(generic_flags) catch unreachable;
 
                 au.addCSourceFiles(.{ .files = &.{
                     "src/plugin/plugin_clap_entry.cpp",
@@ -2241,7 +2242,7 @@ pub fn build(b: *std.Build) void {
                         "detail/auv2/wrappedview.mm",
                         "detail/auv2/parameter.cpp",
                     },
-                    .flags = flags,
+                    .flags = flags.items,
                 });
 
                 {

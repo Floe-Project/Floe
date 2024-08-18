@@ -8,12 +8,12 @@
 
 #define FLOE_EDITOR_ENABLED !PRODUCTION_BUILD
 
-static constexpr bool k_editor_enabled = FLOE_EDITOR_ENABLED;
+constexpr bool k_editor_enabled = FLOE_EDITOR_ENABLED;
 
 #define VERSION_HEX VERSION_PACKED(MAJOR_VERSION, MINOR_VERSION, PATCH_VERSION)
 
 #define PRODUCT_NAME "Floe"
-Version const k_floe_version {FLOE_MAJOR_VERSION, FLOE_MINOR_VERSION, FLOE_PATCH_VERSION};
+constexpr Version k_floe_version {FLOE_MAJOR_VERSION, FLOE_MINOR_VERSION, FLOE_PATCH_VERSION};
 
 #define FLOE_PRESET_FILE_EXTENSION ".floe-preset"
 

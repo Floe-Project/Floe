@@ -77,11 +77,11 @@ class FloeWaveformImages {
             }
         }
 
-        for (auto& w : m_waveforms) {
-            if (w.source_hash == source_hash && w.image_id.size == size) {
-                auto tex = graphics.GetTextureFromImage(w.image_id);
+        for (auto& waveform : m_waveforms) {
+            if (waveform.source_hash == source_hash && waveform.image_id.size == size) {
+                auto tex = graphics.GetTextureFromImage(waveform.image_id);
                 if (tex) {
-                    w.used = true;
+                    waveform.used = true;
                     return *tex;
                 }
             }
@@ -90,21 +90,21 @@ class FloeWaveformImages {
         auto const cursor = scratch_arena.TotalUsed();
         DEFER { scratch_arena.TryShrinkTotalUsed(cursor); };
 
-        Waveform w {};
+        Waveform waveform {};
         auto pixels = CreateWaveformImage(source, size, scratch_arena, scratch_arena);
-        w.source_hash = source_hash;
-        w.image_id = TRY(graphics.CreateImageID(pixels.data, size, 4));
-        w.used = true;
+        waveform.source_hash = source_hash;
+        waveform.image_id = TRY(graphics.CreateImageID(pixels.data, size, 4));
+        waveform.used = true;
 
-        dyn::Append(m_waveforms, w);
-        auto tex = graphics.GetTextureFromImage(w.image_id);
+        dyn::Append(m_waveforms, waveform);
+        auto tex = graphics.GetTextureFromImage(waveform.image_id);
         ASSERT(tex);
         return *tex;
     }
 
     void StartFrame() {
-        for (auto& w : m_waveforms)
-            w.used = false;
+        for (auto& waveform : m_waveforms)
+            waveform.used = false;
     }
 
     void EndFrame(graphics::DrawContext& graphics) {

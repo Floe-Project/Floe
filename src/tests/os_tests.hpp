@@ -885,7 +885,7 @@ TEST_CASE(TestFutex) {
     return k_success;
 }
 
-int global_int = 0;
+int g_global_int = 0;
 
 TEST_CASE(TestThread) {
     Thread thread;
@@ -893,7 +893,7 @@ TEST_CASE(TestThread) {
 
     thread.Start(
         []() {
-            global_int = 1;
+            g_global_int = 1;
             SleepThisThread(1);
         },
         "test thread");
@@ -901,7 +901,7 @@ TEST_CASE(TestThread) {
     REQUIRE(thread.Joinable());
     thread.Join();
 
-    REQUIRE(global_int == 1);
+    REQUIRE(g_global_int == 1);
     return k_success;
 }
 

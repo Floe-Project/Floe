@@ -232,13 +232,13 @@ template <usize arg1, usize... others>
 struct LargestValueInTemplateArgs;
 template <usize arg>
 struct LargestValueInTemplateArgs<arg> {
-    static usize const value = arg;
+    static constexpr usize k_value = arg;
 };
 
 template <usize arg1, usize arg2, usize... others>
 struct LargestValueInTemplateArgs<arg1, arg2, others...> {
-    static usize const value = arg1 >= arg2 ? LargestValueInTemplateArgs<arg1, others...>::value
-                                            : LargestValueInTemplateArgs<arg2, others...>::value;
+    static constexpr usize k_value = arg1 >= arg2 ? LargestValueInTemplateArgs<arg1, others...>::k_value
+                                                  : LargestValueInTemplateArgs<arg2, others...>::k_value;
 };
 
 template <bool B, typename T, typename F>

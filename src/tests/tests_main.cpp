@@ -74,11 +74,11 @@ int main(int argc, char** argv) {
                     else if (IsEqualToCaseInsensitiveAscii(*value, "error"_s))
                         tester.log.max_level_allowed = LogLevel::Error;
                     else {
-                        cli_out.ErrorLn("Unknown log level: {}", *value);
+                        g_cli_out.ErrorLn("Unknown log level: {}", *value);
                         return 1;
                     }
                 } else {
-                    cli_out.ErrorLn("Unknown option: {}", key);
+                    g_cli_out.ErrorLn("Unknown option: {}", key);
                     return 1;
                 }
             }

@@ -29,7 +29,7 @@ void StdoutLogger::LogFunction(String str, LogLevel level, bool add_newline) {
     if (add_newline) auto _ = StdPrint(StdStream::Out, "\n"_s);
 }
 
-StdoutLogger stdout_log;
+StdoutLogger g_stdout_log;
 
 void CliOutLogger::LogFunction(String str, LogLevel level, bool add_newline) {
     auto& mutex = StdStreamMutex(StdStream::Out);
@@ -40,7 +40,7 @@ void CliOutLogger::LogFunction(String str, LogLevel level, bool add_newline) {
     if (add_newline) auto _ = StdPrint(StdStream::Out, "\n"_s);
 }
 
-CliOutLogger cli_out;
+CliOutLogger g_cli_out;
 
 void FileLogger::LogFunction(String str, LogLevel level, bool add_newline) {
     // TracyMessageEx(
@@ -81,7 +81,7 @@ void FileLogger::LogFunction(String str, LogLevel level, bool add_newline) {
             dyn::Assign(filepath, String(path));
         } else {
             dyn::Clear(filepath);
-            stdout_log.DebugLn("failed to get logs known dir: {}", outcome.Error());
+            g_stdout_log.DebugLn("failed to get logs known dir: {}", outcome.Error());
         }
         state.Store(FileLogger::State::Initialised, StoreMemoryOrder::Release);
     } else if (ex == FileLogger::State::Initialising) {
@@ -95,7 +95,7 @@ void FileLogger::LogFunction(String str, LogLevel level, bool add_newline) {
     auto file = ({
         auto outcome = OpenFile(filepath, FileMode::Append);
         if (outcome.HasError()) {
-            stdout_log.DebugLn("failed to open log file {}: {}", filepath, outcome.Error());
+            g_stdout_log.DebugLn("failed to open log file {}: {}", filepath, outcome.Error());
             return;
         }
         outcome.ReleaseValue();
@@ -113,9 +113,9 @@ void FileLogger::LogFunction(String str, LogLevel level, bool add_newline) {
 
     auto writer = file.Writer();
     auto o = try_writing(writer);
-    if (o.HasError()) stdout_log.DebugLn("failed to write log file: {}, {}", filepath, o.Error());
+    if (o.HasError()) g_stdout_log.DebugLn("failed to write log file: {}, {}", filepath, o.Error());
 }
 
 FileLogger g_log_file {};
 
-Logger& g_log = PRODUCTION_BUILD ? (Logger&)g_log_file : (Logger&)stdout_log;
+Logger& g_log = PRODUCTION_BUILD ? (Logger&)g_log_file : (Logger&)g_stdout_log;

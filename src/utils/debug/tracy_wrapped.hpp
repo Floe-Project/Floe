@@ -10,3 +10,9 @@
 #include "tracy/Tracy.hpp" // IWYU pragma: export
 #include "tracy/TracyC.h" // IWYU pragma: export
 #pragma clang diagnostic pop
+
+#ifdef TRACY_ENABLE
+constexpr bool k_tracy_enable = true;
+#else
+constexpr bool k_tracy_enable = false;
+#endif

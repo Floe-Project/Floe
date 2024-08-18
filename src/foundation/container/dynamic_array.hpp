@@ -28,21 +28,21 @@ template <DynArray DynType>
 using MutableSpanFor = Span<typename DynType::ValueType>;
 
 template <typename Type>
-PUBLIC constexpr void CallDestructors(Span<Type> data) {
+PUBLIC constexpr void CallDestructors(Span<Type> items) {
     if constexpr (!Fundamental<Type>)
-        for (auto& d : data)
-            d.~Type();
+        for (auto& item : items)
+            item.~Type();
     if constexpr (RUNTIME_SAFETY_CHECKS_ON) {
         constexpr u8 k_garbage = 0xd0;
-        FillMemory(data.ToByteSpan(), k_garbage);
+        FillMemory(items.ToByteSpan(), k_garbage);
     }
 }
 
 template <typename Type>
-PUBLIC constexpr void CallConstructors(Span<Type> data) {
+PUBLIC constexpr void CallConstructors(Span<Type> items) {
     if constexpr (!Fundamental<Type>)
-        for (auto& d : data)
-            PLACEMENT_NEW(&d) Type();
+        for (auto& item : items)
+            PLACEMENT_NEW(&item) Type();
 }
 
 // You must initialise the elements in the gap that this creates (using placement-new)
@@ -100,8 +100,8 @@ template <DynArray DynType>
 PUBLIC constexpr bool AssignAssumingAlreadyEmpty(DynType& array, SpanFor<DynType> new_items) {
     if (!array.Reserve(new_items.size)) return false;
     array.ResizeWithoutCtorDtor(new_items.size);
-    for (auto const i : Range(new_items.size))
-        PLACEMENT_NEW(array.data + i) DynType::ValueType(new_items[i]);
+    for (auto const item_index : Range(new_items.size))
+        PLACEMENT_NEW(array.data + item_index) DynType::ValueType(new_items[item_index]);
     return true;
 }
 
@@ -117,8 +117,8 @@ PUBLIC constexpr bool AssignRepeated(DynArray auto& array, usize count, Args&&..
     CallDestructors(array.Items());
     if (!array.Reserve(count)) return false;
     array.ResizeWithoutCtorDtor(count);
-    for (auto const i : Range(count))
-        PLACEMENT_NEW(array.data + i) ValueType(Forward<Args>(args)...);
+    for (auto const item_index : Range(count))
+        PLACEMENT_NEW(array.data + item_index) ValueType(Forward<Args>(args)...);
     return true;
 }
 
@@ -126,8 +126,8 @@ template <DynArray DynType>
 PUBLIC constexpr bool MoveAssignAssumingAlreadyEmpty(DynType& array, MutableSpanFor<DynType> data) {
     if (!array.Reserve(data.size)) return false;
     array.ResizeWithoutCtorDtor(data.size);
-    for (auto const i : Range(data.size))
-        PLACEMENT_NEW(array.data + i) DynType::ValueType(Move(data[i]));
+    for (auto const item_index : Range(data.size))
+        PLACEMENT_NEW(array.data + item_index) DynType::ValueType(Move(data[item_index]));
     return true;
 }
 
@@ -154,8 +154,8 @@ template <DynArray DynType>
 PUBLIC constexpr bool AppendSpan(DynType& array, SpanFor<DynType> new_items) {
     if (!MakeUninitialisedGapAtEnd(array, new_items.size)) return false;
     auto write_ptr = array.data + (array.size - new_items.size);
-    for (auto const i : Range(new_items.size))
-        PLACEMENT_NEW(write_ptr + i) DynType::ValueType(new_items[i]);
+    for (auto const new_items_index : Range(new_items.size))
+        PLACEMENT_NEW(write_ptr + new_items_index) DynType::ValueType(new_items[new_items_index]);
     return true;
 }
 
@@ -185,16 +185,16 @@ PUBLIC constexpr bool Insert(DynType& array, usize pos, ArgumentType&& value) {
 template <DynArray DynType>
 PUBLIC constexpr bool InsertSpan(DynType& array, usize pos, SpanFor<DynType> data) {
     if (!MakeUninitialisedGap(array, pos, data.size)) return false;
-    for (auto const i : Range(data.size))
-        PLACEMENT_NEW(array.data + pos + i) DynType::ValueType(data[i]);
+    for (auto const data_index : Range(data.size))
+        PLACEMENT_NEW(array.data + pos + data_index) DynType::ValueType(data[data_index]);
     return true;
 }
 
 template <DynArray DynType, typename ArgumentType = DynType::ValueType>
 PUBLIC constexpr bool InsertRepeated(DynType& array, usize pos, usize count, ArgumentType const& v) {
     if (!MakeUninitialisedGap(array, pos, count)) return false;
-    for (auto const i : Range(count))
-        PLACEMENT_NEW(array.data + pos + i) DynType::ValueType(v);
+    for (auto const index : Range(count))
+        PLACEMENT_NEW(array.data + pos + index) DynType::ValueType(v);
     return true;
 }
 
@@ -286,23 +286,23 @@ PUBLIC constexpr usize RemoveValueIfSwapLast(DynArray auto& array, auto&& should
 template <DynArray DynType>
 PUBLIC constexpr usize
 Replace(DynType& array,
-        ContiguousContainerSimilarTo<Span<typename DynType::ValueType>> auto const& existing_value,
-        ContiguousContainerSimilarTo<Span<typename DynType::ValueType>> auto const& replacement) {
-    if (existing_value.size > array.size) return 0;
-    if (existing_value.size == 0) return 0;
+        ContiguousContainerSimilarTo<Span<typename DynType::ValueType>> auto const& search_span,
+        ContiguousContainerSimilarTo<Span<typename DynType::ValueType>> auto const& replacement_span) {
+    if (search_span.size > array.size) return 0;
+    if (search_span.size == 0) return 0;
 
     usize num_replaced = 0;
-    for (auto const i : Range(array.size - (existing_value.size - 1))) {
+    for (auto const array_index : Range(array.size - (search_span.size - 1))) {
         bool match = true;
-        for (auto const j : Range(existing_value.size)) {
-            if (array.data[i + j] != existing_value[j]) {
+        for (auto const search_index : Range(search_span.size)) {
+            if (array.data[array_index + search_index] != search_span[search_index]) {
                 match = false;
                 break;
             }
         }
         if (match) {
-            dyn::Remove(array, i, existing_value.size);
-            dyn::InsertSpan(array, i, replacement);
+            dyn::Remove(array, array_index, search_span.size);
+            dyn::InsertSpan(array, array_index, replacement_span);
             ++num_replaced;
         }
     }
@@ -394,8 +394,8 @@ struct DynamicArray {
         } else {
             dyn::CallDestructors(Items());
             Reserve(other.size);
-            for (auto const i : Range(other.size))
-                PLACEMENT_NEW(items.data + i) Type(Move(other.data[i]));
+            for (auto const item_index : Range(other.size))
+                PLACEMENT_NEW(items.data + item_index) Type(Move(other.data[item_index]));
             ResizeWithoutCtorDtor(other.size);
             dyn::Clear(other);
         }

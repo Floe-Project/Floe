@@ -78,15 +78,15 @@ struct ArenaList {
     void RemoveIf(FunctionType&& should_remove_value) {
         SinglyLinkedListRemoveIf(
             first,
-            [&should_remove_value](Node const& i) { return should_remove_value(i.data); },
-            [this](Node* i) { Delete(i); });
+            [&should_remove_value](Node const& node) { return should_remove_value(node.data); },
+            [this](Node* node) { Delete(node); });
     }
 
     void Remove(Type const* value) {
         SinglyLinkedListRemoveIf(
             first,
-            [value](Node const& i) { return &i.data == value; },
-            [this](Node* i) { Delete(i); });
+            [value](Node const& node) { return &node.data == value; },
+            [this](Node* node) { Delete(node); });
     }
 
     void Clear() {

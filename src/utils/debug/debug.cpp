@@ -152,6 +152,7 @@ struct DynamicTypeCacheMissData {
 } // namespace ubsan
 
 // Full UBSan runtime
+// NOLINTNEXTLINE
 INTERFACE uintptr_t __ubsan_vptr_type_cache[128] = {};
 INTERFACE void __ubsan_handle_dynamic_type_cache_miss([[maybe_unused]] ubsan::DynamicTypeCacheMissData* data,
                                                       [[maybe_unused]] ubsan::ValueHandle pointer,

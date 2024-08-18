@@ -35,10 +35,10 @@ struct HashTable {
         Iterator& operator++() {
             ++index;
             for (; index < table.mask + 1; ++index) {
-                auto& e = table.elems[index];
-                if (e.active) {
-                    item.key = e.key;
-                    item.value_ptr = &e.data;
+                auto& element = table.elems[index];
+                if (element.active) {
+                    item.key = element.key;
+                    item.value_ptr = &element.data;
                     break;
                 }
             }
@@ -59,18 +59,20 @@ struct HashTable {
     // Quadratic probing is used in case of hash collision
     Element* Lookup(KeyType key, u64 hash, usize _dead) const {
         ASSERT(elems);
-        Element* e;
+        Element* element;
         for (u64 i = hash, j = 1;; i += j++) {
-            e = elems + (i & mask);
-            if ((!e->active && (!e->hash || e->hash == _dead)) || (e->hash == hash && e->key == key)) break;
+            element = elems + (i & mask);
+            if ((!element->active && (!element->hash || element->hash == _dead)) ||
+                (element->hash == hash && element->key == key))
+                break;
         }
-        return e;
+        return element;
     }
 
     Element* FindElement(KeyType key) const {
         if (!elems) return nullptr;
-        Element* e = Lookup(key, k_hash_function(key), 0);
-        if (e->active) return e;
+        Element* element = Lookup(key, k_hash_function(key), 0);
+        if (element->active) return element;
         return nullptr;
     }
 
@@ -93,8 +95,8 @@ struct HashTable {
     }
 
     void Free(Allocator& a) {
-        auto e = Elements();
-        if (e.size) a.Free(e.ToByteSpan());
+        auto element = Elements();
+        if (element.size) a.Free(element.ToByteSpan());
     }
 
     Span<Element const> Elements() const {
@@ -103,16 +105,16 @@ struct HashTable {
     Span<Element> Elements() { return elems ? Span<Element> {elems, mask + 1} : Span<Element> {}; }
 
     ValueType* Find(KeyType key) const {
-        Element* e = FindElement(key);
-        if (!e) return nullptr;
-        return &e->data;
+        Element* element = FindElement(key);
+        if (!element) return nullptr;
+        return &element->data;
     }
 
     bool Delete(KeyType key) {
-        Element* e = FindElement(key);
-        if (!e) return false;
-        e->active = false;
-        e->hash = k_tombstone;
+        Element* element = FindElement(key);
+        if (!element) return false;
+        element->active = false;
+        element->hash = k_tombstone;
         --size;
         ++dead;
         return true;
@@ -139,14 +141,14 @@ struct HashTable {
         mask = capacity - 1;
 
         if (old_elements.size) {
-            Element* new_e;
-            for (auto& e : old_elements)
-                if (e.active) {
-                    for (u64 i = e.hash, j = 1;; i += j++) {
-                        new_e = elems + (i & mask);
-                        if (!new_e->active) break;
+            Element* new_element;
+            for (auto& old_element : old_elements)
+                if (old_element.active) {
+                    for (u64 i = old_element.hash, j = 1;; i += j++) {
+                        new_element = elems + (i & mask);
+                        if (!new_element->active) break;
                     }
-                    *new_e = e;
+                    *new_element = old_element;
                 }
             allocator.Free(old_elements.ToByteSpan());
         }
@@ -159,20 +161,20 @@ struct HashTable {
             return false;
         }
         auto const hash = Hash(key);
-        Element* e = Lookup(key, hash, k_tombstone);
+        Element* element = Lookup(key, hash, k_tombstone);
 
-        if (e->active) return false; // already exists
+        if (element->active) return false; // already exists
         if (size + dead > mask - mask / 4) {
             PanicIfReached();
             return false; // too full
         }
 
-        if (e->hash == k_tombstone) --dead;
+        if (element->hash == k_tombstone) --dead;
         ++size;
-        e->key = key;
-        e->active = true;
-        e->data = value;
-        e->hash = hash;
+        element->key = key;
+        element->active = true;
+        element->data = value;
+        element->hash = hash;
         return true;
     }
 
@@ -180,14 +182,14 @@ struct HashTable {
     bool InsertGrowIfNeeded(Allocator& allocator, KeyType key, ValueType value) {
         if (!elems) IncreaseCapacity(allocator, k_min_size);
         auto const hash = Hash(key);
-        Element* e = Lookup(key, hash, k_tombstone);
-        if (e->active) return false; // already exists
+        Element* element = Lookup(key, hash, k_tombstone);
+        if (element->active) return false; // already exists
 
-        auto const old_hash = e->hash; // save old hash in case it's tombstone marker
-        e->active = true;
-        e->key = key;
-        e->data = value;
-        e->hash = hash;
+        auto const old_hash = element->hash; // save old hash in case it's tombstone marker
+        element->active = true;
+        element->key = key;
+        element->data = value;
+        element->hash = hash;
         if (++size + dead > mask - mask / 4) {
             IncreaseCapacity(allocator, 2 * size);
             dead = 0;
@@ -203,10 +205,10 @@ struct HashTable {
         typename Iterator::Item item {};
         usize index = 0;
         for (; index < mask + 1; ++index) {
-            auto& e = elems[index];
-            if (e.active) {
-                item.key = e.key;
-                item.value_ptr = &e.data;
+            auto& element = elems[index];
+            if (element.active) {
+                item.key = element.key;
+                item.value_ptr = &element.data;
                 break;
             }
         }
@@ -262,9 +264,9 @@ struct DynamicHashTable {
 
     // table must have been created with allocator
     static constexpr DynamicHashTable FromOwnedSpan(Table table, Allocator& allocator) {
-        DynamicHashTable t {allocator};
-        t.table = table;
-        return t;
+        DynamicHashTable result {allocator};
+        result.table = table;
+        return result;
     }
 
     void Free() { table.Free(allocator); }

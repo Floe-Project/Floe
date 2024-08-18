@@ -102,19 +102,19 @@ TEST_CASE(TestBitset) {
 
     {
         Bitset<8> const b(0b00101010);
-        REQUIRE(b.Subsection<3>(2).parts[0] == 0b010);
+        REQUIRE(b.Subsection<3>(2).elements[0] == 0b010);
     }
 
     {
         Bitset<8> const b(0b11110000);
         REQUIRE(!b.Get(0));
         REQUIRE(b.Get(7));
-        REQUIRE(b.Subsection<4>(4).parts[0] == 0b1111);
+        REQUIRE(b.Subsection<4>(4).elements[0] == 0b1111);
     }
 
     {
         Bitset<8> const b(0b00100100);
-        REQUIRE(b.Subsection<4>(2).parts[0] == 0b1001);
+        REQUIRE(b.Subsection<4>(2).elements[0] == 0b1001);
     }
 
     {

@@ -27,7 +27,7 @@ concept TypeWithinTypeAndTags = IsTypePresentInVariadicArgs<Type, typename Ts::T
 
 template <typename... TT>
 struct TypeList {
-    static int const k_size = sizeof...(TT);
+    static constexpr int const k_size = sizeof...(TT);
 };
 
 template <typename T, int k_index, int k_initial_size = 0>
@@ -108,8 +108,8 @@ class TaggedUnion {
         return *(T const*)storage;
     }
 
-    static constexpr usize k_data_size = LargestValueInTemplateArgs<sizeof(typename Ts::Type)...>::value;
-    static constexpr usize k_data_align = LargestValueInTemplateArgs<alignof(typename Ts::Type)...>::value;
+    static constexpr usize k_data_size = LargestValueInTemplateArgs<sizeof(typename Ts::Type)...>::k_value;
+    static constexpr usize k_data_align = LargestValueInTemplateArgs<alignof(typename Ts::Type)...>::k_value;
 
     template <TagType k_wanted_tag>
     constexpr void CallWithTypeIfTagMatches(auto&& function) const {

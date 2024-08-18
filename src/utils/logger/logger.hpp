@@ -4,6 +4,7 @@
 #pragma once
 #include "foundation/foundation.hpp"
 #include "os/threading.hpp"
+#include "utils/debug/tracy_wrapped.hpp"
 
 enum class LogLevel { Debug, Info, Warning, Error };
 
@@ -120,13 +121,13 @@ struct Logger {
 struct StdoutLogger final : Logger {
     void LogFunction(String str, LogLevel level, bool add_newline) override;
 };
-extern StdoutLogger stdout_log;
+extern StdoutLogger g_stdout_log;
 
 // Logs to stdout but info messages don't have a prefix
 struct CliOutLogger final : Logger {
     void LogFunction(String str, LogLevel level, bool add_newline) override;
 };
-extern CliOutLogger cli_out;
+extern CliOutLogger g_cli_out;
 
 // Timestamped log file
 struct FileLogger final : Logger {
@@ -136,13 +137,12 @@ struct FileLogger final : Logger {
     Atomic<State> state {State::Uninitialised};
     DynamicArrayInline<char, 256> filepath;
 };
-
 extern FileLogger g_log_file;
 
 struct DefaultLogger final : Logger {
-    inline void LogFunction(String str, LogLevel level, bool add_newline) override {
+    void LogFunction(String str, LogLevel level, bool add_newline) override {
         if constexpr (!PRODUCTION_BUILD)
-            cli_out.LogFunction(str, level, add_newline);
+            g_stdout_log.LogFunction(str, level, add_newline);
         else
             g_log_file.LogFunction(str, level, add_newline);
     }
@@ -150,8 +150,8 @@ struct DefaultLogger final : Logger {
 
 extern Logger& g_log;
 
-#define DBG_PRINT_EXPR(x)     g_log.DebugLn("DBG: {}: {} = {}", __FUNCTION__, #x, x)
-#define DBG_PRINT_EXPR2(x, y) g_log.DebugLn("DBG: {}: {} = {}, {} = {}", __FUNCTION__, #x, x, #y, y)
+#define DBG_PRINT_EXPR(x)     g_log.DebugLn("{}: {} = {}", __FUNCTION__, #x, x)
+#define DBG_PRINT_EXPR2(x, y) g_log.DebugLn("{}: {} = {}, {} = {}", __FUNCTION__, #x, x, #y, y)
 #define DBG_PRINT_EXPR3(x, y, z)                                                                             \
-    g_log.DebugLn("DBG: {}: {} = {}, {} = {}, {} = {}", __FUNCTION__, #x, x, #y, y, #z, z)
-#define DBG_PRINT_STRUCT(x) g_log.DebugLn("DBG: {}: {} = {}", __FUNCTION__, #x, fmt::DumpStruct(x))
+    g_log.DebugLn("{}: {} = {}, {} = {}, {} = {}", __FUNCTION__, #x, x, #y, y, #z, z)
+#define DBG_PRINT_STRUCT(x) g_log.DebugLn("{}: {} = {}", __FUNCTION__, #x, fmt::DumpStruct(x))

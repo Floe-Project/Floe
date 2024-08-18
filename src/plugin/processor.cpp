@@ -50,31 +50,31 @@ bool CcControllerMovedParamRecently(AudioProcessor const& processor, ParamIndex 
 static void HandleMuteSolo(AudioProcessor& processor) {
     bool const any_solo = processor.solo.AnyValuesSet();
 
-    for (auto const i : Range(k_num_layers)) {
+    for (auto const layer_index : Range(k_num_layers)) {
         bool state = any_solo;
 
-        auto solo = processor.solo.Get(i);
+        auto solo = processor.solo.Get(layer_index);
         if (solo) {
             state = false;
-            SetSilent(processor.layer_processors[i], state);
+            SetSilent(processor.layer_processors[layer_index], state);
             continue;
         }
 
-        auto mute = processor.mute.Get(i);
+        auto mute = processor.mute.Get(layer_index);
         if (mute) {
             state = true;
-            SetSilent(processor.layer_processors[i], state);
+            SetSilent(processor.layer_processors[layer_index], state);
             continue;
         }
 
-        SetSilent(processor.layer_processors[i], state);
+        SetSilent(processor.layer_processors[layer_index], state);
     }
 }
 
 void SetAllParametersToDefaultValues(AudioProcessor& processor) {
     ASSERT(IsMainThread(processor.host));
-    for (auto& p : processor.params)
-        p.SetLinearValue(p.DefaultLinearValue());
+    for (auto& param : processor.params)
+        param.SetLinearValue(param.DefaultLinearValue());
 
     processor.events_for_audio_thread.Push(EventForAudioThreadType::ReloadAllAudioState);
     auto const host = &processor.host;
@@ -389,35 +389,35 @@ static void ProcessorOnParamChange(AudioProcessor& processor, ChangedParams chan
     ZoneScoped;
     ZoneValue(changed_params.m_changed.NumSet());
 
-    if (auto p = changed_params.Param(ParamIndex::MasterVolume)) {
+    if (auto param = changed_params.Param(ParamIndex::MasterVolume)) {
         processor.smoothed_value_system.SetVariableLength(processor.master_vol_smoother_id,
-                                                          p->ProjectedValue(),
+                                                          param->ProjectedValue(),
                                                           2,
                                                           25,
                                                           1);
     }
 
-    if (auto p = changed_params.Param(ParamIndex::MasterDynamics)) {
-        processor.dynamics_value_01 = p->ProjectedValue();
-        for (auto& v : processor.voice_pool.EnumerateActiveVoices())
-            UpdateXfade(v, processor.dynamics_value_01, true);
+    if (auto param = changed_params.Param(ParamIndex::MasterDynamics)) {
+        processor.dynamics_value_01 = param->ProjectedValue();
+        for (auto& voice : processor.voice_pool.EnumerateActiveVoices())
+            UpdateXfade(voice, processor.dynamics_value_01, true);
     }
 
-    if (auto p = changed_params.Param(ParamIndex::MasterVelocity))
-        processor.velocity_to_volume_01 = p->ProjectedValue();
+    if (auto param = changed_params.Param(ParamIndex::MasterVelocity))
+        processor.velocity_to_volume_01 = param->ProjectedValue();
 
     {
         bool mute_or_solo_changed = false;
         for (auto const layer_index : Range(k_num_layers)) {
-            if (auto p = changed_params.Param(
+            if (auto param = changed_params.Param(
                     ParamIndexFromLayerParamIndex((u32)layer_index, LayerParamIndex::Mute))) {
-                processor.mute.SetToValue(layer_index, p->ValueAsBool());
+                processor.mute.SetToValue(layer_index, param->ValueAsBool());
                 mute_or_solo_changed = true;
                 break;
             }
-            if (auto p = changed_params.Param(
+            if (auto param = changed_params.Param(
                     ParamIndexFromLayerParamIndex((u32)layer_index, LayerParamIndex::Solo))) {
-                processor.solo.SetToValue(layer_index, p->ValueAsBool());
+                processor.solo.SetToValue(layer_index, param->ValueAsBool());
                 mute_or_solo_changed = true;
                 break;
             }
@@ -432,8 +432,8 @@ static void ProcessorOnParamChange(AudioProcessor& processor, ChangedParams chan
                       changed_params.Subsection<k_num_layer_parameters>(0 + index * k_num_layer_parameters));
     }
 
-    for (auto fx : processor.effects_ordered_by_type)
-        fx->OnParamChange(changed_params, processor.audio_processing_context);
+    for (auto effect : processor.effects_ordered_by_type)
+        effect->OnParamChange(changed_params, processor.audio_processing_context);
 }
 
 void ParameterJustStartedMoving(AudioProcessor& processor, ParamIndex index) {
@@ -562,8 +562,8 @@ static void HandleNoteOff(AudioProcessor& processor, MidiChannelNote note, bool 
 
 static void Deactivate(AudioProcessor& processor) {
     if (processor.activated) {
-        for (auto const& e : processor.events_for_audio_thread.PopAll()) {
-            if (auto remove_midi_learn = e.TryGet<RemoveMidiLearn>()) {
+        for (auto const& event : processor.events_for_audio_thread.PopAll()) {
+            if (auto remove_midi_learn = event.TryGet<RemoveMidiLearn>()) {
                 processor.param_learned_ccs[ToInt(remove_midi_learn->param)].Clear(
                     remove_midi_learn->midi_cc);
             }

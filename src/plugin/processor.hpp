@@ -120,24 +120,24 @@ class AtomicBitset {
     Bool64 Clear(usize bit) {
         ASSERT(bit < k_bits);
         auto const mask = u64(1) << (bit % k_bits_per_element);
-        return m_data[bit / k_bits_per_element].FetchAnd(~mask, RmwMemoryOrder::Relaxed) & mask;
+        return m_elements[bit / k_bits_per_element].FetchAnd(~mask, RmwMemoryOrder::Relaxed) & mask;
     }
 
     Bool64 Set(usize bit) {
         ASSERT(bit < k_bits);
         auto const mask = u64(1) << (bit % k_bits_per_element);
-        return m_data[bit / k_bits_per_element].FetchOr(mask, RmwMemoryOrder::Relaxed) & mask;
+        return m_elements[bit / k_bits_per_element].FetchOr(mask, RmwMemoryOrder::Relaxed) & mask;
     }
 
     Bool64 Flip(usize bit) {
         ASSERT(bit < k_bits);
         auto const mask = u64(1) << (bit % k_bits_per_element);
-        return m_data[bit / k_bits_per_element].FetchXor(mask, RmwMemoryOrder::Relaxed) & mask;
+        return m_elements[bit / k_bits_per_element].FetchXor(mask, RmwMemoryOrder::Relaxed) & mask;
     }
 
     Bool64 Get(usize bit) const {
         ASSERT(bit < k_bits);
-        return m_data[bit / k_bits_per_element].Load(LoadMemoryOrder::Relaxed) &
+        return m_elements[bit / k_bits_per_element].Load(LoadMemoryOrder::Relaxed) &
                (u64(1) << bit % k_bits_per_element);
     }
 
@@ -145,37 +145,30 @@ class AtomicBitset {
     // regard to each 64-bit block - and that might be good enough for some needs
 
     void AssignBlockwise(Bitset<k_bits> other) {
-        auto const other_raw = other.parts;
-        for (auto const i : Range(m_data.size))
-            m_data[i].Store(other_raw[i], StoreMemoryOrder::Relaxed);
+        auto const other_raw = other.elements;
+        for (auto const element_index : Range(m_elements.size))
+            m_elements[element_index].Store(other_raw[element_index], StoreMemoryOrder::Relaxed);
     }
 
     Bitset<k_bits> GetBlockwise() const {
         Bitset<k_bits> result;
-        for (auto const i : Range(m_data.size))
-            result.parts[i] = m_data[i].Load(LoadMemoryOrder::Relaxed);
+        for (auto const element_index : Range(m_elements.size))
+            result.elements[element_index] = m_elements[element_index].Load(LoadMemoryOrder::Relaxed);
         return result;
     }
 
     void SetAllBlockwise() {
-        for (auto& block : m_data)
+        for (auto& block : m_elements)
             block.store(~(u64)0);
     }
 
     void ClearAllBlockwise() {
-        for (auto& block : m_data)
+        for (auto& block : m_elements)
             block.store(0);
     }
 
-    Bitset<k_bits> ExchangeClearAllBlockwise() {
-        Bitset<k_bits> result;
-        for (auto const i : Range(m_data.Size()))
-            result.Raw()[i] = m_data[i].exchange(0);
-        return result;
-    }
-
   private:
-    Array<Atomic<u64>, k_num_elements> m_data {};
+    Array<Atomic<u64>, k_num_elements> m_elements {};
 };
 
 struct AudioProcessor {

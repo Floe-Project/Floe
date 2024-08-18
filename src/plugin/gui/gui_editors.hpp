@@ -163,7 +163,6 @@ static void DoWholeEditor(Gui* g) {
 
     if (g_show_editor) {
         if (g->frame_input.Key(KeyCode::F2).presses.size) g_show_editor_on_left = !g_show_editor_on_left;
-        g->frame_input.graphics_ctx->PushDefaultFont();
         auto const half_w = (f32)(int)(imgui.Width() / 2);
         Rect debug_r;
         if (g_show_editor_on_left)
@@ -210,6 +209,5 @@ static void DoWholeEditor(Gui* g) {
         }
 
         imgui.EndWindow();
-        g->frame_input.graphics_ctx->PopFont();
     }
 }

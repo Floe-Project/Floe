@@ -7,12 +7,6 @@
 
 #include "tracy_wrapped.hpp"
 
-#ifdef TRACY_ENABLE
-constexpr bool k_tracy_enable = true;
-#else
-constexpr bool k_tracy_enable = false;
-#endif
-
 // Sometimes don't want to depend on our usual string formatting because that code could be cause of the
 // problem we're trying to debug.
 struct InlineSprintfBuffer {

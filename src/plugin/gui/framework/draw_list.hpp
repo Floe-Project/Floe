@@ -211,26 +211,11 @@ struct FontAtlas {
     ~FontAtlas() { Clear(); }
 
     Font* AddFont(FontConfig const* font_cfg);
-    Font* AddFontDefault(FontConfig const* font_cfg = nullptr);
     Font* AddFontFromMemoryTTF(void* ttf_data,
                                int ttf_size,
                                f32 size_pixels,
                                FontConfig const* font_cfg = nullptr,
                                Span<GlyphRange const> glyph_ranges = {});
-
-    // 'compressed_ttf_data' still owned by caller. Compress with binary_to_compressed_c.cpp
-    Font* AddFontFromMemoryCompressedTTF(void const* compressed_ttf_data,
-                                         int compressed_ttf_size,
-                                         f32 size_pixels,
-                                         FontConfig const* font_cfg = nullptr,
-                                         Span<GlyphRange const> glyph_ranges = {});
-
-    // 'compressed_ttf_data_base85' still owned by caller. Compress with binary_to_compressed_c.cpp with
-    // -base85 paramaeter
-    Font* AddFontFromMemoryCompressedBase85TTF(char const* compressed_ttf_data_base85,
-                                               f32 size_pixels,
-                                               FontConfig const* font_cfg = nullptr,
-                                               Span<GlyphRange const> glyph_ranges = {});
 
     // Clear the CPU-side texture data. Saves RAM once the texture has been copied to graphics memory.
     void ClearTexData();
@@ -388,7 +373,6 @@ struct DrawContext {
 
     // void SetCurrentFont(Font *font); // use push pop instead
     void PushFont(Font* font);
-    void PushDefaultFont();
     void PopFont();
 
     Font* CurrentFont() {

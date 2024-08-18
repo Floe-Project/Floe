@@ -139,6 +139,12 @@ struct FileLogger final : Logger {
 };
 extern FileLogger g_log_file;
 
+struct TracyLogger final : Logger {
+    void LogFunction([[maybe_unused]] String str, LogLevel, bool) override {
+        if constexpr (k_tracy_enable) TracyMessageC(str.data, str.size, config.colour);
+    }
+};
+
 struct DefaultLogger final : Logger {
     void LogFunction(String str, LogLevel level, bool add_newline) override {
         if constexpr (!PRODUCTION_BUILD)

@@ -107,7 +107,9 @@ install-cbd arch_os_pair=native_arch_os_pair:
 
 clang-tidy arch_os_pair=native_arch_os_pair: (install-cbd arch_os_pair)
   #!/usr/bin/env bash
-  jq -r '.[].file' {{gen_files_dir}}/compile_commands_{{arch_os_pair}}.json | xargs clang-tidy -p {{gen_files_dir}} 
+  # NOTE: we specify the config file because we don't want clang-tidy to go automatically looking for it and 
+  # sometimes finding .clang-tidy files in third-party libraries that are incompatible with our version of clang-tidy
+  jq -r '.[].file' {{gen_files_dir}}/compile_commands_{{arch_os_pair}}.json | xargs clang-tidy --config-file=.clang-tidy -p {{gen_files_dir}} 
 
 clang-tidy-all: (clang-tidy "x86_64-linux") (clang-tidy "x86_64-windows") (clang-tidy "aarch64-macos")
 

@@ -162,12 +162,12 @@ graphics::ImageID CopyPixelsToGpuLoadedImage(Gui* g, ImagePixelsRgba const& px) 
 // be a problem because we shrink the image size anyway. All functions can then just work with arrays of
 // f32x4.
 
-inline f32x4 SimdRead4Bytes(u8 const* in) {
+ALWAYS_INLINE inline f32x4 SimdRead4Bytes(u8 const* in) {
     auto const byte_vec = LoadUnalignedToType<u8x4>(in);
     return ConvertVector(byte_vec, f32x4);
 }
 
-inline void SimdWrite4Bytes(f32x4 data, u8* out) {
+ALWAYS_INLINE inline void SimdWrite4Bytes(f32x4 data, u8* out) {
     auto const byte_vec = ConvertVector(data, u8x4);
     StoreToUnaligned(out, byte_vec);
 }
@@ -349,6 +349,9 @@ void CreateLibraryBackgroundImageTextures(Gui* g,
     }
 
     if (reload_blurred_background) {
+        Stopwatch stopwatch;
+        DEFER { g_log.DebugLn("Blurred image generation took {} ms", stopwatch.MillisecondsElapsed()); };
+
         auto const original_image_num_bytes = background_size.width * background_size.height * k_channels;
 
         u8* blurred_image_buffer {};

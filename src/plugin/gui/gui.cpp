@@ -80,16 +80,28 @@ static ErrorCodeOr<ImagePixelsRgba> DecodeImageFromFile(String filename) {
 }
 
 enum class LibraryImageType { Icon, Background };
+
+static String FilenameForLibraryImageType(LibraryImageType type) {
+    switch (type) {
+        case LibraryImageType::Icon: return "icon.png";
+        case LibraryImageType::Background: return "background.jpg";
+    }
+    PanicIfReached();
+    return {};
+}
+
+static Optional<String> PathInLibraryForImageType(sample_lib::Library const& lib, LibraryImageType type) {
+    switch (type) {
+        case LibraryImageType::Icon: return lib.icon_image_path;
+        case LibraryImageType::Background: return lib.background_image_path;
+    }
+    PanicIfReached();
+    return {};
+}
+
 Optional<ImagePixelsRgba>
 ImagePixelsFromLibrary(Gui* g, sample_lib::Library const& lib, LibraryImageType type) {
-    String const filename = ({
-        String s;
-        switch (type) {
-            case LibraryImageType::Icon: s = "icon.png"; break;
-            case LibraryImageType::Background: s = "background.jpg"; break;
-        }
-        s;
-    });
+    auto const filename = FilenameForLibraryImageType(type);
 
     if (lib.file_format_specifics.tag == sample_lib::FileFormat::Mdata) {
         // Back in the Mirage days, some libraries didn't embed their own images, but instead got them from a
@@ -110,14 +122,7 @@ ImagePixelsFromLibrary(Gui* g, sample_lib::Library const& lib, LibraryImageType 
         }
     }
 
-    Optional<String> const path_in_lib = ({
-        Optional<String> p;
-        switch (type) {
-            case LibraryImageType::Icon: p = lib.icon_image_path; break;
-            case LibraryImageType::Background: p = lib.background_image_path; break;
-        }
-        p;
-    });
+    auto const path_in_lib = PathInLibraryForImageType(lib, type);
 
     auto err = [&](String middle, LogLevel severity) {
         g_log.Ln(severity, "{} {} {}", lib.name, middle, filename);
@@ -141,19 +146,21 @@ ImagePixelsFromLibrary(Gui* g, sample_lib::Library const& lib, LibraryImageType 
 
 graphics::ImageID CopyPixelsToGpuLoadedImage(Gui* g, ImagePixelsRgba const& px) {
     ASSERT(px.data);
-    auto const id = ({
-        auto const outcome = g->frame_input.graphics_ctx->CreateImageID(px.data, px.size, 4);
-        if (outcome.HasError()) {
-            g->logger.ErrorLn("Failed to create a texture (size {}x{}): {}",
-                              px.size.width,
-                              px.size.height,
-                              outcome.Error());
-            return {};
-        }
-        outcome.Value();
-    });
-    return id;
+    auto const outcome = g->frame_input.graphics_ctx->CreateImageID(px.data, px.size, 4);
+    if (outcome.HasError()) {
+        g->logger.ErrorLn("Failed to create a texture (size {}x{}): {}",
+                          px.size.width,
+                          px.size.height,
+                          outcome.Error());
+        return {};
+    }
+    return outcome.Value();
 }
+
+// IMPROVE: with these algorithms for blurring and overlaying, we should probably just use floats instead of
+// constantly converting to and from bytes. I suspect it would be faster and the extra memory usage wouldn't
+// be a problem because we shrink the image size anyway. All functions can then just work with arrays of
+// f32x4.
 
 inline f32x4 SimdRead4Bytes(u8 const* in) {
     auto const byte_vec = LoadUnalignedToType<u8x4>(in);
@@ -192,7 +199,7 @@ static void BoxBlur(u8 const* in, u8* out, int width, int height, int radius) {
         int const radius_bytes_left = radius * k_channels;
         int const radius_bytes_right = radius_p1 * k_channels;
         int pixel_index = 0;
-        for ([[maybe_unused]] auto const row : Range(height)) {
+        for (auto const _ : Range(height)) {
             f32x4 avg = 0;
             {
                 // calculate the initial average so that we can do a moving average from here onwards
@@ -344,7 +351,7 @@ void CreateLibraryBackgroundImageTextures(Gui* g,
     if (reload_blurred_background) {
         auto const original_image_num_bytes = background_size.width * background_size.height * k_channels;
 
-        Span<u8> blurred_image_buffer {};
+        u8* blurred_image_buffer {};
         auto blur_img_channels = k_channels;
         auto blur_img_size = background_size;
         auto blurred_image_num_bytes = usize(blur_img_size.width * blur_img_size.height * k_channels);
@@ -358,26 +365,35 @@ void CreateLibraryBackgroundImageTextures(Gui* g,
             blur_img_size = {(u16)(window_size.x * downscale_factor),
                              (u16)(window_size.y * downscale_factor)};
             blurred_image_num_bytes = (usize)(blur_img_size.width * blur_img_size.height * k_channels);
-            blurred_image_buffer = arena.AllocateBytesForTypeOversizeAllowed<u8>(blurred_image_num_bytes);
+            blurred_image_buffer =
+                arena
+                    .Allocate(
+                        {.size = blurred_image_num_bytes, .alignment = 16, .allow_oversized_result = true})
+                    .data;
 
-            for (auto i : Range(blurred_image_num_bytes))
-                blurred_image_buffer[i] = 0;
+            for (auto const byte_index : Range(blurred_image_num_bytes))
+                blurred_image_buffer[byte_index] = 0;
 
-            for (auto i : Range(background_size.width * background_size.height * k_channels))
-                background_rgba[i] = background_rgba[i];
+            for (auto const byte_index : Range(background_size.width * background_size.height * k_channels))
+                background_rgba[byte_index] = background_rgba[byte_index];
 
             stbir_resize_uint8_linear(background_rgba,
                                       (int)background_size.width,
                                       (int)background_size.height,
                                       0,
-                                      blurred_image_buffer.data,
+                                      blurred_image_buffer,
                                       blur_img_size.width,
                                       blur_img_size.height,
                                       0,
                                       (stbir_pixel_layout)k_channels);
 
         } else {
-            blurred_image_buffer = arena.Clone(Span<u8> {background_rgba, (usize)original_image_num_bytes});
+            blurred_image_buffer =
+                arena
+                    .Allocate(
+                        {.size = blurred_image_num_bytes, .alignment = 16, .allow_oversized_result = true})
+                    .data;
+            CopyMemory(blurred_image_buffer, background_rgba, (usize)original_image_num_bytes);
         }
 
         // Make the blurred image a more of a mid-brightness, instead of very light or very dark
@@ -398,18 +414,18 @@ void CreateLibraryBackgroundImageTextures(Gui* g,
 
             f32x4 const scaling = brightness_scaling;
             for (usize i = 0; i < blurred_image_num_bytes; i += k_channels) {
-                static f32x4 const max = 255.0f;
-                f32x4 v {(f32)blurred_image_buffer[i + 0],
-                         (f32)blurred_image_buffer[i + 1],
-                         (f32)blurred_image_buffer[i + 2],
-                         0};
-                v = Min(max, v * scaling);
+                alignas(16) u8 pixel_bytes[4];
 
-                alignas(16) f32 results[4];
-                StoreToAligned(results, v);
-                blurred_image_buffer[i + 0] = (u8)results[0];
-                blurred_image_buffer[i + 1] = (u8)results[1];
-                blurred_image_buffer[i + 2] = (u8)results[2];
+                {
+                    static f32x4 const max = 255.0f;
+                    auto pixel = SimdRead4Bytes(blurred_image_buffer + i);
+                    pixel = Min(max, pixel * scaling);
+                    SimdWrite4Bytes(pixel, pixel_bytes);
+                }
+
+                blurred_image_buffer[i + 0] = pixel_bytes[0];
+                blurred_image_buffer[i + 1] = pixel_bytes[1];
+                blurred_image_buffer[i + 2] = pixel_bytes[2];
             }
         }
 
@@ -421,17 +437,15 @@ void CreateLibraryBackgroundImageTextures(Gui* g,
                 Clamp(LiveSize(g->imgui, UiSizeId::BackgroundBlurringOverlayIntensity) / 100.0f, 0.0f, 1.0f);
 
             for (usize i = 0; i < blurred_image_num_bytes; i += k_channels) {
-                f32x4 v {(f32)blurred_image_buffer[i + 0],
-                         (f32)blurred_image_buffer[i + 1],
-                         (f32)blurred_image_buffer[i + 2],
-                         0};
-                v = v + (overlay_colour - v) * overlay_intensity;
-
-                alignas(16) f32 results[4];
-                StoreToAligned(results, v);
-                blurred_image_buffer[i + 0] = (u8)results[0];
-                blurred_image_buffer[i + 1] = (u8)results[1];
-                blurred_image_buffer[i + 2] = (u8)results[2];
+                alignas(16) u8 pixel_bytes[4];
+                {
+                    auto pixel = SimdRead4Bytes(blurred_image_buffer + i);
+                    pixel = pixel + (overlay_colour - pixel) * overlay_intensity;
+                    SimdWrite4Bytes(pixel, pixel_bytes);
+                }
+                blurred_image_buffer[i + 0] = pixel_bytes[0];
+                blurred_image_buffer[i + 1] = pixel_bytes[1];
+                blurred_image_buffer[i + 2] = pixel_bytes[2];
             }
         }
 
@@ -440,49 +454,50 @@ void CreateLibraryBackgroundImageTextures(Gui* g,
             auto const subtle_blur_radius =
                 (int)(LiveSize(g->imgui, UiSizeId::BackgroundBlurringBlurringSmall) *
                       ((f32)blur_img_size.width / 700.0f));
-            auto subtle_blur_buffer = arena.AllocateBytesForTypeOversizeAllowed<u8>(blurred_image_num_bytes);
+            auto subtle_blur_buffer = arena.Allocate({.size = blurred_image_num_bytes, .alignment = 16}).data;
             if (subtle_blur_radius) {
-                BoxBlur(blurred_image_buffer.data,
-                        subtle_blur_buffer.data,
+                BoxBlur(blurred_image_buffer,
+                        subtle_blur_buffer,
                         blur_img_size.width,
                         blur_img_size.height,
                         subtle_blur_radius);
             } else {
-                CopyMemory(subtle_blur_buffer.data, blurred_image_buffer.data, blurred_image_num_bytes);
+                CopyMemory(subtle_blur_buffer, blurred_image_buffer, blurred_image_num_bytes);
             }
 
             // 2. Do a huge blur into a different buffer
-            auto huge_blur_buffer = arena.AllocateBytesForTypeOversizeAllowed<u8>(blurred_image_num_bytes);
+            auto huge_blur_buffer = arena.Allocate({.size = blurred_image_num_bytes, .alignment = 16}).data;
             auto const huge_blur_radius = LiveSize(g->imgui, UiSizeId::BackgroundBlurringBlurring) *
                                           ((f32)blur_img_size.width / 700.0f);
-            BoxBlur(blurred_image_buffer.data,
-                    huge_blur_buffer.data,
+            BoxBlur(blurred_image_buffer,
+                    huge_blur_buffer,
                     blur_img_size.width,
                     blur_img_size.height,
                     (int)huge_blur_radius);
 
             // 3. Blend the 2 blurs together with a given opacity
-            auto s = subtle_blur_buffer.data;
-            auto h = huge_blur_buffer.data;
             auto const opacity_of_subtle_blur_on_top_huge_blur =
                 LiveSize(g->imgui, UiSizeId::BackgroundBlurringBlurringSmallOpacity) / 100.0f;
 
             for (usize i = 0; i < blurred_image_num_bytes; i += k_channels) {
-                f32x4 const s_v {(f32)s[i + 0], (f32)s[i + 1], (f32)s[i + 2], 0};
-                f32x4 h_v {(f32)h[i + 0], (f32)h[i + 1], (f32)h[i + 2], 0};
-                h_v = h_v + (s_v - h_v) * opacity_of_subtle_blur_on_top_huge_blur;
+                alignas(16) u8 pixel_bytes[4];
 
-                alignas(16) f32 results[4];
-                StoreToAligned(results, h_v);
-                blurred_image_buffer[i + 0] = (u8)results[0];
-                blurred_image_buffer[i + 1] = (u8)results[1];
-                blurred_image_buffer[i + 2] = (u8)results[2];
+                {
+                    auto const subtle_blur_pixel = SimdRead4Bytes(subtle_blur_buffer + i);
+                    auto const huge_blur_pixel = SimdRead4Bytes(huge_blur_buffer + i);
+                    f32x4 const pixel = huge_blur_pixel + (subtle_blur_pixel - huge_blur_pixel) *
+                                                              opacity_of_subtle_blur_on_top_huge_blur;
+                    SimdWrite4Bytes(pixel, pixel_bytes);
+                }
+
+                blurred_image_buffer[i + 0] = pixel_bytes[0];
+                blurred_image_buffer[i + 1] = pixel_bytes[1];
+                blurred_image_buffer[i + 2] = pixel_bytes[2];
             }
         }
 
         imgs.blurred_background =
-            g->frame_input.graphics_ctx
-                ->CreateImageID(blurred_image_buffer.data, blur_img_size, blur_img_channels)
+            g->frame_input.graphics_ctx->CreateImageID(blurred_image_buffer, blur_img_size, blur_img_channels)
                 .OrElse([g](ErrorCode error) {
                     g->logger.ErrorLn("Failed to create blurred background texture: {}", error);
                     return graphics::ImageID {};
@@ -490,20 +505,20 @@ void CreateLibraryBackgroundImageTextures(Gui* g,
     }
 }
 
-static LibraryImages LoadDefaultBackgroundIfNeeded(Gui* g) {
+static LibraryImages LoadDefaultLibraryImagesIfNeeded(Gui* g) {
     auto& ctx = g->frame_input.graphics_ctx;
-    auto opt_index = FindIf(g->library_images, [&](LibraryImages const& l) {
-        return l.library_id == k_default_background_lib_id;
+    auto opt_index = FindIf(g->library_images, [&](LibraryImages const& images) {
+        return images.library_id == k_default_background_lib_id;
     });
     if (!opt_index) {
         dyn::Append(g->library_images, {k_default_background_lib_id});
         opt_index = g->library_images.size - 1;
     }
-    auto& imgs = g->library_images[*opt_index];
+    auto& images = g->library_images[*opt_index];
 
-    auto const reload_background = !ctx->ImageIdIsValid(imgs.background) && !imgs.background_missing;
+    auto const reload_background = !ctx->ImageIdIsValid(images.background) && !images.background_missing;
     auto const reload_blurred_background =
-        !ctx->ImageIdIsValid(imgs.blurred_background) && !imgs.background_missing;
+        !ctx->ImageIdIsValid(images.blurred_background) && !images.background_missing;
 
     if (reload_background || reload_blurred_background) {
         auto image_data = EmbeddedDefaultBackground();
@@ -511,16 +526,16 @@ static LibraryImages LoadDefaultBackgroundIfNeeded(Gui* g) {
         ASSERT(!outcome.HasError());
         auto const bg_pixels = outcome.ReleaseValue();
         CreateLibraryBackgroundImageTextures(g,
-                                             imgs,
+                                             images,
                                              bg_pixels,
                                              reload_background,
                                              reload_blurred_background);
     }
 
-    return imgs;
+    return images;
 }
 
-static LibraryImages LoadLibraryBackgroundAndIconIfNeeded(Gui* g, sample_lib::Library const& lib) {
+static LibraryImages LoadLibraryImagesIfNeeded(Gui* g, sample_lib::Library const& lib) {
     auto& ctx = g->frame_input.graphics_ctx;
     auto const lib_id = lib.Id();
 
@@ -565,14 +580,14 @@ static LibraryImages LoadLibraryBackgroundAndIconIfNeeded(Gui* g, sample_lib::Li
 }
 
 Optional<LibraryImages> LibraryImagesFromLibraryId(Gui* g, sample_lib::LibraryIdRef library_id) {
-    if (library_id == k_default_background_lib_id) return LoadDefaultBackgroundIfNeeded(g);
+    if (library_id == k_default_background_lib_id) return LoadDefaultLibraryImagesIfNeeded(g);
 
     auto background_lib =
         sample_lib_server::FindLibraryRetained(g->plugin.shared_data.sample_library_server, library_id);
     DEFER { background_lib.Release(); };
     if (!background_lib) return nullopt;
 
-    return LoadLibraryBackgroundAndIconIfNeeded(g, *background_lib);
+    return LoadLibraryImagesIfNeeded(g, *background_lib);
 }
 
 static void CreateFontsIfNeeded(Gui* g) {
@@ -805,8 +820,8 @@ GuiFrameResult GuiUpdate(Gui* g) {
     live_edit::g_high_contrast_gui = g->settings.settings.gui.high_contrast_gui; // IMRPOVE: hacky
     g->scratch_arena.ResetCursorAndConsolidateRegions();
 
-    while (auto f = g->main_thread_callbacks.TryPop(g->scratch_arena))
-        (*f)();
+    while (auto function = g->main_thread_callbacks.TryPop(g->scratch_arena))
+        (*function)();
 
     CreateFontsIfNeeded(g);
     auto& imgui = g->imgui;
@@ -904,10 +919,11 @@ GuiFrameResult GuiUpdate(Gui* g) {
         DoStandaloneErrorGUI(g);
 
     bool show_error_popup = false;
-    for (auto& errs : Array {&g->plugin.error_notifications, &g->plugin.shared_data.error_notifications}) {
-        for (auto& e : errs->items) {
-            if (e.TryRetain()) {
-                e.Release();
+    for (auto& err_notifications :
+         Array {&g->plugin.error_notifications, &g->plugin.shared_data.error_notifications}) {
+        for (auto& error : err_notifications->items) {
+            if (error.TryRetain()) {
+                error.Release();
                 show_error_popup = true;
                 break;
             }

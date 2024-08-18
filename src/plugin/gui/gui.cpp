@@ -585,8 +585,6 @@ static void CreateFontsIfNeeded(Gui* g) {
 
     if (graphics_ctx->fonts.tex_id == nullptr) {
         graphics_ctx->fonts.Clear();
-        auto def = graphics_ctx->fonts.AddFontDefault();
-        def->font_size_no_scale = 13;
 
         auto const fira_sans_size = g->imgui.PointsToPixels(16);
         auto const roboto_small_size = g->imgui.PointsToPixels(16);

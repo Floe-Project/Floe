@@ -102,7 +102,7 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event);
 int FdFromPuglWorld(PuglWorld* world);
 
 PUBLIC ErrorCodeOr<void> CreateView(GuiPlatform& platform, PluginInstance& plugin) {
-    DebugLoc();
+    g_log.TraceLn();
     platform.g_world_counter++;
     if (auto const floe_host =
             (FloeClapExtensionHost const*)platform.host.get_extension(&platform.host,
@@ -137,7 +137,7 @@ PUBLIC ErrorCodeOr<void> CreateView(GuiPlatform& platform, PluginInstance& plugi
     puglSetViewHint(platform.view, PUGL_RESIZABLE, true);
     auto const size = gui_settings::WindowSize(platform.settings.settings.gui);
     TRY(Required(puglSetSize(platform.view, size.width, size.height)));
-    DebugLn("CreateView size: {}x{}", size.width, size.height);
+    g_log.DebugLn("creating size: {}x{}", size.width, size.height);
 
     platform.gui.Emplace(platform.frame_state, plugin);
 
@@ -163,7 +163,7 @@ PUBLIC ErrorCodeOr<void> CreateView(GuiPlatform& platform, PluginInstance& plugi
 }
 
 PUBLIC void DestroyView(GuiPlatform& platform) {
-    DebugLoc();
+    g_log.TraceLn();
     if (!platform.gui) return;
 
     platform.gui.Clear();

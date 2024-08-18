@@ -600,16 +600,6 @@ struct Context {
     void HandleHoverPopupOpeningAndClosing(Id id);
     void OnScissorChanged() const;
 
-    enum TraceType {
-        TraceTypeActiveId = 1 << 0,
-        TraceTypeHotId = 1 << 1,
-        TraceTypeHoveredId = 1 << 2,
-        TraceTypeTextInput = 1 << 3,
-        TraceTypeRequiresUpdate = 1 << 4,
-        TraceTypePopup = 1 << 5,
-    };
-    void Trace(u32 type, char const* fn, char const* fmt, ...);
-
     //
     //
     //

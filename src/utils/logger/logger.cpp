@@ -21,24 +21,23 @@ void Logger::TraceLn(String message, SourceLocation loc) {
 }
 
 void StdoutLogger::LogFunction(String str, LogLevel level, bool add_newline) {
-    StdPrint(StdStream::Out, LogPrefix(level, {.ansi_colors = true}));
-    StdPrint(StdStream::Out, str);
-    if (add_newline) StdPrint(StdStream::Out, "\n"_s);
+    auto& mutex = StdStreamMutex(StdStream::Out);
+    mutex.Lock();
+    DEFER { mutex.Unlock(); };
+    auto _ = StdPrint(StdStream::Out, LogPrefix(level, {.ansi_colors = true}));
+    auto _ = StdPrint(StdStream::Out, str);
+    if (add_newline) auto _ = StdPrint(StdStream::Out, "\n"_s);
 }
 
 StdoutLogger stdout_log;
 
 void CliOutLogger::LogFunction(String str, LogLevel level, bool add_newline) {
-    LogPrefixOptions options = {.ansi_colors = true};
-    StdStream stream = StdStream::Out;
-    if (level == LogLevel::Error)
-        stream = StdStream::Err;
-    else
-        options.no_info_prefix = true;
-
-    StdPrint(stream, LogPrefix(level, options));
-    StdPrint(stream, str);
-    if (add_newline) StdPrint(stream, "\n"_s);
+    auto& mutex = StdStreamMutex(StdStream::Out);
+    mutex.Lock();
+    DEFER { mutex.Unlock(); };
+    auto _ = StdPrint(StdStream::Out, LogPrefix(level, {.ansi_colors = true, .no_info_prefix = true}));
+    auto _ = StdPrint(StdStream::Out, str);
+    if (add_newline) auto _ = StdPrint(StdStream::Out, "\n"_s);
 }
 
 CliOutLogger cli_out;
@@ -63,8 +62,6 @@ void FileLogger::LogFunction(String str, LogLevel level, bool add_newline) {
     //     }),
     //     str);
 
-    bool first_message = false;
-
     // Could just use a mutex here but this atomic method avoids the class having to have any sort of
     // destructor which is particularly beneficial at the moment trying to debug a crash at shutdown.
     //
@@ -77,15 +74,14 @@ void FileLogger::LogFunction(String str, LogLevel level, bool add_newline) {
                                     RmwMemoryOrder::Acquire,
                                     LoadMemoryOrder::Relaxed)) {
         ArenaAllocatorWithInlineStorage<1000> arena;
-        auto outcome = KnownDirectoryWithSubdirectories(arena, KnownDirectories::Logs, Array {"Floe"_s});
+        auto outcome = FloeKnownDirectory(arena, FloeKnownDirectories::Logs);
         if (outcome.HasValue()) {
             auto path = DynamicArray<char>::FromOwnedSpan(outcome.Value(), arena);
             path::JoinAppend(path, "floe.log");
             dyn::Assign(filepath, String(path));
-            first_message = true;
         } else {
             dyn::Clear(filepath);
-            DebugLn("failed to get logs known dir: {}", outcome.Error());
+            stdout_log.DebugLn("failed to get logs known dir: {}", outcome.Error());
         }
         state.Store(FileLogger::State::Initialised, StoreMemoryOrder::Release);
     } else if (ex == FileLogger::State::Initialising) {
@@ -99,7 +95,7 @@ void FileLogger::LogFunction(String str, LogLevel level, bool add_newline) {
     auto file = ({
         auto outcome = OpenFile(filepath, FileMode::Append);
         if (outcome.HasError()) {
-            ::DebugLn("failed to open log file {}: {}", filepath, outcome.Error());
+            stdout_log.DebugLn("failed to open log file {}: {}", filepath, outcome.Error());
             return;
         }
         outcome.ReleaseValue();
@@ -109,18 +105,6 @@ void FileLogger::LogFunction(String str, LogLevel level, bool add_newline) {
         TRY(writer.WriteChars(Timestamp()));
         TRY(writer.WriteChar(' '));
 
-        if (first_message) {
-            TRY(writer.WriteChars("======== new instance ========:\n"_s));
-
-            TRY(fmt::FormatToWriter(writer,
-                                    "Floe v{}.{}.{}\n",
-                                    FLOE_MAJOR_VERSION,
-                                    FLOE_MINOR_VERSION,
-                                    FLOE_PATCH_VERSION));
-
-            TRY(fmt::FormatToWriter(writer, "OS: {}\n", OperatingSystemName()));
-        }
-
         TRY(writer.WriteChars(LogPrefix(level, {.ansi_colors = false, .no_info_prefix = false})));
         TRY(writer.WriteChars(str));
         if (add_newline) TRY(writer.WriteChar('\n'));
@@ -129,7 +113,9 @@ void FileLogger::LogFunction(String str, LogLevel level, bool add_newline) {
 
     auto writer = file.Writer();
     auto o = try_writing(writer);
-    if (o.HasError()) ::DebugLn("failed to write log file: {}, {}", filepath, o.Error());
+    if (o.HasError()) stdout_log.DebugLn("failed to write log file: {}, {}", filepath, o.Error());
 }
 
 FileLogger g_log_file {};
+
+Logger& g_log = PRODUCTION_BUILD ? (Logger&)g_log_file : (Logger&)stdout_log;

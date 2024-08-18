@@ -46,7 +46,7 @@ extern "C" CLAP_EXPORT const clap_plugin_entry clap_entry = {
     .init = [](char const*) -> bool {
         if (g_init_count++ == 0) {
             g_panic_handler = [](char const* message, SourceLocation loc) {
-                g_log_file.ErrorLn("{}: {}", loc, message);
+                g_log.ErrorLn("{}: {}", loc, message);
                 DefaultPanicHandler(message, loc);
             };
 #ifdef TRACY_ENABLE
@@ -55,13 +55,15 @@ extern "C" CLAP_EXPORT const clap_plugin_entry clap_entry = {
             // after tracy
             StartupCrashHandler();
         }
-        g_log_file.DebugLn("init");
+        g_log.DebugLn("👏 init DSO");
+        g_log.InfoLn("Floe v{}.{}.{}", FLOE_MAJOR_VERSION, FLOE_MINOR_VERSION, FLOE_PATCH_VERSION);
+        g_log.InfoLn("OS: {}", OperatingSystemName());
 
         return true;
     },
     .deinit =
         []() {
-            g_log_file.DebugLn("deinit");
+            g_log_file.DebugLn("👏 deinit");
             if (--g_init_count == 0) {
                 ShutdownCrashHandler();
 #ifdef TRACY_ENABLE
@@ -71,7 +73,7 @@ extern "C" CLAP_EXPORT const clap_plugin_entry clap_entry = {
         },
 
     .get_factory = [](char const* factory_id) -> void const* {
-        g_log_file.DebugLn("get_factory");
+        g_log_file.DebugLn("👏 get_factory");
         if (NullTermStringsEqual(factory_id, CLAP_PLUGIN_FACTORY_ID)) return &factory;
         return nullptr;
     },

@@ -58,7 +58,6 @@ static ErrorCodeOr<ImagePixelsRgba> DecodeJpgOrPng(Span<u8 const> image_data) {
     if (!result.data) return ErrorCode(CommonError::FileFormatIsInvalid);
     result.size = {CheckedCast<u16>(width), CheckedCast<u16>(height)};
     result.free_data = [](u8* data) { stbi_image_free(data); };
-    DebugLn("Decoded jpg/png {}x{} px", width, height);
 
 #if _WIN32
     if (auto f = result.data; f)
@@ -120,22 +119,22 @@ ImagePixelsFromLibrary(Gui* g, sample_lib::Library const& lib, LibraryImageType 
         p;
     });
 
-    auto err = [&](String middle) {
-        DebugLn("{} {} {}", lib.name, middle, filename);
+    auto err = [&](String middle, LogLevel severity) {
+        g_log.Ln(severity, "{} {} {}", lib.name, middle, filename);
         return Optional<ImagePixelsRgba> {};
     };
 
-    if (!path_in_lib) return err("does not have");
+    if (!path_in_lib) return err("does not have", LogLevel::Debug);
 
     auto open_outcome = lib.create_file_reader(lib, *path_in_lib);
-    if (open_outcome.HasError()) return err("error opening");
+    if (open_outcome.HasError()) return err("error opening", LogLevel::Warning);
 
     ArenaAllocator arena {PageAllocator::Instance()};
     auto const file_outcome = open_outcome.Value().ReadOrFetchAll(arena);
-    if (file_outcome.HasError()) return err("error reading");
+    if (file_outcome.HasError()) return err("error reading", LogLevel::Warning);
 
     auto image_outcome = DecodeImage(file_outcome.Value());
-    if (image_outcome.HasError()) return err("error decoding");
+    if (image_outcome.HasError()) return err("error decoding", LogLevel::Warning);
 
     return image_outcome.ReleaseValue();
 }
@@ -302,7 +301,6 @@ static void SampleLibraryChanged(Gui* g, sample_lib::LibraryIdRef library_id) {
 void CreateLibraryBackgroundImageTextures(Gui* g,
                                           LibraryImages& imgs,
                                           ImagePixelsRgba const& bg_pixels,
-                                          sample_lib::LibraryIdRef lib_id,
                                           bool reload_background,
                                           bool reload_blurred_background) {
     u8* background_rgba = bg_pixels.data;
@@ -320,13 +318,6 @@ void CreateLibraryBackgroundImageTextures(Gui* g,
         auto background_buf = arena.AllocateBytesForTypeOversizeAllowed<u8>(
             (usize)(desired_width * desired_height * k_channels));
 
-        DebugLn("Resizing background for {} from {}x{} to {}x{}",
-                lib_id,
-                background_size.width,
-                background_size.height,
-                desired_width,
-                desired_height);
-
         stbir_resize_uint8_linear(background_rgba,
                                   background_size.width,
                                   background_size.height,
@@ -342,7 +333,6 @@ void CreateLibraryBackgroundImageTextures(Gui* g,
     }
 
     if (reload_background) {
-        DebugLn("reloading background for {}", lib_id);
         imgs.background =
             g->frame_input.graphics_ctx->CreateImageID(background_rgba, background_size, k_channels)
                 .OrElse([g](ErrorCode error) {
@@ -369,13 +359,6 @@ void CreateLibraryBackgroundImageTextures(Gui* g,
                              (u16)(window_size.y * downscale_factor)};
             blurred_image_num_bytes = (usize)(blur_img_size.width * blur_img_size.height * k_channels);
             blurred_image_buffer = arena.AllocateBytesForTypeOversizeAllowed<u8>(blurred_image_num_bytes);
-
-            DebugLn("Resizing blurred background for {} from {}x{} to {}x{}",
-                    lib_id,
-                    background_size.width,
-                    background_size.height,
-                    blur_img_size.width,
-                    blur_img_size.height);
 
             for (auto i : Range(blurred_image_num_bytes))
                 blurred_image_buffer[i] = 0;
@@ -530,7 +513,6 @@ static LibraryImages LoadDefaultBackgroundIfNeeded(Gui* g) {
         CreateLibraryBackgroundImageTextures(g,
                                              imgs,
                                              bg_pixels,
-                                             k_default_background_lib_id,
                                              reload_background,
                                              reload_blurred_background);
     }
@@ -566,7 +548,6 @@ static LibraryImages LoadLibraryBackgroundAndIconIfNeeded(Gui* g, sample_lib::Li
         ImagePixelsRgba const bg_pixels = ({
             Optional<ImagePixelsRgba> opt = ImagePixelsFromLibrary(g, lib, LibraryImageType::Background);
             if (!opt) {
-                DebugLn("Failed to file background image for {}", lib_id);
                 imgs.background_missing = true;
                 return imgs;
             }
@@ -576,7 +557,6 @@ static LibraryImages LoadLibraryBackgroundAndIconIfNeeded(Gui* g, sample_lib::Li
         CreateLibraryBackgroundImageTextures(g,
                                              imgs,
                                              bg_pixels,
-                                             lib_id,
                                              reload_background,
                                              reload_blurred_background);
     }

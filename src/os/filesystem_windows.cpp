@@ -17,7 +17,8 @@
 #include "os/filesystem.hpp"
 #include "os/misc.hpp"
 #include "os/misc_windows.hpp"
-#include "utils/debug/debug.hpp"
+#include "utils/debug/tracy_wrapped.hpp"
+#include "utils/logger/logger.hpp"
 
 #include "filesystem.hpp"
 
@@ -855,7 +856,7 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
 
                 while (true) {
                     if (base >= end || ((usize)(end - base) < min_chunk_size)) {
-                        DebugLn("ERROR: invalid data received");
+                        g_log.ErrorLn("ERROR: invalid data received");
                         error = true;
                         break;
                     }
@@ -881,7 +882,7 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                         __builtin_memcpy_inline(&event, base, sizeof(event));
 
                         if ((base + event.NextEntryOffset) > end) {
-                            DebugLn(
+                            g_log.DebugLn(
                                 "ERROR: invalid data received: NextEntryOffset points outside of buffer: FileNameLength: {}, NextEntryOffset: {}",
                                 event.FileNameLength,
                                 event.NextEntryOffset);
@@ -891,7 +892,7 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
 
                         auto const num_wchars = event.FileNameLength / sizeof(wchar_t);
                         if (num_wchars > filename_buf.size) {
-                            DebugLn(
+                            g_log.DebugLn(
                                 "ERROR: filename too long for buffer ({} chars): FileNameLength: {}, NextEntryOffset: {}, bytes_transferred: {}, min_chunk_size: {}",
                                 num_wchars,
                                 event.FileNameLength,
@@ -924,9 +925,9 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                     if (changes) {
                         auto const narrowed = Narrow(args.result_arena, filename);
                         if (narrowed.HasValue()) {
-                            DebugLn("Change: {} {}",
-                                    DirectoryWatcher::ChangeType::ToString(changes),
-                                    narrowed.Value());
+                            g_log.DebugLn("Change: {} {}",
+                                          DirectoryWatcher::ChangeType::ToString(changes),
+                                          narrowed.Value());
                             dir.directory_changes.Add(
                                 {
                                     .subpath = narrowed.Value(),

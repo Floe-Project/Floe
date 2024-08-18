@@ -16,6 +16,7 @@ namespace tests {
 struct TestFailed {};
 
 void TestLogger::LogFunction(String str, LogLevel level, bool add_newline) {
+    if (level < max_level_allowed) return;
     ArenaAllocatorWithInlineStorage<1000> arena;
     DynamicArray<char> buf {arena};
     if (add_newline && tester.current_test_case) fmt::Append(buf, "[ {} ] ", tester.current_test_case->title);
@@ -23,7 +24,7 @@ void TestLogger::LogFunction(String str, LogLevel level, bool add_newline) {
     fmt::Append(buf, "{}", str);
     if (level == LogLevel::Error) dyn::AppendSpan(buf, ANSI_COLOUR_RESET);
     if (add_newline) dyn::Append(buf, '\n');
-    StdPrint(StdStream::Err, buf);
+    auto _ = StdPrint(StdStream::Err, buf);
 }
 
 void RegisterTest(Tester& tester, TestFunction f, String title) {
@@ -46,8 +47,9 @@ String TempFolder(Tester& tester) {
             o.Value();
         });
 
-        StdPrint(StdStream::Err,
-                 fmt::Format(tester.scratch_arena, "Test output folder: {}\n", *tester.test_output_folder));
+        auto _ = StdPrint(
+            StdStream::Err,
+            fmt::Format(tester.scratch_arena, "Test output folder: {}\n", *tester.test_output_folder));
     }
     return *tester.test_output_folder;
 }

@@ -72,7 +72,7 @@ void TryShrinkPages(void* ptr, usize old_size, usize new_size) {
     TracyAlloc(ptr, new_size);
 }
 
-void StdPrint(StdStream stream, String str) {
+ErrorCodeOr<void> StdPrint(StdStream stream, String str) {
     auto const num_written = write(({
                                        int f = STDOUT_FILENO;
                                        switch (stream) {
@@ -83,9 +83,8 @@ void StdPrint(StdStream stream, String str) {
                                    }),
                                    str.data,
                                    str.size);
-    if (num_written < 0) {
-        // error
-    }
+    if (num_written < 0) return ErrnoErrorCode(errno, "StdPrint");
+    return k_success;
 }
 
 s128 NanosecondsSinceEpoch() {
@@ -236,7 +235,7 @@ static void SignalHandler(int signal_num, siginfo_t* info, void* context) {
 #if IS_LINUX
         psiginfo(info, nullptr);
 #else
-        StdPrint(
+        auto _ = StdPrint(
             StdStream::Err,
             fmt::FormatInline<200>("Received signal {} ({})\n", signal_num, SignalString(signal_num, info)));
 #endif
@@ -310,19 +309,19 @@ static void SignalHandler(int signal_num, siginfo_t* info, void* context) {
                     case Type::HandlerFunction: {
                         auto h = previous_handler_function.GetFromTag<Type::HandlerFunction>();
                         if (h == nullptr) {
-                            StdPrint(StdStream::Err, "Previous signal handler is null\n");
+                            auto _ = StdPrint(StdStream::Err, "Previous signal handler is null\n");
                             _exit(EXIT_FAILURE);
                         } else if (*h == SIG_DFL) {
                             // If the previous is the default action, we set the default active again and
                             // raise it.
-                            StdPrint(StdStream::Err, "Calling default signal handler\n");
+                            auto _ = StdPrint(StdStream::Err, "Calling default signal handler\n");
                             signal(signal_num, SIG_DFL);
                             raise(signal_num);
                         } else if (*h == SIG_IGN) {
                             _exit(EXIT_FAILURE);
                             return;
                         } else if (*h == SIG_ERR) {
-                            StdPrint(StdStream::Err, "Error in signal handler\n");
+                            auto _ = StdPrint(StdStream::Err, "Error in signal handler\n");
                             _exit(EXIT_FAILURE);
                             return;
                         }
@@ -331,7 +330,7 @@ static void SignalHandler(int signal_num, siginfo_t* info, void* context) {
                     case Type::HandlerWithInfoFunction: {
                         auto h = previous_handler_function.GetFromTag<Type::HandlerWithInfoFunction>();
                         if (h == nullptr) {
-                            StdPrint(StdStream::Err, "Previous info signal handler is null\n");
+                            auto _ = StdPrint(StdStream::Err, "Previous info signal handler is null\n");
                             _exit(EXIT_FAILURE);
                         }
                         break;
@@ -347,13 +346,13 @@ static void SignalHandler(int signal_num, siginfo_t* info, void* context) {
 
                 switch (previous_handler_function.tag) {
                     case Type::HandlerFunction: {
-                        StdPrint(StdStream::Err, "Calling previous signal handler\n");
+                        auto _ = StdPrint(StdStream::Err, "Calling previous signal handler\n");
                         auto h = previous_handler_function.GetFromTag<Type::HandlerFunction>();
                         (*h)(signal_num);
                         break;
                     }
                     case Type::HandlerWithInfoFunction: {
-                        StdPrint(StdStream::Err, "Calling previous info signal handler\n");
+                        auto _ = StdPrint(StdStream::Err, "Calling previous info signal handler\n");
                         auto h = previous_handler_function.GetFromTag<Type::HandlerWithInfoFunction>();
                         (*h)(signal_num, info, context);
                         break;
@@ -377,8 +376,7 @@ void StartupCrashHandler() {
     g_signals_installed = true;
 
     ArenaAllocatorWithInlineStorage<500> scratch_arena;
-    if (auto const outcome =
-            KnownDirectoryWithSubdirectories(scratch_arena, KnownDirectories::Logs, Array {"Floe"_s});
+    if (auto const outcome = FloeKnownDirectory(scratch_arena, FloeKnownDirectories::Logs);
         outcome.HasValue())
         dyn::Assign(g_crash_folder_path, outcome.Value());
 
@@ -394,11 +392,11 @@ void StartupCrashHandler() {
         if (r != 0) {
             char buffer[200] = {};
             strerror_r(errno, buffer, sizeof(buffer));
-            StdPrint(StdStream::Err,
-                     fmt::FormatInline<200>("failed setting signal handler {}, errno({}) {}\n",
-                                            signal,
-                                            errno,
-                                            FromNullTerminated(buffer)));
+            auto _ = StdPrint(StdStream::Err,
+                              fmt::FormatInline<200>("failed setting signal handler {}, errno({}) {}\n",
+                                                     signal,
+                                                     errno,
+                                                     FromNullTerminated(buffer)));
         }
     }
 }

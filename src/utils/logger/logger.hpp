@@ -41,7 +41,7 @@ constexpr String LogPrefix(LogLevel level, LogPrefixOptions options = {}) {
     return "unknown: "_s;
 }
 
-using LogAllocator = ArenaAllocatorWithInlineStorage<1500>;
+using LogAllocator = ArenaAllocatorWithInlineStorage<2000>;
 
 // Wraps a function that prints a string (to a file or stdout, for example) providing convenience
 // functions for invoking it: different log levels, with or without newlines, log-level filtering.
@@ -49,114 +49,109 @@ struct Logger {
     virtual ~Logger() = default;
     virtual void LogFunction(String str, LogLevel level, bool add_newline) = 0;
 
+    void Ln(LogLevel level, String str) { LogFunction(str, level, true); }
+    template <typename... Args>
+    void Ln(LogLevel level, String format, Args const&... args) {
+        LogAllocator log_allocator;
+        LogFunction(fmt::Format(log_allocator, format, args...), level, true);
+    }
+
     void TraceLn(String message = {}, SourceLocation loc = SourceLocation::Current());
 
     void Debug(String str) {
-        if (LogLevel::Debug < max_level_allowed) return;
-        LogFunction(str, LogLevel::Debug, false);
+        if constexpr (!PRODUCTION_BUILD) LogFunction(str, LogLevel::Debug, false);
     }
-    void Info(String str) {
-        if (LogLevel::Info < max_level_allowed) return;
-        LogFunction(str, LogLevel::Info, false);
-    }
-    void Warning(String str) {
-        if (LogLevel::Warning < max_level_allowed) return;
-        LogFunction(str, LogLevel::Warning, false);
-    }
-    void Error(String str) {
-        if (LogLevel::Error < max_level_allowed) return;
-        LogFunction(str, LogLevel::Error, false);
-    }
+    void Info(String str) { LogFunction(str, LogLevel::Info, false); }
+    void Warning(String str) { LogFunction(str, LogLevel::Warning, false); }
+    void Error(String str) { LogFunction(str, LogLevel::Error, false); }
 
     void DebugLn(String str) {
-        if (LogLevel::Debug < max_level_allowed) return;
-        LogFunction(str, LogLevel::Debug, true);
+        if constexpr (!PRODUCTION_BUILD) LogFunction(str, LogLevel::Debug, true);
     }
-    void InfoLn(String str) {
-        if (LogLevel::Info < max_level_allowed) return;
-        LogFunction(str, LogLevel::Info, true);
-    }
-    void WarningLn(String str) {
-        if (LogLevel::Warning < max_level_allowed) return;
-        LogFunction(str, LogLevel::Warning, true);
-    }
-    void ErrorLn(String str) {
-        if (LogLevel::Error < max_level_allowed) return;
-        LogFunction(str, LogLevel::Error, true);
-    }
+    void InfoLn(String str) { LogFunction(str, LogLevel::Info, true); }
+    void WarningLn(String str) { LogFunction(str, LogLevel::Warning, true); }
+    void ErrorLn(String str) { LogFunction(str, LogLevel::Error, true); }
 
     template <typename... Args>
     void DebugLn(String format, Args const&... args) {
-        if (LogLevel::Debug < max_level_allowed) return;
+        if constexpr (PRODUCTION_BUILD) return;
         LogAllocator log_allocator;
         LogFunction(fmt::Format(log_allocator, format, args...), LogLevel::Debug, true);
     }
     template <typename... Args>
     void InfoLn(String format, Args const&... args) {
-        if (LogLevel::Info < max_level_allowed) return;
         LogAllocator log_allocator;
         LogFunction(fmt::Format(log_allocator, format, args...), LogLevel::Info, true);
     }
     template <typename... Args>
     void ErrorLn(String format, Args const&... args) {
-        if (LogLevel::Error < max_level_allowed) return;
         LogAllocator log_allocator;
         LogFunction(fmt::Format(log_allocator, format, args...), LogLevel::Error, true);
     }
     template <typename... Args>
     void WarningLn(String format, Args const&... args) {
-        if (LogLevel::Warning < max_level_allowed) return;
         LogAllocator log_allocator;
         LogFunction(fmt::Format(log_allocator, format, args...), LogLevel::Warning, true);
     }
 
     template <typename... Args>
     void Debug(String format, Args const&... args) {
-        if (LogLevel::Debug < max_level_allowed) return;
+        if constexpr (PRODUCTION_BUILD) return;
         LogAllocator log_allocator;
         LogFunction(fmt::Format(log_allocator, format, args...), LogLevel::Debug, false);
     }
     template <typename... Args>
     void Info(String format, Args const&... args) {
-        if (LogLevel::Info < max_level_allowed) return;
         LogAllocator log_allocator;
         LogFunction(fmt::Format(log_allocator, format, args...), LogLevel::Info, false);
     }
     template <typename... Args>
     void Error(String format, Args const&... args) {
-        if (LogLevel::Error < max_level_allowed) return;
         LogAllocator log_allocator;
         LogFunction(fmt::Format(log_allocator, format, args...), LogLevel::Error, false);
     }
     template <typename... Args>
     void Warning(String format, Args const&... args) {
-        if (LogLevel::Warning < max_level_allowed) return;
         LogAllocator log_allocator;
         LogFunction(fmt::Format(log_allocator, format, args...), LogLevel::Warning, false);
     }
-
-    LogLevel max_level_allowed = PRODUCTION_BUILD ? LogLevel::Info : LogLevel::Debug;
 };
 
-struct StdoutLogger : Logger {
+struct StdoutLogger final : Logger {
     void LogFunction(String str, LogLevel level, bool add_newline) override;
 };
 extern StdoutLogger stdout_log;
 
-// Errors are printed to stderr, the rest to stdout
-struct CliOutLogger : Logger {
+// Logs to stdout but info messages don't have a prefix
+struct CliOutLogger final : Logger {
     void LogFunction(String str, LogLevel level, bool add_newline) override;
 };
 extern CliOutLogger cli_out;
 
-struct FileLogger : Logger {
+// Timestamped log file
+struct FileLogger final : Logger {
     void LogFunction(String str, LogLevel level, bool add_newline) override;
 
     enum class State : u32 { Uninitialised, Initialising, Initialised };
     Atomic<State> state {State::Uninitialised};
-    bool graphics_info_printed {};
-    DynamicArrayInline<char, 1024> graphics_info;
     DynamicArrayInline<char, 256> filepath;
 };
 
 extern FileLogger g_log_file;
+
+struct DefaultLogger final : Logger {
+    inline void LogFunction(String str, LogLevel level, bool add_newline) override {
+        if constexpr (!PRODUCTION_BUILD)
+            cli_out.LogFunction(str, level, add_newline);
+        else
+            g_log_file.LogFunction(str, level, add_newline);
+    }
+};
+
+extern Logger& g_log;
+
+#define DBG_PRINT_EXPR(x)     g_log.DebugLn("DBG: {}: {} = {}", __FUNCTION__, #x, x)
+#define DBG_PRINT_EXPR2(x, y) g_log.DebugLn("DBG: {}: {} = {}, {} = {}", __FUNCTION__, #x, x, #y, y)
+#define DBG_PRINT_EXPR3(x, y, z)                                                                             \
+    g_log.DebugLn("DBG: {}: {} = {}, {} = {}, {} = {}", __FUNCTION__, #x, x, #y, y, #z, z)
+#define DBG_PRINT_STRUCT(x) g_log.DebugLn("DBG: {}: {} = {}", __FUNCTION__, #x, fmt::DumpStruct(x))

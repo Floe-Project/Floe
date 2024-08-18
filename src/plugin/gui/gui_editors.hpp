@@ -41,9 +41,10 @@ static void DoAudioDebugPanel(Gui* g, Rect r) {
 
     EditorReset(&g->editor);
 
-    EditorText(
-        &g->editor,
-        fmt::Format(g->scratch_arena, "Voices: {}", plugin.processor.voice_pool.num_active_voices.Load(LoadMemoryOrder::Relaxed))); 
+    EditorText(&g->editor,
+               fmt::Format(g->scratch_arena,
+                           "Voices: {}",
+                           plugin.processor.voice_pool.num_active_voices.Load(LoadMemoryOrder::Relaxed)));
     EditorText(&g->editor,
                fmt::Format(g->scratch_arena,
                            "Master Audio Processing: {}",

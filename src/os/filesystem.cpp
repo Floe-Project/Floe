@@ -64,6 +64,15 @@ KnownDirectoryWithSubdirectories(Allocator& a, KnownDirectories type, Span<Strin
     return path.ToOwnedSpan();
 }
 
+ErrorCodeOr<MutableString> FloeKnownDirectory(Allocator& a, FloeKnownDirectories type) {
+    switch (type) {
+        case FloeKnownDirectories::Logs:
+            return KnownDirectoryWithSubdirectories(a, KnownDirectories::Logs, Array {"Floe"_s});
+    }
+    PanicIfReached();
+    return {};
+}
+
 ErrorCodeOr<void>
 MoveFileOrDirIntoFolder(String file_or_folder, String target_folder, ExistingDestinationHandling existing) {
     auto const file_type = TRY(GetFileType(file_or_folder));

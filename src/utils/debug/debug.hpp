@@ -13,31 +13,6 @@ constexpr bool k_tracy_enable = true;
 constexpr bool k_tracy_enable = false;
 #endif
 
-template <typename... Args>
-PUBLIC void DebugLn(String format, Args const&... args) {
-    if constexpr (!PRODUCTION_BUILD) {
-        DynamicArrayInline<char, 1500> buffer {};
-        dyn::AppendSpan(buffer, Timestamp());
-        dyn::Append(buffer, ' ');
-        fmt::Append(buffer, format, args...);
-        dyn::Append(buffer, '\n');
-
-        StdStreamMutex(StdStream::Out).Lock();
-        DEFER { StdStreamMutex(StdStream::Out).Unlock(); };
-        StdPrint(StdStream::Out, buffer);
-    }
-}
-
-PUBLIC inline void DebugLoc(SourceLocation loc = SourceLocation::Current()) {
-    if constexpr (!PRODUCTION_BUILD) DebugLn("{}, {}({})", loc.function, loc.file, loc.line);
-}
-
-#define DBG_PRINT_EXPR(x)     DebugLn("DBG: {}: {} = {}", __FUNCTION__, #x, x)
-#define DBG_PRINT_EXPR2(x, y) DebugLn("DBG: {}: {} = {}, {} = {}", __FUNCTION__, #x, x, #y, y)
-#define DBG_PRINT_EXPR3(x, y, z)                                                                             \
-    DebugLn("DBG: {}: {} = {}, {} = {}, {} = {}", __FUNCTION__, #x, x, #y, y, #z, z)
-#define DBG_PRINT_STRUCT(x) DebugLn("DBG: {}: {} = {}", __FUNCTION__, #x, fmt::DumpStruct(x))
-
 // Sometimes don't want to depend on our usual string formatting because that code could be cause of the
 // problem we're trying to debug.
 struct InlineSprintfBuffer {

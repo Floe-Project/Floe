@@ -7,54 +7,12 @@
 
 #include "foundation/foundation.hpp"
 #include "os/misc.hpp"
-#include "utils/debug/debug.hpp"
 
 #include "gui_frame.hpp"
 
 namespace imgui {
 
 static constexpr f64 k_popup_open_and_close_delay_sec {0.2};
-
-void Context::Trace(u32 type, char const* function, char const* fmt, ...) {
-    if (type & TraceTypeActiveId) return;
-    if (type & TraceTypeHotId) return;
-    if (type & TraceTypeHoveredId) return;
-    if (type & TraceTypeTextInput) return;
-    if (type & TraceTypeRequiresUpdate) return;
-    if (type & TraceTypePopup) return;
-
-    char const* type_name = "";
-    if (type & TraceTypeActiveId) type_name = "ActiveID";
-    if (type & TraceTypeHotId) type_name = "HotID";
-    if (type & TraceTypeHoveredId) type_name = "HoveredID";
-    if (type & TraceTypeTextInput) type_name = "TextInput";
-    if (type & TraceTypeRequiresUpdate) type_name = "RequiresUpdate";
-    if (type & TraceTypePopup) type_name = "Popup";
-
-    static char buffer[512];
-    stbsp_sprintf(buffer,
-                  "[Imgui] %llu %s %s - ",
-                  (unsigned long long)frame_input.update_count,
-                  type_name,
-                  function);
-
-    auto len = (int)NullTerminatedSize(buffer);
-
-    va_list args;
-    va_start(args, fmt);
-    stbsp_vsnprintf(buffer + len, (int)::ArraySize(buffer) - len, fmt, args);
-    DebugLn("{}", buffer);
-    va_end(args);
-}
-
-#define IMGUI_TRACE(type)          Trace(type, __FUNCTION__, "");
-#define IMGUI_TRACE_MSG(type, ...) Trace(type, __FUNCTION__, __VA_ARGS__);
-
-#define SET_ONE_MORE_FRAME(...)                                                                              \
-    do {                                                                                                     \
-        frame_output.ElevateUpdateRequest(GuiFrameResult::UpdateRequest::ImmediatelyUpdate);                 \
-        IMGUI_TRACE_MSG(TraceTypeRequiresUpdate, __VA_ARGS__);                                               \
-    } while (0)
 
 // namespace imstring is based on dear imgui code
 // Copyright (c) 2014-2024 Omar Cornut
@@ -278,10 +236,7 @@ static bool STB_TEXTEDIT_INSERTCHARS(STB_TEXTEDIT_STRING* imgui, //
 
 } // namespace stb
 
-void Context::SetHotRaw(Id id) {
-    IMGUI_TRACE_MSG(TraceTypeHotId, "%u", id);
-    temp_hot_item = id;
-}
+void Context::SetHotRaw(Id id) { temp_hot_item = id; }
 
 // check the modifier key flags to see if the click is allowed
 static bool CheckModifierKeys(ButtonFlags flags, GuiFrameInput const& io) {
@@ -564,7 +519,7 @@ void Context::PushID(void const* ptr) { dyn::Append(id_stack, GetID(ptr)); }
 void Context::PushID(u64 int_id) { dyn::Append(id_stack, GetID(int_id)); }
 
 void Context::PushID(int int_id) {
-    auto* ptr_id = (void*)(intptr_t)int_id;
+    auto* ptr_id = (void*)(uintptr)int_id;
     dyn::Append(id_stack, GetID(ptr_id));
 }
 
@@ -584,12 +539,12 @@ Id Context::GetID(char const* str, char const* str_end) {
 Id Context::GetID(String str) { return GetID(str.data, str.data + str.size); }
 
 Id Context::GetID(u64 int_id) {
-    void const* ptr_id = (void*)(uintptr_t)int_id;
+    void const* ptr_id = (void*)(uintptr)int_id;
     return GetID(ptr_id);
 }
 
 Id Context::GetID(int int_id) {
-    void const* ptr_id = (void*)(intptr_t)int_id;
+    void const* ptr_id = (void*)(uintptr)int_id;
     return GetID(ptr_id);
 }
 
@@ -728,7 +683,6 @@ void Context::Begin(WindowSettings settings) {
     if (GetActive() && active_item.check_for_release &&
         !CheckForValidMouseDown(active_item.button_flags, frame_input)) {
 
-        IMGUI_TRACE_MSG(TraceTypeActiveId, "SetActiveID(0)");
         SetActiveIDZero();
     }
 
@@ -844,14 +798,12 @@ void Context::End(ArenaAllocator& scratch_arena) {
         if (hovered_window != nullptr) {
             Window* window = hovered_window;
             bool const closes_popups = (window->flags & WindowFlags_NeverClosesPopup) == 0;
-            IMGUI_TRACE_MSG(TraceTypeActiveId, "SetActiveID(IMGUI_MISC_ID)");
             SetActiveID(k_imgui_misc_id,
                         closes_popups,
                         {.left_mouse = true, .triggers_on_mouse_down = true},
                         true); // indicate when the mouse is pressed down, but not over anything important
             focused_popup_window = hovered_window;
         } else {
-            IMGUI_TRACE_MSG(TraceTypeActiveId, "SetActiveID(IMGUI_MISC_ID)");
             SetActiveID(k_imgui_misc_id,
                         false,
                         {.left_mouse = true, .triggers_on_mouse_down = true},
@@ -877,18 +829,12 @@ void Context::End(ArenaAllocator& scratch_arena) {
                 if (popup_clicked != nullptr) {
                     for (auto const i : Range(persistent_popup_stack.size)) {
                         if (popup_clicked == persistent_popup_stack[i]) {
-                            if (i != persistent_popup_stack.size - 1) {
-                                IMGUI_TRACE_MSG(TraceTypePopup, "Clicked elsewhere, closing popups");
+                            if (i != persistent_popup_stack.size - 1)
                                 ClosePopupToLevel((int)i + 1); // close children popups
-                            }
                             break;
                         }
                     }
                 } else {
-                    IMGUI_TRACE_MSG(TraceTypePopup,
-                                    "Something unrelated to a popup menu was clicked, closing all popups");
-                    for (auto& p : persistent_popup_stack)
-                        IMGUI_TRACE_MSG(TraceTypePopup, "Closing popup %u", p->id);
                     dyn::Clear(persistent_popup_stack); // something unrelated was clicked, close all popups
                 }
             }
@@ -923,12 +869,14 @@ void Context::End(ArenaAllocator& scratch_arena) {
     hovered_item_last_frame = hovered_item;
     prev_active_text_input = active_text_input;
 
-    if (temp_hot_item != hot_item) SET_ONE_MORE_FRAME("new hot item");
+    if (temp_hot_item != hot_item)
+        frame_output.ElevateUpdateRequest(GuiFrameResult::UpdateRequest::ImmediatelyUpdate);
     if (temp_active_item.just_activated) {
         temp_hot_item = 0;
-        SET_ONE_MORE_FRAME("item just activated");
+        frame_output.ElevateUpdateRequest(GuiFrameResult::UpdateRequest::ImmediatelyUpdate);
     }
-    if (tab_to_focus_next_input) SET_ONE_MORE_FRAME("tab_to_focus_next_input");
+    if (tab_to_focus_next_input)
+        frame_output.ElevateUpdateRequest(GuiFrameResult::UpdateRequest::ImmediatelyUpdate);
 }
 
 bool Context::TextInputHasFocus(Id id) const { return active_text_input && active_text_input == id; }
@@ -1503,7 +1451,6 @@ bool Context::ButtonBehavior(Rect r, Id id, ButtonFlags flags) {
         bool const clicked = CheckForValidMouseDown(flags, frame_input);
 
         if (clicked) {
-            IMGUI_TRACE_MSG(TraceTypeActiveId, "SetActiveID(%u)", id);
             SetActiveID(id, (flags.closes_popups), flags, !(flags.dont_check_for_release));
 
             button_repeat_counter = {};
@@ -1863,7 +1810,7 @@ void Context::EndWindow() {
     Window* window = Last(window_stack);
     if (window->prev_content_size.x != window->prevprev_content_size.x ||
         window->prev_content_size.y != window->prevprev_content_size.y) {
-        SET_ONE_MORE_FRAME("window scrollbar range changed");
+        frame_output.ElevateUpdateRequest(GuiFrameResult::UpdateRequest::ImmediatelyUpdate);
     }
 
     PopRectFromCurrentScissorStack();
@@ -1976,13 +1923,13 @@ void Context::TextInputSelectAll() {
     stb_state.cursor = 0;
     stb_state.select_start = 0;
     stb_state.select_end = textedit_len;
-    SET_ONE_MORE_FRAME("");
+    frame_output.ElevateUpdateRequest(GuiFrameResult::UpdateRequest::ImmediatelyUpdate);
 }
 
 void Context::SetActiveIDZero() { SetActiveID(0, false, {}, false); }
 
 void Context::SetActiveID(Id id, bool closes_popups, ButtonFlags button_flags, bool check_for_release) {
-    SET_ONE_MORE_FRAME("active item set");
+    frame_output.ElevateUpdateRequest(GuiFrameResult::UpdateRequest::ImmediatelyUpdate);
     temp_active_item.id = id;
     temp_active_item.closes_popups = closes_popups;
     temp_active_item.just_activated = (id != 0);
@@ -2002,11 +1949,6 @@ void Context::SetActiveID(Id id, bool closes_popups, ButtonFlags button_flags, b
 
 // IMPROVE: calling OpenPopup without ever calling BeginWindowPopup causes weird behaviour
 Window* Context::OpenPopup(Id id, Id creator_of_this_popup) {
-    IMGUI_TRACE_MSG(TraceTypePopup,
-                    "%s %u is creating popup window %u",
-                    __FUNCTION__,
-                    creator_of_this_popup,
-                    id);
     bool const is_first_popup = persistent_popup_stack.size == 0;
     auto popup = AddWindowIfNotAlreadyThere(id);
     popup->prev_content_size = f32x2 {0, 0};
@@ -2015,7 +1957,7 @@ Window* Context::OpenPopup(Id id, Id creator_of_this_popup) {
     popup_menu_just_created = id;
     dyn::Append(persistent_popup_stack, popup);
     focused_popup_window = popup;
-    SET_ONE_MORE_FRAME("");
+    frame_output.ElevateUpdateRequest(GuiFrameResult::UpdateRequest::ImmediatelyUpdate);
 
     return popup;
 }
@@ -2057,31 +1999,22 @@ bool Context::IsPopupOpen(Id id) {
 }
 
 void Context::ClosePopupToLevel(int remaining) {
-    IMGUI_TRACE(TraceTypePopup);
     if (remaining > 0)
         focused_popup_window = persistent_popup_stack[(usize)remaining - 1];
     else if (persistent_popup_stack.size)
         focused_popup_window = persistent_popup_stack[0]->parent_window;
 
     ASSERT(remaining <= (int)persistent_popup_stack.size);
-    for (auto i = (usize)remaining; i < persistent_popup_stack.size; ++i) {
-        IMGUI_TRACE_MSG(TraceTypePopup,
-                        "%s closing popup window %u",
-                        __FUNCTION__,
-                        persistent_popup_stack[i]->id);
-    }
     dyn::Resize(persistent_popup_stack, (usize)remaining);
 }
 
 void Context::CloseTopPopupOnly() {
-    IMGUI_TRACE(TraceTypePopup);
     ASSERT(persistent_popup_stack.size != 0);
     ClosePopupToLevel((int)persistent_popup_stack.size - 1);
 }
 
 // Close the popup we have begin-ed into.
 void Context::CloseCurrentPopup() {
-    IMGUI_TRACE(TraceTypePopup);
     int popup_index = (int)current_popup_stack.size - 1;
     if (popup_index < 0 || popup_index > (int)persistent_popup_stack.size ||
         current_popup_stack[(usize)popup_index]->id != persistent_popup_stack[(usize)popup_index]->id) {

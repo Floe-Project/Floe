@@ -5,17 +5,17 @@
 
 #include "foundation/memory/allocators.hpp"
 #include "foundation/universal_defs.hpp"
-#include "utils/debug/debug.hpp"
+#include "utils/logger/logger.hpp"
 
 LeakDetectingAllocator::~LeakDetectingAllocator() {
     ArenaAllocatorWithInlineStorage<1000> scratch_arena;
     for (auto& i : m_allocations) {
         if (!i.stack_trace)
-            DebugLn("ERROR: memory leak detected of {} bytes, no stacktrace available", i.data.size);
+            g_log.DebugLn("ERROR: memory leak detected of {} bytes, no stacktrace available", i.data.size);
         else {
-            DebugLn("ERROR: memory leak detected of {} bytes, allocated at location:\n{}",
-                    i.data.size,
-                    StacktraceString(*i.stack_trace, scratch_arena, {.ansi_colours = true}));
+            g_log.DebugLn("ERROR: memory leak detected of {} bytes, allocated at location:\n{}",
+                          i.data.size,
+                          StacktraceString(*i.stack_trace, scratch_arena, {.ansi_colours = true}));
         }
     }
 

@@ -22,6 +22,7 @@
 #include "os/misc_mac.hpp"
 #include "os/threading.hpp"
 #include "utils/debug/debug.hpp"
+#include "utils/logger/logger.hpp"
 
 #include "filesystem.hpp"
 
@@ -137,7 +138,7 @@ ErrorCodeOr<void> Delete(String path, DeleteOptions options) {
 ErrorCodeOr<bool> DeleteDirectoryIfMacBundle(String dir) {
     auto bundle = [NSBundle bundleWithPath:StringToNSString(dir)];
     if (bundle != nil) {
-        DebugLn("Deleting mac bundle");
+        g_log.DebugLn("Deleting mac bundle");
         TRY(Delete(dir, {}));
         return true;
     }
@@ -510,7 +511,7 @@ void EventCallback([[maybe_unused]] ConstFSEventStreamRef stream_ref,
             MAYBE_UNUSED auto u5 = fmt::AppendLine(writer, "  }}");
         }
 
-        StdPrint(StdStream::Err, info);
+        MAYBE_UNUSED auto u6 = StdPrint(StdStream::Err, info);
     }
 
     {
@@ -627,9 +628,9 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                     // FSEvents ONLY supports recursive watching so we just have to ignore subdirectory
                     // events
                     if (!dir.recursive && Contains(subpath, '/')) {
-                        DebugLn("Ignoring subdirectory event: {} because {} is watched non-recursively",
-                                subpath,
-                                dir.path);
+                        g_log.DebugLn("Ignoring subdirectory event: {} because {} is watched non-recursively",
+                                      subpath,
+                                      dir.path);
                         continue;
                     }
 

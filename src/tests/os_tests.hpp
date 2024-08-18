@@ -90,7 +90,7 @@ TEST_CASE(TestFileApi) {
                     if (auto const resulting_file_data =
                             ReadEntireFile(k_out_file_name, tester.scratch_arena);
                         resulting_file_data.HasValue()) {
-                        DebugLn("Running Read from one large file and write to another");
+                        tester.log.DebugLn("Running Read from one large file and write to another");
                         REQUIRE(resulting_file_data.Value().size == section.size);
                         REQUIRE(MemoryIsEqual(resulting_file_data.Value().data, section.data, section.size));
                     }

@@ -6,6 +6,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "foundation/foundation.hpp"
+#include "utils/logger/logger.hpp"
 
 #if __APPLE__
 #include <OpenGL/gl.h>
@@ -17,7 +18,7 @@
 #endif
 
 #include "os/undef_windows_macros.h"
-#include "utils/debug/debug.hpp"
+#include "utils/debug/tracy_wrapped.hpp"
 
 #include "draw_list.hpp"
 
@@ -50,7 +51,7 @@ ErrorCodeOr<void> CheckGLError(String function) {
     GLenum gl_err;
     while ((gl_err = glGetError()) != GL_NO_ERROR) {
         err = ErrorCode(k_gl_error_category, gl_err);
-        DebugLn("GL Error: {}: {}", function, err.Error());
+        g_log.DebugLn("GL Error: {}: {}", function, err.Error());
     }
     if (err.HasError()) return err;
     return k_success;
@@ -58,21 +59,33 @@ ErrorCodeOr<void> CheckGLError(String function) {
 
 struct OpenGLDrawContext : public DrawContext {
     ErrorCodeOr<void> CreateDeviceObjects(void* _window) override {
-        DebugLoc();
+        g_log.TraceLn();
         ASSERT(_window != nullptr);
+
+        {
+            dyn::Clear(graphics_device_info);
+            if (auto const vendor = (char const*)glGetString(GL_VENDOR); vendor)
+                fmt::Append(graphics_device_info, "Vendor:   {}\n", FromNullTerminated(vendor));
+            if (auto const renderer = (char const*)glGetString(GL_RENDERER); renderer)
+                fmt::Append(graphics_device_info, "Renderer: {}\n", FromNullTerminated(renderer));
+            if (auto const version = (char const*)glGetString(GL_VERSION); version)
+                fmt::Append(graphics_device_info, "Version:  {}\n", FromNullTerminated(version));
+            if (graphics_device_info.size) dyn::Pop(graphics_device_info); // remove last newline
+        }
+
         return k_success;
     }
 
     void DestroyDeviceObjects() override {
         ZoneScoped;
-        DebugLoc();
+        g_log.TraceLn();
         DestroyAllTextures();
         DestroyFontTexture();
     }
 
     ErrorCodeOr<void> CreateFontTexture() override {
         ZoneScoped;
-        DebugLoc();
+        g_log.TraceLn();
         unsigned char* pixels;
         int width;
         int height;
@@ -101,7 +114,7 @@ struct OpenGLDrawContext : public DrawContext {
 
     void DestroyFontTexture() override {
         ZoneScoped;
-        DebugLoc();
+        g_log.TraceLn();
         if (font_texture) {
             glDeleteTextures(1, &font_texture);
             fonts.tex_id = nullptr;
@@ -212,7 +225,7 @@ struct OpenGLDrawContext : public DrawContext {
 
     ErrorCodeOr<TextureHandle> CreateTexture(unsigned char* data, UiSize size, u16 bytes_per_pixel) override {
         ZoneScoped;
-        DebugLoc();
+        g_log.TraceLn();
         // Upload texture to graphics system
         GLint last_texture;
         glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture);

@@ -49,6 +49,23 @@ Mutex& StdStreamMutex(StdStream stream) {
     PanicIfReached();
 }
 
+Writer StdWriter(StdStream stream) {
+    Writer result;
+    switch (stream) {
+        case StdStream::Out:
+            result.SetNoObject([](Span<u8 const> bytes) -> ErrorCodeOr<void> {
+                return StdPrint(StdStream::Out, String {(char const*)bytes.data, bytes.size});
+            });
+            break;
+        case StdStream::Err:
+            result.SetNoObject([](Span<u8 const> bytes) -> ErrorCodeOr<void> {
+                return StdPrint(StdStream::Err, String {(char const*)bytes.data, bytes.size});
+            });
+            break;
+    }
+    return result;
+}
+
 #if !IS_WINDOWS
 bool IsRunningUnderWine() { return false; }
 #endif

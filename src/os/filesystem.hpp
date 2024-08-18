@@ -134,12 +134,18 @@ enum class KnownDirectories {
     Count,
 };
 
-// Does not create the directory
+// Does not create the directory, just retreives from the OS
 ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectories type);
 
-// Creates the directory along with the subdirectories
+// Creates the directory along with the subdirectories if they don't exist
 ErrorCodeOr<MutableString>
 KnownDirectoryWithSubdirectories(Allocator& a, KnownDirectories type, Span<String const> subdirectories);
+
+// Higher-level functions: returns a Floe-specific path. Might be a KnownDirectory with a 'Floe' subdirectory.
+enum class FloeKnownDirectories {
+    Logs,
+};
+ErrorCodeOr<MutableString> FloeKnownDirectory(Allocator& a, FloeKnownDirectories type);
 
 enum class ExistingDestinationHandling {
     Skip, // Keep the existing file without reporting an error

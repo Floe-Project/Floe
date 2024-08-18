@@ -5,7 +5,7 @@
 
 #include "foundation/foundation.hpp"
 #include "os/filesystem.hpp"
-#include "utils/debug/debug.hpp"
+#include "utils/logger/logger.hpp"
 
 #include "plugin/common/constants.hpp"
 
@@ -210,7 +210,7 @@ static void WriteColoursFile(LiveEditGui const& gui) {
     ArenaAllocator scratch_arena {page_allocator};
     auto outcome = OpenFile(UiStyleFilepath(scratch_arena, COLOURS_DEF_FILENAME), FileMode::Write);
     if (outcome.HasError()) {
-        DebugLn("{} failed: {}", __FUNCTION__, outcome.Error());
+        g_log.ErrorLn("{} failed: {}", __FUNCTION__, outcome.Error());
         return;
     }
 
@@ -225,7 +225,7 @@ static void WriteColoursFile(LiveEditGui const& gui) {
                                      c.with_brightness,
                                      c.with_alpha);
         if (o.HasError())
-            DebugLn("could not write to file {} for reasion {}", COLOURS_DEF_FILENAME, o.Error());
+            g_log.ErrorLn("could not write to file {} for reasion {}", COLOURS_DEF_FILENAME, o.Error());
     }
 }
 
@@ -234,7 +234,7 @@ static void WriteSizesFile(LiveEditGui const& gui) {
     ArenaAllocator scratch_arena {page_allocator};
     auto outcome = OpenFile(UiStyleFilepath(scratch_arena, SIZES_DEF_FILENAME), FileMode::Write);
     if (outcome.HasError()) {
-        DebugLn("{} failed: {}", __FUNCTION__, outcome.Error());
+        g_log.ErrorLn("{} failed: {}", __FUNCTION__, outcome.Error());
         return;
     }
 
@@ -251,7 +251,8 @@ static void WriteSizesFile(LiveEditGui const& gui) {
                                      name,
                                      sz,
                                      unit_name);
-        if (o.HasError()) DebugLn("could not write to file {} for reason {}", SIZES_DEF_FILENAME, o.Error());
+        if (o.HasError())
+            g_log.ErrorLn("could not write to file {} for reason {}", SIZES_DEF_FILENAME, o.Error());
     }
 }
 
@@ -260,7 +261,7 @@ static void WriteColourMapFile(LiveEditGui const& gui) {
     ArenaAllocator scratch_arena {page_allocator};
     auto outcome = OpenFile(UiStyleFilepath(scratch_arena, COLOUR_MAP_DEF_FILENAME), FileMode::Write);
     if (outcome.HasError()) {
-        DebugLn("{} failed: {}", __FUNCTION__, outcome.Error());
+        g_log.ErrorLn("{} failed: {}", __FUNCTION__, outcome.Error());
         return;
     }
 
@@ -277,7 +278,7 @@ static void WriteColourMapFile(LiveEditGui const& gui) {
                                      String(v.colour),
                                      String(v.high_contrast_colour));
         if (o.HasError())
-            DebugLn("could not write to file {} for reason {}", COLOUR_MAP_DEF_FILENAME, o.Error());
+            g_log.ErrorLn("could not write to file {} for reason {}", COLOUR_MAP_DEF_FILENAME, o.Error());
     }
 }
 
@@ -486,9 +487,9 @@ void ColoursGUISliders(EditorGUI* gui, String search) {
                     auto rgb = ParseInt(FromNullTerminated(start), ParseIntBase::Hexadecimal).ValueOr(0);
                     colours::Col cs = {};
                     cs.a = col.a;
-                    cs.r = (uint8_t)((rgb & 0xff0000) >> 16);
-                    cs.g = (uint8_t)((rgb & 0xff00) >> 8);
-                    cs.b = (uint8_t)(rgb & 0xff);
+                    cs.r = (u8)((rgb & 0xff0000) >> 16);
+                    cs.g = (u8)((rgb & 0xff00) >> 8);
+                    cs.b = (u8)(rgb & 0xff);
                     c.col = colours::ToU32(cs);
                 }
             } else {
@@ -565,10 +566,10 @@ void ColoursGUISliders(EditorGUI* gui, String search) {
                     colours::ConvertHSVtoRGB(static_hue, static_sat, static_val, r1, g1, b1);
 
                     colours::Col new_col;
-                    new_col.a = uint8_t(static_alpha * 255.0f);
-                    new_col.r = uint8_t(r1 * 255.0f);
-                    new_col.g = uint8_t(g1 * 255.0f);
-                    new_col.b = uint8_t(b1 * 255.0f);
+                    new_col.a = u8(static_alpha * 255.0f);
+                    new_col.r = u8(r1 * 255.0f);
+                    new_col.g = u8(g1 * 255.0f);
+                    new_col.b = u8(b1 * 255.0f);
 
                     u32 const col_from_hsv = colours::ToU32(new_col);
                     c.col = col_from_hsv;

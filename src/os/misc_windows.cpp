@@ -139,9 +139,11 @@ void StartupCrashHandler() {
     g_exception_handler = AddVectoredExceptionHandler(1, [](PEXCEPTION_POINTERS exception_info) -> LONG {
         // some exceptions are expected and should be ignored; for example lua will trigger exceptions.
         if (auto const msg = ExceptionCodeString(exception_info->ExceptionRecord->ExceptionCode); msg.size) {
-            StdPrint(StdStream::Err, "Unhandled exception: ");
-            StdPrint(StdStream::Err, msg);
-            StdPrint(StdStream::Err, "\n");
+            g_log.ErrorLn("Unhandled exception: ");
+            g_log.ErrorLn(msg);
+
+            FixedSizeAllocator<2000> a;
+            g_log.ErrorLn(CurrentStacktraceString(a));
 
 #ifdef __x86_64__
             if (exception_info->ExceptionRecord->ExceptionCode == EXCEPTION_ILLEGAL_INSTRUCTION &&
@@ -162,7 +164,7 @@ void ShutdownCrashHandler() {
     if (g_exception_handler) RemoveVectoredContinueHandler(g_exception_handler);
 }
 
-void StdPrint(StdStream stream, String str) {
+ErrorCodeOr<void> StdPrint(StdStream stream, String str) {
     DWORD bytes_written;
     auto const result = WriteFile(GetStdHandle(({
                                       DWORD h = STD_OUTPUT_HANDLE;
@@ -176,9 +178,8 @@ void StdPrint(StdStream stream, String str) {
                                   (DWORD)str.size,
                                   &bytes_written,
                                   nullptr);
-    if (!result) {
-        // error
-    }
+    if (!result) return Win32ErrorCode(GetLastError(), "StdPrint WriteFile");
+    return k_success;
 }
 
 // the FILETIME structure represents the number of 100-nanosecond intervals since January 1, 1601 UTC

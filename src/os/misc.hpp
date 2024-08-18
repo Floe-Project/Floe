@@ -92,7 +92,8 @@ void ShutdownCrashHandler();
 enum class StdStream { Out, Err };
 
 // Unbuffered
-void StdPrint(StdStream stream, String str);
+ErrorCodeOr<void> StdPrint(StdStream stream, String str);
+Writer StdWriter(StdStream stream);
 
 Mutex& StdStreamMutex(StdStream stream);
 

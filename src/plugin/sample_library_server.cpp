@@ -437,7 +437,7 @@ static bool UpdateLibraryJobs(Server& server,
                                                       });
             outcome.HasError()) {
             // IMPROVE: handle error
-            DebugLn("Reading directory changes failed: {}", outcome.Error());
+            g_log.DebugLn("Reading directory changes failed: {}", outcome.Error());
         } else {
             auto const dir_changes_span = outcome.Value();
             for (auto const& dir_changes : dir_changes_span) {
@@ -446,9 +446,9 @@ static bool UpdateLibraryJobs(Server& server,
 
                 if (dir_changes.error) {
                     // IMPROVE: handle this
-                    DebugLn("Reading directory changes failed for {}: {}",
-                            scan_folder.path,
-                            dir_changes.error);
+                    g_log.DebugLn("Reading directory changes failed for {}: {}",
+                                  scan_folder.path,
+                                  dir_changes.error);
                     continue;
                 }
 
@@ -558,7 +558,7 @@ static Optional<DirectoryWatcher> CreateDirectoryWatcher(ThreadsafeErrorNotifica
         error_notifications.RemoveError(error_id);
         watcher.Emplace(watcher_outcome.ReleaseValue());
     } else {
-        DebugLn("Failed to create directory watcher: {}", watcher_outcome.Error());
+        g_log.DebugLn("Failed to create directory watcher: {}", watcher_outcome.Error());
         auto const err = error_notifications.NewError();
         err->value = {
             .title = "Warning: unable to monitor library folders"_s,
@@ -702,8 +702,6 @@ static ListedAudioData* FetchOrCreateAudioData(LibrariesList::Node& lib_node,
             return &d;
         }
     }
-
-    DebugLn("Creating new audio data for {}", path);
 
     auto audio_data = lib_node.value.audio_datas.PrependUninitialised();
     PLACEMENT_NEW(audio_data)
@@ -875,40 +873,42 @@ struct PendingResources {
 
 static void DumpPendingResourcesDebugInfo(PendingResources& pending_resources) {
     ASSERT(CurrentThreadID() == pending_resources.server_thread_id);
-    DebugLn("Thread pool jobs: {}",
-            pending_resources.thread_pool_jobs.counter.Load(LoadMemoryOrder::Relaxed));
-    DebugLn("\nPending results:");
+    g_log.DebugLn("Thread pool jobs: {}",
+                  pending_resources.thread_pool_jobs.counter.Load(LoadMemoryOrder::Relaxed));
+    g_log.DebugLn("\nPending results:");
     for (auto& pending_resource : pending_resources.list) {
-        DebugLn("  Pending result: {}", pending_resource.debug_id);
+        g_log.DebugLn("  Pending result: {}", pending_resource.debug_id);
         switch (pending_resource.state.tag) {
-            case PendingResource::State::AwaitingLibrary: DebugLn("    Awaiting library"); break;
+            case PendingResource::State::AwaitingLibrary: g_log.DebugLn("    Awaiting library"); break;
             case PendingResource::State::AwaitingAudio: {
                 auto& resource = pending_resource.state.Get<PendingResource::ListedPointer>();
                 switch (resource.tag) {
                     case LoadRequestType::Instrument: {
                         auto inst = resource.Get<ListedInstrument*>();
-                        DebugLn("    Awaiting audio for instrument {}", inst->inst.instrument.name);
+                        g_log.DebugLn("    Awaiting audio for instrument {}", inst->inst.instrument.name);
                         for (auto& audio_data : inst->audio_data_set) {
-                            DebugLn("      Audio data: {}, {}",
-                                    audio_data->audio_data.hash,
-                                    EnumToString(audio_data->state.Load(LoadMemoryOrder::Relaxed)));
+                            g_log.DebugLn("      Audio data: {}, {}",
+                                          audio_data->audio_data.hash,
+                                          EnumToString(audio_data->state.Load(LoadMemoryOrder::Relaxed)));
                         }
                         break;
                     }
                     case LoadRequestType::Ir: {
                         auto ir = resource.Get<ListedImpulseResponse*>();
-                        DebugLn("    Awaiting audio for IR {}", ir->ir.ir.path);
-                        DebugLn("      Audio data: {}, {}",
-                                ir->audio_data->audio_data.hash,
-                                EnumToString(ir->audio_data->state.Load(LoadMemoryOrder::Relaxed)));
+                        g_log.DebugLn("    Awaiting audio for IR {}", ir->ir.ir.path);
+                        g_log.DebugLn("      Audio data: {}, {}",
+                                      ir->audio_data->audio_data.hash,
+                                      EnumToString(ir->audio_data->state.Load(LoadMemoryOrder::Relaxed)));
                         break;
                     }
                 }
                 break;
             }
-            case PendingResource::State::Cancelled: DebugLn("    Cancelled"); break;
-            case PendingResource::State::Failed: DebugLn("    Failed"); break;
-            case PendingResource::State::CompletedSuccessfully: DebugLn("    Completed successfully"); break;
+            case PendingResource::State::Cancelled: g_log.DebugLn("    Cancelled"); break;
+            case PendingResource::State::Failed: g_log.DebugLn("    Failed"); break;
+            case PendingResource::State::CompletedSuccessfully:
+                g_log.DebugLn("    Completed successfully");
+                break;
         }
     }
 }
@@ -1343,17 +1343,18 @@ static void ServerThreadProc(Server& server) {
         while (true) {
             server.work_signaller.WaitUntilSignalledOrSpurious(250u);
 
-            if (server.request_debug_dump_current_state.Exchange(false, RmwMemoryOrder::Relaxed)) {
+            if (!PRODUCTION_BUILD &&
+                server.request_debug_dump_current_state.Exchange(false, RmwMemoryOrder::Relaxed)) {
                 ZoneNamedN(dump, "dump", true);
-                DebugLn("Dumping current state of loading thread");
-                DebugLn("Libraries currently loading: {}",
-                        libs_async_ctx.num_uncompleted_jobs.Load(LoadMemoryOrder::Relaxed));
+                g_log.DebugLn("Dumping current state of loading thread");
+                g_log.DebugLn("Libraries currently loading: {}",
+                              libs_async_ctx.num_uncompleted_jobs.Load(LoadMemoryOrder::Relaxed));
                 DumpPendingResourcesDebugInfo(pending_resources);
-                DebugLn("\nAvailable Libraries:");
+                g_log.DebugLn("\nAvailable Libraries:");
                 for (auto& lib : server.libraries) {
-                    DebugLn("  Library: {}", lib.value.lib->name);
+                    g_log.DebugLn("  Library: {}", lib.value.lib->name);
                     for (auto& inst : lib.value.instruments)
-                        DebugLn("    Instrument: {}", inst.inst.instrument.name);
+                        g_log.DebugLn("    Instrument: {}", inst.inst.instrument.name);
                 }
             }
 
@@ -1615,7 +1616,7 @@ static Type& ExtractSuccess(tests::Tester& tester, LoadResult const& result, Loa
         }
     }
 
-    if (auto err = result.result.TryGet<ErrorCode>()) DebugLn("Error: {}", *err);
+    if (auto err = result.result.TryGet<ErrorCode>()) g_log.DebugLn("Error: {}", *err);
     REQUIRE_EQ(result.result.tag, LoadResult::ResultType::Success);
     auto opt_r = result.result.Get<Resource>().TryGetMut<Type>();
     REQUIRE(opt_r);

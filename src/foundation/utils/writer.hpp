@@ -19,6 +19,14 @@ struct Writer {
         };
     }
 
+    constexpr void SetNoObject(ErrorCodeOr<void> (*write_bytes)(Span<u8 const> bytes)) {
+        object = nullptr;
+        write_bytes_function_ptr = (void*)write_bytes;
+        invoke_write_bytes = [](void* func_ptr, void* _, Span<u8 const> bytes) -> ErrorCodeOr<void> {
+            return ((decltype(write_bytes))func_ptr)(bytes);
+        };
+    }
+
     ErrorCodeOr<void> WriteByte(u8 byte) const { return WriteBytes({&byte, 1}); }
     ErrorCodeOr<void> WriteBytes(Span<u8 const> bytes) const {
         return invoke_write_bytes(write_bytes_function_ptr, object, bytes);

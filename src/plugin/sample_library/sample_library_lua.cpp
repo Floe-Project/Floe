@@ -1026,7 +1026,7 @@ static VoidOrError<Error> TryRunLuaCode(LuaState& ctx, int r) {
         }
         case LUA_ERRMEM: return Error {LuaErrorCode::Memory, {}};
         case LUA_ERRERR:
-            DebugLn("error while running the error handler function");
+            g_log.ErrorLn("🐛: error while running the error handler function");
             return Error {LuaErrorCode::Unexpected, {}};
     }
     return Error {LuaErrorCode::Unexpected, {}};
@@ -1226,12 +1226,12 @@ LibraryPtrOrError ReadLua(Reader& reader,
                 case LUA_ERRMEM: return Error {LuaErrorCode::Memory, {}};
             }
 
-            DebugLn("Bug: unknown error from lua_load: {}", r);
+            g_log.ErrorLn("🐛: unknown error from lua_load: {}", r);
             return Error {LuaErrorCode::Unexpected, {}};
         }
 
         if (!lua_isfunction(ctx.lua, -1)) {
-            DebugLn("Bug: we're expecting the lua file to be a function");
+            g_log.ErrorLn("🐛: we're expecting the lua file to be a function");
             return Error {LuaErrorCode::Unexpected, {}};
         }
 

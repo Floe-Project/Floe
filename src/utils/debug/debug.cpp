@@ -26,9 +26,9 @@
                   filename.data,
                   loc.line,
                   loc.function);
-    StdPrint(StdStream::Err, buffer.AsString());
+    auto _ = StdPrint(StdStream::Err, buffer.AsString());
     DumpCurrentStackTraceToStderr(4);
-    StdPrint(StdStream::Err, "\n");
+    auto _ = StdPrint(StdStream::Err, "\n");
     if constexpr (!PRODUCTION_BUILD) __builtin_debugtrap();
     __builtin_abort();
 }
@@ -48,9 +48,9 @@ void AssertionFailed(char const* expression, SourceLocation loc, char const* mes
 }
 
 static void HandleUbsanError(String msg) {
-    StdPrint(StdStream::Err, ANSI_COLOUR_FOREGROUND_RED("UBSan: undefined behaviour detected: "));
-    StdPrint(StdStream::Err, msg);
-    StdPrint(StdStream::Err, "\n");
+    auto _ = StdPrint(StdStream::Err, ANSI_COLOUR_FOREGROUND_RED("UBSan: undefined behaviour detected: "));
+    auto _ = StdPrint(StdStream::Err, msg);
+    auto _ = StdPrint(StdStream::Err, "\n");
     DumpCurrentStackTraceToStderr(3);
     __builtin_abort();
 }
@@ -275,7 +275,8 @@ MINIMAL_HANDLER(cfi_check_fail, "cfi-check-fail")
 // =============================================================================================================
 
 void DumpInfoAboutUBSanToStderr() {
-    StdPrint(StdStream::Err, "Possibly undefined behaviour found with UBSan. UBSan checks include:\n");
+    auto _ =
+        StdPrint(StdStream::Err, "Possibly undefined behaviour found with UBSan. UBSan checks include:\n");
     constexpr String k_ubsan_checks[] = {
         "  type-mismatch\n",       "  alignment-assumption\n",   "  add-overflow\n",
         "  sub-overflow\n",        "  mul-overflow\n",           "  negate-overflow\n",
@@ -287,7 +288,7 @@ void DumpInfoAboutUBSanToStderr() {
         "  nullability-return\n",  "  pointer-overflow\n",       "  cfi-check-fail\n",
     };
     for (auto check : k_ubsan_checks)
-        StdPrint(StdStream::Err, check);
+        auto _ = StdPrint(StdStream::Err, check);
 }
 
 struct BacktraceState {
@@ -416,10 +417,10 @@ MutableString CurrentStacktraceString(Allocator& a, StacktraceOptions options, i
 
 void DumpCurrentStackTraceToStderr(int skip_frames) {
     FixedSizeAllocator<2000> scratch_arena {nullptr};
-    StdPrint(StdStream::Err,
-             CurrentStacktraceString(scratch_arena,
-                                     {
-                                         .ansi_colours = true,
-                                     },
-                                     skip_frames));
+    auto _ = StdPrint(StdStream::Err,
+                      CurrentStacktraceString(scratch_arena,
+                                              {
+                                                  .ansi_colours = true,
+                                              },
+                                              skip_frames));
 }

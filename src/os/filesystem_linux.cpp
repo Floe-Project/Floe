@@ -17,7 +17,8 @@
 #include <unistd.h>
 
 #include "foundation/foundation.hpp"
-#include "utils/debug/debug.hpp"
+#include "utils/debug/tracy_wrapped.hpp"
+#include "utils/logger/logger.hpp"
 
 #include "filesystem.hpp"
 
@@ -542,21 +543,21 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                 }
                 if (!d.HasValue()) {
                     if constexpr (k_debug_inotify) {
-                        DebugLn("ERROR: inotify event for unknown watch id: {}, name_len: {}, name: {}",
-                                event.wd,
-                                event.len,
-                                FromNullTerminated(event.len ? event.name : ""));
-                        DebugLn("Available watch ids:");
+                        g_log.DebugLn("ERROR: inotify event for unknown watch id: {}, name_len: {}, name: {}",
+                                      event.wd,
+                                      event.len,
+                                      FromNullTerminated(event.len ? event.name : ""));
+                        g_log.DebugLn("Available watch ids:");
                         bool found_ids = false;
                         for (auto& watch : watcher.watched_dirs) {
                             if (watch.state != DirectoryWatcher::WatchedDirectory::State::Watching) continue;
                             found_ids = true;
                             auto& native_data = *(LinuxWatchedDirectory*)watch.native_data.pointer;
-                            DebugLn("  {}: {}", native_data.root_watch_id, watch.path);
+                            g_log.DebugLn("  {}: {}", native_data.root_watch_id, watch.path);
                             for (auto& subdir : native_data.subdirs)
-                                DebugLn("    {}: {}", subdir.watch_id, subdir.subpath);
+                                g_log.DebugLn("    {}: {}", subdir.watch_id, subdir.subpath);
                         }
-                        if (!found_ids) DebugLn("  none");
+                        if (!found_ids) g_log.DebugLn("  none");
                     }
                     continue;
                 }
@@ -599,7 +600,7 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                     TRY(fmt::AppendLine(writer, "}}"));
                     return k_success;
                 }();
-                StdPrint(StdStream::Err, printout);
+                g_log.Debug(printout);
             }
 
             // "Watch was removed explicitly (inotify_rm_watch()) or automatically (file was deleted, or

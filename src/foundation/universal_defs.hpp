@@ -93,8 +93,7 @@ constexpr auto k_endianness = Endianness::Big;
 
 // ==========================================================================================================
 struct SourceLocation {
-    // NOTE: could use __builtin_FILE_NAME() instead?
-    static SourceLocation Current(char const* file = __builtin_FILE(),
+    static SourceLocation Current(char const* file = __builtin_FILE_NAME(),
                                   int line = __builtin_LINE(),
                                   char const* function = __builtin_FUNCTION()) {
         return {function, file, line};

@@ -10,11 +10,7 @@
 
 void Logger::TraceLn(String message, SourceLocation loc) {
     DynamicArrayInline<char, 1000> buf;
-    fmt::Append(buf,
-                "trace: {}({}): {}",
-                path::Filename(FromNullTerminated(loc.file)),
-                loc.line,
-                loc.function);
+    fmt::Append(buf, "trace: {}({}): {}", FromNullTerminated(loc.file), loc.line, loc.function);
     if (message.size) fmt::Append(buf, ": {}", message);
 
     LogFunction(buf, LogLevel::Debug, true);

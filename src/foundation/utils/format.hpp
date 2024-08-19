@@ -9,6 +9,7 @@
 #include "foundation/container/tagged_union.hpp"
 #include "foundation/error/error_code.hpp"
 #include "foundation/universal_defs.hpp"
+#include "foundation/utils/path.hpp"
 #include "foundation/utils/string.hpp"
 #include "foundation/utils/writer.hpp"
 
@@ -304,25 +305,7 @@ PUBLIC ErrorCodeOr<void> ValueToString(Writer writer, T const& value, FormatOpti
         if (options.error_debug_info) {
             TRY(writer.WriteChar('\n'));
 
-            auto file = FromNullTerminated(value.source_location.file);
-            if (file.size) {
-                constexpr auto k_find_last_slash = [](String str) {
-                    for (usize i = str.size - 1; i != usize(-1); --i) {
-                        auto const c = str[i];
-                        if constexpr (IS_WINDOWS) {
-                            if (c == '\\' || c == '/') return i;
-                        } else if (c == '/') {
-                            return i;
-                        }
-                    }
-                    return usize(-1);
-                };
-                auto const last_slash = k_find_last_slash(file);
-                ASSERT(last_slash != usize(-1));
-                file = file.SubSpan(last_slash + 1);
-            }
-
-            TRY(writer.WriteChars(file));
+            TRY(writer.WriteChars(FromNullTerminated(value.source_location.file)));
             TRY(writer.WriteChar(':'));
             TRY(writer.WriteChars(IntToString(value.source_location.line)));
 

@@ -15,7 +15,7 @@
 #include "tests/framework.hpp"
 
 [[noreturn]] void DefaultPanicHandler(char const* message, SourceLocation loc) {
-    auto const filename = path::Filename(FromNullTerminated(loc.file));
+    auto const filename = FromNullTerminated(loc.file);
     InlineSprintfBuffer buffer;
     // we style the source location to look like the first item of a call stack and then print the stack
     // skipping one extra frame

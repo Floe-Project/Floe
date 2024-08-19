@@ -357,8 +357,7 @@ struct DrawContext {
     virtual void DestroyFontTexture() = 0;
 
     // Never store a TextureHandle longer than a single frame. It can become invalidated between frames.
-    virtual ErrorCodeOr<TextureHandle>
-    CreateTexture(unsigned char* data, UiSize size, u16 bytes_per_pixel) = 0;
+    virtual ErrorCodeOr<TextureHandle> CreateTexture(u8 const* data, UiSize size, u16 bytes_per_pixel) = 0;
     virtual void DestroyTexture(TextureHandle& id) = 0;
 
     virtual ErrorCodeOr<void> Render(DrawData draw_data, UiSize window_size, f32 display_ratio) = 0;
@@ -402,7 +401,7 @@ struct DrawContext {
         return GetTextureFromImage(*id);
     }
 
-    ErrorCodeOr<ImageID> CreateImageID(u8* data, UiSize size, u16 bytes_per_pixel) {
+    ErrorCodeOr<ImageID> CreateImageID(u8 const* data, UiSize size, u16 bytes_per_pixel) {
         auto tex = TRY(CreateTexture(data, size, bytes_per_pixel));
         ASSERT(tex != nullptr);
         auto const id = ImageID {image_id_counter++, size};

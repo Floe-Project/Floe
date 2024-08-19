@@ -10,7 +10,6 @@
 
 #include "foundation/foundation.hpp"
 #include "os/filesystem.hpp"
-#include "utils/debug/debug.hpp"
 #include "utils/logger/logger.hpp"
 
 #include "build_resources/embedded_files.h"
@@ -172,339 +171,320 @@ ALWAYS_INLINE inline void SimdWrite4Bytes(f32x4 data, u8* out) {
     StoreToUnaligned(out, byte_vec);
 }
 
-//
 // You can do a box blur by first blurring in one direction, and then in the other. This is quicker because we
 // only need to work in 1 dimension at a time, and the memory access is probably more sequential and therefore
 // more cache friendly.
 // Rather than calculate the average for every pixel, we can just keep a running average. For each pixel we
 // just add to the running average the next pixel in view, and subtract the pixel that went out of view. This
 // means the performance will not be worse for larger radii.
-//
 
-static void BoxBlur(u8 const* in, u8* out, int width, int height, int radius) {
-    constexpr int k_channels = 4;
-    if (radius <= 0) return;
+constexpr u16 k_rgba_channels = 4;
+
+struct BlurAxisArgs {
+    f32x4 const* in;
+    f32x4* out;
+    usize data_size;
+    int radius;
+    f32x4 box_size;
+    int gap_between_lines;
+    int gap_between_elements;
+    int num_lines;
+    int line_size;
+};
+static inline void BlurAxis(BlurAxisArgs args) {
+    auto const radius_p1 = args.radius + 1;
+    auto const largest_line_index = args.line_size - 1;
+    for (auto const line_number : Range(args.num_lines)) {
+        auto const line_start_index = line_number * args.gap_between_lines;
+
+        f32x4 avg = 0;
+        {
+            // calculate the initial average so that we can do a moving average from here onwards
+            for (int i = -args.radius; i <= args.radius; ++i)
+                avg += args.in[line_start_index + Clamp(i, 0, largest_line_index)];
+        }
+
+        auto write_ptr = args.out + line_start_index;
+        auto const line_start_read_ptr = args.in + line_start_index;
+
+        // So as to avoid doing the Min/Max check for the edges, we break the loop into 3 sections, where
+        // the presumably largest middle section does not have to use the checks.
+
+        auto write_checked = [&](int start, int end) {
+            for (int element_index = start; element_index < end; ++element_index) {
+                ASSERT(write_ptr >= args.out && write_ptr < args.out + args.data_size);
+                *write_ptr = Clamp01<f32x4>(avg / args.box_size);
+                write_ptr += args.gap_between_elements;
+
+                auto const lhs_ptr =
+                    line_start_read_ptr + Max(element_index - args.radius, 0) * args.gap_between_elements;
+                auto const rhs_ptr =
+                    line_start_read_ptr +
+                    Min(element_index + radius_p1, largest_line_index) * args.gap_between_elements;
+                ASSERT(All(*lhs_ptr >= 0.0f && *lhs_ptr <= 1.0f));
+                ASSERT(All(*rhs_ptr >= 0.0f && *rhs_ptr <= 1.0f));
+                avg += *rhs_ptr - *lhs_ptr;
+            }
+        };
+
+        write_checked(0, args.radius);
+
+        // write_unchecked:
+        // We don't have to check the edge cases for this middle section - which works out much faster
+        auto lhs_ptr = line_start_read_ptr;
+        auto rhs_ptr = line_start_read_ptr + args.radius + radius_p1;
+        for (int element_index = args.radius; element_index < args.line_size - radius_p1; ++element_index) {
+            ASSERT(write_ptr >= args.out && write_ptr < args.out + args.data_size);
+            *write_ptr = Clamp01<f32x4>(avg / args.box_size);
+            write_ptr += args.gap_between_elements;
+            avg += *rhs_ptr - *lhs_ptr;
+            lhs_ptr += args.gap_between_elements;
+            rhs_ptr += args.gap_between_elements;
+        }
+
+        write_checked(args.line_size - radius_p1, args.line_size);
+    }
+}
+
+static bool BoxBlur(f32x4 const* in, f32x4* out, int width, int height, int radius) {
     radius = Min(radius, width / 2, height / 2);
-    CopyMemory(out, in, (usize)(width * height * k_channels));
+    if (radius <= 0) return false;
 
-    f32x4 const box_width = (f32)(radius * 2 + 1);
-    int const max_col_index = width - 1;
-    int const max_row_index = height - 1;
-    int const width_bytes = width * k_channels;
-    int const max_col_bytes = max_col_index * k_channels;
-    int const radius_p1 = radius + 1;
+    for (auto const pixel_index : Range(width * height))
+        out[pixel_index] = in[pixel_index];
 
-    {
-        // Blur horizontally
-        int const radius_bytes_left = radius * k_channels;
-        int const radius_bytes_right = radius_p1 * k_channels;
-        int pixel_index = 0;
-        for (auto const _ : Range(height)) {
-            f32x4 avg = 0;
-            {
-                // calculate the initial average so that we can do a moving average from here onwards
-                for (int i = -radius; i <= radius; ++i) {
-                    auto const ptr = in + ((pixel_index + Clamp(i, 0, max_col_index)) * k_channels);
-                    avg += SimdRead4Bytes(ptr);
-                }
-            }
+    Stopwatch stopwatch;
+    DEFER {
+        g_log.DebugLn("Box blur {}x{}, radius {} took {} ms",
+                      width,
+                      height,
+                      radius,
+                      stopwatch.MillisecondsElapsed());
+    };
 
-            auto write_ptr = out + (pixel_index * k_channels);
-            auto const row_start_read_ptr = in + (pixel_index * k_channels);
+    BlurAxisArgs args {
+        .in = in,
+        .out = out,
+        .data_size = (usize)(width * height),
+        .radius = radius,
+        .box_size = (f32)(radius * 2 + 1),
+    };
 
-            // So as to avoid doing the Min/Max check for the edges, we break the loop into 3 sections, where
-            // the presumably largest middle section does not have to use the checks.
-            auto write_checked = [&](int start, int end) {
-                for (int col_bytes = start; col_bytes < end; col_bytes += k_channels) {
-                    SimdWrite4Bytes(avg / box_width, write_ptr);
-                    write_ptr += k_channels;
+    // vertical blur, a 'line' is a column
+    args.num_lines = width;
+    args.line_size = height;
+    args.gap_between_lines = 1;
+    args.gap_between_elements = width;
+    BlurAxis(args);
 
-                    auto const lhs_ptr = row_start_read_ptr + Max(col_bytes - radius_bytes_left, 0);
-                    auto const rhs_ptr =
-                        row_start_read_ptr + Min(col_bytes + radius_bytes_right, max_col_bytes);
-                    avg += SimdRead4Bytes(rhs_ptr) - SimdRead4Bytes(lhs_ptr);
-                }
-            };
+    args.in = out;
 
-            write_checked(0, radius_bytes_left);
+    // horizontal blur, a 'line' is a row
+    args.num_lines = height;
+    args.line_size = width;
+    args.gap_between_lines = width;
+    args.gap_between_elements = 1;
+    BlurAxis(args);
 
-            // We don't have to check the edge cases for this middle section - which works out much faster
-            auto lhs_ptr = row_start_read_ptr;
-            auto rhs_ptr = row_start_read_ptr + radius_bytes_left + radius_bytes_right;
-            for (int col_bytes = radius_bytes_left; col_bytes < width_bytes - radius_bytes_right;
-                 col_bytes += k_channels) {
-                SimdWrite4Bytes(avg / box_width, write_ptr);
-                avg += SimdRead4Bytes(rhs_ptr) - SimdRead4Bytes(lhs_ptr);
+    return true;
+}
 
-                write_ptr += k_channels;
-                lhs_ptr += k_channels;
-                rhs_ptr += k_channels;
-            }
+struct ImageBytes {
+    usize NumPixels() const { return (usize)(size.width * size.height); }
+    usize NumBytes() const { return NumPixels() * k_rgba_channels; }
+    u8* rgba;
+    UiSize size;
+};
 
-            write_checked(width_bytes - radius_bytes_right, width_bytes);
+struct ImageF32 {
+    usize NumPixels() const { return (usize)(size.width * size.height); }
+    usize NumBytes() const { return NumPixels() * sizeof(f32x4); }
+    Span<f32x4> rgba;
+    UiSize size;
+};
 
-            pixel_index += width;
+static ImageBytes ShrinkImage(ImageBytes image,
+                              u16 bounding_width,
+                              u16 shrinked_to_width,
+                              ArenaAllocator& arena,
+                              bool always_allocate) {
+    if (image.size.width <= bounding_width) {
+        if (!always_allocate)
+            return image;
+        else {
+            auto const num_bytes = image.NumBytes();
+            auto rgba = arena.AllocateExactSizeUninitialised<u8>(num_bytes).data;
+            CopyMemory(rgba, image.rgba, num_bytes);
+            return {.rgba = rgba, .size = image.size};
         }
     }
 
+    // maintain aspect ratio
+    auto const shrunk_height =
+        CheckedCast<u16>((f32)image.size.height * ((f32)shrinked_to_width / (f32)image.size.width));
+
+    Stopwatch stopwatch;
+    DEFER {
+        g_log.DebugLn("Shrinking image {}x{} to {}x{} took {} ms",
+                      image.size.width,
+                      image.size.height,
+                      shrinked_to_width,
+                      shrunk_height,
+                      stopwatch.MillisecondsElapsed());
+    };
+
+    ImageBytes result {
+        .rgba =
+            arena.AllocateBytesForTypeOversizeAllowed<u8>(shrinked_to_width * shrunk_height * k_rgba_channels)
+                .data,
+        .size = {shrinked_to_width, shrunk_height},
+    };
+
+    stbir_resize_uint8_linear(image.rgba,
+                              image.size.width,
+                              image.size.height,
+                              0,
+                              result.rgba,
+                              result.size.width,
+                              result.size.height,
+                              0,
+                              STBIR_RGBA);
+    return result;
+}
+
+static ImageF32 CreateImageF32(ImageBytes const image, ArenaAllocator& arena) {
+    auto const result = arena.AllocateExactSizeUninitialised<f32x4>(image.NumPixels());
+    for (auto [pixel_index, pixel] : Enumerate(result)) {
+        auto const bytes = LoadUnalignedToType<u8x4>(image.rgba + pixel_index * k_rgba_channels);
+        pixel = ConvertVector(bytes, f32x4) / 255.0f;
+    }
+    return {.rgba = result, .size = image.size};
+}
+
+static void WriteImageF32AsBytes(ImageF32 const image, u8* out) {
+    for (auto [pixel_index, pixel] : Enumerate(image.rgba)) {
+        auto bytes = ConvertVector(pixel * 255.0f, u8x4);
+        bytes[3] = 255; // ignore alpha
+        StoreToUnaligned(out + pixel_index * k_rgba_channels, bytes);
+    }
+}
+
+static Optional<graphics::ImageID> TryCreateImageOnGpu(graphics::DrawContext& ctx, ImageBytes const image) {
+    return ctx.CreateImageID(image.rgba, image.size, k_rgba_channels).OrElse([](ErrorCode error) {
+        g_log.ErrorLn("Failed to create image texture: {}", error);
+        return graphics::ImageID {};
+    });
+}
+
+static ImageBytes
+CreateBlurredBackground(imgui::Context const& imgui, ImageBytes const image, ArenaAllocator& arena) {
+    Stopwatch stopwatch;
+    DEFER { g_log.DebugLn("Blurred image generation took {} ms", stopwatch.MillisecondsElapsed()); };
+
+    // Shrink the image down even further for better speed. We are about to blur it, we don't need
+    // detail.
+    auto const bounding_width = CheckedCast<u16>(
+        image.size.width * Clamp01(LiveSize(imgui, UiSizeId::BackgroundBlurringDownscaleFactor) / 100.0f));
+
+    auto const result = ShrinkImage(image, bounding_width, bounding_width, arena, true);
+    auto const num_pixels = result.NumPixels();
+
+    // For ease of use and performance, we convert the image to f32x4 format
+    auto const pixels = CreateImageF32(result, arena);
+
+    // Make the blurred image more of a mid-brightness, instead of very light or very dark
+    if constexpr (0) {
+        f32x4 brightness_sum {};
+
+        for (auto const& pixel : pixels.rgba)
+            brightness_sum += pixel;
+
+        f32 brightness_percent = 0;
+        brightness_percent += brightness_sum[0];
+        brightness_percent += brightness_sum[1];
+        brightness_percent += brightness_sum[2];
+        brightness_percent /= (f32)num_pixels * 3;
+
+        f32 const max_exponent = LiveSize(imgui, UiSizeId::BackgroundBlurringBrightnessExponent) / 100.0f;
+        f32 const brightness_scaling =
+            Pow(2.0f, MapFrom01(1 - brightness_percent, -max_exponent, max_exponent));
+
+        for (auto& pixel : pixels.rgba)
+            pixel = Clamp01<f32x4>(pixel * brightness_scaling);
+    }
+
+    // Blend on top a dark colour to achieve a more consistently dark background
+    if constexpr (0) {
+        f32x4 const overlay_colour =
+            Clamp(LiveSize(imgui, UiSizeId::BackgroundBlurringOverlayColour) / 100.0f, 0.0f, 1.0f);
+        f32x4 const overlay_intensity =
+            Clamp(LiveSize(imgui, UiSizeId::BackgroundBlurringOverlayIntensity) / 100.0f, 0.0f, 1.0f);
+
+        for (auto& pixel : pixels.rgba)
+            pixel = pixel + (overlay_colour - pixel) * overlay_intensity;
+    }
+
+    // Do a pair of blurs with different radii, and blend them together
     {
-        // Blur vertically
-        for (auto const col : Range(width)) {
-            f32x4 avg = 0;
-            for (int i = -radius; i <= radius; ++i) {
-                auto const ptr = out + ((col + Clamp(i, 0, max_row_index) * width) * k_channels);
-                avg += SimdRead4Bytes(ptr);
-            }
+        // 1. Do a subtle blur into a new buffer
+        auto const subtle_blur_pixels = arena.AllocateExactSizeUninitialised<f32x4>(num_pixels).data;
+        auto const subtle_blur_radius =
+            LiveSize(imgui, UiSizeId::BackgroundBlurringBlurringSmall) * ((f32)result.size.width / 700.0f);
+        BoxBlur(pixels.rgba.data,
+                subtle_blur_pixels,
+                result.size.width,
+                result.size.height,
+                (int)subtle_blur_radius);
 
-            auto write_ptr = out + (col * k_channels);
-            auto const col_start_read_ptr = write_ptr;
+        // 2. Do a huge blur into a different buffer
+        auto const huge_blur_pixels = arena.AllocateExactSizeUninitialised<f32x4>(num_pixels).data;
+        auto const huge_blur_radius =
+            LiveSize(imgui, UiSizeId::BackgroundBlurringBlurring) * ((f32)result.size.width / 700.0f);
+        if (!BoxBlur(pixels.rgba.data,
+                     huge_blur_pixels,
+                     result.size.width,
+                     result.size.height,
+                     (int)huge_blur_radius)) {
+            CopyMemory(huge_blur_pixels, pixels.rgba.data, pixels.NumBytes());
+        }
 
-            auto write_checked = [&](int start, int end) {
-                for (int row = start; row < end; ++row) {
-                    SimdWrite4Bytes(avg / box_width, write_ptr);
-                    write_ptr += width_bytes;
-
-                    int const top_row_index = Max(row - radius, 0);
-                    int const bot_row_index = Min(row + radius_p1, max_row_index);
-                    auto const lhs_ptr = col_start_read_ptr + (top_row_index * width_bytes);
-                    auto const rhs_ptr = col_start_read_ptr + (bot_row_index * width_bytes);
-                    avg += SimdRead4Bytes(rhs_ptr) - SimdRead4Bytes(lhs_ptr);
-                }
-            };
-
-            write_checked(0, radius);
-
-            // We don't have to check the edge cases for this middle section - which works out much faster
-            auto top_ptr = col_start_read_ptr;
-            auto bot_ptr = col_start_read_ptr + ((radius + radius_p1) * width_bytes);
-            for (int row = radius; row < height - radius_p1; ++row) {
-                SimdWrite4Bytes(avg / box_width, write_ptr);
-                avg += SimdRead4Bytes(bot_ptr) - SimdRead4Bytes(top_ptr);
-
-                write_ptr += width_bytes;
-                top_ptr += width_bytes;
-                bot_ptr += width_bytes;
-            }
-
-            write_checked(height - radius_p1, height);
+        // 3. Blend the 2 blurs together with a given opacity
+        f32x4 const opacity_of_subtle_blur_on_top_huge_blur =
+            Clamp01(LiveSize(imgui, UiSizeId::BackgroundBlurringBlurringSmallOpacity) / 100.0f);
+        for (auto const pixel_index : Range(num_pixels)) {
+            auto const new_pixel = huge_blur_pixels[pixel_index] +
+                                   (subtle_blur_pixels[pixel_index] - huge_blur_pixels[pixel_index]) *
+                                       opacity_of_subtle_blur_on_top_huge_blur;
+            pixels.rgba[pixel_index] = new_pixel;
         }
     }
+
+    // Convert the f32x4 back to bytes
+    WriteImageF32AsBytes(pixels, result.rgba);
+    return result;
 }
 
-static void SampleLibraryChanged(Gui* g, sample_lib::LibraryIdRef library_id) {
-    auto opt_index =
-        FindIf(g->library_images, [&](LibraryImages const& l) { return l.library_id == library_id; });
-    if (opt_index) {
-        auto& ctx = g->frame_input.graphics_ctx;
-        auto& imgs = g->library_images[*opt_index];
-        imgs.icon_missing = false;
-        imgs.background_missing = false;
-        if (imgs.icon) ctx->DestroyImageID(*imgs.icon);
-        if (imgs.background) ctx->DestroyImageID(*imgs.background);
-        if (imgs.blurred_background) ctx->DestroyImageID(*imgs.blurred_background);
-    }
-}
+static void CreateLibraryBackgroundImageTextures(Gui* g,
+                                                 LibraryImages& imgs,
+                                                 ImagePixelsRgba const& background_image,
+                                                 bool reload_background,
+                                                 bool reload_blurred_background) {
+    ArenaAllocator arena {PageAllocator::Instance()};
 
-void CreateLibraryBackgroundImageTextures(Gui* g,
-                                          LibraryImages& imgs,
-                                          ImagePixelsRgba const& bg_pixels,
-                                          bool reload_background,
-                                          bool reload_blurred_background) {
-    u8* background_rgba = bg_pixels.data;
-    UiSize background_size {bg_pixels.size};
-    constexpr u16 k_channels = 4;
-
-    ArenaAllocator arena(PageAllocator::Instance());
-
-    // If the image is quite a lot larger than we need, resize it down to avoid storing a huge image
-    // on the GPU
-    if (background_size.width > (u16)(g->frame_input.window_size.width * 1.3f)) {
-        auto const desired_width = (int)g->frame_input.window_size.width;
-        auto const desired_height = (int)((f32)background_size.height *
-                                          (g->frame_input.window_size.width / (f32)background_size.width));
-        auto background_buf = arena.AllocateBytesForTypeOversizeAllowed<u8>(
-            (usize)(desired_width * desired_height * k_channels));
-
-        stbir_resize_uint8_linear(background_rgba,
-                                  background_size.width,
-                                  background_size.height,
-                                  0,
-                                  background_buf.data,
-                                  desired_width,
-                                  desired_height,
-                                  0,
-                                  (stbir_pixel_layout)k_channels);
-
-        background_rgba = background_buf.data;
-        background_size = {CheckedCast<u16>(desired_width), CheckedCast<u16>(desired_height)};
-    }
-
-    if (reload_background) {
-        imgs.background =
-            g->frame_input.graphics_ctx->CreateImageID(background_rgba, background_size, k_channels)
-                .OrElse([g](ErrorCode error) {
-                    g->logger.ErrorLn("Failed to create background image texture: {}", error);
-                    return graphics::ImageID {};
-                });
-    }
+    // If the image is quite a lot larger than we need, resize it down to avoid storing a huge image on the
+    // GPU
+    auto const scaled_background = ShrinkImage({.rgba = background_image.data, .size = background_image.size},
+                                               CheckedCast<u16>(g->frame_input.window_size.width * 1.3f),
+                                               g->frame_input.window_size.width,
+                                               arena,
+                                               false);
+    if (reload_background)
+        imgs.background = TryCreateImageOnGpu(*g->frame_input.graphics_ctx, scaled_background);
 
     if (reload_blurred_background) {
-        Stopwatch stopwatch;
-        DEFER { g_log.DebugLn("Blurred image generation took {} ms", stopwatch.MillisecondsElapsed()); };
-
-        auto const original_image_num_bytes = background_size.width * background_size.height * k_channels;
-
-        u8* blurred_image_buffer {};
-        auto blur_img_channels = k_channels;
-        auto blur_img_size = background_size;
-        auto blurred_image_num_bytes = usize(blur_img_size.width * blur_img_size.height * k_channels);
-
-        auto const window_size = g->frame_input.window_size.ToFloat2() * 0.5f;
-        if ((int)window_size.x < background_size.width && (int)window_size.x < background_size.height) {
-            auto const downscale_factor =
-                LiveSize(g->imgui, UiSizeId::BackgroundBlurringDownscaleFactor) / 100.0f;
-            ASSERT(downscale_factor > 0.0f && downscale_factor <= 1.0f);
-
-            blur_img_size = {(u16)(window_size.x * downscale_factor),
-                             (u16)(window_size.y * downscale_factor)};
-            blurred_image_num_bytes = (usize)(blur_img_size.width * blur_img_size.height * k_channels);
-            blurred_image_buffer =
-                arena
-                    .Allocate(
-                        {.size = blurred_image_num_bytes, .alignment = 16, .allow_oversized_result = true})
-                    .data;
-
-            for (auto const byte_index : Range(blurred_image_num_bytes))
-                blurred_image_buffer[byte_index] = 0;
-
-            for (auto const byte_index : Range(background_size.width * background_size.height * k_channels))
-                background_rgba[byte_index] = background_rgba[byte_index];
-
-            stbir_resize_uint8_linear(background_rgba,
-                                      (int)background_size.width,
-                                      (int)background_size.height,
-                                      0,
-                                      blurred_image_buffer,
-                                      blur_img_size.width,
-                                      blur_img_size.height,
-                                      0,
-                                      (stbir_pixel_layout)k_channels);
-
-        } else {
-            blurred_image_buffer =
-                arena
-                    .Allocate(
-                        {.size = blurred_image_num_bytes, .alignment = 16, .allow_oversized_result = true})
-                    .data;
-            CopyMemory(blurred_image_buffer, background_rgba, (usize)original_image_num_bytes);
-        }
-
-        // Make the blurred image a more of a mid-brightness, instead of very light or very dark
-        f32 brightness_percent;
-        f32 brightness_scaling;
-        {
-            u64 brightness {};
-            for (usize i = 0; i < blurred_image_num_bytes; i += k_channels) {
-                brightness += blurred_image_buffer[i + 0];
-                brightness += blurred_image_buffer[i + 1];
-                brightness += blurred_image_buffer[i + 2];
-            }
-            brightness /= (u64)blurred_image_num_bytes;
-            brightness_percent = (f32)brightness / 255.0f;
-            f32 const max_exponent =
-                LiveSize(g->imgui, UiSizeId::BackgroundBlurringBrightnessExponent) / 100.0f;
-            brightness_scaling = Pow(2.0f, MapFrom01(1 - brightness_percent, -max_exponent, max_exponent));
-
-            f32x4 const scaling = brightness_scaling;
-            for (usize i = 0; i < blurred_image_num_bytes; i += k_channels) {
-                alignas(16) u8 pixel_bytes[4];
-
-                {
-                    static f32x4 const max = 255.0f;
-                    auto pixel = SimdRead4Bytes(blurred_image_buffer + i);
-                    pixel = Min(max, pixel * scaling);
-                    SimdWrite4Bytes(pixel, pixel_bytes);
-                }
-
-                blurred_image_buffer[i + 0] = pixel_bytes[0];
-                blurred_image_buffer[i + 1] = pixel_bytes[1];
-                blurred_image_buffer[i + 2] = pixel_bytes[2];
-            }
-        }
-
-        // Blend on top a dark colour to achieve a more consistently dark background
-        {
-            f32x4 const overlay_colour =
-                Clamp(LiveSize(g->imgui, UiSizeId::BackgroundBlurringOverlayColour), 0.0f, 255.0f);
-            f32x4 const overlay_intensity =
-                Clamp(LiveSize(g->imgui, UiSizeId::BackgroundBlurringOverlayIntensity) / 100.0f, 0.0f, 1.0f);
-
-            for (usize i = 0; i < blurred_image_num_bytes; i += k_channels) {
-                alignas(16) u8 pixel_bytes[4];
-                {
-                    auto pixel = SimdRead4Bytes(blurred_image_buffer + i);
-                    pixel = pixel + (overlay_colour - pixel) * overlay_intensity;
-                    SimdWrite4Bytes(pixel, pixel_bytes);
-                }
-                blurred_image_buffer[i + 0] = pixel_bytes[0];
-                blurred_image_buffer[i + 1] = pixel_bytes[1];
-                blurred_image_buffer[i + 2] = pixel_bytes[2];
-            }
-        }
-
-        {
-            // 1. Do a subtle blur into a new buffer
-            auto const subtle_blur_radius =
-                (int)(LiveSize(g->imgui, UiSizeId::BackgroundBlurringBlurringSmall) *
-                      ((f32)blur_img_size.width / 700.0f));
-            auto subtle_blur_buffer = arena.Allocate({.size = blurred_image_num_bytes, .alignment = 16}).data;
-            if (subtle_blur_radius) {
-                BoxBlur(blurred_image_buffer,
-                        subtle_blur_buffer,
-                        blur_img_size.width,
-                        blur_img_size.height,
-                        subtle_blur_radius);
-            } else {
-                CopyMemory(subtle_blur_buffer, blurred_image_buffer, blurred_image_num_bytes);
-            }
-
-            // 2. Do a huge blur into a different buffer
-            auto huge_blur_buffer = arena.Allocate({.size = blurred_image_num_bytes, .alignment = 16}).data;
-            auto const huge_blur_radius = LiveSize(g->imgui, UiSizeId::BackgroundBlurringBlurring) *
-                                          ((f32)blur_img_size.width / 700.0f);
-            BoxBlur(blurred_image_buffer,
-                    huge_blur_buffer,
-                    blur_img_size.width,
-                    blur_img_size.height,
-                    (int)huge_blur_radius);
-
-            // 3. Blend the 2 blurs together with a given opacity
-            auto const opacity_of_subtle_blur_on_top_huge_blur =
-                LiveSize(g->imgui, UiSizeId::BackgroundBlurringBlurringSmallOpacity) / 100.0f;
-
-            for (usize i = 0; i < blurred_image_num_bytes; i += k_channels) {
-                alignas(16) u8 pixel_bytes[4];
-
-                {
-                    auto const subtle_blur_pixel = SimdRead4Bytes(subtle_blur_buffer + i);
-                    auto const huge_blur_pixel = SimdRead4Bytes(huge_blur_buffer + i);
-                    f32x4 const pixel = huge_blur_pixel + (subtle_blur_pixel - huge_blur_pixel) *
-                                                              opacity_of_subtle_blur_on_top_huge_blur;
-                    SimdWrite4Bytes(pixel, pixel_bytes);
-                }
-
-                blurred_image_buffer[i + 0] = pixel_bytes[0];
-                blurred_image_buffer[i + 1] = pixel_bytes[1];
-                blurred_image_buffer[i + 2] = pixel_bytes[2];
-            }
-        }
-
         imgs.blurred_background =
-            g->frame_input.graphics_ctx->CreateImageID(blurred_image_buffer, blur_img_size, blur_img_channels)
-                .OrElse([g](ErrorCode error) {
-                    g->logger.ErrorLn("Failed to create blurred background texture: {}", error);
-                    return graphics::ImageID {};
-                });
+            TryCreateImageOnGpu(*g->frame_input.graphics_ctx,
+                                CreateBlurredBackground(g->imgui, scaled_background, arena));
     }
 }
 
@@ -518,6 +498,14 @@ static LibraryImages LoadDefaultLibraryImagesIfNeeded(Gui* g) {
         opt_index = g->library_images.size - 1;
     }
     auto& images = g->library_images[*opt_index];
+
+    static TimePoint last_time = TimePoint::Now();
+    auto const now = TimePoint::Now();
+    if ((now - last_time) > 0.5) {
+        last_time = now;
+        if (images.background) ctx->DestroyImageID(*images.background);
+        if (images.blurred_background) ctx->DestroyImageID(*images.blurred_background);
+    }
 
     auto const reload_background = !ctx->ImageIdIsValid(images.background) && !images.background_missing;
     auto const reload_blurred_background =
@@ -549,6 +537,14 @@ static LibraryImages LoadLibraryImagesIfNeeded(Gui* g, sample_lib::Library const
         opt_index = g->library_images.size - 1;
     }
     auto& imgs = g->library_images[*opt_index];
+
+    static TimePoint last_time = TimePoint::Now();
+    auto const now = TimePoint::Now();
+    if ((now - last_time) > 0.5) {
+        last_time = now;
+        if (imgs.background) ctx->DestroyImageID(*imgs.background);
+        if (imgs.blurred_background) ctx->DestroyImageID(*imgs.blurred_background);
+    }
 
     auto const reload_icon = !ctx->ImageIdIsValid(imgs.icon) && !imgs.icon_missing;
     auto const reload_background = !ctx->ImageIdIsValid(imgs.background) && !imgs.background_missing;
@@ -591,6 +587,20 @@ Optional<LibraryImages> LibraryImagesFromLibraryId(Gui* g, sample_lib::LibraryId
     if (!background_lib) return nullopt;
 
     return LoadLibraryImagesIfNeeded(g, *background_lib);
+}
+
+static void SampleLibraryChanged(Gui* g, sample_lib::LibraryIdRef library_id) {
+    auto opt_index =
+        FindIf(g->library_images, [&](LibraryImages const& l) { return l.library_id == library_id; });
+    if (opt_index) {
+        auto& ctx = g->frame_input.graphics_ctx;
+        auto& imgs = g->library_images[*opt_index];
+        imgs.icon_missing = false;
+        imgs.background_missing = false;
+        if (imgs.icon) ctx->DestroyImageID(*imgs.icon);
+        if (imgs.background) ctx->DestroyImageID(*imgs.background);
+        if (imgs.blurred_background) ctx->DestroyImageID(*imgs.blurred_background);
+    }
 }
 
 static void CreateFontsIfNeeded(Gui* g) {

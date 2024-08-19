@@ -223,7 +223,7 @@ struct OpenGLDrawContext : public DrawContext {
         return k_success;
     }
 
-    ErrorCodeOr<TextureHandle> CreateTexture(unsigned char* data, UiSize size, u16 bytes_per_pixel) override {
+    ErrorCodeOr<TextureHandle> CreateTexture(u8 const* data, UiSize size, u16 bytes_per_pixel) override {
         ZoneScoped;
         g_log.TraceLn();
         // Upload texture to graphics system
@@ -237,34 +237,26 @@ struct OpenGLDrawContext : public DrawContext {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         GLenum format = (bytes_per_pixel == 3) ? GL_RGB : GL_RGBA;
 
-        unsigned char* data_result = data;
+        // unsigned char* data_result = data;
+        //
+        // // I have no idea why I have to do this... without doing this it seems to work 90% of the time but
+        // // then some images that have 3 channels do not show correctly...
+        // if (bytes_per_pixel == 3) {
+        //     data_result = new unsigned char[size.width * size.height * 4];
+        //     int in_i = 0;
+        //     for (int i = 0; i < size.width * size.height * 4; i += 4) {
+        //         data_result[i + 0] = data[in_i + 0];
+        //         data_result[i + 1] = data[in_i + 1];
+        //         data_result[i + 2] = data[in_i + 2];
+        //         data_result[i + 3] = 255;
+        //         in_i += 3;
+        //     }
+        //     format = GL_RGBA;
+        // }
 
-        // I have no idea why I have to do this... without doing this it seems to work 90% of the time but
-        // then some images that have 3 channels do not show correctly...
-        if (bytes_per_pixel == 3) {
-            data_result = new unsigned char[size.width * size.height * 4];
-            int in_i = 0;
-            for (int i = 0; i < size.width * size.height * 4; i += 4) {
-                data_result[i + 0] = data[in_i + 0];
-                data_result[i + 1] = data[in_i + 1];
-                data_result[i + 2] = data[in_i + 2];
-                data_result[i + 3] = 255;
-                in_i += 3;
-            }
-            format = GL_RGBA;
-        }
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, size.width, size.height, 0, format, GL_UNSIGNED_BYTE, data);
 
-        glTexImage2D(GL_TEXTURE_2D,
-                     0,
-                     GL_RGBA,
-                     size.width,
-                     size.height,
-                     0,
-                     format,
-                     GL_UNSIGNED_BYTE,
-                     data_result);
-
-        if (bytes_per_pixel == 3) delete[] data_result;
+        // if (bytes_per_pixel == 3) delete[] data_result;
 
         if (auto error = glGetError(); error != GL_NO_ERROR)
             return ErrorCode(k_gl_error_category, (s64)error);

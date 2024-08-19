@@ -183,24 +183,27 @@ struct BlurAxisArgs {
     int line_stride;
     int element_stride;
     int num_lines;
-    int line_size;
+    int num_elements;
 };
 static inline void BlurAxis(BlurAxisArgs args) {
     auto const radius_p1 = args.radius + 1;
-    auto const largest_line_index = args.line_size - 1;
-    auto const rhs_edge_begin_index = args.line_size - radius_p1;
+    auto const last_element_index = args.num_elements - 1;
+    auto const rhs_edge_element_index = args.num_elements - radius_p1;
     for (auto const line_number : Range(args.num_lines)) {
-        auto const line_start_index = line_number * args.line_stride;
+        auto const line_data_offset = line_number * args.line_stride;
+        auto data_index = [&](int element_index) ALWAYS_INLINE {
+            return line_data_offset + element_index * args.element_stride;
+        };
 
         f32x4 avg = 0;
-        {
-            // calculate the initial average so that we can do a moving average from here onwards
-            for (int i = -args.radius; i <= args.radius; ++i)
-                avg += args.in[line_start_index + Clamp(i, 0, largest_line_index)];
-        }
 
-        auto write_ptr = args.out + line_start_index;
-        auto const line_start_read_ptr = args.in + line_start_index;
+        // TODO: review the begin/end of the loops, are they correct?
+
+        // calculate the initial average so that we can do a moving average from here onwards
+        for (int element_index = -args.radius; element_index < radius_p1; ++element_index)
+            avg += args.in[data_index(Clamp(element_index, 0, last_element_index))];
+
+        auto write_ptr = args.out + data_index(0);
 
         // So as to avoid doing the Min/Max check for the edges, we break the loop into 3 sections, where
         // the presumably largest middle section does not have to use the checks.
@@ -211,30 +214,29 @@ static inline void BlurAxis(BlurAxisArgs args) {
                 *write_ptr = Clamp01<f32x4>(avg / args.box_size);
                 write_ptr += args.element_stride;
 
-                auto const lhs_ptr =
-                    line_start_read_ptr + Max(element_index - args.radius, 0) * args.element_stride;
-                auto const rhs_ptr = line_start_read_ptr +
-                                     Min(element_index + radius_p1, largest_line_index) * args.element_stride;
-                avg += *rhs_ptr - *lhs_ptr;
+                auto const lhs = args.in[data_index(Max(element_index - args.radius, 0))];
+                auto const rhs = args.in[data_index(Min(element_index + radius_p1, last_element_index))];
+                avg += lhs - rhs;
             }
         };
 
-        write_checked(0, args.radius);
+        write_checked(0, radius_p1);
 
         // write_unchecked:
         // We don't have to check the edge cases for this middle section - which works out much faster
-        auto lhs_ptr = line_start_read_ptr;
-        auto rhs_ptr = line_start_read_ptr + args.radius + radius_p1;
-        for (int element_index = args.radius; element_index < rhs_edge_begin_index; ++element_index) {
+        auto lhs_ptr = args.in + data_index(0);
+        auto rhs_ptr = args.in + data_index(args.radius + radius_p1);
+        for (int element_index = radius_p1; element_index < rhs_edge_element_index; ++element_index) {
             ASSERT(write_ptr >= args.out && write_ptr < args.out + args.data_size);
             *write_ptr = Clamp01<f32x4>(avg / args.box_size);
             write_ptr += args.element_stride;
+
             avg += *rhs_ptr - *lhs_ptr;
             lhs_ptr += args.element_stride;
             rhs_ptr += args.element_stride;
         }
 
-        write_checked(rhs_edge_begin_index, args.line_size);
+        write_checked(rhs_edge_element_index, args.num_elements);
     }
 }
 
@@ -259,20 +261,20 @@ static bool BoxBlur(f32x4 const* in, f32x4* out, int width, int height, int radi
         .box_size = (f32)(radius * 2 + 1),
     };
 
-    // horizontal blur, a 'line' is a row
-    args.num_lines = height;
-    args.line_size = width;
-    args.line_stride = width;
-    args.element_stride = 1;
+    // vertical blur, a 'line' is a column
+    args.num_lines = width;
+    args.num_elements = height;
+    args.line_stride = 1;
+    args.element_stride = width;
     BlurAxis(args);
 
     args.in = out;
 
-    // vertical blur, a 'line' is a column
-    args.num_lines = width;
-    args.line_size = height;
-    args.line_stride = 1;
-    args.element_stride = width;
+    // horizontal blur, a 'line' is a row
+    args.num_lines = height;
+    args.num_elements = width;
+    args.line_stride = width;
+    args.element_stride = 1;
     BlurAxis(args);
 
     return true;
@@ -444,7 +446,8 @@ CreateBlurredBackground(imgui::Context const& imgui, ImageBytes const image, Are
             auto const new_pixel = huge_blur_pixels[pixel_index] +
                                    (subtle_blur_pixels[pixel_index] - huge_blur_pixels[pixel_index]) *
                                        opacity_of_subtle_blur_on_top_huge_blur;
-            pixels.rgba[pixel_index] = new_pixel;
+            (void)new_pixel;
+            pixels.rgba[pixel_index] = huge_blur_pixels[pixel_index];
         }
     }
 

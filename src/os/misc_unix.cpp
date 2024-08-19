@@ -254,6 +254,7 @@ static void SignalHandler(int signal_num, siginfo_t* info, void* context) {
             write(fd, signal_string.data, signal_string.size);
             write(fd, "\n", 1);
 
+            // TODO: test how the FixedSizeAllocator behaves when it's out of memory
             FixedSizeAllocator<3000> local_buffer {nullptr};
             auto const stack_trace = CurrentStacktraceString(local_buffer);
             write(fd, stack_trace.data, stack_trace.size);
@@ -283,6 +284,7 @@ static void SignalHandler(int signal_num, siginfo_t* info, void* context) {
             if (possibly_ubsan_error) DumpInfoAboutUBSanToStderr();
         }
 
+        // TODO: probably need a custom implementation to ensure we only use signal-safe functions
         DumpCurrentStackTraceToStderr();
 
         for (auto [index, s] : Enumerate(k_signals)) {

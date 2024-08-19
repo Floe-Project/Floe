@@ -234,6 +234,7 @@ struct Allocator {
             .alignment = alignment,
             .allow_oversized_result = cmd.allow_oversize_result,
         });
+        if (!new_allocation.size) return {};
         if (cmd.move_memory_handler.function)
             cmd.move_memory_handler.function({.context = cmd.move_memory_handler.context,
                                               .destination = new_allocation.data,

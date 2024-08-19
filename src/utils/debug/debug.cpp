@@ -417,7 +417,7 @@ MutableString CurrentStacktraceString(Allocator& a, StacktraceOptions options, i
 }
 
 void DumpCurrentStackTraceToStderr(int skip_frames) {
-    FixedSizeAllocator<2000> scratch_arena {nullptr};
+    ArenaAllocatorWithInlineStorage<8000> scratch_arena {};
     auto _ = StdPrint(StdStream::Err,
                       CurrentStacktraceString(scratch_arena,
                                               {

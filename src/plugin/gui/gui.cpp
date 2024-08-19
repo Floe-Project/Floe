@@ -58,12 +58,6 @@ static ErrorCodeOr<ImagePixelsRgba> DecodeJpgOrPng(Span<u8 const> image_data) {
     result.size = {CheckedCast<u16>(width), CheckedCast<u16>(height)};
     result.free_data = [](u8* data) { stbi_image_free(data); };
 
-#if _WIN32
-    if (auto f = result.data; f)
-        for (int i = 0; i < width * height * 4; i += 4)
-            Swap(f[i + 0], f[i + 2]); // swap r and b
-#endif
-
     return result;
 }
 
@@ -186,16 +180,17 @@ struct BlurAxisArgs {
     usize data_size;
     int radius;
     f32x4 box_size;
-    int gap_between_lines;
-    int gap_between_elements;
+    int line_stride;
+    int element_stride;
     int num_lines;
     int line_size;
 };
 static inline void BlurAxis(BlurAxisArgs args) {
     auto const radius_p1 = args.radius + 1;
     auto const largest_line_index = args.line_size - 1;
+    auto const rhs_edge_begin_index = args.line_size - radius_p1;
     for (auto const line_number : Range(args.num_lines)) {
-        auto const line_start_index = line_number * args.gap_between_lines;
+        auto const line_start_index = line_number * args.line_stride;
 
         f32x4 avg = 0;
         {
@@ -214,15 +209,12 @@ static inline void BlurAxis(BlurAxisArgs args) {
             for (int element_index = start; element_index < end; ++element_index) {
                 ASSERT(write_ptr >= args.out && write_ptr < args.out + args.data_size);
                 *write_ptr = Clamp01<f32x4>(avg / args.box_size);
-                write_ptr += args.gap_between_elements;
+                write_ptr += args.element_stride;
 
                 auto const lhs_ptr =
-                    line_start_read_ptr + Max(element_index - args.radius, 0) * args.gap_between_elements;
-                auto const rhs_ptr =
-                    line_start_read_ptr +
-                    Min(element_index + radius_p1, largest_line_index) * args.gap_between_elements;
-                ASSERT(All(*lhs_ptr >= 0.0f && *lhs_ptr <= 1.0f));
-                ASSERT(All(*rhs_ptr >= 0.0f && *rhs_ptr <= 1.0f));
+                    line_start_read_ptr + Max(element_index - args.radius, 0) * args.element_stride;
+                auto const rhs_ptr = line_start_read_ptr +
+                                     Min(element_index + radius_p1, largest_line_index) * args.element_stride;
                 avg += *rhs_ptr - *lhs_ptr;
             }
         };
@@ -233,25 +225,22 @@ static inline void BlurAxis(BlurAxisArgs args) {
         // We don't have to check the edge cases for this middle section - which works out much faster
         auto lhs_ptr = line_start_read_ptr;
         auto rhs_ptr = line_start_read_ptr + args.radius + radius_p1;
-        for (int element_index = args.radius; element_index < args.line_size - radius_p1; ++element_index) {
+        for (int element_index = args.radius; element_index < rhs_edge_begin_index; ++element_index) {
             ASSERT(write_ptr >= args.out && write_ptr < args.out + args.data_size);
             *write_ptr = Clamp01<f32x4>(avg / args.box_size);
-            write_ptr += args.gap_between_elements;
+            write_ptr += args.element_stride;
             avg += *rhs_ptr - *lhs_ptr;
-            lhs_ptr += args.gap_between_elements;
-            rhs_ptr += args.gap_between_elements;
+            lhs_ptr += args.element_stride;
+            rhs_ptr += args.element_stride;
         }
 
-        write_checked(args.line_size - radius_p1, args.line_size);
+        write_checked(rhs_edge_begin_index, args.line_size);
     }
 }
 
 static bool BoxBlur(f32x4 const* in, f32x4* out, int width, int height, int radius) {
     radius = Min(radius, width / 2, height / 2);
     if (radius <= 0) return false;
-
-    for (auto const pixel_index : Range(width * height))
-        out[pixel_index] = in[pixel_index];
 
     Stopwatch stopwatch;
     DEFER {
@@ -270,20 +259,20 @@ static bool BoxBlur(f32x4 const* in, f32x4* out, int width, int height, int radi
         .box_size = (f32)(radius * 2 + 1),
     };
 
-    // vertical blur, a 'line' is a column
-    args.num_lines = width;
-    args.line_size = height;
-    args.gap_between_lines = 1;
-    args.gap_between_elements = width;
+    // horizontal blur, a 'line' is a row
+    args.num_lines = height;
+    args.line_size = width;
+    args.line_stride = width;
+    args.element_stride = 1;
     BlurAxis(args);
 
     args.in = out;
 
-    // horizontal blur, a 'line' is a row
-    args.num_lines = height;
-    args.line_size = width;
-    args.gap_between_lines = width;
-    args.gap_between_elements = 1;
+    // vertical blur, a 'line' is a column
+    args.num_lines = width;
+    args.line_size = height;
+    args.line_stride = 1;
+    args.element_stride = width;
     BlurAxis(args);
 
     return true;
@@ -393,7 +382,7 @@ CreateBlurredBackground(imgui::Context const& imgui, ImageBytes const image, Are
     auto const pixels = CreateImageF32(result, arena);
 
     // Make the blurred image more of a mid-brightness, instead of very light or very dark
-    if constexpr (0) {
+    {
         f32x4 brightness_sum {};
 
         for (auto const& pixel : pixels.rgba)
@@ -414,7 +403,7 @@ CreateBlurredBackground(imgui::Context const& imgui, ImageBytes const image, Are
     }
 
     // Blend on top a dark colour to achieve a more consistently dark background
-    if constexpr (0) {
+    {
         f32x4 const overlay_colour =
             Clamp(LiveSize(imgui, UiSizeId::BackgroundBlurringOverlayColour) / 100.0f, 0.0f, 1.0f);
         f32x4 const overlay_intensity =

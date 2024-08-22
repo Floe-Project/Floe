@@ -11,6 +11,7 @@
 #include "utils/json/json_writer.hpp"
 #include "utils/leak_detecting_allocator.hpp"
 #include "utils/thread_extra/atomic_queue.hpp"
+#include "utils/thread_extra/atomic_swap_buffer.hpp"
 
 struct StartingGun {
     void WaitUntilFired() {
@@ -86,6 +87,43 @@ TEST_CASE(TestErrorNotifications) {
 
     for (auto& p : producers)
         p.Join();
+
+    return k_success;
+}
+
+TEST_CASE(TestAtomicSwapBuffer) {
+    AtomicSwapBuffer<int> buffer;
+
+    Thread producer;
+    Thread consumer;
+    StartingGun starting_gun;
+    Atomic<u32> threads_ready {0};
+    producer.Start(
+        [&]() {
+            threads_ready.FetchAdd(1, RmwMemoryOrder::AcquireRelease);
+            starting_gun.WaitUntilFired();
+            for (auto const value : Range<int>(10000)) {
+                auto& data = buffer.Write();
+                data = value;
+                buffer.Publish();
+            }
+        },
+        "Producer");
+    consumer.Start(
+        [&]() {
+            threads_ready.FetchAdd(1, RmwMemoryOrder::AcquireRelease);
+            starting_gun.WaitUntilFired();
+            for (auto const _ : Range<int>(10000))
+                buffer.Consume();
+        },
+        "Consumer");
+
+    while (threads_ready.Load(LoadMemoryOrder::Relaxed) != 2)
+        YieldThisThread();
+
+    starting_gun.Fire();
+    producer.Join();
+    consumer.Join();
 
     return k_success;
 }
@@ -1092,4 +1130,5 @@ TEST_REGISTRATION(RegisterUtilsTests) {
     REGISTER_TEST(TestAtomicQueue);
     REGISTER_TEST(TestErrorNotifications);
     REGISTER_TEST(TestAtomicRefList);
+    REGISTER_TEST(TestAtomicSwapBuffer);
 }

@@ -204,18 +204,12 @@ struct AtomicQueue {
         return entries_to_pop;
     }
 
-    static constexpr usize k_cache_line_size = k_arch == Arch::Aarch64 ? 128 : 64;
-
-    // The logic behind the alignas(k_cache_line_size) is that it may reduce the chances of atomic contention
-    // having to flush the cache line of the other pointers. This is honestly just copied from freebsd
-    // ring_buf.h: it's a speculative optimisation that I haven't tested.
-
-    struct alignas(k_cache_line_size) {
+    struct alignas(k_destructive_interference_size) {
         Conditional<k_num_producers == NumProducers::One, u32 volatile, Atomic<u32>> head {0};
         Atomic<u32> tail {0};
     } producer;
 
-    struct alignas(k_cache_line_size) {
+    struct alignas(k_destructive_interference_size) {
         Conditional<k_num_consumers == NumConsumers::One, u32 volatile, Atomic<u32>> head {0};
         Atomic<u32> tail {0};
     } consumer;

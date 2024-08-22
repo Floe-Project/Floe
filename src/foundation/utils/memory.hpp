@@ -48,6 +48,18 @@ PUBLIC inline bool MemoryIsEqual(void const* a, void const* b, usize num_bytes) 
 
 static constexpr usize k_max_alignment = sizeof(void*) * 2;
 
+// Minimum offset between two objects to avoid false sharing
+// https://en.cppreference.com/w/cpp/thread/hardware_destructive_interference_size
+// https://en.wikipedia.org/wiki/False_sharing
+// The cppreference page suggests that, in certain cases, separating data accessed by multiple threads
+// by this value can speed up things by 6x. FreeBSD's buf_ring.h uses this technique.
+static constexpr usize k_destructive_interference_size = []() {
+    switch (k_arch) {
+        case Arch::X86_64: return 64;
+        case Arch::Aarch64: return 128; // apple's M1 has 128 byte cache lines
+    }
+}();
+
 PUBLIC constexpr bool IsPowerOfTwo(usize v) { return !(v & (v - 1)); }
 PUBLIC constexpr usize Power2Modulo(usize x, usize y) { return x & (y - 1); }
 // https://graphics.stanford.edu/%7Eseander/bithacks.html#RoundUpPowerOf2

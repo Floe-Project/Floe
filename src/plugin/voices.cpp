@@ -463,35 +463,27 @@ class ChunkwiseVoiceProcessor {
             num_frames -= chunk_size;
             m_frame_index += chunk_size;
 
-            m_voice.pool.voice_waveform_markers_for_gui[m_voice.index].Store(
-                {
-                    .layer_index = (u8)m_voice.controller->layer_index,
-                    .position = (u16)(Clamp01(m_position_for_gui) * (f32)UINT16_MAX),
-                    .intensity = (u16)(Clamp01(m_voice.current_gain) * (f32)UINT16_MAX),
-                },
-                StoreMemoryOrder::Relaxed);
-            m_voice.pool.voice_vol_env_markers_for_gui[m_voice.index].Store(
-                {
-                    .on = m_voice.controller->vol_env_on && !m_voice.vol_env.IsIdle(),
-                    .layer_index = (u8)m_voice.controller->layer_index,
-                    .state = (u8)m_voice.vol_env.state,
-                    .pos = (u16)(Clamp01(m_voice.vol_env.output) * (f32)UINT16_MAX),
-                    .sustain_level =
-                        (u16)(Clamp01(m_voice.controller->vol_env.sustain_amount) * (f32)UINT16_MAX),
-                    .id = m_voice.id,
-                },
-                StoreMemoryOrder::Relaxed);
-            m_voice.pool.voice_fil_env_markers_for_gui[m_voice.index].Store(
-                {
-                    .on = m_voice.controller->fil_env_amount != 0 && !m_voice.fil_env.IsIdle(),
-                    .layer_index = (u8)m_voice.controller->layer_index,
-                    .state = (u8)m_voice.fil_env.state,
-                    .pos = (u16)(Clamp01(m_voice.fil_env.output) * (f32)UINT16_MAX),
-                    .sustain_level =
-                        (u16)(Clamp01(m_voice.controller->fil_env.sustain_amount) * (f32)UINT16_MAX),
-                    .id = m_voice.id,
-                },
-                StoreMemoryOrder::Relaxed);
+            m_voice.pool.voice_waveform_markers_for_gui.Write()[m_voice.index] = {
+                .layer_index = (u8)m_voice.controller->layer_index,
+                .position = (u16)(Clamp01(m_position_for_gui) * (f32)UINT16_MAX),
+                .intensity = (u16)(Clamp01(m_voice.current_gain) * (f32)UINT16_MAX),
+            };
+            m_voice.pool.voice_vol_env_markers_for_gui.Write()[m_voice.index] = {
+                .on = m_voice.controller->vol_env_on && !m_voice.vol_env.IsIdle(),
+                .layer_index = (u8)m_voice.controller->layer_index,
+                .state = (u8)m_voice.vol_env.state,
+                .pos = (u16)(Clamp01(m_voice.vol_env.output) * (f32)UINT16_MAX),
+                .sustain_level = (u16)(Clamp01(m_voice.controller->vol_env.sustain_amount) * (f32)UINT16_MAX),
+                .id = m_voice.id,
+            };
+            m_voice.pool.voice_fil_env_markers_for_gui.Write()[m_voice.index] = {
+                .on = m_voice.controller->fil_env_amount != 0 && !m_voice.fil_env.IsIdle(),
+                .layer_index = (u8)m_voice.controller->layer_index,
+                .state = (u8)m_voice.fil_env.state,
+                .pos = (u16)(Clamp01(m_voice.fil_env.output) * (f32)UINT16_MAX),
+                .sustain_level = (u16)(Clamp01(m_voice.controller->fil_env.sustain_amount) * (f32)UINT16_MAX),
+                .id = m_voice.id,
+            };
 
             m_voice.current_gain = 1;
         }
@@ -985,11 +977,15 @@ Array<Span<f32>, k_num_layers> ProcessVoices(VoicePool& pool,
                                      (usize)num_frames * 2);
             }
         } else {
-            pool.voice_waveform_markers_for_gui[v.index].Store({}, StoreMemoryOrder::Relaxed);
-            pool.voice_vol_env_markers_for_gui[v.index].Store({}, StoreMemoryOrder::Relaxed);
-            pool.voice_fil_env_markers_for_gui[v.index].Store({}, StoreMemoryOrder::Relaxed);
+            pool.voice_waveform_markers_for_gui.Write()[v.index] = {};
+            pool.voice_vol_env_markers_for_gui.Write()[v.index] = {};
+            pool.voice_fil_env_markers_for_gui.Write()[v.index] = {};
         }
     }
+
+    pool.voice_waveform_markers_for_gui.Publish();
+    pool.voice_vol_env_markers_for_gui.Publish();
+    pool.voice_fil_env_markers_for_gui.Publish();
 
     return layer_buffers;
 }

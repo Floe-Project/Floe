@@ -4,6 +4,7 @@
 #pragma once
 #include "foundation/foundation.hpp"
 #include "os/threading.hpp"
+#include "utils/thread_extra/atomic_swap_buffer.hpp"
 
 #include "audio_processing_context.hpp"
 #include "common/constants.hpp"
@@ -201,9 +202,9 @@ struct VoicePool {
     Array<Span<f32>, k_num_voices> buffer_pool {};
 
     // TODO(1.0): hide waveform markers for Waveform instruments, only show them for sampled instrument
-    Array<Atomic<VoiceWaveformMarkerForGui>, k_num_voices> voice_waveform_markers_for_gui {};
-    Array<Atomic<VoiceEnvelopeMarkerForGui>, k_num_voices> voice_vol_env_markers_for_gui {};
-    Array<Atomic<VoiceEnvelopeMarkerForGui>, k_num_voices> voice_fil_env_markers_for_gui {};
+    AtomicSwapBuffer<Array<VoiceWaveformMarkerForGui, k_num_voices>, true> voice_waveform_markers_for_gui {};
+    AtomicSwapBuffer<Array<VoiceEnvelopeMarkerForGui, k_num_voices>, true> voice_vol_env_markers_for_gui {};
+    AtomicSwapBuffer<Array<VoiceEnvelopeMarkerForGui, k_num_voices>, true> voice_fil_env_markers_for_gui {};
     Array<Atomic<s16>, 128> voices_per_midi_note_for_gui {};
 
     unsigned int random_seed = FastRandSeedFromTime();

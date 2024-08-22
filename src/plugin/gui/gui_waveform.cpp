@@ -474,9 +474,10 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
 
     // cursors
     if (plugin.processor.voice_pool.num_active_voices.Load(LoadMemoryOrder::Relaxed)) {
+        auto& voice_waveform_markers =
+            plugin.processor.voice_pool.voice_waveform_markers_for_gui.Consume().data;
         for (auto const voice_index : Range(k_num_voices)) {
-            auto const marker = plugin.processor.voice_pool.voice_waveform_markers_for_gui[voice_index].Load(
-                LoadMemoryOrder::Relaxed);
+            auto const marker = voice_waveform_markers[voice_index];
             if (!marker.intensity || marker.layer_index != layer->index) continue;
 
             f32 position = (f32)marker.position / (f32)UINT16_MAX;

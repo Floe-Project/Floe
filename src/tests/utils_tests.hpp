@@ -92,7 +92,7 @@ TEST_CASE(TestErrorNotifications) {
 }
 
 TEST_CASE(TestAtomicSwapBuffer) {
-    AtomicSwapBuffer<int> buffer;
+    AtomicSwapBuffer<int, true> buffer;
 
     Thread producer;
     Thread consumer;

@@ -6,9 +6,14 @@
 // Lock-free triple buffer with atomic swap. Single producer, single consumer. Producer thread writes and
 // publishes when it's done. Consumer thread can safely read blocks of data that are published.
 // Super fast and simple but uses 3x the memory.
+//
+// If there is likely to be lots of contention, you might want to enable k_protect_alignment, which will align
+// the buffers to avoid false sharing, however, this increases the size of this struct even more, to at
+// minimum 384 bytes.
+//
 // https://github.com/brilliantsugar/trio
 // https://github.com/HadrienG2/triple-buffer
-template <TriviallyCopyable Type>
+template <TriviallyCopyable Type, bool k_false_sharing_protection>
 struct AtomicSwapBuffer {
     // producer thread
     Type& Write() { return buffers[back_buffer_index].data; }
@@ -23,31 +28,46 @@ struct AtomicSwapBuffer {
         back_buffer_index = old_middle_state & k_dirty_mask;
     }
 
+    // producer thread
+    void WriteAndPublish(Type const& data) {
+        Write() = data;
+        Publish();
+    }
+
+    struct ConsumeResult {
+        Type const& data;
+        bool changed;
+    };
+
     // consumer thread
     // we could return a bool to indicate if the buffer was dirty, but we don't need it for now
-    Type const& Consume() {
+    ConsumeResult Consume() {
         // if it's not dirty, we don't swap anything, just return the front
         if (!(middle_buffer_state.Load(LoadMemoryOrder::Relaxed) & k_dirty_bit))
-            return buffers[front_buffer_index].data;
+            return {buffers[front_buffer_index].data, false};
 
         // if it's dirty, we swap the middle with the front (with no dirty bit)
         auto const prev = middle_buffer_state.Exchange(front_buffer_index, RmwMemoryOrder::AcquireRelease);
         front_buffer_index = prev & k_dirty_mask;
-        return buffers[front_buffer_index].data;
+        return {buffers[front_buffer_index].data, true};
     }
 
     static constexpr u32 k_dirty_bit = 1u << 31;
     static constexpr u32 k_dirty_mask = ~k_dirty_bit;
 
+    // C++ spec says alignas(0) is always ignored
+    static constexpr usize k_alignment = k_false_sharing_protection ? k_destructive_interference_size : 0;
+
     struct Buffer {
-        alignas(k_destructive_interference_size) Type data;
+        alignas(k_alignment) Type data;
     };
     Buffer buffers[3];
 
-    // producer only
-    alignas(k_destructive_interference_size) u32 back_buffer_index {0};
     // producer and consumer, contains both index and dirty bit
-    alignas(k_destructive_interference_size) Atomic<u32> middle_buffer_state {1};
+    alignas(k_alignment) Atomic<u32> middle_buffer_state {1};
+
+    // producer only
+    alignas(k_alignment) u32 back_buffer_index {0};
     // consumer
-    alignas(k_destructive_interference_size) u32 front_buffer_index {2};
+    alignas(k_alignment) u32 front_buffer_index {2};
 };

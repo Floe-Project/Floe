@@ -92,7 +92,7 @@ class ConvolutionReverb final : public Effect {
     bool SwapConvolversIfNeeded() {
         ZoneScoped;
         auto new_convolver = m_desired_convolver.Exchange((StereoConvolver*)k_desired_convolver_consumed,
-                                                          RmwMemoryOrder::Relaxed);
+                                                          RmwMemoryOrder::Acquire);
         if ((uintptr)new_convolver == k_desired_convolver_consumed) return false;
 
         auto old_convolver = Exchange(m_convolver, new_convolver);

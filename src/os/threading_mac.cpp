@@ -18,9 +18,9 @@
 //
 // [ulock.h]: https://github.com/apple/darwin-xnu/blob/master/bsd/sys/ulock.h
 // [sys_ulock.c]: https://github.com/apple/darwin-xnu/blob/master/bsd/kern/sys_ulock.c
-// NOLINTNEXTLINE(readability-identifier-naming)
+// NOLINTNEXTLINE(readability-identifier-naming, bugprone-reserved-identifier)
 extern "C" int __ulock_wait(uint32_t operation, void* addr, uint64_t value, uint32_t timeout_microseconds);
-// NOLINTNEXTLINE(readability-identifier-naming)
+// NOLINTNEXTLINE(readability-identifier-naming, bugprone-reserved-identifier)
 extern "C" int __ulock_wake(uint32_t operation, void* addr, uint64_t wake_value);
 #define UL_COMPARE_AND_WAIT 1
 #define ULF_WAKE_ALL        0x00000100

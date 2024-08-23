@@ -1,3 +1,6 @@
+// Copyright 2018-2024 Sam Windell
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #pragma once
 
 #include <foundation/foundation.hpp>
@@ -7,13 +10,13 @@
 // publishes when it's done. Consumer thread can safely read blocks of data that are published.
 // Super fast and simple but uses 3x the memory.
 //
-// If there is likely to be lots of contention, you might want to enable k_protect_alignment, which will align
-// the buffers to avoid false sharing, however, this increases the size of this struct even more, to at
-// minimum 384 bytes.
+// If there is likely to be lots of contention, you might want to enable k_avoid_cacheline_contention, which
+// will align the buffers to avoid false sharing. However, this increases the size of this struct even more:
+// it will be at least 384 bytes.
 //
 // https://github.com/brilliantsugar/trio
 // https://github.com/HadrienG2/triple-buffer
-template <TriviallyCopyable Type, bool k_false_sharing_protection>
+template <TriviallyCopyable Type, bool k_avoid_cacheline_contention>
 struct AtomicSwapBuffer {
     // producer thread
     Type& Write() { return buffers[back_buffer_index].data; }
@@ -56,7 +59,7 @@ struct AtomicSwapBuffer {
     static constexpr u32 k_dirty_mask = ~k_dirty_bit;
 
     // C++ spec says alignas(0) is always ignored
-    static constexpr usize k_alignment = k_false_sharing_protection ? k_destructive_interference_size : 0;
+    static constexpr usize k_alignment = k_avoid_cacheline_contention ? k_destructive_interference_size : 0;
 
     struct Buffer {
         alignas(k_alignment) Type data;

@@ -271,8 +271,8 @@ struct BlurredImageBackgroundOptions {
     f32 brightness_scaling_exponent;
     f32 overlay_value; // 0-1, 0 is black, 1 is white
     f32 overlay_alpha; // 0-1
-    u16 blur1_radius;
-    u16 blur2_radius;
+    f32 blur1_radius_percent; // 0-1
+    f32 blur2_radius_percent; // 0-1
     f32 blur2_alpha; // 0-1, blur2 is layered on top of blur1
 };
 
@@ -299,6 +299,8 @@ PUBLIC ImageBytes CreateBlurredLibraryBackground(ImageBytes original,
     ASSERT(options.overlay_value >= 0 && options.overlay_value <= 1);
     ASSERT(options.overlay_alpha >= 0 && options.overlay_alpha <= 1);
     ASSERT(options.blur2_alpha >= 0 && options.blur2_alpha <= 1);
+    ASSERT(options.blur1_radius_percent >= 0 && options.blur1_radius_percent <= 1);
+    ASSERT(options.blur2_radius_percent >= 0 && options.blur2_radius_percent <= 1);
     ASSERT(original.size.width);
     ASSERT(original.size.height);
 
@@ -336,8 +338,10 @@ PUBLIC ImageBytes CreateBlurredLibraryBackground(ImageBytes original,
     // Do a pair of blurs with different radii, and blend them together. 2 is enough to get a nice effect with
     // minimal performance cost.
     {
-        auto const blur1 = CreateBlurredImage(arena, pixels, options.blur1_radius);
-        auto const blur2 = CreateBlurredImage(arena, pixels, options.blur2_radius);
+        auto const blur1 =
+            CreateBlurredImage(arena, pixels, (u16)(options.blur1_radius_percent * pixels.size.width));
+        auto const blur2 =
+            CreateBlurredImage(arena, pixels, (u16)(options.blur2_radius_percent * pixels.size.width));
 
         for (auto const pixel_index : Range(pixels.NumPixels()))
             pixels.rgba[pixel_index] =

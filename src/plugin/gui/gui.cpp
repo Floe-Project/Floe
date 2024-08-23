@@ -133,11 +133,12 @@ static void CreateLibraryBackgroundImageTextures(Gui* g,
 
     // If the image is quite a lot larger than we need, resize it down to avoid storing a huge image on the
     // GPU
-    auto const scaled_background = ShrinkImage(background_image,
-                                               CheckedCast<u16>(g->frame_input.window_size.width * 1.3f),
-                                               g->frame_input.window_size.width,
-                                               arena,
-                                               false);
+    auto const scaled_background =
+        ShrinkImageIfNeeded(background_image,
+                            CheckedCast<u16>(g->frame_input.window_size.width * 1.3f),
+                            g->frame_input.window_size.width,
+                            arena,
+                            false);
     if (reload_background)
         imgs.background = TryCreateImageOnGpu(*g->frame_input.graphics_ctx, scaled_background);
 
@@ -156,12 +157,8 @@ static void CreateLibraryBackgroundImageTextures(Gui* g,
                         Clamp01(LiveSize(g->imgui, UiSizeId::BackgroundBlurringOverlayColour) / 100.0f),
                     .overlay_alpha =
                         Clamp01(LiveSize(g->imgui, UiSizeId::BackgroundBlurringOverlayIntensity) / 100.0f),
-                    .blur1_radius =
-                        CheckedCast<u16>(LiveSize(g->imgui, UiSizeId::BackgroundBlurringBlur1Radius) *
-                                         ((f32)g->imgui.frame_input.window_size.width / 700.0f)),
-                    .blur2_radius =
-                        CheckedCast<u16>(LiveSize(g->imgui, UiSizeId::BackgroundBlurringBlur2Radius) *
-                                         ((f32)g->imgui.frame_input.window_size.width / 700.0f)),
+                    .blur1_radius_percent = LiveSize(g->imgui, UiSizeId::BackgroundBlurringBlur1Radius) / 100,
+                    .blur2_radius_percent = LiveSize(g->imgui, UiSizeId::BackgroundBlurringBlur2Radius) / 100,
                     .blur2_alpha =
                         Clamp01(LiveSize(g->imgui, UiSizeId::BackgroundBlurringBlur2Alpha) / 100.0f),
                 }));

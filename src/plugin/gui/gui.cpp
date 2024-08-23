@@ -85,7 +85,7 @@ ImagePixelsFromLibrary(Gui* g, sample_lib::Library const& lib, LibraryImageType 
     auto const path_in_lib = PathInLibraryForImageType(lib, type);
 
     auto err = [&](String middle, LogLevel severity) {
-        g_log.Ln(severity, "{} {} {}", lib.name, middle, filename);
+        g_log.Ln(severity, k_gui_log_cat, "{} {} {}", lib.name, middle, filename);
         return Optional<ImageBytesManaged> {};
     };
 
@@ -108,10 +108,11 @@ static graphics::ImageID CopyPixelsToGpuLoadedImage(Gui* g, ImageBytesManaged co
     ASSERT(px.rgba);
     auto const outcome = g->frame_input.graphics_ctx->CreateImageID(px.rgba, px.size, 4);
     if (outcome.HasError()) {
-        g->logger.ErrorLn("Failed to create a texture (size {}x{}): {}",
-                          px.size.width,
-                          px.size.height,
-                          outcome.Error());
+        g_log.ErrorLn(k_gui_log_cat,
+                      "Failed to create a texture (size {}x{}): {}",
+                      px.size.width,
+                      px.size.height,
+                      outcome.Error());
         return {};
     }
     return outcome.Value();
@@ -119,7 +120,7 @@ static graphics::ImageID CopyPixelsToGpuLoadedImage(Gui* g, ImageBytesManaged co
 
 static Optional<graphics::ImageID> TryCreateImageOnGpu(graphics::DrawContext& ctx, ImageBytes const image) {
     return ctx.CreateImageID(image.rgba, image.size, k_rgba_channels).OrElse([](ErrorCode error) {
-        g_log.ErrorLn("Failed to create image texture: {}", error);
+        g_log.ErrorLn(k_gui_log_cat, "Failed to create image texture: {}", error);
         return graphics::ImageID {};
     });
 }
@@ -336,7 +337,8 @@ static void CreateFontsIfNeeded(Gui* g) {
         }
 
         auto const outcome = graphics_ctx->CreateFontTexture();
-        if (outcome.HasError()) g->logger.ErrorLn("Failed to create font texture: {}", outcome.Error());
+        if (outcome.HasError())
+            g_log.ErrorLn(k_gui_log_cat, "Failed to create font texture: {}", outcome.Error());
     }
 }
 
@@ -430,13 +432,12 @@ static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
 
 void Gui::OpenDialog(DialogType type) {
     auto const outcome = ::OpenDialog(this, type);
-    if (outcome.HasError()) logger.ErrorLn("Failed to create dialog: {}", outcome.Error());
+    if (outcome.HasError()) g_log.ErrorLn(k_gui_log_cat, "Failed to create dialog: {}", outcome.Error());
 }
 
 Gui::Gui(GuiFrameInput& frame_input, PluginInstance& plugin)
     : frame_input(frame_input)
     , plugin(plugin)
-    , logger(plugin.shared_data.logger)
     , settings(plugin.shared_data.settings)
     , imgui(frame_input, frame_output)
     , sample_lib_server_async_channel(sample_lib_server::OpenAsyncCommsChannel(
@@ -451,7 +452,7 @@ Gui::Gui(GuiFrameInput& frame_input, PluginInstance& plugin)
                       gui->frame_input.request_update.Store(true, StoreMemoryOrder::Relaxed);
                   },
           })) {
-    g_log_file.TraceLn();
+    g_log_file.TraceLn(k_gui_log_cat);
 
     editor.imgui = &imgui;
     imgui.user_callback_data = this;
@@ -473,7 +474,7 @@ Gui::Gui(GuiFrameInput& frame_input, PluginInstance& plugin)
 Gui::~Gui() {
     sample_lib_server::CloseAsyncCommsChannel(plugin.shared_data.sample_library_server,
                                               sample_lib_server_async_channel);
-    g_log_file.TraceLn();
+    g_log_file.TraceLn(k_gui_log_cat);
     if (midi_keyboard_note_held_with_mouse) {
         plugin.processor.events_for_audio_thread.Push(
             GuiNoteClickReleased {.key = midi_keyboard_note_held_with_mouse.Value()});

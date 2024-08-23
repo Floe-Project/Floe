@@ -22,6 +22,7 @@ namespace sample_lib_server {
 using namespace detail;
 constexpr String k_trace_category = "SLS";
 constexpr u32 k_trace_colour = 0xfcba03;
+constexpr auto k_log_cat = "sample-lib-server"_cat;
 
 // ==========================================================================================================
 // Library loading
@@ -437,7 +438,7 @@ static bool UpdateLibraryJobs(Server& server,
                                                       });
             outcome.HasError()) {
             // IMPROVE: handle error
-            g_log.DebugLn("Reading directory changes failed: {}", outcome.Error());
+            g_log.DebugLn(k_log_cat, "Reading directory changes failed: {}", outcome.Error());
         } else {
             auto const dir_changes_span = outcome.Value();
             for (auto const& dir_changes : dir_changes_span) {
@@ -446,7 +447,8 @@ static bool UpdateLibraryJobs(Server& server,
 
                 if (dir_changes.error) {
                     // IMPROVE: handle this
-                    g_log.DebugLn("Reading directory changes failed for {}: {}",
+                    g_log.DebugLn(k_log_cat,
+                                  "Reading directory changes failed for {}: {}",
                                   scan_folder.path,
                                   dir_changes.error);
                     continue;
@@ -558,7 +560,7 @@ static Optional<DirectoryWatcher> CreateDirectoryWatcher(ThreadsafeErrorNotifica
         error_notifications.RemoveError(error_id);
         watcher.Emplace(watcher_outcome.ReleaseValue());
     } else {
-        g_log.DebugLn("Failed to create directory watcher: {}", watcher_outcome.Error());
+        g_log.DebugLn(k_log_cat, "Failed to create directory watcher: {}", watcher_outcome.Error());
         auto const err = error_notifications.NewError();
         err->value = {
             .title = "Warning: unable to monitor library folders"_s,
@@ -873,21 +875,27 @@ struct PendingResources {
 
 static void DumpPendingResourcesDebugInfo(PendingResources& pending_resources) {
     ASSERT(CurrentThreadID() == pending_resources.server_thread_id);
-    g_log.DebugLn("Thread pool jobs: {}",
+    g_log.DebugLn(k_log_cat,
+                  "Thread pool jobs: {}",
                   pending_resources.thread_pool_jobs.counter.Load(LoadMemoryOrder::Relaxed));
-    g_log.DebugLn("\nPending results:");
+    g_log.DebugLn(k_log_cat, "\nPending results:");
     for (auto& pending_resource : pending_resources.list) {
-        g_log.DebugLn("  Pending result: {}", pending_resource.debug_id);
+        g_log.DebugLn(k_log_cat, "  Pending result: {}", pending_resource.debug_id);
         switch (pending_resource.state.tag) {
-            case PendingResource::State::AwaitingLibrary: g_log.DebugLn("    Awaiting library"); break;
+            case PendingResource::State::AwaitingLibrary:
+                g_log.DebugLn(k_log_cat, "    Awaiting library");
+                break;
             case PendingResource::State::AwaitingAudio: {
                 auto& resource = pending_resource.state.Get<PendingResource::ListedPointer>();
                 switch (resource.tag) {
                     case LoadRequestType::Instrument: {
                         auto inst = resource.Get<ListedInstrument*>();
-                        g_log.DebugLn("    Awaiting audio for instrument {}", inst->inst.instrument.name);
+                        g_log.DebugLn(k_log_cat,
+                                      "    Awaiting audio for instrument {}",
+                                      inst->inst.instrument.name);
                         for (auto& audio_data : inst->audio_data_set) {
-                            g_log.DebugLn("      Audio data: {}, {}",
+                            g_log.DebugLn(k_log_cat,
+                                          "      Audio data: {}, {}",
                                           audio_data->audio_data.hash,
                                           EnumToString(audio_data->state.Load(LoadMemoryOrder::Relaxed)));
                         }
@@ -895,8 +903,9 @@ static void DumpPendingResourcesDebugInfo(PendingResources& pending_resources) {
                     }
                     case LoadRequestType::Ir: {
                         auto ir = resource.Get<ListedImpulseResponse*>();
-                        g_log.DebugLn("    Awaiting audio for IR {}", ir->ir.ir.path);
-                        g_log.DebugLn("      Audio data: {}, {}",
+                        g_log.DebugLn(k_log_cat, "    Awaiting audio for IR {}", ir->ir.ir.path);
+                        g_log.DebugLn(k_log_cat,
+                                      "      Audio data: {}, {}",
                                       ir->audio_data->audio_data.hash,
                                       EnumToString(ir->audio_data->state.Load(LoadMemoryOrder::Relaxed)));
                         break;
@@ -904,10 +913,10 @@ static void DumpPendingResourcesDebugInfo(PendingResources& pending_resources) {
                 }
                 break;
             }
-            case PendingResource::State::Cancelled: g_log.DebugLn("    Cancelled"); break;
-            case PendingResource::State::Failed: g_log.DebugLn("    Failed"); break;
+            case PendingResource::State::Cancelled: g_log.DebugLn(k_log_cat, "    Cancelled"); break;
+            case PendingResource::State::Failed: g_log.DebugLn(k_log_cat, "    Failed"); break;
             case PendingResource::State::CompletedSuccessfully:
-                g_log.DebugLn("    Completed successfully");
+                g_log.DebugLn(k_log_cat, "    Completed successfully");
                 break;
         }
     }
@@ -1346,15 +1355,16 @@ static void ServerThreadProc(Server& server) {
             if (!PRODUCTION_BUILD &&
                 server.request_debug_dump_current_state.Exchange(false, RmwMemoryOrder::Relaxed)) {
                 ZoneNamedN(dump, "dump", true);
-                g_log.DebugLn("Dumping current state of loading thread");
-                g_log.DebugLn("Libraries currently loading: {}",
+                g_log.DebugLn(k_log_cat, "Dumping current state of loading thread");
+                g_log.DebugLn(k_log_cat,
+                              "Libraries currently loading: {}",
                               libs_async_ctx.num_uncompleted_jobs.Load(LoadMemoryOrder::Relaxed));
                 DumpPendingResourcesDebugInfo(pending_resources);
-                g_log.DebugLn("\nAvailable Libraries:");
+                g_log.DebugLn(k_log_cat, "\nAvailable Libraries:");
                 for (auto& lib : server.libraries) {
-                    g_log.DebugLn("  Library: {}", lib.value.lib->name);
+                    g_log.DebugLn(k_log_cat, "  Library: {}", lib.value.lib->name);
                     for (auto& inst : lib.value.instruments)
-                        g_log.DebugLn("    Instrument: {}", inst.inst.instrument.name);
+                        g_log.DebugLn(k_log_cat, "    Instrument: {}", inst.inst.instrument.name);
                 }
             }
 
@@ -1606,17 +1616,17 @@ static Type& ExtractSuccess(tests::Tester& tester, LoadResult const& result, Loa
     switch (request.tag) {
         case LoadRequestType::Instrument: {
             auto inst = request.Get<LoadRequestInstrumentIdWithLayer>();
-            tester.log.DebugLn("Instrument: {} - {}", inst.id.library, inst.id.inst_name);
+            tester.log.DebugLn(k_log_cat, "Instrument: {} - {}", inst.id.library, inst.id.inst_name);
             break;
         }
         case LoadRequestType::Ir: {
             auto ir = request.Get<sample_lib::IrId>();
-            tester.log.DebugLn("Ir: {} - {}", ir.library, ir.ir_name);
+            tester.log.DebugLn(k_log_cat, "Ir: {} - {}", ir.library, ir.ir_name);
             break;
         }
     }
 
-    if (auto err = result.result.TryGet<ErrorCode>()) g_log.DebugLn("Error: {}", *err);
+    if (auto err = result.result.TryGet<ErrorCode>()) g_log.DebugLn(k_log_cat, "Error: {}", *err);
     REQUIRE_EQ(result.result.tag, LoadResult::ResultType::Success);
     auto opt_r = result.result.Get<Resource>().TryGetMut<Type>();
     REQUIRE(opt_r);
@@ -2002,8 +2012,7 @@ TEST_CASE(TestSampleLibraryLoader) {
             auto const countdown_result = countdown.WaitUntilZero(timeout_secs * 1000);
 
             if (countdown_result == WaitResult::TimedOut) {
-                tester.log.ErrorLn("Timed out waiting for library resource loading to complete");
-                DumpCurrentStackTraceToStderr();
+                tester.log.ErrorLn(k_log_cat, "Timed out waiting for library resource loading to complete");
                 server.request_debug_dump_current_state.Store(true, StoreMemoryOrder::Release);
                 server.work_signaller.Signal();
                 SleepThisThread(1000);
@@ -2018,7 +2027,8 @@ TEST_CASE(TestSampleLibraryLoader) {
                     if (r->id == request.request_id) {
                         for (auto& n : fixture.error_notif.items) {
                             if (auto e = n.TryScoped()) {
-                                tester.log.DebugLn("Error Notification  {}: {}: {}",
+                                tester.log.DebugLn(k_log_cat,
+                                                   "Error Notification  {}: {}: {}",
                                                    e->title,
                                                    e->message,
                                                    e->error_code);
@@ -2106,8 +2116,7 @@ TEST_CASE(TestSampleLibraryLoader) {
         auto const countdown_result = countdown.WaitUntilZero(k_timeout_secs * 1000);
 
         if (countdown_result == WaitResult::TimedOut) {
-            tester.log.ErrorLn("Timed out waiting for library resource loading to complete");
-            DumpCurrentStackTraceToStderr();
+            tester.log.ErrorLn(k_log_cat, "Timed out waiting for library resource loading to complete");
             server.request_debug_dump_current_state.Store(true, StoreMemoryOrder::Release);
             SleepThisThread(1000);
             // We need to hard-exit without cleaning up because the loading thread is probably deadlocked

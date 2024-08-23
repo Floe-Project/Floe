@@ -14,6 +14,8 @@
 #include "plugin_instance.hpp"
 #include "settings/settings_file.hpp"
 
+constexpr auto k_gui_log_cat = "gui"_cat;
+
 struct PluginInstance;
 struct FloeInstance;
 struct GuiFrameInput;
@@ -135,7 +137,6 @@ struct Gui {
     GuiFrameInput& frame_input;
     GuiFrameResult frame_output;
     PluginInstance& plugin;
-    Logger& logger;
     SettingsFile& settings;
 
     Layout layout = {};

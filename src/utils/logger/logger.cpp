@@ -6,58 +6,81 @@
 #include "foundation/foundation.hpp"
 #include "os/filesystem.hpp"
 #include "os/misc.hpp"
-#include "utils/debug/debug.hpp"
 
-void Logger::TraceLn(String message, SourceLocation loc) {
+ErrorCodeOr<void> WriteFormattedLog(Writer writer,
+                                    LogLevel level,
+                                    WriteFormattedLogOptions options,
+                                    String category,
+                                    String message) {
+    TRY(writer.WriteChar('['));
+    bool needs_space = false;
+
+    if (options.timestamp) {
+        TRY(writer.WriteChars(Timestamp()));
+        needs_space = true;
+    }
+
+    if (category.size) {
+        if (needs_space) TRY(writer.WriteChar(' '));
+        TRY(writer.WriteChars(category));
+        needs_space = true;
+    }
+
+    if (!(options.no_info_prefix && level == LogLevel::Info)) {
+        if (needs_space) TRY(writer.WriteChar(' '));
+        TRY(writer.WriteChars(({
+            String s;
+            switch (level) {
+                case LogLevel::Debug:
+                    s = options.ansi_colors ? String(ANSI_COLOUR_FOREGROUND_BLUE("debug")) : "debug";
+                    break;
+                case LogLevel::Info: s = "info"; break;
+                case LogLevel::Warning:
+                    s = options.ansi_colors ? String(ANSI_COLOUR_FOREGROUND_YELLOW("warning")) : "warning";
+                    break;
+                case LogLevel::Error:
+                    s = options.ansi_colors ? String(ANSI_COLOUR_FOREGROUND_RED("error")) : "error";
+            }
+            s;
+        })));
+    }
+
+    TRY(writer.WriteChars("]"_s));
+    if (message.size) TRY(writer.WriteChar(' '));
+    TRY(writer.WriteChars(message));
+    if (options.add_newline) TRY(writer.WriteChar('\n'));
+    return k_success;
+}
+
+void Logger::TraceLn(CategoryString category, String message, SourceLocation loc) {
     DynamicArrayInline<char, 1000> buf;
     fmt::Append(buf, "trace: {}({}): {}", FromNullTerminated(loc.file), loc.line, loc.function);
     if (message.size) fmt::Append(buf, ": {}", message);
 
-    LogFunction(buf, LogLevel::Debug, true);
+    LogFunction(category.str, buf, LogLevel::Debug, true);
 }
 
-void StdoutLogger::LogFunction(String str, LogLevel level, bool add_newline) {
-    auto& mutex = StdStreamMutex(StdStream::Out);
+void StreamLogger::LogFunction(String category, String str, LogLevel level, bool add_newline) {
+    auto& mutex = StdStreamMutex(stream);
     mutex.Lock();
     DEFER { mutex.Unlock(); };
-    auto _ = StdPrint(StdStream::Out, LogPrefix(level, {.ansi_colors = true}));
-    auto _ = StdPrint(StdStream::Out, str);
-    if (add_newline) auto _ = StdPrint(StdStream::Out, "\n"_s);
+
+    auto log_config = config;
+    log_config.add_newline = add_newline;
+    auto _ = WriteFormattedLog(StdWriter(stream), level, log_config, category, str);
 }
 
-StdoutLogger g_stdout_log;
+StreamLogger g_stdout_log {
+    StdStream::Out,
+    WriteFormattedLogOptions {.ansi_colors = true, .no_info_prefix = false, .timestamp = true},
+};
 
-void CliOutLogger::LogFunction(String str, LogLevel level, bool add_newline) {
-    auto& mutex = StdStreamMutex(StdStream::Out);
-    mutex.Lock();
-    DEFER { mutex.Unlock(); };
-    auto _ = StdPrint(StdStream::Out, LogPrefix(level, {.ansi_colors = true, .no_info_prefix = true}));
-    auto _ = StdPrint(StdStream::Out, str);
-    if (add_newline) auto _ = StdPrint(StdStream::Out, "\n"_s);
-}
+StreamLogger g_cli_out {
+    StdStream::Out,
+    WriteFormattedLogOptions {.ansi_colors = true, .no_info_prefix = true, .timestamp = false},
+};
 
-CliOutLogger g_cli_out;
-
-void FileLogger::LogFunction(String str, LogLevel level, bool add_newline) {
-    // TracyMessageEx(
-    //     {
-    //         .category = "floelogger",
-    //         .colour = 0xffffff,
-    //         .object_id = nullopt,
-    //     },
-    //     "{}: {}",
-    //     ({
-    //         String c;
-    //         switch (level) {
-    //             case LogLevel::Debug: c = "Debug: "_s; break;
-    //             case LogLevel::Info: c = ""_s; break;
-    //             case LogLevel::Warning: c = "Warning: "_s; break;
-    //             case LogLevel::Error: c = "Error: "_s; break;
-    //         }
-    //         c;
-    //     }),
-    //     str);
-
+void FileLogger::LogFunction(String category, String str, LogLevel level, bool add_newline) {
     // Could just use a mutex here but this atomic method avoids the class having to have any sort of
     // destructor which is particularly beneficial at the moment trying to debug a crash at shutdown.
     //
@@ -77,7 +100,7 @@ void FileLogger::LogFunction(String str, LogLevel level, bool add_newline) {
             dyn::Assign(filepath, String(path));
         } else {
             dyn::Clear(filepath);
-            g_stdout_log.DebugLn("failed to get logs known dir: {}", outcome.Error());
+            g_stdout_log.DebugLn("file-logger"_cat, "failed to get logs known dir: {}", outcome.Error());
         }
         state.Store(FileLogger::State::Initialised, StoreMemoryOrder::Release);
     } else if (ex == FileLogger::State::Initialising) {
@@ -91,27 +114,30 @@ void FileLogger::LogFunction(String str, LogLevel level, bool add_newline) {
     auto file = ({
         auto outcome = OpenFile(filepath, FileMode::Append);
         if (outcome.HasError()) {
-            g_stdout_log.DebugLn("failed to open log file {}: {}", filepath, outcome.Error());
+            g_stdout_log.DebugLn("file-logger"_cat,
+                                 "failed to open log file {}: {}",
+                                 filepath,
+                                 outcome.Error());
             return;
         }
         outcome.ReleaseValue();
     });
 
-    auto try_writing = [&](Writer writer) -> ErrorCodeOr<void> {
-        TRY(writer.WriteChars(Timestamp()));
-        TRY(writer.WriteChar(' '));
-
-        TRY(writer.WriteChars(LogPrefix(level, {.ansi_colors = false, .no_info_prefix = false})));
-        TRY(writer.WriteChars(str));
-        if (add_newline) TRY(writer.WriteChar('\n'));
-        return k_success;
-    };
-
     auto writer = file.Writer();
-    auto o = try_writing(writer);
-    if (o.HasError()) g_stdout_log.DebugLn("failed to write log file: {}, {}", filepath, o.Error());
+    auto o = WriteFormattedLog(writer,
+                               level,
+                               {
+                                   .ansi_colors = false,
+                                   .no_info_prefix = false,
+                                   .timestamp = true,
+                                   .add_newline = add_newline,
+                               },
+                               category,
+                               str);
+    if (o.HasError())
+        g_stdout_log.DebugLn("file-logger"_cat, "failed to write log file: {}, {}", filepath, o.Error());
 }
 
 FileLogger g_log_file {};
 
-Logger& g_log = PRODUCTION_BUILD ? (Logger&)g_log_file : (Logger&)g_stdout_log;
+DefaultLogger g_log {};

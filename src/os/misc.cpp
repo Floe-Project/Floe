@@ -51,18 +51,9 @@ Mutex& StdStreamMutex(StdStream stream) {
 
 Writer StdWriter(StdStream stream) {
     Writer result;
-    switch (stream) {
-        case StdStream::Out:
-            result.SetNoObject([](Span<u8 const> bytes) -> ErrorCodeOr<void> {
-                return StdPrint(StdStream::Out, String {(char const*)bytes.data, bytes.size});
-            });
-            break;
-        case StdStream::Err:
-            result.SetNoObject([](Span<u8 const> bytes) -> ErrorCodeOr<void> {
-                return StdPrint(StdStream::Err, String {(char const*)bytes.data, bytes.size});
-            });
-            break;
-    }
+    result.SetContained<StdStream>(stream, [](StdStream stream, Span<u8 const> bytes) -> ErrorCodeOr<void> {
+        return StdPrint(stream, String {(char const*)bytes.data, bytes.size});
+    });
     return result;
 }
 

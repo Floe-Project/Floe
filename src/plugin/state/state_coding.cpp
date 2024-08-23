@@ -863,7 +863,8 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
             auto const& info = k_param_infos[i];
             auto const v = state.param_values[i];
             if (v < info.linear_range.min || v > info.linear_range.max) {
-                g_log.DebugLn("Param \"{} {}\" value ({}) is outside of the expected "
+                g_log.DebugLn({},
+                              "Param \"{} {}\" value ({}) is outside of the expected "
                               "range: ({}, {})",
                               info.ModuleString(),
                               info.name,

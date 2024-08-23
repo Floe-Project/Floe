@@ -11,7 +11,6 @@
 
 #include "foundation/foundation.hpp"
 #include "os/undef_windows_macros.h"
-#include "utils/debug/debug.hpp"
 
 #include "gui/gui.hpp"
 #include "gui_frame.hpp"
@@ -19,6 +18,7 @@
 #include "settings/settings_gui.hpp"
 
 constexpr bool k_debug_gui_platform = false;
+constexpr auto k_gui_platform_log_cat = "🔳gui-platform"_cat;
 
 struct GuiPlatform {
     static constexpr uintptr_t k_timer_id = 200;
@@ -28,7 +28,6 @@ struct GuiPlatform {
 
     clap_host const& host;
     SettingsFile& settings;
-    Logger& logger;
     bool realised = false;
     PuglWorld* world {};
     PuglView* view {};
@@ -103,7 +102,7 @@ static void LogIfSlow(Stopwatch& stopwatch, String message);
 int FdFromPuglWorld(PuglWorld* world);
 
 PUBLIC ErrorCodeOr<void> CreateView(GuiPlatform& platform, PluginInstance& plugin) {
-    g_log.TraceLn();
+    g_log.TraceLn(k_gui_platform_log_cat);
     platform.g_world_counter++;
     if (auto const floe_host =
             (FloeClapExtensionHost const*)platform.host.get_extension(&platform.host,
@@ -138,7 +137,7 @@ PUBLIC ErrorCodeOr<void> CreateView(GuiPlatform& platform, PluginInstance& plugi
     puglSetViewHint(platform.view, PUGL_RESIZABLE, true);
     auto const size = gui_settings::WindowSize(platform.settings.settings.gui);
     TRY(Required(puglSetSize(platform.view, size.width, size.height)));
-    g_log.DebugLn("creating size: {}x{}", size.width, size.height);
+    g_log.DebugLn(k_gui_platform_log_cat, "creating size: {}x{}", size.width, size.height);
 
     platform.gui.Emplace(platform.frame_state, plugin);
 
@@ -164,7 +163,7 @@ PUBLIC ErrorCodeOr<void> CreateView(GuiPlatform& platform, PluginInstance& plugi
 }
 
 PUBLIC void DestroyView(GuiPlatform& platform) {
-    g_log.TraceLn();
+    g_log.TraceLn(k_gui_platform_log_cat);
     if (!platform.gui) return;
 
     platform.gui.Clear();
@@ -256,7 +255,7 @@ namespace detail {
 
 static void LogIfSlow(Stopwatch& stopwatch, String message) {
     auto const elapsed = stopwatch.MillisecondsElapsed();
-    if (elapsed > 10) g_log.WarningLn("{} took {} ms", message, elapsed);
+    if (elapsed > 10) g_log.WarningLn(k_gui_platform_log_cat, "{} took {}ms", message, elapsed);
 }
 
 static bool IsUpdateNeeded(GuiPlatform& platform) {
@@ -479,7 +478,7 @@ static void CreateGraphicsContext(GuiPlatform& platform) {
     auto graphics_ctx = graphics::CreateNewDrawContext();
     auto const outcome = graphics_ctx->CreateDeviceObjects((void*)puglGetNativeView(platform.view));
     if (outcome.HasError()) {
-        platform.logger.ErrorLn("Failed to create graphics context: {}", outcome.Error());
+        g_log.ErrorLn(k_gui_platform_log_cat, "Failed to create graphics context: {}", outcome.Error());
         delete graphics_ctx;
         return;
     }
@@ -610,7 +609,7 @@ static void UpdateAndRender(GuiPlatform& platform) {
     Stopwatch sw {};
     DEFER {
         auto const elapsed = sw.MillisecondsElapsed();
-        if (elapsed > 10) platform.logger.WarningLn("GUI update took {}ms", elapsed);
+        if (elapsed > 10) g_log.WarningLn(k_gui_platform_log_cat, "GUI update took {}ms", elapsed);
     };
 
     auto const window_size = WindowSize(platform);
@@ -625,7 +624,7 @@ static void UpdateAndRender(GuiPlatform& platform) {
     do {
         // Mostly we'd only expect 1 or 2 updates but we set a hard limit of 4 as a fallback.
         if (num_repeats++ >= 4) {
-            platform.logger.WarningLn("GUI update loop repeated too many times");
+            g_log.WarningLn(k_gui_platform_log_cat, "GUI update loop repeated too many times");
             break;
         }
 
@@ -648,7 +647,7 @@ static void UpdateAndRender(GuiPlatform& platform) {
         auto o = platform.graphics_ctx->Render(platform.last_result.draw_data,
                                                window_size,
                                                platform.frame_state.draw_scale_factor);
-        if (o.HasError()) platform.logger.ErrorLn("GUI render failed: {}", o.Error());
+        if (o.HasError()) g_log.ErrorLn(k_gui_platform_log_cat, "GUI render failed: {}", o.Error());
     }
 }
 
@@ -664,18 +663,21 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
         case PUGL_NOTHING: break;
 
         case PUGL_REALIZE: {
+            g_log.DebugLn(k_gui_platform_log_cat, "realize: {}", fmt::DumpStruct(event->any));
             puglGrabFocus(platform.view);
             CreateGraphicsContext(platform);
             break;
         }
 
         case PUGL_UNREALIZE: {
+            g_log.DebugLn(k_gui_platform_log_cat, "unrealize {}", fmt::DumpStruct(event->any));
             DestroyGraphicsContext(platform);
             break;
         }
 
         // resized or moved
         case PUGL_CONFIGURE: {
+            g_log.DebugLn(k_gui_platform_log_cat, "configure {}", fmt::DumpStruct(event->configure));
             if (platform.graphics_ctx)
                 platform.graphics_ctx->Resize({event->configure.width, event->configure.height});
             gui_settings::SetWindowSize(platform.settings.settings.gui,
@@ -694,9 +696,13 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
         }
 
         case PUGL_CLOSE: {
+            g_log.DebugLn(k_gui_platform_log_cat, "close {}", fmt::DumpStruct(event->any));
             auto const host_gui =
                 (clap_host_gui const*)platform.host.get_extension(&platform.host, CLAP_EXT_GUI);
-            if (host_gui) host_gui->closed(&platform.host, false);
+            if (host_gui) {
+                g_log.DebugLn(k_gui_platform_log_cat, "calling host_gui->closed");
+                host_gui->closed(&platform.host, false);
+            }
             break;
         }
 

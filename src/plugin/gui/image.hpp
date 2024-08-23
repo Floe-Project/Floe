@@ -12,6 +12,7 @@
 #include "common/common_errors.hpp"
 
 constexpr u16 k_rgba_channels = 4;
+constexpr auto k_image_log_cat = "🍱image"_cat;
 
 struct ImageBytes {
     usize NumPixels() const { return (usize)(size.width * size.height); }
@@ -95,7 +96,8 @@ PUBLIC ImageBytes ShrinkImageIfNeeded(ImageBytes image,
 
     Stopwatch stopwatch;
     DEFER {
-        g_log.DebugLn("Shrinking image {}x{} to {}x{} took {} ms",
+        g_log.DebugLn(k_image_log_cat,
+                      "Shrinking image {}x{} to {}x{} took {} ms",
                       image.size.width,
                       image.size.height,
                       shrunk_width,
@@ -202,7 +204,8 @@ static bool BoxBlur(ImageF32 in, f32x4* out, u16 radius) {
 
     Stopwatch stopwatch;
     DEFER {
-        g_log.DebugLn("Box blur {}x{}, radius {} took {} ms",
+        g_log.DebugLn(k_image_log_cat,
+                      "Box blur {}x{}, radius {} took {} ms",
                       in.size.width,
                       in.size.height,
                       radius,
@@ -305,7 +308,11 @@ PUBLIC ImageBytes CreateBlurredLibraryBackground(ImageBytes original,
     ASSERT(original.size.height);
 
     Stopwatch stopwatch;
-    DEFER { g_log.DebugLn("Blurred image generation took {} ms", stopwatch.MillisecondsElapsed()); };
+    DEFER {
+        g_log.DebugLn(k_image_log_cat,
+                      "Blurred image generation took {} ms",
+                      stopwatch.MillisecondsElapsed());
+    };
 
     // Shrink the image down for better speed. We are about to blur it, we don't need detail.
     auto const shrunk_width = CheckedCast<u16>(original.size.width * options.downscale_factor);

@@ -225,6 +225,8 @@ static String SignalString(int signal_num, siginfo_t* info) {
     return message;
 }
 
+constexpr StdStream k_signal_output_stream = StdStream::Out;
+
 // remember we can only use async-signal-safe functions here:
 // https://man7.org/linux/man-pages/man7/signal-safety.7.html
 static void SignalHandler(int signal_num, siginfo_t* info, void* context) {
@@ -237,32 +239,9 @@ static void SignalHandler(int signal_num, siginfo_t* info, void* context) {
         psiginfo(info, nullptr);
 #else
         auto _ = StdPrint(
-            StdStream::Out,
+            k_signal_output_stream,
             fmt::FormatInline<200>("Received signal {} ({})\n", signal_num, SignalString(signal_num, info)));
 #endif
-
-        {
-            auto const timestamp = Timestamp();
-            auto const file_path =
-                fmt::FormatInline<400>("{}/crash_{}.log\0", g_crash_folder_path, timestamp);
-            auto const fd = open(file_path.data, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-            DEFER { close(fd); };
-
-            auto const signal_num_str = fmt::FormatInline<50>("{} signal: {}\n", timestamp, signal_num);
-            write(fd, signal_num_str.data, signal_num_str.size);
-
-            auto const signal_string = SignalString(signal_num, info);
-            write(fd, signal_string.data, signal_string.size);
-            write(fd, "\n", 1);
-
-            // TODO: test how the FixedSizeAllocator behaves when it's out of memory
-            FixedSizeAllocator<3000> local_buffer {nullptr};
-            auto const stack_trace = CurrentStacktraceString(local_buffer);
-            write(fd, stack_trace.data, stack_trace.size);
-            write(fd, "\n", 1);
-
-            fsync(fd);
-        }
 
         {
             bool possibly_ubsan_error = false;
@@ -282,11 +261,42 @@ static void SignalHandler(int signal_num, siginfo_t* info, void* context) {
             }
             if (signal_num == SIGTRAP && k_ubsan) possibly_ubsan_error = true;
 
-            if (possibly_ubsan_error) DumpInfoAboutUBSanToStderr();
+            if (possibly_ubsan_error) DumpInfoAboutUBSan(k_signal_output_stream);
         }
 
-        // TODO: probably need a custom implementation to ensure we only use signal-safe functions
-        DumpCurrentStackTraceToStderr();
+        PrintCurrentStacktrace(k_signal_output_stream, {.ansi_colours = true, .demangle = false}, 0);
+
+        {
+            auto const timestamp = Timestamp();
+            auto const file_path =
+                fmt::FormatInline<400>("{}/crash_{}.log\0", g_crash_folder_path, timestamp);
+            auto const fd = open(file_path.data, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+            DEFER { close(fd); };
+
+            auto const signal_num_str = fmt::FormatInline<50>("{}\n Signal {}\n", timestamp, signal_num);
+            write(fd, signal_num_str.data, signal_num_str.size);
+
+            auto const signal_string = SignalString(signal_num, info);
+            write(fd, signal_string.data, signal_string.size);
+            write(fd, "\n", 1);
+
+            Writer writer {};
+            writer.SetContained<int>(fd, [](int fd, Span<u8 const> bytes) -> ErrorCodeOr<void> {
+                auto _ = StdPrint(k_signal_output_stream, "Writing to file\n");
+                auto const num_written = write(fd, bytes.data, bytes.size);
+                if (num_written < 0) return ErrnoErrorCode(errno, "write");
+                return k_success;
+            });
+            WriteCurrentStacktrace(writer,
+                                   {
+                                       .ansi_colours = false,
+                                       .demangle = false,
+                                   },
+                                   0);
+            write(fd, "\n", 1);
+
+            fsync(fd);
+        }
 
         for (auto [index, s] : Enumerate(k_signals)) {
             if (s == signal_num) {
@@ -313,13 +323,14 @@ static void SignalHandler(int signal_num, siginfo_t* info, void* context) {
                         auto h = previous_handler_function.GetFromTag<Type::HandlerFunction>();
                         if (h == nullptr) {
                             if constexpr (!PRODUCTION_BUILD)
-                                auto _ = StdPrint(StdStream::Out, "Previous signal handler is null\n");
+                                auto _ =
+                                    StdPrint(k_signal_output_stream, "Previous signal handler is null\n");
                             _exit(EXIT_FAILURE);
                         } else if (*h == SIG_DFL) {
                             // If the previous is the default action, we set the default active again and
                             // raise it.
                             if constexpr (!PRODUCTION_BUILD)
-                                auto _ = StdPrint(StdStream::Out, "Calling default signal handler\n");
+                                auto _ = StdPrint(k_signal_output_stream, "Calling default signal handler\n");
                             signal(signal_num, SIG_DFL);
                             raise(signal_num);
                         } else if (*h == SIG_IGN) {
@@ -327,7 +338,7 @@ static void SignalHandler(int signal_num, siginfo_t* info, void* context) {
                             return;
                         } else if (*h == SIG_ERR) {
                             if constexpr (!PRODUCTION_BUILD)
-                                auto _ = StdPrint(StdStream::Out, "Error in signal handler\n");
+                                auto _ = StdPrint(k_signal_output_stream, "Error in signal handler\n");
                             _exit(EXIT_FAILURE);
                             return;
                         }
@@ -354,14 +365,15 @@ static void SignalHandler(int signal_num, siginfo_t* info, void* context) {
                 switch (previous_handler_function.tag) {
                     case Type::HandlerFunction: {
                         if constexpr (!PRODUCTION_BUILD)
-                            auto _ = StdPrint(StdStream::Out, "Calling previous signal handler\n");
+                            auto _ = StdPrint(k_signal_output_stream, "Calling previous signal handler\n");
                         auto h = previous_handler_function.GetFromTag<Type::HandlerFunction>();
                         (*h)(signal_num);
                         break;
                     }
                     case Type::HandlerWithInfoFunction: {
                         if constexpr (!PRODUCTION_BUILD)
-                            auto _ = StdPrint(StdStream::Out, "Calling previous info signal handler\n");
+                            auto _ =
+                                StdPrint(k_signal_output_stream, "Calling previous info signal handler\n");
                         auto h = previous_handler_function.GetFromTag<Type::HandlerWithInfoFunction>();
                         (*h)(signal_num, info, context);
                         break;
@@ -384,6 +396,8 @@ void StartupCrashHandler() {
     if (g_signals_installed) return;
     g_signals_installed = true;
 
+    InitStacktraceState();
+
     ArenaAllocatorWithInlineStorage<500> scratch_arena;
     if (auto const outcome = FloeKnownDirectory(scratch_arena, FloeKnownDirectories::Logs);
         outcome.HasValue())
@@ -401,7 +415,8 @@ void StartupCrashHandler() {
         if (r != 0) {
             char buffer[200] = {};
             strerror_r(errno, buffer, sizeof(buffer));
-            g_log.ErrorLn("failed setting signal handler {}, errno({}) {}",
+            g_log.ErrorLn({},
+                          "failed setting signal handler {}, errno({}) {}",
                           signal,
                           errno,
                           FromNullTerminated(buffer));

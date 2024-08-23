@@ -12,18 +12,20 @@ struct Writer {
     template <typename ObjectType>
     constexpr void Set(ObjectType& obj,
                        ErrorCodeOr<void> (*write_bytes)(ObjectType& obj, Span<u8 const> bytes)) {
-        object = &obj;
+        object = (void*)&obj;
         write_bytes_function_ptr = (void*)write_bytes;
         invoke_write_bytes = [](void* func_ptr, void* ob, Span<u8 const> bytes) -> ErrorCodeOr<void> {
             return ((decltype(write_bytes))func_ptr)(*(ObjectType*)ob, bytes);
         };
     }
 
-    constexpr void SetNoObject(ErrorCodeOr<void> (*write_bytes)(Span<u8 const> bytes)) {
-        object = nullptr;
+    template <typename UserData>
+    constexpr void SetContained(UserData user_data,
+                                ErrorCodeOr<void> (*write_bytes)(UserData user_data, Span<u8 const> bytes)) {
+        object = (void*)(uintptr)user_data;
         write_bytes_function_ptr = (void*)write_bytes;
-        invoke_write_bytes = [](void* func_ptr, void* _, Span<u8 const> bytes) -> ErrorCodeOr<void> {
-            return ((decltype(write_bytes))func_ptr)(bytes);
+        invoke_write_bytes = [](void* func_ptr, void* ob, Span<u8 const> bytes) -> ErrorCodeOr<void> {
+            return ((decltype(write_bytes))func_ptr)((UserData)(uintptr)ob, bytes);
         };
     }
 

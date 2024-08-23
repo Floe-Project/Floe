@@ -91,7 +91,7 @@ void ShutdownCrashHandler();
 
 enum class StdStream { Out, Err };
 
-// Unbuffered
+// Unbuffered, signal-safe on unix
 ErrorCodeOr<void> StdPrint(StdStream stream, String str);
 Writer StdWriter(StdStream stream);
 

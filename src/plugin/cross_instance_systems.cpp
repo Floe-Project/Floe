@@ -10,7 +10,6 @@
 
 CrossInstanceSystems::CrossInstanceSystems()
     : arena(PageAllocator::Instance(), Kb(4))
-    , logger(g_log_file)
     , paths(CreateFloePaths(arena))
     , settings(paths)
     , sample_library_server(thread_pool,
@@ -46,7 +45,8 @@ CrossInstanceSystems::~CrossInstanceSystems() {
 
     {
         auto outcome = WriteSettingsFileIfChanged(settings);
-        if (outcome.HasError()) logger.ErrorLn("Failed to write settings file: {}", outcome.Error());
+        if (outcome.HasError())
+            g_log.ErrorLn("global"_cat, "Failed to write settings file: {}", outcome.Error());
     }
 
     settings.tracking.filesystem_change_listeners.Remove(folder_settings_listener_id);

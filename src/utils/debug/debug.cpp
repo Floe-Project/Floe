@@ -12,7 +12,8 @@
 #include "foundation/foundation.hpp"
 #include "os/filesystem.hpp"
 #include "os/misc.hpp"
-#include "tests/framework.hpp"
+
+constexpr StdStream k_panic_stream = StdStream::Out;
 
 [[noreturn]] void DefaultPanicHandler(char const* message, SourceLocation loc) {
     auto const filename = FromNullTerminated(loc.file);
@@ -26,9 +27,9 @@
                   filename.data,
                   loc.line,
                   loc.function);
-    auto _ = StdPrint(StdStream::Err, buffer.AsString());
-    DumpCurrentStackTraceToStderr(4);
-    auto _ = StdPrint(StdStream::Err, "\n");
+    auto _ = StdPrint(k_panic_stream, buffer.AsString());
+    PrintCurrentStacktrace(k_panic_stream, {.ansi_colours = true}, 4);
+    auto _ = StdPrint(k_panic_stream, "\n");
     if constexpr (!PRODUCTION_BUILD) __builtin_debugtrap();
     __builtin_abort();
 }
@@ -48,10 +49,10 @@ void AssertionFailed(char const* expression, SourceLocation loc, char const* mes
 }
 
 static void HandleUbsanError(String msg) {
-    auto _ = StdPrint(StdStream::Err, ANSI_COLOUR_FOREGROUND_RED("UBSan: undefined behaviour detected: "));
-    auto _ = StdPrint(StdStream::Err, msg);
-    auto _ = StdPrint(StdStream::Err, "\n");
-    DumpCurrentStackTraceToStderr(3);
+    auto _ = StdPrint(k_panic_stream, ANSI_COLOUR_FOREGROUND_RED("UBSan: undefined behaviour detected: "));
+    auto _ = StdPrint(k_panic_stream, msg);
+    auto _ = StdPrint(k_panic_stream, "\n");
+    PrintCurrentStacktrace(k_panic_stream, {.ansi_colours = true}, 3);
     __builtin_abort();
 }
 
@@ -275,9 +276,8 @@ MINIMAL_HANDLER(cfi_check_fail, "cfi-check-fail")
 // End of LLVM-based code
 // =============================================================================================================
 
-void DumpInfoAboutUBSanToStderr() {
-    auto _ =
-        StdPrint(StdStream::Err, "Possibly undefined behaviour found with UBSan. UBSan checks include:\n");
+void DumpInfoAboutUBSan(StdStream stream) {
+    auto _ = StdPrint(stream, "Possibly undefined behaviour found with UBSan. UBSan checks include:\n");
     constexpr String k_ubsan_checks[] = {
         "  type-mismatch\n",       "  alignment-assumption\n",   "  add-overflow\n",
         "  sub-overflow\n",        "  mul-overflow\n",           "  negate-overflow\n",
@@ -289,7 +289,7 @@ void DumpInfoAboutUBSanToStderr() {
         "  nullability-return\n",  "  pointer-overflow\n",       "  cfi-check-fail\n",
     };
     for (auto check : k_ubsan_checks)
-        auto _ = StdPrint(StdStream::Err, check);
+        auto _ = StdPrint(stream, check);
 }
 
 struct BacktraceState {
@@ -331,6 +331,8 @@ struct BacktraceState {
     backtrace_state* state = nullptr;
 };
 
+void InitStacktraceState() { auto& _ = BacktraceState::Instance(); }
+
 Optional<StacktraceStack> CurrentStacktrace(int skip_frames) {
     auto& state = BacktraceState::Instance();
 
@@ -354,9 +356,9 @@ Optional<StacktraceStack> CurrentStacktrace(int skip_frames) {
     return result;
 }
 
-struct PrintStacktraceContext {
+struct StacktraceContext {
     StacktraceOptions options;
-    DynamicArray<char> result;
+    Writer writer;
     u32 line_num = 1;
 };
 
@@ -365,63 +367,67 @@ static int HandleStacktraceLine(void* data,
                                 char const* filename,
                                 int lineno,
                                 char const* function) {
-    auto& ctx = *(PrintStacktraceContext*)data;
+    auto& ctx = *(StacktraceContext*)data;
 
     String function_name = {};
     char* demangled_func = nullptr;
     DEFER { free(demangled_func); };
-    if (function) {
+    if (function && ctx.options.demangle) {
         int status;
         demangled_func = abi::__cxa_demangle(function, nullptr, nullptr, &status);
         if (status == 0) function_name = FromNullTerminated(demangled_func);
     }
     if (!function_name.size) function_name = function ? FromNullTerminated(function) : ""_s;
 
-    fmt::Append(ctx.result,
-                "[{}] {}{}{}:{}: {}\n",
-                ctx.line_num++,
-                ctx.options.ansi_colours ? ANSI_COLOUR_SET_FOREGROUND_BLUE : ""_s,
-                filename ? FromNullTerminated(filename) : "unknown-file"_s,
-                ctx.options.ansi_colours ? ANSI_COLOUR_RESET : ""_s,
-                lineno,
-                function_name);
+    auto _ = fmt::FormatToWriter(ctx.writer,
+                                 "[{}] {}{}{}:{}: {}\n",
+                                 ctx.line_num++,
+                                 ctx.options.ansi_colours ? ANSI_COLOUR_SET_FOREGROUND_BLUE : ""_s,
+                                 filename ? FromNullTerminated(filename) : "unknown-file"_s,
+                                 ctx.options.ansi_colours ? ANSI_COLOUR_RESET : ""_s,
+                                 lineno,
+                                 function_name);
     return 0;
 }
 
 static void HandleStacktraceError(void* data, char const* message, [[maybe_unused]] int errnum) {
-    auto& ctx = *(PrintStacktraceContext*)data;
+    auto& ctx = *(StacktraceContext*)data;
 
-    fmt::Append(ctx.result, "[{}] Stacktrace error: {}\n", ctx.line_num++, FromNullTerminated(message));
+    auto _ = fmt::FormatToWriter(ctx.writer,
+                                 "[{}] Stacktrace error: {}\n",
+                                 ctx.line_num++,
+                                 FromNullTerminated(message));
+}
+
+void WriteCurrentStacktrace(Writer writer, StacktraceOptions options, int skip_frames) {
+    auto& state = BacktraceState::Instance();
+    if (state.failed_init_error) {
+        auto _ = fmt::FormatToWriter(writer, "{}", *state.failed_init_error);
+        return;
+    }
+
+    StacktraceContext ctx {.options = options, .writer = writer};
+    backtrace_full(state.state, skip_frames, HandleStacktraceLine, HandleStacktraceError, &ctx);
 }
 
 MutableString StacktraceString(StacktraceStack const& stack, Allocator& a, StacktraceOptions options) {
     auto& state = BacktraceState::Instance();
     if (state.failed_init_error) return a.Clone(*state.failed_init_error);
 
-    PrintStacktraceContext ctx {.options = options, .result = {a}};
+    DynamicArray<char> result {a};
+    StacktraceContext ctx {.options = options, .writer = dyn::WriterFor(result)};
     for (auto const pc : stack)
         backtrace_pcinfo(state.state, pc, HandleStacktraceLine, HandleStacktraceError, &ctx);
 
-    return ctx.result.ToOwnedSpan();
+    return result.ToOwnedSpan();
 }
 
 MutableString CurrentStacktraceString(Allocator& a, StacktraceOptions options, int skip_frames) {
-    auto& state = BacktraceState::Instance();
-    if (state.failed_init_error) return a.Clone(*state.failed_init_error);
-
-    PrintStacktraceContext ctx {.options = options, .result = {a}};
-
-    backtrace_full(state.state, skip_frames, HandleStacktraceLine, HandleStacktraceError, &ctx);
-
-    return ctx.result.ToOwnedSpan();
+    DynamicArray<char> result {a};
+    WriteCurrentStacktrace(dyn::WriterFor(result), options, skip_frames);
+    return result.ToOwnedSpan();
 }
 
-void DumpCurrentStackTraceToStderr(int skip_frames) {
-    ArenaAllocatorWithInlineStorage<8000> scratch_arena {};
-    auto _ = StdPrint(StdStream::Err,
-                      CurrentStacktraceString(scratch_arena,
-                                              {
-                                                  .ansi_colours = true,
-                                              },
-                                              skip_frames));
+void PrintCurrentStacktrace(StdStream stream, StacktraceOptions options, int skip_frames) {
+    WriteCurrentStacktrace(StdWriter(stream), options, skip_frames);
 }

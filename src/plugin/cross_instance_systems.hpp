@@ -3,7 +3,6 @@
 
 #pragma once
 #include "foundation/foundation.hpp"
-#include "utils/logger/logger.hpp"
 #include "utils/thread_extra/thread_pool.hpp"
 
 #include "common/paths.hpp"
@@ -18,7 +17,6 @@ struct CrossInstanceSystems {
     u64 folder_settings_listener_id;
     ArenaAllocator arena;
     ThreadsafeErrorNotifications error_notifications {};
-    Logger& logger;
     FloePaths paths;
     SettingsFile settings;
     ThreadPool thread_pool;

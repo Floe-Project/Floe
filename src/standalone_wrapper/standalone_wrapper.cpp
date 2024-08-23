@@ -18,7 +18,6 @@
 #include <test_utils.h>
 
 #include "os/misc.hpp"
-#include "utils/debug/debug.hpp"
 #include "utils/logger/logger.hpp"
 
 #include "plugin/plugin.hpp"
@@ -262,7 +261,7 @@ static bool OpenMidi(Standalone& standalone) {
     ASSERT(standalone.midi_stream == nullptr);
 
     if (auto result = Pm_Initialize(); result != pmNoError) {
-        g_log.ErrorLn("Pm_Initialize: {}", FromNullTerminated(Pm_GetErrorText(result)));
+        g_log.ErrorLn(k_main_log_cat, "Pm_Initialize: {}", FromNullTerminated(Pm_GetErrorText(result)));
         return false;
     }
 
@@ -286,7 +285,7 @@ static bool OpenMidi(Standalone& standalone) {
     if (auto result = Pm_OpenInput(&standalone.midi_stream, *id_to_use, nullptr, 200, nullptr, nullptr);
         result != pmNoError) {
         standalone.floe_host_ext.standalone_midi_device_error = true;
-        g_log.ErrorLn("Pm_OpenInput: {}", FromNullTerminated(Pm_GetErrorText(result)));
+        g_log.ErrorLn(k_main_log_cat, "Pm_OpenInput: {}", FromNullTerminated(Pm_GetErrorText(result)));
         return false;
     }
 
@@ -452,12 +451,12 @@ static ErrorCodeOr<void> Main() {
     DEFER { standalone.plugin.destroy(&standalone.plugin); };
 
     if (!OpenMidi(standalone)) {
-        g_log.ErrorLn("Could not open Midi");
+        g_log.ErrorLn(k_main_log_cat, "Could not open Midi");
         return ErrorCode {StandaloneError::DeviceError};
     }
     DEFER { CloseMidi(standalone); };
     if (!OpenAudio(standalone)) {
-        g_log.ErrorLn("Could not open Audio");
+        g_log.ErrorLn(k_main_log_cat, "Could not open Audio");
         return ErrorCode {StandaloneError::DeviceError};
     }
     DEFER { CloseAudio(standalone); };
@@ -523,7 +522,7 @@ static ErrorCodeOr<void> Main() {
 int main() {
     auto const o = Main();
     if (o.HasError()) {
-        g_log.ErrorLn("Standalone error: {}", o.Error());
+        g_log.ErrorLn(k_main_log_cat, "Standalone error: {}", o.Error());
         return 1;
     }
     return 0;

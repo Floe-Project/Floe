@@ -6,6 +6,8 @@
 #include "tests/framework.hpp"
 #include "utils/leak_detecting_allocator.hpp"
 
+constexpr auto k_foundation_mod_cat = "foundation"_cat;
+
 TEST_CASE(TestTaggedUnion) {
     enum class E {
         A,
@@ -19,24 +21,31 @@ TEST_CASE(TestTaggedUnion) {
 
     SUBCASE("visit") {
         u = 999;
-        u.Visit([&](auto const& arg) { tester.log.DebugLn("Tagged union value is: {}", arg); });
+        u.Visit([&](auto const& arg) {
+            tester.log.DebugLn(k_foundation_mod_cat, "Tagged union value is: {}", arg);
+        });
 
         u = 3.14f;
-        u.Visit([&](auto const& arg) { tester.log.DebugLn("Tagged union value is: {}", arg); });
+        u.Visit([&](auto const& arg) {
+            tester.log.DebugLn(k_foundation_mod_cat, "Tagged union value is: {}", arg);
+        });
 
         u = E::D;
-        u.Visit(
-            [&](auto const&) { tester.log.DebugLn("ERROR not expected a tag without a type to be called"); });
+        u.Visit([&](auto const&) {
+            tester.log.DebugLn(k_foundation_mod_cat, "ERROR not expected a tag without a type to be called");
+        });
 
         u = "hello"_s;
-        u.Visit([&](auto const& arg) { tester.log.DebugLn("Tagged union value is: {}", arg); });
+        u.Visit([&](auto const& arg) {
+            tester.log.DebugLn(k_foundation_mod_cat, "Tagged union value is: {}", arg);
+        });
 
-        tester.log.DebugLn("Formatting a tagged union: {}", u);
+        tester.log.DebugLn({}, "Formatting a tagged union: {}", u);
     }
 
     SUBCASE("format") {
         u = "hello"_s;
-        tester.log.DebugLn("Formatting a tagged union: {}", u);
+        tester.log.DebugLn({}, "Formatting a tagged union: {}", u);
     }
 
     SUBCASE("comparison") {
@@ -1151,7 +1160,7 @@ TEST_CASE(TestHashTable) {
         {
             auto v = tab.Find("bar");
             REQUIRE(v);
-            tester.log.DebugLn("{}", *v);
+            tester.log.DebugLn({}, "{}", *v);
         }
 
         {
@@ -1159,7 +1168,7 @@ TEST_CASE(TestHashTable) {
             for (auto item : tab) {
                 CHECK(item.value_ptr);
                 CHECK(item.key.size);
-                tester.log.DebugLn("{} -> {}", item.key, *item.value_ptr);
+                tester.log.DebugLn(k_foundation_mod_cat, "{} -> {}", item.key, *item.value_ptr);
                 if (item.key == "112") (*item.value_ptr)++;
                 ++count;
             }
@@ -1689,13 +1698,13 @@ TEST_CASE(TestFormat) {
             char const* c;
         };
         TestStruct const test {1, 2, "three"};
-        tester.log.DebugLn("struct1 is: {}", fmt::DumpStruct(test));
+        tester.log.DebugLn(k_foundation_mod_cat, "struct1 is: {}", fmt::DumpStruct(test));
 
         auto const arr = Array {
             TestStruct {1, 2, "three"},
             TestStruct {4, 5, "six"},
         };
-        tester.log.DebugLn("struct2 is: {}", fmt::DumpStruct(arr));
+        tester.log.DebugLn(k_foundation_mod_cat, "struct2 is: {}", fmt::DumpStruct(arr));
 
         struct OtherStruct {
             int a;
@@ -1705,9 +1714,9 @@ TEST_CASE(TestFormat) {
             TestStruct e;
         };
         OtherStruct const other {1, 2, "three", {4, 5, "six"}, {7, 8, "nine"}};
-        tester.log.DebugLn("struct3 is: {}", fmt::DumpStruct(other));
+        tester.log.DebugLn(k_foundation_mod_cat, "struct3 is: {}", fmt::DumpStruct(other));
 
-        tester.log.DebugLn("struct4 is: {}", fmt::DumpStruct(tester));
+        tester.log.DebugLn(k_foundation_mod_cat, "struct4 is: {}", fmt::DumpStruct(tester));
     }
 
     return k_success;
@@ -2459,7 +2468,7 @@ TEST_CASE(TestParseCommandLineArgs) {
     auto const check_arg = [&](HashTable<String, String> table, String arg, String value) {
         CAPTURE(arg);
         CAPTURE(value);
-        tester.log.DebugLn("Checking arg: {}, value: {}", arg, value);
+        tester.log.DebugLn(k_foundation_mod_cat, "Checking arg: {}, value: {}", arg, value);
         auto f = table.Find(arg);
         CHECK(f != nullptr);
         (void)f;
@@ -2720,7 +2729,7 @@ TEST_CASE(TestAllocatorTypes) {
         else
             PanicIfReached();
 
-        tester.log.DebugLn("Speed benchmark: {} for {}", stopwatch, type_name);
+        tester.log.DebugLn(k_foundation_mod_cat, "Speed benchmark: {} for {}", stopwatch, type_name);
     }
     return k_success;
 }

@@ -36,7 +36,7 @@ PuglWorld* GuiPlatform::g_world = nullptr;
 
 struct FloeInstance {
     FloeInstance(clap_host const* clap_host);
-    ~FloeInstance() { g_log_file.TraceLn(); }
+    ~FloeInstance() { g_log.TraceLn(k_main_log_cat); }
 
     clap_host const& host;
     clap_plugin clap_plugin;
@@ -89,9 +89,9 @@ clap_plugin_state const floe_plugin_state {
     },
 };
 
-static bool LogIfError(ErrorCodeOr<void> const& ec, Logger& logger, String name) {
+static bool LogIfError(ErrorCodeOr<void> const& ec, String name) {
     if (ec.HasError()) {
-        logger.ErrorLn("{}: {}", name, ec.Error());
+        g_log.ErrorLn(k_main_log_cat, "{}: {}", name, ec.Error());
         return false;
     }
     return true;
@@ -145,13 +145,9 @@ clap_plugin_gui const floe_gui {
         ZoneScopedMessage(floe.trace_config, "gui create");
         ASSERT(IsMainThread(floe.host));
 
-        floe.gui_platform.Emplace(floe.host,
-                                  g_cross_instance_systems->settings,
-                                  g_cross_instance_systems->logger);
+        floe.gui_platform.Emplace(floe.host, g_cross_instance_systems->settings);
 
-        auto const result = LogIfError(CreateView(*floe.gui_platform, *floe.plugin),
-                                       g_cross_instance_systems->logger,
-                                       "CreateView");
+        auto const result = LogIfError(CreateView(*floe.gui_platform, *floe.plugin), "CreateView");
 
         return result;
     },
@@ -180,7 +176,7 @@ clap_plugin_gui const floe_gui {
     // [main-thread]
     .set_scale = [](clap_plugin_t const* plugin, f64 scale) -> bool {
         (void)plugin;
-        g_log.DebugLn("👏 set_scale {}", scale);
+        g_log.DebugLn(k_clap_log_cat, "set_scale {}", scale);
         return false; // we (pugl) negotiate this with the OS ourselves
     },
 
@@ -195,7 +191,7 @@ clap_plugin_gui const floe_gui {
         auto size = WindowSize(*floe.gui_platform);
         *width = size.width;
         *height = size.height;
-        g_log.DebugLn("👏 get_size {} {}", *width, *height);
+        g_log.DebugLn(k_clap_log_cat, "get_size {} {}", *width, *height);
         return true;
     },
 
@@ -213,7 +209,10 @@ clap_plugin_gui const floe_gui {
         auto const ratio = gui_settings::CurrentAspectRatio(g_cross_instance_systems->settings.settings.gui);
         hints->aspect_ratio_width = ratio.width;
         hints->aspect_ratio_height = ratio.height;
-        g_log.DebugLn("👏 get_resize_hints {}x{}", hints->aspect_ratio_width, hints->aspect_ratio_height);
+        g_log.DebugLn(k_clap_log_cat,
+                      "get_resize_hints {}x{}",
+                      hints->aspect_ratio_width,
+                      hints->aspect_ratio_height);
         return true;
     },
 
@@ -232,7 +231,8 @@ clap_plugin_gui const floe_gui {
         auto const aspect_ratio_conformed_size = gui_settings::GetNearestAspectRatioSizeInsideSize(
             {CheckedCast<u16>(*width), CheckedCast<u16>(*height)},
             gui_settings::CurrentAspectRatio(g_cross_instance_systems->settings.settings.gui));
-        g_log.DebugLn("👏 adjust_size in: {}x{}, out: {}x{}",
+        g_log.DebugLn(k_clap_log_cat,
+                      "adjust_size in: {}x{}, out: {}x{}",
                       *width,
                       *height,
                       aspect_ratio_conformed_size.width,
@@ -257,7 +257,8 @@ clap_plugin_gui const floe_gui {
         auto const aspect_ratio_conformed_size = gui_settings::GetNearestAspectRatioSizeInsideSize(
             {CheckedCast<u16>(width), CheckedCast<u16>(height)},
             gui_settings::CurrentAspectRatio(g_cross_instance_systems->settings.settings.gui));
-        g_log.DebugLn("👏 set_size in: {}x{}, constrained {}x{}, result: {}",
+        g_log.DebugLn(k_clap_log_cat,
+                      "set_size in: {}x{}, constrained {}x{}, result: {}",
                       width,
                       height,
                       aspect_ratio_conformed_size.width,
@@ -277,8 +278,7 @@ clap_plugin_gui const floe_gui {
         auto& floe = *(FloeInstance*)plugin->plugin_data;
         ZoneScopedMessage(floe.trace_config, "gui set_parent");
         ASSERT(IsMainThread(floe.host));
-        auto const result =
-            LogIfError(SetParent(*floe.gui_platform, *window), g_cross_instance_systems->logger, "SetParent");
+        auto const result = LogIfError(SetParent(*floe.gui_platform, *window), "SetParent");
         // Bitwig never calls show()
         auto _ = SetVisible(*floe.gui_platform, true);
         return result;
@@ -292,9 +292,7 @@ clap_plugin_gui const floe_gui {
         auto& floe = *(FloeInstance*)plugin->plugin_data;
         ZoneScopedMessage(floe.trace_config, "gui set_transient");
         ASSERT(IsMainThread(floe.host));
-        return LogIfError(SetTransient(*floe.gui_platform, *window),
-                          g_cross_instance_systems->logger,
-                          "SetTransient");
+        return LogIfError(SetTransient(*floe.gui_platform, *window), "SetTransient");
     },
 
     // Suggests a window title. Only for floating windows.
@@ -310,15 +308,14 @@ clap_plugin_gui const floe_gui {
         auto& floe = *(FloeInstance*)plugin->plugin_data;
         ZoneScopedMessage(floe.trace_config, "gui show");
         ASSERT(IsMainThread(floe.host));
-        bool const result =
-            LogIfError(SetVisible(*floe.gui_platform, true), g_cross_instance_systems->logger, "SetVisible");
+        bool const result = LogIfError(SetVisible(*floe.gui_platform, true), "SetVisible");
         if (result) {
             static bool shown_graphics_info = false;
             if (!shown_graphics_info) {
                 shown_graphics_info = true;
-                g_cross_instance_systems->logger.InfoLn(
-                    "\n{}",
-                    floe.gui_platform->graphics_ctx->graphics_device_info.Items());
+                g_log.InfoLn(k_main_log_cat,
+                             "\n{}",
+                             floe.gui_platform->graphics_ctx->graphics_device_info.Items());
             }
         }
         return result;
@@ -333,9 +330,7 @@ clap_plugin_gui const floe_gui {
         auto& floe = *(FloeInstance*)plugin->plugin_data;
         ZoneScopedMessage(floe.trace_config, "gui hide");
         ASSERT(IsMainThread(floe.host));
-        return LogIfError(SetVisible(*floe.gui_platform, false),
-                          g_cross_instance_systems->logger,
-                          "SetVisible");
+        return LogIfError(SetVisible(*floe.gui_platform, false), "SetVisible");
     },
 };
 
@@ -712,7 +707,7 @@ clap_plugin const floe_plugin {
 };
 
 FloeInstance::FloeInstance(clap_host const* host) : host(*host) {
-    g_log_file.TraceLn();
+    g_log_file.TraceLn(k_main_log_cat);
     clap_plugin = floe_plugin;
     clap_plugin.plugin_data = this;
 }

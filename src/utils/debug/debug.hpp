@@ -46,17 +46,19 @@ template <typename... Args>
 
 struct StacktraceOptions {
     bool ansi_colours = false;
+    bool demangle = true; // demangling is not signal-safe
 };
 
 using StacktraceStack = DynamicArrayInline<uintptr, 32>;
 Optional<StacktraceStack> CurrentStacktrace(int skip_frames = 1);
+void InitStacktraceState();
 
 MutableString CurrentStacktraceString(Allocator& a, StacktraceOptions options = {}, int skip_frames = 1);
 MutableString StacktraceString(StacktraceStack const&, Allocator& a, StacktraceOptions options = {});
+void PrintCurrentStacktrace(StdStream stream, StacktraceOptions options, int skip_frames);
+void WriteCurrentStacktrace(Writer writer, StacktraceOptions options, int skip_frames);
 
-void DumpCurrentStackTraceToStderr(int skip_frames = 2);
-
-void DumpInfoAboutUBSanToStderr();
+void DumpInfoAboutUBSan(StdStream stream);
 
 struct TracyMessageConfig {
     String category;

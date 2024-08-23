@@ -123,7 +123,7 @@ class PassedSubcaseStacks {
 
 struct TestLogger : Logger {
     TestLogger(Tester& tester) : tester(tester) {}
-    void LogFunction(String str, LogLevel level, bool add_newline) override;
+    void LogFunction(String category, String str, LogLevel level, bool add_newline) override;
     Tester& tester;
     LogLevel max_level_allowed = LogLevel::Info;
 };

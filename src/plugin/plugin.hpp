@@ -3,6 +3,7 @@
 
 #pragma once
 #include "os/threading.hpp"
+#include "utils/logger/logger.hpp"
 
 #include "clap/ext/gui.h"
 #include "clap/ext/thread-check.h"
@@ -90,6 +91,8 @@ struct FloeClapExtensionHost {
 };
 
 struct GuiFrameInput;
+
+constexpr auto k_clap_log_cat = "👏clap"_cat;
 
 inline bool IsMainThread(clap_host const& host) {
     if constexpr (PRODUCTION_BUILD) return true;

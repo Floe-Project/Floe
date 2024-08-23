@@ -41,15 +41,15 @@ ErrorCodeOr<Paths> ScanLibraryFolder(ArenaAllocator& arena, String library_folde
     }
 
     if (!result.lua.size) {
-        g_cli_out.ErrorLn("No Floe Lua file found in {}", library_folder);
+        g_cli_out.ErrorLn({}, "No Floe Lua file found in {}", library_folder);
         return ErrorCode {CommonError::NotFound};
     }
 
     if (!result.license.size) {
-        g_cli_out.ErrorLn("No license file found in {}", library_folder);
-        g_cli_out.ErrorLn("Expected one of the following:");
+        g_cli_out.ErrorLn({}, "No license file found in {}", library_folder);
+        g_cli_out.ErrorLn({}, "Expected one of the following:");
         for (auto const& filename : k_license_filenames)
-            g_cli_out.ErrorLn("  {}", filename);
+            g_cli_out.ErrorLn({}, "  {}", filename);
         return ErrorCode {CommonError::NotFound};
     }
 
@@ -62,7 +62,11 @@ static ErrorCodeOr<sample_lib::Library*> ReadLua(String lua_path, ArenaAllocator
     ArenaAllocator scratch_arena {PageAllocator::Instance()};
     auto const outcome = sample_lib::ReadLua(reader, lua_path, arena, scratch_arena, {});
     if (outcome.HasError()) {
-        g_cli_out.ErrorLn("Error reading {}: {}, {}", lua_path, outcome.Error().message, outcome.Error().code);
+        g_cli_out.ErrorLn({},
+                          "Error reading {}: {}, {}",
+                          lua_path,
+                          outcome.Error().message,
+                          outcome.Error().code);
         return outcome.Error().code;
     }
 
@@ -88,7 +92,7 @@ static ErrorCodeOr<String> MetadataIni(String library_folder, ArenaAllocator& ar
     auto const metadata_ini_path = path::Join(arena, Array {library_folder, k_metadata_ini_filename});
     auto const outcome = ReadEntireFile(metadata_ini_path, arena);
     if (outcome.HasError()) {
-        g_cli_out.ErrorLn("ERROR {}: {}", metadata_ini_path, outcome.Error());
+        g_cli_out.ErrorLn({}, "ERROR {}: {}", metadata_ini_path, outcome.Error());
         return outcome.Error();
     }
     return outcome.Value();
@@ -116,7 +120,7 @@ struct MetadataParser {
 
             auto const equals_pos = Find(line, '=');
             if (!equals_pos) {
-                g_cli_out.ErrorLn("Invalid line in {}: {}", k_metadata_ini_filename, line);
+                g_cli_out.ErrorLn({}, "Invalid line in {}: {}", k_metadata_ini_filename, line);
                 return ErrorCode {CommonError::FileFormatIsInvalid};
             }
 
@@ -127,7 +131,10 @@ struct MetadataParser {
                 cursor = (usize)(value.data - ini.data) + k_multiline_delim.size;
                 auto const end = FindSpan(ini, k_multiline_delim, *cursor);
                 if (!end) {
-                    g_cli_out.ErrorLn("Unterminated multiline value in {}: {}", k_metadata_ini_filename, key);
+                    g_cli_out.ErrorLn({},
+                                      "Unterminated multiline value in {}: {}",
+                                      k_metadata_ini_filename,
+                                      key);
                     return ErrorCode {CommonError::FileFormatIsInvalid};
                 }
 
@@ -156,7 +163,7 @@ static ErrorCodeOr<Metadata> ReadMetadata(String library_folder, ArenaAllocator&
         auto const& [key, value] = *opt_line;
 
         if (key.size) {
-            g_cli_out.ErrorLn("Unknown key in {}: {}", k_metadata_ini_filename, key);
+            g_cli_out.ErrorLn({}, "Unknown key in {}: {}", k_metadata_ini_filename, key);
             return ErrorCode {CommonError::FileFormatIsInvalid};
         }
     }
@@ -193,7 +200,7 @@ static ErrorCodeOr<void> Main(String library_folder) {
     auto const output_path =
         path::Join(arena, Array {library_folder, fmt::Format(arena, "About {}.html"_s, lib->name)});
     TRY(WriteFile(output_path, result_html));
-    g_cli_out.InfoLn("Successfully wrote '{}'", output_path);
+    g_cli_out.InfoLn({}, "Successfully wrote '{}'", output_path);
 
     return k_success;
 }
@@ -202,7 +209,7 @@ int main(int argc, char** argv) {
     ArenaAllocator arena {PageAllocator::Instance()};
 
     if (argc != 2) {
-        g_cli_out.ErrorLn("Usage: {} <library-folder>", argv[0]);
+        g_cli_out.ErrorLn({}, "Usage: {} <library-folder>", argv[0]);
         return 1;
     }
 
@@ -210,7 +217,7 @@ int main(int argc, char** argv) {
 
     auto result = Main(library_folder);
     if (result.HasError()) {
-        g_cli_out.ErrorLn("Error: {}", result.Error());
+        g_cli_out.ErrorLn({}, "Error: {}", result.Error());
         return 1;
     }
 

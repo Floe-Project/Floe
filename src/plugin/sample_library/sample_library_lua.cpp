@@ -11,12 +11,13 @@
 #include "os/filesystem.hpp"
 #include "os/misc.hpp"
 #include "tests/framework.hpp"
-#include "utils/debug/debug.hpp"
 
 #include "common/constants.hpp"
 #include "sample_library.hpp"
 
 namespace sample_lib {
+
+constexpr auto k_log_cat = "lua"_cat;
 
 ErrorCodeCategory const lua_error_category {
     .category_id = "LUA",
@@ -1026,7 +1027,7 @@ static VoidOrError<Error> TryRunLuaCode(LuaState& ctx, int r) {
         }
         case LUA_ERRMEM: return Error {LuaErrorCode::Memory, {}};
         case LUA_ERRERR:
-            g_log.ErrorLn("🐛: error while running the error handler function");
+            g_log.ErrorLn(k_log_cat, "error while running the error handler function");
             return Error {LuaErrorCode::Unexpected, {}};
     }
     return Error {LuaErrorCode::Unexpected, {}};
@@ -1226,12 +1227,12 @@ LibraryPtrOrError ReadLua(Reader& reader,
                 case LUA_ERRMEM: return Error {LuaErrorCode::Memory, {}};
             }
 
-            g_log.ErrorLn("🐛: unknown error from lua_load: {}", r);
+            g_log.ErrorLn(k_log_cat, "unknown error from lua_load: {}", r);
             return Error {LuaErrorCode::Unexpected, {}};
         }
 
         if (!lua_isfunction(ctx.lua, -1)) {
-            g_log.ErrorLn("🐛: we're expecting the lua file to be a function");
+            g_log.ErrorLn(k_log_cat, "we're expecting the lua file to be a function");
             return Error {LuaErrorCode::Unexpected, {}};
         }
 
@@ -1560,7 +1561,7 @@ bool CheckAllReferencedFilesExist(Library const& lib, Logger& logger) {
     auto check_file = [&](String path) {
         auto outcome = lib.create_file_reader(lib, path);
         if (outcome.HasError()) {
-            logger.ErrorLn("Error with file \"{}\" referenced in Lua. {}.", path, outcome.Error());
+            logger.ErrorLn(k_log_cat, "Error with file \"{}\" referenced in Lua. {}.", path, outcome.Error());
             success = false;
         }
     };
@@ -1588,7 +1589,7 @@ TEST_CASE(TestWordWrap) {
         "This is a very long sentence that will be split into multiple lines, with any luck at least.",
         dyn::WriterFor(buffer),
         30));
-    tester.log.DebugLn("{}", buffer);
+    tester.log.DebugLn(k_log_cat, "{}", buffer);
     return k_success;
 }
 
@@ -1600,9 +1601,9 @@ TEST_CASE(TestDocumentedExampleIsValid) {
     LuaCodePrinter printer;
     TRY(printer.PrintWholeLua(dyn::WriterFor(buf),
                               {.mode_flags = LuaCodePrinter::PrintModeFlagsDocumentedExample}));
-    tester.log.Debug("{}", buf);
+    tester.log.Debug(k_log_cat, "{}", buf);
     auto o = ReadLua(buf, "doc.lua", result_arena, scratch_arena);
-    if (auto err = o.TryGet<Error>()) tester.log.ErrorLn("Error: {}, {}", err->code, err->message);
+    if (auto err = o.TryGet<Error>()) tester.log.ErrorLn(k_log_cat, "Error: {}, {}", err->code, err->message);
     CHECK(o.Is<Library*>());
 
     return k_success;
@@ -1618,10 +1619,10 @@ TEST_CASE(TestIncorrectParameters) {
         CHECK(o.Is<Error>());
         if (o.Is<Error>()) {
             auto const err = o.Get<Error>();
-            tester.log.DebugLn("Success: this error was expected: {}, {}", err.code, err.message);
+            tester.log.DebugLn(k_log_cat, "Success: this error was expected: {}, {}", err.code, err.message);
             CHECK(o.Get<Error>().code == LuaErrorCode::Runtime);
         } else
-            tester.log.ErrorLn("Error: not expecting this code to succeed: {}", lua);
+            tester.log.ErrorLn(k_log_cat, "Error: not expecting this code to succeed: {}", lua);
     };
 
     SUBCASE("all arguments are functions") {
@@ -1723,7 +1724,8 @@ TEST_CASE(TestAutoMapKeyRange) {
 
     SUBCASE("2 files") {
         auto r = ReadLua(create_lua(Array {10, 30}), "test.lua", result_arena, arena);
-        if (auto err = r.TryGet<Error>()) tester.log.ErrorLn("Error: {}, {}", err->code, err->message);
+        if (auto err = r.TryGet<Error>())
+            tester.log.ErrorLn(k_log_cat, "Error: {}, {}", err->code, err->message);
         REQUIRE(!r.Is<Error>());
 
         auto library = r.Get<Library*>();
@@ -1742,7 +1744,8 @@ TEST_CASE(TestAutoMapKeyRange) {
 
     SUBCASE("1 file") {
         auto r = ReadLua(create_lua(Array {60}), "test.lua", result_arena, arena);
-        if (auto err = r.TryGet<Error>()) tester.log.ErrorLn("Error: {}, {}", err->code, err->message);
+        if (auto err = r.TryGet<Error>())
+            tester.log.ErrorLn(k_log_cat, "Error: {}, {}", err->code, err->message);
         REQUIRE(!r.Is<Error>());
 
         auto library = r.Get<Library*>();
@@ -1800,7 +1803,7 @@ TEST_CASE(TestBasicFile) {
                      "test.lua",
                      result_arena,
                      arena);
-    if (auto err = r.TryGet<Error>()) tester.log.ErrorLn("Error: {}, {}", err->code, err->message);
+    if (auto err = r.TryGet<Error>()) tester.log.ErrorLn(k_log_cat, "Error: {}, {}", err->code, err->message);
     REQUIRE(!r.Is<Error>());
 
     auto& lib = *r.Get<Library*>();
@@ -1865,12 +1868,13 @@ TEST_CASE(TestErrorHandling) {
         if (auto err = outcome.TryGetFromTag<ResultType::Error>()) {
             if (expected.Succeeded()) {
                 tester.log.ErrorLn(
+                    k_log_cat,
                     "Error: we expected the lua code to succeed interpretation but it failed. Lua code:\n{}\nError:\n{d}, {}",
                     lua_code,
                     err->code,
                     err->message);
             } else {
-                tester.log.DebugLn("Success: failure expected: {d}", err->code);
+                tester.log.DebugLn(k_log_cat, "Success: failure expected: {d}", err->code);
             }
 
             REQUIRE(expected.HasError());
@@ -1878,6 +1882,7 @@ TEST_CASE(TestErrorHandling) {
         } else {
             if (expected.HasError()) {
                 tester.log.ErrorLn(
+                    k_log_cat,
                     "Error: we expected the lua code to fail interpretation but it succeeded. Lua code:\n{}",
                     lua_code);
             }

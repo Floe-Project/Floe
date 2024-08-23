@@ -160,7 +160,7 @@ ErrorCodeOr<File> OpenFile(String filename, FileMode mode) {
     return File {handle};
 }
 
-EXTERN_C IMAGE_DOS_HEADER __ImageBase; // NOLINT(readability-identifier-naming)
+EXTERN_C IMAGE_DOS_HEADER __ImageBase; // NOLINT(readability-identifier-naming, bugprone-reserved-identifier)
 
 struct Win32KnownPath {
     Win32KnownPath(PWSTR p) : path(FromNullTerminated(p)) {}

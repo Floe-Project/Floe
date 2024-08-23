@@ -26,6 +26,7 @@ struct ImageBytesManaged final : ImageBytes {
         if (rgba) stbi_image_free(rgba);
     }
     ImageBytesManaged() {}
+    ImageBytesManaged(ImageBytes image) : ImageBytes {image} {}
     ImageBytesManaged(ImageBytesManaged&& other) : ImageBytes {.rgba = other.rgba, .size = other.size} {
         other.rgba = nullptr;
     }
@@ -54,10 +55,10 @@ static ErrorCodeOr<ImageBytesManaged> DecodeJpgOrPng(Span<u8 const> image_data) 
 
     if (!rgba) return ErrorCode(CommonError::FileFormatIsInvalid);
 
-    ImageBytesManaged result;
-    result.rgba = rgba;
-    result.size = {CheckedCast<u16>(width), CheckedCast<u16>(height)};
-    return result;
+    return ImageBytes {
+        .rgba = rgba,
+        .size = {CheckedCast<u16>(width), CheckedCast<u16>(height)},
+    };
 }
 
 PUBLIC ErrorCodeOr<ImageBytesManaged> DecodeImage(Span<u8 const> image_data) {
@@ -71,11 +72,12 @@ PUBLIC ErrorCodeOr<ImageBytesManaged> DecodeImageFromFile(String filename) {
     return DecodeImage(file_data.ToByteSpan());
 }
 
-PUBLIC ImageBytes ShrinkImage(ImageBytes image,
-                              u16 bounding_width,
-                              u16 shrinked_to_width,
-                              ArenaAllocator& arena,
-                              bool always_allocate) {
+PUBLIC ImageBytes ShrinkImageIfNeeded(ImageBytes image,
+                                      u16 bounding_width,
+                                      u16 shrunk_width,
+                                      ArenaAllocator& arena,
+                                      bool always_allocate) {
+    // see if it's already small enough
     if (image.size.width <= bounding_width) {
         if (!always_allocate)
             return image;
@@ -89,22 +91,21 @@ PUBLIC ImageBytes ShrinkImage(ImageBytes image,
 
     // maintain aspect ratio
     auto const shrunk_height =
-        CheckedCast<u16>((f32)image.size.height * ((f32)shrinked_to_width / (f32)image.size.width));
+        CheckedCast<u16>((f32)image.size.height * ((f32)shrunk_width / (f32)image.size.width));
 
     Stopwatch stopwatch;
     DEFER {
         g_log.DebugLn("Shrinking image {}x{} to {}x{} took {} ms",
                       image.size.width,
                       image.size.height,
-                      shrinked_to_width,
+                      shrunk_width,
                       shrunk_height,
                       stopwatch.MillisecondsElapsed());
     };
 
     ImageBytes result {
-        .rgba = arena.AllocateExactSizeUninitialised<u8>(shrinked_to_width * shrunk_height * k_rgba_channels)
-                    .data,
-        .size = {shrinked_to_width, shrunk_height},
+        .rgba = arena.AllocateExactSizeUninitialised<u8>(shrunk_width * shrunk_height * k_rgba_channels).data,
+        .size = {shrunk_width, shrunk_height},
     };
 
     stbir_resize_uint8_linear(image.rgba,
@@ -306,7 +307,7 @@ PUBLIC ImageBytes CreateBlurredLibraryBackground(ImageBytes original,
 
     // Shrink the image down for better speed. We are about to blur it, we don't need detail.
     auto const shrunk_width = CheckedCast<u16>(original.size.width * options.downscale_factor);
-    auto const result = ShrinkImage(original, shrunk_width, shrunk_width, arena, true);
+    auto const result = ShrinkImageIfNeeded(original, shrunk_width, shrunk_width, arena, true);
 
     // For ease-of-use and performance, we convert the image to f32x4 format
     auto const pixels = ImageBytesToImageF32(result, arena);

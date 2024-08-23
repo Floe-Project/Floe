@@ -18,24 +18,6 @@ struct PluginInstance;
 struct FloeInstance;
 struct GuiFrameInput;
 
-struct ImagePixelsRgba {
-    NON_COPYABLE(ImagePixelsRgba);
-    ~ImagePixelsRgba() {
-        if (free_data && data) free_data(data);
-    }
-    ImagePixelsRgba() {}
-    ImagePixelsRgba(ImagePixelsRgba&& other)
-        : free_data(Move(other.free_data))
-        , data(other.data)
-        , size(other.size) {
-        other.data = nullptr;
-    }
-
-    TrivialFixedSizeFunction<24, void(u8*)> free_data {};
-    u8* data {};
-    UiSize size {};
-};
-
 struct LibraryImages {
     sample_lib::LibraryId library_id {};
     Optional<graphics::ImageID> icon {};
@@ -196,7 +178,6 @@ struct Gui {
 //
 //
 
-graphics::ImageID CopyPixelsToGpuLoadedImage(Gui* g, ImagePixelsRgba const& px);
 Optional<LibraryImages> LibraryImagesFromLibraryId(Gui* g, sample_lib::LibraryIdRef library_id);
 
 void GUIPresetLoaded(Gui* g, PluginInstance* a, bool is_first_preset);

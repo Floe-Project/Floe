@@ -561,6 +561,11 @@ const BuildContext = struct {
     dep_vst3_sdk: *std.Build.Dependency,
 };
 
+const stb_image_config_flags = [_][]const u8{
+    "-DSTBI_NO_STDIO",
+    "-DSTBI_MAX_DIMENSIONS=65535", // we use u16 for dimensions
+};
+
 fn genericFlags(context: *BuildContext, target: std.Build.ResolvedTarget, extra_flags: []const []const u8) ![][]const u8 {
     var flags = std.ArrayList([]const u8).init(context.b.allocator);
     try flags.appendSlice(extra_flags);
@@ -570,9 +575,9 @@ fn genericFlags(context: *BuildContext, target: std.Build.ResolvedTarget, extra_
     try flags.append("-D_FILE_OFFSET_BITS=64");
     try flags.append("-ftime-trace");
 
+    try flags.appendSlice(&stb_image_config_flags);
     try flags.append("-DMINIZ_USE_UNALIGNED_LOADS_AND_STORES=0");
     try flags.append("-DMINIZ_NO_STDIO");
-    try flags.append("-DSTBI_NO_STDIO");
     try flags.append(context.b.fmt("-DMINIZ_LITTLE_ENDIAN={d}", .{@intFromBool(target.result.cpu.arch.endian() == .little)}));
     try flags.append("-DMINIZ_HAS_64BIT_REGISTERS=1");
 
@@ -1396,10 +1401,10 @@ pub fn build(b: *std.Build) void {
         });
         stb_image.addCSourceFile(.{
             .file = b.path("third_party_libs/stb_image_impls.c"),
-            .flags = &.{
+            .flags = &(.{
                 // stb_image_resize2 uses undefined behaviour and so we need to turn off zig's default-on UB sanitizer
                 "-fno-sanitize=undefined",
-            },
+            } ++ stb_image_config_flags),
         });
         stb_image.addIncludePath(build_context.dep_stb.path(""));
         stb_image.linkLibC();

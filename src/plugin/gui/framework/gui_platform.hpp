@@ -95,7 +95,8 @@ static ErrorCodeOr<void> Required(PuglStatus status) {
 
 namespace detail {
 static PuglStatus EventHandler(PuglView* view, PuglEvent const* event);
-}
+static void LogIfSlow(Stopwatch& stopwatch, String message);
+} // namespace detail
 
 // Linux only, we need a way get the file descriptor from the X11 Display, but there's all kinds of macro
 // problems if we directly include X11 headers here, so we'll do it in a separate translation unit
@@ -201,11 +202,15 @@ PUBLIC void DestroyView(GuiPlatform& platform) {
 }
 
 PUBLIC void OnClapTimer(GuiPlatform& platform, clap_id timer_id) {
+    Stopwatch stopwatch {};
     if (platform.timer_id && *platform.timer_id == timer_id) puglUpdate(platform.world, 0);
+    detail::LogIfSlow(stopwatch, "OnClapTimer");
 }
 
 PUBLIC void OnPosixFd(GuiPlatform& platform, int fd) {
+    Stopwatch stopwatch {};
     if (fd == FdFromPuglWorld(platform.world)) puglUpdate(platform.world, 0);
+    detail::LogIfSlow(stopwatch, "OnPosixFd");
 }
 
 PUBLIC ErrorCodeOr<void> SetParent(GuiPlatform& platform, clap_window_t const& window) {
@@ -248,6 +253,11 @@ PUBLIC UiSize WindowSize(GuiPlatform& platform) {
 // ==========================================================================================================
 
 namespace detail {
+
+static void LogIfSlow(Stopwatch& stopwatch, String message) {
+    auto const elapsed = stopwatch.MillisecondsElapsed();
+    if (elapsed > 10) g_log.WarningLn("{} took {} ms", message, elapsed);
+}
 
 static bool IsUpdateNeeded(GuiPlatform& platform) {
     bool update_needed = false;

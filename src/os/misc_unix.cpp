@@ -19,6 +19,7 @@
 #include "os/filesystem.hpp"
 #include "os/misc.hpp"
 #include "utils/debug/debug.hpp"
+#include "utils/logger/logger.hpp"
 
 #include "time.h"
 
@@ -236,7 +237,7 @@ static void SignalHandler(int signal_num, siginfo_t* info, void* context) {
         psiginfo(info, nullptr);
 #else
         auto _ = StdPrint(
-            StdStream::Err,
+            StdStream::Out,
             fmt::FormatInline<200>("Received signal {} ({})\n", signal_num, SignalString(signal_num, info)));
 #endif
 
@@ -311,19 +312,22 @@ static void SignalHandler(int signal_num, siginfo_t* info, void* context) {
                     case Type::HandlerFunction: {
                         auto h = previous_handler_function.GetFromTag<Type::HandlerFunction>();
                         if (h == nullptr) {
-                            auto _ = StdPrint(StdStream::Err, "Previous signal handler is null\n");
+                            if constexpr (!PRODUCTION_BUILD)
+                                auto _ = StdPrint(StdStream::Out, "Previous signal handler is null\n");
                             _exit(EXIT_FAILURE);
                         } else if (*h == SIG_DFL) {
                             // If the previous is the default action, we set the default active again and
                             // raise it.
-                            auto _ = StdPrint(StdStream::Err, "Calling default signal handler\n");
+                            if constexpr (!PRODUCTION_BUILD)
+                                auto _ = StdPrint(StdStream::Out, "Calling default signal handler\n");
                             signal(signal_num, SIG_DFL);
                             raise(signal_num);
                         } else if (*h == SIG_IGN) {
                             _exit(EXIT_FAILURE);
                             return;
                         } else if (*h == SIG_ERR) {
-                            auto _ = StdPrint(StdStream::Err, "Error in signal handler\n");
+                            if constexpr (!PRODUCTION_BUILD)
+                                auto _ = StdPrint(StdStream::Out, "Error in signal handler\n");
                             _exit(EXIT_FAILURE);
                             return;
                         }
@@ -332,7 +336,8 @@ static void SignalHandler(int signal_num, siginfo_t* info, void* context) {
                     case Type::HandlerWithInfoFunction: {
                         auto h = previous_handler_function.GetFromTag<Type::HandlerWithInfoFunction>();
                         if (h == nullptr) {
-                            auto _ = StdPrint(StdStream::Err, "Previous info signal handler is null\n");
+                            if constexpr (!PRODUCTION_BUILD)
+                                auto _ = StdPrint(StdStream::Out, "Previous info signal handler is null\n");
                             _exit(EXIT_FAILURE);
                         }
                         break;
@@ -348,13 +353,15 @@ static void SignalHandler(int signal_num, siginfo_t* info, void* context) {
 
                 switch (previous_handler_function.tag) {
                     case Type::HandlerFunction: {
-                        auto _ = StdPrint(StdStream::Err, "Calling previous signal handler\n");
+                        if constexpr (!PRODUCTION_BUILD)
+                            auto _ = StdPrint(StdStream::Out, "Calling previous signal handler\n");
                         auto h = previous_handler_function.GetFromTag<Type::HandlerFunction>();
                         (*h)(signal_num);
                         break;
                     }
                     case Type::HandlerWithInfoFunction: {
-                        auto _ = StdPrint(StdStream::Err, "Calling previous info signal handler\n");
+                        if constexpr (!PRODUCTION_BUILD)
+                            auto _ = StdPrint(StdStream::Out, "Calling previous info signal handler\n");
                         auto h = previous_handler_function.GetFromTag<Type::HandlerWithInfoFunction>();
                         (*h)(signal_num, info, context);
                         break;
@@ -394,11 +401,10 @@ void StartupCrashHandler() {
         if (r != 0) {
             char buffer[200] = {};
             strerror_r(errno, buffer, sizeof(buffer));
-            auto _ = StdPrint(StdStream::Err,
-                              fmt::FormatInline<200>("failed setting signal handler {}, errno({}) {}\n",
-                                                     signal,
-                                                     errno,
-                                                     FromNullTerminated(buffer)));
+            g_log.ErrorLn("failed setting signal handler {}, errno({}) {}",
+                          signal,
+                          errno,
+                          FromNullTerminated(buffer));
         }
     }
 }

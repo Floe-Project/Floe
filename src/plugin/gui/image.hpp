@@ -102,9 +102,8 @@ PUBLIC ImageBytes ShrinkImage(ImageBytes image,
     };
 
     ImageBytes result {
-        .rgba =
-            arena.AllocateBytesForTypeOversizeAllowed<u8>(shrinked_to_width * shrunk_height * k_rgba_channels)
-                .data,
+        .rgba = arena.AllocateExactSizeUninitialised<u8>(shrinked_to_width * shrunk_height * k_rgba_channels)
+                    .data,
         .size = {shrinked_to_width, shrunk_height},
     };
 

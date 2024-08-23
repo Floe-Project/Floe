@@ -25,6 +25,7 @@ struct LibraryImages {
     Optional<graphics::ImageID> blurred_background {};
     bool icon_missing {};
     bool background_missing {};
+    bool reload {};
 };
 
 struct DraggingFX {

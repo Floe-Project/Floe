@@ -88,6 +88,16 @@ static void DoGUIColourMapEditor(Gui* g, Rect r) {
     imgui.EndWindow();
 }
 
+static void DebugPeriodicallyInvalidateLibraryImages(Gui* g) {
+    static TimePoint last_time = TimePoint::Now();
+    auto const now = TimePoint::Now();
+    if ((now - last_time) > 0.5) {
+        last_time = now;
+        for (auto& images : g->library_images)
+            images.reload = true;
+    }
+}
+
 static void DoGUISizeEditor(Gui* g, Rect r) {
     auto& imgui = g->imgui;
     auto sets = imgui::DefWindow();
@@ -162,6 +172,7 @@ static void DoWholeEditor(Gui* g) {
     if (g->frame_input.Key(KeyCode::F1).presses.size) g_show_editor = !g_show_editor;
 
     if (g_show_editor) {
+        DebugPeriodicallyInvalidateLibraryImages(g);
         if (g->frame_input.Key(KeyCode::F2).presses.size) g_show_editor_on_left = !g_show_editor_on_left;
         auto const half_w = (f32)(int)(imgui.Width() / 2);
         Rect debug_r;

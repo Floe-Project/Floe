@@ -165,30 +165,49 @@ static void CreateLibraryBackgroundImageTextures(Gui* g,
     }
 }
 
-static LibraryImages LoadDefaultLibraryImagesIfNeeded(Gui* g) {
-    auto& ctx = g->frame_input.graphics_ctx;
-    auto opt_index = FindIf(g->library_images, [&](LibraryImages const& images) {
-        return images.library_id == k_default_background_lib_id;
-    });
-    if (!opt_index) {
-        dyn::Append(g->library_images, {k_default_background_lib_id});
-        opt_index = g->library_images.size - 1;
-    }
-    auto& images = g->library_images[*opt_index];
+static LibraryImages& FindOrCreateLibraryImages(Gui* g, sample_lib::LibraryIdRef library_id) {
+    auto opt_index =
+        FindIf(g->library_images, [&](LibraryImages const& l) { return l.library_id == library_id; });
+    if (opt_index) return g->library_images[*opt_index];
 
-    static TimePoint last_time = TimePoint::Now();
-    auto const now = TimePoint::Now();
-    if ((now - last_time) > 0.5) {
-        last_time = now;
+    dyn::Append(g->library_images, {library_id});
+    return g->library_images[g->library_images.size - 1];
+}
+
+struct CheckLibraryImagesResult {
+    bool reload_icon = false;
+    bool reload_background = false;
+    bool reload_blurred_background = false;
+};
+
+static CheckLibraryImagesResult CheckLibraryImages(Gui* g, LibraryImages& images) {
+    auto& ctx = g->frame_input.graphics_ctx;
+    CheckLibraryImagesResult result {};
+
+    if (Exchange(images.reload, false)) {
+        if (images.icon) ctx->DestroyImageID(*images.icon);
         if (images.background) ctx->DestroyImageID(*images.background);
         if (images.blurred_background) ctx->DestroyImageID(*images.blurred_background);
+        result.reload_icon = true;
+        result.reload_background = true;
+        result.reload_blurred_background = true;
+        return result;
     }
 
-    auto const reload_background = !ctx->ImageIdIsValid(images.background) && !images.background_missing;
-    auto const reload_blurred_background =
-        !ctx->ImageIdIsValid(images.blurred_background) && !images.background_missing;
+    if (!ctx->ImageIdIsValid(images.icon) && !images.icon_missing) result.reload_icon = true;
+    if (!ctx->ImageIdIsValid(images.background) && !images.background_missing)
+        result.reload_background = true;
+    if (!ctx->ImageIdIsValid(images.blurred_background) && !images.background_missing)
+        result.reload_blurred_background = true;
 
-    if (reload_background || reload_blurred_background) {
+    return result;
+}
+
+static LibraryImages LoadDefaultLibraryImagesIfNeeded(Gui* g) {
+    auto& images = FindOrCreateLibraryImages(g, k_default_background_lib_id);
+    auto const reloads = CheckLibraryImages(g, images);
+
+    if (reloads.reload_background || reloads.reload_blurred_background) {
         auto image_data = EmbeddedDefaultBackground();
         auto outcome = DecodeImage({image_data.data, image_data.size});
         ASSERT(!outcome.HasError());
@@ -196,63 +215,42 @@ static LibraryImages LoadDefaultLibraryImagesIfNeeded(Gui* g) {
         CreateLibraryBackgroundImageTextures(g,
                                              images,
                                              bg_pixels,
-                                             reload_background,
-                                             reload_blurred_background);
+                                             reloads.reload_background,
+                                             reloads.reload_blurred_background);
     }
 
     return images;
 }
 
 static LibraryImages LoadLibraryImagesIfNeeded(Gui* g, sample_lib::Library const& lib) {
-    auto& ctx = g->frame_input.graphics_ctx;
-    auto const lib_id = lib.Id();
+    auto& images = FindOrCreateLibraryImages(g, lib.Id());
+    auto const reloads = CheckLibraryImages(g, images);
 
-    auto opt_index =
-        FindIf(g->library_images, [&](LibraryImages const& l) { return l.library_id == lib_id; });
-    if (!opt_index) {
-        dyn::Append(g->library_images, {lib_id});
-        opt_index = g->library_images.size - 1;
-    }
-    auto& imgs = g->library_images[*opt_index];
-
-    static TimePoint last_time = TimePoint::Now();
-    auto const now = TimePoint::Now();
-    if ((now - last_time) > 0.5) {
-        last_time = now;
-        if (imgs.background) ctx->DestroyImageID(*imgs.background);
-        if (imgs.blurred_background) ctx->DestroyImageID(*imgs.blurred_background);
-    }
-
-    auto const reload_icon = !ctx->ImageIdIsValid(imgs.icon) && !imgs.icon_missing;
-    auto const reload_background = !ctx->ImageIdIsValid(imgs.background) && !imgs.background_missing;
-    auto const reload_blurred_background =
-        !ctx->ImageIdIsValid(imgs.blurred_background) && !imgs.background_missing;
-
-    if (reload_icon) {
+    if (reloads.reload_icon) {
         if (auto icon_pixels = ImagePixelsFromLibrary(g, lib, LibraryImageType::Icon))
-            imgs.icon = CopyPixelsToGpuLoadedImage(g, icon_pixels.Value());
+            images.icon = CopyPixelsToGpuLoadedImage(g, icon_pixels.Value());
         else
-            imgs.icon_missing = true;
+            images.icon_missing = true;
     }
 
-    if (reload_background || reload_blurred_background) {
+    if (reloads.reload_background || reloads.reload_blurred_background) {
         ImageBytesManaged const bg_pixels = ({
             Optional<ImageBytesManaged> opt = ImagePixelsFromLibrary(g, lib, LibraryImageType::Background);
             if (!opt) {
-                imgs.background_missing = true;
-                return imgs;
+                images.background_missing = true;
+                return images;
             }
             opt.ReleaseValue();
         });
 
         CreateLibraryBackgroundImageTextures(g,
-                                             imgs,
+                                             images,
                                              bg_pixels,
-                                             reload_background,
-                                             reload_blurred_background);
+                                             reloads.reload_background,
+                                             reloads.reload_blurred_background);
     }
 
-    return imgs;
+    return images;
 }
 
 Optional<LibraryImages> LibraryImagesFromLibraryId(Gui* g, sample_lib::LibraryIdRef library_id) {

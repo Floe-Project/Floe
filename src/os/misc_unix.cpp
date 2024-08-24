@@ -415,7 +415,7 @@ void StartupCrashHandler() {
         if (r != 0) {
             char buffer[200] = {};
             strerror_r(errno, buffer, sizeof(buffer));
-            g_log.ErrorLn({},
+            g_log.ErrorLn(k_global_log_cat,
                           "failed setting signal handler {}, errno({}) {}",
                           signal,
                           errno,

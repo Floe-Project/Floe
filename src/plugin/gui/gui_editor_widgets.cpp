@@ -227,7 +227,10 @@ static void WriteColoursFile(LiveEditGui const& gui) {
                                      c.with_brightness,
                                      c.with_alpha);
         if (o.HasError())
-            g_log.ErrorLn(k_editor_log_cat, "could not write to file {} for reasion {}", COLOURS_DEF_FILENAME, o.Error());
+            g_log.ErrorLn(k_editor_log_cat,
+                          "could not write to file {} for reasion {}",
+                          COLOURS_DEF_FILENAME,
+                          o.Error());
     }
 }
 
@@ -254,7 +257,10 @@ static void WriteSizesFile(LiveEditGui const& gui) {
                                      sz,
                                      unit_name);
         if (o.HasError())
-            g_log.ErrorLn(k_editor_log_cat, "could not write to file {} for reason {}", SIZES_DEF_FILENAME, o.Error());
+            g_log.ErrorLn(k_editor_log_cat,
+                          "could not write to file {} for reason {}",
+                          SIZES_DEF_FILENAME,
+                          o.Error());
     }
 }
 
@@ -280,7 +286,10 @@ static void WriteColourMapFile(LiveEditGui const& gui) {
                                      String(v.colour),
                                      String(v.high_contrast_colour));
         if (o.HasError())
-            g_log.ErrorLn(k_editor_log_cat, "could not write to file {} for reason {}", COLOUR_MAP_DEF_FILENAME, o.Error());
+            g_log.ErrorLn(k_editor_log_cat,
+                          "could not write to file {} for reason {}",
+                          COLOUR_MAP_DEF_FILENAME,
+                          o.Error());
     }
 }
 

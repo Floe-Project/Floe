@@ -22,6 +22,8 @@
 
 #include "gui.hpp"
 
+constexpr auto k_log_cat = "installer"_cat;
+
 enum class Pages : u32 {
     Configuration,
     Installing,
@@ -157,7 +159,7 @@ static InstallResult TryInstall(Component const& comp) {
             ArenaAllocatorWithInlineStorage<1000> arena;
             auto out_path = path::Join(arena, Array {comp.install_dir, comp.info.filename, path_component});
 
-            g_log.DebugLn("Zip component {} has root_path {}", path_component, out_path);
+            g_log.DebugLn(k_log_cat, "Zip component {} has root_path {}", path_component, out_path);
 
             auto const dir = file_stat.m_is_directory ? String(out_path) : path::Directory(String(out_path));
             if (dir) {
@@ -201,7 +203,7 @@ static void BackgroundInstallingThread(Application& app) {
     for (auto const i : Range(ToInt(ComponentTypes::Count))) {
         if (!app.components_selected[i]) continue;
         auto const& comp = app.components[i];
-        g_log.DebugLn("Installing {} to {}", comp.info.name, comp.install_dir);
+        g_log.DebugLn(k_log_cat, "Installing {} to {}", comp.info.name, comp.install_dir);
         InstallResult outcome = k_success;
         if (comp.data.size != 0) outcome = TryInstall(comp);
         app.installation_results.Use([i, outcome](InstallationResults& r) { r[i] = outcome; });
@@ -322,7 +324,7 @@ Application* CreateApplication(GuiFramework& framework, u32 root_layout_id) {
                 ErrorDialog(framework, "Bug: missing data resource");
                 ExitProgram(framework);
             } else {
-                g_log.DebugLn("Failed to load component data: {}", data.Error());
+                g_log.DebugLn(k_log_cat, "Failed to load component data: {}", data.Error());
                 data = Span<u8 const> {};
             }
         }
@@ -598,7 +600,7 @@ void HandleUserInteraction(Application& app, GuiFramework& framework, UserIntera
         }
         case UserInteraction::Type::CheckboxTableItemToggled: {
             if (info.widget_id == app.plugin_checkboxes) {
-                g_log.DebugLn("Checkbox {} toggled to {}", info.button_index, info.button_state);
+                g_log.DebugLn(k_log_cat, "Checkbox {} toggled to {}", info.button_index, info.button_state);
                 app.components_selected[info.button_index] = info.button_state;
             }
             if (Find(app.components_selected, true))

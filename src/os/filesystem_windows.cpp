@@ -802,6 +802,8 @@ static ErrorCodeOr<WindowsWatchedDirectory*> WatchDirectory(DirectoryWatcher::Wa
     return windows_dir;
 }
 
+constexpr auto k_log_cat = "dirwatch"_cat;
+
 ErrorCodeOr<Span<DirectoryWatcher::DirectoryChanges const>>
 PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
     auto const any_states_changed =
@@ -856,7 +858,7 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
 
                 while (true) {
                     if (base >= end || ((usize)(end - base) < min_chunk_size)) {
-                        g_log.ErrorLn("ERROR: invalid data received");
+                        g_log.ErrorLn(k_log_cat, "ERROR: invalid data received");
                         error = true;
                         break;
                     }
@@ -883,6 +885,7 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
 
                         if ((base + event.NextEntryOffset) > end) {
                             g_log.DebugLn(
+                                k_log_cat,
                                 "ERROR: invalid data received: NextEntryOffset points outside of buffer: FileNameLength: {}, NextEntryOffset: {}",
                                 event.FileNameLength,
                                 event.NextEntryOffset);
@@ -893,6 +896,7 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                         auto const num_wchars = event.FileNameLength / sizeof(wchar_t);
                         if (num_wchars > filename_buf.size) {
                             g_log.DebugLn(
+                                k_log_cat,
                                 "ERROR: filename too long for buffer ({} chars): FileNameLength: {}, NextEntryOffset: {}, bytes_transferred: {}, min_chunk_size: {}",
                                 num_wchars,
                                 event.FileNameLength,
@@ -925,7 +929,8 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                     if (changes) {
                         auto const narrowed = Narrow(args.result_arena, filename);
                         if (narrowed.HasValue()) {
-                            g_log.DebugLn("Change: {} {}",
+                            g_log.DebugLn(k_log_cat,
+                                          "Change: {} {}",
                                           DirectoryWatcher::ChangeType::ToString(changes),
                                           narrowed.Value());
                             dir.directory_changes.Add(

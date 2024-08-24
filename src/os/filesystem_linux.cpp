@@ -429,7 +429,7 @@ static ErrorCodeOr<LinuxWatchedDirectory*> WatchDirectory(DirectoryWatcher::Watc
 }
 
 constexpr bool k_debug_inotify = false && !PRODUCTION_BUILD;
-constexpr auto k_log_cat = "fswatch"_cat;
+constexpr auto k_log_cat = "dirwatch"_cat;
 
 ErrorCodeOr<Span<DirectoryWatcher::DirectoryChanges const>>
 PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {

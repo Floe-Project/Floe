@@ -138,7 +138,6 @@ ErrorCodeOr<void> Delete(String path, DeleteOptions options) {
 ErrorCodeOr<bool> DeleteDirectoryIfMacBundle(String dir) {
     auto bundle = [NSBundle bundleWithPath:StringToNSString(dir)];
     if (bundle != nil) {
-        g_log.DebugLn("Deleting mac bundle");
         TRY(Delete(dir, {}));
         return true;
     }
@@ -412,7 +411,8 @@ ErrorCodeOr<Optional<MutableString>> FilesystemDialog(DialogOptions options) {
 // EFSW library: https://github.com/SpartanJ/efsw/blob/master/src/efsw/WatcherFSEvents.cpp
 // Atom file watcher: https://github.com/atom/watcher/blob/master/docs/macos.md
 
-constexpr bool k_debug_fsevents = false;
+constexpr bool k_debug_fsevents = false && !PRODUCTION_BUILD;
+constexpr auto k_log_cat = "dirwatch"_cat;
 
 struct MacWatcher {
     FSEventStreamRef stream {};
@@ -459,7 +459,7 @@ void EventCallback([[maybe_unused]] ConstFSEventStreamRef stream_ref,
     auto& watcher = *(MacWatcher*)user_data;
     auto** paths = (char**)event_paths;
 
-    if constexpr (!PRODUCTION_BUILD && k_debug_fsevents) {
+    if constexpr (k_debug_fsevents) {
         DynamicArrayInline<char, 4000> info;
         struct Flag {
             FSEventStreamEventFlags flag;
@@ -628,7 +628,8 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                     // FSEvents ONLY supports recursive watching so we just have to ignore subdirectory
                     // events
                     if (!dir.recursive && Contains(subpath, '/')) {
-                        g_log.DebugLn("Ignoring subdirectory event: {} because {} is watched non-recursively",
+                        g_log.DebugLn(k_log_cat,
+                                      "Ignoring subdirectory event: {} because {} is watched non-recursively",
                                       subpath,
                                       dir.path);
                         continue;

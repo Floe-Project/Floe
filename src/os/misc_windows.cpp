@@ -139,11 +139,13 @@ void StartupCrashHandler() {
     g_exception_handler = AddVectoredExceptionHandler(1, [](PEXCEPTION_POINTERS exception_info) -> LONG {
         // some exceptions are expected and should be ignored; for example lua will trigger exceptions.
         if (auto const msg = ExceptionCodeString(exception_info->ExceptionRecord->ExceptionCode); msg.size) {
-            g_log.ErrorLn("Unhandled exception: ");
-            g_log.ErrorLn(msg);
-
-            FixedSizeAllocator<2000> a;
-            g_log.ErrorLn(CurrentStacktraceString(a));
+            // We don't need a separate crash file because it should be fine to just add it to the log. On
+            // unix this isn't possible because we have to be signal-safe.
+            g_log.ErrorLn(k_global_log_cat, "Unhandled exception: \n{}", msg);
+            {
+                ArenaAllocatorWithInlineStorage<2000> a;
+                g_log.ErrorLn(k_global_log_cat, CurrentStacktraceString(a));
+            }
 
 #ifdef __x86_64__
             if (exception_info->ExceptionRecord->ExceptionCode == EXCEPTION_ILLEGAL_INSTRUCTION &&
@@ -151,11 +153,11 @@ void StartupCrashHandler() {
                 auto* pc =
                     reinterpret_cast<unsigned char const*>(exception_info->ExceptionRecord->ExceptionAddress);
                 if (pc[0] == 0x67 && pc[1] == 0x0f && pc[2] == 0xb9 && pc[3] == 0x40)
-                    DumpInfoAboutUBSanToStderr();
+                    DumpInfoAboutUBSan(StdStream::Err);
             }
 #endif
 
-            DumpCurrentStackTraceToStderr();
+            PrintCurrentStacktrace(StdStream::Err, {}, 0);
         }
         return EXCEPTION_CONTINUE_SEARCH;
     });
@@ -326,14 +328,14 @@ TEST_CASE(TestWindowsErrors) {
         auto e = Win32ErrorCode(ERROR_TOO_MANY_OPEN_FILES, "ERROR_TOO_MANY_OPEN_FILES");
         auto message = fmt::Format(a, "{}", e);
         REQUIRE(message.size);
-        tester.log.DebugLn("{}", e);
+        tester.log.DebugLn({}, "{}", e);
     }
 
     SUBCASE("Win32 HRESULT") {
         auto e = HresultErrorCode(E_OUTOFMEMORY, "E_OUTOFMEMORY");
         auto message = fmt::Format(a, "{}", e);
         REQUIRE(message.size);
-        tester.log.DebugLn("{}", e);
+        tester.log.DebugLn({}, "{}", e);
     }
 
     return k_success;

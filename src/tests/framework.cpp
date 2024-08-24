@@ -101,7 +101,7 @@ void* CreateOrFetchFixturePointer(Tester& tester,
 }
 
 int RunAllTests(Tester& tester, Optional<String> filter_pattern) {
-    g_stdout_log.InfoLn({}, "Running tests ...");
+    g_cli_out.InfoLn({}, "Running tests ...");
     Stopwatch const overall_stopwatch;
 
     for (auto& test_case : tester.test_cases) {
@@ -156,23 +156,23 @@ int RunAllTests(Tester& tester, Optional<String> filter_pattern) {
     }
     tester.current_test_case = nullptr;
 
-    g_stdout_log.InfoLn({}, "Summary");
-    g_stdout_log.InfoLn({}, "--------");
-    g_stdout_log.InfoLn({}, "Assertions: {}", tester.num_assertions);
-    g_stdout_log.InfoLn({}, "Tests: {}", tester.test_cases.size);
-    g_stdout_log.InfoLn({}, "Time taken: {.2}s", overall_stopwatch.SecondsElapsed());
+    g_cli_out.InfoLn({}, "Summary");
+    g_cli_out.InfoLn({}, "--------");
+    g_cli_out.InfoLn({}, "Assertions: {}", tester.num_assertions);
+    g_cli_out.InfoLn({}, "Tests: {}", tester.test_cases.size);
+    g_cli_out.InfoLn({}, "Time taken: {.2}s", overall_stopwatch.SecondsElapsed());
 
     if (tester.num_warnings == 0)
-        g_stdout_log.InfoLn({}, "Warnings: " ANSI_COLOUR_FOREGROUND_GREEN("0"));
+        g_cli_out.InfoLn({}, "Warnings: " ANSI_COLOUR_FOREGROUND_GREEN("0"));
     else
-        g_stdout_log.InfoLn({},
-                            "Warnings: " ANSI_COLOUR_SET_FOREGROUND_RED "{}" ANSI_COLOUR_RESET,
-                            tester.num_warnings);
+        g_cli_out.InfoLn({},
+                         "Warnings: " ANSI_COLOUR_SET_FOREGROUND_RED "{}" ANSI_COLOUR_RESET,
+                         tester.num_warnings);
 
     auto const num_failed = CountIf(tester.test_cases, [](TestCase const& t) { return t.failed; });
     if (num_failed == 0) {
-        g_stdout_log.InfoLn({}, "Failed: " ANSI_COLOUR_FOREGROUND_GREEN("0"));
-        g_stdout_log.InfoLn({}, "Result: " ANSI_COLOUR_FOREGROUND_GREEN("Success"));
+        g_cli_out.InfoLn({}, "Failed: " ANSI_COLOUR_FOREGROUND_GREEN("0"));
+        g_cli_out.InfoLn({}, "Result: " ANSI_COLOUR_FOREGROUND_GREEN("Success"));
     } else {
         DynamicArray<char> failed_test_names {tester.scratch_arena};
         for (auto& test_case : tester.test_cases) {
@@ -185,11 +185,11 @@ int RunAllTests(Tester& tester, Optional<String> filter_pattern) {
             }
         }
 
-        g_stdout_log.InfoLn({},
-                            "Failed: " ANSI_COLOUR_SET_FOREGROUND_RED "{}" ANSI_COLOUR_RESET "{}",
-                            num_failed,
-                            failed_test_names);
-        g_stdout_log.InfoLn({}, "Result: " ANSI_COLOUR_SET_FOREGROUND_RED "Failure");
+        g_cli_out.InfoLn({},
+                         "Failed: " ANSI_COLOUR_SET_FOREGROUND_RED "{}" ANSI_COLOUR_RESET "{}",
+                         num_failed,
+                         failed_test_names);
+        g_cli_out.InfoLn({}, "Result: " ANSI_COLOUR_SET_FOREGROUND_RED "Failure");
     }
 
     return num_failed ? 1 : 0;

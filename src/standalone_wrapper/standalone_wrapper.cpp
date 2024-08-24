@@ -58,7 +58,7 @@ struct Standalone {
         .request_resize =
             [](clap_host_t const* h, uint32_t width, uint32_t height) {
                 auto& standalone = *(Standalone*)h->host_data;
-                if (CurrentThreadID() != standalone.main_thread_id)
+                if (CurrentThreadId() != standalone.main_thread_id)
                     PanicIfReached(); // IMPROVE: support request_resize from non-main thread
 
                 auto gui =
@@ -76,12 +76,12 @@ struct Standalone {
         .is_main_thread =
             [](clap_host_t const* h) {
                 auto standalone = (Standalone*)h->host_data;
-                return CurrentThreadID() == standalone->main_thread_id;
+                return CurrentThreadId() == standalone->main_thread_id;
             },
         .is_audio_thread =
             [](clap_host_t const* h) {
                 auto standalone = (Standalone*)h->host_data;
-                return CurrentThreadID() == standalone->audio_thread_id.Load(LoadMemoryOrder::Relaxed);
+                return CurrentThreadId() == standalone->audio_thread_id.Load(LoadMemoryOrder::Relaxed);
             },
     };
 
@@ -119,7 +119,7 @@ struct Standalone {
             },
     };
 
-    u64 main_thread_id {CurrentThreadID()};
+    u64 main_thread_id {CurrentThreadId()};
     Atomic<u64> audio_thread_id {};
     Atomic<bool> callback_requested {false};
     FloeClapExtensionHost floe_host_ext {};
@@ -146,7 +146,7 @@ AudioCallback(ma_device* device, void* output_buffer, void const* input, ma_uint
     static bool called_before {false};
     if (!called_before) {
         called_before = true;
-        standalone->audio_thread_id.Store(CurrentThreadID(), StoreMemoryOrder::Relaxed);
+        standalone->audio_thread_id.Store(CurrentThreadId(), StoreMemoryOrder::Relaxed);
         SetThreadName("Audio");
         standalone->plugin.start_processing(&standalone->plugin);
         standalone->audio_stream_state.Store(Standalone::AudioStreamState::Open, StoreMemoryOrder::Release);
@@ -520,6 +520,7 @@ static ErrorCodeOr<void> Main() {
 }
 
 int main() {
+    SetThreadName("Main");
     auto const o = Main();
     if (o.HasError()) {
         g_log.ErrorLn(k_main_log_cat, "Standalone error: {}", o.Error());

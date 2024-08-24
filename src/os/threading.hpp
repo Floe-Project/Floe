@@ -40,13 +40,13 @@ static constexpr NativeHandleSizes NativeHandleSizes() {
 void SleepThisThread(int milliseconds);
 void YieldThisThread();
 
-u64 CurrentThreadID();
+u64 CurrentThreadId();
 
 void SetCurrentThreadPriorityRealTime();
 
 constexpr static usize k_max_thread_name_size = 16;
 void SetThreadName(String name);
-String ThreadName();
+Optional<DynamicArrayInline<char, k_max_thread_name_size>> ThreadName();
 
 // Does nothing on end-user builds
 void DebugSetThreadAsMainThread();

@@ -11,7 +11,7 @@
 void SleepThisThread(int milliseconds) { usleep((unsigned)milliseconds * 1000); }
 void YieldThisThread() { sched_yield(); }
 
-u64 CurrentThreadID() { return (u64)(uintptr)pthread_self(); }
+u64 CurrentThreadId() { return (u64)(uintptr)pthread_self(); }
 
 void SetCurrentThreadPriorityRealTime() {
     struct sched_param params = {};
@@ -38,19 +38,33 @@ Thread& Thread::operator=(Thread&& other) {
     return *this;
 }
 
-static void SetThreadName(char const* name) {
+thread_local DynamicArrayInline<char, k_max_thread_name_size> g_thread_name {};
+
+void SetThreadName(String name) {
+    char buffer[k_max_thread_name_size];
+    CopyStringIntoBufferWithNullTerm(buffer, name);
 #if __APPLE__
-    pthread_setname_np(name);
+    pthread_setname_np(buffer);
 #else
-    pthread_setname_np(pthread_self(), name);
+    dyn::Assign(g_thread_name, name);
+    // On Linux, even though we don't use pthread_getname_np to fetch the name, let's still set it because it
+    // might help out external tools.
+    pthread_setname_np(pthread_self(), buffer);
 #endif
 }
 
-void DebuggerSetThreadName(String name) {
-    if constexpr (PRODUCTION_BUILD) return;
-    char buffer[64];
-    CopyStringIntoBufferWithNullTerm(buffer, name);
-    SetThreadName(buffer);
+Optional<DynamicArrayInline<char, k_max_thread_name_size>> ThreadName() {
+    if constexpr (IS_LINUX) {
+        if (!g_thread_name.size) return nullopt;
+        // On Linux, pthread_getname_np will return the name of the executable which is confusing, better to
+        // have nothing and fetch the TID.
+        return g_thread_name.Items();
+    } else {
+        char buffer[k_max_thread_name_size];
+        if (pthread_getname_np(pthread_self(), buffer, k_max_thread_name_size) == 0)
+            return FromNullTerminated(buffer);
+        return nullopt;
+    }
 }
 
 static void* ThreadStartProc(void* data) {

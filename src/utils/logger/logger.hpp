@@ -14,6 +14,7 @@ struct WriteFormattedLogOptions {
     bool no_info_prefix = false;
     bool timestamp = false;
     bool add_newline = true;
+    bool thread = false;
 };
 
 ErrorCodeOr<void> WriteFormattedLog(Writer writer,
@@ -24,7 +25,7 @@ ErrorCodeOr<void> WriteFormattedLog(Writer writer,
 
 using LogAllocator = ArenaAllocatorWithInlineStorage<2000>;
 
-// TODO: rename to ModuleName? it's purpose is not really to categorise, but to identify the system
+// TODO: rename to ModuleName? it's purpose is not really to categorise, but to identify the system.
 // Strongly-typed string so that it's not confused with strings and string formatting
 struct CategoryString {
     constexpr CategoryString() = default;
@@ -41,8 +42,6 @@ constexpr auto k_global_log_cat = "🌍global"_cat;
 // main infrastructure related to the core of the application, the 'app' or 'instance' object
 constexpr auto k_main_log_cat = "🚀main"_cat;
 
-// Wraps a function that prints a string (to a file or stdout, for example) providing convenience
-// functions for invoking it: different log levels, with or without newlines.
 struct Logger {
     virtual ~Logger() = default;
     virtual void LogFunction(String category, String str, LogLevel level, bool add_newline) = 0;
@@ -126,15 +125,20 @@ struct Logger {
     }
 };
 
-struct StreamLogger final : Logger {
-    StreamLogger(StdStream stream, WriteFormattedLogOptions config) : stream(stream), config(config) {}
+struct StdStreamLogger final : Logger {
+    StdStreamLogger(StdStream stream, WriteFormattedLogOptions config) : stream(stream), config(config) {}
     void LogFunction(String category, String str, LogLevel level, bool add_newline) override;
     StdStream const stream;
     WriteFormattedLogOptions const config;
 };
 
-extern StreamLogger g_stdout_log;
-extern StreamLogger g_cli_out; // Logs to stdout but info messages don't have a prefix
+// Debug log to STDOUT. The purpose of the log is to diagnose issues. Some tools like valgrind make it
+// difficult to capture STDERR easily. Let's just keep things simple and use STDOUT for everything.
+extern StdStreamLogger g_debug_log;
+
+// STDOUT log for a CLI program. Info messages are printed verbatim, whereas warnings and erros have prefixes
+// and colours
+extern StdStreamLogger g_cli_out;
 
 // Timestamped log file
 struct FileLogger final : Logger {
@@ -154,11 +158,10 @@ struct TracyLogger final : Logger {
 
 struct DefaultLogger final : Logger {
     void LogFunction(String category, String str, LogLevel level, bool add_newline) override {
-        if constexpr (!PRODUCTION_BUILD) g_stdout_log.LogFunction(category, str, level, add_newline);
+        if constexpr (!PRODUCTION_BUILD) g_debug_log.LogFunction(category, str, level, add_newline);
         g_log_file.LogFunction(category, str, level, add_newline);
     }
 };
-
 extern DefaultLogger g_log;
 
 #define DBG_PRINT_EXPR(x)     g_log.DebugLn("{}: {} = {}", __FUNCTION__, #x, x)

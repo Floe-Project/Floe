@@ -249,7 +249,7 @@ static bool UpdateLibraryJobs(Server& server,
                               PendingLibraryJobs& pending_library_jobs,
                               ArenaAllocator& scratch_arena,
                               Optional<DirectoryWatcher>& watcher) {
-    ASSERT(CurrentThreadID() == pending_library_jobs.server_thread_id);
+    ASSERT(CurrentThreadId() == pending_library_jobs.server_thread_id);
     ZoneNamed(outer, true);
 
     // trigger folder scanning if any are marked as 'rescan-requested'
@@ -874,7 +874,7 @@ struct PendingResources {
 };
 
 static void DumpPendingResourcesDebugInfo(PendingResources& pending_resources) {
-    ASSERT(CurrentThreadID() == pending_resources.server_thread_id);
+    ASSERT(CurrentThreadId() == pending_resources.server_thread_id);
     g_log.DebugLn(k_log_cat,
                   "Thread pool jobs: {}",
                   pending_resources.thread_pool_jobs.counter.Load(LoadMemoryOrder::Relaxed));
@@ -925,7 +925,7 @@ static void DumpPendingResourcesDebugInfo(PendingResources& pending_resources) {
 static bool ConsumeResourceRequests(PendingResources& pending_resources,
                                     ArenaAllocator& arena,
                                     ThreadsafeQueue<QueuedRequest>& request_queue) {
-    ASSERT(CurrentThreadID() == pending_resources.server_thread_id);
+    ASSERT(CurrentThreadId() == pending_resources.server_thread_id);
     bool any_requests = false;
     while (auto queued_request = request_queue.TryPop()) {
         ZoneNamedN(req, "request", true);
@@ -952,7 +952,7 @@ static bool ConsumeResourceRequests(PendingResources& pending_resources,
 static bool UpdatePendingResources(PendingResources& pending_resources,
                                    Server& server,
                                    bool libraries_are_still_loading) {
-    ASSERT(CurrentThreadID() == server.server_thread_id);
+    ASSERT(CurrentThreadId() == server.server_thread_id);
 
     if (pending_resources.list.Empty()) return false;
 
@@ -1284,7 +1284,7 @@ static bool UpdatePendingResources(PendingResources& pending_resources,
 // Server thread
 
 static void ServerThreadUpdateMetrics(Server& server) {
-    ASSERT(CurrentThreadID() == server.server_thread_id);
+    ASSERT(CurrentThreadId() == server.server_thread_id);
     u32 num_insts_loaded = 0;
     u32 num_samples_loaded = 0;
     u64 total_bytes_used = 0;
@@ -1305,7 +1305,7 @@ static void ServerThreadUpdateMetrics(Server& server) {
 
 static void RemoveUnreferencedObjects(Server& server) {
     ZoneScoped;
-    ASSERT(CurrentThreadID() == server.server_thread_id);
+    ASSERT(CurrentThreadId() == server.server_thread_id);
 
     server.channels.Use([](auto& channels) {
         channels.RemoveIf([](AsyncCommsChannel const& h) { return !h.used.Load(LoadMemoryOrder::Relaxed); });
@@ -1331,7 +1331,7 @@ static void RemoveUnreferencedObjects(Server& server) {
 static void ServerThreadProc(Server& server) {
     ZoneScoped;
 
-    server.server_thread_id = CurrentThreadID();
+    server.server_thread_id = CurrentThreadId();
 
     ArenaAllocator scratch_arena {PageAllocator::Instance(), Kb(128)};
     auto watcher = CreateDirectoryWatcher(server.error_notifications);

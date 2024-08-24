@@ -24,6 +24,8 @@ ErrorCodeOr<void> WriteFormattedLog(Writer writer,
 
 using LogAllocator = ArenaAllocatorWithInlineStorage<2000>;
 
+// TODO: rename to ModuleName? it's purpose is not really to categorise, but to identify the system
+// Strongly-typed string so that it's not confused with strings and string formatting
 struct CategoryString {
     constexpr CategoryString() = default;
     constexpr explicit CategoryString(String str) : str(str) {}
@@ -33,7 +35,10 @@ constexpr CategoryString operator""_cat(char const* str, usize size) {
     return CategoryString {String {str, size}};
 }
 
+// global infrastructure that is related to startup and shutdown
 constexpr auto k_global_log_cat = "🌍global"_cat;
+
+// main infrastructure related to the core of the application, the 'app' or 'instance' object
 constexpr auto k_main_log_cat = "🚀main"_cat;
 
 // Wraps a function that prints a string (to a file or stdout, for example) providing convenience

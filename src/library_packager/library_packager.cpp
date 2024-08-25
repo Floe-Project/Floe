@@ -11,9 +11,10 @@
 
 #include "common/common_errors.hpp"
 
-// This tool generates an 'About' HTML file for a Floe library. This file is intended to be packaged with the
-// library to give context to the library's files and to help get users started using it. Additionally, this
-// tool validates that the Lua file is correct and that there's a license file.
+// Library packager CLI tool
+// - Generates an 'About' HTML file for a Floe library
+// - Ensures there's a license file
+// - Validates that the Lua file is correct
 
 struct Paths {
     String lua;

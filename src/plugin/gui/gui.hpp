@@ -14,7 +14,7 @@
 #include "plugin_instance.hpp"
 #include "settings/settings_file.hpp"
 
-constexpr auto k_gui_log_cat = "gui"_cat;
+constexpr auto k_gui_log_module = "gui"_log_module;
 
 struct PluginInstance;
 struct FloeInstance;

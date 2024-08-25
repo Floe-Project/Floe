@@ -8,10 +8,10 @@
 #include "os/misc.hpp"
 
 ErrorCodeOr<void> WriteFormattedLog(Writer writer,
+                                    String module_name,
                                     LogLevel level,
-                                    WriteFormattedLogOptions options,
-                                    String category,
-                                    String message) {
+                                    String message,
+                                    WriteFormattedLogOptions options) {
     TRY(writer.WriteChar('['));
     bool needs_space = false;
 
@@ -20,9 +20,9 @@ ErrorCodeOr<void> WriteFormattedLog(Writer writer,
         TRY(writer.WriteChars(Timestamp()));
     }
 
-    if (category.size) {
+    if (module_name.size) {
         if (Exchange(needs_space, true)) TRY(writer.WriteChar(' '));
-        TRY(writer.WriteChars(category));
+        TRY(writer.WriteChars(module_name));
     }
 
     if (!(options.no_info_prefix && level == LogLevel::Info)) {
@@ -58,26 +58,24 @@ ErrorCodeOr<void> WriteFormattedLog(Writer writer,
     TRY(writer.WriteChars("]"_s));
     if (message.size) TRY(writer.WriteChar(' '));
     TRY(writer.WriteChars(message));
-    if (options.add_newline) TRY(writer.WriteChar('\n'));
+    TRY(writer.WriteChar('\n'));
     return k_success;
 }
 
-void Logger::TraceLn(CategoryString category, String message, SourceLocation loc) {
+void Logger::Trace(LogModuleName module_name, String message, SourceLocation loc) {
     DynamicArrayInline<char, 1000> buf;
     fmt::Append(buf, "trace: {}({}): {}", FromNullTerminated(loc.file), loc.line, loc.function);
     if (message.size) fmt::Append(buf, ": {}", message);
 
-    LogFunction(category.str, buf, LogLevel::Debug, true);
+    Log(module_name, LogLevel::Debug, buf);
 }
 
-void StdStreamLogger::LogFunction(String category, String str, LogLevel level, bool add_newline) {
+void StdStreamLogger::Log(LogModuleName module_name, LogLevel level, String str) {
     auto& mutex = StdStreamMutex(stream);
     mutex.Lock();
     DEFER { mutex.Unlock(); };
 
-    auto log_config = config;
-    log_config.add_newline = add_newline;
-    auto _ = WriteFormattedLog(StdWriter(stream), level, log_config, category, str);
+    auto _ = WriteFormattedLog(StdWriter(stream), module_name.str, level, str, config);
 }
 
 StdStreamLogger g_debug_log {
@@ -96,7 +94,7 @@ StdStreamLogger g_cli_out {
                               .thread = false},
 };
 
-void FileLogger::LogFunction(String category, String str, LogLevel level, bool add_newline) {
+void FileLogger::Log(LogModuleName module_name, LogLevel level, String str) {
     // Could just use a mutex here but this atomic method avoids the class having to have any sort of
     // destructor which is particularly beneficial at the moment trying to debug a crash at shutdown.
     //
@@ -116,7 +114,7 @@ void FileLogger::LogFunction(String category, String str, LogLevel level, bool a
             dyn::Assign(filepath, String(path));
         } else {
             dyn::Clear(filepath);
-            g_debug_log.DebugLn("file-logger"_cat, "failed to get logs known dir: {}", outcome.Error());
+            g_debug_log.Debug("file-logger"_log_module, "failed to get logs known dir: {}", outcome.Error());
         }
         state.Store(FileLogger::State::Initialised, StoreMemoryOrder::Release);
     } else if (ex == FileLogger::State::Initialising) {
@@ -130,10 +128,10 @@ void FileLogger::LogFunction(String category, String str, LogLevel level, bool a
     auto file = ({
         auto outcome = OpenFile(filepath, FileMode::Append);
         if (outcome.HasError()) {
-            g_debug_log.DebugLn(k_global_log_cat,
-                                "failed to open log file {}: {}",
-                                filepath,
-                                outcome.Error());
+            g_debug_log.Debug(k_global_log_module,
+                              "failed to open log file {}: {}",
+                              filepath,
+                              outcome.Error());
             return;
         }
         outcome.ReleaseValue();
@@ -141,17 +139,16 @@ void FileLogger::LogFunction(String category, String str, LogLevel level, bool a
 
     auto writer = file.Writer();
     auto o = WriteFormattedLog(writer,
+                               module_name.str,
                                level,
+                               str,
                                {
                                    .ansi_colors = false,
                                    .no_info_prefix = false,
                                    .timestamp = true,
-                                   .add_newline = add_newline,
-                               },
-                               category,
-                               str);
+                               });
     if (o.HasError())
-        g_debug_log.DebugLn(k_global_log_cat, "failed to write log file: {}, {}", filepath, o.Error());
+        g_debug_log.Debug(k_global_log_module, "failed to write log file: {}, {}", filepath, o.Error());
 }
 
 FileLogger g_log_file {};

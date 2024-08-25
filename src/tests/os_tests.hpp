@@ -6,7 +6,7 @@
 #include "os/filesystem.hpp"
 #include "tests/framework.hpp"
 
-constexpr auto k_os_log_cat = "os"_cat;
+constexpr auto k_os_log_module = "os"_log_module;
 
 TEST_CASE(TestEpochTime) {
     auto const ns = NanosecondsSinceEpoch();
@@ -92,8 +92,8 @@ TEST_CASE(TestFileApi) {
                     if (auto const resulting_file_data =
                             ReadEntireFile(k_out_file_name, tester.scratch_arena);
                         resulting_file_data.HasValue()) {
-                        tester.log.DebugLn(k_os_log_cat,
-                                           "Running Read from one large file and write to another");
+                        tester.log.Debug(k_os_log_module,
+                                         "Running Read from one large file and write to another");
                         REQUIRE(resulting_file_data.Value().size == section.size);
                         REQUIRE(MemoryIsEqual(resulting_file_data.Value().data, section.data, section.size));
                     }
@@ -168,10 +168,10 @@ TEST_CASE(TestFilesystem) {
                         while (it.HasMoreFiles()) {
                             auto const& entry = it.Get();
                             REQUIRE(entry.path.size);
-                            tester.log.DebugLn(k_os_log_cat,
-                                               "directory entry: {}, type: {}",
-                                               entry.path,
-                                               (int)entry.type);
+                            tester.log.Debug(k_os_log_module,
+                                             "directory entry: {}, type: {}",
+                                             entry.path,
+                                             (int)entry.type);
 
                             if (auto inc_outcome = it.Increment(); inc_outcome.HasError()) {
                                 LOG_WARNING("failed to increment DirectoryIterator for reason {}",
@@ -223,7 +223,7 @@ TEST_CASE(TestFilesystem) {
                 return;
             }
             REQUIRE(o.HasValue());
-            tester.log.DebugLn(k_os_log_cat, o.Value());
+            tester.log.Debug(k_os_log_module, o.Value());
             REQUIRE(path::IsAbsolute(o.Value()));
         };
 
@@ -253,7 +253,7 @@ TEST_CASE(TestFilesystem) {
             }
             if (known_folder.HasValue()) {
                 DEFER { a.Free(known_folder.Value().ToByteSpan()); };
-                tester.log.DebugLn(k_os_log_cat, "Found {} dir: {} ", type_name, known_folder.Value());
+                tester.log.Debug(k_os_log_module, "Found {} dir: {} ", type_name, known_folder.Value());
                 CHECK(path::IsAbsolute(known_folder.Value()));
             } else {
                 LOG_WARNING("Error trying to find {} dir: {}", type_name, known_folder.Error());
@@ -457,15 +457,15 @@ TEST_CASE(TestDirectoryWatcher) {
         };
 
         if (auto const dir_changes_span = TRY(PollDirectoryChanges(watcher, args)); dir_changes_span.size) {
-            tester.log.DebugLn(k_os_log_cat, "Unexpected result");
+            tester.log.Debug(k_os_log_module, "Unexpected result");
             for (auto const& dir_changes : dir_changes_span) {
-                tester.log.DebugLn(k_os_log_cat, "  {}", dir_changes.linked_dir_to_watch->path);
-                tester.log.DebugLn(k_os_log_cat, "  {}", dir_changes.error);
+                tester.log.Debug(k_os_log_module, "  {}", dir_changes.linked_dir_to_watch->path);
+                tester.log.Debug(k_os_log_module, "  {}", dir_changes.error);
                 for (auto const& subpath_changeset : dir_changes.subpath_changesets)
-                    tester.log.DebugLn(k_os_log_cat,
-                                       "    {} {}",
-                                       subpath_changeset.subpath,
-                                       DirectoryWatcher::ChangeType::ToString(subpath_changeset.changes));
+                    tester.log.Debug(k_os_log_module,
+                                     "    {} {}",
+                                     subpath_changeset.subpath,
+                                     DirectoryWatcher::ChangeType::ToString(subpath_changeset.changes));
             }
             REQUIRE(false);
         }
@@ -484,14 +484,14 @@ TEST_CASE(TestDirectoryWatcher) {
 
                     CHECK(path::Equal(path, dir));
                     if (directory_changes.error) {
-                        tester.log.DebugLn(k_os_log_cat, "Error in {}: {}", path, *directory_changes.error);
+                        tester.log.Debug(k_os_log_module, "Error in {}: {}", path, *directory_changes.error);
                         continue;
                     }
                     CHECK(!directory_changes.error.HasValue());
 
                     for (auto const& subpath_changeset : directory_changes.subpath_changesets) {
                         if (subpath_changeset.changes & DirectoryWatcher::ChangeType::ManualRescanNeeded) {
-                            tester.log.ErrorLn(k_os_log_cat, "Manual rescan needed for {}", path);
+                            tester.log.Error(k_os_log_module, "Manual rescan needed for {}", path);
                             continue;
                         }
 
@@ -508,12 +508,12 @@ TEST_CASE(TestDirectoryWatcher) {
                             }
                         }
 
-                        tester.log.DebugLn(k_os_log_cat,
-                                           "{} change: \"{}\" {{ {} }} in \"{}\"",
-                                           was_expected ? "Expected" : "Unexpected",
-                                           subpath_changeset.subpath,
-                                           DirectoryWatcher::ChangeType::ToString(subpath_changeset.changes),
-                                           path);
+                        tester.log.Debug(k_os_log_module,
+                                         "{} change: \"{}\" {{ {} }} in \"{}\"",
+                                         was_expected ? "Expected" : "Unexpected",
+                                         subpath_changeset.subpath,
+                                         DirectoryWatcher::ChangeType::ToString(subpath_changeset.changes),
+                                         path);
                     }
                 }
 
@@ -524,10 +524,10 @@ TEST_CASE(TestDirectoryWatcher) {
                 CAPTURE(expected.subpath);
                 CAPTURE(DirectoryWatcher::ChangeType::ToString(expected.changes));
                 if (!found_expected[index]) {
-                    tester.log.DebugLn(k_os_log_cat,
-                                       "Expected change not found: {} {}",
-                                       expected.subpath,
-                                       DirectoryWatcher::ChangeType::ToString(expected.changes));
+                    tester.log.Debug(k_os_log_module,
+                                     "Expected change not found: {} {}",
+                                     expected.subpath,
+                                     DirectoryWatcher::ChangeType::ToString(expected.changes));
                 }
                 CHECK(found_expected[index]);
             }
@@ -599,8 +599,8 @@ TEST_CASE(TestDirectoryWatcher) {
                         }
                         CHECK(found_delete_self);
                     } else {
-                        tester.log.DebugLn(
-                            k_os_log_cat,
+                        tester.log.Debug(
+                            k_os_log_module,
                             "Failed to delete root watched dir: {}. This is probably normal behaviour",
                             delete_outcome.Error());
                     }
@@ -616,10 +616,9 @@ TEST_CASE(TestDirectoryWatcher) {
                     // file object really moves and perhaps a rename like this doesn't do that. Either way I
                     // think we just need to check nothing bad happens in this case and that will do.
                 } else {
-                    tester.log.DebugLn(
-                        k_os_log_cat,
-                        "Failed to move root watched dir: {}. This is probably normal behaviour",
-                        move_outcome.Error());
+                    tester.log.Debug(k_os_log_module,
+                                     "Failed to move root watched dir: {}. This is probably normal behaviour",
+                                     move_outcome.Error());
                 }
             }
 
@@ -858,7 +857,7 @@ TEST_CASE(TestTimePoint) {
     REQUIRE(ApproxEqual(SecondsToMilliseconds(t2 - t1), us / 1000.0, 0.1));
     REQUIRE(ApproxEqual(t2 - t1, us / (1000.0 * 1000.0), 0.1));
 
-    tester.log.DebugLn(k_os_log_cat, "Time has passed: {}", sw);
+    tester.log.Debug(k_os_log_module, "Time has passed: {}", sw);
     return k_success;
 }
 

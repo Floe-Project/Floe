@@ -36,7 +36,7 @@ PuglWorld* GuiPlatform::g_world = nullptr;
 
 struct FloeInstance {
     FloeInstance(clap_host const* clap_host);
-    ~FloeInstance() { g_log.TraceLn(k_main_log_cat); }
+    ~FloeInstance() { g_log.Trace(k_main_log_module); }
 
     clap_host const& host;
     clap_plugin clap_plugin;
@@ -91,7 +91,7 @@ clap_plugin_state const floe_plugin_state {
 
 static bool LogIfError(ErrorCodeOr<void> const& ec, String name) {
     if (ec.HasError()) {
-        g_log.ErrorLn(k_main_log_cat, "{}: {}", name, ec.Error());
+        g_log.Error(k_main_log_module, "{}: {}", name, ec.Error());
         return false;
     }
     return true;
@@ -176,7 +176,7 @@ clap_plugin_gui const floe_gui {
     // [main-thread]
     .set_scale = [](clap_plugin_t const* plugin, f64 scale) -> bool {
         (void)plugin;
-        g_log.DebugLn(k_clap_log_cat, "set_scale {}", scale);
+        g_log.Debug(k_clap_log_module, "set_scale {}", scale);
         return false; // we (pugl) negotiate this with the OS ourselves
     },
 
@@ -191,7 +191,7 @@ clap_plugin_gui const floe_gui {
         auto size = WindowSize(*floe.gui_platform);
         *width = size.width;
         *height = size.height;
-        g_log.DebugLn(k_clap_log_cat, "get_size {} {}", *width, *height);
+        g_log.Debug(k_clap_log_module, "get_size {} {}", *width, *height);
         return true;
     },
 
@@ -209,10 +209,10 @@ clap_plugin_gui const floe_gui {
         auto const ratio = gui_settings::CurrentAspectRatio(g_cross_instance_systems->settings.settings.gui);
         hints->aspect_ratio_width = ratio.width;
         hints->aspect_ratio_height = ratio.height;
-        g_log.DebugLn(k_clap_log_cat,
-                      "get_resize_hints {}x{}",
-                      hints->aspect_ratio_width,
-                      hints->aspect_ratio_height);
+        g_log.Debug(k_clap_log_module,
+                    "get_resize_hints {}x{}",
+                    hints->aspect_ratio_width,
+                    hints->aspect_ratio_height);
         return true;
     },
 
@@ -231,12 +231,12 @@ clap_plugin_gui const floe_gui {
         auto const aspect_ratio_conformed_size = gui_settings::GetNearestAspectRatioSizeInsideSize(
             {CheckedCast<u16>(*width), CheckedCast<u16>(*height)},
             gui_settings::CurrentAspectRatio(g_cross_instance_systems->settings.settings.gui));
-        g_log.DebugLn(k_clap_log_cat,
-                      "adjust_size in: {}x{}, out: {}x{}",
-                      *width,
-                      *height,
-                      aspect_ratio_conformed_size.width,
-                      aspect_ratio_conformed_size.height);
+        g_log.Debug(k_clap_log_module,
+                    "adjust_size in: {}x{}, out: {}x{}",
+                    *width,
+                    *height,
+                    aspect_ratio_conformed_size.width,
+                    aspect_ratio_conformed_size.height);
         *width = aspect_ratio_conformed_size.width;
         *height = aspect_ratio_conformed_size.height;
         return true;
@@ -257,14 +257,14 @@ clap_plugin_gui const floe_gui {
         auto const aspect_ratio_conformed_size = gui_settings::GetNearestAspectRatioSizeInsideSize(
             {CheckedCast<u16>(width), CheckedCast<u16>(height)},
             gui_settings::CurrentAspectRatio(g_cross_instance_systems->settings.settings.gui));
-        g_log.DebugLn(k_clap_log_cat,
-                      "set_size in: {}x{}, constrained {}x{}, result: {}",
-                      width,
-                      height,
-                      aspect_ratio_conformed_size.width,
-                      aspect_ratio_conformed_size.height,
-                      aspect_ratio_conformed_size.width == width &&
-                          aspect_ratio_conformed_size.height == height);
+        g_log.Debug(k_clap_log_module,
+                    "set_size in: {}x{}, constrained {}x{}, result: {}",
+                    width,
+                    height,
+                    aspect_ratio_conformed_size.width,
+                    aspect_ratio_conformed_size.height,
+                    aspect_ratio_conformed_size.width == width &&
+                        aspect_ratio_conformed_size.height == height);
         if (aspect_ratio_conformed_size.width != width || aspect_ratio_conformed_size.height != height)
             return false;
         return SetSize(*floe.gui_platform, {CheckedCast<u16>(width), CheckedCast<u16>(height)});
@@ -313,9 +313,9 @@ clap_plugin_gui const floe_gui {
             static bool shown_graphics_info = false;
             if (!shown_graphics_info) {
                 shown_graphics_info = true;
-                g_log.InfoLn(k_main_log_cat,
-                             "\n{}",
-                             floe.gui_platform->graphics_ctx->graphics_device_info.Items());
+                g_log.Info(k_main_log_module,
+                           "\n{}",
+                           floe.gui_platform->graphics_ctx->graphics_device_info.Items());
             }
         }
         return result;
@@ -707,7 +707,7 @@ clap_plugin const floe_plugin {
 };
 
 FloeInstance::FloeInstance(clap_host const* host) : host(*host) {
-    g_log_file.TraceLn(k_main_log_cat);
+    g_log_file.Trace(k_main_log_module);
     clap_plugin = floe_plugin;
     clap_plugin.plugin_data = this;
 }

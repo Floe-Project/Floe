@@ -92,7 +92,7 @@ struct FloeClapExtensionHost {
 
 struct GuiFrameInput;
 
-constexpr auto k_clap_log_cat = "👏clap"_cat;
+constexpr auto k_clap_log_module = "👏clap"_log_module;
 
 inline bool IsMainThread(clap_host const& host) {
     if constexpr (PRODUCTION_BUILD) return true;

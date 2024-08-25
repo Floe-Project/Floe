@@ -141,10 +141,10 @@ void StartupCrashHandler() {
         if (auto const msg = ExceptionCodeString(exception_info->ExceptionRecord->ExceptionCode); msg.size) {
             // We don't need a separate crash file because it should be fine to just add it to the log. On
             // unix this isn't possible because we have to be signal-safe.
-            g_log.ErrorLn(k_global_log_cat, "Unhandled exception: \n{}", msg);
+            g_log.Error(k_global_log_module, "Unhandled exception: \n{}", msg);
             {
                 ArenaAllocatorWithInlineStorage<2000> a;
-                g_log.ErrorLn(k_global_log_cat, CurrentStacktraceString(a));
+                g_log.Error(k_global_log_module, CurrentStacktraceString(a));
             }
 
 #ifdef __x86_64__
@@ -328,14 +328,14 @@ TEST_CASE(TestWindowsErrors) {
         auto e = Win32ErrorCode(ERROR_TOO_MANY_OPEN_FILES, "ERROR_TOO_MANY_OPEN_FILES");
         auto message = fmt::Format(a, "{}", e);
         REQUIRE(message.size);
-        tester.log.DebugLn({}, "{}", e);
+        tester.log.Debug({}, "{}", e);
     }
 
     SUBCASE("Win32 HRESULT") {
         auto e = HresultErrorCode(E_OUTOFMEMORY, "E_OUTOFMEMORY");
         auto message = fmt::Format(a, "{}", e);
         REQUIRE(message.size);
-        tester.log.DebugLn({}, "{}", e);
+        tester.log.Debug({}, "{}", e);
     }
 
     return k_success;

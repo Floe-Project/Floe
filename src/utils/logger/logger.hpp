@@ -13,121 +13,91 @@ struct WriteFormattedLogOptions {
     bool ansi_colors = false;
     bool no_info_prefix = false;
     bool timestamp = false;
-    bool add_newline = true;
     bool thread = false;
 };
 
 ErrorCodeOr<void> WriteFormattedLog(Writer writer,
+                                    String module_name,
                                     LogLevel level,
-                                    WriteFormattedLogOptions options,
-                                    String category,
-                                    String message);
+                                    String message,
+                                    WriteFormattedLogOptions options);
 
-using LogAllocator = ArenaAllocatorWithInlineStorage<2000>;
-
-// TODO: rename to ModuleName? it's purpose is not really to categorise, but to identify the system.
 // Strongly-typed string so that it's not confused with strings and string formatting
-struct CategoryString {
-    constexpr CategoryString() = default;
-    constexpr explicit CategoryString(String str) : str(str) {}
+struct LogModuleName {
+    constexpr LogModuleName() = default;
+    constexpr explicit LogModuleName(String str) : str(str) {}
     String str {};
 };
-constexpr CategoryString operator""_cat(char const* str, usize size) {
-    return CategoryString {String {str, size}};
+constexpr LogModuleName operator""_log_module(char const* str, usize size) {
+    return LogModuleName {String {str, size}};
 }
 
 // global infrastructure that is related to startup and shutdown
-constexpr auto k_global_log_cat = "🌍global"_cat;
+constexpr auto k_global_log_module = "🌍global"_log_module;
 
 // main infrastructure related to the core of the application, the 'app' or 'instance' object
-constexpr auto k_main_log_cat = "🚀main"_cat;
+constexpr auto k_main_log_module = "🚀main"_log_module;
 
 struct Logger {
     virtual ~Logger() = default;
-    virtual void LogFunction(String category, String str, LogLevel level, bool add_newline) = 0;
+    virtual void Log(LogModuleName module_name, LogLevel level, String str) = 0;
 
-    void Ln(LogLevel level, CategoryString category, String str) {
-        LogFunction(category.str, str, level, true);
-    }
+    using LogAllocator = ArenaAllocatorWithInlineStorage<2000>;
+
+    // NOTE: you will have to use `using Logger::Log` in the derived class to bring this in
     template <typename... Args>
-    void Ln(LogLevel level, CategoryString category, String format, Args const&... args) {
+    void Log(LogModuleName module_name, LogLevel level, String format, Args const&... args) {
+        static_assert(sizeof...(args) != 0);
         LogAllocator log_allocator;
-        LogFunction(category.str, fmt::Format(log_allocator, format, args...), level, true);
+        Log(module_name, level, fmt::Format(log_allocator, format, args...));
     }
 
     void
-    TraceLn(CategoryString category, String message = {}, SourceLocation loc = SourceLocation::Current());
-
-    void Debug(CategoryString category, String str) {
-        if constexpr (!PRODUCTION_BUILD) LogFunction(category.str, str, LogLevel::Debug, false);
-    }
-    void Info(CategoryString category, String str) { LogFunction(category.str, str, LogLevel::Info, false); }
-    void Warning(CategoryString category, String str) {
-        LogFunction(category.str, str, LogLevel::Warning, false);
-    }
-    void Error(CategoryString category, String str) {
-        LogFunction(category.str, str, LogLevel::Error, false);
-    }
-
-    void DebugLn(CategoryString category, String str) {
-        if constexpr (!PRODUCTION_BUILD) LogFunction(category.str, str, LogLevel::Debug, true);
-    }
-    void InfoLn(CategoryString category, String str) { LogFunction(category.str, str, LogLevel::Info, true); }
-    void WarningLn(CategoryString category, String str) {
-        LogFunction(category.str, str, LogLevel::Warning, true);
-    }
-    void ErrorLn(CategoryString category, String str) {
-        LogFunction(category.str, str, LogLevel::Error, true);
-    }
+    Trace(LogModuleName module_name, String message = {}, SourceLocation loc = SourceLocation::Current());
 
     template <typename... Args>
-    void DebugLn(CategoryString category, String format, Args const&... args) {
+    void Debug(LogModuleName module_name, String format, Args const&... args) {
         if constexpr (PRODUCTION_BUILD) return;
-        LogAllocator log_allocator;
-        LogFunction(category.str, fmt::Format(log_allocator, format, args...), LogLevel::Debug, true);
+        if constexpr (sizeof...(args) == 0) {
+            Log(module_name, LogLevel::Debug, format);
+        } else {
+            LogAllocator log_allocator;
+            Log(module_name, LogLevel::Debug, fmt::Format(log_allocator, format, args...));
+        }
     }
     template <typename... Args>
-    void InfoLn(CategoryString category, String format, Args const&... args) {
-        LogAllocator log_allocator;
-        LogFunction(category.str, fmt::Format(log_allocator, format, args...), LogLevel::Info, true);
+    void Info(LogModuleName module_name, String format, Args const&... args) {
+        if constexpr (sizeof...(args) == 0) {
+            Log(module_name, LogLevel::Info, format);
+        } else {
+            LogAllocator log_allocator;
+            Log(module_name, LogLevel::Info, fmt::Format(log_allocator, format, args...));
+        }
     }
     template <typename... Args>
-    void ErrorLn(CategoryString category, String format, Args const&... args) {
-        LogAllocator log_allocator;
-        LogFunction(category.str, fmt::Format(log_allocator, format, args...), LogLevel::Error, true);
+    void Error(LogModuleName module_name, String format, Args const&... args) {
+        if constexpr (sizeof...(args) == 0) {
+            Log(module_name, LogLevel::Error, format);
+        } else {
+            LogAllocator log_allocator;
+            Log(module_name, LogLevel::Error, fmt::Format(log_allocator, format, args...));
+        }
     }
     template <typename... Args>
-    void WarningLn(CategoryString category, String format, Args const&... args) {
-        LogAllocator log_allocator;
-        LogFunction(category.str, fmt::Format(log_allocator, format, args...), LogLevel::Warning, true);
-    }
-
-    template <typename... Args>
-    void Debug(CategoryString category, String format, Args const&... args) {
-        if constexpr (PRODUCTION_BUILD) return;
-        LogAllocator log_allocator;
-        LogFunction(category.str, fmt::Format(log_allocator, format, args...), LogLevel::Debug, false);
-    }
-    template <typename... Args>
-    void Info(CategoryString category, String format, Args const&... args) {
-        LogAllocator log_allocator;
-        LogFunction(category.str, fmt::Format(log_allocator, format, args...), LogLevel::Info, false);
-    }
-    template <typename... Args>
-    void Error(CategoryString category, String format, Args const&... args) {
-        LogAllocator log_allocator;
-        LogFunction(category.str, fmt::Format(log_allocator, format, args...), LogLevel::Error, false);
-    }
-    template <typename... Args>
-    void Warning(CategoryString category, String format, Args const&... args) {
-        LogAllocator log_allocator;
-        LogFunction(category.str, fmt::Format(log_allocator, format, args...), LogLevel::Warning, false);
+    void Warning(LogModuleName module_name, String format, Args const&... args) {
+        if constexpr (sizeof...(args) == 0) {
+            Log(module_name, LogLevel::Warning, format);
+        } else {
+            LogAllocator log_allocator;
+            Log(module_name, LogLevel::Warning, fmt::Format(log_allocator, format, args...));
+        }
     }
 };
 
 struct StdStreamLogger final : Logger {
     StdStreamLogger(StdStream stream, WriteFormattedLogOptions config) : stream(stream), config(config) {}
-    void LogFunction(String category, String str, LogLevel level, bool add_newline) override;
+    void Log(LogModuleName module_name, LogLevel level, String str) override;
+    using Logger::Log; // Bring in the templated Log function
     StdStream const stream;
     WriteFormattedLogOptions const config;
 };
@@ -142,7 +112,8 @@ extern StdStreamLogger g_cli_out;
 
 // Timestamped log file
 struct FileLogger final : Logger {
-    void LogFunction(String category, String str, LogLevel level, bool add_newline) override;
+    void Log(LogModuleName module_name, LogLevel level, String str) override;
+    using Logger::Log;
 
     enum class State : u32 { Uninitialised, Initialising, Initialised };
     Atomic<State> state {State::Uninitialised};
@@ -151,21 +122,23 @@ struct FileLogger final : Logger {
 extern FileLogger g_log_file;
 
 struct TracyLogger final : Logger {
-    void LogFunction([[maybe_unused]] String category, [[maybe_unused]] String str, LogLevel, bool) override {
+    void Log([[maybe_unused]] LogModuleName module_name, LogLevel, [[maybe_unused]] String str) override {
         if constexpr (k_tracy_enable) TracyMessageC(str.data, str.size, config.colour);
     }
+    using Logger::Log;
 };
 
 struct DefaultLogger final : Logger {
-    void LogFunction(String category, String str, LogLevel level, bool add_newline) override {
-        if constexpr (!PRODUCTION_BUILD) g_debug_log.LogFunction(category, str, level, add_newline);
-        g_log_file.LogFunction(category, str, level, add_newline);
+    void Log(LogModuleName module_name, LogLevel level, String str) override {
+        if constexpr (!PRODUCTION_BUILD) g_debug_log.Log(module_name, level, str);
+        g_log_file.Log(module_name, level, str);
     }
+    using Logger::Log;
 };
 extern DefaultLogger g_log;
 
-#define DBG_PRINT_EXPR(x)     g_log.DebugLn("{}: {} = {}", __FUNCTION__, #x, x)
-#define DBG_PRINT_EXPR2(x, y) g_log.DebugLn("{}: {} = {}, {} = {}", __FUNCTION__, #x, x, #y, y)
+#define DBG_PRINT_EXPR(x)     g_log.Debug({}, "{}: {} = {}", __FUNCTION__, #x, x)
+#define DBG_PRINT_EXPR2(x, y) g_log.Debug({}, "{}: {} = {}, {} = {}", __FUNCTION__, #x, x, #y, y)
 #define DBG_PRINT_EXPR3(x, y, z)                                                                             \
-    g_log.DebugLn("{}: {} = {}, {} = {}, {} = {}", __FUNCTION__, #x, x, #y, y, #z, z)
-#define DBG_PRINT_STRUCT(x) g_log.DebugLn("{}: {} = {}", __FUNCTION__, #x, fmt::DumpStruct(x))
+    g_log.Debug({}, "{}: {} = {}, {} = {}, {} = {}", __FUNCTION__, #x, x, #y, y, #z, z)
+#define DBG_PRINT_STRUCT(x) g_log.Debug({}, "{}: {} = {}", __FUNCTION__, #x, fmt::DumpStruct(x))

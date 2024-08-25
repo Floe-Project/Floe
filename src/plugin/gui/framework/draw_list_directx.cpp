@@ -428,15 +428,15 @@ struct DirectXDrawContext : public DrawContext {
         }
 
         if (auto r = DoScreenshot(); r.HasError()) {
-            DebugLn("{}", r.Error());
+            Debug("{}", r.Error());
             PanicIfReached();
             screenshot_callback = {};
         }
 
         if (auto const r = pd3d_device->Present(nullptr, nullptr, nullptr, nullptr); r == D3D_OK) {
-            if (render_count++ == 0) DebugLn("{}: first successful render", __FUNCTION__);
+            if (render_count++ == 0) Debug("{}: first successful render", __FUNCTION__);
         } else if (r == D3DERR_DEVICELOST && pd3d_device->TestCooperativeLevel() == D3DERR_DEVICENOTRESET) {
-            DebugLn(
+            Debug(
                 "pd3d_device->Present returned D3DERR_DEVICELOST, we will destroy the device objects and try again next time");
             DestroyDeviceObjects();
         } else {

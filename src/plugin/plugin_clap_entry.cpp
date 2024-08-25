@@ -30,7 +30,7 @@ static clap_plugin_factory const factory = {
 extern "C" void* __dso_handle;
 extern "C" void __cxa_finalize(void*);
 __attribute__((destructor)) void ZigBugWorkaround() {
-    g_log.DebugLn(k_global_log_cat, "ZigBugWorkaround");
+    g_log.Debug(k_global_log_module, "ZigBugWorkaround");
     __cxa_finalize(__dso_handle);
 }
 // NOLINTEND
@@ -46,7 +46,7 @@ extern "C" CLAP_EXPORT const clap_plugin_entry clap_entry = {
     .init = [](char const*) -> bool {
         if (g_init_count++ == 0) {
             g_panic_handler = [](char const* message, SourceLocation loc) {
-                g_log.ErrorLn(k_global_log_cat, "Panic: {}: {}", loc, message);
+                g_log.Error(k_global_log_module, "Panic: {}: {}", loc, message);
                 DefaultPanicHandler(message, loc);
             };
 #ifdef TRACY_ENABLE
@@ -55,15 +55,15 @@ extern "C" CLAP_EXPORT const clap_plugin_entry clap_entry = {
             // after tracy
             StartupCrashHandler();
         }
-        g_log.DebugLn(k_clap_log_cat, "init DSO");
-        g_log.InfoLn(k_global_log_cat, "Floe version: " FLOE_VERSION_STRING);
-        g_log.InfoLn(k_global_log_cat, "OS: {}", OperatingSystemName());
+        g_log.Debug(k_clap_log_module, "init DSO");
+        g_log.Info(k_global_log_module, "Floe version: " FLOE_VERSION_STRING);
+        g_log.Info(k_global_log_module, "OS: {}", OperatingSystemName());
 
         return true;
     },
     .deinit =
         []() {
-            g_log_file.DebugLn(k_clap_log_cat, "deinit");
+            g_log_file.Debug(k_clap_log_module, "deinit");
             if (--g_init_count == 0) {
                 ShutdownCrashHandler();
 #ifdef TRACY_ENABLE
@@ -73,7 +73,7 @@ extern "C" CLAP_EXPORT const clap_plugin_entry clap_entry = {
         },
 
     .get_factory = [](char const* factory_id) -> void const* {
-        g_log_file.DebugLn(k_clap_log_cat, "get_factory");
+        g_log_file.Debug(k_clap_log_module, "get_factory");
         if (NullTermStringsEqual(factory_id, CLAP_PLUGIN_FACTORY_ID)) return &factory;
         return nullptr;
     },

@@ -13,7 +13,7 @@
 #include "utils/thread_extra/atomic_queue.hpp"
 #include "utils/thread_extra/atomic_swap_buffer.hpp"
 
-constexpr auto k_utils_log_cat = "utils"_cat;
+constexpr auto k_utils_log_module = "utils"_log_module;
 
 struct StartingGun {
     void WaitUntilFired() {
@@ -258,7 +258,7 @@ void DoAtomicQueueTest(tests::Tester& tester, String name) {
             while (!producer_ready.Load(LoadMemoryOrder::Relaxed))
                 YieldThisThread();
 
-            tester.log.DebugLn(k_utils_log_cat, "Producer ready");
+            tester.log.Debug(k_utils_log_module, "Producer ready");
             starting_gun.Fire();
 
             int index = 0;
@@ -587,7 +587,7 @@ TEST_CASE(TestJsonWriter) {
             }
         }
 
-        tester.log.DebugLn(k_utils_log_cat, "{}", output);
+        tester.log.Debug(k_utils_log_module, "{}", output);
 
         CHECK(Parse(output, [](EventHandlerStack&, Event const&) { return true; }, tester.scratch_arena, {})
                   .Succeeded());
@@ -599,7 +599,7 @@ TEST_CASE(TestJsonWriter) {
         TRY(WriteValue(write_ctx, "H:/Floe PresetsÉe"));
         TRY(WriteArrayEnd(write_ctx));
 
-        tester.log.DebugLn(k_utils_log_cat, "{}", output);
+        tester.log.Debug(k_utils_log_module, "{}", output);
         REQUIRE(output.Items() == "[\"H:/Floe PresetsÉe\"]"_s);
     }
     return k_success;
@@ -615,39 +615,44 @@ TEST_CASE(TestJsonReader) {
         if constexpr (0) {
             switch (event.type) {
                 case EventType::String:
-                    tester.log.DebugLn(k_utils_log_cat,
-                                       "JSON event String: {} -> {}",
-                                       event.key,
-                                       event.string);
+                    tester.log.Debug(k_utils_log_module,
+                                     "JSON event String: {} -> {}",
+                                     event.key,
+                                     event.string);
                     break;
                 case EventType::Double:
-                    tester.log.DebugLn(k_utils_log_cat, "JSON event f64: {} -> {}", event.key, event.real);
+                    tester.log.Debug(k_utils_log_module, "JSON event f64: {} -> {}", event.key, event.real);
                     break;
                 case EventType::Int:
-                    tester.log.DebugLn(k_utils_log_cat, "JSON event Int: {} -> {}", event.key, event.integer);
+                    tester.log.Debug(k_utils_log_module,
+                                     "JSON event Int: {} -> {}",
+                                     event.key,
+                                     event.integer);
                     break;
                 case EventType::Bool:
-                    tester.log.DebugLn(k_utils_log_cat,
-                                       "JSON event Bool: {} -> {}",
-                                       event.key,
-                                       event.boolean);
+                    tester.log.Debug(k_utils_log_module,
+                                     "JSON event Bool: {} -> {}",
+                                     event.key,
+                                     event.boolean);
                     break;
                 case EventType::Null:
-                    tester.log.DebugLn(k_utils_log_cat, "JSON event Null: {}", event.key);
+                    tester.log.Debug(k_utils_log_module, "JSON event Null: {}", event.key);
                     break;
                 case EventType::ObjectStart:
-                    tester.log.DebugLn(k_utils_log_cat, "JSON event ObjectStart: {}", event.key);
+                    tester.log.Debug(k_utils_log_module, "JSON event ObjectStart: {}", event.key);
                     break;
-                case EventType::ObjectEnd: tester.log.DebugLn(k_utils_log_cat, "JSON event ObjectEnd"); break;
+                case EventType::ObjectEnd:
+                    tester.log.Debug(k_utils_log_module, "JSON event ObjectEnd");
+                    break;
                 case EventType::ArrayStart:
-                    tester.log.DebugLn(k_utils_log_cat, "JSON event ArrayStart, {}", event.key);
+                    tester.log.Debug(k_utils_log_module, "JSON event ArrayStart, {}", event.key);
                     break;
-                case EventType::ArrayEnd: tester.log.DebugLn(k_utils_log_cat, "JSON event ArrayEnd"); break;
+                case EventType::ArrayEnd: tester.log.Debug(k_utils_log_module, "JSON event ArrayEnd"); break;
                 case EventType::HandlingStarted:
-                    tester.log.DebugLn(k_utils_log_cat, "Json event HandlingStarting");
+                    tester.log.Debug(k_utils_log_module, "Json event HandlingStarting");
                     break;
                 case EventType::HandlingEnded:
-                    tester.log.DebugLn(k_utils_log_cat, "Json event HandlingEnded");
+                    tester.log.Debug(k_utils_log_module, "Json event HandlingEnded");
                     break;
             }
         }
@@ -798,7 +803,7 @@ TEST_CASE(TestJsonReader) {
         auto should_fail = [&](String test) {
             auto r = Parse(test, callback, tester.scratch_arena, settings);
             REQUIRE(r.HasError());
-            tester.log.DebugLn(k_utils_log_cat, "{}", r.Error().message);
+            tester.log.Debug(k_utils_log_module, "{}", r.Error().message);
         };
 
         should_fail("[\"mismatch\"}");
@@ -876,7 +881,7 @@ TEST_CASE(TestStacktraceString) {
                                                {
                                                    .ansi_colours = true,
                                                });
-            tester.log.DebugLn(k_utils_log_cat, "{}", str);
+            tester.log.Debug(k_utils_log_module, "{}", str);
         };
         f();
     }
@@ -884,7 +889,7 @@ TEST_CASE(TestStacktraceString) {
     SUBCASE("stacktrace 2") {
         auto f = [&]() {
             auto str = CurrentStacktraceString(tester.scratch_arena);
-            tester.log.DebugLn(k_utils_log_cat, "{}", str);
+            tester.log.Debug(k_utils_log_module, "{}", str);
         };
         f();
     }
@@ -896,7 +901,7 @@ TEST_CASE(TestStacktraceString) {
                 LOG_WARNING("Failed to get stacktrace");
             else {
                 auto str = StacktraceString(o.Value(), tester.scratch_arena);
-                tester.log.DebugLn(k_utils_log_cat, "{}", str);
+                tester.log.Debug(k_utils_log_module, "{}", str);
             }
         };
         f();
@@ -1037,7 +1042,7 @@ TEST_CASE(TestDirectoryListing) {
         auto& it = outcome.Value();
 
         while (it.HasMoreFiles()) {
-            tester.log.DebugLn(k_utils_log_cat, "{}", it.Get().path);
+            tester.log.Debug(k_utils_log_module, "{}", it.Get().path);
             REQUIRE(it.Increment().Succeeded());
         }
     }

@@ -46,7 +46,7 @@ CrossInstanceSystems::~CrossInstanceSystems() {
     {
         auto outcome = WriteSettingsFileIfChanged(settings);
         if (outcome.HasError())
-            g_log.ErrorLn("global"_cat, "Failed to write settings file: {}", outcome.Error());
+            g_log.Error("global"_log_module, "Failed to write settings file: {}", outcome.Error());
     }
 
     settings.tracking.filesystem_change_listeners.Remove(folder_settings_listener_id);

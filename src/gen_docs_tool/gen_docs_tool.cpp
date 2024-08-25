@@ -41,7 +41,7 @@ ErrorCodeOr<void> Main(String destination_folder) {
 
     {
         auto const lua_path = path::Join(arena, Array {destination_folder, "sample-library-example.lua"_s});
-        g_cli_out.InfoLn({}, "Generating {}", lua_path);
+        g_cli_out.Info({}, "Generating {}", lua_path);
         auto file = TRY(OpenFile(lua_path, FileMode::Write));
         auto writer = file.Writer();
         TRY(sample_lib::WriteDocumentedLuaExample(writer, true));
@@ -50,7 +50,7 @@ ErrorCodeOr<void> Main(String destination_folder) {
     {
         auto const lua_path =
             path::Join(arena, Array {destination_folder, "sample-library-example-no-comments.lua"_s});
-        g_cli_out.InfoLn({}, "Generating {}", lua_path);
+        g_cli_out.Info({}, "Generating {}", lua_path);
         auto file = TRY(OpenFile(lua_path, FileMode::Write));
         auto writer = file.Writer();
         TRY(sample_lib::WriteDocumentedLuaExample(writer, false));
@@ -58,7 +58,7 @@ ErrorCodeOr<void> Main(String destination_folder) {
 
     {
         auto const mdbook_config_path = path::Join(arena, Array {destination_folder, "mdbook_config.txt"_s});
-        g_cli_out.InfoLn({}, "Generating {}", mdbook_config_path);
+        g_cli_out.Info({}, "Generating {}", mdbook_config_path);
         auto file = TRY(OpenFile(mdbook_config_path, FileMode::Write));
         auto writer = file.Writer();
 
@@ -125,7 +125,7 @@ int main(int argc, char** argv) {
     ArenaAllocator arena {PageAllocator::Instance()};
 
     if (argc != 2) {
-        g_cli_out.ErrorLn({}, "Usage: {} <destination_folder>", argv[0]);
+        g_cli_out.Error({}, "Usage: {} <destination_folder>", argv[0]);
         return 1;
     }
 
@@ -133,7 +133,7 @@ int main(int argc, char** argv) {
 
     auto result = Main(destination_folder);
     if (result.HasError()) {
-        g_cli_out.ErrorLn({}, "Error: {}", result.Error());
+        g_cli_out.Error({}, "Error: {}", result.Error());
         return 1;
     }
 

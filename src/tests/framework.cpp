@@ -5,7 +5,6 @@
 
 #include "foundation/memory/allocators.hpp"
 #include "foundation/utils/format.hpp"
-#include "foundation/utils/path.hpp"
 #include "os/filesystem.hpp"
 #include "os/misc.hpp"
 #include "utils/debug/debug.hpp"
@@ -15,15 +14,16 @@ namespace tests {
 
 struct TestFailed {};
 
-void TestLogger::LogFunction(String _, String str, LogLevel level, bool add_newline) {
+void TestLogger::Log(LogModuleName module_name, LogLevel level, String str) {
     if (level < max_level_allowed) return;
     ArenaAllocatorWithInlineStorage<1000> arena;
     DynamicArray<char> buf {arena};
-    if (add_newline && tester.current_test_case) fmt::Append(buf, "[ {} ] ", tester.current_test_case->title);
+    if (tester.current_test_case) fmt::Append(buf, "[ {} ] ", tester.current_test_case->title);
     if (level == LogLevel::Error) dyn::AppendSpan(buf, ANSI_COLOUR_SET_FOREGROUND_RED);
+    if (module_name.str.size) fmt::Append(buf, "[{}] ", module_name.str);
     fmt::Append(buf, "{}", str);
     if (level == LogLevel::Error) dyn::AppendSpan(buf, ANSI_COLOUR_RESET);
-    if (add_newline) dyn::Append(buf, '\n');
+    dyn::Append(buf, '\n');
     auto _ = StdPrint(StdStream::Err, buf);
 }
 
@@ -57,13 +57,13 @@ String TempFolder(Tester& tester) {
 static Optional<String> SearchUpwardsFromExeForFolder(Tester& tester, String folder_name) {
     auto const path_outcome = CurrentExecutablePath(tester.scratch_arena);
     if (path_outcome.HasError()) {
-        tester.log.ErrorLn({}, "failed to get the current exe path: {}", path_outcome.Error());
+        tester.log.Error({}, "failed to get the current exe path: {}", path_outcome.Error());
         return nullopt;
     }
 
     auto result = SearchForExistingFolderUpwards(path_outcome.Value(), folder_name, tester.arena);
     if (!result) {
-        tester.log.ErrorLn({}, "failed to find {} folder", folder_name);
+        tester.log.Error({}, "failed to find {} folder", folder_name);
         return nullopt;
     }
     return result;
@@ -101,14 +101,14 @@ void* CreateOrFetchFixturePointer(Tester& tester,
 }
 
 int RunAllTests(Tester& tester, Optional<String> filter_pattern) {
-    g_cli_out.InfoLn({}, "Running tests ...");
+    g_cli_out.Info({}, "Running tests ...");
     Stopwatch const overall_stopwatch;
 
     for (auto& test_case : tester.test_cases) {
         if (filter_pattern && !MatchWildcard(*filter_pattern, test_case.title)) continue;
 
         tester.current_test_case = &test_case;
-        tester.log.DebugLn({}, "Running ...");
+        tester.log.Debug({}, "Running ...");
 
         tester.subcases_passed.Clear();
         tester.fixture_pointer = nullptr;
@@ -129,11 +129,11 @@ int RunAllTests(Tester& tester, Optional<String> filter_pattern) {
                 if (result.outcome.HasError()) {
                     tester.should_reenter = false;
                     tester.current_test_case->failed = true;
-                    tester.log.ErrorLn({}, "Failed: test returned an error:\n{}", result.outcome.Error());
+                    tester.log.Error({}, "Failed: test returned an error:\n{}", result.outcome.Error());
                     if (result.stacktrace.HasValue()) {
                         ASSERT(result.stacktrace.Value().size);
                         auto const str = StacktraceString(result.stacktrace.Value(), tester.scratch_arena);
-                        tester.log.InfoLn({}, "Stacktrace:\n{}", str);
+                        tester.log.Info({}, "Stacktrace:\n{}", str);
                     }
                 }
             } catch (TestFailed const& e) {
@@ -141,7 +141,7 @@ int RunAllTests(Tester& tester, Optional<String> filter_pattern) {
             } catch (...) {
                 tester.should_reenter = false;
                 tester.current_test_case->failed = true;
-                tester.log.ErrorLn({}, "Failed: an exception was thrown");
+                tester.log.Error({}, "Failed: an exception was thrown");
             }
 
             if (!tester.should_reenter) run_test = false;
@@ -150,29 +150,29 @@ int RunAllTests(Tester& tester, Optional<String> filter_pattern) {
         if (tester.delete_fixture) tester.delete_fixture(tester.fixture_pointer, tester.fixture_arena);
 
         if (!test_case.failed)
-            tester.log.DebugLn({}, ANSI_COLOUR_FOREGROUND_GREEN("Passed") " ({})\n", stopwatch);
+            tester.log.Debug({}, ANSI_COLOUR_FOREGROUND_GREEN("Passed") " ({})\n", stopwatch);
         else
-            tester.log.ErrorLn({}, "Failed\n");
+            tester.log.Error({}, "Failed\n");
     }
     tester.current_test_case = nullptr;
 
-    g_cli_out.InfoLn({}, "Summary");
-    g_cli_out.InfoLn({}, "--------");
-    g_cli_out.InfoLn({}, "Assertions: {}", tester.num_assertions);
-    g_cli_out.InfoLn({}, "Tests: {}", tester.test_cases.size);
-    g_cli_out.InfoLn({}, "Time taken: {.2}s", overall_stopwatch.SecondsElapsed());
+    g_cli_out.Info({}, "Summary");
+    g_cli_out.Info({}, "--------");
+    g_cli_out.Info({}, "Assertions: {}", tester.num_assertions);
+    g_cli_out.Info({}, "Tests: {}", tester.test_cases.size);
+    g_cli_out.Info({}, "Time taken: {.2}s", overall_stopwatch.SecondsElapsed());
 
     if (tester.num_warnings == 0)
-        g_cli_out.InfoLn({}, "Warnings: " ANSI_COLOUR_FOREGROUND_GREEN("0"));
+        g_cli_out.Info({}, "Warnings: " ANSI_COLOUR_FOREGROUND_GREEN("0"));
     else
-        g_cli_out.InfoLn({},
-                         "Warnings: " ANSI_COLOUR_SET_FOREGROUND_RED "{}" ANSI_COLOUR_RESET,
-                         tester.num_warnings);
+        g_cli_out.Info({},
+                       "Warnings: " ANSI_COLOUR_SET_FOREGROUND_RED "{}" ANSI_COLOUR_RESET,
+                       tester.num_warnings);
 
     auto const num_failed = CountIf(tester.test_cases, [](TestCase const& t) { return t.failed; });
     if (num_failed == 0) {
-        g_cli_out.InfoLn({}, "Failed: " ANSI_COLOUR_FOREGROUND_GREEN("0"));
-        g_cli_out.InfoLn({}, "Result: " ANSI_COLOUR_FOREGROUND_GREEN("Success"));
+        g_cli_out.Info({}, "Failed: " ANSI_COLOUR_FOREGROUND_GREEN("0"));
+        g_cli_out.Info({}, "Result: " ANSI_COLOUR_FOREGROUND_GREEN("Success"));
     } else {
         DynamicArray<char> failed_test_names {tester.scratch_arena};
         for (auto& test_case : tester.test_cases) {
@@ -185,11 +185,11 @@ int RunAllTests(Tester& tester, Optional<String> filter_pattern) {
             }
         }
 
-        g_cli_out.InfoLn({},
-                         "Failed: " ANSI_COLOUR_SET_FOREGROUND_RED "{}" ANSI_COLOUR_RESET "{}",
-                         num_failed,
-                         failed_test_names);
-        g_cli_out.InfoLn({}, "Result: " ANSI_COLOUR_SET_FOREGROUND_RED "Failure");
+        g_cli_out.Info({},
+                       "Failed: " ANSI_COLOUR_SET_FOREGROUND_RED "{}" ANSI_COLOUR_RESET "{}",
+                       num_failed,
+                       failed_test_names);
+        g_cli_out.Info({}, "Result: " ANSI_COLOUR_SET_FOREGROUND_RED "Failure");
     }
 
     return num_failed ? 1 : 0;
@@ -209,10 +209,10 @@ void Check(Tester& tester,
         else if (failure_aciton == FailureAction::LogWarningAndContinue)
             pretext = "WARNING issued";
 
-        tester.log.ErrorLn({}, "{}: {}", pretext, message);
-        tester.log.ErrorLn({}, "  File      {}:{}", file, line);
+        tester.log.Error({}, "{}: {}", pretext, message);
+        tester.log.Error({}, "  File      {}:{}", file, line);
         for (auto const& s : tester.subcases_stack)
-            tester.log.ErrorLn({}, "  SUBCASE   {}", s.name);
+            tester.log.Error({}, "  SUBCASE   {}", s.name);
 
         auto capture = tester.capture_buffer.UsedStackData();
         if (capture.size) {
@@ -220,11 +220,11 @@ void Check(Tester& tester,
 
             while (auto pos = Find(capture_str, '\n')) {
                 String const part {capture_str.data, *pos};
-                tester.log.ErrorLn({}, part);
+                tester.log.Error({}, part);
 
                 capture_str.RemovePrefix(*pos + 1);
             }
-            if (capture_str.size) tester.log.ErrorLn({}, capture_str);
+            if (capture_str.size) tester.log.Error({}, capture_str);
         }
 
         PrintCurrentStacktrace(StdStream::Err, {}, 2);
@@ -263,7 +263,7 @@ Subcase::Subcase(Tester& tester, String name, String file, int line) : tester(te
         fmt::Append(buf, "\"{}\"", subcase.name);
         if (&subcase != &Last(tester.subcases_stack)) dyn::AppendSpan(buf, " -> ");
     }
-    tester.log.DebugLn({}, buf);
+    tester.log.Debug({}, buf);
 }
 
 Subcase::~Subcase() {

@@ -57,29 +57,25 @@ int main(int argc, char** argv) {
         tests::Tester tester;
 
         Optional<String> filter_pattern {};
-        {
-            auto const args = Args(argc, argv, false);
-            auto const opts = ParseCommandLineArgs(tester.scratch_arena, args);
-            for (auto [key, value] : opts) {
-                if (key == "filter")
-                    filter_pattern = *value;
-                else if (key == "log-level") {
-                    if (IsEqualToCaseInsensitiveAscii(*value, "debug"_s))
-                        tester.log.max_level_allowed = LogLevel::Debug;
-                    else if (IsEqualToCaseInsensitiveAscii(*value, "info"_s))
-                        tester.log.max_level_allowed = LogLevel::Info;
-                    else if (IsEqualToCaseInsensitiveAscii(*value, "warning"_s))
-                        tester.log.max_level_allowed = LogLevel::Warning;
-                    else if (IsEqualToCaseInsensitiveAscii(*value, "error"_s))
-                        tester.log.max_level_allowed = LogLevel::Error;
-                    else {
-                        g_cli_out.Error({}, "Unknown log level: {}", *value);
-                        return 1;
-                    }
-                } else {
-                    g_cli_out.Error({}, "Unknown option: {}", key);
+        for (auto [key, value] : ParseCommandLineArgs(tester.scratch_arena, argc, argv)) {
+            if (key == "filter")
+                filter_pattern = *value;
+            else if (key == "log-level") {
+                if (IsEqualToCaseInsensitiveAscii(*value, "debug"_s))
+                    tester.log.max_level_allowed = LogLevel::Debug;
+                else if (IsEqualToCaseInsensitiveAscii(*value, "info"_s))
+                    tester.log.max_level_allowed = LogLevel::Info;
+                else if (IsEqualToCaseInsensitiveAscii(*value, "warning"_s))
+                    tester.log.max_level_allowed = LogLevel::Warning;
+                else if (IsEqualToCaseInsensitiveAscii(*value, "error"_s))
+                    tester.log.max_level_allowed = LogLevel::Error;
+                else {
+                    g_cli_out.Error({}, "Unknown log level: {}", *value);
                     return 1;
                 }
+            } else {
+                g_cli_out.Error({}, "Unknown option: {}", key);
+                return 1;
             }
         }
 

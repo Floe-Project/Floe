@@ -608,11 +608,15 @@ concept StringConstOrNot = Same<T, String> || Same<T, MutableString>;
     return str;
 }
 
-// IMPROVE: use an arena rather than static size array
-PUBLIC DynamicArrayInline<String, 50> Args(int argc, char** argv, bool include_program_name) {
-    DynamicArrayInline<String, 50> result;
-    for (int i = include_program_name ? 0 : 1; i < argc; i++)
-        dyn::Append(result, FromNullTerminated(argv[i]));
+PUBLIC Span<String>
+Args(ArenaAllocator& arena, int argc, char const* const* argv, bool include_program_name) {
+    ASSERT(argc > 0);
+    auto const argv_start_index = (usize)(include_program_name ? 0 : 1);
+    auto const result_size = (usize)argc - argv_start_index;
+    if (!result_size) return {};
+    auto result = arena.AllocateExactSizeUninitialised<String>(result_size);
+    for (auto const result_index : Range(result_size))
+        result[result_index] = FromNullTerminated(argv[result_index + argv_start_index]);
     return result;
 }
 
@@ -671,6 +675,11 @@ PUBLIC HashTable<String, String> ParseCommandLineArgs(ArenaAllocator& arena, Spa
     }
 
     return result.ToOwnedTable();
+}
+
+PUBLIC HashTable<String, String>
+ParseCommandLineArgs(ArenaAllocator& arena, int argc, char const* const* argv) {
+    return ParseCommandLineArgs(arena, Args(arena, argc, argv, false));
 }
 
 // https://blog.rink.nu/2023/02/12/behind-the-magic-of-magic_enum/

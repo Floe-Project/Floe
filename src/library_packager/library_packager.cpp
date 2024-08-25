@@ -206,17 +206,68 @@ static ErrorCodeOr<void> Main(String library_folder) {
     return k_success;
 }
 
+struct CommandLineArg {
+    String key;
+    bool required;
+    bool needs_value; // else it's just a flag
+
+    // out
+    Optional<String> value;
+    bool was_set;
+};
+
+static void PrintUsage(String exe_name, Span<CommandLineArg const> args) {
+    g_cli_out.Info({}, "Usage: {} [ARGS]", exe_name);
+    g_cli_out.Info({}, "  Required arguments:");
+    for (auto const& arg : args)
+        if (arg.required) g_cli_out.Info({}, "   --{}{}", arg.key, arg.needs_value ? "=<value>" : "");
+    g_cli_out.Info({}, "  Optional arguments:");
+    for (auto const& arg : args)
+        if (!arg.required) g_cli_out.Info({}, "   --{}{}", arg.key, arg.needs_value ? "=<value>" : "");
+}
+
+static bool ParseCommandLineArgs(ArenaAllocator& arena, int argc, char** argv, Span<CommandLineArg> args) {
+    for (auto [key, value] : ParseCommandLineArgs(arena, argc, argv)) {
+        auto const arg_index = FindIf(args, [&](auto const& arg) { return arg.key == key; });
+        if (!arg_index) {
+            g_cli_out.Error({}, "Unknown option: {}", key);
+            return false;
+        }
+
+        auto& arg = args[*arg_index];
+
+        if (arg.needs_value && !value->size) {
+            g_cli_out.Error({}, "Option --{} requires a value", key);
+            return false;
+        }
+
+        if (value->size) arg.value = *value;
+        arg.was_set = true;
+    }
+
+    for (auto const& arg : args)
+        if (arg.required && !arg.value) {
+            g_cli_out.Error({}, "Required arg --{} not provided", arg.key);
+            return false;
+        }
+
+    return true;
+}
+
 int main(int argc, char** argv) {
     ArenaAllocator arena {PageAllocator::Instance()};
 
-    if (argc != 2) {
-        g_cli_out.Error({}, "Usage: {} <library-folder>", argv[0]);
+    auto command_line_args = ArrayT<CommandLineArg>({
+        {.key = "library-folder", .required = true, .needs_value = true},
+        {.key = "preset-folder", .required = false, .needs_value = true},
+    });
+
+    if (!ParseCommandLineArgs(arena, argc, argv, command_line_args)) {
+        PrintUsage(FromNullTerminated(argv[0]), command_line_args);
         return 1;
     }
 
-    auto const library_folder = FromNullTerminated(argv[1]);
-
-    auto result = Main(library_folder);
+    auto result = Main(*command_line_args[0].value); // TODO: devise a better way than hardcoding the index
     if (result.HasError()) {
         g_cli_out.Error({}, "Error: {}", result.Error());
         return 1;

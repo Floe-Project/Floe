@@ -2465,6 +2465,24 @@ TEST_CASE(TestStringAlgorithms) {
 TEST_CASE(TestParseCommandLineArgs) {
     auto& a = tester.scratch_arena;
 
+    {
+        char const* argv[] = {"program-name", "arg1", "arg2"};
+        auto const argc = (int)ArraySize(argv);
+        {
+            auto args = Args(a, argc, argv, false);
+            CHECK(args.size == 2);
+            CHECK_EQ(args[0], "arg1"_s);
+            CHECK_EQ(args[1], "arg2"_s);
+        }
+        {
+            auto args = Args(a, argc, argv, true);
+            CHECK(args.size == 3);
+            CHECK_EQ(args[0], "program-name"_s);
+            CHECK_EQ(args[1], "arg1"_s);
+            CHECK_EQ(args[2], "arg2"_s);
+        }
+    }
+
     auto const check_arg = [&](HashTable<String, String> table, String arg, String value) {
         CAPTURE(arg);
         CAPTURE(value);

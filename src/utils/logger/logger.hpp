@@ -55,43 +55,24 @@ struct Logger {
     void
     Trace(LogModuleName module_name, String message = {}, SourceLocation loc = SourceLocation::Current());
 
-    template <typename... Args>
-    void Debug(LogModuleName module_name, String format, Args const&... args) {
-        if constexpr (PRODUCTION_BUILD) return;
-        if constexpr (sizeof...(args) == 0) {
-            Log(module_name, LogLevel::Debug, format);
-        } else {
-            LogAllocator log_allocator;
-            Log(module_name, LogLevel::Debug, fmt::Format(log_allocator, format, args...));
-        }
+    // A macro unfortunatly seems the best way to avoid repeating the same code while keep template
+    // instantiations low (needed for fast compile times)
+#define DECLARE_LOG_FUNCTION(level)                                                                          \
+    template <typename... Args>                                                                              \
+    void level(LogModuleName module_name, String format, Args const&... args) {                              \
+        if constexpr (LogLevel::level == LogLevel::Debug && PRODUCTION_BUILD) return;                        \
+        if constexpr (sizeof...(args) == 0) {                                                                \
+            Log(module_name, LogLevel::level, format);                                                       \
+        } else {                                                                                             \
+            LogAllocator log_allocator;                                                                      \
+            Log(module_name, LogLevel::level, fmt::Format(log_allocator, format, args...));                  \
+        }                                                                                                    \
     }
-    template <typename... Args>
-    void Info(LogModuleName module_name, String format, Args const&... args) {
-        if constexpr (sizeof...(args) == 0) {
-            Log(module_name, LogLevel::Info, format);
-        } else {
-            LogAllocator log_allocator;
-            Log(module_name, LogLevel::Info, fmt::Format(log_allocator, format, args...));
-        }
-    }
-    template <typename... Args>
-    void Error(LogModuleName module_name, String format, Args const&... args) {
-        if constexpr (sizeof...(args) == 0) {
-            Log(module_name, LogLevel::Error, format);
-        } else {
-            LogAllocator log_allocator;
-            Log(module_name, LogLevel::Error, fmt::Format(log_allocator, format, args...));
-        }
-    }
-    template <typename... Args>
-    void Warning(LogModuleName module_name, String format, Args const&... args) {
-        if constexpr (sizeof...(args) == 0) {
-            Log(module_name, LogLevel::Warning, format);
-        } else {
-            LogAllocator log_allocator;
-            Log(module_name, LogLevel::Warning, fmt::Format(log_allocator, format, args...));
-        }
-    }
+
+    DECLARE_LOG_FUNCTION(Debug)
+    DECLARE_LOG_FUNCTION(Info)
+    DECLARE_LOG_FUNCTION(Error)
+    DECLARE_LOG_FUNCTION(Warning)
 };
 
 struct StdStreamLogger final : Logger {

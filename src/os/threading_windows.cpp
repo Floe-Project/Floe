@@ -36,7 +36,6 @@ void SleepThisThread(int milliseconds) { ::Sleep((DWORD)milliseconds); }
 void YieldThisThread() { Sleep(0); }
 
 Mutex::Mutex() { InitializeCriticalSection(&mutex.As<CRITICAL_SECTION>()); }
-
 Mutex::~Mutex() { DeleteCriticalSection(&mutex.As<CRITICAL_SECTION>()); }
 void Mutex::Lock() { EnterCriticalSection(&mutex.As<CRITICAL_SECTION>()); }
 bool Mutex::TryLock() { return TryEnterCriticalSection(&mutex.As<CRITICAL_SECTION>()) != FALSE; }

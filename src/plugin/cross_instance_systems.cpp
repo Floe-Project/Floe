@@ -30,7 +30,7 @@ CrossInstanceSystems::CrossInstanceSystems()
                 case ScanFolderType::Count: PanicIfReached();
             }
         });
-    thread_pool.Init("Global", {});
+    thread_pool.Init("global", {});
 
     InitSettingsFile(settings, paths);
 

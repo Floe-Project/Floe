@@ -12,21 +12,30 @@ ErrorCodeOr<void> WriteFormattedLog(Writer writer,
                                     LogLevel level,
                                     String message,
                                     WriteFormattedLogOptions options) {
-    TRY(writer.WriteChar('['));
     bool needs_space = false;
+    bool first_prefix = true;
+
+    auto const begin_prefix_item = [&]() -> ErrorCodeOr<void> {
+        char buf[2];
+        usize len = 0;
+        if (Exchange(first_prefix, false)) buf[len++] = '[';
+        if (Exchange(needs_space, true)) buf[len++] = ' ';
+        if (len) TRY(writer.WriteChars({buf, len}));
+        return k_success;
+    };
 
     if (options.timestamp) {
-        if (Exchange(needs_space, true)) TRY(writer.WriteChar(' '));
+        TRY(begin_prefix_item());
         TRY(writer.WriteChars(Timestamp()));
     }
 
     if (module_name.size) {
-        if (Exchange(needs_space, true)) TRY(writer.WriteChar(' '));
+        TRY(begin_prefix_item());
         TRY(writer.WriteChars(module_name));
     }
 
     if (!(options.no_info_prefix && level == LogLevel::Info)) {
-        if (Exchange(needs_space, true)) TRY(writer.WriteChar(' '));
+        TRY(begin_prefix_item());
         TRY(writer.WriteChars(({
             String s;
             switch (level) {
@@ -45,7 +54,7 @@ ErrorCodeOr<void> WriteFormattedLog(Writer writer,
     }
 
     if (options.thread) {
-        if (Exchange(needs_space, true)) TRY(writer.WriteChar(' '));
+        TRY(begin_prefix_item());
         if (auto const thread_name = ThreadName())
             TRY(writer.WriteChars(*thread_name));
         else
@@ -55,10 +64,9 @@ ErrorCodeOr<void> WriteFormattedLog(Writer writer,
                                                    })));
     }
 
-    TRY(writer.WriteChars("]"_s));
-    if (message.size) TRY(writer.WriteChar(' '));
+    if (!first_prefix) TRY(writer.WriteChars("] "));
     TRY(writer.WriteChars(message));
-    TRY(writer.WriteChar('\n'));
+    if (!first_prefix || message.size) TRY(writer.WriteChar('\n'));
     return k_success;
 }
 

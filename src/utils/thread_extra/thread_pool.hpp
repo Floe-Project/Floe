@@ -15,11 +15,12 @@ struct ThreadPool {
     void Init(String pool_name, Optional<u32> num_threads) {
         ZoneScoped;
         ASSERT(m_workers.size == 0);
+        ASSERT(pool_name.size < k_max_thread_name_size - 4u);
         if (!num_threads) num_threads = Min(Max(GetSystemStats().num_logical_cpus / 2u, 1u), 4u);
 
         dyn::Resize(m_workers, *num_threads);
         for (auto [i, w] : Enumerate(m_workers)) {
-            auto const name = fmt::FormatInline<100>("{}: {}", pool_name, i);
+            auto const name = fmt::FormatInline<k_max_thread_name_size>("{}:{}", pool_name, i);
             w.Start([this]() { WorkerProc(this); }, name, {});
         }
     }

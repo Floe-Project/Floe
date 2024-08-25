@@ -40,12 +40,11 @@ WINDOWS_FP_TEST_REGISTER_FUNCTIONS
 #undef X
 
 int main(int argc, char** argv) {
-    SetThreadName("Main");
+    SetThreadName("main");
     DebugSetThreadAsMainThread();
 #ifdef TRACY_ENABLE
     ___tracy_startup_profiler();
     DEFER { ___tracy_shutdown_profiler(); };
-    tracy::SetThreadName("Main");
 #endif
 
     StartupCrashHandler();

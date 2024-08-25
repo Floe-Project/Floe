@@ -2369,24 +2369,24 @@ TEST_CASE(TestCopyStringIntoBuffer) {
     }
 
     SUBCASE("Span<char> overload") {
-        SUBCASE("Dest empty") { CopyStringIntoBufferWithNullTerm(Span<char> {}, "abc"); }
+        SUBCASE("Dest empty") { CopyStringIntoBufferWithNullTerm(nullptr, 0, "abc"); }
 
         SUBCASE("Source empty") {
             char buffer[6];
-            CopyStringIntoBufferWithNullTerm({buffer, 6}, "");
+            CopyStringIntoBufferWithNullTerm(buffer, 6, "");
             CHECK(buffer[0] == 0);
         }
 
         SUBCASE("Small buffer") {
             char buf[2];
-            CopyStringIntoBufferWithNullTerm({buf, 2}, "abc");
+            CopyStringIntoBufferWithNullTerm(buf, 2, "abc");
             CHECK(buf[0] == 'a');
             CHECK(buf[1] == '\0');
         }
 
         SUBCASE("Whole source fits") {
             char buf[8];
-            CopyStringIntoBufferWithNullTerm({buf, 8}, "aa");
+            CopyStringIntoBufferWithNullTerm(buf, "aa");
             CHECK(buf[0] == 'a');
             CHECK(buf[1] == 'a');
             CHECK(buf[2] == '\0');

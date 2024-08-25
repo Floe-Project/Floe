@@ -219,7 +219,8 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
                         ASSERT(f.audio_format == mdata::AudioFileTypeRaw16Pcm);
                         ASSERT(RoundPositiveFloat(f.sample_rate) == 44100);
                         static_assert(".wav"_s.size == k_raw_16_bit_stereo_44100_format_ext.size);
-                        CopyStringIntoBufferWithNullTerm(MutableString {(char*)ext.data, ext.size},
+                        CopyStringIntoBufferWithNullTerm((char*)ext.data,
+                                                         ext.size,
                                                          k_raw_16_bit_stereo_44100_format_ext);
                     }
                 }

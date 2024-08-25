@@ -1033,7 +1033,7 @@ static LRESULT CALLBACK PageWindowProc(HWND window, UINT msg, WPARAM w_param, LP
 }
 
 static ErrorCodeOr<void> Main(HINSTANCE h_instance, int cmd_show) {
-    SetThreadName("Main");
+    SetThreadName("main");
     DebugSetThreadAsMainThread();
 
     constexpr INITCOMMONCONTROLSEX k_init_cc {.dwSize = sizeof(INITCOMMONCONTROLSEX),

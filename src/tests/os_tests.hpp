@@ -906,7 +906,7 @@ TEST_CASE(TestThread) {
             g_global_int = 1;
             SleepThisThread(1);
         },
-        "test thread");
+        "test-thread");
 
     REQUIRE(thread.Joinable());
     thread.Join();

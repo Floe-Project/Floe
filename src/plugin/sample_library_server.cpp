@@ -1487,7 +1487,7 @@ Server::Server(ThreadPool& pool,
         libraries_by_id.Insert(BuiltinLibrary()->Id(), node);
     }
 
-    thread.Start([this]() { ServerThreadProc(*this); }, "Sample lib loading");
+    thread.Start([this]() { ServerThreadProc(*this); }, "samp-lib-server");
 }
 
 Server::~Server() {
@@ -1635,7 +1635,7 @@ static Type& ExtractSuccess(tests::Tester& tester, LoadResult const& result, Loa
 
 TEST_CASE(TestSampleLibraryLoader) {
     struct Fixture {
-        Fixture(tests::Tester&) { thread_pool.Init("Thread Pool", 8u); }
+        Fixture(tests::Tester&) { thread_pool.Init("pool", 8u); }
         bool initialised = false;
         ArenaAllocatorWithInlineStorage<2000> arena;
         String test_lib_path;

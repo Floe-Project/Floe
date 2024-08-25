@@ -48,7 +48,12 @@ constexpr static usize k_max_thread_name_size = 16;
 void SetThreadName(String name);
 Optional<DynamicArrayInline<char, k_max_thread_name_size>> ThreadName();
 
-// Does nothing on end-user builds
+namespace detail {
+void SetThreadLocalThreadName(String name);
+Optional<String> GetThreadLocalThreadName();
+} // namespace detail
+
+// Does nothing on production builds
 void DebugSetThreadAsMainThread();
 bool IsMainThread();
 
@@ -77,18 +82,17 @@ class Thread {
     struct ThreadStartData {
         ThreadStartData(StartFunction&& f, String name, ThreadStartOptions o)
             : start_function(Move(f))
-            , options(o) {
-            CopyStringIntoBufferWithNullTerm(thread_name, name);
-        }
+            , options(o)
+            , thread_name(name) {}
         void StartThread() {
-            SetThreadName(FromNullTerminated(thread_name));
+            SetThreadName(thread_name);
             start_function();
         }
 
         // private
         StartFunction start_function;
         ThreadStartOptions options;
-        char thread_name[32] {};
+        DynamicArrayInline<char, k_max_thread_name_size> thread_name {};
     };
 
   private:

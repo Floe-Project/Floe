@@ -90,13 +90,12 @@ static unsigned __stdcall ThreadProc(void* data) {
     return 0;
 }
 
-thread_local DynamicArrayInline<char, k_max_thread_name_size> g_thread_name {};
-
-void SetThreadName(String name) { dyn::Assign(g_thread_name, name); }
+void SetThreadName(String name) { detail::SetThreadLocalThreadName(name); }
 
 Optional<DynamicArrayInline<char, k_max_thread_name_size>> ThreadName() {
-    if (!g_thread_name.size) return nullopt;
-    return g_thread_name.Items();
+    auto const name = detail::GetThreadLocalThreadName();
+    if (name) return *name;
+    return nullopt;
 }
 
 void Thread::Start(StartFunction&& function, String name, ThreadStartOptions options) {

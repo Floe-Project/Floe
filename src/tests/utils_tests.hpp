@@ -110,7 +110,7 @@ TEST_CASE(TestAtomicSwapBuffer) {
                 buffer.Publish();
             }
         },
-        "Producer");
+        "producer");
     consumer.Start(
         [&]() {
             threads_ready.FetchAdd(1, RmwMemoryOrder::AcquireRelease);
@@ -118,7 +118,7 @@ TEST_CASE(TestAtomicSwapBuffer) {
             for (auto const _ : Range<int>(10000))
                 buffer.Consume();
         },
-        "Consumer");
+        "consumer");
 
     while (threads_ready.Load(LoadMemoryOrder::Relaxed) != 2)
         YieldThisThread();
@@ -228,8 +228,8 @@ void DoAtomicQueueTest(tests::Tester& tester, String name) {
             Thread producer;
             Thread consumer;
             StartingGun starting_gun;
-            producer.Start([&]() { do_random_spamming(q, starting_gun, true); }, "Producer");
-            consumer.Start([&]() { do_random_spamming(q, starting_gun, false); }, "Consumer");
+            producer.Start([&]() { do_random_spamming(q, starting_gun, true); }, "producer");
+            consumer.Start([&]() { do_random_spamming(q, starting_gun, false); }, "consumer");
             starting_gun.Fire();
             producer.Join();
             consumer.Join();
@@ -253,7 +253,7 @@ void DoAtomicQueueTest(tests::Tester& tester, String name) {
                         while (!q.Push(index))
                             YieldThisThread();
                 },
-                "Producer");
+                "producer");
 
             while (!producer_ready.Load(LoadMemoryOrder::Relaxed))
                 YieldThisThread();
@@ -285,10 +285,10 @@ void DoAtomicQueueTest(tests::Tester& tester, String name) {
                 StartingGun starting_gun;
 
                 for (auto& producer : producers)
-                    producer.Start([&]() { do_random_spamming(q, starting_gun, true); }, "Producer");
+                    producer.Start([&]() { do_random_spamming(q, starting_gun, true); }, "producer");
 
                 for (auto& consumer : consumers)
-                    consumer.Start([&]() { do_random_spamming(q, starting_gun, false); }, "Consumer");
+                    consumer.Start([&]() { do_random_spamming(q, starting_gun, false); }, "consumer");
 
                 starting_gun.Fire();
 
@@ -487,7 +487,7 @@ TEST_CASE(TestAtomicRefList) {
                 }
                 done.Store(true, StoreMemoryOrder::Release);
             },
-            "test thread");
+            "test-thread");
 
         while (!thread_ready.Load(LoadMemoryOrder::Relaxed))
             YieldThisThread();

@@ -530,10 +530,7 @@ clap_plugin const floe_plugin {
 
         if (g_num_init_plugins++ == 0) {
             DebugSetThreadAsMainThread();
-            SetThreadName("Main");
-#ifdef TRACY_ENABLE
-            tracy::SetThreadName("Main");
-#endif
+            SetThreadName("main");
             g_cross_instance_systems.Emplace();
         }
 
@@ -611,7 +608,7 @@ clap_plugin const floe_plugin {
         ZoneScopedMessage(floe.trace_config, "plugin start_processing");
         ASSERT(floe.active);
         ASSERT(!floe.processing);
-        tracy::SetThreadName("Audio");
+        SetThreadName("audio");
         auto& processor = floe.plugin->processor;
         processor.processor_callbacks.start_processing(processor);
         floe.processing = true;

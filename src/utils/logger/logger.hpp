@@ -25,7 +25,13 @@ ErrorCodeOr<void> WriteFormattedLog(Writer writer,
 // Strongly-typed string so that it's not confused with strings and string formatting
 struct LogModuleName {
     constexpr LogModuleName() = default;
-    constexpr explicit LogModuleName(String str) : str(str) {}
+    constexpr explicit LogModuleName(String str) : str(str) {
+        if constexpr (!PRODUCTION_BUILD) {
+            for (auto c : str)
+                if (c == ' ' || c == '_' || IsUppercaseAscii(c))
+                    throw "Log module names must be lowercase, use - instead of _ and not contain spaces";
+        }
+    }
     String str {};
 };
 constexpr LogModuleName operator""_log_module(char const* str, usize size) {

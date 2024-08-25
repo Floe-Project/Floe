@@ -284,10 +284,10 @@ PUBLIC void CopyStringIntoBufferWithNullTerm(char (&destination)[k_size], String
     destination[size] = '\0';
 }
 
-PUBLIC constexpr void CopyStringIntoBufferWithNullTerm(Span<char> buffer, String source) {
-    if (!buffer.size) return;
+PUBLIC constexpr void CopyStringIntoBufferWithNullTerm(char* buffer, usize buffer_size, String source) {
+    if (!buffer_size) return;
 
-    auto const size = Min(buffer.size - 1, source.size);
+    auto const size = Min(buffer_size - 1, source.size);
     for (auto const i : Range(size))
         buffer[i] = source[i];
     buffer[size] = 0;
@@ -391,6 +391,7 @@ PUBLIC constexpr bool IsEndOfLine(char c) { return c == '\n' || c == '\r'; }
 PUBLIC constexpr bool IsSpacing(char c) { return c == ' ' || c == '\t'; }
 PUBLIC constexpr bool IsWhitespace(char c) { return IsSpacing(c) || IsEndOfLine(c); }
 PUBLIC constexpr bool IsPrintableAscii(char c) { return c >= 32 && c <= 126; }
+PUBLIC constexpr bool IsUppercaseAscii(char c) { return c >= 'A' && c <= 'Z'; }
 
 // https://en.wikipedia.org/wiki/Whitespace_character
 PUBLIC constexpr bool IsSpaceU32(u32 c) {

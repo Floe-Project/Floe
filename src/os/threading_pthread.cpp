@@ -38,15 +38,13 @@ Thread& Thread::operator=(Thread&& other) {
     return *this;
 }
 
-thread_local DynamicArrayInline<char, k_max_thread_name_size> g_thread_name {};
-
 void SetThreadName(String name) {
+    detail::SetThreadLocalThreadName(name);
     char buffer[k_max_thread_name_size];
     CopyStringIntoBufferWithNullTerm(buffer, name);
 #if __APPLE__
     pthread_setname_np(buffer);
 #else
-    dyn::Assign(g_thread_name, name);
     // On Linux, even though we don't use pthread_getname_np to fetch the name, let's still set it because it
     // might help out external tools.
     pthread_setname_np(pthread_self(), buffer);
@@ -55,10 +53,11 @@ void SetThreadName(String name) {
 
 Optional<DynamicArrayInline<char, k_max_thread_name_size>> ThreadName() {
     if constexpr (IS_LINUX) {
-        if (!g_thread_name.size) return nullopt;
-        // On Linux, pthread_getname_np will return the name of the executable which is confusing, better to
-        // have nothing and fetch the TID.
-        return g_thread_name.Items();
+        // On Linux, if the thread wasn't explicity name, pthread_getname_np will return the name of the
+        // executable which is confusing, better to have nothing and fetch the TID.
+        auto const name = detail::GetThreadLocalThreadName();
+        if (name) return *name;
+        return nullopt;
     } else {
         char buffer[k_max_thread_name_size];
         if (pthread_getname_np(pthread_self(), buffer, k_max_thread_name_size) == 0)
@@ -69,7 +68,7 @@ Optional<DynamicArrayInline<char, k_max_thread_name_size>> ThreadName() {
 
 static void* ThreadStartProc(void* data) {
     auto d = (Thread::ThreadStartData*)data;
-    if (d->thread_name[0] && !PRODUCTION_BUILD) SetThreadName(d->thread_name);
+    SetThreadName(d->thread_name);
     d->StartThread();
     delete d;
     return nullptr;

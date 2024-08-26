@@ -5,6 +5,8 @@
 #include <errno.h>
 #include <sys/file.h>
 #include <sys/stat.h>
+
+#include "utils/logger/logger.hpp"
 #if __linux__
 #include <sys/stat.h>
 #endif
@@ -74,13 +76,13 @@ ErrorCodeOr<void> DirectoryIterator::Increment() {
         // specify different directory streams are thread-safe"
         auto entry = readdir((DIR*)m_handle); // NOLINT(concurrency-mt-unsafe)
         if (entry) {
-            auto entry_name = FromNullTerminated(entry->d_name);
+            auto const entry_name = FromNullTerminated(entry->d_name);
             if (!MatchWildcard(m_wildcard, entry_name) || entry_name == "."_s || entry_name == ".."_s ||
                 (m_skip_dot_files && entry_name.size && entry_name[0] == '.')) {
                 skip = true;
             } else {
                 dyn::Resize(m_e.path, m_base_path_size);
-                path::JoinAppend(m_e.path, FromNullTerminated(entry->d_name));
+                path::JoinAppend(m_e.path, entry_name);
                 m_e.type = entry->d_type == DT_DIR ? FileType::Directory : FileType::File;
                 if (m_get_file_size) {
                     struct ::stat info;

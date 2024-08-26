@@ -5,6 +5,7 @@
 
 #include "foundation/foundation.hpp"
 #include "os/misc.hpp"
+#include "utils/debug/debug.hpp"
 #include "utils/logger/logger.hpp"
 
 #include "plugin/sample_library/sample_library.hpp"
@@ -300,17 +301,71 @@ static ErrorCodeOr<void> Main(ArgsCstr args) {
 
             mz_zip_archive zip;
             mz_zip_zero_struct(&zip);
-            mz_zip_writer_init_heap(&zip, 0, 1000);
+            if (!mz_zip_writer_init_heap(&zip, 0, Kb(1))) {
+                PanicF(SourceLocation::Current(),
+                       "Failed to initialize zip writer: {}",
+                       mz_zip_get_error_string(mz_zip_get_last_error(&zip)));
+            }
+            DEFER { mz_zip_writer_end(&zip); };
 
-            mz_zip_writer_add_mem(&zip, "file.txt", "Hello, world!", 13, MZ_NO_COMPRESSION);
+            if (library_folder.size) {
+                auto it = TRY(RecursiveDirectoryIterator::Create(arena,
+                                                                 library_folder,
+                                                                 {
+                                                                     .wildcard = "*",
+                                                                     .get_file_size = false,
+                                                                     .skip_dot_files = true,
+                                                                 }));
+                while (it.HasMoreFiles()) {
+                    auto const& entry = it.Get();
+                    auto const path = entry.path.Items();
+                    if (path.size < library_folder.size + 1)
+                        PanicF(SourceLocation::Current(),
+                               "Path error, {} is shorter than {}",
+                               path,
+                               library_folder);
 
-            mz_zip_writer_finalize_archive(&zip);
+                    auto const relative_path = path.SubSpan(library_folder.size + 1);
+                    auto archive_path = DynamicArray<char>::FromOwnedSpan(
+                        path::Join(arena,
+                                   Array {"Libraries"_s, package_name, relative_path},
+                                   path::Format::Posix),
+                        arena);
+                    if constexpr (IS_WINDOWS)
+                        for (auto& c : archive_path)
+                            if (c == '\\') c = '/';
+                    dyn::NullTerminated(archive_path);
+
+                    auto const arena_cursor = arena.TotalUsed();
+                    DEFER { arena.TryShrinkTotalUsed(arena_cursor); };
+
+                    auto const file_data = TRY(ReadEntireFile(entry.path, arena));
+
+                    if (!mz_zip_writer_add_mem(&zip,
+                                               dyn::NullTerminated(archive_path),
+                                               file_data.data,
+                                               file_data.size,
+                                               (mz_uint)(path::Extension(archive_path) == ".flac"
+                                                             ? MZ_NO_COMPRESSION
+                                                             : MZ_DEFAULT_COMPRESSION))) {
+                        PanicF(SourceLocation::Current(),
+                               "Failed to add file to zip: {}",
+                               mz_zip_get_error_string(mz_zip_get_last_error(&zip)));
+                    }
+
+                    TRY(it.Increment());
+                }
+            }
 
             void* zip_data = nullptr;
             usize zip_size = 0;
-            mz_zip_writer_finalize_heap_archive(&zip, &zip_data, &zip_size);
+            if (!mz_zip_writer_finalize_heap_archive(&zip, &zip_data, &zip_size)) {
+                PanicF(SourceLocation::Current(),
+                       "Failed to finalize zip archive: {}",
+                       mz_zip_get_error_string(mz_zip_get_last_error(&zip)));
+            }
 
-            auto _ = WriteFile(zip_path, Span {(u8 const*)zip_data, zip_size});
+            TRY(WriteFile(zip_path, Span {(u8 const*)zip_data, zip_size}));
         }
     }
 
@@ -318,6 +373,7 @@ static ErrorCodeOr<void> Main(ArgsCstr args) {
 }
 
 int main(int argc, char** argv) {
+    SetThreadName("main");
     auto result = Main({argc, argv});
     if (result.HasError()) {
         if (result.Error() == CliError::HelpRequested) return 0;

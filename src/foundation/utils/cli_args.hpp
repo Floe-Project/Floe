@@ -8,8 +8,9 @@
 #include "foundation/utils/writer.hpp"
 
 struct CommandLineArgDefinition {
-    u32 id;
+    u32 id; // normally an enum, used for lookup
     String key;
+    String description;
     bool required;
     bool needs_value; // else it's just a flag
 };
@@ -21,6 +22,7 @@ struct CommandLineArg {
     bool was_provided;
 };
 
+// args straight from main()
 struct ArgsCstr {
     int size;
     char const* const* args; // remember the first arg is the program name
@@ -28,15 +30,33 @@ struct ArgsCstr {
 
 PUBLIC ErrorCodeOr<void>
 PrintUsage(Writer writer, String exe_name, Span<CommandLineArgDefinition const> args) {
-    TRY(fmt::FormatToWriter(writer, "Usage: {} [ARGS]\n", exe_name));
-    TRY(fmt::FormatToWriter(writer, "  Required arguments:\n"));
-    for (auto const& arg : args)
-        if (arg.required)
-            TRY(fmt::FormatToWriter(writer, "    --{}{}\n", arg.key, arg.needs_value ? "=<value>" : ""));
-    TRY(fmt::FormatToWriter(writer, "  Optional arguments:\n"));
-    for (auto const& arg : args)
-        if (!arg.required)
-            TRY(fmt::FormatToWriter(writer, "    --{}{}\n", arg.key, arg.needs_value ? "=<value>" : ""));
+    TRY(fmt::FormatToWriter(writer, "Usage: {} [ARGS]\n\n", exe_name));
+
+    auto print_arg = [&](CommandLineArgDefinition const& arg) -> ErrorCodeOr<void> {
+        TRY(fmt::FormatToWriter(writer, "  --{}{}", arg.key, arg.needs_value ? "=<value>" : ""_s));
+        if (arg.description.size) TRY(fmt::FormatToWriter(writer, "  {}", arg.description));
+        TRY(writer.WriteChar('\n'));
+        return k_success;
+    };
+
+    if (FindIf(args, [](auto const& arg) { return arg.required; })) {
+        TRY(fmt::FormatToWriter(writer, "Required arguments:\n"));
+        for (auto const& arg : args) {
+            if (!arg.required) continue;
+            TRY(print_arg(arg));
+        }
+    }
+
+    if (FindIf(args, [](auto const& arg) { return !arg.required; })) {
+        TRY(fmt::FormatToWriter(writer, "Optional arguments:\n"));
+        for (auto const& arg : args) {
+            if (arg.required) continue;
+            TRY(print_arg(arg));
+        }
+    }
+
+    TRY(writer.WriteChar('\n'));
+
     return k_success;
 }
 
@@ -51,6 +71,7 @@ PUBLIC Span<String> ArgsToStringsSpan(ArenaAllocator& arena, ArgsCstr args, bool
     return result;
 }
 
+// quite basic. only supports -a, -a=value, -a value --arg, --arg=value, --arg value
 PUBLIC HashTable<String, String> ArgsToKeyValueTable(ArenaAllocator& arena, Span<String const> args) {
     DynamicHashTable<String, String> result {arena};
     enum class ArgType { Short, Long, None };
@@ -124,7 +145,7 @@ PUBLIC ErrorCodeCategory const& CliErrorCodeType() {
                 return writer.WriteChars(({
                     String s {};
                     switch ((CliError)e.code) {
-                        case CliError::InvalidArguments: s = "Invalid arguments"; break;
+                        case CliError::InvalidArguments: s = "Invalid CLI arguments"; break;
                         case CliError::HelpRequested: s = "Help requested"; break;
                     }
                     s;
@@ -207,19 +228,30 @@ PUBLIC ErrorCodeOr<Span<CommandLineArg>> ParseCommandLineArgs(Writer writer,
                                 options);
 }
 
-consteval bool ValidateCommandLineArgDefs(Span<CommandLineArgDefinition const> args) {
-    for (auto const& arg : args) {
-        if (!arg.key.size) return false;
+// Compile-time helper that ensures command line arg definitions exactly match an enum. Allowing for easy
+// lookup.
+template <EnumWithCount EnumType, usize N>
+consteval Array<CommandLineArgDefinition, N> MakeCommandLineArgDefs(CommandLineArgDefinition (&&a)[N]) {
+    auto args = ArrayT(a);
+
+    if (args.size != ToInt(EnumType::Count))
+        throw "MakeCommandLineArgDefs: size of array doesn't match enum count";
+
+    for (auto const [arg_index, arg] : Enumerate(args)) {
+        if (arg.id != (u32)arg_index) throw "MakeCommandLineArgDefs: id is out of order with enum value";
+        if (!arg.key.size) throw "MakeCommandLineArgDefs: key is empty";
+
         for (auto const& other_arg : args) {
             if (&arg == &other_arg) continue;
-            if (arg.key == other_arg.key) return false;
-            if (arg.id == other_arg.id) return false;
+            if (arg.key == other_arg.key) throw "MakeCommandLineArgDefs: duplicate key";
         }
     }
-    return true;
+
+    return args;
 }
 
-PUBLIC constexpr CommandLineArg const* Arg(Span<CommandLineArg const> args, auto id) {
+// NOTE: not necessary if you created args with MakeCommandLineArgDefs - you can just use array indexing
+PUBLIC constexpr CommandLineArg const* LookupArg(Span<CommandLineArg const> args, auto id) {
     auto index = FindIf(args, [&](auto const& arg) { return arg.info.id == (u32)id; });
     if (index) return &args[*index];
     return nullptr;

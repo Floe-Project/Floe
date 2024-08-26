@@ -1418,6 +1418,33 @@ pub fn build(b: *std.Build) void {
         dr_wav.addIncludePath(build_context.dep_dr_libs.path(""));
         dr_wav.linkLibC();
 
+        const miniz_config = b.addConfigHeader(.{
+            .style = .blank,
+            .include_path = "miniz_export.h",
+        }, .{
+            .MINIZ_EXPORT = {}, // just defined - no value
+        });
+        var miniz = b.addStaticLibrary(.{
+            .name = "miniz",
+            .target = target,
+            .optimize = build_context.optimise,
+        });
+        {
+            miniz.addCSourceFiles(.{
+                .root = build_context.dep_miniz.path(""),
+                .files = &.{
+                    "miniz.c",
+                    "miniz_tdef.c",
+                    "miniz_tinfl.c",
+                    "miniz_zip.c",
+                },
+                .flags = generic_flags,
+            });
+            miniz.addIncludePath(build_context.dep_miniz.path(""));
+            miniz.linkLibC();
+            miniz.addConfigHeader(miniz_config);
+        }
+
         const flac = b.addStaticLibrary(.{ .name = "flac", .target = target, .optimize = build_context.optimise });
         {
             flac.addCSourceFiles(.{
@@ -1678,6 +1705,9 @@ pub fn build(b: *std.Build) void {
             library_packager.addIncludePath(b.path("src"));
             library_packager.addIncludePath(b.path("src/plugin"));
             library_packager.addConfigHeader(build_config_step);
+            library_packager.linkLibrary(miniz);
+            library_packager.addConfigHeader(miniz_config);
+            library_packager.addIncludePath(build_context.dep_miniz.path(""));
             join_compile_commands.step.dependOn(&library_packager.step);
             applyUniversalSettings(&build_context, library_packager);
             b.getInstallStep().dependOn(&b.addInstallArtifact(library_packager, .{ .dest_dir = install_subfolder }).step);
@@ -2332,31 +2362,6 @@ pub fn build(b: *std.Build) void {
         }
 
         if (target.result.os.tag == .windows) {
-            var miniz = b.addStaticLibrary(.{
-                .name = "miniz",
-                .target = target,
-                .optimize = build_context.optimise,
-            });
-            miniz.addCSourceFiles(.{
-                .root = build_context.dep_miniz.path(""),
-                .files = &.{
-                    "miniz.c",
-                    "miniz_tdef.c",
-                    "miniz_tinfl.c",
-                    "miniz_zip.c",
-                },
-                .flags = generic_flags,
-            });
-            miniz.addIncludePath(build_context.dep_miniz.path(""));
-            miniz.linkLibC();
-            const miniz_config = b.addConfigHeader(.{
-                .style = .blank,
-                .include_path = "miniz_export.h",
-            }, .{
-                .MINIZ_EXPORT = {}, // just defined - no value
-            });
-            miniz.addConfigHeader(miniz_config);
-
             const installer_path = "src/windows_installer";
 
             // the logos probably have a different license to the rest of the codebase, so we keep them separate and optional

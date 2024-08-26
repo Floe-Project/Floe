@@ -1,6 +1,8 @@
 // Copyright 2018-2024 Sam Windell
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <miniz.h>
+
 #include "foundation/foundation.hpp"
 #include "os/misc.hpp"
 #include "utils/logger/logger.hpp"
@@ -46,9 +48,9 @@ ErrorCodeOr<Paths> ScanLibraryFolder(ArenaAllocator& arena, String library_folde
 
     if (!result.license.size) {
         g_cli_out.Error({}, "No license file found in {}", library_folder);
-        g_cli_out.Error({}, "Expected one of the following:");
+        g_cli_out.Info({}, "Expected one of the following:");
         for (auto const& filename : k_license_filenames)
-            g_cli_out.Error({}, "  {}", filename);
+            g_cli_out.Info({}, "  {}", filename);
         return ErrorCode {CommonError::NotFound};
     }
 
@@ -72,14 +74,20 @@ static ErrorCodeOr<sample_lib::Library*> ReadLua(String lua_path, ArenaAllocator
     return outcome.Get<sample_lib::Library*>();
 }
 
-static ErrorCodeOr<MutableString> HtmlTemplate(ArenaAllocator& arena) {
+static ErrorCodeOr<MutableString> AboutLibraryHtmlTemplate(ArenaAllocator& arena) {
     auto const exe_path = String(TRY(CurrentExecutablePath(arena)));
 
     auto const exe_dir = path::Directory(exe_path);
-    if (!exe_dir) return ErrorCode {CommonError::NotFound};
+    if (!exe_dir) {
+        g_cli_out.Error({}, "Could not executable's path");
+        return ErrorCode {CommonError::NotFound};
+    }
 
     auto const html_dir = SearchForExistingFolderUpwards(*exe_dir, "build_resources", arena);
-    if (!html_dir) return ErrorCode {CommonError::NotFound};
+    if (!html_dir) {
+        g_cli_out.Error({}, "Could not find 'build_resources' folder upwards from '{}'", exe_path);
+        return ErrorCode {CommonError::NotFound};
+    }
 
     auto const html_path = path::Join(arena, Array {html_dir.Value(), "about_library_template.html"_s});
     return TRY(ReadEntireFile(html_path, arena));
@@ -170,27 +178,74 @@ static ErrorCodeOr<Metadata> ReadMetadata(String library_folder, ArenaAllocator&
     return result;
 }
 
-enum class CommandLineArgId : u32 {
+static ErrorCodeOr<void> WriteAboutLibraryHtml(sample_lib::Library const& lib,
+                                               ArenaAllocator& arena,
+                                               Paths paths,
+                                               String library_folder) {
+    auto const html_template = TRY(AboutLibraryHtmlTemplate(arena));
+
+    String description_html = {};
+    if (lib.description) description_html = fmt::Format(arena, "<p>{}</p>", *lib.description);
+
+    auto const result_html =
+        fmt::FormatStringReplace(arena,
+                                 html_template,
+                                 ArrayT<fmt::StringReplacement>({
+                                     {"__LIBRARY_NAME__", lib.name},
+                                     {"__LUA_FILENAME__", path::Filename(paths.lua)},
+                                     {"__LICENSE_FILENAME__", path::Filename(paths.license)},
+                                     {"__FLOE_HOMEPAGE_URL__", FLOE_HOMEPAGE_URL},
+                                     {"__FLOE_MANUAL_URL__", FLOE_MANUAL_URL},
+                                     {"__FLOE_DOWNLOAD_URL__", FLOE_DOWNLOAD_URL},
+                                     {"__LIBRARY_DESCRIPTION_HTML__", description_html},
+                                 }));
+
+    auto const output_path =
+        path::Join(arena, Array {library_folder, fmt::Format(arena, "About {}.html"_s, lib.name)});
+    TRY(WriteFile(output_path, result_html));
+
+    g_cli_out.Info({}, "Successfully wrote '{}'", output_path);
+    return k_success;
+}
+
+enum class CliArgId : u32 {
     LibraryFolder,
     PresetFolder,
+    OutputZipFolder,
+    FallbackPackageName,
+    Count,
 };
 
-auto constexpr k_command_line_args_defs = ArrayT<CommandLineArgDefinition>({
+auto constexpr k_command_line_args_defs = MakeCommandLineArgDefs<CliArgId>({
     {
-        .id = (u32)CommandLineArgId::LibraryFolder,
+        .id = (u32)CliArgId::LibraryFolder,
         .key = "library-folder",
-        .required = true,
+        .description = "Path to the library folder",
+        .required = false,
         .needs_value = true,
     },
     {
-        .id = (u32)CommandLineArgId::PresetFolder,
-        .key = "preset-folder",
+        .id = (u32)CliArgId::PresetFolder,
+        .key = "presets-folder",
+        .description = "Path to the presets folder",
+        .required = false,
+        .needs_value = true,
+    },
+    {
+        .id = (u32)CliArgId::OutputZipFolder,
+        .key = "output-zip-folder",
+        .description = "Path to the output zip folder",
+        .required = false,
+        .needs_value = true,
+    },
+    {
+        .id = (u32)CliArgId::FallbackPackageName,
+        .key = "fallback-package-name",
+        .description = "Fallback package name",
         .required = false,
         .needs_value = true,
     },
 });
-
-static_assert(ValidateCommandLineArgDefs(k_command_line_args_defs));
 
 static ErrorCodeOr<void> Main(ArgsCstr args) {
     ArenaAllocator arena {PageAllocator::Instance()};
@@ -204,35 +259,60 @@ static ErrorCodeOr<void> Main(ArgsCstr args) {
                                                        .print_usage_on_error = true,
                                                    }));
 
-    auto const library_folder = Arg(cli_args, CommandLineArgId::LibraryFolder)->value;
+    sample_lib::Library const* lib = nullptr;
 
-    auto const paths = TRY(ScanLibraryFolder(arena, library_folder));
-    auto const lib = TRY(ReadLua(paths.lua, arena));
-    if (!sample_lib::CheckAllReferencedFilesExist(*lib, g_cli_out)) return ErrorCode {CommonError::NotFound};
-    auto const html_template = TRY(HtmlTemplate(arena));
-    auto const metadata = TRY(ReadMetadata(library_folder, arena));
-    (void)metadata; // NOTE: unused at the moment
+    if (auto const library_folder = cli_args[ToInt(CliArgId::LibraryFolder)].value; library_folder.size) {
+        auto const paths = TRY(ScanLibraryFolder(arena, library_folder));
 
-    String description_html = {};
-    if (lib->description) description_html = fmt::Format(arena, "<p>{}</p>", *lib->description);
+        lib = TRY(ReadLua(paths.lua, arena));
+        if (!sample_lib::CheckAllReferencedFilesExist(*lib, g_cli_out))
+            return ErrorCode {CommonError::NotFound};
 
-    auto const result_html =
-        fmt::FormatStringReplace(arena,
-                                 html_template,
-                                 ArrayT<fmt::StringReplacement>({
-                                     {"__LIBRARY_NAME__", lib->name},
-                                     {"__LUA_FILENAME__", path::Filename(paths.lua)},
-                                     {"__LICENSE_FILENAME__", path::Filename(paths.license)},
-                                     {"__FLOE_HOMEPAGE_URL__", FLOE_HOMEPAGE_URL},
-                                     {"__FLOE_MANUAL_URL__", FLOE_MANUAL_URL},
-                                     {"__FLOE_DOWNLOAD_URL__", FLOE_DOWNLOAD_URL},
-                                     {"__LIBRARY_DESCRIPTION_HTML__", description_html},
-                                 }));
+        auto const metadata_outcome = ReadMetadata(library_folder, arena);
+        (void)metadata_outcome; // NOTE: unused at the moment
 
-    auto const output_path =
-        path::Join(arena, Array {library_folder, fmt::Format(arena, "About {}.html"_s, lib->name)});
-    TRY(WriteFile(output_path, result_html));
-    g_cli_out.Info({}, "Successfully wrote '{}'", output_path);
+        TRY(WriteAboutLibraryHtml(*lib, arena, paths, library_folder));
+    }
+
+    if constexpr (0) {
+        if (auto const output_zip_folder = cli_args[ToInt(CliArgId::OutputZipFolder)].value;
+            output_zip_folder.size) {
+            auto const library_folder = cli_args[ToInt(CliArgId::LibraryFolder)].value;
+            auto const presets_folder = cli_args[ToInt(CliArgId::PresetFolder)].value;
+
+            if (!library_folder.size && !presets_folder.size) {
+                g_cli_out.Error({}, "Either --library-folder or --presets-folder must be provided");
+                return ErrorCode {CliError::InvalidArguments};
+            }
+
+            auto const fallback_package_name = cli_args[ToInt(CliArgId::FallbackPackageName)].value;
+            if (!library_folder.size && !fallback_package_name.size) {
+                g_cli_out.Error({}, "If --library-folder is not provided, --fallback-package-name must be");
+                return ErrorCode {CliError::InvalidArguments};
+            }
+
+            auto const package_name = lib ? lib->name : fallback_package_name;
+
+            auto const zip_path =
+                path::Join(arena,
+                           Array {output_zip_folder, fmt::Format(arena, "{}.floe.zip"_s, package_name)});
+            g_cli_out.Info({}, "Creating zip file: {}", zip_path);
+
+            mz_zip_archive zip;
+            mz_zip_zero_struct(&zip);
+            mz_zip_writer_init_heap(&zip, 0, 1000);
+
+            mz_zip_writer_add_mem(&zip, "file.txt", "Hello, world!", 13, MZ_NO_COMPRESSION);
+
+            mz_zip_writer_finalize_archive(&zip);
+
+            void* zip_data = nullptr;
+            usize zip_size = 0;
+            mz_zip_writer_finalize_heap_archive(&zip, &zip_data, &zip_size);
+
+            auto _ = WriteFile(zip_path, Span {(u8 const*)zip_data, zip_size});
+        }
+    }
 
     return k_success;
 }

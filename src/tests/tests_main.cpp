@@ -73,16 +73,28 @@ ErrorCodeOr<int> Main(ArgsCstr args) {
 
     tests::Tester tester;
 
-    enum class CommandLineArgId {
+    enum class CommandLineArgId : u32 {
         Filter,
         LogLevel,
+        Count,
     };
 
-    auto constexpr k_cli_arg_defs = ArrayT<CommandLineArgDefinition>({
-        {(u32)CommandLineArgId::Filter, "filter", false, true},
-        {(u32)CommandLineArgId::LogLevel, "log-level", false, true},
+    auto constexpr k_cli_arg_defs = MakeCommandLineArgDefs<CommandLineArgId>({
+        {
+            .id = (u32)CommandLineArgId::Filter,
+            .key = "filter",
+            .description = "Wildcard pattern to filter tests by name",
+            .required = false,
+            .needs_value = true,
+        },
+        {
+            .id = (u32)CommandLineArgId::LogLevel,
+            .key = "log-level",
+            .description = "Log level: debug, info, warning, error",
+            .required = false,
+            .needs_value = true,
+        },
     });
-    static_assert(ValidateCommandLineArgDefs(k_cli_arg_defs));
 
     auto const cli_args = TRY(ParseCommandLineArgs(StdWriter(g_cli_out.stream),
                                                    tester.scratch_arena,
@@ -93,9 +105,9 @@ ErrorCodeOr<int> Main(ArgsCstr args) {
                                                        .print_usage_on_error = true,
                                                    }));
 
-    TRY(SetLogLevel(tester, Arg(cli_args, CommandLineArgId::LogLevel)->value));
+    TRY(SetLogLevel(tester, cli_args[ToInt(CommandLineArgId::LogLevel)].value));
 
-    auto const filter_pattern = Arg(cli_args, CommandLineArgId::Filter)->OptValue();
+    auto const filter_pattern = cli_args[ToInt(CommandLineArgId::Filter)].OptValue();
 
     // Register the test functions
 #define X(fn) fn(tester);

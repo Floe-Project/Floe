@@ -2534,70 +2534,67 @@ TEST_CASE(TestParseCommandLineArgs) {
             A,
             B,
             C,
+            Count,
         };
-        constexpr auto k_arg_defs = ArrayT<CommandLineArgDefinition>({
+        constexpr auto k_arg_defs = MakeCommandLineArgDefs<ArgId>({
             {.id = (u32)ArgId::A, .key = "a-arg", .required = true, .needs_value = true},
             {.id = (u32)ArgId::B, .key = "b-arg", .required = false, .needs_value = false},
             {.id = (u32)ArgId::C, .key = "c-arg", .required = true, .needs_value = false},
         });
-        static_assert(ValidateCommandLineArgDefs(k_arg_defs));
 
         DynamicArray<char> buffer {a};
         auto writer = dyn::WriterFor(buffer);
 
         SUBCASE("valid args") {
-            auto o = ParseCommandLineArgs(writer,
-                                          a,
-                                          "my-program",
-                                          Array {"--a-arg"_s, "value", "--c-arg"},
-                                          k_arg_defs,
-                                          {
-                                              .handle_help_option = false,
-                                              .print_usage_on_error = false,
-                                          });
-            auto args = REQUIRE_UNWRAP(o);
+            auto const o = ParseCommandLineArgs(writer,
+                                                a,
+                                                "my-program",
+                                                Array {"--a-arg"_s, "value", "--c-arg"},
+                                                k_arg_defs,
+                                                {
+                                                    .handle_help_option = false,
+                                                    .print_usage_on_error = false,
+                                                });
+            auto const args = REQUIRE_UNWRAP(o);
             CHECK(args.size == k_arg_defs.size);
 
-            auto a_arg = Arg(args, ArgId::A);
-            REQUIRE(a_arg != nullptr);
-            CHECK(a_arg->value == "value"_s);
-            CHECK(a_arg->was_provided);
-            CHECK(a_arg->info.id == (u32)ArgId::A);
+            auto a_arg = args[ToInt(ArgId::A)];
+            CHECK(a_arg.value == "value"_s);
+            CHECK(a_arg.was_provided);
+            CHECK(a_arg.info.id == (u32)ArgId::A);
 
-            auto b_arg = Arg(args, ArgId::B);
-            REQUIRE(b_arg != nullptr);
-            CHECK(!b_arg->was_provided);
+            auto b_arg = args[ToInt(ArgId::B)];
+            CHECK(!b_arg.was_provided);
 
-            auto c_arg = Arg(args, ArgId::C);
-            REQUIRE(c_arg != nullptr);
-            CHECK(c_arg->was_provided);
-            CHECK(c_arg->value == ""_s);
+            auto c_arg = args[ToInt(ArgId::C)];
+            CHECK(c_arg.was_provided);
+            CHECK(c_arg.value == ""_s);
         }
 
         SUBCASE("missing required args") {
-            auto o = ParseCommandLineArgs(writer,
-                                          a,
-                                          "my-program",
-                                          Array {"--a-arg"_s, "value"},
-                                          k_arg_defs,
-                                          {
-                                              .handle_help_option = false,
-                                              .print_usage_on_error = false,
-                                          });
+            auto const o = ParseCommandLineArgs(writer,
+                                                a,
+                                                "my-program",
+                                                Array {"--a-arg"_s, "value"},
+                                                k_arg_defs,
+                                                {
+                                                    .handle_help_option = false,
+                                                    .print_usage_on_error = false,
+                                                });
             REQUIRE(o.HasError());
             CHECK(buffer.size > 0);
         }
 
         SUBCASE("help is handled when requested") {
-            auto o = ParseCommandLineArgs(writer,
-                                          a,
-                                          "my-program",
-                                          Array {"--help"_s},
-                                          k_arg_defs,
-                                          {
-                                              .handle_help_option = true,
-                                              .print_usage_on_error = false,
-                                          });
+            auto const o = ParseCommandLineArgs(writer,
+                                                a,
+                                                "my-program",
+                                                Array {"--help"_s},
+                                                k_arg_defs,
+                                                {
+                                                    .handle_help_option = true,
+                                                    .print_usage_on_error = false,
+                                                });
             REQUIRE(o.HasError());
             CHECK(o.Error() == CliError::HelpRequested);
             CHECK(buffer.size > 0);

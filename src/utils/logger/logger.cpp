@@ -13,12 +13,12 @@ ErrorCodeOr<void> WriteFormattedLog(Writer writer,
                                     String message,
                                     WriteFormattedLogOptions options) {
     bool needs_space = false;
-    bool first_prefix = true;
+    bool needs_open_bracket = true;
 
     auto const begin_prefix_item = [&]() -> ErrorCodeOr<void> {
         char buf[2];
         usize len = 0;
-        if (Exchange(first_prefix, false)) buf[len++] = '[';
+        if (Exchange(needs_open_bracket, false)) buf[len++] = '[';
         if (Exchange(needs_space, true)) buf[len++] = ' ';
         if (len) TRY(writer.WriteChars({buf, len}));
         return k_success;
@@ -64,9 +64,13 @@ ErrorCodeOr<void> WriteFormattedLog(Writer writer,
                                                    })));
     }
 
-    if (!first_prefix) TRY(writer.WriteChars("] "));
+    auto const prefix_was_written = !needs_open_bracket;
+
+    if (prefix_was_written) TRY(writer.WriteChars("] "));
     TRY(writer.WriteChars(message));
-    if (!first_prefix || message.size) TRY(writer.WriteChar('\n'));
+    if (prefix_was_written || message.size) {
+        if (!message.size || (message.size && message[message.size - 1] != '\n')) TRY(writer.WriteChar('\n'));
+    }
     return k_success;
 }
 

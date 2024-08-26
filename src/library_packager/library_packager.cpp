@@ -1,10 +1,8 @@
 // Copyright 2018-2024 Sam Windell
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include <foundation/foundation.hpp>
-
+#include "foundation/foundation.hpp"
 #include "os/misc.hpp"
-#include "utils/debug/debug.hpp"
 #include "utils/logger/logger.hpp"
 
 #include "plugin/sample_library/sample_library.hpp"
@@ -172,8 +170,41 @@ static ErrorCodeOr<Metadata> ReadMetadata(String library_folder, ArenaAllocator&
     return result;
 }
 
-static ErrorCodeOr<void> Main(String library_folder) {
+enum class CommandLineArgId : u32 {
+    LibraryFolder,
+    PresetFolder,
+};
+
+auto constexpr k_command_line_args_defs = ArrayT<CommandLineArgDefinition>({
+    {
+        .id = (u32)CommandLineArgId::LibraryFolder,
+        .key = "library-folder",
+        .required = true,
+        .needs_value = true,
+    },
+    {
+        .id = (u32)CommandLineArgId::PresetFolder,
+        .key = "preset-folder",
+        .required = false,
+        .needs_value = true,
+    },
+});
+
+static_assert(ValidateCommandLineArgDefs(k_command_line_args_defs));
+
+static ErrorCodeOr<void> Main(ArgsCstr args) {
     ArenaAllocator arena {PageAllocator::Instance()};
+
+    auto const cli_args = TRY(ParseCommandLineArgs(StdWriter(g_cli_out.stream),
+                                                   arena,
+                                                   args,
+                                                   k_command_line_args_defs,
+                                                   {
+                                                       .handle_help_option = true,
+                                                       .print_usage_on_error = true,
+                                                   }));
+
+    auto const library_folder = Arg(cli_args, CommandLineArgId::LibraryFolder)->value;
 
     auto const paths = TRY(ScanLibraryFolder(arena, library_folder));
     auto const lib = TRY(ReadLua(paths.lua, arena));
@@ -206,72 +237,12 @@ static ErrorCodeOr<void> Main(String library_folder) {
     return k_success;
 }
 
-struct CommandLineArg {
-    String key;
-    bool required;
-    bool needs_value; // else it's just a flag
-
-    // out
-    Optional<String> value;
-    bool was_set;
-};
-
-static void PrintUsage(String exe_name, Span<CommandLineArg const> args) {
-    g_cli_out.Info({}, "Usage: {} [ARGS]", exe_name);
-    g_cli_out.Info({}, "  Required arguments:");
-    for (auto const& arg : args)
-        if (arg.required) g_cli_out.Info({}, "   --{}{}", arg.key, arg.needs_value ? "=<value>" : "");
-    g_cli_out.Info({}, "  Optional arguments:");
-    for (auto const& arg : args)
-        if (!arg.required) g_cli_out.Info({}, "   --{}{}", arg.key, arg.needs_value ? "=<value>" : "");
-}
-
-static bool ParseCommandLineArgs(ArenaAllocator& arena, int argc, char** argv, Span<CommandLineArg> args) {
-    for (auto [key, value] : ParseCommandLineArgs(arena, argc, argv)) {
-        auto const arg_index = FindIf(args, [&](auto const& arg) { return arg.key == key; });
-        if (!arg_index) {
-            g_cli_out.Error({}, "Unknown option: {}", key);
-            return false;
-        }
-
-        auto& arg = args[*arg_index];
-
-        if (arg.needs_value && !value->size) {
-            g_cli_out.Error({}, "Option --{} requires a value", key);
-            return false;
-        }
-
-        if (value->size) arg.value = *value;
-        arg.was_set = true;
-    }
-
-    for (auto const& arg : args)
-        if (arg.required && !arg.value) {
-            g_cli_out.Error({}, "Required arg --{} not provided", arg.key);
-            return false;
-        }
-
-    return true;
-}
-
 int main(int argc, char** argv) {
-    ArenaAllocator arena {PageAllocator::Instance()};
-
-    auto command_line_args = ArrayT<CommandLineArg>({
-        {.key = "library-folder", .required = true, .needs_value = true},
-        {.key = "preset-folder", .required = false, .needs_value = true},
-    });
-
-    if (!ParseCommandLineArgs(arena, argc, argv, command_line_args)) {
-        PrintUsage(FromNullTerminated(argv[0]), command_line_args);
-        return 1;
-    }
-
-    auto result = Main(*command_line_args[0].value); // TODO: devise a better way than hardcoding the index
+    auto result = Main({argc, argv});
     if (result.HasError()) {
+        if (result.Error() == CliError::HelpRequested) return 0;
         g_cli_out.Error({}, "Error: {}", result.Error());
         return 1;
     }
-
     return 0;
 }

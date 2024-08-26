@@ -236,21 +236,7 @@ TEST_CASE(TestFilesystem) {
         for (auto const i : Range(ToInt(KnownDirectories::Count))) {
             auto type = (KnownDirectories)i;
             auto known_folder = KnownDirectory(a, type);
-            String type_name;
-            switch (type) {
-                case KnownDirectories::Temporary: type_name = "Temporary"; break;
-                case KnownDirectories::Logs: type_name = "Logs"; break;
-                case KnownDirectories::Prefs: type_name = "Prefs"; break;
-                case KnownDirectories::AllUsersData: type_name = "AllUsersData"; break;
-                case KnownDirectories::Documents: type_name = "Documents"; break;
-                case KnownDirectories::Data: type_name = "Data"; break;
-                case KnownDirectories::PluginSettings: type_name = "PluginSettings"; break;
-                case KnownDirectories::AllUsersSettings: type_name = "AllUsersSettings"; break;
-                case KnownDirectories::Downloads: type_name = "Downloads"; break;
-                case KnownDirectories::ClapPlugin: type_name = "Clap plugin"; break;
-                case KnownDirectories::Vst3Plugin: type_name = "VST3 plugin"; break;
-                case KnownDirectories::Count: PanicIfReached();
-            }
+            String type_name = EnumToString(type);
             if (known_folder.HasValue()) {
                 DEFER { a.Free(known_folder.Value().ToByteSpan()); };
                 tester.log.Debug(k_os_log_module, "Found {} dir: {} ", type_name, known_folder.Value());

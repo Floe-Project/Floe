@@ -119,7 +119,7 @@ ErrorCodeOr<void> ReadSectionOfFileAndWriteToOtherFile(File& file_to_read_from,
 
 using PathArena = ArenaAllocatorWithInlineStorage<2000>;
 
-enum class KnownDirectories {
+enum class KnownDirectories : u8 {
     Logs,
     Prefs,
     AllUsersData,

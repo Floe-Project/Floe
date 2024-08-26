@@ -233,11 +233,11 @@ ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectories type) {
         case KnownDirectories::Temporary: return a.Clone("/tmp"_s);
         case KnownDirectories::AllUsersSettings:
         case KnownDirectories::PluginSettings: rel_path = "~/.config"; break;
-        case KnownDirectories::AllUsersData:
+        case KnownDirectories::AllUsersData: return a.Clone("/var/lib"_s);
         case KnownDirectories::Documents: rel_path = "~/Documents"; break;
         case KnownDirectories::Downloads: rel_path = "~/Downloads"; break;
         case KnownDirectories::Prefs: rel_path = "~/.config"; break;
-        case KnownDirectories::Data: rel_path = "~/.local/share"; break;
+        case KnownDirectories::Data: rel_path = "~"; break;
         case KnownDirectories::Logs: rel_path = "~/.local/state"; break;
         case KnownDirectories::ClapPlugin: rel_path = "~/.clap"; break;
         case KnownDirectories::Vst3Plugin: rel_path = "~/.vst3"; break;

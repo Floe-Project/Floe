@@ -2465,17 +2465,17 @@ TEST_CASE(TestStringAlgorithms) {
 TEST_CASE(TestParseCommandLineArgs) {
     auto& a = tester.scratch_arena;
 
-    {
+    SUBCASE("args to strings span") {
         char const* argv[] = {"program-name", "arg1", "arg2"};
         auto const argc = (int)ArraySize(argv);
         {
-            auto args = Args(a, argc, argv, false);
+            auto args = ArgsToStringsSpan(a, {argc, argv}, false);
             CHECK(args.size == 2);
             CHECK_EQ(args[0], "arg1"_s);
             CHECK_EQ(args[1], "arg2"_s);
         }
         {
-            auto args = Args(a, argc, argv, true);
+            auto args = ArgsToStringsSpan(a, {argc, argv}, true);
             CHECK(args.size == 3);
             CHECK_EQ(args[0], "program-name"_s);
             CHECK_EQ(args[1], "arg1"_s);
@@ -2493,8 +2493,8 @@ TEST_CASE(TestParseCommandLineArgs) {
         if (f) CHECK_EQ(*f, value);
     };
 
-    {
-        auto args = ParseCommandLineArgs(a, Array {"-a"_s, "b", "--c", "d", "-e", "--key=value"});
+    SUBCASE("mutliple short and long args") {
+        auto args = ArgsToKeyValueTable(a, Array {"-a"_s, "b", "--c", "d", "-e", "--key=value"});
         CHECK(args.size == 4);
         check_arg(args, "a"_s, "b"_s);
         check_arg(args, "c"_s, "d"_s);
@@ -2502,31 +2502,106 @@ TEST_CASE(TestParseCommandLineArgs) {
         check_arg(args, "key"_s, "value"_s);
     }
 
-    {
-        auto args = ParseCommandLineArgs(a, {});
+    SUBCASE("no args") {
+        auto args = ArgsToKeyValueTable(a, Span<String> {});
         CHECK(args.size == 0);
     }
 
-    {
-        auto args = ParseCommandLineArgs(a, Array {"--filter"_s});
+    SUBCASE("arg without value") {
+        auto args = ArgsToKeyValueTable(a, Array {"--filter"_s});
         CHECK(args.size == 1);
         CHECK(args.Find("filter"_s));
     }
 
-    {
-        auto args = ParseCommandLineArgs(a, Array {"filter"_s});
+    SUBCASE("positional args are ignored") {
+        auto args = ArgsToKeyValueTable(a, Array {"filter"_s});
         CHECK(args.size == 0);
     }
 
-    {
-        auto args = ParseCommandLineArgs(a, Array {"-a=b"_s});
+    SUBCASE("short arg with value") {
+        auto args = ArgsToKeyValueTable(a, Array {"-a=b"_s});
         check_arg(args, "a"_s, "b"_s);
         (void)args;
     }
 
-    {
-        auto args = ParseCommandLineArgs(a, Array {"--a=b"_s});
+    SUBCASE("long arg with value") {
+        auto args = ArgsToKeyValueTable(a, Array {"--a=b"_s});
         check_arg(args, "a"_s, "b"_s);
+    }
+
+    SUBCASE("parsing") {
+        enum class ArgId {
+            A,
+            B,
+            C,
+        };
+        constexpr auto k_arg_defs = ArrayT<CommandLineArgDefinition>({
+            {.id = (u32)ArgId::A, .key = "a-arg", .required = true, .needs_value = true},
+            {.id = (u32)ArgId::B, .key = "b-arg", .required = false, .needs_value = false},
+            {.id = (u32)ArgId::C, .key = "c-arg", .required = true, .needs_value = false},
+        });
+        static_assert(ValidateCommandLineArgDefs(k_arg_defs));
+
+        DynamicArray<char> buffer {a};
+        auto writer = dyn::WriterFor(buffer);
+
+        SUBCASE("valid args") {
+            auto o = ParseCommandLineArgs(writer,
+                                          a,
+                                          "my-program",
+                                          Array {"--a-arg"_s, "value", "--c-arg"},
+                                          k_arg_defs,
+                                          {
+                                              .handle_help_option = false,
+                                              .print_usage_on_error = false,
+                                          });
+            auto args = REQUIRE_UNWRAP(o);
+            CHECK(args.size == k_arg_defs.size);
+
+            auto a_arg = Arg(args, ArgId::A);
+            REQUIRE(a_arg != nullptr);
+            CHECK(a_arg->value == "value"_s);
+            CHECK(a_arg->was_provided);
+            CHECK(a_arg->info.id == (u32)ArgId::A);
+
+            auto b_arg = Arg(args, ArgId::B);
+            REQUIRE(b_arg != nullptr);
+            CHECK(!b_arg->was_provided);
+
+            auto c_arg = Arg(args, ArgId::C);
+            REQUIRE(c_arg != nullptr);
+            CHECK(c_arg->was_provided);
+            CHECK(c_arg->value == ""_s);
+        }
+
+        SUBCASE("missing required args") {
+            auto o = ParseCommandLineArgs(writer,
+                                          a,
+                                          "my-program",
+                                          Array {"--a-arg"_s, "value"},
+                                          k_arg_defs,
+                                          {
+                                              .handle_help_option = false,
+                                              .print_usage_on_error = false,
+                                          });
+            REQUIRE(o.HasError());
+            CHECK(buffer.size > 0);
+        }
+
+        SUBCASE("help is handled when requested") {
+            auto o = ParseCommandLineArgs(writer,
+                                          a,
+                                          "my-program",
+                                          Array {"--help"_s},
+                                          k_arg_defs,
+                                          {
+                                              .handle_help_option = true,
+                                              .print_usage_on_error = false,
+                                          });
+            REQUIRE(o.HasError());
+            CHECK(o.Error() == CliError::HelpRequested);
+            CHECK(buffer.size > 0);
+        }
     }
 
     return k_success;

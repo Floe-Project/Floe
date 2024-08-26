@@ -4,7 +4,6 @@
 #pragma once
 
 #include "foundation/container/dynamic_array.hpp"
-#include "foundation/container/hash_table.hpp"
 #include "foundation/universal_defs.hpp"
 
 // Widen/narrow code from stb.h:
@@ -608,82 +607,7 @@ concept StringConstOrNot = Same<T, String> || Same<T, MutableString>;
     return str;
 }
 
-PUBLIC Span<String>
-Args(ArenaAllocator& arena, int argc, char const* const* argv, bool include_program_name) {
-    ASSERT(argc > 0);
-    auto const argv_start_index = (usize)(include_program_name ? 0 : 1);
-    auto const result_size = (usize)argc - argv_start_index;
-    if (!result_size) return {};
-    auto result = arena.AllocateExactSizeUninitialised<String>(result_size);
-    for (auto const result_index : Range(result_size))
-        result[result_index] = FromNullTerminated(argv[result_index + argv_start_index]);
-    return result;
-}
-
-PUBLIC HashTable<String, String> ParseCommandLineArgs(ArenaAllocator& arena, Span<String const> args) {
-    DynamicHashTable<String, String> result {arena};
-    enum class ArgType { Short, Long, None };
-    auto const check_arg = [](String arg) {
-        if (arg[0] == '-' && IsAlphanum(arg[1])) return ArgType::Short;
-        if (arg.size > 2) {
-            if (arg[0] == '-' && arg[1] == '-') return ArgType::Long;
-            if (arg[0] == '-' && IsAlphanum(arg[1]) && arg[2] == '=') return ArgType::Short;
-        }
-        return ArgType::None;
-    };
-    auto const prefix_size = [](ArgType type) -> usize {
-        switch (type) {
-            case ArgType::Short: return 1;
-            case ArgType::Long: return 2;
-            case ArgType::None: return 0;
-        }
-        return 0;
-    };
-    struct KeyVal {
-        String key;
-        String value;
-    };
-    auto const try_get_combined_key_val = [](String arg) {
-        if (auto const opt_index = Find(arg, '='))
-            return KeyVal {arg.SubSpan(0, *opt_index), arg.SubSpan(*opt_index + 1)};
-        return KeyVal {arg, ""_s};
-    };
-
-    for (usize i = 0; i < args.size;) {
-        if (auto const type = check_arg(args[i]); type != ArgType::None) {
-            auto const arg = args[i].SubSpan(prefix_size(type));
-            auto const [key, value] = try_get_combined_key_val(arg);
-
-            bool added_next = false;
-            if (i != args.size - 1) {
-                auto const& next = args[i + 1];
-                if (auto const next_type = check_arg(next); next_type == ArgType::None) {
-                    result.Insert(arg, next);
-                    i += 2;
-                    added_next = true;
-                }
-            }
-
-            if (!added_next) {
-                result.Insert(key, value);
-                i += 1;
-            }
-        } else {
-            // positional arguments aren't supported
-            i += 1;
-        }
-    }
-
-    return result.ToOwnedTable();
-}
-
-PUBLIC HashTable<String, String>
-ParseCommandLineArgs(ArenaAllocator& arena, int argc, char const* const* argv) {
-    return ParseCommandLineArgs(arena, Args(arena, argc, argv, false));
-}
-
 // https://blog.rink.nu/2023/02/12/behind-the-magic-of-magic_enum/
-
 template <auto e>
 requires(EnumWithCount<decltype(e)>)
 consteval auto StringifyEnumValue() {

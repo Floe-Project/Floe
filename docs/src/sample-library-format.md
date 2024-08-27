@@ -15,22 +15,20 @@ It is a new format, along the same lines as SFZ or DecentSampler but focusing on
 
 Sample libraries are configured using a file written in the Lua programming language[^MDATA] (version {{#include ../mdbook_config.txt:lua-version}}).
 
-Let's start with a simple example of one of these `floe.lua` files:
+Let's start with a simple example of a `floe.lua` file:
 ```lua
 {{#include ../sample-library-example-no-comments.lua}}
 ```
 
-It's a simple format, but when needed, you have the power of a full programming language (variables, arrays, loops, functions, etc.) to easily create more complicated configurations.
-
 Floe automatically scans for Lua files in its sample library folders (these are configurable in the settings). It looks for files called `floe.lua`, or files ending with `.floe.lua`; for example, `woodwind-textures.floe.lua`. Floe automatically detects when files are added, removed or changed, and will immediately apply the changes.
 
-In a `floe.lua` file, you use a set of functions that Floe provides (`floe.<function_name>()`) to create a library, instruments, regions, and impulse responses. At the end of your `floe.lua` file, you return the library object.
+Floe provides an API (a set of functions) to `floe.lua` files. This API is available under a table called `floe`, for example, `floe.new_instrument(...)`. It features functions for creating a library, creating instruments, adding regions and impulse responses. At the end of your `floe.lua` file, you return the library object created with `floe.new_library(...)`.
 
-Note this file is only concerned with mapping and configuring audio-files (unlike [SFZ](https://en.wikipedia.org/wiki/SFZ_(file_format)), for example). Sound shaping is provided by Floe's GUI.
+A `floe.lua` file is only concerned with mapping and configuring audio-files. Sound-shaping parameters such as envelopes, filters and effects are offered by-default on Floe's GUI.
 
-Note there there is no 'group' structure, as is often found in other sample-mapping formats such as SFZ. Instead, we can create functions or use loops to apply similar configuration to a set of regions. Additionally, Floe offers a support function called floe.extend_table(base_table, table) which allows new tables to be created that are based off an existing table. 
+In other sample library formats such as SFZ or Kontakt, regions are arranged into 'groups'. Floe does not have this concept. Instead, the features of the Lua programming language (such as functions or loops) can be used to apply similar configuration to a set of regions. Additionally, Floe offers a function called `floe.extend_table(base_table, table)`, which allows new tables to be created that are based off an existing table. 
 
-Additional, a `floe.lua` file has access to some of Lua's standard libraries: `math`, `string`, `table`, `utf8`. The other standard libraries are not accessible to Lua - including the `require` function.
+Additionally, a `floe.lua` file has access to some of Lua's standard libraries: `math`, `string`, `table`, `utf8`. The other standard libraries are not accessible to Lua - including the `require` function. This is to minimise security risks.
 
 ## Core Functions
 

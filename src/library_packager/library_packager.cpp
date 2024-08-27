@@ -75,7 +75,7 @@ static ErrorCodeOr<sample_lib::Library*> ReadLua(String lua_path, ArenaAllocator
     return outcome.Get<sample_lib::Library*>();
 }
 
-static ErrorCodeOr<MutableString> AboutLibraryHtmlTemplate(ArenaAllocator& arena) {
+static ErrorCodeOr<MutableString> FileDataFromBuildResources(ArenaAllocator& arena, String filename) {
     auto const exe_path = String(TRY(CurrentExecutablePath(arena)));
 
     auto const exe_dir = path::Directory(exe_path);
@@ -90,7 +90,7 @@ static ErrorCodeOr<MutableString> AboutLibraryHtmlTemplate(ArenaAllocator& arena
         return ErrorCode {CommonError::NotFound};
     }
 
-    auto const html_path = path::Join(arena, Array {html_dir.Value(), "about_library_template.html"_s});
+    auto const html_path = path::Join(arena, Array {html_dir.Value(), filename});
     return TRY(ReadEntireFile(html_path, arena));
 }
 
@@ -183,7 +183,7 @@ static ErrorCodeOr<void> WriteAboutLibraryHtml(sample_lib::Library const& lib,
                                                ArenaAllocator& arena,
                                                Paths paths,
                                                String library_folder) {
-    auto const html_template = TRY(AboutLibraryHtmlTemplate(arena));
+    auto const html_template = TRY(FileDataFromBuildResources(arena, "about_library_template.html"_s));
 
     String description_html = {};
     if (lib.description) description_html = fmt::Format(arena, "<p>{}</p>", *lib.description);
@@ -261,13 +261,6 @@ static String RelativePath(String from, String to) {
                to);
 
     return to.SubSpan(from.size + 1);
-}
-
-static String ReplaceSpacesWithDashes(ArenaAllocator& arena, String str) {
-    auto result = arena.Clone(str);
-    for (auto& c : result)
-        if (c == ' ') c = '-';
-    return result;
 }
 
 static ErrorCodeOr<void> CheckNeededZipCliArgs(Span<CommandLineArg const> args) {
@@ -418,14 +411,22 @@ static ErrorCodeOr<void> Main(ArgsCstr args) {
                                  Array {"Presets"_s, path::Filename(preset_folder)}));
 
     if (cli_args[ToInt(CliArgId::OutputZipFolder)].was_provided) {
+        auto const html_template = TRY(FileDataFromBuildResources(arena, "how_to_install_template.html"_s));
+        auto const result_html = fmt::FormatStringReplace(arena,
+                                                          html_template,
+                                                          ArrayT<fmt::StringReplacement>({
+                                                              {"__FLOE_MANUAL_URL__", FLOE_MANUAL_URL},
+                                                          }));
+        ZipAddFile(zip, "How to Install.html"_s, result_html.ToByteSpan());
+
         auto const zip_path =
             path::Join(arena,
                        Array {cli_args[ToInt(CliArgId::OutputZipFolder)].values[0],
                               fmt::Format(arena,
-                                          "Package-{}.floe.zip"_s,
+                                          "{}.floe.zip"_s,
                                           cli_args[ToInt(CliArgId::PackageName)].was_provided
                                               ? cli_args[ToInt(CliArgId::PackageName)].values[0]
-                                              : ReplaceSpacesWithDashes(arena, lib_for_package_name->name))});
+                                              : lib_for_package_name->name)});
         TRY(WriteFile(zip_path, ZipFinalise(zip)));
         g_cli_out.Info({}, "Created zip file: {}", zip_path);
     } else {

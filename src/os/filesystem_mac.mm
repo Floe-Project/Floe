@@ -342,7 +342,7 @@ ErrorCodeOr<Optional<MutableString>> FilesystemDialog(DialogOptions options) {
             open_panel.canChooseDirectories = YES;
             open_panel.canChooseFiles = NO;
             open_panel.canCreateDirectories = YES;
-            open_panel.allowsMultipleSelection = NO;
+            open_panel.allowsMultipleSelection = options.allow_multiple_selection;
             if (options.default_path)
                 open_panel.directoryURL = [NSURL fileURLWithPath:StringToNSString(*options.default_path)];
 

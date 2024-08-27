@@ -215,6 +215,7 @@ struct DialogOptions {
     String title;
     Optional<String> default_path; // folder and file
     Span<FileFilter const> filters;
+    bool allow_multiple_selection;
     void* parent_window;
 };
 

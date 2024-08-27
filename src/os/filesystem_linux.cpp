@@ -30,6 +30,8 @@ ErrorCodeOr<Optional<MutableString>> FilesystemDialog(DialogOptions options) {
     for (auto f : options.filters)
         fmt::Append(command, "--file-filter=\"{}|{}\" ", f.description, f.wildcard_filter);
 
+    if (options.allow_multiple_selection) dyn::AppendSpan(command, "--multiple "_s);
+
     switch (options.type) {
         case DialogOptions::Type::SelectFolder: {
             dyn::AppendSpan(command, "--directory "_s);

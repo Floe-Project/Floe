@@ -705,6 +705,12 @@ ErrorCodeOr<Optional<MutableString>> FilesystemDialog(DialogOptions options) {
         FP_HRESULT_TRY(f->SetOptions(flags | FOS_PICKFOLDERS));
     }
 
+    if (options.allow_multiple_selection) {
+        DWORD flags = 0;
+        FP_HRESULT_TRY(f->GetOptions(&flags));
+        FP_HRESULT_TRY(f->SetOptions(flags | FOS_ALLOWMULTISELECT));
+    }
+
     if (auto hr = f->Show((HWND)options.parent_window); hr != S_OK) {
         if (hr == HRESULT_FROM_WIN32(ERROR_CANCELLED)) return nullopt;
         return FilesystemWin32ErrorCode(HresultToWin32(hr), "Show()");

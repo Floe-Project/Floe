@@ -5,7 +5,6 @@
 #include "framework/gui_imgui.hpp"
 
 struct Gui;
-struct PluginInstance;
 
 enum class ModalWindowType {
     About,

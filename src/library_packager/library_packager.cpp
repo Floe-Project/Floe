@@ -368,6 +368,14 @@ static ErrorCodeOr<void> AddAllFilesToZip(mz_zip_archive& zip,
     return k_success;
 }
 
+static String
+PackageName(ArenaAllocator& arena, sample_lib::Library const* lib, CommandLineArg const& package_name_arg) {
+    constexpr String k_ext = ".floe.zip"_s;
+    if (package_name_arg.was_provided) return fmt::Format(arena, "{}{}", package_name_arg.values[0], k_ext);
+    ASSERT(lib);
+    return fmt::Format(arena, "{} - {}{}", lib->author, lib->name, k_ext);
+}
+
 static ErrorCodeOr<void> Main(ArgsCstr args) {
     ArenaAllocator arena {PageAllocator::Instance()};
 
@@ -384,6 +392,8 @@ static ErrorCodeOr<void> Main(ArgsCstr args) {
     auto zip = ZipCreate();
     DEFER { ZipDestroy(zip); };
 
+    auto const create_zip = cli_args[ToInt(CliArgId::OutputZipFolder)].was_provided;
+
     sample_lib::Library* lib_for_package_name = nullptr;
 
     for (auto const library_folder : cli_args[ToInt(CliArgId::LibraryFolder)].values) {
@@ -399,18 +409,17 @@ static ErrorCodeOr<void> Main(ArgsCstr args) {
 
         TRY(WriteAboutLibraryHtml(*lib, arena, paths, library_folder));
 
-        if (cli_args[ToInt(CliArgId::OutputZipFolder)].was_provided)
-            TRY(AddAllFilesToZip(zip, library_folder, arena, Array {"Libraries"_s, lib->name}));
+        if (create_zip) TRY(AddAllFilesToZip(zip, library_folder, arena, Array {"Libraries"_s, lib->name}));
     }
 
-    if (cli_args[ToInt(CliArgId::OutputZipFolder)].was_provided)
+    if (create_zip)
         for (auto const preset_folder : cli_args[ToInt(CliArgId::PresetFolder)].values)
             TRY(AddAllFilesToZip(zip,
                                  preset_folder,
                                  arena,
                                  Array {"Presets"_s, path::Filename(preset_folder)}));
 
-    if (cli_args[ToInt(CliArgId::OutputZipFolder)].was_provided) {
+    if (create_zip) {
         auto const html_template = TRY(FileDataFromBuildResources(arena, "how_to_install_template.html"_s));
         auto const result_html = fmt::FormatStringReplace(arena,
                                                           html_template,
@@ -419,14 +428,11 @@ static ErrorCodeOr<void> Main(ArgsCstr args) {
                                                           }));
         ZipAddFile(zip, "How to Install.html"_s, result_html.ToByteSpan());
 
-        auto const zip_path =
-            path::Join(arena,
-                       Array {cli_args[ToInt(CliArgId::OutputZipFolder)].values[0],
-                              fmt::Format(arena,
-                                          "{}.floe.zip"_s,
-                                          cli_args[ToInt(CliArgId::PackageName)].was_provided
-                                              ? cli_args[ToInt(CliArgId::PackageName)].values[0]
-                                              : lib_for_package_name->name)});
+        auto const zip_path = path::Join(
+            arena,
+            Array {cli_args[ToInt(CliArgId::OutputZipFolder)].values[0],
+                   PackageName(arena, lib_for_package_name, cli_args[ToInt(CliArgId::PackageName)])});
+
         TRY(WriteFile(zip_path, ZipFinalise(zip)));
         g_cli_out.Info({}, "Created zip file: {}", zip_path);
     } else {

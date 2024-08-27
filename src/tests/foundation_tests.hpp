@@ -2533,12 +2533,17 @@ TEST_CASE(TestParseCommandLineArgs) {
             A,
             B,
             C,
+            D,
+            E,
             Count,
         };
         constexpr auto k_arg_defs = MakeCommandLineArgDefs<ArgId>({
             {.id = (u32)ArgId::A, .key = "a-arg", .required = true, .num_values = 1},
             {.id = (u32)ArgId::B, .key = "b-arg", .required = false, .num_values = 0},
-            {.id = (u32)ArgId::C, .key = "c-arg", .required = true, .num_values = 0},
+            {.id = (u32)ArgId::C, .key = "c-arg", .required = false, .num_values = 0},
+            {.id = (u32)ArgId::D, .key = "d-arg", .required = false, .num_values = 2},
+            {.id = (u32)ArgId::E, .key = "e-arg", .required = false, .num_values = -1},
+
         });
 
         DynamicArray<char> buffer {a};
@@ -2574,7 +2579,7 @@ TEST_CASE(TestParseCommandLineArgs) {
             auto const o = ParseCommandLineArgs(writer,
                                                 a,
                                                 "my-program",
-                                                Array {"--a-arg"_s, "value"},
+                                                Array {"--b-arg"_s, "value"},
                                                 k_arg_defs,
                                                 {
                                                     .handle_help_option = false,
@@ -2597,6 +2602,38 @@ TEST_CASE(TestParseCommandLineArgs) {
             REQUIRE(o.HasError());
             CHECK(o.Error() == CliError::HelpRequested);
             CHECK(buffer.size > 0);
+        }
+
+        SUBCASE("arg that requires exactly 2 values") {
+            auto const o = ParseCommandLineArgs(writer,
+                                                a,
+                                                "my-program",
+                                                Array {"--a-arg=1"_s, "--d-arg", "1", "2"},
+                                                k_arg_defs,
+                                                {
+                                                    .handle_help_option = false,
+                                                    .print_usage_on_error = false,
+                                                });
+            auto const args = REQUIRE_UNWRAP(o);
+            auto d_arg = args[ToInt(ArgId::D)];
+            CHECK(d_arg.was_provided);
+            CHECK(d_arg.values == Array {"1"_s, "2"_s});
+        }
+
+        SUBCASE("arg that can receive any number of arguments") {
+            auto const o = ParseCommandLineArgs(writer,
+                                                a,
+                                                "my-program",
+                                                Array {"--a-arg=1"_s, "--e-arg", "1", "2", "3", "4"},
+                                                k_arg_defs,
+                                                {
+                                                    .handle_help_option = false,
+                                                    .print_usage_on_error = false,
+                                                });
+            auto const args = REQUIRE_UNWRAP(o);
+            auto e_arg = args[ToInt(ArgId::E)];
+            CHECK(e_arg.was_provided);
+            CHECK(e_arg.values == Array {"1"_s, "2"_s, "3"_s, "4"_s});
         }
     }
 

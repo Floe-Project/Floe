@@ -248,6 +248,133 @@ auto constexpr k_command_line_args_defs = MakeCommandLineArgDefs<CliArgId>({
     },
 });
 
+// IMPROVE: this is not robust, we need to consider the various forms that a path can take
+static String RelativePath(String from, String to) {
+    if (to.size < from.size + 1)
+        PanicF(SourceLocation::Current(), "Path error, {} is shorter than {}", from, to);
+
+    return to.SubSpan(from.size + 1);
+}
+
+static String ReplaceSpacesWithDashes(ArenaAllocator& arena, String str) {
+    auto result = arena.Clone(str);
+    for (auto& c : result)
+        if (c == ' ') c = '-';
+    return result;
+}
+
+static ErrorCodeOr<void> CheckNeededZipCliArgs(Span<CommandLineArg const> args) {
+    auto const library_folder = args[ToInt(CliArgId::LibraryFolder)].OptValue();
+    auto const presets_folder = args[ToInt(CliArgId::PresetFolder)].OptValue();
+
+    if (!library_folder && !presets_folder) {
+        g_cli_out.Error({}, "Either --library-folder or --presets-folder must be provided");
+        return ErrorCode {CliError::InvalidArguments};
+    }
+
+    auto const fallback_package_name = args[ToInt(CliArgId::FallbackPackageName)].OptValue();
+    if (!library_folder && !fallback_package_name) {
+        g_cli_out.Error({}, "If --library-folder is not provided, --fallback-package-name must be");
+        return ErrorCode {CliError::InvalidArguments};
+    }
+
+    return k_success;
+}
+
+static mz_zip_archive ZipCreate() {
+    mz_zip_archive zip;
+    mz_zip_zero_struct(&zip);
+    if (!mz_zip_writer_init_heap(&zip, 0, Mb(100))) {
+        PanicF(SourceLocation::Current(),
+               "Failed to initialize zip writer: {}",
+               mz_zip_get_error_string(mz_zip_get_last_error(&zip)));
+    }
+    return zip;
+}
+
+static void ZipDestroy(mz_zip_archive& zip) { mz_zip_writer_end(&zip); }
+
+static void ZipAddFile(mz_zip_archive& zip, String path, Span<u8 const> data) {
+    ArenaAllocatorWithInlineStorage<200> scratch_arena;
+    auto const archived_path = NullTerminated(path, scratch_arena);
+
+    // archive paths use posix separators
+    if constexpr (IS_WINDOWS) {
+        for (auto p = archived_path; *p; ++p)
+            if (*p == '\\') *p = '/';
+    }
+
+    if (!mz_zip_writer_add_mem(
+            &zip,
+            archived_path,
+            data.data,
+            data.size,
+            (mz_uint)(path::Extension(path) != ".flac" ? MZ_DEFAULT_COMPRESSION : MZ_NO_COMPRESSION))) {
+        PanicF(SourceLocation::Current(),
+               "Failed to add file to zip: {}",
+               mz_zip_get_error_string(mz_zip_get_last_error(&zip)));
+    }
+}
+
+static Span<u8 const> ZipFinalise(mz_zip_archive& zip) {
+    void* zip_data = nullptr;
+    usize zip_size = 0;
+    if (!mz_zip_writer_finalize_heap_archive(&zip, &zip_data, &zip_size)) {
+        PanicF(SourceLocation::Current(),
+               "Failed to finalize zip archive: {}",
+               mz_zip_get_error_string(mz_zip_get_last_error(&zip)));
+    }
+    return Span {(u8 const*)zip_data, zip_size};
+}
+
+static ErrorCodeOr<void>
+CreateZip(Span<CommandLineArg const> args, sample_lib::Library const* lib, ArenaAllocator& arena) {
+    ASSERT(args[ToInt(CliArgId::OutputZipFolder)].OptValue());
+    TRY(CheckNeededZipCliArgs(args));
+
+    auto zip = ZipCreate();
+    DEFER { ZipDestroy(zip); };
+
+    if (auto const library_folder = args[ToInt(CliArgId::LibraryFolder)].OptValue()) {
+        auto it = TRY(RecursiveDirectoryIterator::Create(arena,
+                                                         *library_folder,
+                                                         {
+                                                             .wildcard = "*",
+                                                             .get_file_size = false,
+                                                             .skip_dot_files = true,
+                                                         }));
+        while (it.HasMoreFiles()) {
+            auto const arena_cursor = arena.TotalUsed();
+            DEFER { arena.TryShrinkTotalUsed(arena_cursor); };
+
+            auto const& entry = it.Get();
+
+            auto archive_path = DynamicArray<char>::FromOwnedSpan(
+                path::Join(arena,
+                           Array {"Libraries"_s, lib->name, RelativePath(*library_folder, entry.path)}),
+                arena);
+
+            auto const file_data = TRY(ReadEntireFile(entry.path, arena)).ToByteSpan();
+
+            ZipAddFile(zip, archive_path, file_data);
+
+            TRY(it.Increment());
+        }
+    }
+
+    auto const zip_path =
+        path::Join(arena,
+                   Array {args[ToInt(CliArgId::OutputZipFolder)].values[0],
+                          fmt::Format(arena,
+                                      "Package-{}.floe.zip"_s,
+                                      lib ? ReplaceSpacesWithDashes(arena, lib->name)
+                                          : args[ToInt(CliArgId::FallbackPackageName)].values[0])});
+
+    TRY(WriteFile(zip_path, ZipFinalise(zip)));
+    g_cli_out.Info({}, "Created zip file: {}", zip_path);
+    return k_success;
+}
+
 static ErrorCodeOr<void> Main(ArgsCstr args) {
     ArenaAllocator arena {PageAllocator::Instance()};
 
@@ -262,7 +389,7 @@ static ErrorCodeOr<void> Main(ArgsCstr args) {
 
     sample_lib::Library const* lib = nullptr;
 
-    if (auto const library_folder = cli_args[ToInt(CliArgId::LibraryFolder)].value; library_folder.size) {
+    if (auto const library_folder = cli_args[ToInt(CliArgId::LibraryFolder)].values[0]; library_folder.size) {
         auto const paths = TRY(ScanLibraryFolder(arena, library_folder));
 
         lib = TRY(ReadLua(paths.lua, arena));
@@ -275,98 +402,9 @@ static ErrorCodeOr<void> Main(ArgsCstr args) {
         TRY(WriteAboutLibraryHtml(*lib, arena, paths, library_folder));
     }
 
-    if constexpr (0) {
-        if (auto const output_zip_folder = cli_args[ToInt(CliArgId::OutputZipFolder)].value;
-            output_zip_folder.size) {
-            auto const library_folder = cli_args[ToInt(CliArgId::LibraryFolder)].value;
-            auto const presets_folder = cli_args[ToInt(CliArgId::PresetFolder)].value;
-
-            if (!library_folder.size && !presets_folder.size) {
-                g_cli_out.Error({}, "Either --library-folder or --presets-folder must be provided");
-                return ErrorCode {CliError::InvalidArguments};
-            }
-
-            auto const fallback_package_name = cli_args[ToInt(CliArgId::FallbackPackageName)].value;
-            if (!library_folder.size && !fallback_package_name.size) {
-                g_cli_out.Error({}, "If --library-folder is not provided, --fallback-package-name must be");
-                return ErrorCode {CliError::InvalidArguments};
-            }
-
-            auto const package_name = lib ? lib->name : fallback_package_name;
-
-            auto const zip_path =
-                path::Join(arena,
-                           Array {output_zip_folder, fmt::Format(arena, "{}.floe.zip"_s, package_name)});
-            g_cli_out.Info({}, "Creating zip file: {}", zip_path);
-
-            mz_zip_archive zip;
-            mz_zip_zero_struct(&zip);
-            if (!mz_zip_writer_init_heap(&zip, 0, Kb(1))) {
-                PanicF(SourceLocation::Current(),
-                       "Failed to initialize zip writer: {}",
-                       mz_zip_get_error_string(mz_zip_get_last_error(&zip)));
-            }
-            DEFER { mz_zip_writer_end(&zip); };
-
-            if (library_folder.size) {
-                auto it = TRY(RecursiveDirectoryIterator::Create(arena,
-                                                                 library_folder,
-                                                                 {
-                                                                     .wildcard = "*",
-                                                                     .get_file_size = false,
-                                                                     .skip_dot_files = true,
-                                                                 }));
-                while (it.HasMoreFiles()) {
-                    auto const& entry = it.Get();
-                    auto const path = entry.path.Items();
-                    if (path.size < library_folder.size + 1)
-                        PanicF(SourceLocation::Current(),
-                               "Path error, {} is shorter than {}",
-                               path,
-                               library_folder);
-
-                    auto const relative_path = path.SubSpan(library_folder.size + 1);
-                    auto archive_path = DynamicArray<char>::FromOwnedSpan(
-                        path::Join(arena,
-                                   Array {"Libraries"_s, package_name, relative_path},
-                                   path::Format::Posix),
-                        arena);
-                    if constexpr (IS_WINDOWS)
-                        for (auto& c : archive_path)
-                            if (c == '\\') c = '/';
-                    dyn::NullTerminated(archive_path);
-
-                    auto const arena_cursor = arena.TotalUsed();
-                    DEFER { arena.TryShrinkTotalUsed(arena_cursor); };
-
-                    auto const file_data = TRY(ReadEntireFile(entry.path, arena));
-
-                    if (!mz_zip_writer_add_mem(&zip,
-                                               dyn::NullTerminated(archive_path),
-                                               file_data.data,
-                                               file_data.size,
-                                               (mz_uint)(path::Extension(archive_path) == ".flac"
-                                                             ? MZ_NO_COMPRESSION
-                                                             : MZ_DEFAULT_COMPRESSION))) {
-                        PanicF(SourceLocation::Current(),
-                               "Failed to add file to zip: {}",
-                               mz_zip_get_error_string(mz_zip_get_last_error(&zip)));
-                    }
-
-                    TRY(it.Increment());
-                }
-            }
-
-            void* zip_data = nullptr;
-            usize zip_size = 0;
-            if (!mz_zip_writer_finalize_heap_archive(&zip, &zip_data, &zip_size)) {
-                PanicF(SourceLocation::Current(),
-                       "Failed to finalize zip archive: {}",
-                       mz_zip_get_error_string(mz_zip_get_last_error(&zip)));
-            }
-
-            TRY(WriteFile(zip_path, Span {(u8 const*)zip_data, zip_size}));
-        }
+    if (auto const output_zip_folder = cli_args[ToInt(CliArgId::OutputZipFolder)].values[0];
+        output_zip_folder.size) {
+        TRY(CreateZip(cli_args, lib, arena));
     }
 
     return k_success;

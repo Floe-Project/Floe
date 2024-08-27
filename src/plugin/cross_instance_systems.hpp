@@ -5,7 +5,8 @@
 #include "foundation/foundation.hpp"
 #include "utils/thread_extra/thread_pool.hpp"
 
-#include "common/paths.hpp"
+#include "common_infrastructure/paths.hpp"
+
 #include "presets_folder.hpp"
 #include "sample_library_server.hpp"
 #include "settings/settings_file.hpp"

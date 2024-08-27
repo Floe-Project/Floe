@@ -8,8 +8,9 @@
 #include "foundation/foundation.hpp"
 #include "utils/debug/debug.hpp"
 
-#include "common/common_errors.hpp"
-#include "common/constants.hpp"
+#include "common_infrastructure/common_errors.hpp"
+#include "common_infrastructure/constants.hpp"
+
 #include "cross_instance_systems.hpp"
 #include "instrument.hpp"
 #include "layer_processor.hpp"

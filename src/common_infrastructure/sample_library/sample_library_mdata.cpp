@@ -5,9 +5,10 @@
 #include "tests/framework.hpp"
 #include "utils/json/json_reader.hpp"
 
+#include "common_infrastructure/common_errors.hpp"
+#include "common_infrastructure/constants.hpp"
+
 #include "audio_file.hpp"
-#include "common/common_errors.hpp"
-#include "common/constants.hpp"
 #include "sample_library.hpp"
 
 namespace sample_lib {

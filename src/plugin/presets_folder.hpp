@@ -7,9 +7,10 @@
 #include "utils/error_notifications.hpp"
 #include "utils/thread_extra/thread_pool.hpp"
 
-#include "common/constants.hpp"
+#include "common_infrastructure/constants.hpp"
+#include "common_infrastructure/sample_library/sample_library.hpp"
+
 #include "rescan_mode.hpp"
-#include "sample_library/sample_library.hpp"
 #include "scanned_folder.hpp"
 
 // TODO(1.0): this needs entirely replacing: use new ReadDirectoryChanges, AssetRefList, HashTable, etc

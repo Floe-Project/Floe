@@ -5,7 +5,7 @@
 #include "foundation/foundation.hpp"
 #include "utils/reader.hpp"
 
-#include "audio_data.hpp"
+#include "common_infrastructure/audio_data.hpp"
 
 constexpr String k_raw_16_bit_stereo_44100_format_ext = ".r16";
 

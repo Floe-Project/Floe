@@ -18,7 +18,7 @@
 #include "os/threading.hpp"
 #include "utils/logger/logger.hpp"
 
-#include "plugin/common/paths.hpp"
+#include "common_infrastructure/paths.hpp"
 
 #include "gui.hpp"
 

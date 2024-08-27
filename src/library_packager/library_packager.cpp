@@ -5,12 +5,11 @@
 
 #include "foundation/foundation.hpp"
 #include "os/misc.hpp"
-#include "utils/debug/debug.hpp"
 #include "utils/logger/logger.hpp"
 
-#include "plugin/sample_library/sample_library.hpp"
-
-#include "common/common_errors.hpp"
+#include "common_infrastructure/common_errors.hpp"
+#include "common_infrastructure/package_format.hpp"
+#include "common_infrastructure/sample_library/sample_library.hpp"
 
 // Library packager CLI tool
 // - Generates an 'About' HTML file for a Floe library
@@ -212,7 +211,7 @@ static ErrorCodeOr<void> WriteAboutLibraryHtml(sample_lib::Library const& lib,
 enum class CliArgId : u32 {
     LibraryFolder,
     PresetFolder,
-    OutputZipFolder,
+    OutputPackageFolder,
     PackageName,
     Count,
 };
@@ -235,9 +234,9 @@ auto constexpr k_command_line_args_defs = MakeCommandLineArgDefs<CliArgId>({
         .num_values = -1,
     },
     {
-        .id = (u32)CliArgId::OutputZipFolder,
-        .key = "output-zip-folder",
-        .description = "Path to the output zip folder",
+        .id = (u32)CliArgId::OutputPackageFolder,
+        .key = "output-package-folder",
+        .description = "Folder to write the created package to",
         .value_type = "path",
         .required = false,
         .num_values = 1,
@@ -252,19 +251,8 @@ auto constexpr k_command_line_args_defs = MakeCommandLineArgDefs<CliArgId>({
     },
 });
 
-// IMPROVE: this is not robust, we need to consider the canonical form that a path can take
-static String RelativePath(String from, String to) {
-    if (to.size < from.size + 1)
-        PanicF(SourceLocation::Current(),
-               "Bug with calculating relative paths: {} is shorter than {}",
-               from,
-               to);
-
-    return to.SubSpan(from.size + 1);
-}
-
-static ErrorCodeOr<void> CheckNeededZipCliArgs(Span<CommandLineArg const> args) {
-    if (!args[ToInt(CliArgId::OutputZipFolder)].was_provided) return k_success;
+static ErrorCodeOr<void> CheckNeededPackageCliArgs(Span<CommandLineArg const> args) {
+    if (!args[ToInt(CliArgId::OutputPackageFolder)].was_provided) return k_success;
 
     auto const library_folders_arg = args[ToInt(CliArgId::LibraryFolder)];
     auto const presets_folders_arg = args[ToInt(CliArgId::PresetFolder)];
@@ -289,91 +277,12 @@ static ErrorCodeOr<void> CheckNeededZipCliArgs(Span<CommandLineArg const> args) 
     return k_success;
 }
 
-static mz_zip_archive ZipCreate() {
-    mz_zip_archive zip;
-    mz_zip_zero_struct(&zip);
-    if (!mz_zip_writer_init_heap(&zip, 0, Mb(100))) {
-        PanicF(SourceLocation::Current(),
-               "Failed to initialize zip writer: {}",
-               mz_zip_get_error_string(mz_zip_get_last_error(&zip)));
-    }
-    return zip;
-}
-
-static void ZipDestroy(mz_zip_archive& zip) { mz_zip_writer_end(&zip); }
-
-static void ZipAddFile(mz_zip_archive& zip, String path, Span<u8 const> data) {
-    ArenaAllocatorWithInlineStorage<200> scratch_arena;
-    auto const archived_path = NullTerminated(path, scratch_arena);
-
-    // archive paths use posix separators
-    if constexpr (IS_WINDOWS) {
-        for (auto p = archived_path; *p; ++p)
-            if (*p == '\\') *p = '/';
-    }
-
-    g_cli_out.Info({}, "Adding file to zip: {}", archived_path);
-
-    if (!mz_zip_writer_add_mem(
-            &zip,
-            archived_path,
-            data.data,
-            data.size,
-            (mz_uint)(path::Extension(path) != ".flac" ? MZ_DEFAULT_COMPRESSION : MZ_NO_COMPRESSION))) {
-        PanicF(SourceLocation::Current(),
-               "Failed to add file to zip: {}",
-               mz_zip_get_error_string(mz_zip_get_last_error(&zip)));
-    }
-}
-
-static Span<u8 const> ZipFinalise(mz_zip_archive& zip) {
-    void* zip_data = nullptr;
-    usize zip_size = 0;
-    if (!mz_zip_writer_finalize_heap_archive(&zip, &zip_data, &zip_size)) {
-        PanicF(SourceLocation::Current(),
-               "Failed to finalize zip archive: {}",
-               mz_zip_get_error_string(mz_zip_get_last_error(&zip)));
-    }
-    return Span {(u8 const*)zip_data, zip_size};
-}
-
-static ErrorCodeOr<void> AddAllFilesToZip(mz_zip_archive& zip,
-                                          String folder,
-                                          ArenaAllocator& arena,
-                                          Span<String const> subdirs_in_zip) {
-    auto it = TRY(RecursiveDirectoryIterator::Create(arena,
-                                                     folder,
-                                                     {
-                                                         .wildcard = "*",
-                                                         .get_file_size = false,
-                                                         .skip_dot_files = true,
-                                                     }));
-    ArenaAllocator inner_arena {PageAllocator::Instance()};
-    while (it.HasMoreFiles()) {
-        inner_arena.ResetCursorAndConsolidateRegions();
-
-        auto const& entry = it.Get();
-        if (entry.type == FileType::File) {
-            auto const file_data = TRY(ReadEntireFile(entry.path, inner_arena)).ToByteSpan();
-
-            DynamicArray<char> archive_path {inner_arena};
-            path::JoinAppend(archive_path, subdirs_in_zip);
-            path::JoinAppend(archive_path, RelativePath(folder, entry.path));
-            ZipAddFile(zip, archive_path, file_data);
-        }
-
-        TRY(it.Increment());
-    }
-
-    return k_success;
-}
-
 static String
 PackageName(ArenaAllocator& arena, sample_lib::Library const* lib, CommandLineArg const& package_name_arg) {
-    constexpr String k_ext = ".floe.zip"_s;
-    if (package_name_arg.was_provided) return fmt::Format(arena, "{}{}", package_name_arg.values[0], k_ext);
+    if (package_name_arg.was_provided)
+        return fmt::Format(arena, "{}{}", package_name_arg.values[0], package::k_file_extension);
     ASSERT(lib);
-    return fmt::Format(arena, "{} - {}{}", lib->author, lib->name, k_ext);
+    return fmt::Format(arena, "{} - {}{}", lib->author, lib->name, package::k_file_extension);
 }
 
 static ErrorCodeOr<void> Main(ArgsCstr args) {
@@ -387,12 +296,12 @@ static ErrorCodeOr<void> Main(ArgsCstr args) {
                                                        .handle_help_option = true,
                                                        .print_usage_on_error = true,
                                                    }));
-    TRY(CheckNeededZipCliArgs(cli_args));
+    TRY(CheckNeededPackageCliArgs(cli_args));
 
-    auto zip = ZipCreate();
-    DEFER { ZipDestroy(zip); };
+    auto package = package::WriterCreate();
+    DEFER { package::WriterDestroy(package); };
 
-    auto const create_zip = cli_args[ToInt(CliArgId::OutputZipFolder)].was_provided;
+    auto const create_package = cli_args[ToInt(CliArgId::OutputPackageFolder)].was_provided;
 
     sample_lib::Library* lib_for_package_name = nullptr;
 
@@ -409,34 +318,31 @@ static ErrorCodeOr<void> Main(ArgsCstr args) {
 
         TRY(WriteAboutLibraryHtml(*lib, arena, paths, library_folder));
 
-        if (create_zip) TRY(AddAllFilesToZip(zip, library_folder, arena, Array {"Libraries"_s, lib->name}));
+        if (create_package) TRY(package::WriterAddLibrary(package, *lib, arena));
     }
 
-    if (create_zip)
+    if (create_package)
         for (auto const preset_folder : cli_args[ToInt(CliArgId::PresetFolder)].values)
-            TRY(AddAllFilesToZip(zip,
-                                 preset_folder,
-                                 arena,
-                                 Array {"Presets"_s, path::Filename(preset_folder)}));
+            TRY(package::WriterAddPresetsFolder(package, preset_folder, arena));
 
-    if (create_zip) {
+    if (create_package) {
         auto const html_template = TRY(FileDataFromBuildResources(arena, "how_to_install_template.html"_s));
         auto const result_html = fmt::FormatStringReplace(arena,
                                                           html_template,
                                                           ArrayT<fmt::StringReplacement>({
                                                               {"__FLOE_MANUAL_URL__", FLOE_MANUAL_URL},
                                                           }));
-        ZipAddFile(zip, "How to Install.html"_s, result_html.ToByteSpan());
+        package::WriterAddFile(package, "How to Install.html"_s, result_html.ToByteSpan());
 
-        auto const zip_path = path::Join(
+        auto const package_path = path::Join(
             arena,
-            Array {cli_args[ToInt(CliArgId::OutputZipFolder)].values[0],
+            Array {cli_args[ToInt(CliArgId::OutputPackageFolder)].values[0],
                    PackageName(arena, lib_for_package_name, cli_args[ToInt(CliArgId::PackageName)])});
 
-        TRY(WriteFile(zip_path, ZipFinalise(zip)));
-        g_cli_out.Info({}, "Created zip file: {}", zip_path);
+        TRY(WriteFile(package_path, package::WriterFinalise(package)));
+        g_cli_out.Info({}, "Created package file: {}", package_path);
     } else {
-        g_cli_out.Info({}, "No output zip folder provided, not creating a zip file");
+        g_cli_out.Info({}, "No output packge folder provided, not creating a package file");
     }
 
     return k_success;

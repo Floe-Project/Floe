@@ -7,7 +7,7 @@
 #include "os/filesystem.hpp"
 #include "utils/logger/logger.hpp"
 
-#include "plugin/common/constants.hpp"
+#include "common_infrastructure/constants.hpp"
 
 #include "gui/framework/colours.hpp"
 #include "gui_window.hpp"

@@ -29,7 +29,7 @@ IncludeCategories:
     Priority: 1
   - Regex:    '^(<|")(foundation|utils|os|tests)/'
     Priority: 2
-  - Regex:    '^(<|")(plugin)/'
+  - Regex:    '^(<|")(common_infrastructure)/'
     Priority: 3
   - Regex:    '.*'
     Priority: 4

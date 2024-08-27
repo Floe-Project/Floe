@@ -70,24 +70,3 @@ struct ThreadsafeErrorNotifications {
     Mutex writer_mutex {};
     AtomicRefList<Item> items {.arena = {PageAllocator::Instance()}};
 };
-
-struct ErrorLog {
-    struct Node {
-        String data {};
-        Node* prev {};
-        Node* next {};
-    };
-
-    void Push(String message, ArenaAllocator& arena) {
-        auto new_node = arena.NewUninitialised<Node>();
-        new_node->data = message;
-        DoublyLinkedListAppend(*this, new_node);
-        if (first) ASSERT(first->next != first);
-    }
-
-    auto begin() const { return SinglyLinkedListIterator<Node, String> {first}; }
-    static auto end() { return SinglyLinkedListIterator<Node, String> {nullptr}; }
-
-    Node* first {};
-    Node* last {};
-};

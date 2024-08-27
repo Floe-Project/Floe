@@ -113,7 +113,8 @@ PUBLIC Span<String> ArgsToStringsSpan(ArenaAllocator& arena, ArgsCstr args, bool
     return result;
 }
 
-// quite basic. only supports -a, -a=value, -a value --arg, --arg=value, --arg value
+// Doesn't support positional args, but does support things like:
+// "-a", "-a=value", "--arg value", "--arg=value", "--arg value1 value2"
 PUBLIC HashTable<String, Span<String>> ArgsToKeyValueTable(ArenaAllocator& arena, Span<String const> args) {
     DynamicHashTable<String, Span<String>> result {arena};
     enum class ArgType { Short, Long, None };

@@ -5,6 +5,8 @@
 
 #include "foundation/foundation.hpp"
 
+#include "common_infrastructure/sample_library/sample_library.hpp"
+
 #include "audio_processing_context.hpp"
 #include "param.hpp"
 #include "param_info.hpp"
@@ -14,7 +16,6 @@
 #include "processing/stereo_audio_frame.hpp"
 #include "processing/synced_timings.hpp"
 #include "processing/volume_fade.hpp"
-#include "sample_library/sample_library.hpp"
 #include "voices.hpp"
 
 static void UpdateLoopPointsForVoices(LayerProcessor& layer, VoicePool& voice_pool) {

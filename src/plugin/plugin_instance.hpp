@@ -5,7 +5,8 @@
 #include "foundation/foundation.hpp"
 #include "utils/debug/debug.hpp"
 
-#include "common/constants.hpp"
+#include "common_infrastructure/constants.hpp"
+
 #include "cross_instance_systems.hpp"
 #include "instrument.hpp"
 #include "plugin.hpp"

@@ -6,8 +6,9 @@
 #include "utils/logger/logger.hpp"
 #include "utils/reader.hpp"
 
-#include "audio_data.hpp"
-#include "common/constants.hpp"
+#include "common_infrastructure/audio_data.hpp"
+#include "common_infrastructure/constants.hpp"
+
 #include "mdata.hpp"
 
 namespace sample_lib {

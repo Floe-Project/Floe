@@ -8,8 +8,9 @@
 #include "foundation/foundation.hpp"
 #include "os/misc.hpp"
 
-#include "common/constants.hpp"
-#include "common/paths.hpp"
+#include "common_infrastructure/constants.hpp"
+#include "common_infrastructure/paths.hpp"
+
 #include "framework/gui_frame.hpp"
 #include "framework/gui_live_edit.hpp"
 #include "gui.hpp"

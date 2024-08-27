@@ -12,7 +12,8 @@
 #include "os/misc.hpp"
 #include "tests/framework.hpp"
 
-#include "common/constants.hpp"
+#include "common_infrastructure/constants.hpp"
+
 #include "sample_library.hpp"
 
 namespace sample_lib {

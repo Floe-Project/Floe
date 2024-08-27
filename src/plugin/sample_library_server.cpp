@@ -12,10 +12,11 @@
 #include "utils/debug/debug.hpp"
 #include "utils/reader.hpp"
 
+#include "common_infrastructure/common_errors.hpp"
+#include "common_infrastructure/sample_library/audio_file.hpp"
+#include "common_infrastructure/sample_library/sample_library.hpp"
+
 #include "build_resources/embedded_files.h"
-#include "common/common_errors.hpp"
-#include "sample_library/audio_file.hpp"
-#include "sample_library/sample_library.hpp"
 
 namespace sample_lib_server {
 

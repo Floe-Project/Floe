@@ -7,7 +7,7 @@
 
 #include "utils/logger/logger.hpp"
 
-#include "plugin/sample_library/sample_library.hpp"
+#include "common_infrastructure/sample_library/sample_library.hpp"
 
 #include "config.h"
 

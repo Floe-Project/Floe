@@ -4,7 +4,7 @@
 #pragma once
 #include "foundation/foundation.hpp"
 
-#include "common/constants.hpp"
+#include "common_infrastructure/constants.hpp"
 
 enum class LayerParamIndex : u16 {
     Volume,

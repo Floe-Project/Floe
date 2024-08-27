@@ -6,8 +6,9 @@
 #include "os/threading.hpp"
 #include "utils/thread_extra/atomic_swap_buffer.hpp"
 
+#include "common_infrastructure/constants.hpp"
+
 #include "audio_processing_context.hpp"
-#include "common/constants.hpp"
 #include "instrument.hpp"
 #include "processing/adsr.hpp"
 #include "processing/filters.hpp"

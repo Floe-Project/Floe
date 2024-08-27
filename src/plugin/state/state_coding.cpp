@@ -10,14 +10,15 @@
 #include "utils/json/json_reader.hpp"
 #include "utils/json/json_writer.hpp"
 
+#include "common_infrastructure/common_errors.hpp"
+#include "common_infrastructure/constants.hpp"
+#include "common_infrastructure/sample_library/mdata.hpp"
+
 #include "build_resources/embedded_files.h"
-#include "common/common_errors.hpp"
-#include "common/constants.hpp"
 #include "config.h"
 #include "effects/effect_infos.hpp"
 #include "param_info.hpp"
 #include "processing/audio_utils.hpp"
-#include "sample_library/mdata.hpp"
 #include "state_snapshot.hpp"
 
 using namespace json;

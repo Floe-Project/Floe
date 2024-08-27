@@ -6,13 +6,14 @@
 #include "os/misc.hpp"
 #include "utils/thread_extra/atomic_queue.hpp"
 
+#include "common_infrastructure/audio_data.hpp"
+#include "common_infrastructure/sample_library/sample_library.hpp"
+
 #include "FFTConvolver/wrapper.hpp"
-#include "audio_data.hpp"
 #include "audio_processing_context.hpp"
 #include "effect.hpp"
 #include "param_info.hpp"
 #include "processing/filters.hpp"
-#include "sample_library/sample_library.hpp"
 #include "smoothed_value_system.hpp"
 
 class ConvolutionReverb final : public Effect {

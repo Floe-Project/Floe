@@ -5,7 +5,8 @@
 
 #include <IconsFontAwesome5.h>
 
-#include "common/constants.hpp"
+#include "common_infrastructure/constants.hpp"
+
 #include "framework/gui_live_edit.hpp"
 #include "gui.hpp"
 #include "gui_drawing_helpers.hpp"

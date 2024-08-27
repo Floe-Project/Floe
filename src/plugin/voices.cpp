@@ -5,8 +5,9 @@
 
 #include "foundation/foundation.hpp"
 
+#include "common_infrastructure/constants.hpp"
+
 #include "audio_processing_context.hpp"
-#include "common/constants.hpp"
 #include "effects/effect_stereo_widen.hpp"
 #include "host_thread_pool.hpp"
 #include "layer_processor.hpp"

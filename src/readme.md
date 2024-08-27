@@ -9,4 +9,6 @@ SPDX-License-Identifier: GPL-3.0-or-later
 - `plugin`: audio plugin code
 - `standalone_wrapper`: audio plugin standalone wrapper
 - `windows_installer`: custom win32 installer
-- `gen_param_docs_html`: cli util to print param info
+- `gen_docs_tool`: tiny cli util to generate things for the docs
+- `common_infrastructure`: floe-specific infrastructure
+- `library_packager`: tool to package up a library for distribution

@@ -9,7 +9,7 @@
 #include "utils/directory_listing/directory_listing.hpp"
 #include "utils/thread_extra/thread_pool.hpp"
 
-#include "plugin/sample_library/sample_library.hpp"
+#include "common_infrastructure/sample_library/sample_library.hpp"
 
 #include "rescan_mode.hpp"
 #include "scanned_folder.hpp"

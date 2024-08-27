@@ -9,9 +9,9 @@
 #include "utils/thread_extra/thread_extra.hpp"
 #include "utils/thread_extra/thread_pool.hpp"
 
-#include "audio_data.hpp"
-#include "common/constants.hpp"
-#include "sample_library/sample_library.hpp"
+#include "common_infrastructure/audio_data.hpp"
+#include "common_infrastructure/constants.hpp"
+#include "common_infrastructure/sample_library/sample_library.hpp"
 
 // Sample library server
 // A centralised manager for sample libraries that multiple plugins/systems can use at once.

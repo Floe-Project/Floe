@@ -4,7 +4,8 @@
 #pragma once
 #include "foundation/foundation.hpp"
 
-#include "sample_library/sample_library.hpp"
+#include "common_infrastructure/sample_library/sample_library.hpp"
+
 #include "sample_library_server.hpp"
 
 // Waveform

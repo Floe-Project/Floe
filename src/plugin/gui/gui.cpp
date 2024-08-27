@@ -11,8 +11,9 @@
 #include "os/filesystem.hpp"
 #include "utils/logger/logger.hpp"
 
+#include "common_infrastructure/constants.hpp"
+
 #include "build_resources/embedded_files.h"
-#include "common/constants.hpp"
 #include "framework/gui_live_edit.hpp"
 #include "gui/framework/draw_list.hpp"
 #include "gui/framework/gui_imgui.hpp"

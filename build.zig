@@ -1546,8 +1546,8 @@ pub fn build(b: *std.Build) void {
             applyUniversalSettings(&build_context, fft_convolver);
         }
 
-        const plugin = b.addStaticLibrary(.{
-            .name = "plugin",
+        const common_infrastructure = b.addStaticLibrary(.{
+            .name = "common_infrastructure",
             .target = target,
             .optimize = build_context.optimise,
         });
@@ -1574,11 +1574,38 @@ pub fn build(b: *std.Build) void {
                 lua.linkLibC();
             }
 
+            const path = "src/common_infrastructure";
+            common_infrastructure.addCSourceFiles(.{
+                .files = &.{
+                    path ++ "/common_errors.cpp",
+                    path ++ "/sample_library/audio_file.cpp",
+                    path ++ "/sample_library/sample_library_lua.cpp",
+                    path ++ "/sample_library/sample_library_mdata.cpp",
+                },
+                .flags = cpp_fp_flags,
+            });
+
+            common_infrastructure.linkLibrary(lua);
+            common_infrastructure.addObject(dr_wav);
+            common_infrastructure.linkLibrary(flac);
+            common_infrastructure.addObject(xxhash);
+            common_infrastructure.addConfigHeader(build_config_step);
+            common_infrastructure.addIncludePath(b.path(path));
+            common_infrastructure.linkLibrary(library);
+            applyUniversalSettings(&build_context, common_infrastructure);
+            join_compile_commands.step.dependOn(&common_infrastructure.step);
+        }
+
+        const plugin = b.addStaticLibrary(.{
+            .name = "plugin",
+            .target = target,
+            .optimize = build_context.optimise,
+        });
+        {
             const plugin_path = "src/plugin";
 
             plugin.addCSourceFiles(.{
                 .files = &(.{
-                    plugin_path ++ "/common/common_errors.cpp",
                     plugin_path ++ "/cross_instance_systems.cpp",
                     plugin_path ++ "/layer_processor.cpp",
                     plugin_path ++ "/param_info.cpp",
@@ -1594,9 +1621,6 @@ pub fn build(b: *std.Build) void {
                     plugin_path ++ "/voices.cpp",
                     plugin_path ++ "/settings/settings_file.cpp",
 
-                    plugin_path ++ "/sample_library/audio_file.cpp",
-                    plugin_path ++ "/sample_library/sample_library_lua.cpp",
-                    plugin_path ++ "/sample_library/sample_library_mdata.cpp",
                     plugin_path ++ "/state/state_coding.cpp",
                     plugin_path ++ "/gui/framework/draw_list.cpp",
                     plugin_path ++ "/gui/framework/gui_imgui.cpp",
@@ -1648,6 +1672,7 @@ pub fn build(b: *std.Build) void {
             plugin.addIncludePath(build_context.dep_icon_font_cpp_headers.path(""));
             plugin.addConfigHeader(build_config_step);
             plugin.linkLibrary(library);
+            plugin.linkLibrary(common_infrastructure);
             plugin.linkLibrary(fft_convolver);
             const embedded_files = b.addObject(.{
                 .name = "embedded_files",
@@ -1663,10 +1688,6 @@ pub fn build(b: *std.Build) void {
             plugin.linkLibrary(pugl);
             plugin.addObject(stb_image);
             plugin.addIncludePath(b.path("src/plugin/gui/live_edit_defs"));
-            plugin.linkLibrary(flac);
-            plugin.addObject(dr_wav);
-            plugin.addObject(xxhash);
-            plugin.linkLibrary(lua);
             plugin.linkLibrary(vitfx);
             applyUniversalSettings(&build_context, plugin);
             join_compile_commands.step.dependOn(&plugin.step);
@@ -1682,9 +1703,8 @@ pub fn build(b: *std.Build) void {
             gen_docs.addCSourceFiles(.{ .files = &.{
                 gen_docs_path ++ "/gen_docs_tool.cpp",
             }, .flags = cpp_fp_flags });
-            gen_docs.linkLibrary(plugin);
+            gen_docs.linkLibrary(common_infrastructure);
             gen_docs.addIncludePath(b.path("src"));
-            gen_docs.addIncludePath(b.path("src/plugin"));
             gen_docs.addConfigHeader(build_config_step);
             join_compile_commands.step.dependOn(&gen_docs.step);
             applyUniversalSettings(&build_context, gen_docs);
@@ -1701,9 +1721,8 @@ pub fn build(b: *std.Build) void {
             library_packager.addCSourceFiles(.{ .files = &.{
                 library_packager_path ++ "/library_packager.cpp",
             }, .flags = cpp_fp_flags });
-            library_packager.linkLibrary(plugin);
+            library_packager.linkLibrary(common_infrastructure);
             library_packager.addIncludePath(b.path("src"));
-            library_packager.addIncludePath(b.path("src/plugin"));
             library_packager.addConfigHeader(build_config_step);
             library_packager.linkLibrary(miniz);
             library_packager.addConfigHeader(miniz_config);

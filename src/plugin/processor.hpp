@@ -9,8 +9,9 @@
 #include "os/threading.hpp"
 #include "utils/thread_extra/atomic_queue.hpp"
 
+#include "common_infrastructure/constants.hpp"
+
 #include "audio_processing_context.hpp"
-#include "common/constants.hpp"
 #include "effects/effect_bitcrush.hpp"
 #include "effects/effect_chorus.hpp"
 #include "effects/effect_compressor_stillwell_majortom.hpp"

@@ -6,7 +6,7 @@
 #include "os/misc.hpp"
 #include "utils/thread_extra/atomic_listener_array.hpp"
 
-#include "common/paths.hpp"
+#include "common_infrastructure/paths.hpp"
 
 //
 // Settings file format

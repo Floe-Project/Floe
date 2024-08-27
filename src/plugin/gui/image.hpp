@@ -9,7 +9,7 @@
 #include "os/filesystem.hpp"
 #include "os/misc.hpp"
 
-#include "common/common_errors.hpp"
+#include "common_infrastructure/common_errors.hpp"
 
 constexpr u16 k_rgba_channels = 4;
 constexpr auto k_image_log_module = "🍱image"_log_module;

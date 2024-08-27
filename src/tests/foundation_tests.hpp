@@ -2538,11 +2538,46 @@ TEST_CASE(TestParseCommandLineArgs) {
             Count,
         };
         constexpr auto k_arg_defs = MakeCommandLineArgDefs<ArgId>({
-            {.id = (u32)ArgId::A, .key = "a-arg", .required = true, .num_values = 1},
-            {.id = (u32)ArgId::B, .key = "b-arg", .required = false, .num_values = 0},
-            {.id = (u32)ArgId::C, .key = "c-arg", .required = false, .num_values = 0},
-            {.id = (u32)ArgId::D, .key = "d-arg", .required = false, .num_values = 2},
-            {.id = (u32)ArgId::E, .key = "e-arg", .required = false, .num_values = -1},
+            {
+                .id = (u32)ArgId::A,
+                .key = "a-arg",
+                .description = "desc",
+                .value_type = "type",
+                .required = true,
+                .num_values = 1,
+            },
+            {
+                .id = (u32)ArgId::B,
+                .key = "b-arg",
+                .description = "desc",
+                .value_type = "type",
+                .required = false,
+                .num_values = 0,
+            },
+            {
+                .id = (u32)ArgId::C,
+                .key = "c-arg",
+                .description = "desc",
+                .value_type = "type",
+                .required = false,
+                .num_values = 0,
+            },
+            {
+                .id = (u32)ArgId::D,
+                .key = "d-arg",
+                .description = "desc",
+                .value_type = "type",
+                .required = false,
+                .num_values = 2,
+            },
+            {
+                .id = (u32)ArgId::E,
+                .key = "e-arg",
+                .description = "desc",
+                .value_type = "type",
+                .required = false,
+                .num_values = -1,
+            },
 
         });
 

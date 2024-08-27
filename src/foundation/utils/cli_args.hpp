@@ -11,6 +11,7 @@ struct CommandLineArgDefinition {
     u32 id; // normally an enum, used for lookup
     String key;
     String description;
+    String value_type; // path, time, num, size
     bool required;
     int num_values; // 0 for no value, -1 for unlimited, else exact number
 };
@@ -35,35 +36,65 @@ PUBLIC ErrorCodeOr<void>
 PrintUsage(Writer writer, String exe_name, Span<CommandLineArgDefinition const> args) {
     TRY(fmt::FormatToWriter(writer, "Usage: {} [ARGS]\n\n", exe_name));
 
-    auto print_arg = [&](CommandLineArgDefinition const& arg) -> ErrorCodeOr<void> {
+    static auto print_arg_key_val = [](Writer writer,
+                                       CommandLineArgDefinition const& arg) -> ErrorCodeOr<void> {
         TRY(fmt::FormatToWriter(writer, "  --{}", arg.key));
 
         switch (arg.num_values) {
             case 0: break;
-            case 1: TRY(writer.WriteChars("=<value>")); break;
-            case -1: TRY(writer.WriteChars(" <value>...")); break;
-            default: TRY(fmt::FormatToWriter(writer, " <{} values>", arg.num_values)); break;
+            case 1: TRY(fmt::FormatToWriter(writer, " <{}>", arg.value_type)); break;
+            case -1: TRY(fmt::FormatToWriter(writer, " <{}>...", arg.value_type)); break;
+            default: {
+                for (auto const _ : Range(arg.num_values))
+                    TRY(fmt::FormatToWriter(writer, " <{}>", arg.value_type));
+                break;
+            }
         }
+        return k_success;
+    };
 
-        if (arg.description.size) TRY(fmt::FormatToWriter(writer, "  {}", arg.description));
+    usize max_key_val_size = 0;
+    for (auto const& arg : args) {
+        usize key_val_size = 0;
+        Writer key_val_size_writer {};
+        key_val_size_writer.Set<usize>(key_val_size,
+                                       [](usize& size, Span<u8 const> bytes) -> ErrorCodeOr<void> {
+                                           size += bytes.size;
+                                           return k_success;
+                                       });
+        TRY(print_arg_key_val(key_val_size_writer, arg));
+        max_key_val_size = Max(max_key_val_size, key_val_size);
+    }
+
+    static auto print_arg = [max_key_val_size](Writer writer,
+                                               CommandLineArgDefinition const& arg) -> ErrorCodeOr<void> {
+        usize key_val_size = 0;
+        {
+            Writer key_val_size_writer {};
+            key_val_size_writer.Set<usize>(key_val_size,
+                                           [](usize& size, Span<u8 const> bytes) -> ErrorCodeOr<void> {
+                                               size += bytes.size;
+                                               return k_success;
+                                           });
+            TRY(print_arg_key_val(key_val_size_writer, arg));
+        }
+        TRY(print_arg_key_val(writer, arg));
+        TRY(writer.WriteCharRepeated(' ', max_key_val_size - key_val_size));
+        TRY(fmt::FormatToWriter(writer, "  {}", arg.description));
         TRY(writer.WriteChar('\n'));
         return k_success;
     };
 
     if (FindIf(args, [](auto const& arg) { return arg.required; })) {
         TRY(fmt::FormatToWriter(writer, "Required arguments:\n"));
-        for (auto const& arg : args) {
-            if (!arg.required) continue;
-            TRY(print_arg(arg));
-        }
+        for (auto const& arg : args)
+            if (arg.required) TRY(print_arg(writer, arg));
     }
 
     if (FindIf(args, [](auto const& arg) { return !arg.required; })) {
         TRY(fmt::FormatToWriter(writer, "Optional arguments:\n"));
-        for (auto const& arg : args) {
-            if (arg.required) continue;
-            TRY(print_arg(arg));
-        }
+        for (auto const& arg : args)
+            if (!arg.required) TRY(print_arg(writer, arg));
     }
 
     TRY(writer.WriteChar('\n'));
@@ -258,6 +289,8 @@ consteval Array<CommandLineArgDefinition, N> MakeCommandLineArgDefs(CommandLineA
     for (auto const [arg_index, arg] : Enumerate(args)) {
         if (arg.id != (u32)arg_index) throw "MakeCommandLineArgDefs: id is out of order with enum value";
         if (!arg.key.size) throw "MakeCommandLineArgDefs: key is empty";
+        if (!arg.description.size) throw "MakeCommandLineArgDefs: description is empty";
+        if (!arg.value_type.size) throw "MakeCommandLineArgDefs: value_type is empty";
 
         for (auto const& other_arg : args) {
             if (&arg == &other_arg) continue;

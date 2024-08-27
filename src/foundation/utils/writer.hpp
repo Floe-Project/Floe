@@ -52,4 +52,5 @@ struct Writer {
     ErrorCodeOr<void> (*invoke_write_bytes)(void* func_ptr, void* object, Span<u8 const> bytes) = {};
     void* write_bytes_function_ptr = {};
     void* object = {};
+    usize bytes_written = {};
 };

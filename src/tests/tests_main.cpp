@@ -39,8 +39,8 @@ WINDOWS_FP_TEST_REGISTER_FUNCTIONS
 #endif
 #undef X
 
-static ErrorCodeOr<void> SetLogLevel(tests::Tester& tester, String log_level) {
-    if (!log_level.size) return k_success; // use default
+static ErrorCodeOr<void> SetLogLevel(tests::Tester& tester, Optional<String> log_level) {
+    if (!log_level) return k_success; // use default
 
     for (auto const& [level, name] : Array {
              Pair {LogLevel::Debug, "debug"_s},
@@ -48,13 +48,13 @@ static ErrorCodeOr<void> SetLogLevel(tests::Tester& tester, String log_level) {
              Pair {LogLevel::Warning, "warning"_s},
              Pair {LogLevel::Error, "error"_s},
          }) {
-        if (IsEqualToCaseInsensitiveAscii(log_level, name)) {
+        if (IsEqualToCaseInsensitiveAscii(*log_level, name)) {
             tester.log.max_level_allowed = level;
             return k_success;
         }
     }
 
-    g_cli_out.Error({}, "Unknown log level: {}", log_level);
+    g_cli_out.Error({}, "Unknown log level: {}", *log_level);
     return ErrorCode {CliError::InvalidArguments};
 }
 
@@ -85,14 +85,14 @@ ErrorCodeOr<int> Main(ArgsCstr args) {
             .key = "filter",
             .description = "Wildcard pattern to filter tests by name",
             .required = false,
-            .needs_value = true,
+            .num_values = 1,
         },
         {
             .id = (u32)CommandLineArgId::LogLevel,
             .key = "log-level",
             .description = "Log level: debug, info, warning, error",
             .required = false,
-            .needs_value = true,
+            .num_values = 1,
         },
     });
 
@@ -105,7 +105,7 @@ ErrorCodeOr<int> Main(ArgsCstr args) {
                                                        .print_usage_on_error = true,
                                                    }));
 
-    TRY(SetLogLevel(tester, cli_args[ToInt(CommandLineArgId::LogLevel)].value));
+    TRY(SetLogLevel(tester, cli_args[ToInt(CommandLineArgId::LogLevel)].OptValue()));
 
     auto const filter_pattern = cli_args[ToInt(CommandLineArgId::Filter)].OptValue();
 

@@ -12,13 +12,15 @@ struct CommandLineArgDefinition {
     String key;
     String description;
     bool required;
-    bool needs_value; // else it's just a flag
+    int num_values; // 0 for no value, -1 for unlimited, else exact number
 };
 
 struct CommandLineArg {
-    Optional<String> OptValue() const { return was_provided ? Optional<String> {value} : nullopt; }
+    Optional<String> OptValue() const {
+        return was_provided && values.size ? Optional<String> {values[0]} : nullopt;
+    }
     CommandLineArgDefinition const& info;
-    String value; // empty if no value given
+    Span<String> values; // empty if no values given
     bool was_provided;
 };
 
@@ -33,7 +35,15 @@ PrintUsage(Writer writer, String exe_name, Span<CommandLineArgDefinition const> 
     TRY(fmt::FormatToWriter(writer, "Usage: {} [ARGS]\n\n", exe_name));
 
     auto print_arg = [&](CommandLineArgDefinition const& arg) -> ErrorCodeOr<void> {
-        TRY(fmt::FormatToWriter(writer, "  --{}{}", arg.key, arg.needs_value ? "=<value>" : ""_s));
+        TRY(fmt::FormatToWriter(writer, "  --{}", arg.key));
+
+        switch (arg.num_values) {
+            case 0: break;
+            case 1: TRY(writer.WriteChars("=<value>")); break;
+            case -1: TRY(writer.WriteChars(" <value>...")); break;
+            default: TRY(fmt::FormatToWriter(writer, " <{} values>", arg.num_values)); break;
+        }
+
         if (arg.description.size) TRY(fmt::FormatToWriter(writer, "  {}", arg.description));
         TRY(writer.WriteChar('\n'));
         return k_success;
@@ -72,10 +82,10 @@ PUBLIC Span<String> ArgsToStringsSpan(ArenaAllocator& arena, ArgsCstr args, bool
 }
 
 // quite basic. only supports -a, -a=value, -a value --arg, --arg=value, --arg value
-PUBLIC HashTable<String, String> ArgsToKeyValueTable(ArenaAllocator& arena, Span<String const> args) {
-    DynamicHashTable<String, String> result {arena};
+PUBLIC HashTable<String, Span<String>> ArgsToKeyValueTable(ArenaAllocator& arena, Span<String const> args) {
+    DynamicHashTable<String, Span<String>> result {arena};
     enum class ArgType { Short, Long, None };
-    auto const check_arg = [](String arg) {
+    auto const arg_type = [](String arg) {
         if (arg[0] == '-' && IsAlphanum(arg[1])) return ArgType::Short;
         if (arg.size > 2) {
             if (arg[0] == '-' && arg[1] == '-') return ArgType::Long;
@@ -101,35 +111,36 @@ PUBLIC HashTable<String, String> ArgsToKeyValueTable(ArenaAllocator& arena, Span
         return KeyVal {arg, ""_s};
     };
 
-    for (usize i = 0; i < args.size;) {
-        if (auto const type = check_arg(args[i]); type != ArgType::None) {
-            auto const arg = args[i].SubSpan(prefix_size(type));
+    String current_key {};
+    DynamicArray<String> current_values {arena};
+
+    for (auto const arg_index : Range(args.size)) {
+        if (auto const type = arg_type(args[arg_index]); type != ArgType::None) {
+            auto const arg = args[arg_index].SubSpan(prefix_size(type));
             auto const [key, value] = try_get_combined_key_val(arg);
 
-            bool added_next = false;
-            if (i != args.size - 1) {
-                auto const& next = args[i + 1];
-                if (auto const next_type = check_arg(next); next_type == ArgType::None) {
-                    result.Insert(arg, next);
-                    i += 2;
-                    added_next = true;
-                }
+            if (key != current_key) {
+                // it's a new key, flush the values of the previous
+                if (current_key.size) result.Insert(current_key, current_values.ToOwnedSpan());
+                current_key = key;
             }
 
-            if (!added_next) {
-                result.Insert(key, value);
-                i += 1;
-            }
+            if (value.size) dyn::Append(current_values, value);
         } else {
-            // positional arguments aren't supported
-            i += 1;
+            if (current_key.size)
+                dyn::Append(current_values, args[arg_index]);
+            else {
+                // positional arguments are not supported at the moment
+            }
         }
     }
+
+    if (current_key.size) result.Insert(current_key, current_values.ToOwnedSpan());
 
     return result.ToOwnedTable();
 }
 
-PUBLIC HashTable<String, String> ArgsToKeyValueTable(ArenaAllocator& arena, ArgsCstr args) {
+PUBLIC HashTable<String, Span<String>> ArgsToKeyValueTable(ArenaAllocator& arena, ArgsCstr args) {
     return ArgsToKeyValueTable(arena, ArgsToStringsSpan(arena, args, false));
 }
 
@@ -178,12 +189,12 @@ PUBLIC ErrorCodeOr<Span<CommandLineArg>> ParseCommandLineArgs(Writer writer,
         PLACEMENT_NEW(&result[arg_index])
         CommandLineArg {
             .info = arg_defs[arg_index],
-            .value = {},
+            .values = {},
             .was_provided = false,
         };
     }
 
-    for (auto [key, value] : ArgsToKeyValueTable(arena, args)) {
+    for (auto [key, values] : ArgsToKeyValueTable(arena, args)) {
         if (options.handle_help_option && key == "help") {
             TRY(PrintUsage(writer, program_name, arg_defs));
             return ErrorCode {CliError::HelpRequested};
@@ -197,12 +208,18 @@ PUBLIC ErrorCodeOr<Span<CommandLineArg>> ParseCommandLineArgs(Writer writer,
 
         auto const& arg = arg_defs[*arg_index];
 
-        if (arg.needs_value && !value->size) {
-            TRY(fmt::FormatToWriter(writer, "Option --{} requires a value\n", key));
+        if (arg.num_values != 0 && !values->size) {
+            TRY(fmt::FormatToWriter(writer,
+                                    "Option --{} requires {} value\n",
+                                    key,
+                                    arg.num_values == 1 ? "a"_s
+                                                        : ((arg.num_values == -1)
+                                                               ? "at least one"_s
+                                                               : String(fmt::IntToString(arg.num_values)))));
             return error(CliError::InvalidArguments);
         }
 
-        result[*arg_index].value = *value;
+        result[*arg_index].values = *values;
         result[*arg_index].was_provided = true;
     }
 

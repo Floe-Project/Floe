@@ -2483,50 +2483,49 @@ TEST_CASE(TestParseCommandLineArgs) {
         }
     }
 
-    auto const check_arg = [&](HashTable<String, String> table, String arg, String value) {
+    auto const check_arg = [&](HashTable<String, Span<String>> table, String arg, Span<String const> values) {
         CAPTURE(arg);
-        CAPTURE(value);
-        tester.log.Debug(k_foundation_mod_cat, "Checking arg: {}, value: {}", arg, value);
+        CAPTURE(values);
+        tester.log.Debug(k_foundation_mod_cat, "Checking arg: {}, values: {}", arg, values);
         auto f = table.Find(arg);
         CHECK(f != nullptr);
-        (void)f;
-        if (f) CHECK_EQ(*f, value);
+        if (f) CHECK_EQ(*f, values);
     };
 
     SUBCASE("mutliple short and long args") {
-        auto args = ArgsToKeyValueTable(a, Array {"-a"_s, "b", "--c", "d", "-e", "--key=value"});
-        CHECK(args.size == 4);
-        check_arg(args, "a"_s, "b"_s);
-        check_arg(args, "c"_s, "d"_s);
-        check_arg(args, "e"_s, ""_s);
-        check_arg(args, "key"_s, "value"_s);
+        auto args = ArgsToKeyValueTable(a, Array {"-a"_s, "b", "--c", "d", "e", "-f", "--key=value"});
+        CHECK_EQ(args.size, 4uz);
+        check_arg(args, "a"_s, Array {"b"_s});
+        check_arg(args, "c"_s, Array {"d"_s, "e"});
+        check_arg(args, "f"_s, {});
+        check_arg(args, "key"_s, Array {"value"_s});
     }
 
     SUBCASE("no args") {
         auto args = ArgsToKeyValueTable(a, Span<String> {});
-        CHECK(args.size == 0);
+        CHECK_EQ(args.size, 0uz);
     }
 
     SUBCASE("arg without value") {
         auto args = ArgsToKeyValueTable(a, Array {"--filter"_s});
-        CHECK(args.size == 1);
+        CHECK_EQ(args.size, 1uz);
         CHECK(args.Find("filter"_s));
     }
 
     SUBCASE("positional args are ignored") {
         auto args = ArgsToKeyValueTable(a, Array {"filter"_s});
-        CHECK(args.size == 0);
+        CHECK_EQ(args.size, 0uz);
     }
 
     SUBCASE("short arg with value") {
         auto args = ArgsToKeyValueTable(a, Array {"-a=b"_s});
-        check_arg(args, "a"_s, "b"_s);
+        check_arg(args, "a"_s, Array {"b"_s});
         (void)args;
     }
 
     SUBCASE("long arg with value") {
         auto args = ArgsToKeyValueTable(a, Array {"--a=b"_s});
-        check_arg(args, "a"_s, "b"_s);
+        check_arg(args, "a"_s, Array {"b"_s});
     }
 
     SUBCASE("parsing") {
@@ -2537,9 +2536,9 @@ TEST_CASE(TestParseCommandLineArgs) {
             Count,
         };
         constexpr auto k_arg_defs = MakeCommandLineArgDefs<ArgId>({
-            {.id = (u32)ArgId::A, .key = "a-arg", .required = true, .needs_value = true},
-            {.id = (u32)ArgId::B, .key = "b-arg", .required = false, .needs_value = false},
-            {.id = (u32)ArgId::C, .key = "c-arg", .required = true, .needs_value = false},
+            {.id = (u32)ArgId::A, .key = "a-arg", .required = true, .num_values = 1},
+            {.id = (u32)ArgId::B, .key = "b-arg", .required = false, .num_values = 0},
+            {.id = (u32)ArgId::C, .key = "c-arg", .required = true, .num_values = 0},
         });
 
         DynamicArray<char> buffer {a};
@@ -2559,7 +2558,7 @@ TEST_CASE(TestParseCommandLineArgs) {
             CHECK(args.size == k_arg_defs.size);
 
             auto a_arg = args[ToInt(ArgId::A)];
-            CHECK(a_arg.value == "value"_s);
+            CHECK(a_arg.values == Array {"value"_s});
             CHECK(a_arg.was_provided);
             CHECK(a_arg.info.id == (u32)ArgId::A);
 
@@ -2568,7 +2567,7 @@ TEST_CASE(TestParseCommandLineArgs) {
 
             auto c_arg = args[ToInt(ArgId::C)];
             CHECK(c_arg.was_provided);
-            CHECK(c_arg.value == ""_s);
+            CHECK(c_arg.values.size == 0);
         }
 
         SUBCASE("missing required args") {

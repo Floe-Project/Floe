@@ -223,28 +223,28 @@ auto constexpr k_command_line_args_defs = MakeCommandLineArgDefs<CliArgId>({
         .key = "library-folder",
         .description = "Path to the library folder",
         .required = false,
-        .needs_value = true,
+        .num_values = 1,
     },
     {
         .id = (u32)CliArgId::PresetFolder,
         .key = "presets-folder",
         .description = "Path to the presets folder",
         .required = false,
-        .needs_value = true,
+        .num_values = 1,
     },
     {
         .id = (u32)CliArgId::OutputZipFolder,
         .key = "output-zip-folder",
         .description = "Path to the output zip folder",
         .required = false,
-        .needs_value = true,
+        .num_values = 1,
     },
     {
         .id = (u32)CliArgId::FallbackPackageName,
         .key = "fallback-package-name",
         .description = "Fallback package name",
         .required = false,
-        .needs_value = true,
+        .num_values = 1,
     },
 });
 

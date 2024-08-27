@@ -5,7 +5,7 @@
 #include "os/filesystem.hpp"
 #include "os/threading.hpp"
 #include "tests/framework.hpp"
-#include "utils/cli_args.hpp"
+#include "utils/cli_arg_parse.hpp"
 #include "utils/directory_listing/directory_listing.hpp"
 #include "utils/error_notifications.hpp"
 #include "utils/json/json_reader.hpp"

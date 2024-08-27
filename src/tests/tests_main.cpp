@@ -4,7 +4,7 @@
 #include "foundation/foundation.hpp"
 #include "os/threading.hpp"
 #include "tests/framework.hpp"
-#include "utils/cli_args.hpp"
+#include "utils/cli_arg_parse.hpp"
 #include "utils/debug/tracy_wrapped.hpp"
 
 #include "foundation_tests.hpp"

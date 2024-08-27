@@ -105,9 +105,9 @@ ErrorCodeOr<int> Main(ArgsCstr args) {
                                                        .print_usage_on_error = true,
                                                    }));
 
-    TRY(SetLogLevel(tester, cli_args[ToInt(CommandLineArgId::LogLevel)].OptValue()));
+    TRY(SetLogLevel(tester, cli_args[ToInt(CommandLineArgId::LogLevel)].Value()));
 
-    auto const filter_pattern = cli_args[ToInt(CommandLineArgId::Filter)].OptValue();
+    auto const filter_pattern = cli_args[ToInt(CommandLineArgId::Filter)].Value();
 
     // Register the test functions
 #define X(fn) fn(tester);

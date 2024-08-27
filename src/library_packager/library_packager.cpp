@@ -213,24 +213,24 @@ enum class CliArgId : u32 {
     LibraryFolder,
     PresetFolder,
     OutputZipFolder,
-    FallbackPackageName,
+    PackageName,
     Count,
 };
 
 auto constexpr k_command_line_args_defs = MakeCommandLineArgDefs<CliArgId>({
     {
         .id = (u32)CliArgId::LibraryFolder,
-        .key = "library-folder",
+        .key = "library-folders",
         .description = "Path to the library folder",
         .required = false,
-        .num_values = 1,
+        .num_values = -1,
     },
     {
         .id = (u32)CliArgId::PresetFolder,
-        .key = "presets-folder",
+        .key = "presets-folders",
         .description = "Path to the presets folder",
         .required = false,
-        .num_values = 1,
+        .num_values = -1,
     },
     {
         .id = (u32)CliArgId::OutputZipFolder,
@@ -240,18 +240,21 @@ auto constexpr k_command_line_args_defs = MakeCommandLineArgDefs<CliArgId>({
         .num_values = 1,
     },
     {
-        .id = (u32)CliArgId::FallbackPackageName,
-        .key = "fallback-package-name",
-        .description = "Fallback package name",
+        .id = (u32)CliArgId::PackageName,
+        .key = "package-name",
+        .description = "Package name - inferred from library name if not provided",
         .required = false,
         .num_values = 1,
     },
 });
 
-// IMPROVE: this is not robust, we need to consider the various forms that a path can take
+// IMPROVE: this is not robust, we need to consider the canonical form that a path can take
 static String RelativePath(String from, String to) {
     if (to.size < from.size + 1)
-        PanicF(SourceLocation::Current(), "Path error, {} is shorter than {}", from, to);
+        PanicF(SourceLocation::Current(),
+               "Bug with calculating relative paths: {} is shorter than {}",
+               from,
+               to);
 
     return to.SubSpan(from.size + 1);
 }
@@ -264,17 +267,25 @@ static String ReplaceSpacesWithDashes(ArenaAllocator& arena, String str) {
 }
 
 static ErrorCodeOr<void> CheckNeededZipCliArgs(Span<CommandLineArg const> args) {
-    auto const library_folder = args[ToInt(CliArgId::LibraryFolder)].OptValue();
-    auto const presets_folder = args[ToInt(CliArgId::PresetFolder)].OptValue();
+    if (!args[ToInt(CliArgId::OutputZipFolder)].was_provided) return k_success;
 
-    if (!library_folder && !presets_folder) {
-        g_cli_out.Error({}, "Either --library-folder or --presets-folder must be provided");
+    auto const library_folders_arg = args[ToInt(CliArgId::LibraryFolder)];
+    auto const presets_folders_arg = args[ToInt(CliArgId::PresetFolder)];
+
+    if (!library_folders_arg.values.size && !presets_folders_arg.values.size) {
+        g_cli_out.Error({},
+                        "Either --{} or --{} must be provided",
+                        library_folders_arg.info.key,
+                        presets_folders_arg.info.key);
         return ErrorCode {CliError::InvalidArguments};
     }
 
-    auto const fallback_package_name = args[ToInt(CliArgId::FallbackPackageName)].OptValue();
-    if (!library_folder && !fallback_package_name) {
-        g_cli_out.Error({}, "If --library-folder is not provided, --fallback-package-name must be");
+    auto const package_name_arg = args[ToInt(CliArgId::PackageName)];
+    if (library_folders_arg.values.size != 1 && !package_name_arg.was_provided) {
+        g_cli_out.Error({},
+                        "If --{} is not set to 1 folder, --{} must be",
+                        library_folders_arg.info.key,
+                        package_name_arg.info.key);
         return ErrorCode {CliError::InvalidArguments};
     }
 
@@ -304,6 +315,8 @@ static void ZipAddFile(mz_zip_archive& zip, String path, Span<u8 const> data) {
             if (*p == '\\') *p = '/';
     }
 
+    g_cli_out.Info({}, "Adding file to zip: {}", archived_path);
+
     if (!mz_zip_writer_add_mem(
             &zip,
             archived_path,
@@ -327,51 +340,34 @@ static Span<u8 const> ZipFinalise(mz_zip_archive& zip) {
     return Span {(u8 const*)zip_data, zip_size};
 }
 
-static ErrorCodeOr<void>
-CreateZip(Span<CommandLineArg const> args, sample_lib::Library const* lib, ArenaAllocator& arena) {
-    ASSERT(args[ToInt(CliArgId::OutputZipFolder)].OptValue());
-    TRY(CheckNeededZipCliArgs(args));
+static ErrorCodeOr<void> AddAllFilesToZip(mz_zip_archive& zip,
+                                          String folder,
+                                          ArenaAllocator& arena,
+                                          Span<String const> subdirs_in_zip) {
+    auto it = TRY(RecursiveDirectoryIterator::Create(arena,
+                                                     folder,
+                                                     {
+                                                         .wildcard = "*",
+                                                         .get_file_size = false,
+                                                         .skip_dot_files = true,
+                                                     }));
+    ArenaAllocator inner_arena {PageAllocator::Instance()};
+    while (it.HasMoreFiles()) {
+        inner_arena.ResetCursorAndConsolidateRegions();
 
-    auto zip = ZipCreate();
-    DEFER { ZipDestroy(zip); };
+        auto const& entry = it.Get();
+        if (entry.type == FileType::File) {
+            auto const file_data = TRY(ReadEntireFile(entry.path, inner_arena)).ToByteSpan();
 
-    if (auto const library_folder = args[ToInt(CliArgId::LibraryFolder)].OptValue()) {
-        auto it = TRY(RecursiveDirectoryIterator::Create(arena,
-                                                         *library_folder,
-                                                         {
-                                                             .wildcard = "*",
-                                                             .get_file_size = false,
-                                                             .skip_dot_files = true,
-                                                         }));
-        while (it.HasMoreFiles()) {
-            auto const arena_cursor = arena.TotalUsed();
-            DEFER { arena.TryShrinkTotalUsed(arena_cursor); };
-
-            auto const& entry = it.Get();
-
-            auto archive_path = DynamicArray<char>::FromOwnedSpan(
-                path::Join(arena,
-                           Array {"Libraries"_s, lib->name, RelativePath(*library_folder, entry.path)}),
-                arena);
-
-            auto const file_data = TRY(ReadEntireFile(entry.path, arena)).ToByteSpan();
-
+            DynamicArray<char> archive_path {inner_arena};
+            path::JoinAppend(archive_path, subdirs_in_zip);
+            path::JoinAppend(archive_path, RelativePath(folder, entry.path));
             ZipAddFile(zip, archive_path, file_data);
-
-            TRY(it.Increment());
         }
+
+        TRY(it.Increment());
     }
 
-    auto const zip_path =
-        path::Join(arena,
-                   Array {args[ToInt(CliArgId::OutputZipFolder)].values[0],
-                          fmt::Format(arena,
-                                      "Package-{}.floe.zip"_s,
-                                      lib ? ReplaceSpacesWithDashes(arena, lib->name)
-                                          : args[ToInt(CliArgId::FallbackPackageName)].values[0])});
-
-    TRY(WriteFile(zip_path, ZipFinalise(zip)));
-    g_cli_out.Info({}, "Created zip file: {}", zip_path);
     return k_success;
 }
 
@@ -386,13 +382,18 @@ static ErrorCodeOr<void> Main(ArgsCstr args) {
                                                        .handle_help_option = true,
                                                        .print_usage_on_error = true,
                                                    }));
+    TRY(CheckNeededZipCliArgs(cli_args));
 
-    sample_lib::Library const* lib = nullptr;
+    auto zip = ZipCreate();
+    DEFER { ZipDestroy(zip); };
 
-    if (auto const library_folder = cli_args[ToInt(CliArgId::LibraryFolder)].values[0]; library_folder.size) {
+    sample_lib::Library* lib_for_package_name = nullptr;
+
+    for (auto const library_folder : cli_args[ToInt(CliArgId::LibraryFolder)].values) {
         auto const paths = TRY(ScanLibraryFolder(arena, library_folder));
 
-        lib = TRY(ReadLua(paths.lua, arena));
+        auto lib = TRY(ReadLua(paths.lua, arena));
+        lib_for_package_name = lib;
         if (!sample_lib::CheckAllReferencedFilesExist(*lib, g_cli_out))
             return ErrorCode {CommonError::NotFound};
 
@@ -400,11 +401,31 @@ static ErrorCodeOr<void> Main(ArgsCstr args) {
         (void)metadata_outcome; // NOTE: unused at the moment
 
         TRY(WriteAboutLibraryHtml(*lib, arena, paths, library_folder));
+
+        if (cli_args[ToInt(CliArgId::OutputZipFolder)].was_provided)
+            TRY(AddAllFilesToZip(zip, library_folder, arena, Array {"Libraries"_s, lib->name}));
     }
 
-    if (auto const output_zip_folder = cli_args[ToInt(CliArgId::OutputZipFolder)].values[0];
-        output_zip_folder.size) {
-        TRY(CreateZip(cli_args, lib, arena));
+    if (cli_args[ToInt(CliArgId::OutputZipFolder)].was_provided)
+        for (auto const preset_folder : cli_args[ToInt(CliArgId::PresetFolder)].values)
+            TRY(AddAllFilesToZip(zip,
+                                 preset_folder,
+                                 arena,
+                                 Array {"Presets"_s, path::Filename(preset_folder)}));
+
+    if (cli_args[ToInt(CliArgId::OutputZipFolder)].was_provided) {
+        auto const zip_path =
+            path::Join(arena,
+                       Array {cli_args[ToInt(CliArgId::OutputZipFolder)].values[0],
+                              fmt::Format(arena,
+                                          "Package-{}.floe.zip"_s,
+                                          cli_args[ToInt(CliArgId::PackageName)].was_provided
+                                              ? cli_args[ToInt(CliArgId::PackageName)].values[0]
+                                              : ReplaceSpacesWithDashes(arena, lib_for_package_name->name))});
+        TRY(WriteFile(zip_path, ZipFinalise(zip)));
+        g_cli_out.Info({}, "Created zip file: {}", zip_path);
+    } else {
+        g_cli_out.Info({}, "No output zip folder provided, not creating a zip file");
     }
 
     return k_success;

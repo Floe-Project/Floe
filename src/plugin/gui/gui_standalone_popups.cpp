@@ -29,10 +29,64 @@
 #include "settings/settings_filesystem.hpp"
 #include "settings/settings_gui.hpp"
 
-imgui::Id GetStandaloneID(StandaloneWindows type) { return (imgui::Id)(type + 1000); }
+static void DoMultilineText(Gui* g, String text, f32& y_pos) {
+    auto& imgui = g->imgui;
+    auto font = imgui.graphics->context->CurrentFont();
+    auto const line_height = imgui.graphics->context->CurrentFontSize();
+
+    // IMPORTANT: if the string is very long, it needs to be word-wrapped manually by including newlines in
+    // the text. This is necessary because our text rendering system is bad at doing huge amounts of
+    // word-wrapping. It still renders text that isn't visible unless there's no word-wrapping, in which case
+    // it's does skip rendering off-screen text.
+    f32 const wrap_width = text.size < 10000 ? imgui.Width() : 0.0f;
+
+    auto size = draw::GetTextSize(font, text, wrap_width);
+
+    auto text_r = Rect {0, y_pos, size.x, size.y};
+    y_pos += size.y + line_height / 2;
+    imgui.RegisterAndConvertRect(&text_r);
+    imgui.graphics->AddText(font,
+                            font->font_size_no_scale,
+                            text_r.pos,
+                            LiveCol(imgui, UiColMap::PopupItemText),
+                            text,
+                            wrap_width);
+}
+
+static bool DoButton(Gui* g, String button_text, f32& y_pos, f32 x_offset) {
+    auto& imgui = g->imgui;
+    auto const line_height = imgui.graphics->context->CurrentFontSize();
+    auto const rounding = LiveSize(g->imgui, UiSizeId::CornerRounding);
+    auto const padding = line_height / 3;
+
+    bool result = false;
+
+    auto const size = draw::GetTextSize(imgui.graphics->context->CurrentFont(), button_text, imgui.Width()) +
+                      f32x2 {line_height, line_height / 2};
+    auto const button_r = imgui.GetRegisteredAndConvertedRect({x_offset, y_pos, size.x, size.y});
+    auto const id = imgui.GetID(button_text);
+    if (imgui.ButtonBehavior(button_r, id, {.left_mouse = true, .triggers_on_mouse_up = true})) result = true;
+    imgui.graphics->AddRectFilled(button_r,
+                                  !imgui.IsHot(id)
+                                      ? LiveCol(imgui, UiColMap::StandaloneWindowButtonBack)
+                                      : LiveCol(imgui, UiColMap::StandaloneWindowButtonBackHover),
+                                  rounding);
+    imgui.graphics->AddRect(button_r, LiveCol(imgui, UiColMap::StandaloneWindowButtonOutline), rounding);
+    auto const text_r = button_r.ReducedHorizontally(padding);
+    imgui.graphics->AddTextJustified(text_r,
+                                     button_text,
+                                     LiveCol(imgui, UiColMap::StandaloneWindowButtonText),
+                                     TextJustification::Centred);
+
+    y_pos += line_height;
+
+    return result;
+}
+
+imgui::Id GetStandaloneID(StandaloneWindows type) { return (imgui::Id)(ToInt(type) + 1000); }
 
 bool IsAnyStandloneOpen(imgui::Context& imgui) {
-    for (auto const i : Range(ToInt(StandaloneWindowsCount)))
+    for (auto const i : Range(ToInt(StandaloneWindows::Count)))
         if (imgui.IsPopupOpen(GetStandaloneID((StandaloneWindows)i))) return true;
     return false;
 }
@@ -162,12 +216,10 @@ void DoErrorsStandalone(Gui* g) {
 
     auto font = imgui.graphics->context->CurrentFont();
 
-    if (imgui.BeginWindowPopup(settings, GetStandaloneID(StandaloneWindowsLoadError), r, "ErrorModal")) {
+    if (imgui.BeginWindowPopup(settings, GetStandaloneID(StandaloneWindows::LoadError), r, "ErrorModal")) {
         f32 y_pos = 0;
         auto text_style = labels::ErrorWindowLabel(imgui);
 
-        auto const error_window_button_h = LiveSize(imgui, UiSizeId::ErrorWindowButtonH);
-        auto const error_window_button_gap_x = LiveSize(imgui, UiSizeId::ErrorWindowButtonGapX);
         auto const error_window_gap_after_desc = LiveSize(imgui, UiSizeId::ErrorWindowGapAfterDesc);
         auto const error_window_divider_spacing_y = LiveSize(imgui, UiSizeId::ErrorWindowDividerSpacingY);
 
@@ -225,46 +277,10 @@ void DoErrorsStandalone(Gui* g) {
                     }
 
                     // buttons
-                    {
-                        f32 x_pos = 0;
-                        auto const btn_w = LiveSize(imgui, UiSizeId::ErrorWindowButtonW);
-
-                        auto btn_sets = imgui::DefButton();
-                        btn_sets.draw = [](IMGUI_DRAW_BUTTON_ARGS) {
-                            auto col = LiveCol(imgui, UiColMap::ErrorWindowButtonBack);
-                            if (imgui.IsHot(id)) col = LiveCol(imgui, UiColMap::ErrorWindowButtonBackHover);
-                            if (imgui.IsActive(id))
-                                col = LiveCol(imgui, UiColMap::ErrorWindowButtonBackActive);
-                            auto const rounding = LiveSize(imgui, UiSizeId::CornerRounding);
-                            imgui.graphics->AddRectFilled(r.Min(), r.Max(), col, rounding);
-
-                            auto text_r = r;
-                            text_r.x += text_r.h * 0.2f;
-                            imgui.graphics->AddTextJustified(text_r,
-                                                             str,
-                                                             LiveCol(imgui, UiColMap::ErrorWindowButtonText),
-                                                             TextJustification::CentredLeft);
-                        };
-
-                        bool button_added = false;
-
-                        auto do_button = [&](String name) {
-                            button_added = true;
-                            bool const clicked =
-                                imgui.Button(btn_sets,
-                                             {x_pos, y_pos, btn_w, (f32)error_window_button_h},
-                                             name);
-                            x_pos += btn_w + (f32)error_window_button_gap_x;
-                            return clicked;
-                        };
-
-                        if (do_button("Dismiss")) {
-                            errors->RemoveError(e.id);
-                            continue;
-                        }
+                    if (DoButton(g, "Dismiss", y_pos, 0)) {
+                        errors->RemoveError(e.id);
+                        continue;
                     }
-
-                    y_pos += (f32)error_window_button_h;
 
                     // divider line
                     if (it->next.Load(LoadMemoryOrder::Relaxed) != nullptr) {
@@ -281,7 +297,7 @@ void DoErrorsStandalone(Gui* g) {
         }
 
         // Add space to the bottom of the scroll window
-        imgui.GetRegisteredAndConvertedRect({0, y_pos, 1, (f32)error_window_button_h});
+        imgui.GetRegisteredAndConvertedRect({0, y_pos, 1, imgui.graphics->context->CurrentFontSize()});
 
         if (!num_errors) imgui.ClosePopupToLevel(0);
 
@@ -305,7 +321,7 @@ void DoMetricsStandalone(Gui* g) {
     r.w = popup_w;
     r.h = popup_h;
 
-    if (imgui.BeginWindowPopup(settings, GetStandaloneID(StandaloneWindowsMetrics), r, "MetricsModal")) {
+    if (imgui.BeginWindowPopup(settings, GetStandaloneID(StandaloneWindows::Metrics), r, "MetricsModal")) {
         DoStandaloneCloseButton(g);
         f32 y_pos = 0;
         StandalonePopupHeading(g, y_pos, "Metrics");
@@ -361,7 +377,7 @@ void DoAboutStandalone(Gui* g) {
     r.w = popup_w;
     r.h = popup_h;
 
-    if (imgui.BeginWindowPopup(settings, GetStandaloneID(StandaloneWindowsAbout), r, "AboutModal")) {
+    if (imgui.BeginWindowPopup(settings, GetStandaloneID(StandaloneWindows::About), r, "AboutModal")) {
         DoStandaloneCloseButton(g);
         f32 y_pos = 0;
         StandalonePopupHeading(g, y_pos, "About");
@@ -430,7 +446,7 @@ void DoInstrumentInfoStandalone(Gui* g) {
     r.w = popup_w;
     r.h = popup_h;
 
-    if (imgui.BeginWindowPopup(settings, GetStandaloneID(StandaloneWindowsInstInfo), r, "InstInfo")) {
+    if (imgui.BeginWindowPopup(settings, GetStandaloneID(StandaloneWindows::InstInfo), r, "InstInfo")) {
         DoStandaloneCloseButton(g);
         f32 y_pos = 0;
 
@@ -439,6 +455,34 @@ void DoInstrumentInfoStandalone(Gui* g) {
             DoLabelLine(imgui, y_pos, i.title, i.info);
 
         imgui.EndWindow();
+    }
+}
+
+void DoInstallWizardStandalone(Gui* g) {
+    g->frame_input.graphics_ctx->PushFont(g->roboto_small);
+    DEFER { g->frame_input.graphics_ctx->PopFont(); };
+    auto& imgui = g->imgui;
+    auto popup_w = LiveSize(imgui, UiSizeId::SettingsWindowWidth);
+    auto popup_h = LiveSize(imgui, UiSizeId::SettingsWindowHeight);
+    auto settings = StandalonePopupSettings(g->imgui);
+
+    Rect r;
+    r.x = (f32)(int)((f32)g->frame_input.window_size.width / 2 - popup_w / 2);
+    r.y = (f32)(int)((f32)g->frame_input.window_size.height / 2 - popup_h / 2);
+    r.w = popup_w;
+    r.h = popup_h;
+
+    if (imgui.BeginWindowPopup(settings, GetStandaloneID(StandaloneWindows::InstallWizard), r, "Install")) {
+        DEFER { imgui.EndWindow(); };
+        f32 y_pos = 0;
+        StandalonePopupHeading(g, y_pos, "Install Libraries");
+        DoStandaloneCloseButton(g);
+
+        DoMultilineText(
+            g,
+            "Floe can extract and install sample library packages.\nThese are ZIP files that end with \"floe.zip.\"",
+            y_pos);
+        if (DoButton(g, "Choose Files", y_pos, 0)) g->OpenDialog(DialogType::InstallPackage);
     }
 }
 
@@ -457,7 +501,8 @@ void DoSettingsStandalone(Gui* g) {
     r.w = popup_w;
     r.h = popup_h;
 
-    if (imgui.BeginWindowPopup(settings, GetStandaloneID(StandaloneWindowsSettings), r, "Settings")) {
+    if (imgui.BeginWindowPopup(settings, GetStandaloneID(StandaloneWindows::Settings), r, "Settings")) {
+        DEFER { imgui.EndWindow(); };
         f32 y_pos = 0;
         StandalonePopupHeading(g, y_pos, "Settings");
         DoStandaloneCloseButton(g);
@@ -657,32 +702,8 @@ void DoSettingsStandalone(Gui* g) {
 
             y_pos += box_r.h + line_height / 3.0f;
 
-            {
-                auto const text = "Add"_s;
-                auto const size =
-                    draw::GetTextSize(imgui.graphics->context->CurrentFont(), text, imgui.Width()) +
-                    f32x2 {line_height, line_height / 2};
-                auto const button_r =
-                    imgui.GetRegisteredAndConvertedRect({left_col_width, y_pos, size.x, size.y});
-                auto const id = imgui.GetID("addlib");
-                if (imgui.ButtonBehavior(button_r, id, {.left_mouse = true, .triggers_on_mouse_up = true}))
-                    result.add = true;
-                imgui.graphics->AddRectFilled(button_r,
-                                              !imgui.IsHot(id)
-                                                  ? LiveCol(imgui, UiColMap::SettingsWindowButtonBack)
-                                                  : LiveCol(imgui, UiColMap::SettingsWindowButtonBackHover),
-                                              rounding);
-                imgui.graphics->AddRect(button_r,
-                                        LiveCol(imgui, UiColMap::SettingsWindowButtonOutline),
-                                        rounding);
-                auto const text_r = button_r.ReducedHorizontally(path_gui_spacing);
-                imgui.graphics->AddTextJustified(text_r,
-                                                 text,
-                                                 LiveCol(imgui, UiColMap::SettingsWindowButtonText),
-                                                 TextJustification::Centred);
-            }
-
-            y_pos += line_height * 1.5f;
+            DoButton(g, "Add", y_pos, left_col_width);
+            y_pos += line_height * 0.5f;
 
             return result;
         };
@@ -714,33 +735,7 @@ void DoSettingsStandalone(Gui* g) {
 
         // Add whitespace at bottom of scrolling
         imgui.GetRegisteredAndConvertedRect({0, y_pos, imgui.Width(), line_height});
-
-        imgui.EndWindow();
     }
-}
-
-static void DoMultilineText(Gui* g, String text, f32& y_pos) {
-    auto& imgui = g->imgui;
-    auto font = imgui.graphics->context->CurrentFont();
-    auto const line_height = imgui.graphics->context->CurrentFontSize();
-
-    // IMPORTANT: if the string is very long, it needs to be word-wrapped manually by including newlines in
-    // the text. This is necessary because our text rendering system is bad at doing huge amounts of
-    // word-wrapping. It still renders text that isn't visible unless there's no word-wrapping, in which case
-    // it's does skip rendering off-screen text.
-    f32 const wrap_width = text.size < 10000 ? imgui.Width() : 0.0f;
-
-    auto size = draw::GetTextSize(font, text, wrap_width);
-
-    auto text_r = Rect {0, y_pos, size.x, size.y};
-    y_pos += size.y + line_height / 2;
-    imgui.RegisterAndConvertRect(&text_r);
-    imgui.graphics->AddText(font,
-                            font->font_size_no_scale,
-                            text_r.pos,
-                            LiveCol(imgui, UiColMap::PopupItemText),
-                            text,
-                            wrap_width);
 }
 
 void DoLicencesStandalone(Gui* g) {
@@ -761,7 +756,7 @@ void DoLicencesStandalone(Gui* g) {
     r.w = popup_w;
     r.h = popup_h;
 
-    if (imgui.BeginWindowPopup(settings, GetStandaloneID(StandaloneWindowsLicences), r, "LicencesModal")) {
+    if (imgui.BeginWindowPopup(settings, GetStandaloneID(StandaloneWindows::Licences), r, "LicencesModal")) {
         DoStandaloneCloseButton(g);
         auto h = LiveSize(imgui, UiSizeId::MenuItemHeight);
         f32 y_pos = 0;

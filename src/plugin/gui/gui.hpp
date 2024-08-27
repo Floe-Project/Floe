@@ -114,7 +114,13 @@ class FloeWaveformImages {
     DynamicArray<Waveform> m_waveforms {Malloc::Instance()};
 };
 
-enum class DialogType { AddNewLibraryScanFolder, AddNewPresetsScanFolder, SavePreset, LoadPreset };
+enum class DialogType {
+    AddNewLibraryScanFolder,
+    AddNewPresetsScanFolder,
+    SavePreset,
+    LoadPreset,
+    InstallPackage,
+};
 
 struct InstInfo {
     String title;

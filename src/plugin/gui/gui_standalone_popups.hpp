@@ -7,14 +7,15 @@
 struct Gui;
 struct PluginInstance;
 
-enum StandaloneWindows {
-    StandaloneWindowsAbout,
-    StandaloneWindowsLicences,
-    StandaloneWindowsMetrics,
-    StandaloneWindowsLoadError,
-    StandaloneWindowsInstInfo,
-    StandaloneWindowsSettings,
-    StandaloneWindowsCount
+enum class StandaloneWindows {
+    About,
+    Licences,
+    Metrics,
+    LoadError,
+    InstInfo,
+    Settings,
+    InstallWizard,
+    Count,
 };
 
 imgui::Id GetStandaloneID(StandaloneWindows type);
@@ -31,3 +32,4 @@ void DoInstrumentInfoStandalone(Gui* g);
 void DoAboutStandalone(Gui* g);
 void DoLicencesStandalone(Gui* g);
 void DoSettingsStandalone(Gui* g);
+void DoInstallWizardStandalone(Gui* g);

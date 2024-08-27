@@ -41,15 +41,15 @@ static void DoSettingsMenuItems(Gui* g) {
         PopupMenuItems submenu(g, {&longest_string_in_submenu, 1});
         if (submenu.DoButton("About")) {
             g->imgui.ClosePopupToLevel(0);
-            g->imgui.OpenPopup(GetStandaloneID(StandaloneWindowsAbout));
+            g->imgui.OpenPopup(GetStandaloneID(StandaloneWindows::About));
         }
         if (submenu.DoButton("Metrics")) {
             g->imgui.ClosePopupToLevel(0);
-            g->imgui.OpenPopup(GetStandaloneID(StandaloneWindowsMetrics));
+            g->imgui.OpenPopup(GetStandaloneID(StandaloneWindows::Metrics));
         }
         if (submenu.DoButton("Licences")) {
             g->imgui.ClosePopupToLevel(0);
-            g->imgui.OpenPopup(GetStandaloneID(StandaloneWindowsLicences));
+            g->imgui.OpenPopup(GetStandaloneID(StandaloneWindows::Licences));
         }
         g->imgui.EndWindow();
     }
@@ -101,6 +101,7 @@ void TopPanel(Gui* g) {
     auto preset_save = lay.CreateChildItem(preset_box, preset_box_icon_width, icon_height, 0);
     lay.SetRightMargin(preset_save, preset_box_pad_r);
 
+    auto box = lay.CreateChildItem(right_container, icon_width, icon_height, LAY_VCENTER);
     auto cog = lay.CreateChildItem(right_container, icon_width, icon_height, LAY_VCENTER);
     auto menu = lay.CreateChildItem(right_container, icon_width, icon_height, LAY_VCENTER);
 
@@ -294,10 +295,18 @@ void TopPanel(Gui* g) {
     }
 
     {
+        auto btn_id = imgui.GetID("install");
+        auto btn_r = lay.GetRect(box);
+        if (buttons::Button(g, btn_id, btn_r, ICON_FA_BOX_OPEN, large_icon_button_style))
+            OpenStandalone(imgui, StandaloneWindows::InstallWizard);
+        Tooltip(g, btn_id, btn_r, "Install libraries"_s);
+    }
+
+    {
         auto btn_id = imgui.GetID("sets");
         auto btn_r = lay.GetRect(cog);
         if (buttons::Button(g, btn_id, btn_r, ICON_FA_COG, large_icon_button_style))
-            OpenStandalone(imgui, StandaloneWindowsSettings);
+            OpenStandalone(imgui, StandaloneWindows::Settings);
         Tooltip(g, btn_id, btn_r, "Open settings window"_s);
     }
 

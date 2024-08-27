@@ -345,6 +345,28 @@ static void CreateFontsIfNeeded(Gui* g) {
 
 static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
     switch (type) {
+        case DialogType::InstallPackage: {
+            auto downloads_folder = KnownDirectory(g->scratch_arena, KnownDirectories::Downloads);
+
+            auto const opt_path = TRY(FilesystemDialog({
+                .type = DialogOptions::Type::OpenFile,
+                .allocator = g->scratch_arena,
+                .title = "Select Floe Package",
+                .default_path =
+                    downloads_folder.HasValue() ? Optional<String>(downloads_folder.Value()) : nullopt,
+                .filters = ArrayT<DialogOptions::FileFilter>({
+                    {
+                        .description = "Floe Package"_s,
+                        .wildcard_filter = "*.floe.zip"_s,
+                    },
+                }),
+                .parent_window = g->frame_input.native_window,
+            }));
+            if (opt_path) {
+                // TODO: Implement package installation
+            }
+            break;
+        }
         case DialogType::AddNewLibraryScanFolder: {
             Optional<String> default_folder {};
             if (auto extra_paths = g->settings.settings.filesystem.extra_libraries_scan_folders;
@@ -396,10 +418,10 @@ static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
                                Array {preset_scan_folders[0], "untitled" FLOE_PRESET_FILE_EXTENSION});
             }
 
-            auto const filters = Array<DialogOptions::FileFilter, 1> {{{
+            constexpr auto k_filters = ArrayT<DialogOptions::FileFilter>({{
                 .description = "Floe Preset"_s,
                 .wildcard_filter = "*.floe-*"_s,
-            }}};
+            }});
 
             if (type == DialogType::LoadPreset) {
                 auto const opt_path = TRY(FilesystemDialog({
@@ -407,7 +429,7 @@ static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
                     .allocator = g->scratch_arena,
                     .title = "Load Floe Preset",
                     .default_path = default_path,
-                    .filters = filters.Items(),
+                    .filters = k_filters.Items(),
                     .parent_window = g->frame_input.native_window,
                 }));
                 if (opt_path) LoadPresetFromFile(g->plugin, *opt_path);
@@ -417,7 +439,7 @@ static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
                     .allocator = g->scratch_arena,
                     .title = "Save Floe Preset",
                     .default_path = default_path,
-                    .filters = filters.Items(),
+                    .filters = k_filters.Items(),
                     .parent_window = g->frame_input.native_window,
                 }));
                 if (opt_path) SaveCurrentStateToFile(g->plugin, *opt_path);
@@ -620,9 +642,9 @@ GuiFrameResult GuiUpdate(Gui* g) {
         }
     }
 
-    if (show_error_popup && !imgui.IsPopupOpen(GetStandaloneID(StandaloneWindowsLoadError))) {
+    if (show_error_popup && !imgui.IsPopupOpen(GetStandaloneID(StandaloneWindows::LoadError))) {
         imgui.ClosePopupToLevel(0);
-        imgui.OpenPopup(GetStandaloneID(StandaloneWindowsLoadError));
+        imgui.OpenPopup(GetStandaloneID(StandaloneWindows::LoadError));
     }
 
     if (IsAnyStandloneOpen(imgui)) DoOverlayClickableBackground(g);
@@ -633,6 +655,7 @@ GuiFrameResult GuiUpdate(Gui* g) {
     DoLicencesStandalone(g);
     DoInstrumentInfoStandalone(g);
     DoSettingsStandalone(g);
+    DoInstallWizardStandalone(g);
 
     DoLoadingOverlay(g);
 

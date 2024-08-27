@@ -4,10 +4,9 @@
 #include "foundation/foundation.hpp"
 #include "os/threading.hpp"
 #include "tests/framework.hpp"
+#include "utils/cli_args.hpp"
+#include "utils/debug/tracy_wrapped.hpp"
 
-#include "tracy/TracyC.h"
-
-//
 #include "foundation_tests.hpp"
 #include "hosting_tests.hpp"
 #include "os_tests.hpp"

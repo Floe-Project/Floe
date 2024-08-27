@@ -5,6 +5,7 @@
 
 #include "foundation/foundation.hpp"
 #include "os/misc.hpp"
+#include "utils/cli_args.hpp"
 #include "utils/logger/logger.hpp"
 
 #include "common_infrastructure/common_errors.hpp"

@@ -3,7 +3,6 @@
 
 #pragma once
 #include "utils/algorithm.hpp" // IWYU pragma: export
-#include "utils/cli_args.hpp" // IWYU pragma: export
 #include "utils/dummy_mutex.hpp" // IWYU pragma: export
 #include "utils/format.hpp" // IWYU pragma: export
 #include "utils/geometry.hpp" // IWYU pragma: export

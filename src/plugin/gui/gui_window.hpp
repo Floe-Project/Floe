@@ -5,7 +5,7 @@
 #include "framework/gui_imgui.hpp"
 
 imgui::WindowSettings PopupWindowSettings(imgui::Context const& imgui);
-imgui::WindowSettings StandalonePopupSettings(imgui::Context const& imgui);
+imgui::WindowSettings ModalWindowSettings(imgui::Context const& imgui);
 imgui::WindowSettings
 FloeWindowSettings(imgui::Context const& imgui,
                    TrivialFixedSizeFunction<48, void(IMGUI_DRAW_WINDOW_BG_ARGS)> const& draw);

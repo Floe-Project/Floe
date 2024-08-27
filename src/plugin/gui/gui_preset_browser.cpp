@@ -54,7 +54,7 @@ PresetBrowser::PresetBrowser(Gui* g, PresetBrowserPersistentData& persistent_dat
     left_margin = LiveSize(imgui, UiSizeId::SidePanelTextMarginLeft);
     file_arrow_size = LiveSize(imgui, UiSizeId::PresetFileArrowSize);
 
-    wnd_settings = StandalonePopupSettings(imgui);
+    wnd_settings = ModalWindowSettings(imgui);
     wnd_settings.pad_top_left = {LiveSize(imgui, UiSizeId::PresetPadL),
                                  LiveSize(imgui, UiSizeId::PresetPadT)};
     wnd_settings.pad_bottom_right = {LiveSize(imgui, UiSizeId::PresetPadR),

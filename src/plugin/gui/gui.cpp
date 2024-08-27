@@ -19,7 +19,7 @@
 #include "gui/framework/gui_imgui.hpp"
 #include "gui_editor_widgets.hpp"
 #include "gui_editors.hpp"
-#include "gui_standalone_popups.hpp"
+#include "gui_modal_windows.hpp"
 #include "gui_widget_helpers.hpp"
 #include "image.hpp"
 #include "plugin.hpp"
@@ -523,6 +523,81 @@ f32x2 GetMaxUVToMaintainAspectRatio(graphics::ImageID img, f32x2 container_size)
     return uv;
 }
 
+static void DoStandaloneErrorGUI(Gui* g) {
+    auto& plugin = g->plugin;
+
+    auto const host = plugin.host;
+    auto const floe_ext = (FloeClapExtensionHost const*)host.get_extension(&host, k_floe_clap_extension_id);
+    if (!floe_ext) return;
+
+    g->frame_input.graphics_ctx->PushFont(g->roboto_small);
+    DEFER { g->frame_input.graphics_ctx->PopFont(); };
+    auto& imgui = g->imgui;
+    auto platform = &g->frame_input;
+    static bool error_window_open = true;
+
+    bool const there_is_an_error =
+        floe_ext->standalone_midi_device_error || floe_ext->standalone_audio_device_error;
+    if (error_window_open && there_is_an_error) {
+        auto settings = imgui::DefWindow();
+        settings.flags |= imgui::WindowFlags_AutoHeight | imgui::WindowFlags_AutoWidth;
+        imgui.BeginWindow(settings, {0, 0, 200, 0}, "StandaloneErrors");
+        f32 y_pos = 0;
+        if (floe_ext->standalone_midi_device_error) {
+            imgui.Text(imgui::DefText(), {0, y_pos, 100, 20}, "No MIDI input");
+            y_pos += 20;
+        }
+        if (floe_ext->standalone_audio_device_error) {
+            imgui.Text(imgui::DefText(), {0, y_pos, 100, 20}, "No audio devices");
+            y_pos += 20;
+        }
+        if (imgui.Button(imgui::DefButton(), {0, y_pos, 100, 20}, imgui.GetID("closeErr"), "Close"))
+            error_window_open = false;
+        imgui.EndWindow();
+    }
+    if (floe_ext->standalone_midi_device_error) {
+        imgui.frame_output.wants_keyboard_input = true;
+        if (platform->Key(ModifierKey::Shift).is_down) {
+            auto gen_midi_message = [&](bool on, u7 key) {
+                if (on)
+                    plugin.processor.events_for_audio_thread.Push(
+                        GuiNoteClicked({.key = key, .velocity = 0.7f}));
+                else
+                    plugin.processor.events_for_audio_thread.Push(GuiNoteClickReleased({.key = key}));
+            };
+
+            struct Key {
+                KeyCode key;
+                u7 midi_key;
+            };
+            static Key const keys[] = {
+                {KeyCode::LeftArrow, 60},
+                {KeyCode::RightArrow, 63},
+                {KeyCode::UpArrow, 80},
+                {KeyCode::DownArrow, 45},
+            };
+
+            for (auto& i : keys) {
+                if (platform->Key(i.key).presses.size) gen_midi_message(true, i.midi_key);
+                if (platform->Key(i.key).releases.size) gen_midi_message(false, i.midi_key);
+            }
+        }
+    }
+}
+
+static bool HasAnyErrorNotifications(Gui* g) {
+    for (auto& err_notifications :
+         Array {&g->plugin.error_notifications, &g->plugin.shared_data.error_notifications}) {
+        for (auto& error : err_notifications->items) {
+            if (error.TryRetain()) {
+                error.Release();
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 GuiFrameResult GuiUpdate(Gui* g) {
     ZoneScoped;
     ASSERT(IsMainThread(g->plugin.host));
@@ -630,34 +705,9 @@ GuiFrameResult GuiUpdate(Gui* g) {
     if (!PRODUCTION_BUILD && !NullTermStringsEqual(g->plugin.host.name, k_floe_standalone_host_name))
         DoStandaloneErrorGUI(g);
 
-    bool show_error_popup = false;
-    for (auto& err_notifications :
-         Array {&g->plugin.error_notifications, &g->plugin.shared_data.error_notifications}) {
-        for (auto& error : err_notifications->items) {
-            if (error.TryRetain()) {
-                error.Release();
-                show_error_popup = true;
-                break;
-            }
-        }
-    }
+    if (HasAnyErrorNotifications(g)) OpenModalIfNotAlready(imgui, ModalWindowType::LoadError);
 
-    if (show_error_popup && !imgui.IsPopupOpen(GetStandaloneID(StandaloneWindows::LoadError))) {
-        imgui.ClosePopupToLevel(0);
-        imgui.OpenPopup(GetStandaloneID(StandaloneWindows::LoadError));
-    }
-
-    if (IsAnyStandloneOpen(imgui)) DoOverlayClickableBackground(g);
-
-    DoErrorsStandalone(g);
-    DoMetricsStandalone(g);
-    DoAboutStandalone(g);
-    DoLicencesStandalone(g);
-    DoInstrumentInfoStandalone(g);
-    DoSettingsStandalone(g);
-    DoInstallWizardStandalone(g);
-
-    DoLoadingOverlay(g);
+    DoModalWindows(g);
 
     DoWholeEditor(g);
     imgui.End(g->scratch_arena);

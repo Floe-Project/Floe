@@ -32,14 +32,14 @@ imgui::WindowSettings PopupWindowSettings(imgui::Context const& imgui) {
     return res;
 }
 
-imgui::WindowSettings StandalonePopupSettings(imgui::Context const& imgui) {
+imgui::WindowSettings ModalWindowSettings(imgui::Context const& imgui) {
     auto res = PopupWindowSettings(imgui);
     res.draw_routine_window_background = res.draw_routine_popup_background;
     res.flags = 0;
-    res.pad_top_left = {LiveSize(imgui, UiSizeId::StandaloneWindowPadL),
-                        LiveSize(imgui, UiSizeId::StandaloneWindowPadT)};
-    res.pad_bottom_right = {LiveSize(imgui, UiSizeId::StandaloneWindowPadR),
-                            LiveSize(imgui, UiSizeId::StandaloneWindowPadB)};
+    res.pad_top_left = {LiveSize(imgui, UiSizeId::ModalWindowPadL),
+                        LiveSize(imgui, UiSizeId::ModalWindowPadT)};
+    res.pad_bottom_right = {LiveSize(imgui, UiSizeId::ModalWindowPadR),
+                            LiveSize(imgui, UiSizeId::ModalWindowPadB)};
     return res;
 }
 

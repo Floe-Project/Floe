@@ -1,7 +1,7 @@
 // Copyright 2018-2024 Sam Windell
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "gui_standalone_popups.hpp"
+#include "gui_modal_windows.hpp"
 
 #include <IconsFontAwesome5.h>
 
@@ -29,6 +29,8 @@
 #include "settings/settings_filesystem.hpp"
 #include "settings/settings_gui.hpp"
 
+static imgui::Id IdForModal(ModalWindowType type) { return (imgui::Id)(ToInt(type) + 1000); }
+
 static void DoMultilineText(Gui* g, String text, f32& y_pos) {
     auto& imgui = g->imgui;
     auto font = imgui.graphics->context->CurrentFont();
@@ -40,17 +42,17 @@ static void DoMultilineText(Gui* g, String text, f32& y_pos) {
     // it's does skip rendering off-screen text.
     f32 const wrap_width = text.size < 10000 ? imgui.Width() : 0.0f;
 
-    auto size = draw::GetTextSize(font, text, wrap_width);
+    auto const size = draw::GetTextSize(font, text, wrap_width);
 
-    auto text_r = Rect {0, y_pos, size.x, size.y};
-    y_pos += size.y + line_height / 2;
-    imgui.RegisterAndConvertRect(&text_r);
+    auto const text_r = imgui.GetRegisteredAndConvertedRect({0, y_pos, size.x, size.y});
     imgui.graphics->AddText(font,
                             font->font_size_no_scale,
                             text_r.pos,
                             LiveCol(imgui, UiColMap::PopupItemText),
                             text,
                             wrap_width);
+
+    y_pos += size.y + line_height / 2;
 }
 
 static bool DoButton(Gui* g, String button_text, f32& y_pos, f32 x_offset) {
@@ -59,43 +61,26 @@ static bool DoButton(Gui* g, String button_text, f32& y_pos, f32 x_offset) {
     auto const rounding = LiveSize(g->imgui, UiSizeId::CornerRounding);
     auto const padding = line_height / 3;
 
-    bool result = false;
-
     auto const size = draw::GetTextSize(imgui.graphics->context->CurrentFont(), button_text, imgui.Width()) +
                       f32x2 {line_height, line_height / 2};
     auto const button_r = imgui.GetRegisteredAndConvertedRect({x_offset, y_pos, size.x, size.y});
     auto const id = imgui.GetID(button_text);
-    if (imgui.ButtonBehavior(button_r, id, {.left_mouse = true, .triggers_on_mouse_up = true})) result = true;
+
+    auto const result =
+        imgui.ButtonBehavior(button_r, id, {.left_mouse = true, .triggers_on_mouse_up = true});
+
     imgui.graphics->AddRectFilled(button_r,
-                                  !imgui.IsHot(id)
-                                      ? LiveCol(imgui, UiColMap::StandaloneWindowButtonBack)
-                                      : LiveCol(imgui, UiColMap::StandaloneWindowButtonBackHover),
+                                  !imgui.IsHot(id) ? LiveCol(imgui, UiColMap::ModalWindowButtonBack)
+                                                   : LiveCol(imgui, UiColMap::ModalWindowButtonBackHover),
                                   rounding);
-    imgui.graphics->AddRect(button_r, LiveCol(imgui, UiColMap::StandaloneWindowButtonOutline), rounding);
-    auto const text_r = button_r.ReducedHorizontally(padding);
-    imgui.graphics->AddTextJustified(text_r,
+    imgui.graphics->AddRect(button_r, LiveCol(imgui, UiColMap::ModalWindowButtonOutline), rounding);
+    imgui.graphics->AddTextJustified(button_r.ReducedHorizontally(padding),
                                      button_text,
-                                     LiveCol(imgui, UiColMap::StandaloneWindowButtonText),
+                                     LiveCol(imgui, UiColMap::ModalWindowButtonText),
                                      TextJustification::Centred);
 
     y_pos += line_height;
-
     return result;
-}
-
-imgui::Id GetStandaloneID(StandaloneWindows type) { return (imgui::Id)(ToInt(type) + 1000); }
-
-bool IsAnyStandloneOpen(imgui::Context& imgui) {
-    for (auto const i : Range(ToInt(StandaloneWindows::Count)))
-        if (imgui.IsPopupOpen(GetStandaloneID((StandaloneWindows)i))) return true;
-    return false;
-}
-
-void OpenStandalone(imgui::Context& imgui, StandaloneWindows type) {
-    if (!imgui.IsPopupOpen(GetStandaloneID(type))) {
-        imgui.ClosePopupToLevel(0);
-        imgui.OpenPopup(GetStandaloneID(type));
-    }
 }
 
 static void DoLabelLine(imgui::Context& imgui, f32& y_pos, String label, String value) {
@@ -112,22 +97,21 @@ static void DoLabelLine(imgui::Context& imgui, f32& y_pos, String label, String 
     y_pos += line_height;
 }
 
-static void StandalonePopupHeading(Gui* g,
-                                   f32& y_pos,
-                                   String str,
-                                   TextJustification justification = TextJustification::CentredLeft) {
+static void
+DoHeading(Gui* g, f32& y_pos, String str, TextJustification justification = TextJustification::CentredLeft) {
     auto& imgui = g->imgui;
-    auto error_window_title_h = LiveSize(imgui, UiSizeId::ErrorWindowTitleH);
-    auto error_window_title_gap_y = LiveSize(imgui, UiSizeId::ErrorWindowTitleGapY);
+    auto const window_title_h = LiveSize(imgui, UiSizeId::ModalWindowTitleH);
+    auto const window_title_gap_y = LiveSize(imgui, UiSizeId::ModalWindowTitleGapY);
 
     imgui.graphics->context->PushFont(g->mada);
-    auto const r = imgui.GetRegisteredAndConvertedRect({0, y_pos, imgui.Width(), error_window_title_h});
+    DEFER { imgui.graphics->context->PopFont(); };
+    auto const r = imgui.GetRegisteredAndConvertedRect({0, y_pos, imgui.Width(), window_title_h});
     g->imgui.graphics->AddTextJustified(r, str, LiveCol(imgui, UiColMap::PopupItemText), justification);
-    imgui.graphics->context->PopFont();
-    y_pos += error_window_title_h + error_window_title_gap_y;
+
+    y_pos += window_title_h + window_title_gap_y;
 }
 
-bool DoStandaloneCloseButton(Gui* g) {
+static bool DoWindowCloseButton(Gui* g) {
     if (DoCloseButtonForCurrentWindow(g,
                                       "Close this window",
                                       buttons::BrowserIconButton(g->imgui).WithLargeIcon())) {
@@ -137,86 +121,25 @@ bool DoStandaloneCloseButton(Gui* g) {
     return false;
 }
 
-void DoStandaloneErrorGUI(Gui* g) {
-    auto& plugin = g->plugin;
-
-    auto const host = plugin.host;
-    auto const floe_ext = (FloeClapExtensionHost const*)host.get_extension(&host, k_floe_clap_extension_id);
-    if (!floe_ext) return;
-
-    g->frame_input.graphics_ctx->PushFont(g->roboto_small);
-    DEFER { g->frame_input.graphics_ctx->PopFont(); };
-    auto& imgui = g->imgui;
-    auto platform = &g->frame_input;
-    static bool error_window_open = true;
-
-    bool const there_is_an_error =
-        floe_ext->standalone_midi_device_error || floe_ext->standalone_audio_device_error;
-    if (error_window_open && there_is_an_error) {
-        auto settings = imgui::DefWindow();
-        settings.flags |= imgui::WindowFlags_AutoHeight | imgui::WindowFlags_AutoWidth;
-        imgui.BeginWindow(settings, {0, 0, 200, 0}, "StandaloneErrors");
-        f32 y_pos = 0;
-        if (floe_ext->standalone_midi_device_error) {
-            imgui.Text(imgui::DefText(), {0, y_pos, 100, 20}, "No MIDI input");
-            y_pos += 20;
-        }
-        if (floe_ext->standalone_audio_device_error) {
-            imgui.Text(imgui::DefText(), {0, y_pos, 100, 20}, "No audio devices");
-            y_pos += 20;
-        }
-        if (imgui.Button(imgui::DefButton(), {0, y_pos, 100, 20}, imgui.GetID("closeErr"), "Close"))
-            error_window_open = false;
-        imgui.EndWindow();
-    }
-    if (floe_ext->standalone_midi_device_error) {
-        imgui.frame_output.wants_keyboard_input = true;
-        if (platform->Key(ModifierKey::Shift).is_down) {
-            auto gen_midi_message = [&](bool on, u7 key) {
-                if (on)
-                    plugin.processor.events_for_audio_thread.Push(
-                        GuiNoteClicked({.key = key, .velocity = 0.7f}));
-                else
-                    plugin.processor.events_for_audio_thread.Push(GuiNoteClickReleased({.key = key}));
-            };
-
-            struct Key {
-                KeyCode key;
-                u7 midi_key;
-            };
-            static Key const keys[] = {
-                {KeyCode::LeftArrow, 60},
-                {KeyCode::RightArrow, 63},
-                {KeyCode::UpArrow, 80},
-                {KeyCode::DownArrow, 45},
-            };
-
-            for (auto& i : keys) {
-                if (platform->Key(i.key).presses.size) gen_midi_message(true, i.midi_key);
-                if (platform->Key(i.key).releases.size) gen_midi_message(false, i.midi_key);
-            }
-        }
-    }
+static Rect ModalRect(imgui::Context const& imgui, UiSizeId width_id, UiSizeId height_id) {
+    auto const size = f32x2 {LiveSize(imgui, width_id), LiveSize(imgui, height_id)};
+    Rect r;
+    r.pos = imgui.frame_input.window_size.ToFloat2() / 2 - size / 2; // centre
+    r.size = size;
+    return r;
 }
 
-void DoErrorsStandalone(Gui* g) {
+static void DoErrorsModal(Gui* g) {
     g->frame_input.graphics_ctx->PushFont(g->roboto_small);
     DEFER { g->frame_input.graphics_ctx->PopFont(); };
     auto& imgui = g->imgui;
-    auto popup_w = LiveSize(imgui, UiSizeId::ErrorWindowWidth);
-    auto popup_h = LiveSize(imgui, UiSizeId::ErrorWindowHeight);
 
-    auto settings = StandalonePopupSettings(g->imgui);
-
-    Rect r;
-    r.x = (f32)(int)((f32)g->frame_input.window_size.width / 2 - popup_w / 2);
-    r.y = (f32)(int)((f32)g->frame_input.window_size.height / 2 - popup_h / 2);
-    r.w = popup_w;
-    r.h = popup_h;
+    auto const r = ModalRect(imgui, UiSizeId::ErrorWindowWidth, UiSizeId::ErrorWindowHeight);
+    auto const settings = ModalWindowSettings(g->imgui);
 
     auto font = imgui.graphics->context->CurrentFont();
 
-    if (imgui.BeginWindowPopup(settings, GetStandaloneID(StandaloneWindows::LoadError), r, "ErrorModal")) {
+    if (imgui.BeginWindowPopup(settings, IdForModal(ModalWindowType::LoadError), r, "ErrorModal")) {
         f32 y_pos = 0;
         auto text_style = labels::ErrorWindowLabel(imgui);
 
@@ -224,7 +147,7 @@ void DoErrorsStandalone(Gui* g) {
         auto const error_window_divider_spacing_y = LiveSize(imgui, UiSizeId::ErrorWindowDividerSpacingY);
 
         // title
-        StandalonePopupHeading(g, y_pos, "Errors");
+        DoHeading(g, y_pos, "Errors");
 
         // new error list
         int num_errors = 0;
@@ -305,26 +228,20 @@ void DoErrorsStandalone(Gui* g) {
     }
 }
 
-void DoMetricsStandalone(Gui* g) {
+static void DoMetricsModal(Gui* g) {
     auto a = &g->plugin;
     g->frame_input.graphics_ctx->PushFont(g->roboto_small);
     DEFER { g->frame_input.graphics_ctx->PopFont(); };
     auto& imgui = g->imgui;
-    auto popup_w = LiveSize(imgui, UiSizeId::MetricsWindowWidth);
-    auto popup_h = LiveSize(imgui, UiSizeId::MetricsWindowHeight);
 
-    auto settings = StandalonePopupSettings(g->imgui);
+    auto const r = ModalRect(imgui, UiSizeId::MetricsWindowWidth, UiSizeId::MetricsWindowHeight);
+    auto const settings = ModalWindowSettings(g->imgui);
 
-    Rect r;
-    r.x = (f32)(int)((f32)g->frame_input.window_size.width / 2 - popup_w / 2);
-    r.y = (f32)(int)((f32)g->frame_input.window_size.height / 2 - popup_h / 2);
-    r.w = popup_w;
-    r.h = popup_h;
-
-    if (imgui.BeginWindowPopup(settings, GetStandaloneID(StandaloneWindows::Metrics), r, "MetricsModal")) {
-        DoStandaloneCloseButton(g);
+    if (imgui.BeginWindowPopup(settings, IdForModal(ModalWindowType::Metrics), r, "MetricsModal")) {
+        DEFER { imgui.EndWindow(); };
+        DoWindowCloseButton(g);
         f32 y_pos = 0;
-        StandalonePopupHeading(g, y_pos, "Metrics");
+        DoHeading(g, y_pos, "Metrics");
 
         auto& sample_library_server = g->plugin.shared_data.sample_library_server;
         DoLabelLine(imgui,
@@ -357,30 +274,22 @@ void DoMetricsStandalone(Gui* g) {
                     fmt::Format(g->scratch_arena,
                                 "{}",
                                 sample_library_server.num_samples_loaded.Load(LoadMemoryOrder::Relaxed)));
-
-        imgui.EndWindow();
     }
 }
 
-void DoAboutStandalone(Gui* g) {
+static void DoAboutModal(Gui* g) {
     g->frame_input.graphics_ctx->PushFont(g->roboto_small);
     DEFER { g->frame_input.graphics_ctx->PopFont(); };
     auto& imgui = g->imgui;
-    auto popup_w = LiveSize(imgui, UiSizeId::AboutWindowWidth);
-    auto popup_h = LiveSize(imgui, UiSizeId::AboutWindowHeight);
 
-    auto settings = StandalonePopupSettings(g->imgui);
+    auto const r = ModalRect(imgui, UiSizeId::AboutWindowWidth, UiSizeId::AboutWindowHeight);
+    auto const settings = ModalWindowSettings(g->imgui);
 
-    Rect r;
-    r.x = (f32)(int)((f32)g->frame_input.window_size.width / 2 - popup_w / 2);
-    r.y = (f32)(int)((f32)g->frame_input.window_size.height / 2 - popup_h / 2);
-    r.w = popup_w;
-    r.h = popup_h;
-
-    if (imgui.BeginWindowPopup(settings, GetStandaloneID(StandaloneWindows::About), r, "AboutModal")) {
-        DoStandaloneCloseButton(g);
+    if (imgui.BeginWindowPopup(settings, IdForModal(ModalWindowType::About), r, "AboutModal")) {
+        DEFER { imgui.EndWindow(); };
+        DoWindowCloseButton(g);
         f32 y_pos = 0;
-        StandalonePopupHeading(g, y_pos, "About");
+        DoHeading(g, y_pos, "About");
 
         DoLabelLine(imgui, y_pos, "Name:", PRODUCT_NAME);
 
@@ -397,26 +306,16 @@ void DoAboutStandalone(Gui* g) {
                     y_pos,
                     "Compiled Date:",
                     fmt::Format(g->scratch_arena, "{}, {}", __DATE__, __TIME__));
-
-        imgui.EndWindow();
     }
 }
 
-void DoLoadingOverlay(Gui* g) {
+static void DoLoadingOverlay(Gui* g) {
     g->frame_input.graphics_ctx->PushFont(g->roboto_small);
     DEFER { g->frame_input.graphics_ctx->PopFont(); };
     auto& imgui = g->imgui;
 
-    auto popup_w = LiveSize(imgui, UiSizeId::LoadingOverlayBoxWidth);
-    auto popup_h = LiveSize(imgui, UiSizeId::LoadingOverlayBoxHeight);
-
-    auto settings = StandalonePopupSettings(g->imgui);
-
-    Rect r;
-    r.x = (f32)(int)((f32)g->frame_input.window_size.width / 2 - popup_w / 2);
-    r.y = (f32)(int)((f32)g->frame_input.window_size.height / 2 - popup_h / 2);
-    r.w = popup_w;
-    r.h = popup_h;
+    auto const r = ModalRect(imgui, UiSizeId::LoadingOverlayBoxWidth, UiSizeId::LoadingOverlayBoxHeight);
+    auto const settings = ModalWindowSettings(g->imgui);
 
     if (g->plugin.pending_state_change ||
         FetchOrRescanPresetsFolder(g->plugin.shared_data.preset_listing,
@@ -425,58 +324,44 @@ void DoLoadingOverlay(Gui* g) {
                                    nullptr)
             .is_loading) {
         imgui.BeginWindow(settings, r, "LoadingModal");
+        DEFER { imgui.EndWindow(); };
+
         f32 y_pos = 0;
-        StandalonePopupHeading(g, y_pos, "Loading...", TextJustification::Centred);
-        imgui.EndWindow();
+        DoHeading(g, y_pos, "Loading...", TextJustification::Centred);
     }
 }
 
-void DoInstrumentInfoStandalone(Gui* g) {
+static void DoInstrumentInfoModal(Gui* g) {
     g->frame_input.graphics_ctx->PushFont(g->roboto_small);
     DEFER { g->frame_input.graphics_ctx->PopFont(); };
     auto& imgui = g->imgui;
-    auto popup_w = LiveSize(imgui, UiSizeId::InfoWindowWidth);
-    auto popup_h = LiveSize(imgui, UiSizeId::InfoWindowHeight);
 
-    auto settings = StandalonePopupSettings(g->imgui);
+    auto const r = ModalRect(imgui, UiSizeId::InfoWindowWidth, UiSizeId::InfoWindowHeight);
+    auto const settings = ModalWindowSettings(g->imgui);
 
-    Rect r;
-    r.x = (f32)(int)((f32)g->frame_input.window_size.width / 2 - popup_w / 2);
-    r.y = (f32)(int)((f32)g->frame_input.window_size.height / 2 - popup_h / 2);
-    r.w = popup_w;
-    r.h = popup_h;
-
-    if (imgui.BeginWindowPopup(settings, GetStandaloneID(StandaloneWindows::InstInfo), r, "InstInfo")) {
-        DoStandaloneCloseButton(g);
+    if (imgui.BeginWindowPopup(settings, IdForModal(ModalWindowType::InstInfo), r, "InstInfo")) {
+        DEFER { imgui.EndWindow(); };
+        DoWindowCloseButton(g);
         f32 y_pos = 0;
 
-        StandalonePopupHeading(g, y_pos, fmt::Format(g->scratch_arena, "{} - Info", g->inst_info_title));
+        DoHeading(g, y_pos, fmt::Format(g->scratch_arena, "{} - Info", g->inst_info_title));
         for (auto& i : g->inst_info)
             DoLabelLine(imgui, y_pos, i.title, i.info);
-
-        imgui.EndWindow();
     }
 }
 
-void DoInstallWizardStandalone(Gui* g) {
+static void DoInstallWizardModal(Gui* g) {
     g->frame_input.graphics_ctx->PushFont(g->roboto_small);
     DEFER { g->frame_input.graphics_ctx->PopFont(); };
     auto& imgui = g->imgui;
-    auto popup_w = LiveSize(imgui, UiSizeId::SettingsWindowWidth);
-    auto popup_h = LiveSize(imgui, UiSizeId::SettingsWindowHeight);
-    auto settings = StandalonePopupSettings(g->imgui);
+    auto const settings = ModalWindowSettings(g->imgui);
+    auto const r = ModalRect(imgui, UiSizeId::InstallWizardWindowWidth, UiSizeId::InstallWizardWindowHeight);
 
-    Rect r;
-    r.x = (f32)(int)((f32)g->frame_input.window_size.width / 2 - popup_w / 2);
-    r.y = (f32)(int)((f32)g->frame_input.window_size.height / 2 - popup_h / 2);
-    r.w = popup_w;
-    r.h = popup_h;
-
-    if (imgui.BeginWindowPopup(settings, GetStandaloneID(StandaloneWindows::InstallWizard), r, "Install")) {
+    if (imgui.BeginWindowPopup(settings, IdForModal(ModalWindowType::InstallWizard), r, "Install")) {
         DEFER { imgui.EndWindow(); };
         f32 y_pos = 0;
-        StandalonePopupHeading(g, y_pos, "Install Libraries");
-        DoStandaloneCloseButton(g);
+        DoHeading(g, y_pos, "Install Libraries");
+        DoWindowCloseButton(g);
 
         DoMultilineText(
             g,
@@ -486,26 +371,18 @@ void DoInstallWizardStandalone(Gui* g) {
     }
 }
 
-void DoSettingsStandalone(Gui* g) {
+static void DoSettingsModal(Gui* g) {
     g->frame_input.graphics_ctx->PushFont(g->roboto_small);
     DEFER { g->frame_input.graphics_ctx->PopFont(); };
     auto& imgui = g->imgui;
-    auto popup_w = LiveSize(imgui, UiSizeId::SettingsWindowWidth);
-    auto popup_h = LiveSize(imgui, UiSizeId::SettingsWindowHeight);
+    auto const r = ModalRect(imgui, UiSizeId::SettingsWindowWidth, UiSizeId::SettingsWindowHeight);
+    auto const settings = ModalWindowSettings(g->imgui);
 
-    auto settings = StandalonePopupSettings(g->imgui);
-
-    Rect r;
-    r.x = (f32)(int)((f32)g->frame_input.window_size.width / 2 - popup_w / 2);
-    r.y = (f32)(int)((f32)g->frame_input.window_size.height / 2 - popup_h / 2);
-    r.w = popup_w;
-    r.h = popup_h;
-
-    if (imgui.BeginWindowPopup(settings, GetStandaloneID(StandaloneWindows::Settings), r, "Settings")) {
+    if (imgui.BeginWindowPopup(settings, IdForModal(ModalWindowType::Settings), r, "Settings")) {
         DEFER { imgui.EndWindow(); };
         f32 y_pos = 0;
-        StandalonePopupHeading(g, y_pos, "Settings");
-        DoStandaloneCloseButton(g);
+        DoHeading(g, y_pos, "Settings");
+        DoWindowCloseButton(g);
 
         auto subwindow_settings =
             FloeWindowSettings(imgui, [](imgui::Context const& imgui, imgui::Window* w) {
@@ -738,29 +615,21 @@ void DoSettingsStandalone(Gui* g) {
     }
 }
 
-void DoLicencesStandalone(Gui* g) {
+static void DoLicencesModal(Gui* g) {
 #include "third_party_licence_text.hpp"
     static bool open[ArraySize(k_third_party_licence_texts)];
 
     g->frame_input.graphics_ctx->PushFont(g->roboto_small);
     DEFER { g->frame_input.graphics_ctx->PopFont(); };
     auto& imgui = g->imgui;
-    auto popup_w = LiveSize(imgui, UiSizeId::LicencesWindowWidth);
-    auto popup_h = LiveSize(imgui, UiSizeId::LicencesWindowHeight);
+    auto const r = ModalRect(imgui, UiSizeId::LicencesWindowWidth, UiSizeId::LicencesWindowHeight);
+    auto const settings = ModalWindowSettings(g->imgui);
 
-    auto settings = StandalonePopupSettings(g->imgui);
-
-    Rect r;
-    r.x = (f32)(int)((f32)g->frame_input.window_size.width / 2 - popup_w / 2);
-    r.y = (f32)(int)((f32)g->frame_input.window_size.height / 2 - popup_h / 2);
-    r.w = popup_w;
-    r.h = popup_h;
-
-    if (imgui.BeginWindowPopup(settings, GetStandaloneID(StandaloneWindows::Licences), r, "LicencesModal")) {
-        DoStandaloneCloseButton(g);
-        auto h = LiveSize(imgui, UiSizeId::MenuItemHeight);
+    if (imgui.BeginWindowPopup(settings, IdForModal(ModalWindowType::Licences), r, "LicencesModal")) {
+        DoWindowCloseButton(g);
+        auto const h = LiveSize(imgui, UiSizeId::MenuItemHeight);
         f32 y_pos = 0;
-        StandalonePopupHeading(g, y_pos, "Licences");
+        DoHeading(g, y_pos, "Licences");
 
         DoMultilineText(
             g,
@@ -793,4 +662,31 @@ void DoLicencesStandalone(Gui* g) {
 
         imgui.EndWindow();
     }
+}
+
+static bool AnyModalOpen(imgui::Context& imgui) {
+    for (auto const i : Range(ToInt(ModalWindowType::Count)))
+        if (imgui.IsPopupOpen(IdForModal((ModalWindowType)i))) return true;
+    return false;
+}
+
+// ===============================================================================================================
+
+void OpenModalIfNotAlready(imgui::Context& imgui, ModalWindowType type) {
+    if (!imgui.IsPopupOpen(IdForModal(type))) {
+        imgui.ClosePopupToLevel(0);
+        imgui.OpenPopup(IdForModal(type));
+    }
+}
+
+void DoModalWindows(Gui* g) {
+    if (AnyModalOpen(g->imgui)) DoOverlayClickableBackground(g);
+    DoErrorsModal(g);
+    DoMetricsModal(g);
+    DoAboutModal(g);
+    DoLoadingOverlay(g);
+    DoInstrumentInfoModal(g);
+    DoInstallWizardModal(g);
+    DoSettingsModal(g);
+    DoLicencesModal(g);
 }

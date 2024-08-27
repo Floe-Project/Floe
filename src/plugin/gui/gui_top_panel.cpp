@@ -5,8 +5,8 @@
 
 #include "gui_button_widgets.hpp"
 #include "gui_menu.hpp"
+#include "gui_modal_windows.hpp"
 #include "gui_peak_meter_widget.hpp"
-#include "gui_standalone_popups.hpp"
 #include "gui_widget_compounds.hpp"
 #include "gui_widget_helpers.hpp"
 #include "plugin_instance.hpp"
@@ -39,18 +39,9 @@ static void DoSettingsMenuItems(Gui* g) {
     if (top_menu.DoSubMenuButton("Information", g->imgui.GetID("about"))) {
         String const longest_string_in_submenu = "Licences";
         PopupMenuItems submenu(g, {&longest_string_in_submenu, 1});
-        if (submenu.DoButton("About")) {
-            g->imgui.ClosePopupToLevel(0);
-            g->imgui.OpenPopup(GetStandaloneID(StandaloneWindows::About));
-        }
-        if (submenu.DoButton("Metrics")) {
-            g->imgui.ClosePopupToLevel(0);
-            g->imgui.OpenPopup(GetStandaloneID(StandaloneWindows::Metrics));
-        }
-        if (submenu.DoButton("Licences")) {
-            g->imgui.ClosePopupToLevel(0);
-            g->imgui.OpenPopup(GetStandaloneID(StandaloneWindows::Licences));
-        }
+        if (submenu.DoButton("About")) OpenModalIfNotAlready(g->imgui, ModalWindowType::About);
+        if (submenu.DoButton("Metrics")) OpenModalIfNotAlready(g->imgui, ModalWindowType::Metrics);
+        if (submenu.DoButton("Licences")) OpenModalIfNotAlready(g->imgui, ModalWindowType::Licences);
         g->imgui.EndWindow();
     }
 }
@@ -298,7 +289,7 @@ void TopPanel(Gui* g) {
         auto btn_id = imgui.GetID("install");
         auto btn_r = lay.GetRect(box);
         if (buttons::Button(g, btn_id, btn_r, ICON_FA_BOX_OPEN, large_icon_button_style))
-            OpenStandalone(imgui, StandaloneWindows::InstallWizard);
+            OpenModalIfNotAlready(imgui, ModalWindowType::InstallWizard);
         Tooltip(g, btn_id, btn_r, "Install libraries"_s);
     }
 
@@ -306,7 +297,7 @@ void TopPanel(Gui* g) {
         auto btn_id = imgui.GetID("sets");
         auto btn_r = lay.GetRect(cog);
         if (buttons::Button(g, btn_id, btn_r, ICON_FA_COG, large_icon_button_style))
-            OpenStandalone(imgui, StandaloneWindows::Settings);
+            OpenModalIfNotAlready(imgui, ModalWindowType::Settings);
         Tooltip(g, btn_id, btn_r, "Open settings window"_s);
     }
 

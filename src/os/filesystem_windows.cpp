@@ -718,27 +718,27 @@ ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments args) {
     }
 
     auto utf8_path_from_shell_item = [&](IShellItem* p_item) -> ErrorCodeOr<MutableString> {
-            PWSTR wide_path = nullptr;
-            FP_HRESULT_TRY(p_item->GetDisplayName(SIGDN_FILESYSPATH, &wide_path));
-            DEFER { CoTaskMemFree(wide_path); };
+        PWSTR wide_path = nullptr;
+        FP_HRESULT_TRY(p_item->GetDisplayName(SIGDN_FILESYSPATH, &wide_path));
+        DEFER { CoTaskMemFree(wide_path); };
 
-            auto narrow_path = Narrow(args.allocator, FromNullTerminated(wide_path)).Value();
-            ASSERT(!path::IsPathSeparator(Last(narrow_path)));
-            ASSERT(path::IsAbsolute(narrow_path));
-            return narrow_path;
+        auto narrow_path = Narrow(args.allocator, FromNullTerminated(wide_path)).Value();
+        ASSERT(!path::IsPathSeparator(Last(narrow_path)));
+        ASSERT(path::IsAbsolute(narrow_path));
+        return narrow_path;
     };
 
     if (!multiple_selection) {
-    IShellItem* p_item = nullptr;
-    FP_HRESULT_TRY(f->GetResult(&p_item));
-    DEFER { p_item->Release(); };
+        IShellItem* p_item = nullptr;
+        FP_HRESULT_TRY(f->GetResult(&p_item));
+        DEFER { p_item->Release(); };
 
-    auto span = args.allocator.AllocateExactSizeUninitialised<MutableString>(1);
-    span[0] = TRY(utf8_path_from_shell_item(p_item));
-    return span;
+        auto span = args.allocator.AllocateExactSizeUninitialised<MutableString>(1);
+        span[0] = TRY(utf8_path_from_shell_item(p_item));
+        return span;
     } else {
         IShellItemArray* p_items = nullptr;
-        FP_HRESULT_TRY(((IFileOpenDialog *)f)->GetResults(&p_items));
+        FP_HRESULT_TRY(((IFileOpenDialog*)f)->GetResults(&p_items));
         DEFER { p_items->Release(); };
 
         DWORD count;

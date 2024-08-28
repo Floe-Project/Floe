@@ -69,21 +69,28 @@ struct DoButtonArgs {
     f32 width;
     String tooltip;
     bool greyed_out;
+    String icon;
 };
 
 static bool DoButton(Gui* g, String button_text, DoButtonArgs args) {
     auto& imgui = g->imgui;
     auto const line_height = imgui.graphics->context->CurrentFontSize();
     auto const rounding = LiveSize(g->imgui, UiSizeId::CornerRounding);
-    auto const padding = line_height / 3;
+    auto const icon_size = line_height;
 
     f32 y_pos = args.incrementing_y ? args.incrementing_y->y : args.y.ValueOr(0);
 
-    auto size = draw::GetTextSize(imgui.graphics->context->CurrentFont(), button_text, imgui.Width()) +
-                f32x2 {line_height, line_height / 2};
-    if (!args.auto_width) size.x = args.width;
+    f32 width = args.width;
+    if (args.auto_width) {
+        auto const text_width =
+            draw::GetTextSize(imgui.graphics->context->CurrentFont(), button_text, imgui.Width()).x;
+        width = text_width + line_height;
+    }
+    if (args.icon.size) width += icon_size;
 
-    auto const button_r = imgui.GetRegisteredAndConvertedRect({args.x_offset, y_pos, size.x, size.y});
+    auto height = line_height * 1.5f;
+
+    auto button_r = imgui.GetRegisteredAndConvertedRect({args.x_offset, y_pos, width, height});
     auto const id = imgui.GetID(button_text);
 
     bool result = false;
@@ -99,16 +106,29 @@ static bool DoButton(Gui* g, String button_text, DoButtonArgs args) {
     if (!args.greyed_out)
         imgui.graphics->AddRect(button_r, LiveCol(imgui, UiColMap::ModalWindowButtonOutline), rounding);
 
+    if (args.icon.size) {
+        imgui.graphics->context->PushFont(g->icons);
+        DEFER { imgui.graphics->context->PopFont(); };
+
+        auto const icon_r = rect_cut::CutLeft(button_r, icon_size);
+        imgui.graphics->AddTextJustified(icon_r,
+                                         args.icon,
+                                         LiveCol(imgui,
+                                                 args.greyed_out ? UiColMap::ModalWindowButtonTextInactive
+                                                                 : UiColMap::ModalWindowButtonText),
+                                         TextJustification::Centred);
+    }
+
     imgui.graphics->AddTextJustified(
-        button_r.ReducedHorizontally(padding),
+        button_r,
         button_text,
         LiveCol(imgui,
                 args.greyed_out ? UiColMap::ModalWindowButtonTextInactive : UiColMap::ModalWindowButtonText),
         TextJustification::Centred);
 
-    if (args.tooltip.size) Tooltip(g, id, button_r, args.tooltip);
+    if (args.tooltip.size) Tooltip(g, id, button_r, args.tooltip, true);
 
-    if (args.incrementing_y) args.incrementing_y->y += size.y;
+    if (args.incrementing_y) args.incrementing_y->y += height;
     return result;
 }
 
@@ -519,13 +539,21 @@ static void DoInstallWizardModal(Gui* g) {
             imgui.BeginWindow(subwindow_settings, main_panel_rect, "inner");
             DEFER { imgui.EndWindow(); };
 
-            f32 y_pos = 0;
+            f32 y_pos = 1; // avoid clipping glitch
 
-            DoMultilineText(
-                g,
-                "Extract and install Floe Packages.\n- Packages are zip files that end with \"floe.zip\".\n- They can contain both libraries and presets.",
-                y_pos);
-            if (DoButton(g, "Choose Files", y_pos, 0)) g->OpenDialog(DialogType::InstallPackage);
+            // DoMultilineText(
+            //     g,
+            //     "Extract and install Floe Packages.\n- Packages are zip files that end with
+            //     \"floe.zip\".\n- They can contain both libraries and presets.", y_pos);
+            if (DoButton(g,
+                         "Choose zip packages",
+                         {
+                             .incrementing_y = IncrementingY {y_pos},
+                             .auto_width = true,
+                             .tooltip = "Select Floe packages to extract and install",
+                             .icon = ICON_FA_FOLDER_OPEN,
+                         }))
+                g->OpenDialog(DialogType::InstallPackage);
             if (g->install_wizard_state.selected_package_paths.Empty())
                 DoTextLine(g, "No packages selected", y_pos, UiColMap::InstallerWizardInactiveText);
             else {

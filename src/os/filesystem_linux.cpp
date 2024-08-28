@@ -22,25 +22,25 @@
 
 #include "filesystem.hpp"
 
-ErrorCodeOr<Optional<MutableString>> FilesystemDialog(DialogOptions options) {
+ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments args) {
     DynamicArrayInline<char, 3000> command {};
     dyn::AppendSpan(command, "zenity --file-selection "_s);
-    fmt::Append(command, "--title=\"{}\" ", options.title);
-    if (options.default_path) fmt::Append(command, "--filename=\"{}\" ", *options.default_path);
-    for (auto f : options.filters)
+    fmt::Append(command, "--title=\"{}\" ", args.title);
+    if (args.default_path) fmt::Append(command, "--filename=\"{}\" ", *args.default_path);
+    for (auto f : args.filters)
         fmt::Append(command, "--file-filter=\"{}|{}\" ", f.description, f.wildcard_filter);
 
-    if (options.allow_multiple_selection) dyn::AppendSpan(command, "--multiple "_s);
+    if (args.allow_multiple_selection) dyn::AppendSpan(command, "--multiple "_s);
 
-    switch (options.type) {
-        case DialogOptions::Type::SelectFolder: {
+    switch (args.type) {
+        case DialogArguments::Type::SelectFolder: {
             dyn::AppendSpan(command, "--directory "_s);
             break;
         }
-        case DialogOptions::Type::OpenFile: {
+        case DialogArguments::Type::OpenFile: {
             break;
         }
-        case DialogOptions::Type::SaveFile: {
+        case DialogArguments::Type::SaveFile: {
             dyn::AppendSpan(command, "--save "_s);
             break;
         }
@@ -51,13 +51,21 @@ ErrorCodeOr<Optional<MutableString>> FilesystemDialog(DialogOptions options) {
         char filename[4000];
         auto _ = fgets(filename, ArraySize(filename), f);
         pclose(f);
-        auto result = WhitespaceStripped(FromNullTerminated(filename));
-        if (path::IsAbsolute(result, path::Format::Posix)) return result.Clone(options.allocator);
+
+        auto const output = FromNullTerminated(filename);
+
+        DynamicArray<MutableString> result {args.allocator};
+        Optional<usize> cursor {0uz};
+        while (cursor) {
+            auto const part = WhitespaceStripped(SplitWithIterator(output, cursor, '\n'));
+            if (path::IsAbsolute(part)) dyn::Append(result, result.allocator.Clone(part));
+        }
+        return result.ToOwnedSpan();
     } else {
         return FilesystemErrnoErrorCode(errno);
     }
 
-    return nullopt;
+    return Span<MutableString> {};
 }
 
 ErrorCodeOr<void> MoveFile(String from, String to, ExistingDestinationHandling existing) {

@@ -348,13 +348,13 @@ static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
         case DialogType::InstallPackage: {
             auto downloads_folder = KnownDirectory(g->scratch_arena, KnownDirectories::Downloads);
 
-            auto const opt_path = TRY(FilesystemDialog({
-                .type = DialogOptions::Type::OpenFile,
+            auto const paths = TRY(FilesystemDialog({
+                .type = DialogArguments::Type::OpenFile,
                 .allocator = g->scratch_arena,
                 .title = "Select Floe Package",
                 .default_path =
                     downloads_folder.HasValue() ? Optional<String>(downloads_folder.Value()) : nullopt,
-                .filters = ArrayT<DialogOptions::FileFilter>({
+                .filters = ArrayT<DialogArguments::FileFilter>({
                     {
                         .description = "Floe Package"_s,
                         .wildcard_filter = "*.floe.zip"_s,
@@ -362,9 +362,7 @@ static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
                 }),
                 .parent_window = g->frame_input.native_window,
             }));
-            if (opt_path) {
-                // TODO: Implement package installation
-            }
+            if (paths.size) InstallWizardSelectFilesDialogResults(g, paths);
             break;
         }
         case DialogType::AddNewLibraryScanFolder: {
@@ -373,16 +371,16 @@ static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
                 extra_paths.size)
                 default_folder = extra_paths[0];
 
-            auto const opt_path = TRY(FilesystemDialog({
-                .type = DialogOptions::Type::SelectFolder,
+            auto const paths = TRY(FilesystemDialog({
+                .type = DialogArguments::Type::SelectFolder,
                 .allocator = g->scratch_arena,
                 .title = "Select Floe Library Folder",
                 .default_path = default_folder,
                 .filters = {},
                 .parent_window = g->frame_input.native_window,
             }));
-            if (opt_path) {
-                auto const path = *opt_path;
+            if (paths.size) {
+                auto const path = paths[0];
                 filesystem_settings::AddScanFolder(g->settings, ScanFolderType::Libraries, path);
             }
             break;
@@ -393,16 +391,16 @@ static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
                 extra_paths.size)
                 default_folder = extra_paths[0];
 
-            auto const opt_path = TRY(FilesystemDialog({
-                .type = DialogOptions::Type::SelectFolder,
+            auto const paths = TRY(FilesystemDialog({
+                .type = DialogArguments::Type::SelectFolder,
                 .allocator = g->scratch_arena,
                 .title = "Select Floe Presets Folder",
                 .default_path = default_folder,
                 .filters = {},
                 .parent_window = g->frame_input.native_window,
             }));
-            if (opt_path) {
-                auto const path = *opt_path;
+            if (paths.size) {
+                auto const path = paths[0];
                 filesystem_settings::AddScanFolder(g->settings, ScanFolderType::Presets, path);
             }
             break;
@@ -418,31 +416,31 @@ static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
                                Array {preset_scan_folders[0], "untitled" FLOE_PRESET_FILE_EXTENSION});
             }
 
-            constexpr auto k_filters = ArrayT<DialogOptions::FileFilter>({{
+            constexpr auto k_filters = ArrayT<DialogArguments::FileFilter>({{
                 .description = "Floe Preset"_s,
                 .wildcard_filter = "*.floe-*"_s,
             }});
 
             if (type == DialogType::LoadPreset) {
-                auto const opt_path = TRY(FilesystemDialog({
-                    .type = DialogOptions::Type::OpenFile,
+                auto const paths = TRY(FilesystemDialog({
+                    .type = DialogArguments::Type::OpenFile,
                     .allocator = g->scratch_arena,
                     .title = "Load Floe Preset",
                     .default_path = default_path,
                     .filters = k_filters.Items(),
                     .parent_window = g->frame_input.native_window,
                 }));
-                if (opt_path) LoadPresetFromFile(g->plugin, *opt_path);
+                if (paths.size) LoadPresetFromFile(g->plugin, paths[0]);
             } else if (type == DialogType::SavePreset) {
-                auto const opt_path = TRY(FilesystemDialog({
-                    .type = DialogOptions::Type::SaveFile,
+                auto const paths = TRY(FilesystemDialog({
+                    .type = DialogArguments::Type::SaveFile,
                     .allocator = g->scratch_arena,
                     .title = "Save Floe Preset",
                     .default_path = default_path,
                     .filters = k_filters.Items(),
                     .parent_window = g->frame_input.native_window,
                 }));
-                if (opt_path) SaveCurrentStateToFile(g->plugin, *opt_path);
+                if (paths.size) SaveCurrentStateToFile(g->plugin, paths[0]);
             } else {
                 PanicIfReached();
             }
@@ -524,6 +522,8 @@ f32x2 GetMaxUVToMaintainAspectRatio(graphics::ImageID img, f32x2 container_size)
 }
 
 static void DoStandaloneErrorGUI(Gui* g) {
+    ASSERT(!PRODUCTION_BUILD);
+
     auto& plugin = g->plugin;
 
     auto const host = plugin.host;
@@ -542,6 +542,7 @@ static void DoStandaloneErrorGUI(Gui* g) {
         auto settings = imgui::DefWindow();
         settings.flags |= imgui::WindowFlags_AutoHeight | imgui::WindowFlags_AutoWidth;
         imgui.BeginWindow(settings, {0, 0, 200, 0}, "StandaloneErrors");
+        DEFER { imgui.EndWindow(); };
         f32 y_pos = 0;
         if (floe_ext->standalone_midi_device_error) {
             imgui.Text(imgui::DefText(), {0, y_pos, 100, 20}, "No MIDI input");
@@ -553,7 +554,6 @@ static void DoStandaloneErrorGUI(Gui* g) {
         }
         if (imgui.Button(imgui::DefButton(), {0, y_pos, 100, 20}, imgui.GetID("closeErr"), "Close"))
             error_window_open = false;
-        imgui.EndWindow();
     }
     if (floe_ext->standalone_midi_device_error) {
         imgui.frame_output.wants_keyboard_input = true;
@@ -588,12 +588,8 @@ static void DoStandaloneErrorGUI(Gui* g) {
 static bool HasAnyErrorNotifications(Gui* g) {
     for (auto& err_notifications :
          Array {&g->plugin.error_notifications, &g->plugin.shared_data.error_notifications}) {
-        for (auto& error : err_notifications->items) {
-            if (error.TryRetain()) {
-                error.Release();
-                return true;
-            }
-        }
+        for (auto& error : err_notifications->items)
+            if (error.TryScoped()) return true;
     }
     return false;
 }
@@ -702,7 +698,7 @@ GuiFrameResult GuiUpdate(Gui* g) {
         imgui.EndWindow();
     }
 
-    if (!PRODUCTION_BUILD && !NullTermStringsEqual(g->plugin.host.name, k_floe_standalone_host_name))
+    if (!PRODUCTION_BUILD && NullTermStringsEqual(g->plugin.host.name, k_floe_standalone_host_name))
         DoStandaloneErrorGUI(g);
 
     if (HasAnyErrorNotifications(g)) OpenModalIfNotAlready(imgui, ModalWindowType::LoadError);

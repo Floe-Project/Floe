@@ -203,7 +203,7 @@ ErrorCodeOr<MutableString> CurrentExecutablePath(Allocator& a);
 
 Optional<String> SearchForExistingFolderUpwards(String dir, String folder_name_to_find, Allocator& allocator);
 
-struct DialogOptions {
+struct DialogArguments {
     enum class Type { SaveFile, OpenFile, SelectFolder };
     struct FileFilter {
         String description;
@@ -219,7 +219,7 @@ struct DialogOptions {
     void* parent_window;
 };
 
-ErrorCodeOr<Optional<MutableString>> FilesystemDialog(DialogOptions options);
+ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments args);
 
 ErrorCodeOr<Span<MutableString>>
 GetFilesRecursive(ArenaAllocator& a, String directory, String wildcard = "*");

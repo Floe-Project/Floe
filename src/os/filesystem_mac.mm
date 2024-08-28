@@ -306,7 +306,7 @@ Optional<Version> MacosBundleVersion(String path) {
 }
 
 @interface DialogDelegate : NSObject <NSOpenSavePanelDelegate>
-@property Span<DialogOptions::FileFilter const> filters; // NOLINT
+@property Span<DialogArguments::FileFilter const> filters; // NOLINT
 @end
 
 @implementation DialogDelegate
@@ -327,11 +327,12 @@ Optional<Version> MacosBundleVersion(String path) {
 }
 @end
 
-ErrorCodeOr<Optional<MutableString>> FilesystemDialog(DialogOptions options) {
+ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments options) {
     auto delegate = [[DialogDelegate alloc] init];
     delegate.filters = options.filters;
     switch (options.type) {
-        case DialogOptions::Type::SelectFolder: {
+        case DialogArguments::Type::OpenFile:
+        case DialogArguments::Type::SelectFolder: {
             NSOpenPanel* open_panel = [NSOpenPanel openPanel];
             open_panel.delegate = delegate;
 
@@ -339,8 +340,8 @@ ErrorCodeOr<Optional<MutableString>> FilesystemDialog(DialogOptions options) {
             [open_panel setLevel:NSModalPanelWindowLevel];
             open_panel.showsResizeIndicator = YES;
             open_panel.showsHiddenFiles = NO;
-            open_panel.canChooseDirectories = YES;
-            open_panel.canChooseFiles = NO;
+            open_panel.canChooseDirectories = options.type == DialogArguments::Type::SelectFolder;
+            open_panel.canChooseFiles = options.type == DialogArguments::Type::OpenFile;
             open_panel.canCreateDirectories = YES;
             open_panel.allowsMultipleSelection = options.allow_multiple_selection;
             if (options.default_path)
@@ -348,35 +349,20 @@ ErrorCodeOr<Optional<MutableString>> FilesystemDialog(DialogOptions options) {
 
             auto const response = [open_panel runModal];
             if (response == NSModalResponseOK) {
-                NSURL* selection = open_panel.URLs[0];
-                NSString* path = [[selection path] stringByResolvingSymlinksInPath];
-                auto utf8 = FromNullTerminated(path.UTF8String);
-                if (path::IsAbsolute(utf8)) return utf8.Clone(options.allocator);
+                auto result =
+                    options.allocator.AllocateExactSizeUninitialised<MutableString>(open_panel.URLs.count);
+                for (NSUInteger i = 0; i < open_panel.URLs.count; i++) {
+                    NSURL* selection = open_panel.URLs[i];
+                    NSString* path = [[selection path] stringByResolvingSymlinksInPath];
+                    auto utf8 = FromNullTerminated(path.UTF8String);
+                    ASSERT(path::IsAbsolute(utf8));
+                    result[i] = utf8.Clone(options.allocator);
+                }
+                return result;
             }
-            return nullopt;
+            break;
         }
-        case DialogOptions::Type::OpenFile: {
-#if 0
-    NSOpenPanel *panel = [NSOpenPanel openPanel];
-    panel.title = StringViewToNSString(title);
-    panel.directoryURL =
-        [NSURL fileURLWithPath:StringViewToNSString(Legacy::Directory(default_path_and_file))
-                   isDirectory:YES];
-    panel.canChooseFiles = YES;
-    panel.canChooseDirectories = NO;
-    panel.allowsMultipleSelection = NO;
-
-    [panel setLevel:NSModalPanelWindowLevel];
-    [panel beginWithCompletionHandler:^(NSModalResponse result) {
-      if (result == NSModalResponseOK) {
-          callback_function(std::string([[[[panel URLs] objectAtIndex:0] path] UTF8String]));
-      }
-    }];
-#endif
-            TODO(); // TODO(1.0)
-            return nullopt;
-        }
-        case DialogOptions::Type::SaveFile: {
+        case DialogArguments::Type::SaveFile: {
             NSSavePanel* panel = [NSSavePanel savePanel];
             panel.title = StringToNSString(options.title);
             [panel setLevel:NSModalPanelWindowLevel];
@@ -388,13 +374,17 @@ ErrorCodeOr<Optional<MutableString>> FilesystemDialog(DialogOptions options) {
             auto const response = [panel runModal];
             if (response == NSModalResponseOK) {
                 auto const path = NSStringToString([[panel URL] path]);
-                if (path::IsAbsolute(path)) return path.Clone(options.allocator);
+                if (path::IsAbsolute(path)) {
+                    auto result = options.allocator.AllocateExactSizeUninitialised<MutableString>(1);
+                    result[0] = path.Clone(options.allocator);
+                    return result;
+                }
             }
-            return nullopt;
+            break;
         }
     }
 
-    return nullopt;
+    return Span<MutableString> {};
 }
 
 // NOTE: It seems you can receive filesystem events from before you start watching the directory even if you

@@ -289,7 +289,7 @@ void TopPanel(Gui* g) {
         auto btn_id = imgui.GetID("install");
         auto btn_r = lay.GetRect(box);
         if (buttons::Button(g, btn_id, btn_r, ICON_FA_BOX_OPEN, large_icon_button_style))
-            OpenModalIfNotAlready(imgui, ModalWindowType::InstallWizard);
+            OpenInstallWizard(g);
         Tooltip(g, btn_id, btn_r, "Install libraries"_s);
     }
 

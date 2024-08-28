@@ -16,6 +16,8 @@ constexpr String k_libraries_subdir = "Libraries";
 constexpr String k_presets_subdir = "Presets";
 constexpr String k_file_extension = ".floe.zip"_s;
 
+PUBLIC bool IsPathPackageFile(String path) { return EndsWithSpan(path, k_file_extension); }
+
 PUBLIC mz_zip_archive WriterCreate() {
     mz_zip_archive zip;
     mz_zip_zero_struct(&zip);

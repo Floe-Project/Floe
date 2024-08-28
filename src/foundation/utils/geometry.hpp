@@ -210,4 +210,18 @@ PUBLIC inline Rect CutLeft(Rect& r, f32 left_width) {
     return result;
 }
 
+PUBLIC inline Rect CutBottom(Rect& r, f32 bottom_height) {
+    auto const new_height = r.h - bottom_height;
+    Rect const result {r.x, r.y + new_height, r.w, bottom_height};
+    r.h = new_height;
+    return result;
+}
+
+PUBLIC inline Rect CutTop(Rect& r, f32 top_height) {
+    Rect const result {r.x, r.y, r.w, top_height};
+    r.y += top_height;
+    r.h -= top_height;
+    return result;
+}
+
 } // namespace rect_cut

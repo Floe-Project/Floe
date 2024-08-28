@@ -626,7 +626,7 @@ DirectoryIterator::~DirectoryIterator() {
         return FilesystemWin32ErrorCode(HresultToWin32(hr), #windows_call);                                  \
     }
 
-ErrorCodeOr<Optional<MutableString>> FilesystemDialog(DialogOptions options) {
+ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments args) {
     auto const com_library_usage = TRY(ScopedWin32ComUsage::Create());
 
     auto const ids = ({
@@ -635,14 +635,14 @@ ErrorCodeOr<Optional<MutableString>> FilesystemDialog(DialogOptions options) {
             IID riid;
         };
         Ids i;
-        switch (options.type) {
-            case DialogOptions::Type::SaveFile: {
+        switch (args.type) {
+            case DialogArguments::Type::SaveFile: {
                 i.rclsid = CLSID_FileSaveDialog;
                 i.riid = IID_IFileSaveDialog;
                 break;
             }
-            case DialogOptions::Type::OpenFile:
-            case DialogOptions::Type::SelectFolder: {
+            case DialogArguments::Type::OpenFile:
+            case DialogArguments::Type::SelectFolder: {
                 i.rclsid = CLSID_FileOpenDialog;
                 i.riid = IID_IFileOpenDialog;
                 break;
@@ -655,10 +655,10 @@ ErrorCodeOr<Optional<MutableString>> FilesystemDialog(DialogOptions options) {
     FP_HRESULT_TRY(CoCreateInstance(ids.rclsid, nullptr, CLSCTX_ALL, ids.riid, reinterpret_cast<void**>(&f)));
     DEFER { f->Release(); };
 
-    if (options.default_path) {
+    if (args.default_path) {
         PathArena temp_path_arena;
 
-        if (auto const narrow_dir = path::Directory(*options.default_path)) {
+        if (auto const narrow_dir = path::Directory(*args.default_path)) {
             auto dir = WidenAllocNullTerm(temp_path_arena, *narrow_dir).Value();
             Replace(dir, L'/', L'\\');
             IShellItem* item = nullptr;
@@ -672,17 +672,17 @@ ErrorCodeOr<Optional<MutableString>> FilesystemDialog(DialogOptions options) {
                 f->SetDefaultFolder(item);
         }
 
-        if (options.type == DialogOptions::Type::SaveFile) {
-            auto filename = path::Filename(*options.default_path);
+        if (args.type == DialogArguments::Type::SaveFile) {
+            auto filename = path::Filename(*args.default_path);
             f->SetFileName(WidenAllocNullTerm(temp_path_arena, filename).Value().data);
         }
     }
 
-    if (options.filters.size) {
+    if (args.filters.size) {
         PathArena temp_path_arena;
         DynamicArray<COMDLG_FILTERSPEC> win32_filters {temp_path_arena};
-        win32_filters.Reserve(options.filters.size);
-        for (auto filter : options.filters) {
+        win32_filters.Reserve(args.filters.size);
+        for (auto filter : args.filters) {
             dyn::Append(
                 win32_filters,
                 COMDLG_FILTERSPEC {
@@ -695,39 +695,64 @@ ErrorCodeOr<Optional<MutableString>> FilesystemDialog(DialogOptions options) {
 
     {
         PathArena temp_path_arena;
-        auto wide_title = WidenAllocNullTerm(temp_path_arena, options.title).Value();
+        auto wide_title = WidenAllocNullTerm(temp_path_arena, args.title).Value();
         FP_HRESULT_TRY(f->SetTitle(wide_title.data));
     }
 
-    if (options.type == DialogOptions::Type::SelectFolder) {
+    if (args.type == DialogArguments::Type::SelectFolder) {
         DWORD flags = 0;
         FP_HRESULT_TRY(f->GetOptions(&flags));
         FP_HRESULT_TRY(f->SetOptions(flags | FOS_PICKFOLDERS));
     }
 
-    if (options.allow_multiple_selection) {
+    auto const multiple_selection = ids.rclsid == CLSID_FileOpenDialog && args.allow_multiple_selection;
+    if (multiple_selection) {
         DWORD flags = 0;
         FP_HRESULT_TRY(f->GetOptions(&flags));
         FP_HRESULT_TRY(f->SetOptions(flags | FOS_ALLOWMULTISELECT));
     }
 
-    if (auto hr = f->Show((HWND)options.parent_window); hr != S_OK) {
-        if (hr == HRESULT_FROM_WIN32(ERROR_CANCELLED)) return nullopt;
+    if (auto hr = f->Show((HWND)args.parent_window); hr != S_OK) {
+        if (hr == HRESULT_FROM_WIN32(ERROR_CANCELLED)) return Span<MutableString> {};
         return FilesystemWin32ErrorCode(HresultToWin32(hr), "Show()");
     }
 
+    auto utf8_path_from_shell_item = [&](IShellItem* p_item) -> ErrorCodeOr<MutableString> {
+            PWSTR wide_path = nullptr;
+            FP_HRESULT_TRY(p_item->GetDisplayName(SIGDN_FILESYSPATH, &wide_path));
+            DEFER { CoTaskMemFree(wide_path); };
+
+            auto narrow_path = Narrow(args.allocator, FromNullTerminated(wide_path)).Value();
+            ASSERT(!path::IsPathSeparator(Last(narrow_path)));
+            ASSERT(path::IsAbsolute(narrow_path));
+            return narrow_path;
+    };
+
+    if (!multiple_selection) {
     IShellItem* p_item = nullptr;
     FP_HRESULT_TRY(f->GetResult(&p_item));
     DEFER { p_item->Release(); };
 
-    PWSTR wide_path = nullptr;
-    FP_HRESULT_TRY(p_item->GetDisplayName(SIGDN_FILESYSPATH, &wide_path));
-    DEFER { CoTaskMemFree(wide_path); };
+    auto span = args.allocator.AllocateExactSizeUninitialised<MutableString>(1);
+    span[0] = TRY(utf8_path_from_shell_item(p_item));
+    return span;
+    } else {
+        IShellItemArray* p_items = nullptr;
+        FP_HRESULT_TRY(((IFileOpenDialog *)f)->GetResults(&p_items));
+        DEFER { p_items->Release(); };
 
-    auto result = Narrow(options.allocator, FromNullTerminated(wide_path)).Value();
-    ASSERT(!path::IsPathSeparator(Last(result)));
-    ASSERT(path::IsAbsolute(result));
-    return result;
+        DWORD count;
+        FP_HRESULT_TRY(p_items->GetCount(&count));
+        auto result = args.allocator.AllocateExactSizeUninitialised<MutableString>(CheckedCast<usize>(count));
+        for (auto const item_index : Range(count)) {
+            IShellItem* p_item = nullptr;
+            FP_HRESULT_TRY(p_items->GetItemAt(item_index, &p_item));
+            DEFER { p_item->Release(); };
+
+            result[item_index] = TRY(utf8_path_from_shell_item(p_item));
+        }
+        return result;
+    }
 }
 
 // Directory watcher

@@ -6,6 +6,7 @@
 
 #include "framework/draw_list.hpp"
 #include "framework/gui_imgui.hpp"
+#include "gui/gui_modal_windows.hpp"
 #include "gui_editor_widgets.hpp"
 #include "gui_envelope.hpp"
 #include "gui_layer.hpp"
@@ -139,6 +140,8 @@ struct Gui {
     bool show_purchasable_libraries = false;
     bool show_news = false;
     u64 m_window_size_listener_id {};
+
+    InstallWizardState install_wizard_state {};
 
     GuiFrameInput& frame_input;
     GuiFrameResult frame_output;

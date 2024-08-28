@@ -8,7 +8,9 @@
 #include "foundation/foundation.hpp"
 #include "os/misc.hpp"
 
+#include "common_infrastructure/common_errors.hpp"
 #include "common_infrastructure/constants.hpp"
+#include "common_infrastructure/package_format.hpp"
 #include "common_infrastructure/paths.hpp"
 
 #include "framework/gui_frame.hpp"
@@ -31,7 +33,7 @@
 
 static imgui::Id IdForModal(ModalWindowType type) { return (imgui::Id)(ToInt(type) + 1000); }
 
-static void DoMultilineText(Gui* g, String text, f32& y_pos) {
+static void DoMultilineText(Gui* g, String text, f32& y_pos, f32 x_offset = 0) {
     auto& imgui = g->imgui;
     auto font = imgui.graphics->context->CurrentFont();
     auto const line_height = imgui.graphics->context->CurrentFontSize();
@@ -40,11 +42,11 @@ static void DoMultilineText(Gui* g, String text, f32& y_pos) {
     // the text. This is necessary because our text rendering system is bad at doing huge amounts of
     // word-wrapping. It still renders text that isn't visible unless there's no word-wrapping, in which case
     // it's does skip rendering off-screen text.
-    f32 const wrap_width = text.size < 10000 ? imgui.Width() : 0.0f;
+    f32 const wrap_width = text.size < 10000 ? Max(imgui.Width() - x_offset, 0.0f) : 0.0f;
 
     auto const size = draw::GetTextSize(font, text, wrap_width);
 
-    auto const text_r = imgui.GetRegisteredAndConvertedRect({0, y_pos, size.x, size.y});
+    auto const text_r = imgui.GetRegisteredAndConvertedRect({x_offset, y_pos, size.x, size.y});
     imgui.graphics->AddText(font,
                             font->font_size_no_scale,
                             text_r.pos,
@@ -55,32 +57,69 @@ static void DoMultilineText(Gui* g, String text, f32& y_pos) {
     y_pos += size.y + line_height / 2;
 }
 
-static bool DoButton(Gui* g, String button_text, f32& y_pos, f32 x_offset) {
+struct IncrementingY {
+    f32& y;
+};
+
+struct DoButtonArgs {
+    Optional<IncrementingY> incrementing_y;
+    Optional<f32> y;
+    f32 x_offset;
+    bool auto_width;
+    f32 width;
+    String tooltip;
+    bool greyed_out;
+};
+
+static bool DoButton(Gui* g, String button_text, DoButtonArgs args) {
     auto& imgui = g->imgui;
     auto const line_height = imgui.graphics->context->CurrentFontSize();
     auto const rounding = LiveSize(g->imgui, UiSizeId::CornerRounding);
     auto const padding = line_height / 3;
 
-    auto const size = draw::GetTextSize(imgui.graphics->context->CurrentFont(), button_text, imgui.Width()) +
-                      f32x2 {line_height, line_height / 2};
-    auto const button_r = imgui.GetRegisteredAndConvertedRect({x_offset, y_pos, size.x, size.y});
+    f32 y_pos = args.incrementing_y ? args.incrementing_y->y : args.y.ValueOr(0);
+
+    auto size = draw::GetTextSize(imgui.graphics->context->CurrentFont(), button_text, imgui.Width()) +
+                f32x2 {line_height, line_height / 2};
+    if (!args.auto_width) size.x = args.width;
+
+    auto const button_r = imgui.GetRegisteredAndConvertedRect({args.x_offset, y_pos, size.x, size.y});
     auto const id = imgui.GetID(button_text);
 
-    auto const result =
-        imgui.ButtonBehavior(button_r, id, {.left_mouse = true, .triggers_on_mouse_up = true});
+    bool result = false;
+    if (!args.greyed_out)
+        result = imgui.ButtonBehavior(button_r, id, {.left_mouse = true, .triggers_on_mouse_up = true});
 
-    imgui.graphics->AddRectFilled(button_r,
-                                  !imgui.IsHot(id) ? LiveCol(imgui, UiColMap::ModalWindowButtonBack)
-                                                   : LiveCol(imgui, UiColMap::ModalWindowButtonBackHover),
-                                  rounding);
-    imgui.graphics->AddRect(button_r, LiveCol(imgui, UiColMap::ModalWindowButtonOutline), rounding);
-    imgui.graphics->AddTextJustified(button_r.ReducedHorizontally(padding),
-                                     button_text,
-                                     LiveCol(imgui, UiColMap::ModalWindowButtonText),
-                                     TextJustification::Centred);
+    imgui.graphics->AddRectFilled(
+        button_r,
+        LiveCol(imgui,
+                !imgui.IsHot(id) ? UiColMap::ModalWindowButtonBack : UiColMap::ModalWindowButtonBackHover),
+        rounding);
 
-    y_pos += line_height;
+    if (!args.greyed_out)
+        imgui.graphics->AddRect(button_r, LiveCol(imgui, UiColMap::ModalWindowButtonOutline), rounding);
+
+    imgui.graphics->AddTextJustified(
+        button_r.ReducedHorizontally(padding),
+        button_text,
+        LiveCol(imgui,
+                args.greyed_out ? UiColMap::ModalWindowButtonTextInactive : UiColMap::ModalWindowButtonText),
+        TextJustification::Centred);
+
+    if (args.tooltip.size) Tooltip(g, id, button_r, args.tooltip);
+
+    if (args.incrementing_y) args.incrementing_y->y += size.y;
     return result;
+}
+
+static bool DoButton(Gui* g, String button_text, f32& y_pos, f32 x_offset) {
+    return DoButton(g,
+                    button_text,
+                    {
+                        .incrementing_y = IncrementingY {y_pos},
+                        .x_offset = x_offset,
+                        .auto_width = true,
+                    });
 }
 
 static void DoLabelLine(imgui::Context& imgui, f32& y_pos, String label, String value) {
@@ -140,6 +179,8 @@ static void DoErrorsModal(Gui* g) {
     auto font = imgui.graphics->context->CurrentFont();
 
     if (imgui.BeginWindowPopup(settings, IdForModal(ModalWindowType::LoadError), r, "ErrorModal")) {
+        DEFER { imgui.EndWindow(); };
+
         f32 y_pos = 0;
         auto text_style = labels::ErrorWindowLabel(imgui);
 
@@ -223,8 +264,6 @@ static void DoErrorsModal(Gui* g) {
         imgui.GetRegisteredAndConvertedRect({0, y_pos, 1, imgui.graphics->context->CurrentFontSize()});
 
         if (!num_errors) imgui.ClosePopupToLevel(0);
-
-        imgui.EndWindow();
     }
 }
 
@@ -239,6 +278,7 @@ static void DoMetricsModal(Gui* g) {
 
     if (imgui.BeginWindowPopup(settings, IdForModal(ModalWindowType::Metrics), r, "MetricsModal")) {
         DEFER { imgui.EndWindow(); };
+
         DoWindowCloseButton(g);
         f32 y_pos = 0;
         DoHeading(g, y_pos, "Metrics");
@@ -293,15 +333,11 @@ static void DoAboutModal(Gui* g) {
 
         DoLabelLine(imgui, y_pos, "Name:", PRODUCT_NAME);
 
-#if PRODUCTION_BUILD
-        char const* release_mode = "";
-#else
-        char const* release_mode = " Debug";
-#endif
-        DoLabelLine(imgui,
-                    y_pos,
-                    "Version:",
-                    fmt::Format(g->scratch_arena, "{}{}", FLOE_VERSION_STRING, release_mode));
+        DoLabelLine(
+            imgui,
+            y_pos,
+            "Version:",
+            fmt::Format(g->scratch_arena, "{}{}", FLOE_VERSION_STRING, PRODUCTION_BUILD ? "" : " Debug"));
         DoLabelLine(imgui,
                     y_pos,
                     "Compiled Date:",
@@ -350,6 +386,14 @@ static void DoInstrumentInfoModal(Gui* g) {
     }
 }
 
+static void DoTextLine(Gui* g, String text, f32& y_pos, UiColMap col_map) {
+    auto& imgui = g->imgui;
+    auto const line_height = imgui.graphics->context->CurrentFontSize();
+    auto const text_r = imgui.GetRegisteredAndConvertedRect({0, y_pos, imgui.Width(), line_height});
+    imgui.graphics->AddTextJustified(text_r, text, LiveCol(imgui, col_map), TextJustification::CentredLeft);
+    y_pos += line_height;
+}
+
 static void DoInstallWizardModal(Gui* g) {
     g->frame_input.graphics_ctx->PushFont(g->roboto_small);
     DEFER { g->frame_input.graphics_ctx->PopFont(); };
@@ -359,15 +403,137 @@ static void DoInstallWizardModal(Gui* g) {
 
     if (imgui.BeginWindowPopup(settings, IdForModal(ModalWindowType::InstallWizard), r, "Install")) {
         DEFER { imgui.EndWindow(); };
-        f32 y_pos = 0;
-        DoHeading(g, y_pos, "Install Libraries");
+        f32 main_y_pos = 0;
+        DoHeading(g, main_y_pos, "Install Floe Packages");
         DoWindowCloseButton(g);
 
-        DoMultilineText(
-            g,
-            "Floe can extract and install sample library packages.\nThese are ZIP files that end with \"floe.zip.\"",
-            y_pos);
-        if (DoButton(g, "Choose Files", y_pos, 0)) g->OpenDialog(DialogType::InstallPackage);
+        auto const line_height = imgui.graphics->context->CurrentFontSize();
+
+        main_y_pos += line_height * 0.75f;
+
+        Rect rect {0.0f, imgui.Size()};
+        rect_cut::CutTop(rect, main_y_pos);
+
+        // bottom navigation buttons
+        {
+            auto const nav_button_spacing = LiveSize(imgui, UiSizeId::InstallWizardWindowNavButtonSpacing);
+            auto const nav_button_width = LiveSize(imgui, UiSizeId::InstallWizardWindowNavButtonWidth);
+            auto const nav_button_height = LiveSize(imgui, UiSizeId::InstallWizardWindowNavButtonHeight);
+
+            Rect nav_bar = rect_cut::CutBottom(rect, nav_button_height);
+            rect_cut::CutBottom(nav_bar, nav_button_spacing);
+            rect_cut::CutTop(nav_bar, nav_button_spacing);
+            rect_cut::CutRight(nav_bar, 1); // fix clipping glitch
+
+            auto const next_button_r = rect_cut::CutRight(nav_bar, nav_button_width);
+            rect_cut::CutRight(nav_bar, nav_button_spacing);
+            auto const prev_button_r = rect_cut::CutRight(nav_bar, nav_button_width);
+            rect_cut::CutRight(nav_bar, nav_button_spacing);
+            auto const help_button_r = rect_cut::CutRight(nav_bar, nav_button_width);
+
+            if (DoButton(g,
+                         "Help",
+                         {
+                             .y = help_button_r.y,
+                             .x_offset = help_button_r.x,
+                             .width = nav_button_width,
+                             .tooltip = "Open installation instructions in your web browser",
+                         })) {
+                OpenUrlInBrowser(FLOE_INSTALLATION_INSTRUCTIONS_URL);
+            }
+            if (DoButton(g,
+                         "Go Back",
+                         {
+                             .y = prev_button_r.y,
+                             .x_offset = prev_button_r.x,
+                             .width = nav_button_width,
+                             .tooltip = "Go back to the previous page",
+                             .greyed_out = ToInt(g->install_wizard_state.page) == 0,
+                         })) {
+                auto const page_index = ToInt(g->install_wizard_state.page);
+                if (page_index != 0) g->install_wizard_state.page = (InstallWizardPage)(page_index - 1);
+            }
+            if (DoButton(g,
+                         "Continue",
+                         {
+                             .y = next_button_r.y,
+                             .x_offset = next_button_r.x,
+                             .width = nav_button_width,
+                             .tooltip = "Go to the next page",
+                             .greyed_out =
+                                 ToInt(g->install_wizard_state.page) == ToInt(InstallWizardPage::Count) - 1,
+                         })) {
+                auto const page_index = ToInt(g->install_wizard_state.page);
+                if (page_index != ToInt(InstallWizardPage::Count) - 1)
+                    g->install_wizard_state.page = (InstallWizardPage)(page_index + 1);
+            }
+        }
+
+        // left sidebar
+        {
+            auto const left_sidebar_rect = rect_cut::CutLeft(rect, line_height * 10);
+
+            f32 y_pos = left_sidebar_rect.y;
+
+            for (auto const page_index : Range(ToInt(InstallWizardPage::Count))) {
+                auto const page = (InstallWizardPage)page_index;
+                auto const page_name = [&]() -> DynamicArrayInline<char, 24> {
+                    String name {};
+                    switch (page) {
+                        case InstallWizardPage::Introduction: name = "Introduction"; break;
+                        case InstallWizardPage::SelectPackages: name = "Select Packages"; break;
+                        case InstallWizardPage::SelectDestination: name = "Select Destination"; break;
+                        case InstallWizardPage::Install: name = "Install"; break;
+                        case InstallWizardPage::Summary: name = "Summary"; break;
+                        case InstallWizardPage::Count: break;
+                    }
+                    DynamicArrayInline<char, 24> result {};
+                    if (page == g->install_wizard_state.page) dyn::AppendSpan(result, "> ");
+                    dyn::AppendSpan(result, name);
+                    return result;
+                }();
+
+                DoTextLine(g,
+                           page_name,
+                           y_pos,
+                           page_index <= ToInt(g->install_wizard_state.page)
+                               ? UiColMap::PopupItemText
+                               : UiColMap::InstallerWizardInactiveText);
+            }
+        }
+
+        // main panel
+        {
+            auto const main_panel_rect = rect;
+
+            auto subwindow_settings =
+                FloeWindowSettings(imgui, [](imgui::Context const& imgui, imgui::Window* w) {
+                    imgui.graphics->AddRectFilled(w->unpadded_bounds.Min(),
+                                                  w->unpadded_bounds.Max(),
+                                                  LiveCol(imgui, UiColMap::InstallerWizardRightBoxBackground),
+                                                  LiveSize(imgui, UiSizeId::CornerRounding));
+                });
+            subwindow_settings.draw_routine_scrollbar = settings.draw_routine_scrollbar;
+            subwindow_settings.pad_bottom_right = line_height / 2;
+            subwindow_settings.pad_top_left = line_height / 2;
+            imgui.BeginWindow(subwindow_settings, main_panel_rect, "inner");
+            DEFER { imgui.EndWindow(); };
+
+            f32 y_pos = 0;
+
+            DoMultilineText(
+                g,
+                "Extract and install Floe Packages.\n- Packages are zip files that end with \"floe.zip\".\n- They can contain both libraries and presets.",
+                y_pos);
+            if (DoButton(g, "Choose Files", y_pos, 0)) g->OpenDialog(DialogType::InstallPackage);
+            if (g->install_wizard_state.selected_package_paths.Empty())
+                DoTextLine(g, "No packages selected", y_pos, UiColMap::InstallerWizardInactiveText);
+            else {
+                DoTextLine(g, "Selected packages:", y_pos, UiColMap::PopupItemText);
+                for (auto const path : g->install_wizard_state.selected_package_paths)
+                    DoTextLine(g, path, y_pos, UiColMap::PopupItemText);
+            }
+        }
     }
 }
 
@@ -689,4 +855,29 @@ void DoModalWindows(Gui* g) {
     DoInstallWizardModal(g);
     DoSettingsModal(g);
     DoLicencesModal(g);
+}
+
+void OpenInstallWizard(Gui* g) {
+    g->install_wizard_state.page = {};
+    g->install_wizard_state.selected_package_paths.Clear();
+    g->install_wizard_state.arena.ResetCursorAndConsolidateRegions();
+    OpenModalIfNotAlready(g->imgui, ModalWindowType::InstallWizard);
+}
+
+void InstallWizardSelectFilesDialogResults(Gui* g, Span<MutableString> paths) {
+    for (auto const path : paths)
+        if (!package::IsPathPackageFile(path)) {
+            auto const err = g->plugin.error_notifications.NewError();
+            err->value = {
+                .title = "Not a Floe package"_s,
+                .message = String(fmt::Format(g->scratch_arena,
+                                              "'{}' is not a Floe package. Floe packages are zip files.",
+                                              path::Filename(path))),
+                .error_code = nullopt,
+                .id = ThreadsafeErrorNotifications::Id("pkg ", path),
+            };
+            g->plugin.error_notifications.AddOrUpdateError(err);
+        } else {
+            g->install_wizard_state.selected_package_paths.Prepend(g->install_wizard_state.arena.Clone(path));
+        }
 }

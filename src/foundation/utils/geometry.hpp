@@ -196,32 +196,37 @@ struct Line {
 // https://halt.software/dead-simple-layouts/
 namespace rect_cut {
 
-PUBLIC inline Rect CutRight(Rect& r, f32 right_width) {
-    auto const new_width = r.w - right_width;
-    Rect const result {r.x + new_width, r.y, right_width, r.h};
+PUBLIC inline Rect CutRight(Rect& r, f32 cut_size) {
+    auto const new_width = r.w - cut_size;
+    Rect const result {r.x + new_width, r.y, cut_size, r.h};
     r.w = new_width;
     return result;
 }
 
-PUBLIC inline Rect CutLeft(Rect& r, f32 left_width) {
-    Rect const result {r.x, r.y, left_width, r.h};
-    r.x += left_width;
-    r.w -= left_width;
+PUBLIC inline Rect CutLeft(Rect& r, f32 cut_size) {
+    Rect const result {r.x, r.y, cut_size, r.h};
+    r.x += cut_size;
+    r.w -= cut_size;
     return result;
 }
 
-PUBLIC inline Rect CutBottom(Rect& r, f32 bottom_height) {
-    auto const new_height = r.h - bottom_height;
-    Rect const result {r.x, r.y + new_height, r.w, bottom_height};
+PUBLIC inline Rect CutBottom(Rect& r, f32 cut_size) {
+    auto const new_height = r.h - cut_size;
+    Rect const result {r.x, r.y + new_height, r.w, cut_size};
     r.h = new_height;
     return result;
 }
 
-PUBLIC inline Rect CutTop(Rect& r, f32 top_height) {
-    Rect const result {r.x, r.y, r.w, top_height};
-    r.y += top_height;
-    r.h -= top_height;
+PUBLIC inline Rect CutTop(Rect& r, f32 cut_size) {
+    Rect const result {r.x, r.y, r.w, cut_size};
+    r.y += cut_size;
+    r.h -= cut_size;
     return result;
+}
+
+PUBLIC inline void CutLeftAndRight(Rect& r, f32 cut_size) {
+    CutLeft(r, cut_size);
+    CutRight(r, cut_size);
 }
 
 } // namespace rect_cut

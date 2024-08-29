@@ -141,7 +141,7 @@ struct Gui {
     bool show_news = false;
     u64 m_window_size_listener_id {};
 
-    InstallWizardState install_wizard_state {};
+    InstallPackagesData install_packages_state {};
 
     GuiFrameInput& frame_input;
     GuiFrameResult frame_output;

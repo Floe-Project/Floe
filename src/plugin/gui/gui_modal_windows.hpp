@@ -27,11 +27,16 @@ enum class InstallPackagesState {
     Count,
 };
 
-struct InstallWizardState {
+struct InstallPackagesData {
     InstallPackagesState state = {};
+
+    // main-thread if state != Installing, else worker-thread
     ArenaAllocator arena {PageAllocator::Instance()};
     ArenaList<String, false> selected_package_paths {arena};
+
+    Atomic<bool> installing_packages {}; 
 };
 
 void OpenInstallPackagesModal(Gui* g);
 void InstallPackagesSelectFilesDialogResults(Gui* g, Span<MutableString> paths);
+void ShutdownInstallPackagesModal(InstallPackagesData& state);

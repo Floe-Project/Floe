@@ -493,6 +493,7 @@ Gui::Gui(GuiFrameInput& frame_input, PluginInstance& plugin)
 }
 
 Gui::~Gui() {
+    ShutdownInstallPackagesModal(install_packages_state);
     sample_lib_server::CloseAsyncCommsChannel(plugin.shared_data.sample_library_server,
                                               sample_lib_server_async_channel);
     g_log_file.Trace(k_gui_log_module);

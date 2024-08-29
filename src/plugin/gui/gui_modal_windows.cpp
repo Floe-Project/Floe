@@ -462,6 +462,11 @@ static void DoInstallPackagesModal(Gui* g) {
     auto const r =
         ModalRect(imgui, UiSizeId::InstallPackagesWindowWidth, UiSizeId::InstallPackagesWindowHeight);
 
+    if (g->install_packages_state.state == InstallPackagesState::Installing &&
+        !g->install_packages_state.installing_packages.Load(LoadMemoryOrder::Relaxed)) {
+        g->install_packages_state.state = InstallPackagesState::Done;
+    }
+
     if (imgui.BeginWindowPopup(settings, IdForModal(ModalWindowType::InstallPackages), r, "install")) {
         DEFER { imgui.EndWindow(); };
         f32 main_y_pos = 0;
@@ -501,71 +506,124 @@ static void DoInstallPackagesModal(Gui* g) {
             f32 y_pos = 1; // avoid clipping glitch
 
             y_pos += line_height;
-            if (DoButton(g,
-                         "Choose Zip Files",
-                         {
-                             .incrementing_y = IncrementingY {y_pos},
-                             .centre_vertically = true,
-                             .auto_width = true,
-                             .tooltip = "Select Floe zip packages to extract and install",
-                             .icon = ICON_FA_FILE_ARCHIVE,
-                             .significant = true,
-                             .white_background = true,
-                             .big_font = true,
-                         }))
-                g->OpenDialog(DialogType::InstallPackage);
 
-            if (g->install_wizard_state.selected_package_paths.Empty())
-                DoTextLine(g,
-                           "No packages selected",
-                           y_pos,
-                           UiColMap::ModalWindowInsignificantText,
-                           {
-                               .justification = TextJustification::Centred,
-                               .font_scaling = 0.9f,
-                           });
-            else {
-                DynamicArray<char> text {g->scratch_arena};
-                dyn::Assign(text, "Selected packages: ");
-                for (auto const path : g->install_wizard_state.selected_package_paths) {
-                    dyn::AppendSpan(text, path::Filename(path).SubSpan(0, package::k_file_extension.size));
-                    dyn::AppendSpan(text, ", ");
+            switch (g->install_packages_state.state) {
+                case InstallPackagesState::SelectFiles: {
+                    if (DoButton(g,
+                                 "Choose Zip Files",
+                                 {
+                                     .incrementing_y = IncrementingY {y_pos},
+                                     .centre_vertically = true,
+                                     .auto_width = true,
+                                     .tooltip = "Select Floe zip packages to extract and install",
+                                     .icon = ICON_FA_FILE_ARCHIVE,
+                                     .significant = true,
+                                     .white_background = true,
+                                     .big_font = true,
+                                 }))
+                        g->OpenDialog(DialogType::InstallPackage);
+
+                    if (g->install_packages_state.selected_package_paths.Empty())
+                        DoTextLine(g,
+                                   "No packages selected",
+                                   y_pos,
+                                   UiColMap::ModalWindowInsignificantText,
+                                   {
+                                       .justification = TextJustification::Centred,
+                                       .font_scaling = 0.9f,
+                                   });
+                    else {
+                        DynamicArray<char> text {g->scratch_arena};
+                        dyn::Assign(text, "Selected packages: ");
+                        for (auto const path : g->install_packages_state.selected_package_paths) {
+                            auto const name =
+                                TrimEndIfMatches(path::Filename(path), package::k_file_extension);
+                            dyn::AppendSpan(text, name);
+                            dyn::AppendSpan(text, ", ");
+                        }
+                        dyn::Resize(text, text.size - 2);
+
+                        DoTextLine(g,
+                                   text,
+                                   y_pos,
+                                   UiColMap::PopupItemText,
+                                   {
+                                       .justification = TextJustification::Centred,
+                                       .font_scaling = 0.9f,
+                                   });
+                    }
+
+                    y_pos += line_height * 1.5f;
+
+                    if (DoButton(g,
+                                 "Install",
+                                 {
+                                     .incrementing_y = IncrementingY {y_pos},
+                                     .centre_vertically = true,
+                                     .auto_width = true,
+                                     .tooltip = "Select Floe zip packages to extract and install",
+                                     .greyed_out =
+                                         g->install_packages_state.selected_package_paths.Empty() ||
+                                         g->install_packages_state.state != InstallPackagesState::SelectFiles,
+                                     .icon = ICON_FA_ARROW_DOWN,
+                                     .white_background = true,
+                                     .big_font = true,
+                                 })) {
+                        g->install_packages_state.state = InstallPackagesState::Installing;
+                        g->install_packages_state.installing_packages.Store(true, StoreMemoryOrder::Relaxed);
+                        g->plugin.shared_data.thread_pool.AddJob(
+                            [&state = g->install_packages_state,
+                             &request_update = g->frame_input.request_update]() {
+                                SleepThisThread(5000);
+                                request_update.Store(true, StoreMemoryOrder::Release);
+                                state.installing_packages.Store(false, StoreMemoryOrder::Release);
+                            });
+                    }
+
+                    DoTextLine(g,
+                               "Installs to your Floe folders",
+                               y_pos,
+                               UiColMap::ModalWindowInsignificantText,
+                               {
+                                   .justification = TextJustification::Centred,
+                                   .font_scaling = 0.9f,
+                               });
+                    break;
                 }
-                if (text.size) dyn::Resize(text, text.size - 2);
-
-                DoTextLine(g,
-                           text,
-                           y_pos,
-                           UiColMap::PopupItemText,
-                           {
-                               .justification = TextJustification::Centred,
-                               .font_scaling = 0.9f,
-                           });
+                case InstallPackagesState::Installing: {
+                    DoTextLine(g,
+                               "Installing...",
+                               y_pos,
+                               UiColMap::PopupItemText,
+                               {TextJustification::Centred});
+                    break;
+                }
+                case InstallPackagesState::Done: {
+                    DoTextLine(g,
+                               "Successfully installed libraries and presets",
+                               y_pos,
+                               UiColMap::PopupItemText,
+                               {TextJustification::Centred});
+                    y_pos += line_height;
+                    if (DoButton(g,
+                                 "Install More",
+                                 {
+                                     .incrementing_y = IncrementingY {y_pos},
+                                     .centre_vertically = true,
+                                     .auto_width = true,
+                                     .tooltip = "Return to the package selection screen",
+                                     .white_background = true,
+                                 })) {
+                        g->install_packages_state.selected_package_paths.Clear();
+                        g->install_packages_state.arena.ResetCursorAndConsolidateRegions();
+                        g->install_packages_state.state = InstallPackagesState::SelectFiles;
+                        g->frame_output.ElevateUpdateRequest(
+                            GuiFrameResult::UpdateRequest::ImmediatelyUpdate);
+                    }
+                    break;
+                }
+                case InstallPackagesState::Count: PanicIfReached();
             }
-
-            y_pos += line_height * 1.5f;
-
-            DoButton(g,
-                     "Install",
-                     {
-                         .incrementing_y = IncrementingY {y_pos},
-                         .centre_vertically = true,
-                         .auto_width = true,
-                         .tooltip = "Select Floe zip packages to extract and install",
-                         .greyed_out = g->install_wizard_state.selected_package_paths.Empty(),
-                         .icon = ICON_FA_ARROW_DOWN,
-                         .white_background = true,
-                         .big_font = true,
-                     });
-
-            DoTextLine(g,
-                       "Installs to your Floe folders",
-                       y_pos,
-                       UiColMap::ModalWindowInsignificantText,
-                       {
-                           .justification = TextJustification::Centred,
-                           .font_scaling = 0.9f,
-                       });
         }
 
         // bottom panel
@@ -967,13 +1025,17 @@ void DoModalWindows(Gui* g) {
 }
 
 void OpenInstallPackagesModal(Gui* g) {
-    g->install_wizard_state.state = {};
-    g->install_wizard_state.selected_package_paths.Clear();
-    g->install_wizard_state.arena.ResetCursorAndConsolidateRegions();
+    if (g->install_packages_state.state != InstallPackagesState::Installing) {
+        g->install_packages_state.selected_package_paths.Clear();
+        g->install_packages_state.arena.ResetCursorAndConsolidateRegions();
+        g->install_packages_state.state = InstallPackagesState::SelectFiles;
+    }
     OpenModalIfNotAlready(g->imgui, ModalWindowType::InstallPackages);
 }
 
 void InstallPackagesSelectFilesDialogResults(Gui* g, Span<MutableString> paths) {
+    if (g->install_packages_state.state == InstallPackagesState::Installing) return;
+
     for (auto const path : paths)
         if (!package::IsPathPackageFile(path)) {
             auto const err = g->plugin.error_notifications.NewError();
@@ -987,6 +1049,12 @@ void InstallPackagesSelectFilesDialogResults(Gui* g, Span<MutableString> paths) 
             };
             g->plugin.error_notifications.AddOrUpdateError(err);
         } else {
-            g->install_wizard_state.selected_package_paths.Prepend(g->install_wizard_state.arena.Clone(path));
+            g->install_packages_state.selected_package_paths.Prepend(
+                g->install_packages_state.arena.Clone(path));
         }
+}
+
+void ShutdownInstallPackagesModal(InstallPackagesData& state) {
+    while (state.installing_packages.Load(LoadMemoryOrder::Acquire))
+        SleepThisThread(100u);
 }

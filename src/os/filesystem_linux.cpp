@@ -48,11 +48,12 @@ ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments args) {
 
     FILE* f = popen(dyn::NullTerminated(command), "r");
     if (f) {
-        char filename[4000];
-        auto _ = fgets(filename, ArraySize(filename), f);
+        char filenames[8000];
+        auto _ = fgets(filenames, ArraySize(filenames), f);
         pclose(f);
 
-        auto const output = FromNullTerminated(filename);
+        auto const output = FromNullTerminated(filenames);
+        g_log.Debug({}, "zenity output: {}", output);
 
         DynamicArray<MutableString> result {args.allocator};
         Optional<usize> cursor {0uz};

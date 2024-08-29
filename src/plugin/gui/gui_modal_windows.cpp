@@ -70,13 +70,23 @@ struct DoButtonArgs {
     String tooltip;
     bool greyed_out;
     String icon;
+    bool significant;
+    bool white_background;
+    bool big_font;
 };
 
 static bool DoButton(Gui* g, String button_text, DoButtonArgs args) {
     auto& imgui = g->imgui;
+
+    if (args.big_font) imgui.graphics->context->PushFont(g->mada);
+    DEFER {
+        if (args.big_font) imgui.graphics->context->PopFont();
+    };
+
     auto const line_height = imgui.graphics->context->CurrentFontSize();
     auto const rounding = LiveSize(g->imgui, UiSizeId::CornerRounding);
-    auto const icon_size = line_height * 0.8f;
+    auto const icon_scaling = 0.8f;
+    auto const icon_size = line_height * icon_scaling;
     auto const box_padding = line_height * 0.4f;
     auto const gap_between_icon_and_text = box_padding;
 
@@ -103,11 +113,17 @@ static bool DoButton(Gui* g, String button_text, DoButtonArgs args) {
     imgui.graphics->AddRectFilled(
         button_r,
         LiveCol(imgui,
-                !imgui.IsHot(id) ? UiColMap::ModalWindowButtonBack : UiColMap::ModalWindowButtonBackHover),
+                !imgui.IsHot(id)
+                    ? (args.white_background ? UiColMap::PopupWindowBack : UiColMap::ModalWindowButtonBack)
+                    : UiColMap::ModalWindowButtonBackHover),
         rounding);
 
     if (!args.greyed_out)
-        imgui.graphics->AddRect(button_r, LiveCol(imgui, UiColMap::ModalWindowButtonOutline), rounding);
+        imgui.graphics->AddRect(button_r,
+                                LiveCol(imgui,
+                                        args.significant ? UiColMap::ModalWindowButtonOutline
+                                                         : UiColMap::ModalWindowButtonOutlineSignificant),
+                                rounding);
 
     auto const required_padding = (box_width - content_width) / 2;
     rect_cut::CutLeft(button_r, required_padding);
@@ -127,7 +143,7 @@ static bool DoButton(Gui* g, String button_text, DoButtonArgs args) {
                                                                  : UiColMap::ModalWindowButtonIcon),
                                          TextJustification::CentredLeft,
                                          TextOverflowType::AllowOverflow,
-                                         0.8f);
+                                         icon_scaling);
     }
 
     imgui.graphics->AddTextJustified(
@@ -457,13 +473,21 @@ static void DoInstallWizardModal(Gui* g) {
         {
             auto const main_panel_rect = rect_cut::CutTop(rect, line_height * 10);
 
-            auto subwindow_settings =
-                FloeWindowSettings(imgui, [](imgui::Context const& imgui, imgui::Window* w) {
-                    imgui.graphics->AddRectFilled(w->unpadded_bounds.Min(),
-                                                  w->unpadded_bounds.Max(),
-                                                  LiveCol(imgui, UiColMap::InstallerWizardRightBoxBackground),
-                                                  LiveSize(imgui, UiSizeId::CornerRounding));
-                });
+            {
+                auto const main_rect_converted = imgui.WindowPosToScreenPos(main_panel_rect.pos);
+                auto const w = imgui.CurrentWindow();
+                imgui.graphics->PushClipRectFullScreen();
+                DEFER { imgui.graphics->PopClipRect(); };
+                Rect const full_width_rect = {w->unpadded_bounds.x,
+                                              main_rect_converted.y,
+                                              w->unpadded_bounds.w,
+                                              main_panel_rect.h};
+                imgui.graphics->AddRectFilled(full_width_rect.Min(),
+                                              full_width_rect.Max(),
+                                              LiveCol(imgui, UiColMap::InstallerWizardRightBoxBackground));
+            }
+
+            auto subwindow_settings = FloeWindowSettings(imgui, [](imgui::Context const&, imgui::Window*) {});
             subwindow_settings.draw_routine_scrollbar = settings.draw_routine_scrollbar;
             subwindow_settings.pad_bottom_right = line_height / 2;
             subwindow_settings.pad_top_left = line_height / 2;
@@ -479,18 +503,19 @@ static void DoInstallWizardModal(Gui* g) {
             //            UiColMap::InstallerWizardSubText);
 
             y_pos += line_height;
-            imgui.graphics->context->PushFont(g->mada);
             if (DoButton(g,
-                         "Choose zip files",
+                         "Choose Zip Files",
                          {
                              .incrementing_y = IncrementingY {y_pos},
                              .centre_vertically = true,
                              .auto_width = true,
                              .tooltip = "Select Floe zip packages to extract and install",
                              .icon = ICON_FA_FILE_ARCHIVE,
+                             .significant = true,
+                             .white_background = true,
+                             .big_font = true,
                          }))
                 g->OpenDialog(DialogType::InstallPackage);
-            imgui.graphics->context->PopFont();
 
             if (g->install_wizard_state.selected_package_paths.Empty())
                 DoTextLine(g,
@@ -531,6 +556,8 @@ static void DoInstallWizardModal(Gui* g) {
                          .tooltip = "Select Floe zip packages to extract and install",
                          .greyed_out = g->install_wizard_state.selected_package_paths.Empty(),
                          .icon = ICON_FA_ARROW_DOWN,
+                         .white_background = true,
+                         .big_font = true,
                      });
 
             DoTextLine(g,

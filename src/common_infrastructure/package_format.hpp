@@ -7,6 +7,7 @@
 #include "foundation/foundation.hpp"
 #include "os/filesystem.hpp"
 #include "utils/debug/debug.hpp"
+#include "utils/error_notifications.hpp"
 
 #include "sample_library/sample_library.hpp"
 
@@ -125,6 +126,112 @@ WriterAddPresetsFolder(mz_zip_archive& zip, String folder, ArenaAllocator& scrat
                                      folder,
                                      scratch_arena,
                                      Array {k_presets_subdir, path::Filename(folder)});
+}
+
+enum class PackageError {
+    FileCurrupted,
+    NotFloePackage,
+};
+PUBLIC ErrorCodeCategory const& PackageErrorCodeType() {
+    static constexpr ErrorCodeCategory const k_cat {
+        .category_id = "CLI",
+        .message =
+            [](Writer const& writer, ErrorCode e) {
+                return writer.WriteChars(({
+                    String s {};
+                    switch ((PackageError)e.code) {
+                        case PackageError::FileCurrupted: s = "File corrupted"_s; break;
+                        case PackageError::NotFloePackage: s = "Not a Floe package"_s; break;
+                    }
+                    s;
+                }));
+            },
+    };
+    return k_cat;
+}
+PUBLIC ErrorCodeCategory const& ErrorCategoryForEnum(PackageError) { return PackageErrorCodeType(); }
+
+PUBLIC bool InstallPackage(String package_path,
+                           String libraries_path,
+                           String presets_path,
+                           ThreadsafeErrorNotifications& error_notifications) {
+    (void)libraries_path;
+    (void)presets_path;
+    ASSERT(IsPathPackageFile(package_path));
+
+    auto const file_error = [&](String path, Optional<ErrorCode> error_code) {
+        auto item = error_notifications.NewError();
+        item->value = {
+            .title = "Error with file"_s,
+            .message = path,
+            .error_code = error_code,
+            .id = ThreadsafeErrorNotifications::Id("pkg ", package_path),
+        };
+        error_notifications.AddOrUpdateError(item);
+        return false;
+    };
+
+    auto const corrupt_error = [&]() {
+        auto item = error_notifications.NewError();
+        item->value = {
+            .title = "Error with zip"_s,
+            .message = package_path,
+            .error_code = ErrorCode {PackageError::FileCurrupted},
+            .id = ThreadsafeErrorNotifications::Id("pkg ", package_path),
+        };
+        error_notifications.AddOrUpdateError(item);
+        return false;
+    };
+
+    auto const invalid_error = [&]() {
+        auto item = error_notifications.NewError();
+        item->value = {
+            .title = "Error with package"_s,
+            .message = package_path,
+            .error_code = ErrorCode {PackageError::NotFloePackage},
+            .id = ThreadsafeErrorNotifications::Id("pkg ", package_path),
+        };
+        error_notifications.AddOrUpdateError(item);
+        return false;
+    };
+
+    auto package_file = ({
+        auto o = OpenFile(package_path, FileMode::Read);
+        if (o.HasError()) return file_error(package_path, o.Error());
+        o.ReleaseValue();
+    });
+
+    auto const package_file_size = ({
+        auto const o = package_file.FileSize();
+        if (o.HasError()) return file_error(package_path, o.Error());
+        o.Value();
+    });
+
+    mz_zip_archive zip;
+    mz_zip_zero_struct(&zip);
+    zip.m_pRead = [](void* opaque_ptr, mz_uint64 file_offset, void* buffer, usize buffer_size) -> usize {
+        auto& file = *(File*)opaque_ptr;
+        auto const seek_outcome = file.Seek((s64)file_offset, File::SeekOrigin::Start);
+        if (seek_outcome.HasError()) return 0;
+
+        auto const read_outcome = file.Read(buffer, buffer_size);
+        if (read_outcome.HasError()) return 0;
+        return read_outcome.Value();
+    };
+    zip.m_pIO_opaque = &package_file;
+
+    if (!mz_zip_reader_init(&zip, package_file_size, 0)) return corrupt_error();
+    DEFER { mz_zip_reader_end(&zip); };
+
+    auto const has_libraries = mz_zip_reader_locate_file(&zip, k_libraries_subdir.data, nullptr, 0) != -1;
+    auto const has_presets = mz_zip_reader_locate_file(&zip, k_presets_subdir.data, nullptr, 0) != -1;
+    if (!has_libraries && !has_presets) return invalid_error();
+
+    if (!mz_zip_validate_archive(&zip, 0)) return corrupt_error();
+
+    // TODO: read
+
+    return false;
 }
 
 } // namespace package

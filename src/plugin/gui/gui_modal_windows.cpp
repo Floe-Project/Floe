@@ -479,6 +479,7 @@ static void DoInstallWizardModal(Gui* g) {
             //            UiColMap::InstallerWizardSubText);
 
             y_pos += line_height;
+            imgui.graphics->context->PushFont(g->mada);
             if (DoButton(g,
                          "Choose zip files",
                          {
@@ -489,25 +490,7 @@ static void DoInstallWizardModal(Gui* g) {
                              .icon = ICON_FA_FILE_ARCHIVE,
                          }))
                 g->OpenDialog(DialogType::InstallPackage);
-
-            DoTextLine(g,
-                       "Floe Packages are zip files ending with \"floe.zip\".",
-                       y_pos,
-                       UiColMap::InstallerWizardInactiveText,
-                       {
-                           .justification = TextJustification::Centred,
-                           .font_scaling = 0.9f,
-                       });
-            DoTextLine(g,
-                       "They can contain both libraries and presets.",
-                       y_pos,
-                       UiColMap::InstallerWizardInactiveText,
-                       {
-                           .justification = TextJustification::Centred,
-                           .font_scaling = 0.9f,
-                       });
-
-            y_pos += line_height * 1.5f;
+            imgui.graphics->context->PopFont();
 
             if (g->install_wizard_state.selected_package_paths.Empty())
                 DoTextLine(g,
@@ -519,24 +502,25 @@ static void DoInstallWizardModal(Gui* g) {
                                .font_scaling = 0.9f,
                            });
             else {
+                DynamicArray<char> text {g->scratch_arena};
+                dyn::Assign(text, "Selected packages: ");
+                for (auto const path : g->install_wizard_state.selected_package_paths) {
+                    dyn::AppendSpan(text, path::Filename(path).SubSpan(0, package::k_file_extension.size));
+                    dyn::AppendSpan(text, ", ");
+                }
+                if (text.size) dyn::Resize(text, text.size - 2);
+
                 DoTextLine(g,
-                           "Selected packages:",
+                           text,
                            y_pos,
                            UiColMap::PopupItemText,
                            {
                                .justification = TextJustification::Centred,
                                .font_scaling = 0.9f,
                            });
-                for (auto const path : g->install_wizard_state.selected_package_paths)
-                    DoTextLine(g,
-                               path,
-                               y_pos,
-                               UiColMap::PopupItemText,
-                               {
-                                   .justification = TextJustification::Centred,
-                                   .font_scaling = 0.9f,
-                               });
             }
+
+            y_pos += line_height * 1.5f;
 
             DoButton(g,
                      "Install",
@@ -548,9 +532,55 @@ static void DoInstallWizardModal(Gui* g) {
                          .greyed_out = g->install_wizard_state.selected_package_paths.Empty(),
                          .icon = ICON_FA_ARROW_DOWN,
                      });
+
+            DoTextLine(g,
+                       "Installs to your Floe folders",
+                       y_pos,
+                       UiColMap::InstallerWizardInactiveText,
+                       {
+                           .justification = TextJustification::Centred,
+                           .font_scaling = 0.9f,
+                       });
         }
 
-        DoTextLine(g, "Select packages to install", main_y_pos, UiColMap::PopupItemText);
+        // bottom panel
+        {
+            auto subwindow_settings = FloeWindowSettings(imgui, [](imgui::Context const&, imgui::Window*) {});
+            subwindow_settings.draw_routine_scrollbar = settings.draw_routine_scrollbar;
+            subwindow_settings.pad_bottom_right = line_height / 2;
+            subwindow_settings.pad_top_left = line_height / 2;
+
+            auto const bottom_left_panel = rect_cut::CutLeft(rect, rect.w / 2);
+            auto const bottom_right_panel = rect;
+
+            {
+                imgui.BeginWindow(subwindow_settings, bottom_left_panel, "innerleft");
+                DEFER { imgui.EndWindow(); };
+
+                f32 y_pos = 1;
+                DoTextLine(g,
+                           "About Floe Packages",
+                           y_pos,
+                           UiColMap::PopupItemText,
+                           {
+                               .justification = TextJustification::Left,
+                           });
+            }
+
+            {
+                imgui.BeginWindow(subwindow_settings, bottom_right_panel, "innerright");
+                DEFER { imgui.EndWindow(); };
+
+                f32 y_pos = 1;
+                DoTextLine(g,
+                           "Other ways to install",
+                           y_pos,
+                           UiColMap::PopupItemText,
+                           {
+                               .justification = TextJustification::Left,
+                           });
+            }
+        }
     }
 }
 

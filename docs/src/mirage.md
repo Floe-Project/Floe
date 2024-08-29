@@ -19,3 +19,9 @@ Floe can load Mirage's libraries and presets. If you have Mirage installed alrea
 You can leave Mirage installed if you want to keep using it: Floe will not interfere with Mirage's installation.
 
 However, Floe is a new plugin with a new name that targets new plugin formats. Your old DAW projects that use Mirage will still need Mirage, Floe can't replace Mirage in that sense.
+
+### The old Mirage installer
+Previously, when Floe was known as Mirage, the installer would also install sample libraries. This is no longer the case. For Floe, sample libraries have a separate installation process. 
+
+Additionally, the installer used to require an internet connection and an account or download-ticket. For Floe, the installer is just a simple offline program with no credentials required.
+

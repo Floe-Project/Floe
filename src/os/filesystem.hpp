@@ -221,9 +221,6 @@ struct DialogArguments {
 
 ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments args);
 
-ErrorCodeOr<Span<MutableString>>
-GetFilesRecursive(ArenaAllocator& a, String directory, String wildcard = "*");
-
 /*
 When creating one of these iterators, they will not return an error if no files that match the pattern, but
 instead it will return false to HasMoreFiles().
@@ -300,6 +297,11 @@ class RecursiveDirectoryIterator {
     bool m_get_file_size {};
     bool m_skip_dot_files {};
 };
+
+ErrorCodeOr<Span<MutableString>> GetFilesRecursive(ArenaAllocator& a,
+                                                   String directory,
+                                                   Optional<FileType> only_type,
+                                                   DirectoryIteratorOptions options);
 
 // Directory watcher
 // =======================================================================================================

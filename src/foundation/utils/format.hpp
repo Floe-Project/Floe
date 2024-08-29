@@ -9,7 +9,6 @@
 #include "foundation/container/tagged_union.hpp"
 #include "foundation/error/error_code.hpp"
 #include "foundation/universal_defs.hpp"
-#include "foundation/utils/path.hpp"
 #include "foundation/utils/string.hpp"
 #include "foundation/utils/writer.hpp"
 

@@ -198,38 +198,20 @@ MoveDirectoryContents(String source_dir, String destination_directory, ExistingD
     return k_success;
 }
 
-static ErrorCodeOr<void>
-AppendFilesForFolder(ArenaAllocator& a, DynamicArray<MutableString>& output, String folder, String wildcard) {
-    ArenaAllocatorWithInlineStorage<1000> temp_allocator;
-    {
-        auto it = TRY(DirectoryIterator::Create(temp_allocator, folder));
-        while (it.HasMoreFiles()) {
-            auto const& entry = it.Get();
-            if (entry.type == FileType::Directory) TRY(AppendFilesForFolder(a, output, entry.path, wildcard));
-            TRY(it.Increment());
-        }
-    }
-
-    {
-        auto it = TRY(DirectoryIterator::Create(temp_allocator,
-                                                folder,
-                                                {
-                                                    .wildcard = wildcard,
-                                                    .get_file_size = false,
-                                                }));
-        while (it.HasMoreFiles()) {
-            auto const& entry = it.Get();
-            dyn::Append(output, MutableString(entry.path).Clone(a));
-            TRY(it.Increment());
-        }
-    }
-
-    return k_success;
-}
-
-ErrorCodeOr<Span<MutableString>> GetFilesRecursive(ArenaAllocator& a, String folder, String wildcard) {
+ErrorCodeOr<Span<MutableString>> GetFilesRecursive(ArenaAllocator& a,
+                                                   String folder,
+                                                   Optional<FileType> only_file_type,
+                                                   DirectoryIteratorOptions options) {
     DynamicArray<MutableString> result {a};
-    TRY(AppendFilesForFolder(a, result, folder, wildcard));
+
+    auto it = TRY(RecursiveDirectoryIterator::Create(a, folder, options));
+    while (it.HasMoreFiles()) {
+        auto const& entry = it.Get();
+        if (!only_file_type || *only_file_type == entry.type)
+            dyn::Append(result, MutableString(entry.path).Clone(a));
+        TRY(it.Increment());
+    }
+
     return result.ToOwnedSpan();
 }
 

@@ -332,7 +332,7 @@ TEST_CASE(TestFilesystem) {
             REQUIRE(TRY(GetFileType(existing_files[1])) == FileType::File);
             REQUIRE(TRY(GetFileType(existing_files[2])) == FileType::File);
 
-            for (auto& f : TRY(GetFilesRecursive(a, dir2))) {
+            for (auto& f : TRY(GetFilesRecursive(a, dir2, FileType::File, {}))) {
                 auto const file_type = TRY(GetFileType(f));
                 if (file_type == FileType::File) {
                     bool found = false;

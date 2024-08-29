@@ -32,7 +32,11 @@
 
 static imgui::Id IdForModal(ModalWindowType type) { return (imgui::Id)(ToInt(type) + 1000); }
 
-static void DoMultilineText(Gui* g, String text, f32& y_pos, f32 x_offset = 0) {
+static void DoMultilineText(Gui* g,
+                            String text,
+                            f32& y_pos,
+                            f32 x_offset = 0,
+                            UiColMap col_map = UiColMap::PopupItemText) {
     auto& imgui = g->imgui;
     auto font = imgui.graphics->context->CurrentFont();
     auto const line_height = imgui.graphics->context->CurrentFontSize();
@@ -46,12 +50,8 @@ static void DoMultilineText(Gui* g, String text, f32& y_pos, f32 x_offset = 0) {
     auto const size = draw::GetTextSize(font, text, wrap_width);
 
     auto const text_r = imgui.GetRegisteredAndConvertedRect({x_offset, y_pos, size.x, size.y});
-    imgui.graphics->AddText(font,
-                            font->font_size_no_scale,
-                            text_r.pos,
-                            LiveCol(imgui, UiColMap::PopupItemText),
-                            text,
-                            wrap_width);
+    imgui.graphics
+        ->AddText(font, font->font_size_no_scale, text_r.pos, LiveCol(imgui, col_map), text, wrap_width);
 
     y_pos += size.y + line_height / 2;
 }
@@ -71,6 +71,7 @@ struct DoButtonArgs {
     bool greyed_out;
     String icon;
     bool significant;
+    bool insignificant;
     bool white_background;
     bool big_font;
 };
@@ -121,8 +122,8 @@ static bool DoButton(Gui* g, String button_text, DoButtonArgs args) {
     if (!args.greyed_out)
         imgui.graphics->AddRect(button_r,
                                 LiveCol(imgui,
-                                        args.significant ? UiColMap::ModalWindowButtonOutline
-                                                         : UiColMap::ModalWindowButtonOutlineSignificant),
+                                        args.significant ? UiColMap::ModalWindowButtonOutlineSignificant
+                                                         : UiColMap::ModalWindowButtonOutline),
                                 rounding);
 
     auto const required_padding = (box_width - content_width) / 2;
@@ -150,7 +151,9 @@ static bool DoButton(Gui* g, String button_text, DoButtonArgs args) {
         button_r,
         button_text,
         LiveCol(imgui,
-                args.greyed_out ? UiColMap::ModalWindowButtonTextInactive : UiColMap::ModalWindowButtonText),
+                args.greyed_out ? UiColMap::ModalWindowButtonTextInactive
+                                : (args.insignificant ? UiColMap::ModalWindowInsignificantText
+                                                      : UiColMap::ModalWindowButtonText)),
         TextJustification::CentredLeft);
 
     if (args.tooltip.size) Tooltip(g, id, button_r, args.tooltip, true);
@@ -451,14 +454,15 @@ static void DoTextLine(Gui* g, String text, f32& y_pos, UiColMap col_map, DoText
     y_pos += line_height;
 }
 
-static void DoInstallWizardModal(Gui* g) {
+static void DoInstallPackagesModal(Gui* g) {
     g->frame_input.graphics_ctx->PushFont(g->roboto_small);
     DEFER { g->frame_input.graphics_ctx->PopFont(); };
     auto& imgui = g->imgui;
     auto const settings = ModalWindowSettings(g->imgui);
-    auto const r = ModalRect(imgui, UiSizeId::InstallWizardWindowWidth, UiSizeId::InstallWizardWindowHeight);
+    auto const r =
+        ModalRect(imgui, UiSizeId::InstallPackagesWindowWidth, UiSizeId::InstallPackagesWindowHeight);
 
-    if (imgui.BeginWindowPopup(settings, IdForModal(ModalWindowType::InstallWizard), r, "Install")) {
+    if (imgui.BeginWindowPopup(settings, IdForModal(ModalWindowType::InstallPackages), r, "install")) {
         DEFER { imgui.EndWindow(); };
         f32 main_y_pos = 0;
         DoHeading(g, main_y_pos, "Extract and Install Floe Packages");
@@ -484,7 +488,7 @@ static void DoInstallWizardModal(Gui* g) {
                                               main_panel_rect.h};
                 imgui.graphics->AddRectFilled(full_width_rect.Min(),
                                               full_width_rect.Max(),
-                                              LiveCol(imgui, UiColMap::InstallerWizardRightBoxBackground));
+                                              LiveCol(imgui, UiColMap::ModalWindowSubContainerBackground));
             }
 
             auto subwindow_settings = FloeWindowSettings(imgui, [](imgui::Context const&, imgui::Window*) {});
@@ -495,12 +499,6 @@ static void DoInstallWizardModal(Gui* g) {
             DEFER { imgui.EndWindow(); };
 
             f32 y_pos = 1; // avoid clipping glitch
-
-            // DoTextLine(g, "Extract and install Floe Packages", y_pos, UiColMap::PopupItemText);
-            // DoTextLine(g,
-            //            "Floe packages are zip files ending with \"floe.zip\".",
-            //            y_pos,
-            //            UiColMap::InstallerWizardSubText);
 
             y_pos += line_height;
             if (DoButton(g,
@@ -521,7 +519,7 @@ static void DoInstallWizardModal(Gui* g) {
                 DoTextLine(g,
                            "No packages selected",
                            y_pos,
-                           UiColMap::InstallerWizardInactiveText,
+                           UiColMap::ModalWindowInsignificantText,
                            {
                                .justification = TextJustification::Centred,
                                .font_scaling = 0.9f,
@@ -563,7 +561,7 @@ static void DoInstallWizardModal(Gui* g) {
             DoTextLine(g,
                        "Installs to your Floe folders",
                        y_pos,
-                       UiColMap::InstallerWizardInactiveText,
+                       UiColMap::ModalWindowInsignificantText,
                        {
                            .justification = TextJustification::Centred,
                            .font_scaling = 0.9f,
@@ -577,6 +575,7 @@ static void DoInstallWizardModal(Gui* g) {
             subwindow_settings.pad_bottom_right = line_height / 2;
             subwindow_settings.pad_top_left = line_height / 2;
 
+            rect_cut::CutTop(rect, line_height);
             auto const bottom_left_panel = rect_cut::CutLeft(rect, rect.w / 2);
             auto const bottom_right_panel = rect;
 
@@ -584,7 +583,7 @@ static void DoInstallWizardModal(Gui* g) {
                 imgui.BeginWindow(subwindow_settings, bottom_left_panel, "innerleft");
                 DEFER { imgui.EndWindow(); };
 
-                f32 y_pos = 1;
+                f32 y_pos = 0;
                 DoTextLine(g,
                            "About Floe Packages",
                            y_pos,
@@ -592,13 +591,31 @@ static void DoInstallWizardModal(Gui* g) {
                            {
                                .justification = TextJustification::Left,
                            });
+                DoMultilineText(
+                    g,
+                    "Floe packages are zip files ending with \"floe.zip\". They can contain both libraries and presets.",
+                    y_pos,
+                    0,
+                    UiColMap::ModalWindowInsignificantText);
+                if (DoButton(g,
+                             "Learn more",
+                             {
+                                 .incrementing_y = IncrementingY {y_pos},
+                                 .auto_width = true,
+                                 .tooltip = "Open the online user manual on Floe packages",
+                                 .icon = ICON_FA_EXTERNAL_LINK_ALT,
+                                 .insignificant = true,
+                                 .white_background = true,
+                             })) {
+                    OpenUrlInBrowser(FLOE_PACKAGES_INFO_URL);
+                }
             }
 
             {
                 imgui.BeginWindow(subwindow_settings, bottom_right_panel, "innerright");
                 DEFER { imgui.EndWindow(); };
 
-                f32 y_pos = 1;
+                f32 y_pos = 0;
                 DoTextLine(g,
                            "Other ways to install",
                            y_pos,
@@ -606,6 +623,24 @@ static void DoInstallWizardModal(Gui* g) {
                            {
                                .justification = TextJustification::Left,
                            });
+                DoMultilineText(
+                    g,
+                    "You can also install libraries and presets by extracting the zip and copying its contents to your Floe folders.",
+                    y_pos,
+                    0,
+                    UiColMap::ModalWindowInsignificantText);
+                if (DoButton(g,
+                             "Learn more",
+                             {
+                                 .incrementing_y = IncrementingY {y_pos},
+                                 .auto_width = true,
+                                 .tooltip = "Open the online user manual on alternate installation methods",
+                                 .icon = ICON_FA_EXTERNAL_LINK_ALT,
+                                 .insignificant = true,
+                                 .white_background = true,
+                             })) {
+                    OpenUrlInBrowser(FLOE_MANUAL_INSTALL_INSTRUCTIONS_URL);
+                }
             }
         }
     }
@@ -926,19 +961,19 @@ void DoModalWindows(Gui* g) {
     DoAboutModal(g);
     DoLoadingOverlay(g);
     DoInstrumentInfoModal(g);
-    DoInstallWizardModal(g);
+    DoInstallPackagesModal(g);
     DoSettingsModal(g);
     DoLicencesModal(g);
 }
 
-void OpenInstallWizard(Gui* g) {
-    g->install_wizard_state.page = {};
+void OpenInstallPackagesModal(Gui* g) {
+    g->install_wizard_state.state = {};
     g->install_wizard_state.selected_package_paths.Clear();
     g->install_wizard_state.arena.ResetCursorAndConsolidateRegions();
-    OpenModalIfNotAlready(g->imgui, ModalWindowType::InstallWizard);
+    OpenModalIfNotAlready(g->imgui, ModalWindowType::InstallPackages);
 }
 
-void InstallWizardSelectFilesDialogResults(Gui* g, Span<MutableString> paths) {
+void InstallPackagesSelectFilesDialogResults(Gui* g, Span<MutableString> paths) {
     for (auto const path : paths)
         if (!package::IsPathPackageFile(path)) {
             auto const err = g->plugin.error_notifications.NewError();

@@ -362,7 +362,7 @@ static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
                 }),
                 .parent_window = g->frame_input.native_window,
             }));
-            if (paths.size) InstallWizardSelectFilesDialogResults(g, paths);
+            if (paths.size) InstallPackagesSelectFilesDialogResults(g, paths);
             break;
         }
         case DialogType::AddNewLibraryScanFolder: {

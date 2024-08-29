@@ -13,27 +13,25 @@ enum class ModalWindowType {
     LoadError,
     InstInfo,
     Settings,
-    InstallWizard,
+    InstallPackages,
     Count,
 };
 
 void OpenModalIfNotAlready(imgui::Context& imgui, ModalWindowType type);
 void DoModalWindows(Gui* g);
 
-enum class InstallWizardPage {
-    Introduction,
-    SelectPackages,
-    SelectDestination,
-    Install,
-    Summary,
+enum class InstallPackagesState {
+    SelectFiles,
+    Installing,
+    Done,
     Count,
 };
 
 struct InstallWizardState {
-    InstallWizardPage page = {};
+    InstallPackagesState state = {};
     ArenaAllocator arena {PageAllocator::Instance()};
     ArenaList<String, false> selected_package_paths {arena};
 };
 
-void OpenInstallWizard(Gui* g);
-void InstallWizardSelectFilesDialogResults(Gui* g, Span<MutableString> paths);
+void OpenInstallPackagesModal(Gui* g);
+void InstallPackagesSelectFilesDialogResults(Gui* g, Span<MutableString> paths);

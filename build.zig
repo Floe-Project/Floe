@@ -23,7 +23,8 @@ const floe_vendor = "Floe";
 const floe_homepage_url = "https://floe.audio";
 const floe_manual_url = "https://floe.audio";
 const floe_download_url = "https://floe.audio";
-const floe_installation_instructions_url = "https://floe.audio"; // TODO: change to actual URL
+const floe_manual_install_instructions_url = "https://floe.audio"; // TODO: change to actual URL
+const floe_packages_info_url = "https://floe.audio"; // TODO: change to actual URL
 const floe_au_factory_function = "FloeFactoryFunction";
 const min_macos_version = "11.0.0"; // use 3-part version for plist
 const min_windows_version = "win10";
@@ -1012,7 +1013,8 @@ pub fn build(b: *std.Build) void {
             .FLOE_HOMEPAGE_URL = floe_homepage_url,
             .FLOE_MANUAL_URL = floe_manual_url,
             .FLOE_DOWNLOAD_URL = floe_download_url,
-            .FLOE_INSTALLATION_INSTRUCTIONS_URL = floe_installation_instructions_url,
+            .FLOE_MANUAL_INSTALL_INSTRUCTIONS_URL = floe_manual_install_instructions_url,
+            .FLOE_PACKAGES_INFO_URL = floe_packages_info_url,
             .FLOE_VENDOR = floe_vendor,
             .IS_WINDOWS = target.result.os.tag == .windows,
             .IS_MACOS = target.result.os.tag == .macos,

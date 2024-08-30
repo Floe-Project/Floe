@@ -6,7 +6,7 @@
 
 #include "state_snapshot.hpp"
 
-struct CodeStateOptions {
+struct CodeStateArguments {
     enum class Mode { Decode, Encode };
 
     Mode mode;
@@ -16,7 +16,7 @@ struct CodeStateOptions {
 };
 
 // "Code" as in decode/encode
-ErrorCodeOr<void> CodeState(StateSnapshot& state, CodeStateOptions const& options);
+ErrorCodeOr<void> CodeState(StateSnapshot& state, CodeStateArguments const& args);
 
 ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_arena, String json_data);
 

@@ -165,8 +165,8 @@ PresetsFolderScanResult FetchOrRescanPresetsFolder(PresetsListing& listing,
                         StateSnapshot state {};
                         TRY(CodeState(
                             state,
-                            CodeStateOptions {
-                                .mode = CodeStateOptions::Mode::Decode,
+                            CodeStateArguments {
+                                .mode = CodeStateArguments::Mode::Decode,
                                 .read_or_write_data = [&file](void* data, usize bytes) -> ErrorCodeOr<void> {
                                     TRY(file.Read(data, bytes));
                                     return k_success;

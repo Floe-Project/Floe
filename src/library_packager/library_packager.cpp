@@ -129,7 +129,7 @@ struct MetadataParser {
             auto const equals_pos = Find(line, '=');
             if (!equals_pos) {
                 g_cli_out.Error({}, "Invalid line in {}: {}", k_metadata_ini_filename, line);
-                return ErrorCode {CommonError::FileFormatIsInvalid};
+                return ErrorCode {CommonError::InvalidFileFormat};
             }
 
             auto const key = WhitespaceStrippedEnd(line.SubSpan(0, *equals_pos));
@@ -143,7 +143,7 @@ struct MetadataParser {
                                     "Unterminated multiline value in {}: {}",
                                     k_metadata_ini_filename,
                                     key);
-                    return ErrorCode {CommonError::FileFormatIsInvalid};
+                    return ErrorCode {CommonError::InvalidFileFormat};
                 }
 
                 value = ini.SubSpan(*cursor, *end - *cursor);
@@ -172,7 +172,7 @@ static ErrorCodeOr<Metadata> ReadMetadata(String library_folder, ArenaAllocator&
 
         if (key.size) {
             g_cli_out.Error({}, "Unknown key in {}: {}", k_metadata_ini_filename, key);
-            return ErrorCode {CommonError::FileFormatIsInvalid};
+            return ErrorCode {CommonError::InvalidFileFormat};
         }
     }
 

@@ -408,7 +408,7 @@ inline ErrorCodeCategory const& ErrorCategoryForEnum(PuglStatus) { return pugl_e
 
 enum class StandaloneError {
     DeviceError,
-    PlugnInterfaceError,
+    PluginInterfaceError,
 };
 ErrorCodeCategory const standalone_error_category {
     .category_id = "STND",
@@ -416,7 +416,7 @@ ErrorCodeCategory const standalone_error_category {
         String str {};
         switch ((StandaloneError)code.code) {
             case StandaloneError::DeviceError: str = "Device error"; break;
-            case StandaloneError::PlugnInterfaceError: str = "Plugn interface error"; break;
+            case StandaloneError::PluginInterfaceError: str = "Plugin interface error"; break;
         }
         return writer.WriteChars(str);
     },

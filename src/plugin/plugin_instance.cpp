@@ -6,7 +6,6 @@
 #include <clap/ext/params.h>
 
 #include "foundation/foundation.hpp"
-#include "utils/debug/debug.hpp"
 
 #include "common_infrastructure/common_errors.hpp"
 #include "common_infrastructure/constants.hpp"
@@ -549,8 +548,8 @@ usize MegabytesUsedBySamples(PluginInstance const& plugin) {
 static bool PluginSaveState(PluginInstance& plugin, clap_ostream const& stream) {
     auto state = CurrentStateSnapshot(plugin);
     auto outcome = CodeState(state,
-                             CodeStateOptions {
-                                 .mode = CodeStateOptions::Mode::Encode,
+                             CodeStateArguments {
+                                 .mode = CodeStateArguments::Mode::Encode,
                                  .read_or_write_data = [&](void* data, usize bytes) -> ErrorCodeOr<void> {
                                      u64 bytes_written = 0;
                                      while (bytes_written != bytes) {
@@ -585,15 +584,14 @@ static bool PluginLoadState(PluginInstance& plugin, clap_istream const& stream) 
     StateSnapshot state {};
     auto const outcome =
         CodeState(state,
-                  CodeStateOptions {
-                      .mode = CodeStateOptions::Mode::Decode,
+                  CodeStateArguments {
+                      .mode = CodeStateArguments::Mode::Decode,
                       .read_or_write_data = [&](void* data, usize bytes) -> ErrorCodeOr<void> {
                           u64 bytes_read = 0;
                           while (bytes_read != bytes) {
                               ASSERT(bytes_read < bytes);
                               auto const n = stream.read(&stream, (u8*)data + bytes_read, bytes - bytes_read);
-                              if (n == 0)
-                                  return ErrorCode(CommonError::FileFormatIsInvalid); // unexpected EOF
+                              if (n == 0) return ErrorCode(CommonError::InvalidFileFormat); // unexpected EOF
                               if (n < 0) return ErrorCode(CommonError::PluginHostError);
                               bytes_read += (u64)n;
                           }

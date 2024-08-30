@@ -482,7 +482,7 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
                                           },
                                           scratch_arena,
                                           {});
-    if (json_parse_outcome.HasError()) return ErrorCode {CommonError::FileFormatIsInvalid};
+    if (json_parse_outcome.HasError()) return ErrorCode {CommonError::InvalidFileFormat};
 
     if (parser.library_name == "None"_s || parser.library_name == ""_s) {
         for (auto& i : state.inst_ids)
@@ -919,7 +919,7 @@ struct StateCoder {
 
     template <TriviallyCopyable Type>
     ErrorCodeOr<void> CodeTrivialObject(Type& trivial_obj, StateVersion version_added) {
-        if (version >= version_added) return options.read_or_write_data(&trivial_obj, sizeof(Type));
+        if (version >= version_added) return args.read_or_write_data(&trivial_obj, sizeof(Type));
         return k_success;
     }
 
@@ -930,11 +930,11 @@ struct StateCoder {
         if (version >= version_added) {
             u32 size = 0;
             if (IsWriting()) size = CheckedCast<u32>(arr.size);
-            TRY(options.read_or_write_data(&size, sizeof(size)));
+            TRY(args.read_or_write_data(&size, sizeof(size)));
 
             if (size) {
                 if (IsReading()) dyn::Resize(arr, size);
-                TRY(options.read_or_write_data((void*)arr.data, size * sizeof(Type)));
+                TRY(args.read_or_write_data((void*)arr.data, size * sizeof(Type)));
             }
         }
         return k_success;
@@ -944,11 +944,11 @@ struct StateCoder {
         if (version >= version_added) {
             u16 size = 0;
             if (IsWriting()) size = CheckedCast<u16>(string.size);
-            TRY(options.read_or_write_data(&size, sizeof(size)));
+            TRY(args.read_or_write_data(&size, sizeof(size)));
 
             if (size) {
                 if (IsReading()) string = allocator.AllocateExactSizeUninitialised<char>(size);
-                TRY(options.read_or_write_data((void*)string.data, size));
+                TRY(args.read_or_write_data((void*)string.data, size));
             }
         }
         return k_success;
@@ -984,21 +984,21 @@ struct StateCoder {
         return k_success;
     }
 
-    bool IsWriting() const { return options.mode == CodeStateOptions::Mode::Encode; }
-    bool IsReading() const { return options.mode == CodeStateOptions::Mode::Decode; }
+    bool IsWriting() const { return args.mode == CodeStateArguments::Mode::Encode; }
+    bool IsReading() const { return args.mode == CodeStateArguments::Mode::Decode; }
 
-    CodeStateOptions const& options;
+    CodeStateArguments const& args;
     StateVersion version;
     u32 counter {0};
 };
 
-ErrorCodeOr<void> CodeState(StateSnapshot& state, CodeStateOptions const& options) {
+ErrorCodeOr<void> CodeState(StateSnapshot& state, CodeStateArguments const& args) {
     static_assert(__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__,
                   "this code makes no attempt to be endian agnostic");
     ArenaAllocatorWithInlineStorage<1000> scratch_arena;
 
     StateCoder coder {
-        .options = options,
+        .args = args,
         .version = StateVersion::Initial, // start at Initial so that we always
                                           // write the magic value
     };
@@ -1010,7 +1010,7 @@ ErrorCodeOr<void> CodeState(StateSnapshot& state, CodeStateOptions const& option
         if (coder.IsWriting()) magic = k_magic;
         TRY(coder.CodeNumber(magic, StateVersion::Initial));
 
-        if (magic != k_magic) return ErrorCode(CommonError::FileFormatIsInvalid);
+        if (magic != k_magic) return ErrorCode(CommonError::InvalidFileFormat);
     }
 
     // =======================================================================================================
@@ -1019,7 +1019,7 @@ ErrorCodeOr<void> CodeState(StateSnapshot& state, CodeStateOptions const& option
         TRY(coder.CodeNumber((UnderlyingType<StateVersion>&)coder.version, StateVersion::Initial));
 
         // Forwards compatibility is not supported.
-        if (coder.version > StateVersion::Latest) return ErrorCode(CommonError::CurrentVersionTooOld);
+        if (coder.version > StateVersion::Latest) return ErrorCode(CommonError::CurrentFloeVersionTooOld);
     }
 
     // =======================================================================================================
@@ -1085,7 +1085,7 @@ ErrorCodeOr<void> CodeState(StateSnapshot& state, CodeStateOptions const& option
         }
     }
 
-    if (options.abbreviated_read) {
+    if (args.abbreviated_read) {
         ASSERT(coder.IsReading());
         return k_success;
     }
@@ -1110,7 +1110,7 @@ ErrorCodeOr<void> CodeState(StateSnapshot& state, CodeStateOptions const& option
 
             if (coder.IsReading()) {
                 auto const param_index = ParamIdToIndex(id);
-                if (!param_index) return ErrorCode(CommonError::FileFormatIsInvalid);
+                if (!param_index) return ErrorCode(CommonError::InvalidFileFormat);
                 state.param_values[(usize)*param_index] = linear_value;
             }
         }
@@ -1166,7 +1166,7 @@ ErrorCodeOr<void> CodeState(StateSnapshot& state, CodeStateOptions const& option
             for (auto [i, fx_id] : Enumerate(ordered_effect_ids)) {
                 auto const type =
                     FindIf(k_effect_info, [fx_id](EffectInfo const& info) { return info.id == fx_id; });
-                if (!type.HasValue()) return ErrorCode(CommonError::FileFormatIsInvalid);
+                if (!type.HasValue()) return ErrorCode(CommonError::InvalidFileFormat);
                 state.fx_order[i] = (EffectType)*type;
             }
 
@@ -1187,7 +1187,7 @@ ErrorCodeOr<void> CodeState(StateSnapshot& state, CodeStateOptions const& option
         Mapping* mappings = nullptr;
         u32 num_mappings = 0;
 
-        if (coder.IsWriting() && options.source == StateSource::Daw) {
+        if (coder.IsWriting() && args.source == StateSource::Daw) {
             DynamicArray<Mapping> mappings_arr {scratch_arena};
             for (auto [param_index, ccs] : Enumerate(state.param_learned_ccs)) {
                 for (auto const cc_num : Range(128uz))
@@ -1209,9 +1209,9 @@ ErrorCodeOr<void> CodeState(StateSnapshot& state, CodeStateOptions const& option
             if (coder.IsWriting()) m = mappings[i];
             TRY(coder.CodeNumber(m.cc_num, StateVersion::Initial));
             TRY(coder.CodeNumber(m.param_id, StateVersion::Initial));
-            if (coder.IsReading() && options.source == StateSource::Daw) {
+            if (coder.IsReading() && args.source == StateSource::Daw) {
                 auto const index = ParamIdToIndex(m.param_id);
-                if (!index) return ErrorCode(CommonError::FileFormatIsInvalid);
+                if (!index) return ErrorCode(CommonError::InvalidFileFormat);
                 state.param_learned_ccs[(usize)*index].Set(m.cc_num);
             }
         }
@@ -1227,8 +1227,8 @@ ErrorCodeOr<StateSnapshot> LoadPresetFile(String const filepath, ArenaAllocator&
     if (path::Extension(filepath) == FLOE_PRESET_FILE_EXTENSION) {
         auto file = TRY(OpenFile(filepath, FileMode::Read));
         TRY(CodeState(state,
-                      CodeStateOptions {
-                          .mode = CodeStateOptions::Mode::Decode,
+                      CodeStateArguments {
+                          .mode = CodeStateArguments::Mode::Decode,
                           .read_or_write_data = [&file](void* data, usize bytes) -> ErrorCodeOr<void> {
                               TRY(file.Read(data, bytes));
                               return k_success;
@@ -1248,8 +1248,8 @@ ErrorCodeOr<void> SavePresetFile(String path, StateSnapshot const& state) {
     ASSERT(path::Extension(path) == FLOE_PRESET_FILE_EXTENSION);
     auto file = TRY(OpenFile(path, FileMode::Write));
     TRY(CodeState(const_cast<StateSnapshot&>(state),
-                  CodeStateOptions {
-                      .mode = CodeStateOptions::Mode::Encode,
+                  CodeStateArguments {
+                      .mode = CodeStateArguments::Mode::Encode,
                       .read_or_write_data = [&file](void* data, usize bytes) -> ErrorCodeOr<void> {
                           TRY(file.Write({(u8 const*)data, bytes}));
                           return k_success;
@@ -1377,11 +1377,11 @@ TEST_CASE(TestParsersHandleInvalidData) {
             usize read_pos = 0;
             auto const result =
                 CodeState(state,
-                          CodeStateOptions {
-                              .mode = CodeStateOptions::Mode::Decode,
+                          CodeStateArguments {
+                              .mode = CodeStateArguments::Mode::Decode,
                               .read_or_write_data = [&](void* out_data, usize bytes) -> ErrorCodeOr<void> {
                                   if ((read_pos + bytes) > data.size)
-                                      return ErrorCode(CommonError::FileFormatIsInvalid);
+                                      return ErrorCode(CommonError::InvalidFileFormat);
                                   CopyMemory(out_data, data.data + read_pos, bytes);
                                   read_pos += bytes;
                                   return k_success;
@@ -1444,8 +1444,8 @@ TEST_CASE(TestNewSerialisation) {
 
         DynamicArray<u8> serialised_data {scratch_arena};
         REQUIRE(CodeState(state,
-                          CodeStateOptions {
-                              .mode = CodeStateOptions::Mode::Encode,
+                          CodeStateArguments {
+                              .mode = CodeStateArguments::Mode::Encode,
                               .read_or_write_data = [&](void* data, usize bytes) -> ErrorCodeOr<void> {
                                   dyn::AppendSpan(serialised_data, Span<u8 const> {(u8 const*)data, bytes});
                                   return k_success;
@@ -1457,8 +1457,8 @@ TEST_CASE(TestNewSerialisation) {
         StateSnapshot out_state {};
         usize read_pos = 0;
         REQUIRE(CodeState(out_state,
-                          CodeStateOptions {
-                              .mode = CodeStateOptions::Mode::Decode,
+                          CodeStateArguments {
+                              .mode = CodeStateArguments::Mode::Decode,
                               .read_or_write_data = [&](void* data, usize bytes) -> ErrorCodeOr<void> {
                                   CHECK(read_pos + bytes <= serialised_data.size);
                                   CopyMemory(data, serialised_data.data + read_pos, bytes);

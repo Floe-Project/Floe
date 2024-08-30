@@ -1688,7 +1688,7 @@ TEST_CASE(TestFormat) {
         };
         ErrorCode const err {category, 100};
         CHECK_NEQ(fmt::Format(a, "{}", err), ""_s);
-        CHECK_NEQ(fmt::Format(a, "{d}", err), ""_s);
+        CHECK_NEQ(fmt::Format(a, "{u}", err), ""_s);
     }
 
     SUBCASE("Dump struct") {

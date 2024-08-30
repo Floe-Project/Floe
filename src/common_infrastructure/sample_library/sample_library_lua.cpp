@@ -1020,9 +1020,16 @@ static VoidOrError<Error> TryRunLuaCode(LuaState& ctx, int r) {
             }
 
             return ErrorAndNotify(ctx, LuaErrorCode::Runtime, [&](DynamicArray<char>& message) {
-                if (lua_isstring(ctx.lua, -1))
-                    fmt::Append(message, "\n{}", LuaString(ctx.lua, -1));
-                else
+                if (lua_isstring(ctx.lua, -1)) {
+                    DynamicArray<char> lua_error {LuaString(ctx.lua, -1), ctx.lua_arena};
+                    // Because we are running from a string rather than file (we read the file into memory),
+                    // the chunkname is in a confusing format. We replace it will the actual filename.
+                    auto const filename = path::Filename(ctx.filepath);
+                    auto const chunk_msg = fmt::Format(ctx.lua_arena, "[string \"{}\"]", filename);
+                    dyn::Replace(lua_error, chunk_msg, filename);
+
+                    fmt::Append(message, "\n{}", lua_error);
+                } else
                     dyn::AppendSpan(message, "\nUnknown error");
             });
         }
@@ -1880,7 +1887,7 @@ TEST_CASE(TestErrorHandling) {
                     err->code,
                     err->message);
             } else {
-                tester.log.Debug(k_log_module, "Success: failure expected: {d}", err->code);
+                tester.log.Debug(k_log_module, "Success: failure expected: {}", err->code);
             }
 
             REQUIRE(expected.HasError());

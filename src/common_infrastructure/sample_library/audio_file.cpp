@@ -16,9 +16,9 @@ ErrorCodeCategory const audio_file_error_category {
     .message = [](Writer const& writer, ErrorCode code) -> ErrorCodeOr<void> {
         String str {};
         switch ((AudioFileError)code.code) {
-            case AudioFileError::FileHasInvalidData: str = "file does not contain valid data"; break;
-            case AudioFileError::NotFlacOrWav: str = "file must be FLAC or WAV"; break;
-            case AudioFileError::NotMonoOrStereo: str = "file must be mono or stereo"; break;
+            case AudioFileError::FileHasInvalidData: str = "File does not contain valid data"; break;
+            case AudioFileError::NotFlacOrWav: str = "File must be FLAC or WAV"; break;
+            case AudioFileError::NotMonoOrStereo: str = "File must be mono or stereo"; break;
         }
         return writer.WriteChars(str);
     },

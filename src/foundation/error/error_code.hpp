@@ -242,8 +242,11 @@ class [[nodiscard]] ErrorCodeOr<void> {
 struct Writer;
 
 struct ErrorCodeCategory {
-    char const* category_id; // a few uppercase characters to identify this category, not null
-    ErrorCodeOr<void> (*const message)(Writer const& writer, ErrorCode e); // can be null
+    // a few uppercase characters to identify this category, not null
+    char const* category_id;
+    // function can be not-set. returns a human-readable short description of the error code, starts with a
+    // capital letter and does _not_ end with a full stop
+    ErrorCodeOr<void> (*const message)(Writer const& writer, ErrorCode e);
 };
 
 struct ErrorCodeRelocateTryHelpers {

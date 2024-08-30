@@ -34,7 +34,7 @@ struct InstallPackagesData {
     ArenaAllocator arena {PageAllocator::Instance()};
     ArenaList<String, false> selected_package_paths {arena};
 
-    Atomic<bool> installing_packages {}; 
+    Atomic<bool> installing_packages {};
 };
 
 void OpenInstallPackagesModal(Gui* g);

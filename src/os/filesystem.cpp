@@ -10,15 +10,14 @@
 #include "utils/debug/debug.hpp"
 
 static constexpr ErrorCodeCategory k_fp_error_category {
-    .category_id = "FP",
+    .category_id = "FS",
     .message = [](Writer const& writer, ErrorCode e) -> ErrorCodeOr<void> {
         auto const get_str = [code = e.code]() -> String {
             switch ((FilesystemError)code) {
                 case FilesystemError::PathDoesNotExist: return "File or folder does not exist";
                 case FilesystemError::TooManyFilesOpen: return "Too many files open";
                 case FilesystemError::FolderContainsTooManyFiles: return "Folder is too large";
-                case FilesystemError::AccessDenied:
-                    return "Access is denied to this file or folder. It could be that it's only accessible to a certain user or administrator.";
+                case FilesystemError::AccessDenied: return "Access is denied to this file or folder";
                 case FilesystemError::PathIsAFile: return "Path is a file";
                 case FilesystemError::PathIsAsDirectory: return "Path is a folder";
                 case FilesystemError::PathAlreadyExists: return "Path already exists";

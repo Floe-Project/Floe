@@ -90,7 +90,7 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
     {
         mdata::MasterHeader header;
         TRY(reader.Read(&header, sizeof(mdata::MasterHeader)));
-        if (header.id_magic != mdata::HeaderIdMasterMagic) return ErrorCode(CommonError::FileFormatIsInvalid);
+        if (header.id_magic != mdata::HeaderIdMasterMagic) return ErrorCode(CommonError::InvalidFileFormat);
         library.name = arena.Clone(header.Name());
         library.minor_version = header.version;
         library.author = k_mdata_library_author;
@@ -99,8 +99,8 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
     {
         mdata::ChunkHeader info_header;
         TRY(reader.Read(&info_header, sizeof(mdata::ChunkHeader)));
-        if (info_header.size_bytes_of_following_data == 0) return ErrorCode(CommonError::FileFormatIsInvalid);
-        if (info_header.id != mdata::HeaderIdInfoJson) return ErrorCode(CommonError::FileFormatIsInvalid);
+        if (info_header.size_bytes_of_following_data == 0) return ErrorCode(CommonError::InvalidFileFormat);
+        if (info_header.id != mdata::HeaderIdInfoJson) return ErrorCode(CommonError::InvalidFileFormat);
 
         DynamicArray<char> json_string {scratch_arena};
         dyn::Resize(json_string, (usize)info_header.size_bytes_of_following_data);
@@ -517,7 +517,7 @@ ErrorCodeOr<u64> MdataHash(Reader& reader) {
     reader.pos = 0;
     mdata::MasterHeader header;
     TRY(reader.Read(&header, sizeof(mdata::MasterHeader)));
-    if (header.id_magic != mdata::HeaderIdMasterMagic) return ErrorCode(CommonError::FileFormatIsInvalid);
+    if (header.id_magic != mdata::HeaderIdMasterMagic) return ErrorCode(CommonError::InvalidFileFormat);
     return Hash(header.Name());
 }
 

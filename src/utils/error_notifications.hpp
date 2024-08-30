@@ -32,6 +32,8 @@ struct ThreadsafeErrorNotifications {
         items.DeleteRemovedAndUnreferenced();
     }
 
+    // returns an uninitialised node so that you can fill in the actual details rather than copying other
+    // allocated formatted strings
     ItemList::Node* NewError() {
         writer_mutex.Lock();
         DEFER { writer_mutex.Unlock(); };

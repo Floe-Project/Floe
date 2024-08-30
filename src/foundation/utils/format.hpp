@@ -46,7 +46,7 @@ f32 or f64           | g          | Auto-float (uses scientific notation if need
 f32 or f64           | .<number>  | float precision e.g. {.2}
 integer              | x          | Hexadecimal
 integer              | +          | Show a + if the number is positive
-ErrorCode            | d          | Print the debug info of the error
+ErrorCode            | u          | Don't print the debug info of the error
 
 */
 
@@ -56,7 +56,7 @@ struct FormatOptions {
     bool show_plus = false;
     String float_precision {};
     bool is_string_literal {};
-    bool error_debug_info = !PRODUCTION_BUILD;
+    bool error_debug_info = true;
     u64 required_width {};
     char padding_character {};
 };
@@ -293,14 +293,11 @@ PUBLIC ErrorCodeOr<void> ValueToString(Writer writer, T const& value, FormatOpti
         // IMPROVE: support width option
         ASSERT(options.required_width == 0);
         if (value.category == nullptr) return writer.WriteChars("success");
+        if (value.category->message) TRY(value.category->message(writer, value));
+        TRY(writer.WriteChars(" (error "));
         TRY(writer.WriteChars(FromNullTerminated(value.category->category_id)));
-        TRY(writer.WriteChar('['));
         TRY(writer.WriteChars(IntToString(value.code)));
-        TRY(writer.WriteChar(']'));
-        if (value.category->message) {
-            TRY(writer.WriteChars(": "));
-            TRY(value.category->message(writer, value));
-        }
+        TRY(writer.WriteChar(')'));
         if (options.error_debug_info) {
             TRY(writer.WriteChar('\n'));
 
@@ -393,7 +390,7 @@ static ErrorCodeOr<BraceSectionResult> ParseBraceSection(Writer writer, char con
                         i += num_numbers;
                         break;
                     }
-                    case 'd': options.error_debug_info = true; break;
+                    case 'u': options.error_debug_info = false; break;
                     default: Panic("Unknown options inside {}");
                 }
             }

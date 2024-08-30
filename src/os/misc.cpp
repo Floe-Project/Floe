@@ -21,11 +21,13 @@ static constexpr ErrorCodeCategory k_errno_category {
             PanicIfReached();
             return fmt::FormatToWriter(writer, "strerror failed: {}", strerror_return_code);
         } else {
+            if (buffer[0] != '\0') buffer[0] = ToUppercaseAscii(buffer[0]);
             return writer.WriteChars(FromNullTerminated(buffer));
         }
 #else
         char buffer[200] {};
         strerror_r((int)code.code, buffer, ArraySize(buffer));
+        if (buffer[0] != '\0') buffer[0] = ToUppercaseAscii(buffer[0]);
         return writer.WriteChars(FromNullTerminated(buffer));
 #endif
     },

@@ -54,7 +54,7 @@ static ErrorCodeOr<ImageBytesManaged> DecodeJpgOrPng(Span<u8 const> image_data) 
                                             &actual_number_channels,
                                             k_rgba_channels);
 
-    if (!rgba) return ErrorCode(CommonError::FileFormatIsInvalid);
+    if (!rgba) return ErrorCode(CommonError::InvalidFileFormat);
 
     return ImageBytes {
         .rgba = rgba,

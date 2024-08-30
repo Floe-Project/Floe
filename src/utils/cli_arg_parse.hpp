@@ -183,13 +183,13 @@ enum class CliError {
 };
 PUBLIC ErrorCodeCategory const& CliErrorCodeType() {
     static constexpr ErrorCodeCategory const k_cat {
-        .category_id = "CLI",
+        .category_id = "CL",
         .message =
             [](Writer const& writer, ErrorCode e) {
                 return writer.WriteChars(({
                     String s {};
                     switch ((CliError)e.code) {
-                        case CliError::InvalidArguments: s = "Invalid CLI arguments"; break;
+                        case CliError::InvalidArguments: s = "Invalid arguments"; break;
                         case CliError::HelpRequested: s = "Help requested"; break;
                     }
                     s;

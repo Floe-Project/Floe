@@ -5,9 +5,9 @@
 #include "foundation/foundation.hpp"
 
 enum class CommonError {
-    FileFormatIsInvalid,
+    InvalidFileFormat,
     PluginHostError,
-    CurrentVersionTooOld,
+    CurrentFloeVersionTooOld,
     NotFound,
 };
 

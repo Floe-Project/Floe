@@ -151,35 +151,60 @@ PUBLIC ErrorCodeCategory const& PackageErrorCodeType() {
 }
 PUBLIC ErrorCodeCategory const& ErrorCategoryForEnum(PackageError) { return PackageErrorCodeType(); }
 
+static bool ErrorExtracting(String path,
+                            Optional<ErrorCode> error_code,
+                            ThreadsafeErrorNotifications& error_notifications) {
+    auto item = error_notifications.NewError();
+    item->value = {
+        .title = "Package error"_s,
+        .error_code = error_code,
+        .id = ThreadsafeErrorNotifications::Id("pkg ", path),
+    };
+    fmt::Assign(item->value.message, "Package file name: {}", path::Filename(path));
+    error_notifications.AddOrUpdateError(item);
+    return false;
+}
+
+static bool ExtractLibrary(mz_zip_archive& zip,
+                           String package_path,
+                           String library_dir_in_zip,
+                           String destination_folder,
+                           ThreadsafeErrorNotifications& error_notifications) {
+    (void)destination_folder;
+    for (auto file_index : Range(mz_zip_reader_get_num_files(&zip))) {
+        mz_zip_archive_file_stat file_stat;
+        if (!mz_zip_reader_file_stat(&zip, file_index, &file_stat))
+            return ErrorExtracting(package_path,
+                                   ErrorCode {PackageError::FileCorrupted},
+                                   error_notifications);
+
+        if (file_stat.m_is_directory) continue;
+
+        auto const file_name = FromNullTerminated(file_stat.m_filename);
+        if (StartsWithSpan(file_name, library_dir_in_zip)) {
+            // TODO
+        }
+    }
+
+    return true;
+}
+
 PUBLIC bool InstallPackage(String package_path,
                            String libraries_path,
                            String presets_path,
                            ThreadsafeErrorNotifications& error_notifications) {
-    (void)libraries_path;
     (void)presets_path;
     ASSERT(IsPathPackageFile(package_path));
 
-    auto const error = [&](String path, Optional<ErrorCode> error_code) {
-        auto item = error_notifications.NewError();
-        item->value = {
-            .title = "Package error"_s,
-            .error_code = error_code,
-            .id = ThreadsafeErrorNotifications::Id("pkg ", package_path),
-        };
-        fmt::Assign(item->value.message, "Package file name: {}", path::Filename(path));
-        error_notifications.AddOrUpdateError(item);
-        return false;
-    };
-
     auto package_file = ({
         auto o = OpenFile(package_path, FileMode::Read);
-        if (o.HasError()) return error(package_path, o.Error());
+        if (o.HasError()) return ErrorExtracting(package_path, o.Error(), error_notifications);
         o.ReleaseValue();
     });
 
     auto const package_file_size = ({
         auto const o = package_file.FileSize();
-        if (o.HasError()) return error(package_path, o.Error());
+        if (o.HasError()) return ErrorExtracting(package_path, o.Error(), error_notifications);
         o.Value();
     });
 
@@ -197,18 +222,37 @@ PUBLIC bool InstallPackage(String package_path,
     zip.m_pIO_opaque = &package_file;
 
     if (!mz_zip_reader_init(&zip, package_file_size, 0))
-        return error(package_path, ErrorCode {PackageError::FileCorrupted});
+        return ErrorExtracting(package_path, ErrorCode {PackageError::FileCorrupted}, error_notifications);
     DEFER { mz_zip_reader_end(&zip); };
 
     auto const has_libraries = mz_zip_reader_locate_file(&zip, k_libraries_subdir.data, nullptr, 0) != -1;
     auto const has_presets = mz_zip_reader_locate_file(&zip, k_presets_subdir.data, nullptr, 0) != -1;
-    if (!has_libraries && !has_presets) return error(package_path, ErrorCode {PackageError::NotFloePackage});
+    if (!has_libraries && !has_presets)
+        return ErrorExtracting(package_path, ErrorCode {PackageError::NotFloePackage}, error_notifications);
 
     // validate checksum
     if (!mz_zip_validate_archive(&zip, 0))
-        return error(package_path, ErrorCode {PackageError::FileCorrupted});
+        return ErrorExtracting(package_path, ErrorCode {PackageError::FileCorrupted}, error_notifications);
 
-    // TODO: read
+    for (auto file_index : Range(mz_zip_reader_get_num_files(&zip))) {
+        mz_zip_archive_file_stat file_stat;
+        if (!mz_zip_reader_file_stat(&zip, file_index, &file_stat))
+            return ErrorExtracting(package_path,
+                                   ErrorCode {PackageError::FileCorrupted},
+                                   error_notifications);
+
+        auto const file_name = FromNullTerminated(file_stat.m_filename);
+
+        if (file_stat.m_is_directory) {
+            auto const parent = path::Directory(file_name, path::Format::Posix);
+            if (parent == k_libraries_subdir) {
+                if (!ExtractLibrary(zip, package_path, file_name, libraries_path, error_notifications))
+                    return false;
+            } else if (parent == k_presets_subdir) {
+                // IMPROVE: extract presets
+            }
+        }
+    }
 
     return false;
 }

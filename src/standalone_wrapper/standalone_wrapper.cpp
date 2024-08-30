@@ -432,7 +432,7 @@ inline ErrorCodeCategory const& ErrorCategoryForEnum(StandaloneError) { return s
 #define TRY_CLAP(expression)                                                                                 \
     ({                                                                                                       \
         const auto CONCAT(st, __LINE__) = (expression);                                                      \
-        if (!CONCAT(st, __LINE__)) return ErrorCode {StandaloneError::PlugnInterfaceError};                  \
+        if (!CONCAT(st, __LINE__)) return ErrorCode {StandaloneError::PluginInterfaceError};                 \
     })
 
 extern clap_plugin_entry const clap_entry;

@@ -11,6 +11,19 @@ Floe sample libraries are plain, open folders of audio files (FLAC or WAV). They
 
 It is a new format, along the same lines as SFZ or DecentSampler but focusing on ease-of-use and extensibility, and bringing the power of a full programming language to ease developing complicated library configurations.
 
+```
+📂FrozenPlain - Slow/
+├── 📄slow.floe.lua
+├── 📄Licence.html
+├── 📄About Slow.html
+├── 📁Samples/
+│   ├── 📄synth_sustain_c4.flac
+│   └── 📄synth_sustain_d4.flac
+└── 📁Images/
+    ├── 📄background.png
+    └── 📄icon.png
+```
+
 ## Developer documentation
 
 Sample libraries are configured using a file written in the Lua programming language[^MDATA] (version {{#include ../mdbook_config.txt:lua-version}}).

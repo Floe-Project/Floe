@@ -9,6 +9,7 @@
 #include "utils/debug/debug.hpp"
 #include "utils/error_notifications.hpp"
 
+#include "checksum_crc32_file.hpp"
 #include "sample_library/sample_library.hpp"
 
 namespace package {
@@ -111,6 +112,13 @@ static ErrorCodeOr<void> WriterAddAllFiles(mz_zip_archive& zip,
     return k_success;
 }
 
+static Optional<String> RelativePathIfInFolder(String path, String folder) {
+    if (path.size < folder.size) return nullopt;
+    if (path[folder.size] != '/') return nullopt;
+    if (!StartsWithSpan(path, folder)) return nullopt;
+    return path.SubSpan(folder.size + 1);
+}
+
 static void
 WriterAddChecksumForFolder(mz_zip_archive& zip, String folder_in_archive, ArenaAllocator& scratch_arena) {
     DynamicArray<char> checksums {scratch_arena};
@@ -122,15 +130,17 @@ WriterAddChecksumForFolder(mz_zip_archive& zip, String folder_in_archive, ArenaA
                    mz_zip_get_error_string(mz_zip_get_last_error(&zip)));
 
         if (file_stat.m_is_directory) continue;
-        auto const filename = FromNullTerminated(file_stat.m_filename);
 
-        if (!StartsWithSpan(filename, folder_in_archive)) continue;
-        if (folder_in_archive.size == filename.size) continue;
-        if (filename[folder_in_archive.size] != '/') continue;
+        auto const relative_path =
+            RelativePathIfInFolder(FromNullTerminated(file_stat.m_filename), folder_in_archive);
+        if (!relative_path) continue;
 
-        auto const relative_path = filename.SubSpan(folder_in_archive.size + 1);
-
-        fmt::Append(checksums, "{08x} {} {}\n", file_stat.m_crc32, file_stat.m_uncomp_size, relative_path);
+        AppendChecksumLine(checksums,
+                           {
+                               .path = *relative_path,
+                               .crc32 = (u32)file_stat.m_crc32,
+                               .file_size = file_stat.m_uncomp_size,
+                           });
     }
     WriterAddFile(zip,
                   path::Join(scratch_arena, Array {folder_in_archive, k_checksums_file}, path::Format::Posix),
@@ -219,9 +229,12 @@ PUBLIC ErrorCodeCategory const& PackageErrorCodeType() {
 }
 PUBLIC ErrorCodeCategory const& ErrorCategoryForEnum(PackageError) { return PackageErrorCodeType(); }
 
+namespace detail {
+
 static bool ErrorExtracting(String path,
                             Optional<ErrorCode> error_code,
-                            ThreadsafeErrorNotifications& error_notifications) {
+                            ThreadsafeErrorNotifications& error_notifications,
+                            String extra_message = {}) {
     auto item = error_notifications.NewError();
     item->value = {
         .title = "Package error"_s,
@@ -229,16 +242,69 @@ static bool ErrorExtracting(String path,
         .id = ThreadsafeErrorNotifications::Id("pkg ", path),
     };
     fmt::Assign(item->value.message, "Package file name: {}", path::Filename(path));
+    if (extra_message.size) fmt::Append(item->value.message, "\n{}", extra_message);
     error_notifications.AddOrUpdateError(item);
     return false;
+}
+
+static Optional<mz_zip_archive_file_stat> FindFloeLuaInZipInLibrary(mz_zip_archive& zip,
+                                                                    String library_dir_in_zip) {
+    for (auto const file_index : Range(mz_zip_reader_get_num_files(&zip))) {
+        mz_zip_archive_file_stat file_stat;
+        if (!mz_zip_reader_file_stat(&zip, file_index, &file_stat)) return {};
+
+        if (file_stat.m_is_directory) continue;
+        auto const relative_path =
+            RelativePathIfInFolder(FromNullTerminated(file_stat.m_filename), library_dir_in_zip);
+        if (!relative_path) continue;
+        if (Contains(*relative_path, '/')) continue;
+
+        if (sample_lib::FilenameIsFloeLuaFile(*relative_path)) return file_stat;
+    }
+    return nullopt;
+}
+
+static Optional<Span<u8 const>>
+ExtractFile(mz_zip_archive& zip, mz_zip_archive_file_stat const& file_stat, ArenaAllocator& arena) {
+    auto const data = arena.AllocateExactSizeUninitialised<u8>(file_stat.m_uncomp_size);
+    if (!mz_zip_reader_extract_to_mem(&zip, file_stat.m_file_index, data.data, data.size, 0)) return nullopt;
+    return data;
 }
 
 static bool ExtractLibrary(mz_zip_archive& zip,
                            String package_path,
                            String library_dir_in_zip,
                            String destination_folder,
-                           ThreadsafeErrorNotifications& error_notifications) {
+                           ThreadsafeErrorNotifications& error_notifications,
+                           ArenaAllocator& scratch_arena) {
     (void)destination_folder;
+
+    auto const floe_lua_stat = FindFloeLuaInZipInLibrary(zip, library_dir_in_zip);
+    if (!floe_lua_stat)
+        return ErrorExtracting(
+            package_path,
+            ErrorCode {PackageError::NotFloePackage},
+            error_notifications,
+            fmt::Format(scratch_arena, "{} is missing floe.lua file", path::Filename(library_dir_in_zip)));
+
+    auto const floe_lua_data = ExtractFile(zip, *floe_lua_stat, scratch_arena);
+    if (!floe_lua_data)
+        return ErrorExtracting(package_path, ErrorCode {PackageError::FileCorrupted}, error_notifications);
+
+    auto lua_reader = Reader::FromMemory(*floe_lua_data);
+    auto const lib = sample_lib::ReadLua(lua_reader,
+                                         FromNullTerminated(floe_lua_stat->m_filename),
+                                         scratch_arena,
+                                         scratch_arena);
+    if (lib.HasError())
+        return ErrorExtracting(package_path,
+                               ErrorCode {PackageError::NotFloePackage},
+                               error_notifications,
+                               fmt::Format(scratch_arena,
+                                           "{} does not have a valid floe.lua file"_s,
+                                           path::Filename(library_dir_in_zip)));
+
+#if 0
     for (auto file_index : Range(mz_zip_reader_get_num_files(&zip))) {
         mz_zip_archive_file_stat file_stat;
         if (!mz_zip_reader_file_stat(&zip, file_index, &file_stat))
@@ -253,26 +319,30 @@ static bool ExtractLibrary(mz_zip_archive& zip,
             // TODO
         }
     }
+#endif
 
     return true;
 }
 
+} // namespace detail
+
 PUBLIC bool InstallPackage(String package_path,
                            String libraries_path,
                            String presets_path,
-                           ThreadsafeErrorNotifications& error_notifications) {
+                           ThreadsafeErrorNotifications& error_notifications,
+                           ArenaAllocator& scratch_arena) {
     (void)presets_path;
     ASSERT(IsPathPackageFile(package_path));
 
     auto package_file = ({
         auto o = OpenFile(package_path, FileMode::Read);
-        if (o.HasError()) return ErrorExtracting(package_path, o.Error(), error_notifications);
+        if (o.HasError()) return detail::ErrorExtracting(package_path, o.Error(), error_notifications);
         o.ReleaseValue();
     });
 
     auto const package_file_size = ({
         auto const o = package_file.FileSize();
-        if (o.HasError()) return ErrorExtracting(package_path, o.Error(), error_notifications);
+        if (o.HasError()) return detail::ErrorExtracting(package_path, o.Error(), error_notifications);
         o.Value();
     });
 
@@ -290,31 +360,39 @@ PUBLIC bool InstallPackage(String package_path,
     zip.m_pIO_opaque = &package_file;
 
     if (!mz_zip_reader_init(&zip, package_file_size, 0))
-        return ErrorExtracting(package_path, ErrorCode {PackageError::FileCorrupted}, error_notifications);
+        return detail::ErrorExtracting(package_path,
+                                       ErrorCode {PackageError::FileCorrupted},
+                                       error_notifications);
     DEFER { mz_zip_reader_end(&zip); };
 
     auto const has_libraries = mz_zip_reader_locate_file(&zip, k_libraries_subdir.data, nullptr, 0) != -1;
     auto const has_presets = mz_zip_reader_locate_file(&zip, k_presets_subdir.data, nullptr, 0) != -1;
     if (!has_libraries && !has_presets)
-        return ErrorExtracting(package_path, ErrorCode {PackageError::NotFloePackage}, error_notifications);
-
-    // validate checksum
-    if (!mz_zip_validate_archive(&zip, 0))
-        return ErrorExtracting(package_path, ErrorCode {PackageError::FileCorrupted}, error_notifications);
+        return detail::ErrorExtracting(package_path,
+                                       ErrorCode {PackageError::NotFloePackage},
+                                       error_notifications);
 
     for (auto file_index : Range(mz_zip_reader_get_num_files(&zip))) {
         mz_zip_archive_file_stat file_stat;
         if (!mz_zip_reader_file_stat(&zip, file_index, &file_stat))
-            return ErrorExtracting(package_path,
-                                   ErrorCode {PackageError::FileCorrupted},
-                                   error_notifications);
+            return detail::ErrorExtracting(package_path,
+                                           ErrorCode {PackageError::FileCorrupted},
+                                           error_notifications);
 
         auto const file_name = FromNullTerminated(file_stat.m_filename);
 
         if (file_stat.m_is_directory) {
             auto const parent = path::Directory(file_name, path::Format::Posix);
             if (parent == k_libraries_subdir) {
-                if (!ExtractLibrary(zip, package_path, file_name, libraries_path, error_notifications))
+                auto const cursor = scratch_arena.TotalUsed();
+                DEFER { scratch_arena.TryShrinkTotalUsed(cursor); };
+
+                if (!detail::ExtractLibrary(zip,
+                                            package_path,
+                                            file_name,
+                                            libraries_path,
+                                            error_notifications,
+                                            scratch_arena))
                     return false;
             } else if (parent == k_presets_subdir) {
                 // IMPROVE: extract presets

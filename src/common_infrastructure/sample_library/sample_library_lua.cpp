@@ -1126,10 +1126,6 @@ LibraryPtrOrError ReadLua(Reader& reader,
                           ArenaAllocator& result_arena,
                           ArenaAllocator& scratch_arena,
                           Options options) {
-    ASSERT(&result_arena != &scratch_arena);
-    auto const scratch_cursor = scratch_arena.TotalUsed();
-    DEFER { scratch_arena.TryShrinkTotalUsed(scratch_cursor); };
-
     LuaState ctx {
         .result_arena = result_arena,
         .lua_arena = scratch_arena,

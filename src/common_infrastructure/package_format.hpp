@@ -16,6 +16,7 @@ namespace package {
 constexpr String k_libraries_subdir = "Libraries";
 constexpr String k_presets_subdir = "Presets";
 constexpr String k_file_extension = ".floe.zip"_s;
+constexpr String k_checksums_file = ".Floe-Details/checksums.crc32"_s;
 
 PUBLIC bool IsPathPackageFile(String path) { return EndsWithSpan(path, k_file_extension); }
 
@@ -110,22 +111,53 @@ static ErrorCodeOr<void> WriterAddAllFiles(mz_zip_archive& zip,
     return k_success;
 }
 
+static void
+WriterAddChecksumForFolder(mz_zip_archive& zip, String folder_in_archive, ArenaAllocator& scratch_arena) {
+    DynamicArray<char> checksums {scratch_arena};
+    for (auto const file_index : Range(mz_zip_reader_get_num_files(&zip))) {
+        mz_zip_archive_file_stat file_stat;
+        if (!mz_zip_reader_file_stat(&zip, file_index, &file_stat))
+            PanicF(SourceLocation::Current(),
+                   "Failed to get file stat: {}",
+                   mz_zip_get_error_string(mz_zip_get_last_error(&zip)));
+
+        if (file_stat.m_is_directory) continue;
+        auto const filename = FromNullTerminated(file_stat.m_filename);
+
+        if (!StartsWithSpan(filename, folder_in_archive)) continue;
+        if (folder_in_archive.size == filename.size) continue;
+        if (filename[folder_in_archive.size] != '/') continue;
+
+        auto const relative_path = filename.SubSpan(folder_in_archive.size + 1);
+
+        fmt::Append(checksums, "{08x} {} {}\n", file_stat.m_crc32, file_stat.m_uncomp_size, relative_path);
+    }
+    WriterAddFile(zip,
+                  path::Join(scratch_arena, Array {folder_in_archive, k_checksums_file}, path::Format::Posix),
+                  checksums.Items().ToByteSpan());
+}
+
 } // namespace detail
 
 PUBLIC ErrorCodeOr<void>
 WriterAddLibrary(mz_zip_archive& zip, sample_lib::Library const& lib, ArenaAllocator& scratch_arena) {
-    return detail::WriterAddAllFiles(zip,
-                                     *path::Directory(lib.path),
-                                     scratch_arena,
-                                     Array {k_libraries_subdir, lib.name});
+    auto const subdirs =
+        Array {k_libraries_subdir, fmt::Format(scratch_arena, "{} - {}", lib.author, lib.name)};
+    TRY(detail::WriterAddAllFiles(zip, *path::Directory(lib.path), scratch_arena, subdirs));
+    detail::WriterAddChecksumForFolder(zip,
+                                       path::Join(scratch_arena, subdirs, path::Format::Posix),
+                                       scratch_arena);
+    return k_success;
 }
 
 PUBLIC ErrorCodeOr<void>
 WriterAddPresetsFolder(mz_zip_archive& zip, String folder, ArenaAllocator& scratch_arena) {
-    return detail::WriterAddAllFiles(zip,
-                                     folder,
-                                     scratch_arena,
-                                     Array {k_presets_subdir, path::Filename(folder)});
+    auto const subdirs = Array {k_presets_subdir, path::Filename(folder)};
+    TRY(detail::WriterAddAllFiles(zip, folder, scratch_arena, subdirs));
+    detail::WriterAddChecksumForFolder(zip,
+                                       path::Join(scratch_arena, subdirs, path::Format::Posix),
+                                       scratch_arena);
+    return k_success;
 }
 
 enum class PackageError {

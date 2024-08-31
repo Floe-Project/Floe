@@ -160,6 +160,42 @@ WriterAddPresetsFolder(mz_zip_archive& zip, String folder, ArenaAllocator& scrat
     return k_success;
 }
 
+// =================================================================================================
+
+/* TODO: the loading a package format
+ *
+ * InstallLibrary:
+ * - extract the library to a temp folder
+ *   - If the extraction completed successfully
+ *     - do an atomic rename to the final location
+ *     - done, success
+ *   - If the extraction failed
+ *     - delete the temp folder
+ *     - done, show an error
+ *
+ * IsUnchangedSinceInstalled:
+ * - if the library folder doesn't have a .checksums.crc32 file return 'false'
+ * - read the .checksums.crc32 file
+ * - if any current file's checksum deviates from the stored checksum return 'false'
+ * - else return 'true'
+ *
+ *
+ * For each library in the package:
+ * - Get the floe.lua file from the package
+ * - Read the floe.lua file
+ * - If the library author+name is not already installed in any library folder (ask the sample library server)
+ *   - InstallPackage
+ * - If it is
+ *   - Compare the version of the installed library vs the version in the package
+ *   - Check IsUnchangedSinceInstalled
+ *   - If the version in the package is newer AND the current installed library unchanged
+ *     - InstallPackage, it's safe to overwrite: libraries are backwards compatible
+ *     - return
+ *   - Else
+ *     - Ask the user if they want to overwrite, giving information about versions and files that have changed
+ *
+ */
+
 enum class PackageError {
     FileCorrupted,
     NotFloePackage,

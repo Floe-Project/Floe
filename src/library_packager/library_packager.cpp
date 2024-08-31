@@ -23,7 +23,16 @@ struct Paths {
 };
 
 ErrorCodeOr<Paths> ScanLibraryFolder(ArenaAllocator& arena, String library_folder) {
-    constexpr auto k_license_filenames = Array {"License.html"_s, "License.txt"};
+    constexpr auto k_license_filenames = Array {
+        "License.html"_s,
+        "License.txt",
+        "License.pdf",
+        "LICENSE",
+        "Licence.html", // british spelling
+        "Licence.txt",
+        "Licence.pdf",
+        "LICENCE",
+    };
 
     Paths result {};
 

@@ -580,6 +580,7 @@ fn genericFlags(context: *BuildContext, target: std.Build.ResolvedTarget, extra_
     try flags.appendSlice(&stb_image_config_flags);
     try flags.append("-DMINIZ_USE_UNALIGNED_LOADS_AND_STORES=0");
     try flags.append("-DMINIZ_NO_STDIO");
+    try flags.append("-DMINIZ_NO_ZLIB_COMPATIBLE_NAME");
     try flags.append(context.b.fmt("-DMINIZ_LITTLE_ENDIAN={d}", .{@intFromBool(target.result.cpu.arch.endian() == .little)}));
     try flags.append("-DMINIZ_HAS_64BIT_REGISTERS=1");
 

@@ -21,6 +21,7 @@
     X(RegisterVolumeFadeTests)                                                                               \
     X(RegisterStateCodingTests)                                                                              \
     X(RegisterAudioFileTests)                                                                                \
+    X(RegisterChecksumFileTests)                                                                             \
     X(RegisterPresetTests)                                                                                   \
     X(RegisterLibraryLuaTests)                                                                               \
     X(RegisterLibraryMdataTests)                                                                             \

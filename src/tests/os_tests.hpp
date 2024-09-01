@@ -159,7 +159,7 @@ TEST_CASE(TestFilesystem) {
         }
 
         SUBCASE("basic actions") {
-            if (auto o = ConvertToAbsolutePath(a, "."); o.HasValue()) {
+            if (auto o = CanonicalizePath(a, "."); o.HasValue()) {
                 auto& dir = o.Value();
 
                 SUBCASE("all files") {
@@ -217,7 +217,7 @@ TEST_CASE(TestFilesystem) {
         auto check = [&](String str, bool expecting_success) {
             CAPTURE(str);
             CAPTURE(expecting_success);
-            auto o = ConvertToAbsolutePath(a, str);
+            auto o = CanonicalizePath(a, str);
             if (!expecting_success) {
                 REQUIRE(o.HasError());
                 return;

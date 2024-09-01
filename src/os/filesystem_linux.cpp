@@ -141,7 +141,7 @@ ErrorCodeOr<void> CopyFile(String from, String to, ExistingDestinationHandling e
     return k_success;
 }
 
-ErrorCodeOr<MutableString> ConvertToAbsolutePath(Allocator& a, String path) {
+ErrorCodeOr<MutableString> CanonicalizePath(Allocator& a, String path) {
     ASSERT(path.size);
 
     PathArena temp_path_allocator;
@@ -160,15 +160,6 @@ ErrorCodeOr<MutableString> ConvertToAbsolutePath(Allocator& a, String path) {
     if (path::IsAbsolute(result_path)) return result_path.Clone(a);
 
     return FilesystemErrnoErrorCode(errno);
-}
-
-ErrorCodeOr<MutableString> ResolveSymlinks(Allocator& a, String path) {
-    ASSERT(path.size);
-    PathArena temp_path_allocator;
-
-    char result[PATH_MAX] {};
-    auto _ = realpath(NullTerminated(path, temp_path_allocator), result);
-    return FromNullTerminated(result).Clone(a);
 }
 
 ErrorCodeOr<void> Delete(String path, DeleteOptions options) {
@@ -255,7 +246,7 @@ ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectories type) {
         case KnownDirectories::Count: PanicIfReached();
     }
 
-    return TRY(ConvertToAbsolutePath(a, rel_path));
+    return TRY(CanonicalizePath(a, rel_path));
 }
 
 ErrorCodeOr<DynamicArrayInline<char, 200>> NameOfRunningExecutableOrLibrary() { return "unknown"_s; }

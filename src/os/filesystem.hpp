@@ -173,12 +173,14 @@ ErrorCodeOr<void> Delete(String path, DeleteOptions options);
 // Returns true if there was a bundle and it was successfully deleted
 ErrorCodeOr<bool> DeleteDirectoryIfMacBundle(String dir);
 
-// Turns a relative path into an absolute path.
-// Windows: if you pass in a path that starts with a slash you will get that same path prefixed with the
-// current drive specifier, e.g. C:/my-path
-ErrorCodeOr<MutableString> ConvertToAbsolutePath(Allocator& a, String path);
-
-ErrorCodeOr<MutableString> ResolveSymlinks(Allocator& a, String path);
+// - Turns a relative path into an absolute path.
+// - Resolves ../ and ./ components.
+// Unix:
+// - Replaces tilde ~ with the user's home directory.
+// Windows:
+// - Add the drive specifier if it's missing.
+// - Replaces / with \.
+ErrorCodeOr<MutableString> CanonicalizePath(Allocator& a, String path);
 
 ErrorCodeOr<void> MoveFileOrDirIntoFolder(String from, String to, ExistingDestinationHandling existing);
 
@@ -225,6 +227,9 @@ ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments args);
 When creating one of these iterators, they will not return an error if no files that match the pattern, but
 instead it will return false to HasMoreFiles().
 
+Every entry begins with the canonical base path (CanonicalBasePath()), so it's ok to offset into the path to
+get the relative path.
+
 Usage:
 
 auto it = TRY(DirectoryIterator::Create(alloc, folder, "*"));
@@ -266,6 +271,7 @@ class DirectoryIterator {
     DirectoryEntry const& Get() const { return m_e; }
     bool HasMoreFiles() const { return !m_reached_end; }
     ErrorCodeOr<void> Increment();
+    String CanonicalBasePath() const { return m_e.path.Items().SubSpan(0, m_base_path_size); }
 
   private:
     DirectoryIterator(String p, Allocator& a) : m_e(p, a), m_wildcard(a) {}
@@ -287,13 +293,15 @@ class RecursiveDirectoryIterator {
     DirectoryEntry const& Get() const { return Last(m_stack).Get(); }
     bool HasMoreFiles() const { return m_stack.size; }
     ErrorCodeOr<void> Increment();
+    String CanonicalBasePath() const { return m_canonical_base_path; }
 
   private:
-    RecursiveDirectoryIterator(Allocator& a) : m_a(a), m_wildcard(a), m_stack(a) {}
+    RecursiveDirectoryIterator(Allocator& a) : m_a(a), m_wildcard(a), m_stack(a), m_canonical_base_path(a) {}
 
     Allocator& m_a;
     DynamicArray<char> m_wildcard;
     DynamicArray<DirectoryIterator> m_stack;
+    DynamicArray<char> m_canonical_base_path;
     bool m_get_file_size {};
     bool m_skip_dot_files {};
 };
@@ -533,7 +541,7 @@ struct DirectoryWatcher {
             new_dir->path = path;
             // some backends (FSEvents) give use events containing paths with resolved symlinks, so we need
             // to resolve it ourselves to be able to correctly compare paths
-            new_dir->resolved_path = ResolveSymlinks(new_dir->arena, dir_to_watch.path).ValueOr(path);
+            new_dir->resolved_path = CanonicalizePath(new_dir->arena, dir_to_watch.path).ValueOr(path);
             new_dir->directory_changes.linked_dir_to_watch = &dir_to_watch;
         }
 

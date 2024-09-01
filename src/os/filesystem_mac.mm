@@ -82,26 +82,14 @@ ErrorCodeOr<void> CopyFile(String from, String to, ExistingDestinationHandling e
     return k_success;
 }
 
-ErrorCodeOr<MutableString> ConvertToAbsolutePath(Allocator& a, String path) {
+ErrorCodeOr<MutableString> CanonicalizePath(Allocator& a, String path) {
     ASSERT(path.size);
     auto nspath = StringToNSString(path);
     if (StartsWith(path, '~')) nspath = nspath.stringByExpandingTildeInPath;
-    auto url = [NSURL fileURLWithPath:nspath];
-    if (url == nil) return FilesystemErrorFromNSError(nullptr);
-    auto abs_string = [url path];
-    if (abs_string == nil) return FilesystemErrorFromNSError(nullptr);
 
-    auto result = NSStringToString(abs_string).Clone(a);
-    ASSERT(path::IsAbsolute(result));
-    return result;
-}
-
-// NOTE: on macOS there are some 'firmlinks' which are like symlinks but are resolved by the kernel.
-// These firmlinks are not resolved if we use the NSString resolving functions, so we use realpath.
-// e.g. /var -> /private/var only happens with realpath
-ErrorCodeOr<MutableString> ResolveSymlinks(Allocator& a, String path) {
-    ASSERT(path.size);
-    auto nspath = StringToNSString(path);
+    // NOTE: on macOS there are some 'firmlinks' which are like symlinks but are resolved by the kernel.
+    // These firmlinks are not resolved if we use the NSString resolving functions, so we use realpath.
+    // e.g. /var -> /private/var only happens with realpath
     char resolved_path[PATH_MAX * 2];
     if (realpath([nspath fileSystemRepresentation], resolved_path) == nullptr)
         return FilesystemErrnoErrorCode(errno);

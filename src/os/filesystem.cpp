@@ -268,6 +268,7 @@ RecursiveDirectoryIterator::Create(Allocator& allocator, String path, DirectoryI
     dyn::Assign(result.m_wildcard, options.wildcard);
     result.m_get_file_size = options.get_file_size;
     result.m_skip_dot_files = options.skip_dot_files;
+    dyn::Assign(result.m_canonical_base_path, it.CanonicalBasePath());
     if (it.HasMoreFiles()) dyn::Append(result.m_stack, Move(it));
 
     return result;

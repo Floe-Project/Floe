@@ -3,6 +3,7 @@
 
 #include <dirent.h>
 #include <errno.h>
+#include <stdlib.h>
 #include <sys/file.h>
 #include <sys/stat.h>
 
@@ -47,10 +48,14 @@ ErrorCodeOr<s64> LastWriteTime(String path) {
 ErrorCodeOr<DirectoryIterator>
 DirectoryIterator::Create(Allocator& allocator, String path, DirectoryIteratorOptions options) {
     PathArena temp_path_allocator;
-    auto handle = ::opendir(NullTerminated(path, temp_path_allocator));
+    char path_buffer[PATH_MAX * 2];
+    auto const real_path = realpath(NullTerminated(path, temp_path_allocator), path_buffer);
+    if (real_path == nullptr) return FilesystemErrnoErrorCode(errno, "realpath");
+
+    auto handle = ::opendir(real_path);
     if (!handle) return FilesystemErrnoErrorCode(errno, "opendir");
 
-    DirectoryIterator result {path, allocator};
+    DirectoryIterator result {FromNullTerminated(real_path), allocator};
     result.m_handle = handle;
     result.m_base_path_size = result.m_e.path.size;
     dyn::Assign(result.m_wildcard, options.wildcard);

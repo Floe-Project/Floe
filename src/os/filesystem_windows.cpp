@@ -336,7 +336,7 @@ ErrorCodeOr<FileType> GetFileType(String absolute_path) {
     return FileType::File;
 }
 
-ErrorCodeOr<MutableString> ConvertToAbsolutePath(Allocator& a, String path) {
+ErrorCodeOr<MutableString> CanonicalizePath(Allocator& a, String path) {
     ASSERT(path.size);
 
     PathArena temp_path_arena;
@@ -361,12 +361,9 @@ ErrorCodeOr<MutableString> ConvertToAbsolutePath(Allocator& a, String path) {
     auto result = Narrow(a, wide_result).Value();
     ASSERT(!path::IsPathSeparator(Last(result)));
     ASSERT(path::IsAbsolute(result));
+    for (auto& c : result)
+        if (c == '/') c = '\\';
     return result;
-}
-
-ErrorCodeOr<MutableString> ResolveSymlinks(Allocator& a, String path) {
-    // TODO:
-    return path.Clone(a);
 }
 
 static ErrorCodeOr<void> Win32DeleteDirectory(WString windows_path, ArenaAllocator& arena) {
@@ -555,22 +552,24 @@ static bool ShouldSkipFile(const WCHAR* null_term_filename, bool skip_dot_files)
 }
 
 ErrorCodeOr<DirectoryIterator>
-DirectoryIterator::Create(Allocator& a, String path, DirectoryIteratorOptions options) {
+DirectoryIterator::Create(Allocator& a, String path_uncanonical, DirectoryIteratorOptions options) {
     ASSERT(options.wildcard.size);
 
     PathArena temp_path_arena;
-    auto path_with_wildcard = path::Join(temp_path_arena, Array {path, options.wildcard});
+    auto path = DynamicArray<char>::FromOwnedSpan(TRY(CanonicalizePath(temp_path_arena, path_uncanonical)),
+                                                  temp_path_arena);
 
     DirectoryIterator result {path, a};
 
+    path::JoinAppend(path, options.wildcard);
+
     WIN32_FIND_DATAW data {};
-    auto handle =
-        FindFirstFileExW(TRY(path::MakePathForWin32(path_with_wildcard, temp_path_arena, true)).path.data,
-                         FindExInfoBasic,
-                         &data,
-                         FindExSearchNameMatch,
-                         nullptr,
-                         FIND_FIRST_EX_LARGE_FETCH);
+    auto handle = FindFirstFileExW(TRY(path::MakePathForWin32(path, temp_path_arena, true)).path.data,
+                                   FindExInfoBasic,
+                                   &data,
+                                   FindExSearchNameMatch,
+                                   nullptr,
+                                   FIND_FIRST_EX_LARGE_FETCH);
     if (handle == INVALID_HANDLE_VALUE) {
         if (GetLastError() == ERROR_FILE_NOT_FOUND) {
             // The search could not find any files.

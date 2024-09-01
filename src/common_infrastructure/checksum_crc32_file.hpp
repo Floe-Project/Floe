@@ -1,4 +1,6 @@
 #pragma once
+#include <miniz.h>
+
 #include "foundation/foundation.hpp"
 
 #include "common_errors.hpp"
@@ -9,8 +11,13 @@ struct ChecksumLine {
     usize file_size;
 };
 
+// similar format to unix cksum - except cksum uses a different crc algorithm
 PUBLIC void AppendChecksumLine(DynamicArray<char>& buffer, ChecksumLine line) {
     fmt::Append(buffer, "{08x} {} {}\n", line.crc32, line.file_size, line.path);
+}
+
+PUBLIC void AppendCommentLine(DynamicArray<char>& buffer, String comment) {
+    fmt::Append(buffer, "; {}\n", comment);
 }
 
 // A parser for the checksum file format
@@ -19,12 +26,6 @@ struct ChecksumFileParser {
         auto const result = whole.SubSpan(0, size);
         whole = whole.SubSpan(size);
         return result;
-    }
-
-    template <typename OptT>
-    static ErrorCodeOr<typename OptT::ValueType> UnwrapOrError(OptT opt) {
-        if (!opt) return ErrorCode {CommonError::InvalidFileFormat};
-        return opt.Value();
     }
 
     ErrorCodeOr<Optional<ChecksumLine>> ReadLine() {
@@ -60,3 +61,7 @@ struct ChecksumFileParser {
     String const file_data;
     Optional<usize> cursor = 0uz;
 };
+
+inline u32 Crc32(Span<u8 const> data) {
+    return CheckedCast<u32>(mz_crc32(MZ_CRC32_INIT, data.data, data.size));
+}

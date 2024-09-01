@@ -299,6 +299,7 @@ PackageName(ArenaAllocator& arena, sample_lib::Library const* lib, CommandLineAr
 
 static ErrorCodeOr<void> Main(ArgsCstr args) {
     ArenaAllocator arena {PageAllocator::Instance()};
+    auto const program_name = path::Filename(FromNullTerminated(args.args[0]));
 
     auto const cli_args = TRY(ParseCommandLineArgs(StdWriter(g_cli_out.stream),
                                                    arena,
@@ -330,12 +331,12 @@ static ErrorCodeOr<void> Main(ArgsCstr args) {
 
         TRY(WriteAboutLibraryHtml(*lib, arena, paths, library_folder));
 
-        if (create_package) TRY(package::WriterAddLibrary(package, *lib, arena));
+        if (create_package) TRY(package::WriterAddLibrary(package, *lib, arena, program_name));
     }
 
     if (create_package)
         for (auto const preset_folder : cli_args[ToInt(CliArgId::PresetFolder)].values)
-            TRY(package::WriterAddPresetsFolder(package, preset_folder, arena));
+            TRY(package::WriterAddPresetsFolder(package, preset_folder, arena, program_name));
 
     if (create_package) {
         auto const html_template = TRY(FileDataFromBuildResources(arena, "how_to_install_template.html"_s));

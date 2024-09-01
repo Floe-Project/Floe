@@ -580,7 +580,7 @@ fn genericFlags(context: *BuildContext, target: std.Build.ResolvedTarget, extra_
     try flags.appendSlice(&stb_image_config_flags);
     try flags.append("-DMINIZ_USE_UNALIGNED_LOADS_AND_STORES=0");
     try flags.append("-DMINIZ_NO_STDIO");
-    try flags.append("-DMINIZ_NO_ZLIB_COMPATIBLE_NAME");
+    try flags.append("-DMINIZ_NO_ZLIB_COMPATIBLE_NAMES");
     try flags.append(context.b.fmt("-DMINIZ_LITTLE_ENDIAN={d}", .{@intFromBool(target.result.cpu.arch.endian() == .little)}));
     try flags.append("-DMINIZ_HAS_64BIT_REGISTERS=1");
 
@@ -710,6 +710,8 @@ fn applyUniversalSettings(context: *BuildContext, step: *std.Build.Step.Compile)
     step.addIncludePath(context.dep_tracy.path("public"));
     step.addIncludePath(context.dep_valgrind_h.path(""));
     step.addIncludePath(context.dep_portmidi.path("pm_common"));
+    step.addIncludePath(context.dep_miniz.path(""));
+    step.addIncludePath(b.path("third_party_libs/miniz"));
 
     step.addIncludePath(b.path("."));
     step.addIncludePath(b.path("src"));
@@ -1423,12 +1425,6 @@ pub fn build(b: *std.Build) void {
         dr_wav.addIncludePath(build_context.dep_dr_libs.path(""));
         dr_wav.linkLibC();
 
-        const miniz_config = b.addConfigHeader(.{
-            .style = .blank,
-            .include_path = "miniz_export.h",
-        }, .{
-            .MINIZ_EXPORT = {}, // just defined - no value
-        });
         var miniz = b.addStaticLibrary(.{
             .name = "miniz",
             .target = target,
@@ -1447,7 +1443,7 @@ pub fn build(b: *std.Build) void {
             });
             miniz.addIncludePath(build_context.dep_miniz.path(""));
             miniz.linkLibC();
-            miniz.addConfigHeader(miniz_config);
+            miniz.addIncludePath(b.path("third_party_libs/miniz"));
         }
 
         const flac = b.addStaticLibrary(.{ .name = "flac", .target = target, .optimize = build_context.optimise });
@@ -1573,7 +1569,7 @@ pub fn build(b: *std.Build) void {
                     if (build_context.optimise == .Debug) "-DLUA_USE_APICHECK" else "",
                 };
 
-                // compile as C++ so it uses exceptions instead of setjmp/longjmp
+                // compile as C++ so it uses exceptions instead of setjmp/longjmp. we use try/catch when handling lua
                 lua.addCSourceFile(.{ .file = b.path("third_party_libs/lua.cpp"), .flags = &flags });
                 lua.addIncludePath(build_context.dep_lua.path(""));
                 lua.linkLibC();
@@ -1598,6 +1594,7 @@ pub fn build(b: *std.Build) void {
             common_infrastructure.addConfigHeader(build_config_step);
             common_infrastructure.addIncludePath(b.path(path));
             common_infrastructure.linkLibrary(library);
+            common_infrastructure.linkLibrary(miniz);
             applyUniversalSettings(&build_context, common_infrastructure);
             join_compile_commands.step.dependOn(&common_infrastructure.step);
         }
@@ -1696,8 +1693,6 @@ pub fn build(b: *std.Build) void {
             plugin.addIncludePath(b.path("src/plugin/gui/live_edit_defs"));
             plugin.linkLibrary(vitfx);
             plugin.linkLibrary(miniz);
-            plugin.addConfigHeader(miniz_config);
-            plugin.addIncludePath(build_context.dep_miniz.path(""));
             applyUniversalSettings(&build_context, plugin);
             join_compile_commands.step.dependOn(&plugin.step);
         }
@@ -1734,8 +1729,6 @@ pub fn build(b: *std.Build) void {
             library_packager.addIncludePath(b.path("src"));
             library_packager.addConfigHeader(build_config_step);
             library_packager.linkLibrary(miniz);
-            library_packager.addConfigHeader(miniz_config);
-            library_packager.addIncludePath(build_context.dep_miniz.path(""));
             join_compile_commands.step.dependOn(&library_packager.step);
             applyUniversalSettings(&build_context, library_packager);
             b.getInstallStep().dependOn(&b.addInstallArtifact(library_packager, .{ .dest_dir = install_subfolder }).step);
@@ -2512,8 +2505,6 @@ pub fn build(b: *std.Build) void {
                 win_installer.addObject(stb_image);
                 win_installer.linkLibrary(library);
                 win_installer.linkLibrary(miniz);
-                win_installer.addConfigHeader(miniz_config);
-                win_installer.addIncludePath(build_context.dep_miniz.path(""));
                 applyUniversalSettings(&build_context, win_installer);
 
                 // everything needs to be installed before we compile the installer because it needs to embed the plugins

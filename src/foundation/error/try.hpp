@@ -31,4 +31,3 @@ struct TryHelpers {
 
 #define TRY(expression)   TRY_X(TryHelpers, expression)
 #define TRY_H(expression) TRY_X(H, expression) // you must define a custom TryHelpers with the name H
-

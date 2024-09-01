@@ -21,6 +21,12 @@ struct ChecksumFileParser {
         return result;
     }
 
+    template <typename OptT>
+    static ErrorCodeOr<typename OptT::ValueType> UnwrapOrError(OptT opt) {
+        if (!opt) return ErrorCode {CommonError::InvalidFileFormat};
+        return opt.Value();
+    }
+
     ErrorCodeOr<Optional<ChecksumLine>> ReadLine() {
         while (cursor) {
             auto line = SplitWithIterator(file_data, cursor, '\n');
@@ -28,28 +34,23 @@ struct ChecksumFileParser {
             if (line.size == 0) continue;
             if (StartsWith(line, ';')) continue;
 
-            usize crc_num_chars = 0;
-            auto const opt_crc = ParseInt(line, ParseIntBase::Hexadecimal, &crc_num_chars);
-            if (!opt_crc) return ErrorCode {CommonError::InvalidFileFormat};
+            auto const crc = TRY_UNWRAP_OPTIONAL(ParseIntTrimString(line, ParseIntBase::Hexadecimal, false),
+                                                 ErrorCode {CommonError::InvalidFileFormat});
 
-            line.RemovePrefix(crc_num_chars);
-            if (line.size == 0) return ErrorCode {CommonError::InvalidFileFormat};
-            line.RemovePrefix(1); // remove space
-            if (line.size == 0) return ErrorCode {CommonError::InvalidFileFormat};
+            if (!StartsWith(line, ' ')) return ErrorCode {CommonError::InvalidFileFormat};
+            line.RemovePrefix(1);
 
-            usize file_size_num_chars = 0;
-            auto const opt_file_size = ParseInt(line, ParseIntBase::Decimal, &file_size_num_chars);
-            if (!opt_file_size) return ErrorCode {CommonError::InvalidFileFormat};
+            auto const file_size = TRY_UNWRAP_OPTIONAL(ParseIntTrimString(line, ParseIntBase::Decimal, false),
+                                                       ErrorCode {CommonError::InvalidFileFormat});
 
-            line.RemovePrefix(file_size_num_chars);
-            if (line.size == 0) return ErrorCode {CommonError::InvalidFileFormat};
-            line.RemovePrefix(1); // remove space
-            if (line.size == 0) return ErrorCode {CommonError::InvalidFileFormat};
+            if (!StartsWith(line, ' ')) return ErrorCode {CommonError::InvalidFileFormat};
+            line.RemovePrefix(1);
+            auto const path = line;
 
             return ChecksumLine {
-                .path = line,
-                .crc32 = (u32)*opt_crc,
-                .file_size = (usize)*opt_file_size,
+                .path = path,
+                .crc32 = (u32)crc,
+                .file_size = (usize)file_size,
             };
         }
 

@@ -99,7 +99,7 @@ PUBLIC constexpr Optional<usize> NarrowToBuffer(char* out, WString wstr) {
 PUBLIC constexpr bool WidenAppend(DynamicArray<wchar_t>& out, String utf8_str) {
     auto const reserved = out.Reserve(out.size + MaxWidenedStringSize(utf8_str));
     ASSERT(reserved);
-    auto const size = TRY_OPT(WidenToBuffer(out.data + out.size, utf8_str));
+    auto const size = TRY_UNWRAP_OPTIONAL(WidenToBuffer(out.data + out.size, utf8_str), false);
     out.ResizeWithoutCtorDtor(out.size + size);
     return true;
 }
@@ -107,14 +107,14 @@ PUBLIC constexpr bool WidenAppend(DynamicArray<wchar_t>& out, String utf8_str) {
 PUBLIC constexpr bool NarrowAppend(DynamicArray<char>& out, WString wstr) {
     auto const reserved = out.Reserve(out.size + MaxNarrowedStringSize(wstr));
     ASSERT(reserved);
-    auto const size = TRY_OPT(NarrowToBuffer(out.data + out.size, wstr));
+    auto const size = TRY_UNWRAP_OPTIONAL(NarrowToBuffer(out.data + out.size, wstr), false);
     out.ResizeWithoutCtorDtor(out.size + size);
     return true;
 }
 
 PUBLIC constexpr Optional<Span<wchar_t>> Widen(Allocator& a, String utf8_str) {
     Span<wchar_t> const result = a.AllocateExactSizeUninitialised<wchar_t>(MaxWidenedStringSize(utf8_str));
-    auto const size = TRY_OPT(WidenToBuffer(result.data, utf8_str));
+    auto const size = TRY_UNWRAP_OPTIONAL(WidenToBuffer(result.data, utf8_str), nullopt);
     return a.ResizeType(result, size, size);
 }
 
@@ -423,11 +423,16 @@ PUBLIC constexpr bool IsSpaceU32(u32 c) {
 }
 
 enum class ParseIntBase { Decimal, Hexadecimal };
-PUBLIC constexpr Optional<s64> ParseInt(String str, ParseIntBase base, usize* num_chars_read = nullptr) {
+
+PUBLIC constexpr Optional<s64>
+ParseInt(String str, ParseIntBase base, usize* num_chars_read = nullptr, bool trim_whitespace = true) {
     auto const end = str.data + str.size;
     auto pos = str.data;
-    while (pos != end && IsWhitespace(*pos))
-        ++pos;
+
+    if (trim_whitespace)
+        while (pos != end && IsWhitespace(*pos))
+            ++pos;
+
     if (pos == end) return nullopt;
 
     s64 result = 0;
@@ -465,6 +470,14 @@ PUBLIC constexpr Optional<s64> ParseInt(String str, ParseIntBase base, usize* nu
     if (!has_digits) return nullopt;
     if (num_chars_read) *num_chars_read = (usize)(pos - str.data);
     return is_negative ? -result : result;
+}
+
+PUBLIC constexpr Optional<s64>
+ParseIntTrimString(String& str, ParseIntBase base, bool trim_whitespace = true) {
+    usize num_chars_read = 0;
+    auto result = ParseInt(str, base, &num_chars_read, trim_whitespace);
+    str.RemovePrefix(num_chars_read);
+    return result;
 }
 
 Optional<double> ParseFloat(String str, usize* num_chars_read = nullptr);

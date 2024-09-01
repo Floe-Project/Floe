@@ -33,6 +33,21 @@ abcdef01 5678 /path/to/another/file)raw"_s;
         CHECK_EQ(line2.Value().file_size, 5678u);
     }
 
+    SUBCASE("handles invalid lines") {
+        auto parse_line = [](String line) {
+            ChecksumFileParser parser {
+                .file_data = line,
+            };
+            return parser.ReadLine();
+        };
+
+        CHECK(parse_line("wf39 qwer path"_s).HasError());
+        CHECK(parse_line("fff 12321").HasError());
+        CHECK(parse_line("1238").HasError());
+        CHECK(parse_line("123 23\npath").HasError());
+        CHECK(parse_line("123  23 path").HasError());
+    }
+
     return k_success;
 }
 

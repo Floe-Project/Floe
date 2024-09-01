@@ -23,6 +23,8 @@ class Optional;
 template <TriviallyCopyable Type>
 class [[nodiscard]] Optional<Type> {
   public:
+    using ValueType = Type;
+
     constexpr Optional() : no_value {}, has_value {false} {}
     constexpr Optional(NulloptType) : no_value {}, has_value {} {}
     constexpr Optional(Type const& v) : value {v}, has_value {true} {}
@@ -299,9 +301,9 @@ class [[nodiscard]] OptionalIndex {
     Type m_value {-1};
 };
 
-#define TRY_OPT(expression)                                                                                  \
+#define TRY_UNWRAP_OPTIONAL(expression, failure_return_value)                                                \
     ({                                                                                                       \
         auto&& CONCAT(try_result, __LINE__) = (expression);                                                  \
-        if (!CONCAT(try_result, __LINE__).HasValue()) return nullopt;                                        \
+        if (!CONCAT(try_result, __LINE__).HasValue()) return failure_return_value;                           \
         CONCAT(try_result, __LINE__).ReleaseValue();                                                         \
     })

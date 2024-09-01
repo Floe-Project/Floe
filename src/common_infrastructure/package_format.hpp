@@ -70,17 +70,6 @@ PUBLIC Span<u8 const> WriterFinalise(mz_zip_archive& zip) {
 
 namespace detail {
 
-// IMPROVE: this is not robust, we need to consider the canonical form that a path can take
-static String RelativePath(String from, String to) {
-    if (to.size < from.size + 1)
-        PanicF(SourceLocation::Current(),
-               "Bug with calculating relative paths: {} is shorter than {}",
-               from,
-               to);
-
-    return to.SubSpan(from.size + 1);
-}
-
 static ErrorCodeOr<void> WriterAddAllFiles(mz_zip_archive& zip,
                                            String folder,
                                            ArenaAllocator& scratch_arena,
@@ -102,7 +91,7 @@ static ErrorCodeOr<void> WriterAddAllFiles(mz_zip_archive& zip,
 
             DynamicArray<char> archive_path {inner_arena};
             path::JoinAppend(archive_path, subdirs_in_zip);
-            path::JoinAppend(archive_path, RelativePath(folder, entry.path));
+            path::JoinAppend(archive_path, entry.path.Items().SubSpan(it.CanonicalBasePath().size + 1));
             WriterAddFile(zip, archive_path, file_data);
         }
 
@@ -187,6 +176,10 @@ PUBLIC ErrorCodeOr<void> WriterAddPresetsFolder(mz_zip_archive& zip,
 
 /* TODO: the loading a package format
  *
+ * There's 3 checksums: the zip file, the checksums.crc32 file, and the actual current filesystem
+ * For a library, we should also consider the version number in the floe.lua file
+ *
+ *
  * InstallLibrary:
  * - extract the library to a temp folder
  *   - If the extraction completed successfully
@@ -210,10 +203,13 @@ PUBLIC ErrorCodeOr<void> WriterAddPresetsFolder(mz_zip_archive& zip,
  *   - InstallPackage
  * - If it is
  *   - Compare the version of the installed library vs the version in the package
- *   - Check IsUnchangedSinceInstalled
- *   - If the version in the package is newer AND the current installed library unchanged
- *     - InstallPackage, it's safe to overwrite: libraries are backwards compatible
- *     - return
+ *   - If IsUnchangedSinceInstalled
+ *     - If the version in the package is newer or equal
+ *       - InstallPackage, it's safe to overwrite: libraries are backwards compatible
+ *         If the version is equal then the developer forgot to increment the version number
+ *       - return
+ *     - Else
+ *       - return: nothing to do, it's already installed
  *   - Else
  *     - Ask the user if they want to overwrite, giving information about versions and files that have changed
  *

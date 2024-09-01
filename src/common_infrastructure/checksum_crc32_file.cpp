@@ -1,3 +1,6 @@
+// Copyright 2018-2024 Sam Windell
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include "checksum_crc32_file.hpp"
 
 #include "tests/framework.hpp"

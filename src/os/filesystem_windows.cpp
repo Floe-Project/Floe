@@ -336,7 +336,7 @@ ErrorCodeOr<FileType> GetFileType(String absolute_path) {
     return FileType::File;
 }
 
-ErrorCodeOr<MutableString> CanonicalizePath(Allocator& a, String path) {
+ErrorCodeOr<MutableString> AbsolutePath(Allocator& a, String path) {
     ASSERT(path.size);
 
     PathArena temp_path_arena;
@@ -361,6 +361,11 @@ ErrorCodeOr<MutableString> CanonicalizePath(Allocator& a, String path) {
     auto result = Narrow(a, wide_result).Value();
     ASSERT(!path::IsPathSeparator(Last(result)));
     ASSERT(path::IsAbsolute(result));
+    return result;
+}
+
+ErrorCodeOr<MutableString> CanonicalizePath(Allocator& a, String path) {
+    auto result = TRY(AbsolutePath(a, path));
     for (auto& c : result)
         if (c == '/') c = '\\';
     return result;

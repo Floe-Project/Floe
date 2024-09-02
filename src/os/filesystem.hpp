@@ -173,10 +173,13 @@ ErrorCodeOr<void> Delete(String path, DeleteOptions options);
 // Returns true if there was a bundle and it was successfully deleted
 ErrorCodeOr<bool> DeleteDirectoryIfMacBundle(String dir);
 
-// - Turns a relative path into an absolute path.
-// - Resolves ../ and ./ components.
+// Turns a relative path into an absolute path.
 // Unix:
 // - Replaces tilde ~ with the user's home directory.
+ErrorCodeOr<MutableString> AbsolutePath(Allocator& a, String path);
+
+// Makes it an AbsolutePath, and:
+// - Resolves ../ and ./ components.
 // Windows:
 // - Add the drive specifier if it's missing.
 // - Replaces / with \.

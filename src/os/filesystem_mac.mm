@@ -82,6 +82,20 @@ ErrorCodeOr<void> CopyFile(String from, String to, ExistingDestinationHandling e
     return k_success;
 }
 
+ErrorCodeOr<MutableString> AbsolutePath(Allocator& a, String path) {
+    ASSERT(path.size);
+    auto nspath = StringToNSString(path);
+    if (StartsWith(path, '~')) nspath = nspath.stringByExpandingTildeInPath;
+    auto url = [NSURL fileURLWithPath:nspath];
+    if (url == nil) return FilesystemErrorFromNSError(nullptr);
+    auto abs_string = [url path];
+    if (abs_string == nil) return FilesystemErrorFromNSError(nullptr);
+
+    auto result = NSStringToString(abs_string).Clone(a);
+    ASSERT(path::IsAbsolute(result));
+    return result;
+}
+
 ErrorCodeOr<MutableString> CanonicalizePath(Allocator& a, String path) {
     ASSERT(path.size);
     auto nspath = StringToNSString(path);

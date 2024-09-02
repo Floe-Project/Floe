@@ -159,7 +159,7 @@ TEST_CASE(TestFilesystem) {
         }
 
         SUBCASE("basic actions") {
-            if (auto o = CanonicalizePath(a, "."); o.HasValue()) {
+            if (auto o = AbsolutePath(a, "."); o.HasValue()) {
                 auto& dir = o.Value();
 
                 SUBCASE("all files") {
@@ -213,17 +213,17 @@ TEST_CASE(TestFilesystem) {
         }
     }
 
-    SUBCASE("String") {
+    SUBCASE("Absolute") {
         auto check = [&](String str, bool expecting_success) {
             CAPTURE(str);
             CAPTURE(expecting_success);
-            auto o = CanonicalizePath(a, str);
+            auto o = AbsolutePath(a, str);
             if (!expecting_success) {
                 REQUIRE(o.HasError());
                 return;
             }
             if (o.HasError()) {
-                LOG_WARNING("Failed to canonicalize path: {}", o.Error());
+                LOG_WARNING("Failed to AbsolutePath: {}", o.Error());
                 return;
             }
             REQUIRE(o.HasValue());

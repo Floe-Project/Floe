@@ -141,7 +141,7 @@ ErrorCodeOr<void> CopyFile(String from, String to, ExistingDestinationHandling e
     return k_success;
 }
 
-ErrorCodeOr<MutableString> CanonicalizePath(Allocator& a, String path) {
+ErrorCodeOr<MutableString> AbsolutePath(Allocator& a, String path) {
     ASSERT(path.size);
 
     PathArena temp_path_allocator;
@@ -161,6 +161,8 @@ ErrorCodeOr<MutableString> CanonicalizePath(Allocator& a, String path) {
 
     return FilesystemErrnoErrorCode(errno);
 }
+
+ErrorCodeOr<MutableString> CanonicalizePath(Allocator& a, String path) { return AbsolutePath(a, path); }
 
 ErrorCodeOr<void> Delete(String path, DeleteOptions options) {
     PathArena temp_path_allocator;

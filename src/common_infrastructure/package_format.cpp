@@ -6,10 +6,15 @@
 #include "tests/framework.hpp"
 #include "utils/logger/logger.hpp"
 
+static String TestLibFolder(tests::Tester& tester, String test_files_folder) {
+    return path::Join(tester.scratch_arena,
+                      Array {test_files_folder, k_repo_subdirs_floe_test_libraries, "Test-Lib-1"});
+}
+
 static ErrorCodeOr<sample_lib::Library*> TestLib(tests::Tester& tester, String test_files_folder) {
-    auto const test_floe_lua_path = (String)path::Join(
-        tester.scratch_arena,
-        Array {test_files_folder, k_repo_subdirs_floe_test_libraries, "Test-Lib-1", "floe.lua"});
+    auto const test_floe_lua_path =
+        (String)path::Join(tester.scratch_arena,
+                           Array {TestLibFolder(tester, test_files_folder), "floe.lua"});
     auto reader = TRY(Reader::FromFile(test_floe_lua_path));
     auto lib_outcome =
         sample_lib::ReadLua(reader, test_floe_lua_path, tester.scratch_arena, tester.scratch_arena);
@@ -21,13 +26,11 @@ static ErrorCodeOr<sample_lib::Library*> TestLib(tests::Tester& tester, String t
     return lib;
 }
 
-static ErrorCodeOr<Span<u8 const>> WriteTestPackage(tests::Tester& tester) {
+static ErrorCodeOr<Span<u8 const>> WriteTestPackage(tests::Tester& tester, String test_files_folder) {
     DynamicArray<u8> zip_data {tester.scratch_arena};
     auto writer = dyn::WriterFor(zip_data);
     auto package = package::WriterCreate(writer);
     DEFER { package::WriterDestroy(package); };
-
-    auto const test_files_folder = TestFilesFolder(tester);
 
     TRY(package::WriterAddLibrary(package,
                                   *TRY(TestLib(tester, test_files_folder)),
@@ -45,7 +48,9 @@ static ErrorCodeOr<Span<u8 const>> WriteTestPackage(tests::Tester& tester) {
 }
 
 TEST_CASE(TestPackageFormat) {
-    auto const zip_data = TRY(WriteTestPackage(tester));
+    auto const test_files_folder = TestFilesFolder(tester);
+
+    auto const zip_data = TRY(WriteTestPackage(tester, test_files_folder));
     CHECK_NEQ(zip_data.size, 0uz);
 
     auto reader = Reader::FromMemory(zip_data);
@@ -70,6 +75,11 @@ TEST_CASE(TestPackageFormat) {
         auto opt_table = TRY(package::ReaderChecksumValuesForDir(package, dir, tester.scratch_arena));
         for (auto [path, values] : opt_table)
             g_debug_log.Debug({}, "Checksum: {08x} {} {}", values->crc32, values->file_size, path);
+
+        auto differs = TRY(FolderDiffersFromChecksumFile(TestLibFolder(tester, test_files_folder),
+                                                         opt_table,
+                                                         tester.scratch_arena));
+        CHECK(!differs);
     }
 
     auto preset_dirs = TRY(package::ReaderFindPresetDirs(package, tester.scratch_arena));

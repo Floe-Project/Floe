@@ -7,6 +7,7 @@
 #include "foundation/container/hash_table.hpp"
 #include "foundation/foundation.hpp"
 #include "os/filesystem.hpp"
+#include "utils/logger/logger.hpp"
 
 #include "common_errors.hpp"
 
@@ -115,12 +116,27 @@ PUBLIC ErrorCodeOr<bool> FolderDiffersFromChecksumFile(String folder_path,
             relative_path = archive_path;
         }
 
-        if (auto last_checksum = checksum_values.Find(relative_path)) {
-            if (last_checksum->file_size != entry.file_size) return true;
+        if (auto element = checksum_values.FindElement(relative_path)) {
+            auto last_checksum = &element->data;
+            if (last_checksum->file_size != entry.file_size) {
+                g_debug_log.Debug({},
+                                  "File size mismatch: {} {} {}",
+                                  relative_path,
+                                  last_checksum->file_size,
+                                  entry.file_size);
+                return true;
+            }
             auto const file_data = TRY(ReadEntireFile(entry.path, scratch_arena)).ToByteSpan();
-            if (Crc32(file_data) != last_checksum->crc32) return true;
+            if (auto crc = Crc32(file_data); crc != last_checksum->crc32) {
+                g_debug_log.Debug({},
+                                  "Checksum mismatch: {} {08x} {08x}",
+                                  relative_path,
+                                  last_checksum->crc32,
+                                  crc);
+                return true;
+            }
             scratch_arena.Free(file_data);
-            checksum_values_found.Insert(relative_path, true);
+            checksum_values_found.Insert(element->key, true);
         }
 
         TRY(it.Increment());
@@ -128,7 +144,10 @@ PUBLIC ErrorCodeOr<bool> FolderDiffersFromChecksumFile(String folder_path,
 
     // check if there's any missing files
     for (auto const& [path, checksum] : checksum_values)
-        if (!checksum_values_found.Find(path)) return true;
+        if (!checksum_values_found.Find(path)) {
+            g_debug_log.Debug({}, "Missing file: {}", path);
+            return true;
+        }
 
     return false;
 }

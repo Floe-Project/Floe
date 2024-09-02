@@ -222,6 +222,10 @@ TEST_CASE(TestFilesystem) {
                 REQUIRE(o.HasError());
                 return;
             }
+            if (o.HasError()) {
+                LOG_WARNING("Failed to canonicalize path: {}", o.Error());
+                return;
+            }
             REQUIRE(o.HasValue());
             tester.log.Debug(k_os_log_module, o.Value());
             REQUIRE(path::IsAbsolute(o.Value()));

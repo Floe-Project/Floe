@@ -80,16 +80,21 @@ PUBLIC u32 Crc32(Span<u8 const> data) {
     return CheckedCast<u32>(mz_crc32(MZ_CRC32_INIT, data.data, data.size));
 }
 
-PUBLIC ErrorCodeOr<bool>
-FolderDiffersFromChecksumFile(String folder_path, String checksum_file_path, ArenaAllocator& scratch_arena) {
-    constexpr usize k_value_found = ~(usize)0;
-
+PUBLIC ErrorCodeOr<HashTable<String, ChecksumValues>> ParseChecksumFile(String checksum_file_data,
+                                                                        ArenaAllocator& scratch_arena) {
     DynamicHashTable<String, ChecksumValues> checksum_values(scratch_arena);
-    ChecksumFileParser parser {TRY(ReadEntireFile(checksum_file_path, scratch_arena))};
+    ChecksumFileParser parser {checksum_file_data};
     while (auto line = TRY(parser.ReadLine()))
         checksum_values.Insert(line->path, ChecksumValues {line->crc32, line->file_size});
+    return checksum_values.ToOwnedTable();
+}
 
-    DynamicHashTable<String, ChecksumValues> current_checksum_values(scratch_arena);
+PUBLIC ErrorCodeOr<bool> FolderDiffersFromChecksumFile(String folder_path,
+                                                       HashTable<String, ChecksumValues> checksum_values,
+                                                       ArenaAllocator& scratch_arena) {
+    DynamicHashTable<String, bool> checksum_values_found(
+        scratch_arena,
+        HashTable<String, bool>::RecommendedCapacity(checksum_values.size));
 
     auto it = TRY(RecursiveDirectoryIterator::Create(scratch_arena,
                                                      folder_path,
@@ -115,7 +120,7 @@ FolderDiffersFromChecksumFile(String folder_path, String checksum_file_path, Are
             auto const file_data = TRY(ReadEntireFile(entry.path, scratch_arena)).ToByteSpan();
             if (Crc32(file_data) != last_checksum->crc32) return true;
             scratch_arena.Free(file_data);
-            last_checksum->file_size = k_value_found;
+            checksum_values_found.Insert(relative_path, true);
         }
 
         TRY(it.Increment());
@@ -123,7 +128,7 @@ FolderDiffersFromChecksumFile(String folder_path, String checksum_file_path, Are
 
     // check if there's any missing files
     for (auto const& [path, checksum] : checksum_values)
-        if (checksum->file_size != k_value_found) return true;
+        if (!checksum_values_found.Find(path)) return true;
 
     return false;
 }

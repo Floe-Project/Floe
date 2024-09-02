@@ -311,7 +311,9 @@ static ErrorCodeOr<void> Main(ArgsCstr args) {
                                                    }));
     TRY(CheckNeededPackageCliArgs(cli_args));
 
-    auto package = package::WriterCreate();
+    DynamicArray<u8> zip_data {arena};
+    auto writer = dyn::WriterFor(zip_data);
+    auto package = package::WriterCreate(writer);
     DEFER { package::WriterDestroy(package); };
 
     auto const create_package = cli_args[ToInt(CliArgId::OutputPackageFolder)].was_provided;
@@ -351,8 +353,8 @@ static ErrorCodeOr<void> Main(ArgsCstr args) {
             arena,
             Array {cli_args[ToInt(CliArgId::OutputPackageFolder)].values[0],
                    PackageName(arena, lib_for_package_name, cli_args[ToInt(CliArgId::PackageName)])});
-
-        TRY(WriteFile(package_path, package::WriterFinalise(package, arena)));
+        package::WriterFinalise(package);
+        TRY(WriteFile(package_path, zip_data));
         g_cli_out.Info({}, "Created package file: {}", package_path);
     } else {
         g_cli_out.Info({}, "No output packge folder provided, not creating a package file");

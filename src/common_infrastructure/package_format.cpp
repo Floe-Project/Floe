@@ -4,6 +4,7 @@
 #include "package_format.hpp"
 
 #include "tests/framework.hpp"
+#include "utils/logger/logger.hpp"
 
 static ErrorCodeOr<sample_lib::Library*> TestLib(tests::Tester& tester, String test_files_folder) {
     auto const test_floe_lua_path = (String)path::Join(
@@ -20,38 +21,60 @@ static ErrorCodeOr<sample_lib::Library*> TestLib(tests::Tester& tester, String t
     return lib;
 }
 
-static ErrorCodeOr<Span<u8 const>> TestPackage(tests::Tester& tester) {
-    auto writer = package::WriterCreate();
-    DEFER { package::WriterDestroy(writer); };
+static ErrorCodeOr<Span<u8 const>> WriteTestPackage(tests::Tester& tester) {
+    DynamicArray<u8> zip_data {tester.scratch_arena};
+    auto writer = dyn::WriterFor(zip_data);
+    auto package = package::WriterCreate(writer);
+    DEFER { package::WriterDestroy(package); };
 
     auto const test_files_folder = TestFilesFolder(tester);
 
-    TRY(package::WriterAddLibrary(writer,
+    TRY(package::WriterAddLibrary(package,
                                   *TRY(TestLib(tester, test_files_folder)),
                                   tester.scratch_arena,
                                   "tester"));
 
     TRY(package::WriterAddPresetsFolder(
-        writer,
+        package,
         path::Join(tester.scratch_arena, Array {test_files_folder, k_repo_subdirs_floe_test_presets}),
         tester.scratch_arena,
         "tester"));
 
-    return package::WriterFinalise(writer, tester.scratch_arena);
+    package::WriterFinalise(package);
+    return zip_data.ToOwnedSpan();
 }
 
 TEST_CASE(TestPackageFormat) {
-    auto const zip_data = TRY(TestPackage(tester));
+    auto const zip_data = TRY(WriteTestPackage(tester));
     CHECK_NEQ(zip_data.size, 0uz);
 
-    auto io_reader = Reader::FromMemory(zip_data);
-    auto outcome = package::ReaderCreate(io_reader);
+    auto reader = Reader::FromMemory(zip_data);
+    auto outcome = package::ReaderCreate(reader);
     if (outcome.HasError()) {
         tester.log.Error({}, "Failed to create package reader: {}", outcome.Error().message);
         return outcome.Error().code;
     }
-    auto reader = outcome.ReleaseValue();
-    DEFER { package::ReaderDestroy(reader); };
+    auto package = outcome.ReleaseValue();
+    DEFER { package::ReaderDestroy(package); };
+
+    auto lib_dirs = TRY(package::ReaderFindLibraryDirs(package, tester.scratch_arena));
+    for (auto dir : lib_dirs) {
+        auto o = package::ReaderReadLibraryLua(package, dir, tester.scratch_arena);
+        if (o.HasError()) {
+            tester.log.Error({}, "Failed to read library lua: {}", o.Error().message);
+            return o.Error().code;
+        }
+        auto lib = o.ReleaseValue();
+        CHECK_EQ(lib->name, "Test Lua"_s);
+
+        auto opt_table = TRY(package::ReaderChecksumValuesForDir(package, dir, tester.scratch_arena));
+        for (auto [path, values] : opt_table)
+            g_debug_log.Debug({}, "Checksum: {08x} {} {}", values->crc32, values->file_size, path);
+    }
+
+    auto preset_dirs = TRY(package::ReaderFindPresetDirs(package, tester.scratch_arena));
+    for (auto dir : preset_dirs)
+        g_debug_log.Debug({}, "Found preset dir: {}", dir);
 
     return k_success;
 }

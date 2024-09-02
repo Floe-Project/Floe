@@ -56,7 +56,7 @@ PUBLIC void WriterAddFile(mz_zip_archive& zip, String path, Span<u8 const> data)
     }
 }
 
-// builds the package file data
+// builds the package file data, invalidated after WrterDestroy
 PUBLIC Span<u8 const> WriterFinalise(mz_zip_archive& zip) {
     void* zip_data = nullptr;
     usize zip_size = 0;
@@ -303,30 +303,35 @@ SubfoldersOfFolder(mz_zip_archive& zip, String folder, ArenaAllocator& arena) {
 
 } // namespace detail
 
-PUBLIC ValueOrError<mz_zip_archive, ReaderError> ReaderCreate(File& file) {
-    using H = TryHelpersReader;
+PUBLIC ValueOrError<mz_zip_archive, ReaderError> ReaderCreate(Reader& reader) {
     mz_zip_archive zip;
     mz_zip_zero_struct(&zip);
     zip.m_pRead = [](void* io_opaque_ptr, mz_uint64 file_offset, void* buffer, usize buffer_size) -> usize {
-        auto& file = *(File*)io_opaque_ptr;
-        auto const seek_outcome = file.Seek((s64)file_offset, File::SeekOrigin::Start);
-        if (seek_outcome.HasError()) return 0;
-
-        auto const read_outcome = file.Read(buffer, buffer_size);
-        if (read_outcome.HasError()) return 0;
-        return read_outcome.Value();
+        auto& reader = *(Reader*)io_opaque_ptr;
+        reader.pos = file_offset;
+        auto const o = reader.Read(buffer, buffer_size);
+        if (o.HasError()) return 0;
+        return o.Value();
     };
-    zip.m_pIO_opaque = &file;
+    zip.m_pIO_opaque = &reader;
 
-    if (!mz_zip_reader_init(&zip, TRY_H(file.FileSize()), 0))
+    if (!mz_zip_reader_init(&zip, reader.size, 0))
         return ReaderError {ErrorCode {PackageError::FileCorrupted}, ""_s};
 
+    g_debug_log.Debug({}, "Zip has {} files", mz_zip_reader_get_num_files(&zip));
+
     usize known_subdirs = 0;
-    for (auto const known_subdir : Array {k_libraries_subdir, k_presets_subdir}) {
-        mz_uint file_index = 0;
-        if (!mz_zip_reader_locate_file_v2(&zip, known_subdir.data, nullptr, 0, &file_index)) continue;
-        if (!mz_zip_reader_is_file_a_directory(&zip, file_index)) continue;
-        ++known_subdirs;
+    for (auto const file_index : Range(mz_zip_reader_get_num_files(&zip))) {
+        mz_zip_archive_file_stat file_stat;
+        if (!mz_zip_reader_file_stat(&zip, file_index, &file_stat))
+            return ReaderError {ErrorCode {PackageError::FileCorrupted}, ""_s};
+        auto const filename = FromNullTerminated(file_stat.m_filename);
+        for (auto const known_subdir : Array {k_libraries_subdir, k_presets_subdir}) {
+            if (detail::RelativePathIfInFolder(filename, known_subdir)) {
+                ++known_subdirs;
+                break;
+            }
+        }
     }
 
     if (!known_subdirs) {

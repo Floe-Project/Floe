@@ -246,13 +246,12 @@ PresetsFolderScanResult FetchOrRescanPresetsFolder(PresetsListing& listing,
 static ErrorCodeOr<DirectoryListing> TestListing(tests::Tester& tester) {
     DirectoryListing listing(tester.scratch_arena);
 
-    auto result =
-        listing.ScanFolders(Array {(String)path::Join(tester.scratch_arena,
-                                                      ConcatArrays(Array {TestFilesFolder(tester)},
-                                                                   k_repo_subdirs_floe_test_presets))},
-                            false,
-                            Array {"*.mirage-*"_s, "*" FLOE_PRESET_FILE_EXTENSION},
-                            {});
+    auto result = listing.ScanFolders(
+        Array {(String)path::Join(tester.scratch_arena,
+                                  Array {TestFilesFolder(tester), k_repo_subdirs_floe_test_presets})},
+        false,
+        Array {"*.mirage-*"_s, "*" FLOE_PRESET_FILE_EXTENSION},
+        {});
     if (result.folder_errors.size) return result.folder_errors[0].error;
     return listing;
 }

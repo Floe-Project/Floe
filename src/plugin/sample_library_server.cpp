@@ -1660,9 +1660,9 @@ TEST_CASE(TestSampleLibraryLoader) {
         auto _ =
             Delete(lib_dir, {.type = DeleteOptions::Type::DirectoryRecursively, .fail_if_not_exists = false});
         {
-            auto const source = (String)path::Join(
-                tester.scratch_arena,
-                ConcatArrays(Array {TestFilesFolder(tester)}, k_repo_subdirs_floe_test_libraries));
+            auto const source =
+                (String)path::Join(tester.scratch_arena,
+                                   Array {TestFilesFolder(tester), k_repo_subdirs_floe_test_libraries});
 
             auto it = TRY(RecursiveDirectoryIterator::Create(tester.scratch_arena, source));
             while (it.HasMoreFiles()) {

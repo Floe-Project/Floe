@@ -1605,9 +1605,8 @@ TEST_CASE(TestFuzzingJsonState) {
 }
 
 static String TestPresetPath(tests::Tester& tester, String filename) {
-    return path::Join(
-        tester.scratch_arena,
-        ConcatArrays(Array {TestFilesFolder(tester)}, k_repo_subdirs_floe_test_presets, Array {filename}));
+    return path::Join(tester.scratch_arena,
+                      Array {TestFilesFolder(tester), k_repo_subdirs_floe_test_presets, filename});
 }
 
 TEST_CASE(TestLoadingOldFiles) {

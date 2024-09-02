@@ -16,6 +16,7 @@
     X(RegisterFoundationTests)                                                                               \
     X(RegisterOsTests)                                                                                       \
     X(RegisterUtilsTests)                                                                                    \
+    X(RegisterPackageFormatTests)                                                                            \
     X(RegisterHostingTests)                                                                                  \
     X(RegisterAudioUtilsTests)                                                                               \
     X(RegisterVolumeFadeTests)                                                                               \

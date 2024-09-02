@@ -1580,6 +1580,7 @@ pub fn build(b: *std.Build) void {
                 .files = &.{
                     path ++ "/common_errors.cpp",
                     path ++ "/checksum_crc32_file.cpp",
+                    path ++ "/package_format.cpp",
                     path ++ "/sample_library/audio_file.cpp",
                     path ++ "/sample_library/sample_library_lua.cpp",
                     path ++ "/sample_library/sample_library_mdata.cpp",

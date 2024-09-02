@@ -28,5 +28,5 @@ constexpr usize k_max_instrument_name_size = 64;
 constexpr usize k_max_ir_name_size = 64;
 constexpr f32 k_erroneous_sample_value = 1000.0f;
 
-constexpr auto k_repo_subdirs_floe_test_presets = Array {"presets"_s};
-constexpr auto k_repo_subdirs_floe_test_libraries = Array {"libraries"_s};
+constexpr auto k_repo_subdirs_floe_test_presets = "presets"_s;
+constexpr auto k_repo_subdirs_floe_test_libraries = "libraries"_s;

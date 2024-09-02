@@ -352,7 +352,7 @@ static ErrorCodeOr<void> Main(ArgsCstr args) {
             Array {cli_args[ToInt(CliArgId::OutputPackageFolder)].values[0],
                    PackageName(arena, lib_for_package_name, cli_args[ToInt(CliArgId::PackageName)])});
 
-        TRY(WriteFile(package_path, package::WriterFinalise(package)));
+        TRY(WriteFile(package_path, package::WriterFinalise(package, arena)));
         g_cli_out.Info({}, "Created package file: {}", package_path);
     } else {
         g_cli_out.Info({}, "No output packge folder provided, not creating a package file");

@@ -37,7 +37,7 @@ static ErrorCodeOr<Span<u8 const>> TestPackage(tests::Tester& tester) {
         tester.scratch_arena,
         "tester"));
 
-    return tester.scratch_arena.Clone(package::WriterFinalise(writer));
+    return package::WriterFinalise(writer, tester.scratch_arena);
 }
 
 TEST_CASE(TestPackageFormat) {

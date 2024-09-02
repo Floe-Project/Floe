@@ -57,7 +57,7 @@ PUBLIC void WriterAddFile(mz_zip_archive& zip, String path, Span<u8 const> data)
 }
 
 // builds the package file data, invalidated after WrterDestroy
-PUBLIC Span<u8 const> WriterFinalise(mz_zip_archive& zip) {
+PUBLIC Span<u8 const> WriterFinalise(mz_zip_archive& zip, ArenaAllocator& arena) {
     void* zip_data = nullptr;
     usize zip_size = 0;
     if (!mz_zip_writer_finalize_heap_archive(&zip, &zip_data, &zip_size)) {
@@ -65,7 +65,10 @@ PUBLIC Span<u8 const> WriterFinalise(mz_zip_archive& zip) {
                "Failed to finalize zip archive: {}",
                mz_zip_get_error_string(mz_zip_get_last_error(&zip)));
     }
-    return Span {(u8 const*)zip_data, zip_size};
+    // IMPROVE: inefficient to copy, can we a custom allocator for Writer?
+    auto result = arena.Clone(Span {(u8 const*)zip_data, zip_size});
+    zip.m_pFree(zip.m_pAlloc_opaque, zip_data);
+    return result;
 }
 
 namespace detail {

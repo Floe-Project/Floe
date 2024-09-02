@@ -336,7 +336,7 @@ void InitStacktraceState() { auto& _ = BacktraceState::Instance(); }
 Optional<StacktraceStack> CurrentStacktrace(int skip_frames) {
     auto& state = BacktraceState::Instance();
 
-    if (state.failed_init_error) return nullopt;
+    if (state.failed_init_error) return k_nullopt;
 
     StacktraceStack result;
     backtrace_simple(

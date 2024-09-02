@@ -171,10 +171,10 @@ PUBLIC constexpr String Filename(String path, Format format = Format::Native) {
 // Copyright (c) Zig contributors
 // SPDX-License-Identifier: MIT
 PUBLIC constexpr Optional<String> Directory(String path, Format format = Format::Native) {
-    if (!path.size) return nullopt;
+    if (!path.size) return k_nullopt;
     if (format == Format::Windows) {
         auto const root_slice = ParseWindowsPath(path).drive;
-        if (path.size == root_slice.size) return nullopt;
+        if (path.size == root_slice.size) return k_nullopt;
 
         auto const have_root_slash =
             path.size > root_slice.size and (path[root_slice.size] == '/' or path[root_slice.size] == '\\');
@@ -182,33 +182,33 @@ PUBLIC constexpr Optional<String> Directory(String path, Format format = Format:
         auto end_index = path.size - 1;
 
         while (path[end_index] == '/' or path[end_index] == '\\') {
-            if (end_index == 0) return nullopt;
+            if (end_index == 0) return k_nullopt;
             end_index -= 1;
         }
 
         while (path[end_index] != '/' and path[end_index] != '\\') {
-            if (end_index == 0) return nullopt;
+            if (end_index == 0) return k_nullopt;
             end_index -= 1;
         }
 
         if (have_root_slash and end_index == root_slice.size) end_index += 1;
-        if (end_index == 0) return nullopt;
+        if (end_index == 0) return k_nullopt;
 
         return path.SubSpan(0, end_index);
     } else {
         auto end_index = path.size - 1;
         while (path[end_index] == '/') {
-            if (end_index == 0) return nullopt;
+            if (end_index == 0) return k_nullopt;
             end_index -= 1;
         }
 
         while (path[end_index] != '/') {
-            if (end_index == 0) return nullopt;
+            if (end_index == 0) return k_nullopt;
             end_index -= 1;
         }
 
         if (end_index == 0 and path[0] == '/') return path.SubSpan(0, 1);
-        if (end_index == 0) return nullopt;
+        if (end_index == 0) return k_nullopt;
 
         return path.SubSpan(0, end_index);
     }

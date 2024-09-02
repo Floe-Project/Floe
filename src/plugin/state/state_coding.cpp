@@ -189,7 +189,7 @@ static Optional<ParamProjection> ParamProjection(ParamIndex index) {
         ASSERT(k_param_infos[(u32)index].linear_range.max < 30); // it's unlikely to have an amp above 30
         return ParamProjection::WasDbNowAmp;
     }
-    return nullopt;
+    return k_nullopt;
 }
 
 } // namespace legacy_mappings
@@ -521,13 +521,13 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
     auto old_p = [&](NoLongerExistingParam p) -> Optional<f32> {
         auto old_param = parser.non_existent_params[ToInt(p)];
         if (old_param.tag == JsonStateParser::ParamValueType::Float) return old_param.Get<f32>();
-        return nullopt;
+        return k_nullopt;
     };
 
     // Set the convolution IR based on the no-longer-existing param
     // ======================================================================================================
     {
-        state.ir_id = nullopt;
+        state.ir_id = k_nullopt;
         auto const old_param =
             parser.non_existent_params[ToInt(NoLongerExistingParam::ConvolutionLegacyMirageIrName)];
         if (old_param.tag == JsonStateParser::ParamValueType::String) {
@@ -667,7 +667,7 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
                 if (str == "1/1"_s) return (f32)param_values::DelaySyncedTime::_1_1;
                 if (str == "1/1D"_s) return (f32)param_values::DelaySyncedTime::_1_1D;
             }
-            return nullopt;
+            return k_nullopt;
         };
 
         state.LinearParam(ParamIndex::DelayOn) = old_settings_on;

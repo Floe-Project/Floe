@@ -304,7 +304,7 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
         Instrument {
             .library = library,
             .name = name,
-            .folders = folders.size ? Optional<String>(folders) : nullopt,
+            .folders = folders.size ? Optional<String>(folders) : k_nullopt,
         };
 
         bool velocity_layers_are_feathered =

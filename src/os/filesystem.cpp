@@ -407,5 +407,5 @@ SearchForExistingFolderUpwards(String dir, String folder_name_to_find, Allocator
             return Optional<String> {allocator.Clone(buf)};
     }
 
-    return nullopt;
+    return k_nullopt;
 }

@@ -222,7 +222,7 @@ class TaggedUnion {
     template <TypeWithinTypeAndTags<Ts...> Type>
     Optional<Type> TryGetOpt() const {
         if (Is<Type>()) return *(Type*)storage;
-        return nullopt;
+        return k_nullopt;
     }
 
     template <TypeWithinTypeAndTags<Ts...> Type>

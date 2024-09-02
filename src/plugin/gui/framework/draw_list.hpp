@@ -387,7 +387,7 @@ struct DrawContext {
     // coressponding texture.
     Optional<TextureHandle> GetTextureFromImage(ImageID id) {
         auto const index = FindIf(textures, [id](IdAndTexture const& i) { return i.id == id; });
-        if (!index) return nullopt;
+        if (!index) return k_nullopt;
         return textures[*index].texture;
     }
 
@@ -397,7 +397,7 @@ struct DrawContext {
         return ImageIdIsValid(*id);
     }
     Optional<TextureHandle> GetTextureFromImage(Optional<ImageID> id) {
-        if (!id) return nullopt;
+        if (!id) return k_nullopt;
         return GetTextureFromImage(*id);
     }
 

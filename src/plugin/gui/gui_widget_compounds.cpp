@@ -88,7 +88,7 @@ LayID LayoutParameterComponent(Gui* g,
         name,
         param.info.IsLayerParam() ? LayoutType::Layer
                                   : (param.info.IsEffectParam() ? LayoutType::Effect : LayoutType::Generic),
-        param.info.value_type == ParamValueType::Menu ? Optional<ParamIndex> {param.info.index} : nullopt,
+        param.info.value_type == ParamValueType::Menu ? Optional<ParamIndex> {param.info.index} : k_nullopt,
         false,
         size_index_for_gapx,
         set_gapx_independent_of_size,

@@ -106,7 +106,7 @@ static void DoReadLibraryJob(PendingLibraryJobs::Job::ReadLibrary& job, ArenaAll
 
         for (auto& node : args.libraries) {
             if (auto l = node.TryScoped()) {
-                if (l->lib->file_hash == file_hash && l->lib->path == path) return nullopt;
+                if (l->lib->file_hash == file_hash && l->lib->path == path) return k_nullopt;
             }
         }
 
@@ -1426,8 +1426,8 @@ static sample_lib::Library* BuiltinLibrary() {
         .url = FLOE_HOMEPAGE_URL,
         .author = sample_lib::k_builtin_library_id.author,
         .minor_version = 1,
-        .background_image_path = nullopt,
-        .icon_image_path = nullopt,
+        .background_image_path = k_nullopt,
+        .icon_image_path = k_nullopt,
         .insts_by_name = {},
         .irs_by_name = {},
         .path = ":memory:",

@@ -94,7 +94,7 @@ void SetThreadName(String name) { detail::SetThreadLocalThreadName(name); }
 Optional<DynamicArrayInline<char, k_max_thread_name_size>> ThreadName() {
     auto const name = detail::GetThreadLocalThreadName();
     if (name) return *name;
-    return nullopt;
+    return k_nullopt;
 }
 
 void Thread::Start(StartFunction&& function, String name, ThreadStartOptions options) {

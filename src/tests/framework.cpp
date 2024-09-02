@@ -58,13 +58,13 @@ static Optional<String> SearchUpwardsFromExeForFolder(Tester& tester, String fol
     auto const path_outcome = CurrentExecutablePath(tester.scratch_arena);
     if (path_outcome.HasError()) {
         tester.log.Error({}, "failed to get the current exe path: {}", path_outcome.Error());
-        return nullopt;
+        return k_nullopt;
     }
 
     auto result = SearchForExistingFolderUpwards(path_outcome.Value(), folder_name, tester.arena);
     if (!result) {
         tester.log.Error({}, "failed to find {} folder", folder_name);
-        return nullopt;
+        return k_nullopt;
     }
     return result;
 }

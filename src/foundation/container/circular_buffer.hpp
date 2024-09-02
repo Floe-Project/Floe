@@ -64,7 +64,7 @@ struct CircularBuffer {
         return buffer[Mask(read++)];
     }
     constexpr Optional<Type> TryPop() {
-        if (Empty()) return nullopt;
+        if (Empty()) return k_nullopt;
         return Pop();
     }
     constexpr void Clear() {

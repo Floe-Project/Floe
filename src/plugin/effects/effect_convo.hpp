@@ -128,7 +128,7 @@ class ConvolutionReverb final : public Effect {
     }
 
     // [main-thread]
-    Optional<sample_lib::IrId> ir_id = nullopt; // May differ to what is actually loaded
+    Optional<sample_lib::IrId> ir_id = k_nullopt; // May differ to what is actually loaded
 
   private:
     static StereoConvolver* CreateConvolver(AudioData const& audio_data) {

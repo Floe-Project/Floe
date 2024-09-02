@@ -392,7 +392,7 @@ TEST_CASE(TestDynamicArrayClone) {
         DynamicArray<Optional<String>> buf {a};
         dyn::Append(buf, "1"_s);
         dyn::Append(buf, "2"_s);
-        dyn::Append(buf, nullopt);
+        dyn::Append(buf, k_nullopt);
 
         auto const duped = buf.Clone(a, CloneType::Shallow);
         REQUIRE(duped.size == 3);

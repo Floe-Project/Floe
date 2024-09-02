@@ -102,9 +102,9 @@ static ErrorCodeOr<void> WriterAddAllFiles(mz_zip_archive& zip,
 }
 
 static Optional<String> RelativePathIfInFolder(String path, String folder) {
-    if (path.size < folder.size) return nullopt;
-    if (path[folder.size] != '/') return nullopt;
-    if (!StartsWithSpan(path, folder)) return nullopt;
+    if (path.size < folder.size) return k_nullopt;
+    if (path[folder.size] != '/') return k_nullopt;
+    if (!StartsWithSpan(path, folder)) return k_nullopt;
     return path.SubSpan(folder.size + 1);
 }
 

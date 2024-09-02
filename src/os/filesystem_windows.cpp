@@ -966,7 +966,7 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                             dir.directory_changes.Add(
                                 {
                                     .subpath = narrowed.Value(),
-                                    .file_type = nullopt,
+                                    .file_type = k_nullopt,
                                     .changes = changes,
                                 },
                                 args.result_arena);
@@ -982,7 +982,7 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                     dir.directory_changes.Add(
                         {
                             .subpath = {},
-                            .file_type = nullopt,
+                            .file_type = k_nullopt,
                             .changes = DirectoryWatcher::ChangeType::ManualRescanNeeded,
                         },
                         args.result_arena);
@@ -1009,7 +1009,7 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                 dir.directory_changes.Add(
                     {
                         .subpath = {},
-                        .file_type = nullopt,
+                        .file_type = k_nullopt,
                         .changes = DirectoryWatcher::ChangeType::ManualRescanNeeded,
                     },
                     args.result_arena);

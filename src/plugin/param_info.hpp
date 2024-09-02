@@ -604,7 +604,7 @@ struct ParameterInfo {
         if (clamp_if_out_of_range)
             projected_value = Clamp(projected_value, projection_range.min, projection_range.max);
         else if (projected_value < projection_range.min || projected_value > projection_range.max)
-            return nullopt;
+            return k_nullopt;
 
         if (projection) return projection->LineariseValue<Pow<f32>>(linear_range, projected_value);
 
@@ -663,7 +663,7 @@ struct LayerParamInfo {
 };
 
 constexpr Optional<LayerParamInfo> LayerParamInfoFromGlobalIndex(ParamIndex global_index) {
-    if (global_index >= ParamIndex::FirstNonLayerParam) return nullopt;
+    if (global_index >= ParamIndex::FirstNonLayerParam) return k_nullopt;
 
     return LayerParamInfo {
         .param = (LayerParamIndex)(ToInt(global_index) % k_num_layer_parameters),
@@ -738,7 +738,7 @@ struct CustomLinearOptions {
 constexpr ValConfig CustomLinear(CustomLinearOptions opts) {
     return ValConfig {
         .linear_range = opts.range,
-        .projection = nullopt,
+        .projection = k_nullopt,
         .default_linear_value = opts.default_val,
         .flags = opts.flags,
         .value_type = opts.value_type,
@@ -754,7 +754,7 @@ struct FilterSemitonesOptions {
 constexpr ValConfig FilterSemitones(FilterSemitonesOptions opts) {
     return ValConfig {
         .linear_range = opts.range,
-        .projection = nullopt,
+        .projection = k_nullopt,
         .default_linear_value = opts.default_val,
         .flags = opts.flags,
         .display_format = ParamDisplayFormat::FilterSemitones,
@@ -798,7 +798,7 @@ constexpr ValConfig Menu(MenuOptions opts) {
     auto const range = ParameterInfo::Range {0, (f32)items.size - 1};
     return ValConfig {
         .linear_range = range,
-        .projection = nullopt,
+        .projection = k_nullopt,
         .default_linear_value = (f32)opts.default_val,
         .flags = opts.flags,
         .value_type = ParamValueType::Menu,
@@ -809,7 +809,7 @@ constexpr ValConfig Menu(MenuOptions opts) {
 struct VolumeOptions {
     f32 default_db;
     f32 max_db = 12;
-    Optional<f32> exponent = nullopt;
+    Optional<f32> exponent = k_nullopt;
     ParamFlags flags;
 };
 constexpr ValConfig Volume(VolumeOptions opts) {

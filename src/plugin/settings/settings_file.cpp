@@ -201,7 +201,7 @@ static Optional<String> ValueIfKeyMatches(String line, String key) {
             if (l.size) return l;
         }
     }
-    return nullopt;
+    return k_nullopt;
 }
 
 static bool SetIfMatching(String line, String key, bool& value) {
@@ -453,7 +453,7 @@ Optional<Settings> FindAndReadSettingsFile(ArenaAllocator& a, FloePaths const& p
         break;
     }
 
-    if (file_data.size == 0) return nullopt;
+    if (file_data.size == 0) return k_nullopt;
 
     Settings result {};
 
@@ -463,7 +463,7 @@ Optional<Settings> FindAndReadSettingsFile(ArenaAllocator& a, FloePaths const& p
                !parsed_json) {
         // The file is not valid json. Let's say it's not an error though. Instead, let's just use
         // default values.
-        return nullopt;
+        return k_nullopt;
     }
 
     return result;

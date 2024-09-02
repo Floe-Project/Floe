@@ -415,7 +415,7 @@ struct DirectoryWatcher {
     struct DirectoryChanges {
         // private
         void Clear() {
-            error = nullopt;
+            error = k_nullopt;
             subpath_changesets.Clear();
         }
 

@@ -190,7 +190,7 @@ struct LayerProcessor {
         ASSERT(IsMainThread(host));
         if (auto sampled_inst = instrument.TryGetFromTag<InstrumentType::Sampler>())
             return (*sampled_inst)->instrument.library.Id();
-        return nullopt;
+        return k_nullopt;
     }
 
     param_values::VelocityMappingMode GetVelocityMode() const {
@@ -226,7 +226,7 @@ struct LayerProcessor {
         void SetNone() { value.Store(0, StoreMemoryOrder::Release); }
         Optional<InstrumentUnwrapped> Consume() {
             auto v = value.Exchange(k_consumed, RmwMemoryOrder::Relaxed);
-            if (v == k_consumed) return nullopt;
+            if (v == k_consumed) return k_nullopt;
             if (v == 0) return InstrumentType::None;
             for (auto const w : Range((u64)WaveformType::Count))
                 if (v == ValForWaveform((WaveformType)w)) return (WaveformType)w;

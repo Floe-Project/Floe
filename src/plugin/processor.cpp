@@ -27,7 +27,7 @@ void LearnMidiCC(AudioProcessor& processor, ParamIndex param) {
 
 void CancelMidiCCLearn(AudioProcessor& processor) {
     ASSERT(IsMainThread(processor.host));
-    processor.midi_learn_param_index.Store(nullopt, StoreMemoryOrder::Relaxed);
+    processor.midi_learn_param_index.Store(k_nullopt, StoreMemoryOrder::Relaxed);
 }
 
 void UnlearnMidiCC(AudioProcessor& processor, ParamIndex param, u7 cc_num_to_remove) {
@@ -872,7 +872,7 @@ static void ProcessClapNoteOrMidi(AudioProcessor& processor,
 
                     if (k_midi_learn_controller_bitset.Get(cc_num)) {
                         if (auto param_index =
-                                processor.midi_learn_param_index.Exchange(nullopt, RmwMemoryOrder::Relaxed);
+                                processor.midi_learn_param_index.Exchange(k_nullopt, RmwMemoryOrder::Relaxed);
                             param_index.HasValue()) {
                             processor.param_learned_ccs[(usize)param_index.Value()].Set(cc_num);
                         }

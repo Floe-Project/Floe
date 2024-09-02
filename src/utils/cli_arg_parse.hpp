@@ -19,7 +19,7 @@ struct CommandLineArgDefinition {
 struct CommandLineArg {
     Optional<String> Value() const {
         ASSERT(info.num_values == 1);
-        return was_provided && values.size ? Optional<String> {values[0]} : nullopt;
+        return was_provided && values.size ? Optional<String> {values[0]} : k_nullopt;
     }
     CommandLineArgDefinition const& info;
     Span<String> values; // empty if no values given

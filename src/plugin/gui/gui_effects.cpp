@@ -141,7 +141,7 @@ static void ImpulseResponseMenuItems(Gui* g) {
 
     if (DoMultipleMenuItems(g, irs, current)) {
         if (current == 0)
-            LoadConvolutionIr(g->plugin, nullopt);
+            LoadConvolutionIr(g->plugin, k_nullopt);
         else
             LoadConvolutionIr(g->plugin, ir_ids[(usize)current]);
     }
@@ -557,8 +557,8 @@ void DoEffectsWindow(Gui* g, Rect r) {
                     left = &plugin.processor.params[ToInt(ParamIndex::DelayTimeLMs)];
                     right = &plugin.processor.params[ToInt(ParamIndex::DelayTimeRMs)];
                 }
-                LayoutParameterComponent(g, param_container, ids.delay.left, *left, nullopt, false, true);
-                LayoutParameterComponent(g, param_container, ids.delay.right, *right, nullopt, false, true);
+                LayoutParameterComponent(g, param_container, ids.delay.left, *left, k_nullopt, false, true);
+                LayoutParameterComponent(g, param_container, ids.delay.right, *right, k_nullopt, false, true);
                 {
                     LayoutParameterComponent(g,
                                              param_container,
@@ -601,7 +601,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
                                          ids.convo.ir.control,
                                          ids.convo.ir.label,
                                          LayoutType::Effect,
-                                         nullopt,
+                                         k_nullopt,
                                          true);
 
                 LayoutParameterComponent(

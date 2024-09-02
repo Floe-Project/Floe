@@ -1044,7 +1044,7 @@ void InstallPackagesSelectFilesDialogResults(Gui* g, Span<MutableString> paths) 
                 .message = String(fmt::Format(g->scratch_arena,
                                               "'{}' is not a Floe package. Floe packages are zip files.",
                                               path::Filename(path))),
-                .error_code = nullopt,
+                .error_code = k_nullopt,
                 .id = ThreadsafeErrorNotifications::Id("pkg ", path),
             };
             g->plugin.error_notifications.AddOrUpdateError(err);

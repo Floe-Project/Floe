@@ -16,7 +16,7 @@ struct HostThreadPool {
                    ? Optional<HostThreadPool> {HostThreadPool {.host = host,
                                                                .host_thread_pool_interface = *thread_pool,
                                                                .function = {}}}
-                   : nullopt;
+                   : k_nullopt;
     }
 
     bool RequestMultithreadedExecution(FunctionType&& f, u32 num_times_to_be_called) {

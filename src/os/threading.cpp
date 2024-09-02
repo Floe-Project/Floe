@@ -43,7 +43,7 @@ void SetThreadLocalThreadName(String name) {
 }
 
 Optional<String> GetThreadLocalThreadName() {
-    if (!g_thread_name.size) return nullopt;
+    if (!g_thread_name.size) return k_nullopt;
     return g_thread_name.Items();
 }
 

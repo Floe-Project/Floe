@@ -90,26 +90,26 @@ PUBLIC Optional<Version> ParseVersionString(String str) {
         n.HasValue() && num_chars_read == major_text.size)
         result.major = (u8)n.Value();
     else
-        return nullopt;
+        return k_nullopt;
 
     if (auto n = ParseInt(minor_text, ParseIntBase::Decimal, &num_chars_read);
         n.HasValue() && num_chars_read == minor_text.size)
         result.minor = (u8)n.Value();
     else
-        return nullopt;
+        return k_nullopt;
 
     if (auto n = ParseInt(patch_text, ParseIntBase::Decimal, &num_chars_read);
         n.HasValue() && num_chars_read == patch_text.size)
         result.patch = (u8)n.Value();
     else
-        return nullopt;
+        return k_nullopt;
 
     if (beta_text) {
         if (auto n = ParseInt(*beta_text, ParseIntBase::Decimal, &num_chars_read);
             n.HasValue() && num_chars_read == beta_text->size)
             result.beta = (u8)n.Value();
         else
-            return nullopt;
+            return k_nullopt;
     }
 
     return result;

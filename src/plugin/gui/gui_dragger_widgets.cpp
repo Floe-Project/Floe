@@ -97,7 +97,7 @@ bool Dragger(Gui* g, Parameter const& param, Rect r, Style const& style) {
                     id,
                     param,
                     r,
-                    changed ? Optional<f32>((f32)result) : nullopt,
+                    changed ? Optional<f32>((f32)result) : k_nullopt,
                     ParamDisplayFlagsNoValuePopup);
 
     return changed;

@@ -92,7 +92,7 @@ static void LoadNewState(PluginInstance& plugin, StateSnapshotWithMetadata const
         }
 
         ASSERT(!state.state.ir_id.HasValue());
-        plugin.processor.convo.ir_id = nullopt;
+        plugin.processor.convo.ir_id = k_nullopt;
         SetConvolutionIrAudioData(plugin.processor, nullptr);
 
         ApplyNewState(plugin.processor, state.state, source);

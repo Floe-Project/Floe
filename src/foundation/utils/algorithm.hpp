@@ -313,22 +313,22 @@ PUBLIC constexpr bool ContainsOnly(ContiguousContainer auto const& data, auto&& 
 PUBLIC constexpr Optional<usize> FindLast(ContiguousContainer auto const& data, auto&& search_item) {
     for (usize i = data.size - 1; i != usize(-1); --i)
         if (data[i] == search_item) return i;
-    return nullopt;
+    return k_nullopt;
 }
 
 PUBLIC constexpr Optional<usize>
 Find(ContiguousContainer auto const& data, auto const& search_item, usize start = 0) {
     for (usize i = start; i < data.size; ++i)
         if (data[i] == search_item) return i;
-    return nullopt;
+    return k_nullopt;
 }
 
 PUBLIC constexpr Optional<usize>
 FindSpan(ContiguousContainer auto const& haystack, ContiguousContainer auto const& needle, usize start = 0) {
-    if (start >= haystack.size) return nullopt;
+    if (start >= haystack.size) return k_nullopt;
     auto const haystack_size = haystack.size - start;
-    if (needle.size > haystack_size) return nullopt;
-    if (needle.size == 0) return nullopt;
+    if (needle.size > haystack_size) return k_nullopt;
+    if (needle.size == 0) return k_nullopt;
     ASSERT(haystack_size != 0);
     auto const* haystack_data = haystack.data + start;
     for (auto const pos : Range((haystack_size - needle.size) + 1)) {
@@ -342,7 +342,7 @@ FindSpan(ContiguousContainer auto const& haystack, ContiguousContainer auto cons
         }
         if (matches) return pos + start;
     }
-    return nullopt;
+    return k_nullopt;
 }
 
 PUBLIC constexpr Optional<usize>
@@ -355,7 +355,7 @@ FindIf(ContiguousContainer auto const& data, auto&& item_is_desired, usize start
 PUBLIC constexpr Optional<usize> FindLastIf(ContiguousContainer auto const& data, auto&& item_is_desired) {
     for (usize i = data.size - 1; i != usize(-1); --i)
         if (item_is_desired(data[i])) return i;
-    return nullopt;
+    return k_nullopt;
 }
 
 PUBLIC constexpr bool ContainsSpan(ContiguousContainer auto const& haystack,

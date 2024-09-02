@@ -12,7 +12,7 @@
 PUBLIC constexpr usize MaxWidenedStringSize(String utf8_str) { return utf8_str.size; }
 
 PUBLIC constexpr Optional<usize> WidenToBuffer(wchar_t* out, String utf8_str) {
-    auto const text_encoding_error = nullopt;
+    auto const text_encoding_error = k_nullopt;
 
     auto str = (unsigned char const*)utf8_str.data;
     u32 c;
@@ -65,7 +65,7 @@ PUBLIC constexpr Optional<usize> WidenToBuffer(wchar_t* out, String utf8_str) {
 PUBLIC constexpr usize MaxNarrowedStringSize(WString wstr) { return wstr.size * 3; }
 
 PUBLIC constexpr Optional<usize> NarrowToBuffer(char* out, WString wstr) {
-    auto const text_encoding_error = nullopt;
+    auto const text_encoding_error = k_nullopt;
     auto str = wstr.data;
     auto const end = wstr.data + wstr.size;
     usize out_size = 0;
@@ -114,20 +114,20 @@ PUBLIC constexpr bool NarrowAppend(DynamicArray<char>& out, WString wstr) {
 
 PUBLIC constexpr Optional<Span<wchar_t>> Widen(Allocator& a, String utf8_str) {
     Span<wchar_t> const result = a.AllocateExactSizeUninitialised<wchar_t>(MaxWidenedStringSize(utf8_str));
-    auto const size = TRY_UNWRAP_OPTIONAL(WidenToBuffer(result.data, utf8_str), nullopt);
+    auto const size = TRY_UNWRAP_OPTIONAL(WidenToBuffer(result.data, utf8_str), k_nullopt);
     return a.ResizeType(result, size, size);
 }
 
 PUBLIC constexpr Optional<MutableString> Narrow(Allocator& a, WString wstr) {
     DynamicArray<char> result {a};
-    if (!NarrowAppend(result, wstr)) return nullopt;
+    if (!NarrowAppend(result, wstr)) return k_nullopt;
     return result.ToOwnedSpan();
 }
 
 // do not Free() the result.
 PUBLIC constexpr Optional<Span<wchar_t>> WidenAllocNullTerm(ArenaAllocator& allocator, String utf8_str) {
     DynamicArray<wchar_t> buffer {allocator};
-    if (!WidenAppend(buffer, utf8_str)) return nullopt;
+    if (!WidenAppend(buffer, utf8_str)) return k_nullopt;
     dyn::Append(buffer, L'\0');
     auto result = buffer.ToOwnedSpan();
     result.RemoveSuffix(1);
@@ -137,7 +137,7 @@ PUBLIC constexpr Optional<Span<wchar_t>> WidenAllocNullTerm(ArenaAllocator& allo
 // do not Free() the result.
 PUBLIC constexpr Optional<MutableString> NarrowAllocNullTerm(ArenaAllocator& allocator, WString wstr) {
     DynamicArray<char> buffer {allocator};
-    if (!NarrowAppend(buffer, wstr)) return nullopt;
+    if (!NarrowAppend(buffer, wstr)) return k_nullopt;
     dyn::Append(buffer, '\0');
     auto result = buffer.ToOwnedSpan();
     result.RemoveSuffix(1);
@@ -433,7 +433,7 @@ ParseInt(String str, ParseIntBase base, usize* num_chars_read = nullptr, bool tr
         while (pos != end && IsWhitespace(*pos))
             ++pos;
 
-    if (pos == end) return nullopt;
+    if (pos == end) return k_nullopt;
 
     s64 result = 0;
     bool is_negative = false;
@@ -467,7 +467,7 @@ ParseInt(String str, ParseIntBase base, usize* num_chars_read = nullptr, bool tr
             break;
         }
     }
-    if (!has_digits) return nullopt;
+    if (!has_digits) return k_nullopt;
     if (num_chars_read) *num_chars_read = (usize)(pos - str.data);
     return is_negative ? -result : result;
 }

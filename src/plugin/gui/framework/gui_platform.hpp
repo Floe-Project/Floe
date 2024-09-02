@@ -179,7 +179,7 @@ PUBLIC void DestroyView(GuiPlatform& platform) {
                                                                         CLAP_EXT_TIMER_SUPPORT);
         if (timer_support && platform.timer_id) {
             timer_support->unregister_timer(&platform.host, *platform.timer_id);
-            platform.timer_id = nullopt;
+            platform.timer_id = k_nullopt;
         }
     }
 
@@ -342,7 +342,7 @@ static Optional<MouseButton> RemapMouseButton(u32 button) {
         case 1: return MouseButton::Right;
         case 2: return MouseButton::Middle;
     }
-    return nullopt;
+    return k_nullopt;
 }
 
 static bool EventMouseButton(GuiPlatform& platform, PuglButtonEvent const& button_event, bool is_down) {
@@ -431,7 +431,7 @@ static Optional<KeyCode> RemapKeyCode(u32 pugl_key) {
         case 'y': return KeyCode::Y;
         case 'z': return KeyCode::Z;
     }
-    return nullopt;
+    return k_nullopt;
 }
 
 static Optional<ModifierKey> RemapModKey(u32 pugl_key) {
@@ -445,7 +445,7 @@ static Optional<ModifierKey> RemapModKey(u32 pugl_key) {
         case PUGL_KEY_SUPER_L:
         case PUGL_KEY_SUPER_R: return ModifierKey::Super;
     }
-    return nullopt;
+    return k_nullopt;
 }
 
 static bool EventKeyModifier(GuiPlatform& platform, ModifierKey mod_key, bool is_down) {

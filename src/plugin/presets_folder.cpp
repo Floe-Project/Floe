@@ -307,7 +307,7 @@ TEST_CASE(TestCurrentPresetInfo) {
     {
         PresetInfo current_preset_info;
 
-        SetPresetInfo(current_preset_info, nullopt, nullptr, nullptr);
+        SetPresetInfo(current_preset_info, k_nullopt, nullptr, nullptr);
         CHECK_EQ(current_preset_info.Name(), k_default_preset_name);
         CHECK(current_preset_info.listing_entry == nullptr);
 

@@ -449,7 +449,7 @@ Optional<DynamicArrayInline<char, 64>> ParamToLegacyId(LegacyParam index) {
         }
     }
 
-    return nullopt;
+    return k_nullopt;
 }
 
 Optional<LegacyParam> ParamFromLegacyId(String id) {
@@ -467,7 +467,7 @@ Optional<LegacyParam> ParamFromLegacyId(String id) {
     for (auto const& p : legacy_params::no_longer_exists::k_params)
         if (p.id == id) return p.index;
 
-    return nullopt;
+    return k_nullopt;
 }
 
 TEST_CASE(TestParamStringConversion) {

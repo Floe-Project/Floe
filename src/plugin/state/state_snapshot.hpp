@@ -34,7 +34,7 @@ struct StateSnapshotMetadata {
 
     Optional<String> Path() const {
         if (path::IsAbsolute(name_or_path)) return name_or_path;
-        return nullopt;
+        return k_nullopt;
     }
     String Name() const { return path::FilenameWithoutExtension(name_or_path); }
 

@@ -160,7 +160,7 @@ bool Knob(Gui* g, imgui::Id id, Rect r, f32& percent, f32 default_percent, Style
 bool Knob(Gui* g, Parameter const& param, Rect r, Style const& style) { return Knob(g, 0, param, r, style); }
 
 bool Knob(Gui* g, imgui::Id id, Parameter const& param, Rect r, Style const& style) {
-    id = BeginParameterGUI(g, param, r, id ? Optional<imgui::Id>(id) : nullopt);
+    id = BeginParameterGUI(g, param, r, id ? Optional<imgui::Id>(id) : k_nullopt);
     Optional<f32> new_val {};
     f32 val = param.LinearValue();
 

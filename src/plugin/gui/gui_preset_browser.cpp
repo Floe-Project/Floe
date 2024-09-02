@@ -64,7 +64,7 @@ PresetBrowser::PresetBrowser(Gui* g, PresetBrowserPersistentData& persistent_dat
 PresetBrowser::~PresetBrowser() {
     if (persistent_data.current_dragging_preset &&
         !imgui.IsActive(persistent_data.current_dragging_preset->imgui_id)) {
-        persistent_data.current_dragging_preset = nullopt;
+        persistent_data.current_dragging_preset = k_nullopt;
     }
 }
 

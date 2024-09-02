@@ -164,7 +164,7 @@ static UiSize LabelSize(HWND label, Optional<UiSize> container) {
     return {CheckedCast<u16>(r.right), CheckedCast<u16>(r.bottom)};
 }
 
-static UiSize ButtonSize(HWND button) { return ExpandChecked(LabelSize(button, nullopt), {20, 10}); }
+static UiSize ButtonSize(HWND button) { return ExpandChecked(LabelSize(button, k_nullopt), {20, 10}); }
 
 // This function returns the minimum acceptable size of the widget. The caller may decide to use a larger size
 // than this.

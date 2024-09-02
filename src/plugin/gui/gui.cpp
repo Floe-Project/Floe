@@ -261,7 +261,7 @@ Optional<LibraryImages> LibraryImagesFromLibraryId(Gui* g, sample_lib::LibraryId
     auto background_lib =
         sample_lib_server::FindLibraryRetained(g->plugin.shared_data.sample_library_server, library_id);
     DEFER { background_lib.Release(); };
-    if (!background_lib) return nullopt;
+    if (!background_lib) return k_nullopt;
 
     return LoadLibraryImagesIfNeeded(g, *background_lib);
 }
@@ -353,7 +353,7 @@ static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
                 .allocator = g->scratch_arena,
                 .title = "Select Floe Package",
                 .default_path =
-                    downloads_folder.HasValue() ? Optional<String>(downloads_folder.Value()) : nullopt,
+                    downloads_folder.HasValue() ? Optional<String>(downloads_folder.Value()) : k_nullopt,
                 .filters = ArrayT<DialogArguments::FileFilter>({
                     {
                         .description = "Floe Package"_s,

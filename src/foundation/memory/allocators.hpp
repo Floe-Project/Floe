@@ -253,14 +253,14 @@ constexpr Span<RemoveConst<Type>> Span<Type>::Clone(Allocator& a, CloneType clon
 template <TriviallyCopyable Type>
 constexpr Optional<Type> Optional<Type>::Clone(Allocator& a, CloneType clone_type) const {
     if (HasValue()) return Value().Clone(a, clone_type);
-    return nullopt;
+    return k_nullopt;
 }
 
 template <typename Type>
 requires(!TriviallyCopyable<Type>)
 constexpr Optional<Type> Optional<Type>::Clone(Allocator& a, CloneType clone_type) const {
     if (HasValue()) return Value().Clone(a, clone_type);
-    return nullopt;
+    return k_nullopt;
 }
 
 static void CheckAllocatorCommandIsValid(AllocatorCommandUnion const& command_union) {
@@ -342,7 +342,7 @@ class Malloc final : public Allocator {
 
 static constexpr Optional<Span<u8>>
 HandleBumpAllocation(Span<u8> stack, usize& cursor, AllocateCommand const& cmd) {
-    if (!stack.size) return nullopt;
+    if (!stack.size) return k_nullopt;
 
     auto const align_to_add = BytesToAddForAlignment(cursor, cmd.alignment);
     auto const aligned_cursor = cursor + align_to_add;
@@ -353,7 +353,7 @@ HandleBumpAllocation(Span<u8> stack, usize& cursor, AllocateCommand const& cmd) 
         return result;
     }
 
-    return nullopt;
+    return k_nullopt;
 }
 
 static constexpr Optional<Span<u8>>
@@ -370,7 +370,7 @@ TryGrowingInPlace(Span<u8> stack, usize& cursor, ResizeCommand const& cmd) {
             return result;
         }
     }
-    return nullopt;
+    return k_nullopt;
 }
 
 static constexpr void HandleBumpFree(Span<u8> data_to_free, u8* stack_data, usize& cursor) {

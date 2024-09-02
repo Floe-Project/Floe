@@ -648,7 +648,7 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                         if (s.rename_cookie == event.cookie) {
                             native.path_pool.Free(s.subpath);
                             s.subpath = native.path_pool.Clone(subpath, this_dir.dir.arena);
-                            s.rename_cookie = nullopt;
+                            s.rename_cookie = k_nullopt;
                         }
                     }
                 }

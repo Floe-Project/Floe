@@ -237,7 +237,7 @@ inline Optional<FileFormat> DetermineFileFormat(String path) {
     auto const filename = path::Filename(path);
     if (FilenameIsFloeLuaFile(filename)) return FileFormat::Lua;
     if (FilenameIsMdataFile(filename)) return FileFormat::Mdata;
-    return nullopt;
+    return k_nullopt;
 }
 
 // only honoured by the lua system

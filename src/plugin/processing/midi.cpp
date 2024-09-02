@@ -65,5 +65,5 @@ Optional<RpnDetector::Rpn> RpnDetector::DetectRpnFromCcMessage(MidiMessage msg) 
         }
     }
 
-    return nullopt;
+    return k_nullopt;
 }

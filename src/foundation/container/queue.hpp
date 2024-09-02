@@ -31,7 +31,7 @@ struct Queue {
         mutex.Lock();
         DEFER { mutex.Unlock(); };
 
-        if (!first) return nullopt;
+        if (!first) return k_nullopt;
         auto result = first->data;
 
         DoublyLinkedListRemoveFirst(*this);

@@ -57,12 +57,12 @@ Optional<DynamicArrayInline<char, k_max_thread_name_size>> ThreadName() {
         // executable which is confusing, better to have nothing and fetch the TID.
         auto const name = detail::GetThreadLocalThreadName();
         if (name) return *name;
-        return nullopt;
+        return k_nullopt;
     } else {
         char buffer[k_max_thread_name_size];
         if (pthread_getname_np(pthread_self(), buffer, k_max_thread_name_size) == 0)
             return FromNullTerminated(buffer);
-        return nullopt;
+        return k_nullopt;
     }
 }
 

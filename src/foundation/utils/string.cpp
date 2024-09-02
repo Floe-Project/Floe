@@ -11,10 +11,10 @@ Optional<double> ParseFloat(String str, usize* num_chars_read) {
     CopyStringIntoBufferWithNullTerm(buffer, str);
     char* str_end {};
     auto result = strtod(buffer, &str_end);
-    if (result == HUGE_VAL) return nullopt;
+    if (result == HUGE_VAL) return k_nullopt;
     usize const chars_read =
         (str_end >= buffer && str_end <= (buffer + sizeof(buffer))) ? (usize)(str_end - buffer) : 0;
-    if (chars_read == 0) return nullopt;
+    if (chars_read == 0) return k_nullopt;
     if (num_chars_read) *num_chars_read = chars_read;
     return result;
 }

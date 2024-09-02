@@ -11,7 +11,7 @@ struct NulloptType {
     constexpr operator bool() const { return false; }
 };
 
-inline constexpr NulloptType nullopt {NulloptType::Construct::Token};
+inline constexpr NulloptType k_nullopt {NulloptType::Construct::Token};
 
 struct Allocator;
 

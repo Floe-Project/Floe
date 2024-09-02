@@ -64,7 +64,7 @@ struct ChecksumFileParser {
             };
         }
 
-        return nullopt;
+        return k_nullopt;
     }
 
     String const file_data;

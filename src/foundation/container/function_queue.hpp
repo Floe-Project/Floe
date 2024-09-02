@@ -33,7 +33,7 @@ struct FunctionQueue {
         mutex.Lock();
         DEFER { mutex.Unlock(); };
 
-        if (!first) return nullopt;
+        if (!first) return k_nullopt;
         auto result = first->function.CloneObject(result_arena);
 
         DoublyLinkedListRemoveFirst(*this);

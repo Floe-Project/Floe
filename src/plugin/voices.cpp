@@ -219,10 +219,10 @@ void UpdateLoopInfo(Voice& v) {
                 if (sampler.region->file.loop)
                     sampler.loop = NormaliseLoop(*sampler.region->file.loop, sampler.data->num_frames);
                 else
-                    sampler.loop = nullopt;
+                    sampler.loop = k_nullopt;
                 break;
             }
-            case param_values::LoopMode::None: sampler.loop = nullopt; break;
+            case param_values::LoopMode::None: sampler.loop = k_nullopt; break;
             case param_values::LoopMode::Regular:
             case param_values::LoopMode::PingPong: {
                 auto const n = (f32)sampler.data->num_frames;

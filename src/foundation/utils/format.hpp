@@ -184,7 +184,7 @@ PUBLIC ErrorCodeOr<void> ValueToString(Writer writer, T const& value, FormatOpti
         if (value.HasValue())
             return ValueToString(writer, *value, options);
         else
-            TRY(writer.WriteChars("nullopt"_s));
+            TRY(writer.WriteChars("k_nullopt"_s));
         return k_success;
     }
 

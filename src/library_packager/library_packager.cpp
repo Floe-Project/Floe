@@ -165,7 +165,7 @@ struct MetadataParser {
             return KeyVal {key, value};
         }
 
-        return nullopt;
+        return k_nullopt;
     }
 
     static constexpr String k_multiline_delim = "\"\"\"";

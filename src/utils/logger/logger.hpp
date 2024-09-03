@@ -115,6 +115,24 @@ struct TracyLogger final : Logger {
     using Logger::Log;
 };
 
+struct BufferLogger final : Logger {
+    BufferLogger(Allocator& a) : buffer(a) {}
+    void Log(LogModuleName module_name, LogLevel level, String str) override {
+        auto _ = WriteFormattedLog(dyn::WriterFor(buffer),
+                                   module_name.str,
+                                   level,
+                                   str,
+                                   {
+                                       .ansi_colors = false,
+                                       .no_info_prefix = true,
+                                       .timestamp = false,
+                                       .thread = false,
+                                   });
+    }
+
+    DynamicArray<char> buffer;
+};
+
 struct DefaultLogger final : Logger {
     void Log(LogModuleName module_name, LogLevel level, String str) override {
         if constexpr (!PRODUCTION_BUILD) g_debug_log.Log(module_name, level, str);

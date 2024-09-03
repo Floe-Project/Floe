@@ -11,6 +11,11 @@
 
 #include "common_errors.hpp"
 
+struct ChecksumValues {
+    u32 crc32;
+    usize file_size;
+};
+
 struct ChecksumLine {
     String path;
     u32 crc32;
@@ -28,6 +33,27 @@ PUBLIC void AppendChecksumLine(DynamicArray<char>& buffer, ChecksumLine line) {
 
 PUBLIC void AppendCommentLine(DynamicArray<char>& buffer, String comment) {
     fmt::Append(buffer, "; {}\n", comment);
+}
+
+PUBLIC String SerialiseChecksumsValues(HashTable<String, ChecksumValues> checksum_values,
+                                       Allocator& allocator,
+                                       String comment) {
+    DynamicArray<char> buffer {allocator};
+    if (comment.size) AppendCommentLine(buffer, comment);
+    for (auto const& [path, checksum] : checksum_values)
+        AppendChecksumLine(
+            buffer,
+            ChecksumLine {.path = path, .crc32 = checksum->crc32, .file_size = checksum->file_size});
+    return buffer.ToOwnedSpan();
+}
+
+PUBLIC ErrorCodeOr<void> WriteChecksumsValuesToFile(String path,
+                                                    HashTable<String, ChecksumValues> checksum_values,
+                                                    Allocator& allocator,
+                                                    String comment) {
+    auto const data = SerialiseChecksumsValues(checksum_values, allocator, comment);
+    TRY(WriteFile(path, data));
+    return k_success;
 }
 
 // A parser for the checksum file format
@@ -70,11 +96,6 @@ struct ChecksumFileParser {
 
     String const file_data;
     Optional<usize> cursor = 0uz;
-};
-
-struct ChecksumValues {
-    u32 crc32;
-    usize file_size;
 };
 
 PUBLIC u32 Crc32(Span<u8 const> data) {

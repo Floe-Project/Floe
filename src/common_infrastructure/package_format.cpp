@@ -6,15 +6,15 @@
 #include "tests/framework.hpp"
 #include "utils/logger/logger.hpp"
 
-static String TestLibFolder(tests::Tester& tester, String test_files_folder) {
-    return path::Join(tester.scratch_arena,
-                      Array {test_files_folder, k_repo_subdirs_floe_test_libraries, "Test-Lib-1"});
+static String TestLibFolder(tests::Tester& tester) {
+    return path::Join(
+        tester.scratch_arena,
+        Array {tests::TestFilesFolder(tester), k_repo_subdirs_floe_test_libraries, "Test-Lib-1"});
 }
 
-static ErrorCodeOr<sample_lib::Library*> LoadTestLibrary(tests::Tester& tester, String test_files_folder) {
+static ErrorCodeOr<sample_lib::Library*> LoadTestLibrary(tests::Tester& tester) {
     auto const test_floe_lua_path =
-        (String)path::Join(tester.scratch_arena,
-                           Array {TestLibFolder(tester, test_files_folder), "floe.lua"});
+        (String)path::Join(tester.scratch_arena, Array {TestLibFolder(tester), "floe.lua"});
     auto reader = TRY(Reader::FromFile(test_floe_lua_path));
     auto lib_outcome =
         sample_lib::ReadLua(reader, test_floe_lua_path, tester.scratch_arena, tester.scratch_arena);
@@ -26,20 +26,19 @@ static ErrorCodeOr<sample_lib::Library*> LoadTestLibrary(tests::Tester& tester, 
     return lib;
 }
 
-static ErrorCodeOr<Span<u8 const>> WriteTestPackage(tests::Tester& tester, String test_files_folder) {
+static ErrorCodeOr<Span<u8 const>> WriteTestPackage(tests::Tester& tester) {
     DynamicArray<u8> zip_data {tester.scratch_arena};
     auto writer = dyn::WriterFor(zip_data);
     auto package = package::WriterCreate(writer);
     DEFER { package::WriterDestroy(package); };
 
-    TRY(package::WriterAddLibrary(package,
-                                  *TRY(LoadTestLibrary(tester, test_files_folder)),
-                                  tester.scratch_arena,
-                                  "tester"));
+    auto lib = TRY(LoadTestLibrary(tester));
+    TRY(package::WriterAddLibrary(package, *lib, tester.scratch_arena, "tester"));
 
     TRY(package::WriterAddPresetsFolder(
         package,
-        path::Join(tester.scratch_arena, Array {test_files_folder, k_repo_subdirs_floe_test_presets}),
+        path::Join(tester.scratch_arena,
+                   Array {tests::TestFilesFolder(tester), k_repo_subdirs_floe_test_presets}),
         tester.scratch_arena,
         "tester"));
 
@@ -47,12 +46,7 @@ static ErrorCodeOr<Span<u8 const>> WriteTestPackage(tests::Tester& tester, Strin
     return zip_data.ToOwnedSpan();
 }
 
-TEST_CASE(TestPackageFormat) {
-    auto const test_files_folder = TestFilesFolder(tester);
-
-    auto const zip_data = TRY(WriteTestPackage(tester, test_files_folder));
-    CHECK_NEQ(zip_data.size, 0uz);
-
+static ErrorCodeOr<void> ReadTestPackage(tests::Tester& tester, Span<u8 const> zip_data) {
     auto reader = Reader::FromMemory(zip_data);
     auto outcome = package::ReaderCreate(reader);
     if (outcome.HasError()) {
@@ -62,29 +56,46 @@ TEST_CASE(TestPackageFormat) {
     auto package = outcome.ReleaseValue();
     DEFER { package::ReaderDestroy(package); };
 
-    auto lib_dirs = TRY(package::ReaderFindLibraryDirs(package, tester.scratch_arena));
-    for (auto dir : lib_dirs) {
-        auto o = package::ReaderReadLibraryLua(package, dir, tester.scratch_arena);
+    auto const lib_dirs = TRY(package::ReaderFindLibraryDirs(package, tester.scratch_arena));
+    for (auto const dir : lib_dirs) {
+        auto const o = package::ReaderReadLibraryLua(package, dir, tester.scratch_arena);
         if (o.HasError()) {
             tester.log.Error({}, "Failed to read library lua: {}", o.Error().message);
             return o.Error().code;
         }
-        auto lib = o.ReleaseValue();
+        auto const lib = o.ReleaseValue();
         CHECK_EQ(lib->name, "Test Lua"_s);
 
-        auto opt_table = TRY(package::ReaderChecksumValuesForDir(package, dir, tester.scratch_arena));
-        for (auto [path, values] : opt_table)
-            g_debug_log.Debug({}, "Checksum: {08x} {} {}", values->crc32, values->file_size, path);
-
-        auto differs = TRY(FolderDiffersFromChecksumValues(TestLibFolder(tester, test_files_folder),
-                                                           opt_table,
-                                                           tester.scratch_arena));
+        auto const checksum_values =
+            TRY(package::ReaderChecksumValuesForDir(package, dir, tester.scratch_arena));
+        auto const differs = TRY(
+            FolderDiffersFromChecksumValues(TestLibFolder(tester), checksum_values, tester.scratch_arena));
         CHECK(!differs);
+
+        auto const dest_dir = String(
+            path::Join(tester.scratch_arena, Array {tests::TempFolder(tester), "PackageExtract test"}));
+        TRY(CreateDirectory(dest_dir, {.create_intermediate_directories = false}));
+        DEFER { auto _ = Delete(dest_dir, {.type = DeleteOptions::Type::DirectoryRecursively}); };
+
+        TRY(package::ReaderExtractFolder(package, dir, dest_dir, tester.scratch_arena));
+
+        auto const final_name = path::Join(tester.scratch_arena, Array {dest_dir, path::Filename(dir)});
+        auto const final_differs =
+            TRY(FolderDiffersFromChecksumValues(final_name, checksum_values, tester.scratch_arena));
+        CHECK(!final_differs);
     }
 
-    auto preset_dirs = TRY(package::ReaderFindPresetDirs(package, tester.scratch_arena));
-    for (auto dir : preset_dirs)
+    auto const preset_dirs = TRY(package::ReaderFindPresetDirs(package, tester.scratch_arena));
+    for (auto const dir : preset_dirs)
         g_debug_log.Debug({}, "Found preset dir: {}", dir);
+    return k_success;
+}
+
+TEST_CASE(TestPackageFormat) {
+    auto const zip_data = TRY(WriteTestPackage(tester));
+    CHECK_NEQ(zip_data.size, 0uz);
+
+    TRY(ReadTestPackage(tester, zip_data));
 
     return k_success;
 }

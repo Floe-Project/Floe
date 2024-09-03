@@ -93,9 +93,7 @@ PUBLIC ErrorCodeOr<HashTable<String, ChecksumValues>> ParseChecksumFile(String c
 PUBLIC ErrorCodeOr<bool> FolderDiffersFromChecksumValues(String folder_path,
                                                          HashTable<String, ChecksumValues> checksum_values,
                                                          ArenaAllocator& scratch_arena) {
-    DynamicHashTable<String, bool> checksum_values_found(
-        scratch_arena,
-        HashTable<String, bool>::RecommendedCapacity(checksum_values.size));
+    auto checksum_values_found = Set<String>::Create(scratch_arena, checksum_values.Capacity());
 
     auto it = TRY(RecursiveDirectoryIterator::Create(scratch_arena,
                                                      folder_path,
@@ -136,7 +134,7 @@ PUBLIC ErrorCodeOr<bool> FolderDiffersFromChecksumValues(String folder_path,
                 return true;
             }
             scratch_arena.Free(file_data);
-            checksum_values_found.Insert(element->key, true);
+            checksum_values_found.InsertWithoutGrowing(element->key);
         }
 
         TRY(it.Increment());
@@ -144,7 +142,7 @@ PUBLIC ErrorCodeOr<bool> FolderDiffersFromChecksumValues(String folder_path,
 
     // check if there's any missing files
     for (auto const& [path, checksum] : checksum_values)
-        if (!checksum_values_found.Find(path)) {
+        if (!checksum_values_found.Contains(path)) {
             g_debug_log.Debug({}, "Missing file: {}", path);
             return true;
         }

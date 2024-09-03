@@ -6,7 +6,6 @@
 #include "tests/framework.hpp"
 
 TEST_CASE(TestChecksumFileParsing) {
-
     SUBCASE("empty file") {
         ChecksumFileParser parser {
             .file_data = "",

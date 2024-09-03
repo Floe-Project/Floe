@@ -11,7 +11,7 @@ static String TestLibFolder(tests::Tester& tester, String test_files_folder) {
                       Array {test_files_folder, k_repo_subdirs_floe_test_libraries, "Test-Lib-1"});
 }
 
-static ErrorCodeOr<sample_lib::Library*> TestLib(tests::Tester& tester, String test_files_folder) {
+static ErrorCodeOr<sample_lib::Library*> LoadTestLibrary(tests::Tester& tester, String test_files_folder) {
     auto const test_floe_lua_path =
         (String)path::Join(tester.scratch_arena,
                            Array {TestLibFolder(tester, test_files_folder), "floe.lua"});
@@ -33,7 +33,7 @@ static ErrorCodeOr<Span<u8 const>> WriteTestPackage(tests::Tester& tester, Strin
     DEFER { package::WriterDestroy(package); };
 
     TRY(package::WriterAddLibrary(package,
-                                  *TRY(TestLib(tester, test_files_folder)),
+                                  *TRY(LoadTestLibrary(tester, test_files_folder)),
                                   tester.scratch_arena,
                                   "tester"));
 
@@ -76,9 +76,9 @@ TEST_CASE(TestPackageFormat) {
         for (auto [path, values] : opt_table)
             g_debug_log.Debug({}, "Checksum: {08x} {} {}", values->crc32, values->file_size, path);
 
-        auto differs = TRY(FolderDiffersFromChecksumFile(TestLibFolder(tester, test_files_folder),
-                                                         opt_table,
-                                                         tester.scratch_arena));
+        auto differs = TRY(FolderDiffersFromChecksumValues(TestLibFolder(tester, test_files_folder),
+                                                           opt_table,
+                                                           tester.scratch_arena));
         CHECK(!differs);
     }
 

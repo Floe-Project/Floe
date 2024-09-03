@@ -90,9 +90,9 @@ PUBLIC ErrorCodeOr<HashTable<String, ChecksumValues>> ParseChecksumFile(String c
     return checksum_values.ToOwnedTable();
 }
 
-PUBLIC ErrorCodeOr<bool> FolderDiffersFromChecksumFile(String folder_path,
-                                                       HashTable<String, ChecksumValues> checksum_values,
-                                                       ArenaAllocator& scratch_arena) {
+PUBLIC ErrorCodeOr<bool> FolderDiffersFromChecksumValues(String folder_path,
+                                                         HashTable<String, ChecksumValues> checksum_values,
+                                                         ArenaAllocator& scratch_arena) {
     DynamicHashTable<String, bool> checksum_values_found(
         scratch_arena,
         HashTable<String, bool>::RecommendedCapacity(checksum_values.size));

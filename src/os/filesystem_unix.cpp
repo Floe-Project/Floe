@@ -203,6 +203,7 @@ ErrorCodeOr<File> OpenFile(String filename, FileMode mode) {
             case FileMode::Read: w = "rb"; break;
             case FileMode::Write: w = "wb"; break;
             case FileMode::Append: w = "ab"; break;
+            case FileMode::WriteNoOverwrite: w = "wxb"; break;
         }
         w;
     });

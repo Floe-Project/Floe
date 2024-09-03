@@ -515,7 +515,7 @@ static ErrorCodeOr<void> ExtractFolder(PackageReader& package,
                                 .fail_if_exists = false,
                             }));
         g_debug_log.Debug({}, "Extracting {} to {}", path, out_path);
-        auto out_file = TRY(OpenFile(out_path, FileMode::Write));
+        auto out_file = TRY(OpenFile(out_path, FileMode::WriteNoOverwrite));
         TRY(detail::ExtractFileToFile(package.zip, file_stat, out_file));
     }
 

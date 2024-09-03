@@ -124,6 +124,7 @@ ErrorCodeOr<File> OpenFile(String filename, FileMode mode) {
             case FileMode::Read: d = GENERIC_READ; break;
             case FileMode::Write: d = GENERIC_WRITE; break;
             case FileMode::Append: d = FILE_APPEND_DATA; break;
+            case FileMode::WriteNoOverwrite: d = GENERIC_WRITE; break;
         }
         d;
     });
@@ -134,6 +135,7 @@ ErrorCodeOr<File> OpenFile(String filename, FileMode mode) {
             case FileMode::Read: c = OPEN_EXISTING; break;
             case FileMode::Write: c = CREATE_ALWAYS; break;
             case FileMode::Append: c = OPEN_ALWAYS; break;
+            case FileMode::WriteNoOverwrite: c = CREATE_NEW; break;
         }
         c;
     });
@@ -144,6 +146,7 @@ ErrorCodeOr<File> OpenFile(String filename, FileMode mode) {
             case FileMode::Read: s = FILE_SHARE_READ; break;
             case FileMode::Write: s = 0; break;
             case FileMode::Append: s = 0; break;
+            case FileMode::WriteNoOverwrite: s = 0; break;
         }
         s;
     });

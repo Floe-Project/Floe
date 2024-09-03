@@ -28,6 +28,7 @@ ErrorCode FilesystemErrnoErrorCode(s64 error_code,
 enum class FileMode {
     Read,
     Write, // overwrites if it already exists
+    WriteNoOverwrite,
     Append,
 };
 

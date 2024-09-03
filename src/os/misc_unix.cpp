@@ -154,7 +154,7 @@ static constexpr auto k_signals = Array {
 
 bool g_signals_installed = false;
 static struct sigaction g_previous_signal_actions[k_signals.size] {};
-static DynamicArrayInline<char, 200> g_crash_folder_path {};
+static DynamicArrayBounded<char, 200> g_crash_folder_path {};
 
 #if defined(__has_feature)
 #if __has_feature(undefined_behavior_sanitizer)

@@ -97,7 +97,7 @@ ErrorCodeOr<void> Main(String destination_folder) {
 
         {
             auto const macos_version = ParseVersionString(MIN_MACOS_VERSION).Value();
-            DynamicArrayInline<char, 64> macos_version_str {"macOS "};
+            DynamicArrayBounded<char, 64> macos_version_str {"macOS "};
             ASSERT(macos_version.major != 0);
             fmt::Append(macos_version_str, "{}", macos_version.major);
             if (macos_version.minor != 0) fmt::Append(macos_version_str, ".{}", macos_version.minor);

@@ -22,8 +22,8 @@ struct PluginInstance {
         }
 
         ArenaAllocator arena {PageAllocator::Instance()};
-        DynamicArrayInline<sample_lib_server::RequestId, k_num_layers + 1> requests;
-        DynamicArrayInline<sample_lib_server::LoadResult, k_num_layers + 1> retained_results;
+        DynamicArrayBounded<sample_lib_server::RequestId, k_num_layers + 1> requests;
+        DynamicArrayBounded<sample_lib_server::LoadResult, k_num_layers + 1> retained_results;
         StateSnapshotWithMetadata snapshot;
         StateSource source;
     };
@@ -60,7 +60,7 @@ struct PluginInstance {
     u64 random_seed = SeedFromTime();
 
     // IMPORTANT: debug-only, remove this
-    DynamicArrayInline<char, 200> state_change_description {};
+    DynamicArrayBounded<char, 200> state_change_description {};
 
     ThreadsafeFunctionQueue main_thread_callbacks {.arena = {PageAllocator::Instance()}};
 

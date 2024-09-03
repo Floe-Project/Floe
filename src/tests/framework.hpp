@@ -84,7 +84,7 @@ struct TestCase {
 };
 
 struct SubcaseSignature {
-    DynamicArrayInline<char, 128> name;
+    DynamicArrayBounded<char, 128> name;
     String file;
     int line;
 };

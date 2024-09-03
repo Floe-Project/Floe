@@ -45,7 +45,7 @@ void SetCurrentThreadPriorityRealTime();
 
 constexpr static usize k_max_thread_name_size = 16;
 void SetThreadName(String name);
-Optional<DynamicArrayInline<char, k_max_thread_name_size>> ThreadName();
+Optional<DynamicArrayBounded<char, k_max_thread_name_size>> ThreadName();
 
 namespace detail {
 void SetThreadLocalThreadName(String name);
@@ -91,7 +91,7 @@ class Thread {
         // private
         StartFunction start_function;
         ThreadStartOptions options;
-        DynamicArrayInline<char, k_max_thread_name_size> thread_name {};
+        DynamicArrayBounded<char, k_max_thread_name_size> thread_name {};
     };
 
   private:

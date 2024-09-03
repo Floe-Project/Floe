@@ -203,7 +203,7 @@ ErrorCodeOr<s64> LastWriteTime(String path);
 
 Optional<Version> MacosBundleVersion(String path);
 
-ErrorCodeOr<DynamicArrayInline<char, 200>> NameOfRunningExecutableOrLibrary();
+ErrorCodeOr<DynamicArrayBounded<char, 200>> NameOfRunningExecutableOrLibrary();
 ErrorCodeOr<MutableString> CurrentExecutablePath(Allocator& a);
 
 Optional<String> SearchForExistingFolderUpwards(String dir, String folder_name_to_find, Allocator& allocator);
@@ -388,8 +388,8 @@ struct DirectoryWatcher {
             // if true, ignore all other changes and recursively rescan this directory
             ManualRescanNeeded = 1 << 6,
         };
-        static constexpr DynamicArrayInline<char, 200> ToString(ChangeTypeFlags c) {
-            DynamicArrayInline<char, 200> result;
+        static constexpr DynamicArrayBounded<char, 200> ToString(ChangeTypeFlags c) {
+            DynamicArrayBounded<char, 200> result;
             if (c & Added) dyn::AppendSpan(result, "Added, ");
             if (c & Deleted) dyn::AppendSpan(result, "Deleted, ");
             if (c & Modified) dyn::AppendSpan(result, "Modified, ");

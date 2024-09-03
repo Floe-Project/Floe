@@ -265,7 +265,7 @@ ErrorCodeOr<MutableString> CurrentExecutablePath(Allocator& a) {
     return Narrow(a, full_wide_path).Value();
 }
 
-ErrorCodeOr<DynamicArrayInline<char, 200>> NameOfRunningExecutableOrLibrary() {
+ErrorCodeOr<DynamicArrayBounded<char, 200>> NameOfRunningExecutableOrLibrary() {
     PathArena temp_path_arena;
     auto const full_wide_path = TRY(Win32GetRunningProgramName(temp_path_arena));
     auto full_path = Narrow(temp_path_arena, full_wide_path).Value();

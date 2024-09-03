@@ -141,8 +141,8 @@ PUBLIC constexpr usize IntToString(IntType num, char* buffer, IntToStringOptions
 }
 
 template <Integral IntType>
-PUBLIC constexpr DynamicArrayInline<char, 32> IntToString(IntType num, IntToStringOptions options = {}) {
-    DynamicArrayInline<char, 32> result;
+PUBLIC constexpr DynamicArrayBounded<char, 32> IntToString(IntType num, IntToStringOptions options = {}) {
+    DynamicArrayBounded<char, 32> result;
     result.size = IntToString(num, result.data, options);
     return result;
 }
@@ -503,8 +503,8 @@ PUBLIC inline void Assign(DynCharArray& output, String format, Args const&... ar
 }
 
 template <usize k_size, typename... Args>
-PUBLIC inline DynamicArrayInline<char, k_size> FormatInline(String format, Args const&... args) {
-    DynamicArrayInline<char, k_size> result;
+PUBLIC inline DynamicArrayBounded<char, k_size> FormatInline(String format, Args const&... args) {
+    DynamicArrayBounded<char, k_size> result;
     auto const outcome = FormatToWriter(dyn::WriterFor(result), format, args...);
     if (outcome.HasError()) __builtin_debugtrap();
     return result;

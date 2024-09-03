@@ -8,7 +8,7 @@
 #include "os/filesystem.hpp"
 #include "os/misc.hpp"
 
-DynamicArrayInline<char, 64> OperatingSystemName() { return "Linux"_s; }
+DynamicArrayBounded<char, 64> OperatingSystemName() { return "Linux"_s; }
 
 String GetFileBrowserAppName() { return "File Explorer"; }
 

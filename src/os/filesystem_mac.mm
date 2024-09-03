@@ -277,7 +277,7 @@ ErrorCodeOr<MutableString> CurrentExecutablePath(Allocator& a) {
     return MutableString {};
 }
 
-ErrorCodeOr<DynamicArrayInline<char, 200>> NameOfRunningExecutableOrLibrary() {
+ErrorCodeOr<DynamicArrayBounded<char, 200>> NameOfRunningExecutableOrLibrary() {
     if (NSBundle* bundle = [NSBundle bundleForClass:[MAKE_UNIQUE_OBJC_NAME(ClassForGettingBundle) class]])
         return path::Filename(NSStringToString(bundle.bundlePath));
 
@@ -286,7 +286,7 @@ ErrorCodeOr<DynamicArrayInline<char, 200>> NameOfRunningExecutableOrLibrary() {
     char unused_buffer[1];
     errno = 0;
     if (_NSGetExecutablePath(unused_buffer, &size) == k_buffer_not_large_enough) {
-        DynamicArrayInline<char, 200> result;
+        DynamicArrayBounded<char, 200> result;
         dyn::Resize(result, size);
         errno = 0;
         if (_NSGetExecutablePath(result.data, &size) == 0) return result;
@@ -452,7 +452,7 @@ void EventCallback([[maybe_unused]] ConstFSEventStreamRef stream_ref,
     auto** paths = (char**)event_paths;
 
     if constexpr (k_debug_fsevents) {
-        DynamicArrayInline<char, 4000> info;
+        DynamicArrayBounded<char, 4000> info;
         struct Flag {
             FSEventStreamEventFlags flag;
             String name;
@@ -490,7 +490,7 @@ void EventCallback([[maybe_unused]] ConstFSEventStreamRef stream_ref,
             MAYBE_UNUSED auto u1 = fmt::AppendLine(writer, "  {{");
             MAYBE_UNUSED auto u2 = fmt::AppendLine(writer, "    path: {}", paths[i]);
 
-            DynamicArrayInline<char, 1000> flags_str;
+            DynamicArrayBounded<char, 1000> flags_str;
             for (auto const& flag : k_flags)
                 if (event_flags[i] & flag.flag) {
                     dyn::AppendSpan(flags_str, flag.name);

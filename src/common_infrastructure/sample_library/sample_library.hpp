@@ -163,8 +163,8 @@ struct LibraryId {
     bool operator==(LibraryId const& other) const = default;
     bool operator==(LibraryIdRef const& other) const { return Ref() == other; }
 
-    DynamicArrayInline<char, k_max_library_author_size> author;
-    DynamicArrayInline<char, k_max_library_name_size> name;
+    DynamicArrayBounded<char, k_max_library_author_size> author;
+    DynamicArrayBounded<char, k_max_library_name_size> name;
 };
 
 struct InstrumentId {
@@ -174,7 +174,7 @@ struct InstrumentId {
     }
     u64 Hash() const { return library.Ref().HashWithExtra(inst_name); }
     LibraryId library;
-    DynamicArrayInline<char, k_max_instrument_name_size> inst_name;
+    DynamicArrayBounded<char, k_max_instrument_name_size> inst_name;
 };
 
 struct IrId {
@@ -184,7 +184,7 @@ struct IrId {
     }
     u64 Hash() const { return library.Ref().HashWithExtra(ir_name); }
     LibraryId library;
-    DynamicArrayInline<char, k_max_ir_name_size> ir_name;
+    DynamicArrayBounded<char, k_max_ir_name_size> ir_name;
 };
 
 enum class LuaErrorCode {

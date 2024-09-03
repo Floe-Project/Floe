@@ -110,7 +110,7 @@ struct GuiFrameInput {
     Array<ModifierKeyState, ToInt(ModifierKey::Count)> modifier_keys {};
     // may contain text from the OS clipboard if you requested it
     DynamicArray<char> clipboard_text {PageAllocator::Instance()};
-    DynamicArrayInline<u32, 16> input_utf32_chars {};
+    DynamicArrayBounded<u32, 16> input_utf32_chars {};
 
     TimePoint current_time {};
     TimePoint time_prev {};

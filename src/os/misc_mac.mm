@@ -77,7 +77,7 @@ ErrorCode ErrorFromNSError(NSError* error, char const* extra_debug_info, SourceL
     return {*code_type, (s64)error.code, extra_debug_info, loc};
 }
 
-DynamicArrayInline<char, 64> OperatingSystemName() {
+DynamicArrayBounded<char, 64> OperatingSystemName() {
     NSOperatingSystemVersion version = [[NSProcessInfo processInfo] operatingSystemVersion];
 
     return fmt::FormatInline<64>("macOS {}.{}.{}",

@@ -28,7 +28,7 @@ bool IsMainThread() {
     return g_main_thread_id == CurrentThreadId();
 }
 
-thread_local DynamicArrayInline<char, k_max_thread_name_size> g_thread_name {};
+thread_local DynamicArrayBounded<char, k_max_thread_name_size> g_thread_name {};
 
 namespace detail {
 

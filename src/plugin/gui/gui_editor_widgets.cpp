@@ -297,7 +297,7 @@ void SizesGUISliders(EditorGUI* g, String search) {
     auto& live_gui = g->imgui->live_edit_values;
     EditorHeading(g, "Sizes");
 
-    static DynamicArrayInline<String, ToInt(UiSizeId::Count)> categories {};
+    static DynamicArrayBounded<String, ToInt(UiSizeId::Count)> categories {};
     if (categories.size == 0)
         for (auto const i : Range(ToInt(UiSizeId::Count)))
             dyn::AppendIfNotAlreadyThere(categories, k_ui_sizes_categories[i]);
@@ -348,7 +348,7 @@ void SizesGUISliders(EditorGUI* g, String search) {
 }
 
 static auto GetColourNames(LiveEditGui const& gui, bool include_none) {
-    DynamicArrayInline<String, k_max_num_colours + 1> colour_names;
+    DynamicArrayBounded<String, k_max_num_colours + 1> colour_names;
     if (include_none) dyn::Append(colour_names, "---");
     for (auto const i : Range(k_max_num_colours))
         dyn::Append(colour_names, gui.ui_cols[i].name);
@@ -365,7 +365,7 @@ void ColourMapGUIMenus(EditorGUI* g, String search, String colour_search, bool h
     auto& live_gui = g->imgui->live_edit_values;
     EditorHeading(g, "Colour Mapping");
 
-    static DynamicArrayInline<String, ToInt(UiColMap::Count)> categories {};
+    static DynamicArrayBounded<String, ToInt(UiColMap::Count)> categories {};
     if (categories.size == 0)
         for (auto const i : Range(ToInt(UiColMap::Count)))
             dyn::AppendIfNotAlreadyThere(categories, k_ui_col_map_categories[i]);

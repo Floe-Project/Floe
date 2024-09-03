@@ -514,45 +514,45 @@ struct DynamicArray {
 
 template <typename Type, usize k_capacity>
 requires(!Const<Type>)
-struct DynamicArrayInline {
+struct DynamicArrayBounded {
     using ValueType = Type;
 
-    PROPAGATE_TRIVIALLY_COPYABLE(DynamicArrayInline, Type);
-    DEFINE_CONTIGUOUS_CONTAINER_METHODS(DynamicArrayInline, data, size)
+    PROPAGATE_TRIVIALLY_COPYABLE(DynamicArrayBounded, Type);
+    DEFINE_CONTIGUOUS_CONTAINER_METHODS(DynamicArrayBounded, data, size)
 
-    constexpr DynamicArrayInline() = default;
+    constexpr DynamicArrayBounded() = default;
 
-    constexpr DynamicArrayInline(Span<Type const> data) {
+    constexpr DynamicArrayBounded(Span<Type const> data) {
         ASSERT(dyn::AssignAssumingAlreadyEmpty(*this, data));
     }
 
     template <usize k_array_capacity>
     requires(k_array_capacity <= k_capacity)
-    constexpr DynamicArrayInline(Array<Type, k_array_capacity> const& array) {
+    constexpr DynamicArrayBounded(Array<Type, k_array_capacity> const& array) {
         ASSERT(dyn::AssignAssumingAlreadyEmpty(*this, array.Items()));
     }
 
-    constexpr DynamicArrayInline(DynamicArrayInline const& other) {
+    constexpr DynamicArrayBounded(DynamicArrayBounded const& other) {
         dyn::AssignAssumingAlreadyEmpty(*this, other.Items());
     }
 
-    constexpr DynamicArrayInline(DynamicArrayInline&& other) {
+    constexpr DynamicArrayBounded(DynamicArrayBounded&& other) {
         dyn::MoveAssignAssumingAlreadyEmpty(*this, other.Items());
         dyn::Clear(other);
     }
 
-    constexpr DynamicArrayInline& operator=(DynamicArrayInline const& other) {
+    constexpr DynamicArrayBounded& operator=(DynamicArrayBounded const& other) {
         ASSERT_ALWAYS(dyn::Assign(*this, other.Items()));
         return *this;
     }
 
-    constexpr DynamicArrayInline& operator=(DynamicArrayInline&& other) {
+    constexpr DynamicArrayBounded& operator=(DynamicArrayBounded&& other) {
         ASSERT_ALWAYS(dyn::MoveAssign(*this, other.Items()));
         dyn::Clear(other);
         return *this;
     }
 
-    constexpr ~DynamicArrayInline() { dyn::CallDestructors(Items()); }
+    constexpr ~DynamicArrayBounded() { dyn::CallDestructors(Items()); }
 
     constexpr bool Reserve(usize capacity) { return capacity <= k_capacity; }
 

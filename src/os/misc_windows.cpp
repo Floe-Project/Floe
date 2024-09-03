@@ -25,7 +25,7 @@
 // https://github.com/juce-framework/JUCE/blob/master/modules/juce_foundation/native/juce_SystemStats_windows.cpp
 // Copyright (c) 2022 - Raw Material Software Limited
 // SPDX-License-Identifier: ISC
-DynamicArrayInline<char, 64> OperatingSystemName() {
+DynamicArrayBounded<char, 64> OperatingSystemName() {
     auto const windows_version_info = []() -> RTL_OSVERSIONINFOW {
         RTL_OSVERSIONINFOW version_info = {};
 

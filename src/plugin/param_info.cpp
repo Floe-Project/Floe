@@ -154,9 +154,9 @@ TEST_CASE(TestNumberStartsWithNegativeZero) {
     return k_success;
 }
 
-Optional<DynamicArrayInline<char, 128>> ParameterInfo::LinearValueToString(f32 linear_value) const {
+Optional<DynamicArrayBounded<char, 128>> ParameterInfo::LinearValueToString(f32 linear_value) const {
     constexpr usize k_size = 128;
-    using ResultType = DynamicArrayInline<char, k_size>;
+    using ResultType = DynamicArrayBounded<char, k_size>;
     ResultType result;
     auto const value = ProjectValue(linear_value);
 
@@ -422,14 +422,14 @@ constexpr auto k_params = ArrayT<NoLongerExistsParam>({
 
 } // namespace legacy_params
 
-Optional<DynamicArrayInline<char, 64>> ParamToLegacyId(LegacyParam index) {
+Optional<DynamicArrayBounded<char, 64>> ParamToLegacyId(LegacyParam index) {
     switch (index.tag) {
         case ParamExistance::StillExists: {
             auto const i = index.Get<ParamIndex>();
             if (auto const layer_param_info = LayerParamInfoFromGlobalIndex(i)) {
                 for (auto const& legacy : legacy_params::still_exists::k_layer_params) {
                     if (layer_param_info->param == legacy.index) {
-                        auto result = DynamicArrayInline<char, 64> {};
+                        auto result = DynamicArrayBounded<char, 64> {};
                         dyn::Append(result, 'L');
                         dyn::Append(result, (char)('0' + layer_param_info->layer_num));
                         dyn::AppendSpan(result, legacy.id_suffix);

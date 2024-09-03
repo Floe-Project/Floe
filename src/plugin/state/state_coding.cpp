@@ -248,7 +248,7 @@ class JsonStateParser {
     }
 
     Array<bool, k_num_parameters> param_value_is_present {};
-    DynamicArrayInline<EffectType, k_num_effect_types> fx_order {};
+    DynamicArrayBounded<EffectType, k_num_effect_types> fx_order {};
 
     Optional<Version> mirage_version {};
     String last_loaded_preset_name {};
@@ -778,7 +778,7 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
         }
 
         if (parser.fx_order.size) {
-            DynamicArrayInline<EffectType, k_num_effect_types> effects {};
+            DynamicArrayBounded<EffectType, k_num_effect_types> effects {};
             for (auto fx_type : parser.fx_order)
                 dyn::Append(effects, fx_type);
 
@@ -1322,7 +1322,7 @@ static void CheckStateIsValid(tests::Tester& tester, StateSnapshot const& state)
         CHECK_OP(value, >=, info.linear_range.min);
         CHECK_OP(value, <=, info.linear_range.max);
     }
-    DynamicArrayInline<EffectType, k_num_effect_types> effects {};
+    DynamicArrayBounded<EffectType, k_num_effect_types> effects {};
     for (auto fx : state.fx_order)
         dyn::AppendIfNotAlreadyThere(effects, fx);
     CHECK_EQ(effects.size, k_num_effect_types);

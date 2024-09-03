@@ -612,7 +612,7 @@ struct ParameterInfo {
     }
 
     Optional<f32> StringToLinearValue(String str) const;
-    Optional<DynamicArrayInline<char, 128>> LinearValueToString(f32 linear_value) const;
+    Optional<DynamicArrayBounded<char, 128>> LinearValueToString(f32 linear_value) const;
 
     constexpr bool IsEffectParam() const { return module_parts[0] == ParameterModule::Effect; }
     constexpr bool IsLayerParam() const {
@@ -620,8 +620,8 @@ struct ParameterInfo {
                module_parts[0] == ParameterModule::Layer3;
     }
 
-    DynamicArrayInline<char, 128> ModuleString() const {
-        DynamicArrayInline<char, 128> result {};
+    DynamicArrayBounded<char, 128> ModuleString() const {
+        DynamicArrayBounded<char, 128> result {};
         for (auto m : module_parts) {
             if (m == ParameterModule::None) break;
             if (result.size != 0) dyn::Append(result, '/');
@@ -2270,4 +2270,4 @@ using LegacyParam = TaggedUnion<ParamExistance,
                                 TypeAndTag<NoLongerExistingParam, ParamExistance::NoLongerExists>>;
 
 Optional<LegacyParam> ParamFromLegacyId(String id);
-Optional<DynamicArrayInline<char, 64>> ParamToLegacyId(LegacyParam index);
+Optional<DynamicArrayBounded<char, 64>> ParamToLegacyId(LegacyParam index);

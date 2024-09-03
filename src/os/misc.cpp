@@ -63,7 +63,7 @@ Writer StdWriter(StdStream stream) {
 bool IsRunningUnderWine() { return false; }
 #endif
 
-DynamicArrayInline<char, k_timestamp_max_str_size> Timestamp() {
+DynamicArrayBounded<char, k_timestamp_max_str_size> Timestamp() {
     auto const t = LocalTimeFromNanosecondsSinceEpoch(NanosecondsSinceEpoch());
     return fmt::FormatInline<k_timestamp_max_str_size>("{}-{02}-{02} {02}:{02}:{02}.{03} ",
                                                        t.year,

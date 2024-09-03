@@ -356,7 +356,7 @@ TEST_CASE(TestWriter) {
     }
 
     SUBCASE("inline") {
-        DynamicArrayInline<char, 128> buf {};
+        DynamicArrayBounded<char, 128> buf {};
         auto writer = dyn::WriterFor(buf);
         TRY(writer.WriteBytes(Array {(u8)'a'}));
         CHECK_EQ(buf.Items(), "a"_s);
@@ -407,7 +407,7 @@ TEST_CASE(TestDynamicArrayClone) {
 }
 
 TEST_CASE(TestDynamicArrayString) {
-    DynamicArrayInline<char, 64> buf;
+    DynamicArrayBounded<char, 64> buf;
     dyn::Assign(buf, "a   "_s);
     dyn::TrimWhitespace(buf);
     REQUIRE(buf == "a"_s);
@@ -420,9 +420,9 @@ TEST_CASE(TestDynamicArrayString) {
     return k_success;
 }
 
-TEST_CASE(TestDynamicArrayInlineBasics) {
+TEST_CASE(TestDynamicArrayBoundedBasics) {
     SUBCASE("Basics") {
-        DynamicArrayInline<char, 10> arr {"aa"_s};
+        DynamicArrayBounded<char, 10> arr {"aa"_s};
         REQUIRE(arr == "aa"_s);
         REQUIRE(arr.data);
         REQUIRE(arr.size);
@@ -430,18 +430,18 @@ TEST_CASE(TestDynamicArrayInlineBasics) {
     }
 
     SUBCASE("Move") {
-        DynamicArrayInline<char, 10> a {"aa"_s};
-        DynamicArrayInline<char, 10> b {Move(a)};
+        DynamicArrayBounded<char, 10> a {"aa"_s};
+        DynamicArrayBounded<char, 10> b {Move(a)};
         REQUIRE(b == "aa"_s);
 
-        DynamicArrayInline<char, 10> c {"bb"_s};
+        DynamicArrayBounded<char, 10> c {"bb"_s};
         b = Move(c);
         REQUIRE(b == "bb"_s);
     }
 
     SUBCASE("Overflow") {
         LeakDetectingAllocator alloc;
-        DynamicArrayInline<DynamicArray<char>, 4> arr;
+        DynamicArrayBounded<DynamicArray<char>, 4> arr;
         REQUIRE(dyn::Append(arr, DynamicArray<char>("foo", alloc)));
         REQUIRE(dyn::Append(arr, DynamicArray<char>("foo", alloc)));
         REQUIRE(dyn::Append(arr, DynamicArray<char>("foo", alloc)));
@@ -1593,7 +1593,7 @@ TEST_CASE(TestFormatStringReplace) {
 
 TEST_CASE(TestIntToString) {
     auto to_string = [](int value, fmt::IntToStringOptions options) {
-        DynamicArrayInline<char, 32> result;
+        DynamicArrayBounded<char, 32> result;
         auto size = IntToString(value, result.data, options);
         result.ResizeWithoutCtorDtor(size);
         return result;
@@ -1611,7 +1611,7 @@ TEST_CASE(TestFormat) {
     auto& a = tester.scratch_arena;
 
     SUBCASE("basics") {
-        DynamicArrayInline<char, 256> buf;
+        DynamicArrayBounded<char, 256> buf;
         fmt::Assign(buf, "text {}, end", 100);
         CHECK_EQ(buf, "text 100, end"_s);
     }
@@ -1841,7 +1841,7 @@ TEST_CASE(TestPath) {
     }
 
     SUBCASE("Join") {
-        DynamicArrayInline<char, 128> s;
+        DynamicArrayBounded<char, 128> s;
         s = "foo"_s;
         JoinAppend(s, "bar"_s, Format::Posix);
         CHECK_EQ(s, "foo/bar"_s);
@@ -2481,8 +2481,8 @@ TEST_CASE(TestAllocatorTypes) {
 
     SUBCASE("Pointers are unique when no existing data is passed in") {
         constexpr auto k_iterations = 1000;
-        DynamicArrayInline<Span<u8>, k_iterations> allocs;
-        DynamicArrayInline<void*, k_iterations> set;
+        DynamicArrayBounded<Span<u8>, k_iterations> allocs;
+        DynamicArrayBounded<void*, k_iterations> set;
         for (auto _ : Range(k_iterations)) {
             dyn::Append(allocs, a.Allocate({1, 1, true}));
             REQUIRE(Last(allocs).data != nullptr);
@@ -2497,8 +2497,8 @@ TEST_CASE(TestAllocatorTypes) {
         usize const sizes[] = {1, 2, 3, 99, 7000};
         usize const alignments[] = {1, 2, 4, 8, 16, 32};
         auto const total_size = ArraySize(sizes) * ArraySize(alignments);
-        DynamicArrayInline<Span<u8>, total_size> allocs;
-        DynamicArrayInline<void*, total_size> set;
+        DynamicArrayBounded<Span<u8>, total_size> allocs;
+        DynamicArrayBounded<void*, total_size> set;
         for (auto s : sizes) {
             for (auto align : alignments) {
                 dyn::Append(allocs, a.Allocate({s, align, true}));
@@ -2745,7 +2745,7 @@ TEST_REGISTRATION(RegisterFoundationTests) {
     REGISTER_TEST(TestDynamicArrayBasics<int>);
     REGISTER_TEST(TestDynamicArrayChar);
     REGISTER_TEST(TestDynamicArrayClone);
-    REGISTER_TEST(TestDynamicArrayInlineBasics);
+    REGISTER_TEST(TestDynamicArrayBoundedBasics);
     REGISTER_TEST(TestDynamicArrayString);
     REGISTER_TEST(TestFormat);
     REGISTER_TEST(TestFormatStringReplace);

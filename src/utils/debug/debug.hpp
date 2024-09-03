@@ -37,7 +37,7 @@ struct InlineSprintfBuffer {
 
 template <typename... Args>
 [[noreturn]] PUBLIC void PanicF(SourceLocation loc, String format, Args const&... args) {
-    DynamicArrayInline<char, 1000> buffer {};
+    DynamicArrayBounded<char, 1000> buffer {};
     fmt::Append(buffer, format, args...);
     Panic(dyn::NullTerminated(buffer), loc);
 }
@@ -49,7 +49,7 @@ struct StacktraceOptions {
     bool demangle = true; // demangling is not signal-safe
 };
 
-using StacktraceStack = DynamicArrayInline<uintptr, 32>;
+using StacktraceStack = DynamicArrayBounded<uintptr, 32>;
 Optional<StacktraceStack> CurrentStacktrace(int skip_frames = 1);
 void InitStacktraceState();
 
@@ -70,7 +70,7 @@ template <typename... Args>
 PUBLIC void TracyMessageEx(TracyMessageConfig config, String format, Args const&... args) {
     if constexpr (!k_tracy_enable) return;
 
-    DynamicArrayInline<char, 5000> msg;
+    DynamicArrayBounded<char, 5000> msg;
     dyn::Append(msg, '[');
     dyn::AppendSpan(msg, config.category);
     dyn::AppendSpan(msg, "] "_s);

@@ -35,7 +35,7 @@ struct Widget {
     GuiFramework* framework {};
     u32 id {};
 
-    DynamicArrayInline<Widget*, k_max_children> children {};
+    DynamicArrayBounded<Widget*, k_max_children> children {};
 
     WidgetOptions options {};
 
@@ -67,7 +67,7 @@ struct GuiFramework {
     HFONT heading_font {};
     HBRUSH static_background_brush {};
     Application* app {};
-    DynamicArrayInline<Widget, k_max_widgets> widgets {};
+    DynamicArrayBounded<Widget, k_max_widgets> widgets {};
     PageAllocator page_allocator;
     ArenaAllocator scratch_arena {page_allocator};
     ArenaAllocator arena {PageAllocator::Instance()};
@@ -215,7 +215,7 @@ static UiSize GetSizeAndLayoutChildren(Widget& widget, UiSize max_size_allowed) 
 
             int num_of_expand = 0;
             int used = 0;
-            DynamicArrayInline<Child, Widget::k_max_children> visible_children;
+            DynamicArrayBounded<Child, Widget::k_max_children> visible_children;
             for (auto [i, c] : Enumerate(widget.children)) {
                 if (!IsWindowVisible(c->window)) continue;
 

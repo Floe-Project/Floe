@@ -254,7 +254,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
     for (auto& s : switches)
         s = LAY_INVALID_ID;
     LayID switches_bottom_divider;
-    DynamicArrayInline<EffectIDs, k_num_effect_types> effects;
+    DynamicArrayBounded<EffectIDs, k_num_effect_types> effects;
 
     auto& dragging_fx_unit = g->dragging_fx_unit;
 

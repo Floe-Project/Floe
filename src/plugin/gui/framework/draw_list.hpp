@@ -175,7 +175,7 @@ struct GlyphRange {
     Char16 start;
     Char16 end; // inclusive
 };
-using GlyphRanges = DynamicArrayInline<GlyphRange, 10>;
+using GlyphRanges = DynamicArrayBounded<GlyphRange, 10>;
 
 struct FontConfig {
     bool font_data_reference_only = false;
@@ -433,7 +433,7 @@ struct DrawContext {
         TextureHandle texture;
     };
 
-    DynamicArrayInline<char, 3000> graphics_device_info {};
+    DynamicArrayBounded<char, 3000> graphics_device_info {};
 
     DynamicArray<IdAndTexture> textures {Malloc::Instance()};
 

@@ -243,7 +243,7 @@ struct VoiceStartParams {
 
         f32 initial_sample_offset01 {};
         f32 initial_dynamics_01 {};
-        DynamicArrayInline<Region, k_max_num_voice_samples> voice_sample_params {};
+        DynamicArrayBounded<Region, k_max_num_voice_samples> voice_sample_params {};
     };
 
     struct WaveformParams {

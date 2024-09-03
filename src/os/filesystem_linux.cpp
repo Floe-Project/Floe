@@ -23,7 +23,7 @@
 #include "filesystem.hpp"
 
 ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments args) {
-    DynamicArrayInline<char, 3000> command {};
+    DynamicArrayBounded<char, 3000> command {};
     dyn::AppendSpan(command, "zenity --file-selection "_s);
     fmt::Append(command, "--title=\"{}\" ", args.title);
     if (args.default_path) fmt::Append(command, "--filename=\"{}\" ", *args.default_path);
@@ -251,7 +251,7 @@ ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectories type) {
     return TRY(CanonicalizePath(a, rel_path));
 }
 
-ErrorCodeOr<DynamicArrayInline<char, 200>> NameOfRunningExecutableOrLibrary() { return "unknown"_s; }
+ErrorCodeOr<DynamicArrayBounded<char, 200>> NameOfRunningExecutableOrLibrary() { return "unknown"_s; }
 
 ErrorCodeOr<MutableString> CurrentExecutablePath(Allocator& a) {
     char buffer[8000];
@@ -571,7 +571,7 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
             });
 
             if constexpr (k_debug_inotify) {
-                DynamicArrayInline<char, 2000> printout;
+                DynamicArrayBounded<char, 2000> printout;
                 auto _ = [&]() -> ErrorCodeOr<void> {
                     auto writer = dyn::WriterFor(printout);
                     TRY(fmt::AppendLine(writer, "{{"));

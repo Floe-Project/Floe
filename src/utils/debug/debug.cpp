@@ -327,7 +327,7 @@ struct BacktraceState {
         return instance;
     }
 
-    Optional<DynamicArrayInline<char, 256>> failed_init_error;
+    Optional<DynamicArrayBounded<char, 256>> failed_init_error;
     backtrace_state* state = nullptr;
 };
 

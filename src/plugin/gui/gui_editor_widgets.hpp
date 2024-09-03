@@ -43,7 +43,7 @@ bool EditorSlider(EditorGUI* g, String label, f32 min, f32 max, f32& val);
 bool EditorSlider(EditorGUI* g, String label, int min, int max, int& val);
 bool EditorDragger(EditorGUI* g, String label, int min, int max, int& val);
 
-using EditorTextInputBuffer = DynamicArrayInline<char, 128>;
+using EditorTextInputBuffer = DynamicArrayBounded<char, 128>;
 void EditorTextInput(EditorGUI* g, String label, EditorTextInputBuffer& buf);
 
 bool EditorMenuItems(EditorGUI* g, Span<String const> items, int& current);

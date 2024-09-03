@@ -32,12 +32,12 @@ struct PresetsListing {
 };
 
 struct PresetMetadata {
-    DynamicArrayInline<sample_lib::LibraryIdRef, k_num_layers> used_libraries {};
+    DynamicArrayBounded<sample_lib::LibraryIdRef, k_num_layers> used_libraries {};
 };
 
 struct PresetBrowserFilters {
     u64 selected_folder_hash {}; // IMPROVE: store an Entry pointer probably
-    DynamicArrayInline<char, 128> search_filter {};
+    DynamicArrayBounded<char, 128> search_filter {};
 };
 
 void PresetListingChanged(PresetBrowserFilters& preset_browser_filters, DirectoryListing const* listing);
@@ -58,7 +58,7 @@ enum class PresetRandomiseMode {
 
 struct PresetLibraryInfo {
     sample_lib::LibraryId library_id;
-    DynamicArrayInline<char, 32> file_extension;
+    DynamicArrayBounded<char, 32> file_extension;
 };
 
 using PresetRandomiseCriteria =

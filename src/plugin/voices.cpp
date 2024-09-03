@@ -35,7 +35,7 @@ static Voice& FindVoice(VoicePool& pool, AudioProcessingContext const& context) 
     for (auto& v : pool.voices)
         if (!v.is_active) return v;
 
-    DynamicArrayInline<u16, k_num_voices> voice_indexes {};
+    DynamicArrayBounded<u16, k_num_voices> voice_indexes {};
     for (auto [i, index] : Enumerate<u16>(voice_indexes))
         index = i;
     Sort(voice_indexes, [&voices = pool.voices](u16 a, u16 b) { return voices[a].age < voices[b].age; });

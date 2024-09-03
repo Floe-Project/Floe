@@ -260,8 +260,8 @@ static Type NumberFromTop(LuaState& ctx, FieldInfo field_info) {
     return (Type)val;
 }
 
-static DynamicArrayInline<long long, 4> ListOfInts(LuaState& ctx, usize num_expected, FieldInfo field_info) {
-    DynamicArrayInline<long long, 4> result;
+static DynamicArrayBounded<long long, 4> ListOfInts(LuaState& ctx, usize num_expected, FieldInfo field_info) {
+    DynamicArrayBounded<long long, 4> result;
     for (auto const i : ::Range(num_expected)) {
         bool success = false;
         lua_geti(ctx.lua, -1, (int)i + 1);
@@ -947,7 +947,7 @@ static int NewInstrument(lua_State* lua) {
     InterpretTable<Instrument>(ctx, 2, inst);
 
     if (!library->insts_by_name.InsertGrowIfNeeded(ctx.result_arena, inst.name, &inst)) {
-        DynamicArrayInline<char, k_max_instrument_name_size + 1> name {inst.name};
+        DynamicArrayBounded<char, k_max_instrument_name_size + 1> name {inst.name};
         luaL_error(lua, "Instrument names must be unique: %s is found twice", dyn::NullTerminated(name));
     }
 
@@ -972,7 +972,7 @@ static int AddIr(lua_State* lua) {
     InterpretTable<ImpulseResponse>(ctx, 2, ir);
 
     if (!library->irs_by_name.InsertGrowIfNeeded(ctx.result_arena, ir.name, &ir)) {
-        DynamicArrayInline<char, k_max_ir_name_size + 1> name {ir.name};
+        DynamicArrayBounded<char, k_max_ir_name_size + 1> name {ir.name};
         luaL_error(lua, "IR names must be unique: %s is found twice", dyn::NullTerminated(name));
     }
 
@@ -1399,7 +1399,7 @@ struct LuaCodePrinter {
     }
 
     static ErrorCodeOr<void> PrintWordwrappedComment(Writer writer, String str, u32 indent) {
-        DynamicArrayInline<char, 100> line_prefix {"-- "};
+        DynamicArrayBounded<char, 100> line_prefix {"-- "};
         dyn::InsertRepeated(line_prefix, 0, indent * k_indent_spaces, ' ');
         TRY(WordWrap(str, writer, k_word_wrap_width, line_prefix));
         return k_success;
@@ -1420,7 +1420,7 @@ struct LuaCodePrinter {
         });
 
         if (mode_flags & PrintModeFlagsDocumentedExample) {
-            DynamicArrayInline<char, 4000> comment_buffer;
+            DynamicArrayBounded<char, 4000> comment_buffer;
             auto comment_writer = dyn::WriterFor(comment_buffer);
             TRY(f.AppendDescription(comment_writer, true));
             TRY(PrintWordwrappedComment(writer, comment_buffer, indent));

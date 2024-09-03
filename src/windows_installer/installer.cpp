@@ -62,7 +62,7 @@ struct Component {
 };
 
 struct InstallError {
-    DynamicArrayInline<char, 500> message;
+    DynamicArrayBounded<char, 500> message;
     ErrorCode error;
 };
 
@@ -105,7 +105,7 @@ ErrorCodeOr<Span<u8 const>> GetResource(int resource_id) {
 
 template <typename... Args>
 static void MinizErrorPanic(SourceLocation loc, mz_zip_archive& zip, String format, Args const&... args) {
-    DynamicArrayInline<char, 1000> buffer {};
+    DynamicArrayBounded<char, 1000> buffer {};
     fmt::Append(buffer, "{}: ", mz_zip_get_error_string(mz_zip_get_last_error(&zip)));
     fmt::Append(buffer, format, args...);
     fmt::Append(buffer, "\nAt {}", loc);

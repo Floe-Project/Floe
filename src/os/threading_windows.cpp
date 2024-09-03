@@ -91,7 +91,7 @@ static unsigned __stdcall ThreadProc(void* data) {
 
 void SetThreadName(String name) { detail::SetThreadLocalThreadName(name); }
 
-Optional<DynamicArrayInline<char, k_max_thread_name_size>> ThreadName() {
+Optional<DynamicArrayBounded<char, k_max_thread_name_size>> ThreadName() {
     auto const name = detail::GetThreadLocalThreadName();
     if (name) return *name;
     return k_nullopt;

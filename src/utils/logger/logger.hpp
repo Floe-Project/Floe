@@ -104,7 +104,7 @@ struct FileLogger final : Logger {
 
     enum class State : u32 { Uninitialised, Initialising, Initialised };
     Atomic<State> state {State::Uninitialised};
-    DynamicArrayInline<char, 256> filepath;
+    DynamicArrayBounded<char, 256> filepath;
 };
 extern FileLogger g_log_file;
 

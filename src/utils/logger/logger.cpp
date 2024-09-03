@@ -75,7 +75,7 @@ ErrorCodeOr<void> WriteFormattedLog(Writer writer,
 }
 
 void Logger::Trace(LogModuleName module_name, String message, SourceLocation loc) {
-    DynamicArrayInline<char, 1000> buf;
+    DynamicArrayBounded<char, 1000> buf;
     fmt::Append(buf, "trace: {}({}): {}", FromNullTerminated(loc.file), loc.line, loc.function);
     if (message.size) fmt::Append(buf, ": {}", message);
 

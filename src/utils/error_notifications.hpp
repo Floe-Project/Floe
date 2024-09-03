@@ -10,8 +10,8 @@
 // This is for errors that we want to let the user know about.
 struct ThreadsafeErrorNotifications {
     struct Item {
-        DynamicArrayInline<char, 64> title;
-        DynamicArrayInline<char, 512> message;
+        DynamicArrayBounded<char, 64> title;
+        DynamicArrayBounded<char, 512> message;
         Optional<ErrorCode> error_code;
         u64 id;
     };

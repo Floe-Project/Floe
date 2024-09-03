@@ -275,7 +275,7 @@ StateSnapshot CurrentStateSnapshot(PluginInstance const& plugin) {
 }
 
 static auto PrintInstrumentId(InstrumentId id) {
-    DynamicArrayInline<char, 100> result {};
+    DynamicArrayBounded<char, 100> result {};
     switch (id.tag) {
         case InstrumentType::None: fmt::Append(result, "None"_s); break;
         case InstrumentType::WaveformSynth:

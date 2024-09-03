@@ -44,8 +44,8 @@ struct AtomicQueue {
         return false;
     }
 
-    DynamicArrayInline<Type, k_size> PopAll() {
-        DynamicArrayInline<Type, k_size> result;
+    DynamicArrayBounded<Type, k_size> PopAll() {
+        DynamicArrayBounded<Type, k_size> result;
         result.ResizeWithoutCtorDtor(k_size);
         auto num = Pop(result.Items());
         result.ResizeWithoutCtorDtor(num);

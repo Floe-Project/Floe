@@ -18,7 +18,7 @@ static void PresetsWindowButton(Gui* g, PluginInstance* a, Rect r) {
 
     auto button_id = imgui.GetID("PresetMenu");
 
-    DynamicArrayInline<char, 100> preset_text {a->last_snapshot.metadata.Name()};
+    DynamicArrayBounded<char, 100> preset_text {a->last_snapshot.metadata.Name()};
     if (StateChangedSinceLastSnapshot(*a)) dyn::AppendSpan(preset_text, " (modified)"_s);
 
     if (buttons::Button(g, button_id, r, preset_text, buttons::PresetsPopupButton(g->imgui))) {

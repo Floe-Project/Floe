@@ -51,7 +51,7 @@ void SetThreadName(String name) {
 #endif
 }
 
-Optional<DynamicArrayInline<char, k_max_thread_name_size>> ThreadName() {
+Optional<DynamicArrayBounded<char, k_max_thread_name_size>> ThreadName() {
     if constexpr (IS_LINUX) {
         // On Linux, if the thread wasn't explicity name, pthread_getname_np will return the name of the
         // executable which is confusing, better to have nothing and fetch the TID.

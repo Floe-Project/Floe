@@ -7,6 +7,7 @@
 
 #include "contiguous.hpp"
 
+// Wrapper around a C-style array.
 // These arrays can be passed around in parameters. And they implicitly convert to a Span of the matching
 // type. There's a couple of handy ways that you can initialise an array:
 // 1. function(Array {"abc"_s, "def"}) here, the type of the array is determined by the first item - a String

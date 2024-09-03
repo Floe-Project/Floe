@@ -21,6 +21,7 @@ struct TryHelpers {
 };
 
 // Uses clang 'statement expression', a non-standard extension
+// NOTE: cannot be used multiple times on the same line
 #define TRY_X(try_helpers, expression)                                                                       \
     ({                                                                                                       \
         auto&& CONCAT(try_result, __LINE__) = (expression);                                                  \

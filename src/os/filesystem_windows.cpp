@@ -184,6 +184,57 @@ static ErrorCodeOr<Win32KnownPath> Win32GetKnownFilepath(GUID folder_id) {
     return wide_file_path;
 }
 
+ErrorCodeOr<void> WindowsSetFileAttributes(String path, Optional<WindowsFileAttributes> attributes) {
+    ASSERT(path::IsAbsolute(path));
+
+    DWORD attribute_flags = FILE_ATTRIBUTE_NORMAL;
+    if (attributes) {
+        attribute_flags = 0;
+        if (attributes->hidden) attribute_flags |= FILE_ATTRIBUTE_HIDDEN;
+    }
+
+    PathArena temp_path_arena;
+    if (!SetFileAttributesW(TRY(path::MakePathForWin32(path, temp_path_arena, true)).path.data,
+                            attribute_flags))
+        return FilesystemWin32ErrorCode(GetLastError(), "SetFileAttributesW");
+    return k_success;
+}
+
+static bool CreateDirectoryWithAttributes(WCHAR* path, DWORD attributes) {
+    HANDLE handle = CreateFileW(path,
+                                GENERIC_READ | GENERIC_WRITE,
+                                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                nullptr,
+                                CREATE_NEW,
+                                FILE_FLAG_BACKUP_SEMANTICS | attributes,
+                                nullptr);
+
+    if (handle != INVALID_HANDLE_VALUE) {
+        CloseHandle(handle);
+        return true;
+    }
+    return false;
+}
+
+static DWORD AttributesForDir(WCHAR* path, usize path_size, CreateDirectoryOptions options) {
+    ASSERT(path_size);
+    ASSERT(path);
+    ASSERT(path[path_size] == L'\0');
+
+    DWORD attributes = {};
+    if (options.win32_hide_dirs_starting_with_dot) {
+        usize last_slash = 0;
+        for (usize i = path_size - 1; i != usize(-1); --i)
+            if (path[i] == L'\\') {
+                last_slash = i;
+                break;
+            }
+        if (last_slash + 1 < path_size && path[last_slash + 1] == L'.') attributes |= FILE_ATTRIBUTE_HIDDEN;
+    }
+
+    return attributes;
+}
+
 ErrorCodeOr<void> CreateDirectory(String path, CreateDirectoryOptions options) {
     ASSERT(path::IsAbsolute(path));
     PathArena temp_path_arena;
@@ -209,14 +260,19 @@ ErrorCodeOr<void> CreateDirectory(String path, CreateDirectoryOptions options) {
 
             while (offset < wide_path.path.size) {
                 auto slash_pos = Find(wide_path.path, L'\\', offset);
+                usize path_size = 0;
                 if (slash_pos) {
+                    path_size = *slash_pos;
                     offset = *slash_pos + 1;
                     wide_path.path[*slash_pos] = L'\0';
                 } else {
+                    path_size = wide_path.path.size;
                     offset = wide_path.path.size;
                 }
 
-                if (CreateDirectoryW(wide_path.path.data, nullptr) == 0) {
+                if (!CreateDirectoryWithAttributes(
+                        wide_path.path.data,
+                        AttributesForDir(wide_path.path.data, path_size, options))) {
                     auto const err_inner = GetLastError();
                     if (err_inner != ERROR_ALREADY_EXISTS)
                         return FilesystemWin32ErrorCode(err_inner, "CreateDirectoryW");
@@ -272,11 +328,11 @@ ErrorCodeOr<DynamicArrayBounded<char, 200>> NameOfRunningExecutableOrLibrary() {
     return String {path::Filename(full_path)};
 }
 
-ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectories type) {
+ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectoryType type) {
     GUID folder_id {};
     Optional<String> subfolder {};
     switch (type) {
-        case KnownDirectories::Temporary: {
+        case KnownDirectoryType::Temporary: {
             WCHAR buffer[MAX_PATH + 1];
             auto size = GetTempPathW((DWORD)ArraySize(buffer), buffer);
             if (size == 0) return FilesystemWin32ErrorCode(GetLastError(), "GetTempPathW");
@@ -289,23 +345,23 @@ ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectories type) {
             ASSERT(path::IsAbsolute(result));
             return result;
         }
-        case KnownDirectories::AllUsersData: folder_id = FOLDERID_Public; break;
-        case KnownDirectories::AllUsersSettings: folder_id = FOLDERID_ProgramData; break;
-        case KnownDirectories::PluginSettings:
-        case KnownDirectories::Data: folder_id = FOLDERID_RoamingAppData; break;
-        case KnownDirectories::Prefs: folder_id = FOLDERID_LocalAppData; break;
-        case KnownDirectories::Logs: folder_id = FOLDERID_LocalAppData; break;
-        case KnownDirectories::Documents: folder_id = FOLDERID_Documents; break;
-        case KnownDirectories::Downloads: folder_id = FOLDERID_Downloads; break;
-        case KnownDirectories::ClapPlugin:
+        case KnownDirectoryType::AllUsersData: folder_id = FOLDERID_Public; break;
+        case KnownDirectoryType::AllUsersSettings: folder_id = FOLDERID_ProgramData; break;
+        case KnownDirectoryType::PluginSettings:
+        case KnownDirectoryType::Data: folder_id = FOLDERID_RoamingAppData; break;
+        case KnownDirectoryType::Prefs: folder_id = FOLDERID_LocalAppData; break;
+        case KnownDirectoryType::Logs: folder_id = FOLDERID_LocalAppData; break;
+        case KnownDirectoryType::Documents: folder_id = FOLDERID_Documents; break;
+        case KnownDirectoryType::Downloads: folder_id = FOLDERID_Downloads; break;
+        case KnownDirectoryType::ClapPlugin:
             folder_id = FOLDERID_ProgramFilesCommon;
             subfolder = "CLAP";
             break;
-        case KnownDirectories::Vst3Plugin:
+        case KnownDirectoryType::Vst3Plugin:
             folder_id = FOLDERID_ProgramFilesCommon;
             subfolder = "VST3";
             break;
-        case KnownDirectories::Count: PanicIfReached(); break;
+        case KnownDirectoryType::Count: PanicIfReached(); break;
     }
 
     auto const wide_path = TRY(Win32GetKnownFilepath(folder_id));
@@ -466,33 +522,13 @@ ErrorCodeOr<void> Delete(String path, DeleteOptions options) {
     }
 }
 
-ErrorCodeOr<void> MoveFile(String from, String to, ExistingDestinationHandling existing) {
-    ASSERT(path::IsAbsolute(from));
-    ASSERT(path::IsAbsolute(to));
-    PathArena temp_path_arena;
-
-    DWORD flags = MOVEFILE_COPY_ALLOWED;
-    if (existing == ExistingDestinationHandling::Overwrite) flags |= MOVEFILE_REPLACE_EXISTING;
-
-    if (MoveFileWithProgressW(TRY(path::MakePathForWin32(from, temp_path_arena, true)).path.data,
-                              TRY(path::MakePathForWin32(to, temp_path_arena, true)).path.data,
-                              nullptr,
-                              nullptr,
-                              flags) == 0) {
-        auto const err = FilesystemWin32ErrorCode(GetLastError(), "MoveFileW");
-        if (err == FilesystemError::PathAlreadyExists && existing == ExistingDestinationHandling::Skip)
-            return k_success;
-        return err;
-    }
-    return k_success;
-}
-
 ErrorCodeOr<void> CopyFile(String from, String to, ExistingDestinationHandling existing) {
     ASSERT(path::IsAbsolute(from));
     ASSERT(path::IsAbsolute(to));
     PathArena temp_path_arena;
 
     if (existing == ExistingDestinationHandling::Skip) {
+        // IMPROVE: not atomic
         if (GetFileType(to).HasValue()) // IMPROVE: inefficient doing wide-text conversion again
             return k_success;
     }
@@ -501,6 +537,18 @@ ErrorCodeOr<void> CopyFile(String from, String to, ExistingDestinationHandling e
                   TRY(path::MakePathForWin32(to, temp_path_arena, true)).path.data,
                   existing == ExistingDestinationHandling::Fail) == 0) {
         return FilesystemWin32ErrorCode(GetLastError(), "CopyFileW");
+    }
+    return k_success;
+}
+
+ErrorCodeOr<void> Rename(String from, String to) {
+    ASSERT(path::IsAbsolute(from));
+    ASSERT(path::IsAbsolute(to));
+    PathArena temp_path_arena;
+
+    if (MoveFileW(TRY(path::MakePathForWin32(from, temp_path_arena, true)).path.data,
+                  TRY(path::MakePathForWin32(to, temp_path_arena, true)).path.data) == 0) {
+        return FilesystemWin32ErrorCode(GetLastError(), "MoveFileW");
     }
     return k_success;
 }

@@ -18,7 +18,7 @@ static Span<String> PossibleSettingsPaths(ArenaAllocator& arena) {
     DynamicArray<String> result {arena};
     result.Reserve(5);
 
-    auto try_add_path = [&](KnownDirectories known_dir, Span<String const> sub_paths) {
+    auto try_add_path = [&](KnownDirectoryType known_dir, Span<String const> sub_paths) {
         if (auto o = KnownDirectory(arena, known_dir); o.HasValue()) {
             auto p = DynamicArray<char>::FromOwnedSpan(o.Value(), arena);
             path::JoinAppend(p, sub_paths);
@@ -27,23 +27,23 @@ static Span<String> PossibleSettingsPaths(ArenaAllocator& arena) {
     };
 
     // Best path
-    try_add_path(KnownDirectories::PluginSettings, Array {"Floe"_s, "settings.ini"_s});
+    try_add_path(KnownDirectoryType::PluginSettings, Array {"Floe"_s, "settings.ini"_s});
 
     // Legacy paths
     // In the past some of these were poorly chosen as locations for saving settings due to file permissions.
     {
-        try_add_path(KnownDirectories::AllUsersSettings,
+        try_add_path(KnownDirectoryType::AllUsersSettings,
                      Array {"FrozenPlain"_s, "Mirage", "Settings", "mirage.json"_s});
 
         if constexpr (IS_WINDOWS)
-            try_add_path(KnownDirectories::PluginSettings,
+            try_add_path(KnownDirectoryType::PluginSettings,
                          Array {"FrozenPlain"_s, "Mirage", "mirage.json"_s});
         else
-            try_add_path(KnownDirectories::PluginSettings, Array {"FrozenPlain"_s, "mirage.json"_s});
+            try_add_path(KnownDirectoryType::PluginSettings, Array {"FrozenPlain"_s, "mirage.json"_s});
 
         if constexpr (IS_MACOS) {
-            try_add_path(KnownDirectories::AllUsersData, Array {"FrozenPlain"_s, "Mirage", "mirage.json"});
-            try_add_path(KnownDirectories::Data, Array {"FrozenPlain"_s, "Mirage", "mirage.json"});
+            try_add_path(KnownDirectoryType::AllUsersData, Array {"FrozenPlain"_s, "Mirage", "mirage.json"});
+            try_add_path(KnownDirectoryType::Data, Array {"FrozenPlain"_s, "Mirage", "mirage.json"});
         }
     }
 
@@ -53,11 +53,11 @@ static Span<String> PossibleSettingsPaths(ArenaAllocator& arena) {
 static ErrorCodeOr<String>
 AlwaysScannedFolders(ScanFolderType type, LocationType location_type, ArenaAllocator& allocator) {
     auto const dir = TRY(KnownDirectory(allocator, ({
-                                            KnownDirectories k;
+                                            KnownDirectoryType k;
                                             switch (location_type) {
-                                                case LocationType::User: k = KnownDirectories::Data; break;
+                                                case LocationType::User: k = KnownDirectoryType::Data; break;
                                                 case LocationType::AllUsers:
-                                                    k = KnownDirectories::AllUsersData;
+                                                    k = KnownDirectoryType::AllUsersData;
                                                     break;
                                             }
                                             k;

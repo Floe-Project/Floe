@@ -18,7 +18,7 @@ enum class ComponentTypes : u32 {
 
 struct ComponentInfo {
     String name;
-    Optional<KnownDirectories> install_dir;
+    Optional<KnownDirectoryType> install_dir;
     String install_dir_fallback;
     String filename;
     int resource_id;
@@ -27,14 +27,14 @@ struct ComponentInfo {
 constexpr auto k_plugin_infos = Array {
     ComponentInfo {
         .name = "Floe CLAP Plugin v" FLOE_VERSION_STRING,
-        .install_dir = KnownDirectories::ClapPlugin,
+        .install_dir = KnownDirectoryType::ClapPlugin,
         .install_dir_fallback = "C:\\Program Files\\Common Files\\CLAP"_s,
         .filename = path::Filename(CLAP_PLUGIN_PATH),
         .resource_id = CLAP_PLUGIN_RC_ID,
     },
     ComponentInfo {
         .name = "Floe VST3 Plugin v" FLOE_VERSION_STRING,
-        .install_dir = KnownDirectories::Vst3Plugin,
+        .install_dir = KnownDirectoryType::Vst3Plugin,
         .install_dir_fallback = "C:\\Program Files\\Common Files\\VST3"_s,
         .filename = path::Filename(VST3_PLUGIN_PATH),
         .resource_id = VST3_PLUGIN_RC_ID,

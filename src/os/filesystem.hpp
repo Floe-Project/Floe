@@ -18,11 +18,13 @@ enum class FilesystemError : u32 {
 
 ErrorCodeCategory const& ErrorCategoryForEnum(FilesystemError e);
 
-// translated
+// attempts to translate errno to a FilesystemError
 ErrorCode FilesystemErrnoErrorCode(s64 error_code,
                                    char const* extra_debug_info = nullptr,
                                    SourceLocation loc = SourceLocation::Current());
 
+// fopen()-like File API
+// =======================================================================================================
 enum class FileMode {
     Read,
     Write, // overwrites if it already exists
@@ -78,6 +80,10 @@ struct File {
 
     ErrorCodeOr<usize> Write(Span<u8 const> data);
     ErrorCodeOr<usize> Write(Span<char const> data) { return Write(data.ToByteSpan()); }
+    ErrorCodeOr<usize> WriteAt(s64 position, Span<u8 const> data) {
+        TRY(Seek(position, SeekOrigin::Start));
+        return Write(data);
+    }
 
     friend ErrorCodeOr<File> OpenFile(String filename, FileMode mode);
 
@@ -115,11 +121,13 @@ ErrorCodeOr<void> ReadSectionOfFileAndWriteToOtherFile(File& file_to_read_from,
                                                        usize size,
                                                        String filename_to_write_to);
 
+// Checking the filesystem
 // Returned paths will use whatever the OS's path separator. And they never have a trailing path seporator.
+// =======================================================================================================
 
 using PathArena = ArenaAllocatorWithInlineStorage<2000>;
 
-enum class KnownDirectories : u8 {
+enum class KnownDirectoryType : u8 {
     Logs,
     Prefs,
     AllUsersData,
@@ -135,43 +143,21 @@ enum class KnownDirectories : u8 {
 };
 
 // Does not create the directory, just retreives from the OS
-ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectories type);
+ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectoryType type);
 
 // Creates the directory along with the subdirectories if they don't exist
 ErrorCodeOr<MutableString>
-KnownDirectoryWithSubdirectories(Allocator& a, KnownDirectories type, Span<String const> subdirectories);
+KnownDirectoryWithSubdirectories(Allocator& a, KnownDirectoryType type, Span<String const> subdirectories);
 
 // Higher-level functions: returns a Floe-specific path. Might be a KnownDirectory with a 'Floe' subdirectory.
-enum class FloeKnownDirectories {
+enum class FloeKnownDirectoryType {
     Logs,
 };
-ErrorCodeOr<MutableString> FloeKnownDirectory(Allocator& a, FloeKnownDirectories type);
-
-enum class ExistingDestinationHandling {
-    Skip, // Keep the existing file without reporting an error
-    Overwrite, // Overwrite it if it exists
-    Fail, // Fail if it exists
-};
+ErrorCodeOr<MutableString> FloeKnownDirectory(Allocator& a, FloeKnownDirectoryType type);
 
 enum class FileType { File, Directory };
 
 ErrorCodeOr<FileType> GetFileType(String path);
-
-struct CreateDirectoryOptions {
-    bool create_intermediate_directories = false;
-    bool fail_if_exists = false; // returns FilesystemError::PathAlreadyExists
-};
-ErrorCodeOr<void> CreateDirectory(String path, CreateDirectoryOptions options = {});
-
-struct DeleteOptions {
-    enum class Type { Any, File, DirectoryRecursively, DirectoryOnlyIfEmpty };
-    Type type = Type::Any;
-    bool fail_if_not_exists = true; // returns FilesystemError::PathDoesNotExist
-};
-ErrorCodeOr<void> Delete(String path, DeleteOptions options);
-
-// Returns true if there was a bundle and it was successfully deleted
-ErrorCodeOr<bool> DeleteDirectoryIfMacBundle(String dir);
 
 // Turns a relative path into an absolute path.
 // Unix:
@@ -185,20 +171,8 @@ ErrorCodeOr<MutableString> AbsolutePath(Allocator& a, String path);
 // - Replaces / with \.
 ErrorCodeOr<MutableString> CanonicalizePath(Allocator& a, String path);
 
-ErrorCodeOr<void> MoveFileOrDirIntoFolder(String from, String to, ExistingDestinationHandling existing);
-
-ErrorCodeOr<void> MoveFile(String from, String to, ExistingDestinationHandling existing);
-ErrorCodeOr<void> CopyFile(String from, String to, ExistingDestinationHandling existing);
-
-// Moves everything (recursively) from source_dir into destination_directory
-ErrorCodeOr<void>
-MoveDirectoryContents(String source_dir, String destination_directory, ExistingDestinationHandling existing);
-
-ErrorCodeOr<void> MoveFileOrDirectoryContentsIntoFolder(String file_or_dir,
-                                                        String destination_dir,
-                                                        ExistingDestinationHandling existing);
-
 // Returns a counter representing time since unix epoch
+// IMPROVE: use 128-bit nanosecond format that we use in misc.hpp
 ErrorCodeOr<s64> LastWriteTime(String path);
 
 Optional<Version> MacosBundleVersion(String path);
@@ -208,6 +182,53 @@ ErrorCodeOr<MutableString> CurrentExecutablePath(Allocator& a);
 
 Optional<String> SearchForExistingFolderUpwards(String dir, String folder_name_to_find, Allocator& allocator);
 
+// Manipulating the filesystem
+// =======================================================================================================
+
+struct CreateDirectoryOptions {
+    bool create_intermediate_directories = false;
+    bool fail_if_exists = false; // returns FilesystemError::PathAlreadyExists
+    bool win32_hide_dirs_starting_with_dot = true;
+};
+ErrorCodeOr<void> CreateDirectory(String path, CreateDirectoryOptions options = {});
+
+struct DeleteOptions {
+    enum class Type { Any, File, DirectoryRecursively, DirectoryOnlyIfEmpty };
+    Type type = Type::Any;
+    bool fail_if_not_exists = true; // returns FilesystemError::PathDoesNotExist
+};
+ErrorCodeOr<void> Delete(String path, DeleteOptions options);
+
+// Returns true if there was a bundle and it was successfully deleted
+ErrorCodeOr<bool> DeleteDirectoryIfMacBundle(String dir);
+
+enum class ExistingDestinationHandling {
+    Skip, // Keep the existing file without reporting an error
+    Overwrite, // Overwrite it if it exists
+    Fail, // Fail if it exists
+};
+
+// rename() on Unix, MoveFile() on Windows
+// - old_name and new_name must be the same type: both files or both directories
+// - old_name and new_name must be on the same filesystem
+// - The new_name can be in a different directory
+// - If they're files, new_name will be overwritten if it exists
+// - If they're directories, new_name must not exist OR it must be empty
+ErrorCodeOr<void> Rename(String old_name, String new_name);
+
+// Same as Rename except the destination is a folder that will contain the moved file or directory.
+ErrorCodeOr<void> MoveIntoFolder(String from, String destination_folder);
+
+ErrorCodeOr<void> CopyFile(String from, String to, ExistingDestinationHandling existing);
+
+struct WindowsFileAttributes {
+    bool hidden {};
+};
+// no-op on non-Windows. If attributes is not given, it will remove all attributes.
+ErrorCodeOr<void> WindowsSetFileAttributes(String path, Optional<WindowsFileAttributes> attributes);
+
+// Dialog for selecting files or folders
+// =======================================================================================================
 struct DialogArguments {
     enum class Type { SaveFile, OpenFile, SelectFolder };
     struct FileFilter {
@@ -226,22 +247,22 @@ struct DialogArguments {
 
 ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments args);
 
-/*
-When creating one of these iterators, they will not return an error if no files that match the pattern, but
-instead it will return false to HasMoreFiles().
-
-Every entry begins with the canonical base path (CanonicalBasePath()), so it's ok to offset into the path to
-get the relative path.
-
-Usage:
-
-auto it = TRY(DirectoryIterator::Create(alloc, folder, "*"));
-while (it.HasMoreFiles()) {
-    auto const &entry = it.Get();
-    // use entry
-    TRY(it.Increment());
-}
-*/
+// DirectoryIterator
+// =======================================================================================================
+// When creating one of these iterators, they will not return an error if no files that match the pattern, but
+// instead it will return false to HasMoreFiles().
+//
+// Every entry begins with the canonical base path (CanonicalBasePath()), so it's ok to offset into the path
+// to get the relative path.
+//
+// Usage:
+//
+// auto it = TRY(DirectoryIterator::Create(alloc, folder, "*"));
+// while (it.HasMoreFiles()) {
+//     auto const &entry = it.Get();
+//     // use entry
+//     TRY(it.Increment());
+// }
 
 struct DirectoryEntry {
     DirectoryEntry(String p, Allocator& a) : path(p, a) {}
@@ -256,9 +277,8 @@ struct DirectoryIteratorOptions {
     bool skip_dot_files = true;
 };
 
-// TODO: tidy up the usage of the options - we seem to be needlessly spliting them out into individual fields
-// when we could just keep the struct
-
+// IMPROVE: tidy up the usage of the options - we seem to be needlessly spliting them out into individual
+// fields when we could just keep the struct
 class DirectoryIterator {
   public:
     NON_COPYABLE(DirectoryIterator);

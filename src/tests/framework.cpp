@@ -35,7 +35,7 @@ String TempFolder(Tester& tester) {
     if (!tester.test_output_folder) {
         tester.test_output_folder = ({
             auto const o = KnownDirectoryWithSubdirectories(tester.arena,
-                                                            KnownDirectories::Temporary,
+                                                            KnownDirectoryType::Temporary,
                                                             Array {"Floe"_s, "tests"});
             if (o.HasError()) {
                 Check(tester,

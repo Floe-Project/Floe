@@ -399,7 +399,7 @@ void StartupCrashHandler() {
     InitStacktraceState();
 
     ArenaAllocatorWithInlineStorage<500> scratch_arena;
-    if (auto const outcome = FloeKnownDirectory(scratch_arena, FloeKnownDirectories::Logs);
+    if (auto const outcome = FloeKnownDirectory(scratch_arena, FloeKnownDirectoryType::Logs);
         outcome.HasValue())
         dyn::Assign(g_crash_folder_path, outcome.Value());
 

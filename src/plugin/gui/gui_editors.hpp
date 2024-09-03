@@ -125,7 +125,7 @@ static void TakeScreenshot(Gui* g) {
 
     g->frame_input.graphics_ctx->RequestScreenshotImage([g](u8 const* data, int width, int height) {
         auto path = DynamicArray<char>::FromOwnedSpan(
-            KnownDirectoryWithSubdirectories(g->scratch_arena, KnownDirectories::Data, Array {"Floe"_s})
+            KnownDirectoryWithSubdirectories(g->scratch_arena, KnownDirectoryType::Data, Array {"Floe"_s})
                 .Value(),
             g->scratch_arena);
         dyn::AppendSpan(path, "/screenshot-");

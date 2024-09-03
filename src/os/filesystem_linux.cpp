@@ -69,44 +69,6 @@ ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments args) {
     return Span<MutableString> {};
 }
 
-ErrorCodeOr<void> MoveFile(String from, String to, ExistingDestinationHandling existing) {
-    PathArena temp_path_allocator;
-    auto to_nt = NullTerminated(to, temp_path_allocator);
-
-    if (auto const exists = access(to_nt, F_OK) == 0) {
-        switch (existing) {
-            case ExistingDestinationHandling::Fail: return ErrorCode(FilesystemError::PathAlreadyExists);
-            case ExistingDestinationHandling::Skip: return k_success;
-            case ExistingDestinationHandling::Overwrite: break;
-        }
-    }
-
-    auto from_nt = NullTerminated(from, temp_path_allocator);
-    auto result = ::rename(from_nt, to_nt);
-
-    if (result == -1 && errno == EXDEV) {
-        // Handle moving the file across different drives
-        int input;
-        int output;
-        if ((input = open(from_nt, O_RDONLY)) == -1) return FilesystemErrnoErrorCode(errno, "open");
-        DEFER { close(input); };
-
-        if ((output = creat(to_nt, 0660)) == -1) return FilesystemErrnoErrorCode(errno, "open");
-        DEFER { close(output); };
-
-        off_t bytes_copied = 0;
-        struct stat fileinfo = {};
-        fstat(input, &fileinfo);
-        if (sendfile(output, input, &bytes_copied, (usize)fileinfo.st_size) == -1)
-            return FilesystemErrnoErrorCode(errno, "open");
-
-        if (remove(from_nt) == -1) return FilesystemErrnoErrorCode(errno, "remove");
-    } else if (result != 0) {
-        return FilesystemErrnoErrorCode(errno, "rename");
-    }
-    return k_success;
-}
-
 static ErrorCodeOr<ssize> CopyFile(char const* source, char const* destination) {
     int input;
     int output;
@@ -231,21 +193,21 @@ ErrorCodeOr<void> CreateDirectory(String path, CreateDirectoryOptions options) {
     }
 }
 
-ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectories type) {
+ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectoryType type) {
     String rel_path;
     switch (type) {
-        case KnownDirectories::Temporary: return a.Clone("/tmp"_s);
-        case KnownDirectories::AllUsersSettings:
-        case KnownDirectories::PluginSettings: rel_path = "~/.config"; break;
-        case KnownDirectories::AllUsersData: return a.Clone("/var/lib"_s);
-        case KnownDirectories::Documents: rel_path = "~/Documents"; break;
-        case KnownDirectories::Downloads: rel_path = "~/Downloads"; break;
-        case KnownDirectories::Prefs: rel_path = "~/.config"; break;
-        case KnownDirectories::Data: rel_path = "~"; break;
-        case KnownDirectories::Logs: rel_path = "~/.local/state"; break;
-        case KnownDirectories::ClapPlugin: rel_path = "~/.clap"; break;
-        case KnownDirectories::Vst3Plugin: rel_path = "~/.vst3"; break;
-        case KnownDirectories::Count: PanicIfReached();
+        case KnownDirectoryType::Temporary: return a.Clone("/tmp"_s);
+        case KnownDirectoryType::AllUsersSettings:
+        case KnownDirectoryType::PluginSettings: rel_path = "~/.config"; break;
+        case KnownDirectoryType::AllUsersData: return a.Clone("/var/lib"_s);
+        case KnownDirectoryType::Documents: rel_path = "~/Documents"; break;
+        case KnownDirectoryType::Downloads: rel_path = "~/Downloads"; break;
+        case KnownDirectoryType::Prefs: rel_path = "~/.config"; break;
+        case KnownDirectoryType::Data: rel_path = "~"; break;
+        case KnownDirectoryType::Logs: rel_path = "~/.local/state"; break;
+        case KnownDirectoryType::ClapPlugin: rel_path = "~/.clap"; break;
+        case KnownDirectoryType::Vst3Plugin: rel_path = "~/.vst3"; break;
+        case KnownDirectoryType::Count: PanicIfReached();
     }
 
     return TRY(CanonicalizePath(a, rel_path));

@@ -7,7 +7,6 @@
 
 #include "foundation/foundation.hpp"
 #include "os/misc.hpp"
-#include "utils/debug/debug.hpp"
 
 static constexpr ErrorCodeCategory k_fp_error_category {
     .category_id = "FS",
@@ -55,7 +54,7 @@ ErrorCode FilesystemErrnoErrorCode(s64 error_code, char const* extra_debug_info,
 }
 
 ErrorCodeOr<MutableString>
-KnownDirectoryWithSubdirectories(Allocator& a, KnownDirectories type, Span<String const> subdirectories) {
+KnownDirectoryWithSubdirectories(Allocator& a, KnownDirectoryType type, Span<String const> subdirectories) {
     ASSERT(subdirectories.size);
     auto path = DynamicArray<char>::FromOwnedSpan(TRY(KnownDirectory(a, type)), a);
     path::JoinAppend(path, subdirectories);
@@ -63,138 +62,20 @@ KnownDirectoryWithSubdirectories(Allocator& a, KnownDirectories type, Span<Strin
     return path.ToOwnedSpan();
 }
 
-ErrorCodeOr<MutableString> FloeKnownDirectory(Allocator& a, FloeKnownDirectories type) {
+ErrorCodeOr<MutableString> FloeKnownDirectory(Allocator& a, FloeKnownDirectoryType type) {
     switch (type) {
-        case FloeKnownDirectories::Logs:
-            return KnownDirectoryWithSubdirectories(a, KnownDirectories::Logs, Array {"Floe"_s});
+        case FloeKnownDirectoryType::Logs:
+            return KnownDirectoryWithSubdirectories(a, KnownDirectoryType::Logs, Array {"Floe"_s});
     }
     PanicIfReached();
     return {};
 }
 
-ErrorCodeOr<void>
-MoveFileOrDirIntoFolder(String file_or_folder, String target_folder, ExistingDestinationHandling existing) {
-    auto const file_type = TRY(GetFileType(file_or_folder));
-
+// uses Rename() to move a file or folder into a given destination folder
+ErrorCodeOr<void> MoveIntoFolder(String from, String destination_folder) {
     PathArena path_allocator;
-    auto new_name = path::Join(path_allocator, Array {target_folder, path::Filename(file_or_folder)});
-
-    switch (file_type) {
-        case FileType::Directory: {
-            TRY(CreateDirectory(new_name,
-                                {.create_intermediate_directories = true, .fail_if_exists = false}));
-            return MoveDirectoryContents(file_or_folder, new_name, existing);
-        }
-        case FileType::File: {
-            return MoveFile(file_or_folder, new_name, existing);
-        }
-    }
-    PanicIfReached();
-    return {};
-}
-
-ErrorCodeOr<void> MoveFileOrDirectoryContentsIntoFolder(String file_or_dir,
-                                                        String destination_dir,
-                                                        ExistingDestinationHandling existing) {
-    auto const file_type = TRY(GetFileType(file_or_dir));
-
-    switch (file_type) {
-        case FileType::Directory: {
-            return MoveDirectoryContents(file_or_dir, destination_dir, existing);
-        }
-        case FileType::File: {
-            PathArena path_allocator;
-            auto to = path::Join(path_allocator, Array {destination_dir, path::Filename(file_or_dir)});
-            return MoveFile(file_or_dir, to, existing);
-        }
-    }
-    PanicIfReached();
-    return {};
-}
-
-ErrorCodeOr<void>
-MoveDirectoryContents(String source_dir, String destination_directory, ExistingDestinationHandling existing) {
-    auto dest_file_type = GetFileType(destination_directory);
-    if (dest_file_type.HasError() && dest_file_type.Error() != FilesystemError::PathDoesNotExist)
-        return dest_file_type.Error();
-
-    if (dest_file_type.Value() == FileType::File) return ErrorCode(FilesystemError::PathIsAFile);
-
-    if (existing == ExistingDestinationHandling::Fail) {
-        // Do a dry-run and see if there would be any conflicts
-
-        ArenaAllocatorWithInlineStorage<4000> temp_allocator;
-        auto it = TRY(RecursiveDirectoryIterator::Create(temp_allocator,
-                                                         source_dir,
-                                                         {
-                                                             .wildcard = "*",
-                                                             .get_file_size = false,
-                                                         }));
-        while (it.HasMoreFiles()) {
-            auto const& entry = it.Get();
-
-            auto relative_path =
-                path::TrimDirectorySeparatorsEnd(entry.path.Items().SubSpan(source_dir.size));
-            if (relative_path.size) {
-                if (entry.type == FileType::File) {
-                    PathArena path_allocator;
-                    auto const o =
-                        GetFileType(path::Join(path_allocator, Array {destination_directory, relative_path}));
-                    if (o.HasValue()) return ErrorCode(FilesystemError::PathAlreadyExists);
-                }
-            }
-
-            TRY(it.Increment());
-        }
-    }
-
-    {
-        ArenaAllocatorWithInlineStorage<4000> temp_allocator;
-        auto it = TRY(RecursiveDirectoryIterator::Create(temp_allocator,
-                                                         source_dir,
-                                                         {
-                                                             .wildcard = "*",
-                                                             .get_file_size = false,
-                                                         }));
-        while (it.HasMoreFiles()) {
-            auto const& entry = it.Get();
-
-            auto relative_path =
-                path::TrimDirectorySeparatorsEnd(entry.path.Items().SubSpan(source_dir.size));
-            if (relative_path.size) {
-                PathArena path_allocator;
-                auto dest = path::Join(path_allocator, Array {destination_directory, relative_path});
-
-                if (entry.type == FileType::Directory) {
-                    auto created_dir_outcome =
-                        CreateDirectory(dest,
-                                        {.create_intermediate_directories = true, .fail_if_exists = true});
-                    if (created_dir_outcome == ErrorCode {FilesystemError::PathAlreadyExists}) {
-                        if (existing == ExistingDestinationHandling::Overwrite) {
-                            // On Mac it's not allowed to modify the contents of a signed bundle.
-                            // Therefore we try to delete the whole bundle and try again.
-                            // https://stackoverflow.com/questions/3439408/nsfilemanager-creating-folder-cocoa-error-513
-                            auto const deleted_mac_bundle = TRY(DeleteDirectoryIfMacBundle(dest));
-                            if (deleted_mac_bundle)
-                                TRY(CreateDirectory(dest, {.create_intermediate_directories = true}));
-                        }
-                    } else {
-                        TRY(created_dir_outcome);
-                    }
-                } else {
-                    TRY(MoveFile(entry.path, dest, existing));
-                }
-            }
-
-            TRY(it.Increment());
-        }
-    }
-
-    // A hack to delete the directory contents
-    TRY(Delete(source_dir, {}));
-    TRY(CreateDirectory(source_dir, {.create_intermediate_directories = true, .fail_if_exists = false}));
-
-    return k_success;
+    auto new_name = path::Join(path_allocator, Array {destination_folder, path::Filename(from)});
+    return Rename(from, new_name);
 }
 
 ErrorCodeOr<Span<MutableString>> GetFilesRecursive(ArenaAllocator& a,

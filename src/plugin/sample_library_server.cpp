@@ -2103,9 +2103,9 @@ TEST_CASE(TestSampleLibraryLoader) {
             // Let's make this a bit more interesting by simulating a file rename mid-move
             if (RandomIntInRange(random_seed, 0, 4) == 0) {
                 if (is_renamed)
-                    auto _ = MoveFile(temp_rename, fixture.test_lib_path, ExistingDestinationHandling::Fail);
+                    auto _ = Rename(temp_rename, fixture.test_lib_path);
                 else
-                    auto _ = MoveFile(fixture.test_lib_path, temp_rename, ExistingDestinationHandling::Fail);
+                    auto _ = Rename(fixture.test_lib_path, temp_rename);
                 is_renamed = !is_renamed;
             }
 

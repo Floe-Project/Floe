@@ -3,21 +3,29 @@
 
 #include <dirent.h>
 #include <errno.h>
+#include <limits.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <sys/file.h>
 #include <sys/stat.h>
 
-#include "utils/logger/logger.hpp"
 #if __linux__
 #include <sys/stat.h>
 #endif
-#include <errno.h>
-#include <stdio.h>
 
 #include "foundation/foundation.hpp"
 
-#include "config.h"
 #include "filesystem.hpp"
+
+ErrorCodeOr<void> WindowsSetFileAttributes(String, Optional<WindowsFileAttributes>) { return k_success; }
+
+ErrorCodeOr<void> Rename(String from, String to) {
+    PathArena temp_path_allocator;
+    auto const result =
+        rename(NullTerminated(from, temp_path_allocator), NullTerminated(to, temp_path_allocator));
+    if (result != 0) return FilesystemErrnoErrorCode(errno, "rename");
+    return k_success;
+}
 
 ErrorCodeOr<FileType> GetFileType(String path) {
     PathArena temp_path_allocator;

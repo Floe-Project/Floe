@@ -119,7 +119,7 @@ void FileLogger::Log(LogModuleName module_name, LogLevel level, String str) {
                                     RmwMemoryOrder::Acquire,
                                     LoadMemoryOrder::Relaxed)) {
         ArenaAllocatorWithInlineStorage<1000> arena;
-        auto outcome = FloeKnownDirectory(arena, FloeKnownDirectories::Logs);
+        auto outcome = FloeKnownDirectory(arena, FloeKnownDirectoryType::Logs);
         if (outcome.HasValue()) {
             auto path = DynamicArray<char>::FromOwnedSpan(outcome.Value(), arena);
             path::JoinAppend(path, "floe.log");

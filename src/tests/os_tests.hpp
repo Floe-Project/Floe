@@ -143,7 +143,7 @@ TEST_CASE(TestFilesystem) {
     SUBCASE("DirectoryIterator") {
         SUBCASE("on an empty dir") {
             auto temp_dir =
-                DynamicArray<char>::FromOwnedSpan(TRY(KnownDirectory(a, KnownDirectories::Temporary)), a);
+                DynamicArray<char>::FromOwnedSpan(TRY(KnownDirectory(a, KnownDirectoryType::Temporary)), a);
             path::JoinAppend(temp_dir, "empty_dir"_s);
 
             TRY(CreateDirectory(temp_dir, {.create_intermediate_directories = true}));
@@ -237,8 +237,8 @@ TEST_CASE(TestFilesystem) {
     }
 
     SUBCASE("KnownDirectory") {
-        for (auto const i : Range(ToInt(KnownDirectories::Count))) {
-            auto type = (KnownDirectories)i;
+        for (auto const i : Range(ToInt(KnownDirectoryType::Count))) {
+            auto type = (KnownDirectoryType)i;
             auto known_folder = KnownDirectory(a, type);
             String type_name = EnumToString(type);
             if (known_folder.HasValue()) {
@@ -254,7 +254,7 @@ TEST_CASE(TestFilesystem) {
     SUBCASE("DeleteDirectory") {
         auto test_delete_directory = [&a, &tester]() -> ErrorCodeOr<void> {
             auto const dir = TRY(KnownDirectoryWithSubdirectories(a,
-                                                                  KnownDirectories::Temporary,
+                                                                  KnownDirectoryType::Temporary,
                                                                   Array {"test"_s, "framework_dir"}));
             TRY(CreateDirectory(dir, {.create_intermediate_directories = true}));
 
@@ -290,112 +290,45 @@ TEST_CASE(TestFilesystem) {
         return k_success;
     }
 
-    SUBCASE("MoveDirectoryContents") {
-        auto const temp_dir_path =
-            path::Join(a, Array {tests::TempFolder(tester), "MoveDirectoryContents test"});
-        auto _ = Delete(temp_dir_path, {});
-        TRY(CreateDirectory(temp_dir_path));
+    SUBCASE("Rename") {
+        auto const dir = String(path::Join(a, Array {tests::TempFolder(tester), "Rename test"}));
+        TRY(CreateDirectory(dir, {.create_intermediate_directories = false}));
+        DEFER { auto _ = Delete(dir, {.type = DeleteOptions::Type::DirectoryRecursively}); };
 
-        auto make_path = [&](Span<String const> sub_paths) {
-            DynamicArray<String> parts {a};
-            dyn::Append(parts, temp_dir_path);
-            dyn::AppendSpan(parts, sub_paths);
-            return String(path::Join(a, parts));
-        };
+        auto const path1 = path::Join(a, Array {dir, "rename-test-path1"});
+        auto const path2 = path::Join(a, Array {dir, "rename-test-path2"});
 
-        auto make_dir = [&](Span<String const> name) -> ErrorCodeOr<String> {
-            auto const dir = make_path(name);
-            TRY(CreateDirectory(dir, {.create_intermediate_directories = true}));
-            return dir;
-        };
-
-        auto make_file_containing_its_own_subpath = [&](Span<String const> path) -> ErrorCodeOr<String> {
-            auto const f = make_path(path);
-            TRY(WriteFile(f, path::Join(a, path)));
-            return f;
-        };
-
-        auto const dir1 = TRY(make_dir(Array {"dir1"_s}));
-        TRY(make_dir(Array {"dir1"_s, "subdir"}));
-        TRY(make_file_containing_its_own_subpath(Array {"dir1"_s, "file1"}));
-        TRY(make_file_containing_its_own_subpath(Array {"dir1"_s, "subdir"_s, "file2"}));
-        TRY(make_file_containing_its_own_subpath(Array {"dir1"_s, "subdir"_s, "file3"}));
-
-        auto const dir2 = TRY(make_dir(Array {"dir2"_s}));
-        auto const dir2_file1 = TRY(make_file_containing_its_own_subpath(Array {"dir2"_s, "file1"}));
-
-        auto check_dest_contents = [&]() -> ErrorCodeOr<void> {
-            DynamicArray<String> existing_files {a};
-            dyn::Append(existing_files, make_path(Array {"dir2"_s, "file1"}));
-            dyn::Append(existing_files, make_path(Array {"dir2"_s, "subdir", "file2"}));
-            dyn::Append(existing_files, make_path(Array {"dir2"_s, "subdir", "file3"}));
-
-            REQUIRE(TRY(GetFileType(dir2)) == FileType::Directory);
-            REQUIRE(TRY(GetFileType(existing_files[0])) == FileType::File);
-            REQUIRE(TRY(GetFileType(make_path(Array {"dir2"_s, "subdir"}))) == FileType::Directory);
-            REQUIRE(TRY(GetFileType(existing_files[1])) == FileType::File);
-            REQUIRE(TRY(GetFileType(existing_files[2])) == FileType::File);
-
-            for (auto& f : TRY(GetFilesRecursive(a, dir2, FileType::File, {}))) {
-                auto const file_type = TRY(GetFileType(f));
-                if (file_type == FileType::File) {
-                    bool found = false;
-                    for (auto& existing : existing_files)
-                        if (path::Equal(existing, f)) found = true;
-                    CAPTURE(f);
-                    REQUIRE(found);
-                }
-            }
-            return k_success;
-        };
-
-        SUBCASE("fails when moving into existing dir") {
-            auto o = MoveDirectoryContents(dir1, dir2, ExistingDestinationHandling::Fail);
-            REQUIRE(o.HasError());
-            REQUIRE(o.Error() == FilesystemError::PathAlreadyExists);
+        SUBCASE("basic file rename") {
+            TRY(WriteFile(path1, "data"_s.ToByteSpan()));
+            TRY(Rename(path1, path2));
+            CHECK(TRY(GetFileType(path2)) == FileType::File);
+            CHECK(GetFileType(path1).HasError());
         }
 
-        SUBCASE("move into empty destination succeeds") {
-            TRY(Delete(dir2_file1, {}));
-            REQUIRE(GetFileType(dir2_file1).HasError());
-            auto o = MoveDirectoryContents(dir1, dir2, ExistingDestinationHandling::Fail);
-            REQUIRE(!o.HasError());
-            TRY(check_dest_contents());
+        SUBCASE("file rename replaces existing") {
+            TRY(WriteFile(path1, "data1"_s.ToByteSpan()));
+            TRY(WriteFile(path2, "data2"_s.ToByteSpan()));
+            TRY(Rename(path1, path2));
+            CHECK(TRY(ReadEntireFile(path2, a)) == "data1"_s);
+            CHECK(GetFileType(path1).HasError());
         }
 
-        SUBCASE("move while overwriting files succeeds") {
-            auto o = MoveDirectoryContents(dir1, dir2, ExistingDestinationHandling::Overwrite);
-            REQUIRE(!o.HasError());
-
-            auto const data = TRY(ReadEntireFile(dir2_file1, a));
-            REQUIRE(path::Equal(data, "dir1/file1"_s));
-            TRY(check_dest_contents());
+        SUBCASE("move dir") {
+            TRY(CreateDirectory(path1, {.create_intermediate_directories = false}));
+            TRY(Rename(path1, path2));
+            CHECK(TRY(GetFileType(path2)) == FileType::Directory);
+            CHECK(GetFileType(path1).HasError());
         }
 
-        SUBCASE("move while skipping files succeeds") {
-            auto o = MoveDirectoryContents(dir1, dir2, ExistingDestinationHandling::Skip);
-            REQUIRE(!o.HasError());
-
-            auto const data = TRY(ReadEntireFile(dir2_file1, a));
-            REQUIRE(path::Equal(data, "dir2/file1"_s));
-            TRY(check_dest_contents());
-        }
-
-        SUBCASE("moving into non-existent destination fails") {
-#if _WIN32
-            auto const made_up_dir = "C:/skkfjhsef"_s;
-#else
-            auto const made_up_dir = "/Users/samwindell/skfeskhfj"_s;
-#endif
-            auto o = MoveDirectoryContents(made_up_dir, dir2, ExistingDestinationHandling::Skip);
-            REQUIRE(o.HasError());
-        }
-
-        SUBCASE("moving into a existing file fails") {
-            auto o = MoveDirectoryContents(dir1, dir2_file1, ExistingDestinationHandling::Skip);
-            REQUIRE(o.HasError());
+        SUBCASE("move dir ok if new_name exists but is empty") {
+            TRY(CreateDirectory(path1, {.create_intermediate_directories = false}));
+            TRY(CreateDirectory(path2, {.create_intermediate_directories = false}));
+            TRY(Rename(path1, path2));
+            CHECK(TRY(GetFileType(path2)) == FileType::Directory);
+            CHECK(GetFileType(path1).HasError());
         }
     }
+
     return k_success;
 }
 
@@ -546,7 +479,7 @@ TEST_CASE(TestDirectoryWatcher) {
 
             SUBCASE("rename is detected") {
                 auto const new_file = TestPath::Create(a, dir, "file1_renamed.txt");
-                TRY(MoveFile(file.full_path, new_file.full_path, ExistingDestinationHandling::Fail));
+                TRY(Rename(file.full_path, new_file.full_path));
                 TRY(check(Array {
                     DirectoryWatcher::DirectoryChanges::Change {
                         file.subpath,
@@ -599,7 +532,7 @@ TEST_CASE(TestDirectoryWatcher) {
 
             SUBCASE("no crash moving root dir") {
                 auto const dir_name = fmt::Format(a, "{}-moved", dir);
-                auto const move_outcome = MoveFile(dir, dir_name, ExistingDestinationHandling::Fail);
+                auto const move_outcome = Rename(dir, dir_name);
                 if (!move_outcome.HasError()) {
                     DEFER { auto _ = Delete(dir_name, {.type = DeleteOptions::Type::DirectoryRecursively}); };
                     // On Linux, we don't get any events. Perhaps a MOVE only triggers when the underlying
@@ -637,9 +570,7 @@ TEST_CASE(TestDirectoryWatcher) {
                 SUBCASE("rename is detected") {
                     auto const new_subfile =
                         TestPath::Create(a, dir, path::Join(a, Array {subdir.subpath, "file2_renamed.txt"}));
-                    TRY(MoveFile(subfile.full_path,
-                                 new_subfile.full_path,
-                                 ExistingDestinationHandling::Fail));
+                    TRY(Rename(subfile.full_path, new_subfile.full_path));
                     TRY(check(Array {
                         DirectoryWatcher::DirectoryChanges::Change {
                             subfile.subpath,
@@ -703,9 +634,7 @@ TEST_CASE(TestDirectoryWatcher) {
 
                 SUBCASE("moved subfolder is still watched") {
                     auto const subdir_moved = TestPath::Create(a, dir, "subdir-moved");
-                    TRY(MoveFile(subdir.full_path,
-                                 subdir_moved.full_path,
-                                 ExistingDestinationHandling::Fail));
+                    TRY(Rename(subdir.full_path, subdir_moved.full_path));
 
                     auto const subfile2 =
                         TestPath::Create(a,

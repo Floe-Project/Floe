@@ -120,12 +120,7 @@ PresetBrowser::DoPresetFolderRecurse(DirectoryListing::Entry const* f, f32& ypos
                     if (from) {
                         auto const to = f;
                         if (path::IsAbsolute(from->Path()) && path::IsAbsolute(to->Path())) {
-                            if (auto o = MoveFileOrDirIntoFolder(from->Path(),
-                                                                 to->Path(),
-                                                                 ExistingDestinationHandling::Fail);
-                                o.HasError()) {
-                                int const b = 0;
-                                (void)b;
+                            if (auto o = MoveIntoFolder(from->Path(), to->Path()); o.HasError()) {
                             }
                         }
                     }

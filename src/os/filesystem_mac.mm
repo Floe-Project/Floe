@@ -48,24 +48,6 @@ static ErrorCode FilesystemErrorFromNSError(NSError* error,
     return ErrorFromNSError(error, extra_debug_info, loc);
 }
 
-ErrorCodeOr<void> MoveFile(String from, String to, ExistingDestinationHandling existing) {
-    if (existing == ExistingDestinationHandling::Skip || existing == ExistingDestinationHandling::Overwrite) {
-        if ([[NSFileManager defaultManager] fileExistsAtPath:StringToNSString(to)]) {
-            if (existing == ExistingDestinationHandling::Skip) return k_success;
-
-            TRY(Delete(to, {}));
-        }
-    }
-
-    NSError* error = nil;
-    if (![[NSFileManager defaultManager] moveItemAtPath:StringToNSString(from)
-                                                 toPath:StringToNSString(to)
-                                                  error:&error]) {
-        return FilesystemErrorFromNSError(error);
-    }
-    return k_success;
-}
-
 ErrorCodeOr<void> CopyFile(String from, String to, ExistingDestinationHandling existing) {
     auto dest = StringToNSString(to);
     if (existing == ExistingDestinationHandling::Fail || existing == ExistingDestinationHandling::Skip) {
@@ -179,62 +161,62 @@ OSXGetSystemFilepath(Allocator& a, NSSearchPathDirectory type, NSSearchPathDomai
     return a.Clone(NSStringToString(url.path));
 }
 
-ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectories type) {
+ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectoryType type) {
     NSSearchPathDirectory osx_type {};
     NSSearchPathDomainMask domain {};
     Optional<String> extra_subdirs {};
     Optional<String> fallback {};
     switch (type) {
-        case KnownDirectories::Temporary: return a.Clone(NSStringToString(NSTemporaryDirectory()));
-        case KnownDirectories::Logs:
+        case KnownDirectoryType::Temporary: return a.Clone(NSStringToString(NSTemporaryDirectory()));
+        case KnownDirectoryType::Logs:
             osx_type = NSLibraryDirectory;
             domain = NSUserDomainMask;
             extra_subdirs = "Logs";
             break;
-        case KnownDirectories::PluginSettings:
+        case KnownDirectoryType::PluginSettings:
             osx_type = NSMusicDirectory;
             domain = NSUserDomainMask;
             extra_subdirs = "Audio Music Apps/Plug-In Settings";
             break;
-        case KnownDirectories::Documents:
+        case KnownDirectoryType::Documents:
             osx_type = NSDocumentDirectory;
             domain = NSUserDomainMask;
             break;
-        case KnownDirectories::Downloads:
+        case KnownDirectoryType::Downloads:
             osx_type = NSDownloadsDirectory;
             domain = NSUserDomainMask;
             break;
-        case KnownDirectories::Prefs:
+        case KnownDirectoryType::Prefs:
             osx_type = NSApplicationSupportDirectory;
             domain = NSUserDomainMask;
             break;
-        case KnownDirectories::Data:
+        case KnownDirectoryType::Data:
             osx_type = NSApplicationSupportDirectory;
             domain = NSUserDomainMask;
             break;
-        case KnownDirectories::AllUsersData:
+        case KnownDirectoryType::AllUsersData:
             osx_type = NSApplicationSupportDirectory;
             domain = NSLocalDomainMask;
             fallback = "/Library/Application Support";
             break;
-        case KnownDirectories::AllUsersSettings:
+        case KnownDirectoryType::AllUsersSettings:
             osx_type = NSApplicationSupportDirectory;
             domain = NSLocalDomainMask;
             fallback = "/Library/Application Support";
             break;
-        case KnownDirectories::ClapPlugin:
+        case KnownDirectoryType::ClapPlugin:
             osx_type = NSLibraryDirectory;
             domain = NSLocalDomainMask;
             extra_subdirs = "Audio/Plug-Ins/CLAP";
             fallback = "/Library";
             break;
-        case KnownDirectories::Vst3Plugin:
+        case KnownDirectoryType::Vst3Plugin:
             osx_type = NSLibraryDirectory;
             domain = NSLocalDomainMask;
             extra_subdirs = "Audio/Plug-Ins/VST3";
             fallback = "/Library";
             break;
-        case KnownDirectories::Count: PanicIfReached();
+        case KnownDirectoryType::Count: PanicIfReached();
     }
 
     auto path = ({

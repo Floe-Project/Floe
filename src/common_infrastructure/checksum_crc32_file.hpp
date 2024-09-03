@@ -113,6 +113,7 @@ PUBLIC ErrorCodeOr<HashTable<String, ChecksumValues>> ParseChecksumFile(String c
 
 PUBLIC ErrorCodeOr<bool> FolderDiffersFromChecksumValues(String folder_path,
                                                          HashTable<String, ChecksumValues> checksum_values,
+                                                         Logger& logger,
                                                          ArenaAllocator& scratch_arena) {
     auto checksum_values_found = Set<String>::Create(scratch_arena, checksum_values.Capacity());
 
@@ -138,20 +139,12 @@ PUBLIC ErrorCodeOr<bool> FolderDiffersFromChecksumValues(String folder_path,
         if (auto element = checksum_values.FindElement(relative_path)) {
             auto last_checksum = &element->data;
             if (last_checksum->file_size != entry.file_size) {
-                g_debug_log.Debug({},
-                                  "File size mismatch: {} {} {}",
-                                  relative_path,
-                                  last_checksum->file_size,
-                                  entry.file_size);
+                logger.Debug({}, "File changed: {}", relative_path);
                 return true;
             }
             auto const file_data = TRY(ReadEntireFile(entry.path, scratch_arena)).ToByteSpan();
             if (auto crc = Crc32(file_data); crc != last_checksum->crc32) {
-                g_debug_log.Debug({},
-                                  "Checksum mismatch: {} {08x} {08x}",
-                                  relative_path,
-                                  last_checksum->crc32,
-                                  crc);
+                logger.Debug({}, "File changed: {}", relative_path);
                 return true;
             }
             scratch_arena.Free(file_data);
@@ -164,7 +157,7 @@ PUBLIC ErrorCodeOr<bool> FolderDiffersFromChecksumValues(String folder_path,
     // check if there's any missing files
     for (auto const& [path, checksum] : checksum_values)
         if (!checksum_values_found.Contains(path)) {
-            g_debug_log.Debug({}, "Missing file: {}", path);
+            logger.Debug({}, "Missing file: {}", path);
             return true;
         }
 

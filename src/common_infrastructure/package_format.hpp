@@ -10,20 +10,27 @@
 #include "utils/debug/debug.hpp"
 
 #include "checksum_crc32_file.hpp"
+#include "miniz_zip.h"
 #include "sample_library/sample_library.hpp"
 
 namespace package {
 
 constexpr String k_libraries_subdir = "Libraries";
 constexpr String k_presets_subdir = "Presets";
+constexpr auto k_folders = Array {k_libraries_subdir, k_presets_subdir};
 constexpr String k_file_extension = ".floe.zip"_s;
 constexpr String k_checksums_file = "Floe-Details/checksums.crc32"_s;
+enum class SubfolderType : u8 { Libraries, Presets, Count };
 
 PUBLIC bool IsPathPackageFile(String path) { return EndsWithSpan(path, k_file_extension); }
 
 enum class PackageError {
     FileCorrupted,
     NotFloePackage,
+    InvalidLibrary,
+    AccessDenied,
+    FilesystemError,
+    NotEmpty,
 };
 PUBLIC ErrorCodeCategory const& PackageErrorCodeType() {
     static constexpr ErrorCodeCategory const k_cat {
@@ -33,8 +40,24 @@ PUBLIC ErrorCodeCategory const& PackageErrorCodeType() {
                 return writer.WriteChars(({
                     String s {};
                     switch ((PackageError)e.code) {
-                        case PackageError::FileCorrupted: s = "File is corrupted"_s; break;
-                        case PackageError::NotFloePackage: s = "Not a valid Floe package"_s; break;
+                        case PackageError::FileCorrupted:
+                            s = "Package file is corrupted, retry download"_s;
+                            break;
+                        case PackageError::NotFloePackage:
+                            s = "Not a valid Floe package, notify the developer"_s;
+                            break;
+                        case PackageError::InvalidLibrary:
+                            s = "Library is invalid, notify the developer"_s;
+                            break;
+                        case PackageError::AccessDenied:
+                            s = "Access denied, manual installation recommended"_s;
+                            break;
+                        case PackageError::FilesystemError:
+                            s = "Filesystem error, retry recommended"_s;
+                            break;
+                        case PackageError::NotEmpty:
+                            s = "Directory not empty, install would overwrite files"_s;
+                            break;
                     }
                     s;
                 }));
@@ -184,7 +207,9 @@ static Optional<String> RelativePathIfInFolder(String path, String folder) {
     if (path.size <= folder.size) return k_nullopt;
     if (path[folder.size] != '/') return k_nullopt;
     if (!StartsWithSpan(path, folder)) return k_nullopt;
-    return path.SubSpan(folder.size + 1);
+    auto result = path.SubSpan(folder.size + 1);
+    result = TrimEndIfMatches(result, '/');
+    return result;
 }
 
 static void WriterAddChecksumForFolder(mz_zip_archive& zip,
@@ -217,7 +242,6 @@ static void WriterAddChecksumForFolder(mz_zip_archive& zip,
                                .file_size = file_stat.m_uncomp_size,
                            });
     }
-    g_debug_log.Debug({}, "Checksums for folder {}: {}", folder_in_archive, checksums.Items());
     WriterAddFile(zip,
                   path::Join(scratch_arena, Array {folder_in_archive, k_checksums_file}, path::Format::Posix),
                   checksums.Items().ToByteSpan());
@@ -322,21 +346,25 @@ static ErrorCodeOr<mz_zip_archive_file_stat> FileStat(mz_zip_archive& zip, mz_ui
     return file_stat;
 }
 
-static ValueOrError<mz_zip_archive_file_stat, ReaderError>
+static String PathWithoutTrailingSlash(char const* path) {
+    return TrimEndIfMatches(FromNullTerminated(path), '/');
+}
+
+static ValueOrError<Optional<mz_zip_archive_file_stat>, ReaderError>
 FindFloeLuaInZipInLibrary(mz_zip_archive& zip, String library_dir_in_zip) {
     using H = TryHelpersReader;
     for (auto const file_index : Range(mz_zip_reader_get_num_files(&zip))) {
         auto const file_stat = TRY_H(FileStat(zip, file_index));
         if (file_stat.m_is_directory) continue;
-        auto const path = FromNullTerminated(file_stat.m_filename);
+        auto const path = PathWithoutTrailingSlash(file_stat.m_filename);
         if (!sample_lib::FilenameIsFloeLuaFile(path::Filename(path, path::Format::Posix))) continue;
         auto const parent = path::Directory(path, path::Format::Posix);
         if (!parent) continue;
         if (*parent != library_dir_in_zip) continue;
 
-        return file_stat;
+        return Optional<mz_zip_archive_file_stat>(file_stat);
     }
-    return ReaderError {ErrorCode {PackageError::NotFloePackage}, "No floe.lua file in library"_s};
+    return Optional<mz_zip_archive_file_stat>(k_nullopt);
 }
 
 static ErrorCodeOr<Span<u8 const>>
@@ -374,38 +402,93 @@ ExtractFileToFile(mz_zip_archive& zip, mz_zip_archive_file_stat const& file_stat
     return k_success;
 }
 
-static ErrorCodeOr<Span<String>>
-SubfoldersOfFolder(mz_zip_archive& zip, String folder, ArenaAllocator& arena) {
-    DynamicArray<String> folders {arena};
-
-    for (auto const file_index : Range(mz_zip_reader_get_num_files(&zip))) {
-        auto const file_stat = TRY(FileStat(zip, file_index));
-        auto const path = FromNullTerminated(file_stat.m_filename);
-        if (StartsWithSpan(path, folder) && path.size > folder.size) {
-            auto const relative_path = TrimEndIfMatches(path.SubSpan(folder.size + 1), '/');
-            if (relative_path.size == 0) continue;
-            if (Contains(relative_path, '/')) continue;
-            dyn::Append(folders, arena.Clone(TrimEndIfMatches(path, '/')));
-        }
-    }
-
-    return folders.ToOwnedSpan();
-}
-
-static ErrorCodeOr<String> UniqueTempFolder(String inside_folder, u64& seed, ArenaAllocator& arena) {
+static String UniqueTempFolder(String inside_folder, u64& seed, ArenaAllocator& arena) {
     DynamicArrayBounded<char, 64> name {".Floe-Temp-"};
     auto const chars_added = fmt::IntToString(RandomU64(seed),
                                               name.data + name.size,
                                               {.base = fmt::IntToStringOptions::Base::Hexadecimal});
     name.size += chars_added;
     auto const result = path::Join(arena, Array {inside_folder, name});
-    TRY(CreateDirectory(result,
-                        {
-                            .create_intermediate_directories = false,
-                            .fail_if_exists = true,
-                            .win32_hide_dirs_starting_with_dot = true,
-                        }));
     return result;
+}
+
+static ValueOrError<sample_lib::Library*, ReaderError>
+ReaderReadLibraryLua(mz_zip_archive& zip, String library_dir_in_zip, ArenaAllocator& arena) {
+    using H = TryHelpersReader;
+    auto const floe_lua_stat = TRY(detail::FindFloeLuaInZipInLibrary(zip, library_dir_in_zip));
+    if (!floe_lua_stat) return (sample_lib::Library*)nullptr;
+    auto const floe_lua_data = TRY_H(detail::ExtractFileToMem(zip, *floe_lua_stat, arena));
+
+    auto lua_reader = ::Reader::FromMemory(floe_lua_data);
+    auto const lib_outcome =
+        sample_lib::ReadLua(lua_reader, PathWithoutTrailingSlash(floe_lua_stat->m_filename), arena, arena);
+    if (lib_outcome.HasError()) return ReaderError {PackageError::InvalidLibrary, "floe.lua file is invalid"};
+    return lib_outcome.ReleaseValue();
+}
+
+static ErrorCodeOr<HashTable<String, ChecksumValues>>
+ReaderChecksumValuesForDir(mz_zip_archive& zip, String dir_in_zip, ArenaAllocator& arena) {
+    DynamicHashTable<String, ChecksumValues> table {arena};
+    for (auto const file_index : Range(mz_zip_reader_get_num_files(&zip))) {
+        auto const file_stat = TRY(detail::FileStat(zip, file_index));
+        if (file_stat.m_is_directory) continue;
+        auto const path = PathWithoutTrailingSlash(file_stat.m_filename);
+        auto const relative_path = detail::RelativePathIfInFolder(path, dir_in_zip);
+        if (!relative_path) continue;
+        if (*relative_path == k_checksums_file) continue;
+        table.Insert(arena.Clone(*relative_path),
+                     ChecksumValues {(u32)file_stat.m_crc32, file_stat.m_uncomp_size});
+    }
+    return table.ToOwnedTable();
+}
+
+static ErrorCodeOr<void> ExtractFolder(mz_zip_archive& zip,
+                                       String dir_in_zip,
+                                       String destination_folder,
+                                       ArenaAllocator& scratch_arena) {
+    for (auto const file_index : Range(mz_zip_reader_get_num_files(&zip))) {
+        auto const file_stat = TRY(detail::FileStat(zip, file_index));
+        if (file_stat.m_is_directory) continue;
+        auto const path = PathWithoutTrailingSlash(file_stat.m_filename);
+        auto const relative_path = detail::RelativePathIfInFolder(path, dir_in_zip);
+        if (!relative_path) continue;
+
+        auto const out_path = path::Join(scratch_arena, Array {destination_folder, *relative_path});
+        DEFER { scratch_arena.Free(out_path.ToByteSpan()); };
+        TRY(CreateDirectory(*path::Directory(out_path),
+                            {
+                                .create_intermediate_directories = true,
+                                .fail_if_exists = false,
+                            }));
+        auto out_file = TRY(OpenFile(out_path, FileMode::WriteNoOverwrite));
+        TRY(detail::ExtractFileToFile(zip, file_stat, out_file));
+    }
+
+    {
+        auto const checksum_values = TRY(ReaderChecksumValuesForDir(zip, dir_in_zip, scratch_arena));
+        auto const checksum_file_path =
+            path::Join(scratch_arena, Array {destination_folder, k_checksums_file});
+        TRY(CreateDirectory(*path::Directory(checksum_file_path),
+                            {
+                                .create_intermediate_directories = true,
+                                .fail_if_exists = false,
+                            }));
+        TRY(WriteChecksumsValuesToFile(checksum_file_path,
+                                       checksum_values,
+                                       scratch_arena,
+                                       "Generated by Floe"));
+    }
+
+    return k_success;
+}
+
+static PackageError ErrorCodeToPackageError(ErrorCode e) {
+    if (e.category == &PackageErrorCodeType()) return (PackageError)e.code;
+    if (e == FilesystemError::AccessDenied)
+        return PackageError::AccessDenied;
+    else if (e == FilesystemError::NotEmpty)
+        return PackageError::NotEmpty;
+    return PackageError::FilesystemError;
 }
 
 } // namespace detail
@@ -434,8 +517,7 @@ PUBLIC ValueOrError<PackageReader, ReaderError> ReaderCreate(Reader& reader) {
     usize known_subdirs = 0;
     for (auto const file_index : Range(mz_zip_reader_get_num_files(&zip))) {
         auto const file_stat = TRY_H(detail::FileStat(zip, file_index));
-        auto const path = FromNullTerminated(file_stat.m_filename);
-        g_debug_log.Debug({}, "File in zip: {}", path);
+        auto const path = detail::PathWithoutTrailingSlash(file_stat.m_filename);
         for (auto const known_subdir : Array {k_libraries_subdir, k_presets_subdir}) {
             if (path == known_subdir || detail::RelativePathIfInFolder(path, known_subdir)) {
                 ++known_subdirs;
@@ -455,103 +537,79 @@ PUBLIC ValueOrError<PackageReader, ReaderError> ReaderCreate(Reader& reader) {
 
 PUBLIC void ReaderDestroy(PackageReader& package) { mz_zip_reader_end(&package.zip); }
 
-PUBLIC ErrorCodeOr<Span<String>> ReaderFindLibraryDirs(PackageReader& package, ArenaAllocator& arena) {
-    return detail::SubfoldersOfFolder(package.zip, k_libraries_subdir, arena);
-}
+struct PackageFolderIterator {
+    struct PackageFolder {
+        String path; // path in the zip
+        SubfolderType type;
+        sample_lib::Library* library; // can be null
+        HashTable<String, ChecksumValues> checksum_values;
+    };
 
-PUBLIC ErrorCodeOr<Span<String>> ReaderFindPresetDirs(PackageReader& package, ArenaAllocator& arena) {
-    return detail::SubfoldersOfFolder(package.zip, k_presets_subdir, arena);
-}
+    ErrorCodeOr<Optional<PackageFolder>> Next(ArenaAllocator& arena) {
+        DEFER { ++file_index; };
+        for (; file_index < mz_zip_reader_get_num_files(&reader.zip); ++file_index) {
+            auto const file_stat = TRY(detail::FileStat(reader.zip, file_index));
+            auto const path = detail::PathWithoutTrailingSlash(file_stat.m_filename);
+            for (auto const folder : k_folders) {
+                auto const relative_path = detail::RelativePathIfInFolder(path, folder);
+                if (!relative_path) continue;
+                if (relative_path->size == 0) continue;
+                if (Contains(*relative_path, '/')) continue;
 
-PUBLIC ValueOrError<sample_lib::Library*, ReaderError>
-ReaderReadLibraryLua(PackageReader& package, String library_dir_in_zip, ArenaAllocator& scratch_arena) {
-    using H = TryHelpersReader;
-    auto const floe_lua_stat = TRY(detail::FindFloeLuaInZipInLibrary(package.zip, library_dir_in_zip));
-    auto const floe_lua_data = TRY_H(detail::ExtractFileToMem(package.zip, floe_lua_stat, scratch_arena));
-
-    auto lua_reader = ::Reader::FromMemory(floe_lua_data);
-    auto const lib_outcome = sample_lib::ReadLua(lua_reader,
-                                                 FromNullTerminated(floe_lua_stat.m_filename),
-                                                 scratch_arena,
-                                                 scratch_arena);
-    if (lib_outcome.HasError()) return ReaderError {PackageError::NotFloePackage, "floe.lua file is invalid"};
-    return lib_outcome.ReleaseValue();
-}
-
-PUBLIC ErrorCodeOr<HashTable<String, ChecksumValues>>
-ReaderChecksumValuesForDir(PackageReader& package, String dir_in_zip, ArenaAllocator& arena) {
-    DynamicHashTable<String, ChecksumValues> table {arena};
-    for (auto const file_index : Range(mz_zip_reader_get_num_files(&package.zip))) {
-        auto const file_stat = TRY(detail::FileStat(package.zip, file_index));
-        if (file_stat.m_is_directory) continue;
-        auto const path = FromNullTerminated(file_stat.m_filename);
-        auto const relative_path = detail::RelativePathIfInFolder(path, dir_in_zip);
-        if (!relative_path) continue;
-        if (*relative_path == k_checksums_file) continue;
-        table.Insert(arena.Clone(*relative_path),
-                     ChecksumValues {(u32)file_stat.m_crc32, file_stat.m_uncomp_size});
-    }
-    return table.ToOwnedTable();
-}
-
-namespace detail {
-
-static ErrorCodeOr<void> ExtractFolder(PackageReader& package,
-                                       String dir_in_zip,
-                                       String destination_folder,
-                                       ArenaAllocator& scratch_arena) {
-    for (auto const file_index : Range(mz_zip_reader_get_num_files(&package.zip))) {
-        auto const file_stat = TRY(detail::FileStat(package.zip, file_index));
-        if (file_stat.m_is_directory) continue;
-        auto const path = FromNullTerminated(file_stat.m_filename);
-        auto const relative_path = detail::RelativePathIfInFolder(path, dir_in_zip);
-        if (!relative_path) continue;
-
-        auto const out_path = path::Join(scratch_arena, Array {destination_folder, *relative_path});
-        DEFER { scratch_arena.Free(out_path.ToByteSpan()); };
-        TRY(CreateDirectory(*path::Directory(out_path),
-                            {
-                                .create_intermediate_directories = true,
-                                .fail_if_exists = false,
-                            }));
-        g_debug_log.Debug({}, "Extracting {} to {}", path, out_path);
-        auto out_file = TRY(OpenFile(out_path, FileMode::WriteNoOverwrite));
-        TRY(detail::ExtractFileToFile(package.zip, file_stat, out_file));
+                PackageFolder result {
+                    .path = path.Clone(arena),
+                    .type = ({
+                        SubfolderType t;
+                        if (folder == k_libraries_subdir)
+                            t = SubfolderType::Libraries;
+                        else if (folder == k_presets_subdir)
+                            t = SubfolderType::Presets;
+                        else
+                            PanicIfReached();
+                        t;
+                    }),
+                    .checksum_values = TRY(detail::ReaderChecksumValuesForDir(reader.zip, path, arena)),
+                };
+                if (folder == k_libraries_subdir) {
+                    auto const o = detail::ReaderReadLibraryLua(reader.zip, path, arena);
+                    if (o.HasError()) return o.Error().code;
+                    result.library = o.ReleaseValue();
+                }
+                return result;
+            }
+        }
+        return k_nullopt;
     }
 
-    {
-        auto const checksum_values = TRY(ReaderChecksumValuesForDir(package, dir_in_zip, scratch_arena));
-        auto const checksum_file_path =
-            path::Join(scratch_arena, Array {destination_folder, k_checksums_file});
-        TRY(CreateDirectory(*path::Directory(checksum_file_path),
-                            {
-                                .create_intermediate_directories = true,
-                                .fail_if_exists = false,
-                            }));
-        TRY(WriteChecksumsValuesToFile(checksum_file_path,
-                                       checksum_values,
-                                       scratch_arena,
-                                       "Generated by Floe"));
-    }
-
-    return k_success;
-}
-
-} // namespace detail
+    PackageReader& reader;
+    mz_uint file_index = 0;
+};
 
 // The resulting directory will be destination_folder/dir_in_zip.
 // Extracts to a temp folder than then renames to the final location. This ensures we either fail or succeed,
 // with no inbetween cases where the folder is partially extracted. Additionally, it doesn't generate lots of
 // filesystem-change notifications which Floe might try to process and fail on.
-PUBLIC ErrorCodeOr<void> ReaderExtractFolder(PackageReader& package,
-                                             String dir_in_zip,
-                                             String destination_folder,
-                                             ArenaAllocator& scratch_arena) {
+PUBLIC Optional<PackageError> ReaderExtractFolder(PackageReader& package,
+                                                  String dir_in_zip,
+                                                  String destination_folder,
+                                                  ArenaAllocator& scratch_arena,
+                                                  Logger& error_log,
+                                                  bool overwrite_existing_files) {
     // We don't use the system temp folder because we want to do an atomic rename to the final location which
     // only works if 2 folders are on the same filesystem. By using a temp folder in the same location as the
     // destination folder we ensure that.
     auto const temp_folder =
-        TRY(detail::UniqueTempFolder(*path::Directory(destination_folder), package.seed, scratch_arena));
+        detail::UniqueTempFolder(*path::Directory(destination_folder), package.seed, scratch_arena);
+    auto const temp_folder_outcome = CreateDirectory(temp_folder,
+                                                     {
+                                                         .create_intermediate_directories = false,
+                                                         .fail_if_exists = true,
+                                                         .win32_hide_dirs_starting_with_dot = true,
+                                                     });
+    if (temp_folder_outcome.HasError()) {
+        error_log.Error({}, "Failed to create temp folder: {}. {}", temp_folder, temp_folder_outcome.Error());
+        return PackageError::FilesystemError;
+    }
     DEFER {
         auto _ = Delete(temp_folder,
                         {
@@ -559,14 +617,69 @@ PUBLIC ErrorCodeOr<void> ReaderExtractFolder(PackageReader& package,
                             .fail_if_not_exists = false,
                         });
     };
-    TRY(detail::ExtractFolder(package, dir_in_zip, temp_folder, scratch_arena));
+
+    if (auto const extract_result =
+            detail::ExtractFolder(package.zip, dir_in_zip, temp_folder, scratch_arena);
+        extract_result.HasError()) {
+        error_log.Error({}, "Failed to extract files to a temp location: {}", extract_result.Error());
+        return PackageError::FilesystemError;
+    }
 
     auto const destination_folder_path =
         path::Join(scratch_arena, Array {destination_folder, path::Filename(dir_in_zip)});
-    TRY(Rename(temp_folder, destination_folder_path));
-    TRY(WindowsSetFileAttributes(destination_folder_path, k_nullopt)); // remove hidden
 
-    return k_success;
+    if (auto const rename_o = Rename(temp_folder, destination_folder_path); rename_o.HasError()) {
+        if (overwrite_existing_files && rename_o.Error() == FilesystemError::NotEmpty) {
+            for (auto const file_index : Range(mz_zip_reader_get_num_files(&package.zip))) {
+                auto const file_stat_outcome = detail::FileStat(package.zip, file_index);
+                if (file_stat_outcome.HasError()) return PackageError::FileCorrupted;
+                auto const file_stat = file_stat_outcome.Value();
+                if (file_stat.m_is_directory) continue;
+                auto const path = detail::PathWithoutTrailingSlash(file_stat.m_filename);
+                auto const relative_path = detail::RelativePathIfInFolder(path, dir_in_zip);
+                if (!relative_path) continue;
+
+                auto const to_path = path::Join(scratch_arena, Array {destination_folder, *relative_path});
+                DEFER { scratch_arena.Free(to_path.ToByteSpan()); };
+                if (auto const dir_o = CreateDirectory(*path::Directory(to_path),
+                                                       {
+                                                           .create_intermediate_directories = true,
+                                                           .fail_if_exists = false,
+                                                       });
+                    dir_o.HasError()) {
+                    error_log.Error({},
+                                    "Failed to create directory(s) in your install folder: {}. {}",
+                                    *path::Directory(to_path),
+                                    dir_o.Error());
+                    return detail::ErrorCodeToPackageError(dir_o.Error());
+                }
+
+                auto const from_path = path::Join(scratch_arena, Array {temp_folder, *relative_path});
+                DEFER { scratch_arena.Free(from_path.ToByteSpan()); };
+                if (auto const copy_o = Rename(from_path, to_path); copy_o.HasError()) {
+                    error_log.Error({},
+                                    "Failed to install file in your install folder: {}. {}",
+                                    to_path,
+                                    copy_o.Error());
+                    return detail::ErrorCodeToPackageError(copy_o.Error());
+                }
+            }
+        } else {
+            error_log.Error({},
+                            "Failed to install files in your install folder: {}. {}",
+                            destination_folder_path,
+                            rename_o.Error());
+            return detail::ErrorCodeToPackageError(rename_o.Error());
+        }
+    }
+
+    // remove hidden
+    if (auto const o = WindowsSetFileAttributes(destination_folder_path, k_nullopt); o.HasError()) {
+        error_log.Error({}, "Failed to make the folder visible: {}. {}", destination_folder_path, o.Error());
+        return PackageError::FilesystemError;
+    }
+
+    return k_nullopt;
 }
 
 } // namespace package

@@ -56,38 +56,80 @@ static ErrorCodeOr<void> ReadTestPackage(tests::Tester& tester, Span<u8 const> z
     auto package = outcome.ReleaseValue();
     DEFER { package::ReaderDestroy(package); };
 
-    auto const lib_dirs = TRY(package::ReaderFindLibraryDirs(package, tester.scratch_arena));
-    for (auto const dir : lib_dirs) {
-        auto const o = package::ReaderReadLibraryLua(package, dir, tester.scratch_arena);
-        if (o.HasError()) {
-            tester.log.Error({}, "Failed to read library lua: {}", o.Error().message);
-            return o.Error().code;
+    package::PackageFolderIterator iterator {
+        .reader = package,
+    };
+
+    usize folders_found = 0;
+    while (auto const folder = TRY(iterator.Next(tester.scratch_arena))) {
+        ++folders_found;
+        switch (folder->type) {
+            case package::SubfolderType::Libraries: {
+                REQUIRE(folder->library);
+                auto const& lib = *folder->library;
+                CHECK_EQ(lib.name, "Test Lua"_s);
+
+                auto const differs = TRY(FolderDiffersFromChecksumValues(TestLibFolder(tester),
+                                                                         folder->checksum_values,
+                                                                         tester.log,
+                                                                         tester.scratch_arena));
+                CHECK(!differs);
+
+                // test extraction
+                {
+                    auto const dest_dir =
+                        String(path::Join(tester.scratch_arena,
+                                          Array {tests::TempFolder(tester), "PackageExtract test"}));
+                    TRY(CreateDirectory(dest_dir, {.create_intermediate_directories = false}));
+                    DEFER { auto _ = Delete(dest_dir, {.type = DeleteOptions::Type::DirectoryRecursively}); };
+
+                    BufferLogger logger {tester.scratch_arena};
+
+                    auto opt_error = package::ReaderExtractFolder(package,
+                                                                  folder->path,
+                                                                  dest_dir,
+                                                                  tester.scratch_arena,
+                                                                  logger,
+                                                                  false);
+                    if (opt_error.HasValue()) return ErrorCode {*opt_error};
+
+                    // We should fail when the folder is not empty
+                    CHECK(package::ReaderExtractFolder(package,
+                                                       folder->path,
+                                                       dest_dir,
+                                                       tester.scratch_arena,
+                                                       logger,
+                                                       false) == package::PackageError::NotEmpty);
+
+                    // we should succeed when we allow overwriting
+                    opt_error = package::ReaderExtractFolder(package,
+                                                             folder->path,
+                                                             dest_dir,
+                                                             tester.scratch_arena,
+                                                             logger,
+                                                             true);
+                    if (opt_error.HasValue()) return ErrorCode {*opt_error};
+
+                    auto const final_name =
+                        path::Join(tester.scratch_arena, Array {dest_dir, path::Filename(folder->path)});
+                    auto const final_differs = TRY(FolderDiffersFromChecksumValues(final_name,
+                                                                                   folder->checksum_values,
+                                                                                   logger,
+                                                                                   tester.scratch_arena));
+                    CHECK(!final_differs);
+                }
+
+                break;
+            }
+            case package::SubfolderType::Presets: {
+                break;
+            }
+            case package::SubfolderType::Count: PanicIfReached();
         }
-        auto const lib = o.ReleaseValue();
-        CHECK_EQ(lib->name, "Test Lua"_s);
-
-        auto const checksum_values =
-            TRY(package::ReaderChecksumValuesForDir(package, dir, tester.scratch_arena));
-        auto const differs = TRY(
-            FolderDiffersFromChecksumValues(TestLibFolder(tester), checksum_values, tester.scratch_arena));
-        CHECK(!differs);
-
-        auto const dest_dir = String(
-            path::Join(tester.scratch_arena, Array {tests::TempFolder(tester), "PackageExtract test"}));
-        TRY(CreateDirectory(dest_dir, {.create_intermediate_directories = false}));
-        DEFER { auto _ = Delete(dest_dir, {.type = DeleteOptions::Type::DirectoryRecursively}); };
-
-        TRY(package::ReaderExtractFolder(package, dir, dest_dir, tester.scratch_arena));
-
-        auto const final_name = path::Join(tester.scratch_arena, Array {dest_dir, path::Filename(dir)});
-        auto const final_differs =
-            TRY(FolderDiffersFromChecksumValues(final_name, checksum_values, tester.scratch_arena));
-        CHECK(!final_differs);
     }
 
-    auto const preset_dirs = TRY(package::ReaderFindPresetDirs(package, tester.scratch_arena));
-    for (auto const dir : preset_dirs)
-        g_debug_log.Debug({}, "Found preset dir: {}", dir);
+    CHECK_EQ(folders_found, 2u);
+
     return k_success;
 }
 

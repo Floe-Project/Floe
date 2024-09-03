@@ -12,13 +12,13 @@ local single_sample = floe.new_instrument(library, {
     folders = "Folder",
     description = "Description",
     tags = {},
-    waveform_audio_path = "samples/a.flac",
+    waveform_audio_path = "Samples/a.flac",
 })
 
 floe.add_region(single_sample, {
     file = {
         root_key = 60,
-        path = "samples/a.flac",
+        path = "Samples/a.flac",
     },
     trigger_criteria = {
         trigger_event = "note-on",
@@ -33,13 +33,13 @@ local same_sample_twice = floe.new_instrument(library, {
     folders = "Folder",
     description = "Description",
     tags = {},
-    waveform_audio_path = "samples/a.flac",
+    waveform_audio_path = "Samples/a.flac",
 })
 
 floe.add_region(same_sample_twice, {
     file = {
         root_key = 30,
-        path = "samples/a.flac",
+        path = "Samples/a.flac",
     },
     trigger_criteria = {
         trigger_event = "note-on",
@@ -50,7 +50,7 @@ floe.add_region(same_sample_twice, {
 floe.add_region(same_sample_twice, {
     file = {
         root_key = 60,
-        path = "samples/a.flac",
+        path = "Samples/a.flac",
     },
     trigger_criteria = {
         trigger_event = "note-on",
@@ -65,7 +65,7 @@ local auto_mapped_samples = floe.new_instrument(library, {
     folders = "Folder",
     description = "Description",
     tags = {},
-    waveform_audio_path = "samples/a.flac",
+    waveform_audio_path = "Samples/a.flac",
 })
 local auto_map_config = {
     {
@@ -89,7 +89,7 @@ for _, config in pairs(auto_map_config) do
     floe.add_region(auto_mapped_samples, {
         file = {
             root_key = config.root,
-            path = "samples/" .. config.file .. ".flac",
+            path = "Samples/" .. config.file .. ".flac",
         },
         trigger_criteria = {
             trigger_event = "note-on",

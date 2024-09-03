@@ -30,24 +30,24 @@ class [[nodiscard]] Optional<Type> {
     constexpr Optional(Type const& v) : value {v}, has_value {true} {}
     constexpr ~Optional() = default;
 
-    constexpr Optional(Optional const& other) : has_value {other.has_value} {
-        if (other.has_value) {
-            if constexpr (!TriviallyCopyAssignable<Type>)
-                PLACEMENT_NEW(&value) Type(other.value);
-            else
-                value = other.value;
-        }
+    constexpr Optional(Optional&& other) = default;
+    constexpr Optional& operator=(Optional&& other) = default;
+
+    constexpr Optional(Optional const& other) requires(TriviallyCopyAssignable<Type>)
+    = default;
+    constexpr Optional& operator=(Optional const& other) requires(TriviallyCopyAssignable<Type>)
+    = default;
+
+    constexpr Optional(Optional const& other) requires(!TriviallyCopyAssignable<Type>)
+        : has_value {other.has_value} {
+        if (other.has_value) PLACEMENT_NEW(&value) Type(other.value);
     }
 
-    constexpr Optional& operator=(Optional const& other) {
+    constexpr Optional& operator=(Optional const& other) requires(!TriviallyCopyAssignable<Type>)
+    {
         if (this != &other) {
             has_value = other.has_value;
-            if (other.has_value) {
-                if constexpr (!TriviallyCopyAssignable<Type>)
-                    PLACEMENT_NEW(&value) Type(other.value);
-                else
-                    value = other.value;
-            }
+            if (other.has_value) PLACEMENT_NEW(&value) Type(other.value);
         }
         return *this;
     }

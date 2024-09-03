@@ -201,19 +201,9 @@ ErrorCodeOr<void> WindowsSetFileAttributes(String path, Optional<WindowsFileAttr
 }
 
 static bool CreateDirectoryWithAttributes(WCHAR* path, DWORD attributes) {
-    HANDLE handle = CreateFileW(path,
-                                GENERIC_READ | GENERIC_WRITE,
-                                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                                nullptr,
-                                CREATE_NEW,
-                                FILE_FLAG_BACKUP_SEMANTICS | attributes,
-                                nullptr);
-
-    if (handle != INVALID_HANDLE_VALUE) {
-        CloseHandle(handle);
-        return true;
-    }
-    return false;
+    if (!CreateDirectoryW(path, nullptr)) return false;
+    SetFileAttributesW(path, attributes);
+    return true;
 }
 
 static DWORD AttributesForDir(WCHAR* path, usize path_size, CreateDirectoryOptions options) {
@@ -221,7 +211,7 @@ static DWORD AttributesForDir(WCHAR* path, usize path_size, CreateDirectoryOptio
     ASSERT(path);
     ASSERT(path[path_size] == L'\0');
 
-    DWORD attributes = {};
+    DWORD attributes = 0;
     if (options.win32_hide_dirs_starting_with_dot) {
         usize last_slash = 0;
         for (usize i = path_size - 1; i != usize(-1); --i)
@@ -232,7 +222,7 @@ static DWORD AttributesForDir(WCHAR* path, usize path_size, CreateDirectoryOptio
         if (last_slash + 1 < path_size && path[last_slash + 1] == L'.') attributes |= FILE_ATTRIBUTE_HIDDEN;
     }
 
-    return attributes;
+    return attributes ? attributes : FILE_ATTRIBUTE_NORMAL;
 }
 
 ErrorCodeOr<void> CreateDirectory(String path, CreateDirectoryOptions options) {

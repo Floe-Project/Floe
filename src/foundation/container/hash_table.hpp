@@ -9,12 +9,17 @@
 #pragma once
 #include "foundation/memory/allocators.hpp"
 
+struct DummyValueType {};
+
+template <typename T>
+concept TriviallyCopyableOrDummy = TriviallyCopyable<T> || Same<DummyValueType, T>;
+
 template <TriviallyCopyable KeyType,
-          TriviallyCopyable ValueType,
+          TriviallyCopyableOrDummy ValueType,
           u64 (*k_hash_function)(KeyType) = Hash<KeyType>>
 struct HashTable {
     struct Element {
-        ValueType data {};
+        [[no_unique_address]] ValueType data {};
         KeyType key {};
         u64 hash {};
         bool active {};
@@ -29,7 +34,7 @@ struct HashTable {
         }
         struct Item {
             KeyType key;
-            ValueType* value_ptr;
+            [[no_unique_address]] ValueType* value_ptr;
         };
         Item operator*() const { return item; }
         Iterator& operator++() {
@@ -94,6 +99,8 @@ struct HashTable {
         return table;
     }
 
+    usize Capacity() const { return mask + 1; }
+
     void Free(Allocator& a) {
         auto element = Elements();
         if (element.size) a.Free(element.ToByteSpan());
@@ -105,6 +112,8 @@ struct HashTable {
     Span<Element> Elements() { return elems ? Span<Element> {elems, mask + 1} : Span<Element> {}; }
 
     ValueType* Find(KeyType key) const {
+        static_assert(!Same<ValueType, DummyValueType>,
+                      "HashTable::Find called on a set, use FindElement instead");
         Element* element = FindElement(key);
         if (!element) return nullptr;
         return &element->data;
@@ -223,7 +232,7 @@ struct HashTable {
 };
 
 template <TriviallyCopyable KeyType,
-          TriviallyCopyable ValueType,
+          TriviallyCopyableOrDummy ValueType,
           u64 (*k_hash_function)(KeyType) = Hash<KeyType>>
 struct DynamicHashTable {
     using Table = HashTable<KeyType, ValueType, k_hash_function>;
@@ -287,4 +296,40 @@ struct DynamicHashTable {
 
     Allocator& allocator;
     Table table {};
+};
+
+template <TriviallyCopyable KeyType, u64 (*k_hash_function)(KeyType) = Hash<KeyType>>
+struct Set : HashTable<KeyType, DummyValueType, k_hash_function> {
+    using Table = HashTable<KeyType, DummyValueType, k_hash_function>;
+
+    // delete methods that don't make sense for a set
+    bool InsertWithoutGrowing(KeyType key, DummyValueType) = delete;
+    bool InsertGrowIfNeeded(Allocator& allocator, KeyType key, DummyValueType) = delete;
+    DummyValueType* Find(KeyType key) const = delete;
+
+    // replace with methods that make sense for a set
+    static Set Create(Allocator& a, usize size) { return Set {Table::Create(a, size)}; }
+    bool InsertWithoutGrowing(KeyType key) { return Table::InsertWithoutGrowing(key, {}); }
+    // allocator must be the same as created this table
+    bool InsertGrowIfNeeded(Allocator& allocator, KeyType key) {
+        return Table::InsertGrowIfNeeded(allocator, key, {});
+    }
+    bool Contains(KeyType key) const { return this->FindElement(key); }
+};
+
+template <TriviallyCopyable KeyType, u64 (*k_hash_function)(KeyType) = Hash<KeyType>>
+struct DynamicSet : DynamicHashTable<KeyType, DummyValueType, k_hash_function> {
+    using Table = HashTable<KeyType, DummyValueType, k_hash_function>;
+
+    DynamicSet(Allocator& alloc, usize initial_capacity = 0)
+        : DynamicHashTable<KeyType, DummyValueType, k_hash_function>(alloc, initial_capacity) {}
+
+    bool Insert(KeyType key) {
+        return DynamicHashTable<KeyType, DummyValueType, k_hash_function>::Insert(key, {});
+    }
+
+    DummyValueType* Find(KeyType key) const = delete;
+    Table::Element* FindElement(KeyType key) const = delete;
+
+    bool Contains(KeyType key) const { return this->table.FindElement(key); }
 };

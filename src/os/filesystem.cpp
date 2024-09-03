@@ -3,6 +3,7 @@
 
 #include "filesystem.hpp"
 
+#include <cerrno>
 #include <errno.h>
 
 #include "foundation/foundation.hpp"
@@ -21,6 +22,10 @@ static constexpr ErrorCodeCategory k_fp_error_category {
                 case FilesystemError::PathIsAsDirectory: return "Path is a folder";
                 case FilesystemError::PathAlreadyExists: return "Path already exists";
                 case FilesystemError::FileWatcherCreationFailed: return "File watcher creation failed";
+                case FilesystemError::FilesystemBusy: return "Filesystem is busy";
+                case FilesystemError::DiskFull: return "Disk is full";
+                case FilesystemError::DifferentFilesystems: return "Paths are on different filesystems";
+                case FilesystemError::NotEmpty: return "Folder is not empty";
                 case FilesystemError::Count: break;
             }
             return "";
@@ -35,6 +40,7 @@ static constexpr Optional<FilesystemError> TranslateErrnoCode(s64 ec) {
     switch (ec) {
         case ENOENT: return FilesystemError::PathDoesNotExist;
         case ENFILE: return FilesystemError::TooManyFilesOpen;
+        case EROFS: // read-only
         case EACCES:
         case EPERM: {
             // POSIX defines EACCES as "an attempt was made to access a file in a way forbidden by its file
@@ -43,6 +49,13 @@ static constexpr Optional<FilesystemError> TranslateErrnoCode(s64 ec) {
             // so similar that I think we will just consider them the same.
             return FilesystemError::AccessDenied;
         }
+        case EBUSY: return FilesystemError::FilesystemBusy;
+#ifdef EDQUOT
+        case EDQUOT: return FilesystemError::DiskFull;
+#endif
+        case ENOSPC: return FilesystemError::DiskFull;
+        case EXDEV: return FilesystemError::DifferentFilesystems;
+        case ENOTEMPTY: return FilesystemError::NotEmpty;
     }
     return {};
 }

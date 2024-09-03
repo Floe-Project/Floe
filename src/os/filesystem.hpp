@@ -13,6 +13,10 @@ enum class FilesystemError : u32 {
     PathIsAFile,
     PathIsAsDirectory,
     FileWatcherCreationFailed,
+    FilesystemBusy,
+    DiskFull,
+    DifferentFilesystems,
+    NotEmpty,
     Count,
 };
 

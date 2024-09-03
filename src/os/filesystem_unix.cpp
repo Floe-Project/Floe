@@ -23,7 +23,13 @@ ErrorCodeOr<void> Rename(String from, String to) {
     PathArena temp_path_allocator;
     auto const result =
         rename(NullTerminated(from, temp_path_allocator), NullTerminated(to, temp_path_allocator));
-    if (result != 0) return FilesystemErrnoErrorCode(errno, "rename");
+    if (result != 0) {
+        switch (result) {
+            case EINVAL:
+            case EFAULT: PanicIfReached();
+        }
+        return FilesystemErrnoErrorCode(errno, "rename");
+    }
     return k_success;
 }
 

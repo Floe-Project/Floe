@@ -282,7 +282,6 @@ static void SignalHandler(int signal_num, siginfo_t* info, void* context) {
 
             Writer writer {};
             writer.SetContained<int>(fd, [](int fd, Span<u8 const> bytes) -> ErrorCodeOr<void> {
-                auto _ = StdPrint(k_signal_output_stream, "Writing to file\n");
                 auto const num_written = write(fd, bytes.data, bytes.size);
                 if (num_written < 0) return ErrnoErrorCode(errno, "write");
                 return k_success;

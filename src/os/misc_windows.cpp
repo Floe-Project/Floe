@@ -291,7 +291,7 @@ static constexpr ErrorCodeCategory k_error_category {
             FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
                            nullptr,
                            (DWORD)code.code,
-                           MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_UK),
+                           MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US),
                            buf,
                            (DWORD)ArraySize(buf),
                            nullptr);

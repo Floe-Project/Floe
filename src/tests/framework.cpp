@@ -100,12 +100,21 @@ void* CreateOrFetchFixturePointer(Tester& tester,
     return tester.fixture_pointer;
 }
 
-int RunAllTests(Tester& tester, Optional<String> filter_pattern) {
+int RunAllTests(Tester& tester, Span<String> filter_patterns) {
     g_cli_out.Info({}, "Running tests ...");
     Stopwatch const overall_stopwatch;
 
     for (auto& test_case : tester.test_cases) {
-        if (filter_pattern && !MatchWildcard(*filter_pattern, test_case.title)) continue;
+        if (filter_patterns.size) {
+            bool matches_any_pattern = false;
+            for (auto const& pattern : filter_patterns) {
+                if (MatchWildcard(pattern, test_case.title)) {
+                    matches_any_pattern = true;
+                    break;
+                }
+            }
+            if (!matches_any_pattern) continue;
+        }
 
         tester.current_test_case = &test_case;
         tester.log.Debug({}, "Running ...");
@@ -136,8 +145,7 @@ int RunAllTests(Tester& tester, Optional<String> filter_pattern) {
                         tester.log.Info({}, "Stacktrace:\n{}", str);
                     }
                 }
-            } catch (TestFailed const& e) {
-                (void)e;
+            } catch (TestFailed const& _) {
             } catch (...) {
                 tester.should_reenter = false;
                 tester.current_test_case->failed = true;

@@ -87,7 +87,7 @@ ErrorCodeOr<int> Main(ArgsCstr args) {
             .description = "Wildcard pattern to filter tests by name",
             .value_type = "pattern",
             .required = false,
-            .num_values = 1,
+            .num_values = -1,
         },
         {
             .id = (u32)CommandLineArgId::LogLevel,
@@ -99,8 +99,9 @@ ErrorCodeOr<int> Main(ArgsCstr args) {
         },
     });
 
+    ArenaAllocatorWithInlineStorage<1000> arena;
     auto const cli_args = TRY(ParseCommandLineArgs(StdWriter(g_cli_out.stream),
-                                                   tester.scratch_arena,
+                                                   arena,
                                                    args,
                                                    k_cli_arg_defs,
                                                    {
@@ -110,8 +111,6 @@ ErrorCodeOr<int> Main(ArgsCstr args) {
 
     TRY(SetLogLevel(tester, cli_args[ToInt(CommandLineArgId::LogLevel)].Value()));
 
-    auto const filter_pattern = cli_args[ToInt(CommandLineArgId::Filter)].Value();
-
     // Register the test functions
 #define X(fn) fn(tester);
     TEST_REGISTER_FUNCTIONS
@@ -120,7 +119,7 @@ ErrorCodeOr<int> Main(ArgsCstr args) {
 #endif
 #undef X
 
-    return RunAllTests(tester, filter_pattern);
+    return RunAllTests(tester, cli_args[ToInt(CommandLineArgId::Filter)].values);
 }
 
 int main(int argc, char** argv) {

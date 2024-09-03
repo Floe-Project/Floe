@@ -153,7 +153,7 @@ struct Tester {
 };
 
 void RegisterTest(Tester& tester, TestFunction f, String title);
-int RunAllTests(Tester& tester, Optional<String> filter_pattern = {});
+int RunAllTests(Tester& tester, Span<String> filter_patterns);
 void Check(Tester& tester,
            bool expression,
            String message,

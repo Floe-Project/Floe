@@ -34,7 +34,8 @@ struct HashTable {
         }
         struct Item {
             KeyType key;
-            [[no_unique_address]] ValueType* value_ptr;
+            [[no_unique_address]] Conditional<Same<DummyValueType, ValueType>, DummyValueType, ValueType*>
+                value_ptr;
         };
         Item operator*() const { return item; }
         Iterator& operator++() {
@@ -43,7 +44,7 @@ struct HashTable {
                 auto& element = table.elems[index];
                 if (element.active) {
                     item.key = element.key;
-                    item.value_ptr = &element.data;
+                    if constexpr (!Same<DummyValueType, ValueType>) item.value_ptr = &element.data;
                     break;
                 }
             }
@@ -272,7 +273,7 @@ struct DynamicHashTable {
     }
 
     // table must have been created with allocator
-    static constexpr DynamicHashTable FromOwnedSpan(Table table, Allocator& allocator) {
+    static constexpr DynamicHashTable FromOwnedTable(Table table, Allocator& allocator) {
         DynamicHashTable result {allocator};
         result.table = table;
         return result;
@@ -319,7 +320,7 @@ struct Set : HashTable<KeyType, DummyValueType, k_hash_function> {
 
 template <TriviallyCopyable KeyType, u64 (*k_hash_function)(KeyType) = Hash<KeyType>>
 struct DynamicSet : DynamicHashTable<KeyType, DummyValueType, k_hash_function> {
-    using Table = HashTable<KeyType, DummyValueType, k_hash_function>;
+    using Set = Set<KeyType, k_hash_function>;
 
     DynamicSet(Allocator& alloc, usize initial_capacity = 0)
         : DynamicHashTable<KeyType, DummyValueType, k_hash_function>(alloc, initial_capacity) {}
@@ -328,8 +329,14 @@ struct DynamicSet : DynamicHashTable<KeyType, DummyValueType, k_hash_function> {
         return DynamicHashTable<KeyType, DummyValueType, k_hash_function>::Insert(key, {});
     }
 
+    Set ToOwnedSet() {
+        auto result = this->table;
+        this->table = {};
+        return result;
+    }
+
     DummyValueType* Find(KeyType key) const = delete;
-    Table::Element* FindElement(KeyType key) const = delete;
+    Set::Element* FindElement(KeyType key) const = delete;
 
     bool Contains(KeyType key) const { return this->table.FindElement(key); }
 };

@@ -83,38 +83,52 @@ static ErrorCodeOr<void> ReadTestPackage(tests::Tester& tester, Span<u8 const> z
                     TRY(CreateDirectory(dest_dir, {.create_intermediate_directories = false}));
                     DEFER { auto _ = Delete(dest_dir, {.type = DeleteOptions::Type::DirectoryRecursively}); };
 
-                    BufferLogger logger {tester.scratch_arena};
+                    BufferLogger error_log {tester.scratch_arena};
 
-                    auto opt_error = package::ReaderExtractFolder(package,
-                                                                  folder->path,
-                                                                  dest_dir,
-                                                                  tester.scratch_arena,
-                                                                  logger,
-                                                                  false);
-                    if (opt_error.HasValue()) return ErrorCode {*opt_error};
+                    {
+                        auto const extract_result = package::ReaderExtractFolder(package,
+                                                                                 folder->path,
+                                                                                 dest_dir,
+                                                                                 tester.scratch_arena,
+                                                                                 error_log,
+                                                                                 false);
+                        if (extract_result.HasError()) return ErrorCode {extract_result.Error()};
+                        CHECK(error_log.buffer.size == 0);
+                    }
 
                     // We should fail when the folder is not empty
-                    CHECK(package::ReaderExtractFolder(package,
-                                                       folder->path,
-                                                       dest_dir,
-                                                       tester.scratch_arena,
-                                                       logger,
-                                                       false) == package::PackageError::NotEmpty);
+                    {
+                        auto const extract_result = package::ReaderExtractFolder(package,
+                                                                                 folder->path,
+                                                                                 dest_dir,
+                                                                                 tester.scratch_arena,
+                                                                                 error_log,
+                                                                                 false);
+                        REQUIRE(extract_result.HasError());
+                        CHECK(extract_result.Error() == package::PackageError::NotEmpty);
+                        CHECK(error_log.buffer.size > 0);
+                        tester.log.Info({}, "Expected error log: {}", error_log.buffer);
+                        dyn::Clear(error_log.buffer);
+                    }
 
                     // we should succeed when we allow overwriting
-                    opt_error = package::ReaderExtractFolder(package,
-                                                             folder->path,
-                                                             dest_dir,
-                                                             tester.scratch_arena,
-                                                             logger,
-                                                             true);
-                    if (opt_error.HasValue()) return ErrorCode {*opt_error};
+                    {
+                        auto const extract_result = package::ReaderExtractFolder(package,
+                                                                                 folder->path,
+                                                                                 dest_dir,
+                                                                                 tester.scratch_arena,
+                                                                                 error_log,
+                                                                                 true);
+                        if (extract_result.HasError()) return ErrorCode {extract_result.Error()};
+                        CHECK(error_log.buffer.size == 0);
+                    }
 
+                    // check that the installed checksums are correct
                     auto const final_name =
                         path::Join(tester.scratch_arena, Array {dest_dir, path::Filename(folder->path)});
                     auto const final_differs = TRY(FolderDiffersFromChecksumValues(final_name,
                                                                                    folder->checksum_values,
-                                                                                   logger,
+                                                                                   error_log,
                                                                                    tester.scratch_arena));
                     CHECK(!final_differs);
                 }

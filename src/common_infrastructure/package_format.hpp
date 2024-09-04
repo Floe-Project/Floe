@@ -589,12 +589,12 @@ struct PackageFolderIterator {
 // Extracts to a temp folder than then renames to the final location. This ensures we either fail or succeed,
 // with no inbetween cases where the folder is partially extracted. Additionally, it doesn't generate lots of
 // filesystem-change notifications which Floe might try to process and fail on.
-PUBLIC Optional<PackageError> ReaderExtractFolder(PackageReader& package,
-                                                  String dir_in_zip,
-                                                  String destination_folder,
-                                                  ArenaAllocator& scratch_arena,
-                                                  Logger& error_log,
-                                                  bool overwrite_existing_files) {
+PUBLIC VoidOrError<PackageError> ReaderExtractFolder(PackageReader& package,
+                                                     String dir_in_zip,
+                                                     String destination_folder,
+                                                     ArenaAllocator& scratch_arena,
+                                                     Logger& error_log,
+                                                     bool overwrite_existing_files) {
     // We don't use the system temp folder because we want to do an atomic rename to the final location which
     // only works if 2 folders are on the same filesystem. By using a temp folder in the same location as the
     // destination folder we ensure that.
@@ -679,7 +679,7 @@ PUBLIC Optional<PackageError> ReaderExtractFolder(PackageReader& package,
         return PackageError::FilesystemError;
     }
 
-    return k_nullopt;
+    return k_success;
 }
 
 } // namespace package

@@ -654,9 +654,8 @@ PUBLIC ErrorCodeOr<DestinationFolderStatus> CheckDestinationFolder(String destin
 
     auto const checksum_file_path =
         path::Join(scratch_arena, Array {destination_folder_path, k_checksums_file});
-    if (auto const file_data_outcome = ReadEntireFile(checksum_file_path, scratch_arena);
-        !file_data_outcome.HasError()) {
-        auto const file_data = file_data_outcome.Value();
+    if (auto const o = ReadEntireFile(checksum_file_path, scratch_arena); !o.HasError()) {
+        auto const file_data = o.Value();
         auto const stored_checksums = ParseChecksumFile(file_data, scratch_arena);
         if (stored_checksums.HasValue()) {
             result.changed_since_originally_installed =
@@ -681,15 +680,6 @@ PUBLIC VoidOrError<PackageError> ReaderExtractFolder(PackageReader& package,
                                                      ArenaAllocator& scratch_arena,
                                                      Logger& error_log,
                                                      bool overwrite_existing_files) {
-    auto const zip_folder_checksums = ({
-        auto const o = detail::ReaderChecksumValuesForDir(package, folder.path, scratch_arena);
-        if (o.HasError()) return detail::CreatePackageError(error_log, o.Error());
-        o.Value();
-    });
-
-    auto const destination_folder_path =
-        path::Join(scratch_arena, Array {destination_folder, path::Filename(folder.path)});
-
     // We don't use the system temp folder because we want to do an atomic rename to the final location which
     // only works if 2 folders are on the same filesystem. By using a temp folder in the same location as the
     // destination folder we ensure that.
@@ -713,10 +703,13 @@ PUBLIC VoidOrError<PackageError> ReaderExtractFolder(PackageReader& package,
     };
 
     if (auto const o =
-            detail::ExtractFolder(package, folder.path, temp_folder, scratch_arena, zip_folder_checksums);
+            detail::ExtractFolder(package, folder.path, temp_folder, scratch_arena, folder.checksum_values);
         o.HasError()) {
         return detail::CreatePackageError(error_log, o.Error(), "in folder: {}", temp_folder);
     }
+
+    auto const destination_folder_path =
+        path::Join(scratch_arena, Array {destination_folder, path::Filename(folder.path)});
 
     if (auto const rename_o = Rename(temp_folder, destination_folder_path); rename_o.HasError()) {
         if (overwrite_existing_files && rename_o.Error() == FilesystemError::NotEmpty) {

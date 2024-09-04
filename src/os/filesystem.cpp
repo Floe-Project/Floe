@@ -69,7 +69,7 @@ ErrorCode FilesystemErrnoErrorCode(s64 error_code, char const* extra_debug_info,
 ErrorCodeOr<MutableString>
 KnownDirectoryWithSubdirectories(Allocator& a, KnownDirectoryType type, Span<String const> subdirectories) {
     ASSERT(subdirectories.size);
-    auto path = DynamicArray<char>::FromOwnedSpan(TRY(KnownDirectory(a, type)), a);
+    auto path = DynamicArray<char>::FromOwnedSpan(TRY(KnownDirectory(a, type, true)), a);
     path::JoinAppend(path, subdirectories);
     TRY(CreateDirectory(path, {.create_intermediate_directories = true, .fail_if_exists = false}));
     return path.ToOwnedSpan();

@@ -149,34 +149,34 @@ ErrorCodeOr<void> CreateDirectory(String path, CreateDirectoryOptions options) {
 }
 
 static ErrorCodeOr<MutableString>
-OSXGetSystemFilepath(Allocator& a, NSSearchPathDirectory type, NSSearchPathDomainMask domain) {
+OSXGetSystemFilepath(Allocator& a, NSSearchPathDirectory type, NSSearchPathDomainMask domain, bool create) {
     NSError* error = nil;
     auto url = [[NSFileManager defaultManager] URLForDirectory:type
                                                       inDomain:domain
                                              appropriateForURL:nullptr
-                                                        create:YES
+                                                        create:create
                                                          error:&error];
 
     if (url == nil) return FilesystemErrorFromNSError(error);
     return a.Clone(NSStringToString(url.path));
 }
 
-ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectoryType type) {
+ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectoryType type, bool create) {
     NSSearchPathDirectory osx_type {};
     NSSearchPathDomainMask domain {};
-    Optional<String> extra_subdirs {};
+    Span<String const> extra_subdirs {};
     Optional<String> fallback {};
     switch (type) {
         case KnownDirectoryType::Temporary: return a.Clone(NSStringToString(NSTemporaryDirectory()));
         case KnownDirectoryType::Logs:
             osx_type = NSLibraryDirectory;
             domain = NSUserDomainMask;
-            extra_subdirs = "Logs";
+            extra_subdirs = Array {"Logs"_s};
             break;
-        case KnownDirectoryType::PluginSettings:
+        case KnownDirectoryType::LegacyPluginSettings:
             osx_type = NSMusicDirectory;
             domain = NSUserDomainMask;
-            extra_subdirs = "Audio Music Apps/Plug-In Settings";
+            extra_subdirs = Array {"Audio Music Apps"_s, "Plug-In Settings"};
             break;
         case KnownDirectoryType::Documents:
             osx_type = NSDocumentDirectory;
@@ -186,42 +186,48 @@ ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectoryType type)
             osx_type = NSDownloadsDirectory;
             domain = NSUserDomainMask;
             break;
-        case KnownDirectoryType::Prefs:
+        case KnownDirectoryType::LegacyData:
             osx_type = NSApplicationSupportDirectory;
             domain = NSUserDomainMask;
             break;
-        case KnownDirectoryType::Data:
-            osx_type = NSApplicationSupportDirectory;
-            domain = NSUserDomainMask;
-            break;
-        case KnownDirectoryType::AllUsersData:
+        case KnownDirectoryType::LegacyAllUsersData:
             osx_type = NSApplicationSupportDirectory;
             domain = NSLocalDomainMask;
             fallback = "/Library/Application Support";
             break;
-        case KnownDirectoryType::AllUsersSettings:
+        case KnownDirectoryType::LegacyAllUsersSettings:
             osx_type = NSApplicationSupportDirectory;
             domain = NSLocalDomainMask;
             fallback = "/Library/Application Support";
             break;
-        case KnownDirectoryType::ClapPlugin:
+        case KnownDirectoryType::GlobalVst3Plugins:
             osx_type = NSLibraryDirectory;
             domain = NSLocalDomainMask;
-            extra_subdirs = "Audio/Plug-Ins/CLAP";
+            extra_subdirs = Array {"Audio"_s, "Plug-Ins", "VST3"};
             fallback = "/Library";
             break;
-        case KnownDirectoryType::Vst3Plugin:
+        case KnownDirectoryType::UserVst3Plugins:
+            osx_type = NSLibraryDirectory;
+            domain = NSUserDomainMask;
+            extra_subdirs = Array {"Audio"_s, "Plug-Ins", "VST3"};
+            break;
+        case KnownDirectoryType::GlobalClapPlugins:
             osx_type = NSLibraryDirectory;
             domain = NSLocalDomainMask;
-            extra_subdirs = "Audio/Plug-Ins/VST3";
+            extra_subdirs = Array {"Audio"_s, "Plug-Ins", "CLAP"};
             fallback = "/Library";
+            break;
+        case KnownDirectoryType::UserClapPlugins:
+            osx_type = NSLibraryDirectory;
+            domain = NSUserDomainMask;
+            extra_subdirs = Array {"Audio"_s, "Plug-Ins", "CLAP"};
             break;
         case KnownDirectoryType::Count: PanicIfReached();
     }
 
     auto path = ({
         MutableString p {};
-        if (auto outcome = OSXGetSystemFilepath(a, osx_type, domain); outcome.HasError())
+        if (auto outcome = OSXGetSystemFilepath(a, osx_type, domain, create); outcome.HasError())
             if (!fallback)
                 return outcome.Error();
             else
@@ -231,9 +237,14 @@ ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectoryType type)
         p;
     });
 
-    if (extra_subdirs) {
+    if (extra_subdirs.size) {
         auto p = DynamicArray<char>::FromOwnedSpan(path, a);
-        path::JoinAppend(p, *extra_subdirs);
+        for (auto const subdir : extra_subdirs) {
+            dyn::Append(p, '/');
+            dyn::AppendSpan(p, subdir);
+            if (create)
+                TRY(CreateDirectory(p, {.create_intermediate_directories = false, .fail_if_exists = false}));
+        }
         path = p.ToOwnedSpan();
     }
 

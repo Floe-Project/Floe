@@ -133,31 +133,38 @@ ErrorCodeOr<void> ReadSectionOfFileAndWriteToOtherFile(File& file_to_read_from,
 using PathArena = ArenaAllocatorWithInlineStorage<2000>;
 
 enum class KnownDirectoryType : u8 {
-    Logs,
-    Prefs,
-    AllUsersData,
     Documents,
-    PluginSettings,
-    AllUsersSettings,
-    Data,
     Downloads,
-    ClapPlugin,
-    Vst3Plugin,
+    Logs,
     Temporary,
+
+    // TODO:
+    // UserSettings
+    // UserPresets
+    // UserLibraries
+    // is ~/Library/Audio/Presets/ needed on macos because of sandboxing?
+
+    GlobalVst3Plugins,
+    UserVst3Plugins,
+    GlobalClapPlugins,
+    UserClapPlugins,
+
+    LegacyAllUsersData,
+    LegacyAllUsersSettings,
+    LegacyData,
+    LegacyPluginSettings,
+
     Count,
 };
 
-// Does not create the directory, just retreives from the OS
-ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectoryType type);
+ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectoryType type, bool create);
 
 // Creates the directory along with the subdirectories if they don't exist
 ErrorCodeOr<MutableString>
 KnownDirectoryWithSubdirectories(Allocator& a, KnownDirectoryType type, Span<String const> subdirectories);
 
-// Higher-level functions: returns a Floe-specific path. Might be a KnownDirectory with a 'Floe' subdirectory.
-enum class FloeKnownDirectoryType {
-    Logs,
-};
+// Returns a Floe-specific path. Might be a KnownDirectory with a 'Floe' subdirectory. Creates the dir.
+enum class FloeKnownDirectoryType { Logs };
 ErrorCodeOr<MutableString> FloeKnownDirectory(Allocator& a, FloeKnownDirectoryType type);
 
 enum class FileType { File, Directory };

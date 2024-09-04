@@ -334,7 +334,7 @@ Application* CreateApplication(GuiFramework& framework, u32 root_layout_id) {
             .install_dir = ({
                 String p;
                 if (info.install_dir)
-                    p = KnownDirectory(app->arena, *info.install_dir)
+                    p = KnownDirectory(app->arena, *info.install_dir, true)
                             .ValueOr(app->arena.Clone(info.install_dir_fallback));
                 else {
                     ASSERT(info.resource_id == CORE_LIBRARY_RC_ID);

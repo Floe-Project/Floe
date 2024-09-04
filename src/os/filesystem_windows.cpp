@@ -181,9 +181,10 @@ struct Win32KnownPath {
 };
 
 // Does not contain a trailing backslash
-static ErrorCodeOr<Win32KnownPath> Win32GetKnownFilepath(GUID folder_id) {
+static ErrorCodeOr<Win32KnownPath> Win32GetKnownFilepath(GUID folder_id, bool create) {
     PWSTR wide_file_path = nullptr;
-    auto hr = SHGetKnownFolderPath(folder_id, KF_FLAG_CREATE, nullptr, &wide_file_path);
+    auto hr =
+        SHGetKnownFolderPath(folder_id, create ? KF_FLAG_CREATE : KF_FLAG_DEFAULT, nullptr, &wide_file_path);
     if (hr != S_OK) {
         // The API says it should be freed regardless of if SHGetKnownFolderPath succeeded
         CoTaskMemFree(wide_file_path);
@@ -326,9 +327,9 @@ ErrorCodeOr<DynamicArrayBounded<char, 200>> NameOfRunningExecutableOrLibrary() {
     return String {path::Filename(full_path)};
 }
 
-ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectoryType type) {
+ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectoryType type, bool create) {
     GUID folder_id {};
-    Optional<String> subfolder {};
+    Span<WString const> subfolders {};
     switch (type) {
         case KnownDirectoryType::Temporary: {
             WCHAR buffer[MAX_PATH + 1];
@@ -343,33 +344,52 @@ ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectoryType type)
             ASSERT(path::IsAbsolute(result));
             return result;
         }
-        case KnownDirectoryType::AllUsersData: folder_id = FOLDERID_Public; break;
-        case KnownDirectoryType::AllUsersSettings: folder_id = FOLDERID_ProgramData; break;
-        case KnownDirectoryType::PluginSettings:
-        case KnownDirectoryType::Data: folder_id = FOLDERID_RoamingAppData; break;
-        case KnownDirectoryType::Prefs: folder_id = FOLDERID_LocalAppData; break;
+        case KnownDirectoryType::LegacyAllUsersData: folder_id = FOLDERID_Public; break;
+        case KnownDirectoryType::LegacyAllUsersSettings: folder_id = FOLDERID_ProgramData; break;
+        case KnownDirectoryType::LegacyPluginSettings: folder_id = FOLDERID_RoamingAppData; break;
+        case KnownDirectoryType::LegacyData: folder_id = FOLDERID_RoamingAppData; break;
         case KnownDirectoryType::Logs: folder_id = FOLDERID_LocalAppData; break;
         case KnownDirectoryType::Documents: folder_id = FOLDERID_Documents; break;
         case KnownDirectoryType::Downloads: folder_id = FOLDERID_Downloads; break;
-        case KnownDirectoryType::ClapPlugin:
+        case KnownDirectoryType::GlobalClapPlugins:
             folder_id = FOLDERID_ProgramFilesCommon;
-            subfolder = "CLAP";
+            subfolders = Array {L"CLAP"_s};
             break;
-        case KnownDirectoryType::Vst3Plugin:
+        case KnownDirectoryType::UserClapPlugins:
+            folder_id = FOLDERID_LocalAppData;
+            subfolders = Array {L"CLAP"_s};
+            break;
+        case KnownDirectoryType::GlobalVst3Plugins:
             folder_id = FOLDERID_ProgramFilesCommon;
-            subfolder = "VST3";
+            subfolders = Array {L"VST3"_s};
+            break;
+        case KnownDirectoryType::UserVst3Plugins:
+            folder_id = IsRunningUnderWine() ? FOLDERID_LocalAppData : FOLDERID_UserProgramFilesCommon;
+            subfolders = Array {L"VST3"_s};
             break;
         case KnownDirectoryType::Count: PanicIfReached(); break;
     }
 
-    auto const wide_path = TRY(Win32GetKnownFilepath(folder_id));
-    auto result = Narrow(a, wide_path.path).Value();
+    // NOTE: Not all KNOWNFOLDERID values are present on all systems. We might get a E_INVALIDARG
+    auto const wide_path = TRY(Win32GetKnownFilepath(folder_id, create));
 
-    if (subfolder) {
-        auto arr = DynamicArray<char>::FromOwnedSpan(result, a);
-        dyn::Append(arr, '\\');
-        dyn::AppendSpan(arr, *subfolder);
-        result = arr.ToOwnedSpan();
+    MutableString result;
+    if (subfolders.size) {
+        PathArena temp_path_arena;
+        DynamicArray<wchar_t> wide_result {wide_path.path, temp_path_arena};
+        for (auto const subfolder : subfolders) {
+            dyn::Append(wide_result, L'\\');
+            dyn::AppendSpan(wide_result, subfolder);
+            if (create) {
+                if (!CreateDirectoryW(wide_result.data, nullptr)) {
+                    auto const err = GetLastError();
+                    if (err != ERROR_ALREADY_EXISTS) return FilesystemWin32ErrorCode(err, "CreateDirectoryW");
+                }
+            }
+        }
+        result = Narrow(a, wide_result).Value();
+    } else {
+        result = Narrow(a, wide_path.path).Value();
     }
 
     ASSERT(!path::IsPathSeparator(Last(result)));

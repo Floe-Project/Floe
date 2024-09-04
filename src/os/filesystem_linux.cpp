@@ -193,24 +193,33 @@ ErrorCodeOr<void> CreateDirectory(String path, CreateDirectoryOptions options) {
     }
 }
 
-ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectoryType type) {
+ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectoryType type, bool create) {
     String rel_path;
     switch (type) {
         case KnownDirectoryType::Temporary: return a.Clone("/tmp"_s);
-        case KnownDirectoryType::AllUsersSettings:
-        case KnownDirectoryType::PluginSettings: rel_path = "~/.config"; break;
-        case KnownDirectoryType::AllUsersData: return a.Clone("/var/lib"_s);
+        case KnownDirectoryType::LegacyAllUsersSettings:
+        case KnownDirectoryType::LegacyPluginSettings: rel_path = "~/.config"; break;
+        case KnownDirectoryType::LegacyAllUsersData: return a.Clone("/var/lib"_s);
         case KnownDirectoryType::Documents: rel_path = "~/Documents"; break;
         case KnownDirectoryType::Downloads: rel_path = "~/Downloads"; break;
-        case KnownDirectoryType::Prefs: rel_path = "~/.config"; break;
-        case KnownDirectoryType::Data: rel_path = "~"; break;
+        case KnownDirectoryType::LegacyData: rel_path = "~"; break;
         case KnownDirectoryType::Logs: rel_path = "~/.local/state"; break;
-        case KnownDirectoryType::ClapPlugin: rel_path = "~/.clap"; break;
-        case KnownDirectoryType::Vst3Plugin: rel_path = "~/.vst3"; break;
+        case KnownDirectoryType::UserClapPlugins: rel_path = "~/.clap"; break;
+        case KnownDirectoryType::UserVst3Plugins: rel_path = "~/.vst3"; break;
+        case KnownDirectoryType::GlobalClapPlugins: return a.Clone("/usr/lib/clap"_s);
+        case KnownDirectoryType::GlobalVst3Plugins: return a.Clone("/usr/lib/vst3"_s);
         case KnownDirectoryType::Count: PanicIfReached();
     }
 
-    return TRY(CanonicalizePath(a, rel_path));
+    auto result = TRY(CanonicalizePath(a, rel_path));
+    if (create) {
+        TRY(CreateDirectory(result,
+                            {
+                                .create_intermediate_directories = true,
+                                .fail_if_exists = false,
+                            }));
+    }
+    return result;
 }
 
 ErrorCodeOr<DynamicArrayBounded<char, 200>> NameOfRunningExecutableOrLibrary() { return "unknown"_s; }

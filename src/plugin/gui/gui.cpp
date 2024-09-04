@@ -346,7 +346,7 @@ static void CreateFontsIfNeeded(Gui* g) {
 static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
     switch (type) {
         case DialogType::InstallPackage: {
-            auto downloads_folder = KnownDirectory(g->scratch_arena, KnownDirectoryType::Downloads);
+            auto downloads_folder = KnownDirectory(g->scratch_arena, KnownDirectoryType::Downloads, false);
 
             auto const paths = TRY(FilesystemDialog({
                 .type = DialogArguments::Type::OpenFile,

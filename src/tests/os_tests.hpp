@@ -143,7 +143,8 @@ TEST_CASE(TestFilesystem) {
     SUBCASE("DirectoryIterator") {
         SUBCASE("on an empty dir") {
             auto temp_dir =
-                DynamicArray<char>::FromOwnedSpan(TRY(KnownDirectory(a, KnownDirectoryType::Temporary)), a);
+                DynamicArray<char>::FromOwnedSpan(TRY(KnownDirectory(a, KnownDirectoryType::Temporary, true)),
+                                                  a);
             path::JoinAppend(temp_dir, "empty_dir"_s);
 
             TRY(CreateDirectory(temp_dir, {.create_intermediate_directories = true}));
@@ -239,7 +240,7 @@ TEST_CASE(TestFilesystem) {
     SUBCASE("KnownDirectory") {
         for (auto const i : Range(ToInt(KnownDirectoryType::Count))) {
             auto type = (KnownDirectoryType)i;
-            auto known_folder = KnownDirectory(a, type);
+            auto known_folder = KnownDirectory(a, type, false);
             String type_name = EnumToString(type);
             if (known_folder.HasValue()) {
                 DEFER { a.Free(known_folder.Value().ToByteSpan()); };

@@ -30,6 +30,11 @@ static constexpr Optional<FilesystemError> TranslateWin32Code(DWORD win32_code) 
         case ERROR_ACCESS_DENIED: return FilesystemError::AccessDenied;
         case ERROR_SHARING_VIOLATION: return FilesystemError::AccessDenied;
         case ERROR_ALREADY_EXISTS: return FilesystemError::PathAlreadyExists;
+        case ERROR_FILE_EXISTS: return FilesystemError::PathAlreadyExists;
+        case ERROR_NOT_SAME_DEVICE: return FilesystemError::DifferentFilesystems;
+        case ERROR_HANDLE_DISK_FULL: return FilesystemError::DiskFull;
+        case ERROR_PATH_BUSY: return FilesystemError::FilesystemBusy;
+        case ERROR_DIR_NOT_EMPTY: return FilesystemError::NotEmpty;
     }
     return {};
 }
@@ -520,18 +525,65 @@ ErrorCodeOr<void> CopyFile(String from, String to, ExistingDestinationHandling e
     ASSERT(path::IsAbsolute(to));
     PathArena temp_path_arena;
 
-    if (existing == ExistingDestinationHandling::Skip) {
-        // IMPROVE: not atomic
-        if (GetFileType(to).HasValue()) // IMPROVE: inefficient doing wide-text conversion again
-            return k_success;
-    }
-
-    if (CopyFileW(TRY(path::MakePathForWin32(from, temp_path_arena, true)).path.data,
-                  TRY(path::MakePathForWin32(to, temp_path_arena, true)).path.data,
-                  existing == ExistingDestinationHandling::Fail) == 0) {
-        return FilesystemWin32ErrorCode(GetLastError(), "CopyFileW");
+    auto const fail_if_exists = ({
+        BOOL f = TRUE;
+        switch (existing) {
+            case ExistingDestinationHandling::Fail: f = TRUE; break;
+            case ExistingDestinationHandling::Overwrite: f = FALSE; break;
+            case ExistingDestinationHandling::Skip: f = TRUE; break;
+        }
+        f;
+    });
+    auto const from_wide = TRY(path::MakePathForWin32(from, temp_path_arena, true)).path.data;
+    auto const to_wide = TRY(path::MakePathForWin32(to, temp_path_arena, true)).path.data;
+    if (!CopyFileW(from_wide, to_wide, fail_if_exists)) {
+        auto err = GetLastError();
+        if (err == ERROR_ACCESS_DENIED && existing == ExistingDestinationHandling::Overwrite) {
+            // "This function fails with ERROR_ACCESS_DENIED if the destination file already exists and has
+            // the FILE_ATTRIBUTE_HIDDEN or FILE_ATTRIBUTE_READONLY attribute set."
+            if (SetFileAttributesW(to_wide, FILE_ATTRIBUTE_NORMAL)) {
+                if (CopyFileW(from_wide, to_wide, fail_if_exists)) return k_success;
+                err = GetLastError();
+            }
+        }
+        if (err == ERROR_FILE_EXISTS && existing == ExistingDestinationHandling::Skip) return k_success;
+        return FilesystemWin32ErrorCode(err, "CopyFileW");
     }
     return k_success;
+}
+
+// There's a function PathIsDirectoryEmptyW but it does not seem to support long paths, so we implement our
+// own.
+static bool PathIsANonEmptyDirectory(WString path) {
+    PathArena temp_path_arena;
+
+    WIN32_FIND_DATAW data {};
+    DynamicArray<wchar_t> search_path {path, temp_path_arena};
+    dyn::AppendSpan(search_path, L"\\*");
+    SetLastError(0);
+
+    auto handle = FindFirstFileW(dyn::NullTerminated(search_path), &data);
+    if (handle == INVALID_HANDLE_VALUE) return false; // Not a directory, or inaccessible
+    DEFER { FindClose(handle); };
+
+    if (GetLastError() == ERROR_FILE_NOT_FOUND) return false; // Empty directory
+
+    while (true) {
+        auto const file_name = FromNullTerminated(data.cFileName);
+        if (file_name != L"."_s && file_name != L".."_s) return true;
+        if (FindNextFileW(handle, &data)) {
+            continue;
+        } else {
+            if (GetLastError() == ERROR_NO_MORE_FILES) {
+                // Empty directory. If we made it here we can't have found any files since we 'return true' if
+                // anything was found
+                return false;
+            }
+            return false; // an error occurred, we can't determine if the directory is non-empty
+        }
+    }
+
+    return false;
 }
 
 ErrorCodeOr<void> Rename(String from, String to) {
@@ -539,9 +591,24 @@ ErrorCodeOr<void> Rename(String from, String to) {
     ASSERT(path::IsAbsolute(to));
     PathArena temp_path_arena;
 
-    if (MoveFileW(TRY(path::MakePathForWin32(from, temp_path_arena, true)).path.data,
-                  TRY(path::MakePathForWin32(to, temp_path_arena, true)).path.data) == 0) {
-        return FilesystemWin32ErrorCode(GetLastError(), "MoveFileW");
+    auto to_wide = TRY(path::MakePathForWin32(to, temp_path_arena, true)).path;
+
+    // Only succeeds if the destination is an empty directory. We do this to make Rename consistent across
+    // Windows and POSIX rename().
+    RemoveDirectoryW(to_wide.data);
+
+    if (!MoveFileWithProgressW(TRY(path::MakePathForWin32(from, temp_path_arena, true)).path.data,
+                               to_wide.data,
+                               nullptr,
+                               nullptr,
+                               MOVEFILE_REPLACE_EXISTING)) {
+        auto err = GetLastError();
+        if (err == ERROR_ACCESS_DENIED) {
+            // When the destination is a non-empty directory we don't get ERROR_DIR_NOT_EMPTY as we might
+            // expect, but instead ERROR_ACCESS_DENIED. Let's try and fix that.
+            if (PathIsANonEmptyDirectory(to_wide)) err = ERROR_DIR_NOT_EMPTY;
+        }
+        return FilesystemWin32ErrorCode(err, "MoveFileW");
     }
     return k_success;
 }

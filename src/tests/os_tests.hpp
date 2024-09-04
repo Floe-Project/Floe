@@ -287,45 +287,80 @@ TEST_CASE(TestFilesystem) {
         TRY(CreateDirectory(dir, {.create_intermediate_directories = false}));
         CHECK(TRY(GetFileType(dir)) == FileType::Directory);
         TRY(Delete(dir, {}));
-        return k_success;
     }
 
-    SUBCASE("Rename") {
-        auto const dir = String(path::Join(a, Array {tests::TempFolder(tester), "Rename test"}));
+    SUBCASE("relocate files") {
+        auto const dir = String(path::Join(a, Array {tests::TempFolder(tester), "Relocate files test"}));
         TRY(CreateDirectory(dir, {.create_intermediate_directories = false}));
         DEFER { auto _ = Delete(dir, {.type = DeleteOptions::Type::DirectoryRecursively}); };
 
-        auto const path1 = path::Join(a, Array {dir, "rename-test-path1"});
-        auto const path2 = path::Join(a, Array {dir, "rename-test-path2"});
+        auto const path1 = path::Join(a, Array {dir, "test-path1"});
+        auto const path2 = path::Join(a, Array {dir, "test-path2"});
 
-        SUBCASE("basic file rename") {
-            TRY(WriteFile(path1, "data"_s.ToByteSpan()));
-            TRY(Rename(path1, path2));
-            CHECK(TRY(GetFileType(path2)) == FileType::File);
-            CHECK(GetFileType(path1).HasError());
+        SUBCASE("Rename") {
+            SUBCASE("basic file rename") {
+                TRY(WriteFile(path1, "data"_s.ToByteSpan()));
+                TRY(Rename(path1, path2));
+                CHECK(TRY(GetFileType(path2)) == FileType::File);
+                CHECK(GetFileType(path1).HasError());
+            }
+
+            SUBCASE("file rename replaces existing") {
+                TRY(WriteFile(path1, "data1"_s.ToByteSpan()));
+                TRY(WriteFile(path2, "data2"_s.ToByteSpan()));
+                TRY(Rename(path1, path2));
+                CHECK(TRY(ReadEntireFile(path2, a)) == "data1"_s);
+                CHECK(GetFileType(path1).HasError());
+            }
+
+            SUBCASE("move dir") {
+                TRY(CreateDirectory(path1, {.create_intermediate_directories = false}));
+                TRY(Rename(path1, path2));
+                CHECK(TRY(GetFileType(path2)) == FileType::Directory);
+                CHECK(GetFileType(path1).HasError());
+            }
+
+            SUBCASE("move dir ok if new_name exists but is empty") {
+                TRY(CreateDirectory(path1, {.create_intermediate_directories = false}));
+                TRY(CreateDirectory(path2, {.create_intermediate_directories = false}));
+                TRY(Rename(path1, path2));
+                CHECK(TRY(GetFileType(path2)) == FileType::Directory);
+                CHECK(GetFileType(path1).HasError());
+            }
         }
 
-        SUBCASE("file rename replaces existing") {
-            TRY(WriteFile(path1, "data1"_s.ToByteSpan()));
-            TRY(WriteFile(path2, "data2"_s.ToByteSpan()));
-            TRY(Rename(path1, path2));
-            CHECK(TRY(ReadEntireFile(path2, a)) == "data1"_s);
-            CHECK(GetFileType(path1).HasError());
-        }
+        SUBCASE("CopyFile") {
+            SUBCASE("basic file copy") {
+                TRY(WriteFile(path1, "data"_s.ToByteSpan()));
+                TRY(CopyFile(path1, path2, ExistingDestinationHandling::Fail));
+            }
 
-        SUBCASE("move dir") {
-            TRY(CreateDirectory(path1, {.create_intermediate_directories = false}));
-            TRY(Rename(path1, path2));
-            CHECK(TRY(GetFileType(path2)) == FileType::Directory);
-            CHECK(GetFileType(path1).HasError());
-        }
+            SUBCASE("ExistingDesinationHandling") {
+                TRY(WriteFile(path1, "data1"_s.ToByteSpan()));
+                TRY(WriteFile(path2, "data2"_s.ToByteSpan()));
 
-        SUBCASE("move dir ok if new_name exists but is empty") {
-            TRY(CreateDirectory(path1, {.create_intermediate_directories = false}));
-            TRY(CreateDirectory(path2, {.create_intermediate_directories = false}));
-            TRY(Rename(path1, path2));
-            CHECK(TRY(GetFileType(path2)) == FileType::Directory);
-            CHECK(GetFileType(path1).HasError());
+                SUBCASE("ExistingDestinationHandling::Fail works") {
+                    auto const o = CopyFile(path1, path2, ExistingDestinationHandling::Fail);
+                    REQUIRE(o.HasError());
+                    CHECK(o.Error() == FilesystemError::PathAlreadyExists);
+                }
+
+                SUBCASE("ExistingDestinationHandling::Overwrite works") {
+                    TRY(CopyFile(path1, path2, ExistingDestinationHandling::Overwrite));
+                    CHECK(TRY(ReadEntireFile(path2, a)) == "data1"_s);
+                }
+
+                SUBCASE("ExistingDestinationHandling::Skip works") {
+                    TRY(CopyFile(path1, path2, ExistingDestinationHandling::Skip));
+                    CHECK(TRY(ReadEntireFile(path2, a)) == "data2"_s);
+                }
+
+                SUBCASE("Overwrite a hidden file") {
+                    TRY(WindowsSetFileAttributes(path2, WindowsFileAttributes {.hidden = true}));
+                    TRY(CopyFile(path1, path2, ExistingDestinationHandling::Overwrite));
+                    CHECK(TRY(ReadEntireFile(path2, a)) == "data1"_s);
+                }
+            }
         }
     }
 

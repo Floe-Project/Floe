@@ -561,7 +561,7 @@ struct DynamicArrayBounded {
         size = new_size;
     }
 
-    constexpr usize Capacity() const { return k_capacity; }
+    static constexpr usize Capacity() { return k_capacity; }
 
     struct Storage {
         PROPAGATE_TRIVIALLY_COPYABLE(Storage, Type);

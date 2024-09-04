@@ -48,20 +48,32 @@ static ErrorCodeOr<Span<u8 const>> WriteTestPackage(tests::Tester& tester) {
 
 static ErrorCodeOr<void> ReadTestPackage(tests::Tester& tester, Span<u8 const> zip_data) {
     auto reader = Reader::FromMemory(zip_data);
-    auto outcome = package::ReaderCreate(reader);
-    if (outcome.HasError()) {
-        tester.log.Error({}, "Failed to create package reader: {}", outcome.Error().message);
-        return outcome.Error().code;
-    }
-    auto package = outcome.ReleaseValue();
-    DEFER { package::ReaderDestroy(package); };
+    BufferLogger error_log {tester.scratch_arena};
 
-    package::PackageFolderIterator iterator {
-        .reader = package,
-    };
+    package::PackageReader package {reader};
+    auto outcome = package::ReaderInit(package, error_log);
+    if (outcome.HasError()) {
+        TEST_FAILED("Failed to create package reader: {}. error_log: {}",
+                    ErrorCode {outcome.Error()},
+                    error_log.buffer);
+    }
+    DEFER { package::ReaderDeinit(package); };
+
+    package::PackageFolderIteratorIndex iterator = 0;
 
     usize folders_found = 0;
-    while (auto const folder = TRY(iterator.Next(tester.scratch_arena))) {
+    while (true) {
+        auto const folder = ({
+            auto const o = package::IteratePackageFolders(package, iterator, tester.scratch_arena, error_log);
+            if (o.HasError()) {
+                TEST_FAILED("Failed to read package folder: {}, error_log: {}",
+                            ErrorCode {o.Error()},
+                            error_log.buffer);
+            }
+            o.ReleaseValue();
+        });
+        if (!folder) break;
+
         ++folders_found;
         switch (folder->type) {
             case package::SubfolderType::Libraries: {
@@ -69,25 +81,30 @@ static ErrorCodeOr<void> ReadTestPackage(tests::Tester& tester, Span<u8 const> z
                 auto const& lib = *folder->library;
                 CHECK_EQ(lib.name, "Test Lua"_s);
 
-                auto const differs = TRY(FolderDiffersFromChecksumValues(TestLibFolder(tester),
-                                                                         folder->checksum_values,
-                                                                         tester.log,
-                                                                         tester.scratch_arena));
-                CHECK(!differs);
-
                 // test extraction
                 {
                     auto const dest_dir =
                         String(path::Join(tester.scratch_arena,
                                           Array {tests::TempFolder(tester), "PackageExtract test"}));
+                    auto _ = Delete(dest_dir, {.type = DeleteOptions::Type::DirectoryRecursively});
                     TRY(CreateDirectory(dest_dir, {.create_intermediate_directories = false}));
                     DEFER { auto _ = Delete(dest_dir, {.type = DeleteOptions::Type::DirectoryRecursively}); };
 
-                    BufferLogger error_log {tester.scratch_arena};
+                    // Initially should be empty
+                    {
+                        auto const status = TRY(package::CheckDestinationFolder(dest_dir,
+                                                                                *folder,
+                                                                                tester.scratch_arena,
+                                                                                error_log));
+                        CHECK(!status.exists_and_contains_files);
+                        CHECK(!status.exactly_matches_zip);
+                        CHECK(status.changed_since_originally_installed == package::Tri::No);
+                    }
 
+                    // Initial extraction
                     {
                         auto const extract_result = package::ReaderExtractFolder(package,
-                                                                                 folder->path,
+                                                                                 *folder,
                                                                                  dest_dir,
                                                                                  tester.scratch_arena,
                                                                                  error_log,
@@ -96,10 +113,21 @@ static ErrorCodeOr<void> ReadTestPackage(tests::Tester& tester, Span<u8 const> z
                         CHECK(error_log.buffer.size == 0);
                     }
 
+                    // Check installed
+                    {
+                        auto const status = TRY(package::CheckDestinationFolder(dest_dir,
+                                                                                *folder,
+                                                                                tester.scratch_arena,
+                                                                                error_log));
+                        CHECK(status.exists_and_contains_files);
+                        CHECK(status.exactly_matches_zip);
+                        CHECK(status.changed_since_originally_installed == package::Tri::No);
+                    }
+
                     // We should fail when the folder is not empty
                     {
                         auto const extract_result = package::ReaderExtractFolder(package,
-                                                                                 folder->path,
+                                                                                 *folder,
                                                                                  dest_dir,
                                                                                  tester.scratch_arena,
                                                                                  error_log,
@@ -114,7 +142,7 @@ static ErrorCodeOr<void> ReadTestPackage(tests::Tester& tester, Span<u8 const> z
                     // we should succeed when we allow overwriting
                     {
                         auto const extract_result = package::ReaderExtractFolder(package,
-                                                                                 folder->path,
+                                                                                 *folder,
                                                                                  dest_dir,
                                                                                  tester.scratch_arena,
                                                                                  error_log,
@@ -123,14 +151,16 @@ static ErrorCodeOr<void> ReadTestPackage(tests::Tester& tester, Span<u8 const> z
                         CHECK(error_log.buffer.size == 0);
                     }
 
-                    // check that the installed checksums are correct
-                    auto const final_name =
-                        path::Join(tester.scratch_arena, Array {dest_dir, path::Filename(folder->path)});
-                    auto const final_differs = TRY(FolderDiffersFromChecksumValues(final_name,
-                                                                                   folder->checksum_values,
-                                                                                   error_log,
-                                                                                   tester.scratch_arena));
-                    CHECK(!final_differs);
+                    // Check installed again
+                    {
+                        auto const status = TRY(package::CheckDestinationFolder(dest_dir,
+                                                                                *folder,
+                                                                                tester.scratch_arena,
+                                                                                error_log));
+                        CHECK(status.exists_and_contains_files);
+                        CHECK(status.exactly_matches_zip);
+                        CHECK(status.changed_since_originally_installed == package::Tri::No);
+                    }
                 }
 
                 break;

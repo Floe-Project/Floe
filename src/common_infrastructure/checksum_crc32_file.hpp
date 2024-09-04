@@ -17,10 +17,13 @@ struct ChecksumValues {
 };
 
 struct ChecksumLine {
-    String path;
+    String path; // relative to the root of the folder, POSIX-style
     u32 crc32;
     usize file_size;
 };
+
+using ChecksumTable = HashTable<String, ChecksumValues>;
+using DynamicChecksumTable = DynamicHashTable<String, ChecksumValues>;
 
 // similar format to unix cksum - except cksum uses a different crc algorithm
 PUBLIC void AppendChecksumLine(DynamicArray<char>& buffer, ChecksumLine line) {
@@ -47,10 +50,8 @@ PUBLIC String SerialiseChecksumsValues(HashTable<String, ChecksumValues> checksu
     return buffer.ToOwnedSpan();
 }
 
-PUBLIC ErrorCodeOr<void> WriteChecksumsValuesToFile(String path,
-                                                    HashTable<String, ChecksumValues> checksum_values,
-                                                    Allocator& allocator,
-                                                    String comment) {
+PUBLIC ErrorCodeOr<void>
+WriteChecksumsValuesToFile(String path, ChecksumTable checksum_values, Allocator& allocator, String comment) {
     auto const data = SerialiseChecksumsValues(checksum_values, allocator, comment);
     TRY(WriteFile(path, data));
     return k_success;
@@ -102,8 +103,8 @@ PUBLIC u32 Crc32(Span<u8 const> data) {
     return CheckedCast<u32>(mz_crc32(MZ_CRC32_INIT, data.data, data.size));
 }
 
-PUBLIC ErrorCodeOr<HashTable<String, ChecksumValues>> ParseChecksumFile(String checksum_file_data,
-                                                                        ArenaAllocator& scratch_arena) {
+PUBLIC ErrorCodeOr<ChecksumTable> ParseChecksumFile(String checksum_file_data,
+                                                    ArenaAllocator& scratch_arena) {
     DynamicHashTable<String, ChecksumValues> checksum_values(scratch_arena);
     ChecksumFileParser parser {checksum_file_data};
     while (auto line = TRY(parser.ReadLine()))
@@ -111,14 +112,12 @@ PUBLIC ErrorCodeOr<HashTable<String, ChecksumValues>> ParseChecksumFile(String c
     return checksum_values.ToOwnedTable();
 }
 
-PUBLIC ErrorCodeOr<bool> FolderDiffersFromChecksumValues(String folder_path,
-                                                         HashTable<String, ChecksumValues> checksum_values,
-                                                         Logger& logger,
-                                                         ArenaAllocator& scratch_arena) {
-    auto checksum_values_found = Set<String>::Create(scratch_arena, checksum_values.Capacity());
+PUBLIC ErrorCodeOr<ChecksumTable>
+ChecksumsForFolder(String folder, ArenaAllocator& arena, ArenaAllocator& scratch_arena) {
+    DynamicChecksumTable checksums {arena};
 
     auto it = TRY(RecursiveDirectoryIterator::Create(scratch_arena,
-                                                     folder_path,
+                                                     folder,
                                                      {
                                                          .wildcard = "*",
                                                          .get_file_size = true,
@@ -127,39 +126,48 @@ PUBLIC ErrorCodeOr<bool> FolderDiffersFromChecksumValues(String folder_path,
 
     while (it.HasMoreFiles()) {
         auto const& entry = it.Get();
+        if (entry.type == FileType::File) {
 
-        auto relative_path = entry.path.Items().SubSpan(it.CanonicalBasePath().size + 1);
-        if constexpr (IS_WINDOWS) {
-            // zip files use forward slashes
-            auto archive_path = scratch_arena.Clone(relative_path);
-            Replace(archive_path, '\\', '/');
-            relative_path = archive_path;
-        }
-
-        if (auto element = checksum_values.FindElement(relative_path)) {
-            auto last_checksum = &element->data;
-            if (last_checksum->file_size != entry.file_size) {
-                logger.Debug({}, "File changed: {}", relative_path);
-                return true;
+            auto relative_path = entry.path.Items().SubSpan(it.CanonicalBasePath().size + 1);
+            if constexpr (IS_WINDOWS) {
+                // we use POSIX-style paths in the checksum file
+                auto archive_path = scratch_arena.Clone(relative_path);
+                Replace(archive_path, '\\', '/');
+                relative_path = archive_path;
             }
+            ASSERT(relative_path.size);
+            ASSERT(relative_path[0] != '/');
+
             auto const file_data = TRY(ReadEntireFile(entry.path, scratch_arena)).ToByteSpan();
-            if (auto crc = Crc32(file_data); crc != last_checksum->crc32) {
-                logger.Debug({}, "File changed: {}", relative_path);
-                return true;
-            }
-            scratch_arena.Free(file_data);
-            checksum_values_found.InsertWithoutGrowing(element->key);
+            DEFER { scratch_arena.Free(file_data); };
+
+            checksums.Insert(arena.Clone(relative_path),
+                             ChecksumValues {
+                                 .crc32 = Crc32(file_data),
+                                 .file_size = entry.file_size,
+                             });
         }
 
         TRY(it.Increment());
     }
 
-    // check if there's any missing files
-    for (auto const& [path, checksum] : checksum_values)
-        if (!checksum_values_found.Contains(path)) {
-            logger.Debug({}, "Missing file: {}", path);
+    return checksums.ToOwnedTable();
+}
+
+// All values in the authority table must be present in the test_table and have the same checksums.
+// test_table is allowed to have extra files.
+PUBLIC bool ChecksumsDiffer(ChecksumTable authority, ChecksumTable test_table, Logger& diff_log) {
+    for (auto const [key, val_ptr] : authority) {
+        auto const a_val = *val_ptr;
+        if (auto const b_val = test_table.FindElement(key)) {
+            if (a_val.crc32 != b_val->data.crc32 || a_val.file_size != b_val->data.file_size) {
+                diff_log.Info({}, "File has changed: {}", key);
+                return true;
+            }
+        } else {
+            diff_log.Info({}, "File is missing: {}", key);
             return true;
         }
-
+    }
     return false;
 }

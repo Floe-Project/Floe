@@ -40,24 +40,12 @@ PUBLIC ErrorCodeCategory const& PackageErrorCodeType() {
                 return writer.WriteChars(({
                     String s {};
                     switch ((PackageError)e.code) {
-                        case PackageError::FileCorrupted:
-                            s = "Package file is corrupted, retry download"_s;
-                            break;
-                        case PackageError::NotFloePackage:
-                            s = "Not a valid Floe package, notify the developer"_s;
-                            break;
-                        case PackageError::InvalidLibrary:
-                            s = "Library is invalid, notify the developer"_s;
-                            break;
-                        case PackageError::AccessDenied:
-                            s = "Access denied, manual installation recommended"_s;
-                            break;
-                        case PackageError::FilesystemError:
-                            s = "Filesystem error, retry recommended"_s;
-                            break;
-                        case PackageError::NotEmpty:
-                            s = "Directory not empty, install would overwrite files"_s;
-                            break;
+                        case PackageError::FileCorrupted: s = "Package file is corrupted"_s; break;
+                        case PackageError::NotFloePackage: s = "Not a valid Floe package"_s; break;
+                        case PackageError::InvalidLibrary: s = "Library is invalid"_s; break;
+                        case PackageError::AccessDenied: s = "Access denied"_s; break;
+                        case PackageError::FilesystemError: s = "Filesystem error"_s; break;
+                        case PackageError::NotEmpty: s = "Directory not empty"_s; break;
                     }
                     s;
                 }));
@@ -323,26 +311,23 @@ PUBLIC ErrorCodeOr<void> WriterAddPresetsFolder(mz_zip_archive& zip,
  *
  */
 
-struct ReaderError {
-    ErrorCode code;
-    String message;
-};
-
-struct TryHelpersReader {
-    TRY_HELPER_INHERIT(IsError, TryHelpers)
-    TRY_HELPER_INHERIT(ExtractValue, TryHelpers)
-    template <typename T>
-    static ReaderError ExtractError(ErrorCodeOr<T> const& o) {
-        return {o.Error(), ""_s};
-    }
+struct PackageReader {
+    Reader& zip_file_reader;
+    mz_zip_archive zip;
+    u64 seed = SeedFromTime();
+    Optional<ErrorCode> zip_file_read_error {};
 };
 
 namespace detail {
 
-static ErrorCodeOr<mz_zip_archive_file_stat> FileStat(mz_zip_archive& zip, mz_uint file_index) {
+ErrorCode ZipReadError(PackageReader const& package) {
+    if (package.zip_file_read_error) return *package.zip_file_read_error;
+    return ErrorCode {PackageError::FileCorrupted};
+}
+
+static ErrorCodeOr<mz_zip_archive_file_stat> FileStat(PackageReader& package, mz_uint file_index) {
     mz_zip_archive_file_stat file_stat;
-    if (!mz_zip_reader_file_stat(&zip, file_index, &file_stat))
-        return ErrorCode {PackageError::FileCorrupted};
+    if (!mz_zip_reader_file_stat(&package.zip, file_index, &file_stat)) return ZipReadError(package);
     return file_stat;
 }
 
@@ -350,11 +335,10 @@ static String PathWithoutTrailingSlash(char const* path) {
     return TrimEndIfMatches(FromNullTerminated(path), '/');
 }
 
-static ValueOrError<Optional<mz_zip_archive_file_stat>, ReaderError>
-FindFloeLuaInZipInLibrary(mz_zip_archive& zip, String library_dir_in_zip) {
-    using H = TryHelpersReader;
-    for (auto const file_index : Range(mz_zip_reader_get_num_files(&zip))) {
-        auto const file_stat = TRY_H(FileStat(zip, file_index));
+static ErrorCodeOr<Optional<mz_zip_archive_file_stat>> FindFloeLuaInZipInLibrary(PackageReader& package,
+                                                                                 String library_dir_in_zip) {
+    for (auto const file_index : Range(mz_zip_reader_get_num_files(&package.zip))) {
+        auto const file_stat = TRY(FileStat(package, file_index));
         if (file_stat.m_is_directory) continue;
         auto const path = PathWithoutTrailingSlash(file_stat.m_filename);
         if (!sample_lib::FilenameIsFloeLuaFile(path::Filename(path, path::Format::Posix))) continue;
@@ -368,22 +352,22 @@ FindFloeLuaInZipInLibrary(mz_zip_archive& zip, String library_dir_in_zip) {
 }
 
 static ErrorCodeOr<Span<u8 const>>
-ExtractFileToMem(mz_zip_archive& zip, mz_zip_archive_file_stat const& file_stat, ArenaAllocator& arena) {
+ExtractFileToMem(PackageReader& package, mz_zip_archive_file_stat const& file_stat, ArenaAllocator& arena) {
     auto const data = arena.AllocateExactSizeUninitialised<u8>(file_stat.m_uncomp_size);
-    if (!mz_zip_reader_extract_to_mem(&zip, file_stat.m_file_index, data.data, data.size, 0))
-        return ErrorCode {PackageError::FileCorrupted};
+    if (!mz_zip_reader_extract_to_mem(&package.zip, file_stat.m_file_index, data.data, data.size, 0))
+        return ZipReadError(package);
     return data;
 }
 
 static ErrorCodeOr<void>
-ExtractFileToFile(mz_zip_archive& zip, mz_zip_archive_file_stat const& file_stat, File& out_file) {
+ExtractFileToFile(PackageReader& package, mz_zip_archive_file_stat const& file_stat, File& out_file) {
     struct Context {
         File& out_file;
         ErrorCodeOr<void> result = k_success;
     };
     Context context {out_file};
     if (!mz_zip_reader_extract_to_callback(
-            &zip,
+            &package.zip,
             file_stat.m_file_index,
             [](void* user_data, mz_uint64 file_offset, void const* buffer, usize buffer_size) -> usize {
                 auto& context = *(Context*)user_data;
@@ -397,7 +381,7 @@ ExtractFileToFile(mz_zip_archive& zip, mz_zip_archive_file_stat const& file_stat
             &context,
             0)) {
         if (context.result.HasError()) return context.result.Error();
-        return ErrorCode {PackageError::FileCorrupted};
+        return ZipReadError(package);
     }
     return k_success;
 }
@@ -412,25 +396,24 @@ static String UniqueTempFolder(String inside_folder, u64& seed, ArenaAllocator& 
     return result;
 }
 
-static ValueOrError<sample_lib::Library*, ReaderError>
-ReaderReadLibraryLua(mz_zip_archive& zip, String library_dir_in_zip, ArenaAllocator& arena) {
-    using H = TryHelpersReader;
-    auto const floe_lua_stat = TRY(detail::FindFloeLuaInZipInLibrary(zip, library_dir_in_zip));
+static ErrorCodeOr<sample_lib::Library*>
+ReaderReadLibraryLua(PackageReader& package, String library_dir_in_zip, ArenaAllocator& arena) {
+    auto const floe_lua_stat = TRY(detail::FindFloeLuaInZipInLibrary(package, library_dir_in_zip));
     if (!floe_lua_stat) return (sample_lib::Library*)nullptr;
-    auto const floe_lua_data = TRY_H(detail::ExtractFileToMem(zip, *floe_lua_stat, arena));
+    auto const floe_lua_data = TRY(detail::ExtractFileToMem(package, *floe_lua_stat, arena));
 
     auto lua_reader = ::Reader::FromMemory(floe_lua_data);
     auto const lib_outcome =
         sample_lib::ReadLua(lua_reader, PathWithoutTrailingSlash(floe_lua_stat->m_filename), arena, arena);
-    if (lib_outcome.HasError()) return ReaderError {PackageError::InvalidLibrary, "floe.lua file is invalid"};
+    if (lib_outcome.HasError()) return ErrorCode {PackageError::InvalidLibrary};
     return lib_outcome.ReleaseValue();
 }
 
 static ErrorCodeOr<HashTable<String, ChecksumValues>>
-ReaderChecksumValuesForDir(mz_zip_archive& zip, String dir_in_zip, ArenaAllocator& arena) {
+ReaderChecksumValuesForDir(PackageReader& package, String dir_in_zip, ArenaAllocator& arena) {
     DynamicHashTable<String, ChecksumValues> table {arena};
-    for (auto const file_index : Range(mz_zip_reader_get_num_files(&zip))) {
-        auto const file_stat = TRY(detail::FileStat(zip, file_index));
+    for (auto const file_index : Range(mz_zip_reader_get_num_files(&package.zip))) {
+        auto const file_stat = TRY(detail::FileStat(package, file_index));
         if (file_stat.m_is_directory) continue;
         auto const path = PathWithoutTrailingSlash(file_stat.m_filename);
         auto const relative_path = detail::RelativePathIfInFolder(path, dir_in_zip);
@@ -442,12 +425,13 @@ ReaderChecksumValuesForDir(mz_zip_archive& zip, String dir_in_zip, ArenaAllocato
     return table.ToOwnedTable();
 }
 
-static ErrorCodeOr<void> ExtractFolder(mz_zip_archive& zip,
+static ErrorCodeOr<void> ExtractFolder(PackageReader& package,
                                        String dir_in_zip,
                                        String destination_folder,
-                                       ArenaAllocator& scratch_arena) {
-    for (auto const file_index : Range(mz_zip_reader_get_num_files(&zip))) {
-        auto const file_stat = TRY(detail::FileStat(zip, file_index));
+                                       ArenaAllocator& scratch_arena,
+                                       HashTable<String, ChecksumValues> destination_checksums) {
+    for (auto const file_index : Range(mz_zip_reader_get_num_files(&package.zip))) {
+        auto const file_stat = TRY(detail::FileStat(package, file_index));
         if (file_stat.m_is_directory) continue;
         auto const path = PathWithoutTrailingSlash(file_stat.m_filename);
         auto const relative_path = detail::RelativePathIfInFolder(path, dir_in_zip);
@@ -461,11 +445,10 @@ static ErrorCodeOr<void> ExtractFolder(mz_zip_archive& zip,
                                 .fail_if_exists = false,
                             }));
         auto out_file = TRY(OpenFile(out_path, FileMode::WriteNoOverwrite));
-        TRY(detail::ExtractFileToFile(zip, file_stat, out_file));
+        TRY(detail::ExtractFileToFile(package, file_stat, out_file));
     }
 
     {
-        auto const checksum_values = TRY(ReaderChecksumValuesForDir(zip, dir_in_zip, scratch_arena));
         auto const checksum_file_path =
             path::Join(scratch_arena, Array {destination_folder, k_checksums_file});
         TRY(CreateDirectory(*path::Directory(checksum_file_path),
@@ -474,7 +457,7 @@ static ErrorCodeOr<void> ExtractFolder(mz_zip_archive& zip,
                                 .fail_if_exists = false,
                             }));
         TRY(WriteChecksumsValuesToFile(checksum_file_path,
-                                       checksum_values,
+                                       destination_checksums,
                                        scratch_arena,
                                        "Generated by Floe"));
     }
@@ -482,41 +465,74 @@ static ErrorCodeOr<void> ExtractFolder(mz_zip_archive& zip,
     return k_success;
 }
 
-static PackageError ErrorCodeToPackageError(ErrorCode e) {
-    if (e.category == &PackageErrorCodeType()) return (PackageError)e.code;
-    if (e == FilesystemError::AccessDenied)
-        return PackageError::AccessDenied;
-    else if (e == FilesystemError::NotEmpty)
-        return PackageError::NotEmpty;
-    return PackageError::FilesystemError;
+template <typename... Args>
+static PackageError CreatePackageError(Logger& error_log, ErrorCode error, Args const&... args) {
+    auto const package_error = ({
+        PackageError e;
+        if (error.category == &PackageErrorCodeType())
+            e = (PackageError)error.code;
+        else if (error == FilesystemError::AccessDenied)
+            e = PackageError::AccessDenied;
+        else if (error == FilesystemError::NotEmpty)
+            e = PackageError::NotEmpty;
+        else
+            e = PackageError::FilesystemError;
+        e;
+    });
+
+    DynamicArrayBounded<char, 1000> error_buffer;
+    fmt::Append(error_buffer, "{u}", ErrorCode {package_error});
+    if (error != package_error) fmt::Append(error_buffer, ". {u}", error);
+    if constexpr (sizeof...(args) > 0) {
+        dyn::AppendSpan(error_buffer, ": ");
+        fmt::Append(error_buffer, args...);
+        dyn::Append(error_buffer, '.');
+    } else
+        fmt::Append(error_buffer, ".");
+
+    String possible_fix {};
+    switch (package_error) {
+        case PackageError::FileCorrupted: possible_fix = "Try redownloading the package"; break;
+        case PackageError::NotFloePackage: possible_fix = "Make sure the file is a Floe package"; break;
+        case PackageError::InvalidLibrary: possible_fix = "Contact the developer"; break;
+        case PackageError::AccessDenied: possible_fix = "Install the package manually"; break;
+        case PackageError::FilesystemError: possible_fix = "Try again"; break;
+        case PackageError::NotEmpty: possible_fix = {}; break;
+    }
+    if (possible_fix.size) fmt::Append(error_buffer, " {}.", possible_fix);
+
+    error_log.Error({}, error_buffer);
+
+    return package_error;
 }
 
 } // namespace detail
 
-struct PackageReader {
-    mz_zip_archive zip;
-    u64 seed = SeedFromTime();
-};
-
-PUBLIC ValueOrError<PackageReader, ReaderError> ReaderCreate(Reader& reader) {
-    using H = TryHelpersReader;
-    mz_zip_archive zip;
-    mz_zip_zero_struct(&zip);
-    zip.m_pRead = [](void* io_opaque_ptr, mz_uint64 file_offset, void* buffer, usize buffer_size) -> usize {
-        auto& reader = *(Reader*)io_opaque_ptr;
-        reader.pos = file_offset;
-        auto const o = reader.Read(buffer, buffer_size);
-        if (o.HasError()) return 0;
+PUBLIC VoidOrError<PackageError> ReaderInit(PackageReader& package, Logger& error_log) {
+    mz_zip_zero_struct(&package.zip);
+    package.zip.m_pRead =
+        [](void* io_opaque_ptr, mz_uint64 file_offset, void* buffer, usize buffer_size) -> usize {
+        auto& package = *(PackageReader*)io_opaque_ptr;
+        package.zip_file_reader.pos = file_offset;
+        auto const o = package.zip_file_reader.Read(buffer, buffer_size);
+        if (o.HasError()) {
+            package.zip_file_read_error = o.Error();
+            return 0;
+        }
         return o.Value();
     };
-    zip.m_pIO_opaque = &reader;
+    package.zip.m_pIO_opaque = &package;
 
-    if (!mz_zip_reader_init(&zip, reader.size, 0))
-        return ReaderError {ErrorCode {PackageError::FileCorrupted}, ""_s};
+    if (!mz_zip_reader_init(&package.zip, package.zip_file_reader.size, 0))
+        return detail::CreatePackageError(error_log, detail::ZipReadError(package));
 
     usize known_subdirs = 0;
-    for (auto const file_index : Range(mz_zip_reader_get_num_files(&zip))) {
-        auto const file_stat = TRY_H(detail::FileStat(zip, file_index));
+    for (auto const file_index : Range(mz_zip_reader_get_num_files(&package.zip))) {
+        auto const file_stat = ({
+            auto const o = detail::FileStat(package, file_index);
+            if (o.HasError()) return detail::CreatePackageError(error_log, o.Error());
+            o.Value();
+        });
         auto const path = detail::PathWithoutTrailingSlash(file_stat.m_filename);
         for (auto const known_subdir : Array {k_libraries_subdir, k_presets_subdir}) {
             if (path == known_subdir || detail::RelativePathIfInFolder(path, known_subdir)) {
@@ -527,88 +543,166 @@ PUBLIC ValueOrError<PackageReader, ReaderError> ReaderCreate(Reader& reader) {
     }
 
     if (!known_subdirs) {
-        mz_zip_reader_end(&zip);
-        return ReaderError {ErrorCode {PackageError::NotFloePackage},
-                            "Doesn't contain Libraries or Presets subfolders"_s};
+        mz_zip_reader_end(&package.zip);
+        return detail::CreatePackageError(error_log,
+                                          ErrorCode {PackageError::NotFloePackage},
+                                          "it doesn't contain Libraries or Presets subfolders");
     }
 
-    return PackageReader {zip};
+    return k_success;
 }
 
-PUBLIC void ReaderDestroy(PackageReader& package) { mz_zip_reader_end(&package.zip); }
+PUBLIC void ReaderDeinit(PackageReader& package) { mz_zip_reader_end(&package.zip); }
 
-struct PackageFolderIterator {
-    struct PackageFolder {
-        String path; // path in the zip
-        SubfolderType type;
-        sample_lib::Library* library; // can be null
-        HashTable<String, ChecksumValues> checksum_values;
-    };
+struct PackageFolder {
+    String path; // path in the zip
+    SubfolderType type;
+    sample_lib::Library* library; // can be null
+    HashTable<String, ChecksumValues> checksum_values;
+};
 
-    ErrorCodeOr<Optional<PackageFolder>> Next(ArenaAllocator& arena) {
-        DEFER { ++file_index; };
-        for (; file_index < mz_zip_reader_get_num_files(&reader.zip); ++file_index) {
-            auto const file_stat = TRY(detail::FileStat(reader.zip, file_index));
-            auto const path = detail::PathWithoutTrailingSlash(file_stat.m_filename);
-            for (auto const folder : k_folders) {
-                auto const relative_path = detail::RelativePathIfInFolder(path, folder);
-                if (!relative_path) continue;
-                if (relative_path->size == 0) continue;
-                if (Contains(*relative_path, '/')) continue;
+// init to 0
+using PackageFolderIteratorIndex = mz_uint;
 
-                PackageFolder result {
-                    .path = path.Clone(arena),
-                    .type = ({
-                        SubfolderType t;
-                        if (folder == k_libraries_subdir)
-                            t = SubfolderType::Libraries;
-                        else if (folder == k_presets_subdir)
-                            t = SubfolderType::Presets;
-                        else
-                            PanicIfReached();
-                        t;
-                    }),
-                    .checksum_values = TRY(detail::ReaderChecksumValuesForDir(reader.zip, path, arena)),
-                };
-                if (folder == k_libraries_subdir) {
-                    auto const o = detail::ReaderReadLibraryLua(reader.zip, path, arena);
-                    if (o.HasError()) return o.Error().code;
-                    result.library = o.ReleaseValue();
-                }
-                return result;
-            }
+// Call this repeatedly until it returns nullopt
+PUBLIC ValueOrError<Optional<PackageFolder>, PackageError>
+IteratePackageFolders(PackageReader& package,
+                      PackageFolderIteratorIndex& file_index,
+                      ArenaAllocator& arena,
+                      Logger& error_log) {
+    DEFER { ++file_index; };
+    for (; file_index < mz_zip_reader_get_num_files(&package.zip); ++file_index) {
+        auto const file_stat = ({
+            auto const o = detail::FileStat(package, file_index);
+            if (o.HasError()) return detail::CreatePackageError(error_log, o.Error());
+            o.Value();
+        });
+        auto const path = detail::PathWithoutTrailingSlash(file_stat.m_filename);
+        for (auto const folder : k_folders) {
+            auto const relative_path = detail::RelativePathIfInFolder(path, folder);
+            if (!relative_path) continue;
+            if (relative_path->size == 0) continue;
+            if (Contains(*relative_path, '/')) continue;
+
+            return Optional<PackageFolder> {PackageFolder {
+                .path = path.Clone(arena),
+                .type = ({
+                    SubfolderType t;
+                    if (folder == k_libraries_subdir)
+                        t = SubfolderType::Libraries;
+                    else if (folder == k_presets_subdir)
+                        t = SubfolderType::Presets;
+                    else
+                        PanicIfReached();
+                    t;
+                }),
+                .library = ({
+                    sample_lib::Library* lib = nullptr;
+                    if (folder == k_libraries_subdir) {
+                        lib = ({
+                            auto const o = detail::ReaderReadLibraryLua(package, path, arena);
+                            if (o.HasError()) return detail::CreatePackageError(error_log, o.Error());
+                            o.Value();
+                        });
+                    }
+                    lib;
+                }),
+                .checksum_values = ({
+                    auto const o = detail::ReaderChecksumValuesForDir(package, path, arena);
+                    if (o.HasError()) return detail::CreatePackageError(error_log, o.Error());
+                    o.Value();
+                }),
+            }};
         }
-        return k_nullopt;
+    }
+    return Optional<PackageFolder> {k_nullopt};
+}
+
+enum class Tri { No, Yes, Unknown };
+
+struct DestinationFolderStatus {
+    bool exists_and_contains_files;
+    bool exactly_matches_zip;
+    Tri changed_since_originally_installed;
+};
+
+// Destination folder is the folder where the package will be installed. e.g. /home/me/Libraries
+PUBLIC ErrorCodeOr<DestinationFolderStatus> CheckDestinationFolder(String destination_folder,
+                                                                   PackageFolder const& folder,
+                                                                   ArenaAllocator& scratch_arena,
+                                                                   Logger& error_log) {
+    auto const destination_folder_path =
+        String(path::Join(scratch_arena, Array {destination_folder, path::Filename(folder.path)}));
+
+    DestinationFolderStatus result {};
+
+    auto const actual_checksums = ({
+        auto const o = ChecksumsForFolder(destination_folder_path, scratch_arena, scratch_arena);
+        if (o.HasError()) {
+            if (o.Error() == FilesystemError::PathDoesNotExist) return result;
+            error_log.Error({}, "Couldn't read folder: {}", destination_folder_path);
+            return o.Error();
+        }
+        o.Value();
+    });
+
+    if (actual_checksums.size == 0) return result;
+
+    result.exists_and_contains_files = true;
+    result.exactly_matches_zip = !ChecksumsDiffer(folder.checksum_values, actual_checksums, error_log);
+    result.changed_since_originally_installed = Tri::Unknown;
+
+    auto const checksum_file_path =
+        path::Join(scratch_arena, Array {destination_folder_path, k_checksums_file});
+    if (auto const file_data_outcome = ReadEntireFile(checksum_file_path, scratch_arena);
+        !file_data_outcome.HasError()) {
+        auto const file_data = file_data_outcome.Value();
+        auto const stored_checksums = ParseChecksumFile(file_data, scratch_arena);
+        if (stored_checksums.HasValue()) {
+            result.changed_since_originally_installed =
+                ChecksumsDiffer(stored_checksums.Value(), actual_checksums, error_log) ? Tri::Yes : Tri::No;
+        } else {
+            // presumably we wouldn't have installed a badly formatted checksums file, so let's say it's
+            // changed and perhaps we will overwrite it
+            result.changed_since_originally_installed = Tri::Yes;
+        }
     }
 
-    PackageReader& reader;
-    mz_uint file_index = 0;
-};
+    return result;
+}
 
 // The resulting directory will be destination_folder/dir_in_zip.
 // Extracts to a temp folder than then renames to the final location. This ensures we either fail or succeed,
-// with no inbetween cases where the folder is partially extracted. Additionally, it doesn't generate lots of
+// with no in-between cases where the folder is partially extracted. Additionally, it doesn't generate lots of
 // filesystem-change notifications which Floe might try to process and fail on.
 PUBLIC VoidOrError<PackageError> ReaderExtractFolder(PackageReader& package,
-                                                     String dir_in_zip,
+                                                     PackageFolder const& folder,
                                                      String destination_folder,
                                                      ArenaAllocator& scratch_arena,
                                                      Logger& error_log,
                                                      bool overwrite_existing_files) {
+    auto const zip_folder_checksums = ({
+        auto const o = detail::ReaderChecksumValuesForDir(package, folder.path, scratch_arena);
+        if (o.HasError()) return detail::CreatePackageError(error_log, o.Error());
+        o.Value();
+    });
+
+    auto const destination_folder_path =
+        path::Join(scratch_arena, Array {destination_folder, path::Filename(folder.path)});
+
     // We don't use the system temp folder because we want to do an atomic rename to the final location which
     // only works if 2 folders are on the same filesystem. By using a temp folder in the same location as the
     // destination folder we ensure that.
     auto const temp_folder =
         detail::UniqueTempFolder(*path::Directory(destination_folder), package.seed, scratch_arena);
-    auto const temp_folder_outcome = CreateDirectory(temp_folder,
-                                                     {
-                                                         .create_intermediate_directories = false,
-                                                         .fail_if_exists = true,
-                                                         .win32_hide_dirs_starting_with_dot = true,
-                                                     });
-    if (temp_folder_outcome.HasError()) {
-        error_log.Error({}, "Failed to create temp folder: {}. {}", temp_folder, temp_folder_outcome.Error());
-        return PackageError::FilesystemError;
+    if (auto const o = CreateDirectory(temp_folder,
+                                       {
+                                           .create_intermediate_directories = false,
+                                           .fail_if_exists = true,
+                                           .win32_hide_dirs_starting_with_dot = true,
+                                       });
+        o.HasError()) {
+        return detail::CreatePackageError(error_log, o.Error(), "folder: {}", temp_folder);
     }
     DEFER {
         auto _ = Delete(temp_folder,
@@ -618,65 +712,63 @@ PUBLIC VoidOrError<PackageError> ReaderExtractFolder(PackageReader& package,
                         });
     };
 
-    if (auto const extract_result =
-            detail::ExtractFolder(package.zip, dir_in_zip, temp_folder, scratch_arena);
-        extract_result.HasError()) {
-        error_log.Error({}, "Failed to extract files to a temp location: {}", extract_result.Error());
-        return PackageError::FilesystemError;
+    if (auto const o =
+            detail::ExtractFolder(package, folder.path, temp_folder, scratch_arena, zip_folder_checksums);
+        o.HasError()) {
+        return detail::CreatePackageError(error_log, o.Error(), "in folder: {}", temp_folder);
     }
-
-    auto const destination_folder_path =
-        path::Join(scratch_arena, Array {destination_folder, path::Filename(dir_in_zip)});
 
     if (auto const rename_o = Rename(temp_folder, destination_folder_path); rename_o.HasError()) {
         if (overwrite_existing_files && rename_o.Error() == FilesystemError::NotEmpty) {
             for (auto const file_index : Range(mz_zip_reader_get_num_files(&package.zip))) {
-                auto const file_stat_outcome = detail::FileStat(package.zip, file_index);
-                if (file_stat_outcome.HasError()) return PackageError::FileCorrupted;
-                auto const file_stat = file_stat_outcome.Value();
+                auto const file_stat = ({
+                    auto const o = detail::FileStat(package, file_index);
+                    if (o.HasError()) return detail::CreatePackageError(error_log, o.Error());
+                    o.Value();
+                });
                 if (file_stat.m_is_directory) continue;
                 auto const path = detail::PathWithoutTrailingSlash(file_stat.m_filename);
-                auto const relative_path = detail::RelativePathIfInFolder(path, dir_in_zip);
+                auto const relative_path = detail::RelativePathIfInFolder(path, folder.path);
                 if (!relative_path) continue;
 
                 auto const to_path = path::Join(scratch_arena, Array {destination_folder, *relative_path});
                 DEFER { scratch_arena.Free(to_path.ToByteSpan()); };
-                if (auto const dir_o = CreateDirectory(*path::Directory(to_path),
-                                                       {
-                                                           .create_intermediate_directories = true,
-                                                           .fail_if_exists = false,
-                                                       });
-                    dir_o.HasError()) {
-                    error_log.Error({},
-                                    "Failed to create directory(s) in your install folder: {}. {}",
-                                    *path::Directory(to_path),
-                                    dir_o.Error());
-                    return detail::ErrorCodeToPackageError(dir_o.Error());
+                if (auto const o = CreateDirectory(*path::Directory(to_path),
+                                                   {
+                                                       .create_intermediate_directories = true,
+                                                       .fail_if_exists = false,
+                                                   });
+                    o.HasError()) {
+                    return detail::CreatePackageError(
+                        error_log,
+                        o.Error(),
+                        "cound't create directory(s) in your install folder: {}",
+                        to_path);
                 }
 
                 auto const from_path = path::Join(scratch_arena, Array {temp_folder, *relative_path});
                 DEFER { scratch_arena.Free(from_path.ToByteSpan()); };
                 if (auto const copy_o = Rename(from_path, to_path); copy_o.HasError()) {
-                    error_log.Error({},
-                                    "Failed to install file in your install folder: {}. {}",
-                                    to_path,
-                                    copy_o.Error());
-                    return detail::ErrorCodeToPackageError(copy_o.Error());
+                    return detail::CreatePackageError(error_log,
+                                                      copy_o.Error(),
+                                                      "couldn't install file to your install folder: {}",
+                                                      to_path);
                 }
             }
         } else {
-            error_log.Error({},
-                            "Failed to install files in your install folder: {}. {}",
-                            destination_folder_path,
-                            rename_o.Error());
-            return detail::ErrorCodeToPackageError(rename_o.Error());
+            return detail::CreatePackageError(error_log,
+                                              rename_o.Error(),
+                                              "couldn't install files to your install folder: {}",
+                                              destination_folder_path);
         }
     }
 
     // remove hidden
     if (auto const o = WindowsSetFileAttributes(destination_folder_path, k_nullopt); o.HasError()) {
-        error_log.Error({}, "Failed to make the folder visible: {}. {}", destination_folder_path, o.Error());
-        return PackageError::FilesystemError;
+        return detail::CreatePackageError(error_log,
+                                          o.Error(),
+                                          "failed to make the folder visible: {}",
+                                          destination_folder_path);
     }
 
     return k_success;

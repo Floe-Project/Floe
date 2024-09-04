@@ -50,6 +50,15 @@ PUBLIC constexpr u64 HashMultipleFnv1a(ContiguousContainerOfContiguousContainers
     return hash;
 }
 
+inline u64 HashInit() { return 0xcbf29ce484222325; }
+template <Fundamental T>
+inline void HashUpdate(u64& hash, Span<T const> data) {
+    for (auto& byte : data.ToByteSpan()) {
+        hash ^= byte;
+        hash *= 0x100000001b3;
+    }
+}
+
 template <Fundamental T>
 PUBLIC constexpr u32 HashDbj(Span<T const> data) {
     // Dbj

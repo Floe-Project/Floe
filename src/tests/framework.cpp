@@ -256,6 +256,7 @@ Subcase::Subcase(Tester& tester, String name, String file, int line) : tester(te
 
     // push the current signature to the stack so we can check if the
     // current stack + the current new subcase have been traversed
+    ASSERT(name.size <= decltype(SubcaseSignature::name)::Capacity());
     dyn::Append(tester.subcases_stack, SubcaseSignature {name, file, line});
     if (tester.subcases_passed.Contains(tester.subcases_stack)) {
         // pop - revert to previous stack since we've already passed this

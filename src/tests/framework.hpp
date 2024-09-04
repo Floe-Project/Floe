@@ -112,10 +112,13 @@ class PassedSubcaseStacks {
 
   private:
     static u64 Hash(DynamicArray<SubcaseSignature> const& v) {
-        u64 result = 0;
-        for (auto const& s : v)
-            result += ::Hash(s.file) + (u64)s.line + ::Hash(s.name.Items());
-        return result;
+        u64 hash = HashInit();
+        for (auto const& s : v) {
+            HashUpdate(hash, s.name.Items());
+            HashUpdate(hash, s.file);
+            HashUpdate(hash, Span {&s.line, 1});
+        }
+        return hash;
     }
 
     DynamicArray<u64> m_hashes;

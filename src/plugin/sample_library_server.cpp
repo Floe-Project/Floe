@@ -522,7 +522,7 @@ static bool UpdateLibraryJobs(Server& server,
             ++it;
     }
 
-    // update libraries_by_name
+    // update libraries_by_id
     {
         ZoneNamedN(rebuild_htab, "rehash", true);
         server.libraries_by_id_mutex.Lock();
@@ -1471,9 +1471,10 @@ Server::Server(ThreadPool& pool,
     : error_notifications(error_notifications)
     , thread_pool(pool) {
     for (auto e : always_scanned_folders) {
+        ArenaAllocatorWithInlineStorage<1000> scratch_arena;
         auto node = scan_folders.AllocateUninitialised();
         PLACEMENT_NEW(&node->value) ScanFolder();
-        dyn::Assign(node->value.path, e);
+        dyn::Assign(node->value.path, CanonicalizePath(scratch_arena, e).ValueOr({(char*)e.data, e.size}));
         node->value.source = ScanFolder::Source::AlwaysScannedFolder;
         node->value.state.raw = ScanFolder::State::NotScanned;
         scan_folders.Insert(node);
@@ -1553,9 +1554,10 @@ void SetExtraScanFolders(Server& server, Span<String const> extra_folders) {
             if (l.value.path == e) already_present = true;
         if (already_present) continue;
 
+        ArenaAllocatorWithInlineStorage<1000> scratch_arena;
         auto node = server.scan_folders.AllocateUninitialised();
         PLACEMENT_NEW(&node->value) ScanFolder();
-        dyn::Assign(node->value.path, e);
+        dyn::Assign(node->value.path, CanonicalizePath(scratch_arena, e).ValueOr({(char*)e.data, e.size}));
         node->value.source = ScanFolder::Source::ExtraFolder;
         node->value.state.raw = ScanFolder::State::NotScanned;
         server.scan_folders.Insert(node);

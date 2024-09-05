@@ -50,17 +50,25 @@ static ErrorCode FilesystemErrorFromNSError(NSError* error,
 
 ErrorCodeOr<void> CopyFile(String from, String to, ExistingDestinationHandling existing) {
     auto dest = StringToNSString(to);
-    if (existing == ExistingDestinationHandling::Fail || existing == ExistingDestinationHandling::Skip) {
-        if ([[NSFileManager defaultManager] fileExistsAtPath:dest]) {
-            return existing == ExistingDestinationHandling::Fail
-                       ? ErrorCodeOr<void> {ErrorCode(FilesystemError::PathAlreadyExists)}
-                       : k_success;
-        }
-    }
+    auto source = StringToNSString(from);
 
     NSError* error = nil;
-    if (![[NSFileManager defaultManager] copyItemAtPath:StringToNSString(from) toPath:dest error:&error])
+    if (![[NSFileManager defaultManager] copyItemAtPath:source toPath:dest error:&error]) {
+        if (error.code == NSFileWriteFileExistsError) {
+            if (existing == ExistingDestinationHandling::Skip) return k_success;
+            if (existing == ExistingDestinationHandling::Overwrite) {
+                // IMPROVE: use replaceItemAtURL? Though it may require first creating a temp directory and
+                // copying the file there
+                if (![[NSFileManager defaultManager] removeItemAtPath:dest error:&error])
+                    return FilesystemErrorFromNSError(error);
+                if (![[NSFileManager defaultManager] copyItemAtPath:source toPath:dest error:&error])
+                    return FilesystemErrorFromNSError(error);
+                return k_success;
+            }
+            return ErrorCode {FilesystemError::PathAlreadyExists};
+        }
         return FilesystemErrorFromNSError(error);
+    }
     return k_success;
 }
 

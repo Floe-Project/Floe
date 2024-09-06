@@ -230,10 +230,39 @@ static bool SetIfMatching(String line, String key, Type& value) {
     return false;
 }
 
+enum class KeyType : u32 {
+    ShowTooltips,
+    GuiKeyboardOctave,
+    HighContrastGui,
+    SortLibrariesAlphabetically,
+    ShowKeyboard,
+    PresetsRandomMode,
+    WindowWidth,
+    ExtraLibrariesFolder,
+    ExtraPresetsFolder,
+    CcToParamIdMap,
+    Count,
+};
+
+constexpr String Key(KeyType k) {
+    switch (k) {
+        case KeyType::ShowTooltips: return "show_tooltips"_s;
+        case KeyType::GuiKeyboardOctave: return "gui_keyboard_octave"_s;
+        case KeyType::HighContrastGui: return "high_contrast_gui"_s;
+        case KeyType::SortLibrariesAlphabetically: return "sort_libraries_alphabetically"_s;
+        case KeyType::ShowKeyboard: return "show_keyboard"_s;
+        case KeyType::PresetsRandomMode: return "presets_random_mode"_s;
+        case KeyType::WindowWidth: return "window_width"_s;
+        case KeyType::ExtraLibrariesFolder: return "extra_libraries_folder"_s;
+        case KeyType::ExtraPresetsFolder: return "extra_presets_folder"_s;
+        case KeyType::CcToParamIdMap: return "cc_to_param_id_map"_s;
+        case KeyType::Count: PanicIfReached();
+    }
+}
+
 static void
 Parse(Settings& content, ArenaAllocator& content_allocator, ArenaAllocator& scratch_arena, String file_data) {
     DynamicArray<String> unknown_lines {scratch_arena};
-    DynamicArray<String> additional_library_paths {scratch_arena};
     DynamicArray<String> extra_libraries_folders {scratch_arena};
     DynamicArray<String> presets_folders {scratch_arena};
 
@@ -243,10 +272,9 @@ Parse(Settings& content, ArenaAllocator& content_allocator, ArenaAllocator& scra
         if (line.size == 0) continue;
         if (StartsWith(line, ';')) continue;
 
-        {
-            // The same key is allowed to appear more than once. We just append each value to an array.
+        { // The same key is allowed to appear more than once. We just append each value to an array.
             String path {};
-            if (SetIfMatching(line, "extra_libraries_folder", path)) {
+            if (SetIfMatching(line, Key(KeyType::ExtraLibrariesFolder), path)) {
                 if (path::IsAbsolute(path)) dyn::Append(extra_libraries_folders, path);
                 continue;
             }
@@ -255,24 +283,15 @@ Parse(Settings& content, ArenaAllocator& content_allocator, ArenaAllocator& scra
         {
             // The same key is allowed to appear more than once. We just append each value to an array.
             String path {};
-            if (SetIfMatching(line, "extra_presets_folder", path)) {
+            if (SetIfMatching(line, Key(KeyType::ExtraPresetsFolder), path)) {
                 if (path::IsAbsolute(path)) dyn::Append(presets_folders, path);
                 continue;
             }
         }
 
         {
-            // The same key is allowed to appear more than once. We just append each value to an array.
-            String path {};
-            if (SetIfMatching(line, "additional_library_path", path)) {
-                if (path::IsAbsolute(path)) dyn::Append(additional_library_paths, path);
-                continue;
-            }
-        }
-
-        {
             String value {};
-            if (SetIfMatching(line, "cc_to_param_id_map", value)) {
+            if (SetIfMatching(line, Key(KeyType::CcToParamIdMap), value)) {
                 if (auto equal_pos = Find(value, ':')) {
                     if (auto r = ParseInt(value.SubSpan(0, equal_pos.Value()), ParseIntBase::Decimal);
                         r.HasValue()) {
@@ -300,13 +319,15 @@ Parse(Settings& content, ArenaAllocator& content_allocator, ArenaAllocator& scra
             }
         }
 
-        if (SetIfMatching(line, "show_tooltips", content.gui.show_tooltips)) continue;
-        if (SetIfMatching(line, "window_width", content.gui.window_width)) continue;
-        if (SetIfMatching(line, "gui_keyboard_octave", content.gui.keyboard_octave)) continue;
-        if (SetIfMatching(line, "presets_random_mode", content.gui.presets_random_mode)) continue;
-        if (SetIfMatching(line, "show_keyboard", content.gui.show_keyboard)) continue;
-        if (SetIfMatching(line, "high_contrast_gui", content.gui.high_contrast_gui)) continue;
-        if (SetIfMatching(line, "sort_libraries_alphabetically", content.gui.sort_libraries_alphabetically))
+        if (SetIfMatching(line, Key(KeyType::ShowTooltips), content.gui.show_tooltips)) continue;
+        if (SetIfMatching(line, Key(KeyType::WindowWidth), content.gui.window_width)) continue;
+        if (SetIfMatching(line, Key(KeyType::GuiKeyboardOctave), content.gui.keyboard_octave)) continue;
+        if (SetIfMatching(line, Key(KeyType::PresetsRandomMode), content.gui.presets_random_mode)) continue;
+        if (SetIfMatching(line, Key(KeyType::ShowKeyboard), content.gui.show_keyboard)) continue;
+        if (SetIfMatching(line, Key(KeyType::HighContrastGui), content.gui.high_contrast_gui)) continue;
+        if (SetIfMatching(line,
+                          Key(KeyType::SortLibrariesAlphabetically),
+                          content.gui.sort_libraries_alphabetically))
             continue;
 
         dyn::Append(unknown_lines, line);
@@ -334,22 +355,24 @@ ErrorCodeOr<void> WriteFile(Settings const& data, String path) {
 
     auto writer = file.Writer();
 
-    TRY(fmt::AppendLine(writer, "show_tooltips = {}", data.gui.show_tooltips));
-
-    TRY(fmt::AppendLine(writer, "gui_keyboard_octave = {}", data.gui.keyboard_octave));
-    TRY(fmt::AppendLine(writer, "show_tooltips = {}", data.gui.show_tooltips));
-    TRY(fmt::AppendLine(writer, "high_contrast_gui = {}", data.gui.high_contrast_gui));
+    TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::ShowKeyboard), data.gui.show_tooltips));
+    TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::GuiKeyboardOctave), data.gui.keyboard_octave));
+    TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::ShowTooltips), data.gui.show_tooltips));
+    TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::HighContrastGui), data.gui.high_contrast_gui));
     TRY(fmt::AppendLine(writer,
-                        "sort_libraries_alphabetically = {}",
+                        "{} = {}",
+                        Key(KeyType::SortLibrariesAlphabetically),
                         data.gui.sort_libraries_alphabetically));
-    TRY(fmt::AppendLine(writer, "show_keyboard = {}", data.gui.show_keyboard));
-    TRY(fmt::AppendLine(writer, "presets_random_mode = {}", data.gui.presets_random_mode));
-    TRY(fmt::AppendLine(writer, "window_width = {}", data.gui.window_width));
+    TRY(fmt::AppendLine(writer,
+                        "{} = {}",
+                        Key(KeyType::SortLibrariesAlphabetically),
+                        data.gui.presets_random_mode));
+    TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::WindowWidth), data.gui.window_width));
 
     for (auto p : data.filesystem.extra_libraries_scan_folders)
-        TRY(fmt::AppendLine(writer, "extra_libraries_folder = {}", p));
+        TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::ExtraLibrariesFolder), p));
     for (auto p : data.filesystem.extra_presets_scan_folders)
-        TRY(fmt::AppendLine(writer, "extra_presets_folder = {}", p));
+        TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::ExtraPresetsFolder), p));
 
     for (auto cc = data.midi.cc_to_param_mapping; cc != nullptr; cc = cc->next) {
         DynamicArray<char> buf {scratch_arena};
@@ -358,7 +381,7 @@ ErrorCodeOr<void> WriteFile(Settings const& data, String path) {
         if (!buf.size) continue;
 
         dyn::Pop(buf); // remove last comma
-        TRY(fmt::AppendLine(writer, "cc_to_param_id_map = {}:{}", cc->cc_num, buf));
+        TRY(fmt::AppendLine(writer, "{} = {}:{}", Key(KeyType::CcToParamIdMap), cc->cc_num, buf));
     }
 
     for (auto line : data.unknown_lines_from_file)

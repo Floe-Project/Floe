@@ -61,7 +61,7 @@ AlwaysScannedFolders(ScanFolderType type, LocationType location_type, ArenaAlloc
                                                     k = KnownDirectoryType::LegacyData;
                                                     break;
                                                 case LocationType::AllUsers:
-                                                    k = KnownDirectoryType::LegacyAllUsersData;
+                                                    k = KnownDirectoryType::GlobalData;
                                                     break;
                                             }
                                             k;

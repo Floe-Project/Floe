@@ -197,17 +197,21 @@ ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectoryType type,
     String rel_path;
     switch (type) {
         case KnownDirectoryType::Temporary: return a.Clone("/tmp"_s);
-        case KnownDirectoryType::LegacyAllUsersSettings:
-        case KnownDirectoryType::LegacyPluginSettings: rel_path = "~/.config"; break;
-        case KnownDirectoryType::LegacyAllUsersData: return a.Clone("/var/lib"_s);
         case KnownDirectoryType::Documents: rel_path = "~/Documents"; break;
         case KnownDirectoryType::Downloads: rel_path = "~/Downloads"; break;
-        case KnownDirectoryType::LegacyData: rel_path = "~"; break;
         case KnownDirectoryType::Logs: rel_path = "~/.local/state"; break;
+        case KnownDirectoryType::GlobalData: rel_path = "~"; break;
+
         case KnownDirectoryType::UserClapPlugins: rel_path = "~/.clap"; break;
         case KnownDirectoryType::UserVst3Plugins: rel_path = "~/.vst3"; break;
         case KnownDirectoryType::GlobalClapPlugins: return a.Clone("/usr/lib/clap"_s);
         case KnownDirectoryType::GlobalVst3Plugins: return a.Clone("/usr/lib/vst3"_s);
+
+        case KnownDirectoryType::LegacyData: rel_path = "~"; break;
+        case KnownDirectoryType::LegacyAllUsersSettings:
+        case KnownDirectoryType::LegacyPluginSettings: rel_path = "~/.config"; break;
+        case KnownDirectoryType::LegacyAllUsersData: return a.Clone("/var/lib"_s);
+
         case KnownDirectoryType::Count: PanicIfReached();
     }
 

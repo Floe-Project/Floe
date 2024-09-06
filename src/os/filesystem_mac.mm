@@ -181,11 +181,6 @@ ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectoryType type,
             domain = NSUserDomainMask;
             extra_subdirs = Array {"Logs"_s};
             break;
-        case KnownDirectoryType::LegacyPluginSettings:
-            osx_type = NSMusicDirectory;
-            domain = NSUserDomainMask;
-            extra_subdirs = Array {"Audio Music Apps"_s, "Plug-In Settings"};
-            break;
         case KnownDirectoryType::Documents:
             osx_type = NSDocumentDirectory;
             domain = NSUserDomainMask;
@@ -194,20 +189,44 @@ ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectoryType type,
             osx_type = NSDownloadsDirectory;
             domain = NSUserDomainMask;
             break;
-        case KnownDirectoryType::LegacyData:
-            osx_type = NSApplicationSupportDirectory;
-            domain = NSUserDomainMask;
-            break;
-        case KnownDirectoryType::LegacyAllUsersData:
-            osx_type = NSApplicationSupportDirectory;
-            domain = NSLocalDomainMask;
-            fallback = "/Library/Application Support";
-            break;
-        case KnownDirectoryType::LegacyAllUsersSettings:
-            osx_type = NSApplicationSupportDirectory;
-            domain = NSLocalDomainMask;
-            fallback = "/Library/Application Support";
-            break;
+        case KnownDirectoryType::GlobalData: {
+            // We ignore the 'create' option here because /Users/Shared is a folder that should always exist,
+            // and if it doesn't, we need to handle it in a particular way here.
+            MutableString path {};
+            if (auto const o = OSXGetSystemFilepath(a, NSUserDirectory, NSLocalDomainMask, true);
+                o.HasError()) {
+                g_log.Warning(k_main_log_module, "Failed to get /Users: {}", o.Error());
+                path = a.Clone("/Users"_s);
+            }
+
+            ASSERT(!EndsWith(path, '/'));
+            auto p = DynamicArray<char>::FromOwnedSpan(path, a);
+            dyn::Append(p, '/');
+            dyn::AppendSpan(p, "Shared");
+
+            // /Users/Shared should be always be present on macOS systems. However, if it's not, we try to
+            // create it here. We got the attributes by looking at the result of `stat /Users/Shared`.
+            {
+                NSDictionary* attributes = @{
+                    NSFilePosixPermissions : @01775, // full permissions for all
+                    NSFileOwnerAccountID : @0, // root (UID 0)
+                    NSFileGroupOwnerAccountID : @0 // wheel (GID 0)
+                };
+
+                NSError* error = nil;
+                if (![[NSFileManager defaultManager] createDirectoryAtPath:StringToNSString(p)
+                                               withIntermediateDirectories:NO
+                                                                attributes:attributes
+                                                                     error:&error]) {
+                    auto const ec = FilesystemErrorFromNSError(error);
+                    if (ec != FilesystemError::PathAlreadyExists)
+                        g_log.Error(k_main_log_module, "Failed to create /Users/Shared: {}", ec);
+                }
+            }
+
+            return p.ToOwnedSpan();
+        }
+
         case KnownDirectoryType::GlobalVst3Plugins:
             osx_type = NSLibraryDirectory;
             domain = NSLocalDomainMask;
@@ -230,6 +249,27 @@ ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectoryType type,
             domain = NSUserDomainMask;
             extra_subdirs = Array {"Audio"_s, "Plug-Ins", "CLAP"};
             break;
+
+        case KnownDirectoryType::LegacyPluginSettings:
+            osx_type = NSMusicDirectory;
+            domain = NSUserDomainMask;
+            extra_subdirs = Array {"Audio Music Apps"_s, "Plug-In Settings"};
+            break;
+        case KnownDirectoryType::LegacyData:
+            osx_type = NSApplicationSupportDirectory;
+            domain = NSUserDomainMask;
+            break;
+        case KnownDirectoryType::LegacyAllUsersData:
+            osx_type = NSApplicationSupportDirectory;
+            domain = NSLocalDomainMask;
+            fallback = "/Library/Application Support";
+            break;
+        case KnownDirectoryType::LegacyAllUsersSettings:
+            osx_type = NSApplicationSupportDirectory;
+            domain = NSLocalDomainMask;
+            fallback = "/Library/Application Support";
+            break;
+
         case KnownDirectoryType::Count: PanicIfReached();
     }
 

@@ -344,13 +344,11 @@ ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectoryType type,
             ASSERT(path::IsAbsolute(result));
             return result;
         }
-        case KnownDirectoryType::LegacyAllUsersData: folder_id = FOLDERID_Public; break;
-        case KnownDirectoryType::LegacyAllUsersSettings: folder_id = FOLDERID_ProgramData; break;
-        case KnownDirectoryType::LegacyPluginSettings: folder_id = FOLDERID_RoamingAppData; break;
-        case KnownDirectoryType::LegacyData: folder_id = FOLDERID_RoamingAppData; break;
         case KnownDirectoryType::Logs: folder_id = FOLDERID_LocalAppData; break;
         case KnownDirectoryType::Documents: folder_id = FOLDERID_Documents; break;
         case KnownDirectoryType::Downloads: folder_id = FOLDERID_Downloads; break;
+        case KnownDirectoryType::GlobalData: folder_id = FOLDERID_Public; break;
+
         case KnownDirectoryType::GlobalClapPlugins:
             folder_id = FOLDERID_ProgramFilesCommon;
             subfolders = Array {L"CLAP"_s};
@@ -367,6 +365,12 @@ ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectoryType type,
             folder_id = IsRunningUnderWine() ? FOLDERID_LocalAppData : FOLDERID_UserProgramFilesCommon;
             subfolders = Array {L"VST3"_s};
             break;
+
+        case KnownDirectoryType::LegacyAllUsersData: folder_id = FOLDERID_Public; break;
+        case KnownDirectoryType::LegacyAllUsersSettings: folder_id = FOLDERID_ProgramData; break;
+        case KnownDirectoryType::LegacyPluginSettings: folder_id = FOLDERID_RoamingAppData; break;
+        case KnownDirectoryType::LegacyData: folder_id = FOLDERID_RoamingAppData; break;
+
         case KnownDirectoryType::Count: PanicIfReached(); break;
     }
 

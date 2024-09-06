@@ -138,11 +138,16 @@ enum class KnownDirectoryType : u8 {
     Logs,
     Temporary,
 
-    // TODO:
-    // UserSettings
-    // UserPresets
-    // UserLibraries
-    // is ~/Library/Audio/Presets/ needed on macos because of sandboxing?
+    // Shared between all users, it's carefully picked to be writable by all users even when we're running as
+    // an audio plugin and therefore could be sandboxed.
+    //
+    // We tend to prefer global locations because as an audio plugin, we're almost always going to be
+    // installed globally anyways.
+    //
+    // NOTE: on Linux it's not global, it's in the user's home directory.
+    GlobalData,
+
+    // TODO: UserData
 
     GlobalVst3Plugins,
     UserVst3Plugins,

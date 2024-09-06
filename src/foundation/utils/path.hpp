@@ -215,6 +215,7 @@ PUBLIC constexpr Optional<String> Directory(String path, Format format = Format:
     return {};
 }
 
+// Be careful with this, paths need to be the same level of 'Canonicalised'
 PUBLIC constexpr bool IsWithinDirectory(String path, String directory, Format format = Format::Native) {
     if (directory.size >= path.size) return false;
     if (!IsPathSeparator(path[directory.size])) return false;

@@ -140,6 +140,218 @@ TEST_CASE(TestFileApi) {
 TEST_CASE(TestFilesystem) {
     auto& a = tester.scratch_arena;
 
+    SUBCASE("DirectoryIteratorV2") {
+        auto dir = String(path::Join(a, Array {tests::TempFolder(tester), "DirectoryIteratorV2 test"}));
+        auto _ = Delete(dir, {.type = DeleteOptions::Type::DirectoryRecursively});
+        TRY(CreateDirectory(dir, {.create_intermediate_directories = true}));
+        DEFER {
+            if (auto o = Delete(dir, {.type = DeleteOptions::Type::DirectoryRecursively}); o.HasError())
+                LOG_WARNING("failed to delete temp dir: {}", o.Error());
+        };
+
+        SUBCASE("empty dir") {
+            SUBCASE("non-recursive") {
+                auto it = REQUIRE_UNWRAP(dir_iterator::Create(a, dir, {}));
+                DEFER { dir_iterator::Destroy(it); };
+                auto opt_entry = REQUIRE_UNWRAP(dir_iterator::Next(it, a));
+                CHECK(!opt_entry.HasValue());
+            }
+            SUBCASE("recursive") {
+                auto it = REQUIRE_UNWRAP(dir_iterator::RecursiveCreate(a, dir, {}));
+                DEFER { dir_iterator::Destroy(it); };
+                auto opt_entry = REQUIRE_UNWRAP(dir_iterator::Next(it, a));
+                CHECK(!opt_entry.HasValue());
+            }
+        }
+
+        SUBCASE("dir with files") {
+            auto const file1 = path::Join(a, Array {dir, "file1.txt"_s});
+            auto const file2 = path::Join(a, Array {dir, "file2.txt"_s});
+            auto const file3 = path::Join(a, Array {dir, ".file3.wav"_s});
+            auto const subdir1 = String(path::Join(a, Array {dir, "subdir1"_s}));
+            auto const subdir1_file1 = path::Join(a, Array {subdir1, "subdir1_file1.txt"_s});
+            auto const subdir2 = String(path::Join(a, Array {dir, "subdir2"_s}));
+            auto const subdir2_file1 = path::Join(a, Array {subdir2, "subdir2_file1.txt"_s});
+            auto const subdir2_subdir = String(path::Join(a, Array {subdir2, "subdir2_subdir"_s}));
+
+            TRY(CreateDirectory(subdir1, {.create_intermediate_directories = false}));
+            TRY(CreateDirectory(subdir2, {.create_intermediate_directories = false}));
+            TRY(CreateDirectory(subdir2_subdir, {.create_intermediate_directories = false}));
+
+            TRY(WriteFile(file1, "data"_s.ToByteSpan()));
+            TRY(WriteFile(file2, "data"_s.ToByteSpan()));
+            TRY(WriteFile(file3, "data"_s.ToByteSpan()));
+            TRY(WriteFile(subdir1_file1, "data"_s.ToByteSpan()));
+            TRY(WriteFile(subdir2_file1, "data"_s.ToByteSpan()));
+
+            auto contains = [](Span<dir_iterator::Entry const> entries, dir_iterator::Entry entry) {
+                for (auto const& e : entries)
+                    if (e.subpath == entry.subpath && e.type == entry.type) return true;
+                return false;
+            };
+            DynamicArrayBounded<dir_iterator::Entry, 10> entries;
+
+            SUBCASE("non-recursive") {
+                SUBCASE("standard options") {
+                    auto it = REQUIRE_UNWRAP(dir_iterator::Create(a,
+                                                                  dir,
+                                                                  {
+                                                                      .wildcard = "*",
+                                                                      .get_file_size = false,
+                                                                      .skip_dot_files = false,
+                                                                  }));
+                    DEFER { dir_iterator::Destroy(it); };
+
+                    while (auto opt_entry = REQUIRE_UNWRAP(dir_iterator::Next(it, a)))
+                        dyn::Append(entries, opt_entry.Value());
+
+                    CHECK_EQ(entries.size, 5u);
+                    CHECK(contains(entries, {.subpath = a.Clone("file1.txt"_s), .type = FileType::File}));
+                    CHECK(contains(entries, {.subpath = a.Clone("file2.txt"_s), .type = FileType::File}));
+                    CHECK(contains(entries, {.subpath = a.Clone(".file3.wav"_s), .type = FileType::File}));
+                    CHECK(contains(entries, {.subpath = a.Clone("subdir1"_s), .type = FileType::Directory}));
+                    CHECK(contains(entries, {.subpath = a.Clone("subdir2"_s), .type = FileType::Directory}));
+                }
+
+                SUBCASE("skip dot files") {
+                    auto it = REQUIRE_UNWRAP(dir_iterator::Create(a,
+                                                                  dir,
+                                                                  {
+                                                                      .wildcard = "*",
+                                                                      .get_file_size = false,
+                                                                      .skip_dot_files = true,
+                                                                  }));
+                    DEFER { dir_iterator::Destroy(it); };
+
+                    while (auto opt_entry = REQUIRE_UNWRAP(dir_iterator::Next(it, a)))
+                        dyn::Append(entries, opt_entry.Value());
+
+                    CHECK_EQ(entries.size, 4u);
+                    CHECK(contains(entries, {.subpath = a.Clone("file1.txt"_s), .type = FileType::File}));
+                    CHECK(contains(entries, {.subpath = a.Clone("file2.txt"_s), .type = FileType::File}));
+                    CHECK(contains(entries, {.subpath = a.Clone("subdir1"_s), .type = FileType::Directory}));
+                    CHECK(contains(entries, {.subpath = a.Clone("subdir2"_s), .type = FileType::Directory}));
+                }
+
+                SUBCASE("only .txt files") {
+                    auto it = REQUIRE_UNWRAP(dir_iterator::Create(a,
+                                                                  dir,
+                                                                  {
+                                                                      .wildcard = "*.txt",
+                                                                      .get_file_size = false,
+                                                                      .skip_dot_files = false,
+                                                                  }));
+                    DEFER { dir_iterator::Destroy(it); };
+
+                    while (auto opt_entry = REQUIRE_UNWRAP(dir_iterator::Next(it, a)))
+                        dyn::Append(entries, opt_entry.Value());
+
+                    CHECK_EQ(entries.size, 2u);
+                    CHECK(contains(entries, {.subpath = a.Clone("file1.txt"_s), .type = FileType::File}));
+                    CHECK(contains(entries, {.subpath = a.Clone("file2.txt"_s), .type = FileType::File}));
+                }
+
+                SUBCASE("get file size") {
+                    auto it = REQUIRE_UNWRAP(dir_iterator::Create(a,
+                                                                  dir,
+                                                                  {
+                                                                      .wildcard = "*",
+                                                                      .get_file_size = true,
+                                                                      .skip_dot_files = false,
+                                                                  }));
+                    DEFER { dir_iterator::Destroy(it); };
+                    while (auto opt_entry = REQUIRE_UNWRAP(dir_iterator::Next(it, a)))
+                        if (opt_entry->type == FileType::File) CHECK_EQ(opt_entry->file_size, 4u);
+                }
+            }
+
+            SUBCASE("recursive") {
+                SUBCASE("standard options") {
+                    auto it = REQUIRE_UNWRAP(dir_iterator::RecursiveCreate(a,
+                                                                           dir,
+                                                                           {
+                                                                               .wildcard = "*",
+                                                                               .get_file_size = false,
+                                                                               .skip_dot_files = false,
+                                                                           }));
+                    DEFER { dir_iterator::Destroy(it); };
+
+                    while (auto opt_entry = REQUIRE_UNWRAP(dir_iterator::Next(it, a)))
+                        dyn::Append(entries, opt_entry.Value());
+
+                    CHECK_EQ(entries.size, 8u);
+                    CHECK(contains(entries, {.subpath = a.Clone("file1.txt"_s), .type = FileType::File}));
+                    CHECK(contains(entries, {.subpath = a.Clone("file2.txt"_s), .type = FileType::File}));
+                    CHECK(contains(entries, {.subpath = a.Clone(".file3.wav"_s), .type = FileType::File}));
+                    CHECK(contains(entries, {.subpath = a.Clone("subdir1"_s), .type = FileType::Directory}));
+                    CHECK(contains(entries, {.subpath = a.Clone("subdir2"_s), .type = FileType::Directory}));
+                    CHECK(contains(entries,
+                                   {.subpath = path::Join(a, Array {"subdir2"_s, "subdir2_subdir"_s}),
+                                    .type = FileType::Directory}));
+                    CHECK(contains(entries,
+                                   {.subpath = path::Join(a, Array {"subdir1"_s, "subdir1_file1.txt"_s}),
+                                    .type = FileType::File}));
+                    CHECK(contains(entries,
+                                   {.subpath = path::Join(a, Array {"subdir2"_s, "subdir2_file1.txt"_s}),
+                                    .type = FileType::File}));
+                }
+
+                SUBCASE("skip dot files") {
+                    auto it = REQUIRE_UNWRAP(dir_iterator::RecursiveCreate(a,
+                                                                           dir,
+                                                                           {
+                                                                               .wildcard = "*",
+                                                                               .get_file_size = false,
+                                                                               .skip_dot_files = true,
+                                                                           }));
+                    DEFER { dir_iterator::Destroy(it); };
+
+                    while (auto opt_entry = REQUIRE_UNWRAP(dir_iterator::Next(it, a)))
+                        dyn::Append(entries, opt_entry.Value());
+
+                    CHECK_EQ(entries.size, 7u);
+                    CHECK(contains(entries, {.subpath = a.Clone("file1.txt"_s), .type = FileType::File}));
+                    CHECK(contains(entries, {.subpath = a.Clone("file2.txt"_s), .type = FileType::File}));
+                    CHECK(contains(entries, {.subpath = a.Clone("subdir1"_s), .type = FileType::Directory}));
+                    CHECK(contains(entries, {.subpath = a.Clone("subdir2"_s), .type = FileType::Directory}));
+                    CHECK(contains(entries,
+                                   {.subpath = path::Join(a, Array {"subdir2"_s, "subdir2_subdir"_s}),
+                                    .type = FileType::Directory}));
+                    CHECK(contains(entries,
+                                   {.subpath = path::Join(a, Array {"subdir1"_s, "subdir1_file1.txt"_s}),
+                                    .type = FileType::File}));
+                    CHECK(contains(entries,
+                                   {.subpath = path::Join(a, Array {"subdir2"_s, "subdir2_file1.txt"_s}),
+                                    .type = FileType::File}));
+                }
+
+                SUBCASE("only .txt files") {
+                    auto it = REQUIRE_UNWRAP(dir_iterator::RecursiveCreate(a,
+                                                                           dir,
+                                                                           {
+                                                                               .wildcard = "*.txt",
+                                                                               .get_file_size = false,
+                                                                               .skip_dot_files = false,
+                                                                           }));
+                    DEFER { dir_iterator::Destroy(it); };
+
+                    while (auto opt_entry = REQUIRE_UNWRAP(dir_iterator::Next(it, a)))
+                        dyn::Append(entries, opt_entry.Value());
+
+                    CHECK_EQ(entries.size, 4u);
+                    CHECK(contains(entries, {.subpath = a.Clone("file1.txt"_s), .type = FileType::File}));
+                    CHECK(contains(entries, {.subpath = a.Clone("file2.txt"_s), .type = FileType::File}));
+                    CHECK(contains(entries,
+                                   {.subpath = path::Join(a, Array {"subdir1"_s, "subdir1_file1.txt"_s}),
+                                    .type = FileType::File}));
+                    CHECK(contains(entries,
+                                   {.subpath = path::Join(a, Array {"subdir2"_s, "subdir2_file1.txt"_s}),
+                                    .type = FileType::File}));
+                }
+            }
+        }
+    }
+
     SUBCASE("DirectoryIterator") {
         SUBCASE("on an empty dir") {
             auto temp_dir =

@@ -13,6 +13,9 @@ enum class Format {
     Native = IS_WINDOWS ? Windows : Posix,
 };
 
+constexpr char k_dir_separator = IS_WINDOWS ? '\\' : '/';
+
+// TODO: rename IsDirectorySeparator
 PUBLIC constexpr bool IsPathSeparator(char c, Format format = Format::Native) {
     return (format == Format::Windows) ? (c == '\\' || c == '/') : (c == '/');
 }

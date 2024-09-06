@@ -292,6 +292,7 @@ struct DirectoryIteratorOptions {
     String wildcard = "*";
     bool get_file_size = false;
     bool skip_dot_files = true;
+    bool get_full_path = false;
 };
 
 // IMPROVE: tidy up the usage of the options - we seem to be needlessly spliting them out into individual
@@ -345,6 +346,62 @@ class RecursiveDirectoryIterator {
     bool m_get_file_size {};
     bool m_skip_dot_files {};
 };
+
+// =======================================================================================================
+
+namespace dir_iterator {
+
+struct Options {
+    String wildcard = "*";
+    bool get_file_size = false;
+    bool skip_dot_files = true;
+    bool get_full_path = false;
+};
+
+struct Entry {
+    MutableString subpath; // path relative to the base iterator path
+    FileType type;
+    u64 file_size; // ONLY valid if options.get_file_size == true
+    MutableString full_path; // ONLY valid if options.get_full_path == true
+};
+
+struct Iterator {
+    // private
+    static ErrorCodeOr<Iterator> InternalCreate(ArenaAllocator& arena, String path, Options options) {
+        Iterator result {
+            .options = options,
+            .canonical_base_path = TRY(CanonicalizePath(arena, path)),
+        };
+        result.options.wildcard = arena.Clone(options.wildcard);
+        return result;
+    }
+
+    Options options;
+    void* handle;
+    String canonical_base_path;
+    bool reached_end;
+    Entry first_entry; // Windows only
+};
+
+struct RecursiveIterator {
+    ArenaList<Iterator, false> stack;
+    DynamicArray<char> dir_path_to_iterate;
+    String canonical_base_path;
+    Options options;
+};
+
+ErrorCodeOr<Iterator> Create(ArenaAllocator& a, String path, Options options);
+ErrorCodeOr<RecursiveIterator> RecursiveCreate(ArenaAllocator& a, String path, Options options);
+
+void Destroy(Iterator& it);
+void Destroy(RecursiveIterator& it);
+
+ErrorCodeOr<Optional<Entry>> Next(Iterator& it, ArenaAllocator& result_arena);
+ErrorCodeOr<Optional<Entry>> Next(RecursiveIterator& it, ArenaAllocator& result_arena);
+
+} // namespace dir_iterator
+
+// =======================================================================================================
 
 ErrorCodeOr<Span<MutableString>> GetFilesRecursive(ArenaAllocator& a,
                                                    String directory,

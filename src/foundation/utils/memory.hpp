@@ -97,6 +97,18 @@ PUBLIC constexpr Span<u8 const> AsBytes(Type const& obj) {
 }
 
 template <typename Type>
-PUBLIC constexpr Span<u8> AsMutableBytes(Type& obj) {
-    return {(u8*)&obj, sizeof(Type)};
+PUBLIC constexpr void WriteAndIncrement(usize& pos, Span<u8> dest, Type const& src) {
+    if constexpr (requires(Type t) { t.size; }) {
+        static_assert(sizeof(typename Type::ValueType) == 1);
+        CopyMemory(&dest.data[pos], src.data, src.size);
+        pos += src.size;
+    } else {
+        static_assert(Same<Type, u8> || Same<Type, char>);
+        dest.data[pos] = (u8)src;
+        pos += 1;
+    }
+}
+template <typename Type>
+PUBLIC constexpr void WriteAndIncrement(usize& pos, Span<char> dest, Type const& src) {
+    WriteAndIncrement(pos, {(u8*)dest.data, dest.size}, src);
 }

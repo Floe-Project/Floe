@@ -201,6 +201,106 @@ ErrorCodeOr<void> RecursiveDirectoryIterator::Increment() {
     return k_success;
 }
 
+namespace dir_iterator {
+
+static ErrorCodeOr<Iterator> CreateSubIterator(ArenaAllocator& a, String path, Options options) {
+    // We do not pass the wildcard into the sub iterators because we need to get the folders, not just paths
+    // that match the pattern.
+    options.wildcard = "*";
+    return Create(a, path, options);
+}
+
+ErrorCodeOr<RecursiveIterator> RecursiveCreate(ArenaAllocator& a, String path, Options options) {
+    auto it = TRY(CreateSubIterator(a, path, options));
+    RecursiveIterator result {
+        .stack = {a},
+        .dir_path_to_iterate = {a},
+        .canonical_base_path = a.Clone(it.canonical_base_path),
+        .options = options,
+    };
+    result.stack.Prepend(it);
+    result.options.wildcard = a.Clone(options.wildcard);
+    result.dir_path_to_iterate.Reserve(240);
+    return result;
+}
+
+void Destroy(RecursiveIterator& it) {
+    for (auto& i : it.stack)
+        Destroy(i);
+}
+
+ErrorCodeOr<Optional<Entry>> Next(RecursiveIterator& it, ArenaAllocator& result_arena) {
+    do {
+        if (it.dir_path_to_iterate.size) {
+            it.stack.Prepend(TRY(CreateSubIterator(result_arena, it.dir_path_to_iterate, it.options)));
+            dyn::Clear(it.dir_path_to_iterate);
+        }
+
+        while (!it.stack.Empty()) {
+            // Break to outer loop because we need to add another iterator to the stack. If we don't break, we
+            // might overwrite dir_path_to_iterate (since we just use a single string rather than a queue).
+            if (it.dir_path_to_iterate.size) break;
+
+            auto& first = *it.stack.begin();
+
+            auto entry_outcome = Next(first, result_arena);
+            if (entry_outcome.HasValue()) {
+                auto& opt_entry = entry_outcome.Value();
+                if (opt_entry) {
+                    auto& entry = *opt_entry;
+
+                    // If it's a directory we will queue it up to be iterated next time. We don't do this here
+                    // because if creating the subiterator fails, we have lost this current entry.
+                    if (entry.type == FileType::Directory) {
+                        dyn::Assign(it.dir_path_to_iterate, first.canonical_base_path);
+                        ASSERT(!EndsWith(it.dir_path_to_iterate, path::k_dir_separator));
+                        dyn::Append(it.dir_path_to_iterate, path::k_dir_separator);
+                        dyn::AppendSpan(it.dir_path_to_iterate, entry.subpath);
+                    }
+
+                    if (!MatchWildcard(it.options.wildcard, path::Filename(entry.subpath)) ||
+                        (it.options.skip_dot_files && entry.subpath.size && entry.subpath[0] == '.')) {
+                        continue;
+                    }
+
+                    // Each entry's subpath is relative to the base path of the iterator that created it. We
+                    // need convert the subpath relative from each iterator to the base path of this recursive
+                    // iterator.
+                    if (auto subiterator_path_delta =
+                            first.canonical_base_path.SubSpan(it.canonical_base_path.size);
+                        subiterator_path_delta.size) {
+                        subiterator_path_delta.RemovePrefix(1); // remove the '/'
+
+                        auto subpath = result_arena.AllocateExactSizeUninitialised<char>(
+                            subiterator_path_delta.size + 1 + entry.subpath.size);
+                        usize write_pos = 0;
+                        WriteAndIncrement(write_pos, subpath, subiterator_path_delta);
+                        WriteAndIncrement(write_pos, subpath, path::k_dir_separator);
+                        WriteAndIncrement(write_pos, subpath, entry.subpath);
+                        entry.subpath = subpath;
+                    }
+
+                    return entry;
+                } else {
+                    ASSERT(first.reached_end == true);
+                    Destroy(first);
+                    it.stack.RemoveFirst();
+                    continue;
+                }
+            } else {
+                Destroy(first);
+                it.stack.RemoveFirst();
+                return entry_outcome.Error();
+            }
+        }
+    } while (it.dir_path_to_iterate.size);
+
+    ASSERT(it.stack.Empty());
+    return k_nullopt;
+}
+
+} // namespace dir_iterator
+
 #ifndef __APPLE__
 ErrorCodeOr<bool> DeleteDirectoryIfMacBundle(String) { return false; }
 #endif

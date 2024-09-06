@@ -89,6 +89,13 @@ struct ArenaList {
             [this](Node* node) { Delete(node); });
     }
 
+    void RemoveFirst() {
+        ASSERT(first);
+        auto next = first->next;
+        Delete(first);
+        first = next;
+    }
+
     void Clear() {
         while (first) {
             auto next = first->next;

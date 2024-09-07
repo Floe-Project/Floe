@@ -199,6 +199,7 @@ TEST_CASE(TestFilesystem) {
                                                                       .wildcard = "*",
                                                                       .get_file_size = false,
                                                                       .skip_dot_files = false,
+                                                                      .get_full_path = false,
                                                                   }));
                     DEFER { dir_iterator::Destroy(it); };
 
@@ -220,6 +221,7 @@ TEST_CASE(TestFilesystem) {
                                                                       .wildcard = "*",
                                                                       .get_file_size = false,
                                                                       .skip_dot_files = true,
+                                                                      .get_full_path = false,
                                                                   }));
                     DEFER { dir_iterator::Destroy(it); };
 
@@ -240,6 +242,7 @@ TEST_CASE(TestFilesystem) {
                                                                       .wildcard = "*.txt",
                                                                       .get_file_size = false,
                                                                       .skip_dot_files = false,
+                                                                      .get_full_path = false,
                                                                   }));
                     DEFER { dir_iterator::Destroy(it); };
 
@@ -258,10 +261,29 @@ TEST_CASE(TestFilesystem) {
                                                                       .wildcard = "*",
                                                                       .get_file_size = true,
                                                                       .skip_dot_files = false,
+                                                                      .get_full_path = false,
                                                                   }));
                     DEFER { dir_iterator::Destroy(it); };
                     while (auto opt_entry = REQUIRE_UNWRAP(dir_iterator::Next(it, a)))
                         if (opt_entry->type == FileType::File) CHECK_EQ(opt_entry->file_size, 4u);
+                }
+
+                SUBCASE("get full path") {
+                    auto it = REQUIRE_UNWRAP(dir_iterator::Create(a,
+                                                                  dir,
+                                                                  {
+                                                                      .wildcard = "*",
+                                                                      .get_file_size = false,
+                                                                      .skip_dot_files = false,
+                                                                      .get_full_path = true,
+                                                                  }));
+                    DEFER { dir_iterator::Destroy(it); };
+
+                    while (auto opt_entry = REQUIRE_UNWRAP(dir_iterator::Next(it, a))) {
+                        CHECK(opt_entry->full_path.size);
+                        CHECK(StartsWithSpan(opt_entry->full_path, dir));
+                        CHECK(GetFileType(opt_entry->full_path).HasValue());
+                    }
                 }
             }
 

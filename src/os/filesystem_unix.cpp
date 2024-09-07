@@ -64,11 +64,10 @@ ErrorCodeOr<s64> LastWriteTime(String path) {
 namespace dir_iterator {
 
 ErrorCodeOr<Iterator> Create(ArenaAllocator& arena, String path, Options options) {
-    ASSERT(options.wildcard.size);
     auto result = TRY(Iterator::InternalCreate(arena, path, options));
 
     ArenaAllocatorWithInlineStorage<1024> scratch_arena;
-    auto handle = opendir(NullTerminated(result.canonical_base_path, scratch_arena));
+    auto handle = opendir(NullTerminated(result.base_path, scratch_arena));
     if (!handle) return FilesystemErrnoErrorCode(errno, "opendir");
     result.handle = handle;
 
@@ -103,7 +102,7 @@ ErrorCodeOr<Optional<Entry>> Next(Iterator& it, ArenaAllocator& result_arena) {
                         u64 s = 0;
                         if (it.options.get_file_size) {
                             PathArena temp_path_allocator;
-                            DynamicArray<char> full_path {it.canonical_base_path, temp_path_allocator};
+                            DynamicArray<char> full_path {it.base_path, temp_path_allocator};
                             ASSERT(!EndsWith(full_path, '/'));
                             dyn::Append(full_path, '/');
                             dyn::AppendSpan(full_path, entry_name);
@@ -117,11 +116,11 @@ ErrorCodeOr<Optional<Entry>> Next(Iterator& it, ArenaAllocator& result_arena) {
                     .full_path = ({
                         MutableString p {};
                         if (it.options.get_full_path) {
-                            p = result_arena.AllocateExactSizeUninitialised<char>(
-                                it.canonical_base_path.size + 1 + entry_name.size);
+                            p = result_arena.AllocateExactSizeUninitialised<char>(it.base_path.size + 1 +
+                                                                                  entry_name.size);
                             usize write_pos = 0;
-                            WriteAndIncrement(write_pos, p, it.canonical_base_path);
-                            WriteAndIncrement(write_pos, p, path::k_dir_separator);
+                            WriteAndIncrement(write_pos, p, it.base_path);
+                            WriteAndIncrement(write_pos, p, '/');
                             WriteAndIncrement(write_pos, p, entry_name);
                         }
                         p;

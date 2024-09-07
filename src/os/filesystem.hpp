@@ -368,9 +368,11 @@ struct Entry {
 struct Iterator {
     // private
     static ErrorCodeOr<Iterator> InternalCreate(ArenaAllocator& arena, String path, Options options) {
+        ASSERT(options.wildcard.size);
+        ASSERT(!path::EndsWithDirectorySeparator(path));
         Iterator result {
             .options = options,
-            .canonical_base_path = TRY(CanonicalizePath(arena, path)),
+            .base_path = arena.Clone(path),
         };
         result.options.wildcard = arena.Clone(options.wildcard);
         return result;
@@ -378,7 +380,7 @@ struct Iterator {
 
     Options options;
     void* handle;
-    String canonical_base_path;
+    String base_path;
     bool reached_end;
     Entry first_entry; // Windows only
 };

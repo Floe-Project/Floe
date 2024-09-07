@@ -215,7 +215,7 @@ ErrorCodeOr<RecursiveIterator> RecursiveCreate(ArenaAllocator& a, String path, O
     RecursiveIterator result {
         .stack = {a},
         .dir_path_to_iterate = {a},
-        .canonical_base_path = a.Clone(it.canonical_base_path),
+        .canonical_base_path = a.Clone(it.base_path),
         .options = options,
     };
     result.stack.Prepend(it);
@@ -252,7 +252,7 @@ ErrorCodeOr<Optional<Entry>> Next(RecursiveIterator& it, ArenaAllocator& result_
                     // If it's a directory we will queue it up to be iterated next time. We don't do this here
                     // because if creating the subiterator fails, we have lost this current entry.
                     if (entry.type == FileType::Directory) {
-                        dyn::Assign(it.dir_path_to_iterate, first.canonical_base_path);
+                        dyn::Assign(it.dir_path_to_iterate, first.base_path);
                         ASSERT(!EndsWith(it.dir_path_to_iterate, path::k_dir_separator));
                         dyn::Append(it.dir_path_to_iterate, path::k_dir_separator);
                         dyn::AppendSpan(it.dir_path_to_iterate, entry.subpath);
@@ -267,7 +267,7 @@ ErrorCodeOr<Optional<Entry>> Next(RecursiveIterator& it, ArenaAllocator& result_
                     // need convert the subpath relative from each iterator to the base path of this recursive
                     // iterator.
                     if (auto subiterator_path_delta =
-                            first.canonical_base_path.SubSpan(it.canonical_base_path.size);
+                            first.base_path.SubSpan(it.canonical_base_path.size);
                         subiterator_path_delta.size) {
                         subiterator_path_delta.RemovePrefix(1); // remove the '/'
 

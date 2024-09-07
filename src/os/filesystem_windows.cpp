@@ -672,11 +672,24 @@ ErrorCodeOr<s64> LastWriteTime(String path) {
 
 namespace dir_iterator {
 
-static Entry MakeEntry(WIN32_FIND_DATAW const& data, ArenaAllocator& arena) {
+static Entry
+MakeEntry(WIN32_FIND_DATAW const& data, ArenaAllocator& arena, String base_path, Options const& options) {
+    auto filename = Narrow(arena, FromNullTerminated(data.cFileName)).Value();
     return {
-        .subpath = Narrow(arena, FromNullTerminated(data.cFileName)).Value(),
+        .subpath = filename,
         .type = (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ? FileType::Directory : FileType::File,
         .file_size = (data.nFileSizeHigh * (MAXDWORD + 1)) + data.nFileSizeLow,
+        .full_path = ({
+            MutableString p {};
+            if (options.get_full_path) {
+                p = arena.AllocateExactSizeUninitialised<char>(base_path.size + 1 + filename.size);
+                usize pos = 0;
+                WriteAndIncrement(pos, p, base_path);
+                WriteAndIncrement(pos, p, '\\');
+                WriteAndIncrement(pos, p, filename);
+            }
+            p;
+        }),
     };
 }
 
@@ -697,12 +710,11 @@ ErrorCodeOr<Iterator> Create(ArenaAllocator& a, String path, Options options) {
     auto result = TRY(Iterator::InternalCreate(a, path, options));
 
     PathArena temp_path_arena;
-    auto wpath =
-        path::MakePathForWin32(ArrayT<WString>({Widen(temp_path_arena, result.canonical_base_path).Value(),
-                                                Widen(temp_path_arena, options.wildcard).Value()}),
-                               temp_path_arena,
-                               true)
-            .path;
+    auto wpath = path::MakePathForWin32(ArrayT<WString>({Widen(temp_path_arena, result.base_path).Value(),
+                                                         Widen(temp_path_arena, options.wildcard).Value()}),
+                                        temp_path_arena,
+                                        true)
+                     .path;
 
     WIN32_FIND_DATAW data {};
     auto handle = FindFirstFileExW(wpath.data,
@@ -720,7 +732,7 @@ ErrorCodeOr<Iterator> Create(ArenaAllocator& a, String path, Options options) {
         return FilesystemWin32ErrorCode(GetLastError(), "FindFirstFileW");
     }
     result.handle = handle;
-    result.first_entry = MakeEntry(data, a);
+    result.first_entry = MakeEntry(data, a, result.base_path, options);
     return result;
 }
 
@@ -752,7 +764,7 @@ ErrorCodeOr<Optional<Entry>> Next(Iterator& it, ArenaAllocator& result_arena) {
 
         if (ShouldSkipFile(FromNullTerminated(data.cFileName), it.options.skip_dot_files)) continue;
 
-        return MakeEntry(data, result_arena);
+        return MakeEntry(data, result_arena, it.base_path, it.options);
     }
 
     return Optional<Entry> {};

@@ -199,7 +199,6 @@ TEST_CASE(TestFilesystem) {
                                                                       .wildcard = "*",
                                                                       .get_file_size = false,
                                                                       .skip_dot_files = false,
-                                                                      .get_full_path = false,
                                                                   }));
                     DEFER { dir_iterator::Destroy(it); };
 
@@ -221,7 +220,6 @@ TEST_CASE(TestFilesystem) {
                                                                       .wildcard = "*",
                                                                       .get_file_size = false,
                                                                       .skip_dot_files = true,
-                                                                      .get_full_path = false,
                                                                   }));
                     DEFER { dir_iterator::Destroy(it); };
 
@@ -242,7 +240,6 @@ TEST_CASE(TestFilesystem) {
                                                                       .wildcard = "*.txt",
                                                                       .get_file_size = false,
                                                                       .skip_dot_files = false,
-                                                                      .get_full_path = false,
                                                                   }));
                     DEFER { dir_iterator::Destroy(it); };
 
@@ -261,29 +258,32 @@ TEST_CASE(TestFilesystem) {
                                                                       .wildcard = "*",
                                                                       .get_file_size = true,
                                                                       .skip_dot_files = false,
-                                                                      .get_full_path = false,
                                                                   }));
                     DEFER { dir_iterator::Destroy(it); };
                     while (auto opt_entry = REQUIRE_UNWRAP(dir_iterator::Next(it, a)))
                         if (opt_entry->type == FileType::File) CHECK_EQ(opt_entry->file_size, 4u);
                 }
 
-                SUBCASE("get full path") {
+                SUBCASE("no files matching pattern") {
                     auto it = REQUIRE_UNWRAP(dir_iterator::Create(a,
                                                                   dir,
                                                                   {
-                                                                      .wildcard = "*",
+                                                                      .wildcard = "sef9823ksdjf39s*",
                                                                       .get_file_size = false,
-                                                                      .skip_dot_files = false,
-                                                                      .get_full_path = true,
                                                                   }));
                     DEFER { dir_iterator::Destroy(it); };
+                    auto opt_entry = REQUIRE_UNWRAP(dir_iterator::Next(it, a));
+                    CHECK(!opt_entry.HasValue());
+                }
 
-                    while (auto opt_entry = REQUIRE_UNWRAP(dir_iterator::Next(it, a))) {
-                        CHECK(opt_entry->full_path.size);
-                        CHECK(StartsWithSpan(opt_entry->full_path, dir));
-                        CHECK(GetFileType(opt_entry->full_path).HasValue());
-                    }
+                SUBCASE("non existent dir") {
+                    REQUIRE(dir_iterator::Create(a,
+                                                 "C:/seflskflks"_s,
+                                                 {
+                                                     .wildcard = "*",
+                                                     .get_file_size = false,
+                                                 })
+                                .HasError());
                 }
             }
 
@@ -370,80 +370,6 @@ TEST_CASE(TestFilesystem) {
                                    {.subpath = path::Join(a, Array {"subdir2"_s, "subdir2_file1.txt"_s}),
                                     .type = FileType::File}));
                 }
-            }
-        }
-    }
-
-    SUBCASE("DirectoryIterator") {
-        SUBCASE("on an empty dir") {
-            auto temp_dir =
-                DynamicArray<char>::FromOwnedSpan(TRY(KnownDirectory(a, KnownDirectoryType::Temporary, true)),
-                                                  a);
-            path::JoinAppend(temp_dir, "empty_dir"_s);
-
-            TRY(CreateDirectory(temp_dir, {.create_intermediate_directories = true}));
-            DEFER {
-                if (auto o = Delete(temp_dir, {.type = DeleteOptions::Type::DirectoryOnlyIfEmpty});
-                    o.HasError())
-                    LOG_WARNING("failed to delete temp dir: {}", o.Error());
-            };
-
-            auto o = DirectoryIterator::Create(a, temp_dir);
-            REQUIRE(o.HasValue());
-            REQUIRE(!o.Value().HasMoreFiles());
-        }
-
-        SUBCASE("basic actions") {
-            if (auto o = AbsolutePath(a, "."); o.HasValue()) {
-                auto& dir = o.Value();
-
-                SUBCASE("all files") {
-                    if (auto it_outcome = DirectoryIterator::Create(a, dir); it_outcome.HasValue()) {
-                        auto& it = it_outcome.Value();
-                        while (it.HasMoreFiles()) {
-                            auto const& entry = it.Get();
-                            REQUIRE(entry.path.size);
-                            tester.log.Debug(k_os_log_module,
-                                             "directory entry: {}, type: {}",
-                                             entry.path,
-                                             (int)entry.type);
-
-                            if (auto inc_outcome = it.Increment(); inc_outcome.HasError()) {
-                                LOG_WARNING("failed to increment DirectoryIterator for reason {}",
-                                            inc_outcome.Error());
-                                break;
-                            }
-                        }
-                    } else {
-                        LOG_WARNING("failed to create DirectoryIterator at dir {} for reason {}",
-                                    dir,
-                                    it_outcome.Error());
-                    }
-                }
-
-                SUBCASE("no files matching pattern") {
-                    auto it = DirectoryIterator::Create(a,
-                                                        dir,
-                                                        {
-                                                            .wildcard = "sef9823ksdjf39s*",
-                                                            .get_file_size = false,
-                                                        });
-                    REQUIRE(it.HasValue());
-                    REQUIRE(!it.Value().HasMoreFiles());
-                }
-
-                SUBCASE("non existent dir") {
-                    REQUIRE(DirectoryIterator::Create(a,
-                                                      "C:/seflskflks"_s,
-                                                      {
-                                                          .wildcard = "*",
-                                                          .get_file_size = false,
-                                                      })
-                                .HasError());
-                }
-
-            } else {
-                LOG_WARNING("Could not convert to abs path: {}", o.Error());
             }
         }
     }

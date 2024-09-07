@@ -102,28 +102,18 @@ ErrorCodeOr<Optional<Entry>> Next(Iterator& it, ArenaAllocator& result_arena) {
                         u64 s = 0;
                         if (it.options.get_file_size) {
                             PathArena temp_path_allocator;
-                            DynamicArray<char> full_path {it.base_path, temp_path_allocator};
-                            ASSERT(!EndsWith(full_path, '/'));
-                            dyn::Append(full_path, '/');
-                            dyn::AppendSpan(full_path, entry_name);
-                            dyn::Append(full_path, '\0');
+                            auto full_path = temp_path_allocator.AllocateExactSizeUninitialised<char>(
+                                it.base_path.size + 1 + entry_name.size + 1);
+                            usize write_pos = 0;
+                            WriteAndIncrement(write_pos, full_path, it.base_path);
+                            WriteAndIncrement(write_pos, full_path, '/');
+                            WriteAndIncrement(write_pos, full_path, entry_name);
+                            WriteAndIncrement(write_pos, full_path, '\0');
                             struct stat info;
                             if (stat(full_path.data, &info) != 0) return FilesystemErrnoErrorCode(errno);
                             s = (u64)info.st_size;
                         }
                         s;
-                    }),
-                    .full_path = ({
-                        MutableString p {};
-                        if (it.options.get_full_path) {
-                            p = result_arena.AllocateExactSizeUninitialised<char>(it.base_path.size + 1 +
-                                                                                  entry_name.size);
-                            usize write_pos = 0;
-                            WriteAndIncrement(write_pos, p, it.base_path);
-                            WriteAndIncrement(write_pos, p, '/');
-                            WriteAndIncrement(write_pos, p, entry_name);
-                        }
-                        p;
                     }),
                 };
                 return result;
@@ -138,68 +128,6 @@ ErrorCodeOr<Optional<Entry>> Next(Iterator& it, ArenaAllocator& result_arena) {
 }
 
 } // namespace dir_iterator
-
-ErrorCodeOr<DirectoryIterator>
-DirectoryIterator::Create(Allocator& allocator, String path, DirectoryIteratorOptions options) {
-    PathArena temp_path_allocator;
-    char path_buffer[PATH_MAX * 2];
-    auto const real_path = realpath(NullTerminated(path, temp_path_allocator), path_buffer);
-    if (real_path == nullptr) return FilesystemErrnoErrorCode(errno, "realpath");
-
-    auto handle = ::opendir(real_path);
-    if (!handle) return FilesystemErrnoErrorCode(errno, "opendir");
-
-    DirectoryIterator result {FromNullTerminated(real_path), allocator};
-    result.m_handle = handle;
-    result.m_base_path_size = result.m_e.path.size;
-    dyn::Assign(result.m_wildcard, options.wildcard);
-    result.m_get_file_size = options.get_file_size;
-    result.m_skip_dot_files = options.skip_dot_files;
-
-    TRY(result.Increment());
-    return result;
-}
-
-DirectoryIterator::~DirectoryIterator() {
-    if (m_handle) ::closedir((DIR*)m_handle);
-}
-
-ErrorCodeOr<void> DirectoryIterator::Increment() {
-    if (m_reached_end) return k_success;
-    ASSERT(m_handle);
-    bool skip;
-    do {
-        skip = false;
-        errno = 0;
-        // "modern implementations (including the glibc implementation), concurrent calls to readdir() that
-        // specify different directory streams are thread-safe"
-        auto entry = readdir((DIR*)m_handle); // NOLINT(concurrency-mt-unsafe)
-        if (entry) {
-            auto const entry_name = FromNullTerminated(entry->d_name);
-            if (!MatchWildcard(m_wildcard, entry_name) || entry_name == "."_s || entry_name == ".."_s ||
-                (m_skip_dot_files && entry_name.size && entry_name[0] == '.')) {
-                skip = true;
-            } else {
-                dyn::Resize(m_e.path, m_base_path_size);
-                path::JoinAppend(m_e.path, entry_name);
-                m_e.type = entry->d_type == DT_DIR ? FileType::Directory : FileType::File;
-                if (m_get_file_size) {
-                    struct ::stat info;
-                    auto r = ::stat(dyn::NullTerminated(m_e.path), &info);
-                    if (r != 0) return FilesystemErrnoErrorCode(errno);
-
-                    m_e.file_size = (u64)info.st_size;
-                }
-            }
-        } else {
-            m_reached_end = true;
-            if (errno) return FilesystemErrnoErrorCode(errno);
-            break;
-        }
-    } while (skip);
-
-    return k_success;
-}
 
 ErrorCodeOr<void> File::Lock(FileLockType type) {
     int const operation = ({

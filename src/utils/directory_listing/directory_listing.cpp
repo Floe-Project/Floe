@@ -112,24 +112,24 @@ DirectoryListing::DirectoryListing(DirectoryListing&& other)
     Swap(m_roots, other.m_roots);
 }
 
-template <typename Iterator, typename CallbackType>
-static ErrorCodeOr<void> IterateDirTemplate(String dir, CallbackType callback) {
+template <typename CreateFunction, typename CallbackType>
+static ErrorCodeOr<void>
+IterateDirTemplate(CreateFunction create_function, String dir, CallbackType callback) {
     ASSERT(path::IsAbsolute(dir));
     ArenaAllocatorWithInlineStorage<1000> allocator;
-    auto it = TRY(Iterator::Create(allocator, dir));
-    while (it.HasMoreFiles()) {
-        TRY(callback(it.Get()));
-        TRY(it.Increment());
-    }
+    auto it = TRY(create_function(allocator, dir, {}));
+    DEFER { dir_iterator::Destroy(it); };
+    while (auto entry = TRY(dir_iterator::Next(it, allocator)))
+        TRY(callback(*entry));
     return k_success;
 }
 
 template <typename CallbackType>
 static ErrorCodeOr<void> IterateDir(String dir, bool recursive, CallbackType callback) {
     if (recursive)
-        return IterateDirTemplate<RecursiveDirectoryIterator>(dir, callback);
+        return IterateDirTemplate(dir_iterator::RecursiveCreate, dir, callback);
     else
-        return IterateDirTemplate<DirectoryIterator>(dir, callback);
+        return IterateDirTemplate(dir_iterator::Create, dir, callback);
 }
 
 DirectoryListing::ScanResult DirectoryListing::Rescan() {
@@ -184,7 +184,7 @@ DirectoryListing::ScanResult DirectoryListing::Rescan() {
 
         dyn::Append(m_entries, Entry {root_path, Entry::Type::Directory, create_metadata(root_path)});
 
-        auto callback = [this, &create_metadata](DirectoryEntry const& e) -> ErrorCodeOr<void> {
+        auto callback = [&](dir_iterator::Entry const& e) -> ErrorCodeOr<void> {
             if (m_entries.size == (Entry::k_last_valid_index + 1))
                 return ErrorCode(FilesystemError::FolderContainsTooManyFiles);
 
@@ -195,7 +195,7 @@ DirectoryListing::ScanResult DirectoryListing::Rescan() {
             } else if (e.type == FileType::File) {
                 bool matches = false;
                 for (auto wildcard : m_file_name_wildcards)
-                    if (MatchWildcard(wildcard, path::Filename(e.path))) {
+                    if (MatchWildcard(wildcard, path::Filename(e.subpath))) {
                         matches = true;
                         break;
                     }
@@ -207,7 +207,7 @@ DirectoryListing::ScanResult DirectoryListing::Rescan() {
                 return k_success;
             }
 
-            auto const entry_path = String(e.path).Clone(m_arena, CloneType::Shallow);
+            auto const entry_path = path::Join(m_arena, Array {root_path, e.subpath});
             dyn::Append(m_entries, Entry {entry_path, type, create_metadata(entry_path)});
 
             return k_success;

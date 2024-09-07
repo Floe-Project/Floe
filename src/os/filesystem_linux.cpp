@@ -362,20 +362,17 @@ static ErrorCodeOr<LinuxWatchedDirectory*> WatchDirectory(DirectoryWatcher::Watc
     PathPool path_pool {};
     if (recursive) {
         auto const try_watch_subdirs = [&]() -> ErrorCodeOr<void> {
-            auto it = TRY(RecursiveDirectoryIterator::Create(scratch_arena,
-                                                             dir.path,
-                                                             {
-                                                                 .wildcard = "*",
-                                                                 .get_file_size = false,
-                                                             }));
+            auto it = TRY(dir_iterator::RecursiveCreate(scratch_arena,
+                                                        dir.path,
+                                                        {
+                                                            .wildcard = "*",
+                                                            .get_file_size = false,
+                                                        }));
+            DEFER { dir_iterator::Destroy(it); };
             DynamicArray<char> full_subpath {dir.path, scratch_arena};
-            while (it.HasMoreFiles()) {
-                auto const& entry = it.Get();
-
-                if (entry.type == FileType::Directory) {
-                    String subpath = entry.path;
-                    subpath = TrimStartIfMatches(subpath, dir.path);
-                    subpath = path::TrimDirectorySeparatorsStart(subpath);
+            while (auto const entry = TRY(dir_iterator::Next(it, scratch_arena))) {
+                if (entry->type == FileType::Directory) {
+                    String subpath = entry->subpath;
 
                     dyn::Resize(full_subpath, dir.path.size);
                     path::JoinAppend(full_subpath, subpath);
@@ -388,8 +385,6 @@ static ErrorCodeOr<LinuxWatchedDirectory*> WatchDirectory(DirectoryWatcher::Watc
                         .watch_id_invalidated = false,
                     };
                 }
-
-                TRY(it.Increment());
             }
             return k_success;
         };
@@ -660,31 +655,33 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                     // we also need to check the contents of the new directory, it might have already have
                     // files or subdirectories added
                     {
-                        auto it = TRY(RecursiveDirectoryIterator::Create(args.scratch_arena,
-                                                                         full_path,
-                                                                         {
-                                                                             .wildcard = "*",
-                                                                             .get_file_size = false,
-                                                                         }));
-                        while (it.HasMoreFiles()) {
-                            auto& entry = it.Get();
+                        auto it = TRY(dir_iterator::RecursiveCreate(args.scratch_arena,
+                                                                    full_path,
+                                                                    {
+                                                                        .wildcard = "*",
+                                                                        .get_file_size = false,
+                                                                    }));
+                        DEFER { dir_iterator::Destroy(it); };
+                        while (auto const entry = TRY(dir_iterator::Next(it, args.scratch_arena))) {
+                            DynamicArray<char> entry_full_path {String(full_path), args.scratch_arena};
+                            path::JoinAppend(entry_full_path, entry->subpath);
 
-                            ASSERT(StartsWithSpan(entry.path, this_dir.RootDirPath()));
-                            auto subsubpath = entry.path.Items().SubSpan(this_dir.RootDirPath().size);
+                            ASSERT(StartsWithSpan(entry_full_path, this_dir.RootDirPath()));
+                            auto subsubpath = entry_full_path.Items().SubSpan(this_dir.RootDirPath().size);
                             if (StartsWith(subsubpath, '/')) subsubpath = subsubpath.SubSpan(1);
 
                             this_dir.dir.directory_changes.Add(
                                 {
                                     .subpath = args.result_arena.Clone(subsubpath),
-                                    .file_type = entry.type,
+                                    .file_type = entry->type,
                                     .changes = DirectoryWatcher::ChangeType::Added,
                                 },
                                 args.result_arena);
 
-                            if (entry.type == FileType::Directory) {
+                            if (entry->type == FileType::Directory) {
                                 auto const sub_watch_id_outcome =
                                     InotifyWatch(watcher.native_data.int_id,
-                                                 NullTerminated(entry.path, args.scratch_arena));
+                                                 dyn::NullTerminated(entry_full_path));
                                 bool skip = false;
                                 if (sub_watch_id_outcome.HasError()) {
                                     auto const err = sub_watch_id_outcome.Error();
@@ -704,8 +701,6 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                                     };
                                 }
                             }
-
-                            TRY(it.Increment());
                         }
                     }
                 }

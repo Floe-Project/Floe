@@ -266,88 +266,6 @@ ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments args);
 
 // DirectoryIterator
 // =======================================================================================================
-// When creating one of these iterators, they will not return an error if no files that match the pattern, but
-// instead it will return false to HasMoreFiles().
-//
-// Every entry begins with the canonical base path (CanonicalBasePath()), so it's ok to offset into the path
-// to get the relative path.
-//
-// Usage:
-//
-// auto it = TRY(DirectoryIterator::Create(alloc, folder, "*"));
-// while (it.HasMoreFiles()) {
-//     auto const &entry = it.Get();
-//     // use entry
-//     TRY(it.Increment());
-// }
-
-struct DirectoryEntry {
-    DirectoryEntry(String p, Allocator& a) : path(p, a) {}
-    DynamicArray<char> path;
-    u64 file_size {};
-    FileType type {FileType::Directory};
-};
-
-struct DirectoryIteratorOptions {
-    String wildcard = "*";
-    bool get_file_size = false;
-    bool skip_dot_files = true;
-    bool get_full_path = false;
-};
-
-// IMPROVE: tidy up the usage of the options - we seem to be needlessly spliting them out into individual
-// fields when we could just keep the struct
-class DirectoryIterator {
-  public:
-    NON_COPYABLE(DirectoryIterator);
-
-    DirectoryIterator(DirectoryIterator&& other);
-    DirectoryIterator& operator=(DirectoryIterator&& other);
-
-    ~DirectoryIterator();
-
-    static ErrorCodeOr<DirectoryIterator>
-    Create(Allocator& a, String path, DirectoryIteratorOptions options = {});
-
-    DirectoryEntry const& Get() const { return m_e; }
-    bool HasMoreFiles() const { return !m_reached_end; }
-    ErrorCodeOr<void> Increment();
-    String CanonicalBasePath() const { return m_e.path.Items().SubSpan(0, m_base_path_size); }
-
-  private:
-    DirectoryIterator(String p, Allocator& a) : m_e(p, a), m_wildcard(a) {}
-
-    bool m_reached_end {};
-    DirectoryEntry m_e;
-    void* m_handle {};
-    usize m_base_path_size {};
-    DynamicArray<char> m_wildcard;
-    bool m_get_file_size {};
-    bool m_skip_dot_files {};
-};
-
-class RecursiveDirectoryIterator {
-  public:
-    static ErrorCodeOr<RecursiveDirectoryIterator>
-    Create(Allocator& allocator, String path, DirectoryIteratorOptions options = {});
-
-    DirectoryEntry const& Get() const { return Last(m_stack).Get(); }
-    bool HasMoreFiles() const { return m_stack.size; }
-    ErrorCodeOr<void> Increment();
-    String CanonicalBasePath() const { return m_canonical_base_path; }
-
-  private:
-    RecursiveDirectoryIterator(Allocator& a) : m_a(a), m_wildcard(a), m_stack(a), m_canonical_base_path(a) {}
-
-    Allocator& m_a;
-    DynamicArray<char> m_wildcard;
-    DynamicArray<DirectoryIterator> m_stack;
-    DynamicArray<char> m_canonical_base_path;
-    bool m_get_file_size {};
-    bool m_skip_dot_files {};
-};
-
-// =======================================================================================================
 
 namespace dir_iterator {
 
@@ -355,14 +273,12 @@ struct Options {
     String wildcard = "*";
     bool get_file_size = false;
     bool skip_dot_files = true;
-    bool get_full_path = false;
 };
 
 struct Entry {
     MutableString subpath; // path relative to the base iterator path
     FileType type;
     u64 file_size; // ONLY valid if options.get_file_size == true
-    MutableString full_path; // ONLY valid if options.get_full_path == true
 };
 
 struct Iterator {
@@ -388,7 +304,7 @@ struct Iterator {
 struct RecursiveIterator {
     ArenaList<Iterator, false> stack;
     DynamicArray<char> dir_path_to_iterate;
-    String canonical_base_path;
+    String base_path;
     Options options;
 };
 
@@ -401,6 +317,16 @@ void Destroy(RecursiveIterator& it);
 ErrorCodeOr<Optional<Entry>> Next(Iterator& it, ArenaAllocator& result_arena);
 ErrorCodeOr<Optional<Entry>> Next(RecursiveIterator& it, ArenaAllocator& result_arena);
 
+inline MutableString FullPath(auto& iterator, Entry const& entry, ArenaAllocator& arena) {
+    auto result =
+        arena.AllocateExactSizeUninitialised<char>(iterator.base_path.size + 1 + entry.subpath.size);
+    usize write_pos = 0;
+    WriteAndIncrement(write_pos, result, iterator.base_path);
+    WriteAndIncrement(write_pos, result, path::k_dir_separator);
+    WriteAndIncrement(write_pos, result, entry.subpath);
+    return result;
+}
+
 } // namespace dir_iterator
 
 // =======================================================================================================
@@ -408,7 +334,7 @@ ErrorCodeOr<Optional<Entry>> Next(RecursiveIterator& it, ArenaAllocator& result_
 ErrorCodeOr<Span<MutableString>> GetFilesRecursive(ArenaAllocator& a,
                                                    String directory,
                                                    Optional<FileType> only_type,
-                                                   DirectoryIteratorOptions options);
+                                                   dir_iterator::Options options);
 
 // Directory watcher
 // =======================================================================================================

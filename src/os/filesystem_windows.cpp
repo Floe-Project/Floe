@@ -672,24 +672,12 @@ ErrorCodeOr<s64> LastWriteTime(String path) {
 
 namespace dir_iterator {
 
-static Entry
-MakeEntry(WIN32_FIND_DATAW const& data, ArenaAllocator& arena, String base_path, Options const& options) {
+static Entry MakeEntry(WIN32_FIND_DATAW const& data, ArenaAllocator& arena) {
     auto filename = Narrow(arena, FromNullTerminated(data.cFileName)).Value();
     return {
         .subpath = filename,
         .type = (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ? FileType::Directory : FileType::File,
         .file_size = (data.nFileSizeHigh * (MAXDWORD + 1)) + data.nFileSizeLow,
-        .full_path = ({
-            MutableString p {};
-            if (options.get_full_path) {
-                p = arena.AllocateExactSizeUninitialised<char>(base_path.size + 1 + filename.size);
-                usize pos = 0;
-                WriteAndIncrement(pos, p, base_path);
-                WriteAndIncrement(pos, p, '\\');
-                WriteAndIncrement(pos, p, filename);
-            }
-            p;
-        }),
     };
 }
 
@@ -732,7 +720,7 @@ ErrorCodeOr<Iterator> Create(ArenaAllocator& a, String path, Options options) {
         return FilesystemWin32ErrorCode(GetLastError(), "FindFirstFileW");
     }
     result.handle = handle;
-    result.first_entry = MakeEntry(data, a, result.base_path, options);
+    result.first_entry = MakeEntry(data, a);
     return result;
 }
 
@@ -764,7 +752,7 @@ ErrorCodeOr<Optional<Entry>> Next(Iterator& it, ArenaAllocator& result_arena) {
 
         if (ShouldSkipFile(FromNullTerminated(data.cFileName), it.options.skip_dot_files)) continue;
 
-        return MakeEntry(data, result_arena, it.base_path, it.options);
+        return MakeEntry(data, result_arena);
     }
 
     return Optional<Entry> {};
@@ -772,90 +760,6 @@ ErrorCodeOr<Optional<Entry>> Next(Iterator& it, ArenaAllocator& result_arena) {
 
 } // namespace dir_iterator
 
-static ErrorCodeOr<void>
-FillDirectoryEntry(DirectoryEntry& e, const WIN32_FIND_DATAW& data, usize base_path_size) {
-    PathArena temp_path_arena;
-    auto filename = Narrow(temp_path_arena, FromNullTerminated(data.cFileName)).Value();
-    dyn::Resize(e.path, base_path_size);
-    path::JoinAppend(e.path, filename);
-    e.type = FileType::File;
-    e.file_size = (data.nFileSizeHigh * (MAXDWORD + 1)) + data.nFileSizeLow;
-    if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) e.type = FileType::Directory;
-    return k_success;
-}
-
-static bool ShouldSkipFile(const WCHAR* null_term_filename, bool skip_dot_files) {
-    auto const filename = FromNullTerminated(null_term_filename);
-    return filename == L"."_s || filename == L".."_s ||
-           (skip_dot_files && filename.size && filename[0] == L'.');
-}
-
-ErrorCodeOr<DirectoryIterator>
-DirectoryIterator::Create(Allocator& a, String path_uncanonical, DirectoryIteratorOptions options) {
-    ASSERT(options.wildcard.size);
-
-    PathArena temp_path_arena;
-    auto path = DynamicArray<char>::FromOwnedSpan(TRY(CanonicalizePath(temp_path_arena, path_uncanonical)),
-                                                  temp_path_arena);
-
-    DirectoryIterator result {path, a};
-
-    path::JoinAppend(path, options.wildcard);
-
-    WIN32_FIND_DATAW data {};
-    auto handle = FindFirstFileExW(TRY(path::MakePathForWin32(path, temp_path_arena, true)).path.data,
-                                   FindExInfoBasic,
-                                   &data,
-                                   FindExSearchNameMatch,
-                                   nullptr,
-                                   FIND_FIRST_EX_LARGE_FETCH);
-    if (handle == INVALID_HANDLE_VALUE) {
-        if (GetLastError() == ERROR_FILE_NOT_FOUND) {
-            // The search could not find any files.
-            result.m_reached_end = true;
-            return result;
-        }
-        return FilesystemWin32ErrorCode(GetLastError(), "FindFirstFileW");
-    }
-
-    result.m_handle = handle;
-    result.m_base_path_size = result.m_e.path.size;
-    result.m_get_file_size = options.get_file_size;
-    result.m_skip_dot_files = options.skip_dot_files;
-
-    if (ShouldSkipFile(data.cFileName, result.m_skip_dot_files))
-        TRY(result.Increment());
-    else
-        TRY(FillDirectoryEntry(result.m_e, data, result.m_base_path_size));
-
-    return result;
-}
-
-ErrorCodeOr<void> DirectoryIterator::Increment() {
-    if (m_reached_end) {
-        PanicIfReached();
-        return k_success;
-    }
-
-    WIN32_FIND_DATAW data {};
-    if (FindNextFileW(m_handle, &data) == 0) {
-        if (GetLastError() != ERROR_NO_MORE_FILES) {
-            return FilesystemWin32ErrorCode(GetLastError(), "FindNextFileW");
-        } else {
-            m_reached_end = true;
-            return k_success;
-        }
-    }
-
-    if (ShouldSkipFile(data.cFileName, m_skip_dot_files)) return Increment();
-
-    TRY(FillDirectoryEntry(m_e, data, m_base_path_size));
-    return k_success;
-}
-
-DirectoryIterator::~DirectoryIterator() {
-    if (m_handle) FindClose(m_handle);
-}
 //
 // ==========================================================================================================
 

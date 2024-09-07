@@ -130,19 +130,17 @@ static void DoScanFolderJob(PendingLibraryJobs::Job::ScanFolder& job,
     ZoneText(path.data, path.size);
 
     auto const try_job = [&]() -> ErrorCodeOr<void> {
-        auto it = TRY(RecursiveDirectoryIterator::Create(scratch_arena,
-                                                         path,
-                                                         {
-                                                             .wildcard = "*",
-                                                             .get_file_size = false,
-                                                         }));
-        while (it.HasMoreFiles()) {
-            auto const& entry = it.Get();
-
-            if (auto format = sample_lib::DetermineFileFormat(entry.path))
-                ReadLibraryAsync(pending_library_jobs, lib_list, String(entry.path), *format);
-
-            TRY(it.Increment());
+        auto it = TRY(dir_iterator::RecursiveCreate(scratch_arena,
+                                                    path,
+                                                    {
+                                                        .wildcard = "*",
+                                                        .get_file_size = false,
+                                                    }));
+        DEFER { dir_iterator::Destroy(it); };
+        while (auto const entry = TRY(dir_iterator::Next(it, scratch_arena))) {
+            auto const full_path = dir_iterator::FullPath(it, *entry, scratch_arena);
+            if (auto format = sample_lib::DetermineFileFormat(full_path))
+                ReadLibraryAsync(pending_library_jobs, lib_list, String(full_path), *format);
         }
         return k_success;
     };
@@ -1666,26 +1664,24 @@ TEST_CASE(TestSampleLibraryLoader) {
                 (String)path::Join(tester.scratch_arena,
                                    Array {TestFilesFolder(tester), k_repo_subdirs_floe_test_libraries});
 
-            auto it = TRY(RecursiveDirectoryIterator::Create(tester.scratch_arena, source));
-            while (it.HasMoreFiles()) {
-                auto const& entry = it.Get();
-
-                auto const relative_path =
-                    path::TrimDirectorySeparatorsEnd(entry.path.Items().SubSpan(source.size));
+            auto it = TRY(dir_iterator::RecursiveCreate(tester.scratch_arena, source, {}));
+            DEFER { dir_iterator::Destroy(it); };
+            while (auto entry = TRY(dir_iterator::Next(it, tester.scratch_arena))) {
+                auto const relative_path = entry->subpath;
                 auto const dest_file = path::Join(tester.scratch_arena, Array {lib_dir, relative_path});
-                if (entry.type == FileType::File) {
+                if (entry->type == FileType::File) {
                     if (auto const dir = path::Directory(dest_file)) {
                         TRY(CreateDirectory(
                             *dir,
                             {.create_intermediate_directories = true, .fail_if_exists = false}));
                     }
-                    TRY(CopyFile(entry.path, dest_file, ExistingDestinationHandling::Overwrite));
+                    TRY(CopyFile(dir_iterator::FullPath(it, *entry, tester.scratch_arena),
+                                 dest_file,
+                                 ExistingDestinationHandling::Overwrite));
                 } else {
                     TRY(CreateDirectory(dest_file,
                                         {.create_intermediate_directories = true, .fail_if_exists = false}));
                 }
-
-                TRY(it.Increment());
             }
         }
 

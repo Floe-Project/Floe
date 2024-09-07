@@ -31,7 +31,7 @@ void TryShrinkPages(void* ptr, usize old_size, usize new_size);
 
 bool IsRunningUnderWine();
 
-// Allocate whole pages at a time - often 4kb each; this is the smallest size that the OS gives out.
+// Allocate whole pages at a time: 4kb or 16kb each; this is the smallest size that the OS gives out.
 class PageAllocator final : public Allocator {
     static usize AlignUpToPageSize(usize size) { return AlignForward(size, GetSystemStats().page_size); }
 

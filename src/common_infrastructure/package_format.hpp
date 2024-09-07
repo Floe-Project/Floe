@@ -165,27 +165,27 @@ static ErrorCodeOr<void> WriterAddAllFiles(mz_zip_archive& zip,
                                            String folder,
                                            ArenaAllocator& scratch_arena,
                                            Span<String const> subdirs_in_zip) {
-    auto it = TRY(RecursiveDirectoryIterator::Create(scratch_arena,
-                                                     folder,
-                                                     {
-                                                         .wildcard = "*",
-                                                         .get_file_size = false,
-                                                         .skip_dot_files = true,
-                                                     }));
+    auto it = TRY(dir_iterator::RecursiveCreate(scratch_arena,
+                                                folder,
+                                                {
+                                                    .wildcard = "*",
+                                                    .get_file_size = false,
+                                                    .skip_dot_files = true,
+                                                }));
+    DEFER { dir_iterator::Destroy(it); };
     ArenaAllocator inner_arena {PageAllocator::Instance()};
-    while (it.HasMoreFiles()) {
+    while (auto entry = TRY(dir_iterator::Next(it, scratch_arena))) {
         inner_arena.ResetCursorAndConsolidateRegions();
 
-        auto const& entry = it.Get();
         DynamicArray<char> archive_path {inner_arena};
         path::JoinAppend(archive_path, subdirs_in_zip);
-        path::JoinAppend(archive_path, entry.path.Items().SubSpan(it.CanonicalBasePath().size + 1));
-        if (entry.type == FileType::File) {
-            auto const file_data = TRY(ReadEntireFile(entry.path, inner_arena)).ToByteSpan();
+        path::JoinAppend(archive_path, entry->subpath);
+        if (entry->type == FileType::File) {
+            auto const file_data =
+                TRY(ReadEntireFile(dir_iterator::FullPath(it, *entry, inner_arena), inner_arena))
+                    .ToByteSpan();
             WriterAddFile(zip, archive_path, file_data);
         }
-
-        TRY(it.Increment());
     }
 
     return k_success;

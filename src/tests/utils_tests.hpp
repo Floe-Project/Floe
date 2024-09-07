@@ -1143,25 +1143,24 @@ TEST_CASE(TestSprintfBuffer) {
 
 namespace dir_listing_tests {
 struct Helpers {
-    static ErrorCodeOr<usize> CountFiles(Allocator& a, String path) {
-        return Count(a, path, [](DirectoryEntry const& e) { return e.type == FileType::File; });
+    static ErrorCodeOr<usize> CountFiles(ArenaAllocator& a, String path) {
+        return Count(a, path, [](dir_iterator::Entry const& e) { return e.type == FileType::File; });
     }
-    static ErrorCodeOr<usize> CountDirectores(Allocator& a, String path) {
-        return Count(a, path, [](DirectoryEntry const& e) { return e.type == FileType::Directory; });
+    static ErrorCodeOr<usize> CountDirectores(ArenaAllocator& a, String path) {
+        return Count(a, path, [](dir_iterator::Entry const& e) { return e.type == FileType::Directory; });
     }
-    static ErrorCodeOr<usize> CountAny(Allocator& a, String path) {
-        return Count(a, path, [](DirectoryEntry const&) { return true; });
+    static ErrorCodeOr<usize> CountAny(ArenaAllocator& a, String path) {
+        return Count(a, path, [](dir_iterator::Entry const&) { return true; });
     }
 
     template <typename ShouldCount>
-    static ErrorCodeOr<usize> Count(Allocator& a, String path, ShouldCount should_count_directory_entry) {
+    static ErrorCodeOr<usize>
+    Count(ArenaAllocator& a, String path, ShouldCount should_count_directory_entry) {
         usize count = 0;
-        auto it = TRY(RecursiveDirectoryIterator::Create(a, path));
-        while (it.HasMoreFiles()) {
-            auto const& entry = it.Get();
-            if (should_count_directory_entry(entry)) ++count;
-            TRY(it.Increment());
-        }
+        auto it = TRY(dir_iterator::RecursiveCreate(a, path, {}));
+        DEFER { dir_iterator::Destroy(it); };
+        while (auto const entry = TRY(dir_iterator::Next(it, a)))
+            if (should_count_directory_entry(*entry)) ++count;
         return count;
     }
 };
@@ -1191,27 +1190,24 @@ struct TestDirectoryStructure {
 
     String Directory() const { return root_dir; }
 
-    ErrorCodeOr<usize> NumFilesWithExtension(Allocator& a, String ext) const {
+    ErrorCodeOr<usize> NumFilesWithExtension(ArenaAllocator& a, String ext) const {
         usize count = 0;
-        auto it = TRY(RecursiveDirectoryIterator::Create(a, root_dir));
-        while (it.HasMoreFiles()) {
-            auto const& entry = it.Get();
-            if (path::Extension(entry.path) == ext) ++count;
-            TRY(it.Increment());
-        }
+        auto it = TRY(dir_iterator::RecursiveCreate(a, root_dir, {}));
+        DEFER { dir_iterator::Destroy(it); };
+        while (auto const entry = TRY(dir_iterator::Next(it, a)))
+            if (path::Extension(entry->subpath) == ext) ++count;
         return count;
     }
 
-    ErrorCodeOr<bool> DeleteAFile(Allocator& a) const {
+    ErrorCodeOr<bool> DeleteAFile(ArenaAllocator& a) const {
         Optional<MutableString> path_to_remove {};
-        auto it = TRY(RecursiveDirectoryIterator::Create(a, root_dir));
-        while (it.HasMoreFiles()) {
-            auto const& entry = it.Get();
-            if (entry.type == FileType::File) {
-                path_to_remove = MutableString(entry.path).Clone(a);
+        auto it = TRY(dir_iterator::RecursiveCreate(a, root_dir, {}));
+        DEFER { dir_iterator::Destroy(it); };
+        while (auto const entry = TRY(dir_iterator::Next(it, a))) {
+            if (entry->type == FileType::File) {
+                path_to_remove = dir_iterator::FullPath(it, *entry, a);
                 break;
             }
-            TRY(it.Increment());
         }
 
         ASSERT(path_to_remove);
@@ -1219,13 +1215,11 @@ struct TestDirectoryStructure {
         return outcome.Succeeded();
     }
 
-    ErrorCodeOr<MutableString> GetASubdirectory(Allocator& a) const {
-        auto it = TRY(RecursiveDirectoryIterator::Create(a, root_dir));
-        while (it.HasMoreFiles()) {
-            auto const& entry = it.Get();
-            if (entry.type == FileType::Directory) return MutableString(entry.path).Clone(a);
-            TRY(it.Increment());
-        }
+    ErrorCodeOr<MutableString> GetASubdirectory(ArenaAllocator& a) const {
+        auto it = TRY(dir_iterator::RecursiveCreate(a, root_dir, {}));
+        DEFER { dir_iterator::Destroy(it); };
+        while (auto const entry = TRY(dir_iterator::Next(it, a)))
+            if (entry->type == FileType::Directory) return dir_iterator::FullPath(it, *entry, a);
         PanicIfReached();
         return {};
     }
@@ -1250,23 +1244,12 @@ TEST_CASE(TestDirectoryListing) {
     ArenaAllocator scratch_arena {a};
     TestDirectoryStructure const test_dir(tester);
 
-    SUBCASE("RecursiveDirectoryIterator") {
-        auto outcome = RecursiveDirectoryIterator::Create(a, test_dir.Directory());
-        REQUIRE(outcome.HasValue());
-        auto& it = outcome.Value();
-
-        while (it.HasMoreFiles()) {
-            tester.log.Debug(k_utils_log_module, "{}", it.Get().path);
-            REQUIRE(it.Increment().Succeeded());
-        }
-    }
-
     SUBCASE("general") {
         DirectoryListing listing {a};
         auto const result = listing.ScanFolders(Array {test_dir.Directory()}, true, Array {"*"_s}, nullptr);
 
         if (result.folder_errors.size == 0) {
-            REQUIRE(listing.NumFiles() == TRY(Helpers::CountFiles(scratch_arena, test_dir.Directory())));
+            REQUIRE_EQ(listing.NumFiles(), TRY(Helpers::CountFiles(scratch_arena, test_dir.Directory())));
             REQUIRE(listing.NumDirectories() ==
                     TRY(Helpers::CountDirectores(scratch_arena, test_dir.Directory())));
             REQUIRE(listing.NumEntries() == TRY(Helpers::CountAny(scratch_arena, test_dir.Directory())));

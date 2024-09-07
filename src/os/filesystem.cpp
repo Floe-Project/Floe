@@ -94,111 +94,17 @@ ErrorCodeOr<void> MoveIntoFolder(String from, String destination_folder) {
 ErrorCodeOr<Span<MutableString>> GetFilesRecursive(ArenaAllocator& a,
                                                    String folder,
                                                    Optional<FileType> only_file_type,
-                                                   DirectoryIteratorOptions options) {
+                                                   dir_iterator::Options options) {
     DynamicArray<MutableString> result {a};
 
-    auto it = TRY(RecursiveDirectoryIterator::Create(a, folder, options));
-    while (it.HasMoreFiles()) {
-        auto const& entry = it.Get();
-        if (!only_file_type || *only_file_type == entry.type)
-            dyn::Append(result, MutableString(entry.path).Clone(a));
-        TRY(it.Increment());
-    }
+    ArenaAllocatorWithInlineStorage<4000> scratch_arena;
+    auto it = TRY(dir_iterator::RecursiveCreate(scratch_arena, folder, options));
+    DEFER { dir_iterator::Destroy(it); };
+    while (auto const entry = TRY(dir_iterator::Next(it, scratch_arena)))
+        if (!only_file_type || *only_file_type == entry->type)
+            dyn::Append(result, dir_iterator::FullPath(it, *entry, a));
 
     return result.ToOwnedSpan();
-}
-
-DirectoryIterator::DirectoryIterator(DirectoryIterator&& other)
-    : m_e(Move(other.m_e))
-    , m_wildcard(Move(other.m_wildcard)) {
-    m_reached_end = other.m_reached_end;
-    m_handle = other.m_handle;
-    m_base_path_size = other.m_base_path_size;
-    m_get_file_size = other.m_get_file_size;
-    m_skip_dot_files = other.m_skip_dot_files;
-
-    other.m_handle = nullptr;
-    other.m_reached_end = true;
-}
-
-DirectoryIterator& DirectoryIterator::operator=(DirectoryIterator&& other) {
-    m_reached_end = other.m_reached_end;
-    m_e = Move(other.m_e);
-    m_handle = other.m_handle;
-    m_base_path_size = other.m_base_path_size;
-    m_wildcard = Move(other.m_wildcard);
-    m_get_file_size = other.m_get_file_size;
-    m_skip_dot_files = other.m_skip_dot_files;
-
-    other.m_handle = nullptr;
-    other.m_reached_end = true;
-
-    return *this;
-}
-
-static ErrorCodeOr<void> IncrementToNextThatMatchesPattern(DirectoryIterator& it,
-                                                           String wildcard,
-                                                           bool always_increment,
-                                                           bool skip_dot_files) {
-    if (always_increment) TRY(it.Increment());
-    while (it.HasMoreFiles() && it.Get().type == FileType::File &&
-           (!MatchWildcard(wildcard, path::Filename(it.Get().path)) ||
-            (skip_dot_files && it.Get().path.size && it.Get().path[0] == '.'))) {
-        TRY(it.Increment());
-    };
-    return k_success;
-}
-
-ErrorCodeOr<RecursiveDirectoryIterator>
-RecursiveDirectoryIterator::Create(Allocator& allocator, String path, DirectoryIteratorOptions options) {
-    auto inner_options = options;
-    // We do not pass the wildcard into the sub iterators because we need to get the folders, not just paths
-    // that match the pattern.
-    inner_options.wildcard = "*";
-    auto it = TRY(DirectoryIterator::Create(allocator, path, inner_options));
-    TRY(IncrementToNextThatMatchesPattern(it, options.wildcard, false, options.skip_dot_files));
-
-    RecursiveDirectoryIterator result {allocator};
-    dyn::Assign(result.m_wildcard, options.wildcard);
-    result.m_get_file_size = options.get_file_size;
-    result.m_skip_dot_files = options.skip_dot_files;
-    dyn::Assign(result.m_canonical_base_path, it.CanonicalBasePath());
-    if (it.HasMoreFiles()) dyn::Append(result.m_stack, Move(it));
-
-    return result;
-}
-
-ErrorCodeOr<void> RecursiveDirectoryIterator::Increment() {
-    ASSERT(m_stack.size != 0);
-
-    auto const it_index = m_stack.size - 1;
-
-    {
-        auto& it = Last(m_stack);
-
-        if (it.Get().type == FileType::Directory) {
-            // We do not pass the wildcard into the sub iterators because we need to get the folders, not just
-            // paths that match the pattern.
-            auto const inner_options = DirectoryIteratorOptions {
-                .wildcard = "*",
-                .get_file_size = m_get_file_size,
-                .skip_dot_files = m_skip_dot_files,
-            };
-            auto sub_it = TRY(DirectoryIterator::Create(m_a, it.Get().path, inner_options));
-            TRY(IncrementToNextThatMatchesPattern(sub_it, m_wildcard, false, m_skip_dot_files));
-            if (sub_it.HasMoreFiles()) dyn::Append(m_stack, Move(sub_it));
-        }
-    }
-
-    auto& it = m_stack[it_index];
-
-    TRY(IncrementToNextThatMatchesPattern(it, m_wildcard, true, m_skip_dot_files));
-    if (!it.HasMoreFiles()) {
-        auto const index = &it - m_stack.data;
-        dyn::Remove(m_stack, (usize)index);
-    }
-
-    return k_success;
 }
 
 namespace dir_iterator {
@@ -215,7 +121,7 @@ ErrorCodeOr<RecursiveIterator> RecursiveCreate(ArenaAllocator& a, String path, O
     RecursiveIterator result {
         .stack = {a},
         .dir_path_to_iterate = {a},
-        .canonical_base_path = a.Clone(it.base_path),
+        .base_path = a.Clone(it.base_path),
         .options = options,
     };
     result.stack.Prepend(it);
@@ -266,8 +172,7 @@ ErrorCodeOr<Optional<Entry>> Next(RecursiveIterator& it, ArenaAllocator& result_
                     // Each entry's subpath is relative to the base path of the iterator that created it. We
                     // need convert the subpath relative from each iterator to the base path of this recursive
                     // iterator.
-                    if (auto subiterator_path_delta =
-                            first.base_path.SubSpan(it.canonical_base_path.size);
+                    if (auto subiterator_path_delta = first.base_path.SubSpan(it.base_path.size);
                         subiterator_path_delta.size) {
                         subiterator_path_delta.RemovePrefix(1); // remove the '/'
 

@@ -38,20 +38,18 @@ ErrorCodeOr<Paths> ScanLibraryFolder(ArenaAllocator& arena, String library_folde
 
     Paths result {};
 
-    auto it = TRY(DirectoryIterator::Create(arena,
-                                            library_folder,
-                                            {
-                                                .wildcard = "*",
-                                                .get_file_size = false,
-                                            }));
-    while (it.HasMoreFiles()) {
-        auto const& entry = it.Get();
-        if (sample_lib::FilenameIsFloeLuaFile(entry.path))
-            result.lua = arena.Clone(entry.path);
-        else if (Contains(k_license_filenames, path::Filename(entry.path)))
-            result.license = arena.Clone(entry.path);
-        TRY(it.Increment());
-    }
+    auto it = TRY(dir_iterator::Create(arena,
+                                       library_folder,
+                                       {
+                                           .wildcard = "*",
+                                           .get_file_size = false,
+                                       }));
+    DEFER { dir_iterator::Destroy(it); };
+    while (auto const entry = TRY(dir_iterator::Next(it, arena)))
+        if (sample_lib::FilenameIsFloeLuaFile(entry->subpath))
+            result.lua = dir_iterator::FullPath(it, *entry, arena);
+        else if (Contains(k_license_filenames, path::Filename(entry->subpath)))
+            result.license = dir_iterator::FullPath(it, *entry, arena);
 
     if (!result.lua.size) {
         g_cli_out.Error({}, "No Floe Lua file found in {}", library_folder);

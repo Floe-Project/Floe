@@ -116,39 +116,37 @@ PUBLIC ErrorCodeOr<ChecksumTable>
 ChecksumsForFolder(String folder, ArenaAllocator& arena, ArenaAllocator& scratch_arena) {
     DynamicChecksumTable checksums {arena};
 
-    auto it = TRY(RecursiveDirectoryIterator::Create(scratch_arena,
-                                                     folder,
-                                                     {
-                                                         .wildcard = "*",
-                                                         .get_file_size = true,
-                                                         .skip_dot_files = false,
-                                                     }));
+    auto it = TRY(dir_iterator::RecursiveCreate(scratch_arena,
+                                                folder,
+                                                {
+                                                    .wildcard = "*",
+                                                    .get_file_size = true,
+                                                    .skip_dot_files = false,
+                                                }));
+    DEFER { dir_iterator::Destroy(it); };
 
-    while (it.HasMoreFiles()) {
-        auto const& entry = it.Get();
-        if (entry.type == FileType::File) {
+    while (auto entry = TRY(dir_iterator::Next(it, arena))) {
+        if (entry->type == FileType::File) {
 
-            auto relative_path = entry.path.Items().SubSpan(it.CanonicalBasePath().size + 1);
+            auto relative_path = entry->subpath;
             if constexpr (IS_WINDOWS) {
                 // we use POSIX-style paths in the checksum file
-                auto archive_path = scratch_arena.Clone(relative_path);
-                Replace(archive_path, '\\', '/');
-                relative_path = archive_path;
+                Replace(relative_path, '\\', '/');
             }
             ASSERT(relative_path.size);
             ASSERT(relative_path[0] != '/');
 
-            auto const file_data = TRY(ReadEntireFile(entry.path, scratch_arena)).ToByteSpan();
+            auto const file_data =
+                TRY(ReadEntireFile(dir_iterator::FullPath(it, *entry, scratch_arena), scratch_arena))
+                    .ToByteSpan();
             DEFER { scratch_arena.Free(file_data); };
 
-            checksums.Insert(arena.Clone(relative_path),
+            checksums.Insert(relative_path,
                              ChecksumValues {
                                  .crc32 = Crc32(file_data),
-                                 .file_size = entry.file_size,
+                                 .file_size = entry->file_size,
                              });
         }
-
-        TRY(it.Increment());
     }
 
     return checksums.ToOwnedTable();

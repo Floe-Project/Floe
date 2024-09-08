@@ -63,6 +63,7 @@ PUBLIC constexpr Optional<usize> WidenToBuffer(wchar_t* out, String utf8_str) {
 }
 
 PUBLIC constexpr usize MaxNarrowedStringSize(WString wstr) { return wstr.size * 3; }
+PUBLIC constexpr usize MaxNarrowedStringSize(usize wstr_size) { return wstr_size * 3; }
 
 PUBLIC constexpr Optional<usize> NarrowToBuffer(char* out, WString wstr) {
     auto const text_encoding_error = k_nullopt;
@@ -645,3 +646,12 @@ constexpr auto EnumStrings() {
 
 // Only works for enums with a final value called Count and contiguous values starting from 0.
 constexpr String EnumToString(Enum auto e) { return EnumStrings<decltype(e)>()[ToInt(e)]; }
+
+PUBLIC MutableString CombineStrings(Allocator& a, Span<String const> parts) {
+    auto result = a.AllocateExactSizeUninitialised<char>(TotalSize(parts));
+    usize pos = 0;
+    for (auto const& part : parts)
+        WriteAndIncrement(pos, result, part);
+
+    return result;
+}

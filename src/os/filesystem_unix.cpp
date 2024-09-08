@@ -102,13 +102,13 @@ ErrorCodeOr<Optional<Entry>> Next(Iterator& it, ArenaAllocator& result_arena) {
                         u64 s = 0;
                         if (it.options.get_file_size) {
                             PathArena temp_path_allocator;
-                            auto full_path = temp_path_allocator.AllocateExactSizeUninitialised<char>(
-                                it.base_path.size + 1 + entry_name.size + 1);
-                            usize write_pos = 0;
-                            WriteAndIncrement(write_pos, full_path, it.base_path);
-                            WriteAndIncrement(write_pos, full_path, '/');
-                            WriteAndIncrement(write_pos, full_path, entry_name);
-                            WriteAndIncrement(write_pos, full_path, '\0');
+                            auto const full_path = CombineStrings(temp_path_allocator,
+                                                                  Array {
+                                                                      it.base_path,
+                                                                      "/"_s,
+                                                                      entry_name,
+                                                                      "\0"_s,
+                                                                  });
                             struct stat info;
                             if (stat(full_path.data, &info) != 0) return FilesystemErrnoErrorCode(errno);
                             s = (u64)info.st_size;

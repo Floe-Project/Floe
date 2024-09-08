@@ -1603,6 +1603,8 @@ TEST_CASE(TestIntToString) {
     CHECK(to_string(-99, {.base = fmt::IntToStringOptions::Base::Decimal}) == "-99"_s);
     CHECK(to_string(10, {.base = fmt::IntToStringOptions::Base::Hexadecimal}) == "a");
     CHECK(to_string(255, {.base = fmt::IntToStringOptions::Base::Hexadecimal}) == "ff");
+    CHECK(to_string(0xfedcba, {.base = fmt::IntToStringOptions::Base::Hexadecimal, .capitalize_hex = true}) ==
+          "FEDCBA");
     CHECK(to_string(-255, {.base = fmt::IntToStringOptions::Base::Hexadecimal}) == "-ff");
     return k_success;
 }
@@ -1883,9 +1885,7 @@ TEST_CASE(TestPath) {
         CHECK_EQ(s, "/foo"_s);
 
         {
-            auto result = Join(scratch_arena,
-                               ArrayT<String>({DynamicArray<char> {"foo", scratch_arena}, "bar"_s, "baz"_s}),
-                               Format::Posix);
+            auto result = Join(scratch_arena, Array {"foo"_s, "bar"_s, "baz"_s}, Format::Posix);
             CHECK_EQ(result, "foo/bar/baz"_s);
         }
     }

@@ -15,9 +15,9 @@
 #include "scanned_folder.hpp"
 #include "state/state_coding.hpp"
 
-PresetsListing::PresetsListing(Span<String const> always_scanned_folders,
+PresetsListing::PresetsListing(String always_scanned_folder,
                                ThreadsafeErrorNotifications& error_notifications)
-    : always_scanned_folders(always_scanned_folders)
+    : always_scanned_folder(always_scanned_folder)
     , scanned_folder(true)
     , error_notifications(error_notifications) {}
 
@@ -142,7 +142,8 @@ PresetsFolderScanResult FetchOrRescanPresetsFolder(PresetsListing& listing,
                                                    Span<String const> extra_scan_folders,
                                                    ThreadPool* thread_pool) {
     ArenaAllocatorWithInlineStorage<1000> scratch_arena;
-    DynamicArray<String> scan_folders {listing.always_scanned_folders, scratch_arena};
+    DynamicArray<String> scan_folders {scratch_arena};
+    dyn::Append(scan_folders, listing.always_scanned_folder);
     dyn::AppendSpan(scan_folders, extra_scan_folders);
 
     auto const is_loading = HandleRescanRequest(

@@ -229,7 +229,7 @@ inline u64 HashLibraryRef(sample_lib::LibraryIdRef id) { return id.Hash(); }
 
 struct Server {
     Server(ThreadPool& pool,
-           Span<String const> always_scanned_folders,
+           String always_scanned_folders,
            ThreadsafeErrorNotifications& connection_independent_error_notif);
     ~Server();
 

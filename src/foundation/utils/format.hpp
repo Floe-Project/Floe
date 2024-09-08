@@ -44,7 +44,8 @@ any                  | <number>   | THIS MUST BE FIRST. The minimum number of ch
                                   | with spaces) or 04 (padded with 0).
 f32 or f64           | g          | Auto-float (uses scientific notation if needed)
 f32 or f64           | .<number>  | float precision e.g. {.2}
-integer              | x          | Hexadecimal
+integer              | x          | Hexadecimal (lowercase)
+integer              | X          | Hexadecimal (uppercase)
 integer              | +          | Show a + if the number is positive
 ErrorCode            | u          | Don't print the debug info of the error
 
@@ -52,7 +53,8 @@ ErrorCode            | u          | Don't print the debug info of the error
 
 struct FormatOptions {
     bool auto_float_format = false;
-    bool hex = false;
+    bool lowercase_hex = false;
+    bool uppercase_hex = false;
     bool show_plus = false;
     String float_precision {};
     bool is_string_literal {};
@@ -86,6 +88,7 @@ struct IntToStringOptions {
     enum class Base { Decimal, Hexadecimal };
     Base base = Base::Decimal;
     bool include_sign = false;
+    bool capitalize_hex = false;
 };
 
 template <Integral IntType>
@@ -111,7 +114,7 @@ PUBLIC constexpr usize IntToString(IntType num, char* buffer, IntToStringOptions
         *ptr++ = '0';
     } else {
         do {
-            *ptr++ = "0123456789abcdef"[num % base];
+            *ptr++ = (options.capitalize_hex ? "0123456789ABCDEF" : "0123456789abcdef")[num % base];
             num /= base;
         } while (num != 0);
     }
@@ -267,9 +270,11 @@ PUBLIC ErrorCodeOr<void> ValueToString(Writer writer, T const& value, FormatOpti
         auto const size = IntToString(ScalarToInt(value),
                                       buffer,
                                       {
-                                          .base = options.hex ? IntToStringOptions::Base::Hexadecimal
-                                                              : IntToStringOptions::Base::Decimal,
+                                          .base = (options.lowercase_hex || options.uppercase_hex)
+                                                      ? IntToStringOptions::Base::Hexadecimal
+                                                      : IntToStringOptions::Base::Decimal,
                                           .include_sign = options.show_plus,
+                                          .capitalize_hex = options.uppercase_hex,
                                       });
         TRY(PadToRequiredWidthIfNeeded(writer, options, size));
         TRY(writer.WriteChars(String {buffer, size}));
@@ -375,7 +380,8 @@ static ErrorCodeOr<BraceSectionResult> ParseBraceSection(Writer writer, char con
             for (usize i = 0; i < brace_contents.size; ++i) {
                 switch (brace_contents[i]) {
                     case 'g': options.auto_float_format = true; break;
-                    case 'x': options.hex = true; break;
+                    case 'x': options.lowercase_hex = true; break;
+                    case 'X': options.uppercase_hex = true; break;
                     case '+': options.show_plus = true; break;
                     case '.': {
                         usize num_numbers = 1;

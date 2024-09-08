@@ -193,35 +193,53 @@ ErrorCodeOr<void> CreateDirectory(String path, CreateDirectoryOptions options) {
     }
 }
 
-ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectoryType type, bool create) {
-    String rel_path;
+MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirectoryOptions options) {
+    Optional<String> home_path {};
+    String abs_path {};
     switch (type) {
-        case KnownDirectoryType::Temporary: return a.Clone("/tmp"_s);
-        case KnownDirectoryType::Documents: rel_path = "~/Documents"; break;
-        case KnownDirectoryType::Downloads: rel_path = "~/Downloads"; break;
-        case KnownDirectoryType::Logs: rel_path = "~/.local/state"; break;
-        case KnownDirectoryType::GlobalData: rel_path = "~"; break;
+        case KnownDirectoryType::Temporary: abs_path = "/tmp"_s; break;
+        case KnownDirectoryType::Documents: home_path = "Documents"; break;
+        case KnownDirectoryType::Downloads: home_path = "Downloads"; break;
+        case KnownDirectoryType::Logs: home_path = ".local/state"; break;
+        case KnownDirectoryType::GlobalData: home_path = ""; break;
 
-        case KnownDirectoryType::UserClapPlugins: rel_path = "~/.clap"; break;
-        case KnownDirectoryType::UserVst3Plugins: rel_path = "~/.vst3"; break;
-        case KnownDirectoryType::GlobalClapPlugins: return a.Clone("/usr/lib/clap"_s);
-        case KnownDirectoryType::GlobalVst3Plugins: return a.Clone("/usr/lib/vst3"_s);
+        case KnownDirectoryType::UserClapPlugins: home_path = ".clap"; break;
+        case KnownDirectoryType::UserVst3Plugins: home_path = ".vst3"; break;
+        case KnownDirectoryType::GlobalClapPlugins: abs_path = "/usr/lib/clap"_s; break;
+        case KnownDirectoryType::GlobalVst3Plugins: abs_path = "/usr/lib/vst3"_s; break;
 
-        case KnownDirectoryType::LegacyData: rel_path = "~"; break;
+        case KnownDirectoryType::LegacyData: home_path = ""; break;
         case KnownDirectoryType::LegacyAllUsersSettings:
-        case KnownDirectoryType::LegacyPluginSettings: rel_path = "~/.config"; break;
-        case KnownDirectoryType::LegacyAllUsersData: return a.Clone("/var/lib"_s);
+        case KnownDirectoryType::LegacyPluginSettings: home_path = ".config"; break;
+        case KnownDirectoryType::LegacyAllUsersData: abs_path = "/var/lib"_s; break;
 
         case KnownDirectoryType::Count: PanicIfReached();
     }
 
-    auto result = TRY(CanonicalizePath(a, rel_path));
-    if (create) {
-        TRY(CreateDirectory(result,
-                            {
-                                .create_intermediate_directories = true,
-                                .fail_if_exists = false,
-                            }));
+    MutableString result {};
+    if (home_path) {
+        char const* home = secure_getenv("HOME");
+        if (home == nullptr) {
+            if (options.error_log)
+                auto _ = fmt::FormatToWriter(*options.error_log, "HOME environment variable not set");
+            home = "unknown";
+        }
+        result = path::Join(a, Array {FromNullTerminated(home), *home_path});
+    } else {
+        result = a.Clone(abs_path);
+    }
+
+    if (options.create) {
+        auto const o = CreateDirectory(result,
+                                       {
+                                           .create_intermediate_directories = true,
+                                           .fail_if_exists = false,
+                                       });
+        if (o.HasError() && options.error_log)
+            auto _ = fmt::FormatToWriter(*options.error_log,
+                                         "Failed to create directory '{}': {}",
+                                         result,
+                                         o.Error());
     }
     return result;
 }

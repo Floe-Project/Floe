@@ -20,9 +20,9 @@
 // still jobs in the thread pool - which would then access deleted memory
 
 struct PresetsListing {
-    PresetsListing(Span<String const> always_scanned_folders, ThreadsafeErrorNotifications& error_notifs);
+    PresetsListing(String always_scanned_folder, ThreadsafeErrorNotifications& error_notifs);
 
-    Span<String const> const always_scanned_folders;
+    String const always_scanned_folder;
     ScannedFolder scanned_folder;
     ThreadsafeErrorNotifications& error_notifications;
 

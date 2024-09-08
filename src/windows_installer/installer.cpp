@@ -334,12 +334,10 @@ Application* CreateApplication(GuiFramework& framework, u32 root_layout_id) {
             .install_dir = ({
                 String p;
                 if (info.install_dir)
-                    p = KnownDirectory(app->arena, *info.install_dir, true)
-                            .ValueOr(app->arena.Clone(info.install_dir_fallback));
+                    p = KnownDirectory(app->arena, *info.install_dir, {.create = true});
                 else {
                     ASSERT(info.resource_id == CORE_LIBRARY_RC_ID);
-                    p = AlwaysScannedFolders(ScanFolderType::Libraries, LocationType::AllUsers, app->arena)
-                            .ValueOr(app->arena.Clone(info.install_dir_fallback));
+                    p = AlwaysScannedFolder(ScanFolderType::Libraries, app->arena);
                 }
                 p;
             }),

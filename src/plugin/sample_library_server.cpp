@@ -1464,15 +1464,15 @@ static sample_lib::Library* BuiltinLibrary() {
 }
 
 Server::Server(ThreadPool& pool,
-               Span<String const> always_scanned_folders,
+               String always_scanned_folder,
                ThreadsafeErrorNotifications& error_notifications)
     : error_notifications(error_notifications)
     , thread_pool(pool) {
-    for (auto e : always_scanned_folders) {
+    if (always_scanned_folder.size) {
         ArenaAllocatorWithInlineStorage<1000> scratch_arena;
         auto node = scan_folders.AllocateUninitialised();
         PLACEMENT_NEW(&node->value) ScanFolder();
-        dyn::Assign(node->value.path, e);
+        dyn::Assign(node->value.path, always_scanned_folder);
         node->value.source = ScanFolder::Source::AlwaysScannedFolder;
         node->value.state.raw = ScanFolder::State::NotScanned;
         scan_folders.Insert(node);

@@ -398,9 +398,8 @@ void StartupCrashHandler() {
     InitStacktraceState();
 
     ArenaAllocatorWithInlineStorage<500> scratch_arena;
-    if (auto const outcome = FloeKnownDirectory(scratch_arena, FloeKnownDirectoryType::Logs);
-        outcome.HasValue())
-        dyn::Assign(g_crash_folder_path, outcome.Value());
+    dyn::Assign(g_crash_folder_path,
+                FloeKnownDirectory(scratch_arena, FloeKnownDirectoryType::Logs, k_nullopt, {.create = true}));
 
     for (auto [index, signal] : Enumerate(k_signals)) {
         struct sigaction action {};

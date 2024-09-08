@@ -398,25 +398,23 @@ TEST_CASE(TestFilesystem) {
     }
 
     SUBCASE("KnownDirectory") {
+        auto error_writer = ErrorWriter(tester.log);
         for (auto const i : Range(ToInt(KnownDirectoryType::Count))) {
             auto type = (KnownDirectoryType)i;
-            auto known_folder = KnownDirectory(a, type, false);
+            auto known_folder = KnownDirectory(a, type, {.create = false, .error_log = &error_writer.writer});
             String type_name = EnumToString(type);
-            if (known_folder.HasValue()) {
-                DEFER { a.Free(known_folder.Value().ToByteSpan()); };
-                tester.log.Debug(k_os_log_module, "Found {} dir: {} ", type_name, known_folder.Value());
-                CHECK(path::IsAbsolute(known_folder.Value()));
-            } else {
-                LOG_WARNING("Error trying to find {} dir: {}", type_name, known_folder.Error());
-            }
+            tester.log.Debug(k_os_log_module, "Found {} dir: {} ", type_name, known_folder);
+            CHECK(path::IsAbsolute(known_folder));
         }
     }
 
     SUBCASE("DeleteDirectory") {
         auto test_delete_directory = [&a, &tester]() -> ErrorCodeOr<void> {
-            auto const dir = TRY(KnownDirectoryWithSubdirectories(a,
-                                                                  KnownDirectoryType::Temporary,
-                                                                  Array {"test"_s, "framework_dir"}));
+            auto const dir = KnownDirectoryWithSubdirectories(a,
+                                                              KnownDirectoryType::Temporary,
+                                                              Array {"Floe"_s, "TestDeleteDirectory"},
+                                                              k_nullopt,
+                                                              KnownDirectoryOptions {.create = false});
             TRY(CreateDirectory(dir, {.create_intermediate_directories = true}));
 
             // create files and folders within the dir

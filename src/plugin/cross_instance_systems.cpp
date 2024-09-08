@@ -13,7 +13,7 @@ CrossInstanceSystems::CrossInstanceSystems()
     , paths(CreateFloePaths(arena))
     , settings(paths)
     , sample_library_server(thread_pool,
-                            paths.always_scanned_folders[ToInt(ScanFolderType::Libraries)],
+                            paths.always_scanned_folder[ToInt(ScanFolderType::Libraries)],
                             error_notifications) {
     folder_settings_listener_id =
         settings.tracking.filesystem_change_listeners.Add([this](ScanFolderType type) {

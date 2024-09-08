@@ -853,77 +853,75 @@ static void DoSettingsModal(Gui* g) {
             bool add {};
         };
 
-        auto do_scan_folder_gui = [&](String title,
-                                      String subheading,
-                                      Span<String> extra_paths,
-                                      Span<String> always_scanned_paths) {
-            imgui.PushID(title);
-            DEFER { imgui.PopID(); };
+        auto do_scan_folder_gui =
+            [&](String title, String subheading, Span<String> extra_paths, String always_scanned_path) {
+                imgui.PushID(title);
+                DEFER { imgui.PopID(); };
 
-            FolderEdits result {};
-            do_lhs_title(title);
-            do_rhs_subheading(subheading);
-            auto const box_r = imgui.GetRegisteredAndConvertedRect(
-                {left_col_width,
-                 y_pos,
-                 right_col_width,
-                 path_gui_height * (f32)Max(1u, (u32)(extra_paths.size + always_scanned_paths.size))});
+                FolderEdits result {};
+                do_lhs_title(title);
+                do_rhs_subheading(subheading);
+                auto const box_r = imgui.GetRegisteredAndConvertedRect(
+                    {left_col_width,
+                     y_pos,
+                     right_col_width,
+                     path_gui_height * (f32)Max(1u, (u32)(extra_paths.size + 1))});
 
-            g->imgui.graphics->AddRectFilled(box_r,
-                                             LiveCol(imgui, UiColMap::SettingsWindowPathBackground),
-                                             rounding);
+                g->imgui.graphics->AddRectFilled(box_r,
+                                                 LiveCol(imgui, UiColMap::SettingsWindowPathBackground),
+                                                 rounding);
 
-            u32 pos = 0;
-            for (auto paths : Array {always_scanned_paths, extra_paths}) {
-                Optional<u32> remove_index {};
-                for (auto [index, path] : Enumerate<u32>(paths)) {
-                    imgui.PushID(pos);
-                    DEFER { imgui.PopID(); };
-                    auto const path_r = Rect {box_r.x,
-                                              box_r.y + ((f32)pos * path_gui_height),
-                                              right_col_width,
-                                              path_gui_height};
-                    auto reduced_path_r = path_r.ReducedHorizontally(path_gui_spacing);
+                u32 pos = 0;
+                for (auto paths : Array {Array {always_scanned_path}.Items(), extra_paths}) {
+                    Optional<u32> remove_index {};
+                    for (auto [index, path] : Enumerate<u32>(paths)) {
+                        imgui.PushID(pos);
+                        DEFER { imgui.PopID(); };
+                        auto const path_r = Rect {box_r.x,
+                                                  box_r.y + ((f32)pos * path_gui_height),
+                                                  right_col_width,
+                                                  path_gui_height};
+                        auto reduced_path_r = path_r.ReducedHorizontally(path_gui_spacing);
 
-                    if (paths.data == extra_paths.data) {
-                        auto const del_button_r = rect_cut::CutRight(reduced_path_r, line_height);
+                        if (paths.data == extra_paths.data) {
+                            auto const del_button_r = rect_cut::CutRight(reduced_path_r, line_height);
+                            rect_cut::CutRight(reduced_path_r, path_gui_spacing);
+                            if (do_icon_button(del_button_r, ICON_FA_TIMES, "Remove")) remove_index = index;
+                        }
+
+                        auto const open_button_r = rect_cut::CutRight(reduced_path_r, line_height);
                         rect_cut::CutRight(reduced_path_r, path_gui_spacing);
-                        if (do_icon_button(del_button_r, ICON_FA_TIMES, "Remove")) remove_index = index;
+                        if (do_icon_button(open_button_r, ICON_FA_EXTERNAL_LINK_ALT, "Open folder"))
+                            OpenFolderInFileBrowser(path);
+
+                        g->imgui.graphics->AddTextJustified(reduced_path_r,
+                                                            path,
+                                                            LiveCol(imgui, UiColMap::SettingsWindowMainText),
+                                                            TextJustification::CentredLeft,
+                                                            TextOverflowType::ShowDotsOnLeft);
+                        ++pos;
                     }
 
-                    auto const open_button_r = rect_cut::CutRight(reduced_path_r, line_height);
-                    rect_cut::CutRight(reduced_path_r, path_gui_spacing);
-                    if (do_icon_button(open_button_r, ICON_FA_EXTERNAL_LINK_ALT, "Open folder"))
-                        OpenFolderInFileBrowser(path);
-
-                    g->imgui.graphics->AddTextJustified(reduced_path_r,
-                                                        path,
-                                                        LiveCol(imgui, UiColMap::SettingsWindowMainText),
-                                                        TextJustification::CentredLeft,
-                                                        TextOverflowType::ShowDotsOnLeft);
-                    ++pos;
+                    if (remove_index) {
+                        // IMPROVE: show an 'are you sure?' window
+                        result.remove = paths[*remove_index];
+                    }
                 }
 
-                if (remove_index) {
-                    // IMPROVE: show an 'are you sure?' window
-                    result.remove = paths[*remove_index];
-                }
-            }
+                y_pos += box_r.h + line_height / 3.0f;
 
-            y_pos += box_r.h + line_height / 3.0f;
+                DoButton(g, "Add", y_pos, left_col_width);
+                y_pos += line_height * 0.5f;
 
-            DoButton(g, "Add", y_pos, left_col_width);
-            y_pos += line_height * 0.5f;
-
-            return result;
-        };
+                return result;
+            };
 
         {
             auto edits = do_scan_folder_gui(
                 "Library scan-folders",
                 "Folders that contain libraries (scanned recursively)",
                 g->settings.settings.filesystem.extra_libraries_scan_folders,
-                g->plugin.shared_data.paths.always_scanned_folders[ToInt(ScanFolderType::Libraries)]);
+                g->plugin.shared_data.paths.always_scanned_folder[ToInt(ScanFolderType::Libraries)]);
 
             if (edits.remove)
                 filesystem_settings::RemoveScanFolder(g->settings, ScanFolderType::Libraries, *edits.remove);
@@ -936,7 +934,7 @@ static void DoSettingsModal(Gui* g) {
                 "Preset scan-folders",
                 "Folders that contain presets (scanned recursively)",
                 g->settings.settings.filesystem.extra_presets_scan_folders,
-                g->plugin.shared_data.paths.always_scanned_folders[ToInt(ScanFolderType::Presets)]);
+                g->plugin.shared_data.paths.always_scanned_folder[ToInt(ScanFolderType::Presets)]);
 
             if (edits.remove)
                 filesystem_settings::RemoveScanFolder(g->settings, ScanFolderType::Presets, *edits.remove);

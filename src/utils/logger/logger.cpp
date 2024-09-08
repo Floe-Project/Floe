@@ -119,15 +119,13 @@ void FileLogger::Log(LogModuleName module_name, LogLevel level, String str) {
                                     RmwMemoryOrder::Acquire,
                                     LoadMemoryOrder::Relaxed)) {
         ArenaAllocatorWithInlineStorage<1000> arena;
-        auto outcome = FloeKnownDirectory(arena, FloeKnownDirectoryType::Logs);
-        if (outcome.HasValue()) {
-            auto path = DynamicArray<char>::FromOwnedSpan(outcome.Value(), arena);
-            path::JoinAppend(path, "floe.log");
-            dyn::Assign(filepath, String(path));
-        } else {
-            dyn::Clear(filepath);
-            g_debug_log.Debug("file-logger"_log_module, "failed to get logs known dir: {}", outcome.Error());
-        }
+
+        auto error_log = StdWriter(StdStream::Out);
+        auto const path = FloeKnownDirectory(arena,
+                                             FloeKnownDirectoryType::Logs,
+                                             "floe.log"_s,
+                                             {.create = true, .error_log = &error_log});
+        dyn::Assign(filepath, path);
         state.Store(FileLogger::State::Initialised, StoreMemoryOrder::Release);
     } else if (ex == FileLogger::State::Initialising) {
         do {

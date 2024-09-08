@@ -3,6 +3,7 @@
 
 #pragma once
 #include "foundation/container/dynamic_array.hpp"
+#include "foundation/container/span.hpp"
 #include "foundation/utils/string.hpp"
 
 namespace path {
@@ -258,11 +259,16 @@ JoinAppend(dyn::DynArray auto& output, Span<String const> parts, Format format =
 }
 
 PUBLIC constexpr MutableString Join(Allocator& a, Span<String const> parts, Format format = Format::Native) {
-    ASSERT(parts.size);
-    DynamicArray<char> buffer {parts[0], a};
-    for (auto p : parts.SubSpan(1))
-        JoinAppend(buffer, p, format);
-    return buffer.ToOwnedSpan();
+    if (!parts.size) return {};
+    auto buffer = a.AllocateExactSizeUninitialised<char>(TotalSize(parts) + parts.size - 1);
+    usize pos = 0;
+    for (auto const part : parts) {
+        if (!part.size) continue;
+        if (pos && !IsPathSeparator(buffer[pos - 1], format))
+            WriteAndIncrement(pos, buffer, format == Format::Windows ? '\\' : '/');
+        WriteAndIncrement(pos, buffer, part);
+    }
+    return a.ResizeType(buffer, pos, pos);
 }
 
 constexpr WString k_win32_long_path_prefix {L"\\\\?\\"};

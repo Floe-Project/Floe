@@ -20,7 +20,7 @@ static Span<String>* ScanFolderPaths(Settings& settings, ScanFolderType type) {
 } // namespace detail
 
 PUBLIC void AddScanFolder(SettingsFile& settings, ScanFolderType type, String path) {
-    if (Find(settings.paths.always_scanned_folders[ToInt(type)], path)) return;
+    if (path == settings.paths.always_scanned_folder[ToInt(type)]) return;
 
     auto& paths = *detail::ScanFolderPaths(settings.settings, type);
 

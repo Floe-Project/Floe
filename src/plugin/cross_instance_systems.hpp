@@ -21,7 +21,7 @@ struct CrossInstanceSystems {
     FloePaths paths;
     SettingsFile settings;
     ThreadPool thread_pool;
-    PresetsListing preset_listing {paths.always_scanned_folders[ToInt(ScanFolderType::Presets)],
+    PresetsListing preset_listing {paths.always_scanned_folder[ToInt(ScanFolderType::Presets)],
                                    error_notifications};
     sample_lib_server::Server sample_library_server;
 };

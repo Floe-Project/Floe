@@ -81,6 +81,43 @@ struct Logger {
     DECLARE_LOG_FUNCTION(Warning)
 };
 
+struct LineWriter {
+    LineWriter(LogModuleName module_name, LogLevel level, Logger& sink)
+        : module_name(module_name)
+        , level(level)
+        , sink(sink) {
+        writer.Set<LineWriter>(*this, [](LineWriter& w, Span<u8 const> bytes) -> ErrorCodeOr<void> {
+            w.Append(String {(char const*)bytes.data, bytes.size});
+            return k_success;
+        });
+    }
+    ~LineWriter() { Flush(); }
+
+    void Flush() {
+        if (buffer.size) {
+            sink.Log(module_name, level, buffer);
+            dyn::Clear(buffer);
+        }
+    }
+    void Append(String data) {
+        for (auto c : data)
+            if (c == '\n')
+                Flush();
+            else
+                dyn::Append(buffer, c);
+    }
+
+    LogModuleName module_name;
+    LogLevel level;
+    Logger& sink;
+    DynamicArrayBounded<char, 250> buffer {};
+    Writer writer {};
+};
+
+inline LineWriter ErrorWriter(Logger& logger) {
+    return LineWriter {k_main_log_module, LogLevel::Error, logger};
+}
+
 struct StdStreamLogger final : Logger {
     StdStreamLogger(StdStream stream, WriteFormattedLogOptions config) : stream(stream), config(config) {}
     void Log(LogModuleName module_name, LogLevel level, String str) override;

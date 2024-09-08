@@ -346,14 +346,14 @@ static void CreateFontsIfNeeded(Gui* g) {
 static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
     switch (type) {
         case DialogType::InstallPackage: {
-            auto downloads_folder = KnownDirectory(g->scratch_arena, KnownDirectoryType::Downloads, false);
+            auto downloads_folder =
+                KnownDirectory(g->scratch_arena, KnownDirectoryType::Downloads, {.create = false});
 
             auto const paths = TRY(FilesystemDialog({
                 .type = DialogArguments::Type::OpenFile,
                 .allocator = g->scratch_arena,
                 .title = "Select Floe Package",
-                .default_path =
-                    downloads_folder.HasValue() ? Optional<String>(downloads_folder.Value()) : k_nullopt,
+                .default_path = downloads_folder,
                 .filters = ArrayT<DialogArguments::FileFilter>({
                     {
                         .description = "Floe Package"_s,

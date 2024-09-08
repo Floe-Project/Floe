@@ -66,22 +66,76 @@ ErrorCode FilesystemErrnoErrorCode(s64 error_code, char const* extra_debug_info,
     return ErrnoErrorCode(error_code, extra_debug_info, loc);
 }
 
-ErrorCodeOr<MutableString>
-KnownDirectoryWithSubdirectories(Allocator& a, KnownDirectoryType type, Span<String const> subdirectories) {
-    ASSERT(subdirectories.size);
-    auto path = DynamicArray<char>::FromOwnedSpan(TRY(KnownDirectory(a, type, true)), a);
-    path::JoinAppend(path, subdirectories);
-    TRY(CreateDirectory(path, {.create_intermediate_directories = true, .fail_if_exists = false}));
-    return path.ToOwnedSpan();
+MutableString KnownDirectoryWithSubdirectories(Allocator& a,
+                                               KnownDirectoryType type,
+                                               Span<String const> subdirectories,
+                                               Optional<String> filename,
+                                               KnownDirectoryOptions options) {
+    auto path = KnownDirectory(a, type, options);
+    if (!subdirectories.size && !filename) return path;
+
+    auto const full_path = a.ResizeType(path,
+                                        path.size,
+                                        path.size + TotalSize(subdirectories) + subdirectories.size +
+                                            (filename ? filename->size + 1 : 0));
+    usize pos = path.size;
+    for (auto const& sub : subdirectories) {
+        WriteAndIncrement(pos, full_path, path::k_dir_separator);
+        WriteAndIncrement(pos, full_path, sub);
+
+        if (options.create) {
+            auto const dir = String {full_path.data, pos};
+            auto const o = CreateDirectory(dir,
+                                           {
+                                               .create_intermediate_directories = false,
+                                               .fail_if_exists = false,
+                                               .win32_hide_dirs_starting_with_dot = true,
+                                           });
+            if (options.error_log) {
+                auto _ = fmt::FormatToWriter(*options.error_log,
+                                             "Failed to create directory '{}': {}",
+                                             dir,
+                                             o.Error());
+            }
+        }
+    }
+    if (filename) {
+        WriteAndIncrement(pos, full_path, path::k_dir_separator);
+        WriteAndIncrement(pos, full_path, *filename);
+    }
+
+    return full_path;
 }
 
-ErrorCodeOr<MutableString> FloeKnownDirectory(Allocator& a, FloeKnownDirectoryType type) {
+MutableString FloeKnownDirectory(Allocator& a,
+                                 FloeKnownDirectoryType type,
+                                 Optional<String> filename,
+                                 KnownDirectoryOptions options) {
+    KnownDirectoryType known_dir_type {};
+    Span<String const> subdirectories {};
     switch (type) {
         case FloeKnownDirectoryType::Logs:
-            return KnownDirectoryWithSubdirectories(a, KnownDirectoryType::Logs, Array {"Floe"_s});
+            known_dir_type = KnownDirectoryType::Logs;
+            subdirectories = Array {"Floe"_s};
+            break;
+        case FloeKnownDirectoryType::Settings:
+            known_dir_type = KnownDirectoryType::GlobalData;
+            subdirectories = Array {"Floe"_s, "Settings"};
+            break;
+        case FloeKnownDirectoryType::Presets:
+            known_dir_type = KnownDirectoryType::GlobalData;
+            subdirectories = Array {"Floe"_s, "Presets"};
+            break;
+        case FloeKnownDirectoryType::Libraries:
+            known_dir_type = KnownDirectoryType::GlobalData;
+            subdirectories = Array {"Floe"_s, "Libraries"};
+            break;
+        case FloeKnownDirectoryType::Temporary:
+            known_dir_type = KnownDirectoryType::Temporary;
+            subdirectories = Array {"Floe"_s};
+            break;
     }
-    PanicIfReached();
-    return {};
+    return KnownDirectoryWithSubdirectories(a, known_dir_type, subdirectories, filename, options);
 }
 
 // uses Rename() to move a file or folder into a given destination folder

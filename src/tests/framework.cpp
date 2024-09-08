@@ -32,26 +32,16 @@ void RegisterTest(Tester& tester, TestFunction f, String title) {
 }
 
 String TempFolder(Tester& tester) {
-    if (!tester.test_output_folder) {
-        tester.test_output_folder = ({
-            auto const o = KnownDirectoryWithSubdirectories(tester.arena,
-                                                            KnownDirectoryType::Temporary,
-                                                            Array {"Floe"_s, "tests"});
-            if (o.HasError()) {
-                Check(tester,
-                      false,
-                      fmt::Format(tester.scratch_arena, "failed to get tests output dir: {}", o.Error()),
-                      FailureAction::FailAndExitTest);
-                return {"ERROR"};
-            }
-            o.Value();
-        });
-
-        auto _ = StdPrint(
-            StdStream::Err,
-            fmt::Format(tester.scratch_arena, "Test output folder: {}\n", *tester.test_output_folder));
+    if (!tester.temp_folder) {
+        auto error_log = StdWriter(StdStream::Out);
+        tester.temp_folder = FloeKnownDirectory(tester.arena,
+                                                FloeKnownDirectoryType::Temporary,
+                                                k_nullopt,
+                                                {.create = true, .error_log = &error_log});
+        auto _ = StdPrint(StdStream::Err,
+                          fmt::Format(tester.scratch_arena, "Test output folder: {}\n", *tester.temp_folder));
     }
-    return *tester.test_output_folder;
+    return *tester.temp_folder;
 }
 
 static Optional<String> SearchUpwardsFromExeForFolder(Tester& tester, String folder_name) {
@@ -101,6 +91,11 @@ void* CreateOrFetchFixturePointer(Tester& tester,
 }
 
 int RunAllTests(Tester& tester, Span<String> filter_patterns) {
+    DEFER {
+        if (tester.temp_folder)
+            auto _ = Delete(*tester.temp_folder, {.type = DeleteOptions::Type::DirectoryRecursively});
+    };
+
     g_cli_out.Info({}, "Running tests ...");
     Stopwatch const overall_stopwatch;
 

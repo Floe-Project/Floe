@@ -132,26 +132,33 @@ ErrorCodeOr<void> ReadSectionOfFileAndWriteToOtherFile(File& file_to_read_from,
 
 using PathArena = ArenaAllocatorWithInlineStorage<2000>;
 
+// Generic directories, they won't have a 'Floe' subdirectory
 enum class KnownDirectoryType : u8 {
     Documents,
     Downloads,
     Logs,
     Temporary,
 
-    // Shared between all users, it's carefully picked to be writable by all users even when we're running as
-    // an audio plugin and therefore could be sandboxed.
+    // Any user can read and write here. It's carefully picked to also work when we're running as an audio
+    // plugin and even sandboxed.
+    //
+    // We still need to be mindful of permissions. If one user creates a file, it should be readable by
+    // everyone, but it might not be writable by everyone. If we wan't to share write-access then we can use
+    // things like open()'s mode argument, chmod() or umask() on UNIX, or CreateFile()'s security attributes
+    // or SetFileSecurity() on Windows.
     //
     // We tend to prefer global locations because as an audio plugin, we're almost always going to be
-    // installed globally anyways.
+    // installed globally anyways. Things like sample libraries are extensions of the application, it makes
+    // no sense to install them per-user.
     //
     // NOTE: on Linux it's not global, it's in the user's home directory.
     GlobalData,
 
-    // TODO: UserData
-
     GlobalVst3Plugins,
-    UserVst3Plugins,
     GlobalClapPlugins,
+
+    // NOTE: per-user sample library locations are not typically used.
+    UserVst3Plugins,
     UserClapPlugins,
 
     LegacyAllUsersData,
@@ -162,15 +169,28 @@ enum class KnownDirectoryType : u8 {
     Count,
 };
 
-ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectoryType type, bool create);
+struct KnownDirectoryOptions {
+    bool create;
+    Writer* error_log;
+};
 
-// Creates the directory along with the subdirectories if they don't exist
-ErrorCodeOr<MutableString>
-KnownDirectoryWithSubdirectories(Allocator& a, KnownDirectoryType type, Span<String const> subdirectories);
+MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirectoryOptions options);
 
-// Returns a Floe-specific path. Might be a KnownDirectory with a 'Floe' subdirectory. Creates the dir.
-enum class FloeKnownDirectoryType { Logs };
-ErrorCodeOr<MutableString> FloeKnownDirectory(Allocator& a, FloeKnownDirectoryType type);
+// Gets a known directory and adds subdirectories and (optionally) a filename. It will create the
+// subdirectories if options.create is true.
+MutableString KnownDirectoryWithSubdirectories(Allocator& a,
+                                               KnownDirectoryType type,
+                                               Span<String const> subdirectories,
+                                               Optional<String> filename,
+                                               KnownDirectoryOptions options);
+
+// Returns a Floe-specific path. Might be a KnownDirectory with a 'Floe' subdirectory. Just a wrapper around
+// KnownDirectoryWithSubdirectories.
+enum class FloeKnownDirectoryType { Temporary, Logs, Settings, Libraries, Presets };
+MutableString FloeKnownDirectory(Allocator& a,
+                                 FloeKnownDirectoryType type,
+                                 Optional<String> filename,
+                                 KnownDirectoryOptions options);
 
 enum class FileType { File, Directory };
 
@@ -284,6 +304,7 @@ struct Entry {
 struct Iterator {
     // private
     static ErrorCodeOr<Iterator> InternalCreate(ArenaAllocator& arena, String path, Options options) {
+        ASSERT(path.size);
         ASSERT(options.wildcard.size);
         ASSERT(!path::EndsWithDirectorySeparator(path));
         Iterator result {

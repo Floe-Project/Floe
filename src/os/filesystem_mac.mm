@@ -156,59 +156,60 @@ ErrorCodeOr<void> CreateDirectory(String path, CreateDirectoryOptions options) {
     return k_success;
 }
 
-static ErrorCodeOr<MutableString>
-OSXGetSystemFilepath(Allocator& a, NSSearchPathDirectory type, NSSearchPathDomainMask domain, bool create) {
-    NSError* error = nil;
-    auto url = [[NSFileManager defaultManager] URLForDirectory:type
-                                                      inDomain:domain
-                                             appropriateForURL:nullptr
-                                                        create:create
-                                                         error:&error];
-
-    if (url == nil) return FilesystemErrorFromNSError(error);
-    return a.Clone(NSStringToString(url.path));
-}
-
-ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectoryType type, bool create) {
-    NSSearchPathDirectory osx_type {};
+MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirectoryOptions options) {
+    NSSearchPathDirectory dir_type {};
     NSSearchPathDomainMask domain {};
     Span<String const> extra_subdirs {};
-    Optional<String> fallback {};
+    String fallback {};
     switch (type) {
         case KnownDirectoryType::Temporary: return a.Clone(NSStringToString(NSTemporaryDirectory()));
         case KnownDirectoryType::Logs:
-            osx_type = NSLibraryDirectory;
+            dir_type = NSLibraryDirectory;
             domain = NSUserDomainMask;
             extra_subdirs = Array {"Logs"_s};
+            fallback = "Library";
             break;
         case KnownDirectoryType::Documents:
-            osx_type = NSDocumentDirectory;
+            dir_type = NSDocumentDirectory;
             domain = NSUserDomainMask;
+            fallback = "Documents";
             break;
         case KnownDirectoryType::Downloads:
-            osx_type = NSDownloadsDirectory;
+            dir_type = NSDownloadsDirectory;
             domain = NSUserDomainMask;
+            fallback = "Downloads";
             break;
         case KnownDirectoryType::GlobalData: {
             // We ignore the 'create' option here because /Users/Shared is a folder that should always exist,
             // and if it doesn't, we need to handle it in a particular way here.
-            MutableString path {};
-            if (auto const o = OSXGetSystemFilepath(a, NSUserDirectory, NSLocalDomainMask, true);
-                o.HasError()) {
-                g_log.Warning(k_main_log_module, "Failed to get /Users: {}", o.Error());
-                path = a.Clone("/Users"_s);
+            String base_path {};
+
+            NSError* error = nil;
+            auto url = [[NSFileManager defaultManager] URLForDirectory:NSUserDirectory
+                                                              inDomain:NSLocalDomainMask
+                                                     appropriateForURL:nullptr
+                                                                create:true
+                                                                 error:&error];
+
+            if (url == nil) {
+                if (options.error_log) {
+                    auto _ = fmt::FormatToWriter(*options.error_log,
+                                                 "Failed getting /Users: {}\n",
+                                                 FilesystemErrorFromNSError(error));
+                }
+
+                base_path = "/Users";
+            } else {
+                base_path = NSStringToString(url.path);
             }
 
-            ASSERT(!EndsWith(path, '/'));
-            auto p = DynamicArray<char>::FromOwnedSpan(path, a);
-            dyn::Append(p, '/');
-            dyn::AppendSpan(p, "Shared");
+            auto result = path::Join(a, Array {base_path, "Shared"_s});
 
             // /Users/Shared should be always be present on macOS systems. However, if it's not, we try to
             // create it here. We got the attributes by looking at the result of `stat /Users/Shared`. ignore
             // any error, we can't do anything about it
             [[NSFileManager defaultManager]
-                      createDirectoryAtPath:StringToNSString(p)
+                      createDirectoryAtPath:StringToNSString(result)
                 withIntermediateDirectories:NO
                                  attributes:@{
                                      NSFilePosixPermissions : @01775, // full permissions
@@ -217,48 +218,52 @@ ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectoryType type,
                                  }
                                       error:nil];
 
-            return p.ToOwnedSpan();
+            return result;
         }
 
         case KnownDirectoryType::GlobalVst3Plugins:
-            osx_type = NSLibraryDirectory;
+            dir_type = NSLibraryDirectory;
             domain = NSLocalDomainMask;
             extra_subdirs = Array {"Audio"_s, "Plug-Ins", "VST3"};
             fallback = "/Library";
             break;
         case KnownDirectoryType::UserVst3Plugins:
-            osx_type = NSLibraryDirectory;
+            dir_type = NSLibraryDirectory;
             domain = NSUserDomainMask;
             extra_subdirs = Array {"Audio"_s, "Plug-Ins", "VST3"};
+            fallback = "Library";
             break;
         case KnownDirectoryType::GlobalClapPlugins:
-            osx_type = NSLibraryDirectory;
+            dir_type = NSLibraryDirectory;
             domain = NSLocalDomainMask;
             extra_subdirs = Array {"Audio"_s, "Plug-Ins", "CLAP"};
             fallback = "/Library";
             break;
         case KnownDirectoryType::UserClapPlugins:
-            osx_type = NSLibraryDirectory;
+            dir_type = NSLibraryDirectory;
             domain = NSUserDomainMask;
             extra_subdirs = Array {"Audio"_s, "Plug-Ins", "CLAP"};
+            fallback = "Library";
             break;
 
         case KnownDirectoryType::LegacyPluginSettings:
-            osx_type = NSMusicDirectory;
+            dir_type = NSMusicDirectory;
             domain = NSUserDomainMask;
             extra_subdirs = Array {"Audio Music Apps"_s, "Plug-In Settings"};
+            fallback = "Music";
             break;
         case KnownDirectoryType::LegacyData:
-            osx_type = NSApplicationSupportDirectory;
+            dir_type = NSApplicationSupportDirectory;
             domain = NSUserDomainMask;
+            fallback = "Application Support";
             break;
         case KnownDirectoryType::LegacyAllUsersData:
-            osx_type = NSApplicationSupportDirectory;
+            dir_type = NSApplicationSupportDirectory;
             domain = NSLocalDomainMask;
             fallback = "/Library/Application Support";
             break;
         case KnownDirectoryType::LegacyAllUsersSettings:
-            osx_type = NSApplicationSupportDirectory;
+            dir_type = NSApplicationSupportDirectory;
             domain = NSLocalDomainMask;
             fallback = "/Library/Application Support";
             break;
@@ -266,30 +271,54 @@ ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectoryType type,
         case KnownDirectoryType::Count: PanicIfReached();
     }
 
-    auto path = ({
-        MutableString p {};
-        if (auto outcome = OSXGetSystemFilepath(a, osx_type, domain, create); outcome.HasError())
-            if (!fallback)
-                return outcome.Error();
-            else
-                p = a.Clone(*fallback);
-        else
-            p = outcome.Value();
-        p;
-    });
+    NSError* error = nil;
+    auto url = [[NSFileManager defaultManager] URLForDirectory:dir_type
+                                                      inDomain:domain
+                                             appropriateForURL:nullptr
+                                                        create:options.create
+                                                         error:&error];
+
+    MutableString path {};
+    if (url == nil) {
+        if (options.error_log) {
+            auto _ = fmt::FormatToWriter(*options.error_log,
+                                         "Failed getting known directory {}, domain {}: {}\n",
+                                         dir_type,
+                                         domain,
+                                         FilesystemErrorFromNSError(error));
+        }
+        if (domain == NSUserDomainMask) {
+            DynamicArrayBounded<String, 10> parts {};
+            ASSERT(extra_subdirs.size <= (parts.Capacity() - 2));
+            dyn::Append(parts, "/Users"_s);
+            dyn::Append(parts, NSStringToString(NSUserName()));
+            dyn::AppendSpan(parts, extra_subdirs);
+            path = path::Join(a, parts);
+        } else
+            path = a.Clone(fallback);
+    } else {
+        path = a.Clone(NSStringToString(url.path));
+    }
 
     if (extra_subdirs.size) {
         auto p = DynamicArray<char>::FromOwnedSpan(path, a);
         for (auto const subdir : extra_subdirs) {
             dyn::Append(p, '/');
             dyn::AppendSpan(p, subdir);
-            if (create)
-                TRY(CreateDirectory(p, {.create_intermediate_directories = false, .fail_if_exists = false}));
+            if (options.create) {
+                auto const o =
+                    CreateDirectory(p, {.create_intermediate_directories = false, .fail_if_exists = false});
+                if (o.HasError() && options.error_log) {
+                    auto _ = fmt::FormatToWriter(*options.error_log,
+                                                 "Failed creating directory {}: {}\n",
+                                                 p,
+                                                 o.Error());
+                }
+            }
         }
-        path = p.ToOwnedSpan();
+        return p.ToOwnedSpan();
     }
 
-    ASSERT(path::IsAbsolute(path));
     return path;
 }
 

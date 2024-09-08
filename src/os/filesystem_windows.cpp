@@ -5,6 +5,7 @@
 #include <aclapi.h>
 #include <dbghelp.h>
 #include <fileapi.h>
+#include <lmcons.h>
 #include <shlobj.h>
 #include <shlwapi.h>
 #include <winnt.h>
@@ -14,6 +15,7 @@
 //
 
 #include "foundation/foundation.hpp"
+#include "foundation/utils/memory.hpp"
 #include "os/filesystem.hpp"
 #include "os/misc.hpp"
 #include "os/misc_windows.hpp"
@@ -170,29 +172,6 @@ ErrorCodeOr<File> OpenFile(String filename, FileMode mode) {
 
 EXTERN_C IMAGE_DOS_HEADER __ImageBase; // NOLINT(readability-identifier-naming, bugprone-reserved-identifier)
 
-struct Win32KnownPath {
-    Win32KnownPath(PWSTR p) : path(FromNullTerminated(p)) {}
-    Win32KnownPath(Win32KnownPath const& other) = delete;
-    Win32KnownPath(Win32KnownPath&& other) : path(other.path) { other.path = {}; }
-    ~Win32KnownPath() {
-        if (path.size) CoTaskMemFree((PWSTR)path.data);
-    }
-    WString path;
-};
-
-// Does not contain a trailing backslash
-static ErrorCodeOr<Win32KnownPath> Win32GetKnownFilepath(GUID folder_id, bool create) {
-    PWSTR wide_file_path = nullptr;
-    auto hr =
-        SHGetKnownFolderPath(folder_id, create ? KF_FLAG_CREATE : KF_FLAG_DEFAULT, nullptr, &wide_file_path);
-    if (hr != S_OK) {
-        // The API says it should be freed regardless of if SHGetKnownFolderPath succeeded
-        CoTaskMemFree(wide_file_path);
-        return FilesystemWin32ErrorCode(HresultToWin32(hr), "SHGetKnownFolderPath");
-    }
-    return wide_file_path;
-}
-
 ErrorCodeOr<void> WindowsSetFileAttributes(String path, Optional<WindowsFileAttributes> attributes) {
     ASSERT(path::IsAbsolute(path));
 
@@ -327,73 +306,192 @@ ErrorCodeOr<DynamicArrayBounded<char, 200>> NameOfRunningExecutableOrLibrary() {
     return String {path::Filename(full_path)};
 }
 
-ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectoryType type, bool create) {
-    GUID folder_id {};
-    Span<WString const> subfolders {};
+MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirectoryOptions options) {
+    if (type == KnownDirectoryType::Temporary) {
+        WCHAR buffer[MAX_PATH + 1];
+        auto size = GetTempPathW((DWORD)ArraySize(buffer), buffer);
+        if (size == 0) {
+            if (options.error_log) {
+                auto _ = fmt::FormatToWriter(*options.error_log,
+                                             "{}",
+                                             FilesystemWin32ErrorCode(GetLastError(), "GetTempPathW"));
+            }
+            return a.Clone("C:\\Windows\\Temp"_s);
+        }
+
+        if (auto const last = buffer[size - 1]; last == L'\\' || last == L'/') --size;
+
+        WString const wide_path {buffer, (usize)size};
+        auto result = Narrow(a, wide_path).Value();
+        ASSERT(!path::IsPathSeparator(Last(result)));
+        ASSERT(path::IsAbsolute(result));
+        return result;
+    }
+
+    struct KnownDirectoryConfig {
+        GUID folder_id;
+        Span<WString const> subfolders {};
+        String fallback_absolute {};
+        String fallback_user {};
+    };
+
+    KnownDirectoryConfig config {};
     switch (type) {
         case KnownDirectoryType::Temporary: {
-            WCHAR buffer[MAX_PATH + 1];
-            auto size = GetTempPathW((DWORD)ArraySize(buffer), buffer);
-            if (size == 0) return FilesystemWin32ErrorCode(GetLastError(), "GetTempPathW");
-
-            if (auto const last = buffer[size - 1]; last == L'\\' || last == L'/') --size;
-
-            WString const wide_path {buffer, (usize)size};
-            auto result = Narrow(a, wide_path).Value();
-            ASSERT(!path::IsPathSeparator(Last(result)));
-            ASSERT(path::IsAbsolute(result));
-            return result;
+            PanicIfReached();
         }
-        case KnownDirectoryType::Logs: folder_id = FOLDERID_LocalAppData; break;
-        case KnownDirectoryType::Documents: folder_id = FOLDERID_Documents; break;
-        case KnownDirectoryType::Downloads: folder_id = FOLDERID_Downloads; break;
-        case KnownDirectoryType::GlobalData: folder_id = FOLDERID_Public; break;
+        case KnownDirectoryType::Logs:
+            config.folder_id = FOLDERID_LocalAppData;
+            config.fallback_user = "AppData\\Local";
+            break;
+        case KnownDirectoryType::Documents:
+            config.folder_id = FOLDERID_Documents;
+            config.fallback_user = "Documents";
+            break;
+        case KnownDirectoryType::Downloads:
+            config.folder_id = FOLDERID_Downloads;
+            config.fallback_user = "Downloads";
+            break;
+        case KnownDirectoryType::GlobalData:
+            config.folder_id = FOLDERID_Public;
+            config.fallback_absolute = "C:\\Users\\Public";
+            break;
 
         case KnownDirectoryType::GlobalClapPlugins:
-            folder_id = FOLDERID_ProgramFilesCommon;
-            subfolders = Array {L"CLAP"_s};
+            config.folder_id = FOLDERID_ProgramFilesCommon;
+            config.subfolders = Array {L"CLAP"_s};
+            config.fallback_absolute = "C:\\Program Files\\Common Files\\CLAP";
             break;
         case KnownDirectoryType::UserClapPlugins:
-            folder_id = FOLDERID_LocalAppData;
-            subfolders = Array {L"CLAP"_s};
+            config.folder_id = FOLDERID_LocalAppData;
+            config.subfolders = Array {L"CLAP"_s};
+            config.fallback_user = "AppData\\Local\\CLAP";
             break;
         case KnownDirectoryType::GlobalVst3Plugins:
-            folder_id = FOLDERID_ProgramFilesCommon;
-            subfolders = Array {L"VST3"_s};
+            config.folder_id = FOLDERID_ProgramFilesCommon;
+            config.subfolders = Array {L"VST3"_s};
+            config.fallback_absolute = "C:\\Program Files\\Common Files\\VST3";
             break;
         case KnownDirectoryType::UserVst3Plugins:
-            folder_id = IsRunningUnderWine() ? FOLDERID_LocalAppData : FOLDERID_UserProgramFilesCommon;
-            subfolders = Array {L"VST3"_s};
+            config.folder_id = FOLDERID_UserProgramFilesCommon;
+            config.fallback_user = "AppData\\Local\\Programs\\Common";
+            config.subfolders = Array {L"VST3"_s};
             break;
 
-        case KnownDirectoryType::LegacyAllUsersData: folder_id = FOLDERID_Public; break;
-        case KnownDirectoryType::LegacyAllUsersSettings: folder_id = FOLDERID_ProgramData; break;
-        case KnownDirectoryType::LegacyPluginSettings: folder_id = FOLDERID_RoamingAppData; break;
-        case KnownDirectoryType::LegacyData: folder_id = FOLDERID_RoamingAppData; break;
+        case KnownDirectoryType::LegacyAllUsersData:
+            config.folder_id = FOLDERID_Public;
+            config.fallback_absolute = "C:\\Users\\Public";
+            break;
+        case KnownDirectoryType::LegacyAllUsersSettings:
+            config.folder_id = FOLDERID_ProgramData;
+            config.fallback_absolute = "C:\\ProgramData";
+            break;
+        case KnownDirectoryType::LegacyPluginSettings:
+            config.folder_id = FOLDERID_RoamingAppData;
+            config.fallback_user = "AppData\\Roaming";
+            break;
+        case KnownDirectoryType::LegacyData:
+            config.folder_id = FOLDERID_RoamingAppData;
+            config.fallback_user = "AppData\\Roaming";
+            break;
 
         case KnownDirectoryType::Count: PanicIfReached(); break;
     }
 
-    // NOTE: Not all KNOWNFOLDERID values are present on all systems. We might get a E_INVALIDARG
-    auto const wide_path = TRY(Win32GetKnownFilepath(folder_id, create));
+    PWSTR wide_file_path_null_term = nullptr;
+    auto hr = SHGetKnownFolderPath(config.folder_id,
+                                   options.create ? KF_FLAG_CREATE : KF_FLAG_DEFAULT,
+                                   nullptr,
+                                   &wide_file_path_null_term);
+    // The API says it should be freed regardless of if SHGetKnownFolderPath succeeded
+    DEFER { CoTaskMemFree(wide_file_path_null_term); };
+
+    if (hr != S_OK) {
+        if (options.error_log) {
+            auto _ = fmt::FormatToWriter(
+                *options.error_log,
+                "Failed to get known directory {{{08X}-{04X}-{04X}-{02X}{02X}-{02X}{02X}{02X}{02X}{02X}{02X}}}: {}",
+                config.folder_id.Data1,
+                config.folder_id.Data2,
+                config.folder_id.Data3,
+                config.folder_id.Data4[0],
+                config.folder_id.Data4[1],
+                config.folder_id.Data4[2],
+                config.folder_id.Data4[3],
+                config.folder_id.Data4[4],
+                config.folder_id.Data4[5],
+                config.folder_id.Data4[6],
+                config.folder_id.Data4[7],
+                FilesystemWin32ErrorCode(HresultToWin32(hr), "SHGetKnownFolderPath"));
+        }
+        auto const fallback = ({
+            MutableString f {};
+            if (config.fallback_absolute.size)
+                f = a.Clone(config.fallback_absolute);
+            else {
+                ASSERT(config.fallback_user.size);
+                Array<WCHAR, UNLEN + 1> wbuffer {};
+                Array<char, MaxNarrowedStringSize(wbuffer.size)> buffer {};
+                String username = "User";
+                auto size = (DWORD)wbuffer.size;
+                if (GetUserNameW(wbuffer.data, &size)) {
+                    if (size > 0) {
+                        auto const narrow_size = NarrowToBuffer(buffer.data, {wbuffer.data, size - 1});
+                        if (narrow_size) username = String {buffer.data, *narrow_size};
+                    }
+                } else if (options.error_log) {
+                    auto _ = fmt::FormatToWriter(*options.error_log,
+                                                 "Failed to get username: {}",
+                                                 FilesystemWin32ErrorCode(GetLastError(), "GetUserNameW"));
+                }
+
+                f = CombineStrings(a,
+                                   Array {
+                                       "C:\\Users\\"_s,
+                                       username,
+                                       "\\"_s,
+                                       config.fallback_user,
+                                   });
+            }
+            f;
+        });
+        if (options.create) {
+            auto _ = CreateDirectory(fallback,
+                                     {
+                                         .create_intermediate_directories = true,
+                                         .fail_if_exists = false,
+                                         .win32_hide_dirs_starting_with_dot = false,
+                                     });
+        }
+        return fallback;
+    }
+
+    auto const wide_path = WString {wide_file_path_null_term, wcslen(wide_file_path_null_term)};
 
     MutableString result;
-    if (subfolders.size) {
+    if (config.subfolders.size) {
         PathArena temp_path_arena;
-        DynamicArray<wchar_t> wide_result {wide_path.path, temp_path_arena};
-        for (auto const subfolder : subfolders) {
+        DynamicArray<wchar_t> wide_result {wide_path, temp_path_arena};
+        for (auto const subfolder : config.subfolders) {
             dyn::Append(wide_result, L'\\');
             dyn::AppendSpan(wide_result, subfolder);
-            if (create) {
+            if (options.create) {
                 if (!CreateDirectoryW(wide_result.data, nullptr)) {
                     auto const err = GetLastError();
-                    if (err != ERROR_ALREADY_EXISTS) return FilesystemWin32ErrorCode(err, "CreateDirectoryW");
+                    if (err != ERROR_ALREADY_EXISTS) {
+                        if (options.error_log) {
+                            auto _ = fmt::FormatToWriter(*options.error_log,
+                                                         "Failed to create directory '{}': {}",
+                                                         Narrow(temp_path_arena, wide_result),
+                                                         FilesystemWin32ErrorCode(err, "CreateDirectoryW"));
+                        }
+                    }
                 }
             }
         }
         result = Narrow(a, wide_result).Value();
     } else {
-        result = Narrow(a, wide_path.path).Value();
+        result = Narrow(a, wide_path).Value();
     }
 
     ASSERT(!path::IsPathSeparator(Last(result)));

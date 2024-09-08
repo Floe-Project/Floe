@@ -162,7 +162,21 @@ MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirecto
     Span<String const> extra_subdirs {};
     String fallback {};
     switch (type) {
-        case KnownDirectoryType::Temporary: return a.Clone(NSStringToString(NSTemporaryDirectory()));
+        case KnownDirectoryType::Temporary: {
+            auto result = a.Clone(NSStringToString(NSTemporaryDirectory()));
+            if (options.create) {
+                if (auto const o =
+                        CreateDirectory(result,
+                                        {.create_intermediate_directories = true, .fail_if_exists = false});
+                    o.HasError() && options.error_log) {
+                    auto _ = fmt::FormatToWriter(*options.error_log,
+                                                 "Failed creating directory {}: {}",
+                                                 result,
+                                                 o.Error());
+                }
+            }
+            return result;
+        }
         case KnownDirectoryType::Logs:
             dir_type = NSLibraryDirectory;
             domain = NSUserDomainMask;

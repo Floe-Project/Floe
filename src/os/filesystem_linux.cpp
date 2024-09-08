@@ -165,7 +165,6 @@ ErrorCodeOr<void> Delete(String path, DeleteOptions options) {
 ErrorCodeOr<void> CreateDirectory(String path, CreateDirectoryOptions options) {
     PathArena temp_path_allocator;
     DynamicArray<char> buffer {path, temp_path_allocator};
-    Optional<usize> cursor = 0u;
 
     if (mkdir(dyn::NullTerminated(buffer), 0700) == 0) {
         return k_success;
@@ -173,6 +172,7 @@ ErrorCodeOr<void> CreateDirectory(String path, CreateDirectoryOptions options) {
         if (errno == EEXIST && !options.fail_if_exists) return k_success;
         if (errno == ENOENT && options.create_intermediate_directories) {
             dyn::Clear(buffer);
+            Optional<usize> cursor = 0u;
             while (cursor) {
                 auto part = SplitWithIterator(path, cursor, '/');
                 if (part.size) {
@@ -197,7 +197,28 @@ MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirecto
     Optional<String> home_path {};
     String abs_path {};
     switch (type) {
-        case KnownDirectoryType::Temporary: abs_path = "/tmp"_s; break;
+        case KnownDirectoryType::Temporary: {
+            MutableString result {};
+            if (auto const dir = secure_getenv("TMPDIR"))
+                result = a.Clone(FromNullTerminated(dir));
+            else
+                result = a.Clone(String(P_tmpdir));
+            if (options.create) {
+                if (auto const o = CreateDirectory(result,
+                                                   {
+                                                       .create_intermediate_directories = true,
+                                                       .fail_if_exists = false,
+                                                   });
+                    o.HasError()) {
+                    if (options.error_log)
+                        auto _ = fmt::FormatToWriter(*options.error_log,
+                                                     "Failed to create directory '{}': {}",
+                                                     result,
+                                                     o.Error());
+                }
+            }
+            return result;
+        }
         case KnownDirectoryType::Documents: home_path = "Documents"; break;
         case KnownDirectoryType::Downloads: home_path = "Downloads"; break;
         case KnownDirectoryType::Logs: home_path = ".local/state"; break;

@@ -310,18 +310,34 @@ MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirecto
     if (type == KnownDirectoryType::Temporary) {
         WCHAR buffer[MAX_PATH + 1];
         auto size = GetTempPathW((DWORD)ArraySize(buffer), buffer);
-        if (size == 0) {
+        WString wide_path {};
+        if (size) {
+            if (auto const last = buffer[size - 1]; last == L'\\' || last == L'/') --size;
+            wide_path = {buffer, (usize)size};
+        } else {
             if (options.error_log) {
                 auto _ = fmt::FormatToWriter(*options.error_log,
-                                             "{}",
+                                             "Failed to get temp path: {}",
                                              FilesystemWin32ErrorCode(GetLastError(), "GetTempPathW"));
             }
-            return a.Clone("C:\\Windows\\Temp"_s);
+            wide_path = L"C:\\Windows\\Temp"_s;
         }
 
-        if (auto const last = buffer[size - 1]; last == L'\\' || last == L'/') --size;
+        if (options.create) {
+            if (!CreateDirectoryW(wide_path.data, nullptr)) {
+                auto const err = GetLastError();
+                if (err != ERROR_ALREADY_EXISTS) {
+                    if (options.error_log) {
+                        PathArena temp_path_arena;
+                        auto _ = fmt::FormatToWriter(*options.error_log,
+                                                     "Failed to create directory '{}': {}",
+                                                     Narrow(temp_path_arena, wide_path),
+                                                     FilesystemWin32ErrorCode(err, "CreateDirectoryW"));
+                    }
+                }
+            }
+        }
 
-        WString const wide_path {buffer, (usize)size};
         auto result = Narrow(a, wide_path).Value();
         ASSERT(!path::IsPathSeparator(Last(result)));
         ASSERT(path::IsAbsolute(result));

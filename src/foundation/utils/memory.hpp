@@ -98,14 +98,19 @@ PUBLIC constexpr Span<u8 const> AsBytes(Type const& obj) {
 
 template <typename Type>
 PUBLIC constexpr void WriteAndIncrement(usize& pos, Span<u8> dest, Type const& src) {
-    if constexpr (requires(Type t) { t.size; }) {
-        static_assert(sizeof(typename Type::ValueType) == 1);
+    if constexpr (requires(Type t) {
+                      typename Type::ValueType;
+                      requires sizeof(typename Type::ValueType) == 1;
+                      { t.size } -> Convertible<usize>;
+                      { t.data } -> Convertible<typename Type::ValueType const*>;
+                  }) {
         CopyMemory(&dest.data[pos], src.data, src.size);
         pos += src.size;
-    } else {
-        static_assert(Same<Type, u8> || Same<Type, char>);
+    } else if constexpr (Fundamental<Type> && sizeof(Type) == 1) {
         dest.data[pos] = (u8)src;
         pos += 1;
+    } else {
+        static_assert(false);
     }
 }
 template <typename Type>

@@ -58,6 +58,7 @@ static ErrorCodeOr<void> ReadTestPackage(tests::Tester& tester, Span<u8 const> z
                     error_log.buffer);
     }
     DEFER { package::ReaderDeinit(package); };
+    CHECK(error_log.buffer.size == 0);
 
     package::PackageFolderIteratorIndex iterator = 0;
 
@@ -73,6 +74,7 @@ static ErrorCodeOr<void> ReadTestPackage(tests::Tester& tester, Span<u8 const> z
             o.ReleaseValue();
         });
         if (!folder) break;
+        CHECK(error_log.buffer.size == 0);
 
         ++folders_found;
         switch (folder->type) {

@@ -635,23 +635,28 @@ PUBLIC ErrorCodeOr<DestinationFolderStatus> CheckDestinationFolder(String destin
     auto const destination_folder_path =
         String(path::Join(scratch_arena, Array {destination_folder, path::Filename(folder.path)}));
 
-    DestinationFolderStatus result {};
-
     auto const actual_checksums = ({
         auto const o = ChecksumsForFolder(destination_folder_path, scratch_arena, scratch_arena);
         if (o.HasError()) {
-            if (o.Error() == FilesystemError::PathDoesNotExist) return result;
+            if (o.Error() == FilesystemError::PathDoesNotExist) {
+                // doesn't exist
+                return DestinationFolderStatus {};
+            }
             error_log.Error({}, "Couldn't read folder: {}", destination_folder_path);
             return o.Error();
+        }
+        if (o.Value().size == 0) {
+            // exists but empty
+            return DestinationFolderStatus {};
         }
         o.Value();
     });
 
-    if (actual_checksums.size == 0) return result;
-
-    result.exists_and_contains_files = true;
-    result.exactly_matches_zip = !ChecksumsDiffer(folder.checksum_values, actual_checksums, error_log);
-    result.changed_since_originally_installed = Tri::Unknown;
+    DestinationFolderStatus result {
+        .exists_and_contains_files = true,
+        .exactly_matches_zip = !ChecksumsDiffer(folder.checksum_values, actual_checksums, error_log),
+        .changed_since_originally_installed = Tri::Unknown,
+    };
 
     auto const checksum_file_path =
         path::Join(scratch_arena, Array {destination_folder_path, k_checksums_file});
@@ -671,6 +676,7 @@ PUBLIC ErrorCodeOr<DestinationFolderStatus> CheckDestinationFolder(String destin
     return result;
 }
 
+// Destination folder is the folder where the package will be installed. e.g. /home/me/Libraries
 // The resulting directory will be destination_folder/dir_in_zip.
 // Extracts to a temp folder than then renames to the final location. This ensures we either fail or succeed,
 // with no in-between cases where the folder is partially extracted. Additionally, it doesn't generate lots of

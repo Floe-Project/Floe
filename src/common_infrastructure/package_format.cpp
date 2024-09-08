@@ -177,6 +177,19 @@ static ErrorCodeOr<void> ReadTestPackage(tests::Tester& tester, Span<u8 const> z
     return k_success;
 }
 
+TEST_CASE(TestRelativePathIfInFolder) {
+    CHECK_EQ(package::detail::RelativePathIfInFolder("/a/b/c", "/a/b"), "c"_s);
+    CHECK_EQ(package::detail::RelativePathIfInFolder("/a/b/c", "/a/b/"), "c"_s);
+    CHECK_EQ(package::detail::RelativePathIfInFolder("/a/b/c", "/a"), "b/c"_s);
+    CHECK(!package::detail::RelativePathIfInFolder("/aa/b/c", "/a"));
+    CHECK(!package::detail::RelativePathIfInFolder("/a/b/c", "/a/d"));
+    CHECK(!package::detail::RelativePathIfInFolder("/a/b/c", "/a/b/c"));
+    CHECK(!package::detail::RelativePathIfInFolder("", ""));
+    CHECK(!package::detail::RelativePathIfInFolder("", "/a"));
+    CHECK(!package::detail::RelativePathIfInFolder("/a", ""));
+    return k_success;
+}
+
 TEST_CASE(TestPackageFormat) {
     auto const zip_data = TRY(WriteTestPackage(tester));
     CHECK_NEQ(zip_data.size, 0uz);
@@ -186,4 +199,7 @@ TEST_CASE(TestPackageFormat) {
     return k_success;
 }
 
-TEST_REGISTRATION(RegisterPackageFormatTests) { REGISTER_TEST(TestPackageFormat); }
+TEST_REGISTRATION(RegisterPackageFormatTests) {
+    REGISTER_TEST(TestPackageFormat);
+    REGISTER_TEST(TestRelativePathIfInFolder);
+}

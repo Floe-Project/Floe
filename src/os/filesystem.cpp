@@ -91,7 +91,7 @@ MutableString KnownDirectoryWithSubdirectories(Allocator& a,
                                                .fail_if_exists = false,
                                                .win32_hide_dirs_starting_with_dot = true,
                                            });
-            if (options.error_log) {
+            if (o.HasError() && options.error_log) {
                 auto _ = fmt::FormatToWriter(*options.error_log,
                                              "Failed to create directory '{}': {}",
                                              dir,

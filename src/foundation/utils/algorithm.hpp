@@ -86,6 +86,13 @@ PUBLIC constexpr u32 Hash32(auto data) { return HashDbj(data); }
 PUBLIC constexpr u64 HashMultiple(auto const& data) { return HashMultipleFnv1a(data); }
 PUBLIC constexpr u32 HashMultiple32(auto const& data) { return HashMultipleDbj(data); }
 
+PUBLIC constexpr usize TotalSize(ContiguousContainerOfContiguousContainers auto const& c_of_c) {
+    usize total_size = 0;
+    for (auto const& c : c_of_c)
+        total_size += c.size;
+    return total_size;
+}
+
 template <typename T>
 PUBLIC constexpr auto Begin(T& c) -> decltype(c.begin()) {
     return c.begin();

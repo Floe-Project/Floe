@@ -410,11 +410,7 @@ TEST_CASE(TestFilesystem) {
 
     SUBCASE("DeleteDirectory") {
         auto test_delete_directory = [&a, &tester]() -> ErrorCodeOr<void> {
-            auto const dir = KnownDirectoryWithSubdirectories(a,
-                                                              KnownDirectoryType::Temporary,
-                                                              Array {"Floe"_s, "TestDeleteDirectory"},
-                                                              k_nullopt,
-                                                              KnownDirectoryOptions {.create = false});
+            auto const dir = path::Join(a, Array {tests::TempFolder(tester), "DeleteDirectory test"});
             TRY(CreateDirectory(dir, {.create_intermediate_directories = true}));
 
             // create files and folders within the dir

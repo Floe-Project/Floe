@@ -205,24 +205,17 @@ ErrorCodeOr<MutableString> KnownDirectory(Allocator& a, KnownDirectoryType type,
             dyn::AppendSpan(p, "Shared");
 
             // /Users/Shared should be always be present on macOS systems. However, if it's not, we try to
-            // create it here. We got the attributes by looking at the result of `stat /Users/Shared`.
-            {
-                NSDictionary* attributes = @{
-                    NSFilePosixPermissions : @01775, // full permissions for all
-                    NSFileOwnerAccountID : @0, // root (UID 0)
-                    NSFileGroupOwnerAccountID : @0 // wheel (GID 0)
-                };
-
-                NSError* error = nil;
-                if (![[NSFileManager defaultManager] createDirectoryAtPath:StringToNSString(p)
-                                               withIntermediateDirectories:NO
-                                                                attributes:attributes
-                                                                     error:&error]) {
-                    auto const ec = FilesystemErrorFromNSError(error);
-                    if (ec != FilesystemError::PathAlreadyExists)
-                        g_log.Error(k_main_log_module, "Failed to create /Users/Shared: {}", ec);
-                }
-            }
+            // create it here. We got the attributes by looking at the result of `stat /Users/Shared`. ignore
+            // any error, we can't do anything about it
+            [[NSFileManager defaultManager]
+                      createDirectoryAtPath:StringToNSString(p)
+                withIntermediateDirectories:NO
+                                 attributes:@{
+                                     NSFilePosixPermissions : @01775, // full permissions
+                                     NSFileOwnerAccountID : @0, // root (UID 0)
+                                     NSFileGroupOwnerAccountID : @0 // wheel (GID 0)
+                                 }
+                                      error:nil];
 
             return p.ToOwnedSpan();
         }

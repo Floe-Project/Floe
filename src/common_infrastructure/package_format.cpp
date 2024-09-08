@@ -137,7 +137,7 @@ static ErrorCodeOr<void> ReadTestPackage(tests::Tester& tester, Span<u8 const> z
                         REQUIRE(extract_result.HasError());
                         CHECK(extract_result.Error() == package::PackageError::NotEmpty);
                         CHECK(error_log.buffer.size > 0);
-                        tester.log.Info({}, "Expected error log: {}", error_log.buffer);
+                        tester.log.Debug({}, "Expected error log: {}", error_log.buffer);
                         dyn::Clear(error_log.buffer);
                     }
 

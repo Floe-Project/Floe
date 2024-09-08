@@ -402,7 +402,7 @@ void InitSettingsFile(SettingsFile& settings, FloePaths const& paths) {
     if (InitialiseSettingsFileData(settings.settings, settings.arena, file_is_new))
         settings.tracking.changed = true;
 
-    auto watcher = CreateDirectoryWatcher(settings.arena);
+    auto watcher = CreateDirectoryWatcher(settings.watcher_arena);
     if (watcher.HasValue()) settings.watcher.Emplace(watcher.ReleaseValue());
 }
 

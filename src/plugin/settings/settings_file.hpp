@@ -79,6 +79,7 @@ struct SettingsFile {
     SettingsTracking tracking;
     Settings settings;
     ArenaAllocator watcher_scratch {PageAllocator::Instance()};
+    ArenaAllocator watcher_arena {PageAllocator::Instance()};
     Optional<DirectoryWatcher> watcher;
     TimePoint last_watch_time {};
 };
@@ -91,6 +92,5 @@ void PollForSettingsFileChanges(SettingsFile& settings);
 Optional<Settings> FindAndReadSettingsFile(ArenaAllocator& a, FloePaths const& paths);
 bool InitialiseSettingsFileData(Settings& file, ArenaAllocator& arena, bool file_is_brand_new);
 
-// path should probably be WriteFilepath()
 ErrorCodeOr<void> WriteSettingsFile(Settings const& data, String path);
 ErrorCodeOr<void> WriteSettingsFileIfChanged(SettingsFile& settings);

@@ -144,10 +144,7 @@ DirectoryListing::ScanResult DirectoryListing::Rescan() {
     m_arena.ResetCursorAndConsolidateRegions();
     m_file_name_wildcards = m_arena.Clone(temp_wildcards, CloneType::Deep);
     m_roots = m_arena.NewMultiple<Entry*>(temp_root_paths.size);
-    m_root_paths = m_arena.AllocateExactSizeUninitialised<String>(temp_root_paths.size);
-    for (auto const p_index : Range(temp_root_paths.size))
-        m_root_paths[p_index] = CanonicalizePath(m_arena, temp_root_paths[p_index])
-                                    .ValueOr(m_arena.Clone(temp_root_paths[p_index]));
+    m_root_paths = m_arena.Clone(temp_root_paths, CloneType::Deep);
 
     dyn::Append(m_entries, Entry {"All"_s, Entry::Type::Directory, nullptr});
 

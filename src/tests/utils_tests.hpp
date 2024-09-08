@@ -1255,7 +1255,7 @@ TEST_CASE(TestDirectoryListing) {
             REQUIRE(listing.NumEntries() == TRY(Helpers::CountAny(scratch_arena, test_dir.Directory())));
 
             auto root = listing.Roots()[0];
-            REQUIRE(root->Path() == TRY(CanonicalizePath(tester.scratch_arena, test_dir.Directory())));
+            REQUIRE(root->Path() == test_dir.Directory());
             REQUIRE(root->NumChildren(true) == TRY(Helpers::CountAny(scratch_arena, test_dir.Directory())));
             REQUIRE(root->NumChildrenFiles(true) ==
                     TRY(Helpers::CountFiles(scratch_arena, test_dir.Directory())));

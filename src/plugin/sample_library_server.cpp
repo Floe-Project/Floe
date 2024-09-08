@@ -1472,7 +1472,7 @@ Server::Server(ThreadPool& pool,
         ArenaAllocatorWithInlineStorage<1000> scratch_arena;
         auto node = scan_folders.AllocateUninitialised();
         PLACEMENT_NEW(&node->value) ScanFolder();
-        dyn::Assign(node->value.path, CanonicalizePath(scratch_arena, e).ValueOr({(char*)e.data, e.size}));
+        dyn::Assign(node->value.path, e);
         node->value.source = ScanFolder::Source::AlwaysScannedFolder;
         node->value.state.raw = ScanFolder::State::NotScanned;
         scan_folders.Insert(node);
@@ -1555,7 +1555,7 @@ void SetExtraScanFolders(Server& server, Span<String const> extra_folders) {
         ArenaAllocatorWithInlineStorage<1000> scratch_arena;
         auto node = server.scan_folders.AllocateUninitialised();
         PLACEMENT_NEW(&node->value) ScanFolder();
-        dyn::Assign(node->value.path, CanonicalizePath(scratch_arena, e).ValueOr({(char*)e.data, e.size}));
+        dyn::Assign(node->value.path, e);
         node->value.source = ScanFolder::Source::ExtraFolder;
         node->value.state.raw = ScanFolder::State::NotScanned;
         server.scan_folders.Insert(node);

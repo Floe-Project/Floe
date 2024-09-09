@@ -3,22 +3,20 @@ SPDX-FileCopyrightText: 2018-2024 Sam Windell
 SPDX-License-Identifier: CC0-1.0
 -->
 
+<a href="https://floe.audio">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Floe-Project/Floe-Logos/HEAD/horizontal_transparent.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Floe-Project/Floe-Logos/HEAD/horizontal_transparent_dark.svg">
+    <img alt="Floe" src="https://raw.githubusercontent.com/Floe-Project/Floe-Logos/HEAD/horizontal_background.svg" width="350" height="auto" style="max-width: 100%;">
+  </picture>
+</a>
+
+---
+
 ![CI](https://github.com/Floe-Project/Floe/actions/workflows/ci.yml/badge.svg)
 [![codecov](https://codecov.io/github/Floe-Project/Floe/graph/badge.svg?token=7HEJ7SF75K)](https://codecov.io/github/Floe-Project/Floe)
 [![CodeFactor](https://www.codefactor.io/repository/github/floe-project/floe/badge/main)](https://www.codefactor.io/repository/github/floe-project/floe/overview/main)
 
-<p align="center">
-  <a href="https://floe.audio">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Floe-Project/Floe-Logos/HEAD/horizontal_transparent.svg">
-      <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Floe-Project/Floe-Logos/HEAD/horizontal_transparent_dark.svg">
-      <img alt="Floe" src="https://raw.githubusercontent.com/Floe-Project/Floe-Logos/HEAD/horizontal_background.svg" style="width: 350px; height: auto; max-width: 100%;">
-    </picture>
-  </a>
-</p>
-
-
-# [Floe](https://floe.audio) Source Code
 ___IMPORTANT: Large-scale changes are underway, many things are missing and broken for now.___
 
 ### Sample library engine

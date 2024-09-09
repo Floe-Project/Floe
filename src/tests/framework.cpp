@@ -37,7 +37,10 @@ String TempFolder(Tester& tester) {
         tester.temp_folder = FloeKnownDirectory(tester.arena,
                                                 FloeKnownDirectoryType::Temporary,
                                                 k_nullopt,
-                                                {.create = true, .error_log = &error_log});
+                                                {
+                                                    .create = true,
+                                                    .error_log = &error_log,
+                                                });
         auto _ = StdPrint(StdStream::Err,
                           fmt::Format(tester.scratch_arena, "Test output folder: {}\n", *tester.temp_folder));
     }

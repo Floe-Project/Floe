@@ -35,94 +35,71 @@ TEST_CASE(TestEpochTime) {
 
 TEST_CASE(TestFileApi) {
     auto& scratch_arena = tester.scratch_arena;
-    auto const filename = path::Join(scratch_arena, Array {tests::TempFolder(tester), "newfile.txt"});
-    auto const binary_filename = path::Join(scratch_arena, Array {tests::TempFolder(tester), "binfile.dat"});
-    constexpr auto k_file_contents = "hello friends\n"_s;
+    auto const filename1 = path::Join(scratch_arena, Array {tests::TempFolder(tester), "filename1"});
+    auto const filename2 = path::Join(scratch_arena, Array {tests::TempFolder(tester), "filename2"});
+    DEFER { auto _ = Delete(filename1, {}); };
+    DEFER { auto _ = Delete(filename2, {}); };
+    constexpr auto k_data = "data"_s;
 
-    SUBCASE("Create a file") {
-        auto f = OpenFile(filename, FileMode::Write);
-        REQUIRE(f.HasValue());
-        auto _ = f.Value().Write(k_file_contents.ToByteSpan());
+    SUBCASE("Write and read") {
+        SUBCASE("Open API") {
+            {
+                auto f = TRY(OpenFile(filename1, FileMode::Write));
+                CHECK(f.Write(k_data.ToByteSpan()).HasValue());
+            }
+            {
+                auto f = TRY(OpenFile(filename1, FileMode::Read));
+                CHECK_EQ(TRY(f.FileSize()), k_data.size);
+                CHECK_EQ(TRY(f.ReadWholeFile(scratch_arena)), k_data);
+            }
+        }
+        SUBCASE("read-all API") {
+            TRY(WriteFile(filename1, k_data.ToByteSpan()));
+            CHECK_EQ(TRY(ReadEntireFile(filename1, scratch_arena)), k_data);
+        }
     }
 
-    SUBCASE("Move a file") {
-        auto f = OpenFile(filename, FileMode::Read);
+    SUBCASE("Seek") {
+        TRY(WriteFile(filename1, k_data.ToByteSpan()));
+        auto f = TRY(OpenFile(filename1, FileMode::Read));
+        TRY(f.Seek(2, File::SeekOrigin::Start));
+        char buffer[2];
+        CHECK_EQ(TRY(f.Read(buffer, 2)), 2u);
+        CHECK_EQ(String(buffer, 2), k_data.SubSpan(2));
+    }
+
+    SUBCASE("Move a File object") {
+        auto f = OpenFile(filename1, FileMode::Read);
         auto f2 = Move(f);
     }
 
-    struct Foo {
-        f32 f1, f2;
-    };
-    Foo const foo {2, 4};
-
-    SUBCASE("Binary file") {
-        SUBCASE("Create and write to a binary file") {
-            auto f = OpenFile(binary_filename, FileMode::Write);
-            REQUIRE(f.HasValue());
-            auto const num_written = f.Value().Write(AsBytes(foo));
-            REQUIRE(num_written.HasValue());
-            REQUIRE(num_written.Value() == sizeof(Foo));
-        }
-
-        SUBCASE("Read binary file") {
-            auto f = OpenFile(binary_filename, FileMode::Read);
-            REQUIRE(f.HasValue());
-            Foo result {};
-            auto read_o = f.Value().Read(&result, sizeof(result));
-            REQUIRE(read_o.HasValue());
-        }
-    }
-
     SUBCASE("Read from one large file and write to another") {
-        constexpr String k_str = "filedata\n";
-        DynamicArray<char> file_data {tester.scratch_arena};
-        constexpr usize k_one_hundred_mb {1024 * 1024 * 100};
-        file_data.Reserve(k_one_hundred_mb);
-        for (auto _ : Range(1000000))
-            dyn::AppendSpan(file_data, k_str);
-        auto const big_file_name =
-            path::Join(scratch_arena, Array {tests::TempFolder(tester), "big file.txt"});
-        if (WriteFile(big_file_name, file_data.Items().ToByteSpan()).HasValue()) {
-            if (auto f = OpenFile("big file.txt", FileMode::Read); f.HasValue()) {
-                usize const offset = k_str.size * 100;
-                String const section = String(file_data).SubSpan(offset, k_str.size * 900000);
-                constexpr String k_out_file_name {"section of big file.txt"};
-                if (ReadSectionOfFileAndWriteToOtherFile(f.Value(), offset, section.size, k_out_file_name)
-                        .Succeeded()) {
-                    if (auto const resulting_file_data =
-                            ReadEntireFile(k_out_file_name, tester.scratch_arena);
-                        resulting_file_data.HasValue()) {
-                        tester.log.Debug(k_os_log_module,
-                                         "Running Read from one large file and write to another");
-                        REQUIRE(resulting_file_data.Value().size == section.size);
-                        REQUIRE(MemoryIsEqual(resulting_file_data.Value().data, section.data, section.size));
-                    }
-                }
+        auto buffer = tester.scratch_arena.AllocateExactSizeUninitialised<u8>(Mb(8));
+        {
+            auto f = TRY(OpenFile(filename1, FileMode::Write));
+            FillMemory(buffer, 'a');
+            TRY(f.Write(buffer));
+            FillMemory(buffer, 'b');
+            TRY(f.Write(buffer));
+        }
+
+        {
+            auto f = TRY(OpenFile(filename1, FileMode::Read));
+
+            {
+                TRY(ReadSectionOfFileAndWriteToOtherFile(f, 0, buffer.size, filename2));
+                auto f2 = TRY(ReadEntireFile(filename2, tester.scratch_arena));
+                FillMemory(buffer, 'a');
+                CHECK(f2.ToByteSpan() == buffer);
+            }
+
+            {
+                TRY(ReadSectionOfFileAndWriteToOtherFile(f, buffer.size, 8, filename2));
+                auto f2 = TRY(ReadEntireFile(filename2, tester.scratch_arena));
+                FillMemory({buffer.data, 8}, 'b');
+                CHECK(f2.ToByteSpan() == Span<u8> {buffer.data, 8});
             }
         }
-    }
-
-    SUBCASE("Read and write binary array") {
-        Array<int, 5> const data {1, 2, 4, 5, 6};
-        auto const array_filename =
-            path::Join(scratch_arena, Array {tests::TempFolder(tester), "array_binary.dat"});
-
-        auto o = WriteFile(array_filename, data.Items().ToByteSpan());
-        REQUIRE(o.HasValue());
-        REQUIRE(o.Value() == (data.size * (sizeof(*data.data))));
-
-        auto f = ReadEntireFile(array_filename, tester.scratch_arena);
-        REQUIRE(f.HasValue());
-    }
-
-    SUBCASE("Opening a file") {
-        auto f = OpenFile(filename, FileMode::Read);
-        REQUIRE(f.HasValue());
-        auto file_data = f.Value().ReadWholeFile(tester.scratch_arena);
-        REQUIRE(file_data.HasValue());
-        CAPTURE(file_data.Value().size);
-        auto const data = String {file_data.Value().data, file_data.Value().size};
-        REQUIRE(data == k_file_contents);
     }
 
     SUBCASE("Try opening a file that does not exist") {

@@ -7,7 +7,16 @@ SPDX-License-Identifier: CC0-1.0
 [![codecov](https://codecov.io/github/Floe-Project/Floe/graph/badge.svg?token=7HEJ7SF75K)](https://codecov.io/github/Floe-Project/Floe)
 [![CodeFactor](https://www.codefactor.io/repository/github/floe-project/floe/badge/main)](https://www.codefactor.io/repository/github/floe-project/floe/overview/main)
 
-![floe-logo](https://raw.githubusercontent.com/Floe-Project/Floe-Logos/main/vertical_background.svg)
+<p align="center">
+  <a href="https://floe.audio">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Floe-Project/Floe-Logos/HEAD/horizontal_transparent.svg">
+      <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Floe-Project/Floe-Logos/HEAD/horizontal_transparent_dark.svg">
+      <img alt="Tailwind CSS" src="https://raw.githubusercontent.com/Floe-Project/Floe-Logos/HEAD/horizontal_background.svg" style="width: 350px; height: auto; max-width: 100%;">
+    </picture>
+  </a>
+</p>
+
 
 # [Floe](https://floe.audio) Source Code
 ___IMPORTANT: Large-scale changes are underway, many things are missing and broken for now.___

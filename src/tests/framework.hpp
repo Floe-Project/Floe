@@ -147,9 +147,9 @@ struct Tester {
     TestCase* current_test_case {};
     usize num_assertions = 0;
     usize num_warnings = 0;
-    Optional<String> temp_folder;
-    Optional<String> test_files_folder;
-    Optional<Optional<String>> build_resources_folder;
+    Optional<String> temp_folder {};
+    Optional<String> test_files_folder {};
+    Optional<Optional<String>> build_resources_folder {};
     ArenaAllocator fixture_arena {PageAllocator::Instance()};
     void* fixture_pointer {};
     DeleteFixturePointer delete_fixture {};

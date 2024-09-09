@@ -42,6 +42,9 @@ TEST_CASE(TestFileApi) {
     constexpr auto k_data = "data"_s;
 
     SUBCASE("Write and read") {
+        TRY(CreateDirectory(tests::TempFolder(tester), {.create_intermediate_directories = true}));
+        g_debug_log.Debug(k_os_log_module, "filename1: {}", filename1);
+
         SUBCASE("Open API") {
             {
                 auto f = TRY(OpenFile(filename1, FileMode::Write));

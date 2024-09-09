@@ -19,7 +19,7 @@ Some things may be incorrect, missing or broken. We are bit-by-bit filling in th
 }
 </style>
 
-<img class="logo-image" src="https://raw.githubusercontent.com/Floe-Project/Floe-Logos/main/icon.svg" alt="Floe logo">
+<img class="logo-image" src="https://raw.githubusercontent.com/Floe-Project/Floe-Logos/main/vertical_transparent.svg" alt="Floe logo">
 
 <h1 style="text-align:center; font-size: 40px">No-hassle sample library player: free for all</h1>
 <p style="text-align:center; margin-bottom: 40px;">Floe is a free, open-source sample library engine in CLAP, VST3 and AU audio plugin formats. It provides expressive playback and sound-shaping of sample libraries in the [Floe format](./sample-library-format.md).</p>

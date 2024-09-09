@@ -388,13 +388,7 @@ ExtractFileToFile(PackageReader& package, mz_zip_archive_file_stat const& file_s
 }
 
 static String UniqueTempFolder(String inside_folder, u64& seed, ArenaAllocator& arena) {
-    DynamicArrayBounded<char, 64> name {".Floe-Temp-"};
-    auto const chars_added = fmt::IntToString(RandomU64(seed),
-                                              name.data + name.size,
-                                              {.base = fmt::IntToStringOptions::Base::Hexadecimal});
-    name.size += chars_added;
-    auto const result = path::Join(arena, Array {inside_folder, name});
-    return result;
+    return path::Join(arena, Array {inside_folder, UniqueFilename(".Floe-Temp-", seed)});
 }
 
 static ErrorCodeOr<sample_lib::Library*>

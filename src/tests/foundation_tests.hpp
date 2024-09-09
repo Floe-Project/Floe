@@ -271,11 +271,10 @@ TEST_CASE(TestCircularBufferRefType) {
     {
         CircularBuffer<int> buf {PageAllocator::Instance()};
 
-        u64 random_seed = SeedFromTime();
         int push_counter = 0;
         int pop_counter = 0;
         for (auto _ : Range(10000)) {
-            auto update = RandomIntInRange<int>(random_seed, -8, 8);
+            auto update = RandomIntInRange<int>(tester.random_seed, -8, 8);
             if (update < 0) {
                 while (update != 0) {
                     if (auto v = buf.TryPop()) REQUIRE_EQ(v, pop_counter++);

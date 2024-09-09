@@ -186,11 +186,21 @@ MutableString KnownDirectoryWithSubdirectories(Allocator& a,
 
 // Returns a Floe-specific path. Might be a KnownDirectory with a 'Floe' subdirectory. Just a wrapper around
 // KnownDirectoryWithSubdirectories.
-enum class FloeKnownDirectoryType { Temporary, Logs, Settings, Libraries, Presets };
+enum class FloeKnownDirectoryType { Logs, Settings, Libraries, Presets };
 MutableString FloeKnownDirectory(Allocator& a,
                                  FloeKnownDirectoryType type,
                                  Optional<String> filename,
                                  KnownDirectoryOptions options);
+
+inline DynamicArrayBounded<char, 32> UniqueFilename(String prefix, u64 seed) {
+    ASSERT(prefix.size <= 16);
+    DynamicArrayBounded<char, 32> name {prefix};
+    auto const chars_added = fmt::IntToString(RandomU64(seed),
+                                              name.data + name.size,
+                                              {.base = fmt::IntToStringOptions::Base::Hexadecimal});
+    name.size += chars_added;
+    return name;
+}
 
 enum class FileType { File, Directory };
 

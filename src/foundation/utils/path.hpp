@@ -258,6 +258,24 @@ JoinAppend(dyn::DynArray auto& output, Span<String const> parts, Format format =
         JoinAppend(output, p, format);
 }
 
+PUBLIC constexpr MutableString JoinAppendResizeAllocation(Allocator& a,
+                                                          MutableString allocated_path,
+                                                          Span<String const> parts,
+                                                          Format format = Format::Native) {
+    if (!parts.size) return allocated_path;
+    auto buffer = a.ResizeType(allocated_path,
+                               allocated_path.size,
+                               allocated_path.size + TotalSize(parts) + parts.size);
+    usize pos = allocated_path.size;
+    for (auto const part : parts) {
+        if (!part.size) continue;
+        if (!IsPathSeparator(buffer[pos - 1], format))
+            WriteAndIncrement(pos, buffer, format == Format::Windows ? '\\' : '/');
+        WriteAndIncrement(pos, buffer, part);
+    }
+    return a.ResizeType(buffer, pos, pos);
+}
+
 PUBLIC constexpr MutableString Join(Allocator& a, Span<String const> parts, Format format = Format::Native) {
     if (!parts.size) return {};
     auto buffer = a.AllocateExactSizeUninitialised<char>(TotalSize(parts) + parts.size - 1);

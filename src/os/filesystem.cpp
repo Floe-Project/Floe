@@ -130,10 +130,6 @@ MutableString FloeKnownDirectory(Allocator& a,
             known_dir_type = KnownDirectoryType::GlobalData;
             subdirectories = Array {"Floe"_s, "Libraries"};
             break;
-        case FloeKnownDirectoryType::Temporary:
-            known_dir_type = KnownDirectoryType::Temporary;
-            subdirectories = Array {"Floe"_s};
-            break;
     }
     return KnownDirectoryWithSubdirectories(a, known_dir_type, subdirectories, filename, options);
 }

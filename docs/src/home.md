@@ -10,16 +10,17 @@ Some things may be incorrect, missing or broken. We are bit-by-bit filling in th
 
 </div>
 
-<style>
-.logo-image {
-  display: block;
-  margin-left: auto;
-  margin-right: auto;
-  width: 10%;
-}
-</style>
+---
 
-<img class="logo-image" src="https://raw.githubusercontent.com/Floe-Project/Floe-Logos/main/vertical_transparent.svg" alt="Floe logo">
+<p align="center">
+    <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Floe-Project/Floe-Logos/HEAD/horizontal_transparent.svg">
+        <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Floe-Project/Floe-Logos/HEAD/horizontal_transparent_dark.svg">
+        <img alt="Floe" src="https://raw.githubusercontent.com/Floe-Project/Floe-Logos/HEAD/horizontal_background.svg" width="350" height="auto" style="max-width: 100%;">
+    </picture>
+</p>
+
+---
 
 <h1 style="text-align:center; font-size: 40px">No-hassle sample library player: free for all</h1>
 <p style="text-align:center; margin-bottom: 40px;">Floe is a free, open-source sample library engine in CLAP, VST3 and AU audio plugin formats. It provides expressive playback and sound-shaping of sample libraries in the [Floe format](./sample-library-format.md).</p>

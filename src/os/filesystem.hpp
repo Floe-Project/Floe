@@ -362,10 +362,10 @@ inline MutableString FullPath(auto& iterator, Entry const& entry, ArenaAllocator
 
 // =======================================================================================================
 
-ErrorCodeOr<Span<MutableString>> GetFilesRecursive(ArenaAllocator& a,
-                                                   String directory,
-                                                   Optional<FileType> only_type,
-                                                   dir_iterator::Options options);
+ErrorCodeOr<Span<dir_iterator::Entry>> AllEntriesRecursive(ArenaAllocator& a,
+                                                           String directory,
+                                                           Optional<FileType> only_type,
+                                                           dir_iterator::Options options);
 
 // Directory watcher
 // =======================================================================================================

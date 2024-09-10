@@ -141,18 +141,17 @@ ErrorCodeOr<void> MoveIntoFolder(String from, String destination_folder) {
     return Rename(from, new_name);
 }
 
-ErrorCodeOr<Span<MutableString>> GetFilesRecursive(ArenaAllocator& a,
-                                                   String folder,
-                                                   Optional<FileType> only_file_type,
-                                                   dir_iterator::Options options) {
-    DynamicArray<MutableString> result {a};
+ErrorCodeOr<Span<dir_iterator::Entry>> AllEntriesRecursive(ArenaAllocator& a,
+                                                           String folder,
+                                                           Optional<FileType> only_file_type,
+                                                           dir_iterator::Options options) {
+    DynamicArray<dir_iterator::Entry> result {a};
 
     ArenaAllocatorWithInlineStorage<4000> scratch_arena;
     auto it = TRY(dir_iterator::RecursiveCreate(scratch_arena, folder, options));
     DEFER { dir_iterator::Destroy(it); };
-    while (auto const entry = TRY(dir_iterator::Next(it, scratch_arena)))
-        if (!only_file_type || *only_file_type == entry->type)
-            dyn::Append(result, dir_iterator::FullPath(it, *entry, a));
+    while (auto const entry = TRY(dir_iterator::Next(it, a)))
+        if (!only_file_type || *only_file_type == entry->type) dyn::Append(result, *entry);
 
     return result.ToOwnedSpan();
 }

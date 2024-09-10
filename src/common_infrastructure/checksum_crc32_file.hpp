@@ -154,18 +154,26 @@ ChecksumsForFolder(String folder, ArenaAllocator& arena, ArenaAllocator& scratch
 
 // All values in the authority table must be present in the test_table and have the same checksums.
 // test_table is allowed to have extra files.
-PUBLIC bool ChecksumsDiffer(ChecksumTable authority, ChecksumTable test_table, Logger& diff_log) {
+PUBLIC bool ChecksumsDiffer(ChecksumTable authority, ChecksumTable test_table, Logger* diff_log) {
     for (auto const [key, val_ptr] : authority) {
         auto const a_val = *val_ptr;
         if (auto const b_val = test_table.FindElement(key)) {
             if (a_val.crc32 != b_val->data.crc32 || a_val.file_size != b_val->data.file_size) {
-                diff_log.Info({}, "File has changed: {}", key);
+                if (diff_log) diff_log->Info({}, "File has changed: {}", key);
                 return true;
             }
         } else {
-            diff_log.Info({}, "File is missing: {}", key);
+            if (diff_log) diff_log->Info({}, "File is missing: {}", key);
             return true;
         }
     }
     return false;
+}
+
+PUBLIC ErrorCodeOr<bool>
+FileMatchesChecksum(String filepath, ChecksumValues const& checksum, ArenaAllocator& scratch_arena) {
+    auto f = TRY(OpenFile(filepath, FileMode::Read));
+    auto const file_size = TRY(f.FileSize());
+    return file_size == checksum.file_size &&
+           Crc32(TRY(f.ReadWholeFile(scratch_arena)).ToByteSpan()) == checksum.crc32;
 }

@@ -25,17 +25,6 @@ struct Paths {
 };
 
 ErrorCodeOr<Paths> ScanLibraryFolder(ArenaAllocator& arena, String library_folder) {
-    constexpr auto k_license_filenames = Array {
-        "License.html"_s,
-        "License.txt",
-        "License.pdf",
-        "LICENSE",
-        "Licence.html", // british spelling
-        "Licence.txt",
-        "Licence.pdf",
-        "LICENCE",
-    };
-
     Paths result {};
 
     auto it = TRY(dir_iterator::Create(arena,
@@ -48,7 +37,8 @@ ErrorCodeOr<Paths> ScanLibraryFolder(ArenaAllocator& arena, String library_folde
     while (auto const entry = TRY(dir_iterator::Next(it, arena)))
         if (sample_lib::FilenameIsFloeLuaFile(entry->subpath))
             result.lua = dir_iterator::FullPath(it, *entry, arena);
-        else if (Contains(k_license_filenames, path::Filename(entry->subpath)))
+        else if (IsEqualToCaseInsensitiveAscii(path::FilenameWithoutExtension(entry->subpath), "license") ||
+                 IsEqualToCaseInsensitiveAscii(path::FilenameWithoutExtension(entry->subpath), "licence"))
             result.license = dir_iterator::FullPath(it, *entry, arena);
 
     if (!result.lua.size) {
@@ -58,9 +48,9 @@ ErrorCodeOr<Paths> ScanLibraryFolder(ArenaAllocator& arena, String library_folde
 
     if (!result.license.size) {
         g_cli_out.Error({}, "No license file found in {}", library_folder);
-        g_cli_out.Info({}, "Expected one of the following:");
-        for (auto const& filename : k_license_filenames)
-            g_cli_out.Info({}, "  {}", filename);
+        g_cli_out.Info(
+            {},
+            "Expected a file called licence (or license) to be present. Any file extension is allowed.");
         return ErrorCode {CommonError::NotFound};
     }
 

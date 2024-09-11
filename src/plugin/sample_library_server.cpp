@@ -138,6 +138,7 @@ static void DoScanFolderJob(PendingLibraryJobs::Job::ScanFolder& job,
                                                     }));
         DEFER { dir_iterator::Destroy(it); };
         while (auto const entry = TRY(dir_iterator::Next(it, scratch_arena))) {
+            if (ContainsSpan(entry->subpath, k_temporary_directory_prefix)) continue;
             auto const full_path = dir_iterator::FullPath(it, *entry, scratch_arena);
             if (auto format = sample_lib::DetermineFileFormat(full_path))
                 ReadLibraryAsync(pending_library_jobs, lib_list, String(full_path), *format);

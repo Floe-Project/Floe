@@ -88,7 +88,7 @@ struct IntToStringOptions {
     enum class Base { Decimal, Hexadecimal, Base32 };
     Base base = Base::Decimal;
     bool include_sign = false;
-    bool capitalize_hex = false;
+    bool capitalize = false;
 };
 
 template <Integral IntType>
@@ -115,8 +115,8 @@ PUBLIC constexpr usize IntToString(IntType num, char* buffer, IntToStringOptions
         *ptr++ = '0';
     } else {
         do {
-            *ptr++ = (options.capitalize_hex ? "0123456789ABCDEFGHIJKLMNPQRSTVWX"
-                                             : "0123456789abcdefghijklmnpqrstvwx")[num % base];
+            *ptr++ = (options.capitalize ? "0123456789ABCDEFGHIJKLMNPQRSTVWX"
+                                         : "0123456789abcdefghijklmnpqrstvwx")[num % base];
             num /= base;
         } while (num != 0);
     }
@@ -276,7 +276,7 @@ PUBLIC ErrorCodeOr<void> ValueToString(Writer writer, T const& value, FormatOpti
                                                       ? IntToStringOptions::Base::Hexadecimal
                                                       : IntToStringOptions::Base::Decimal,
                                           .include_sign = options.show_plus,
-                                          .capitalize_hex = options.uppercase_hex,
+                                          .capitalize = options.uppercase_hex,
                                       });
         TRY(PadToRequiredWidthIfNeeded(writer, options, size));
         TRY(writer.WriteChars(String {buffer, size}));

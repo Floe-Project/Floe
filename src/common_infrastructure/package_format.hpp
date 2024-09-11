@@ -650,7 +650,7 @@ struct ExtractOptions {
 };
 
 // Destination folder is the folder where the package will be installed. e.g. /home/me/Libraries
-// The resulting directory will be destination_folder/dir_in_zip.
+// The final folder name is determined by options.destination.
 // Extracts to a temp folder than then renames to the final location. This ensures we either fail or succeed,
 // with no in-between cases where the folder is partially extracted. Additionally, it doesn't generate lots of
 // filesystem-change notifications which Floe might try to process and fail on.
@@ -673,7 +673,11 @@ PUBLIC VoidOrError<PackageError> ReaderExtractFolder(PackageReader& package,
 
         if (options.resolve_install_folder_name_conflicts) {
             auto const o = detail::ResolvePossibleFilenameConflicts(f, scratch_arena);
-            if (o.HasError()) return detail::CreatePackageError(error_log, o.Error(), "folder: {}", f);
+            if (o.HasError())
+                return detail::CreatePackageError(error_log,
+                                                  o.Error(),
+                                                  "couldn't access destination folder: {}",
+                                                  f);
             f = o.Value();
         }
 
@@ -692,7 +696,8 @@ PUBLIC VoidOrError<PackageError> ReaderExtractFolder(PackageReader& package,
             if (o.HasError())
                 return detail::CreatePackageError(error_log,
                                                   o.Error(),
-                                                  "the destination filesystem can't be accessed");
+                                                  "couldn't access destination folder: {}",
+                                                  default_destination_folder);
         }
         String(o.Value());
     });
@@ -734,7 +739,7 @@ PUBLIC VoidOrError<PackageError> ReaderExtractFolder(PackageReader& package,
                     return detail::CreatePackageError(
                         error_log,
                         o.Error(),
-                        "cound't create directory(s) in your install folder: {}",
+                        "could'nt create directory(s) in your install folder: {}",
                         to_path);
                 }
 

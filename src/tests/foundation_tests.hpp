@@ -1602,7 +1602,7 @@ TEST_CASE(TestIntToString) {
     CHECK(to_string(-99, {.base = fmt::IntToStringOptions::Base::Decimal}) == "-99"_s);
     CHECK(to_string(10, {.base = fmt::IntToStringOptions::Base::Hexadecimal}) == "a");
     CHECK(to_string(255, {.base = fmt::IntToStringOptions::Base::Hexadecimal}) == "ff");
-    CHECK(to_string(0xfedcba, {.base = fmt::IntToStringOptions::Base::Hexadecimal, .capitalize_hex = true}) ==
+    CHECK(to_string(0xfedcba, {.base = fmt::IntToStringOptions::Base::Hexadecimal, .capitalize = true}) ==
           "FEDCBA");
     CHECK(to_string(-255, {.base = fmt::IntToStringOptions::Base::Hexadecimal}) == "-ff");
     return k_success;

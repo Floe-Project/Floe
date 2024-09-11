@@ -205,11 +205,14 @@ inline DynamicArrayBounded<char, 32> UniqueFilename(String prefix, u64 seed) {
 
 constexpr String k_temporary_directory_prefix = ".floe-temp-";
 
-// Creates a directory on the same filesystem as an already existing path. Delete the directory when you're done with it.
+// Creates a directory on the same filesystem as an already existing path. Delete the directory when you're
+// done with it.
 ErrorCodeOr<MutableString> TemporaryDirectoryOnSameFilesystemAs(String existing_abs_path, Allocator& a);
 
-// Creates a directory with the prefix k_temporary_directory_prefix in the given folder. Delete the directory when you're done with it.
-ErrorCodeOr<MutableString> TemporaryDirectoryWithinFolder(String existing_abs_folder, Allocator& a, u64 &seed);
+// Creates a directory with the prefix k_temporary_directory_prefix in the given folder. Delete the directory
+// when you're done with it.
+ErrorCodeOr<MutableString>
+TemporaryDirectoryWithinFolder(String existing_abs_folder, Allocator& a, u64& seed);
 
 enum class FileType { File, Directory };
 
@@ -222,6 +225,7 @@ ErrorCodeOr<MutableString> AbsolutePath(Allocator& a, String path);
 
 // Makes it an AbsolutePath, and:
 // - Resolves ../ and ./ components.
+// - Resolves symlinks.
 // Windows:
 // - Add the drive specifier if it's missing.
 // - Replaces / with \.

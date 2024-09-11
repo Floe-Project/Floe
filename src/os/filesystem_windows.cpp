@@ -396,7 +396,7 @@ MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirecto
         }
 
         auto result = Narrow(a, wide_path).Value();
-        ASSERT(!path::IsPathSeparator(Last(result)));
+        ASSERT(!path::IsDirectorySeparator(Last(result)));
         ASSERT(path::IsAbsolute(result));
         return result;
     }
@@ -567,7 +567,7 @@ MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirecto
         result = Narrow(a, wide_path).Value();
     }
 
-    ASSERT(!path::IsPathSeparator(Last(result)));
+    ASSERT(!path::IsDirectorySeparator(Last(result)));
     ASSERT(path::IsAbsolute(result));
 
     return result;
@@ -608,7 +608,7 @@ ErrorCodeOr<MutableString> AbsolutePath(Allocator& a, String path) {
     dyn::Resize(wide_result, (usize)path_len);
 
     auto result = Narrow(a, wide_result).Value();
-    ASSERT(!path::IsPathSeparator(Last(result)));
+    ASSERT(!path::IsDirectorySeparator(Last(result)));
     ASSERT(path::IsAbsolute(result));
     return result;
 }
@@ -1036,7 +1036,7 @@ ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments args) {
         DEFER { CoTaskMemFree(wide_path); };
 
         auto narrow_path = Narrow(args.allocator, FromNullTerminated(wide_path)).Value();
-        ASSERT(!path::IsPathSeparator(Last(narrow_path)));
+        ASSERT(!path::IsDirectorySeparator(Last(narrow_path)));
         ASSERT(path::IsAbsolute(narrow_path));
         return narrow_path;
     };

@@ -16,21 +16,20 @@ enum class Format {
 
 constexpr char k_dir_separator = IS_WINDOWS ? '\\' : '/';
 
-// TODO: rename IsDirectorySeparator
-PUBLIC constexpr bool IsPathSeparator(char c, Format format = Format::Native) {
+PUBLIC constexpr bool IsDirectorySeparator(char c, Format format = Format::Native) {
     return (format == Format::Windows) ? (c == '\\' || c == '/') : (c == '/');
 }
 
 PUBLIC constexpr bool StartsWithDirectorySeparator(String path, Format format = Format::Native) {
-    return path.size && IsPathSeparator(path[0], format);
+    return path.size && IsDirectorySeparator(path[0], format);
 }
 
 PUBLIC constexpr bool EndsWithDirectorySeparator(String path, Format format = Format::Native) {
-    return path.size && IsPathSeparator(path[path.size - 1], format);
+    return path.size && IsDirectorySeparator(path[path.size - 1], format);
 }
 
 PUBLIC constexpr Optional<usize> FindLastDirectorySeparator(String path, Format format = Format::Native) {
-    return FindLastIf(path, [format](char c) { return IsPathSeparator(c, format); });
+    return FindLastIf(path, [format](char c) { return IsDirectorySeparator(c, format); });
 }
 
 struct WindowsPathInfo {
@@ -52,7 +51,7 @@ PUBLIC constexpr WindowsPathInfo ParseWindowsPath(String path) {
     if (path[1] == ':') {
         return {
             .type = WindowsPathInfo::Type::Drive,
-            .is_abs = path.size > 2 && IsPathSeparator(path[2], Format::Windows),
+            .is_abs = path.size > 2 && IsDirectorySeparator(path[2], Format::Windows),
             .drive = path.SubSpan(0, 2),
         };
     }
@@ -96,14 +95,14 @@ PUBLIC constexpr bool IsAbsolute(String path, Format format = Format::Native) {
     if (format == Format::Windows)
         return ParseWindowsPath(path).is_abs;
     else
-        return path.size && IsPathSeparator(path[0], Format::Posix);
+        return path.size && IsDirectorySeparator(path[0], Format::Posix);
 }
 
 PUBLIC constexpr usize Depth(String subpath, Format format = Format::Native) {
     ASSERT(!IsAbsolute(subpath, format));
     usize depth = 0;
     for (auto c : subpath)
-        if (IsPathSeparator(c, format)) ++depth;
+        if (IsDirectorySeparator(c, format)) ++depth;
     return depth;
 }
 
@@ -160,7 +159,7 @@ PUBLIC constexpr String Filename(String path, Format format = Format::Native) {
     bool found = false;
     usize last_slash = 0;
     for (usize i = path.size - 1; i != usize(-1); --i)
-        if (IsPathSeparator(path[i], format)) {
+        if (IsDirectorySeparator(path[i], format)) {
             found = true;
             last_slash = i;
             break;
@@ -222,7 +221,7 @@ PUBLIC constexpr Optional<String> Directory(String path, Format format = Format:
 // Be careful with this, paths need to be the same level of 'Canonicalised'
 PUBLIC constexpr bool IsWithinDirectory(String path, String directory, Format format = Format::Native) {
     if (directory.size >= path.size) return false;
-    if (!IsPathSeparator(path[directory.size])) return false;
+    if (!IsDirectorySeparator(path[directory.size])) return false;
     return Equal(path.SubSpan(0, directory.size), directory, format);
 }
 
@@ -246,7 +245,7 @@ JoinAppend(dyn::DynArray auto& output, String item_to_append, Format format = Fo
 
     auto item_to_append_span = TrimDirectorySeparatorsStart(item_to_append, format);
     if (output.size && item_to_append_span.size) {
-        if (!IsPathSeparator(Last(output), format))
+        if (!IsDirectorySeparator(Last(output), format))
             dyn::Append(output, (format == Format::Windows) ? '\\' : '/');
     }
     dyn::AppendSpan(output, item_to_append_span);
@@ -269,7 +268,7 @@ PUBLIC constexpr MutableString JoinAppendResizeAllocation(Allocator& a,
     usize pos = allocated_path.size;
     for (auto const part : parts) {
         if (!part.size) continue;
-        if (!IsPathSeparator(buffer[pos - 1], format))
+        if (!IsDirectorySeparator(buffer[pos - 1], format))
             WriteAndIncrement(pos, buffer, format == Format::Windows ? '\\' : '/');
         WriteAndIncrement(pos, buffer, part);
     }
@@ -282,7 +281,7 @@ PUBLIC constexpr MutableString Join(Allocator& a, Span<String const> parts, Form
     usize pos = 0;
     for (auto const part : parts) {
         if (!part.size) continue;
-        if (pos && !IsPathSeparator(buffer[pos - 1], format))
+        if (pos && !IsDirectorySeparator(buffer[pos - 1], format))
             WriteAndIncrement(pos, buffer, format == Format::Windows ? '\\' : '/');
         WriteAndIncrement(pos, buffer, part);
     }

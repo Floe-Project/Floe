@@ -387,10 +387,6 @@ ExtractFileToFile(PackageReader& package, mz_zip_archive_file_stat const& file_s
     return k_success;
 }
 
-static String UniqueTempFolder(String inside_folder, u64& seed, ArenaAllocator& arena) {
-    return path::Join(arena, Array {inside_folder, UniqueFilename(".Floe-Temp-", seed)});
-}
-
 static ErrorCodeOr<sample_lib::Library*>
 ReaderReadLibraryLua(PackageReader& package, String library_dir_in_zip, ArenaAllocator& arena) {
     auto const floe_lua_stat = TRY(detail::FindFloeLuaInZipInLibrary(package, library_dir_in_zip));
@@ -509,7 +505,8 @@ static ErrorCodeOr<String> ResolvePossibleFilenameConflicts(String path, ArenaAl
     constexpr usize k_max_suffix_str_size = " (999)"_s.size;
 
     auto buffer = arena.AllocateExactSizeUninitialised<char>(path.size + k_max_suffix_str_size);
-    usize pos = path.size;
+    usize pos = 0;
+    WriteAndIncrement(pos, buffer, path);
     WriteAndIncrement(pos, buffer, " ("_s);
 
     for (usize suffix_num = 1; suffix_num <= k_max_suffix_number; ++suffix_num) {
@@ -647,7 +644,7 @@ enum class DestinationType {
 using Destination = TaggedUnion<DestinationType, TypeAndTag<String, DestinationType::FullPath>>;
 
 struct ExtractOptions {
-    Destination destination_options = DestinationType::DefaultFolderWithSubfolderFromPackage;
+    Destination destination = DestinationType::DefaultFolderWithSubfolderFromPackage;
     bool overwrite_existing_files;
     bool resolve_install_folder_name_conflicts;
 };
@@ -658,15 +655,15 @@ struct ExtractOptions {
 // with no in-between cases where the folder is partially extracted. Additionally, it doesn't generate lots of
 // filesystem-change notifications which Floe might try to process and fail on.
 PUBLIC VoidOrError<PackageError> ReaderExtractFolder(PackageReader& package,
-                                                     String default_destination_folder,
                                                      PackageFolder const& folder,
+                                                     String default_destination_folder,
                                                      ArenaAllocator& scratch_arena,
                                                      Logger& error_log,
                                                      ExtractOptions options) {
     auto const destination_folder = ({
         String f {};
-        switch (options.destination_options.tag) {
-            case DestinationType::FullPath: f = options.destination_options.Get<String>(); break;
+        switch (options.destination.tag) {
+            case DestinationType::FullPath: f = options.destination.Get<String>(); break;
             case DestinationType::DefaultFolderWithSubfolderFromPackage: {
                 f = path::Join(scratch_arena,
                                Array {default_destination_folder, path::Filename(folder.path)});
@@ -683,21 +680,22 @@ PUBLIC VoidOrError<PackageError> ReaderExtractFolder(PackageReader& package,
         f;
     });
 
-    // We don't use the system temp folder because we want to do an atomic rename to the final location which
-    // only works if 2 folders are on the same filesystem (not different volumes/devices/drives). By using a
-    // temp folder in the same location as the destination folder we ensure that.
-    // TODO: this is going to trigger lots of filesystem-change notifications which Floe might try to process
-    auto const temp_folder =
-        detail::UniqueTempFolder(*path::Directory(destination_folder), package.seed, scratch_arena);
-    if (auto const o = CreateDirectory(temp_folder,
-                                       {
-                                           .create_intermediate_directories = false,
-                                           .fail_if_exists = true,
-                                           .win32_hide_dirs_starting_with_dot = true,
-                                       });
-        o.HasError()) {
-        return detail::CreatePackageError(error_log, o.Error(), "folder: {}", temp_folder);
-    }
+    // Try to get a folder on the same filesystem so that we can atomic-rename and therefore reduce the chance
+    // of leaving partially extracted files and generating lots of filesystem-change events.
+    auto const temp_folder = ({
+        ASSERT(GetFileType(default_destination_folder).HasValue());
+        // try getting an 'official' temp folder
+        auto o = TemporaryDirectoryOnSameFilesystemAs(default_destination_folder, scratch_arena);
+        if (o.HasError()) {
+            // fallback to a folder within the destination folder
+            o = TemporaryDirectoryWithinFolder(default_destination_folder, scratch_arena, package.seed);
+            if (o.HasError())
+                return detail::CreatePackageError(error_log,
+                                                  o.Error(),
+                                                  "the destination filesystem can't be accessed");
+        }
+        String(o.Value());
+    });
     DEFER {
         auto _ = Delete(temp_folder,
                         {
@@ -768,7 +766,7 @@ PUBLIC VoidOrError<PackageError> ReaderExtractFolder(PackageReader& package,
     return k_success;
 }
 
-struct ComparisonMetrics {
+struct ExistingInstalltionInfo {
     enum class ModifiedSinceInstalled {
         Unmodified,
         Modified,
@@ -784,43 +782,44 @@ struct ComparisonMetrics {
     VersionComparison version_comparison;
 };
 
-enum class ExistingStatusType {
+enum class InstallationStatusType {
     NotInstalled,
     AlreadyInstalled,
     InstalledButDifferent,
 };
 
-using ExistingStatus =
-    TaggedUnion<ExistingStatusType, TypeAndTag<ComparisonMetrics, ExistingStatusType::InstalledButDifferent>>;
+using InstallationStatus =
+    TaggedUnion<InstallationStatusType,
+                TypeAndTag<ExistingInstalltionInfo, InstallationStatusType::InstalledButDifferent>>;
 
-enum class InstallRecommendationType {
+enum class RecommendedAction {
     Install,
     InstallAndOverwriteWithoutAsking,
     DoNothing,
     AskUser,
 };
 
-struct PreinstallationCheckResult {
-    ExistingStatus existing_status;
-    InstallRecommendationType recommendation;
+struct FolderCheckResult {
+    InstallationStatus installation_status;
+    RecommendedAction recommended_action;
     ExtractOptions extract_options;
 };
 
-PUBLIC ValueOrError<PreinstallationCheckResult, PackageError>
-LibraryPreinstallationChecks(PackageFolder const& folder,
-                             sample_lib::Library const* existing_matching_library,
-                             ArenaAllocator& scratch_arena,
-                             Logger& error_log) {
+PUBLIC ValueOrError<FolderCheckResult, PackageError>
+LibraryCheckExistingInstallation(PackageFolder const& folder,
+                                 sample_lib::Library const* existing_matching_library,
+                                 ArenaAllocator& scratch_arena,
+                                 Logger& error_log) {
     ASSERT(folder.type == SubfolderType::Libraries);
     ASSERT(folder.library);
 
     if (!existing_matching_library)
-        return PreinstallationCheckResult {
-            .existing_status = ExistingStatusType::NotInstalled,
-            .recommendation = InstallRecommendationType::Install,
+        return FolderCheckResult {
+            .installation_status = InstallationStatusType::NotInstalled,
+            .recommended_action = RecommendedAction::Install,
             .extract_options =
                 {
-                    .destination_options = DestinationType::DefaultFolderWithSubfolderFromPackage,
+                    .destination = DestinationType::DefaultFolderWithSubfolderFromPackage,
                     .overwrite_existing_files = false,
                     .resolve_install_folder_name_conflicts = true,
                 },
@@ -837,74 +836,74 @@ LibraryPreinstallationChecks(PackageFolder const& folder,
     });
 
     if (!ChecksumsDiffer(folder.checksum_values, actual_checksums, nullptr))
-        return PreinstallationCheckResult {
-            .existing_status = ExistingStatusType::AlreadyInstalled,
-            .recommendation = InstallRecommendationType::DoNothing,
+        return FolderCheckResult {
+            .installation_status = InstallationStatusType::AlreadyInstalled,
+            .recommended_action = RecommendedAction::DoNothing,
             .extract_options = {},
         };
 
     // The installed version DIFFERS from the package version.
     // HOW it differs will effect the recommendation we give to the user.
 
-    ComparisonMetrics metrics {};
+    ExistingInstalltionInfo existing {};
     auto const checksum_file_path = path::Join(scratch_arena, Array {existing_folder, k_checksums_file});
     if (auto const o = ReadEntireFile(checksum_file_path, scratch_arena); !o.HasError()) {
         auto const stored_checksums = ParseChecksumFile(o.Value(), scratch_arena);
         if (stored_checksums.HasValue() &&
             !ChecksumsDiffer(stored_checksums.Value(), actual_checksums, &error_log)) {
-            metrics.modified_since_installed = ComparisonMetrics::ModifiedSinceInstalled::Unmodified;
+            existing.modified_since_installed = ExistingInstalltionInfo::ModifiedSinceInstalled::Unmodified;
         } else {
-            // The library has been modified since it was installed. OR the checksums file is badly formatted
-            // - which presumably means it was modified.
-            metrics.modified_since_installed = ComparisonMetrics::ModifiedSinceInstalled::Modified;
+            // The library has been modified since it was installed. OR the checksums file is badly formatted,
+            // which presumably means it was modified.
+            existing.modified_since_installed = ExistingInstalltionInfo::ModifiedSinceInstalled::Modified;
         }
     } else {
-        metrics.modified_since_installed = ComparisonMetrics::ModifiedSinceInstalled::Unknown;
+        existing.modified_since_installed = ExistingInstalltionInfo::ModifiedSinceInstalled::Unknown;
     }
 
     if (folder.library->minor_version > existing_matching_library->minor_version)
-        metrics.version_comparison = ComparisonMetrics::VersionComparison::PackageIsNewer;
+        existing.version_comparison = ExistingInstalltionInfo::VersionComparison::PackageIsNewer;
     else if (folder.library->minor_version < existing_matching_library->minor_version)
-        metrics.version_comparison = ComparisonMetrics::VersionComparison::PackageIsOlder;
+        existing.version_comparison = ExistingInstalltionInfo::VersionComparison::PackageIsOlder;
     else
-        metrics.version_comparison = ComparisonMetrics::VersionComparison::Equal;
+        existing.version_comparison = ExistingInstalltionInfo::VersionComparison::Equal;
 
-    InstallRecommendationType recommendation;
-    switch (metrics.modified_since_installed) {
-        case ComparisonMetrics::ModifiedSinceInstalled::Unmodified: {
-            if (metrics.version_comparison == ComparisonMetrics::VersionComparison::PackageIsNewer)
-                recommendation = InstallRecommendationType::InstallAndOverwriteWithoutAsking; // safe update
+    RecommendedAction recommended_action;
+    switch (existing.modified_since_installed) {
+        case ExistingInstalltionInfo::ModifiedSinceInstalled::Unmodified: {
+            if (existing.version_comparison == ExistingInstalltionInfo::VersionComparison::PackageIsNewer)
+                recommended_action = RecommendedAction::InstallAndOverwriteWithoutAsking; // safe update
             else
-                recommendation = InstallRecommendationType::DoNothing;
+                recommended_action = RecommendedAction::DoNothing;
             break;
         }
-        case ComparisonMetrics::ModifiedSinceInstalled::Modified: {
-            recommendation = InstallRecommendationType::AskUser;
+        case ExistingInstalltionInfo::ModifiedSinceInstalled::Modified: {
+            recommended_action = RecommendedAction::AskUser;
             break;
         }
-        case ComparisonMetrics::ModifiedSinceInstalled::Unknown: {
-            recommendation = InstallRecommendationType::AskUser;
+        case ExistingInstalltionInfo::ModifiedSinceInstalled::Unknown: {
+            recommended_action = RecommendedAction::AskUser;
             break;
         }
     }
 
-    return PreinstallationCheckResult {
-        .existing_status = metrics,
-        .recommendation = recommendation,
+    return FolderCheckResult {
+        .installation_status = existing,
+        .recommended_action = recommended_action,
         .extract_options =
             {
-                .destination_options = existing_folder,
+                .destination = existing_folder,
                 .overwrite_existing_files = true,
                 .resolve_install_folder_name_conflicts = false,
             },
     };
 }
 
-PUBLIC ValueOrError<PreinstallationCheckResult, PackageError>
-PresetsPreinstallationChecks(PackageFolder const& package_folder,
-                             Span<String const> presets_folders,
-                             ArenaAllocator& scratch_arena,
-                             Logger& error_log) {
+PUBLIC ValueOrError<FolderCheckResult, PackageError>
+PresetsCheckExistingInstallation(PackageFolder const& package_folder,
+                                 Span<String const> presets_folders,
+                                 ArenaAllocator& scratch_arena,
+                                 Logger& error_log) {
     for (auto const folder : presets_folders) {
         auto const entries = ({
             auto const o = AllEntriesRecursive(scratch_arena,
@@ -970,21 +969,21 @@ PresetsPreinstallationChecks(PackageFolder const& package_folder,
                 }
 
                 if (matches_exactly)
-                    return PreinstallationCheckResult {
-                        .existing_status = ExistingStatusType::AlreadyInstalled,
-                        .recommendation = InstallRecommendationType::DoNothing,
+                    return FolderCheckResult {
+                        .installation_status = InstallationStatusType::AlreadyInstalled,
+                        .recommended_action = RecommendedAction::DoNothing,
                         .extract_options = {},
                     };
             }
         }
     }
 
-    return PreinstallationCheckResult {
-        .existing_status = ExistingStatusType::NotInstalled,
-        .recommendation = InstallRecommendationType::Install,
+    return FolderCheckResult {
+        .installation_status = InstallationStatusType::NotInstalled,
+        .recommended_action = RecommendedAction::Install,
         .extract_options =
             {
-                .destination_options = DestinationType::DefaultFolderWithSubfolderFromPackage,
+                .destination = DestinationType::DefaultFolderWithSubfolderFromPackage,
                 .overwrite_existing_files = false,
                 .resolve_install_folder_name_conflicts = true,
             },

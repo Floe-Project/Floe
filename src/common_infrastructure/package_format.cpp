@@ -12,6 +12,11 @@ static String TestLibFolder(tests::Tester& tester) {
         Array {tests::TestFilesFolder(tester), k_repo_subdirs_floe_test_libraries, "Test-Lib-1"});
 }
 
+static String TestPresetsFolder(tests::Tester& tester) {
+    return path::Join(tester.scratch_arena,
+                      Array {tests::TestFilesFolder(tester), k_repo_subdirs_floe_test_presets});
+}
+
 static ErrorCodeOr<sample_lib::Library*> LoadTestLibrary(tests::Tester& tester) {
     auto const test_floe_lua_path =
         (String)path::Join(tester.scratch_arena, Array {TestLibFolder(tester), "floe.lua"});
@@ -35,21 +40,13 @@ static ErrorCodeOr<Span<u8 const>> WriteTestPackage(tests::Tester& tester) {
     auto lib = TRY(LoadTestLibrary(tester));
     TRY(package::WriterAddLibrary(package, *lib, tester.scratch_arena, "tester"));
 
-    TRY(package::WriterAddPresetsFolder(
-        package,
-        path::Join(tester.scratch_arena,
-                   Array {tests::TestFilesFolder(tester), k_repo_subdirs_floe_test_presets}),
-        tester.scratch_arena,
-        "tester"));
+    TRY(package::WriterAddPresetsFolder(package, TestPresetsFolder(tester), tester.scratch_arena, "tester"));
 
     package::WriterFinalise(package);
     return zip_data.ToOwnedSpan();
 }
 
 static ErrorCodeOr<void> ReadTestPackage(tests::Tester& tester, Span<u8 const> zip_data) {
-    (void)tester;
-    (void)zip_data;
-#if 0
     auto reader = Reader::FromMemory(zip_data);
     BufferLogger error_log {tester.scratch_arena};
 
@@ -83,8 +80,7 @@ static ErrorCodeOr<void> ReadTestPackage(tests::Tester& tester, Span<u8 const> z
         switch (folder->type) {
             case package::SubfolderType::Libraries: {
                 REQUIRE(folder->library);
-                auto const& lib = *folder->library;
-                CHECK_EQ(lib.name, "Test Lua"_s);
+                CHECK_EQ(folder->library->name, "Test Lua"_s);
 
                 // test extraction
                 {
@@ -95,48 +91,72 @@ static ErrorCodeOr<void> ReadTestPackage(tests::Tester& tester, Span<u8 const> z
                     TRY(CreateDirectory(dest_dir, {.create_intermediate_directories = false}));
                     DEFER { auto _ = Delete(dest_dir, {.type = DeleteOptions::Type::DirectoryRecursively}); };
 
+                    // Check not installed if we don't provide a library
+                    {
+                        auto const o = package::LibraryCheckExistingInstallation(*folder,
+                                                                                 nullptr,
+                                                                                 tester.scratch_arena,
+                                                                                 error_log);
+                        if (o.HasError()) return ErrorCode {o.Error()};
+                        auto status = o.ReleaseValue();
+                        CHECK(status.installation_status == package::InstallationStatusType::NotInstalled);
+                    }
+
+                    // Check installed if we provide a library
+                    {
+                        auto lib = TRY(LoadTestLibrary(tester));
+                        auto const o = package::LibraryCheckExistingInstallation(*folder,
+                                                                                 lib,
+                                                                                 tester.scratch_arena,
+                                                                                 error_log);
+                        if (o.HasError()) return ErrorCode {o.Error()};
+                        auto status = o.ReleaseValue();
+                        CHECK(status.installation_status ==
+                              package::InstallationStatusType::AlreadyInstalled);
+                    }
+
                     // Initially should be empty
                     {
-                        auto const status = TRY(package::CheckDestinationFolder(dest_dir,
-                                                                                *folder,
-                                                                                tester.scratch_arena,
-                                                                                error_log));
-                        CHECK(!status.exists_and_contains_files);
-                        CHECK(!status.exactly_matches_package_folder);
-                        CHECK(status.changed_since_originally_installed == package::Tri::No);
+                        auto checksums =
+                            TRY(ChecksumsForFolder(dest_dir, tester.scratch_arena, tester.scratch_arena));
+                        CHECK_EQ(checksums.size, 0u);
                     }
 
                     // Initial extraction
                     {
-                        auto const extract_result = package::ReaderExtractFolder(package,
-                                                                                 *folder,
-                                                                                 dest_dir,
-                                                                                 tester.scratch_arena,
-                                                                                 error_log,
-                                                                                 false);
-                        if (extract_result.HasError()) return ErrorCode {extract_result.Error()};
+                        auto const extract_result = package::ReaderExtractFolder(
+                            package,
+                            *folder,
+                            dest_dir,
+                            tester.scratch_arena,
+                            error_log,
+                            {
+                                .destination =
+                                    package::DestinationType::DefaultFolderWithSubfolderFromPackage,
+                                .overwrite_existing_files = false,
+                                .resolve_install_folder_name_conflicts = false,
+                            });
+                        if (extract_result.HasError()) {
+                            tester.log.Error({}, "error log: {}", error_log.buffer);
+                            return ErrorCode {extract_result.Error()};
+                        }
                         CHECK(error_log.buffer.size == 0);
-                    }
-
-                    // Check installed
-                    {
-                        auto const status = TRY(package::CheckDestinationFolder(dest_dir,
-                                                                                *folder,
-                                                                                tester.scratch_arena,
-                                                                                error_log));
-                        CHECK(status.exists_and_contains_files);
-                        CHECK(status.exactly_matches_package_folder);
-                        CHECK(status.changed_since_originally_installed == package::Tri::No);
                     }
 
                     // We should fail when the folder is not empty
                     {
-                        auto const extract_result = package::ReaderExtractFolder(package,
-                                                                                 *folder,
-                                                                                 dest_dir,
-                                                                                 tester.scratch_arena,
-                                                                                 error_log,
-                                                                                 false);
+                        auto const extract_result = package::ReaderExtractFolder(
+                            package,
+                            *folder,
+                            dest_dir,
+                            tester.scratch_arena,
+                            error_log,
+                            {
+                                .destination =
+                                    package::DestinationType::DefaultFolderWithSubfolderFromPackage,
+                                .overwrite_existing_files = false,
+                                .resolve_install_folder_name_conflicts = false,
+                            });
                         REQUIRE(extract_result.HasError());
                         CHECK(extract_result.Error() == package::PackageError::NotEmpty);
                         CHECK(error_log.buffer.size > 0);
@@ -144,33 +164,59 @@ static ErrorCodeOr<void> ReadTestPackage(tests::Tester& tester, Span<u8 const> z
                         dyn::Clear(error_log.buffer);
                     }
 
-                    // we should succeed when we allow overwriting
+                    // We should succeed when we allow overwriting
                     {
-                        auto const extract_result = package::ReaderExtractFolder(package,
-                                                                                 *folder,
-                                                                                 dest_dir,
-                                                                                 tester.scratch_arena,
-                                                                                 error_log,
-                                                                                 true);
+                        auto const extract_result = package::ReaderExtractFolder(
+                            package,
+                            *folder,
+                            dest_dir,
+                            tester.scratch_arena,
+                            error_log,
+                            {
+                                .destination =
+                                    package::DestinationType::DefaultFolderWithSubfolderFromPackage,
+                                .overwrite_existing_files = true,
+                                .resolve_install_folder_name_conflicts = false,
+                            });
                         if (extract_result.HasError()) return ErrorCode {extract_result.Error()};
                         CHECK(error_log.buffer.size == 0);
                     }
 
-                    // Check installed again
+                    // We should succeed when we allow name conflict resolution
                     {
-                        auto const status = TRY(package::CheckDestinationFolder(dest_dir,
-                                                                                *folder,
-                                                                                tester.scratch_arena,
-                                                                                error_log));
-                        CHECK(status.exists_and_contains_files);
-                        CHECK(status.exactly_matches_package_folder);
-                        CHECK(status.changed_since_originally_installed == package::Tri::No);
+                        auto const extract_result = package::ReaderExtractFolder(
+                            package,
+                            *folder,
+                            dest_dir,
+                            tester.scratch_arena,
+                            error_log,
+                            {
+                                .destination =
+                                    package::DestinationType::DefaultFolderWithSubfolderFromPackage,
+                                .overwrite_existing_files = false,
+                                .resolve_install_folder_name_conflicts = true,
+                            });
+                        if (extract_result.HasError()) return ErrorCode {extract_result.Error()};
+                        CHECK(error_log.buffer.size == 0);
                     }
+
+                    // Check installed
+                    CHECK_NEQ(
+                        TRY(ChecksumsForFolder(dest_dir, tester.scratch_arena, tester.scratch_arena)).size,
+                        0u);
                 }
 
                 break;
             }
             case package::SubfolderType::Presets: {
+                auto const o = package::PresetsCheckExistingInstallation(
+                    *folder,
+                    Array {*path::Directory(TestPresetsFolder(tester))},
+                    tester.scratch_arena,
+                    error_log);
+                if (o.HasError()) return ErrorCode {o.Error()};
+                auto const status = o.ReleaseValue();
+                CHECK(status.installation_status == package::InstallationStatusType::AlreadyInstalled);
                 break;
             }
             case package::SubfolderType::Count: PanicIfReached();
@@ -178,7 +224,6 @@ static ErrorCodeOr<void> ReadTestPackage(tests::Tester& tester, Span<u8 const> z
     }
 
     CHECK_EQ(folders_found, 2u);
-#endif
 
     return k_success;
 }

@@ -388,6 +388,14 @@ TEST_CASE(TestFilesystem) {
         }
     }
 
+    SUBCASE("TemporaryDirectoryOnSameFilesystemAs") {
+        auto const abs_path = KnownDirectory(tester.arena, KnownDirectoryType::GlobalData, {.create = true});
+        auto temp_dir = TRY(TemporaryDirectoryOnSameFilesystemAs(abs_path, a));
+        tester.log.Debug(k_os_log_module, "Temporary directory on same filesystem: {}", temp_dir);
+        CHECK(path::IsAbsolute(temp_dir));
+        CHECK(GetFileType(temp_dir).HasValue());
+    }
+
     SUBCASE("DeleteDirectory") {
         auto test_delete_directory = [&a, &tester]() -> ErrorCodeOr<void> {
             auto const dir = path::Join(a, Array {tests::TempFolder(tester), "DeleteDirectory test"});

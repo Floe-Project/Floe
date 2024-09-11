@@ -306,6 +306,63 @@ ErrorCodeOr<DynamicArrayBounded<char, 200>> NameOfRunningExecutableOrLibrary() {
     return String {path::Filename(full_path)};
 }
 
+static ErrorCodeOr<WString> VolumeName(const WCHAR* path, ArenaAllocator& arena) {
+    auto buffer = arena.AllocateExactSizeUninitialised<WCHAR>(100);
+    if (!GetVolumePathNameW(path, buffer.data, (DWORD)buffer.size))
+        return FilesystemWin32ErrorCode(GetLastError(), "GetVolumePathNameW");
+    return WString {buffer.data, wcslen(buffer.data)};
+}
+
+ErrorCodeOr<MutableString> TemporaryDirectoryOnSameFilesystemAs(String path, Allocator& a) {
+    ASSERT(path::IsAbsolute(path));
+    PathArena temp_path_arena;
+
+    // standard temporary directory
+    Array<WCHAR, MAX_PATH + 1> standard_temp_dir_buffer;
+    auto size = GetTempPathW((DWORD)standard_temp_dir_buffer.size, standard_temp_dir_buffer.data);
+    WString standard_temp_dir {};
+    if (size && size < standard_temp_dir_buffer.size) {
+        standard_temp_dir_buffer[size] = L'\0';
+        standard_temp_dir = {standard_temp_dir_buffer.data, (usize)size};
+    } else {
+        standard_temp_dir = L"C:\\Windows\\Temp\\"_s;
+    }
+    auto const standard_temp_dir_volume = TRY(VolumeName(standard_temp_dir.data, temp_path_arena));
+
+    //
+    auto wide_path = WidenAllocNullTerm(temp_path_arena, path).Value();
+    for (auto& c : wide_path)
+        if (c == L'/') c = L'\\';
+    auto const volume_name = TRY(VolumeName(wide_path.data, temp_path_arena));
+
+    WString base_path {};
+    if (volume_name == standard_temp_dir_volume)
+        base_path = standard_temp_dir;
+    else
+        base_path = volume_name;
+
+    WString wide_result {};
+    {
+        u64 random_seed = SeedFromTime();
+        auto const filename =
+            Widen(temp_path_arena, UniqueFilename(k_temporary_directory_prefix, random_seed)).Value();
+
+        auto wide_result_buffer =
+            temp_path_arena.AllocateExactSizeUninitialised<WCHAR>(base_path.size + filename.size + 1);
+        usize pos = 0;
+        ASSERT(base_path[base_path.size - 1] == L'\\');
+        WriteAndIncrement(pos, wide_result_buffer, base_path);
+        WriteAndIncrement(pos, wide_result_buffer, filename);
+        WriteAndIncrement(pos, wide_result_buffer, L'\0');
+        pos -= 1;
+        if (!CreateDirectoryW(wide_result_buffer.data, nullptr))
+            return FilesystemWin32ErrorCode(GetLastError(), "CreateDirectoryW");
+        wide_result = {wide_result_buffer.data, pos};
+    }
+
+    return Narrow(a, wide_result).Value();
+}
+
 MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirectoryOptions options) {
     if (type == KnownDirectoryType::Temporary) {
         WCHAR buffer[MAX_PATH + 1];

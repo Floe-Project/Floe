@@ -156,6 +156,18 @@ ErrorCodeOr<void> CreateDirectory(String path, CreateDirectoryOptions options) {
     return k_success;
 }
 
+ErrorCodeOr<MutableString> TemporaryDirectoryOnSameFilesystemAs(String existing_abs_path, Allocator& a) {
+    NSError* error = nil;
+    auto url = [[NSFileManager defaultManager]
+          URLForDirectory:NSItemReplacementDirectory
+                 inDomain:NSLocalDomainMask
+        appropriateForURL:[NSURL fileURLWithPath:StringToNSString(existing_abs_path)]
+                   create:YES
+                    error:&error];
+    if (url == nil) return FilesystemErrorFromNSError(error);
+    return a.Clone(NSStringToString(url.path));
+}
+
 MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirectoryOptions options) {
     NSSearchPathDirectory dir_type {};
     NSSearchPathDomainMask domain {};

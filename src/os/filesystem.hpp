@@ -197,10 +197,19 @@ inline DynamicArrayBounded<char, 32> UniqueFilename(String prefix, u64 seed) {
     DynamicArrayBounded<char, 32> name {prefix};
     auto const chars_added = fmt::IntToString(RandomU64(seed),
                                               name.data + name.size,
-                                              {.base = fmt::IntToStringOptions::Base::Hexadecimal});
+                                              {.base = fmt::IntToStringOptions::Base::Base32});
+    ASSERT(chars_added <= 16);
     name.size += chars_added;
     return name;
 }
+
+constexpr String k_temporary_directory_prefix = ".floe-temp-";
+
+// Creates a directory on the same filesystem as an already existing path. Delete the directory when you're done with it.
+ErrorCodeOr<MutableString> TemporaryDirectoryOnSameFilesystemAs(String existing_abs_path, Allocator& a);
+
+// Creates a directory with the prefix k_temporary_directory_prefix in the given folder. Delete the directory when you're done with it.
+ErrorCodeOr<MutableString> TemporaryDirectoryWithinFolder(String existing_abs_folder, Allocator& a, u64 &seed);
 
 enum class FileType { File, Directory };
 

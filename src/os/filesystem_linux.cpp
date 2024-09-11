@@ -8,6 +8,7 @@
 #include <ftw.h>
 #include <link.h>
 #include <linux/limits.h>
+#include <mntent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/inotify.h>
@@ -191,6 +192,66 @@ ErrorCodeOr<void> CreateDirectory(String path, CreateDirectoryOptions options) {
 
         return FilesystemErrnoErrorCode(errno);
     }
+}
+
+static ErrorCodeOr<String> FindMountPoint(char const* path, ArenaAllocator& arena) {
+    struct stat path_stat;
+    if (stat(path, &path_stat) != 0) return FilesystemErrnoErrorCode(errno, "stat");
+
+    auto mtab = setmntent("/etc/mtab", "r");
+    if (!mtab) return FilesystemErrnoErrorCode(errno, "setmntent");
+    DEFER { endmntent(mtab); };
+
+    auto mnt_buffer = arena.AllocateExactSizeUninitialised<char>(1024);
+    struct mntent entry;
+
+    while (getmntent_r(mtab, &entry, mnt_buffer.data, (int)mnt_buffer.size) != nullptr) {
+        struct stat mount_stat;
+        if (stat(entry.mnt_dir, &mount_stat) == 0) {
+            // ok to return the string here because it's in the arena
+            if (path_stat.st_dev == mount_stat.st_dev) return FromNullTerminated(entry.mnt_dir);
+        }
+    }
+
+    return ErrorCode {FilesystemError::PathDoesNotExist};
+}
+
+static bool PathsHaveSameDevice(char const* path1, char const* path2) {
+    struct stat path1_stat;
+    if (stat(path1, &path1_stat) != 0) return false;
+
+    struct stat path2_stat;
+    if (stat(path2, &path2_stat) != 0) return false;
+
+    return path1_stat.st_dev == path2_stat.st_dev;
+}
+
+ErrorCodeOr<MutableString> TemporaryDirectoryOnSameFilesystemAs(String path, Allocator& a) {
+    ASSERT(path::IsAbsolute(path));
+
+    auto const standard_temp = ({
+        char const* str = "/tmp";
+        if (auto const dir = secure_getenv("TMPDIR"))
+            str = dir;
+        else
+            str = P_tmpdir;
+        str;
+    });
+
+    PathArena temp_path_allocator;
+    auto const path_nt = NullTerminated(path, temp_path_allocator);
+
+    String base_path {};
+    if (PathsHaveSameDevice(path_nt, standard_temp))
+        base_path = FromNullTerminated(standard_temp);
+    else
+        base_path = TRY(FindMountPoint(path_nt, temp_path_allocator));
+
+    u64 seed = SeedFromTime();
+    auto const result = path::Join(a, Array {base_path, UniqueFilename(k_temporary_directory_prefix, seed)});
+    TRY(CreateDirectory(result, {.create_intermediate_directories = true, .fail_if_exists = false}));
+
+    return result;
 }
 
 MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirectoryOptions options) {

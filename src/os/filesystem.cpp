@@ -134,6 +134,19 @@ MutableString FloeKnownDirectory(Allocator& a,
     return KnownDirectoryWithSubdirectories(a, known_dir_type, subdirectories, filename, options);
 }
 
+ErrorCodeOr<MutableString>
+TemporaryDirectoryWithinFolder(String existing_abs_folder, Allocator& a, u64& seed) {
+    auto result =
+        path::Join(a, Array {existing_abs_folder, UniqueFilename(k_temporary_directory_prefix, seed)});
+    TRY(CreateDirectory(result,
+                        {
+                            .create_intermediate_directories = false,
+                            .fail_if_exists = true,
+                            .win32_hide_dirs_starting_with_dot = true,
+                        }));
+    return result;
+}
+
 // uses Rename() to move a file or folder into a given destination folder
 ErrorCodeOr<void> MoveIntoFolder(String from, String destination_folder) {
     PathArena path_allocator;

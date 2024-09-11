@@ -15,6 +15,8 @@
 
 namespace package {
 
+constexpr auto k_log_mod = "📦pkg"_log_module;
+
 constexpr String k_libraries_subdir = "Libraries";
 constexpr String k_presets_subdir = "Presets";
 constexpr auto k_folders = Array {k_libraries_subdir, k_presets_subdir};
@@ -421,6 +423,7 @@ static ErrorCodeOr<void> ExtractFolder(PackageReader& package,
                                        String destination_folder,
                                        ArenaAllocator& scratch_arena,
                                        HashTable<String, ChecksumValues> destination_checksums) {
+    g_log.Info(k_log_mod, "Extracting folder: {} to {}", dir_in_zip, destination_folder);
     for (auto const file_index : Range(mz_zip_reader_get_num_files(&package.zip))) {
         auto const file_stat = TRY(detail::FileStat(package, file_index));
         if (file_stat.m_is_directory) continue;
@@ -493,6 +496,7 @@ static PackageError CreatePackageError(Logger& error_log, ErrorCode error, Args 
     if (possible_fix.size) fmt::Append(error_buffer, " {}.", possible_fix);
 
     error_log.Error({}, error_buffer);
+    g_log.Info(k_log_mod, "Package error: {}", error_buffer);
 
     return package_error;
 }
@@ -544,7 +548,7 @@ PUBLIC VoidOrError<PackageError> ReaderInit(PackageReader& package, Logger& erro
     if (!mz_zip_reader_init(&package.zip, package.zip_file_reader.size, 0))
         return detail::CreatePackageError(error_log, detail::ZipReadError(package));
 
-    usize known_subdirs = 0;
+    bool known_subdirs = false;
     for (auto const file_index : Range(mz_zip_reader_get_num_files(&package.zip))) {
         auto const file_stat = ({
             auto const o = detail::FileStat(package, file_index);
@@ -554,7 +558,7 @@ PUBLIC VoidOrError<PackageError> ReaderInit(PackageReader& package, Logger& erro
         auto const path = detail::PathWithoutTrailingSlash(file_stat.m_filename);
         for (auto const known_subdir : Array {k_libraries_subdir, k_presets_subdir}) {
             if (path == known_subdir || detail::RelativePathIfInFolder(path, known_subdir)) {
-                ++known_subdirs;
+                known_subdirs = true;
                 break;
             }
         }
@@ -601,6 +605,8 @@ IteratePackageFolders(PackageReader& package,
             if (!relative_path) continue;
             if (relative_path->size == 0) continue;
             if (Contains(*relative_path, '/')) continue;
+
+            g_log.Info(k_log_mod, "Package contains folder: {}", path);
 
             return Optional<PackageFolder> {PackageFolder {
                 .path = path.Clone(arena),
@@ -678,6 +684,8 @@ PUBLIC VoidOrError<PackageError> ReaderExtractFolder(PackageReader& package,
                                                   o.Error(),
                                                   "couldn't access destination folder: {}",
                                                   f);
+            if (o.Value() != f)
+                g_log.Info(k_log_mod, "Resolved folder name conflict: {} -> {}", f, o.Value());
             f = o.Value();
         }
 
@@ -904,6 +912,13 @@ LibraryCheckExistingInstallation(PackageFolder const& folder,
     };
 }
 
+// We don't actually check the checksums file of a presets folder. All we do is check if the exact files from
+// the package are already installed. If there's any discrepancy, we just install the package again to a new
+// folder. It means there could be duplicate files, but it's not a problem; preset files are tiny, and our
+// preset system will ignore duplicate files by checking their checksums.
+//
+// We take this approach because there is no reason to overwrite preset files. Preset files are tiny. If
+// there's a 'version 2' of a preset pack, then it might as well be installed alongside version 1.
 PUBLIC ValueOrError<FolderCheckResult, PackageError>
 PresetsCheckExistingInstallation(PackageFolder const& package_folder,
                                  Span<String const> presets_folders,

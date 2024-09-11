@@ -96,24 +96,20 @@ PUBLIC constexpr Span<u8 const> AsBytes(Type const& obj) {
     return {(u8 const*)&obj, sizeof(Type)};
 }
 
-template <typename Type>
-PUBLIC constexpr void WriteAndIncrement(usize& pos, Span<u8> dest, Type const& src) {
+template <typename DestType, typename Type>
+PUBLIC constexpr void WriteAndIncrement(usize& pos, Span<DestType> dest, Type const& src) {
     if constexpr (requires(Type t) {
                       typename Type::ValueType;
-                      requires sizeof(typename Type::ValueType) == 1;
+                      requires sizeof(typename Type::ValueType) == sizeof(DestType);
                       { t.size } -> Convertible<usize>;
                       { t.data } -> Convertible<typename Type::ValueType const*>;
                   }) {
-        CopyMemory(&dest.data[pos], src.data, src.size);
+        CopyMemory(&dest.data[pos], src.data, src.size * sizeof(DestType));
         pos += src.size;
-    } else if constexpr (Fundamental<Type> && sizeof(Type) == 1) {
-        dest.data[pos] = (u8)src;
+    } else if constexpr (Fundamental<Type> && sizeof(Type) == sizeof(DestType)) {
+        dest.data[pos] = (DestType)src;
         pos += 1;
     } else {
         static_assert(false);
     }
-}
-template <typename Type>
-PUBLIC constexpr void WriteAndIncrement(usize& pos, Span<char> dest, Type const& src) {
-    WriteAndIncrement(pos, {(u8*)dest.data, dest.size}, src);
 }

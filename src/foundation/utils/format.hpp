@@ -85,7 +85,7 @@ concept TypeWithCustomValueToString =
     requires(T value, Writer writer, FormatOptions options) { CustomValueToString(writer, value, options); };
 
 struct IntToStringOptions {
-    enum class Base { Decimal, Hexadecimal };
+    enum class Base { Decimal, Hexadecimal, Base32 };
     Base base = Base::Decimal;
     bool include_sign = false;
     bool capitalize_hex = false;
@@ -102,6 +102,7 @@ PUBLIC constexpr usize IntToString(IntType num, char* buffer, IntToStringOptions
     switch (options.base) {
         case IntToStringOptions::Base::Decimal: base = 10; break;
         case IntToStringOptions::Base::Hexadecimal: base = 16; break;
+        case IntToStringOptions::Base::Base32: base = 32; break;
     }
 
     bool const is_negative = SignedInt<IntType> && num < 0;
@@ -114,7 +115,8 @@ PUBLIC constexpr usize IntToString(IntType num, char* buffer, IntToStringOptions
         *ptr++ = '0';
     } else {
         do {
-            *ptr++ = (options.capitalize_hex ? "0123456789ABCDEF" : "0123456789abcdef")[num % base];
+            *ptr++ = (options.capitalize_hex ? "0123456789ABCDEFGHIJKLMNPQRSTVWX"
+                                             : "0123456789abcdefghijklmnpqrstvwx")[num % base];
             num /= base;
         } while (num != 0);
     }

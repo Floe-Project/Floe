@@ -76,5 +76,5 @@ However, Linux is only provided for development purposes at the moment, and you 
 - Good tooling is a priority. The build system generates a compile_commands.json, so clangd, clang-tidy, cppcheck, etc. are all supported.
 - We pair `Nix` with `just` for accessing great tools, being able to deeply integrate the project and be consistent across machines (local/CI/Linux/macOS).
 - We try to focus on making the code a joy to work on: programming can be fun.
-- Incrementally improve the codebase, it's still a work-in-progress.
+- Incrementally improve the codebase, it's still a work-in-progress. Unfortunately there's still some technical debt to pay off.
 

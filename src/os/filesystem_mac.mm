@@ -158,13 +158,24 @@ ErrorCodeOr<void> CreateDirectory(String path, CreateDirectoryOptions options) {
 
 ErrorCodeOr<MutableString> TemporaryDirectoryOnSameFilesystemAs(String existing_abs_path, Allocator& a) {
     NSError* error = nil;
-    auto url = [[NSFileManager defaultManager]
-          URLForDirectory:NSItemReplacementDirectory
-                 inDomain:NSLocalDomainMask
-        appropriateForURL:[NSURL fileURLWithPath:StringToNSString(existing_abs_path)]
-                   create:YES
-                    error:&error];
-    if (url == nil) return FilesystemErrorFromNSError(error);
+    NSString* ns_path = StringToNSString(existing_abs_path);
+    auto url = [[NSFileManager defaultManager] URLForDirectory:NSItemReplacementDirectory
+                                                      inDomain:NSUserDomainMask
+                                             appropriateForURL:[NSURL fileURLWithPath:ns_path]
+                                                        create:YES
+                                                         error:&error];
+    if (url == nil && error == nil) {
+        // try again but this time with a the local domain mask
+        url = [[NSFileManager defaultManager] URLForDirectory:NSItemReplacementDirectory
+                                                     inDomain:NSLocalDomainMask
+                                            appropriateForURL:[NSURL fileURLWithPath:ns_path]
+                                                       create:YES
+                                                        error:&error];
+    }
+    if (url == nil) {
+        if (error == nil) return ErrorCode {FilesystemError::PathDoesNotExist};
+        return FilesystemErrorFromNSError(error);
+    }
     return a.Clone(NSStringToString(url.path));
 }
 

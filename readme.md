@@ -19,8 +19,10 @@ SPDX-License-Identifier: CC0-1.0
 
 ___IMPORTANT: Large-scale changes are underway, many things are missing and broken for now.___
 
-### Sample library engine
-Floe is a CLAP, VST3 or AU plugin for Windows and macOS. It loads sample libraries in the Floe format. Visit [floe.audio](https://floe.audio) for more information about the project.
+### Sample library player
+Floe is a CLAP, VST3 or AU plugin for Windows and macOS. It loads sample libraries in the Floe format. Visit [floe.audio](https://floe.audio) for more information about the project. 
+
+Join Floe's [Zulip group chat/forum](https://floe.zulipchat.com) for discussions or questions about Floe.
 
 ## Development Roadmap
 Floe will be updated and deployed regularly with stable, backwards-compatible releases. Currently we are working towards the first stable version, 1.0. We use GitHub issues to track the [milestones](https://github.com/Floe-Project/Floe/milestones?direction=asc&sort=title&state=open) towards that.
@@ -77,4 +79,5 @@ However, Linux is only provided for development purposes at the moment, and you 
 - We pair `Nix` with `just` for accessing great tools, being able to deeply integrate the project and be consistent across machines (local/CI/Linux/macOS).
 - We try to focus on making the code a joy to work on: programming can be fun.
 - Incrementally improve the codebase, it's still a work-in-progress. Unfortunately there's still some technical debt to pay off.
+- In years to come we might make more use of the Zig programming language.
 

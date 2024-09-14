@@ -3,12 +3,11 @@
 
 #pragma once
 #include "foundation/foundation.hpp"
-#include "utils/debug/debug.hpp"
 
-#include "audio_processing_context.hpp"
 #include "effect_infos.hpp"
 #include "param.hpp"
-#include "processing/stereo_audio_frame.hpp"
+#include "processing_utils/audio_processing_context.hpp"
+#include "processing_utils/stereo_audio_frame.hpp"
 #include "smoothed_value_system.hpp"
 
 inline void UpdateSilentSeconds(f32& silent_seconds, Span<StereoAudioFrame const> frames, f32 sample_rate) {

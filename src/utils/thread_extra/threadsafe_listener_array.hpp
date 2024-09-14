@@ -6,7 +6,7 @@
 #include "os/threading.hpp"
 
 template <typename Function>
-class AtomicListenerArray {
+class ThreadsafeListenerArray {
   public:
     u64 Add(Function&& f) {
         ScopedMutexLock const lock(m_mutex);

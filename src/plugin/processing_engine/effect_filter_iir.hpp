@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #pragma once
-#include "audio_processing_context.hpp"
 #include "effect.hpp"
 #include "param_info.hpp"
-#include "processing/filters.hpp"
+#include "processing_utils/audio_processing_context.hpp"
+#include "processing_utils/filters.hpp"
 #include "smoothed_value_system.hpp"
 
 class FilterEffect final : public Effect {

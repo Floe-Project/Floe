@@ -7,15 +7,15 @@
 
 #include "common_infrastructure/sample_library/sample_library.hpp"
 
-#include "audio_processing_context.hpp"
 #include "param.hpp"
 #include "param_info.hpp"
-#include "processing/filters.hpp"
-#include "processing/midi.hpp"
-#include "processing/peak_meter.hpp"
-#include "processing/stereo_audio_frame.hpp"
-#include "processing/synced_timings.hpp"
-#include "processing/volume_fade.hpp"
+#include "processing_utils/audio_processing_context.hpp"
+#include "processing_utils/filters.hpp"
+#include "processing_utils/midi.hpp"
+#include "processing_utils/peak_meter.hpp"
+#include "processing_utils/stereo_audio_frame.hpp"
+#include "processing_utils/synced_timings.hpp"
+#include "processing_utils/volume_fade.hpp"
 #include "voices.hpp"
 
 static void UpdateLoopPointsForVoices(LayerProcessor& layer, VoicePool& voice_pool) {

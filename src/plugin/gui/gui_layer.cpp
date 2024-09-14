@@ -18,8 +18,8 @@
 #include "gui_widget_compounds.hpp"
 #include "gui_widget_helpers.hpp"
 #include "gui_window.hpp"
-#include "layer_processor.hpp"
 #include "plugin_instance.hpp"
+#include "processing_engine/layer_processor.hpp"
 
 namespace layer_gui {
 

@@ -21,7 +21,7 @@
 #include "utils/logger/logger.hpp"
 
 #include "plugin/plugin.hpp"
-#include "plugin/processing/audio_utils.hpp"
+#include "plugin/processing_utils/audio_utils.hpp"
 
 // A very simple 'standalone' host for development purposes.
 

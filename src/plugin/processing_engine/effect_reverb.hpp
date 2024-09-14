@@ -7,7 +7,7 @@
 #include "utils/debug/debug.hpp"
 #include "utils/debug/tracy_wrapped.hpp"
 
-#include "effects/effect.hpp"
+#include "effect.hpp"
 
 class Reverb final : public Effect {
   public:

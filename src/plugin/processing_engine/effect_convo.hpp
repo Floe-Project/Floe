@@ -10,10 +10,10 @@
 #include "common_infrastructure/sample_library/sample_library.hpp"
 
 #include "FFTConvolver/wrapper.hpp"
-#include "audio_processing_context.hpp"
 #include "effect.hpp"
 #include "param_info.hpp"
-#include "processing/filters.hpp"
+#include "processing_utils/audio_processing_context.hpp"
+#include "processing_utils/filters.hpp"
 #include "smoothed_value_system.hpp"
 
 class ConvolutionReverb final : public Effect {

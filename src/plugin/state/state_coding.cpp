@@ -1,7 +1,7 @@
 // Copyright 2018-2024 Sam Windell
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "state_coding.hpp"
+#include "state/state_coding.hpp"
 
 #include "foundation/foundation.hpp"
 #include "os/filesystem.hpp"
@@ -14,9 +14,9 @@
 #include "common_infrastructure/sample_library/mdata.hpp"
 
 #include "config.h"
-#include "effects/effect_infos.hpp"
+#include "effect_infos.hpp"
 #include "param_info.hpp"
-#include "processing/audio_utils.hpp"
+#include "processing_utils/audio_utils.hpp"
 #include "state_snapshot.hpp"
 
 using namespace json;

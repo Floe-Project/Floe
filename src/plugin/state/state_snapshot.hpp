@@ -4,7 +4,7 @@
 #pragma once
 #include "foundation/foundation.hpp"
 
-#include "effects/effect_infos.hpp"
+#include "effect_infos.hpp"
 #include "instrument.hpp"
 #include "param_info.hpp"
 

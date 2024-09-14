@@ -9,7 +9,7 @@
 #include "common_infrastructure/audio_data.hpp"
 #include "common_infrastructure/sample_library/sample_library.hpp"
 
-#include "processing/filters.hpp"
+#include "processing_utils/filters.hpp"
 
 inline void
 DoMonoCubicInterp(f32 const* f0, f32 const* f1, f32 const* f2, f32 const* fm1, f32 const x, f32& out) {

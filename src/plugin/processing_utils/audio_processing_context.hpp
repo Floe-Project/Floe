@@ -4,7 +4,7 @@
 #pragma once
 #include "foundation/foundation.hpp"
 
-#include "processing/midi.hpp"
+#include "processing_utils/midi.hpp"
 
 struct MidiNoteState {
     void NoteOn(MidiChannelNote note, f32 velocity) {

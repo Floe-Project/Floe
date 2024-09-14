@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #pragma once
-#include "audio_processing_context.hpp"
 #include "effect.hpp"
 #include "param_info.hpp"
+#include "processing_utils/audio_processing_context.hpp"
 #include "smoothed_value_system.hpp"
 
 enum DistFunction {

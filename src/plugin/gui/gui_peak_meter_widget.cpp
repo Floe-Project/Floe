@@ -7,7 +7,7 @@
 
 #include "framework/gui_live_edit.hpp"
 #include "gui.hpp"
-#include "processing/audio_utils.hpp"
+#include "processing_utils/audio_utils.hpp"
 
 namespace peak_meters {
 

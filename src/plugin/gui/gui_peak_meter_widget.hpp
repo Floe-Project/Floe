@@ -6,7 +6,7 @@
 
 #include "gui_fwd.hpp"
 #include "layout.hpp"
-#include "processing/peak_meter.hpp"
+#include "processing_utils/peak_meter.hpp"
 
 namespace peak_meters {
 

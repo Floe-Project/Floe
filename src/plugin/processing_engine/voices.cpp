@@ -7,11 +7,11 @@
 
 #include "common_infrastructure/constants.hpp"
 
-#include "audio_processing_context.hpp"
-#include "effects/effect_stereo_widen.hpp"
 #include "host_thread_pool.hpp"
 #include "layer_processor.hpp"
 #include "param_info.hpp"
+#include "processing_engine/effect_stereo_widen.hpp"
+#include "processing_utils/audio_processing_context.hpp"
 
 static constexpr u32 k_num_frames_in_voice_processing_chunk = 64;
 

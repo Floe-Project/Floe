@@ -4,8 +4,8 @@
 #pragma once
 #include <vitfx/wrapper.hpp>
 
-#include "effects/effect.hpp"
-#include "processing/synced_timings.hpp"
+#include "effect.hpp"
+#include "processing_utils/synced_timings.hpp"
 
 class Delay final : public Effect {
   public:

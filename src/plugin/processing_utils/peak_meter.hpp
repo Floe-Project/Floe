@@ -5,7 +5,7 @@
 #include "foundation/foundation.hpp"
 #include "os/threading.hpp"
 
-#include "processing/stereo_audio_frame.hpp"
+#include "processing_utils/stereo_audio_frame.hpp"
 
 struct StereoPeakMeter {
     struct Snapshot {

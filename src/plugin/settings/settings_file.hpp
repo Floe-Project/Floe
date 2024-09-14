@@ -4,7 +4,7 @@
 #pragma once
 #include "foundation/foundation.hpp"
 #include "os/misc.hpp"
-#include "utils/thread_extra/atomic_listener_array.hpp"
+#include "utils/thread_extra/threadsafe_listener_array.hpp"
 
 #include "common_infrastructure/paths.hpp"
 
@@ -64,11 +64,11 @@ struct Settings {
     Span<String> unknown_lines_from_file {};
 };
 
-using FolderChangeListeners = AtomicListenerArray<TrivialFixedSizeFunction<16, void(ScanFolderType)>>;
+using FolderChangeListeners = ThreadsafeListenerArray<TrivialFixedSizeFunction<16, void(ScanFolderType)>>;
 
 struct SettingsTracking {
     bool changed {};
-    AtomicListenerArray<TrivialFixedSizeFunction<16, void()>> window_size_change_listeners;
+    ThreadsafeListenerArray<TrivialFixedSizeFunction<16, void()>> window_size_change_listeners;
     FolderChangeListeners filesystem_change_listeners;
 };
 

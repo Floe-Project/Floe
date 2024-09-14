@@ -10,8 +10,8 @@
 
 #include "effect.hpp"
 #include "param_info.hpp"
-#include "processing/filters.hpp"
-#include "processing/lfo.hpp"
+#include "processing_utils/filters.hpp"
+#include "processing_utils/lfo.hpp"
 #include "smoothed_value_system.hpp"
 
 struct ChorusProcessor {

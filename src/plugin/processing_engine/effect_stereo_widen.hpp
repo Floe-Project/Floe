@@ -3,7 +3,7 @@
 
 #pragma once
 #include "effect.hpp"
-#include "processing/stereo_audio_frame.hpp"
+#include "processing_utils/stereo_audio_frame.hpp"
 #include "smoothed_value_system.hpp"
 
 // http://www.musicdsp.org/show_archive_comment.php?ArchiveID=256

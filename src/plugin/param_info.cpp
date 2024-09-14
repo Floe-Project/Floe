@@ -8,7 +8,7 @@
 #include "tests/framework.hpp"
 
 #include "param_info.hpp"
-#include "processing/audio_utils.hpp"
+#include "processing_utils/audio_utils.hpp"
 
 Span<String const> ParameterMenuItems(ParamIndex param_index) {
     auto const& param = k_param_infos[ToInt(param_index)];

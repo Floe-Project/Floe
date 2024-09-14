@@ -3,8 +3,8 @@
 
 #pragma once
 #include "foundation/foundation.hpp"
-#include "utils/thread_extra/atomic_listener_array.hpp"
 #include "utils/thread_extra/thread_pool.hpp"
+#include "utils/thread_extra/threadsafe_listener_array.hpp"
 
 #include "rescan_mode.hpp"
 
@@ -17,7 +17,7 @@ struct ScannedFolder {
     Atomic<bool> needs_rescan {true};
     Atomic<u32> async_scans {0};
     Optional<u64> filesystem_settings_listener_id {};
-    AtomicListenerArray<TrivialFixedSizeFunction<16, void()>> listeners {};
+    ThreadsafeListenerArray<TrivialFixedSizeFunction<16, void()>> listeners {};
     Mutex overall_mutex {};
     ArenaAllocator thread_arena {Malloc::Instance()};
 };

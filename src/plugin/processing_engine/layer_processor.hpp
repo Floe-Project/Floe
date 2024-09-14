@@ -4,17 +4,17 @@
 #pragma once
 #include "foundation/foundation.hpp"
 
-#include "audio_processing_context.hpp"
 #include "clap/host.h"
 #include "instrument.hpp"
 #include "param.hpp"
 #include "param_info.hpp"
 #include "plugin.hpp"
-#include "processing/adsr.hpp"
-#include "processing/filters.hpp"
-#include "processing/midi.hpp"
-#include "processing/peak_meter.hpp"
-#include "processing/volume_fade.hpp"
+#include "processing_utils/adsr.hpp"
+#include "processing_utils/audio_processing_context.hpp"
+#include "processing_utils/filters.hpp"
+#include "processing_utils/midi.hpp"
+#include "processing_utils/peak_meter.hpp"
+#include "processing_utils/volume_fade.hpp"
 #include "sample_library_server.hpp"
 #include "smoothed_value_system.hpp"
 

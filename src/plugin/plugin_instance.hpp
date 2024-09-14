@@ -10,7 +10,7 @@
 #include "cross_instance_systems.hpp"
 #include "instrument.hpp"
 #include "plugin.hpp"
-#include "processor.hpp"
+#include "processing_engine/processor.hpp"
 #include "sample_library_server.hpp"
 #include "state/state_snapshot.hpp"
 

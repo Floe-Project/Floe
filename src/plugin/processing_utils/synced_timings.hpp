@@ -4,7 +4,7 @@
 #pragma once
 #include "foundation/foundation.hpp"
 
-#include "processing/audio_utils.hpp"
+#include "processing_utils/audio_utils.hpp"
 
 enum class SyncedTimes {
     // NOLINTBEGIN(readability-identifier-naming)

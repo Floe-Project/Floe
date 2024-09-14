@@ -8,7 +8,6 @@
 
 #include "os/threading.hpp"
 
-#include "effects/effect.hpp"
 #include "framework/gui_live_edit.hpp"
 #include "gui.hpp"
 #include "gui/framework/colours.hpp"
@@ -20,6 +19,7 @@
 #include "gui_window.hpp"
 #include "param_info.hpp"
 #include "plugin_instance.hpp"
+#include "processing_engine/effect.hpp"
 
 constexpr auto k_reverb_params = ComptimeParamSearch<ComptimeParamSearchOptions {
     .modules = {ParameterModule::Effect, ParameterModule::Reverb},

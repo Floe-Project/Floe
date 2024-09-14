@@ -5,7 +5,7 @@
 #include "dsp_stillwell_majortom.hpp"
 #include "effect.hpp"
 #include "param_info.hpp"
-#include "processing/audio_utils.hpp"
+#include "processing_utils/audio_utils.hpp"
 #include "smoothed_value_system.hpp"
 
 class Compressor final : public Effect {

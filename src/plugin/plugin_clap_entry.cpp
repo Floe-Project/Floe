@@ -26,6 +26,7 @@ static clap_plugin_factory const factory = {
 };
 
 #if __linux__
+// https://github.com/ziglang/zig/issues/17908
 // NOLINTBEGIN
 extern "C" void* __dso_handle;
 extern "C" void __cxa_finalize(void*);

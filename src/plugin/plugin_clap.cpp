@@ -20,8 +20,8 @@
 #include "param_info.hpp"
 #include "plugin.hpp"
 #include "plugin_instance.hpp"
-#include "processing/scoped_denormals.hpp"
-#include "processor.hpp"
+#include "processing_engine/processor.hpp"
+#include "processing_utils/scoped_denormals.hpp"
 #include "settings/settings_file.hpp"
 
 //

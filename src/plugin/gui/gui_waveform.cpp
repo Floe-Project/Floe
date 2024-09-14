@@ -12,8 +12,8 @@
 #include "gui_drawing_helpers.hpp"
 #include "gui_label_widgets.hpp"
 #include "gui_widget_helpers.hpp"
-#include "layer_processor.hpp"
 #include "param_info.hpp"
+#include "processing_engine/layer_processor.hpp"
 #include "sample_processing.hpp"
 
 static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Rect waveform_r) {

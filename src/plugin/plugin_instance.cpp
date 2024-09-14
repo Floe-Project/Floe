@@ -12,7 +12,7 @@
 
 #include "cross_instance_systems.hpp"
 #include "instrument.hpp"
-#include "layer_processor.hpp"
+#include "processing_engine/layer_processor.hpp"
 #include "param_info.hpp"
 #include "plugin.hpp"
 #include "sample_library_server.hpp"

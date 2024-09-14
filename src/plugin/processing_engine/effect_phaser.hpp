@@ -4,7 +4,7 @@
 #pragma once
 #include <vitfx/wrapper.hpp>
 
-#include "effects/effect.hpp"
+#include "effect.hpp"
 
 class Phaser final : public Effect {
   public:

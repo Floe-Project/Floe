@@ -8,14 +8,14 @@
 
 #include "common_infrastructure/constants.hpp"
 
-#include "audio_processing_context.hpp"
 #include "instrument.hpp"
-#include "processing/adsr.hpp"
-#include "processing/filters.hpp"
-#include "processing/lfo.hpp"
-#include "processing/midi.hpp"
-#include "processing/smoothed_value_system.hpp"
-#include "processing/volume_fade.hpp"
+#include "processing_utils/adsr.hpp"
+#include "processing_utils/audio_processing_context.hpp"
+#include "processing_utils/filters.hpp"
+#include "processing_utils/lfo.hpp"
+#include "processing_utils/midi.hpp"
+#include "processing_utils/smoothed_value_system.hpp"
+#include "processing_utils/volume_fade.hpp"
 #include "sample_processing.hpp"
 
 constexpr u32 k_max_num_active_voices = 32;

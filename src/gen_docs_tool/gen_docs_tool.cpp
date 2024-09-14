@@ -1,10 +1,11 @@
 // Copyright 2018-2024 Sam Windell
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include <foundation/foundation.hpp>
 #include <lua.h>
-#include <os/misc.hpp>
 
+#include "foundation/foundation.hpp"
+#include "os/misc.hpp"
+#include "utils/cli_arg_parse.hpp"
 #include "utils/logger/logger.hpp"
 
 #include "common_infrastructure/sample_library/sample_library.hpp"
@@ -121,15 +122,34 @@ ErrorCodeOr<void> Main(String destination_folder) {
     return k_success;
 }
 
-int main(int argc, char** argv) {
+static ErrorCodeOr<int> Main(ArgsCstr args) {
+    enum class CommandLineArgId : u32 {
+        OutFolder,
+        Count,
+    };
+
+    auto constexpr k_cli_arg_defs = MakeCommandLineArgDefs<CommandLineArgId>({
+        {
+            .id = (u32)CommandLineArgId::OutFolder,
+            .key = "out-folder",
+            .description = "Destination folder for generated files",
+            .value_type = "path",
+            .required = true,
+            .num_values = 1,
+        },
+    });
+
     ArenaAllocator arena {PageAllocator::Instance()};
 
-    if (argc != 2) {
-        g_cli_out.Error({}, "Usage: {} <destination_folder>", argv[0]);
-        return 1;
-    }
+    auto const cli_args = TRY(ParseCommandLineArgsStandard(arena,
+                                                           args,
+                                                           k_cli_arg_defs,
+                                                           {
+                                                               .handle_help_option = true,
+                                                               .print_usage_on_error = true,
+                                                           }));
 
-    auto const destination_folder = FromNullTerminated(argv[1]);
+    auto const destination_folder = cli_args[ToInt(CommandLineArgId::OutFolder)].values[0];
 
     auto result = Main(destination_folder);
     if (result.HasError()) {
@@ -138,4 +158,14 @@ int main(int argc, char** argv) {
     }
 
     return 0;
+}
+
+int main(int argc, char** argv) {
+    SetThreadName("main");
+    auto result = Main({argc, argv});
+    if (result.HasError()) {
+        g_cli_out.Error({}, "Error: {}", result.Error());
+        return 1;
+    }
+    return result.Value();
 }

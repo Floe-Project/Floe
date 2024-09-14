@@ -99,14 +99,13 @@ ErrorCodeOr<int> Main(ArgsCstr args) {
     });
 
     ArenaAllocatorWithInlineStorage<1000> arena;
-    auto const cli_args = TRY(ParseCommandLineArgs(StdWriter(g_cli_out.stream),
-                                                   arena,
-                                                   args,
-                                                   k_cli_arg_defs,
-                                                   {
-                                                       .handle_help_option = true,
-                                                       .print_usage_on_error = true,
-                                                   }));
+    auto const cli_args = TRY(ParseCommandLineArgsStandard(arena,
+                                                           args,
+                                                           k_cli_arg_defs,
+                                                           {
+                                                               .handle_help_option = true,
+                                                               .print_usage_on_error = true,
+                                                           }));
 
     TRY(SetLogLevel(tester, cli_args[ToInt(CommandLineArgId::LogLevel)].Value()));
 
@@ -122,7 +121,10 @@ ErrorCodeOr<int> Main(ArgsCstr args) {
 }
 
 int main(int argc, char** argv) {
-    auto result = Main({argc, argv});
-    if (result.HasError()) return 1;
+    auto const result = Main({argc, argv});
+    if (result.HasError()) {
+        g_cli_out.Error({}, "Error: {}", result.Error());
+        return 1;
+    }
     return result.Value();
 }

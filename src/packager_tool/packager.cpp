@@ -283,18 +283,17 @@ PackageName(ArenaAllocator& arena, sample_lib::Library const* lib, CommandLineAr
     return fmt::Format(arena, "{} - {}{}", lib->author, lib->name, package::k_file_extension);
 }
 
-static ErrorCodeOr<void> Main(ArgsCstr args) {
+static ErrorCodeOr<int> Main(ArgsCstr args) {
     ArenaAllocator arena {PageAllocator::Instance()};
     auto const program_name = path::Filename(FromNullTerminated(args.args[0]));
 
-    auto const cli_args = TRY(ParseCommandLineArgs(StdWriter(g_cli_out.stream),
-                                                   arena,
-                                                   args,
-                                                   k_command_line_args_defs,
-                                                   {
-                                                       .handle_help_option = true,
-                                                       .print_usage_on_error = true,
-                                                   }));
+    auto const cli_args = TRY(ParseCommandLineArgsStandard(arena,
+                                                           args,
+                                                           k_command_line_args_defs,
+                                                           {
+                                                               .handle_help_option = true,
+                                                               .print_usage_on_error = true,
+                                                           }));
     TRY(CheckNeededPackageCliArgs(cli_args));
 
     DynamicArray<u8> zip_data {arena};
@@ -346,16 +345,15 @@ static ErrorCodeOr<void> Main(ArgsCstr args) {
         g_cli_out.Info({}, "No output packge folder provided, not creating a package file");
     }
 
-    return k_success;
+    return 0;
 }
 
 int main(int argc, char** argv) {
     SetThreadName("main");
-    auto result = Main({argc, argv});
+    auto const result = Main({argc, argv});
     if (result.HasError()) {
-        if (result.Error() == CliError::HelpRequested) return 0;
         g_cli_out.Error({}, "Error: {}", result.Error());
         return 1;
     }
-    return 0;
+    return result.Value();
 }

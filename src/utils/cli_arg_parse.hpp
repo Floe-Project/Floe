@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #pragma once
-#include "foundation/container/hash_table.hpp"
-#include "foundation/utils/format.hpp"
-#include "foundation/utils/string.hpp"
-#include "foundation/utils/writer.hpp"
+#include "foundation/foundation.hpp"
+
+#include "logger/logger.hpp"
 
 struct CommandLineArgDefinition {
     u32 id; // normally an enum, used for lookup
@@ -276,6 +275,23 @@ PUBLIC ErrorCodeOr<Span<CommandLineArg>> ParseCommandLineArgs(Writer writer,
                                 ArgsToStringsSpan(arena, args, false),
                                 arg_defs,
                                 options);
+}
+
+PUBLIC ValueOrError<Span<CommandLineArg>, int>
+ParseCommandLineArgsStandard(ArenaAllocator& arena,
+                             ArgsCstr args,
+                             Span<CommandLineArgDefinition const> arg_defs,
+                             ParseCommandLineArgsOptions options = {
+                                 .handle_help_option = true,
+                                 .print_usage_on_error = true,
+                             }) {
+    auto writer = StdWriter(g_cli_out.stream);
+    auto result = ParseCommandLineArgs(writer, arena, args, arg_defs, options);
+    if (result.HasError()) {
+        if (result.Error() == CliError::HelpRequested) return 0;
+        return 1;
+    }
+    return result.Value();
 }
 
 // Compile-time helper that ensures command line arg definitions exactly match an enum. Allowing for easy

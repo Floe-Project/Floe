@@ -12,8 +12,6 @@
 #include "common_infrastructure/package_format.hpp"
 #include "common_infrastructure/sample_library/sample_library.hpp"
 
-// TODO: rename this, it's not just packaging libraries, also presets
-
 // Library packager CLI tool
 // - Generates an 'About' HTML file for a Floe library
 // - Ensures there's a license file

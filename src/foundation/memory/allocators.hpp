@@ -56,6 +56,7 @@ using AllocatorCommandUnion = TaggedUnion<AllocatorCommand,
 
 struct Allocator {
     virtual ~Allocator() = default;
+    virtual Span<u8> DoCommand(AllocatorCommandUnion const& command) = 0;
 
     Span<u8> Allocate(AllocateCommand const& command) { return DoCommand(command); }
     void Free(Span<u8> data) { DoCommand(FreeCommand {.allocation = data}); }
@@ -225,8 +226,6 @@ struct Allocator {
             d.~Type();
         Free(data.ToByteSpan());
     }
-
-    virtual Span<u8> DoCommand(AllocatorCommandUnion const& command) = 0;
 
     Span<u8> ResizeUsingNewAllocation(ResizeCommand const& cmd, usize alignment) {
         auto new_allocation = Allocate({

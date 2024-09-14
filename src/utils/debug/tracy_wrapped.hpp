@@ -3,6 +3,8 @@
 
 #pragma once
 
+// A wrapper around Tracy headers so we can ignore warnings from them.
+
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wconversion"
 #pragma clang diagnostic ignored "-Wunused-parameter"

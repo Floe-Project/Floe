@@ -11,4 +11,4 @@ SPDX-License-Identifier: GPL-3.0-or-later
 - `windows_installer`: custom win32 installer
 - `gen_docs_tool`: tiny cli util to generate things for the docs
 - `common_infrastructure`: floe-specific infrastructure
-- `library_packager`: tool to package up a library for distribution
+- `packager`: tool to package up libraries/presets for distribution

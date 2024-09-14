@@ -1717,22 +1717,22 @@ pub fn build(b: *std.Build) void {
         }
 
         {
-            var library_packager = b.addExecutable(.{
-                .name = "library_packager",
+            var packager = b.addExecutable(.{
+                .name = "packager",
                 .target = target,
                 .optimize = build_context.optimise,
             });
-            const library_packager_path = "src/library_packager";
-            library_packager.addCSourceFiles(.{ .files = &.{
-                library_packager_path ++ "/library_packager.cpp",
+            const packager_path = "src/packager_tool";
+            packager.addCSourceFiles(.{ .files = &.{
+                packager_path ++ "/packager.cpp",
             }, .flags = cpp_fp_flags });
-            library_packager.linkLibrary(common_infrastructure);
-            library_packager.addIncludePath(b.path("src"));
-            library_packager.addConfigHeader(build_config_step);
-            library_packager.linkLibrary(miniz);
-            join_compile_commands.step.dependOn(&library_packager.step);
-            applyUniversalSettings(&build_context, library_packager);
-            b.getInstallStep().dependOn(&b.addInstallArtifact(library_packager, .{ .dest_dir = install_subfolder }).step);
+            packager.linkLibrary(common_infrastructure);
+            packager.addIncludePath(b.path("src"));
+            packager.addConfigHeader(build_config_step);
+            packager.linkLibrary(miniz);
+            join_compile_commands.step.dependOn(&packager.step);
+            applyUniversalSettings(&build_context, packager);
+            b.getInstallStep().dependOn(&b.addInstallArtifact(packager, .{ .dest_dir = install_subfolder }).step);
         }
 
         var clap_post_install_step = b.allocator.create(PostInstallStep) catch @panic("OOM");

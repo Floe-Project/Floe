@@ -396,7 +396,8 @@ fetch-logos: (_fetch-external-github-repo "Floe-Project" "Floe-Logos" logos_abs_
 _try-add-core-library-to-zip zip-path:
   #!/usr/bin/env bash
   if [[ -d "{{core_library_abs_dir}}" ]]; then
-    {{native_binary_dir_abs}}/library_packager "{{core_library_abs_dir}}"
+    # TODO: either use the packager or skip including the core library in distributions
+    # {{native_binary_dir_abs}}/packager "{{core_library_abs_dir}}"
     # need to do some faffing with folders so that we only zip the library and none of the parent folders
     full_zip_path=$(realpath "{{zip-path}}")
     core_dirname=$(dirname "{{core_library_abs_dir}}")
@@ -634,7 +635,8 @@ macos-build-installer:
   
   # step 3: make a package for the core library
   if [[ -d "{{core_library_abs_dir}}" ]]; then
-    {{native_binary_dir_abs}}/library_packager "{{core_library_abs_dir}}"
+    # TODO: either use the packager or skip including the core library in distributions
+    # {{native_binary_dir_abs}}/packager "{{core_library_abs_dir}}"
     mkdir -p core_library
     pushd core_library
     install_folder="Library/Application Support/Floe/Libraries"

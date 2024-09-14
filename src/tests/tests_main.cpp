@@ -61,7 +61,6 @@ static ErrorCodeOr<void> SetLogLevel(tests::Tester& tester, Optional<String> log
 
 ErrorCodeOr<int> Main(ArgsCstr args) {
     SetThreadName("main");
-    DebugSetThreadAsMainThread();
 #ifdef TRACY_ENABLE
     ___tracy_startup_profiler();
     DEFER { ___tracy_shutdown_profiler(); };

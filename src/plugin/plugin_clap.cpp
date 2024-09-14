@@ -529,7 +529,6 @@ clap_plugin const floe_plugin {
         ZoneScopedMessage(floe.trace_config, "plugin init");
 
         if (g_num_init_plugins++ == 0) {
-            DebugSetThreadAsMainThread();
             SetThreadName("main");
             g_cross_instance_systems.Emplace();
         }

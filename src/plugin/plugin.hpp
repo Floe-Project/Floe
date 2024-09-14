@@ -99,7 +99,7 @@ inline bool IsMainThread(clap_host const& host) {
         thread_check)
         return thread_check->is_main_thread(&host);
     else
-        return IsMainThread();
+        return DebugCheckThreadName("main");
 }
 
 static constexpr char const* k_features[] = {CLAP_PLUGIN_FEATURE_INSTRUMENT,

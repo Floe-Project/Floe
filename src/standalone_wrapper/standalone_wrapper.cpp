@@ -20,7 +20,7 @@
 #include "os/misc.hpp"
 #include "utils/logger/logger.hpp"
 
-#include "plugin/plugin.hpp"
+#include "plugin/plugin/plugin.hpp"
 #include "plugin/processing_utils/audio_utils.hpp"
 
 // A very simple 'standalone' host for development purposes.

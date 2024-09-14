@@ -8,23 +8,9 @@
 
 #include "common_infrastructure/paths.hpp"
 
-//
-// Settings file format
-// ----------------------------------------------------------------------------------------------------------
-//
-// The settings file used to be JSON. When a change was made to the settings via GUI, the whole JSON file
-// would be overwritten. This meant any fields that were not understood (such as fields used by an older/newer
-// version of Floe) would be discarded. This causes issues when multiple versions of Floe try to use the
-// same file.
-//
-// To fix this backwards compatibility issue, we could use JSON like before but it is a bit more complicated
-// due to the fact that JSON can use objects and arrays. We'd need to do more advanced parsing and storing of
-// unrecognised fields and save them back out to file.
-//
-// To simplify this we can instead switch to an INI format - we don't need anything fancier. For the
-// compatibility issues, all we need to do is store any _lines_ that we don't recognise and write those back
-// as-is to the file when needed. This way any other versions of Floe will still find the fields they want.
-//
+// Settings are stored in an INI-like file format. Duplicate keys are allowed meaning there can be a list of
+// values for one key. We keep track of all the lines in the file that we don't use, so we can write them back
+// to the file and therefore avoiding issues if the file is read by another version of Floe.
 
 struct Settings {
     struct Filesystem {

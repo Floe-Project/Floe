@@ -14,6 +14,7 @@
 #include "common_infrastructure/constants.hpp"
 
 #include "build_resources/embedded_files.h"
+#include "engine/engine.hpp"
 #include "framework/gui_live_edit.hpp"
 #include "gui/framework/draw_list.hpp"
 #include "gui/framework/gui_imgui.hpp"
@@ -22,9 +23,8 @@
 #include "gui_modal_windows.hpp"
 #include "gui_widget_helpers.hpp"
 #include "image.hpp"
-#include "plugin.hpp"
-#include "plugin_instance.hpp"
-#include "sample_library_server.hpp"
+#include "plugin/plugin.hpp"
+#include "sample_lib_server/sample_library_server.hpp"
 #include "settings/settings_filesystem.hpp"
 #include "settings/settings_gui.hpp"
 #include "state/state_coding.hpp"
@@ -69,7 +69,7 @@ ImagePixelsFromLibrary(Gui* g, sample_lib::Library const& lib, LibraryImageType 
         // Back in the Mirage days, some libraries didn't embed their own images, but instead got them from a
         // shared pool. We replicate that behaviour here.
         auto mirage_compat_lib =
-            sample_lib_server::FindLibraryRetained(g->plugin.shared_data.sample_library_server,
+            sample_lib_server::FindLibraryRetained(g->shared_engine_systems.sample_library_server,
                                                    sample_lib::k_mirage_compat_library_id);
         DEFER { mirage_compat_lib.Release(); };
 
@@ -260,7 +260,7 @@ Optional<LibraryImages> LibraryImagesFromLibraryId(Gui* g, sample_lib::LibraryId
     if (library_id == k_default_background_lib_id) return LoadDefaultLibraryImagesIfNeeded(g);
 
     auto background_lib =
-        sample_lib_server::FindLibraryRetained(g->plugin.shared_data.sample_library_server, library_id);
+        sample_lib_server::FindLibraryRetained(g->shared_engine_systems.sample_library_server, library_id);
     DEFER { background_lib.Release(); };
     if (!background_lib) return k_nullopt;
 
@@ -410,7 +410,7 @@ static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
         case DialogType::SavePreset: {
             Optional<String> default_path {};
             auto& preset_scan_folders =
-                g->plugin.shared_data.settings.settings.filesystem.extra_presets_scan_folders;
+                g->shared_engine_systems.settings.settings.filesystem.extra_presets_scan_folders;
             if (preset_scan_folders.size) {
                 default_path =
                     path::Join(g->scratch_arena,
@@ -431,7 +431,7 @@ static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
                     .filters = k_filters.Items(),
                     .parent_window = g->frame_input.native_window,
                 }));
-                if (paths.size) LoadPresetFromFile(g->plugin, paths[0]);
+                if (paths.size) LoadPresetFromFile(g->engine, paths[0]);
             } else if (type == DialogType::SavePreset) {
                 auto const paths = TRY(FilesystemDialog({
                     .type = DialogArguments::Type::SaveFile,
@@ -441,7 +441,7 @@ static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
                     .filters = k_filters.Items(),
                     .parent_window = g->frame_input.native_window,
                 }));
-                if (paths.size) SaveCurrentStateToFile(g->plugin, paths[0]);
+                if (paths.size) SaveCurrentStateToFile(g->engine, paths[0]);
             } else {
                 PanicIfReached();
             }
@@ -457,15 +457,16 @@ void Gui::OpenDialog(DialogType type) {
     if (outcome.HasError()) g_log.Error(k_gui_log_module, "Failed to create dialog: {}", outcome.Error());
 }
 
-Gui::Gui(GuiFrameInput& frame_input, PluginInstance& plugin)
+Gui::Gui(GuiFrameInput& frame_input, Engine& engine)
     : frame_input(frame_input)
-    , plugin(plugin)
-    , settings(plugin.shared_data.settings)
+    , engine(engine)
+    , shared_engine_systems(engine.shared_engine_systems)
+    , settings(engine.shared_engine_systems.settings)
     , imgui(frame_input, frame_output)
     , sample_lib_server_async_channel(sample_lib_server::OpenAsyncCommsChannel(
-          plugin.shared_data.sample_library_server,
+          engine.shared_engine_systems.sample_library_server,
           {
-              .error_notifications = plugin.error_notifications,
+              .error_notifications = engine.error_notifications,
               .result_added_callback = []() {},
               .library_changed_callback =
                   [gui = this](sample_lib::LibraryIdRef library_id_ref) {
@@ -482,11 +483,12 @@ Gui::Gui(GuiFrameInput& frame_input, PluginInstance& plugin)
     layout.Reserve(2048);
 
     m_window_size_listener_id =
-        plugin.shared_data.settings.tracking.window_size_change_listeners.Add([this]() {
-            auto const& host = this->plugin.host;
+        engine.shared_engine_systems.settings.tracking.window_size_change_listeners.Add([this]() {
+            auto const& host = this->engine.host;
             auto const host_gui = (clap_host_gui const*)host.get_extension(&host, CLAP_EXT_GUI);
             if (host_gui) {
-                auto const size = gui_settings::WindowSize(this->plugin.shared_data.settings.settings.gui);
+                auto const size =
+                    gui_settings::WindowSize(this->engine.shared_engine_systems.settings.settings.gui);
                 host_gui->resize_hints_changed(&host);
                 host_gui->request_resize(&host, size.width, size.height);
             }
@@ -495,16 +497,17 @@ Gui::Gui(GuiFrameInput& frame_input, PluginInstance& plugin)
 
 Gui::~Gui() {
     ShutdownInstallPackagesModal(install_packages_state);
-    sample_lib_server::CloseAsyncCommsChannel(plugin.shared_data.sample_library_server,
+    sample_lib_server::CloseAsyncCommsChannel(engine.shared_engine_systems.sample_library_server,
                                               sample_lib_server_async_channel);
     g_log_file.Trace(k_gui_log_module);
     if (midi_keyboard_note_held_with_mouse) {
-        plugin.processor.events_for_audio_thread.Push(
+        engine.processor.events_for_audio_thread.Push(
             GuiNoteClickReleased {.key = midi_keyboard_note_held_with_mouse.Value()});
-        plugin.host.request_process(&plugin.host);
+        engine.host.request_process(&engine.host);
     }
 
-    plugin.shared_data.settings.tracking.window_size_change_listeners.Remove(m_window_size_listener_id);
+    engine.shared_engine_systems.settings.tracking.window_size_change_listeners.Remove(
+        m_window_size_listener_id);
 }
 
 bool Tooltip(Gui* g, imgui::Id id, Rect r, char const* fmt, ...);
@@ -526,9 +529,9 @@ f32x2 GetMaxUVToMaintainAspectRatio(graphics::ImageID img, f32x2 container_size)
 static void DoStandaloneErrorGUI(Gui* g) {
     ASSERT(!PRODUCTION_BUILD);
 
-    auto& plugin = g->plugin;
+    auto& engine = g->engine;
 
-    auto const host = plugin.host;
+    auto const host = engine.host;
     auto const floe_ext = (FloeClapExtensionHost const*)host.get_extension(&host, k_floe_clap_extension_id);
     if (!floe_ext) return;
 
@@ -562,10 +565,10 @@ static void DoStandaloneErrorGUI(Gui* g) {
         if (platform->Key(ModifierKey::Shift).is_down) {
             auto gen_midi_message = [&](bool on, u7 key) {
                 if (on)
-                    plugin.processor.events_for_audio_thread.Push(
+                    engine.processor.events_for_audio_thread.Push(
                         GuiNoteClicked({.key = key, .velocity = 0.7f}));
                 else
-                    plugin.processor.events_for_audio_thread.Push(GuiNoteClickReleased({.key = key}));
+                    engine.processor.events_for_audio_thread.Push(GuiNoteClickReleased({.key = key}));
             };
 
             struct Key {
@@ -589,7 +592,7 @@ static void DoStandaloneErrorGUI(Gui* g) {
 
 static bool HasAnyErrorNotifications(Gui* g) {
     for (auto& err_notifications :
-         Array {&g->plugin.error_notifications, &g->plugin.shared_data.error_notifications}) {
+         Array {&g->engine.error_notifications, &g->shared_engine_systems.error_notifications}) {
         for (auto& error : err_notifications->items)
             if (error.TryScoped()) return true;
     }
@@ -598,7 +601,7 @@ static bool HasAnyErrorNotifications(Gui* g) {
 
 GuiFrameResult GuiUpdate(Gui* g) {
     ZoneScoped;
-    ASSERT(IsMainThread(g->plugin.host));
+    ASSERT(IsMainThread(g->engine.host));
 
     g->frame_output = {};
 
@@ -638,7 +641,7 @@ GuiFrameResult GuiUpdate(Gui* g) {
         auto r = window->unpadded_bounds;
 
         if (!settings.high_contrast_gui) {
-            auto overall_library = LibraryForOverallBackground(g->plugin);
+            auto overall_library = LibraryForOverallBackground(g->engine);
             if (overall_library) {
                 auto imgs = LibraryImagesFromLibraryId(g, *overall_library);
                 if (imgs->background) {
@@ -700,7 +703,7 @@ GuiFrameResult GuiUpdate(Gui* g) {
         imgui.EndWindow();
     }
 
-    if (!PRODUCTION_BUILD && NullTermStringsEqual(g->plugin.host.name, k_floe_standalone_host_name))
+    if (!PRODUCTION_BUILD && NullTermStringsEqual(g->engine.host.name, k_floe_standalone_host_name))
         DoStandaloneErrorGUI(g);
 
     if (HasAnyErrorNotifications(g)) OpenModalIfNotAlready(imgui, ModalWindowType::LoadError);
@@ -712,14 +715,14 @@ GuiFrameResult GuiUpdate(Gui* g) {
 
     auto outcome = WriteSettingsFileIfChanged(g->settings);
     if (outcome.HasError()) {
-        auto item = g->plugin.error_notifications.NewError();
+        auto item = g->engine.error_notifications.NewError();
         item->value = {
             .title = "Failed to save settings file"_s,
             .message = g->settings.paths.settings_write_path,
             .error_code = outcome.Error(),
             .id = U64FromChars("savesets"),
         };
-        g->plugin.error_notifications.AddOrUpdateError(item);
+        g->engine.error_notifications.AddOrUpdateError(item);
     }
 
     return g->frame_output;

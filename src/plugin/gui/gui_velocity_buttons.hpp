@@ -4,6 +4,6 @@
 #pragma once
 
 #include "framework/gui_imgui.hpp"
-#include "param_info.hpp"
+#include "infos/param_info.hpp"
 
 imgui::DrawButton* GetVelocityButtonDrawingFunction(param_values::VelocityMappingMode button_ind);

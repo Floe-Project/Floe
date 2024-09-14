@@ -7,7 +7,7 @@
 #include "gui.hpp"
 #include "gui_label_widgets.hpp"
 #include "gui_widget_helpers.hpp"
-#include "param_info.hpp"
+#include "infos/param_info.hpp"
 
 LayID LayoutParameterComponent(Gui* g,
                                LayID parent,

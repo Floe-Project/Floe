@@ -262,3 +262,5 @@ class SmoothedValueSystem {
 
     Span<rbj_filter::SmoothedCoefficients::State> m_filter_result_buffer {};
 };
+
+using FloeSmoothedValueSystem = SmoothedValueSystem<60, 0, 20>;

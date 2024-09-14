@@ -9,7 +9,7 @@
 #include "utils/json/json_reader.hpp"
 
 #include "config.h"
-#include "param_info.hpp"
+#include "infos/param_info.hpp"
 #include "settings_gui.hpp"
 #include "settings_midi.hpp"
 

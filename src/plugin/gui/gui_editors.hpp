@@ -16,20 +16,20 @@ constexpr bool k_editor_enabled = FLOE_EDITOR_ENABLED;
 
 static void DoProfileGUI(Gui* g, Rect r) {
     auto& imgui = g->imgui;
-    auto& plugin = g->plugin;
+    auto& engine = g->engine;
     auto sets = imgui::DefWindow();
     sets.flags = 0;
     imgui.BeginWindow(sets, r, "AudioDebug");
 
     EditorReset(&g->editor);
-    // NOTE: not really thread-safe to access plugin.processor
-    auto const max_ms = (f32)plugin.processor.audio_processing_context.process_block_size_max /
-                        plugin.processor.audio_processing_context.sample_rate * 1000.0f;
+    // NOTE: not really thread-safe to access engine.processor
+    auto const max_ms = (f32)engine.processor.audio_processing_context.process_block_size_max /
+                        engine.processor.audio_processing_context.sample_rate * 1000.0f;
     EditorText(&g->editor,
                fmt::Format(g->scratch_arena,
                            "FS: {} Block: {} Max MS Allowed: {.3}",
-                           plugin.processor.audio_processing_context.sample_rate,
-                           plugin.processor.audio_processing_context.process_block_size_max,
+                           engine.processor.audio_processing_context.sample_rate,
+                           engine.processor.audio_processing_context.process_block_size_max,
                            max_ms));
 
     imgui.EndWindow();
@@ -37,7 +37,7 @@ static void DoProfileGUI(Gui* g, Rect r) {
 
 static void DoAudioDebugPanel(Gui* g, Rect r) {
     auto& imgui = g->imgui;
-    auto& plugin = g->plugin;
+    auto& engine = g->engine;
     auto sets = imgui::DefWindow();
     sets.flags = 0;
     imgui.BeginWindow(sets, r, "AudioDebug");
@@ -47,13 +47,13 @@ static void DoAudioDebugPanel(Gui* g, Rect r) {
     EditorText(&g->editor,
                fmt::Format(g->scratch_arena,
                            "Voices: {}",
-                           plugin.processor.voice_pool.num_active_voices.Load(LoadMemoryOrder::Relaxed)));
+                           engine.processor.voice_pool.num_active_voices.Load(LoadMemoryOrder::Relaxed)));
     EditorText(&g->editor,
                fmt::Format(g->scratch_arena,
                            "Master Audio Processing: {}",
-                           plugin.processor.fx_need_another_frame_of_processing));
+                           engine.processor.fx_need_another_frame_of_processing));
 
-    EditorText(&g->editor, fmt::Format(g->scratch_arena, "State diff: {}", plugin.state_change_description));
+    EditorText(&g->editor, fmt::Format(g->scratch_arena, "State diff: {}", engine.state_change_description));
     imgui.EndWindow();
 }
 

@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #pragma once
+#include "engine/engine.hpp"
 #include "gui_widget_compounds.hpp"
 #include "layout.hpp"
-#include "plugin_instance.hpp"
 
 struct Gui;
-struct PluginInstance;
+struct Engine;
 
 namespace layer_gui {
 
@@ -110,11 +110,6 @@ void Layout(Gui* g,
             f32 width,
             f32 height);
 
-void Draw(Gui* g,
-          PluginInstance* a,
-          Rect r,
-          LayerProcessor* layer,
-          LayerLayoutTempIDs& ids,
-          LayerLayout* layer_gui);
+void Draw(Gui* g, Engine* a, Rect r, LayerProcessor* layer, LayerLayoutTempIDs& ids, LayerLayout* layer_gui);
 
 } // namespace layer_gui

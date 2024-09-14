@@ -1328,7 +1328,6 @@ pub fn build(b: *std.Build) void {
 
             const generic_source_files = .{
                 library_path ++ "/utils/debug/debug.cpp",
-                library_path ++ "/utils/directory_listing/directory_listing.cpp",
                 library_path ++ "/utils/leak_detecting_allocator.cpp",
                 library_path ++ "/tests/framework.cpp",
                 library_path ++ "/utils/logger/logger.cpp",
@@ -1610,24 +1609,12 @@ pub fn build(b: *std.Build) void {
 
             plugin.addCSourceFiles(.{
                 .files = &(.{
-                    plugin_path ++ "/cross_instance_systems.cpp",
-                    plugin_path ++ "/param_info.cpp",
-                    plugin_path ++ "/plugin_clap.cpp",
-                    plugin_path ++ "/plugin_instance.cpp",
-                    plugin_path ++ "/presets_folder.cpp",
-                    plugin_path ++ "/processing_engine/layer_processor.cpp",
-                    plugin_path ++ "/processing_engine/processor.cpp",
-                    plugin_path ++ "/processing_engine/voices.cpp",
-                    plugin_path ++ "/processing_utils/audio_utils.cpp",
-                    plugin_path ++ "/processing_utils/midi.cpp",
-                    plugin_path ++ "/processing_utils/volume_fade.cpp",
-                    plugin_path ++ "/sample_library_server.cpp",
-                    plugin_path ++ "/scanned_folder.cpp",
-                    plugin_path ++ "/settings/settings_file.cpp",
-
-                    plugin_path ++ "/state/state_coding.cpp",
+                    plugin_path ++ "/engine/engine.cpp",
+                    plugin_path ++ "/engine/shared_engine_systems.cpp",
                     plugin_path ++ "/gui/framework/draw_list.cpp",
+                    plugin_path ++ "/gui/framework/draw_list_opengl.cpp",
                     plugin_path ++ "/gui/framework/gui_imgui.cpp",
+                    plugin_path ++ "/gui/framework/gui_platform.cpp",
                     plugin_path ++ "/gui/framework/gui_platform_native_helpers.cpp",
                     plugin_path ++ "/gui/gui.cpp",
                     plugin_path ++ "/gui/gui_bot_panel.cpp",
@@ -1642,16 +1629,29 @@ pub fn build(b: *std.Build) void {
                     plugin_path ++ "/gui/gui_label_widgets.cpp",
                     plugin_path ++ "/gui/gui_layer.cpp",
                     plugin_path ++ "/gui/gui_mid_panel.cpp",
+                    plugin_path ++ "/gui/gui_modal_windows.cpp",
                     plugin_path ++ "/gui/gui_peak_meter_widget.cpp",
                     plugin_path ++ "/gui/gui_preset_browser.cpp",
-                    plugin_path ++ "/gui/gui_modal_windows.cpp",
                     plugin_path ++ "/gui/gui_top_panel.cpp",
                     plugin_path ++ "/gui/gui_velocity_buttons.cpp",
                     plugin_path ++ "/gui/gui_waveform.cpp",
                     plugin_path ++ "/gui/gui_widget_compounds.cpp",
                     plugin_path ++ "/gui/gui_widget_helpers.cpp",
                     plugin_path ++ "/gui/gui_window.cpp",
-                    plugin_path ++ "/gui/framework/draw_list_opengl.cpp",
+                    plugin_path ++ "/infos/param_info.cpp",
+                    plugin_path ++ "/plugin/plugin.cpp",
+                    plugin_path ++ "/presets/directory_listing.cpp",
+                    plugin_path ++ "/presets/presets_folder.cpp",
+                    plugin_path ++ "/presets/scanned_folder.cpp",
+                    plugin_path ++ "/processing_utils/audio_utils.cpp",
+                    plugin_path ++ "/processing_utils/midi.cpp",
+                    plugin_path ++ "/processing_utils/volume_fade.cpp",
+                    plugin_path ++ "/processor/layer_processor.cpp",
+                    plugin_path ++ "/processor/processor.cpp",
+                    plugin_path ++ "/processor/voices.cpp",
+                    plugin_path ++ "/sample_lib_server/sample_library_server.cpp",
+                    plugin_path ++ "/settings/settings_file.cpp",
+                    plugin_path ++ "/state/state_coding.cpp",
                 }),
                 .flags = cpp_fp_flags,
             });
@@ -1744,7 +1744,7 @@ pub fn build(b: *std.Build) void {
                 .version = floe_version,
                 .pic = true,
             });
-            clap.addCSourceFiles(.{ .files = &.{"src/plugin/plugin_clap_entry.cpp"}, .flags = cpp_fp_flags });
+            clap.addCSourceFiles(.{ .files = &.{"src/plugin/plugin/plugin_entry.cpp"}, .flags = cpp_fp_flags });
             clap.addConfigHeader(build_config_step);
             clap.addIncludePath(b.path("src"));
             clap.linkLibrary(plugin);
@@ -1881,7 +1881,7 @@ pub fn build(b: *std.Build) void {
             floe_standalone.addCSourceFiles(.{
                 .files = &.{
                     "src/standalone_wrapper/standalone_wrapper.cpp",
-                    "src/plugin/plugin_clap_entry.cpp",
+                    "src/plugin/plugin/plugin_entry.cpp",
                 },
                 .flags = cpp_fp_flags,
             });
@@ -2122,7 +2122,7 @@ pub fn build(b: *std.Build) void {
             const flags = cppFlags(b, generic_flags, extra_flags.items) catch unreachable;
 
             vst3.addCSourceFiles(.{ .files = &.{
-                "src/plugin/plugin_clap_entry.cpp",
+                "src/plugin/plugin/plugin_entry.cpp",
             }, .flags = cpp_fp_flags });
 
             const wrapper_src_path = build_context.dep_clap_wrapper.path("src");
@@ -2283,7 +2283,7 @@ pub fn build(b: *std.Build) void {
                 flags.appendSlice(generic_flags) catch unreachable;
 
                 au.addCSourceFiles(.{ .files = &.{
-                    "src/plugin/plugin_clap_entry.cpp",
+                    "src/plugin/plugin/plugin_entry.cpp",
                 }, .flags = cpp_fp_flags });
 
                 const wrapper_src_path = build_context.dep_clap_wrapper.path("src");

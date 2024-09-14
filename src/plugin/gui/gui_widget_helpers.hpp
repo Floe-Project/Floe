@@ -4,7 +4,7 @@
 #pragma once
 #include "framework/gui_imgui.hpp"
 #include "gui_button_widgets.hpp"
-#include "param.hpp"
+#include "processor/param.hpp"
 
 struct Gui;
 

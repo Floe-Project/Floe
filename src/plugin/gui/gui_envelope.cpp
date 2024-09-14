@@ -17,7 +17,7 @@ void GUIDoEnvelope(Gui* g,
                    GuiEnvelopeType type) {
     ASSERT(adsr_layer_params.size == 4);
     auto& imgui = g->imgui;
-    auto& plugin = g->plugin;
+    auto& engine = g->engine;
 
     auto const max_attack_percent = 0.31f;
     auto const max_decay_percent = 0.31f;
@@ -67,7 +67,7 @@ void GUIDoEnvelope(Gui* g,
 
     {
         auto attack_param_id = ParamIndexFromLayerParamIndex(layer->index, adsr_layer_params[0]);
-        auto& attack_param = plugin.processor.params[ToInt(attack_param_id)];
+        auto& attack_param = engine.processor.params[ToInt(attack_param_id)];
         auto norm_attack_val = attack_param.LinearValue();
 
         auto const get_x_coord_at_percent = [&](f32 percent) {
@@ -103,10 +103,10 @@ void GUIDoEnvelope(Gui* g,
         }
 
         if (imgui.WasJustActivated(attack_imgui_id))
-            ParameterJustStartedMoving(plugin.processor, attack_param_id);
-        if (changed) SetParameterValue(plugin.processor, attack_param_id, new_value, {});
+            ParameterJustStartedMoving(engine.processor, attack_param_id);
+        if (changed) SetParameterValue(engine.processor, attack_param_id, new_value, {});
         if (imgui.WasJustDeactivated(attack_imgui_id))
-            ParameterJustStoppedMoving(plugin.processor, attack_param_id);
+            ParameterJustStoppedMoving(engine.processor, attack_param_id);
 
         ParameterValuePopup(g, attack_param, attack_imgui_id, grabber_unregistered);
         DoParameterTooltipIfNeeded(g, attack_param, attack_imgui_id, grabber_unregistered);
@@ -115,8 +115,8 @@ void GUIDoEnvelope(Gui* g,
     {
         auto decay_id = ParamIndexFromLayerParamIndex(layer->index, adsr_layer_params[1]);
         auto sustain_id = ParamIndexFromLayerParamIndex(layer->index, adsr_layer_params[2]);
-        auto& decay_param = plugin.processor.params[ToInt(decay_id)];
-        auto& sustain_param = plugin.processor.params[ToInt(sustain_id)];
+        auto& decay_param = engine.processor.params[ToInt(decay_id)];
+        auto& sustain_param = engine.processor.params[ToInt(sustain_id)];
         ParamIndex params[] = {decay_id, sustain_id};
         Parameter const* param_ptrs[] = {&decay_param, &sustain_param};
         auto const decay_norm_value = decay_param.LinearValue();
@@ -166,8 +166,8 @@ void GUIDoEnvelope(Gui* g,
         }
 
         if (imgui.WasJustActivated(dec_sus_imgui_id)) {
-            ParameterJustStartedMoving(plugin.processor, decay_id);
-            ParameterJustStartedMoving(plugin.processor, sustain_id);
+            ParameterJustStartedMoving(engine.processor, decay_id);
+            ParameterJustStartedMoving(engine.processor, sustain_id);
         }
         if (imgui.IsActive(dec_sus_imgui_id)) {
             {
@@ -178,7 +178,7 @@ void GUIDoEnvelope(Gui* g,
                 curr_pos = Clamp(curr_pos, min_pixels_pos, max_pixels_pos);
                 auto const curr_pos_percent = MapTo01(curr_pos, min_pixels_pos, max_pixels_pos);
 
-                SetParameterValue(plugin.processor, decay_id, curr_pos_percent, {});
+                SetParameterValue(engine.processor, decay_id, curr_pos_percent, {});
             }
             {
                 auto const min_pixels_pos = imgui.WindowPosToScreenPos({0, get_y_coord_at_percent(0)}).y;
@@ -188,13 +188,13 @@ void GUIDoEnvelope(Gui* g,
                 curr_pos = Clamp(curr_pos, min_pixels_pos, max_pixels_pos);
                 auto const curr_pos_percent = MapTo01(curr_pos, min_pixels_pos, max_pixels_pos);
 
-                SetParameterValue(plugin.processor, sustain_id, 1 - curr_pos_percent, {});
+                SetParameterValue(engine.processor, sustain_id, 1 - curr_pos_percent, {});
             }
         }
 
         if (imgui.WasJustDeactivated(dec_sus_imgui_id)) {
-            ParameterJustStoppedMoving(plugin.processor, decay_id);
-            ParameterJustStoppedMoving(plugin.processor, sustain_id);
+            ParameterJustStoppedMoving(engine.processor, decay_id);
+            ParameterJustStoppedMoving(engine.processor, sustain_id);
         }
 
         ParameterValuePopup(g, param_ptrs, dec_sus_imgui_id, grabber_unregistered);
@@ -203,7 +203,7 @@ void GUIDoEnvelope(Gui* g,
 
     {
         auto release_param_id = ParamIndexFromLayerParamIndex(layer->index, adsr_layer_params[3]);
-        auto& release_param = plugin.processor.params[ToInt(release_param_id)];
+        auto& release_param = engine.processor.params[ToInt(release_param_id)];
         auto const release_norm_value = release_param.LinearValue();
 
         auto const get_x_coord_at_percent = [&](f32 percent) {
@@ -244,11 +244,11 @@ void GUIDoEnvelope(Gui* g,
         }
 
         if (imgui.WasJustActivated(release_imgui_id))
-            ParameterJustStartedMoving(plugin.processor, release_param_id);
-        if (changed) SetParameterValue(plugin.processor, release_param_id, new_value, {});
+            ParameterJustStartedMoving(engine.processor, release_param_id);
+        if (changed) SetParameterValue(engine.processor, release_param_id, new_value, {});
 
         if (imgui.WasJustDeactivated(release_imgui_id))
-            ParameterJustStoppedMoving(plugin.processor, release_param_id);
+            ParameterJustStoppedMoving(engine.processor, release_param_id);
 
         ParameterValuePopup(g, release_param, release_imgui_id, grabber_unregistered);
         DoParameterTooltipIfNeeded(g, release_param, release_imgui_id, grabber_unregistered);
@@ -301,8 +301,8 @@ void GUIDoEnvelope(Gui* g,
         imgui.graphics->AddConvexPolyFilled(area_points_b, (int)ArraySize(area_points_b), area_col, false);
 
         auto& voice_markers = type == GuiEnvelopeType::Volume
-                                  ? plugin.processor.voice_pool.voice_vol_env_markers_for_gui.Consume().data
-                                  : plugin.processor.voice_pool.voice_fil_env_markers_for_gui.Consume().data;
+                                  ? engine.processor.voice_pool.voice_vol_env_markers_for_gui.Consume().data
+                                  : engine.processor.voice_pool.voice_fil_env_markers_for_gui.Consume().data;
 
         for (auto const voice_index : ::Range(k_num_voices)) {
             auto const envelope_marker = voice_markers[voice_index];

@@ -14,8 +14,8 @@
 #include "common_infrastructure/sample_library/mdata.hpp"
 
 #include "config.h"
-#include "effect_infos.hpp"
-#include "param_info.hpp"
+#include "infos/effect_infos.hpp"
+#include "infos/param_info.hpp"
 #include "processing_utils/audio_utils.hpp"
 #include "state_snapshot.hpp"
 

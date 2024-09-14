@@ -101,7 +101,7 @@ static f32 RoundUpToNearestMultiple(f32 value, f32 multiple) { return multiple *
 void MidPanel(Gui* g) {
     auto& imgui = g->imgui;
     auto& lay = g->layout;
-    auto& plugin = g->plugin;
+    auto& engine = g->engine;
 
     auto const layer_width = RoundUpToNearestMultiple(LiveSize(imgui, UiSizeId::LayerWidth), k_num_layers);
     auto const total_layer_width = layer_width * k_num_layers;
@@ -129,7 +129,7 @@ void MidPanel(Gui* g) {
         auto settings = FloeWindowSettings(imgui, [&](IMGUI_DRAW_WINDOW_BG_ARGS) {
             auto const& r = window->bounds;
 
-            auto const overall_lib = LibraryForOverallBackground(plugin);
+            auto const overall_lib = LibraryForOverallBackground(engine);
             if (overall_lib)
                 DoBlurredBackground(g,
                                     r,
@@ -143,7 +143,7 @@ void MidPanel(Gui* g) {
             auto const layer_opacity =
                 Clamp01(LiveSize(imgui, UiSizeId::BackgroundBlurringOpacitySingleLayer) / 100.0f);
             for (auto layer_index : Range(k_num_layers)) {
-                if (auto const lib_id = g->plugin.Layer(layer_index).LibId(); lib_id) {
+                if (auto const lib_id = g->engine.Layer(layer_index).LibId(); lib_id) {
                     if (*lib_id == overall_lib) continue;
                     auto const layer_r = Rect {r.x + (f32)layer_index * layer_width_without_pad,
                                                r.y,
@@ -192,7 +192,7 @@ void MidPanel(Gui* g) {
         }
 
         // randomise button
-        if (do_randomise_button("Load random instruments for all 3 layers")) RandomiseAllLayerInsts(plugin);
+        if (do_randomise_button("Load random instruments for all 3 layers")) RandomiseAllLayerInsts(engine);
 
         // do the 3 panels
         auto const layer_width_minus_pad = imgui.Width() / 3;
@@ -200,7 +200,7 @@ void MidPanel(Gui* g) {
         for (auto const i : Range(k_num_layers)) {
             layer_gui::LayerLayoutTempIDs ids {};
             layer_gui::Layout(g,
-                              &plugin.Layer(i),
+                              &engine.Layer(i),
                               ids,
                               &g->layer_gui[i],
                               layer_width_minus_pad,
@@ -209,9 +209,9 @@ void MidPanel(Gui* g) {
 
             layer_gui::Draw(
                 g,
-                &plugin,
+                &engine,
                 {(f32)i * layer_width_minus_pad, mid_panel_title_height, layer_width_minus_pad, layer_height},
-                &plugin.Layer(i),
+                &engine.Layer(i),
                 ids,
                 &g->layer_gui[i]);
             lay.Reset();
@@ -224,7 +224,7 @@ void MidPanel(Gui* g) {
         auto settings = FloeWindowSettings(imgui, [&](IMGUI_DRAW_WINDOW_BG_ARGS) {
             auto const& r = window->bounds;
 
-            auto const overall_lib = LibraryForOverallBackground(plugin);
+            auto const overall_lib = LibraryForOverallBackground(engine);
             if (overall_lib)
                 DoBlurredBackground(g,
                                     r,
@@ -269,7 +269,7 @@ void MidPanel(Gui* g) {
 
         // randomise button
         if (do_randomise_button("Randomise all of the effects"))
-            RandomiseAllEffectParameterValues(plugin.processor);
+            RandomiseAllEffectParameterValues(engine.processor);
 
         DoEffectsWindow(g,
                         {0, mid_panel_title_height, imgui.Width(), imgui.Height() - mid_panel_title_height});

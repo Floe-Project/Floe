@@ -3,18 +3,18 @@
 
 #include <IconsFontAwesome5.h>
 
+#include "engine/engine.hpp"
 #include "framework/gui_live_edit.hpp"
 #include "gui.hpp"
 #include "gui_button_widgets.hpp"
 #include "gui_dragger_widgets.hpp"
 #include "gui_keyboard.hpp"
 #include "gui_widget_helpers.hpp"
-#include "plugin_instance.hpp"
 
 void BotPanel(Gui* g) {
     auto& imgui = g->imgui;
     auto& lay = g->layout;
-    auto& plugin = g->plugin;
+    auto& engine = g->engine;
 
     auto const slider_w = LiveSize(imgui, UiSizeId::MidiKeyboardSlider);
     auto const control_w = LiveSize(imgui, UiSizeId::MidiKeyboardControlWidth);
@@ -78,10 +78,10 @@ void BotPanel(Gui* g) {
 
     if (auto key = KeyboardGui(g, keyboard_r, settings.keyboard_octave)) {
         if (key->is_down)
-            plugin.processor.events_for_audio_thread.Push(
+            engine.processor.events_for_audio_thread.Push(
                 GuiNoteClicked {.key = key->note, .velocity = key->velocity});
         else
-            plugin.processor.events_for_audio_thread.Push(GuiNoteClickReleased {.key = key->note});
-        plugin.host.request_process(&plugin.host);
+            engine.processor.events_for_audio_thread.Push(GuiNoteClickReleased {.key = key->note});
+        engine.host.request_process(&engine.host);
     }
 }

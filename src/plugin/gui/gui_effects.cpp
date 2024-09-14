@@ -8,6 +8,7 @@
 
 #include "os/threading.hpp"
 
+#include "engine/engine.hpp"
 #include "framework/gui_live_edit.hpp"
 #include "gui.hpp"
 #include "gui/framework/colours.hpp"
@@ -17,9 +18,8 @@
 #include "gui_widget_compounds.hpp"
 #include "gui_widget_helpers.hpp"
 #include "gui_window.hpp"
-#include "param_info.hpp"
-#include "plugin_instance.hpp"
-#include "processing_engine/effect.hpp"
+#include "infos/param_info.hpp"
+#include "processor/effect.hpp"
 
 constexpr auto k_reverb_params = ComptimeParamSearch<ComptimeParamSearchOptions {
     .modules = {ParameterModule::Effect, ParameterModule::Reverb},
@@ -112,7 +112,7 @@ static void ImpulseResponseMenuItems(Gui* g) {
     auto const scratch_cursor = g->scratch_arena.TotalUsed();
     DEFER { g->scratch_arena.TryShrinkTotalUsed(scratch_cursor); };
 
-    auto libs = sample_lib_server::AllLibrariesRetained(g->plugin.shared_data.sample_library_server,
+    auto libs = sample_lib_server::AllLibrariesRetained(g->shared_engine_systems.sample_library_server,
                                                         g->scratch_arena);
     DEFER { sample_lib_server::ReleaseAll(libs); };
 
@@ -133,7 +133,7 @@ static void ImpulseResponseMenuItems(Gui* g) {
                 .ir_name = ir.key,
             };
 
-            if (g->plugin.processor.convo.ir_id == ir_id) current = (int)irs.size;
+            if (g->engine.processor.convo.ir_id == ir_id) current = (int)irs.size;
             dyn::Append(irs, fmt::Format(g->scratch_arena, "{}: {}", l->name, ir.key));
             dyn::Append(ir_ids, ir_id);
         }
@@ -141,9 +141,9 @@ static void ImpulseResponseMenuItems(Gui* g) {
 
     if (DoMultipleMenuItems(g, irs, current)) {
         if (current == 0)
-            LoadConvolutionIr(g->plugin, k_nullopt);
+            LoadConvolutionIr(g->engine, k_nullopt);
         else
-            LoadConvolutionIr(g->plugin, ir_ids[(usize)current]);
+            LoadConvolutionIr(g->engine, ir_ids[(usize)current]);
     }
 }
 
@@ -152,7 +152,7 @@ static void DoImpulseResponseMenu(Gui* g, LayID lay_id) {
 
     auto id = g->imgui.GetID("Impulse");
     auto const ir_name =
-        g->plugin.processor.convo.ir_id ? String(g->plugin.processor.convo.ir_id->ir_name) : "None"_s;
+        g->engine.processor.convo.ir_id ? String(g->engine.processor.convo.ir_id->ir_name) : "None"_s;
     if (buttons::Popup(g, id, id + 1, r, ir_name, buttons::ParameterPopupButton(g->imgui))) {
         ImpulseResponseMenuItems(g);
         g->imgui.EndWindow();
@@ -216,7 +216,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
     using enum UiSizeId;
     auto& imgui = g->imgui;
     auto& lay = g->layout;
-    auto& plugin = g->plugin;
+    auto& engine = g->engine;
 
     auto const fx_divider_margin_t = LiveSize(imgui, FXDividerMarginT);
     auto const fx_divider_margin_b = LiveSize(imgui, FXDividerMarginB);
@@ -358,30 +358,30 @@ void DoEffectsWindow(Gui* g, Rect r) {
                 inner_container = *container;
                 previous_group = info.grouping_within_module;
             }
-            LayoutParameterComponent(g, inner_container, ids[i], plugin.processor.params[ToInt(params[i])]);
+            LayoutParameterComponent(g, inner_container, ids[i], engine.processor.params[ToInt(params[i])]);
         }
     };
 
     auto ordered_effects =
-        DecodeEffectsArray(plugin.processor.desired_effects_order.Load(LoadMemoryOrder::Relaxed),
-                           plugin.processor.effects_ordered_by_type);
+        DecodeEffectsArray(engine.processor.desired_effects_order.Load(LoadMemoryOrder::Relaxed),
+                           engine.processor.effects_ordered_by_type);
 
     for (auto fx : ordered_effects) {
-        if (!EffectIsOn(plugin.processor.params, fx)) continue;
+        if (!EffectIsOn(engine.processor.params, fx)) continue;
 
         switch (fx->type) {
             case EffectType::Distortion: {
-                auto ids = create_fx_ids(plugin.processor.distortion, nullptr);
+                auto ids = create_fx_ids(engine.processor.distortion, nullptr);
                 auto param_container = create_param_container();
 
                 LayoutParameterComponent(g,
                                          param_container,
                                          ids.distortion.type,
-                                         plugin.processor.params[ToInt(ParamIndex::DistortionType)]);
+                                         engine.processor.params[ToInt(ParamIndex::DistortionType)]);
                 LayoutParameterComponent(g,
                                          param_container,
                                          ids.distortion.amount,
-                                         plugin.processor.params[ToInt(ParamIndex::DistortionDrive)]);
+                                         engine.processor.params[ToInt(ParamIndex::DistortionDrive)]);
 
                 ids.divider = create_divider_id();
                 dyn::Append(effects, ids);
@@ -389,28 +389,28 @@ void DoEffectsWindow(Gui* g, Rect r) {
             }
 
             case EffectType::BitCrush: {
-                auto ids = create_fx_ids(plugin.processor.bit_crush, nullptr);
+                auto ids = create_fx_ids(engine.processor.bit_crush, nullptr);
                 auto param_container = create_param_container();
 
                 LayoutParameterComponent(g,
                                          param_container,
                                          ids.bit_crush.bits,
-                                         plugin.processor.params[ToInt(ParamIndex::BitCrushBits)]);
+                                         engine.processor.params[ToInt(ParamIndex::BitCrushBits)]);
 
                 LayoutParameterComponent(g,
                                          param_container,
                                          ids.bit_crush.sample_rate,
-                                         plugin.processor.params[ToInt(ParamIndex::BitCrushBitRate)]);
+                                         engine.processor.params[ToInt(ParamIndex::BitCrushBitRate)]);
 
                 auto mix_container = create_subcontainer(param_container);
                 LayoutParameterComponent(g,
                                          mix_container,
                                          ids.bit_crush.wet,
-                                         plugin.processor.params[ToInt(ParamIndex::BitCrushWet)]);
+                                         engine.processor.params[ToInt(ParamIndex::BitCrushWet)]);
                 LayoutParameterComponent(g,
                                          mix_container,
                                          ids.bit_crush.dry,
-                                         plugin.processor.params[ToInt(ParamIndex::BitCrushDry)]);
+                                         engine.processor.params[ToInt(ParamIndex::BitCrushDry)]);
 
                 ids.divider = create_divider_id();
                 dyn::Append(effects, ids);
@@ -419,7 +419,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
 
             case EffectType::Compressor: {
                 LayID heading_container;
-                auto ids = create_fx_ids(plugin.processor.compressor, &heading_container);
+                auto ids = create_fx_ids(engine.processor.compressor, &heading_container);
                 auto param_container = create_param_container();
 
                 ids.compressor.auto_gain = lay.CreateChildItem(heading_container,
@@ -430,15 +430,15 @@ void DoEffectsWindow(Gui* g, Rect r) {
                 LayoutParameterComponent(g,
                                          param_container,
                                          ids.compressor.threshold,
-                                         plugin.processor.params[ToInt(ParamIndex::CompressorThreshold)]);
+                                         engine.processor.params[ToInt(ParamIndex::CompressorThreshold)]);
                 LayoutParameterComponent(g,
                                          param_container,
                                          ids.compressor.ratio,
-                                         plugin.processor.params[ToInt(ParamIndex::CompressorRatio)]);
+                                         engine.processor.params[ToInt(ParamIndex::CompressorRatio)]);
                 LayoutParameterComponent(g,
                                          param_container,
                                          ids.compressor.gain,
-                                         plugin.processor.params[ToInt(ParamIndex::CompressorGain)]);
+                                         engine.processor.params[ToInt(ParamIndex::CompressorGain)]);
 
                 ids.divider = create_divider_id();
                 dyn::Append(effects, ids);
@@ -446,28 +446,28 @@ void DoEffectsWindow(Gui* g, Rect r) {
             }
 
             case EffectType::FilterEffect: {
-                auto ids = create_fx_ids(plugin.processor.filter_effect, nullptr);
+                auto ids = create_fx_ids(engine.processor.filter_effect, nullptr);
                 auto param_container = create_param_container();
 
                 LayoutParameterComponent(g,
                                          param_container,
                                          ids.filter.type,
-                                         plugin.processor.params[ToInt(ParamIndex::FilterType)]);
+                                         engine.processor.params[ToInt(ParamIndex::FilterType)]);
                 LayoutParameterComponent(g,
                                          param_container,
                                          ids.filter.cutoff,
-                                         plugin.processor.params[ToInt(ParamIndex::FilterCutoff)]);
+                                         engine.processor.params[ToInt(ParamIndex::FilterCutoff)]);
                 LayoutParameterComponent(g,
                                          param_container,
                                          ids.filter.reso,
-                                         plugin.processor.params[ToInt(ParamIndex::FilterResonance)]);
+                                         engine.processor.params[ToInt(ParamIndex::FilterResonance)]);
                 ids.filter.using_gain =
-                    plugin.processor.filter_effect.IsUsingGainParam(plugin.processor.params);
+                    engine.processor.filter_effect.IsUsingGainParam(engine.processor.params);
                 if (ids.filter.using_gain) {
                     LayoutParameterComponent(g,
                                              param_container,
                                              ids.filter.gain,
-                                             plugin.processor.params[ToInt(ParamIndex::FilterGain)]);
+                                             engine.processor.params[ToInt(ParamIndex::FilterGain)]);
                 }
 
                 ids.divider = create_divider_id();
@@ -476,13 +476,13 @@ void DoEffectsWindow(Gui* g, Rect r) {
             }
 
             case EffectType::StereoWiden: {
-                auto ids = create_fx_ids(plugin.processor.stereo_widen, nullptr);
+                auto ids = create_fx_ids(engine.processor.stereo_widen, nullptr);
                 auto param_container = create_param_container();
 
                 LayoutParameterComponent(g,
                                          param_container,
                                          ids.stereo.width,
-                                         plugin.processor.params[ToInt(ParamIndex::StereoWidenWidth)]);
+                                         engine.processor.params[ToInt(ParamIndex::StereoWidenWidth)]);
 
                 ids.divider = create_divider_id();
                 dyn::Append(effects, ids);
@@ -490,31 +490,31 @@ void DoEffectsWindow(Gui* g, Rect r) {
             }
 
             case EffectType::Chorus: {
-                auto ids = create_fx_ids(plugin.processor.chorus, nullptr);
+                auto ids = create_fx_ids(engine.processor.chorus, nullptr);
                 auto param_container = create_param_container();
 
                 LayoutParameterComponent(g,
                                          param_container,
                                          ids.chorus.rate,
-                                         plugin.processor.params[ToInt(ParamIndex::ChorusRate)]);
+                                         engine.processor.params[ToInt(ParamIndex::ChorusRate)]);
                 LayoutParameterComponent(g,
                                          param_container,
                                          ids.chorus.highpass,
-                                         plugin.processor.params[ToInt(ParamIndex::ChorusHighpass)]);
+                                         engine.processor.params[ToInt(ParamIndex::ChorusHighpass)]);
                 LayoutParameterComponent(g,
                                          param_container,
                                          ids.chorus.depth,
-                                         plugin.processor.params[ToInt(ParamIndex::ChorusDepth)]);
+                                         engine.processor.params[ToInt(ParamIndex::ChorusDepth)]);
 
                 auto mix_container = create_subcontainer(param_container);
                 LayoutParameterComponent(g,
                                          mix_container,
                                          ids.chorus.wet,
-                                         plugin.processor.params[ToInt(ParamIndex::ChorusWet)]);
+                                         engine.processor.params[ToInt(ParamIndex::ChorusWet)]);
                 LayoutParameterComponent(g,
                                          mix_container,
                                          ids.chorus.dry,
-                                         plugin.processor.params[ToInt(ParamIndex::ChorusDry)]);
+                                         engine.processor.params[ToInt(ParamIndex::ChorusDry)]);
 
                 ids.divider = create_divider_id();
                 dyn::Append(effects, ids);
@@ -522,7 +522,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
             }
 
             case EffectType::Reverb: {
-                auto ids = create_fx_ids(plugin.processor.reverb, nullptr);
+                auto ids = create_fx_ids(engine.processor.reverb, nullptr);
 
                 layout_all(ids.reverb.ids, k_reverb_params);
 
@@ -532,7 +532,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
             }
 
             case EffectType::Phaser: {
-                auto ids = create_fx_ids(plugin.processor.phaser, nullptr);
+                auto ids = create_fx_ids(engine.processor.phaser, nullptr);
 
                 layout_all(ids.phaser.ids, k_phaser_params);
 
@@ -543,7 +543,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
 
             case EffectType::Delay: {
                 LayID heading_container;
-                auto ids = create_fx_ids(plugin.processor.delay, &heading_container);
+                auto ids = create_fx_ids(engine.processor.delay, &heading_container);
                 auto param_container = create_param_container();
 
                 ids.delay.sync_btn = lay.CreateChildItem(heading_container,
@@ -551,11 +551,11 @@ void DoEffectsWindow(Gui* g, Rect r) {
                                                          fx_param_button_height,
                                                          0);
 
-                auto left = &plugin.processor.params[ToInt(ParamIndex::DelayTimeSyncedL)];
-                auto right = &plugin.processor.params[ToInt(ParamIndex::DelayTimeSyncedR)];
-                if (!plugin.processor.params[ToInt(ParamIndex::DelayTimeSyncSwitch)].ValueAsBool()) {
-                    left = &plugin.processor.params[ToInt(ParamIndex::DelayTimeLMs)];
-                    right = &plugin.processor.params[ToInt(ParamIndex::DelayTimeRMs)];
+                auto left = &engine.processor.params[ToInt(ParamIndex::DelayTimeSyncedL)];
+                auto right = &engine.processor.params[ToInt(ParamIndex::DelayTimeSyncedR)];
+                if (!engine.processor.params[ToInt(ParamIndex::DelayTimeSyncSwitch)].ValueAsBool()) {
+                    left = &engine.processor.params[ToInt(ParamIndex::DelayTimeLMs)];
+                    right = &engine.processor.params[ToInt(ParamIndex::DelayTimeRMs)];
                 }
                 LayoutParameterComponent(g, param_container, ids.delay.left, *left, k_nullopt, false, true);
                 LayoutParameterComponent(g, param_container, ids.delay.right, *right, k_nullopt, false, true);
@@ -563,29 +563,29 @@ void DoEffectsWindow(Gui* g, Rect r) {
                     LayoutParameterComponent(g,
                                              param_container,
                                              ids.delay.feedback,
-                                             plugin.processor.params[ToInt(ParamIndex::DelayFeedback)]);
+                                             engine.processor.params[ToInt(ParamIndex::DelayFeedback)]);
                 }
                 {
                     auto const id =
                         LayoutParameterComponent(g,
                                                  param_container,
                                                  ids.delay.mode,
-                                                 plugin.processor.params[ToInt(ParamIndex::DelayMode)]);
+                                                 engine.processor.params[ToInt(ParamIndex::DelayMode)]);
                     lay_set_behave(&lay.ctx, id, LAY_BREAK);
                 }
                 LayoutParameterComponent(
                     g,
                     param_container,
                     ids.delay.filter_cutoff,
-                    plugin.processor.params[ToInt(ParamIndex::DelayFilterCutoffSemitones)]);
+                    engine.processor.params[ToInt(ParamIndex::DelayFilterCutoffSemitones)]);
                 LayoutParameterComponent(g,
                                          param_container,
                                          ids.delay.filter_spread,
-                                         plugin.processor.params[ToInt(ParamIndex::DelayFilterSpread)]);
+                                         engine.processor.params[ToInt(ParamIndex::DelayFilterSpread)]);
                 LayoutParameterComponent(g,
                                          param_container,
                                          ids.delay.mix,
-                                         plugin.processor.params[ToInt(ParamIndex::DelayMix)]);
+                                         engine.processor.params[ToInt(ParamIndex::DelayMix)]);
 
                 ids.divider = create_divider_id();
                 dyn::Append(effects, ids);
@@ -593,7 +593,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
             }
 
             case EffectType::ConvolutionReverb: {
-                auto ids = create_fx_ids(plugin.processor.convo, nullptr);
+                auto ids = create_fx_ids(engine.processor.convo, nullptr);
                 auto param_container = create_param_container();
 
                 LayoutParameterComponent(g,
@@ -608,17 +608,17 @@ void DoEffectsWindow(Gui* g, Rect r) {
                     g,
                     param_container,
                     ids.convo.highpass,
-                    plugin.processor.params[ToInt(ParamIndex::ConvolutionReverbHighpass)]);
+                    engine.processor.params[ToInt(ParamIndex::ConvolutionReverbHighpass)]);
 
                 auto mix_container = create_subcontainer(param_container);
                 LayoutParameterComponent(g,
                                          mix_container,
                                          ids.convo.wet,
-                                         plugin.processor.params[ToInt(ParamIndex::ConvolutionReverbWet)]);
+                                         engine.processor.params[ToInt(ParamIndex::ConvolutionReverbWet)]);
                 LayoutParameterComponent(g,
                                          mix_container,
                                          ids.convo.dry,
-                                         plugin.processor.params[ToInt(ParamIndex::ConvolutionReverbDry)]);
+                                         engine.processor.params[ToInt(ParamIndex::ConvolutionReverbDry)]);
 
                 ids.divider = create_divider_id();
                 dyn::Append(effects, ids);
@@ -681,7 +681,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
     auto const do_all_ids = [&](Span<LayIDPair> ids, Span<ParamIndex const> params, FXColours cols) {
         for (auto const i : Range(ids.size))
             KnobAndLabel(g,
-                         plugin.processor.params[ToInt(params[i])],
+                         engine.processor.params[ToInt(params[i])],
                          ids[i],
                          knobs::DefaultKnob(imgui, cols.highlight));
 
@@ -735,7 +735,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
                                     r,
                                     ICON_FA_TIMES,
                                     buttons::IconButton(imgui).WithIconScaling(0.7f))) {
-                    SetParameterValue(plugin.processor, k_effect_info[ToInt(fx.type)].on_param_index, 0, {});
+                    SetParameterValue(engine.processor, k_effect_info[ToInt(fx.type)].on_param_index, 0, {});
                 }
                 Tooltip(g,
                         close_id,
@@ -748,20 +748,20 @@ void DoEffectsWindow(Gui* g, Rect r) {
             case EffectType::Distortion: {
                 auto const cols = GetFxCols(imgui, ids.type);
 
-                do_heading(plugin.processor.distortion, cols.back);
+                do_heading(engine.processor.distortion, cols.back);
                 auto& d = ids.distortion;
 
                 buttons::PopupWithItems(g,
-                                        plugin.processor.params[ToInt(ParamIndex::DistortionType)],
+                                        engine.processor.params[ToInt(ParamIndex::DistortionType)],
                                         d.type.control,
                                         buttons::ParameterPopupButton(imgui));
                 labels::Label(g,
-                              plugin.processor.params[ToInt(ParamIndex::DistortionType)],
+                              engine.processor.params[ToInt(ParamIndex::DistortionType)],
                               d.type.label,
                               labels::ParameterCentred(imgui));
 
                 KnobAndLabel(g,
-                             plugin.processor.params[ToInt(ParamIndex::DistortionDrive)],
+                             engine.processor.params[ToInt(ParamIndex::DistortionDrive)],
                              d.amount,
                              knobs::DefaultKnob(imgui, cols.highlight));
                 break;
@@ -769,28 +769,28 @@ void DoEffectsWindow(Gui* g, Rect r) {
             case EffectType::BitCrush: {
                 auto const cols = GetFxCols(imgui, ids.type);
 
-                do_heading(plugin.processor.bit_crush, cols.back);
+                do_heading(engine.processor.bit_crush, cols.back);
                 auto& b = ids.bit_crush;
 
                 draggers::Dragger(g,
-                                  plugin.processor.params[ToInt(ParamIndex::BitCrushBits)],
+                                  engine.processor.params[ToInt(ParamIndex::BitCrushBits)],
                                   b.bits.control,
                                   draggers::DefaultStyle(imgui));
                 labels::Label(g,
-                              plugin.processor.params[ToInt(ParamIndex::BitCrushBits)],
+                              engine.processor.params[ToInt(ParamIndex::BitCrushBits)],
                               b.bits.label,
                               labels::ParameterCentred(imgui));
 
                 KnobAndLabel(g,
-                             plugin.processor.params[ToInt(ParamIndex::BitCrushBitRate)],
+                             engine.processor.params[ToInt(ParamIndex::BitCrushBitRate)],
                              b.sample_rate,
                              knobs::DefaultKnob(imgui, cols.highlight));
                 KnobAndLabel(g,
-                             plugin.processor.params[ToInt(ParamIndex::BitCrushWet)],
+                             engine.processor.params[ToInt(ParamIndex::BitCrushWet)],
                              b.wet,
                              knobs::DefaultKnob(imgui, cols.highlight));
                 KnobAndLabel(g,
-                             plugin.processor.params[ToInt(ParamIndex::BitCrushDry)],
+                             engine.processor.params[ToInt(ParamIndex::BitCrushDry)],
                              b.dry,
                              knobs::DefaultKnob(imgui, cols.highlight));
 
@@ -800,24 +800,24 @@ void DoEffectsWindow(Gui* g, Rect r) {
             case EffectType::Compressor: {
                 auto const cols = GetFxCols(imgui, ids.type);
 
-                do_heading(plugin.processor.compressor, cols.back);
+                do_heading(engine.processor.compressor, cols.back);
                 auto& b = ids.compressor;
 
                 KnobAndLabel(g,
-                             plugin.processor.params[ToInt(ParamIndex::CompressorThreshold)],
+                             engine.processor.params[ToInt(ParamIndex::CompressorThreshold)],
                              b.threshold,
                              knobs::DefaultKnob(imgui, cols.highlight));
                 KnobAndLabel(g,
-                             plugin.processor.params[ToInt(ParamIndex::CompressorRatio)],
+                             engine.processor.params[ToInt(ParamIndex::CompressorRatio)],
                              b.ratio,
                              knobs::DefaultKnob(imgui, cols.highlight));
                 KnobAndLabel(g,
-                             plugin.processor.params[ToInt(ParamIndex::CompressorGain)],
+                             engine.processor.params[ToInt(ParamIndex::CompressorGain)],
                              b.gain,
                              knobs::BidirectionalKnob(imgui, cols.highlight));
 
                 buttons::Toggle(g,
-                                plugin.processor.params[ToInt(ParamIndex::CompressorAutoGain)],
+                                engine.processor.params[ToInt(ParamIndex::CompressorAutoGain)],
                                 b.auto_gain,
                                 buttons::ParameterToggleButton(imgui, cols.highlight));
                 break;
@@ -825,29 +825,29 @@ void DoEffectsWindow(Gui* g, Rect r) {
             case EffectType::FilterEffect: {
                 auto const cols = GetFxCols(imgui, ids.type);
 
-                do_heading(plugin.processor.filter_effect, cols.back);
+                do_heading(engine.processor.filter_effect, cols.back);
                 auto& f = ids.filter;
 
                 buttons::PopupWithItems(g,
-                                        plugin.processor.params[ToInt(ParamIndex::FilterType)],
+                                        engine.processor.params[ToInt(ParamIndex::FilterType)],
                                         f.type.control,
                                         buttons::ParameterPopupButton(imgui));
                 labels::Label(g,
-                              plugin.processor.params[ToInt(ParamIndex::FilterType)],
+                              engine.processor.params[ToInt(ParamIndex::FilterType)],
                               f.type.label,
                               labels::ParameterCentred(imgui));
 
                 KnobAndLabel(g,
-                             plugin.processor.params[ToInt(ParamIndex::FilterCutoff)],
+                             engine.processor.params[ToInt(ParamIndex::FilterCutoff)],
                              f.cutoff,
                              knobs::DefaultKnob(imgui, cols.highlight));
                 KnobAndLabel(g,
-                             plugin.processor.params[ToInt(ParamIndex::FilterResonance)],
+                             engine.processor.params[ToInt(ParamIndex::FilterResonance)],
                              f.reso,
                              knobs::DefaultKnob(imgui, cols.highlight));
                 if (f.using_gain) {
                     KnobAndLabel(g,
-                                 plugin.processor.params[ToInt(ParamIndex::FilterGain)],
+                                 engine.processor.params[ToInt(ParamIndex::FilterGain)],
                                  f.gain,
                                  knobs::DefaultKnob(imgui, cols.highlight));
                 }
@@ -856,9 +856,9 @@ void DoEffectsWindow(Gui* g, Rect r) {
             case EffectType::StereoWiden: {
                 auto const cols = GetFxCols(imgui, ids.type);
 
-                do_heading(plugin.processor.stereo_widen, cols.back);
+                do_heading(engine.processor.stereo_widen, cols.back);
                 KnobAndLabel(g,
-                             plugin.processor.params[ToInt(ParamIndex::StereoWidenWidth)],
+                             engine.processor.params[ToInt(ParamIndex::StereoWidenWidth)],
                              ids.stereo.width,
                              knobs::BidirectionalKnob(imgui, cols.highlight));
                 break;
@@ -866,25 +866,25 @@ void DoEffectsWindow(Gui* g, Rect r) {
             case EffectType::Chorus: {
                 auto const cols = GetFxCols(imgui, ids.type);
 
-                do_heading(plugin.processor.chorus, cols.back);
+                do_heading(engine.processor.chorus, cols.back);
                 KnobAndLabel(g,
-                             plugin.processor.params[ToInt(ParamIndex::ChorusRate)],
+                             engine.processor.params[ToInt(ParamIndex::ChorusRate)],
                              ids.chorus.rate,
                              knobs::DefaultKnob(imgui, cols.highlight));
                 KnobAndLabel(g,
-                             plugin.processor.params[ToInt(ParamIndex::ChorusDepth)],
+                             engine.processor.params[ToInt(ParamIndex::ChorusDepth)],
                              ids.chorus.depth,
                              knobs::DefaultKnob(imgui, cols.highlight));
                 KnobAndLabel(g,
-                             plugin.processor.params[ToInt(ParamIndex::ChorusHighpass)],
+                             engine.processor.params[ToInt(ParamIndex::ChorusHighpass)],
                              ids.chorus.highpass,
                              knobs::DefaultKnob(imgui, cols.highlight));
                 KnobAndLabel(g,
-                             plugin.processor.params[ToInt(ParamIndex::ChorusWet)],
+                             engine.processor.params[ToInt(ParamIndex::ChorusWet)],
                              ids.chorus.wet,
                              knobs::DefaultKnob(imgui, cols.highlight));
                 KnobAndLabel(g,
-                             plugin.processor.params[ToInt(ParamIndex::ChorusDry)],
+                             engine.processor.params[ToInt(ParamIndex::ChorusDry)],
                              ids.chorus.dry,
                              knobs::DefaultKnob(imgui, cols.highlight));
                 draw_knob_joining_line(ids.chorus.wet.control, ids.chorus.dry.control);
@@ -893,80 +893,80 @@ void DoEffectsWindow(Gui* g, Rect r) {
 
             case EffectType::Reverb: {
                 auto const cols = GetFxCols(imgui, ids.type);
-                do_heading(plugin.processor.reverb, cols.back);
+                do_heading(engine.processor.reverb, cols.back);
                 do_all_ids(ids.reverb.ids, k_reverb_params, cols);
                 break;
             }
 
             case EffectType::Phaser: {
                 auto const cols = GetFxCols(imgui, ids.type);
-                do_heading(plugin.processor.phaser, cols.back);
+                do_heading(engine.processor.phaser, cols.back);
                 do_all_ids(ids.phaser.ids, k_phaser_params, cols);
                 break;
             }
 
             case EffectType::Delay: {
                 auto const cols = GetFxCols(imgui, ids.type);
-                do_heading(plugin.processor.delay, cols.back);
+                do_heading(engine.processor.delay, cols.back);
                 auto const knob_style = knobs::DefaultKnob(imgui, cols.highlight);
 
-                if (plugin.processor.params[ToInt(ParamIndex::DelayTimeSyncSwitch)].ValueAsBool()) {
+                if (engine.processor.params[ToInt(ParamIndex::DelayTimeSyncSwitch)].ValueAsBool()) {
                     buttons::PopupWithItems(g,
-                                            plugin.processor.params[ToInt(ParamIndex::DelayTimeSyncedL)],
+                                            engine.processor.params[ToInt(ParamIndex::DelayTimeSyncedL)],
                                             ids.delay.left.control,
                                             buttons::ParameterPopupButton(imgui));
                     buttons::PopupWithItems(g,
-                                            plugin.processor.params[ToInt(ParamIndex::DelayTimeSyncedR)],
+                                            engine.processor.params[ToInt(ParamIndex::DelayTimeSyncedR)],
                                             ids.delay.right.control,
                                             buttons::ParameterPopupButton(imgui));
                     labels::Label(g,
-                                  plugin.processor.params[ToInt(ParamIndex::DelayTimeSyncedL)],
+                                  engine.processor.params[ToInt(ParamIndex::DelayTimeSyncedL)],
                                   ids.delay.left.label,
                                   labels::ParameterCentred(imgui));
                     labels::Label(g,
-                                  plugin.processor.params[ToInt(ParamIndex::DelayTimeSyncedR)],
+                                  engine.processor.params[ToInt(ParamIndex::DelayTimeSyncedR)],
                                   ids.delay.right.label,
                                   labels::ParameterCentred(imgui));
                 } else {
                     KnobAndLabel(g,
-                                 plugin.processor.params[ToInt(ParamIndex::DelayTimeLMs)],
+                                 engine.processor.params[ToInt(ParamIndex::DelayTimeLMs)],
                                  ids.delay.left,
                                  knob_style);
                     KnobAndLabel(g,
-                                 plugin.processor.params[ToInt(ParamIndex::DelayTimeRMs)],
+                                 engine.processor.params[ToInt(ParamIndex::DelayTimeRMs)],
                                  ids.delay.right,
                                  knob_style);
                 }
                 draw_knob_joining_line(ids.delay.left.control, ids.delay.right.control);
 
                 buttons::Toggle(g,
-                                plugin.processor.params[ToInt(ParamIndex::DelayTimeSyncSwitch)],
+                                engine.processor.params[ToInt(ParamIndex::DelayTimeSyncSwitch)],
                                 ids.delay.sync_btn,
                                 buttons::ParameterToggleButton(imgui, cols.highlight));
 
                 buttons::PopupWithItems(g,
-                                        plugin.processor.params[ToInt(ParamIndex::DelayMode)],
+                                        engine.processor.params[ToInt(ParamIndex::DelayMode)],
                                         ids.delay.mode.control,
                                         buttons::ParameterPopupButton(imgui));
                 labels::Label(g,
-                              plugin.processor.params[ToInt(ParamIndex::DelayMode)],
+                              engine.processor.params[ToInt(ParamIndex::DelayMode)],
                               ids.delay.mode.label,
                               labels::ParameterCentred(imgui));
 
                 KnobAndLabel(g,
-                             plugin.processor.params[ToInt(ParamIndex::DelayFeedback)],
+                             engine.processor.params[ToInt(ParamIndex::DelayFeedback)],
                              ids.delay.feedback,
                              knob_style);
                 KnobAndLabel(g,
-                             plugin.processor.params[ToInt(ParamIndex::DelayMix)],
+                             engine.processor.params[ToInt(ParamIndex::DelayMix)],
                              ids.delay.mix,
                              knob_style);
                 KnobAndLabel(g,
-                             plugin.processor.params[ToInt(ParamIndex::DelayFilterCutoffSemitones)],
+                             engine.processor.params[ToInt(ParamIndex::DelayFilterCutoffSemitones)],
                              ids.delay.filter_cutoff,
                              knob_style);
                 KnobAndLabel(g,
-                             plugin.processor.params[ToInt(ParamIndex::DelayFilterSpread)],
+                             engine.processor.params[ToInt(ParamIndex::DelayFilterSpread)],
                              ids.delay.filter_spread,
                              knob_style);
                 draw_knob_joining_line(ids.delay.filter_cutoff.control, ids.delay.filter_spread.control);
@@ -977,21 +977,21 @@ void DoEffectsWindow(Gui* g, Rect r) {
             case EffectType::ConvolutionReverb: {
                 auto const cols = GetFxCols(imgui, ids.type);
 
-                do_heading(plugin.processor.convo, cols.back);
+                do_heading(engine.processor.convo, cols.back);
 
                 DoImpulseResponseMenu(g, ids.convo.ir.control);
                 labels::Label(g, ids.convo.ir.label, "Impulse", labels::ParameterCentred(imgui));
 
                 KnobAndLabel(g,
-                             plugin.processor.params[ToInt(ParamIndex::ConvolutionReverbHighpass)],
+                             engine.processor.params[ToInt(ParamIndex::ConvolutionReverbHighpass)],
                              ids.convo.highpass,
                              knobs::DefaultKnob(imgui, cols.highlight));
                 KnobAndLabel(g,
-                             plugin.processor.params[ToInt(ParamIndex::ConvolutionReverbWet)],
+                             engine.processor.params[ToInt(ParamIndex::ConvolutionReverbWet)],
                              ids.convo.wet,
                              knobs::DefaultKnob(imgui, cols.highlight));
                 KnobAndLabel(g,
-                             plugin.processor.params[ToInt(ParamIndex::ConvolutionReverbDry)],
+                             engine.processor.params[ToInt(ParamIndex::ConvolutionReverbDry)],
                              ids.convo.dry,
                              knobs::DefaultKnob(imgui, cols.highlight));
 
@@ -1078,7 +1078,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
                 style.no_tooltips = true;
                 auto [changed, id] = buttons::Toggle(
                     g,
-                    plugin.processor.params[ToInt(k_effect_info[ToInt(fx->type)].on_param_index)],
+                    engine.processor.params[ToInt(k_effect_info[ToInt(fx->type)].on_param_index)],
                     slot_r,
                     k_effect_info[ToInt(fx->type)].name,
                     style);
@@ -1121,7 +1121,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
             buttons::FakeButton(g,
                                 btn_r,
                                 k_effect_info[ToInt(active_fx->type)].name,
-                                EffectIsOn(plugin.processor.params, active_fx),
+                                EffectIsOn(engine.processor.params, active_fx),
                                 style);
             g->frame_output.cursor_type = CursorType::AllArrows;
         }
@@ -1134,8 +1134,8 @@ void DoEffectsWindow(Gui* g, Rect r) {
     }
 
     if (effects_order_changed) {
-        plugin.processor.desired_effects_order.Store(EncodeEffectsArray(ordered_effects),
+        engine.processor.desired_effects_order.Store(EncodeEffectsArray(ordered_effects),
                                                      StoreMemoryOrder::Release);
-        plugin.processor.events_for_audio_thread.Push(EventForAudioThreadType::FxOrderChanged);
+        engine.processor.events_for_audio_thread.Push(EventForAudioThreadType::FxOrderChanged);
     }
 }

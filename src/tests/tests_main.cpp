@@ -28,6 +28,7 @@
     X(RegisterLibraryMdataTests)                                                                             \
     X(RegisterSampleLibraryLoaderTests)                                                                      \
     X(RegisterParamInfoTests)                                                                                \
+    X(RegisterDirectoryListingTests)                                                                         \
     X(RegisterSettingsFileTests)
 
 #define WINDOWS_FP_TEST_REGISTER_FUNCTIONS X(RegisterWindowsSpecificTests)

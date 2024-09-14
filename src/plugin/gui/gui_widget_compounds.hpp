@@ -8,7 +8,7 @@
 #include "framework/gui_live_edit.hpp"
 #include "gui_fwd.hpp"
 #include "gui_knob_widgets.hpp"
-#include "param_info.hpp"
+#include "infos/param_info.hpp"
 
 struct LayIDPair {
     LayID control;

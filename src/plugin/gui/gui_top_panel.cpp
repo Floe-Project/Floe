@@ -3,17 +3,17 @@
 
 #include <IconsFontAwesome5.h>
 
+#include "engine/engine.hpp"
 #include "gui_button_widgets.hpp"
 #include "gui_menu.hpp"
 #include "gui_modal_windows.hpp"
 #include "gui_peak_meter_widget.hpp"
 #include "gui_widget_compounds.hpp"
 #include "gui_widget_helpers.hpp"
-#include "plugin_instance.hpp"
-#include "presets_folder.hpp"
+#include "presets/presets_folder.hpp"
 #include "state/state_snapshot.hpp"
 
-static void PresetsWindowButton(Gui* g, PluginInstance* a, Rect r) {
+static void PresetsWindowButton(Gui* g, Engine* a, Rect r) {
     auto& imgui = g->imgui;
 
     auto button_id = imgui.GetID("PresetMenu");
@@ -32,8 +32,8 @@ static void DoSettingsMenuItems(Gui* g) {
     String const longest_string_in_menu = "Randomise All Parameters";
     PopupMenuItems top_menu(g, {&longest_string_in_menu, 1});
 
-    if (top_menu.DoButton("Reset All Parameters")) SetAllParametersToDefaultValues(g->plugin.processor);
-    if (top_menu.DoButton("Randomise All Parameters")) RandomiseAllParameterValues(g->plugin.processor);
+    if (top_menu.DoButton("Reset All Parameters")) SetAllParametersToDefaultValues(g->engine.processor);
+    if (top_menu.DoButton("Randomise All Parameters")) RandomiseAllParameterValues(g->engine.processor);
     top_menu.Divider();
 
     if (top_menu.DoSubMenuButton("Information", g->imgui.GetID("about"))) {
@@ -49,7 +49,7 @@ static void DoSettingsMenuItems(Gui* g) {
 void TopPanel(Gui* g) {
     auto& imgui = g->imgui;
     auto& lay = g->layout;
-    auto& plugin = g->plugin;
+    auto& engine = g->engine;
 
     bool const has_insts_with_dynamics = true; // TODO(1.0), get the value properly?
     auto title_font = g->mada_big;
@@ -102,19 +102,19 @@ void TopPanel(Gui* g) {
     LayoutParameterComponent(g,
                              knob_container,
                              dyn,
-                             plugin.processor.params[ToInt(ParamIndex::MasterDynamics)],
+                             engine.processor.params[ToInt(ParamIndex::MasterDynamics)],
                              UiSizeId::Top2KnobsGapX);
     LayIDPair velo;
     LayoutParameterComponent(g,
                              knob_container,
                              velo,
-                             plugin.processor.params[ToInt(ParamIndex::MasterVelocity)],
+                             engine.processor.params[ToInt(ParamIndex::MasterVelocity)],
                              UiSizeId::Top2KnobsGapX);
     LayIDPair vol;
     LayoutParameterComponent(g,
                              knob_container,
                              vol,
-                             plugin.processor.params[ToInt(ParamIndex::MasterVolume)],
+                             engine.processor.params[ToInt(ParamIndex::MasterVolume)],
                              UiSizeId::Top2KnobsGapX);
 
     auto level = lay.CreateChildItem(right_container, peak_meter_w, peak_meter_h, LAY_VCENTER);
@@ -185,7 +185,7 @@ void TopPanel(Gui* g) {
                     preset_load_criteria = PresetRandomiseCriteria {PresetRandomiseMode::All};
                     break;
                 case PresetRandomiseMode::BrowserFilters:
-                    preset_load_criteria = PresetRandomiseCriteria {plugin.preset_browser_filters};
+                    preset_load_criteria = PresetRandomiseCriteria {engine.preset_browser_filters};
                     break;
                 case PresetRandomiseMode::Folder:
                     preset_load_criteria = PresetRandomiseCriteria {PresetRandomiseMode::Folder};
@@ -224,13 +224,14 @@ void TopPanel(Gui* g) {
     }
 
     if (preset_load_criteria) {
-        LoadPresetFromListing(plugin,
-                              *preset_load_criteria,
-                              FetchOrRescanPresetsFolder(
-                                  plugin.shared_data.preset_listing,
-                                  RescanMode::RescanAsyncIfNeeded,
-                                  plugin.shared_data.settings.settings.filesystem.extra_presets_scan_folders,
-                                  &plugin.shared_data.thread_pool));
+        LoadPresetFromListing(
+            engine,
+            *preset_load_criteria,
+            FetchOrRescanPresetsFolder(
+                engine.shared_engine_systems.preset_listing,
+                RescanMode::RescanAsyncIfNeeded,
+                engine.shared_engine_systems.settings.settings.filesystem.extra_presets_scan_folders,
+                &engine.shared_engine_systems.thread_pool));
         g->preset_browser_data.scroll_to_show_current_preset = true;
     }
 
@@ -240,13 +241,13 @@ void TopPanel(Gui* g) {
         if (buttons::Popup(g, btn_id, pop_id, preset_save_r, ICON_FA_SAVE, large_icon_button_style)) {
             auto save_over_text = fmt::Format(g->scratch_arena,
                                               "Save (Overwrite \"{}\")",
-                                              g->plugin.last_snapshot.metadata.Name());
-            auto const existing_path = g->plugin.last_snapshot.metadata.Path();
+                                              g->engine.last_snapshot.metadata.Name());
+            auto const existing_path = g->engine.last_snapshot.metadata.Path();
             auto ptr = existing_path ? String(save_over_text) : "Save Preset As"_s;
 
             PopupMenuItems items(g, {&ptr, 1});
             if (existing_path) {
-                if (items.DoButton(save_over_text)) SaveCurrentStateToFile(plugin, *existing_path);
+                if (items.DoButton(save_over_text)) SaveCurrentStateToFile(engine, *existing_path);
             }
 
             if (items.DoButton("Save Preset As")) g->OpenDialog(DialogType::SavePreset);
@@ -318,25 +319,25 @@ void TopPanel(Gui* g) {
     }
 
     imgui.graphics->context->PopFont();
-    PresetsWindowButton(g, &plugin, preset_menu_r);
+    PresetsWindowButton(g, &engine, preset_menu_r);
 
     //
 
-    peak_meters::PeakMeter(g, level_r, plugin.processor.peak_meter, true);
+    peak_meters::PeakMeter(g, level_r, engine.processor.peak_meter, true);
 
-    KnobAndLabel(g, plugin.processor.params[ToInt(ParamIndex::MasterVolume)], vol, knobs::DefaultKnob(imgui));
+    KnobAndLabel(g, engine.processor.params[ToInt(ParamIndex::MasterVolume)], vol, knobs::DefaultKnob(imgui));
     KnobAndLabel(g,
-                 plugin.processor.params[ToInt(ParamIndex::MasterVelocity)],
+                 engine.processor.params[ToInt(ParamIndex::MasterVelocity)],
                  velo,
                  knobs::DefaultKnob(imgui));
 
     {
         g->dynamics_slider_is_held = false;
-        auto const id = imgui.GetID((u64)plugin.processor.params[ToInt(ParamIndex::MasterDynamics)].info.id);
+        auto const id = imgui.GetID((u64)engine.processor.params[ToInt(ParamIndex::MasterDynamics)].info.id);
         if (has_insts_with_dynamics) {
             knobs::Knob(g,
                         id,
-                        plugin.processor.params[ToInt(ParamIndex::MasterDynamics)],
+                        engine.processor.params[ToInt(ParamIndex::MasterDynamics)],
                         dyn.control,
                         knobs::DefaultKnob(imgui));
             g->dynamics_slider_is_held = imgui.IsActive(id);
@@ -356,7 +357,7 @@ void TopPanel(Gui* g) {
             if (imgui.IsHot(id)) imgui.frame_output.cursor_type = CursorType::Default;
         }
         labels::Label(g,
-                      plugin.processor.params[ToInt(ParamIndex::MasterDynamics)],
+                      engine.processor.params[ToInt(ParamIndex::MasterDynamics)],
                       dyn.label,
                       labels::ParameterCentred(imgui, !has_insts_with_dynamics));
     }

@@ -8,7 +8,7 @@
 #include "gui_velocity_buttons.hpp"
 #include "gui_widget_helpers.hpp"
 #include "gui_window.hpp"
-#include "param.hpp"
+#include "processor/param.hpp"
 
 namespace buttons {
 

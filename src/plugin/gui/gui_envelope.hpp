@@ -5,9 +5,9 @@
 #include "foundation/foundation.hpp"
 
 #include "gui_fwd.hpp"
-#include "param_info.hpp"
-#include "processing_engine/layer_processor.hpp"
+#include "infos/param_info.hpp"
 #include "processing_utils/smoothed_value.hpp"
+#include "processor/layer_processor.hpp"
 
 enum class GuiEnvelopeType { Volume, Filter, Count };
 

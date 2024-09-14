@@ -8,8 +8,8 @@
 #include "framework/draw_list.hpp"
 #include "framework/gui_imgui.hpp"
 #include "gui_fwd.hpp"
+#include "infos/param_info.hpp"
 #include "layout.hpp"
-#include "param_info.hpp"
 
 namespace buttons {
 

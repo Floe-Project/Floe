@@ -12,6 +12,7 @@
 #include "common_infrastructure/package_format.hpp"
 #include "common_infrastructure/paths.hpp"
 
+#include "engine/engine.hpp"
 #include "framework/gui_frame.hpp"
 #include "framework/gui_live_edit.hpp"
 #include "gui.hpp"
@@ -21,11 +22,10 @@
 #include "gui_label_widgets.hpp"
 #include "gui_widget_helpers.hpp"
 #include "gui_window.hpp"
-#include "plugin.hpp"
-#include "plugin_instance.hpp"
-#include "presets_folder.hpp"
-#include "processing_engine/layer_processor.hpp"
-#include "sample_library_server.hpp"
+#include "plugin/plugin.hpp"
+#include "presets/presets_folder.hpp"
+#include "processor/layer_processor.hpp"
+#include "sample_lib_server/sample_library_server.hpp"
 #include "settings/settings_file.hpp"
 #include "settings/settings_filesystem.hpp"
 #include "settings/settings_gui.hpp"
@@ -245,7 +245,7 @@ static void DoErrorsModal(Gui* g) {
         {
 
             for (auto errors :
-                 Array {&g->plugin.error_notifications, &g->plugin.shared_data.error_notifications}) {
+                 Array {&g->engine.error_notifications, &g->shared_engine_systems.error_notifications}) {
                 for (auto it = errors->items.begin(); it != errors->items.end(); ++it) {
                     auto e_ptr = it->TryRetain();
                     if (!e_ptr) continue;
@@ -318,7 +318,7 @@ static void DoErrorsModal(Gui* g) {
 }
 
 static void DoMetricsModal(Gui* g) {
-    auto a = &g->plugin;
+    auto a = &g->engine;
     g->frame_input.graphics_ctx->PushFont(g->roboto_small);
     DEFER { g->frame_input.graphics_ctx->PopFont(); };
     auto& imgui = g->imgui;
@@ -333,7 +333,7 @@ static void DoMetricsModal(Gui* g) {
         f32 y_pos = 0;
         DoHeading(g, y_pos, "Metrics");
 
-        auto& sample_library_server = g->plugin.shared_data.sample_library_server;
+        auto& sample_library_server = g->shared_engine_systems.sample_library_server;
         DoLabelLine(imgui,
                     y_pos,
                     "Number of active voices:",
@@ -403,8 +403,8 @@ static void DoLoadingOverlay(Gui* g) {
     auto const r = ModalRect(imgui, UiSizeId::LoadingOverlayBoxWidth, UiSizeId::LoadingOverlayBoxHeight);
     auto const settings = ModalWindowSettings(g->imgui);
 
-    if (g->plugin.pending_state_change ||
-        FetchOrRescanPresetsFolder(g->plugin.shared_data.preset_listing,
+    if (g->engine.pending_state_change ||
+        FetchOrRescanPresetsFolder(g->shared_engine_systems.preset_listing,
                                    RescanMode::DontRescan,
                                    g->settings.settings.filesystem.extra_presets_scan_folders,
                                    nullptr)
@@ -571,7 +571,7 @@ static void DoInstallPackagesModal(Gui* g) {
                                  })) {
                         g->install_packages_state.state = InstallPackagesState::Installing;
                         g->install_packages_state.installing_packages.Store(true, StoreMemoryOrder::Relaxed);
-                        g->plugin.shared_data.thread_pool.AddJob(
+                        g->shared_engine_systems.thread_pool.AddJob(
                             [&state = g->install_packages_state,
                              &request_update = g->frame_input.request_update]() {
                                 SleepThisThread(5000);
@@ -921,7 +921,7 @@ static void DoSettingsModal(Gui* g) {
                 "Library scan-folders",
                 "Folders that contain libraries (scanned recursively)",
                 g->settings.settings.filesystem.extra_libraries_scan_folders,
-                g->plugin.shared_data.paths.always_scanned_folder[ToInt(ScanFolderType::Libraries)]);
+                g->shared_engine_systems.paths.always_scanned_folder[ToInt(ScanFolderType::Libraries)]);
 
             if (edits.remove)
                 filesystem_settings::RemoveScanFolder(g->settings, ScanFolderType::Libraries, *edits.remove);
@@ -934,7 +934,7 @@ static void DoSettingsModal(Gui* g) {
                 "Preset scan-folders",
                 "Folders that contain presets (scanned recursively)",
                 g->settings.settings.filesystem.extra_presets_scan_folders,
-                g->plugin.shared_data.paths.always_scanned_folder[ToInt(ScanFolderType::Presets)]);
+                g->shared_engine_systems.paths.always_scanned_folder[ToInt(ScanFolderType::Presets)]);
 
             if (edits.remove)
                 filesystem_settings::RemoveScanFolder(g->settings, ScanFolderType::Presets, *edits.remove);
@@ -1036,7 +1036,7 @@ void InstallPackagesSelectFilesDialogResults(Gui* g, Span<MutableString> paths) 
 
     for (auto const path : paths)
         if (!package::IsPathPackageFile(path)) {
-            auto const err = g->plugin.error_notifications.NewError();
+            auto const err = g->engine.error_notifications.NewError();
             err->value = {
                 .title = "Not a Floe package"_s,
                 .message = String(fmt::Format(g->scratch_arena,
@@ -1045,7 +1045,7 @@ void InstallPackagesSelectFilesDialogResults(Gui* g, Span<MutableString> paths) 
                 .error_code = k_nullopt,
                 .id = ThreadsafeErrorNotifications::Id("pkg ", path),
             };
-            g->plugin.error_notifications.AddOrUpdateError(err);
+            g->engine.error_notifications.AddOrUpdateError(err);
         } else {
             g->install_packages_state.selected_package_paths.Prepend(
                 g->install_packages_state.arena.Clone(path));

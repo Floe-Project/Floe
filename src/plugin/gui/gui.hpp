@@ -4,6 +4,7 @@
 #pragma once
 #include "foundation/foundation.hpp"
 
+#include "engine/engine.hpp"
 #include "framework/draw_list.hpp"
 #include "framework/gui_imgui.hpp"
 #include "gui/gui_modal_windows.hpp"
@@ -12,13 +13,12 @@
 #include "gui_layer.hpp"
 #include "gui_preset_browser.hpp"
 #include "layout.hpp"
-#include "plugin_instance.hpp"
 #include "settings/settings_file.hpp"
 
 constexpr auto k_gui_log_module = "gui"_log_module;
 
-struct PluginInstance;
-struct FloeInstance;
+struct Engine;
+struct FloePluginInstance;
 struct GuiFrameInput;
 
 struct LibraryImages {
@@ -129,7 +129,7 @@ struct InstInfo {
 };
 
 struct Gui {
-    Gui(GuiFrameInput& frame_input, PluginInstance& plugin);
+    Gui(GuiFrameInput& frame_input, Engine& engine);
     ~Gui();
 
     void OpenDialog(DialogType type);
@@ -145,7 +145,8 @@ struct Gui {
 
     GuiFrameInput& frame_input;
     GuiFrameResult frame_output;
-    PluginInstance& plugin;
+    Engine& engine;
+    SharedEngineSystems& shared_engine_systems;
     SettingsFile& settings;
 
     Layout layout = {};
@@ -191,7 +192,7 @@ struct Gui {
 
 Optional<LibraryImages> LibraryImagesFromLibraryId(Gui* g, sample_lib::LibraryIdRef library_id);
 
-void GUIPresetLoaded(Gui* g, PluginInstance* a, bool is_first_preset);
+void GUIPresetLoaded(Gui* g, Engine* a, bool is_first_preset);
 GuiFrameResult GuiUpdate(Gui* g);
 void TopPanel(Gui* g);
 void MidPanel(Gui* g);

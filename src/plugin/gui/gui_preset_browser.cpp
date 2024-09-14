@@ -7,7 +7,6 @@
 
 #include "foundation/foundation.hpp"
 #include "os/filesystem.hpp"
-#include "utils/directory_listing/directory_listing.hpp"
 
 #include "config.h"
 #include "framework/gui_live_edit.hpp"
@@ -16,7 +15,7 @@
 #include "gui_drawing_helpers.hpp"
 #include "gui_widget_helpers.hpp"
 #include "gui_window.hpp"
-#include "presets_folder.hpp"
+#include "presets/presets_folder.hpp"
 
 PresetBrowser::PresetBrowser(Gui* g, PresetBrowserPersistentData& persistent_data, bool force_listing_fetch)
     : persistent_data(persistent_data)
@@ -24,16 +23,16 @@ PresetBrowser::PresetBrowser(Gui* g, PresetBrowserPersistentData& persistent_dat
     , g(g) {
 
     if (persistent_data.show_preset_panel || force_listing_fetch) {
-        listing = FetchOrRescanPresetsFolder(g->plugin.shared_data.preset_listing,
+        listing = FetchOrRescanPresetsFolder(g->shared_engine_systems.preset_listing,
                                              RescanMode::RescanAsyncIfNeeded,
                                              g->settings.settings.filesystem.extra_presets_scan_folders,
-                                             &g->plugin.shared_data.thread_pool);
+                                             &g->shared_engine_systems.thread_pool);
     }
     if (listing.listing) {
-        current_preset = g->plugin.last_snapshot.metadata.Path()
-                             ? listing.listing->Find(*g->plugin.last_snapshot.metadata.Path())
+        current_preset = g->engine.last_snapshot.metadata.Path()
+                             ? listing.listing->Find(*g->engine.last_snapshot.metadata.Path())
                              : nullptr;
-        selected_folder = listing.listing->Find(g->plugin.preset_browser_filters.selected_folder_hash);
+        selected_folder = listing.listing->Find(g->engine.preset_browser_filters.selected_folder_hash);
     }
 
     preset_folders_panel_width = LiveSize(imgui, UiSizeId::PresetFoldersPanelWidth);
@@ -104,7 +103,7 @@ PresetBrowser::DoPresetFolderRecurse(DirectoryListing::Entry const* f, f32& ypos
                                         ICON_FA_CHECK);
             }
 
-            bool state = f->Hash() == g->plugin.preset_browser_filters.selected_folder_hash;
+            bool state = f->Hash() == g->engine.preset_browser_filters.selected_folder_hash;
 
             DynamicArray<char> name {f->Filename(), g->scratch_arena};
             if (name == "."_s) PanicIfReached();
@@ -188,7 +187,7 @@ DirectoryListing::Entry const* PresetBrowser::DoPresetFilesRecurse(DirectoryList
         } else if (f->IsFile()) {
             if (EntryMatchesSearchFilter(*f,
                                          *listing.listing,
-                                         g->plugin.preset_browser_filters.search_filter,
+                                         g->engine.preset_browser_filters.search_filter,
                                          selected_folder)) {
                 if (first_in_folder) {
                     first_in_folder = false;
@@ -305,12 +304,12 @@ void PresetBrowser::DoAllPresetFolders() {
     if (!listing.listing) return;
     auto root = listing.listing->MasterRoot();
 
-    auto initial_folder_hash = g->plugin.preset_browser_filters.selected_folder_hash;
+    auto initial_folder_hash = g->engine.preset_browser_filters.selected_folder_hash;
 
     if (persistent_data.scroll_to_show_current_preset) {
         if (current_preset && root) {
             if (!current_preset->IsDecendentOf(selected_folder)) {
-                g->plugin.preset_browser_filters.selected_folder_hash = root->Hash();
+                g->engine.preset_browser_filters.selected_folder_hash = root->Hash();
                 selected_folder = root;
             }
         }
@@ -319,9 +318,9 @@ void PresetBrowser::DoAllPresetFolders() {
     int indent = 1;
     f32 ypos = preset_panel_xgap;
     if (auto folder_clicked_on = DoPresetFolderRecurse(root, ypos, indent); folder_clicked_on != nullptr)
-        g->plugin.preset_browser_filters.selected_folder_hash = folder_clicked_on->Hash();
+        g->engine.preset_browser_filters.selected_folder_hash = folder_clicked_on->Hash();
 
-    if (initial_folder_hash != g->plugin.preset_browser_filters.selected_folder_hash) folder_changed = true;
+    if (initial_folder_hash != g->engine.preset_browser_filters.selected_folder_hash) folder_changed = true;
 }
 
 void PresetBrowser::PopulateRowsAndCols(
@@ -335,7 +334,7 @@ void PresetBrowser::PopulateRowsAndCols(
         } else if (f->IsFile()) {
             if (EntryMatchesSearchFilter(*f,
                                          *listing.listing,
-                                         g->plugin.preset_browser_filters.search_filter,
+                                         g->engine.preset_browser_filters.search_filter,
                                          selected_folder)) {
                 int const column = count % k_preset_browser_num_columns;
 
@@ -451,12 +450,12 @@ void PresetBrowser::DoAllPresetFiles() {
 
     if (!listing.listing) return;
 
-    if (g->plugin.preset_browser_filters.selected_folder_hash == 0) {
-        g->plugin.preset_browser_filters.selected_folder_hash = listing.listing->MasterRoot()->Hash();
+    if (g->engine.preset_browser_filters.selected_folder_hash == 0) {
+        g->engine.preset_browser_filters.selected_folder_hash = listing.listing->MasterRoot()->Hash();
         selected_folder = listing.listing->MasterRoot();
     }
     auto const selected_preset_folder =
-        listing.listing->Find(g->plugin.preset_browser_filters.selected_folder_hash);
+        listing.listing->Find(g->engine.preset_browser_filters.selected_folder_hash);
 
     int count = 0;
 
@@ -478,7 +477,7 @@ void PresetBrowser::DoAllPresetFiles() {
     ypos += preset_button_height;
     imgui.GetRegisteredAndConvertedRect(GetAndIncrementRect(false, ypos, 0));
 
-    if (preset_to_load) LoadPresetFromFile(g->plugin, preset_to_load->Path());
+    if (preset_to_load) LoadPresetFromFile(g->engine, preset_to_load->Path());
 }
 
 void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
@@ -686,20 +685,20 @@ void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
                         imgui.TextInput(settings,
                                         search_r,
                                         imgui.GetID("search"),
-                                        g->plugin.preset_browser_filters.search_filter);
+                                        g->engine.preset_browser_filters.search_filter);
 
                     if (search_text_input.buffer_changed)
-                        dyn::Assign(g->plugin.preset_browser_filters.search_filter, search_text_input.text);
+                        dyn::Assign(g->engine.preset_browser_filters.search_filter, search_text_input.text);
 
                     auto const icon_r = search_r.CutLeft(search_r.w - search_r.h);
-                    if (g->plugin.preset_browser_filters.search_filter.size) {
+                    if (g->engine.preset_browser_filters.search_filter.size) {
                         auto const icon_id = imgui.GetID("clear");
                         if (buttons::Button(g,
                                             icon_id,
                                             icon_r,
                                             ICON_FA_TIMES_CIRCLE,
                                             buttons::BrowserIconButton(imgui))) {
-                            dyn::Clear(g->plugin.preset_browser_filters.search_filter);
+                            dyn::Clear(g->engine.preset_browser_filters.search_filter);
                         }
                         Tooltip(g, icon_id, icon_r, "Clear the search text"_s);
                     } else {
@@ -715,8 +714,8 @@ void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
                                         rand_r,
                                         ICON_FA_RANDOM,
                                         buttons::BrowserIconButton(imgui))) {
-                        LoadPresetFromListing(g->plugin,
-                                              PresetRandomiseCriteria {g->plugin.preset_browser_filters},
+                        LoadPresetFromListing(g->engine,
+                                              PresetRandomiseCriteria {g->engine.preset_browser_filters},
                                               listing);
                     }
                     Tooltip(g,

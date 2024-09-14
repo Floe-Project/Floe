@@ -4,9 +4,9 @@
 #pragma once
 #include "foundation/foundation.hpp"
 
-#include "effect_infos.hpp"
+#include "infos/effect_infos.hpp"
+#include "infos/param_info.hpp"
 #include "instrument.hpp"
-#include "param_info.hpp"
 
 struct StateSnapshot {
     f32& LinearParam(ParamIndex index) { return param_values[ToInt(index)]; }

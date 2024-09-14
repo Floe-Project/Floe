@@ -10,7 +10,7 @@
 #include "gui_drawing_helpers.hpp"
 #include "gui_label_widgets.hpp"
 #include "gui_window.hpp"
-#include "param_info.hpp"
+#include "infos/param_info.hpp"
 #include "settings/settings_midi.hpp"
 
 void StartFloeMenu(Gui* g) { g->imgui.graphics->context->PushFont(g->roboto_small); }
@@ -105,7 +105,7 @@ void ParameterValuePopup(Gui* g, Span<Parameter const*> params, imgui::Id id, Re
 
     bool cc_just_moved_param = false;
     for (auto param : params) {
-        if (CcControllerMovedParamRecently(g->plugin.processor, param->info.index)) {
+        if (CcControllerMovedParamRecently(g->engine.processor, param->info.index)) {
             cc_just_moved_param = true;
             break;
         }
@@ -136,7 +136,7 @@ void MidiLearnMenu(Gui* g, ParamIndex param, Rect r) { MidiLearnMenu(g, {&param,
 
 void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
     auto& imgui = g->imgui;
-    auto& plugin = g->plugin;
+    auto& engine = g->engine;
     imgui.PushID((int)params[0]);
     auto popup_id = imgui.GetID("MidiLearnPopup");
     auto right_clicker_id = imgui.GetID("MidiLearnClicker");
@@ -166,7 +166,7 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
 
         check_max_size(k_reset_text);
         check_max_size(k_set_text);
-        if (IsMidiCCLearnActive(plugin.processor))
+        if (IsMidiCCLearnActive(engine.processor))
             check_max_size(k_cancel_text);
         else
             check_max_size(k_learn_text);
@@ -174,7 +174,7 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
         auto const persistent_ccs =
             midi_settings::PersistentCcsForParam(g->settings.settings.midi, ParamIndexToId(param));
 
-        auto param_ccs = GetLearnedCCsBitsetForParam(plugin.processor, param);
+        auto param_ccs = GetLearnedCCsBitsetForParam(engine.processor, param);
         auto const num_ccs_for_param = (int)param_ccs.NumSet();
         num_items += num_ccs_for_param == 0 ? 1 : num_ccs_for_param + 2;
         for (auto const cc_num : Range(128uz)) {
@@ -216,7 +216,7 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
                               {0, pos, item_width, item_height},
                               fmt::Format(g->scratch_arena,
                                           "{}: ",
-                                          g->plugin.processor.params[ToInt(param)].info.gui_label),
+                                          g->engine.processor.params[ToInt(param)].info.gui_label),
                               labels::FakeMenuItem(imgui));
                 pos += item_height;
             }
@@ -226,9 +226,9 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
                                     {0, pos, item_width, item_height},
                                     k_reset_text,
                                     buttons::MenuItem(imgui, false))) {
-                    SetParameterValue(plugin.processor,
+                    SetParameterValue(engine.processor,
                                       param,
-                                      plugin.processor.params[ToInt(param)].DefaultLinearValue(),
+                                      engine.processor.params[ToInt(param)].DefaultLinearValue(),
                                       {});
                     imgui.ClosePopupToLevel(0);
                 }
@@ -246,12 +246,12 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
                 pos += item_height;
             }
 
-            if (IsMidiCCLearnActive(plugin.processor)) {
+            if (IsMidiCCLearnActive(engine.processor)) {
                 if (buttons::Button(g,
                                     {0, pos, item_width, item_height},
                                     k_cancel_text,
                                     buttons::MenuItem(imgui, false))) {
-                    CancelMidiCCLearn(plugin.processor);
+                    CancelMidiCCLearn(engine.processor);
                 }
                 pos += item_height;
             } else {
@@ -259,7 +259,7 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
                                     {0, pos, item_width, item_height},
                                     k_learn_text,
                                     buttons::MenuItem(imgui, false))) {
-                    LearnMidiCC(plugin.processor, param);
+                    LearnMidiCC(engine.processor, param);
                 }
                 pos += item_height;
             }
@@ -267,7 +267,7 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
             auto const persistent_ccs =
                 midi_settings::PersistentCcsForParam(g->settings.settings.midi, ParamIndexToId(param));
 
-            auto ccs_bitset = GetLearnedCCsBitsetForParam(plugin.processor, param);
+            auto ccs_bitset = GetLearnedCCsBitsetForParam(engine.processor, param);
             bool closes_popups = false;
             if (ccs_bitset.AnyValuesSet()) closes_popups = true;
             for (auto const cc_num : Range(128uz)) {
@@ -278,7 +278,7 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
                                     {0, pos, item_width, item_height},
                                     fmt::Format(g->scratch_arena, k_remove_fmt, cc_num),
                                     buttons::MenuItem(imgui, closes_popups))) {
-                    UnlearnMidiCC(plugin.processor, param, (u7)cc_num);
+                    UnlearnMidiCC(engine.processor, param, (u7)cc_num);
                 }
                 pos += item_height;
 
@@ -407,9 +407,9 @@ void EndParameterGUI(Gui* g,
                      Rect r,
                      Optional<f32> new_val,
                      ParamDisplayFlags flags) {
-    if (g->imgui.WasJustActivated(id)) ParameterJustStartedMoving(g->plugin.processor, param.info.index);
-    if (new_val) SetParameterValue(g->plugin.processor, param.info.index, *new_val, {});
-    if (g->imgui.WasJustDeactivated(id)) ParameterJustStoppedMoving(g->plugin.processor, param.info.index);
+    if (g->imgui.WasJustActivated(id)) ParameterJustStartedMoving(g->engine.processor, param.info.index);
+    if (new_val) SetParameterValue(g->engine.processor, param.info.index, *new_val, {});
+    if (g->imgui.WasJustDeactivated(id)) ParameterJustStoppedMoving(g->engine.processor, param.info.index);
 
     if (!(flags & ParamDisplayFlagsNoTooltip) && !g->imgui.TextInputHasFocus(id))
         DoParameterTooltipIfNeeded(g, param, id, r);
@@ -499,7 +499,7 @@ void HandleShowingTextEditorForParams(Gui* g, Rect r, Span<ParamIndex const> par
             if (p == *g->param_text_editor_to_open) {
                 auto const id = g->imgui.GetID("text input");
 
-                auto const& p_obj = g->plugin.processor.params[ToInt(p)];
+                auto const& p_obj = g->engine.processor.params[ToInt(p)];
                 auto const str = p_obj.info.LinearValueToString(p_obj.LinearValue());
                 ASSERT(str.HasValue());
 
@@ -508,7 +508,7 @@ void HandleShowingTextEditorForParams(Gui* g, Rect r, Span<ParamIndex const> par
 
                 if (text_input.enter_pressed || g->imgui.TextInputJustUnfocused(id)) {
                     if (auto val = p_obj.info.StringToLinearValue(text_input.text))
-                        SetParameterValue(g->plugin.processor, p, *val, {});
+                        SetParameterValue(g->engine.processor, p, *val, {});
                     g->param_text_editor_to_open.Clear();
                 }
                 break;

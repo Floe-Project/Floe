@@ -8,13 +8,15 @@
 #include <pugl/gl.h> // on windows this includes windows.h
 #include <pugl/pugl.h>
 #include <test_utils.h> // pugl - bit of a hack including it this way
+//
+#include "os/undef_windows_macros.h"
+//
 
 #include "foundation/foundation.hpp"
-#include "os/undef_windows_macros.h"
 
+#include "engine/engine.hpp"
 #include "gui/gui.hpp"
 #include "gui_frame.hpp"
-#include "plugin_instance.hpp"
 #include "settings/settings_gui.hpp"
 
 constexpr bool k_debug_gui_platform = false;
@@ -101,7 +103,7 @@ static void LogIfSlow(Stopwatch& stopwatch, String message);
 // problems if we directly include X11 headers here, so we'll do it in a separate translation unit
 int FdFromPuglWorld(PuglWorld* world);
 
-PUBLIC ErrorCodeOr<void> CreateView(GuiPlatform& platform, PluginInstance& plugin) {
+PUBLIC ErrorCodeOr<void> CreateView(GuiPlatform& platform, Engine& plugin) {
     g_log.Trace(k_gui_platform_log_module);
     platform.g_world_counter++;
     if (auto const floe_host =

@@ -4,7 +4,7 @@
 #pragma once
 #include "foundation/foundation.hpp"
 
-#include "param_info.hpp"
+#include "infos/param_info.hpp"
 #include "settings/settings_file.hpp"
 
 namespace midi_settings {

@@ -12,12 +12,12 @@
 #include "gui_drawing_helpers.hpp"
 #include "gui_label_widgets.hpp"
 #include "gui_widget_helpers.hpp"
-#include "param_info.hpp"
-#include "processing_engine/layer_processor.hpp"
-#include "sample_processing.hpp"
+#include "infos/param_info.hpp"
+#include "processor/layer_processor.hpp"
+#include "processor/sample_processing.hpp"
 
 static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Rect waveform_r) {
-    auto& plugin = g->plugin;
+    auto& engine = g->engine;
     auto& imgui = g->imgui;
 
     auto const handle_height = LiveSize(imgui, UiSizeId::Main_WaveformHandleHeight);
@@ -139,14 +139,14 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
 
         if (imgui.WasJustActivated(id))
             for (auto p : params)
-                ParameterJustStartedMoving(plugin.processor, p);
+                ParameterJustStartedMoving(engine.processor, p);
         if (changed) callback(value);
         if (imgui.WasJustDeactivated(id))
             for (auto p : params)
-                ParameterJustStoppedMoving(plugin.processor, p);
+                ParameterJustStoppedMoving(engine.processor, p);
 
         if (tooltip_param) {
-            auto& param_obj = plugin.processor.params[(usize)*tooltip_param];
+            auto& param_obj = engine.processor.params[(usize)*tooltip_param];
             ParameterValuePopup(g, param_obj, id, grabber_unregistered);
             DoParameterTooltipIfNeeded(g, param_obj, id, grabber_unregistered);
         }
@@ -205,7 +205,7 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
         auto const end_param_id = ParamIndexFromLayerParamIndex(layer->index, LayerParamIndex::LoopEnd);
 
         auto set_xfade_size_if_needed = [&]() {
-            auto xfade = plugin.processor.params[ToInt(xfade_param_id)].LinearValue();
+            auto xfade = engine.processor.params[ToInt(xfade_param_id)].LinearValue();
             auto clamped_xfade = ClampCrossfadeSize(
                 xfade,
                 loop_start,
@@ -213,7 +213,7 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
                 1.0f,
                 ping_pong);
             if (xfade > clamped_xfade) {
-                SetParameterValue(plugin.processor,
+                SetParameterValue(engine.processor,
                                   xfade_param_id,
                                   clamped_xfade,
                                   {.host_should_not_record = true});
@@ -222,7 +222,7 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
 
         // start
         {
-            auto const& param = plugin.processor.params[ToInt(start_param_id)];
+            auto const& param = engine.processor.params[ToInt(start_param_id)];
 
             start_line = waveform_r.WithXW(waveform_r.x + loop_start_pos, 1);
             start_handle = {start_line.Right() - handle_width, r.y, handle_width, handle_height};
@@ -244,7 +244,7 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
                              reverse,
                              [&](f32 val) {
                                  val = Max(0.0f, Min(loop_end - epsilon, val));
-                                 SetParameterValue(plugin.processor, start_param_id, val, {});
+                                 SetParameterValue(engine.processor, start_param_id, val, {});
                                  set_xfade_size_if_needed();
                              });
 
@@ -254,7 +254,7 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
 
         // end
         {
-            auto const& param = plugin.processor.params[ToInt(end_param_id)];
+            auto const& param = engine.processor.params[ToInt(end_param_id)];
 
             end_line = waveform_r.WithXW(waveform_r.x + loop_end_pos, 1);
             end_handle = {end_line.x, r.y, handle_width, handle_height};
@@ -276,7 +276,7 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
                              reverse,
                              [&](f32 value) {
                                  value = Min(1.0f, Max(loop_start + epsilon, value));
-                                 SetParameterValue(plugin.processor, end_param_id, value, {});
+                                 SetParameterValue(engine.processor, end_param_id, value, {});
                                  set_xfade_size_if_needed();
                              });
 
@@ -307,8 +307,8 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
                                      auto new_end = loop_end + delta;
 
                                      if (new_start != loop_start || new_end != loop_end) {
-                                         SetParameterValue(plugin.processor, start_param_id, new_start, {});
-                                         SetParameterValue(plugin.processor, end_param_id, new_end, {});
+                                         SetParameterValue(engine.processor, start_param_id, new_start, {});
+                                         SetParameterValue(engine.processor, end_param_id, new_end, {});
                                          set_xfade_size_if_needed();
                                      }
                                  });
@@ -318,7 +318,7 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
 
         // xfade
         if (loop_points_editable) {
-            auto const& param = plugin.processor.params[ToInt(xfade_param_id)];
+            auto const& param = engine.processor.params[ToInt(xfade_param_id)];
 
             xfade_line = waveform_r.WithXW(waveform_r.x + loop_xfade_line_pos, 1);
             xfade_handle = {xfade_line.x, waveform_r.y + handle_height, handle_width, handle_height};
@@ -344,7 +344,7 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
                                                                      loop_end + epsilon,
                                                                      1.0f,
                                                                      ping_pong);
-                                     SetParameterValue(plugin.processor, xfade_param_id, value, {});
+                                     SetParameterValue(engine.processor, xfade_param_id, value, {});
                                  });
             }
 
@@ -360,7 +360,7 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
     {
         auto const sample_offset = layer->params[ToInt(LayerParamIndex::SampleOffset)].LinearValue();
         auto const param_id = ParamIndexFromLayerParamIndex(layer->index, LayerParamIndex::SampleOffset);
-        auto const& param = plugin.processor.params[ToInt(param_id)];
+        auto const& param = engine.processor.params[ToInt(param_id)];
 
         auto sample_offset_r = waveform_r.WithW(waveform_r.w * sample_offset);
         offs_handle = {sample_offset_r.Right() - handle_width,
@@ -380,7 +380,7 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
                          param.LinearValue(),
                          param.DefaultLinearValue(),
                          false,
-                         [&](f32 value) { SetParameterValue(plugin.processor, param_id, value, {}); });
+                         [&](f32 value) { SetParameterValue(engine.processor, param_id, value, {}); });
 
         imgui.RegisterAndConvertRect(&offs_handle);
         imgui.RegisterAndConvertRect(&sample_offset_r);
@@ -474,9 +474,9 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
     draw_handle(offs_handle, offs_imgui_id, HandleType::Offset, false);
 
     // cursors
-    if (plugin.processor.voice_pool.num_active_voices.Load(LoadMemoryOrder::Relaxed)) {
+    if (engine.processor.voice_pool.num_active_voices.Load(LoadMemoryOrder::Relaxed)) {
         auto& voice_waveform_markers =
-            plugin.processor.voice_pool.voice_waveform_markers_for_gui.Consume().data;
+            engine.processor.voice_pool.voice_waveform_markers_for_gui.Consume().data;
         for (auto const voice_index : Range(k_num_voices)) {
             auto const marker = voice_waveform_markers[voice_index];
             if (!marker.intensity || marker.layer_index != layer->index) continue;
@@ -526,7 +526,7 @@ void GUIDoSampleWaveform(Gui* g, LayerProcessor* layer, Rect r) {
                                      rounding);
 
     bool is_loading = false;
-    if (g->plugin.sample_lib_server_async_channel.instrument_loading_percents[(usize)layer->index].Load(
+    if (g->engine.sample_lib_server_async_channel.instrument_loading_percents[(usize)layer->index].Load(
             LoadMemoryOrder::Relaxed) != -1) {
         labels::Label(g, r, "Loading...", labels::WaveformLoadingLabel(g->imgui));
         is_loading = true;

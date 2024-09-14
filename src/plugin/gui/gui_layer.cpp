@@ -5,6 +5,7 @@
 
 #include <IconsFontAwesome5.h>
 
+#include "engine/engine.hpp"
 #include "framework/gui_live_edit.hpp"
 #include "gui.hpp"
 #include "gui_button_widgets.hpp"
@@ -18,8 +19,7 @@
 #include "gui_widget_compounds.hpp"
 #include "gui_widget_helpers.hpp"
 #include "gui_window.hpp"
-#include "plugin_instance.hpp"
-#include "processing_engine/layer_processor.hpp"
+#include "processor/layer_processor.hpp"
 
 namespace layer_gui {
 
@@ -27,7 +27,7 @@ static void LayerInstrumentMenuItems(Gui* g, LayerProcessor* layer) {
     auto const scratch_cursor = g->scratch_arena.TotalUsed();
     DEFER { g->scratch_arena.TryShrinkTotalUsed(scratch_cursor); };
 
-    auto libs = sample_lib_server::AllLibrariesRetained(g->plugin.shared_data.sample_library_server,
+    auto libs = sample_lib_server::AllLibrariesRetained(g->shared_engine_systems.sample_library_server,
                                                         g->scratch_arena);
     DEFER { sample_lib_server::ReleaseAll(libs); };
 
@@ -68,22 +68,22 @@ static void LayerInstrumentMenuItems(Gui* g, LayerProcessor* layer) {
 
     if (DoMultipleMenuItems(g, insts, current)) {
         if (current == 0)
-            LoadInstrument(g->plugin, layer->index, InstrumentId {InstrumentType::None});
+            LoadInstrument(g->engine, layer->index, InstrumentId {InstrumentType::None});
         else if (current >= 1 && current <= (int)WaveformType::Count)
-            LoadInstrument(g->plugin, layer->index, InstrumentId {(WaveformType)(current - 1)});
+            LoadInstrument(g->engine, layer->index, InstrumentId {(WaveformType)(current - 1)});
         else
-            LoadInstrument(g->plugin, layer->index, InstrumentId {inst_info[(usize)current]});
+            LoadInstrument(g->engine, layer->index, InstrumentId {inst_info[(usize)current]});
     }
 }
 
 static void DoInstSelectorGUI(Gui* g, Rect r, u32 layer) {
-    auto& plugin = g->plugin;
+    auto& engine = g->engine;
     auto& imgui = g->imgui;
     imgui.PushID("inst selector");
     DEFER { imgui.PopID(); };
     auto imgui_id = imgui.GetID((u64)layer);
 
-    auto layer_obj = &plugin.Layer(layer);
+    auto layer_obj = &engine.Layer(layer);
     auto const inst_name = layer_obj->InstName();
 
     Optional<graphics::TextureHandle> icon_tex {};
@@ -513,7 +513,7 @@ static void DrawSelectorProgressBar(imgui::Context const& imgui, Rect r, f32 loa
 }
 
 void Draw(Gui* g,
-          PluginInstance* plugin,
+          Engine* engine,
           Rect r,
           LayerProcessor* layer,
           LayerLayoutTempIDs& c,
@@ -550,7 +550,7 @@ void Draw(Gui* g,
         if (auto inst = layer->instrument.GetNullable<AssetReference<LoadedInstrument>>();
             inst && (*inst) &&
             (g->dynamics_slider_is_held ||
-             CcControllerMovedParamRecently(g->plugin.processor, ParamIndex::MasterDynamics)) &&
+             CcControllerMovedParamRecently(g->engine.processor, ParamIndex::MasterDynamics)) &&
             ((*inst)->instrument.flags & FloeLibrary::Instrument::HasDynamicLayers)) {
             should_highlight = true;
         }
@@ -570,7 +570,7 @@ void Draw(Gui* g,
 
         DoInstSelectorGUI(g, selector_menu_r, layer->index);
         if (auto percent =
-                g->plugin.sample_lib_server_async_channel.instrument_loading_percents[(usize)layer->index]
+                g->engine.sample_lib_server_async_channel.instrument_loading_percents[(usize)layer->index]
                     .Load(LoadMemoryOrder::Relaxed);
             percent != -1) {
             f32 const load_percent = (f32)percent / 100.0f;
@@ -583,13 +583,13 @@ void Draw(Gui* g,
                             selector_left_r,
                             ICON_FA_CARET_LEFT,
                             buttons::IconButton(imgui)))
-            CycleInstrument(*plugin, layer->index, CycleDirection::Backward);
+            CycleInstrument(*engine, layer->index, CycleDirection::Backward);
         if (buttons::Button(g,
                             selector_right_id,
                             selector_right_r,
                             ICON_FA_CARET_RIGHT,
                             buttons::IconButton(imgui))) {
-            CycleInstrument(*plugin, layer->index, CycleDirection::Forward);
+            CycleInstrument(*engine, layer->index, CycleDirection::Forward);
         }
         {
             auto rand_id = imgui.GetID("Rand");
@@ -599,7 +599,7 @@ void Draw(Gui* g,
                                 rand_r,
                                 ICON_FA_RANDOM,
                                 buttons::IconButton(imgui).WithRandomiseIconScaling())) {
-                LoadRandomInstrument(*plugin, layer->index, false);
+                LoadRandomInstrument(*engine, layer->index, false);
             }
             Tooltip(g, rand_id, rand_r, "Load a random instrument"_s);
         }
@@ -625,7 +625,7 @@ void Draw(Gui* g,
             volume_knob_r.y + (volume_knob_r.h - (layer_peak_meter_height + layer_peak_meter_bottom_gap)),
             layer_peak_meter_width,
             layer_peak_meter_height - layer_peak_meter_bottom_gap};
-        auto const& processor = plugin->processor.layer_processors[(usize)layer->index];
+        auto const& processor = engine->processor.layer_processors[(usize)layer->index];
         peak_meters::PeakMeter(g, peak_meter_r, processor.peak_meter, false);
     }
 
@@ -891,7 +891,7 @@ void Draw(Gui* g,
                             buttons::VelocityButton(imgui, (param_values::VelocityMappingMode)btn_ind))) {
                         auto velo_param_id =
                             ParamIndexFromLayerParamIndex(layer->index, LayerParamIndex::VelocityMapping);
-                        SetParameterValue(g->plugin.processor, velo_param_id, (f32)btn_ind, {});
+                        SetParameterValue(g->engine.processor, velo_param_id, (f32)btn_ind, {});
                     }
 
                     Tooltip(g, imgui_id, btn_r, layer_gui::k_velo_btn_tooltips[(usize)btn_ind]);
@@ -1011,7 +1011,7 @@ void Draw(Gui* g,
     }
 
     // overlay
-    auto const& layer_processor = plugin->processor.layer_processors[(usize)layer->index];
+    auto const& layer_processor = engine->processor.layer_processors[(usize)layer->index];
     if (layer_processor.is_silent.Load(LoadMemoryOrder::Relaxed)) {
         auto pos = imgui.curr_window->unpadded_bounds.pos;
         imgui.graphics->AddRectFilled(pos, pos + imgui.Size(), LiveCol(imgui, UiColMap::LayerMutedOverlay));

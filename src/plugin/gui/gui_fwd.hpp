@@ -5,7 +5,7 @@
 #include "foundation/foundation.hpp"
 
 struct Gui;
-struct PluginInstance;
+struct Engine;
 struct Parameter;
 
 namespace imgui {

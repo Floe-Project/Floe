@@ -18,6 +18,8 @@
 #include "sample_library_server.hpp"
 #include "smoothed_value_system.hpp"
 
+constexpr u32 k_num_layer_eq_bands = 2;
+
 struct EqBand {
     EqBand(FloeSmoothedValueSystem& s) : eq_coeffs_smoother_id(s.CreateFilterSmoother()) {}
 

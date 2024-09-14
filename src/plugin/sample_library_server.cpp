@@ -1663,7 +1663,7 @@ TEST_CASE(TestSampleLibraryLoader) {
         {
             auto const source =
                 (String)path::Join(tester.scratch_arena,
-                                   Array {TestFilesFolder(tester), k_repo_subdirs_floe_test_libraries});
+                                   Array {TestFilesFolder(tester), tests::k_libraries_test_files_subdir});
 
             auto it = TRY(dir_iterator::RecursiveCreate(tester.scratch_arena, source, {}));
             DEFER { dir_iterator::Destroy(it); };

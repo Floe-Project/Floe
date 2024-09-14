@@ -144,7 +144,7 @@ void TopPanel(Gui* g) {
     {
         if (title_font) imgui.graphics->context->PushFont(title_font);
 
-        String const name = PRODUCT_NAME;
+        String const name = "Floe";
 
         auto title_r = lay.GetRect(title).Up(Round(-title_font->descent));
 

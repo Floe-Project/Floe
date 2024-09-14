@@ -9,12 +9,12 @@
 static String TestLibFolder(tests::Tester& tester) {
     return path::Join(
         tester.scratch_arena,
-        Array {tests::TestFilesFolder(tester), k_repo_subdirs_floe_test_libraries, "Test-Lib-1"});
+        Array {tests::TestFilesFolder(tester), tests::k_libraries_test_files_subdir, "Test-Lib-1"});
 }
 
 static String TestPresetsFolder(tests::Tester& tester) {
     return path::Join(tester.scratch_arena,
-                      Array {tests::TestFilesFolder(tester), k_repo_subdirs_floe_test_presets});
+                      Array {tests::TestFilesFolder(tester), tests::k_preset_test_files_subdir});
 }
 
 static ErrorCodeOr<sample_lib::Library*> LoadTestLibrary(tests::Tester& tester) {

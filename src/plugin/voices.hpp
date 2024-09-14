@@ -18,6 +18,11 @@
 #include "processing/volume_fade.hpp"
 #include "sample_processing.hpp"
 
+constexpr u32 k_max_num_active_voices = 32;
+constexpr u32 k_num_voices = 64;
+constexpr u32 k_max_num_voice_samples = 4;
+constexpr f32 k_erroneous_sample_value = 1000.0f;
+
 struct VoiceProcessingController;
 
 struct HostThreadPool;

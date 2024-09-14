@@ -249,7 +249,7 @@ static ErrorCodeOr<DirectoryListing> TestListing(tests::Tester& tester) {
 
     auto result = listing.ScanFolders(
         Array {(String)path::Join(tester.scratch_arena,
-                                  Array {TestFilesFolder(tester), k_repo_subdirs_floe_test_presets})},
+                                  Array {TestFilesFolder(tester), tests::k_preset_test_files_subdir})},
         false,
         Array {"*.mirage-*"_s, "*" FLOE_PRESET_FILE_EXTENSION},
         {});

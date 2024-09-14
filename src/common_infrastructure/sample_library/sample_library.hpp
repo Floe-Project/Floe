@@ -7,9 +7,13 @@
 #include "utils/reader.hpp"
 
 #include "common_infrastructure/audio_data.hpp"
-#include "common_infrastructure/constants.hpp"
 
 #include "mdata.hpp"
+
+constexpr usize k_max_library_author_size = 64;
+constexpr usize k_max_library_name_size = 64;
+constexpr usize k_max_instrument_name_size = 64;
+constexpr usize k_max_ir_name_size = 64;
 
 namespace sample_lib {
 

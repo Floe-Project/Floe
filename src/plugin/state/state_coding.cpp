@@ -6,7 +6,6 @@
 #include "foundation/foundation.hpp"
 #include "os/filesystem.hpp"
 #include "tests/framework.hpp"
-#include "utils/debug/debug.hpp"
 #include "utils/json/json_reader.hpp"
 #include "utils/json/json_writer.hpp"
 
@@ -14,7 +13,6 @@
 #include "common_infrastructure/constants.hpp"
 #include "common_infrastructure/sample_library/mdata.hpp"
 
-#include "build_resources/embedded_files.h"
 #include "config.h"
 #include "effects/effect_infos.hpp"
 #include "param_info.hpp"
@@ -1606,7 +1604,7 @@ TEST_CASE(TestFuzzingJsonState) {
 
 static String TestPresetPath(tests::Tester& tester, String filename) {
     return path::Join(tester.scratch_arena,
-                      Array {TestFilesFolder(tester), k_repo_subdirs_floe_test_presets, filename});
+                      Array {TestFilesFolder(tester), tests::k_preset_test_files_subdir, filename});
 }
 
 TEST_CASE(TestLoadingOldFiles) {

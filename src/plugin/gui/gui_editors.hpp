@@ -11,6 +11,9 @@
 #include "gui.hpp"
 #include "gui_editor_widgets.hpp"
 
+#define FLOE_EDITOR_ENABLED !PRODUCTION_BUILD
+constexpr bool k_editor_enabled = FLOE_EDITOR_ENABLED;
+
 static void DoProfileGUI(Gui* g, Rect r) {
     auto& imgui = g->imgui;
     auto& plugin = g->plugin;

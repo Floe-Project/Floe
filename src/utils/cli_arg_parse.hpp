@@ -11,7 +11,7 @@ struct CommandLineArgDefinition {
     u32 id; // normally an enum, used for lookup
     String key;
     String description;
-    String value_type; // for docs, e.g. path, time, num, depth
+    String value_type; // for --help, e.g. path, time, num, depth
     bool required;
     int num_values; // 0 for no value, -1 for unlimited, else exact number
 };

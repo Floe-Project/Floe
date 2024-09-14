@@ -90,8 +90,6 @@ struct FloeClapExtensionHost {
     void* pugl_world;
 };
 
-struct GuiFrameInput;
-
 constexpr auto k_clap_log_module = "👏clap"_log_module;
 
 inline bool IsMainThread(clap_host const& host) {

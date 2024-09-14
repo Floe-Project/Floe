@@ -381,7 +381,7 @@ static void DoAboutModal(Gui* g) {
         f32 y_pos = 0;
         DoHeading(g, y_pos, "About");
 
-        DoLabelLine(imgui, y_pos, "Name:", PRODUCT_NAME);
+        DoLabelLine(imgui, y_pos, "Name:", "Floe");
 
         DoLabelLine(
             imgui,

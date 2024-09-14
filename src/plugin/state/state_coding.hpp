@@ -6,6 +6,8 @@
 
 #include "state_snapshot.hpp"
 
+#define FLOE_PRESET_FILE_EXTENSION ".floe-preset"
+
 struct CodeStateArguments {
     enum class Mode { Decode, Encode };
 

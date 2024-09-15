@@ -7,9 +7,9 @@
 
 #include "foundation/foundation.hpp"
 
-#include "framework/gui_imgui.hpp"
-#include "framework/gui_live_edit.hpp"
-#include "gui/framework/colours.hpp"
+#include "gui_framework/colours.hpp"
+#include "gui_framework/gui_imgui.hpp"
+#include "gui_framework/gui_live_edit.hpp"
 
 namespace draw {
 

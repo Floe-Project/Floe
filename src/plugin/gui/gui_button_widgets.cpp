@@ -3,7 +3,7 @@
 
 #include "gui_button_widgets.hpp"
 
-#include "framework/gui_live_edit.hpp"
+#include "gui_framework/gui_live_edit.hpp"
 #include "gui.hpp"
 #include "gui_velocity_buttons.hpp"
 #include "gui_widget_helpers.hpp"

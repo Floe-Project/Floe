@@ -7,8 +7,8 @@
 
 #include "common_infrastructure/constants.hpp"
 
+#include "descriptors/param_descriptors.hpp"
 #include "host_thread_pool.hpp"
-#include "infos/param_info.hpp"
 #include "layer_processor.hpp"
 #include "processing_utils/audio_processing_context.hpp"
 #include "processor/effect_stereo_widen.hpp"

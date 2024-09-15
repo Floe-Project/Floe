@@ -10,7 +10,7 @@
 #include "common_infrastructure/common_errors.hpp"
 #include "common_infrastructure/constants.hpp"
 
-#include "infos/param_info.hpp"
+#include "descriptors/param_descriptors.hpp"
 #include "plugin/plugin.hpp"
 #include "processor/layer_processor.hpp"
 #include "sample_lib_server/sample_library_server.hpp"
@@ -319,7 +319,7 @@ static void AssignDiffDescription(dyn::DynArray auto& diff_desc,
         if (old_state.param_values[param_index] != new_state.param_values[param_index]) {
             fmt::Append(diff_desc,
                         "Param {}: {} vs {}\n"_s,
-                        k_param_infos[param_index].name,
+                        k_param_descriptors[param_index].name,
                         old_state.param_values[param_index],
                         new_state.param_values[param_index]);
         }

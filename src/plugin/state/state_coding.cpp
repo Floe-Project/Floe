@@ -14,8 +14,8 @@
 #include "common_infrastructure/sample_library/mdata.hpp"
 
 #include "config.h"
-#include "infos/effect_infos.hpp"
-#include "infos/param_info.hpp"
+#include "descriptors/effect_descriptors.hpp"
+#include "descriptors/param_descriptors.hpp"
 #include "processing_utils/audio_utils.hpp"
 #include "state_snapshot.hpp"
 
@@ -170,9 +170,9 @@ static Optional<ParamProjection> ParamProjection(ParamIndex index) {
         IsLayerParamOfSpecificType(index, LayerParamIndex::Pan) || (index == ParamIndex::MasterVelocity) ||
         (index == ParamIndex::MasterDynamics) || (index == ParamIndex::DistortionDrive) ||
         (index == ParamIndex::StereoWidenWidth) || (index == ParamIndex::FilterResonance)) {
-        ASSERT(k_param_infos[(u32)index].linear_range.min == 0 ||
-               k_param_infos[(u32)index].linear_range.min == -1);
-        ASSERT(k_param_infos[(u32)index].linear_range.max == 1);
+        ASSERT(k_param_descriptors[(u32)index].linear_range.min == 0 ||
+               k_param_descriptors[(u32)index].linear_range.min == -1);
+        ASSERT(k_param_descriptors[(u32)index].linear_range.max == 1);
         return ParamProjection::WasPercentNowFraction;
     }
 
@@ -183,8 +183,9 @@ static Optional<ParamProjection> ParamProjection(ParamIndex index) {
         (index == ParamIndex::ChorusWet) || (index == ParamIndex::ChorusDry) ||
         (index == ParamIndex::ConvolutionReverbWet) || (index == ParamIndex::ConvolutionReverbDry) ||
         (index == ParamIndex::BitCrushWet)) {
-        ASSERT(k_param_infos[(u32)index].linear_range.min >= 0);
-        ASSERT(k_param_infos[(u32)index].linear_range.max < 30); // it's unlikely to have an amp above 30
+        ASSERT(k_param_descriptors[(u32)index].linear_range.min >= 0);
+        ASSERT(k_param_descriptors[(u32)index].linear_range.max <
+               30); // it's unlikely to have an amp above 30
         return ParamProjection::WasDbNowAmp;
     }
     return k_nullopt;
@@ -505,14 +506,14 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
                 }
             }
 
-            v = k_param_infos[index].LineariseValue(v, true).Value();
+            v = k_param_descriptors[index].LineariseValue(v, true).Value();
         } else {
             // The loaded data might be from an older version of Floe that didn't
             // have all of the parameters that this version has. Rather than just
             // ignore the parameters not set - we want to set them to their default
             // values. This ensures loaded presets always behave in a predictable way,
             // rather than some parameters not changing.
-            v = k_param_infos[index].default_linear_value;
+            v = k_param_descriptors[index].default_linear_value;
         }
     }
 
@@ -566,32 +567,33 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
             old_settings_wet_01 / (old_settings_wet_01 + old_settings_dry_01);
         state.LinearParam(ParamIndex::ReverbSize) = old_settings_size_01;
         state.LinearParam(ParamIndex::ReverbDecayTimeMs) = old_settings_size_01;
-        state.LinearParam(ParamIndex::ReverbDelay) =
-            ParamInfo(ParamIndex::ReverbDelay).LineariseValue(old_settings_pre_delay_ms, true).Value();
+        state.LinearParam(ParamIndex::ReverbDelay) = ParamDescriptorAt(ParamIndex::ReverbDelay)
+                                                         .LineariseValue(old_settings_pre_delay_ms, true)
+                                                         .Value();
         state.LinearParam(ParamIndex::ReverbChorusFrequency) =
-            ParamInfo(ParamIndex::ReverbChorusFrequency)
+            ParamDescriptorAt(ParamIndex::ReverbChorusFrequency)
                 .LineariseValue(old_settings_mod_freq_hz, true)
                 .Value();
         state.LinearParam(ParamIndex::ReverbChorusAmount) = old_settings_mod_depth_01;
         if (old_settings_filter_bidirectional > 0) {
             auto const p = ParamIndex::ReverbPreLowPassCutoff;
-            auto const info = k_param_infos[ToInt(p)];
+            auto const info = k_param_descriptors[ToInt(p)];
             state.LinearParam(p) = MapFrom01(1 - old_settings_filter_bidirectional,
                                              info.linear_range.min,
                                              info.linear_range.max);
             state.LinearParam(ParamIndex::ReverbPreHighPassCutoff) = 0;
         } else {
             auto const p = ParamIndex::ReverbPreHighPassCutoff;
-            auto const info = k_param_infos[ToInt(p)];
+            auto const info = k_param_descriptors[ToInt(p)];
             state.LinearParam(p) =
                 MapFrom01(-old_settings_filter_bidirectional, info.linear_range.min, info.linear_range.max);
             state.LinearParam(ParamIndex::ReverbPreLowPassCutoff) = 128;
         }
         constexpr auto k_zero_db = 0.0f;
         state.LinearParam(ParamIndex::ReverbLowShelfGain) =
-            ParamInfo(ParamIndex::ReverbLowShelfGain).LineariseValue(k_zero_db, false).Value();
+            ParamDescriptorAt(ParamIndex::ReverbLowShelfGain).LineariseValue(k_zero_db, false).Value();
         state.LinearParam(ParamIndex::ReverbHighShelfGain) =
-            ParamInfo(ParamIndex::ReverbHighShelfGain).LineariseValue(k_zero_db, false).Value();
+            ParamDescriptorAt(ParamIndex::ReverbHighShelfGain).LineariseValue(k_zero_db, false).Value();
     }
 
     // Set the phaser parameters based on the no-longer-existing params
@@ -613,8 +615,9 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
         state.LinearParam(ParamIndex::PhaserStereoAmount) = old_mod_stereo;
         state.LinearParam(ParamIndex::PhaserFeedback) = old_feedback_01;
         state.LinearParam(ParamIndex::PhaserModDepth) = old_setting_mod_depth_01;
-        state.LinearParam(ParamIndex::PhaserModFreqHz) =
-            ParamInfo(ParamIndex::PhaserModFreqHz).LineariseValue(old_setting_mod_freq_hz, true).Value();
+        state.LinearParam(ParamIndex::PhaserModFreqHz) = ParamDescriptorAt(ParamIndex::PhaserModFreqHz)
+                                                             .LineariseValue(old_setting_mod_freq_hz, true)
+                                                             .Value();
         state.LinearParam(ParamIndex::PhaserCenterSemitones) =
             FrequencyToMidiNote(old_setting_centre_freq_hz);
     }
@@ -669,10 +672,12 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
         };
 
         state.LinearParam(ParamIndex::DelayOn) = old_settings_on;
-        state.LinearParam(ParamIndex::DelayTimeLMs) =
-            ParamInfo(ParamIndex::DelayTimeLMs).LineariseValue(old_settings_delay_time_ms_l, true).Value();
-        state.LinearParam(ParamIndex::DelayTimeRMs) =
-            ParamInfo(ParamIndex::DelayTimeRMs).LineariseValue(old_settings_delay_time_ms_r, true).Value();
+        state.LinearParam(ParamIndex::DelayTimeLMs) = ParamDescriptorAt(ParamIndex::DelayTimeLMs)
+                                                          .LineariseValue(old_settings_delay_time_ms_l, true)
+                                                          .Value();
+        state.LinearParam(ParamIndex::DelayTimeRMs) = ParamDescriptorAt(ParamIndex::DelayTimeRMs)
+                                                          .LineariseValue(old_settings_delay_time_ms_r, true)
+                                                          .Value();
         state.LinearParam(ParamIndex::DelayTimeSyncSwitch) = old_settings_is_synced;
         state.LinearParam(ParamIndex::DelayTimeSyncedL) =
             get_synced_delay_time(NoLongerExistingParam::DelayTimeSyncedL)
@@ -859,7 +864,7 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
 
     if constexpr (RUNTIME_SAFETY_CHECKS_ON) {
         for (auto const i : Range(k_num_parameters)) {
-            auto const& info = k_param_infos[i];
+            auto const& info = k_param_descriptors[i];
             auto const v = state.param_values[i];
             if (v < info.linear_range.min || v > info.linear_range.max) {
                 g_log.Debug({},
@@ -1306,7 +1311,7 @@ static ErrorCodeOr<String> MakeJsonPreset(ArenaAllocator& arena, Version version
 }
 
 static f32 ProjectedValue(StateSnapshot const& state, ParamIndex index) {
-    auto const& param = k_param_infos[ToInt(index)];
+    auto const& param = k_param_descriptors[ToInt(index)];
     return param.ProjectValue(state.param_values[ToInt(index)]);
 }
 
@@ -1316,7 +1321,7 @@ static f32 ProjectedLayerValue(StateSnapshot const& state, u32 layer_index, Laye
 
 static void CheckStateIsValid(tests::Tester& tester, StateSnapshot const& state) {
     for (auto [index, value] : Enumerate(state.param_values)) {
-        auto const& info = k_param_infos[index];
+        auto const& info = k_param_descriptors[index];
         CHECK_OP(value, >=, info.linear_range.min);
         CHECK_OP(value, <=, info.linear_range.max);
     }
@@ -1402,7 +1407,7 @@ TEST_CASE(TestNewSerialisation) {
         StateSnapshot state {};
         u64 random_seed = SeedFromTime();
         for (auto [index, param] : Enumerate(state.param_values)) {
-            auto const& info = k_param_infos[index];
+            auto const& info = k_param_descriptors[index];
             param = RandomFloatInRange(random_seed, info.linear_range.min, info.linear_range.max);
         }
 
@@ -1551,7 +1556,7 @@ TEST_CASE(TestFuzzingJsonState) {
         scratch_arena.ResetCursorAndConsolidateRegions();
 
         auto const param = ParamIndex(i);
-        auto const& info = k_param_infos[i];
+        auto const& info = k_param_descriptors[i];
         auto const legacy_id = ParamToLegacyId(param);
         if (!legacy_id) continue;
 

@@ -1,22 +1,21 @@
 // Copyright 2018-2024 Sam Windell
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "param_info.hpp"
+#include "param_descriptors.hpp"
 
 #include "foundation/container/tagged_union.hpp"
 #include "foundation/foundation.hpp"
 #include "tests/framework.hpp"
 
-#include "param_info.hpp"
 #include "processing_utils/audio_utils.hpp"
 
 Span<String const> ParameterMenuItems(ParamIndex param_index) {
-    auto const& param = k_param_infos[ToInt(param_index)];
+    auto const& param = k_param_descriptors[ToInt(param_index)];
     ASSERT(param.value_type == ParamValueType::Menu);
     return MenuItems(param.menu_type);
 }
 
-Optional<f32> ParameterInfo::StringToLinearValue(String str) const {
+Optional<f32> ParamDescriptor::StringToLinearValue(String str) const {
     str = WhitespaceStripped(str);
 
     switch (display_format) {
@@ -154,7 +153,7 @@ TEST_CASE(TestNumberStartsWithNegativeZero) {
     return k_success;
 }
 
-Optional<DynamicArrayBounded<char, 128>> ParameterInfo::LinearValueToString(f32 linear_value) const {
+Optional<DynamicArrayBounded<char, 128>> ParamDescriptor::LinearValueToString(f32 linear_value) const {
     constexpr usize k_size = 128;
     using ResultType = DynamicArrayBounded<char, k_size>;
     ResultType result;
@@ -426,12 +425,12 @@ Optional<DynamicArrayBounded<char, 64>> ParamToLegacyId(LegacyParam index) {
     switch (index.tag) {
         case ParamExistance::StillExists: {
             auto const i = index.Get<ParamIndex>();
-            if (auto const layer_param_info = LayerParamInfoFromGlobalIndex(i)) {
+            if (auto const layer_param_desc = LayerParamIndexAndLayerFor(i)) {
                 for (auto const& legacy : legacy_params::still_exists::k_layer_params) {
-                    if (layer_param_info->param == legacy.index) {
+                    if (layer_param_desc->param == legacy.index) {
                         auto result = DynamicArrayBounded<char, 64> {};
                         dyn::Append(result, 'L');
-                        dyn::Append(result, (char)('0' + layer_param_info->layer_num));
+                        dyn::Append(result, (char)('0' + layer_param_desc->layer_num));
                         dyn::AppendSpan(result, legacy.id_suffix);
                         return result;
                     }
@@ -473,7 +472,7 @@ Optional<LegacyParam> ParamFromLegacyId(String id) {
 TEST_CASE(TestParamStringConversion) {
     {
         auto const& attack_param =
-            k_param_infos[ToInt(ParamIndexFromLayerParamIndex(0, LayerParamIndex::VolumeAttack))];
+            k_param_descriptors[ToInt(ParamIndexFromLayerParamIndex(0, LayerParamIndex::VolumeAttack))];
         tester.log.Debug({}, "Attack param id: {}", attack_param.id);
         auto const str = attack_param.LinearValueToString(0.4708353049341293f);
         REQUIRE(str);
@@ -484,7 +483,7 @@ TEST_CASE(TestParamStringConversion) {
     }
     {
         auto const& detune_param =
-            k_param_infos[ToInt(ParamIndexFromLayerParamIndex(0, LayerParamIndex::TuneCents))];
+            k_param_descriptors[ToInt(ParamIndexFromLayerParamIndex(0, LayerParamIndex::TuneCents))];
         tester.log.Debug({}, "Detune param id: {}", detune_param.id);
         auto const str = detune_param.LinearValueToString(-0.010595884688319623f);
         REQUIRE(str);
@@ -508,7 +507,7 @@ TEST_CASE(TestLegacyConversion) {
     return k_success;
 }
 
-TEST_REGISTRATION(RegisterParamInfoTests) {
+TEST_REGISTRATION(RegisterParamDescriptorTests) {
     REGISTER_TEST(TestNumberStartsWithNegativeZero);
     REGISTER_TEST(TestLegacyConversion);
     REGISTER_TEST(TestParamStringConversion);

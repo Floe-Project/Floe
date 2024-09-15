@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include "gui/framework/gui_imgui.hpp"
 #include "gui_button_widgets.hpp"
+#include "gui_framework/gui_imgui.hpp"
 #include "layout.hpp"
 
 namespace labels {

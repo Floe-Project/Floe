@@ -5,7 +5,7 @@
 #include "foundation/foundation.hpp"
 
 #include "clap/host.h"
-#include "infos/param_info.hpp"
+#include "descriptors/param_descriptors.hpp"
 #include "param.hpp"
 #include "plugin/plugin.hpp"
 #include "processing_utils/adsr.hpp"

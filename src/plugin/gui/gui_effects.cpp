@@ -8,17 +8,17 @@
 
 #include "os/threading.hpp"
 
+#include "descriptors/param_descriptors.hpp"
 #include "engine/engine.hpp"
-#include "framework/gui_live_edit.hpp"
 #include "gui.hpp"
-#include "gui/framework/colours.hpp"
-#include "gui/framework/gui_imgui.hpp"
 #include "gui/gui_dragger_widgets.hpp"
+#include "gui_framework/colours.hpp"
+#include "gui_framework/gui_imgui.hpp"
+#include "gui_framework/gui_live_edit.hpp"
 #include "gui_label_widgets.hpp"
 #include "gui_widget_compounds.hpp"
 #include "gui_widget_helpers.hpp"
 #include "gui_window.hpp"
-#include "infos/param_info.hpp"
 #include "processor/effect.hpp"
 
 constexpr auto k_reverb_params = ComptimeParamSearch<ComptimeParamSearchOptions {
@@ -350,7 +350,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
         Optional<LayID> container {};
         u8 previous_group = 0;
         for (auto const i : Range(ids.size)) {
-            auto const& info = k_param_infos[ToInt(params[i])];
+            auto const& info = k_param_descriptors[ToInt(params[i])];
             LayID inner_container = param_container;
             if (info.grouping_within_module != 0) {
                 if (!container || info.grouping_within_module != previous_group)
@@ -687,7 +687,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
 
         u8 previous_group = 0;
         for (auto const i : Range(ids.size)) {
-            auto const& info = k_param_infos[ToInt(params[i])];
+            auto const& info = k_param_descriptors[ToInt(params[i])];
             if (info.grouping_within_module != 0) {
                 if (info.grouping_within_module == previous_group)
                     draw_knob_joining_line(ids[i - 1].control, ids[i].control);

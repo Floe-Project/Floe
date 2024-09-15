@@ -11,6 +11,7 @@
 
 #include "common_infrastructure/constants.hpp"
 
+#include "descriptors/param_descriptors.hpp"
 #include "effect_bitcrush.hpp"
 #include "effect_chorus.hpp"
 #include "effect_compressor_stillwell_majortom.hpp"
@@ -22,7 +23,6 @@
 #include "effect_reverb.hpp"
 #include "effect_stereo_widen.hpp"
 #include "host_thread_pool.hpp"
-#include "infos/param_info.hpp"
 #include "layer_processor.hpp"
 #include "param.hpp"
 #include "plugin/plugin.hpp"

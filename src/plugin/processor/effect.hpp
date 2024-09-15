@@ -4,7 +4,7 @@
 #pragma once
 #include "foundation/foundation.hpp"
 
-#include "infos/effect_infos.hpp"
+#include "descriptors/effect_descriptors.hpp"
 #include "param.hpp"
 #include "processing_utils/audio_processing_context.hpp"
 #include "processing_utils/smoothed_value_system.hpp"

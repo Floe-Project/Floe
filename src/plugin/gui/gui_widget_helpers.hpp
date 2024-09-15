@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #pragma once
-#include "framework/gui_imgui.hpp"
+#include "gui_framework/gui_imgui.hpp"
 #include "gui_button_widgets.hpp"
 #include "processor/param.hpp"
 

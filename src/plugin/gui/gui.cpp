@@ -11,15 +11,13 @@
 #include "os/filesystem.hpp"
 #include "utils/logger/logger.hpp"
 
-#include "common_infrastructure/constants.hpp"
-
 #include "build_resources/embedded_files.h"
 #include "engine/engine.hpp"
-#include "framework/gui_live_edit.hpp"
-#include "gui/framework/draw_list.hpp"
-#include "gui/framework/gui_imgui.hpp"
 #include "gui_editor_widgets.hpp"
 #include "gui_editors.hpp"
+#include "gui_framework/draw_list.hpp"
+#include "gui_framework/gui_imgui.hpp"
+#include "gui_framework/gui_live_edit.hpp"
 #include "gui_modal_windows.hpp"
 #include "gui_widget_helpers.hpp"
 #include "image.hpp"

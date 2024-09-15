@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #pragma once
+#include "descriptors/param_descriptors.hpp"
 #include "dsp_stillwell_majortom.hpp"
 #include "effect.hpp"
-#include "infos/param_info.hpp"
 #include "processing_utils/audio_utils.hpp"
 #include "processing_utils/smoothed_value_system.hpp"
 

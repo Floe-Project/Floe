@@ -5,14 +5,12 @@
 
 #include <IconsFontAwesome5.h>
 
-#include "common_infrastructure/constants.hpp"
-
-#include "framework/gui_live_edit.hpp"
+#include "descriptors/param_descriptors.hpp"
+#include "gui_framework/gui_live_edit.hpp"
 #include "gui.hpp"
 #include "gui_drawing_helpers.hpp"
 #include "gui_label_widgets.hpp"
 #include "gui_widget_helpers.hpp"
-#include "infos/param_info.hpp"
 #include "processor/layer_processor.hpp"
 #include "processor/sample_processing.hpp"
 

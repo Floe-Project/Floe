@@ -7,7 +7,7 @@
 
 #include "os/filesystem.hpp"
 
-#include "framework/gui_live_edit.hpp"
+#include "gui_framework/gui_live_edit.hpp"
 #include "gui.hpp"
 #include "gui_editor_widgets.hpp"
 

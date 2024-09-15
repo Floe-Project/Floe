@@ -16,10 +16,10 @@
 #include "clap/host.h"
 #include "clap/id.h"
 #include "clap/process.h"
+#include "descriptors/param_descriptors.hpp"
 #include "engine/engine.hpp"
 #include "engine/shared_engine_systems.hpp"
-#include "gui/framework/gui_platform.hpp"
-#include "infos/param_info.hpp"
+#include "gui_framework/gui_platform.hpp"
 #include "plugin.hpp"
 #include "processing_utils/scoped_denormals.hpp"
 #include "processor/processor.hpp"
@@ -51,8 +51,7 @@ struct FloePluginInstance {
         .object_id = id,
     };
 
-    PageAllocator page_allocator;
-    ArenaAllocator arena {page_allocator};
+    ArenaAllocator arena {PageAllocator::Instance()};
 
     Optional<Engine> engine {};
 
@@ -62,9 +61,6 @@ struct FloePluginInstance {
 static u16 g_num_init_plugins = 0;
 
 clap_plugin_state const floe_plugin_state {
-    // Saves the plugin state into stream.
-    // Returns true if the state was correctly saved.
-    // [main-thread]
     .save = [](clap_plugin const* plugin, clap_ostream const* stream) -> bool {
         auto& floe = *(FloePluginInstance*)plugin->plugin_data;
         ZoneScopedMessage(floe.trace_config, "state save");
@@ -74,9 +70,6 @@ clap_plugin_state const floe_plugin_state {
         return true;
     },
 
-    // Loads the plugin state from stream.
-    // Returns true if the state was correctly restored.
-    // [main-thread]
     .load = [](clap_plugin const* plugin, clap_istream const* stream) -> bool {
         auto& floe = *(FloePluginInstance*)plugin->plugin_data;
         ZoneScopedMessage(floe.trace_config, "state load");
@@ -101,8 +94,6 @@ constexpr u32 k_largest_gui_size = LargestRepresentableValue<u16>();
 // responsible for defining if it is physical pixels or logical pixels.
 // NOLINTNEXTLINE(cppcoreguidelines-interfaces-global-init)
 clap_plugin_gui const floe_gui {
-    // Returns true if the requested gui api is supported
-    // [main-thread]
     .is_api_supported = [](clap_plugin_t const* plugin, char const* api, bool is_floating) -> bool {
         (void)is_floating;
         auto& floe = *(FloePluginInstance*)plugin->plugin_data;
@@ -110,11 +101,6 @@ clap_plugin_gui const floe_gui {
         return NullTermStringsEqual(k_supported_gui_api, api);
     },
 
-    // Returns true if the plugin has a preferred api.
-    // The host has no obligation to honor the plugin preference, this is just a hint.
-    // The const char **api variable should be explicitly assigned as a pointer to
-    // one of the CLAP_WINDOW_API_ constants defined above, not strcopied.
-    // [main-thread]
     .get_preferred_api = [](clap_plugin_t const* plugin, char const** api, bool* is_floating) -> bool {
         auto& floe = *(FloePluginInstance*)plugin->plugin_data;
         ASSERT(IsMainThread(floe.host));
@@ -123,22 +109,9 @@ clap_plugin_gui const floe_gui {
         return true;
     },
 
-    // Create and allocate all resources necessary for the gui.
-    //
-    // If is_floating is true, then the window will not be managed by the host. The plugin
-    // can set its window to stays above the parent window, see set_transient().
-    // api may be null or blank for floating window.
-    //
-    // If is_floating is false, then the plugin has to embed its window into the parent window, see
-    // set_parent().
-    //
-    // After this call, the GUI may not be visible yet; don't forget to call show().
-    //
-    // Returns true if the GUI is successfully created.
-    // [main-thread]
     .create = [](clap_plugin_t const* plugin, char const* api, bool is_floating) -> bool {
         ASSERT(NullTermStringsEqual(api, k_supported_gui_api));
-        ASSERT(!is_floating); // not supported
+        ASSERT(!is_floating); // not supported at the moment
         auto& floe = *(FloePluginInstance*)plugin->plugin_data;
         ZoneScopedMessage(floe.trace_config, "gui create");
         ASSERT(IsMainThread(floe.host));
@@ -150,8 +123,6 @@ clap_plugin_gui const floe_gui {
         return result;
     },
 
-    // Free all resources associated with the gui.
-    // [main-thread]
     .destroy =
         [](clap_plugin_t const* plugin) {
             auto& floe = *(FloePluginInstance*)plugin->plugin_data;
@@ -161,28 +132,12 @@ clap_plugin_gui const floe_gui {
             floe.gui_platform.Clear();
         },
 
-    // Set the absolute GUI scaling factor, and override any OS info.
-    // Should not be used if the windowing api relies upon logical pixels.
-    //
-    // If the plugin prefers to work out the scaling factor itself by querying the OS directly,
-    // then ignore the call.
-    //
-    // scale = 2 means 200% scaling.
-    //
-    // Returns true if the scaling could be applied
-    // Returns false if the call was ignored, or the scaling could not be applied.
-    // [main-thread]
     .set_scale = [](clap_plugin_t const* plugin, f64 scale) -> bool {
         (void)plugin;
         g_log.Debug(k_clap_log_module, "set_scale {}", scale);
         return false; // we (pugl) negotiate this with the OS ourselves
     },
 
-    // Get the current size of the plugin UI.
-    // clap_plugin_gui->create() must have been called prior to asking the size.
-    //
-    // Returns true if the plugin could get the size.
-    // [main-thread]
     .get_size = [](clap_plugin_t const* plugin, u32* width, u32* height) -> bool {
         auto& floe = *(FloePluginInstance*)plugin->plugin_data;
         ASSERT(IsMainThread(floe.host));
@@ -193,13 +148,8 @@ clap_plugin_gui const floe_gui {
         return true;
     },
 
-    // Returns true if the window is resizeable (mouse drag).
-    // Only for embedded windows.
-    // [main-thread]
     .can_resize = [](clap_plugin_t const*) -> bool { return true; },
 
-    // Returns true if the plugin can provide hints on how to resize the window.
-    // [main-thread]
     .get_resize_hints = [](clap_plugin_t const*, clap_gui_resize_hints_t* hints) -> bool {
         hints->can_resize_vertically = true;
         hints->can_resize_horizontally = true;
@@ -214,14 +164,6 @@ clap_plugin_gui const floe_gui {
         return true;
     },
 
-    // If the plugin gui is resizable, then the plugin will calculate the closest
-    // usable size which fits in the given size.
-    // This method does not change the size.
-    //
-    // Only for embedded windows.
-    //
-    // Returns true if the plugin could adjust the given size.
-    // [main-thread]
     .adjust_size = [](clap_plugin_t const*, u32* width, u32* height) -> bool {
         *width = Clamp<u32>(*width, 1, k_largest_gui_size);
         *height = Clamp<u32>(*height, 1, k_largest_gui_size);
@@ -240,10 +182,6 @@ clap_plugin_gui const floe_gui {
         return true;
     },
 
-    // Sets the window size. Only for embedded windows.
-    //
-    // Returns true if the plugin could resize its window to the given size.
-    // [main-thread]
     .set_size = [](clap_plugin_t const* plugin, u32 width, u32 height) -> bool {
         auto& floe = *(FloePluginInstance*)plugin->plugin_data;
         ZoneScopedMessage(floe.trace_config, "gui set_size {} {}", width, height);
@@ -268,10 +206,6 @@ clap_plugin_gui const floe_gui {
         return SetSize(*floe.gui_platform, {CheckedCast<u16>(width), CheckedCast<u16>(height)});
     },
 
-    // Embeds the plugin window into the given window.
-    //
-    // Returns true on success.
-    // [main-thread & !floating]
     .set_parent = [](clap_plugin_t const* plugin, clap_window_t const* window) -> bool {
         auto& floe = *(FloePluginInstance*)plugin->plugin_data;
         ZoneScopedMessage(floe.trace_config, "gui set_parent");
@@ -282,10 +216,6 @@ clap_plugin_gui const floe_gui {
         return result;
     },
 
-    // Set the plugin floating window to stay above the given window.
-    //
-    // Returns true on success.
-    // [main-thread & floating]
     .set_transient = [](clap_plugin_t const* plugin, clap_window_t const* window) -> bool {
         auto& floe = *(FloePluginInstance*)plugin->plugin_data;
         ZoneScopedMessage(floe.trace_config, "gui set_transient");
@@ -293,15 +223,8 @@ clap_plugin_gui const floe_gui {
         return LogIfError(SetTransient(*floe.gui_platform, *window), "SetTransient");
     },
 
-    // Suggests a window title. Only for floating windows.
-    //
-    // [main-thread & floating]
     .suggest_title = [](clap_plugin_t const*, char const*) {},
 
-    // Show the window.
-    //
-    // Returns true on success.
-    // [main-thread]
     .show = [](clap_plugin_t const* plugin) -> bool {
         auto& floe = *(FloePluginInstance*)plugin->plugin_data;
         ZoneScopedMessage(floe.trace_config, "gui show");
@@ -319,11 +242,6 @@ clap_plugin_gui const floe_gui {
         return result;
     },
 
-    // Hide the window, this method does not free the resources, it just hides
-    // the window content. Yet it may be a good idea to stop painting timers.
-    //
-    // Returns true on success.
-    // [main-thread]
     .hide = [](clap_plugin_t const* plugin) -> bool {
         auto& floe = *(FloePluginInstance*)plugin->plugin_data;
         ZoneScopedMessage(floe.trace_config, "gui hide");
@@ -333,14 +251,10 @@ clap_plugin_gui const floe_gui {
 };
 
 clap_plugin_params const floe_params {
-    // Returns the number of parameters.
-    // [main-thread]
     .count = [](clap_plugin_t const*) -> u32 { return (u32)k_num_parameters; },
 
-    // Copies the parameter's info to param_info. Returns true on success.
-    // [main-thread]
     .get_info = [](clap_plugin_t const*, u32 param_index, clap_param_info_t* param_info) -> bool {
-        auto const& param = k_param_infos[param_index];
+        auto const& param = k_param_descriptors[param_index];
         param_info->id = ParamIndexToId((ParamIndex)param_index);
         param_info->default_value = (f64)param.default_linear_value;
         param_info->max_value = (f64)param.linear_range.max;
@@ -357,8 +271,6 @@ clap_plugin_params const floe_params {
         return true;
     },
 
-    // Writes the parameter's current value to out_value. Returns true on success.
-    // [main-thread]
     .get_value = [](clap_plugin_t const* plugin, clap_id param_id, f64* out_value) -> bool {
         auto& floe = *(FloePluginInstance*)plugin->plugin_data;
         ASSERT(IsMainThread(floe.host));
@@ -372,16 +284,13 @@ clap_plugin_params const floe_params {
         return true;
     },
 
-    // Fills out_buffer with a null-terminated UTF-8 string that represents the parameter at the
-    // given 'value' argument. eg: "2.3 kHz". Returns true on success. The host should always use
-    // this to format parameter values before displaying it to the user. [main-thread]
     .value_to_text =
         [](clap_plugin_t const*, clap_id param_id, f64 value, char* out_buffer, u32 out_buffer_capacity)
         -> bool {
         auto const opt_index = ParamIdToIndex(param_id);
         if (!opt_index) return false;
         auto const index = (usize)*opt_index;
-        auto const& p = k_param_infos[index];
+        auto const& p = k_param_descriptors[index];
         auto const str = p.LinearValueToString((f32)value);
         if (!str) return false;
         if (out_buffer_capacity < (str->size + 1)) return false;
@@ -390,15 +299,12 @@ clap_plugin_params const floe_params {
         return true;
     },
 
-    // Converts the null-terminated UTF-8 param_value_text into a f64 and writes it to out_value.
-    // Returns true on success. The host can use this to convert user input into a parameter value.
-    // [main-thread]
     .text_to_value =
         [](clap_plugin_t const*, clap_id param_id, char const* param_value_text, f64* out_value) -> bool {
         auto const opt_index = ParamIdToIndex(param_id);
         if (!opt_index) return false;
         auto const index = (usize)*opt_index;
-        auto const& p = k_param_infos[index];
+        auto const& p = k_param_descriptors[index];
         if (auto v = p.StringToLinearValue(FromNullTerminated(param_value_text))) {
             *out_value = (f64)*v;
             return true;
@@ -406,14 +312,6 @@ clap_plugin_params const floe_params {
         return false;
     },
 
-    // Flushes a set of parameter changes.
-    // This method must not be called concurrently to clap_plugin->process().
-    //
-    // Note: if the plugin is processing, then the process() call will already achieve the
-    // parameter update (bi-directional), so a call to flush isn't required, also be aware
-    // that the plugin may use the sample offset in process(), while this information would be
-    // lost within flush().
-    //
     // [active ? audio-thread : main-thread]
     .flush =
         [](clap_plugin_t const* plugin, clap_input_events_t const* in, clap_output_events_t const* out) {
@@ -430,12 +328,8 @@ static constexpr clap_id k_input_port_id = 1;
 static constexpr clap_id k_output_port_id = 2;
 
 clap_plugin_audio_ports const floe_audio_ports {
-    // number of ports, for either input or output
-    // [main-thread]
     .count = [](clap_plugin_t const*, bool) -> u32 { return 1; },
 
-    // get info about about an audio port.
-    // [main-thread]
     .get = [](clap_plugin_t const*, u32 index, bool is_input, clap_audio_port_info_t* info) -> bool {
         ASSERT(index == 0);
         if (is_input) {
@@ -461,12 +355,8 @@ static constexpr clap_id k_main_note_port_id = 1; // never change this
 
 // The note ports scan has to be done while the plugin is deactivated.
 clap_plugin_note_ports const floe_note_ports {
-    // number of ports, for either input or output
-    // [main-thread]
     .count = [](clap_plugin_t const*, bool is_input) -> u32 { return is_input ? 1 : 0; },
 
-    // get info about about a note port.
-    // [main-thread]
     .get = [](clap_plugin_t const*, u32 index, bool is_input, clap_note_port_info_t* info) -> bool {
         ZoneScopedN("clap_plugin_note_ports get");
         if (index != 0 || !is_input) return false;
@@ -480,7 +370,6 @@ clap_plugin_note_ports const floe_note_ports {
 };
 
 clap_plugin_thread_pool const floe_thread_pool {
-    // Called by the thread pool
     .exec =
         [](clap_plugin_t const* plugin, u32 task_index) {
             ZoneScopedN("clap_plugin_thread_pool exec");
@@ -515,10 +404,6 @@ clap_plugin const floe_plugin {
     .desc = &k_plugin_info,
     .plugin_data = nullptr,
 
-    // Must be called after creating the plugin.
-    // If init returns false, the host must destroy the plugin instance.
-    // If init returns true, then the plugin is initialized and in the deactivated state.
-    // [main-thread]
     .init = [](clap_plugin const* plugin) -> bool {
         auto& floe = *(FloePluginInstance*)plugin->plugin_data;
         ASSERT(!floe.initialised);
@@ -537,9 +422,6 @@ clap_plugin const floe_plugin {
         return true;
     },
 
-    // Free the plugin and its resources.
-    // It is required to deactivate the plugin prior to this call.
-    // [main-thread & !active]
     .destroy =
         [](clap_plugin const* plugin) {
             auto& floe = *(FloePluginInstance*)plugin->plugin_data;
@@ -556,13 +438,6 @@ clap_plugin const floe_plugin {
             PageAllocator::Instance().Delete(&floe);
         },
 
-    // Activate and deactivate the plugin.
-    // In this call the plugin may allocate memory and prepare everything needed for the process
-    // call. The process's sample rate will be constant and process's frame count will included in
-    // the [min, max] range, which is bounded by [1, INT32_MAX].
-    // Once activated the latency and port configuration must remain constant, until deactivation.
-    //
-    // [main-thread & !active_state]
     .activate =
         [](clap_plugin const* plugin, f64 sample_rate, u32 min_frames_count, u32 max_frames_count) -> bool {
         auto& floe = *(FloePluginInstance*)plugin->plugin_data;
@@ -579,7 +454,6 @@ clap_plugin const floe_plugin {
         return true;
     },
 
-    // [main-thread & active_state]
     .deactivate =
         [](clap_plugin const* plugin) {
             auto& floe = *(FloePluginInstance*)plugin->plugin_data;
@@ -598,8 +472,6 @@ clap_plugin const floe_plugin {
             floe.active = false;
         },
 
-    // Call start processing before processing.
-    // [audio-thread & active_state & !processing_state]
     .start_processing = [](clap_plugin const* plugin) -> bool {
         auto& floe = *(FloePluginInstance*)plugin->plugin_data;
         ZoneScopedMessage(floe.trace_config, "plugin start_processing");
@@ -612,8 +484,6 @@ clap_plugin const floe_plugin {
         return true;
     },
 
-    // Call stop processing before sending the plugin to sleep.
-    // [audio-thread & active_state & processing_state]
     .stop_processing =
         [](clap_plugin const* plugin) {
             auto& floe = *(FloePluginInstance*)plugin->plugin_data;
@@ -625,12 +495,6 @@ clap_plugin const floe_plugin {
             floe.processing = false;
         },
 
-    // - Clears all buffers, performs a full reset of the processing state (filters, oscillators,
-    //   envelopes, lfo, ...) and kills all voices.
-    // - The parameter's value remain unchanged.
-    // - clap_process.steady_time may jump backward.
-    //
-    // [audio-thread & active_state]
     .reset =
         [](clap_plugin const* plugin) {
             auto& floe = *(FloePluginInstance*)plugin->plugin_data;
@@ -639,10 +503,6 @@ clap_plugin const floe_plugin {
             processor.processor_callbacks.reset(processor);
         },
 
-    // process audio, events, ...
-    // All the pointers coming from clap_process_t and its nested attributes,
-    // are valid until process() returns.
-    // [audio-thread & active_state & processing_state]
     .process = [](clap_plugin const* plugin, clap_process_t const* process) -> clap_process_status {
         auto& floe = *(FloePluginInstance*)plugin->plugin_data;
         ZoneScopedMessage(floe.trace_config, "plugin process");
@@ -658,11 +518,6 @@ clap_plugin const floe_plugin {
         return processor.processor_callbacks.process(floe.engine->processor, *process);
     },
 
-    // Query an extension.
-    // The returned pointer is owned by the plugin.
-    // It is forbidden to call it before plugin->init().
-    // You can call it within plugin->init() call, and after.
-    // [thread-safe]
     .get_extension = [](clap_plugin const* plugin, char const* id) -> void const* {
         auto& floe = *(FloePluginInstance*)plugin->plugin_data;
         ZoneScopedMessage(floe.trace_config, "plugin get_extension");
@@ -677,9 +532,6 @@ clap_plugin const floe_plugin {
         return nullptr;
     },
 
-    // Called by the host on the main thread in response to a previous call to:
-    //   host->request_callback(host);
-    // [main-thread]
     .on_main_thread =
         [](clap_plugin const* plugin) {
             auto& floe = *(FloePluginInstance*)plugin->plugin_data;

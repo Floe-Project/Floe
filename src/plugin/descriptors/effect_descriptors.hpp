@@ -4,7 +4,7 @@
 
 #include "foundation/foundation.hpp"
 
-#include "param_info.hpp"
+#include "param_descriptors.hpp"
 
 // These are not ordered
 enum class EffectType : u8 {

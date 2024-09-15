@@ -5,7 +5,7 @@
 
 #include "foundation/foundation.hpp"
 
-#include "framework/gui_imgui.hpp"
+#include "gui_framework/gui_imgui.hpp"
 
 struct EditorGUI {
     f32 y_pos = 0;

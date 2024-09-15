@@ -5,10 +5,10 @@
 
 #include <IconsFontAwesome5.h>
 
-#include "framework/draw_list.hpp"
-#include "framework/gui_imgui.hpp"
+#include "descriptors/param_descriptors.hpp"
+#include "gui_framework/draw_list.hpp"
+#include "gui_framework/gui_imgui.hpp"
 #include "gui_fwd.hpp"
-#include "infos/param_info.hpp"
 #include "layout.hpp"
 
 namespace buttons {

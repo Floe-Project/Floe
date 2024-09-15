@@ -8,8 +8,8 @@
 #include "foundation/foundation.hpp"
 #include "os/misc.hpp"
 
+#include "descriptors/param_descriptors.hpp"
 #include "effect.hpp"
-#include "infos/param_info.hpp"
 #include "processing_utils/filters.hpp"
 #include "processing_utils/lfo.hpp"
 #include "processing_utils/smoothed_value_system.hpp"

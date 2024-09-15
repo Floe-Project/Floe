@@ -10,8 +10,8 @@
 #include "common_infrastructure/sample_library/sample_library.hpp"
 
 #include "FFTConvolver/wrapper.hpp"
+#include "descriptors/param_descriptors.hpp"
 #include "effect.hpp"
-#include "infos/param_info.hpp"
 #include "processing_utils/audio_processing_context.hpp"
 #include "processing_utils/filters.hpp"
 #include "processing_utils/smoothed_value_system.hpp"

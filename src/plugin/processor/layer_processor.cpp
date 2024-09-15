@@ -7,7 +7,7 @@
 
 #include "common_infrastructure/sample_library/sample_library.hpp"
 
-#include "infos/param_info.hpp"
+#include "descriptors/param_descriptors.hpp"
 #include "param.hpp"
 #include "processing_utils/audio_processing_context.hpp"
 #include "processing_utils/filters.hpp"

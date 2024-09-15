@@ -4,8 +4,8 @@
 #pragma once
 #include "foundation/foundation.hpp"
 
+#include "descriptors/param_descriptors.hpp"
 #include "gui_fwd.hpp"
-#include "infos/param_info.hpp"
 #include "processing_utils/smoothed_value.hpp"
 #include "processor/layer_processor.hpp"
 

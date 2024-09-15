@@ -3,7 +3,7 @@
 
 #include "gui_velocity_buttons.hpp"
 
-#include "infos/param_info.hpp"
+#include "descriptors/param_descriptors.hpp"
 
 static void DrawVelocityButtonBack(imgui::Context const& imgui, Rect r) {
     imgui.graphics->AddRectFilled(r.Min(), r.Max(), LiveCol(imgui, UiColMap::VelocityButton_Back));

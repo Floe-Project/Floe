@@ -5,12 +5,12 @@
 
 #include <IconsFontAwesome5.h>
 
-#include "framework/gui_live_edit.hpp"
+#include "descriptors/param_descriptors.hpp"
+#include "gui_framework/gui_live_edit.hpp"
 #include "gui.hpp"
 #include "gui_drawing_helpers.hpp"
 #include "gui_label_widgets.hpp"
 #include "gui_window.hpp"
-#include "infos/param_info.hpp"
 #include "settings/settings_midi.hpp"
 
 void StartFloeMenu(Gui* g) { g->imgui.graphics->context->PushFont(g->roboto_small); }

@@ -6,7 +6,7 @@
 #include "os/threading.hpp"
 
 #include "clap/ext/params.h"
-#include "infos/param_info.hpp"
+#include "descriptors/param_descriptors.hpp"
 #include "param.hpp"
 #include "plugin/plugin.hpp"
 #include "voices.hpp"
@@ -1447,8 +1447,8 @@ AudioProcessor::AudioProcessor(clap_host const& host)
     for (auto const i : Range(k_num_parameters)) {
         PLACEMENT_NEW(&params[i])
         Parameter {
-            .info = k_param_infos[i],
-            .value = k_param_infos[i].default_linear_value,
+            .info = k_param_descriptors[i],
+            .value = k_param_descriptors[i].default_linear_value,
         };
     }
 

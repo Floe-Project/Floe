@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "framework/gui_imgui.hpp"
-#include "infos/param_info.hpp"
+#include "descriptors/param_descriptors.hpp"
+#include "gui_framework/gui_imgui.hpp"
 
 imgui::DrawButton* GetVelocityButtonDrawingFunction(param_values::VelocityMappingMode button_ind);

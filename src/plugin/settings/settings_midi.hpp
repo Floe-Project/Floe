@@ -4,7 +4,7 @@
 #pragma once
 #include "foundation/foundation.hpp"
 
-#include "infos/param_info.hpp"
+#include "descriptors/param_descriptors.hpp"
 #include "settings/settings_file.hpp"
 
 namespace midi_settings {
@@ -41,7 +41,10 @@ AddPersistentCcToParamMapping(Settings::Midi& midi, ArenaAllocator& arena, u8 cc
 
 PUBLIC bool Initialise(Settings::Midi& midi, ArenaAllocator& arena, bool file_is_brand_new) {
     if (file_is_brand_new) {
-        AddPersistentCcToParamMapping(midi, arena, 1, k_param_infos[ToInt(ParamIndex::MasterDynamics)].id);
+        AddPersistentCcToParamMapping(midi,
+                                      arena,
+                                      1,
+                                      k_param_descriptors[ToInt(ParamIndex::MasterDynamics)].id);
         return true;
     }
     return false;

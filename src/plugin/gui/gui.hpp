@@ -5,8 +5,8 @@
 #include "foundation/foundation.hpp"
 
 #include "engine/engine.hpp"
-#include "framework/draw_list.hpp"
-#include "framework/gui_imgui.hpp"
+#include "gui_framework/draw_list.hpp"
+#include "gui_framework/gui_imgui.hpp"
 #include "gui/gui_modal_windows.hpp"
 #include "gui_editor_widgets.hpp"
 #include "gui_envelope.hpp"

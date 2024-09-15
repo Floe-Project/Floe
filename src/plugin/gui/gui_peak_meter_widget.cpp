@@ -5,7 +5,7 @@
 
 #include "foundation/foundation.hpp"
 
-#include "framework/gui_live_edit.hpp"
+#include "gui_framework/gui_live_edit.hpp"
 #include "gui.hpp"
 #include "processing_utils/audio_utils.hpp"
 

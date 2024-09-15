@@ -9,7 +9,7 @@
 #include "os/filesystem.hpp"
 
 #include "config.h"
-#include "framework/gui_live_edit.hpp"
+#include "gui_framework/gui_live_edit.hpp"
 #include "gui.hpp"
 #include "gui/gui_label_widgets.hpp"
 #include "gui_drawing_helpers.hpp"

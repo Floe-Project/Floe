@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #pragma once
-#include "framework/gui_live_edit.hpp"
+#include "gui_framework/gui_live_edit.hpp"
 #include "gui.hpp"
 #include "gui_label_widgets.hpp"
 #include "gui_widget_helpers.hpp"

@@ -6,7 +6,7 @@
 #include <IconsFontAwesome5.h>
 
 #include "engine/engine.hpp"
-#include "framework/gui_live_edit.hpp"
+#include "gui_framework/gui_live_edit.hpp"
 #include "gui.hpp"
 #include "gui_button_widgets.hpp"
 #include "gui_dragger_widgets.hpp"

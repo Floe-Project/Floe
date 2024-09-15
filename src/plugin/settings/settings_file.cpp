@@ -9,7 +9,7 @@
 #include "utils/json/json_reader.hpp"
 
 #include "config.h"
-#include "infos/param_info.hpp"
+#include "descriptors/param_descriptors.hpp"
 #include "settings_gui.hpp"
 #include "settings_midi.hpp"
 
@@ -97,7 +97,7 @@ struct LegacyJsonSettingsParser {
                                             content.midi,
                                             allocator,
                                             cc_num,
-                                            k_param_infos
+                                            k_param_descriptors
                                                 [ToInt(result->GetFromTag<ParamExistance::StillExists>())]
                                                     .id);
                                     }
@@ -573,7 +573,8 @@ TEST_CASE(TestJsonParsing) {
 
     REQUIRE(result.midi.cc_to_param_mapping);
     CHECK(result.midi.cc_to_param_mapping->cc_num == 1);
-    CHECK(result.midi.cc_to_param_mapping->param->id == k_param_infos[ToInt(ParamIndex::MasterVolume)].id);
+    CHECK(result.midi.cc_to_param_mapping->param->id ==
+          k_param_descriptors[ToInt(ParamIndex::MasterVolume)].id);
 
     return k_success;
 }

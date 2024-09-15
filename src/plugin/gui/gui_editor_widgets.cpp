@@ -9,7 +9,7 @@
 
 #include "common_infrastructure/constants.hpp"
 
-#include "gui/framework/colours.hpp"
+#include "gui_framework/colours.hpp"
 #include "gui_window.hpp"
 
 void EditorReset(EditorGUI* g) {

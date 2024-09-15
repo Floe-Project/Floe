@@ -4,8 +4,8 @@
 #pragma once
 #include "foundation/foundation.hpp"
 
-#include "infos/effect_infos.hpp"
-#include "infos/param_info.hpp"
+#include "descriptors/effect_descriptors.hpp"
+#include "descriptors/param_descriptors.hpp"
 #include "instrument.hpp"
 
 struct StateSnapshot {

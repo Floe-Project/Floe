@@ -6,9 +6,6 @@
 
 #include "common_infrastructure/constants.hpp"
 
-// TODO: rename this to 'param_descriptors'. That matches the naming in the clap API. It's a bit clearer I
-// think too. Same with 'ParamInfo' -> 'ParamDescriptor', and effect_infos -> effect_descriptors
-
 enum class LayerParamIndex : u16 {
     Volume,
     Mute,
@@ -145,10 +142,6 @@ enum class ParamIndex : u16 {
 
     CountHelper,
     Count = CountHelper - FirstNonLayerParam,
-};
-
-enum class SpecialParameters {
-    ConvolutionIr,
 };
 
 constexpr auto k_num_parameters = ToInt(LayerParamIndex::Count) * k_num_layers + ToInt(ParamIndex::Count);
@@ -469,7 +462,7 @@ static_assert(k_velocity_mapping_mode_strings.size == ToInt(VelocityMappingMode:
 
 } // namespace param_values
 
-struct ParameterInfo {
+struct ParamDescriptor {
     enum class MenuType : u8 {
         None,
         LoopMode,
@@ -549,7 +542,7 @@ struct ParameterInfo {
         f32 exponent;
     };
 
-    constexpr ParameterInfo() = default;
+    constexpr ParamDescriptor() = default;
 
     struct ConstructorArgs {
         struct ValueConfig {
@@ -571,7 +564,7 @@ struct ParameterInfo {
         u8 related_params_group;
     };
 
-    constexpr ParameterInfo(ConstructorArgs args)
+    constexpr ParamDescriptor(ConstructorArgs args)
         : index((ParamIndex)-1)
         , id(args.id)
         , flags(args.value_config.flags)
@@ -660,37 +653,37 @@ constexpr bool IsLayerParamOfSpecificType(ParamIndex global_index, LayerParamInd
     return false;
 }
 
-struct LayerParamInfo {
+struct LayerParamIndexAndLayer {
     LayerParamIndex param;
     u32 layer_num;
 };
 
-constexpr Optional<LayerParamInfo> LayerParamInfoFromGlobalIndex(ParamIndex global_index) {
+constexpr Optional<LayerParamIndexAndLayer> LayerParamIndexAndLayerFor(ParamIndex global_index) {
     if (global_index >= ParamIndex::FirstNonLayerParam) return k_nullopt;
 
-    return LayerParamInfo {
+    return LayerParamIndexAndLayer {
         .param = (LayerParamIndex)(ToInt(global_index) % k_num_layer_parameters),
         .layer_num = ToInt(global_index) / (u32)k_num_layer_parameters,
     };
 }
 
-constexpr Span<String const> MenuItems(ParameterInfo::MenuType type) {
+constexpr Span<String const> MenuItems(ParamDescriptor::MenuType type) {
     using namespace param_values;
     switch (type) {
-        case ParameterInfo::MenuType::EqType: return k_eq_type_strings;
-        case ParameterInfo::MenuType::LoopMode: return k_loop_mode_strings;
-        case ParameterInfo::MenuType::LfoSyncedRate: return k_lfo_synced_rate_strings;
-        case ParameterInfo::MenuType::LfoRestartMode: return k_lfo_restart_mode_strings;
-        case ParameterInfo::MenuType::LfoDestination: return k_lfo_destinations_strings;
-        case ParameterInfo::MenuType::LfoShape: return k_lfo_shape_strings;
-        case ParameterInfo::MenuType::LayerFilterType: return k_layer_filter_type_strings;
-        case ParameterInfo::MenuType::EffectFilterType: return k_effect_filter_type_strings;
-        case ParameterInfo::MenuType::DistortionType: return k_distortion_type_strings;
-        case ParameterInfo::MenuType::DelaySyncedTime: return k_delay_synced_time_strings;
-        case ParameterInfo::MenuType::DelayMode: return k_delay_mode_strings;
-        case ParameterInfo::MenuType::VelocityMappingMode: return k_velocity_mapping_mode_strings;
-        case ParameterInfo::MenuType::None:
-        case ParameterInfo::MenuType::Count: break;
+        case ParamDescriptor::MenuType::EqType: return k_eq_type_strings;
+        case ParamDescriptor::MenuType::LoopMode: return k_loop_mode_strings;
+        case ParamDescriptor::MenuType::LfoSyncedRate: return k_lfo_synced_rate_strings;
+        case ParamDescriptor::MenuType::LfoRestartMode: return k_lfo_restart_mode_strings;
+        case ParamDescriptor::MenuType::LfoDestination: return k_lfo_destinations_strings;
+        case ParamDescriptor::MenuType::LfoShape: return k_lfo_shape_strings;
+        case ParamDescriptor::MenuType::LayerFilterType: return k_layer_filter_type_strings;
+        case ParamDescriptor::MenuType::EffectFilterType: return k_effect_filter_type_strings;
+        case ParamDescriptor::MenuType::DistortionType: return k_distortion_type_strings;
+        case ParamDescriptor::MenuType::DelaySyncedTime: return k_delay_synced_time_strings;
+        case ParamDescriptor::MenuType::DelayMode: return k_delay_mode_strings;
+        case ParamDescriptor::MenuType::VelocityMappingMode: return k_velocity_mapping_mode_strings;
+        case ParamDescriptor::MenuType::None:
+        case ParamDescriptor::MenuType::Count: break;
     }
     throw "";
     return {};
@@ -698,7 +691,7 @@ constexpr Span<String const> MenuItems(ParameterInfo::MenuType type) {
 
 namespace val_config_helpers {
 
-using ValConfig = ParameterInfo::ConstructorArgs::ValueConfig;
+using ValConfig = ParamDescriptor::ConstructorArgs::ValueConfig;
 
 constexpr f32 DbToAmp(f32 db) { return (f32)constexpr_math::Pow(10.0, (f64)db / 20.0); }
 constexpr f32 LogWithBase(f32 base, f32 x) {
@@ -734,7 +727,7 @@ constexpr ValConfig BidirectionalPercent(BidirectionalPercentOptions opts) {
 
 struct CustomLinearOptions {
     ParamValueType value_type = ParamValueType::Float;
-    ParameterInfo::Range range;
+    ParamDescriptor::Range range;
     f32 default_val;
     ParamFlags flags;
 };
@@ -752,7 +745,7 @@ constexpr ValConfig CustomLinear(CustomLinearOptions opts) {
 struct FilterSemitonesOptions {
     f32 default_val;
     ParamFlags flags;
-    ParameterInfo::Range range = {0, 128};
+    ParamDescriptor::Range range = {0, 128};
 };
 constexpr ValConfig FilterSemitones(FilterSemitonesOptions opts) {
     return ValConfig {
@@ -765,7 +758,7 @@ constexpr ValConfig FilterSemitones(FilterSemitonesOptions opts) {
 }
 
 struct IntOptions {
-    ParameterInfo::Range range;
+    ParamDescriptor::Range range;
     f32 default_val;
     ParamFlags flags;
 };
@@ -792,13 +785,13 @@ constexpr ValConfig Bool(BoolOptions opts) {
 }
 
 struct MenuOptions {
-    ParameterInfo::MenuType type;
+    ParamDescriptor::MenuType type;
     u32 default_val;
     ParamFlags flags;
 };
 constexpr ValConfig Menu(MenuOptions opts) {
     auto const items = MenuItems(opts.type);
-    auto const range = ParameterInfo::Range {0, (f32)items.size - 1};
+    auto const range = ParamDescriptor::Range {0, (f32)items.size - 1};
     return ValConfig {
         .linear_range = range,
         .projection = k_nullopt,
@@ -821,8 +814,8 @@ constexpr ValConfig Volume(VolumeOptions opts) {
     // By default, make it so that 0.5 linear value (the middle) maps to -6dB.
     if (!opts.exponent) opts.exponent = LogWithBase(0.5f, DbToAmp(-6) / max_amp);
 
-    ParameterInfo::Projection const p {{0, max_amp}, *opts.exponent};
-    ParameterInfo::Range const linear_range = {0, 1};
+    ParamDescriptor::Projection const p {{0, max_amp}, *opts.exponent};
+    ParamDescriptor::Range const linear_range = {0, 1};
     return ValConfig {
         .linear_range = linear_range,
         .projection = p,
@@ -851,8 +844,8 @@ struct GainOptions {
     ParamFlags flags;
 };
 constexpr ValConfig Gain(GainOptions opts) {
-    ParameterInfo::Projection const projection {{-30, 30}, 1.6f};
-    ParameterInfo::Range const linear_range = {-1, 1};
+    ParamDescriptor::Projection const projection {{-30, 30}, 1.6f};
+    ParamDescriptor::Range const linear_range = {-1, 1};
     return ValConfig {
         .linear_range = linear_range,
         .projection = projection,
@@ -864,12 +857,12 @@ constexpr ValConfig Gain(GainOptions opts) {
 }
 
 struct MsOptions {
-    ParameterInfo::Projection projection;
+    ParamDescriptor::Projection projection;
     f32 default_ms;
     ParamFlags flags;
 };
 constexpr ValConfig Ms(MsOptions opts) {
-    ParameterInfo::Range const linear_range = {0, 1};
+    ParamDescriptor::Range const linear_range = {0, 1};
     return ValConfig {
         .linear_range = linear_range,
         .projection = opts.projection,
@@ -909,12 +902,12 @@ constexpr ValConfig EnvelopeMs(MsHelperOptions opts) {
 }
 
 struct HzOptions {
-    ParameterInfo::Projection projection;
+    ParamDescriptor::Projection projection;
     f32 default_hz;
     ParamFlags flags;
 };
 constexpr ValConfig Hz(HzOptions opts) {
-    ParameterInfo::Range const linear_range {0, 1};
+    ParamDescriptor::Range const linear_range {0, 1};
     return ValConfig {
         .linear_range = linear_range,
         .projection = opts.projection,
@@ -941,7 +934,7 @@ struct HzSlowOptions {
     f32 default_hz;
     ParamFlags flags;
     f32 exponent = 1.8f;
-    ParameterInfo::Range range = {0.1f, 20};
+    ParamDescriptor::Range range = {0.1f, 20};
 };
 constexpr ValConfig HzSlow(HzSlowOptions opts) {
     return Hz({
@@ -954,11 +947,11 @@ constexpr ValConfig HzSlow(HzSlowOptions opts) {
 struct CustomProjectedOptions {
     ParamDisplayFormat display_format;
     f32 default_val;
-    ParameterInfo::Projection projection;
+    ParamDescriptor::Projection projection;
     ParamFlags flags;
 };
 constexpr ValConfig CustomProjected(CustomProjectedOptions opts) {
-    ParameterInfo::Range const linear_range {0, 1};
+    ParamDescriptor::Range const linear_range {0, 1};
     return ValConfig {
         .linear_range = linear_range,
         .projection = opts.projection,
@@ -994,7 +987,7 @@ consteval auto CreateParams() {
 
     // =====================================================================================================
     struct Result {
-        Array<ParameterInfo, k_num_parameters> params;
+        Array<ParamDescriptor, k_num_parameters> params;
 
         // index is an ID, value is a ParamIndex
         Array<IdMapIntType, k_ids_per_region * u32(IdRegion::Count)> id_map;
@@ -1004,11 +997,11 @@ consteval auto CreateParams() {
         i = k_invalid_param_id;
 
     // =====================================================================================================
-    auto mp = [&result](ParamIndex index) -> ParameterInfo& { return result.params[ToInt(index)]; };
+    auto mp = [&result](ParamIndex index) -> ParamDescriptor& { return result.params[ToInt(index)]; };
 
     using enum ParamIndex;
     using namespace param_values;
-    using Args = ParameterInfo::ConstructorArgs;
+    using Args = ParamDescriptor::ConstructorArgs;
 
     // =====================================================================================================
     mp(MasterVolume) = Args {
@@ -1043,7 +1036,7 @@ consteval auto CreateParams() {
     mp(DistortionType) = Args {
         .id = id(IdRegion::Master, 3), // never change
         .value_config = val_config_helpers::Menu({
-            .type = ParameterInfo::MenuType::DistortionType,
+            .type = ParamDescriptor::MenuType::DistortionType,
             .default_val = (u32)DistortionType::TubeLog,
         }),
         .modules = {ParameterModule::Effect, ParameterModule::Distortion},
@@ -1197,7 +1190,7 @@ consteval auto CreateParams() {
     mp(FilterType) = Args {
         .id = id(IdRegion::Master, 20), // never change
         .value_config = val_config_helpers::Menu({
-            .type = ParameterInfo::MenuType::EffectFilterType,
+            .type = ParamDescriptor::MenuType::EffectFilterType,
             .default_val = (u32)EffectFilterType::LowPass,
         }),
         .modules = {ParameterModule::Effect, ParameterModule::Filter},
@@ -1281,7 +1274,7 @@ consteval auto CreateParams() {
     mp(DelayMode) = Args {
         .id = id(IdRegion::Master, 90), // never change
         .value_config = val_config_helpers::Menu({
-            .type = ParameterInfo::MenuType::DelayMode,
+            .type = ParamDescriptor::MenuType::DelayMode,
             .default_val = (u32)DelayMode::Stereo,
         }),
         .modules = {ParameterModule::Effect, ParameterModule::Delay},
@@ -1326,7 +1319,7 @@ consteval auto CreateParams() {
     mp(DelayTimeSyncedL) = Args {
         .id = id(IdRegion::Master, 95), // never change
         .value_config = val_config_helpers::Menu({
-            .type = ParameterInfo::MenuType::DelaySyncedTime,
+            .type = ParamDescriptor::MenuType::DelaySyncedTime,
             .default_val = (u32)DelaySyncedTime::_1_4,
         }),
         .modules = {ParameterModule::Effect, ParameterModule::Delay},
@@ -1337,7 +1330,7 @@ consteval auto CreateParams() {
     mp(DelayTimeSyncedR) = Args {
         .id = id(IdRegion::Master, 96), // never change
         .value_config = val_config_helpers::Menu({
-            .type = ParameterInfo::MenuType::DelaySyncedTime,
+            .type = ParamDescriptor::MenuType::DelaySyncedTime,
             .default_val = (u32)DelaySyncedTime::_1_8,
         }),
         .modules = {ParameterModule::Effect, ParameterModule::Delay},
@@ -1536,9 +1529,9 @@ consteval auto CreateParams() {
         .related_params_group = 3,
     };
 
-    auto const shelf_gain_value_config = ParameterInfo::ConstructorArgs::ValueConfig {
+    auto const shelf_gain_value_config = ParamDescriptor::ConstructorArgs::ValueConfig {
         .linear_range = {0, 1},
-        .projection = ParameterInfo::Projection {.range = {-24, 0}, .exponent = 0.5f},
+        .projection = ParamDescriptor::Projection {.range = {-24, 0}, .exponent = 0.5f},
         .default_linear_value = 1,
         .display_format = ParamDisplayFormat::VolumeDbRange,
     };
@@ -1642,7 +1635,7 @@ consteval auto CreateParams() {
     for (auto const layer_index : Range(k_num_layers)) {
         using enum LayerParamIndex;
 
-        auto lp = [&result, layer_index](LayerParamIndex index) -> ParameterInfo& {
+        auto lp = [&result, layer_index](LayerParamIndex index) -> ParamDescriptor& {
             auto const global_index = ParamIndexFromLayerParamIndex(layer_index, index);
             return result.params[ToInt(global_index)];
         };
@@ -1706,7 +1699,7 @@ consteval auto CreateParams() {
             .value_config =
                 {
                     .linear_range {-1, 1},
-                    .projection = ParameterInfo::Projection {{-1200, 1200}, 1.8f},
+                    .projection = ParamDescriptor::Projection {{-1200, 1200}, 1.8f},
                     .default_linear_value = 0,
                     .display_format = ParamDisplayFormat::Cents,
                 },
@@ -1728,7 +1721,7 @@ consteval auto CreateParams() {
         lp(LoopMode) = Args {
             .id = id(region, 49), // never change
             .value_config = val_config_helpers::Menu({
-                .type = ParameterInfo::MenuType::LoopMode,
+                .type = ParamDescriptor::MenuType::LoopMode,
                 .default_val = (u32)LoopMode::InstrumentDefault,
             }),
             .modules = {layer_module, ParameterModule::Loop},
@@ -1848,7 +1841,7 @@ consteval auto CreateParams() {
         lp(FilterType) = Args {
             .id = id(region, 21), // never change
             .value_config = val_config_helpers::Menu({
-                .type = ParameterInfo::MenuType::LayerFilterType,
+                .type = ParamDescriptor::MenuType::LayerFilterType,
                 .default_val = (u32)LayerFilterType::Lowpass,
             }),
             .modules = {layer_module, ParameterModule::Filter},
@@ -1912,7 +1905,7 @@ consteval auto CreateParams() {
         lp(LfoShape) = Args {
             .id = id(region, 28), // never change
             .value_config = val_config_helpers::Menu({
-                .type = ParameterInfo::MenuType::LfoShape,
+                .type = ParamDescriptor::MenuType::LfoShape,
                 .default_val = (u32)LfoShape::Sine,
             }),
             .modules = {layer_module, ParameterModule::Lfo},
@@ -1923,7 +1916,7 @@ consteval auto CreateParams() {
         lp(LfoRestart) = Args {
             .id = id(region, 29), // never change
             .value_config = val_config_helpers::Menu({
-                .type = ParameterInfo::MenuType::LfoRestartMode,
+                .type = ParamDescriptor::MenuType::LfoRestartMode,
                 .default_val = (u32)LfoRestartMode::Retrigger,
             }),
             .modules = {layer_module, ParameterModule::Lfo},
@@ -1946,7 +1939,7 @@ consteval auto CreateParams() {
         lp(LfoDestination) = Args {
             .id = id(region, 31), // never change
             .value_config = val_config_helpers::Menu({
-                .type = ParameterInfo::MenuType::LfoDestination,
+                .type = ParamDescriptor::MenuType::LfoDestination,
                 .default_val = (u32)LfoDestination::Volume,
             }),
             .modules = {layer_module, ParameterModule::Lfo},
@@ -1957,7 +1950,7 @@ consteval auto CreateParams() {
         lp(LfoRateTempoSynced) = Args {
             .id = id(region, 32), // never change
             .value_config = val_config_helpers::Menu({
-                .type = ParameterInfo::MenuType::LfoSyncedRate,
+                .type = ParamDescriptor::MenuType::LfoSyncedRate,
                 .default_val = (u32)LfoSyncedRate::_1_4,
             }),
             .modules = {layer_module, ParameterModule::Lfo},
@@ -2018,7 +2011,7 @@ consteval auto CreateParams() {
         lp(EqType1) = Args {
             .id = id(region, 39), // never change
             .value_config = val_config_helpers::Menu({
-                .type = ParameterInfo::MenuType::EqType,
+                .type = ParamDescriptor::MenuType::EqType,
                 .default_val = (u32)EqType::Peak,
             }),
             .modules = {layer_module, ParameterModule::Eq, ParameterModule::Band1},
@@ -2053,7 +2046,7 @@ consteval auto CreateParams() {
         lp(EqType2) = Args {
             .id = id(region, 43), // never change
             .value_config = val_config_helpers::Menu({
-                .type = ParameterInfo::MenuType::EqType,
+                .type = ParamDescriptor::MenuType::EqType,
                 .default_val = (u32)EqType::Peak,
             }),
             .modules = {layer_module, ParameterModule::Eq, ParameterModule::Band2},
@@ -2066,7 +2059,7 @@ consteval auto CreateParams() {
         lp(VelocityMapping) = Args {
             .id = id(region, 44), // never change
             .value_config = val_config_helpers::Menu({
-                .type = ParameterInfo::MenuType::VelocityMappingMode,
+                .type = ParamDescriptor::MenuType::VelocityMappingMode,
                 .default_val = (u32)VelocityMappingMode::None,
             }),
             .modules = {layer_module, ParameterModule::Midi},
@@ -2137,7 +2130,7 @@ consteval auto CreateParams() {
 
 constexpr auto k_create_params_result = CreateParams();
 
-constexpr auto k_param_infos = k_create_params_result.params;
+constexpr auto k_param_descriptors = k_create_params_result.params;
 constexpr auto k_id_map = k_create_params_result.id_map;
 
 struct ComptimeParamSearchOptions {
@@ -2156,33 +2149,35 @@ constexpr auto ComptimeParamSearch() {
         return n;
     }());
 
-    constexpr auto k_matches_criteria = [k_modules](ParameterInfo p) {
+    constexpr auto k_matches_criteria = [k_modules](ParamDescriptor p) {
         if (k_criteria.skip && *k_criteria.skip == p.index) return false;
         return StartsWithSpan(p.module_parts, k_modules);
     };
 
     constexpr auto k_num_results = [k_matches_criteria]() {
         usize n = 0;
-        for (auto& p : k_param_infos)
+        for (auto& p : k_param_descriptors)
             if (k_matches_criteria(p)) ++n;
         return n;
     }();
 
     Array<ParamIndex, k_num_results> result {};
     usize n = 0;
-    for (auto& p : k_param_infos)
+    for (auto& p : k_param_descriptors)
         if (k_matches_criteria(p)) result[n++] = p.index;
 
     Sort(result, [](ParamIndex a, ParamIndex b) {
-        auto const& a_info = k_param_infos[ToInt(a)];
-        auto const& b_info = k_param_infos[ToInt(b)];
-        return a_info.grouping_within_module < b_info.grouping_within_module;
+        auto const& a_desc = k_param_descriptors[ToInt(a)];
+        auto const& b_desc = k_param_descriptors[ToInt(b)];
+        return a_desc.grouping_within_module < b_desc.grouping_within_module;
     });
 
     return result;
 }
 
-constexpr ParameterInfo const& ParamInfo(ParamIndex index) { return k_param_infos[ToInt(index)]; }
+constexpr ParamDescriptor const& ParamDescriptorAt(ParamIndex index) {
+    return k_param_descriptors[ToInt(index)];
+}
 
 constexpr Optional<ParamIndex> ParamIdToIndex(u32 id) {
     if (id >= k_id_map.size) return {};
@@ -2190,7 +2185,7 @@ constexpr Optional<ParamIndex> ParamIdToIndex(u32 id) {
     if (result == k_invalid_param_id) return {};
     return (ParamIndex)result;
 }
-constexpr u32 ParamIndexToId(ParamIndex index) { return k_param_infos[ToInt(index)].id; }
+constexpr u32 ParamIndexToId(ParamIndex index) { return k_param_descriptors[ToInt(index)].id; }
 
 Span<String const> ParameterMenuItems(ParamIndex param_index);
 

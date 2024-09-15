@@ -3,9 +3,9 @@
 
 #include "gui_keyboard.hpp"
 
-#include "framework/gui_live_edit.hpp"
+#include "gui_framework/gui_live_edit.hpp"
 #include "gui.hpp"
-#include "gui/framework/colours.hpp"
+#include "gui_framework/colours.hpp"
 
 Optional<KeyboardGuiKeyPressed> KeyboardGui(Gui* g, Rect r, int starting_octave) {
     auto& imgui = g->imgui;

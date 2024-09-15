@@ -4,7 +4,7 @@
 #pragma once
 #include "foundation/foundation.hpp"
 
-#include "framework/gui_imgui.hpp"
+#include "gui_framework/gui_imgui.hpp"
 #include "presets/presets_folder.hpp"
 
 struct Gui;

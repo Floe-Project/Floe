@@ -27,7 +27,7 @@
     X(RegisterLibraryLuaTests)                                                                               \
     X(RegisterLibraryMdataTests)                                                                             \
     X(RegisterSampleLibraryLoaderTests)                                                                      \
-    X(RegisterParamInfoTests)                                                                                \
+    X(RegisterParamDescriptorTests)                                                                          \
     X(RegisterDirectoryListingTests)                                                                         \
     X(RegisterSettingsFileTests)
 

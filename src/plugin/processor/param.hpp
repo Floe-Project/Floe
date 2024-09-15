@@ -5,7 +5,7 @@
 #include "foundation/foundation.hpp"
 #include "os/threading.hpp"
 
-#include "infos/param_info.hpp"
+#include "descriptors/param_descriptors.hpp"
 
 // TODO: This should be replaced by a new system. The atomic operations here are sketchy and we want a new
 // system that is far more robust and supports sample-accurate automation.
@@ -27,7 +27,7 @@ struct Parameter {
 
     f32 DefaultLinearValue() const { return info.default_linear_value; }
 
-    ParameterInfo const& info;
+    ParamDescriptor const& info;
     Atomic<f32> value;
 };
 

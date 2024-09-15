@@ -3,7 +3,7 @@
 
 #include "gui_window.hpp"
 
-#include "framework/gui_live_edit.hpp"
+#include "gui_framework/gui_live_edit.hpp"
 #include "gui_drawing_helpers.hpp"
 
 imgui::WindowSettings PopupWindowSettings(imgui::Context const& imgui) {

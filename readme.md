@@ -35,8 +35,9 @@ We will release a beta version of Floe. It will have pretty much all the feature
 We aim to provide a stable, complete version of Floe. It will be full, usable, professional software, but we are not stopping there. There are still things we want to add and improve.
 
 On the surface, it might not look very different from Mirage (Floe's predecessor). However, there are many significant improvements which are the result of over a year of development. The focus has been on these things:
-- Make the codebase amiable to years of future development: reduce technical debt, improve maintainability, automate testing and deployment.
-- Improve the ability to develop new sample libraries
+- Make the codebase amenable to years of future development: reduce technical debt, improve maintainability, automate testing and deployment.
+- Improve the ability to develop new sample libraries.
+- Make installing the plugin and sample libraries much less hassle, and fix issues relating to folders and files.
 
 New features since Mirage:
 - Ability for anyone to develop sample libraries
@@ -55,7 +56,7 @@ New features since Mirage:
 Floe is not much use without sample libraries. Next step will be to expand the number of sample libraries available so that people can start properly using it. FrozenPlain will be updating their website and converting their Mirage libraries to Floe's new sample library format.
 
 ### Step 4: continued maintainability improvements
-There's still some parts of Floe's codebase that are not amiable to long-term development: the GUI and the audio processing pipeline. These need to be reworked before big new features are added.
+There's still some parts of Floe's codebase that are not amenable to long-term development: the GUI and the audio processing pipeline. These need to be reworked before big new features are added.
 
 ### Step 5: larger improvements and new features
 The groundwork has been laid, now to level-up Floe. We will be looking at what users want as well as the following list:

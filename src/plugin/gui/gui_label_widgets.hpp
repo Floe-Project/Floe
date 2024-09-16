@@ -5,7 +5,7 @@
 
 #include "gui_button_widgets.hpp"
 #include "gui_framework/gui_imgui.hpp"
-#include "layout.hpp"
+#include "gui_framework/layout.hpp"
 
 namespace labels {
 
@@ -89,7 +89,7 @@ PUBLIC Style WaveformLoadingLabel(imgui::Context const& imgui) {
 void Label(Gui* g, Rect r, String str, Style const& style);
 void Label(Gui* g, ::Parameter const& param, Rect r, Style const& style);
 
-void Label(Gui* g, LayID r, String str, Style const& style);
-void Label(Gui* g, ::Parameter const& param, LayID r, Style const& style);
+void Label(Gui* g, layout::Id r, String str, Style const& style);
+void Label(Gui* g, ::Parameter const& param, layout::Id r, Style const& style);
 
 } // namespace labels

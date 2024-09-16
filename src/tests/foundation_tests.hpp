@@ -1725,8 +1725,8 @@ TEST_CASE(TestFormat) {
 
 TEST_CASE(TestRect) {
     SUBCASE("MakeRectThatEnclosesRects") {
-        auto const r1 = Rect {0, 5, 50, 50};
-        auto const r2 = Rect {5, 0, 100, 25};
+        auto const r1 = Rect {.xywh {0, 5, 50, 50}};
+        auto const r2 = Rect {.xywh {5, 0, 100, 25}};
         auto const enclosing = Rect::MakeRectThatEnclosesRects(r1, r2);
         REQUIRE(enclosing.x == 0);
         REQUIRE(enclosing.y == 0);

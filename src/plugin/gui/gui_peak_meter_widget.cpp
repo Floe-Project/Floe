@@ -5,8 +5,8 @@
 
 #include "foundation/foundation.hpp"
 
-#include "gui_framework/gui_live_edit.hpp"
 #include "gui.hpp"
+#include "gui_framework/gui_live_edit.hpp"
 #include "processing_utils/audio_utils.hpp"
 
 namespace peak_meters {
@@ -15,7 +15,7 @@ static void DrawPeakMeters(imgui::Context const& imgui, Rect r, f32 vl, f32 vr, 
     auto const gap = LiveSize(imgui, UiSizeId::PeakMeterGap);
     auto const marker_w = LiveSize(imgui, UiSizeId::PeakMeterMarkerWidth);
     auto const marker_pad = LiveSize(imgui, UiSizeId::PeakMeterMarkerPad);
-    auto padded_r = Rect {r.x + marker_w, r.y, r.w - (marker_w * 2), r.h};
+    auto padded_r = Rect {.x = r.x + marker_w, .y = r.y, .w = r.w - (marker_w * 2), .h = r.h};
     auto w = (padded_r.w / 2) - (gap / 2);
 
     constexpr f32 k_max_db = 10;
@@ -106,8 +106,8 @@ void PeakMeter(Gui* g, Rect r, StereoPeakMeter const& level, bool flash_when_cli
                    snapshot.levels[1],
                    flash_when_clipping && level.DidClipRecently());
 }
-void PeakMeter(Gui* g, LayID lay_id, StereoPeakMeter const& level, bool flash_when_clipping) {
-    PeakMeter(g, g->layout.GetRect(lay_id), level, flash_when_clipping);
+void PeakMeter(Gui* g, layout::Id lay_id, StereoPeakMeter const& level, bool flash_when_clipping) {
+    PeakMeter(g, layout::GetRect(g->layout, lay_id), level, flash_when_clipping);
 }
 
 } // namespace peak_meters

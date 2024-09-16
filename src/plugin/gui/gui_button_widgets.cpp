@@ -3,8 +3,8 @@
 
 #include "gui_button_widgets.hpp"
 
-#include "gui_framework/gui_live_edit.hpp"
 #include "gui.hpp"
+#include "gui_framework/gui_live_edit.hpp"
 #include "gui_velocity_buttons.hpp"
 #include "gui_widget_helpers.hpp"
 #include "gui_window.hpp"
@@ -57,7 +57,8 @@ static void DrawKeyboardIcon(Gui* g, Style const& style, Rect r, imgui::Id id, b
 
     {
         {
-            Rect kr {start_pos + f32x2 {0, black_height}, f32x2 {white_width, white_height - black_height}};
+            Rect kr {.pos = start_pos + f32x2 {0, black_height},
+                     .size = f32x2 {white_width, white_height - black_height}};
             im.graphics->AddRectFilled(kr.Min(), kr.Max(), col, rounding, 4 | 8);
 
             kr.x += white_width + gap;
@@ -69,7 +70,7 @@ static void DrawKeyboardIcon(Gui* g, Style const& style, Rect r, imgui::Id id, b
 
         {
             auto const white_top_width = (total_width - (black_width * 2 + gap * 4)) / 3;
-            Rect kr {start_pos, f32x2 {white_top_width, white_height}};
+            Rect kr {.pos = start_pos, .size = f32x2 {white_top_width, white_height}};
 
             im.graphics->AddRectFilled(kr.Min(), kr.Max(), col, rounding, 4 | 8);
 
@@ -141,7 +142,7 @@ static void DrawIconAndTextButton(Gui* g, Style const& style, Rect r, imgui::Id 
                                       TextOverflowType::AllowOverflow,
                                       style.icon_scaling);
     } else if (style.icon_and_text.icon_texture) {
-        auto const icon_r = Rect {r.x, r.y, r.h, r.h}.Reduced(r.h / 10);
+        auto const icon_r = Rect {.x = r.x, .y = r.y, .w = r.h, .h = r.h}.Reduced(r.h / 10);
         im.graphics->AddImage(*style.icon_and_text.icon_texture, icon_r.Min(), icon_r.Max());
     }
 
@@ -302,37 +303,42 @@ void FakeButton(Gui* g, Rect r, String str, bool state, Style const& style) {
     ButtonInternal(g, style, {}, {}, r, state, str);
 }
 
-bool Button(Gui* g, imgui::Id id, LayID lay_id, String str, Style const& style) {
-    return Button(g, id, g->layout.GetRect(lay_id), str, style);
+bool Button(Gui* g, imgui::Id id, layout::Id lay_id, String str, Style const& style) {
+    return Button(g, id, layout::GetRect(g->layout, lay_id), str, style);
 }
-bool Toggle(Gui* g, imgui::Id id, LayID lay_id, bool& state, String str, Style const& style) {
-    return Toggle(g, id, g->layout.GetRect(lay_id), state, str, style);
+bool Toggle(Gui* g, imgui::Id id, layout::Id lay_id, bool& state, String str, Style const& style) {
+    return Toggle(g, id, layout::GetRect(g->layout, lay_id), state, str, style);
 }
-bool Popup(Gui* g, imgui::Id button_id, imgui::Id popup_id, LayID lay_id, String str, Style const& style) {
-    return Popup(g, button_id, popup_id, g->layout.GetRect(lay_id), str, style);
-}
-
-bool Button(Gui* g, LayID lay_id, String str, Style const& style) {
-    return Button(g, g->layout.GetRect(lay_id), str, style);
-}
-bool Toggle(Gui* g, LayID lay_id, bool& state, String str, Style const& style) {
-    return Toggle(g, g->layout.GetRect(lay_id), state, str, style);
-}
-bool Popup(Gui* g, imgui::Id popup_id, LayID lay_id, String str, Style const& style) {
-    return Popup(g, popup_id, g->layout.GetRect(lay_id), str, style);
+bool Popup(Gui* g,
+           imgui::Id button_id,
+           imgui::Id popup_id,
+           layout::Id lay_id,
+           String str,
+           Style const& style) {
+    return Popup(g, button_id, popup_id, layout::GetRect(g->layout, lay_id), str, style);
 }
 
-ButtonReturnObject Toggle(Gui* g, Parameter const& param, LayID lay_id, String str, Style const& style) {
-    return Toggle(g, param, g->layout.GetRect(lay_id), str, style);
+bool Button(Gui* g, layout::Id lay_id, String str, Style const& style) {
+    return Button(g, layout::GetRect(g->layout, lay_id), str, style);
 }
-ButtonReturnObject Toggle(Gui* g, Parameter const& param, LayID lay_id, Style const& style) {
-    return Toggle(g, param, g->layout.GetRect(lay_id), style);
+bool Toggle(Gui* g, layout::Id lay_id, bool& state, String str, Style const& style) {
+    return Toggle(g, layout::GetRect(g->layout, lay_id), state, str, style);
 }
-ButtonReturnObject PopupWithItems(Gui* g, Parameter const& param, LayID lay_id, Style const& style) {
-    return PopupWithItems(g, param, g->layout.GetRect(lay_id), style);
+bool Popup(Gui* g, imgui::Id popup_id, layout::Id lay_id, String str, Style const& style) {
+    return Popup(g, popup_id, layout::GetRect(g->layout, lay_id), str, style);
 }
 
-void FakeButton(Gui* g, LayID lay_id, String str, Style const& style) {
-    FakeButton(g, g->layout.GetRect(lay_id), str, style);
+ButtonReturnObject Toggle(Gui* g, Parameter const& param, layout::Id lay_id, String str, Style const& style) {
+    return Toggle(g, param, layout::GetRect(g->layout, lay_id), str, style);
+}
+ButtonReturnObject Toggle(Gui* g, Parameter const& param, layout::Id lay_id, Style const& style) {
+    return Toggle(g, param, layout::GetRect(g->layout, lay_id), style);
+}
+ButtonReturnObject PopupWithItems(Gui* g, Parameter const& param, layout::Id lay_id, Style const& style) {
+    return PopupWithItems(g, param, layout::GetRect(g->layout, lay_id), style);
+}
+
+void FakeButton(Gui* g, layout::Id lay_id, String str, Style const& style) {
+    FakeButton(g, layout::GetRect(g->layout, lay_id), str, style);
 }
 } // namespace buttons

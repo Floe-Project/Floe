@@ -27,13 +27,6 @@
 #include "settings/settings_gui.hpp"
 #include "state/state_coding.hpp"
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wconversion"
-#define LAY_IMPLEMENTATION
-#include "layout/layout.h"
-#undef LAY_IMPLEMENTATION
-#pragma clang diagnostic pop
-
 static f32 PixelsPerPoint(Gui* g) {
     constexpr auto k_points_in_width = 1000.0f; // 1000 just because it's easy to work with
     return (f32)g->settings.settings.gui.window_width / k_points_in_width;
@@ -478,7 +471,7 @@ Gui::Gui(GuiFrameInput& frame_input, Engine& engine)
     editor.imgui = &imgui;
     imgui.user_callback_data = this;
 
-    layout.Reserve(2048);
+    layout::ReserveItemsCapacity(layout, 2048);
 
     m_window_size_listener_id =
         engine.shared_engine_systems.settings.tracking.window_size_change_listeners.Add([this]() {
@@ -494,6 +487,7 @@ Gui::Gui(GuiFrameInput& frame_input, Engine& engine)
 }
 
 Gui::~Gui() {
+    layout::DestroyContext(layout);
     ShutdownInstallPackagesModal(install_packages_state);
     sample_lib_server::CloseAsyncCommsChannel(engine.shared_engine_systems.sample_library_server,
                                               sample_lib_server_async_channel);
@@ -544,18 +538,18 @@ static void DoStandaloneErrorGUI(Gui* g) {
     if (error_window_open && there_is_an_error) {
         auto settings = imgui::DefWindow();
         settings.flags |= imgui::WindowFlags_AutoHeight | imgui::WindowFlags_AutoWidth;
-        imgui.BeginWindow(settings, {0, 0, 200, 0}, "StandaloneErrors");
+        imgui.BeginWindow(settings, {.xywh {0, 0, 200, 0}}, "StandaloneErrors");
         DEFER { imgui.EndWindow(); };
         f32 y_pos = 0;
         if (floe_ext->standalone_midi_device_error) {
-            imgui.Text(imgui::DefText(), {0, y_pos, 100, 20}, "No MIDI input");
+            imgui.Text(imgui::DefText(), {.xywh {0, y_pos, 100, 20}}, "No MIDI input");
             y_pos += 20;
         }
         if (floe_ext->standalone_audio_device_error) {
-            imgui.Text(imgui::DefText(), {0, y_pos, 100, 20}, "No audio devices");
+            imgui.Text(imgui::DefText(), {.xywh {0, y_pos, 100, 20}}, "No audio devices");
             y_pos += 20;
         }
-        if (imgui.Button(imgui::DefButton(), {0, y_pos, 100, 20}, imgui.GetID("closeErr"), "Close"))
+        if (imgui.Button(imgui::DefButton(), {.xywh {0, y_pos, 100, 20}}, imgui.GetID("closeErr"), "Close"))
             error_window_open = false;
     }
     if (floe_ext->standalone_midi_device_error) {
@@ -672,7 +666,7 @@ GuiFrameResult GuiUpdate(Gui* g) {
         mid_settings.draw_routine_window_background = draw_mid_window;
         mid_settings.flags = 0;
 
-        auto mid_panel_r = Rect {0, top_h, imgui.Width(), mid_h};
+        auto mid_panel_r = Rect {.x = 0, .y = top_h, .w = imgui.Width(), .h = mid_h};
         imgui.BeginWindow(mid_settings, mid_panel_r, "MidPanel");
         MidPanel(g);
         imgui.EndWindow();
@@ -686,7 +680,7 @@ GuiFrameResult GuiUpdate(Gui* g) {
         sets.draw_routine_window_background = draw_top_window;
         sets.pad_top_left = {LiveSize(imgui, UiSizeId::Top2PadLR), LiveSize(imgui, UiSizeId::Top2PadT)};
         sets.pad_bottom_right = {LiveSize(imgui, UiSizeId::Top2PadLR), LiveSize(imgui, UiSizeId::Top2PadB)};
-        imgui.BeginWindow(sets, {0, 0, imgui.Width(), top_h}, "TopPanel");
+        imgui.BeginWindow(sets, {.xywh {0, 0, imgui.Width(), top_h}}, "TopPanel");
         TopPanel(g);
         imgui.EndWindow();
     }
@@ -696,7 +690,7 @@ GuiFrameResult GuiUpdate(Gui* g) {
         bot_settings.pad_top_left = {8, 8};
         bot_settings.pad_bottom_right = {8, 8};
         bot_settings.draw_routine_window_background = draw_bot_window;
-        imgui.BeginWindow(bot_settings, {0, top_h + mid_h, imgui.Width(), bot_h}, "BotPanel");
+        imgui.BeginWindow(bot_settings, {.xywh {0, top_h + mid_h, imgui.Width(), bot_h}}, "BotPanel");
         BotPanel(g);
         imgui.EndWindow();
     }

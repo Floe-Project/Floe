@@ -32,9 +32,9 @@ constexpr auto k_phaser_params = ComptimeParamSearch<ComptimeParamSearchOptions 
 }>();
 
 struct EffectIDs {
-    LayID heading;
-    LayID divider;
-    LayID close;
+    layout::Id heading;
+    layout::Id divider;
+    layout::Id close;
 
     Effect* fx;
     EffectType type;
@@ -57,7 +57,7 @@ struct EffectIDs {
             LayIDPair ratio;
             LayIDPair gain;
 
-            LayID auto_gain;
+            layout::Id auto_gain;
         } compressor;
 
         struct {
@@ -96,7 +96,7 @@ struct EffectIDs {
             LayIDPair filter_cutoff;
             LayIDPair filter_spread;
             LayIDPair mode;
-            LayID sync_btn;
+            layout::Id sync_btn;
         } delay;
 
         struct {
@@ -147,8 +147,8 @@ static void ImpulseResponseMenuItems(Gui* g) {
     }
 }
 
-static void DoImpulseResponseMenu(Gui* g, LayID lay_id) {
-    auto r = g->layout.GetRect(lay_id);
+static void DoImpulseResponseMenu(Gui* g, layout::Id lay_id) {
+    auto r = layout::GetRect(g->layout, lay_id);
 
     auto id = g->imgui.GetID("Impulse");
     auto const ir_name =
@@ -248,12 +248,12 @@ void DoEffectsWindow(Gui* g, Rect r) {
     }
     imgui.BeginWindow(settings, r, "Effects");
     DEFER { imgui.EndWindow(); };
-    DEFER { lay.Reset(); };
+    DEFER { layout::ResetContext(lay); };
 
-    LayID switches[k_num_effect_types];
+    layout::Id switches[k_num_effect_types];
     for (auto& s : switches)
-        s = LAY_INVALID_ID;
-    LayID switches_bottom_divider;
+        s = layout::k_invalid_id;
+    layout::Id switches_bottom_divider;
     DynamicArrayBounded<EffectIDs, k_num_effect_types> effects;
 
     auto& dragging_fx_unit = g->dragging_fx_unit;
@@ -261,8 +261,13 @@ void DoEffectsWindow(Gui* g, Rect r) {
     //
     //
     //
-    auto const root_width = (LayScalar)(imgui.Width());
-    auto effects_root = lay.CreateRootItem(root_width, (LayScalar)imgui.Height(), LAY_COLUMN | LAY_START);
+    auto const root_width = imgui.Width();
+    auto effects_root = layout::CreateItem(lay,
+                                           {
+                                               .size = {root_width, imgui.Height()},
+                                               .contents_direction = layout::Direction::Column,
+                                               .contents_align = layout::JustifyContent::Start,
+                                           });
 
     int const switches_left_col_size = k_num_effect_types / 2 + (k_num_effect_types % 2);
 
@@ -272,28 +277,54 @@ void DoEffectsWindow(Gui* g, Rect r) {
         auto const fx_switch_board_margin_r = LiveSize(imgui, FXSwitchBoardMarginR);
         auto const fx_switch_board_margin_b = LiveSize(imgui, FXSwitchBoardMarginB);
 
-        auto switches_container = lay.CreateParentItem(effects_root, 1, 0, LAY_HFILL, LAY_ROW);
-        lay.SetMargins(switches_container,
-                       fx_switch_board_margin_l,
-                       fx_switch_board_margin_t,
-                       fx_switch_board_margin_r,
-                       fx_switch_board_margin_b);
+        auto switches_container = layout::CreateItem(lay,
+                                                     {
+                                                         .parent = effects_root,
+                                                         .size = {1, 0},
+                                                         .margins = {.l = fx_switch_board_margin_l,
+                                                                     .r = fx_switch_board_margin_r,
+                                                                     .t = fx_switch_board_margin_t,
+                                                                     .b = fx_switch_board_margin_b},
+                                                         .anchor = layout::Anchor::LeftAndRight,
+                                                         .contents_direction = layout::Direction::Row,
 
-        auto left = lay.CreateParentItem(switches_container, 1, 0, LAY_HFILL, LAY_COLUMN);
-        auto right = lay.CreateParentItem(switches_container, 1, 0, LAY_HFILL, LAY_COLUMN);
+                                                     });
+
+        auto left = layout::CreateItem(lay,
+                                       {
+                                           .parent = switches_container,
+                                           .size = {1, 0},
+                                           .anchor = layout::Anchor::LeftAndRight,
+                                           .contents_direction = layout::Direction::Column,
+
+                                       });
+        auto right = layout::CreateItem(lay,
+                                        {
+                                            .parent = switches_container,
+                                            .size = {1, 0},
+                                            .anchor = layout::Anchor::LeftAndRight,
+                                            .contents_direction = layout::Direction::Column,
+                                        });
 
         for (auto const i : Range(k_num_effect_types)) {
             auto const parent = (i < switches_left_col_size) ? left : right;
-            switches[i] =
-                lay.CreateChildItem(parent,
-                                    (root_width / 2) - fx_switch_board_margin_l - fx_switch_board_margin_r,
-                                    fx_switch_board_item_height,
-                                    0);
+            switches[i] = layout::CreateItem(
+                lay,
+                {
+                    .parent = parent,
+                    .size = {(root_width / 2) - fx_switch_board_margin_l - fx_switch_board_margin_r,
+                             fx_switch_board_item_height},
+                });
         }
     }
 
-    switches_bottom_divider = lay.CreateChildItem(effects_root, 1, 1, LAY_HFILL);
-    lay.SetMargins(switches_bottom_divider, 0, 0, 0, fx_divider_margin_b);
+    switches_bottom_divider = layout::CreateItem(lay,
+                                                 {
+                                                     .parent = effects_root,
+                                                     .size = {1, 1},
+                                                     .margins = {.b = fx_divider_margin_b},
+                                                     .anchor = layout::Anchor::LeftAndRight,
+                                                 });
 
     auto heading_font = g->fira_sans;
 
@@ -307,51 +338,91 @@ void DoEffectsWindow(Gui* g, Rect r) {
         return f32x2 {Round(size.x + epsilon) + (f32)fx_heading_extra_width, (f32)fx_heading_h};
     };
 
-    auto create_fx_ids = [&](Effect& fx, LayID* heading_container_out) {
+    auto create_fx_ids = [&](Effect& fx, layout::Id* heading_container_out) {
         EffectIDs ids;
         ids.type = fx.type;
         ids.fx = &fx;
 
         auto master_heading_container =
-            lay.CreateParentItem(effects_root, 1, 0, LAY_HFILL, LAY_ROW | LAY_START);
+            layout::CreateItem(lay,
+                               {
+                                   .parent = effects_root,
+                                   .size = {1, 0},
+                                   .anchor = layout::Anchor::LeftAndRight,
+                                   .contents_direction = layout::Direction::Row,
+                                   .contents_align = layout::JustifyContent::Start,
+                               });
 
         auto const heading_size = get_heading_size(k_effect_info[ToInt(fx.type)].name);
-        ids.heading = lay.CreateChildItem(master_heading_container,
-                                          (LayScalar)heading_size.x,
-                                          (LayScalar)heading_size.y,
-                                          LAY_LEFT | LAY_TOP);
-        lay.SetMargins(ids.heading, fx_heading_l, 0, fx_heading_r, 0);
+        ids.heading = layout::CreateItem(lay,
+                                         {
+                                             .parent = master_heading_container,
+                                             .size = {heading_size.x, heading_size.y},
+                                             .margins = {.l = fx_heading_l, .r = fx_heading_r},
+                                             .anchor = layout::Anchor::Left | layout::Anchor::Top,
+                                         });
 
-        auto heading_container =
-            lay.CreateParentItem(master_heading_container, 1, 0, LAY_HFILL, LAY_ROW | LAY_END);
+        auto heading_container = layout::CreateItem(lay,
+                                                    {
+                                                        .parent = master_heading_container,
+                                                        .size = {1, 0},
+                                                        .anchor = layout::Anchor::LeftAndRight,
+                                                        .contents_direction = layout::Direction::Row,
+                                                        .contents_align = layout::JustifyContent::End,
 
-        ids.close =
-            lay.CreateChildItem(master_heading_container, fx_close_button_width, fx_close_button_height, 0);
+                                                    });
+
+        ids.close = layout::CreateItem(lay,
+                                       {
+                                           .parent = master_heading_container,
+                                           .size = {fx_close_button_width, fx_close_button_height},
+                                       });
 
         if (heading_container_out) *heading_container_out = heading_container;
         return ids;
     };
 
     auto create_divider_id = [&]() {
-        auto result = lay.CreateChildItem(effects_root, 1, 1, LAY_HFILL);
-        lay.SetMargins(result, 0, fx_divider_margin_t, 0, fx_divider_margin_b);
+        auto result = layout::CreateItem(lay,
+                                         {
+                                             .parent = effects_root,
+                                             .size = {1, 1},
+                                             .margins = {.t = fx_divider_margin_t, .b = fx_divider_margin_b},
+                                             .anchor = layout::Anchor::LeftAndRight,
+                                         });
         return result;
     };
 
     auto create_param_container = [&]() {
-        return lay.CreateParentItem(effects_root, 1, 0, LAY_HFILL, LAY_ROW | LAY_MIDDLE | LAY_WRAP);
+        return layout::CreateItem(lay,
+                                  {
+                                      .parent = effects_root,
+                                      .size = {1, 0},
+                                      .anchor = layout::Anchor::LeftAndRight,
+                                      .contents_direction = layout::Direction::Row,
+                                      .contents_multiline = true,
+                                      .contents_align = layout::JustifyContent::Middle,
+
+                                  });
     };
 
-    auto create_subcontainer = [&](LayID parent) { return lay.CreateParentItem(parent, 0, 0, 0, LAY_ROW); };
+    auto create_subcontainer = [&](layout::Id parent) {
+        return layout::CreateItem(lay,
+                                  {
+                                      .parent = parent,
+                                      .size = {0, 0},
+                                      .contents_direction = layout::Direction::Row,
+                                  });
+    };
 
     auto layout_all = [&](Span<LayIDPair> ids, Span<ParamIndex const> params) {
         auto param_container = create_param_container();
 
-        Optional<LayID> container {};
+        Optional<layout::Id> container {};
         u8 previous_group = 0;
         for (auto const i : Range(ids.size)) {
             auto const& info = k_param_descriptors[ToInt(params[i])];
-            LayID inner_container = param_container;
+            layout::Id inner_container = param_container;
             if (info.grouping_within_module != 0) {
                 if (!container || info.grouping_within_module != previous_group)
                     container = create_subcontainer(param_container);
@@ -418,14 +489,16 @@ void DoEffectsWindow(Gui* g, Rect r) {
             }
 
             case EffectType::Compressor: {
-                LayID heading_container;
+                layout::Id heading_container;
                 auto ids = create_fx_ids(engine.processor.compressor, &heading_container);
                 auto param_container = create_param_container();
 
-                ids.compressor.auto_gain = lay.CreateChildItem(heading_container,
-                                                               fx_compressor_auto_gain_width,
-                                                               fx_param_button_height,
-                                                               0);
+                ids.compressor.auto_gain =
+                    layout::CreateItem(lay,
+                                       {
+                                           .parent = heading_container,
+                                           .size = {fx_compressor_auto_gain_width, fx_param_button_height},
+                                       });
 
                 LayoutParameterComponent(g,
                                          param_container,
@@ -542,14 +615,16 @@ void DoEffectsWindow(Gui* g, Rect r) {
             }
 
             case EffectType::Delay: {
-                LayID heading_container;
+                layout::Id heading_container;
                 auto ids = create_fx_ids(engine.processor.delay, &heading_container);
                 auto param_container = create_param_container();
 
-                ids.delay.sync_btn = lay.CreateChildItem(heading_container,
-                                                         fx_delay_sync_btn_width,
-                                                         fx_param_button_height,
-                                                         0);
+                ids.delay.sync_btn =
+                    layout::CreateItem(lay,
+                                       {
+                                           .parent = heading_container,
+                                           .size = {fx_delay_sync_btn_width, fx_param_button_height},
+                                       });
 
                 auto left = &engine.processor.params[ToInt(ParamIndex::DelayTimeSyncedL)];
                 auto right = &engine.processor.params[ToInt(ParamIndex::DelayTimeSyncedR)];
@@ -571,7 +646,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
                                                  param_container,
                                                  ids.delay.mode,
                                                  engine.processor.params[ToInt(ParamIndex::DelayMode)]);
-                    lay_set_behave(&lay.ctx, id, LAY_BREAK);
+                    layout::SetBehave(lay, id, layout::flags::LineBreak);
                 }
                 LayoutParameterComponent(
                     g,
@@ -631,18 +706,18 @@ void DoEffectsWindow(Gui* g, Rect r) {
     //
     //
     //
-    lay.PerformLayout();
+    layout::RunContext(lay);
 
-    LayID closest_divider = LAY_INVALID_ID;
+    layout::Id closest_divider = layout::k_invalid_id;
     if (dragging_fx_unit && imgui.HoveredWindow() == imgui.CurrentWindow()) {
         f32 const rel_y_pos = imgui.ScreenPosToWindowPos(imgui.frame_input.cursor_pos).y;
-        f32 distance = Abs(lay.GetRect(switches_bottom_divider).y - rel_y_pos);
+        f32 distance = Abs(layout::GetRect(lay, switches_bottom_divider).y - rel_y_pos);
         closest_divider = switches_bottom_divider;
         usize closest_slot = 0;
         auto const original_slot = FindSlotInEffects(ordered_effects, dragging_fx_unit->fx);
 
         for (auto ids : effects) {
-            if (f32 const d = Abs(lay.GetRect(ids.divider).y - rel_y_pos); d < distance) {
+            if (f32 const d = Abs(layout::GetRect(lay, ids.divider).y - rel_y_pos); d < distance) {
                 distance = d;
                 closest_divider = ids.divider;
                 closest_slot = FindSlotInEffects(ordered_effects, ids.fx) + 1;
@@ -656,19 +731,19 @@ void DoEffectsWindow(Gui* g, Rect r) {
         dragging_fx_unit->drop_slot = closest_slot;
     }
 
-    auto const draw_divider = [&](LayID id) {
+    auto const draw_divider = [&](layout::Id id) {
         auto const room_at_scroll_window_bottom = imgui.PointsToPixels(15);
         auto const line_r =
-            imgui.GetRegisteredAndConvertedRect(lay.GetRect(id).WithH(room_at_scroll_window_bottom));
+            imgui.GetRegisteredAndConvertedRect(layout::GetRect(lay, id).WithH(room_at_scroll_window_bottom));
         imgui.graphics->AddLine(line_r.TopLeft(),
                                 line_r.TopRight(),
                                 (id == closest_divider) ? LiveCol(imgui, UiColMap::FXDividerLineDropZone)
                                                         : LiveCol(imgui, UiColMap::FXDividerLine));
     };
 
-    auto const draw_knob_joining_line = [&](LayID knob1, LayID knob2) {
-        auto r1 = imgui.GetRegisteredAndConvertedRect(lay.GetRect(knob1));
-        auto r2 = imgui.GetRegisteredAndConvertedRect(lay.GetRect(knob2));
+    auto const draw_knob_joining_line = [&](layout::Id knob1, layout::Id knob2) {
+        auto r1 = imgui.GetRegisteredAndConvertedRect(layout::GetRect(lay, knob1));
+        auto r2 = imgui.GetRegisteredAndConvertedRect(layout::GetRect(lay, knob2));
         f32x2 const start {r1.Right() + fx_knob_joining_line_pad_lr,
                            r1.CentreY() - fx_knob_joining_line_thickness / 2};
         f32x2 const end {r2.x - fx_knob_joining_line_pad_lr, start.y};
@@ -708,7 +783,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
         auto const do_heading = [&](Effect& fx, u32 col) {
             {
                 auto const id = imgui.GetID("heading");
-                auto const r = lay.GetRect(ids.heading);
+                auto const r = layout::GetRect(lay, ids.heading);
                 buttons::Button(g,
                                 id,
                                 r,
@@ -729,7 +804,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
 
             {
                 auto const close_id = imgui.GetID("close");
-                auto const r = lay.GetRect(ids.close);
+                auto const r = layout::GetRect(lay, ids.close);
                 if (buttons::Button(g,
                                     close_id,
                                     r,
@@ -1012,7 +1087,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
             style.draw_with_overlay_graphics = true;
 
             auto const text = k_effect_info[ToInt(dragging_fx_unit->fx->type)].name;
-            Rect btn_r {g->frame_input.cursor_pos, get_heading_size(text)};
+            Rect btn_r {.pos = g->frame_input.cursor_pos, .size = get_heading_size(text)};
             btn_r.pos += {btn_r.h, 0};
             buttons::FakeButton(g, btn_r, text, style);
         }
@@ -1050,7 +1125,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
         auto& dragging_fx = g->dragging_fx_switch;
         usize fx_index = 0;
         for (auto const slot : Range(k_num_effect_types)) {
-            auto const whole_r = lay.GetRect(switches[slot]);
+            auto const whole_r = layout::GetRect(lay, switches[slot]);
             auto const number_r = whole_r.WithW((f32)fx_switch_board_number_width);
             auto const slot_r = whole_r.CutLeft((f32)fx_switch_board_number_width);
             auto const converted_slot_r = imgui.GetRegisteredAndConvertedRect(slot_r);
@@ -1114,7 +1189,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
                 buttons::ParameterToggleButton(imgui, GetFxCols(imgui, dragging_fx->fx->type).button);
             style.draw_with_overlay_graphics = true;
 
-            Rect btn_r {lay.GetRect(switches[0])};
+            Rect btn_r {layout::GetRect(lay, switches[0])};
             btn_r.pos = imgui.frame_input.cursor_pos - dragging_fx->relative_grab_point;
 
             auto active_fx = dragging_fx->fx;

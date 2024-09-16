@@ -68,36 +68,105 @@ void TopPanel(Gui* g) {
     auto const peak_meter_w = LiveSize(imgui, UiSizeId::Top2PeakMeterW);
     auto const peak_meter_h = LiveSize(imgui, UiSizeId::Top2PeakMeterH);
 
-    auto root = lay.CreateRootItem((LayScalar)imgui.Width(), (LayScalar)imgui.Height(), LAY_ROW | LAY_START);
+    auto root = layout::CreateItem(lay,
+                                   {
+                                       .size = imgui.Size(),
+                                       .contents_direction = layout::Direction::Row,
+                                       .contents_align = layout::JustifyContent::Start,
+                                   });
 
-    auto left_container = lay.CreateParentItem(root, 0, 1, LAY_VFILL, LAY_ROW | LAY_START);
+    auto left_container = layout::CreateItem(lay,
+                                             {
+                                                 .parent = root,
+                                                 .size = {0, 1},
+                                                 .anchor = layout::Anchor::TopAndBottom,
+                                                 .contents_direction = layout::Direction::Row,
+                                                 .contents_align = layout::JustifyContent::Start,
 
-    auto title = lay.CreateChildItem(left_container,
-                                     title_width,
-                                     (LayScalar)title_font->font_size_no_scale,
-                                     LAY_VCENTER);
-    lay.SetLeftMargin(title, title_margin_l);
+                                             });
 
-    auto right_container = lay.CreateParentItem(root, 1, 1, LAY_FILL, LAY_ROW | LAY_END);
+    auto title = layout::CreateItem(lay,
+                                    {
+                                        .parent = left_container,
+                                        .size = {title_width, (f32)title_font->font_size_no_scale},
+                                        .margins = {.l = title_margin_l},
+                                    });
 
-    auto preset_box = lay.CreateParentItem(right_container, 0, 0, LAY_VCENTER, LAY_ROW | LAY_START);
-    lay.SetRightMargin(preset_box, preset_box_margin_r);
-    lay.SetLeftMargin(preset_box, preset_box_margin_l);
+    auto right_container = layout::CreateItem(lay,
+                                              {
+                                                  .parent = root,
+                                                  .size = {1, 1},
+                                                  .anchor = layout::Anchor::All,
+                                                  .contents_direction = layout::Direction::Row,
+                                                  .contents_align = layout::JustifyContent::End,
 
-    auto preset_menu = lay.CreateChildItem(preset_box, preset_box_w, icon_height, 0);
-    auto preset_left = lay.CreateChildItem(preset_box, preset_box_icon_width, icon_height, 0);
-    auto preset_right = lay.CreateChildItem(preset_box, preset_box_icon_width, icon_height, 0);
-    auto preset_random = lay.CreateChildItem(preset_box, preset_box_icon_width, icon_height, 0);
-    auto preset_random_menu = lay.CreateChildItem(preset_box, preset_box_icon_width, icon_height, 0);
-    auto preset_save = lay.CreateChildItem(preset_box, preset_box_icon_width, icon_height, 0);
-    lay.SetRightMargin(preset_save, preset_box_pad_r);
+                                              });
 
-    auto box = lay.CreateChildItem(right_container, icon_width, icon_height, LAY_VCENTER);
-    auto cog = lay.CreateChildItem(right_container, icon_width, icon_height, LAY_VCENTER);
-    auto menu = lay.CreateChildItem(right_container, icon_width, icon_height, LAY_VCENTER);
+    auto preset_box = layout::CreateItem(lay,
+                                         {
+                                             .parent = right_container,
+                                             .size = {0, 0},
+                                             .margins = {.l = preset_box_margin_l, .r = preset_box_margin_r},
+                                             .contents_direction = layout::Direction::Row,
+                                             .contents_align = layout::JustifyContent::Start,
+                                         });
 
-    auto knob_container = lay.CreateParentItem(right_container, 0, 0, LAY_VCENTER, LAY_ROW);
-    lay.SetMargins(knob_container, knobs_margin_l, 0, knobs_margin_r, 0);
+    auto preset_menu = layout::CreateItem(lay,
+                                          {
+                                              .parent = preset_box,
+                                              .size = {preset_box_w, icon_height},
+                                          });
+    auto preset_left = layout::CreateItem(lay,
+                                          {
+                                              .parent = preset_box,
+                                              .size = {preset_box_icon_width, icon_height},
+                                          });
+    auto preset_right = layout::CreateItem(lay,
+                                           {
+                                               .parent = preset_box,
+                                               .size = {preset_box_icon_width, icon_height},
+                                           });
+    auto preset_random = layout::CreateItem(lay,
+                                            {
+                                                .parent = preset_box,
+                                                .size = {preset_box_icon_width, icon_height},
+                                            });
+    auto preset_random_menu = layout::CreateItem(lay,
+                                                 {
+                                                     .parent = preset_box,
+                                                     .size = {preset_box_icon_width, icon_height},
+                                                 });
+    auto preset_save = layout::CreateItem(lay,
+                                          {
+                                              .parent = preset_box,
+                                              .size = {preset_box_icon_width, icon_height},
+                                              .margins = {.r = preset_box_pad_r},
+                                          });
+
+    auto box = layout::CreateItem(lay,
+                                  {
+                                      .parent = right_container,
+                                      .size = {icon_width, icon_height},
+                                  });
+    auto cog = layout::CreateItem(lay,
+                                  {
+                                      .parent = right_container,
+                                      .size = {icon_width, icon_height},
+                                  });
+    auto menu = layout::CreateItem(lay,
+                                   {
+                                       .parent = right_container,
+                                       .size = {icon_width, icon_height},
+                                   });
+
+    auto knob_container = layout::CreateItem(lay,
+                                             {
+                                                 .parent = right_container,
+                                                 .size = {0, 0},
+                                                 .margins = {.l = knobs_margin_l, .r = knobs_margin_r},
+                                                 .contents_direction = layout::Direction::Row,
+
+                                             });
     LayIDPair dyn;
     LayoutParameterComponent(g,
                              knob_container,
@@ -117,23 +186,27 @@ void TopPanel(Gui* g) {
                              engine.processor.params[ToInt(ParamIndex::MasterVolume)],
                              UiSizeId::Top2KnobsGapX);
 
-    auto level = lay.CreateChildItem(right_container, peak_meter_w, peak_meter_h, LAY_VCENTER);
+    auto level = layout::CreateItem(lay,
+                                    {
+                                        .parent = right_container,
+                                        .size = {peak_meter_w, peak_meter_h},
+                                    });
 
-    lay.PerformLayout();
+    layout::RunContext(lay);
 
-    auto preset_rand_r = lay.GetRect(preset_random);
-    auto preset_rand_menu_r = lay.GetRect(preset_random_menu);
-    auto preset_menu_r = lay.GetRect(preset_menu);
-    auto preset_left_r = lay.GetRect(preset_left);
-    auto preset_right_r = lay.GetRect(preset_right);
-    auto preset_save_r = lay.GetRect(preset_save);
-    auto level_r = lay.GetRect(level);
+    auto preset_rand_r = layout::GetRect(lay, preset_random);
+    auto preset_rand_menu_r = layout::GetRect(lay, preset_random_menu);
+    auto preset_menu_r = layout::GetRect(lay, preset_menu);
+    auto preset_left_r = layout::GetRect(lay, preset_left);
+    auto preset_right_r = layout::GetRect(lay, preset_right);
+    auto preset_save_r = layout::GetRect(lay, preset_save);
+    auto level_r = layout::GetRect(lay, level);
 
     //
     //
     //
     {
-        auto back_r = imgui.GetRegisteredAndConvertedRect(lay.GetRect(preset_box));
+        auto back_r = imgui.GetRegisteredAndConvertedRect(layout::GetRect(lay, preset_box));
         auto const rounding = LiveSize(imgui, UiSizeId::CornerRounding);
         imgui.graphics->AddRectFilled(back_r.Min(),
                                       back_r.Max(),
@@ -146,7 +219,7 @@ void TopPanel(Gui* g) {
 
         String const name = "Floe";
 
-        auto title_r = lay.GetRect(title).Up(Round(-title_font->descent));
+        auto title_r = layout::GetRect(lay, title).Up(Round(-title_font->descent));
 
         labels::Label(g, title_r, name, labels::Title(imgui, LiveCol(imgui, UiColMap::TopPanelTitleText)));
         if (title_font) imgui.graphics->context->PopFont();
@@ -288,7 +361,7 @@ void TopPanel(Gui* g) {
 
     {
         auto btn_id = imgui.GetID("install");
-        auto btn_r = lay.GetRect(box);
+        auto btn_r = layout::GetRect(lay, box);
         if (buttons::Button(g, btn_id, btn_r, ICON_FA_BOX_OPEN, large_icon_button_style))
             OpenInstallPackagesModal(g);
         Tooltip(g, btn_id, btn_r, "Install libraries & presets"_s);
@@ -296,14 +369,14 @@ void TopPanel(Gui* g) {
 
     {
         auto btn_id = imgui.GetID("sets");
-        auto btn_r = lay.GetRect(cog);
+        auto btn_r = layout::GetRect(lay, cog);
         if (buttons::Button(g, btn_id, btn_r, ICON_FA_COG, large_icon_button_style))
             OpenModalIfNotAlready(imgui, ModalWindowType::Settings);
         Tooltip(g, btn_id, btn_r, "Open settings window"_s);
     }
 
     {
-        auto additonal_menu_r = lay.GetRect(menu);
+        auto additonal_menu_r = layout::GetRect(lay, menu);
         auto additional_menu_id = imgui.GetID("Menu");
         auto popup_id = imgui.GetID("MenuPopup");
         if (buttons::Popup(g,
@@ -344,7 +417,7 @@ void TopPanel(Gui* g) {
             if (imgui.WasJustActivated(id))
                 g->imgui.frame_output.ElevateUpdateRequest(GuiFrameResult::UpdateRequest::ImmediatelyUpdate);
         } else {
-            auto knob_r = lay.GetRect(dyn.control);
+            auto knob_r = layout::GetRect(lay, dyn.control);
             knobs::FakeKnob(g, knob_r);
 
             imgui.RegisterAndConvertRect(&knob_r);
@@ -362,5 +435,5 @@ void TopPanel(Gui* g) {
                       labels::ParameterCentred(imgui, !has_insts_with_dynamics));
     }
 
-    lay.Reset();
+    layout::ResetContext(lay);
 }

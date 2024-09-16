@@ -80,7 +80,7 @@ void GUIDoEnvelope(Gui* g,
         attack_x_range.min = get_x_coord_at_percent(0);
         attack_x_range.max = get_x_coord_at_percent(1);
 
-        Rect grabber = {0, 0, attack_point.x + (handle_size / 2), imgui.Height()};
+        Rect grabber = {.xywh {0, 0, attack_point.x + (handle_size / 2), imgui.Height()}};
         auto const grabber_unregistered = grabber;
         MidiLearnMenu(g, attack_param_id, grabber_unregistered);
         imgui.RegisterAndConvertRect(&grabber);
@@ -217,10 +217,8 @@ void GUIDoEnvelope(Gui* g,
         release_x_range.min = get_x_coord_at_percent(0);
         release_x_range.max = get_x_coord_at_percent(1);
 
-        Rect grabber {sustain_point.x,
-                      0,
-                      max_release_percent * padded_width + handle_size / 2,
-                      imgui.Height()};
+        Rect grabber {
+            .xywh {sustain_point.x, 0, max_release_percent * padded_width + handle_size / 2, imgui.Height()}};
         auto const grabber_unregistered = grabber;
 
         MidiLearnMenu(g, release_param_id, grabber_unregistered);
@@ -399,7 +397,7 @@ void GUIDoEnvelope(Gui* g,
         };
 
         auto const cut = imgui.Width() / 3;
-        Rect const edit_r {cut, 0, imgui.Width() - cut * 2, imgui.Height()};
+        Rect const edit_r {.xywh {cut, 0, imgui.Width() - cut * 2, imgui.Height()}};
         HandleShowingTextEditorForParams(g, edit_r, params);
     }
 }

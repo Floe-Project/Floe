@@ -31,35 +31,27 @@ PUBLIC constexpr UiSize ExpandChecked(UiSize size, UiSize expansion) {
     return {CheckedCast<u16>(size.width + expansion.width), CheckedCast<u16>(size.height + expansion.height)};
 }
 
-// NOTE: we have to be a bit careful with naming here. The name 'Rectangle' conflicts with a GDI
-// header on Windows, and 'Rect' conflicts with an header on macOS
 struct Rect {
-    Rect(f32x2 _pos, f32 _w, f32 _h) : pos(_pos), w(_w), h(_h) {}
-    Rect(f32 _x, f32 _y, f32x2 _size) : pos {_x, _y}, size(_size) {}
-    Rect(f32x2 _pos, f32x2 _size) : pos(_pos), size(_size) {}
-    Rect(f32 _x, f32 _y, f32 _w, f32 _h) : pos {_x, _y}, w(_w), h(_h) {}
-    Rect() { x = y = w = h = 0; }
+    Rect Up(f32 offset) const { return {.xywh = {x, y - offset, w, h}}; }
+    Rect Down(f32 offset) const { return {.xywh = {x, y + offset, w, h}}; }
+    Rect Left(f32 offset) const { return {.xywh = {x - offset, y, w, h}}; }
+    Rect Right(f32 offset) const { return {.xywh = {x + offset, y, w, h}}; }
 
-    Rect Up(f32 offset) const { return Rect(x, y - offset, w, h); }
-    Rect Down(f32 offset) const { return Rect(x, y + offset, w, h); }
-    Rect Left(f32 offset) const { return Rect(x - offset, y, w, h); }
-    Rect Right(f32 offset) const { return Rect(x + offset, y, w, h); }
+    Rect WithX(f32 _x) const { return {.xywh = {_x, y, w, h}}; }
+    Rect WithY(f32 _y) const { return {.xywh = {x, _y, w, h}}; }
+    Rect WithW(f32 _w) const { return {.xywh = {x, y, _w, h}}; }
+    Rect WithH(f32 _h) const { return {.xywh = {x, y, w, _h}}; }
 
-    Rect WithX(f32 _x) const { return Rect(_x, y, w, h); }
-    Rect WithY(f32 _y) const { return Rect(x, _y, w, h); }
-    Rect WithW(f32 _w) const { return Rect(x, y, _w, h); }
-    Rect WithH(f32 _h) const { return Rect(x, y, w, _h); }
+    Rect WithXW(f32 _x, f32 _w) const { return {.xywh = {_x, y, _w, h}}; }
+    Rect WithYH(f32 _y, f32 _h) const { return {.xywh = {x, _y, w, _h}}; }
 
-    Rect WithXW(f32 _x, f32 _w) const { return Rect(_x, y, _w, h); }
-    Rect WithYH(f32 _y, f32 _h) const { return Rect(x, _y, w, _h); }
+    Rect WithPos(f32x2 _pos) const { return {.pos = _pos, .size = size}; }
+    Rect WithSize(f32x2 _size) const { return {.pos = pos, .size = _size}; }
 
-    Rect WithPos(f32x2 _pos) const { return Rect(_pos, size); }
-    Rect WithSize(f32x2 _size) const { return Rect(pos, _size); }
-
-    Rect CutLeft(f32 cut_amount) const { return Rect(x + cut_amount, y, w - cut_amount, h); }
-    Rect CutTop(f32 cut_amount) const { return Rect(x, y + cut_amount, w, h - cut_amount); }
-    Rect CutRight(f32 cut_amount) const { return Rect(x, y, w - cut_amount, h); }
-    Rect CutBottom(f32 cut_amount) const { return Rect(x, y, w, h - cut_amount); }
+    Rect CutLeft(f32 cut_amount) const { return {.xywh = {x + cut_amount, y, w - cut_amount, h}}; }
+    Rect CutTop(f32 cut_amount) const { return {.xywh = {x, y + cut_amount, w, h - cut_amount}}; }
+    Rect CutRight(f32 cut_amount) const { return {.xywh = {x, y, w - cut_amount, h}}; }
+    Rect CutBottom(f32 cut_amount) const { return {.xywh = {x, y, w, h - cut_amount}}; }
 
     void SetBottomByResizing(f32 b) { h = b - pos.y; }
     void SetRightByResizing(f32 r) { w = r - pos.x; }
@@ -123,7 +115,7 @@ struct Rect {
         auto const y2 = ::Min(a.y + a.h, b.y + b.h);
         if (y2 < y1) return false;
 
-        a = Rect(x1, y1, x2 - x1, y2 - y1);
+        a = Rect {.xywh = {x1, y1, x2 - x1, y2 - y1}};
         return true;
     }
 
@@ -131,7 +123,7 @@ struct Rect {
         return !((b.x > (a.x + a.w)) || ((b.x + b.w) < a.x) || (b.y > (a.y + a.h)) || (b.y + b.h) < a.y);
     }
 
-    static Rect FromMinMax(f32x2 min, f32x2 max) { return Rect(min, max - min); }
+    static Rect FromMinMax(f32x2 min, f32x2 max) { return Rect {.pos = min, .size = max - min}; }
 
     static Rect MakeRectThatEnclosesRects(Rect const& a, Rect const& b) {
         Rect result;
@@ -152,18 +144,23 @@ struct Rect {
     }
 
     union {
-        f32x2 pos;
         struct {
-            f32 x;
-            f32 y;
+            union {
+                f32x2 pos;
+                struct {
+                    f32 x;
+                    f32 y;
+                };
+            };
+            union {
+                f32x2 size;
+                struct {
+                    f32 w;
+                    f32 h;
+                };
+            };
         };
-    };
-    union {
-        f32x2 size;
-        struct {
-            f32 w;
-            f32 h;
-        };
+        f32x4 xywh {};
     };
 };
 
@@ -198,13 +195,13 @@ namespace rect_cut {
 
 PUBLIC inline Rect CutRight(Rect& r, f32 cut_size) {
     auto const new_width = r.w - cut_size;
-    Rect const result {r.x + new_width, r.y, cut_size, r.h};
+    Rect const result {.x = r.x + new_width, .y = r.y, .w = cut_size, .h = r.h};
     r.w = new_width;
     return result;
 }
 
 PUBLIC inline Rect CutLeft(Rect& r, f32 cut_size) {
-    Rect const result {r.x, r.y, cut_size, r.h};
+    Rect const result {.x = r.x, .y = r.y, .w = cut_size, .h = r.h};
     r.x += cut_size;
     r.w -= cut_size;
     return result;
@@ -212,13 +209,13 @@ PUBLIC inline Rect CutLeft(Rect& r, f32 cut_size) {
 
 PUBLIC inline Rect CutBottom(Rect& r, f32 cut_size) {
     auto const new_height = r.h - cut_size;
-    Rect const result {r.x, r.y + new_height, r.w, cut_size};
+    Rect const result {.x = r.x, .y = r.y + new_height, .w = r.w, .h = cut_size};
     r.h = new_height;
     return result;
 }
 
 PUBLIC inline Rect CutTop(Rect& r, f32 cut_size) {
-    Rect const result {r.x, r.y, r.w, cut_size};
+    Rect const result {.x = r.x, .y = r.y, .w = r.w, .h = cut_size};
     r.y += cut_size;
     r.h -= cut_size;
     return result;

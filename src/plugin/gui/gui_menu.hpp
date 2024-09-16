@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #pragma once
-#include "gui_framework/gui_live_edit.hpp"
 #include "gui.hpp"
+#include "gui_framework/gui_live_edit.hpp"
 #include "gui_label_widgets.hpp"
 #include "gui_widget_helpers.hpp"
 
@@ -82,7 +82,7 @@ struct PopupMenuItems {
 
     void Divider() {
         auto& imgui = m_g->imgui;
-        Rect div_r = {m_div_gap_x, m_y_pos + (m_div_h / 2), m_g->imgui.Width() - 2 * m_div_gap_x, 1};
+        Rect div_r = {.xywh {m_div_gap_x, m_y_pos + (m_div_h / 2), m_g->imgui.Width() - 2 * m_div_gap_x, 1}};
         m_g->imgui.RegisterAndConvertRect(&div_r);
         m_g->imgui.graphics->AddRectFilled(div_r.Min(),
                                            div_r.Max(),
@@ -94,7 +94,7 @@ struct PopupMenuItems {
 
   private:
     Rect GetItemRect() {
-        m_item_rect = {0, m_y_pos, m_w, m_h};
+        m_item_rect = {.xywh {0, m_y_pos, m_w, m_h}};
         return m_item_rect;
     }
 

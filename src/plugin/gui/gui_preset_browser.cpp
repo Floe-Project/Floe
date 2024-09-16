@@ -9,10 +9,10 @@
 #include "os/filesystem.hpp"
 
 #include "config.h"
-#include "gui_framework/gui_live_edit.hpp"
 #include "gui.hpp"
 #include "gui/gui_label_widgets.hpp"
 #include "gui_drawing_helpers.hpp"
+#include "gui_framework/gui_live_edit.hpp"
 #include "gui_widget_helpers.hpp"
 #include "gui_window.hpp"
 #include "presets/presets_folder.hpp"
@@ -71,7 +71,8 @@ Rect PresetBrowser::GetAndIncrementRect(bool const is_in_folder_list, f32& ypos,
     auto const indent_px =
         is_in_folder_list ? ((f32)indent * preset_button_folder_indent + preset_button_folder_initial_indent)
                           : (f32)indent * preset_button_file_indent;
-    auto const result = Rect {indent_px, ypos, imgui.Width() - indent_px, preset_button_height};
+    auto const result =
+        Rect {.x = indent_px, .y = ypos, .w = imgui.Width() - indent_px, .h = preset_button_height};
     ypos += preset_button_height + preset_button_ygap;
     return result;
 }
@@ -200,16 +201,16 @@ DirectoryListing::Entry const* PresetBrowser::DoPresetFilesRecurse(DirectoryList
                     count = 0;
 
                     auto const starting_y = ypos;
-                    Rect const r {0,
-                                  ypos,
-                                  imgui.Width(),
-                                  LiveSize(imgui, UiSizeId::PresetFilesFolderHeadingHeight)};
+                    Rect const r {.xywh {0,
+                                         ypos,
+                                         imgui.Width(),
+                                         LiveSize(imgui, UiSizeId::PresetFilesFolderHeadingHeight)}};
                     ypos += r.h + LiveSize(imgui, UiSizeId::PresetFilesFolderHeadingPadBelow);
 
                     if (IsOnScreen(imgui, r)) {
                         if (starting_y >= preset_button_height) {
                             auto const divider =
-                                imgui.GetRegisteredAndConvertedRect({0, r.y, imgui.Width(), 1});
+                                imgui.GetRegisteredAndConvertedRect({.xywh {0, r.y, imgui.Width(), 1}});
                             imgui.graphics->AddRectFilled(divider.Min(),
                                                           divider.Max(),
                                                           LiveCol(imgui, UiColMap::BrowserFileDivider));
@@ -490,14 +491,16 @@ void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
         //
         //
         {
-            auto const width = LiveSize(imgui, UiSizeId::PresetWidth);
-            auto const height = LiveSize(imgui, UiSizeId::PresetHeight);
-            auto const y_offs = LiveSize(imgui, UiSizeId::PresetYOffset);
+            auto const size = f32x2 {
+                LiveSize(imgui, UiSizeId::PresetWidth),
+                LiveSize(imgui, UiSizeId::PresetHeight),
+            };
+            auto const offset = f32x2 {0, LiveSize(imgui, UiSizeId::PresetYOffset)};
             imgui.BeginWindow(wnd_settings,
-                              {mid_panel_r.CentreX() - width / 2,
-                               mid_panel_r.CentreY() - height / 2 - y_offs,
-                               width,
-                               height},
+                              {
+                                  .pos = mid_panel_r.Centre() - size / 2 - offset,
+                                  .size = size,
+                              },
                               "PresetPanel");
         }
 
@@ -518,33 +521,41 @@ void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
                 imgui.graphics->context->PushFont(g->mada);
                 labels::Label(
                     g,
-                    {gap_left_heading, panel_ypos, imgui.Width() - gap_left_heading, heading_height},
+                    {.xywh {gap_left_heading, panel_ypos, imgui.Width() - gap_left_heading, heading_height}},
                     "Floe Presets",
                     labels::BrowserHeading(imgui));
                 imgui.graphics->context->PopFont();
             }
 
-            LayID load_file_button;
+            layout::Id load_file_button;
             auto& lay = g->layout;
-            DEFER { lay.Reset(); };
+            DEFER { layout::ResetContext(lay); };
             {
                 auto const pad_t = LiveSize(imgui, UiSizeId::PresetTopControlsPadT);
                 auto const pad_r = LiveSize(imgui, UiSizeId::PresetTopControlsPadR);
                 auto const h = LiveSize(imgui, UiSizeId::PresetTopControlsHeight);
                 auto const preset_btn_w = LiveSize(imgui, UiSizeId::PresetTopControlsButtonWidth);
 
-                auto root = lay.CreateRootItem((LayScalar)imgui.Width(),
-                                               (LayScalar)imgui.Height(),
-                                               LAY_ROW | LAY_END);
-                lay.SetTopMargin(root, (LayScalar)(gap_above_heading + pad_t));
+                auto root = layout::CreateItem(lay,
+                                               {
+                                                   .size = imgui.Size(),
+                                                   .margins = {.t = gap_above_heading + pad_t},
+                                                   .contents_direction = layout::Direction::Row,
+                                                   .contents_align = layout::JustifyContent::End,
+                                               });
 
-                load_file_button = lay.CreateChildItem(root, preset_btn_w, h, LAY_TOP);
-                lay.SetRightMargin(load_file_button, pad_r);
-                lay.PerformLayout();
+                load_file_button = layout::CreateItem(lay,
+                                                      {
+                                                          .parent = root,
+                                                          .size = {preset_btn_w, h},
+                                                          .margins = {.r = pad_r},
+                                                          .anchor = layout::Anchor::Top,
+                                                      });
+                layout::RunContext(lay);
             }
 
             {
-                Rect const load_file_r {lay.GetRect(load_file_button)};
+                Rect const load_file_r {layout::GetRect(lay, load_file_button)};
                 auto const load_file_id = imgui.GetID("load");
                 if (buttons::Button(g,
                                     load_file_id,
@@ -603,18 +614,18 @@ void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
                                             r.Min() + f32x2 {r.w, table_title_h},
                                             line_col);
                 }),
-            {0, panel_ypos, imgui.Width(), imgui.Height() - panel_ypos},
+            {.xywh {0, panel_ypos, imgui.Width(), imgui.Height() - panel_ypos}},
             "Preset Folders");
         DEFER { imgui.EndWindow(); };
 
         labels::Label(g,
-                      {0, 0, preset_folders_panel_width, table_title_h},
+                      {.xywh {0, 0, preset_folders_panel_width, table_title_h}},
                       "Filter By Folder",
                       labels::PresetSectionHeading(imgui));
 
         {
             imgui.BeginWindow(FloeWindowSettings(imgui, [](IMGUI_DRAW_WINDOW_BG_ARGS) {}),
-                              {preset_folders_panel_width, 0, files_panel_width, table_title_h},
+                              {.xywh {preset_folders_panel_width, 0, files_panel_width, table_title_h}},
                               "files heading");
             DEFER { imgui.EndWindow(); };
 
@@ -622,33 +633,51 @@ void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
                 auto& lay = g->layout;
 
                 auto const heading_h = table_title_h;
-                auto root = lay.CreateRootItem((LayScalar)files_panel_width, (LayScalar)heading_h, LAY_ROW);
+                auto root = layout::CreateItem(lay,
+                                               {
+                                                   .size = {files_panel_width, heading_h},
+                                                   .contents_direction = layout::Direction::Row,
+                                                   .contents_align = layout::JustifyContent::Middle,
+                                               });
 
-                auto title = lay.CreateChildItem(root, 1, 1, LAY_FILL);
+                auto title = layout::CreateItem(lay,
+                                                {
+                                                    .parent = root,
+                                                    .size = {1, 1},
+                                                    .anchor = layout::Anchor::All,
+                                                });
 
-                LayID search;
+                layout::Id search;
                 {
                     auto const h = LiveSize(imgui, UiSizeId::PresetSearchHeight);
                     auto const w = LiveSize(imgui, UiSizeId::PresetSearchWidth);
                     auto const pad_r = LiveSize(imgui, UiSizeId::PresetSearchPadR);
-                    search = lay.CreateChildItem(root, w, h, LAY_VCENTER);
-                    lay.SetRightMargin(search, pad_r);
+                    search = layout::CreateItem(lay,
+                                                {
+                                                    .parent = root,
+                                                    .size = {w, h},
+                                                    .margins = {.r = pad_r},
+                                                });
                 }
 
-                LayID random;
+                layout::Id random;
                 {
                     auto const size = LiveSize(imgui, UiSizeId::PresetRandomButtonSize);
                     auto const pad_r = LiveSize(imgui, UiSizeId::PresetRandomButtonPadR);
-                    random = lay.CreateChildItem(root, size, size, LAY_VCENTER);
-                    lay.SetRightMargin(random, pad_r);
+                    random = layout::CreateItem(lay,
+                                                {
+                                                    .parent = root,
+                                                    .size = {size, size},
+                                                    .margins = {.r = pad_r},
+                                                });
                 }
 
-                lay.PerformLayout();
+                layout::RunContext(lay);
 
                 labels::Label(g, title, "Presets", labels::PresetSectionHeading(imgui));
 
                 {
-                    auto const search_r = lay.GetRect(search);
+                    auto const search_r = layout::GetRect(lay, search);
 
                     auto settings = imgui::DefTextInput();
                     settings.draw = [](IMGUI_DRAW_TEXT_INPUT_ARGS) {
@@ -708,7 +737,7 @@ void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
 
                 {
                     auto const rand_id = imgui.GetID("rand");
-                    auto const rand_r = lay.GetRect(random);
+                    auto const rand_r = layout::GetRect(lay, random);
                     if (buttons::Button(g,
                                         rand_id,
                                         rand_r,
@@ -724,7 +753,7 @@ void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
                             "Load a random preset based on the current folder filters and search results"_s);
                 }
 
-                lay.Reset();
+                layout::ResetContext(lay);
             }
         }
 
@@ -735,19 +764,20 @@ void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
         scrollable_window_settings.scrollbar_padding_top = preset_panel_xgap / 2;
 
         {
-            imgui.BeginWindow(scrollable_window_settings,
-                              {0, table_title_h, preset_folders_panel_width, imgui.Height() - table_title_h},
-                              "Folders");
+            imgui.BeginWindow(
+                scrollable_window_settings,
+                {.xywh {0, table_title_h, preset_folders_panel_width, imgui.Height() - table_title_h}},
+                "Folders");
             DoAllPresetFolders();
             imgui.EndWindow();
         }
 
         {
             imgui.BeginWindow(scrollable_window_settings,
-                              {preset_folders_panel_width,
-                               table_title_h,
-                               files_panel_width,
-                               imgui.Height() - table_title_h},
+                              {.xywh {preset_folders_panel_width,
+                                      table_title_h,
+                                      files_panel_width,
+                                      imgui.Height() - table_title_h}},
                               "Files");
             if (folder_changed && !persistent_data.scroll_to_show_current_preset)
                 imgui.SetYScroll(imgui.CurrentWindow(), 0);

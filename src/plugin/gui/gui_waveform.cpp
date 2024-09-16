@@ -6,9 +6,9 @@
 #include <IconsFontAwesome5.h>
 
 #include "descriptors/param_descriptors.hpp"
-#include "gui_framework/gui_live_edit.hpp"
 #include "gui.hpp"
 #include "gui_drawing_helpers.hpp"
+#include "gui_framework/gui_live_edit.hpp"
 #include "gui_label_widgets.hpp"
 #include "gui_widget_helpers.hpp"
 #include "processor/layer_processor.hpp"
@@ -223,7 +223,7 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
             auto const& param = engine.processor.params[ToInt(start_param_id)];
 
             start_line = waveform_r.WithXW(waveform_r.x + loop_start_pos, 1);
-            start_handle = {start_line.Right() - handle_width, r.y, handle_width, handle_height};
+            start_handle = {.xywh {start_line.Right() - handle_width, r.y, handle_width, handle_height}};
             if (reverse) start_handle.x += handle_width - start_line.w;
 
             auto grabber = start_handle;
@@ -255,7 +255,7 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
             auto const& param = engine.processor.params[ToInt(end_param_id)];
 
             end_line = waveform_r.WithXW(waveform_r.x + loop_end_pos, 1);
-            end_handle = {end_line.x, r.y, handle_width, handle_height};
+            end_handle = {.xywh {end_line.x, r.y, handle_width, handle_height}};
             if (reverse) end_handle.x -= handle_width - end_line.w;
 
             auto grabber = end_handle;
@@ -319,7 +319,7 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
             auto const& param = engine.processor.params[ToInt(xfade_param_id)];
 
             xfade_line = waveform_r.WithXW(waveform_r.x + loop_xfade_line_pos, 1);
-            xfade_handle = {xfade_line.x, waveform_r.y + handle_height, handle_width, handle_height};
+            xfade_handle = {.xywh {xfade_line.x, waveform_r.y + handle_height, handle_width, handle_height}};
             if (reverse && !ping_pong) xfade_handle.x -= handle_width - xfade_line.w;
 
             auto grabber = xfade_handle;
@@ -361,10 +361,10 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
         auto const& param = engine.processor.params[ToInt(param_id)];
 
         auto sample_offset_r = waveform_r.WithW(waveform_r.w * sample_offset);
-        offs_handle = {sample_offset_r.Right() - handle_width,
-                       waveform_r.Bottom() - handle_height,
-                       handle_width,
-                       handle_height};
+        offs_handle = {.xywh {sample_offset_r.Right() - handle_width,
+                              waveform_r.Bottom() - handle_height,
+                              handle_width,
+                              handle_height}};
         auto grabber = offs_handle;
         grabber.y -= extra_grabbing_room_towards_centre;
         grabber.h += extra_grabbing_room_towards_centre + extra_grabbing_room_away_from_centre;

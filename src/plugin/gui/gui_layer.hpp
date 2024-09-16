@@ -3,8 +3,8 @@
 
 #pragma once
 #include "engine/engine.hpp"
+#include "gui_framework/layout.hpp"
 #include "gui_widget_compounds.hpp"
-#include "layout.hpp"
 
 struct Gui;
 struct Engine;
@@ -32,69 +32,69 @@ enum class PageType {
 constexpr usize k_num_pages = ToInt(PageType::Count);
 
 struct LayerLayoutTempIDs {
-    LayID selector_box;
-    LayID selector_menu;
-    LayID selector_l, selector_r;
-    LayID selector_randomise;
+    layout::Id selector_box;
+    layout::Id selector_menu;
+    layout::Id selector_l, selector_r;
+    layout::Id selector_randomise;
 
-    LayID volume;
-    LayID mute_solo;
+    layout::Id volume;
+    layout::Id mute_solo;
 
     LayIDPair knob1, knob2, knob3;
 
-    LayID divider;
-    LayID tabs[k_num_pages];
-    LayID divider2;
+    layout::Id divider;
+    layout::Id tabs[k_num_pages];
+    layout::Id divider2;
 
     union {
         struct {
-            LayID waveform;
-            LayID loop_mode;
-            LayID reverse;
+            layout::Id waveform;
+            layout::Id loop_mode;
+            layout::Id reverse;
 
-            LayID divider;
+            layout::Id divider;
 
-            LayID env_on;
-            LayID envelope;
+            layout::Id env_on;
+            layout::Id envelope;
         } main;
 
         struct {
-            LayID filter_on;
-            LayID filter_type;
+            layout::Id filter_on;
+            layout::Id filter_type;
             LayIDPair cutoff;
             LayIDPair reso;
             LayIDPair env_amount;
-            LayID envelope;
+            layout::Id envelope;
         } filter;
 
         struct {
-            LayID on;
-            LayID type[k_num_layer_eq_bands];
+            layout::Id on;
+            layout::Id type[k_num_layer_eq_bands];
             LayIDPair freq[k_num_layer_eq_bands];
             LayIDPair reso[k_num_layer_eq_bands];
             LayIDPair gain[k_num_layer_eq_bands];
         } eq;
 
         struct {
-            LayID transpose;
-            LayID transpose_name;
-            LayID keytrack;
-            LayID mono;
-            LayID retrig;
-            LayID velo_buttons;
-            LayID velo_name;
+            layout::Id transpose;
+            layout::Id transpose_name;
+            layout::Id keytrack;
+            layout::Id mono;
+            layout::Id retrig;
+            layout::Id velo_buttons;
+            layout::Id velo_name;
         } midi;
 
         struct {
-            LayID on;
+            layout::Id on;
             LayIDPair amount;
             LayIDPair rate;
-            LayID target;
-            LayID target_name;
-            LayID shape;
-            LayID shape_name;
-            LayID mode;
-            LayID mode_name;
+            layout::Id target;
+            layout::Id target_name;
+            layout::Id shape;
+            layout::Id shape_name;
+            layout::Id mode;
+            layout::Id mode_name;
         } lfo;
     };
 };

@@ -6,9 +6,9 @@
 #include <IconsFontAwesome5.h>
 
 #include "descriptors/param_descriptors.hpp"
-#include "gui_framework/gui_live_edit.hpp"
 #include "gui.hpp"
 #include "gui_drawing_helpers.hpp"
+#include "gui_framework/gui_live_edit.hpp"
 #include "gui_label_widgets.hpp"
 #include "gui_window.hpp"
 #include "settings/settings_midi.hpp"
@@ -57,7 +57,7 @@ void DoTooltipText(Gui* g, String str, Rect r, bool rect_is_window_pos) {
     popup_r.x = popup_r.x + ((r.w / 2) - (popup_r.w / 2));
 
     popup_r.pos = imgui::BestPopupPos(popup_r,
-                                      {abs_pos.x, abs_pos.y, r.w, r.h},
+                                      {.pos = abs_pos, .size = r.size},
                                       g->frame_input.window_size.ToFloat2(),
                                       false);
 
@@ -193,11 +193,12 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
 
     auto centred_x = r.x + ((r.w / 2) - (item_width / 2));
 
-    auto popup_pos = imgui::BestPopupPos(Rect {centred_x, r.y, item_width, item_height * (f32)num_items},
-                                         r,
-                                         g->frame_input.window_size.ToFloat2(),
-                                         false);
-    Rect const popup_r(popup_pos, 0, 0);
+    auto popup_pos = imgui::BestPopupPos(
+        Rect {.x = centred_x, .y = r.y, .w = item_width, .h = item_height * (f32)num_items},
+        r,
+        g->frame_input.window_size.ToFloat2(),
+        false);
+    Rect const popup_r {.pos = popup_pos};
 
     auto settings = PopupWindowSettings(imgui);
     settings.flags =
@@ -213,7 +214,7 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
 
             if (params.size != 1) {
                 labels::Label(g,
-                              {0, pos, item_width, item_height},
+                              {.xywh {0, pos, item_width, item_height}},
                               fmt::Format(g->scratch_arena,
                                           "{}: ",
                                           g->engine.processor.params[ToInt(param)].info.gui_label),
@@ -223,7 +224,7 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
 
             {
                 if (buttons::Button(g,
-                                    {0, pos, item_width, item_height},
+                                    {.xywh {0, pos, item_width, item_height}},
                                     k_reset_text,
                                     buttons::MenuItem(imgui, false))) {
                     SetParameterValue(engine.processor,
@@ -237,7 +238,7 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
 
             {
                 if (buttons::Button(g,
-                                    {0, pos, item_width, item_height},
+                                    {.xywh {0, pos, item_width, item_height}},
                                     k_set_text,
                                     buttons::MenuItem(imgui, false))) {
                     imgui.ClosePopupToLevel(0);
@@ -248,7 +249,7 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
 
             if (IsMidiCCLearnActive(engine.processor)) {
                 if (buttons::Button(g,
-                                    {0, pos, item_width, item_height},
+                                    {.xywh {0, pos, item_width, item_height}},
                                     k_cancel_text,
                                     buttons::MenuItem(imgui, false))) {
                     CancelMidiCCLearn(engine.processor);
@@ -256,7 +257,7 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
                 pos += item_height;
             } else {
                 if (buttons::Button(g,
-                                    {0, pos, item_width, item_height},
+                                    {.xywh {0, pos, item_width, item_height}},
                                     k_learn_text,
                                     buttons::MenuItem(imgui, false))) {
                     LearnMidiCC(engine.processor, param);
@@ -275,7 +276,7 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
                 imgui.PushID((u64)cc_num);
 
                 if (buttons::Button(g,
-                                    {0, pos, item_width, item_height},
+                                    {.xywh {0, pos, item_width, item_height}},
                                     fmt::Format(g->scratch_arena, k_remove_fmt, cc_num),
                                     buttons::MenuItem(imgui, closes_popups))) {
                     UnlearnMidiCC(engine.processor, param, (u7)cc_num);
@@ -285,7 +286,7 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
                 if (!persistent_ccs.Get(cc_num)) {
                     bool state = false;
                     if (buttons::Toggle(g,
-                                        {0, pos, item_width, item_height},
+                                        {.xywh {0, pos, item_width, item_height}},
                                         state,
                                         fmt::Format(g->scratch_arena, k_always_set_fmt, cc_num),
                                         buttons::MenuItem(imgui, closes_popups))) {
@@ -307,7 +308,7 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
 
                     bool state = true;
                     if (buttons::Toggle(g,
-                                        {0, pos, item_width, item_height},
+                                        {.xywh {0, pos, item_width, item_height}},
                                         state,
                                         fmt::Format(g->scratch_arena, k_always_set_fmt, cc_num),
                                         buttons::MenuItem(imgui, closes_popups))) {
@@ -326,7 +327,7 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
                 auto const div_gap_x = LiveSize(imgui, UiSizeId::MenuItemDividerGapX);
                 auto const div_h = LiveSize(imgui, UiSizeId::MenuItemDividerH);
 
-                Rect div_r = {div_gap_x, pos + (div_h / 2), item_width - 2 * div_gap_x, 1};
+                Rect div_r = {.xywh {div_gap_x, pos + (div_h / 2), item_width - 2 * div_gap_x, 1}};
                 imgui.RegisterAndConvertRect(&div_r);
                 imgui.graphics->AddRectFilled(div_r.Min(),
                                               div_r.Max(),
@@ -354,7 +355,7 @@ bool DoMultipleMenuItems(Gui* g,
         bool state = i == current;
         if (buttons::Toggle(g,
                             g->imgui.GetID(i),
-                            {0, h * (f32)i, w, h},
+                            {.xywh {0, h * (f32)i, w, h}},
                             state,
                             GetStr(items, i),
                             buttons::MenuItem(g->imgui, true)))
@@ -422,7 +423,7 @@ bool DoCloseButtonForCurrentWindow(Gui* g, String tooltip_text, buttons::Style c
     f32 const size = LiveSize(imgui, UiSizeId::SidePanelCloseButtonSize);
 
     auto const x = imgui.Width() - (pad + size);
-    Rect const btn_r = {x, pad, size, size};
+    Rect const btn_r = {.xywh {x, pad, size, size}};
 
     auto const btn_id = imgui.GetID("close");
     bool const button_clicked = buttons::Button(g, btn_id, btn_r, ICON_FA_TIMES, style);
@@ -438,7 +439,7 @@ bool DoOverlayClickableBackground(Gui* g) {
         auto r = window->unpadded_bounds;
         imgui.graphics->AddRectFilled(r.Min(), r.Max(), LiveCol(imgui, UiColMap::SidePanelOverlay));
     });
-    imgui.BeginWindow(invis_sets, {0, 0, imgui.Width(), imgui.Height()}, "invisible");
+    imgui.BeginWindow(invis_sets, {.xywh {0, 0, imgui.Width(), imgui.Height()}}, "invisible");
     auto invis_window = imgui.CurrentWindow();
 
     if (imgui.IsWindowHovered(invis_window)) {
@@ -458,10 +459,8 @@ imgui::TextInputSettings GetParameterTextInputSettings() {
 
         auto const text_pos = result->GetTextPos();
         auto const w = Max(r.w, draw::GetTextWidth(imgui.graphics->context->CurrentFont(), text));
-        Rect const background_r {r.CentreX() - w / 2,
-                                 text_pos.y,
-                                 w,
-                                 imgui.graphics->context->CurrentFontSize()};
+        Rect const background_r {
+            .xywh {r.CentreX() - w / 2, text_pos.y, w, imgui.graphics->context->CurrentFontSize()}};
         auto const rounding = LiveSize(imgui, UiSizeId::CornerRounding);
 
         imgui.graphics->AddRectFilled(background_r.Min(),

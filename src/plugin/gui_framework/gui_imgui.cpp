@@ -285,7 +285,7 @@ Context::ScrollbarResult Context::Scrollbar(Window* window,
     scroll_r.y = window_y + scrollbar_rel_y;
     scroll_r.w = window->style.scrollbar_width;
     scroll_r.h = scrollbar_h;
-    Rect scrollbar_bb = Rect(scroll_r.x, window_y, window->style.scrollbar_width, window_h);
+    auto scrollbar_bb = Rect {.xywh = {scroll_r.x, window_y, window->style.scrollbar_width, window_h}};
     f32* scroll_y = &scroll_r.y;
 
     if (!is_vertical) {
@@ -693,7 +693,7 @@ void Context::Begin(WindowSettings settings) {
 
     BeginWindow(settings,
                 k_imgui_app_window_id,
-                Rect(0, 0, frame_input.window_size.ToFloat2()),
+                Rect {.size = frame_input.window_size.ToFloat2()},
                 "ApplicationWindow");
 }
 
@@ -1016,7 +1016,7 @@ bool Context::SliderBehavior(Rect r,
 }
 
 void Context::SetMinimumPopupSize(f32 width, f32 height) {
-    Rect r = Rect(0, 0, width, height);
+    auto r = Rect {.w = width, .h = height};
     RegisterAndConvertRect(&r);
 }
 
@@ -1370,10 +1370,10 @@ TextInputResult Context::SingleLineTextInput(Rect r,
         f32 const selection_size =
             font->CalcTextSizeA(font_size, FLT_MAX, 0, {start, (usize)(end - start)}).x;
 
-        auto selection_r = Rect(result.text_pos.x + selection_start,
-                                result.text_pos.y - y_pad,
-                                selection_size,
-                                font_size + y_pad * 2);
+        auto selection_r = Rect {.x = result.text_pos.x + selection_start,
+                                 .y = result.text_pos.y - y_pad,
+                                 .w = selection_size,
+                                 .h = font_size + y_pad * 2};
 
         result.selection_rect = selection_r;
     }
@@ -1389,10 +1389,10 @@ TextInputResult Context::SingleLineTextInput(Rect r,
                                 {result.text.data, (usize)(cursor_ptr - result.text.data)})
                 .x;
 
-        auto cursor_r = Rect(result.text_pos.x + cursor_start,
-                             result.text_pos.y - y_pad,
-                             cursor_width,
-                             font_size + y_pad * 2);
+        auto cursor_r = Rect {.x = result.text_pos.x + cursor_start,
+                              .y = result.text_pos.y - y_pad,
+                              .w = cursor_width,
+                              .h = font_size + y_pad * 2};
 
         result.cursor_rect = cursor_r;
     }
@@ -1582,7 +1582,7 @@ void Context::BeginWindow(WindowSettings settings, Window* window, Rect r, Strin
 
             bool const has_parent_popup = curr_window && curr_window->flags & WindowFlags_Popup;
 
-            auto base_r = Rect {r.pos, size};
+            auto base_r = Rect {.pos = r.pos, .size = size};
             if (has_parent_popup) {
                 rect_to_avoid = curr_window->bounds;
                 rect_to_avoid.y = 0;
@@ -2044,7 +2044,7 @@ void Context::DebugTextItem(char const* label, char const* text, ...) {
     f32 const x_pad = 10;
     auto const height = graphics->context->CurrentFontSize();
 
-    Rect r = {0, debug_y_pos, Width(), height};
+    Rect r = {.xywh {0, debug_y_pos, Width(), height}};
     RegisterAndConvertRect(&r);
 
     graphics->AddText(graphics->context->CurrentFont(),
@@ -2067,7 +2067,7 @@ bool Context::DebugTextHeading(bool& state, char const* text) {
     f32 const height = graphics->context->CurrentFontSize() + 4;
 
     bool const clicked =
-        Button(DefButton(), {0, debug_y_pos, Width(), height}, GetID(text), FromNullTerminated(text));
+        Button(DefButton(), {.xywh {0, debug_y_pos, Width(), height}}, GetID(text), FromNullTerminated(text));
     debug_y_pos += height;
     if (clicked) state = !state;
     return state;
@@ -2077,7 +2077,7 @@ bool Context::DebugButton(char const* text) {
     f32 const height = graphics->context->CurrentFontSize() + 4;
 
     bool const clicked = ToggleButton(DefToggleButton(),
-                                      {0, debug_y_pos, Width(), height},
+                                      {.xywh {0, debug_y_pos, Width(), height}},
                                       GetID(text),
                                       debug_show_register_widget_overlay,
                                       FromNullTerminated(text));

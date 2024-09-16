@@ -5,20 +5,18 @@
 #include "foundation/foundation.hpp"
 
 #include "engine/engine.hpp"
-#include "gui_framework/draw_list.hpp"
-#include "gui_framework/gui_imgui.hpp"
 #include "gui/gui_modal_windows.hpp"
 #include "gui_editor_widgets.hpp"
 #include "gui_envelope.hpp"
+#include "gui_framework/draw_list.hpp"
+#include "gui_framework/gui_imgui.hpp"
+#include "gui_framework/layout.hpp"
 #include "gui_layer.hpp"
 #include "gui_preset_browser.hpp"
-#include "layout.hpp"
 #include "settings/settings_file.hpp"
 
 constexpr auto k_gui_log_module = "gui"_log_module;
 
-struct Engine;
-struct FloePluginInstance;
 struct GuiFrameInput;
 
 struct LibraryImages {
@@ -123,11 +121,6 @@ enum class DialogType {
     InstallPackage,
 };
 
-struct InstInfo {
-    String title;
-    String info;
-};
-
 struct Gui {
     Gui(GuiFrameInput& frame_input, Engine& engine);
     ~Gui();
@@ -149,7 +142,7 @@ struct Gui {
     SharedEngineSystems& shared_engine_systems;
     SettingsFile& settings;
 
-    Layout layout = {};
+    layout::Context layout = {};
     imgui::Context imgui {frame_input, frame_output};
     EditorGUI editor = {};
     graphics::Font* fira_sans {};
@@ -177,10 +170,6 @@ struct Gui {
     TimePoint redraw_counter = {};
 
     bool dynamics_slider_is_held {};
-
-    ArenaAllocator inst_info_arena {page_allocator};
-    String inst_info_title {};
-    DynamicArray<InstInfo> inst_info {inst_info_arena};
 
     ThreadsafeFunctionQueue main_thread_callbacks {.arena = {PageAllocator::Instance()}};
     sample_lib_server::AsyncCommsChannel& sample_lib_server_async_channel;

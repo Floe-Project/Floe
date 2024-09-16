@@ -3,8 +3,8 @@
 
 #include "gui_window.hpp"
 
-#include "gui_framework/gui_live_edit.hpp"
 #include "gui_drawing_helpers.hpp"
+#include "gui_framework/gui_live_edit.hpp"
 
 imgui::WindowSettings PopupWindowSettings(imgui::Context const& imgui) {
     auto res = imgui::DefPopup();

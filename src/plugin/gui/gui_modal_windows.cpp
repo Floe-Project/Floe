@@ -49,7 +49,7 @@ static void DoMultilineText(Gui* g,
 
     auto const size = draw::GetTextSize(font, text, wrap_width);
 
-    auto const text_r = imgui.GetRegisteredAndConvertedRect({x_offset, y_pos, size.x, size.y});
+    auto const text_r = imgui.GetRegisteredAndConvertedRect({.xywh {x_offset, y_pos, size.x, size.y}});
     imgui.graphics
         ->AddText(font, font->font_size_no_scale, text_r.pos, LiveCol(imgui, col_map), text, wrap_width);
 
@@ -104,7 +104,7 @@ static bool DoButton(Gui* g, String button_text, DoButtonArgs args) {
     auto x_pos = args.x_offset;
     if (args.centre_vertically) x_pos = (imgui.Width() - box_width) / 2;
 
-    auto button_r = imgui.GetRegisteredAndConvertedRect({x_pos, y_pos, box_width, box_height});
+    auto button_r = imgui.GetRegisteredAndConvertedRect({.xywh {x_pos, y_pos, box_width, box_height}});
     auto const id = imgui.GetID(button_text);
 
     bool result = false;
@@ -174,7 +174,7 @@ static bool DoButton(Gui* g, String button_text, f32& y_pos, f32 x_offset) {
 
 static void DoLabelLine(imgui::Context& imgui, f32& y_pos, String label, String value) {
     auto const line_height = imgui.graphics->context->CurrentFontSize();
-    auto const text_r = imgui.GetRegisteredAndConvertedRect({0, y_pos, imgui.Width(), line_height});
+    auto const text_r = imgui.GetRegisteredAndConvertedRect({.xywh {0, y_pos, imgui.Width(), line_height}});
     imgui.graphics->AddTextJustified(text_r,
                                      label,
                                      LiveCol(imgui, UiColMap::PopupItemText),
@@ -194,7 +194,7 @@ DoHeading(Gui* g, f32& y_pos, String str, TextJustification justification = Text
 
     imgui.graphics->context->PushFont(g->mada);
     DEFER { imgui.graphics->context->PopFont(); };
-    auto const r = imgui.GetRegisteredAndConvertedRect({0, y_pos, imgui.Width(), window_title_h});
+    auto const r = imgui.GetRegisteredAndConvertedRect({.xywh {0, y_pos, imgui.Width(), window_title_h}});
     g->imgui.graphics->AddTextJustified(r, str, LiveCol(imgui, UiColMap::PopupItemText), justification);
 
     y_pos += window_title_h + window_title_gap_y;
@@ -260,7 +260,7 @@ static void DoErrorsModal(Gui* g) {
                         imgui.graphics->context->PushFont(g->mada);
                         auto const error_window_item_h = LiveSize(imgui, UiSizeId::ErrorWindowItemH);
                         labels::Label(g,
-                                      {0, y_pos, imgui.Width(), (f32)error_window_item_h},
+                                      {.xywh {0, y_pos, imgui.Width(), (f32)error_window_item_h}},
                                       e.title,
                                       text_style);
                         imgui.graphics->context->PopFont();
@@ -279,7 +279,7 @@ static void DoErrorsModal(Gui* g) {
 
                         auto const max_width = imgui.Width() * 0.95f;
                         auto const size = draw::GetTextSize(font, error_text, max_width);
-                        auto desc_r = Rect {0, y_pos, size.x, size.y};
+                        auto desc_r = Rect {.x = 0, .y = y_pos, .w = size.x, .h = size.y};
                         imgui.RegisterAndConvertRect(&desc_r);
                         imgui.graphics->AddText(font,
                                                 font->font_size_no_scale,
@@ -299,7 +299,7 @@ static void DoErrorsModal(Gui* g) {
                     // divider line
                     if (it->next.Load(LoadMemoryOrder::Relaxed) != nullptr) {
                         y_pos += (f32)error_window_gap_after_desc;
-                        auto line_r = Rect {0, y_pos, imgui.Width(), 1};
+                        auto line_r = Rect {.x = 0, .y = y_pos, .w = imgui.Width(), .h = 1};
                         imgui.RegisterAndConvertRect(&line_r);
                         imgui.graphics->AddLine(line_r.Min(), line_r.Max(), text_style.main_cols.reg);
                         y_pos += (f32)error_window_divider_spacing_y;
@@ -311,7 +311,8 @@ static void DoErrorsModal(Gui* g) {
         }
 
         // Add space to the bottom of the scroll window
-        imgui.GetRegisteredAndConvertedRect({0, y_pos, 1, imgui.graphics->context->CurrentFontSize()});
+        imgui.GetRegisteredAndConvertedRect(
+            {.xywh {0, y_pos, 1, imgui.graphics->context->CurrentFontSize()}});
 
         if (!num_errors) imgui.ClosePopupToLevel(0);
     }
@@ -417,25 +418,6 @@ static void DoLoadingOverlay(Gui* g) {
     }
 }
 
-static void DoInstrumentInfoModal(Gui* g) {
-    g->frame_input.graphics_ctx->PushFont(g->roboto_small);
-    DEFER { g->frame_input.graphics_ctx->PopFont(); };
-    auto& imgui = g->imgui;
-
-    auto const r = ModalRect(imgui, UiSizeId::InfoWindowWidth, UiSizeId::InfoWindowHeight);
-    auto const settings = ModalWindowSettings(g->imgui);
-
-    if (imgui.BeginWindowPopup(settings, IdForModal(ModalWindowType::InstInfo), r, "InstInfo")) {
-        DEFER { imgui.EndWindow(); };
-        DoWindowCloseButton(g);
-        f32 y_pos = 0;
-
-        DoHeading(g, y_pos, fmt::Format(g->scratch_arena, "{} - Info", g->inst_info_title));
-        for (auto& i : g->inst_info)
-            DoLabelLine(imgui, y_pos, i.title, i.info);
-    }
-}
-
 struct DoTextLineOptions {
     TextJustification justification = TextJustification::CentredLeft;
     f32 font_scaling = 1.0f;
@@ -444,7 +426,7 @@ struct DoTextLineOptions {
 static void DoTextLine(Gui* g, String text, f32& y_pos, UiColMap col_map, DoTextLineOptions options = {}) {
     auto& imgui = g->imgui;
     auto const line_height = imgui.graphics->context->CurrentFontSize();
-    auto const text_r = imgui.GetRegisteredAndConvertedRect({0, y_pos, imgui.Width(), line_height});
+    auto const text_r = imgui.GetRegisteredAndConvertedRect({.xywh {0, y_pos, imgui.Width(), line_height}});
     imgui.graphics->AddTextJustified(text_r,
                                      text,
                                      LiveCol(imgui, col_map),
@@ -475,7 +457,7 @@ static void DoInstallPackagesModal(Gui* g) {
 
         auto const line_height = imgui.graphics->context->CurrentFontSize();
 
-        Rect rect {0.0f, imgui.Size()};
+        Rect rect {.pos = {}, .size = imgui.Size()};
         rect_cut::CutTop(rect, main_y_pos);
 
         // main panel
@@ -487,10 +469,10 @@ static void DoInstallPackagesModal(Gui* g) {
                 auto const w = imgui.CurrentWindow();
                 imgui.graphics->PushClipRectFullScreen();
                 DEFER { imgui.graphics->PopClipRect(); };
-                Rect const full_width_rect = {w->unpadded_bounds.x,
-                                              main_rect_converted.y,
-                                              w->unpadded_bounds.w,
-                                              main_panel_rect.h};
+                Rect const full_width_rect = {.xywh {w->unpadded_bounds.x,
+                                                     main_rect_converted.y,
+                                                     w->unpadded_bounds.w,
+                                                     main_panel_rect.h}};
                 imgui.graphics->AddRectFilled(full_width_rect.Min(),
                                               full_width_rect.Max(),
                                               LiveCol(imgui, UiColMap::ModalWindowSubContainerBackground));
@@ -724,7 +706,9 @@ static void DoSettingsModal(Gui* g) {
                                               LiveCol(imgui, UiColMap::PopupWindowBack));
             });
         subwindow_settings.draw_routine_scrollbar = settings.draw_routine_scrollbar;
-        imgui.BeginWindow(subwindow_settings, {0, y_pos, imgui.Width(), imgui.Height() - y_pos}, "inner");
+        imgui.BeginWindow(subwindow_settings,
+                          {.xywh {0, y_pos, imgui.Width(), imgui.Height() - y_pos}},
+                          "inner");
         DEFER { imgui.EndWindow(); };
         y_pos = 0;
 
@@ -739,7 +723,7 @@ static void DoSettingsModal(Gui* g) {
         auto do_toggle_button = [&](String title, bool& state) {
             bool result = false;
             if (buttons::Toggle(g,
-                                {left_col_width, y_pos, right_col_width, line_height},
+                                {.xywh {left_col_width, y_pos, right_col_width, line_height}},
                                 state,
                                 title,
                                 buttons::SettingsWindowButton(imgui))) {
@@ -753,7 +737,7 @@ static void DoSettingsModal(Gui* g) {
 
         auto do_divider = [&](String title) {
             auto const div_r =
-                imgui.GetRegisteredAndConvertedRect({0, y_pos, imgui.Width(), line_height * 2});
+                imgui.GetRegisteredAndConvertedRect({.xywh {0, y_pos, imgui.Width(), line_height * 2}});
             g->imgui.graphics->AddTextJustified(div_r,
                                                 title,
                                                 LiveCol(imgui, UiColMap::SettingsWindowMainText),
@@ -768,7 +752,7 @@ static void DoSettingsModal(Gui* g) {
 
         auto do_lhs_title = [&](String text) {
             auto const title_r =
-                imgui.GetRegisteredAndConvertedRect({0, y_pos, imgui.Width(), line_height * 2});
+                imgui.GetRegisteredAndConvertedRect({.xywh {0, y_pos, imgui.Width(), line_height * 2}});
             g->imgui.graphics->AddTextJustified(title_r,
                                                 text,
                                                 LiveCol(imgui, UiColMap::SettingsWindowMainText),
@@ -801,8 +785,8 @@ static void DoSettingsModal(Gui* g) {
             do_lhs_title("GUI size");
 
             Optional<int> width_change {};
-            auto box_r =
-                imgui.GetRegisteredAndConvertedRect({left_col_width, y_pos, right_col_width, line_height});
+            auto box_r = imgui.GetRegisteredAndConvertedRect(
+                {.xywh {left_col_width, y_pos, right_col_width, line_height}});
             if (do_icon_button(rect_cut::CutLeft(box_r, line_height),
                                ICON_FA_MINUS_SQUARE,
                                "Decrease GUI size"))
@@ -838,8 +822,8 @@ static void DoSettingsModal(Gui* g) {
         do_divider("Folders");
 
         auto do_rhs_subheading = [&](String text) {
-            auto const info_text_r =
-                imgui.GetRegisteredAndConvertedRect({left_col_width, y_pos, right_col_width, line_height});
+            auto const info_text_r = imgui.GetRegisteredAndConvertedRect(
+                {.xywh {left_col_width, y_pos, right_col_width, line_height}});
             g->imgui.graphics->AddTextJustified(info_text_r,
                                                 text,
                                                 LiveCol(imgui, UiColMap::SettingsWindowDullText),
@@ -862,10 +846,10 @@ static void DoSettingsModal(Gui* g) {
                 do_lhs_title(title);
                 do_rhs_subheading(subheading);
                 auto const box_r = imgui.GetRegisteredAndConvertedRect(
-                    {left_col_width,
-                     y_pos,
-                     right_col_width,
-                     path_gui_height * (f32)Max(1u, (u32)(extra_paths.size + 1))});
+                    {.xywh {left_col_width,
+                            y_pos,
+                            right_col_width,
+                            path_gui_height * (f32)Max(1u, (u32)(extra_paths.size + 1))}});
 
                 g->imgui.graphics->AddRectFilled(box_r,
                                                  LiveCol(imgui, UiColMap::SettingsWindowPathBackground),
@@ -877,10 +861,10 @@ static void DoSettingsModal(Gui* g) {
                     for (auto [index, path] : Enumerate<u32>(paths)) {
                         imgui.PushID(pos);
                         DEFER { imgui.PopID(); };
-                        auto const path_r = Rect {box_r.x,
-                                                  box_r.y + ((f32)pos * path_gui_height),
-                                                  right_col_width,
-                                                  path_gui_height};
+                        auto const path_r = Rect {.x = box_r.x,
+                                                  .y = box_r.y + ((f32)pos * path_gui_height),
+                                                  .w = right_col_width,
+                                                  .h = path_gui_height};
                         auto reduced_path_r = path_r.ReducedHorizontally(path_gui_spacing);
 
                         if (paths.data == extra_paths.data) {
@@ -942,7 +926,7 @@ static void DoSettingsModal(Gui* g) {
         }
 
         // Add whitespace at bottom of scrolling
-        imgui.GetRegisteredAndConvertedRect({0, y_pos, imgui.Width(), line_height});
+        imgui.GetRegisteredAndConvertedRect({.xywh {0, y_pos, imgui.Width(), line_height}});
     }
 }
 
@@ -972,7 +956,7 @@ static void DoLicencesModal(Gui* g) {
             bool state = open[i];
             bool const changed = buttons::Toggle(g,
                                                  imgui.GetID(&txt),
-                                                 {0, y_pos, imgui.Width(), h},
+                                                 {.xywh {0, y_pos, imgui.Width(), h}},
                                                  state,
                                                  txt.name,
                                                  buttons::LicencesFoldButton(imgui));
@@ -1016,7 +1000,6 @@ void DoModalWindows(Gui* g) {
     DoMetricsModal(g);
     DoAboutModal(g);
     DoLoadingOverlay(g);
-    DoInstrumentInfoModal(g);
     DoInstallPackagesModal(g);
     DoSettingsModal(g);
     DoLicencesModal(g);

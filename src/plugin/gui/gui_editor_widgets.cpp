@@ -17,13 +17,17 @@ void EditorReset(EditorGUI* g) {
     g->alternating_back = false;
 }
 
-Rect EditorGetFullR(EditorGUI* g) { return Rect {0, g->y_pos, g->imgui->Width(), g->item_h - 1}; }
+Rect EditorGetFullR(EditorGUI* g) {
+    return Rect {.x = 0, .y = g->y_pos, .w = g->imgui->Width(), .h = g->item_h - 1};
+}
 
-Rect EditorGetLeftR(EditorGUI* g) { return Rect {0, g->y_pos, g->imgui->Width() / 2, g->item_h - 1}; }
+Rect EditorGetLeftR(EditorGUI* g) {
+    return Rect {.x = 0, .y = g->y_pos, .w = g->imgui->Width() / 2, .h = g->item_h - 1};
+}
 
 Rect EditorGetRightR(EditorGUI* g) {
     auto w = g->imgui->Width() / 2;
-    return Rect {w, g->y_pos, w, g->item_h - 1};
+    return Rect {.x = w, .y = g->y_pos, .w = w, .h = g->item_h - 1};
 }
 
 void EditorIncrementPos(EditorGUI* g, f32 size) { g->y_pos += (size != 0) ? size : g->item_h; }
@@ -136,7 +140,7 @@ bool EditorMenuItems(EditorGUI* g, Span<String const> items, int& current) {
     for (auto const i : Range(items.size)) {
         bool selected = (int)i == current;
         if (g->imgui->ToggleButton(item_set,
-                                   {0, h * (f32)i, w, h},
+                                   {.xywh = {0, h * (f32)i, w, h}},
                                    g->imgui->GetID(items[i]),
                                    selected,
                                    items[i]))

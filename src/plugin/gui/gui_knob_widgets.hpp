@@ -5,8 +5,8 @@
 #include "foundation/foundation.hpp"
 
 #include "gui_framework/gui_imgui.hpp"
+#include "gui_framework/layout.hpp"
 #include "gui_fwd.hpp"
-#include "layout.hpp"
 
 namespace knobs {
 
@@ -47,9 +47,9 @@ bool Knob(Gui* g, imgui::Id id, Rect r, f32& percent, f32 default_percent, Style
 bool Knob(Gui* g, imgui::Id id, Parameter const& param, Rect r, Style const& style);
 bool Knob(Gui* g, Parameter const& param, Rect r, Style const& style);
 
-bool Knob(Gui* g, imgui::Id id, LayID r, f32& percent, f32 default_percent, Style const& style);
-bool Knob(Gui* g, imgui::Id id, Parameter const& param, LayID r, Style const& style);
-bool Knob(Gui* g, Parameter const& param, LayID r, Style const& style);
+bool Knob(Gui* g, imgui::Id id, layout::Id r, f32& percent, f32 default_percent, Style const& style);
+bool Knob(Gui* g, imgui::Id id, Parameter const& param, layout::Id r, Style const& style);
+bool Knob(Gui* g, Parameter const& param, layout::Id r, Style const& style);
 
 void FakeKnob(Gui* g, Rect r);
 

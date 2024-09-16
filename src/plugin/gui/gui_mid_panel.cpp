@@ -3,10 +3,10 @@
 
 #include <IconsFontAwesome5.h>
 
-#include "gui_framework/gui_live_edit.hpp"
 #include "gui.hpp"
-#include "gui_framework/colours.hpp"
 #include "gui_effects.hpp"
+#include "gui_framework/colours.hpp"
+#include "gui_framework/gui_live_edit.hpp"
 #include "gui_widget_helpers.hpp"
 #include "gui_window.hpp"
 
@@ -113,7 +113,7 @@ void MidPanel(Gui* g) {
     auto do_randomise_button = [&](String tooltip) {
         auto const margin = LiveSize(imgui, UiSizeId::MidPanelTitleMarginLeft);
         auto const size = LiveSize(imgui, UiSizeId::LayerSelectorButtonW);
-        Rect const btn_r {imgui.Width() - (size + margin), 0, size, mid_panel_title_height};
+        Rect const btn_r = {.xywh {imgui.Width() - (size + margin), 0, size, mid_panel_title_height}};
         auto const id = imgui.GetID("rand");
         if (buttons::Button(g,
                             id,
@@ -145,10 +145,10 @@ void MidPanel(Gui* g) {
             for (auto layer_index : Range(k_num_layers)) {
                 if (auto const lib_id = g->engine.Layer(layer_index).LibId(); lib_id) {
                     if (*lib_id == overall_lib) continue;
-                    auto const layer_r = Rect {r.x + (f32)layer_index * layer_width_without_pad,
-                                               r.y,
-                                               layer_width_without_pad,
-                                               r.h}
+                    auto const layer_r = Rect {.x = r.x + (f32)layer_index * layer_width_without_pad,
+                                               .y = r.y,
+                                               .w = layer_width_without_pad,
+                                               .h = r.h}
                                              .CutTop(mid_panel_title_height);
                     DoBlurredBackground(g, r, layer_r, window, *lib_id, mid_panel_size, layer_opacity);
                 }
@@ -176,14 +176,14 @@ void MidPanel(Gui* g) {
         settings.pad_top_left.y = LiveSize(imgui, UiSizeId::LayersBoxMarginT);
         settings.pad_bottom_right.x = LiveSize(imgui, UiSizeId::LayersBoxMarginR);
         settings.pad_bottom_right.y = LiveSize(imgui, UiSizeId::LayersBoxMarginB);
-        imgui.BeginWindow(settings, {0, 0, total_layer_width, imgui.Height()}, "Layers");
+        imgui.BeginWindow(settings, {.xywh {0, 0, total_layer_width, imgui.Height()}}, "Layers");
 
         // do the title
         {
-            Rect title_r {LiveSize(imgui, UiSizeId::MidPanelTitleMarginLeft),
-                          0,
-                          imgui.Width(),
-                          mid_panel_title_height};
+            Rect title_r {.xywh {LiveSize(imgui, UiSizeId::MidPanelTitleMarginLeft),
+                                 0,
+                                 imgui.Width(),
+                                 mid_panel_title_height}};
             imgui.RegisterAndConvertRect(&title_r);
             imgui.graphics->AddTextJustified(title_r,
                                              "Layers",
@@ -205,16 +205,18 @@ void MidPanel(Gui* g) {
                               &g->layer_gui[i],
                               layer_width_minus_pad,
                               layer_height);
-            lay.PerformLayout();
+            layout::RunContext(lay);
 
-            layer_gui::Draw(
-                g,
-                &engine,
-                {(f32)i * layer_width_minus_pad, mid_panel_title_height, layer_width_minus_pad, layer_height},
-                &engine.Layer(i),
-                ids,
-                &g->layer_gui[i]);
-            lay.Reset();
+            layer_gui::Draw(g,
+                            &engine,
+                            {.xywh {(f32)i * layer_width_minus_pad,
+                                    mid_panel_title_height,
+                                    layer_width_minus_pad,
+                                    layer_height}},
+                            &engine.Layer(i),
+                            ids,
+                            &g->layer_gui[i]);
+            layout::ResetContext(lay);
         }
 
         imgui.EndWindow();
@@ -251,15 +253,15 @@ void MidPanel(Gui* g) {
         settings.pad_bottom_right.y = LiveSize(imgui, UiSizeId::FXListMarginB);
 
         imgui.BeginWindow(settings,
-                          {total_layer_width, 0, imgui.Width() - total_layer_width, imgui.Height()},
+                          {.xywh {total_layer_width, 0, imgui.Width() - total_layer_width, imgui.Height()}},
                           "EffectsContainer");
 
         // do the title
         {
-            Rect title_r {LiveSize(imgui, UiSizeId::MidPanelTitleMarginLeft),
-                          0,
-                          imgui.Width(),
-                          mid_panel_title_height};
+            Rect title_r {.xywh {LiveSize(imgui, UiSizeId::MidPanelTitleMarginLeft),
+                                 0,
+                                 imgui.Width(),
+                                 mid_panel_title_height}};
             imgui.RegisterAndConvertRect(&title_r);
             imgui.graphics->AddTextJustified(title_r,
                                              "Effects",
@@ -271,8 +273,9 @@ void MidPanel(Gui* g) {
         if (do_randomise_button("Randomise all of the effects"))
             RandomiseAllEffectParameterValues(engine.processor);
 
-        DoEffectsWindow(g,
-                        {0, mid_panel_title_height, imgui.Width(), imgui.Height() - mid_panel_title_height});
+        DoEffectsWindow(
+            g,
+            {.xywh {0, mid_panel_title_height, imgui.Width(), imgui.Height() - mid_panel_title_height}});
 
         imgui.EndWindow();
     }

@@ -1616,6 +1616,7 @@ pub fn build(b: *std.Build) void {
                     plugin_path ++ "/gui_framework/gui_imgui.cpp",
                     plugin_path ++ "/gui_framework/gui_platform.cpp",
                     plugin_path ++ "/gui_framework/gui_platform_native_helpers.cpp",
+                    plugin_path ++ "/gui_framework/layout.cpp",
                     plugin_path ++ "/gui/gui.cpp",
                     plugin_path ++ "/gui/gui_bot_panel.cpp",
                     plugin_path ++ "/gui/gui_button_widgets.cpp",

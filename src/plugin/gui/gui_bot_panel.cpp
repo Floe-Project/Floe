@@ -4,10 +4,10 @@
 #include <IconsFontAwesome5.h>
 
 #include "engine/engine.hpp"
-#include "gui_framework/gui_live_edit.hpp"
 #include "gui.hpp"
 #include "gui_button_widgets.hpp"
 #include "gui_dragger_widgets.hpp"
+#include "gui_framework/gui_live_edit.hpp"
 #include "gui_keyboard.hpp"
 #include "gui_widget_helpers.hpp"
 
@@ -21,31 +21,60 @@ void BotPanel(Gui* g) {
     auto const button_h = LiveSize(imgui, UiSizeId::MidiKeyboardButtonSize);
     auto const button_ygap = LiveSize(imgui, UiSizeId::MidiKeyboardButtonYGap);
 
-    auto root = lay.CreateRootItem((LayScalar)imgui.Width(),
-                                   (LayScalar)imgui.Height(),
-                                   LayContainRow | LayContainLayout | LayContainStart);
-    auto controls = lay.CreateParentItem(root,
-                                         control_w,
-                                         (LayScalar)(imgui.Height() * 0.9f),
-                                         0,
-                                         LayContainRow | LayContainStart);
-    auto oct = lay.CreateParentItem(controls,
-                                    (LayScalar)(slider_w * 1.5f),
-                                    0,
-                                    LayBehaveVfill,
-                                    LayContainColumn | LayContainMiddle);
-    auto oct_up = lay.CreateChildItem(oct, 0, button_h, LayBehaveHfill);
-    auto oct_text = lay.CreateChildItem(oct, 0, button_h, LayBehaveHfill);
-    lay.SetMargins(oct_text, 0, button_ygap, 0, button_ygap);
-    auto oct_dn = lay.CreateChildItem(oct, 0, button_h, LayBehaveHfill);
-    auto keyboard = lay.CreateChildItem(root, 0, 0, LayBehaveFill);
+    auto root = layout::CreateItem(lay,
+                                   {
+                                       .size = imgui.Size(),
+                                       .contents_direction = layout::Direction::Row,
+                                       .contents_model = layout::Model::Layout,
+                                       .contents_align = layout::JustifyContent::Start,
+                                   });
+    auto controls = layout::CreateItem(lay,
+                                       {
+                                           .parent = root,
+                                           .size = {control_w, (f32)(imgui.Height() * 0.9f)},
+                                           .contents_direction = layout::Direction::Row,
+                                           .contents_align = layout::JustifyContent::Start,
+                                       });
+    auto oct = layout::CreateItem(lay,
+                                  {
+                                      .parent = controls,
+                                      .size = {(f32)(slider_w * 1.5f), 0},
+                                      .anchor = layout::Anchor::TopAndBottom,
+                                      .contents_direction = layout::Direction::Column,
+                                      .contents_align = layout::JustifyContent::Middle,
+                                  });
+    auto oct_up = layout::CreateItem(lay,
+                                     {
+                                         .parent = oct,
+                                         .size = {0, button_h},
+                                         .anchor = layout::Anchor::LeftAndRight,
+                                     });
+    auto oct_text = layout::CreateItem(lay,
+                                       {
+                                           .parent = oct,
+                                           .size = {0, button_h},
+                                           .margins = {.tb = button_ygap},
+                                           .anchor = layout::Anchor::LeftAndRight,
+                                       });
+    auto oct_dn = layout::CreateItem(lay,
+                                     {
+                                         .parent = oct,
+                                         .size = {0, button_h},
+                                         .anchor = layout::Anchor::LeftAndRight,
+                                     });
+    auto keyboard = layout::CreateItem(lay,
+                                       {
+                                           .parent = root,
+                                           .size = {0, 0},
+                                           .anchor = layout::Anchor::All,
+                                       });
 
-    lay.PerformLayout();
-    Rect const keyboard_r = lay.GetRect(keyboard);
-    Rect const oct_up_r = lay.GetRect(oct_up);
-    Rect const oct_dn_r = lay.GetRect(oct_dn);
-    Rect const oct_text_r = lay.GetRect(oct_text);
-    lay.Reset();
+    layout::RunContext(lay);
+    Rect const keyboard_r = layout::GetRect(lay, keyboard);
+    Rect const oct_up_r = layout::GetRect(lay, oct_up);
+    Rect const oct_dn_r = layout::GetRect(lay, oct_dn);
+    Rect const oct_text_r = layout::GetRect(lay, oct_text);
+    layout::ResetContext(lay);
 
     auto up_id = imgui.GetID("Up");
     ;

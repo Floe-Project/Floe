@@ -4,21 +4,21 @@
 #include "gui_widget_compounds.hpp"
 
 #include "descriptors/param_descriptors.hpp"
-#include "gui_framework/gui_live_edit.hpp"
 #include "gui.hpp"
+#include "gui_framework/gui_live_edit.hpp"
 #include "gui_label_widgets.hpp"
 #include "gui_widget_helpers.hpp"
 
-LayID LayoutParameterComponent(Gui* g,
-                               LayID parent,
-                               LayID& param_layid,
-                               LayID& name,
-                               LayoutType type,
-                               Optional<ParamIndex> index_for_menu_items,
-                               bool is_convo_ir,
-                               Optional<UiSizeId> size_index_for_gapx,
-                               bool set_gapx_independent_of_size,
-                               bool set_bottom_gap_independent_of_size) {
+layout::Id LayoutParameterComponent(Gui* g,
+                                    layout::Id parent,
+                                    layout::Id& param_layid,
+                                    layout::Id& name,
+                                    LayoutType type,
+                                    Optional<ParamIndex> index_for_menu_items,
+                                    bool is_convo_ir,
+                                    Optional<UiSizeId> size_index_for_gapx,
+                                    bool set_gapx_independent_of_size,
+                                    bool set_bottom_gap_independent_of_size) {
     auto& imgui = g->imgui;
     auto& lay = g->layout;
 
@@ -47,40 +47,55 @@ LayID LayoutParameterComponent(Gui* g,
     if (index_for_menu_items) {
         auto const menu_items = ParameterMenuItems(*index_for_menu_items);
         auto strings_width = MaxStringLength(g, menu_items) + menu_button_text_margin_l * 2;
-        width = (LayScalar)strings_width;
-        height = (LayScalar)param_popup_button_height;
+        width = (f32)strings_width;
+        height = (f32)param_popup_button_height;
     } else if (is_convo_ir) {
-        height = (LayScalar)param_popup_button_height;
+        height = (f32)param_popup_button_height;
         width = fx_convo_ir_width;
     }
 
     if (set_gapx_independent_of_size && width != starting_width)
-        gap_x -= (LayScalar)Max(0.0f, (width - starting_width) / 2);
+        gap_x -= (f32)Max(0.0f, (width - starting_width) / 2);
 
     if (set_bottom_gap_independent_of_size && height != starting_height) {
-        auto const delta = (LayScalar)Max(0.0f, starting_height - height);
-        gap_bottom += (LayScalar)(delta / 2);
-        gap_top += (LayScalar)(delta / 2);
+        auto const delta = (f32)Max(0.0f, starting_height - height);
+        gap_bottom += (f32)(delta / 2);
+        gap_top += (f32)(delta / 2);
     }
 
-    auto container = lay.CreateParentItem(parent, 0, 0, 0, LAY_COLUMN | LAY_START);
-    lay.SetMargins(container, gap_x, gap_top, gap_x, gap_bottom);
+    auto container = layout::CreateItem(lay,
+                                        {
+                                            .parent = parent,
+                                            .size = {0, 0},
+                                            .margins {.lr = gap_x, .t = gap_top, .b = gap_bottom},
+                                            .contents_direction = layout::Direction::Column,
+                                            .contents_align = layout::JustifyContent::Start,
 
-    param_layid = lay.CreateChildItem(container, width, (LayScalar)height, 0);
-    lay.SetBottomMargin(param_layid, param_component_label_gap_y);
-    name = lay.CreateChildItem(container, width, (LayScalar)(imgui.graphics->context->CurrentFontSize()), 0);
+                                        });
+
+    param_layid = layout::CreateItem(lay,
+                                     {
+                                         .parent = container,
+                                         .size = {width, (f32)height},
+                                         .margins = {.b = param_component_label_gap_y},
+                                     });
+    name = layout::CreateItem(lay,
+                              {
+                                  .parent = container,
+                                  .size = {width, (f32)(imgui.graphics->context->CurrentFontSize())},
+                              });
 
     return container;
 }
 
-LayID LayoutParameterComponent(Gui* g,
-                               LayID parent,
-                               LayID& param_layid,
-                               LayID& name,
-                               Parameter const& param,
-                               Optional<UiSizeId> size_index_for_gapx,
-                               bool set_gapx_independent_of_size,
-                               bool set_bottom_gap_independent_of_size) {
+layout::Id LayoutParameterComponent(Gui* g,
+                                    layout::Id parent,
+                                    layout::Id& param_layid,
+                                    layout::Id& name,
+                                    Parameter const& param,
+                                    Optional<UiSizeId> size_index_for_gapx,
+                                    bool set_gapx_independent_of_size,
+                                    bool set_bottom_gap_independent_of_size) {
     auto result = LayoutParameterComponent(
         g,
         parent,
@@ -100,21 +115,23 @@ LayID LayoutParameterComponent(Gui* g,
         auto const dragger_margin_t = LiveSize(g->imgui, UiSizeId::FXDraggerMarginT);
         auto const dragger_margin_b = LiveSize(g->imgui, UiSizeId::FXDraggerMarginB);
 
-        lay_set_size_xy(&g->layout.ctx, param_layid, dragger_width, dragger_height);
-        g->layout.SetTopMargin(param_layid, dragger_margin_t);
-        g->layout.SetBottomMargin(param_layid, dragger_margin_b);
+        layout::SetSize(g->layout, param_layid, f32x2 {dragger_width, dragger_height});
+        auto margins = layout::GetMargins(g->layout, param_layid);
+        margins.t = dragger_margin_t;
+        margins.b = dragger_margin_b;
+        layout::SetMargins(g->layout, param_layid, margins);
     }
 
     return result;
 }
 
-LayID LayoutParameterComponent(Gui* g,
-                               LayID parent,
-                               LayIDPair& ids,
-                               Parameter const& param,
-                               Optional<UiSizeId> size_index_for_gapx,
-                               bool set_gapx_independent_of_size,
-                               bool set_bottom_gap_independent_of_size) {
+layout::Id LayoutParameterComponent(Gui* g,
+                                    layout::Id parent,
+                                    LayIDPair& ids,
+                                    Parameter const& param,
+                                    Optional<UiSizeId> size_index_for_gapx,
+                                    bool set_gapx_independent_of_size,
+                                    bool set_bottom_gap_independent_of_size) {
     return LayoutParameterComponent(g,
                                     parent,
                                     ids.control,
@@ -143,8 +160,8 @@ bool KnobAndLabel(Gui* g,
 bool KnobAndLabel(Gui* g, Parameter const& param, LayIDPair ids, knobs::Style const& style, bool greyed_out) {
     return KnobAndLabel(g,
                         param,
-                        g->layout.GetRect(ids.control),
-                        g->layout.GetRect(ids.label),
+                        layout::GetRect(g->layout, ids.control),
+                        layout::GetRect(g->layout, ids.label),
                         style,
                         greyed_out);
 }

@@ -11,7 +11,6 @@ enum class ModalWindowType {
     Licences,
     Metrics,
     LoadError,
-    InstInfo,
     Settings,
     InstallPackages,
     Count,

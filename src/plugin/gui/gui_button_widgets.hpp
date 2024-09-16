@@ -8,8 +8,8 @@
 #include "descriptors/param_descriptors.hpp"
 #include "gui_framework/draw_list.hpp"
 #include "gui_framework/gui_imgui.hpp"
+#include "gui_framework/layout.hpp"
 #include "gui_fwd.hpp"
-#include "layout.hpp"
 
 namespace buttons {
 
@@ -424,19 +424,24 @@ ButtonReturnObject PopupWithItems(Gui* g, Parameter const& param, Rect r, Style 
 void FakeButton(Gui* g, Rect r, String str, Style const& style);
 
 // LayID
-bool Button(Gui* g, imgui::Id id, LayID lay_id, String str, Style const& style);
-bool Toggle(Gui* g, imgui::Id id, LayID lay_id, bool& state, String str, Style const& style);
-bool Popup(Gui* g, imgui::Id button_id, imgui::Id popup_id, LayID lay_id, String str, Style const& style);
+bool Button(Gui* g, imgui::Id id, layout::Id lay_id, String str, Style const& style);
+bool Toggle(Gui* g, imgui::Id id, layout::Id lay_id, bool& state, String str, Style const& style);
+bool Popup(Gui* g,
+           imgui::Id button_id,
+           imgui::Id popup_id,
+           layout::Id lay_id,
+           String str,
+           Style const& style);
 
-bool Button(Gui* g, LayID lay_id, String str, Style const& style);
-bool Toggle(Gui* g, LayID lay_id, bool& state, String str, Style const& style);
-bool Popup(Gui* g, imgui::Id popup_id, LayID lay_id, String str, Style const& style);
+bool Button(Gui* g, layout::Id lay_id, String str, Style const& style);
+bool Toggle(Gui* g, layout::Id lay_id, bool& state, String str, Style const& style);
+bool Popup(Gui* g, imgui::Id popup_id, layout::Id lay_id, String str, Style const& style);
 
-ButtonReturnObject Toggle(Gui* g, Parameter const& param, LayID lay_id, String str, Style const& style);
-ButtonReturnObject Toggle(Gui* g, Parameter const& param, LayID lay_id, Style const& style);
-ButtonReturnObject PopupWithItems(Gui* g, Parameter const& param, LayID lay_id, Style const& style);
+ButtonReturnObject Toggle(Gui* g, Parameter const& param, layout::Id lay_id, String str, Style const& style);
+ButtonReturnObject Toggle(Gui* g, Parameter const& param, layout::Id lay_id, Style const& style);
+ButtonReturnObject PopupWithItems(Gui* g, Parameter const& param, layout::Id lay_id, Style const& style);
 
-void FakeButton(Gui* g, LayID lay_id, String str, Style const& style);
+void FakeButton(Gui* g, layout::Id lay_id, String str, Style const& style);
 void FakeButton(Gui* g, Rect r, String str, Style const& style);
 void FakeButton(Gui* g, Rect r, String str, bool state, Style const& style);
 

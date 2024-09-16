@@ -17,10 +17,12 @@ void Label(Gui* g, ::Parameter const& param, Rect r, Style const& style) {
     Label(g, r, param.info.gui_label, style);
 }
 
-void Label(Gui* g, LayID id, String str, Style const& style) { Label(g, g->layout.GetRect(id), str, style); }
+void Label(Gui* g, layout::Id id, String str, Style const& style) {
+    Label(g, layout::GetRect(g->layout, id), str, style);
+}
 
-void Label(Gui* g, ::Parameter const& param, LayID id, Style const& style) {
-    Label(g, param, g->layout.GetRect(id), style);
+void Label(Gui* g, ::Parameter const& param, layout::Id id, Style const& style) {
+    Label(g, param, layout::GetRect(g->layout, id), style);
 }
 
 } // namespace labels

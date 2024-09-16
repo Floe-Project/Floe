@@ -5,8 +5,8 @@
 
 #include "foundation/foundation.hpp"
 
-#include "gui_framework/gui_live_edit.hpp"
 #include "gui.hpp"
+#include "gui_framework/gui_live_edit.hpp"
 #include "gui_widget_helpers.hpp"
 
 namespace knobs {
@@ -193,14 +193,14 @@ bool Knob(Gui* g, imgui::Id id, Parameter const& param, Rect r, Style const& sty
     return new_val.HasValue();
 }
 
-bool Knob(Gui* g, imgui::Id id, LayID lay_id, f32& percent, f32 default_percent, Style const& style) {
-    return Knob(g, id, g->layout.GetRect(lay_id), percent, default_percent, style);
+bool Knob(Gui* g, imgui::Id id, layout::Id lay_id, f32& percent, f32 default_percent, Style const& style) {
+    return Knob(g, id, layout::GetRect(g->layout, lay_id), percent, default_percent, style);
 }
-bool Knob(Gui* g, Parameter const& param, LayID lay_id, Style const& style) {
-    return Knob(g, 0, param, g->layout.GetRect(lay_id), style);
+bool Knob(Gui* g, Parameter const& param, layout::Id lay_id, Style const& style) {
+    return Knob(g, 0, param, layout::GetRect(g->layout, lay_id), style);
 }
-bool Knob(Gui* g, imgui::Id id, Parameter const& param, LayID lay_id, Style const& style) {
-    return Knob(g, id, param, g->layout.GetRect(lay_id), style);
+bool Knob(Gui* g, imgui::Id id, Parameter const& param, layout::Id lay_id, Style const& style) {
+    return Knob(g, id, param, layout::GetRect(g->layout, lay_id), style);
 }
 
 void FakeKnob(Gui* g, Rect r) {

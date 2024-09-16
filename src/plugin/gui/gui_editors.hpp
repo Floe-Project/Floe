@@ -7,9 +7,9 @@
 
 #include "os/filesystem.hpp"
 
-#include "gui_framework/gui_live_edit.hpp"
 #include "gui.hpp"
 #include "gui_editor_widgets.hpp"
+#include "gui_framework/gui_live_edit.hpp"
 
 #define FLOE_EDITOR_ENABLED !PRODUCTION_BUILD
 constexpr bool k_editor_enabled = FLOE_EDITOR_ENABLED;
@@ -181,9 +181,9 @@ static void DoWholeEditor(Gui* g) {
         auto const half_w = (f32)(int)(imgui.Width() / 2);
         Rect debug_r;
         if (g_show_editor_on_left)
-            debug_r = {half_w + 1, 0, half_w - 1, imgui.Height()};
+            debug_r = {.xywh {half_w + 1, 0, half_w - 1, imgui.Height()}};
         else
-            debug_r = {0, 0, half_w - 1, imgui.Height()};
+            debug_r = {.xywh {0, 0, half_w - 1, imgui.Height()}};
         imgui.BeginWindow(imgui::DefWindow(), debug_r, "DebugR");
 
         static String const tab_text[] = {
@@ -204,14 +204,14 @@ static void DoWholeEditor(Gui* g) {
             bool v = i == selected_tab;
             auto id = imgui.GetID(tab_text[i]);
             if (imgui.ToggleButton(imgui::DefToggleButton(),
-                                   {(f32)i * third, 0, third, tab_h},
+                                   {.xywh {(f32)i * third, 0, third, tab_h}},
                                    id,
                                    v,
                                    tab_text[i])) {
                 selected_tab = i;
             }
         }
-        Rect const selected_r = {0, tab_h, imgui.Width(), imgui.Height() - tab_h};
+        Rect const selected_r = {.xywh {0, tab_h, imgui.Width(), imgui.Height() - tab_h}};
         switch (selected_tab) {
             case 0: DoCommandPanel(g, selected_r); break;
             case 1: DoAudioDebugPanel(g, selected_r); break;

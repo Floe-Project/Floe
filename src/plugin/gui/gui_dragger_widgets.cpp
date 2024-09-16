@@ -5,8 +5,8 @@
 
 #include <IconsFontAwesome5.h>
 
-#include "gui_framework/gui_live_edit.hpp"
 #include "gui.hpp"
+#include "gui_framework/gui_live_edit.hpp"
 #include "gui_widget_helpers.hpp"
 
 namespace draggers {
@@ -103,11 +103,11 @@ bool Dragger(Gui* g, Parameter const& param, Rect r, Style const& style) {
     return changed;
 }
 
-bool Dragger(Gui* g, imgui::Id id, LayID lay_id, int min, int max, int& value, Style const& style) {
-    return Dragger(g, id, g->layout.GetRect(lay_id), min, max, value, style);
+bool Dragger(Gui* g, imgui::Id id, layout::Id lay_id, int min, int max, int& value, Style const& style) {
+    return Dragger(g, id, layout::GetRect(g->layout, lay_id), min, max, value, style);
 }
-bool Dragger(Gui* g, Parameter const& param, LayID lay_id, Style const& style) {
-    return Dragger(g, param, g->layout.GetRect(lay_id), style);
+bool Dragger(Gui* g, Parameter const& param, layout::Id lay_id, Style const& style) {
+    return Dragger(g, param, layout::GetRect(g->layout, lay_id), style);
 }
 
 } // namespace draggers

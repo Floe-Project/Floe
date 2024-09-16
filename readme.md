@@ -28,7 +28,7 @@ Join Floe's [Zulip group chat/forum](https://floe.zulipchat.com) for discussions
 Below is the current plan. Subject to change. We sometimes use GitHub issues to track [milestones](https://github.com/Floe-Project/Floe/milestones?direction=asc&sort=title&state=open) towards future releases. 
 
 ### Step 1: beta release in October/November 2024
-We will release a beta version of Floe. It will have pretty much all the features but might need bugs ironing out.
+We will release a beta version of Floe. It will be fully functional, but might have some bugs. The goal of the beta is to fix bugs before the full release.
 
 ### Step 2: release V1 before 2025
 #### Complete, but not completed
@@ -59,13 +59,14 @@ Floe is not much use without sample libraries. Next step will be to expand the n
 There's still some parts of Floe's codebase that are not amenable to long-term development: the GUI and the audio processing pipeline. These need to be reworked before big new features are added.
 
 ### Step 5: larger improvements and new features
-The groundwork has been laid, now to level-up Floe. We will be looking at what users want as well as the following list:
+The groundwork has been laid, now to enhance Floe. We will be looking at what users want as well as the following list:
 - Make the GUI more consistent
 - Support modern technologies: MPE, MIDI2, polyphonic modulation
 - Add more features the sample-library format to allow for more complex sampling
+- Add support for controlling GUI via the Lua sample libraries
 - Modulation system
 - Macro knobs
-- Add algorithmic oscillators for laying with sample-based synthesis
+- Add algorithmic oscillators for layering with sample-based synthesis
 
 ## License
 This project is licensed under GPL version 3 or later. See the LICENCES folder for the full licence text. We follow the [REUSE](https://reuse.software/) recommendations for this repository.
@@ -78,9 +79,10 @@ However, Linux is only provided for development purposes at the moment, and you 
 - Install Nix and enable Flakes
 - Run `nix develop` in the root of the project to enter a shell with all dependencies
 - Run `just build native`. Alternative options instead of `native` are: `linux`, `windows`, `mac_arm`, `mac_x86`, `mac_ub` (universal binary)
+- Binaries are created in the zig-out directory
 
 ## About the code
-Floe is a [CLAP](https://github.com/free-audio/clap) plugin at its core. The [clap-wrapper project](https://github.com/free-audio/clap-wrapper) is used to provide VST3 and AU versions.
+Floe is a [CLAP](https://github.com/free-audio/clap) plugin written in C++. The [clap-wrapper project](https://github.com/free-audio/clap-wrapper) is used to provide VST3 and AU versions. Eventually, we plan to use the Zig programming language.
 
 ### Project structure
 #### Helpers
@@ -119,18 +121,16 @@ Floe is a [CLAP](https://github.com/free-audio/clap) plugin at its core. The [cl
 
 ### Code style [WIP]
 - No frameworks, just a handful of libraries for specific tasks.
-- In general, we prefer a more C-style of C++: structs and functions, memory arenas instead of new/delete/smart-pointers.
+- In general, we prefer structs and functions rather than objects and methods, and memory arenas instead of new/delete/malloc/free/smart-pointers.
 - Compile times are pretty fast and we do our best to keep them that way.
 - We don't use the C++ standard library, and only sparingly use the C standard library.
 - We only support one compiler: Clang (via Zig), and so we wholeheartedly use Clang-specific features and features from C++20/23 and above.
 - Good tooling is a priority. The build system generates a compile_commands.json, so clangd, clang-tidy, cppcheck, etc. are all supported.
-- We pair `Nix` with `just` for accessing great tools, being able to deeply integrate the project and be consistent across machines (local/CI/Linux/macOS).
 - We try to focus on making the code a joy to work on: programming can be fun.
 - Incrementally improve the codebase, it's still a work-in-progress. Unfortunately there's still some technical debt to pay off.
-- In years to come we might make more use of the Zig programming language.
 
 ## Inventory of features
-1. 🟦 Completed for the current requirements
+1. 🟦 Completed enough for the current requirements
 2. 🟩 Works well-enough but doesn't handle everything
 3. 🟨 Mostly works but some aspects are missing or broken
 4. 🟥 Fundamentally broken or not-yet-implemented
@@ -141,12 +141,12 @@ Floe is a [CLAP](https://github.com/free-audio/clap) plugin at its core. The [cl
 | Directory watcher           | Cross-platform API for watching for file changes     | 🟦     |
 | CI & CD                     | Continuous integration and deployment                | 🟦     |
 | State serialisation         | Saving/loading plugin state to DAW or preset         | 🟦     |
-| Lua sample library format   | Sample library Lua API                               | 🟩     |
-| MDATA sample library format | Legacy binary sample library format                  | 🟩     |
-| Settings file               | Saving/loading settings from file                    | 🟩     |
+| Lua sample library format   | Sample library Lua API                               | 🟦     |
+| MDATA sample library format | Legacy binary sample library format                  | 🟦     |
+| Settings file               | Saving/loading settings from file                    | 🟦     |
+| Audio parameters            | System for configuring/using audio plugin parameters | 🟦     |
 | GUI                         | Graphical user interface                             | 🟩     |
 | Audio/GUI communication     | Communication between audio and GUI threads          | 🟩     |
-| Audio parameters            | System for configuring/using audio plugin parameters | 🟩     |
 | Audio processing pipeline   | Sound shaping, MIDI, modulation, effects, etc.       | 🟨     |
 | CLAP format                 | CLAP                                                 | 🟨     |
 | VST3 format                 | VST3                                                 | 🟥     |

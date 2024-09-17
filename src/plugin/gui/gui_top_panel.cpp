@@ -14,9 +14,7 @@
 #include "state/state_snapshot.hpp"
 
 static void PresetsWindowButton(Gui* g, Engine* a, Rect r) {
-    auto& imgui = g->imgui;
-
-    auto button_id = imgui.GetID("PresetMenu");
+    auto button_id = g->imgui.GetID("PresetMenu");
 
     DynamicArrayBounded<char, 100> preset_text {a->last_snapshot.metadata.Name()};
     if (StateChangedSinceLastSnapshot(*a)) dyn::AppendSpan(preset_text, " (modified)"_s);
@@ -47,25 +45,21 @@ static void DoSettingsMenuItems(Gui* g) {
 }
 
 void TopPanel(Gui* g) {
-    auto& imgui = g->imgui;
-    auto& lay = g->layout;
-    auto& engine = g->engine;
-
     bool const has_insts_with_dynamics = true; // TODO(1.0), get the value properly?
     auto title_font = g->mada_big;
 
-    auto const preset_box_icon_width = LiveSize(imgui, UiSizeId::Top2PresetBoxIconWidth);
-    auto const icon_width = LiveSize(imgui, UiSizeId::Top2IconWidth);
-    auto const icon_height = LiveSize(imgui, UiSizeId::Top2IconHeight);
+    auto const preset_box_icon_width = LiveSize(g->imgui, UiSizeId::Top2PresetBoxIconWidth);
+    auto const icon_width = LiveSize(g->imgui, UiSizeId::Top2IconWidth);
+    auto const icon_height = LiveSize(g->imgui, UiSizeId::Top2IconHeight);
 
-    auto root = layout::CreateItem(lay,
+    auto root = layout::CreateItem(g->layout,
                                    {
-                                       .size = imgui.Size(),
+                                       .size = g->imgui.Size(),
                                        .contents_direction = layout::Direction::Row,
                                        .contents_align = layout::JustifyContent::Start,
                                    });
 
-    auto left_container = layout::CreateItem(lay,
+    auto left_container = layout::CreateItem(g->layout,
                                              {
                                                  .parent = root,
                                                  .size = {layout::k_hug_contents, layout::k_fill_parent},
@@ -74,14 +68,14 @@ void TopPanel(Gui* g) {
                                              });
 
     auto title = layout::CreateItem(
-        lay,
+        g->layout,
         {
             .parent = left_container,
-            .size = {LiveSize(imgui, UiSizeId::Top2TitleWidth), title_font->font_size_no_scale},
-            .margins = {.l = LiveSize(imgui, UiSizeId::Top2TitleMarginL)},
+            .size = {LiveSize(g->imgui, UiSizeId::Top2TitleWidth), title_font->font_size_no_scale},
+            .margins = {.l = LiveSize(g->imgui, UiSizeId::Top2TitleMarginL)},
         });
 
-    auto right_container = layout::CreateItem(lay,
+    auto right_container = layout::CreateItem(g->layout,
                                               {
                                                   .parent = root,
                                                   .size = layout::k_fill_parent,
@@ -90,149 +84,150 @@ void TopPanel(Gui* g) {
                                               });
 
     auto preset_box =
-        layout::CreateItem(lay,
+        layout::CreateItem(g->layout,
                            {
                                .parent = right_container,
                                .size = layout::k_hug_contents,
-                               .margins = {.l = LiveSize(imgui, UiSizeId::Top2PresetBoxMarginL),
-                                           .r = LiveSize(imgui, UiSizeId::Top2PresetBoxMarginR)},
+                               .margins = {.l = LiveSize(g->imgui, UiSizeId::Top2PresetBoxMarginL),
+                                           .r = LiveSize(g->imgui, UiSizeId::Top2PresetBoxMarginR)},
                                .contents_direction = layout::Direction::Row,
                                .contents_align = layout::JustifyContent::Start,
                            });
 
     auto preset_menu =
-        layout::CreateItem(lay,
+        layout::CreateItem(g->layout,
                            {
                                .parent = preset_box,
-                               .size = {LiveSize(imgui, UiSizeId::Top2PresetBoxW), icon_height},
+                               .size = {LiveSize(g->imgui, UiSizeId::Top2PresetBoxW), icon_height},
                            });
 
-    auto preset_left = layout::CreateItem(lay,
+    auto preset_left = layout::CreateItem(g->layout,
                                           {
                                               .parent = preset_box,
                                               .size = {preset_box_icon_width, icon_height},
                                           });
-    auto preset_right = layout::CreateItem(lay,
+    auto preset_right = layout::CreateItem(g->layout,
                                            {
                                                .parent = preset_box,
                                                .size = {preset_box_icon_width, icon_height},
                                            });
-    auto preset_random = layout::CreateItem(lay,
+    auto preset_random = layout::CreateItem(g->layout,
                                             {
                                                 .parent = preset_box,
                                                 .size = {preset_box_icon_width, icon_height},
                                             });
-    auto preset_random_menu = layout::CreateItem(lay,
+    auto preset_random_menu = layout::CreateItem(g->layout,
                                                  {
                                                      .parent = preset_box,
                                                      .size = {preset_box_icon_width, icon_height},
                                                  });
-    auto preset_save = layout::CreateItem(lay,
-                                          {
-                                              .parent = preset_box,
-                                              .size = {preset_box_icon_width, icon_height},
-                                              .margins = {.r = LiveSize(imgui, UiSizeId::Top2PresetBoxPadR)},
-                                          });
+    auto preset_save =
+        layout::CreateItem(g->layout,
+                           {
+                               .parent = preset_box,
+                               .size = {preset_box_icon_width, icon_height},
+                               .margins = {.r = LiveSize(g->imgui, UiSizeId::Top2PresetBoxPadR)},
+                           });
 
-    auto box = layout::CreateItem(lay,
+    auto box = layout::CreateItem(g->layout,
                                   {
                                       .parent = right_container,
                                       .size = {icon_width, icon_height},
                                   });
-    auto cog = layout::CreateItem(lay,
+    auto cog = layout::CreateItem(g->layout,
                                   {
                                       .parent = right_container,
                                       .size = {icon_width, icon_height},
                                   });
-    auto menu = layout::CreateItem(lay,
+    auto menu = layout::CreateItem(g->layout,
                                    {
                                        .parent = right_container,
                                        .size = {icon_width, icon_height},
                                    });
 
     auto knob_container =
-        layout::CreateItem(lay,
+        layout::CreateItem(g->layout,
                            {
                                .parent = right_container,
                                .size = layout::k_hug_contents,
-                               .margins = {.l = LiveSize(imgui, UiSizeId::Top2KnobsMarginL),
-                                           .r = LiveSize(imgui, UiSizeId::Top2KnobsMarginR)},
+                               .margins = {.l = LiveSize(g->imgui, UiSizeId::Top2KnobsMarginL),
+                                           .r = LiveSize(g->imgui, UiSizeId::Top2KnobsMarginR)},
                                .contents_direction = layout::Direction::Row,
                            });
     LayIDPair dyn;
     LayoutParameterComponent(g,
                              knob_container,
                              dyn,
-                             engine.processor.params[ToInt(ParamIndex::MasterDynamics)],
+                             g->engine.processor.params[ToInt(ParamIndex::MasterDynamics)],
                              UiSizeId::Top2KnobsGapX);
     LayIDPair velo;
     LayoutParameterComponent(g,
                              knob_container,
                              velo,
-                             engine.processor.params[ToInt(ParamIndex::MasterVelocity)],
+                             g->engine.processor.params[ToInt(ParamIndex::MasterVelocity)],
                              UiSizeId::Top2KnobsGapX);
     LayIDPair vol;
     LayoutParameterComponent(g,
                              knob_container,
                              vol,
-                             engine.processor.params[ToInt(ParamIndex::MasterVolume)],
+                             g->engine.processor.params[ToInt(ParamIndex::MasterVolume)],
                              UiSizeId::Top2KnobsGapX);
 
-    auto level = layout::CreateItem(
-        lay,
-        {
-            .parent = right_container,
-            .size = {LiveSize(imgui, UiSizeId::Top2PeakMeterW), LiveSize(imgui, UiSizeId::Top2PeakMeterH)},
-        });
+    auto level = layout::CreateItem(g->layout,
+                                    {
+                                        .parent = right_container,
+                                        .size = {LiveSize(g->imgui, UiSizeId::Top2PeakMeterW),
+                                                 LiveSize(g->imgui, UiSizeId::Top2PeakMeterH)},
+                                    });
 
-    layout::RunContext(lay);
-    DEFER { layout::ResetContext(lay); };
+    layout::RunContext(g->layout);
+    DEFER { layout::ResetContext(g->layout); };
 
-    auto preset_rand_r = layout::GetRect(lay, preset_random);
-    auto preset_rand_menu_r = layout::GetRect(lay, preset_random_menu);
-    auto preset_menu_r = layout::GetRect(lay, preset_menu);
-    auto preset_left_r = layout::GetRect(lay, preset_left);
-    auto preset_right_r = layout::GetRect(lay, preset_right);
-    auto preset_save_r = layout::GetRect(lay, preset_save);
-    auto level_r = layout::GetRect(lay, level);
+    auto preset_rand_r = layout::GetRect(g->layout, preset_random);
+    auto preset_rand_menu_r = layout::GetRect(g->layout, preset_random_menu);
+    auto preset_menu_r = layout::GetRect(g->layout, preset_menu);
+    auto preset_left_r = layout::GetRect(g->layout, preset_left);
+    auto preset_right_r = layout::GetRect(g->layout, preset_right);
+    auto preset_save_r = layout::GetRect(g->layout, preset_save);
+    auto level_r = layout::GetRect(g->layout, level);
 
     //
     //
     //
     {
-        auto back_r = imgui.GetRegisteredAndConvertedRect(layout::GetRect(lay, preset_box));
-        auto const rounding = LiveSize(imgui, UiSizeId::CornerRounding);
-        imgui.graphics->AddRectFilled(back_r.Min(),
-                                      back_r.Max(),
-                                      LiveCol(imgui, UiColMap::TopPanelPresetsBack),
-                                      rounding);
+        auto back_r = g->imgui.GetRegisteredAndConvertedRect(layout::GetRect(g->layout, preset_box));
+        auto const rounding = LiveSize(g->imgui, UiSizeId::CornerRounding);
+        g->imgui.graphics->AddRectFilled(back_r, LiveCol(g->imgui, UiColMap::TopPanelPresetsBack), rounding);
     }
 
     {
-        if (title_font) imgui.graphics->context->PushFont(title_font);
+        if (title_font) g->imgui.graphics->context->PushFont(title_font);
 
         String const name = "Floe";
 
-        auto title_r = layout::GetRect(lay, title).Up(Round(-title_font->descent));
+        auto title_r = layout::GetRect(g->layout, title).Up(Round(-title_font->descent));
 
-        labels::Label(g, title_r, name, labels::Title(imgui, LiveCol(imgui, UiColMap::TopPanelTitleText)));
-        if (title_font) imgui.graphics->context->PopFont();
+        labels::Label(g,
+                      title_r,
+                      name,
+                      labels::Title(g->imgui, LiveCol(g->imgui, UiColMap::TopPanelTitleText)));
+        if (title_font) g->imgui.graphics->context->PopFont();
     }
 
-    imgui.graphics->context->PushFont(g->mada);
+    g->imgui.graphics->context->PushFont(g->mada);
 
     Optional<PresetSelectionCriteria> preset_load_criteria {};
 
     //
-    auto large_icon_button_style = buttons::TopPanelIconButton(imgui).WithLargeIcon();
+    auto large_icon_button_style = buttons::TopPanelIconButton(g->imgui).WithLargeIcon();
     {
-        auto btn_id = imgui.GetID("L");
+        auto btn_id = g->imgui.GetID("L");
         if (buttons::Button(g, btn_id, preset_left_r, ICON_FA_CARET_LEFT, large_icon_button_style))
             preset_load_criteria = DirectoryListing::AdjacentDirection::Previous;
         Tooltip(g, btn_id, preset_left_r, "Load previous preset"_s);
     }
     {
-        auto btn_id = imgui.GetID("R");
+        auto btn_id = g->imgui.GetID("R");
         if (buttons::Button(g, btn_id, preset_right_r, ICON_FA_CARET_RIGHT, large_icon_button_style))
             preset_load_criteria = DirectoryListing::AdjacentDirection::Next;
         Tooltip(g, btn_id, preset_left_r, "Load next preset"_s);
@@ -241,7 +236,7 @@ void TopPanel(Gui* g) {
 
     auto& settings = g->settings.settings.gui;
     {
-        auto btn_id = imgui.GetID("rand_pre");
+        auto btn_id = g->imgui.GetID("rand_pre");
         if (buttons::Button(g,
                             btn_id,
                             preset_rand_r,
@@ -252,7 +247,7 @@ void TopPanel(Gui* g) {
                     preset_load_criteria = PresetRandomiseCriteria {PresetRandomiseMode::All};
                     break;
                 case PresetRandomiseMode::BrowserFilters:
-                    preset_load_criteria = PresetRandomiseCriteria {engine.preset_browser_filters};
+                    preset_load_criteria = PresetRandomiseCriteria {g->engine.preset_browser_filters};
                     break;
                 case PresetRandomiseMode::Folder:
                     preset_load_criteria = PresetRandomiseCriteria {PresetRandomiseMode::Folder};
@@ -292,19 +287,19 @@ void TopPanel(Gui* g) {
 
     if (preset_load_criteria) {
         LoadPresetFromListing(
-            engine,
+            g->engine,
             *preset_load_criteria,
             FetchOrRescanPresetsFolder(
-                engine.shared_engine_systems.preset_listing,
+                g->engine.shared_engine_systems.preset_listing,
                 RescanMode::RescanAsyncIfNeeded,
-                engine.shared_engine_systems.settings.settings.filesystem.extra_presets_scan_folders,
-                &engine.shared_engine_systems.thread_pool));
+                g->engine.shared_engine_systems.settings.settings.filesystem.extra_presets_scan_folders,
+                &g->engine.shared_engine_systems.thread_pool));
         g->preset_browser_data.scroll_to_show_current_preset = true;
     }
 
     {
-        auto const btn_id = imgui.GetID("save");
-        auto const pop_id = imgui.GetID("save_pop");
+        auto const btn_id = g->imgui.GetID("save");
+        auto const pop_id = g->imgui.GetID("save_pop");
         if (buttons::Popup(g, btn_id, pop_id, preset_save_r, ICON_FA_SAVE, large_icon_button_style)) {
             auto save_over_text = fmt::Format(g->scratch_arena,
                                               "Save (Overwrite \"{}\")",
@@ -314,20 +309,20 @@ void TopPanel(Gui* g) {
 
             PopupMenuItems items(g, {&ptr, 1});
             if (existing_path) {
-                if (items.DoButton(save_over_text)) SaveCurrentStateToFile(engine, *existing_path);
+                if (items.DoButton(save_over_text)) SaveCurrentStateToFile(g->engine, *existing_path);
             }
 
             if (items.DoButton("Save Preset As")) g->OpenDialog(DialogType::SavePreset);
 
-            imgui.EndWindow();
+            g->imgui.EndWindow();
         }
         Tooltip(g, btn_id, preset_save_r, "Save the current state as a preset"_s);
     }
 
     if (g->icons) g->frame_input.graphics_ctx->PopFont();
     {
-        auto btn_id = imgui.GetID("rand_pre_menu");
-        auto pop_id = imgui.GetID("rand_pre_menu_pop");
+        auto btn_id = g->imgui.GetID("rand_pre_menu");
+        auto pop_id = g->imgui.GetID("rand_pre_menu_pop");
         if (buttons::Popup(g,
                            btn_id,
                            pop_id,
@@ -348,31 +343,31 @@ void TopPanel(Gui* g) {
                 settings.presets_random_mode = mode;
             }
 
-            imgui.EndWindow();
+            g->imgui.EndWindow();
         }
         Tooltip(g, btn_id, preset_rand_menu_r, "Select the mode of the random-preset button"_s);
     }
 
     {
-        auto btn_id = imgui.GetID("install");
-        auto btn_r = layout::GetRect(lay, box);
+        auto btn_id = g->imgui.GetID("install");
+        auto btn_r = layout::GetRect(g->layout, box);
         if (buttons::Button(g, btn_id, btn_r, ICON_FA_BOX_OPEN, large_icon_button_style))
             OpenInstallPackagesModal(g);
         Tooltip(g, btn_id, btn_r, "Install libraries & presets"_s);
     }
 
     {
-        auto btn_id = imgui.GetID("sets");
-        auto btn_r = layout::GetRect(lay, cog);
+        auto btn_id = g->imgui.GetID("sets");
+        auto btn_r = layout::GetRect(g->layout, cog);
         if (buttons::Button(g, btn_id, btn_r, ICON_FA_COG, large_icon_button_style))
-            OpenModalIfNotAlready(imgui, ModalWindowType::Settings);
+            OpenModalIfNotAlready(g->imgui, ModalWindowType::Settings);
         Tooltip(g, btn_id, btn_r, "Open settings window"_s);
     }
 
     {
-        auto additonal_menu_r = layout::GetRect(lay, menu);
-        auto additional_menu_id = imgui.GetID("Menu");
-        auto popup_id = imgui.GetID("MenuPopup");
+        auto const additonal_menu_r = layout::GetRect(g->layout, menu);
+        auto const additional_menu_id = g->imgui.GetID("Menu");
+        auto const popup_id = g->imgui.GetID("MenuPopup");
         if (buttons::Popup(g,
                            additional_menu_id,
                            popup_id,
@@ -380,52 +375,56 @@ void TopPanel(Gui* g) {
                            ICON_FA_ELLIPSIS_V,
                            large_icon_button_style)) {
             DoSettingsMenuItems(g);
-            imgui.EndWindow();
+            g->imgui.EndWindow();
         }
         Tooltip(g, additional_menu_id, additonal_menu_r, "Additional functions and information"_s);
     }
 
-    imgui.graphics->context->PopFont();
-    PresetsWindowButton(g, &engine, preset_menu_r);
+    g->imgui.graphics->context->PopFont();
+    PresetsWindowButton(g, &g->engine, preset_menu_r);
 
     //
 
-    peak_meters::PeakMeter(g, level_r, engine.processor.peak_meter, true);
+    peak_meters::PeakMeter(g, level_r, g->engine.processor.peak_meter, true);
 
-    KnobAndLabel(g, engine.processor.params[ToInt(ParamIndex::MasterVolume)], vol, knobs::DefaultKnob(imgui));
     KnobAndLabel(g,
-                 engine.processor.params[ToInt(ParamIndex::MasterVelocity)],
+                 g->engine.processor.params[ToInt(ParamIndex::MasterVolume)],
+                 vol,
+                 knobs::DefaultKnob(g->imgui));
+    KnobAndLabel(g,
+                 g->engine.processor.params[ToInt(ParamIndex::MasterVelocity)],
                  velo,
-                 knobs::DefaultKnob(imgui));
+                 knobs::DefaultKnob(g->imgui));
 
     {
         g->dynamics_slider_is_held = false;
-        auto const id = imgui.GetID((u64)engine.processor.params[ToInt(ParamIndex::MasterDynamics)].info.id);
+        auto const id =
+            g->imgui.GetID((u64)g->engine.processor.params[ToInt(ParamIndex::MasterDynamics)].info.id);
         if (has_insts_with_dynamics) {
             knobs::Knob(g,
                         id,
-                        engine.processor.params[ToInt(ParamIndex::MasterDynamics)],
+                        g->engine.processor.params[ToInt(ParamIndex::MasterDynamics)],
                         dyn.control,
-                        knobs::DefaultKnob(imgui));
-            g->dynamics_slider_is_held = imgui.IsActive(id);
-            if (imgui.WasJustActivated(id))
+                        knobs::DefaultKnob(g->imgui));
+            g->dynamics_slider_is_held = g->imgui.IsActive(id);
+            if (g->imgui.WasJustActivated(id))
                 g->imgui.frame_output.ElevateUpdateRequest(GuiFrameResult::UpdateRequest::ImmediatelyUpdate);
         } else {
-            auto knob_r = layout::GetRect(lay, dyn.control);
+            auto knob_r = layout::GetRect(g->layout, dyn.control);
             knobs::FakeKnob(g, knob_r);
 
-            imgui.RegisterAndConvertRect(&knob_r);
-            imgui.ButtonBehavior(knob_r, id, {});
+            g->imgui.RegisterAndConvertRect(&knob_r);
+            g->imgui.ButtonBehavior(knob_r, id, {});
             Tooltip(
                 g,
                 id,
                 knob_r,
                 "Dynamics: no currently loaded instruments have dynamics information; this knob is inactive"_s);
-            if (imgui.IsHot(id)) imgui.frame_output.cursor_type = CursorType::Default;
+            if (g->imgui.IsHot(id)) g->imgui.frame_output.cursor_type = CursorType::Default;
         }
         labels::Label(g,
-                      engine.processor.params[ToInt(ParamIndex::MasterDynamics)],
+                      g->engine.processor.params[ToInt(ParamIndex::MasterDynamics)],
                       dyn.label,
-                      labels::ParameterCentred(imgui, !has_insts_with_dynamics));
+                      labels::ParameterCentred(g->imgui, !has_insts_with_dynamics));
     }
 }

@@ -77,20 +77,19 @@ static void LayerInstrumentMenuItems(Gui* g, LayerProcessor* layer) {
 }
 
 static void DoInstSelectorGUI(Gui* g, Rect r, u32 layer) {
-    auto& engine = g->engine;
-    auto& imgui = g->imgui;
-    imgui.PushID("inst selector");
-    DEFER { imgui.PopID(); };
-    auto imgui_id = imgui.GetID((u64)layer);
+    g->imgui.PushID("inst selector");
+    DEFER { g->imgui.PopID(); };
+    auto imgui_id = g->imgui.GetID((u64)layer);
 
-    auto layer_obj = &engine.Layer(layer);
+    auto layer_obj = &g->engine.Layer(layer);
     auto const inst_name = layer_obj->InstName();
 
     Optional<graphics::TextureHandle> icon_tex {};
     if (layer_obj->instrument_id.tag == InstrumentType::Sampler) {
         auto sample_inst_id = layer_obj->instrument_id.Get<sample_lib::InstrumentId>();
         auto imgs = LibraryImagesFromLibraryId(g, sample_inst_id.library);
-        if (imgs && imgs->icon) icon_tex = imgui.frame_input.graphics_ctx->GetTextureFromImage(*imgs->icon);
+        if (imgs && imgs->icon)
+            icon_tex = g->imgui.frame_input.graphics_ctx->GetTextureFromImage(*imgs->icon);
     }
 
     if (buttons::Popup(g,
@@ -98,9 +97,9 @@ static void DoInstSelectorGUI(Gui* g, Rect r, u32 layer) {
                        imgui_id + 1,
                        r,
                        inst_name,
-                       buttons::InstSelectorPopupButton(imgui, icon_tex))) {
+                       buttons::InstSelectorPopupButton(g->imgui, icon_tex))) {
         LayerInstrumentMenuItems(g, layer_obj);
-        imgui.EndWindow();
+        g->imgui.EndWindow();
     }
 
     if (layer_obj->instrument_id.tag == InstrumentType::None) {
@@ -122,7 +121,7 @@ static String GetPageTitle(PageType type) {
         case PageType::Midi: return "MIDI";
         case PageType::Lfo: return "LFO";
         case PageType::Filter: return "Filter";
-        default: PanicIfReached();
+        case PageType::Count: PanicIfReached();
     }
     return "";
 }
@@ -134,13 +133,10 @@ void Layout(Gui* g,
             f32 width,
             f32 height) {
     using enum UiSizeId;
-    auto& imgui = g->imgui;
-    auto& lay = g->layout;
+    auto const param_popup_button_height = LiveSize(g->imgui, ParamPopupButtonHeight);
+    auto const page_heading_height = LiveSize(g->imgui, Page_HeadingHeight);
 
-    auto const param_popup_button_height = LiveSize(imgui, ParamPopupButtonHeight);
-    auto const page_heading_height = LiveSize(imgui, Page_HeadingHeight);
-
-    auto container = layout::CreateItem(lay,
+    auto container = layout::CreateItem(g->layout,
                                         {
                                             .size = {width, height},
                                             .contents_direction = layout::Direction::Column,
@@ -150,40 +146,40 @@ void Layout(Gui* g,
     // selector
     {
 
-        c.selector_box =
-            layout::CreateItem(lay,
-                               {
-                                   .parent = container,
-                                   .size = {layout::k_fill_parent, LiveSize(imgui, LayerSelectorBoxHeight)},
-                                   .margins = {.l = LiveSize(imgui, LayerSelectorBoxMarginL),
-                                               .r = LiveSize(imgui, LayerSelectorBoxMarginR),
-                                               .t = LiveSize(imgui, LayerSelectorBoxMarginT),
-                                               .b = LiveSize(imgui, LayerSelectorBoxMarginB)},
-                                   .contents_direction = layout::Direction::Row,
-                                   .contents_align = layout::JustifyContent::Start,
-                               });
+        c.selector_box = layout::CreateItem(
+            g->layout,
+            {
+                .parent = container,
+                .size = {layout::k_fill_parent, LiveSize(g->imgui, LayerSelectorBoxHeight)},
+                .margins = {.l = LiveSize(g->imgui, LayerSelectorBoxMarginL),
+                            .r = LiveSize(g->imgui, LayerSelectorBoxMarginR),
+                            .t = LiveSize(g->imgui, LayerSelectorBoxMarginT),
+                            .b = LiveSize(g->imgui, LayerSelectorBoxMarginB)},
+                .contents_direction = layout::Direction::Row,
+                .contents_align = layout::JustifyContent::Start,
+            });
 
-        c.selector_menu = layout::CreateItem(lay,
+        c.selector_menu = layout::CreateItem(g->layout,
                                              {
                                                  .parent = c.selector_box,
                                                  .size = layout::k_fill_parent,
                                              });
 
-        auto const layer_selector_button_w = LiveSize(imgui, LayerSelectorButtonW);
-        auto const layer_selector_box_buttons_margin_r = LiveSize(imgui, LayerSelectorBoxButtonsMarginR);
+        auto const layer_selector_button_w = LiveSize(g->imgui, LayerSelectorButtonW);
+        auto const layer_selector_box_buttons_margin_r = LiveSize(g->imgui, LayerSelectorBoxButtonsMarginR);
 
-        c.selector_l = layout::CreateItem(lay,
+        c.selector_l = layout::CreateItem(g->layout,
                                           {
                                               .parent = c.selector_box,
                                               .size = {layer_selector_button_w, layout::k_fill_parent},
                                           });
-        c.selector_r = layout::CreateItem(lay,
+        c.selector_r = layout::CreateItem(g->layout,
                                           {
                                               .parent = c.selector_box,
                                               .size = {layer_selector_button_w, layout::k_fill_parent},
                                           });
         c.selector_randomise =
-            layout::CreateItem(lay,
+            layout::CreateItem(g->layout,
                                {
                                    .parent = c.selector_box,
                                    .size = {layer_selector_button_w, layout::k_fill_parent},
@@ -195,44 +191,44 @@ void Layout(Gui* g,
 
     // mixer container 1
     {
-        auto subcontainer_1 = layout::CreateItem(lay,
+        auto subcontainer_1 = layout::CreateItem(g->layout,
                                                  {
                                                      .parent = container,
                                                      .size = {layout::k_fill_parent, layout::k_hug_contents},
                                                      .margins {
-                                                         .l = LiveSize(imgui, LayerMixerContainer1MarginL),
-                                                         .r = LiveSize(imgui, LayerMixerContainer1MarginR),
-                                                         .t = LiveSize(imgui, LayerMixerContainer1MarginT),
-                                                         .b = LiveSize(imgui, LayerMixerContainer1MarginB),
+                                                         .l = LiveSize(g->imgui, LayerMixerContainer1MarginL),
+                                                         .r = LiveSize(g->imgui, LayerMixerContainer1MarginR),
+                                                         .t = LiveSize(g->imgui, LayerMixerContainer1MarginT),
+                                                         .b = LiveSize(g->imgui, LayerMixerContainer1MarginB),
                                                      },
                                                      .contents_direction = layout::Direction::Row,
                                                      .contents_align = layout::JustifyContent::Middle,
                                                  });
 
-        c.volume = layout::CreateItem(lay,
+        c.volume = layout::CreateItem(g->layout,
                                       {
                                           .parent = subcontainer_1,
-                                          .size = LiveSize(imgui, LayerVolumeKnobSize),
-                                          .margins = {.r = LiveSize(imgui, LayerVolumeKnobMarginR)},
+                                          .size = LiveSize(g->imgui, LayerVolumeKnobSize),
+                                          .margins = {.r = LiveSize(g->imgui, LayerVolumeKnobMarginR)},
                                       });
 
         c.mute_solo = layout::CreateItem(
-            lay,
+            g->layout,
             {
                 .parent = subcontainer_1,
-                .size = {LiveSize(imgui, LayerMuteSoloWidth), LiveSize(imgui, LayerMuteSoloHeight)},
+                .size = {LiveSize(g->imgui, LayerMuteSoloWidth), LiveSize(g->imgui, LayerMuteSoloHeight)},
                 .margins {
-                    .l = LiveSize(imgui, LayerMuteSoloMarginL),
-                    .r = LiveSize(imgui, LayerMuteSoloMarginR),
-                    .t = LiveSize(imgui, LayerMuteSoloMarginT),
-                    .b = LiveSize(imgui, LayerMuteSoloMarginB),
+                    .l = LiveSize(g->imgui, LayerMuteSoloMarginL),
+                    .r = LiveSize(g->imgui, LayerMuteSoloMarginR),
+                    .t = LiveSize(g->imgui, LayerMuteSoloMarginT),
+                    .b = LiveSize(g->imgui, LayerMuteSoloMarginB),
                 },
             });
     }
 
     // mixer container 2
     {
-        auto subcontainer_2 = layout::CreateItem(lay,
+        auto subcontainer_2 = layout::CreateItem(g->layout,
                                                  {
                                                      .parent = container,
                                                      .size = layout::k_hug_contents,
@@ -244,17 +240,17 @@ void Layout(Gui* g,
                                  c.knob1,
                                  layer->params[ToInt(LayerParamIndex::TuneSemitone)],
                                  LayerPitchMarginLR);
-        layout::SetSize(lay,
+        layout::SetSize(g->layout,
                         c.knob1.control,
                         f32x2 {
-                            LiveSize(imgui, LayerPitchWidth),
-                            LiveSize(imgui, LayerPitchHeight),
+                            LiveSize(g->imgui, LayerPitchWidth),
+                            LiveSize(g->imgui, LayerPitchHeight),
                         });
-        layout::SetMargins(lay,
+        layout::SetMargins(g->layout,
                            c.knob1.control,
                            {
-                               .t = LiveSize(imgui, LayerPitchMarginT),
-                               .b = LiveSize(imgui, LayerPitchMarginB),
+                               .t = LiveSize(g->imgui, LayerPitchMarginT),
+                               .b = LiveSize(g->imgui, LayerPitchMarginB),
                            });
 
         LayoutParameterComponent(g,
@@ -269,9 +265,9 @@ void Layout(Gui* g,
                                  LayerMixerKnobGapX);
     }
 
-    auto const layer_mixer_divider_vert_margins = LiveSize(imgui, LayerMixerDividerVertMargins);
+    auto const layer_mixer_divider_vert_margins = LiveSize(g->imgui, LayerMixerDividerVertMargins);
     // divider
-    c.divider = layout::CreateItem(lay,
+    c.divider = layout::CreateItem(g->layout,
                                    {
                                        .parent = container,
                                        .size = {layout::k_fill_parent, 1},
@@ -281,23 +277,24 @@ void Layout(Gui* g,
     // tabs
     {
         auto tab_lay =
-            layout::CreateItem(lay,
+            layout::CreateItem(g->layout,
                                {
                                    .parent = container,
-                                   .size = {layout::k_fill_parent, LiveSize(imgui, LayerParamsGroupTabsH)},
-                                   .margins = {.lr = LiveSize(imgui, LayerParamsGroupBoxGapX)},
+                                   .size = {layout::k_fill_parent, LiveSize(g->imgui, LayerParamsGroupTabsH)},
+                                   .margins = {.lr = LiveSize(g->imgui, LayerParamsGroupBoxGapX)},
                                    .contents_direction = layout::Direction::Row,
                                    .contents_align = layout::JustifyContent::Middle,
                                });
 
-        auto const layer_params_group_tabs_gap = LiveSize(imgui, LayerParamsGroupTabsGap);
+        auto const layer_params_group_tabs_gap = LiveSize(g->imgui, LayerParamsGroupTabsGap);
         for (auto const i : Range(k_num_pages)) {
             auto const page_type = (PageType)i;
-            auto size = draw::GetTextWidth(imgui.graphics->context->CurrentFont(), GetPageTitle(page_type));
+            auto size =
+                draw::GetTextWidth(g->imgui.graphics->context->CurrentFont(), GetPageTitle(page_type));
             if (page_type == PageType::Filter || page_type == PageType::Lfo || page_type == PageType::Eq)
-                size += LiveSize(imgui, LayerParamsGroupTabsIconW2);
+                size += LiveSize(g->imgui, LayerParamsGroupTabsIconW2);
             c.tabs[i] =
-                layout::CreateItem(lay,
+                layout::CreateItem(g->layout,
                                    {
                                        .parent = tab_lay,
                                        .size = {size + layer_params_group_tabs_gap, layout::k_fill_parent},
@@ -307,7 +304,7 @@ void Layout(Gui* g,
 
     // divider2
     {
-        c.divider2 = layout::CreateItem(lay,
+        c.divider2 = layout::CreateItem(g->layout,
                                         {
                                             .parent = container,
                                             .size = {layout::k_fill_parent, 1},
@@ -316,9 +313,9 @@ void Layout(Gui* g,
     }
 
     {
-        auto const page_heading_margin_l = LiveSize(imgui, Page_HeadingMarginL);
-        auto const page_heading_margin_t = LiveSize(imgui, Page_HeadingMarginT);
-        auto const page_heading_margin_b = LiveSize(imgui, Page_HeadingMarginB);
+        auto const page_heading_margin_l = LiveSize(g->imgui, Page_HeadingMarginL);
+        auto const page_heading_margin_t = LiveSize(g->imgui, Page_HeadingMarginT);
+        auto const page_heading_margin_b = LiveSize(g->imgui, Page_HeadingMarginB);
         auto const heading_margins = layout::Margins {
             .l = page_heading_margin_l,
             .r = 0,
@@ -326,7 +323,7 @@ void Layout(Gui* g,
             .b = page_heading_margin_b,
         };
 
-        auto page_container = layout::CreateItem(lay,
+        auto page_container = layout::CreateItem(g->layout,
                                                  {
                                                      .parent = container,
                                                      .size = layout::k_fill_parent,
@@ -334,58 +331,58 @@ void Layout(Gui* g,
                                                      .contents_align = layout::JustifyContent::Start,
                                                  });
 
-        auto const main_envelope_h = LiveSize(imgui, Main_EnvelopeH);
+        auto const main_envelope_h = LiveSize(g->imgui, Main_EnvelopeH);
 
         switch (layer_gui->selected_page) {
             case PageType::Main: {
-                c.main.waveform =
-                    layout::CreateItem(lay,
-                                       {
-                                           .parent = page_container,
-                                           .size = {layout::k_fill_parent, LiveSize(imgui, Main_WaveformH)},
-                                           .margins =
-                                               {
-                                                   .lr = LiveSize(imgui, Main_WaveformMarginLR),
-                                                   .tb = LiveSize(imgui, Main_WaveformMarginTB),
-                                               },
-                                       });
+                c.main.waveform = layout::CreateItem(
+                    g->layout,
+                    {
+                        .parent = page_container,
+                        .size = {layout::k_fill_parent, LiveSize(g->imgui, Main_WaveformH)},
+                        .margins =
+                            {
+                                .lr = LiveSize(g->imgui, Main_WaveformMarginLR),
+                                .tb = LiveSize(g->imgui, Main_WaveformMarginTB),
+                            },
+                    });
 
-                auto const main_item_margin_lr = LiveSize(imgui, Main_ItemMarginLR);
-                auto const main_item_height = LiveSize(imgui, Main_ItemHeight);
-                auto const main_item_gap_y = LiveSize(imgui, Main_ItemGapY);
+                auto const main_item_margin_lr = LiveSize(g->imgui, Main_ItemMarginLR);
+                auto const main_item_height = LiveSize(g->imgui, Main_ItemHeight);
+                auto const main_item_gap_y = LiveSize(g->imgui, Main_ItemGapY);
                 auto btn_container =
-                    layout::CreateItem(lay,
+                    layout::CreateItem(g->layout,
                                        {
                                            .parent = page_container,
                                            .size = {layout::k_fill_parent, layout::k_hug_contents},
                                            .margins = {.lr = main_item_margin_lr},
                                            .contents_direction = layout::Direction::Row,
                                        });
-                c.main.reverse = layout::CreateItem(lay,
+                c.main.reverse = layout::CreateItem(g->layout,
                                                     {
                                                         .parent = btn_container,
                                                         .size = {layout::k_fill_parent, main_item_height},
                                                         .margins = {.tb = main_item_gap_y},
                                                     });
                 c.main.loop_mode =
-                    layout::CreateItem(lay,
+                    layout::CreateItem(g->layout,
                                        {
                                            .parent = btn_container,
                                            .size = {layout::k_fill_parent, param_popup_button_height},
                                            .margins = {.tb = main_item_gap_y},
                                        });
 
-                auto const main_divider_margin_t = LiveSize(imgui, Main_DividerMarginT);
-                auto const main_divider_margin_b = LiveSize(imgui, Main_DividerMarginB);
+                auto const main_divider_margin_t = LiveSize(g->imgui, Main_DividerMarginT);
+                auto const main_divider_margin_b = LiveSize(g->imgui, Main_DividerMarginB);
                 c.main.divider = layout::CreateItem(
-                    lay,
+                    g->layout,
                     {
                         .parent = page_container,
                         .size = {layout::k_fill_parent, 1},
                         .margins = {.t = main_divider_margin_t, .b = main_divider_margin_b},
                     });
 
-                c.main.env_on = layout::CreateItem(lay,
+                c.main.env_on = layout::CreateItem(g->layout,
                                                    {
                                                        .parent = page_container,
                                                        .size = {layout::k_fill_parent, page_heading_height},
@@ -396,22 +393,22 @@ void Layout(Gui* g,
                                                        }),
                                                    });
 
-                c.main.envelope = layout::CreateItem(lay,
+                c.main.envelope = layout::CreateItem(g->layout,
                                                      {
                                                          .parent = page_container,
                                                          .size = {layout::k_fill_parent, main_envelope_h},
                                                          .margins {
-                                                             .lr = LiveSize(imgui, Main_EnvelopeMarginLR),
-                                                             .tb = LiveSize(imgui, Main_EnvelopeMarginTB),
+                                                             .lr = LiveSize(g->imgui, Main_EnvelopeMarginLR),
+                                                             .tb = LiveSize(g->imgui, Main_EnvelopeMarginTB),
                                                          },
                                                      });
                 break;
             }
             case PageType::Filter: {
-                auto const filter_gap_y_before_knobs = LiveSize(imgui, Filter_GapYBeforeKnobs);
+                auto const filter_gap_y_before_knobs = LiveSize(g->imgui, Filter_GapYBeforeKnobs);
 
                 auto filter_heading_container =
-                    layout::CreateItem(lay,
+                    layout::CreateItem(g->layout,
                                        {
                                            .parent = page_container,
                                            .size = {layout::k_fill_parent, layout::k_hug_contents},
@@ -419,7 +416,7 @@ void Layout(Gui* g,
                                            .contents_direction = layout::Direction::Row,
                                        });
                 c.filter.filter_on =
-                    layout::CreateItem(lay,
+                    layout::CreateItem(g->layout,
                                        {
                                            .parent = filter_heading_container,
                                            .size = {layout::k_fill_parent, page_heading_height},
@@ -427,7 +424,7 @@ void Layout(Gui* g,
                                            .anchor = layout::Anchor::Top,
                                        });
                 c.filter.filter_type =
-                    layout::CreateItem(lay,
+                    layout::CreateItem(g->layout,
                                        {
                                            .parent = filter_heading_container,
                                            .size = {layout::k_fill_parent, param_popup_button_height},
@@ -435,7 +432,7 @@ void Layout(Gui* g,
                                        });
 
                 auto filter_knobs_container =
-                    layout::CreateItem(lay,
+                    layout::CreateItem(g->layout,
                                        {
                                            .parent = page_container,
                                            .size = {layout::k_fill_parent, layout::k_hug_contents},
@@ -458,29 +455,30 @@ void Layout(Gui* g,
                                          layer->params[ToInt(LayerParamIndex::FilterEnvAmount)],
                                          Page_3KnobGapX);
 
-                c.filter.envelope = layout::CreateItem(lay,
-                                                       {
-                                                           .parent = page_container,
-                                                           .size = {layout::k_fill_parent, main_envelope_h},
-                                                           .margins {
-                                                               .lr = LiveSize(imgui, Filter_EnvelopeMarginLR),
-                                                               .tb = LiveSize(imgui, Filter_EnvelopeMarginTB),
-                                                           },
-                                                       });
+                c.filter.envelope =
+                    layout::CreateItem(g->layout,
+                                       {
+                                           .parent = page_container,
+                                           .size = {layout::k_fill_parent, main_envelope_h},
+                                           .margins {
+                                               .lr = LiveSize(g->imgui, Filter_EnvelopeMarginLR),
+                                               .tb = LiveSize(g->imgui, Filter_EnvelopeMarginTB),
+                                           },
+                                       });
                 break;
             }
             case PageType::Eq: {
-                c.eq.on = layout::CreateItem(lay,
+                c.eq.on = layout::CreateItem(g->layout,
                                              {
                                                  .parent = page_container,
                                                  .size = {layout::k_fill_parent, page_heading_height},
                                                  .margins = heading_margins,
                                              });
 
-                auto const eq_band_gap_y = LiveSize(imgui, EQ_BandGapY);
+                auto const eq_band_gap_y = LiveSize(g->imgui, EQ_BandGapY);
                 {
                     c.eq.type[0] =
-                        layout::CreateItem(lay,
+                        layout::CreateItem(g->layout,
                                            {
                                                .parent = page_container,
                                                .size = {layout::k_fill_parent, param_popup_button_height},
@@ -491,7 +489,7 @@ void Layout(Gui* g,
                                            });
 
                     auto knob_container =
-                        layout::CreateItem(lay,
+                        layout::CreateItem(g->layout,
                                            {
                                                .parent = page_container,
                                                .size = {layout::k_fill_parent, layout::k_hug_contents},
@@ -513,12 +511,12 @@ void Layout(Gui* g,
                                              c.eq.gain[0],
                                              layer->params[ToInt(LayerParamIndex::EqGain1)],
                                              Page_3KnobGapX);
-                    layout::SetMargins(lay, knob_container, {.b = eq_band_gap_y});
+                    layout::SetMargins(g->layout, knob_container, {.b = eq_band_gap_y});
                 }
 
                 {
                     c.eq.type[1] =
-                        layout::CreateItem(lay,
+                        layout::CreateItem(g->layout,
                                            {
                                                .parent = page_container,
                                                .size = {layout::k_fill_parent, param_popup_button_height},
@@ -528,7 +526,7 @@ void Layout(Gui* g,
                                                },
                                            });
                     auto knob_container =
-                        layout::CreateItem(lay,
+                        layout::CreateItem(g->layout,
                                            {
                                                .parent = page_container,
                                                .size = {layout::k_fill_parent, layout::k_hug_contents},
@@ -555,21 +553,21 @@ void Layout(Gui* g,
                 break;
             }
             case PageType::Midi: {
-                auto const midi_item_height = LiveSize(imgui, MIDI_ItemHeight);
-                auto const midi_item_width = LiveSize(imgui, MIDI_ItemWidth);
-                auto const midi_item_margin_lr = LiveSize(imgui, MIDI_ItemMarginLR);
-                auto const midi_item_gap_y = LiveSize(imgui, MIDI_ItemGapY);
+                auto const midi_item_height = LiveSize(g->imgui, MIDI_ItemHeight);
+                auto const midi_item_width = LiveSize(g->imgui, MIDI_ItemWidth);
+                auto const midi_item_margin_lr = LiveSize(g->imgui, MIDI_ItemMarginLR);
+                auto const midi_item_gap_y = LiveSize(g->imgui, MIDI_ItemGapY);
 
                 auto layout_item = [&](layout::Id& control, layout::Id& name, f32 height) {
                     auto parent =
-                        layout::CreateItem(lay,
+                        layout::CreateItem(g->layout,
                                            {
                                                .parent = page_container,
                                                .size = {layout::k_fill_parent, layout::k_hug_contents},
                                                .contents_direction = layout::Direction::Row,
 
                                            });
-                    control = layout::CreateItem(lay,
+                    control = layout::CreateItem(g->layout,
                                                  {
                                                      .parent = parent,
                                                      .size = {midi_item_width, height},
@@ -578,7 +576,7 @@ void Layout(Gui* g,
                                                          .tb = midi_item_gap_y,
                                                      },
                                                  });
-                    name = layout::CreateItem(lay,
+                    name = layout::CreateItem(g->layout,
                                               {
                                                   .parent = parent,
                                                   .size = {layout::k_fill_parent, height},
@@ -595,14 +593,16 @@ void Layout(Gui* g,
                         .tb = midi_item_gap_y,
                     },
                 };
-                c.midi.keytrack = layout::CreateItem(lay, button_options);
-                c.midi.mono = layout::CreateItem(lay, button_options);
-                c.midi.retrig = layout::CreateItem(lay, button_options);
-                layout_item(c.midi.velo_buttons, c.midi.velo_name, LiveSize(imgui, MIDI_VeloButtonsHeight));
+                c.midi.keytrack = layout::CreateItem(g->layout, button_options);
+                c.midi.mono = layout::CreateItem(g->layout, button_options);
+                c.midi.retrig = layout::CreateItem(g->layout, button_options);
+                layout_item(c.midi.velo_buttons,
+                            c.midi.velo_name,
+                            LiveSize(g->imgui, MIDI_VeloButtonsHeight));
                 break;
             }
             case PageType::Lfo: {
-                c.lfo.on = layout::CreateItem(lay,
+                c.lfo.on = layout::CreateItem(g->layout,
                                               {
                                                   .parent = page_container,
                                                   .size = {layout::k_fill_parent, page_heading_height},
@@ -610,24 +610,24 @@ void Layout(Gui* g,
                                               });
                 auto layout_item = [&](layout::Id& control, layout::Id& name) {
                     auto parent =
-                        layout::CreateItem(lay,
+                        layout::CreateItem(g->layout,
                                            {
                                                .parent = page_container,
                                                .size = {layout::k_fill_parent, layout::k_hug_contents},
                                                .contents_direction = layout::Direction::Row,
                                            });
                     control = layout::CreateItem(
-                        lay,
+                        g->layout,
                         {
                             .parent = parent,
-                            .size = {LiveSize(imgui, LFO_ItemWidth), param_popup_button_height},
+                            .size = {LiveSize(g->imgui, LFO_ItemWidth), param_popup_button_height},
                             .margins {
-                                .l = LiveSize(imgui, LFO_ItemMarginL),
-                                .r = LiveSize(imgui, LFO_ItemMarginR),
-                                .tb = LiveSize(imgui, LFO_ItemGapY),
+                                .l = LiveSize(g->imgui, LFO_ItemMarginL),
+                                .r = LiveSize(g->imgui, LFO_ItemMarginR),
+                                .tb = LiveSize(g->imgui, LFO_ItemGapY),
                             },
                         });
-                    name = layout::CreateItem(lay,
+                    name = layout::CreateItem(g->layout,
                                               {
                                                   .parent = parent,
                                                   .size = {layout::k_fill_parent, param_popup_button_height},
@@ -639,11 +639,11 @@ void Layout(Gui* g,
                 layout_item(c.lfo.mode, c.lfo.mode_name);
 
                 auto knob_container =
-                    layout::CreateItem(lay,
+                    layout::CreateItem(g->layout,
                                        {
                                            .parent = page_container,
                                            .size = {layout::k_fill_parent, layout::k_hug_contents},
-                                           .margins = {.t = LiveSize(imgui, LFO_GapYBeforeKnobs)},
+                                           .margins = {.t = LiveSize(g->imgui, LFO_GapYBeforeKnobs)},
                                            .contents_direction = layout::Direction::Row,
                                            .contents_align = layout::JustifyContent::Middle,
                                        });
@@ -686,29 +686,26 @@ void Draw(Gui* g,
           LayerLayout* layer_gui) {
     using enum UiSizeId;
 
-    auto& lay = g->layout;
-    auto& imgui = g->imgui;
-
-    auto settings = FloeWindowSettings(imgui, [&](IMGUI_DRAW_WINDOW_BG_ARGS) {});
+    auto settings = FloeWindowSettings(g->imgui, [&](IMGUI_DRAW_WINDOW_BG_ARGS) {});
     settings.flags |= imgui::WindowFlags_NoScrollbarY;
-    imgui.BeginWindow(settings, imgui.GetID(layer), r);
-    DEFER { imgui.EndWindow(); };
+    g->imgui.BeginWindow(settings, g->imgui.GetID(layer), r);
+    DEFER { g->imgui.EndWindow(); };
 
     auto const draw_divider = [&](layout::Id id) {
-        auto line_r = layout::GetRect(lay, id);
-        imgui.RegisterAndConvertRect(&line_r);
-        imgui.graphics->AddLine({line_r.x, line_r.Bottom()},
-                                {line_r.Right(), line_r.Bottom()},
-                                LiveCol(imgui, UiColMap::LayerDividerLine));
+        auto line_r = layout::GetRect(g->layout, id);
+        g->imgui.RegisterAndConvertRect(&line_r);
+        g->imgui.graphics->AddLine({line_r.x, line_r.Bottom()},
+                                   {line_r.Right(), line_r.Bottom()},
+                                   LiveCol(g->imgui, UiColMap::LayerDividerLine));
     };
 
     // Inst selector
     {
-        auto selector_left_id = imgui.GetID("SelcL");
-        auto selector_right_id = imgui.GetID("SelcR");
-        auto selector_menu_r = layout::GetRect(lay, c.selector_menu);
-        auto selector_left_r = layout::GetRect(lay, c.selector_l);
-        auto selector_right_r = layout::GetRect(lay, c.selector_r);
+        auto selector_left_id = g->imgui.GetID("SelcL");
+        auto selector_right_id = g->imgui.GetID("SelcR");
+        auto selector_menu_r = layout::GetRect(g->layout, c.selector_menu);
+        auto selector_left_r = layout::GetRect(g->layout, c.selector_l);
+        auto selector_right_r = layout::GetRect(g->layout, c.selector_r);
 
         bool const should_highlight = false;
         // TODO(1.0): how are we going to handle the new dynamics knob changes
@@ -723,15 +720,15 @@ void Draw(Gui* g,
 #endif
 
         auto const registered_selector_box_r =
-            imgui.GetRegisteredAndConvertedRect(layout::GetRect(lay, c.selector_box));
+            g->imgui.GetRegisteredAndConvertedRect(layout::GetRect(g->layout, c.selector_box));
         {
-            auto const rounding = LiveSize(imgui, UiSizeId::CornerRounding);
-            auto const col = should_highlight ? LiveCol(imgui, UiColMap::LayerSelectorMenuBackHighlight)
-                                              : LiveCol(imgui, UiColMap::LayerSelectorMenuBack);
-            imgui.graphics->AddRectFilled(registered_selector_box_r.Min(),
-                                          registered_selector_box_r.Max(),
-                                          col,
-                                          rounding);
+            auto const rounding = LiveSize(g->imgui, UiSizeId::CornerRounding);
+            auto const col = should_highlight ? LiveCol(g->imgui, UiColMap::LayerSelectorMenuBackHighlight)
+                                              : LiveCol(g->imgui, UiColMap::LayerSelectorMenuBack);
+            g->imgui.graphics->AddRectFilled(registered_selector_box_r.Min(),
+                                             registered_selector_box_r.Max(),
+                                             col,
+                                             rounding);
         }
 
         DoInstSelectorGUI(g, selector_menu_r, layer->index);
@@ -740,7 +737,7 @@ void Draw(Gui* g,
                     .Load(LoadMemoryOrder::Relaxed);
             percent != -1) {
             f32 const load_percent = (f32)percent / 100.0f;
-            DrawSelectorProgressBar(imgui, registered_selector_box_r, load_percent);
+            DrawSelectorProgressBar(g->imgui, registered_selector_box_r, load_percent);
             g->imgui.WakeupAtTimedInterval(g->redraw_counter, 0.1);
         }
 
@@ -748,23 +745,23 @@ void Draw(Gui* g,
                             selector_left_id,
                             selector_left_r,
                             ICON_FA_CARET_LEFT,
-                            buttons::IconButton(imgui)))
+                            buttons::IconButton(g->imgui)))
             CycleInstrument(*engine, layer->index, CycleDirection::Backward);
         if (buttons::Button(g,
                             selector_right_id,
                             selector_right_r,
                             ICON_FA_CARET_RIGHT,
-                            buttons::IconButton(imgui))) {
+                            buttons::IconButton(g->imgui))) {
             CycleInstrument(*engine, layer->index, CycleDirection::Forward);
         }
         {
-            auto rand_id = imgui.GetID("Rand");
-            auto rand_r = layout::GetRect(lay, c.selector_randomise);
+            auto rand_id = g->imgui.GetID("Rand");
+            auto rand_r = layout::GetRect(g->layout, c.selector_randomise);
             if (buttons::Button(g,
                                 rand_id,
                                 rand_r,
                                 ICON_FA_RANDOM,
-                                buttons::IconButton(imgui).WithRandomiseIconScaling())) {
+                                buttons::IconButton(g->imgui).WithRandomiseIconScaling())) {
                 LoadRandomInstrument(*engine, layer->index, false);
             }
             Tooltip(g, rand_id, rand_r, "Load a random instrument"_s);
@@ -779,12 +776,12 @@ void Draw(Gui* g,
     // divider
     draw_divider(c.divider);
 
-    auto const volume_knob_r = layout::GetRect(lay, c.volume);
+    auto const volume_knob_r = layout::GetRect(g->layout, c.volume);
     // level meter
     {
-        auto const layer_peak_meter_width = LiveSize(imgui, LayerPeakMeterWidth);
-        auto const layer_peak_meter_height = LiveSize(imgui, LayerPeakMeterHeight);
-        auto const layer_peak_meter_bottom_gap = LiveSize(imgui, LayerPeakMeterBottomGap);
+        auto const layer_peak_meter_width = LiveSize(g->imgui, LayerPeakMeterWidth);
+        auto const layer_peak_meter_height = LiveSize(g->imgui, LayerPeakMeterHeight);
+        auto const layer_peak_meter_bottom_gap = LiveSize(g->imgui, LayerPeakMeterBottomGap);
 
         Rect const peak_meter_r {.xywh {
             volume_knob_r.Centre().x - layer_peak_meter_width / 2,
@@ -797,8 +794,8 @@ void Draw(Gui* g,
 
     // volume
     {
-        auto const volume_name_h = layout::GetRect(lay, c.knob1.label).h;
-        auto const volume_name_y_gap = LiveSize(imgui, LayerVolumeNameGapY);
+        auto const volume_name_h = layout::GetRect(g->layout, c.knob1.label).h;
+        auto const volume_name_y_gap = LiveSize(g->imgui, LayerVolumeNameGapY);
         Rect const volume_name_r {.xywh {volume_knob_r.x,
                                          volume_knob_r.Bottom() - volume_name_h + volume_name_y_gap,
                                          volume_knob_r.w,
@@ -808,41 +805,44 @@ void Draw(Gui* g,
                      layer->params[ToInt(LayerParamIndex::Volume)],
                      volume_knob_r,
                      volume_name_r,
-                     knobs::DefaultKnob(imgui));
+                     knobs::DefaultKnob(g->imgui));
     }
 
     // mute and solo
     {
-        auto mute_solo_r = layout::GetRect(lay, c.mute_solo);
+        auto mute_solo_r = layout::GetRect(g->layout, c.mute_solo);
         Rect const mute_r = {.xywh {mute_solo_r.x, mute_solo_r.y, mute_solo_r.w / 2, mute_solo_r.h}};
         Rect const solo_r = {
             .xywh {mute_solo_r.x + mute_solo_r.w / 2, mute_solo_r.y, mute_solo_r.w / 2, mute_solo_r.h}};
 
-        auto const col_border = LiveCol(imgui, UiColMap::LayerMuteSoloBorder);
-        auto const col_background = LiveCol(imgui, UiColMap::LayerMuteSoloBackground);
-        auto const rounding = LiveSize(imgui, UiSizeId::CornerRounding);
-        auto reg_mute_solo_r = imgui.GetRegisteredAndConvertedRect(mute_solo_r);
-        auto reg_mute_r = imgui.GetRegisteredAndConvertedRect(mute_r);
-        imgui.graphics->AddRectFilled(reg_mute_solo_r.Min(), reg_mute_solo_r.Max(), col_background, rounding);
-        imgui.graphics->AddLine({reg_mute_r.Right(), reg_mute_r.y},
-                                {reg_mute_r.Right(), reg_mute_r.Bottom()},
-                                col_border);
+        auto const col_border = LiveCol(g->imgui, UiColMap::LayerMuteSoloBorder);
+        auto const col_background = LiveCol(g->imgui, UiColMap::LayerMuteSoloBackground);
+        auto const rounding = LiveSize(g->imgui, UiSizeId::CornerRounding);
+        auto reg_mute_solo_r = g->imgui.GetRegisteredAndConvertedRect(mute_solo_r);
+        auto reg_mute_r = g->imgui.GetRegisteredAndConvertedRect(mute_r);
+        g->imgui.graphics->AddRectFilled(reg_mute_solo_r.Min(),
+                                         reg_mute_solo_r.Max(),
+                                         col_background,
+                                         rounding);
+        g->imgui.graphics->AddLine({reg_mute_r.Right(), reg_mute_r.y},
+                                   {reg_mute_r.Right(), reg_mute_r.Bottom()},
+                                   col_border);
 
         buttons::Toggle(g,
                         layer->params[ToInt(LayerParamIndex::Mute)],
                         mute_r,
                         "M",
-                        buttons::IconButton(imgui));
+                        buttons::IconButton(g->imgui));
         buttons::Toggle(g,
                         layer->params[ToInt(LayerParamIndex::Solo)],
                         solo_r,
                         "S",
-                        buttons::IconButton(imgui));
+                        buttons::IconButton(g->imgui));
     }
 
     // knobs
     {
-        auto semitone_style = draggers::DefaultStyle(imgui);
+        auto semitone_style = draggers::DefaultStyle(g->imgui);
         semitone_style.always_show_plus = true;
         draggers::Dragger(g,
                           layer->params[ToInt(LayerParamIndex::TuneSemitone)],
@@ -851,13 +851,16 @@ void Draw(Gui* g,
         labels::Label(g,
                       layer->params[ToInt(LayerParamIndex::TuneSemitone)],
                       c.knob1.label,
-                      labels::ParameterCentred(imgui));
+                      labels::ParameterCentred(g->imgui));
 
         KnobAndLabel(g,
                      layer->params[ToInt(LayerParamIndex::TuneCents)],
                      c.knob2,
-                     knobs::BidirectionalKnob(imgui));
-        KnobAndLabel(g, layer->params[ToInt(LayerParamIndex::Pan)], c.knob3, knobs::BidirectionalKnob(imgui));
+                     knobs::BidirectionalKnob(g->imgui));
+        KnobAndLabel(g,
+                     layer->params[ToInt(LayerParamIndex::Pan)],
+                     c.knob3,
+                     knobs::BidirectionalKnob(g->imgui));
     }
 
     draw_divider(c.divider2);
@@ -867,17 +870,17 @@ void Draw(Gui* g,
         case PageType::Main: {
             // waveform
             {
-                GUIDoSampleWaveform(g, layer, layout::GetRect(lay, c.main.waveform));
+                GUIDoSampleWaveform(g, layer, layout::GetRect(g->layout, c.main.waveform));
 
                 buttons::Toggle(g,
                                 layer->params[ToInt(LayerParamIndex::Reverse)],
                                 c.main.reverse,
-                                buttons::ParameterToggleButton(imgui));
+                                buttons::ParameterToggleButton(g->imgui));
 
                 buttons::PopupWithItems(g,
                                         layer->params[ToInt(LayerParamIndex::LoopMode)],
                                         c.main.loop_mode,
-                                        buttons::ParameterPopupButton(imgui));
+                                        buttons::ParameterPopupButton(g->imgui));
             }
 
             draw_divider(c.main.divider);
@@ -887,11 +890,11 @@ void Draw(Gui* g,
                 buttons::Toggle(g,
                                 layer->params[ToInt(LayerParamIndex::VolEnvOn)],
                                 c.main.env_on,
-                                buttons::LayerHeadingButton(imgui));
+                                buttons::LayerHeadingButton(g->imgui));
                 bool const env_on = layer->params[ToInt(LayerParamIndex::VolEnvOn)].ValueAsBool();
                 GUIDoEnvelope(g,
                               layer,
-                              layout::GetRect(lay, c.main.envelope),
+                              layout::GetRect(g->layout, c.main.envelope),
                               !env_on,
                               {LayerParamIndex::VolumeAttack,
                                LayerParamIndex::VolumeDecay,
@@ -907,32 +910,32 @@ void Draw(Gui* g,
             buttons::Toggle(g,
                             layer->params[ToInt(LayerParamIndex::FilterOn)],
                             c.filter.filter_on,
-                            buttons::LayerHeadingButton(imgui));
+                            buttons::LayerHeadingButton(g->imgui));
 
             buttons::PopupWithItems(g,
                                     layer->params[ToInt(LayerParamIndex::FilterType)],
                                     c.filter.filter_type,
-                                    buttons::ParameterPopupButton(imgui, greyed_out));
+                                    buttons::ParameterPopupButton(g->imgui, greyed_out));
 
             KnobAndLabel(g,
                          layer->params[ToInt(LayerParamIndex::FilterCutoff)],
                          c.filter.cutoff,
-                         knobs::DefaultKnob(imgui),
+                         knobs::DefaultKnob(g->imgui),
                          greyed_out);
             KnobAndLabel(g,
                          layer->params[ToInt(LayerParamIndex::FilterResonance)],
                          c.filter.reso,
-                         knobs::DefaultKnob(imgui),
+                         knobs::DefaultKnob(g->imgui),
                          greyed_out);
             KnobAndLabel(g,
                          layer->params[ToInt(LayerParamIndex::FilterEnvAmount)],
                          c.filter.env_amount,
-                         knobs::BidirectionalKnob(imgui),
+                         knobs::BidirectionalKnob(g->imgui),
                          greyed_out);
 
             GUIDoEnvelope(g,
                           layer,
-                          layout::GetRect(lay, c.filter.envelope),
+                          layout::GetRect(g->layout, c.filter.envelope),
                           greyed_out ||
                               (layer->params[ToInt(LayerParamIndex::FilterEnvAmount)].LinearValue() == 0),
                           {LayerParamIndex::FilterAttack,
@@ -947,49 +950,49 @@ void Draw(Gui* g,
             bool const greyed_out = !layer->params[ToInt(LayerParamIndex::EqOn)].ValueAsBool();
             buttons::Toggle(g,
                             layer->params[ToInt(LayerParamIndex::EqOn)],
-                            layout::GetRect(lay, c.eq.on),
-                            buttons::LayerHeadingButton(imgui));
+                            layout::GetRect(g->layout, c.eq.on),
+                            buttons::LayerHeadingButton(g->imgui));
 
             buttons::PopupWithItems(g,
                                     layer->params[ToInt(LayerParamIndex::EqType1)],
-                                    layout::GetRect(lay, c.eq.type[0]),
-                                    buttons::ParameterPopupButton(imgui, greyed_out));
+                                    layout::GetRect(g->layout, c.eq.type[0]),
+                                    buttons::ParameterPopupButton(g->imgui, greyed_out));
 
             KnobAndLabel(g,
                          layer->params[ToInt(LayerParamIndex::EqFreq1)],
                          c.eq.freq[0],
-                         knobs::DefaultKnob(imgui),
+                         knobs::DefaultKnob(g->imgui),
                          greyed_out);
             KnobAndLabel(g,
                          layer->params[ToInt(LayerParamIndex::EqResonance1)],
                          c.eq.reso[0],
-                         knobs::DefaultKnob(imgui),
+                         knobs::DefaultKnob(g->imgui),
                          greyed_out);
             KnobAndLabel(g,
                          layer->params[ToInt(LayerParamIndex::EqGain1)],
                          c.eq.gain[0],
-                         knobs::BidirectionalKnob(imgui),
+                         knobs::BidirectionalKnob(g->imgui),
                          greyed_out);
 
             buttons::PopupWithItems(g,
                                     layer->params[ToInt(LayerParamIndex::EqType2)],
-                                    layout::GetRect(lay, c.eq.type[1]),
-                                    buttons::ParameterPopupButton(imgui, greyed_out));
+                                    layout::GetRect(g->layout, c.eq.type[1]),
+                                    buttons::ParameterPopupButton(g->imgui, greyed_out));
 
             KnobAndLabel(g,
                          layer->params[ToInt(LayerParamIndex::EqFreq2)],
                          c.eq.freq[1],
-                         knobs::DefaultKnob(imgui),
+                         knobs::DefaultKnob(g->imgui),
                          greyed_out);
             KnobAndLabel(g,
                          layer->params[ToInt(LayerParamIndex::EqResonance2)],
                          c.eq.reso[1],
-                         knobs::DefaultKnob(imgui),
+                         knobs::DefaultKnob(g->imgui),
                          greyed_out);
             KnobAndLabel(g,
                          layer->params[ToInt(LayerParamIndex::EqGain2)],
                          c.eq.gain[1],
-                         knobs::BidirectionalKnob(imgui),
+                         knobs::BidirectionalKnob(g->imgui),
                          greyed_out);
 
             break;
@@ -998,45 +1001,45 @@ void Draw(Gui* g,
             draggers::Dragger(g,
                               layer->params[ToInt(LayerParamIndex::MidiTranspose)],
                               c.midi.transpose,
-                              draggers::DefaultStyle(imgui));
+                              draggers::DefaultStyle(g->imgui));
             labels::Label(g,
                           layer->params[ToInt(LayerParamIndex::MidiTranspose)],
                           c.midi.transpose_name,
-                          labels::Parameter(imgui));
+                          labels::Parameter(g->imgui));
             {
-                auto const label_id = imgui.GetID("transp");
-                auto const label_r = layout::GetRect(lay, c.midi.transpose_name);
-                imgui.ButtonBehavior(imgui.GetRegisteredAndConvertedRect(label_r), label_id, {});
+                auto const label_id = g->imgui.GetID("transp");
+                auto const label_r = layout::GetRect(g->layout, c.midi.transpose_name);
+                g->imgui.ButtonBehavior(g->imgui.GetRegisteredAndConvertedRect(label_r), label_id, {});
                 Tooltip(g,
                         label_id,
                         label_r,
                         layer->params[ToInt(LayerParamIndex::MidiTranspose)].info.tooltip);
-                if (imgui.IsHot(label_id)) imgui.frame_output.cursor_type = CursorType::Default;
+                if (g->imgui.IsHot(label_id)) g->imgui.frame_output.cursor_type = CursorType::Default;
             }
 
             buttons::Toggle(g,
                             layer->params[ToInt(LayerParamIndex::Keytrack)],
                             c.midi.keytrack,
-                            buttons::MidiButton(imgui));
+                            buttons::MidiButton(g->imgui));
             buttons::Toggle(g,
                             layer->params[ToInt(LayerParamIndex::Monophonic)],
                             c.midi.mono,
-                            buttons::MidiButton(imgui));
+                            buttons::MidiButton(g->imgui));
             buttons::Toggle(g,
                             layer->params[ToInt(LayerParamIndex::CC64Retrigger)],
                             c.midi.retrig,
-                            buttons::MidiButton(imgui));
+                            buttons::MidiButton(g->imgui));
 
             {
                 static constexpr auto k_num_btns = ToInt(param_values::VelocityMappingMode::Count);
                 static_assert(k_num_btns == 6, "");
-                auto const btn_gap = LiveSize(imgui, MIDI_VeloButtonsSpacing);
+                auto const btn_gap = LiveSize(g->imgui, MIDI_VeloButtonsSpacing);
                 auto const whole_velo_r =
-                    layout::GetRect(lay, c.midi.velo_buttons).CutRight(btn_gap * 2).CutBottom(btn_gap);
+                    layout::GetRect(g->layout, c.midi.velo_buttons).CutRight(btn_gap * 2).CutBottom(btn_gap);
 
                 for (auto const btn_ind : Range(k_num_btns)) {
                     bool state = ToInt(layer->GetVelocityMode()) == btn_ind;
-                    auto imgui_id = imgui.GetID(layer_gui::k_velo_btn_tooltips[(usize)btn_ind]);
+                    auto imgui_id = g->imgui.GetID(layer_gui::k_velo_btn_tooltips[(usize)btn_ind]);
 
                     Rect btn_r {.xywh {whole_velo_r.x + (whole_velo_r.w / 3) * (btn_ind % 3),
                                        whole_velo_r.y + (whole_velo_r.h / 2) * (f32)(int)(btn_ind / 3),
@@ -1052,7 +1055,7 @@ void Draw(Gui* g,
                             btn_r,
                             state,
                             "",
-                            buttons::VelocityButton(imgui, (param_values::VelocityMappingMode)btn_ind))) {
+                            buttons::VelocityButton(g->imgui, (param_values::VelocityMappingMode)btn_ind))) {
                         auto velo_param_id =
                             ParamIndexFromLayerParamIndex(layer->index, LayerParamIndex::VelocityMapping);
                         SetParameterValue(g->engine.processor, velo_param_id, (f32)btn_ind, {});
@@ -1064,11 +1067,11 @@ void Draw(Gui* g,
                 labels::Label(g,
                               layer->params[ToInt(LayerParamIndex::VelocityMapping)],
                               c.midi.velo_name,
-                              labels::Parameter(imgui));
+                              labels::Parameter(g->imgui));
 
-                auto const label_id = imgui.GetID("velobtn");
-                auto const label_r = layout::GetRect(lay, c.midi.velo_name);
-                imgui.ButtonBehavior(imgui.GetRegisteredAndConvertedRect(label_r), label_id, {});
+                auto const label_id = g->imgui.GetID("velobtn");
+                auto const label_r = layout::GetRect(g->layout, c.midi.velo_name);
+                g->imgui.ButtonBehavior(g->imgui.GetRegisteredAndConvertedRect(label_r), label_id, {});
                 Tooltip(g,
                         label_id,
                         label_r,
@@ -1076,7 +1079,7 @@ void Draw(Gui* g,
                         "low velocity to high velocity. To do this, 2 or more layers should be used, and "
                         "each layer should be given a different velocity mapping option so that the loudness "
                         "of each layer is controlled by the MIDI velocity."_s);
-                if (imgui.IsHot(label_id)) imgui.frame_output.cursor_type = CursorType::Default;
+                if (g->imgui.IsHot(label_id)) g->imgui.frame_output.cursor_type = CursorType::Default;
             }
 
             break;
@@ -1085,40 +1088,40 @@ void Draw(Gui* g,
             buttons::Toggle(g,
                             layer->params[ToInt(LayerParamIndex::LfoOn)],
                             c.lfo.on,
-                            buttons::LayerHeadingButton(imgui));
+                            buttons::LayerHeadingButton(g->imgui));
             auto const greyed_out = !layer->params[ToInt(LayerParamIndex::LfoOn)].ValueAsBool();
 
             buttons::PopupWithItems(g,
                                     layer->params[ToInt(LayerParamIndex::LfoDestination)],
                                     c.lfo.target,
-                                    buttons::ParameterPopupButton(imgui, greyed_out));
+                                    buttons::ParameterPopupButton(g->imgui, greyed_out));
             labels::Label(g,
                           layer->params[ToInt(LayerParamIndex::LfoDestination)],
                           c.lfo.target_name,
-                          labels::Parameter(imgui));
+                          labels::Parameter(g->imgui));
 
             buttons::PopupWithItems(g,
                                     layer->params[ToInt(LayerParamIndex::LfoRestart)],
                                     c.lfo.mode,
-                                    buttons::ParameterPopupButton(imgui, greyed_out));
+                                    buttons::ParameterPopupButton(g->imgui, greyed_out));
             labels::Label(g,
                           layer->params[ToInt(LayerParamIndex::LfoRestart)],
                           c.lfo.mode_name,
-                          labels::Parameter(imgui));
+                          labels::Parameter(g->imgui));
 
             buttons::PopupWithItems(g,
                                     layer->params[ToInt(LayerParamIndex::LfoShape)],
                                     c.lfo.shape,
-                                    buttons::ParameterPopupButton(imgui, greyed_out));
+                                    buttons::ParameterPopupButton(g->imgui, greyed_out));
             labels::Label(g,
                           layer->params[ToInt(LayerParamIndex::LfoShape)],
                           c.lfo.shape_name,
-                          labels::Parameter(imgui));
+                          labels::Parameter(g->imgui));
 
             KnobAndLabel(g,
                          layer->params[ToInt(LayerParamIndex::LfoAmount)],
                          c.lfo.amount,
-                         knobs::BidirectionalKnob(imgui),
+                         knobs::BidirectionalKnob(g->imgui),
                          greyed_out);
 
             Parameter const* rate_param;
@@ -1127,30 +1130,29 @@ void Draw(Gui* g,
                 buttons::PopupWithItems(g,
                                         *rate_param,
                                         c.lfo.rate.control,
-                                        buttons::ParameterPopupButton(imgui, greyed_out));
+                                        buttons::ParameterPopupButton(g->imgui, greyed_out));
             } else {
                 rate_param = &layer->params[ToInt(LayerParamIndex::LfoRateHz)];
                 knobs::Knob(g,
                             *rate_param,
                             c.lfo.rate.control,
-                            knobs::DefaultKnob(imgui).GreyedOut(greyed_out));
+                            knobs::DefaultKnob(g->imgui).GreyedOut(greyed_out));
             }
 
-            auto const rate_name_r = layout::GetRect(lay, c.lfo.rate.label);
-            labels::Label(g, *rate_param, rate_name_r, labels::ParameterCentred(imgui, greyed_out));
+            auto const rate_name_r = layout::GetRect(g->layout, c.lfo.rate.label);
+            labels::Label(g, *rate_param, rate_name_r, labels::ParameterCentred(g->imgui, greyed_out));
 
-            auto const lfo_sync_switch_width = LiveSize(imgui, LFO_SyncSwitchWidth);
-            auto const lfo_sync_switch_height = LiveSize(imgui, LFO_SyncSwitchHeight);
-            auto const lfo_sync_switch_gap_y = LiveSize(imgui, LFO_SyncSwitchGapY);
+            auto const lfo_sync_switch_width = LiveSize(g->imgui, LFO_SyncSwitchWidth);
+            auto const lfo_sync_switch_height = LiveSize(g->imgui, LFO_SyncSwitchHeight);
+            auto const lfo_sync_switch_gap_y = LiveSize(g->imgui, LFO_SyncSwitchGapY);
 
-            Rect const sync_r {.xywh {rate_name_r.x + rate_name_r.w / 2 - lfo_sync_switch_width / 2,
-                                      rate_name_r.Bottom() + lfo_sync_switch_gap_y,
-                                      lfo_sync_switch_width,
-                                      lfo_sync_switch_height}};
             buttons::Toggle(g,
                             layer->params[ToInt(LayerParamIndex::LfoSyncSwitch)],
-                            sync_r,
-                            buttons::ParameterToggleButton(imgui));
+                            {.xywh {rate_name_r.x + rate_name_r.w / 2 - lfo_sync_switch_width / 2,
+                                    rate_name_r.Bottom() + lfo_sync_switch_gap_y,
+                                    lfo_sync_switch_width,
+                                    lfo_sync_switch_height}},
+                            buttons::ParameterToggleButton(g->imgui));
 
             break;
         }
@@ -1161,23 +1163,25 @@ void Draw(Gui* g,
     for (auto const i : Range(k_num_pages)) {
         auto const page_type = (PageType)i;
         bool state = page_type == layer_gui->selected_page;
-        auto const id = imgui.GetID((u64)i);
-        auto const tab_r = layout::GetRect(lay, c.tabs[i]);
+        auto const id = g->imgui.GetID((u64)i);
+        auto const tab_r = layout::GetRect(g->layout, c.tabs[i]);
         auto const name {GetPageTitle(page_type)};
         bool const has_dot =
             (page_type == PageType::Filter &&
              layer->params[ToInt(LayerParamIndex::FilterOn)].ValueAsBool()) ||
             (page_type == PageType::Lfo && layer->params[ToInt(LayerParamIndex::LfoOn)].ValueAsBool()) ||
             (page_type == PageType::Eq && layer->params[ToInt(LayerParamIndex::EqOn)].ValueAsBool());
-        if (buttons::Toggle(g, id, tab_r, state, name, buttons::LayerTabButton(imgui, has_dot)))
+        if (buttons::Toggle(g, id, tab_r, state, name, buttons::LayerTabButton(g->imgui, has_dot)))
             layer_gui->selected_page = page_type;
         Tooltip(g, id, tab_r, fmt::Format(g->scratch_arena, "Open {} tab", name));
     }
 
     // overlay
     if (engine->processor.layer_processors[layer->index].is_silent.Load(LoadMemoryOrder::Relaxed)) {
-        auto const pos = imgui.curr_window->unpadded_bounds.pos;
-        imgui.graphics->AddRectFilled(pos, pos + imgui.Size(), LiveCol(imgui, UiColMap::LayerMutedOverlay));
+        auto const pos = g->imgui.curr_window->unpadded_bounds.pos;
+        g->imgui.graphics->AddRectFilled(pos,
+                                         pos + g->imgui.Size(),
+                                         LiveCol(g->imgui, UiColMap::LayerMutedOverlay));
     }
 }
 

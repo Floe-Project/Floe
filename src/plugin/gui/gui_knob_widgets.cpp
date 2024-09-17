@@ -14,8 +14,8 @@ namespace knobs {
 static void DrawKnob(Gui* g, imgui::Id id, Rect r, f32 percent, Style const& style) {
     auto const& imgui = g->imgui;
     auto const c = f32x2 {r.CentreX(), r.y + r.w / 2};
-    auto const start_radians = (3 * maths::k_pi<>) / 4;
-    auto const end_radians = maths::k_tau<> + maths::k_pi<> / 4;
+    auto const start_radians = (3 * k_pi<>) / 4;
+    auto const end_radians = k_tau<> + k_pi<> / 4;
     auto const delta = end_radians - start_radians;
     auto const angle = start_radians + (1 - percent) * delta;
     auto const angle2 = start_radians + percent * delta;
@@ -46,7 +46,7 @@ static void DrawKnob(Gui* g, imgui::Id id, Rect r, f32 percent, Style const& sty
         imgui.graphics->PathStroke(LiveCol(imgui, UiColMap::KnobOuterArcEmpty), false, outer_arc_thickness);
     } else {
         auto const overload_radians = start_radians + delta * *style.overload_position;
-        auto const radians_per_px = maths::k_tau<> * r.w / 2;
+        auto const radians_per_px = k_tau<> * r.w / 2;
         auto const desired_px_width = 15;
         auto const overload_radians_end = overload_radians + desired_px_width / radians_per_px;
 
@@ -137,8 +137,8 @@ static void DrawKnob(Gui* g, imgui::Id id, Rect r, f32 percent, Style const& sty
         auto const inner_arc_radius_inner = inner_arc_radius_mid - inner_arc_thickness / 2;
 
         f32x2 offset;
-        offset.x = Sin(angle - maths::k_pi<> / 2);
-        offset.y = Cos(angle - maths::k_pi<> / 2);
+        offset.x = Sin(angle - k_pi<> / 2);
+        offset.y = Cos(angle - k_pi<> / 2);
         auto const outer_point = c + (offset * f32x2 {inner_arc_radius_outer, inner_arc_radius_outer});
         auto const inner_point = c + (offset * f32x2 {inner_arc_radius_inner, inner_arc_radius_inner});
 

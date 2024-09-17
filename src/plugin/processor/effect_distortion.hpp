@@ -91,7 +91,7 @@ struct DistortionProcessor {
 
     static f32 Sinc(f32 x) {
         if (x == 0.0f) return 1.0f;
-        x *= maths::k_pi<>;
+        x *= k_pi<>;
         return Sin(x) / x;
     }
 

@@ -54,19 +54,9 @@ void TopPanel(Gui* g) {
     bool const has_insts_with_dynamics = true; // TODO(1.0), get the value properly?
     auto title_font = g->mada_big;
 
-    auto const title_width = LiveSize(imgui, UiSizeId::Top2TitleWidth);
-    auto const title_margin_l = LiveSize(imgui, UiSizeId::Top2TitleMarginL);
-    auto const preset_box_margin_l = LiveSize(imgui, UiSizeId::Top2PresetBoxMarginL);
-    auto const preset_box_margin_r = LiveSize(imgui, UiSizeId::Top2PresetBoxMarginR);
-    auto const preset_box_pad_r = LiveSize(imgui, UiSizeId::Top2PresetBoxPadR);
-    auto const preset_box_w = LiveSize(imgui, UiSizeId::Top2PresetBoxW);
     auto const preset_box_icon_width = LiveSize(imgui, UiSizeId::Top2PresetBoxIconWidth);
     auto const icon_width = LiveSize(imgui, UiSizeId::Top2IconWidth);
     auto const icon_height = LiveSize(imgui, UiSizeId::Top2IconHeight);
-    auto const knobs_margin_l = LiveSize(imgui, UiSizeId::Top2KnobsMarginL);
-    auto const knobs_margin_r = LiveSize(imgui, UiSizeId::Top2KnobsMarginR);
-    auto const peak_meter_w = LiveSize(imgui, UiSizeId::Top2PeakMeterW);
-    auto const peak_meter_h = LiveSize(imgui, UiSizeId::Top2PeakMeterH);
 
     auto root = layout::CreateItem(lay,
                                    {
@@ -78,44 +68,45 @@ void TopPanel(Gui* g) {
     auto left_container = layout::CreateItem(lay,
                                              {
                                                  .parent = root,
-                                                 .size = {0, 1},
-                                                 .anchor = layout::Anchor::TopAndBottom,
+                                                 .size = {layout::k_hug_contents, layout::k_fill_parent},
                                                  .contents_direction = layout::Direction::Row,
                                                  .contents_align = layout::JustifyContent::Start,
-
                                              });
 
-    auto title = layout::CreateItem(lay,
-                                    {
-                                        .parent = left_container,
-                                        .size = {title_width, (f32)title_font->font_size_no_scale},
-                                        .margins = {.l = title_margin_l},
-                                    });
+    auto title = layout::CreateItem(
+        lay,
+        {
+            .parent = left_container,
+            .size = {LiveSize(imgui, UiSizeId::Top2TitleWidth), title_font->font_size_no_scale},
+            .margins = {.l = LiveSize(imgui, UiSizeId::Top2TitleMarginL)},
+        });
 
     auto right_container = layout::CreateItem(lay,
                                               {
                                                   .parent = root,
-                                                  .size = {1, 1},
-                                                  .anchor = layout::Anchor::All,
+                                                  .size = layout::k_fill_parent,
                                                   .contents_direction = layout::Direction::Row,
                                                   .contents_align = layout::JustifyContent::End,
-
                                               });
 
-    auto preset_box = layout::CreateItem(lay,
-                                         {
-                                             .parent = right_container,
-                                             .size = {0, 0},
-                                             .margins = {.l = preset_box_margin_l, .r = preset_box_margin_r},
-                                             .contents_direction = layout::Direction::Row,
-                                             .contents_align = layout::JustifyContent::Start,
-                                         });
+    auto preset_box =
+        layout::CreateItem(lay,
+                           {
+                               .parent = right_container,
+                               .size = layout::k_hug_contents,
+                               .margins = {.l = LiveSize(imgui, UiSizeId::Top2PresetBoxMarginL),
+                                           .r = LiveSize(imgui, UiSizeId::Top2PresetBoxMarginR)},
+                               .contents_direction = layout::Direction::Row,
+                               .contents_align = layout::JustifyContent::Start,
+                           });
 
-    auto preset_menu = layout::CreateItem(lay,
-                                          {
-                                              .parent = preset_box,
-                                              .size = {preset_box_w, icon_height},
-                                          });
+    auto preset_menu =
+        layout::CreateItem(lay,
+                           {
+                               .parent = preset_box,
+                               .size = {LiveSize(imgui, UiSizeId::Top2PresetBoxW), icon_height},
+                           });
+
     auto preset_left = layout::CreateItem(lay,
                                           {
                                               .parent = preset_box,
@@ -140,7 +131,7 @@ void TopPanel(Gui* g) {
                                           {
                                               .parent = preset_box,
                                               .size = {preset_box_icon_width, icon_height},
-                                              .margins = {.r = preset_box_pad_r},
+                                              .margins = {.r = LiveSize(imgui, UiSizeId::Top2PresetBoxPadR)},
                                           });
 
     auto box = layout::CreateItem(lay,
@@ -159,14 +150,15 @@ void TopPanel(Gui* g) {
                                        .size = {icon_width, icon_height},
                                    });
 
-    auto knob_container = layout::CreateItem(lay,
-                                             {
-                                                 .parent = right_container,
-                                                 .size = {0, 0},
-                                                 .margins = {.l = knobs_margin_l, .r = knobs_margin_r},
-                                                 .contents_direction = layout::Direction::Row,
-
-                                             });
+    auto knob_container =
+        layout::CreateItem(lay,
+                           {
+                               .parent = right_container,
+                               .size = layout::k_hug_contents,
+                               .margins = {.l = LiveSize(imgui, UiSizeId::Top2KnobsMarginL),
+                                           .r = LiveSize(imgui, UiSizeId::Top2KnobsMarginR)},
+                               .contents_direction = layout::Direction::Row,
+                           });
     LayIDPair dyn;
     LayoutParameterComponent(g,
                              knob_container,
@@ -186,13 +178,15 @@ void TopPanel(Gui* g) {
                              engine.processor.params[ToInt(ParamIndex::MasterVolume)],
                              UiSizeId::Top2KnobsGapX);
 
-    auto level = layout::CreateItem(lay,
-                                    {
-                                        .parent = right_container,
-                                        .size = {peak_meter_w, peak_meter_h},
-                                    });
+    auto level = layout::CreateItem(
+        lay,
+        {
+            .parent = right_container,
+            .size = {LiveSize(imgui, UiSizeId::Top2PeakMeterW), LiveSize(imgui, UiSizeId::Top2PeakMeterH)},
+        });
 
     layout::RunContext(lay);
+    DEFER { layout::ResetContext(lay); };
 
     auto preset_rand_r = layout::GetRect(lay, preset_random);
     auto preset_rand_menu_r = layout::GetRect(lay, preset_random_menu);
@@ -434,6 +428,4 @@ void TopPanel(Gui* g) {
                       dyn.label,
                       labels::ParameterCentred(imgui, !has_insts_with_dynamics));
     }
-
-    layout::ResetContext(lay);
 }

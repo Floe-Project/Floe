@@ -19,6 +19,8 @@ namespace layout {
 using Id = u32;
 
 constexpr Id k_invalid_id = ~(u32)0;
+constexpr f32 k_hug_contents = 0.0f;
+constexpr f32 k_fill_parent = -1.0f;
 
 struct Item {
     u32 flags;
@@ -223,18 +225,26 @@ ALWAYS_INLINE inline Rect GetRect(Context const& ctx, Id id) {
 
 ALWAYS_INLINE inline f32x2 GetSize(Context& ctx, Id item) { return GetItem(ctx, item)->size; }
 
+// 0 means hug contents, use the constant k_hug_contents rather than set to zero.
+// You can also use k_fill_parent in either dimension.
 ALWAYS_INLINE inline void SetItemSize(Item& item, f32x2 size) {
     item.size = size;
-    u32 flags = item.flags;
-    if (size[0] == 0)
-        flags &= ~flags::ItemHorizontalFixed;
+
+    auto const w = size[0];
+    if (w == k_hug_contents)
+        item.flags &= ~flags::ItemHorizontalFixed;
+    else if (w == k_fill_parent)
+        item.flags |= flags::FillHorizontal;
     else
-        flags |= flags::ItemHorizontalFixed;
-    if (size[1] == 0)
-        flags &= ~flags::ItemVerticalFixed;
+        item.flags |= flags::ItemHorizontalFixed;
+
+    auto const h = size[1];
+    if (h == k_hug_contents)
+        item.flags &= ~flags::ItemVerticalFixed;
+    else if (h == k_fill_parent)
+        item.flags |= flags::FillVertical;
     else
-        flags |= flags::ItemVerticalFixed;
-    item.flags = flags;
+        item.flags |= flags::ItemVerticalFixed;
 }
 ALWAYS_INLINE inline void SetSize(Context& ctx, Id id, f32x2 size) { SetItemSize(*GetItem(ctx, id), size); }
 
@@ -270,7 +280,7 @@ ALWAYS_INLINE inline f32x4& GetMarginsLtrb(Context& ctx, Id item) { return GetIt
 // =========================================================================================================
 
 // Lots of unions/structs here so that designated initialiser can be used really effectively to just set the
-// value you want
+// value you want, everything else will be zeroed out.
 struct Margins {
     union {
         struct {
@@ -293,15 +303,13 @@ struct Margins {
     };
 };
 
+// It's not recommended to combine Left+Right or Top+Bottom, instead, set the size to k_fill_parent.
 enum class Anchor : u16 {
     None = 0, // no anchor, item will be in the centre
     Left = flags::Left,
     Top = flags::Top,
     Right = flags::Right,
     Bottom = flags::Bottom,
-    LeftAndRight = Left | Right, // AKA Fill horizontally
-    TopAndBottom = Top | Bottom, // AKA Fill vertically
-    All = LeftAndRight | TopAndBottom, // AKA Fill
 };
 
 inline Anchor operator|(Anchor a, Anchor b) { return (Anchor)(ToInt(a) | ToInt(b)); }
@@ -326,7 +334,7 @@ enum class JustifyContent : u8 {
 
 struct ItemOptions {
     Optional<Id> parent {};
-    f32x2 size {};
+    f32x2 size {}; // remember k_hug_contents and k_fill_parent
     Margins margins {};
     Anchor anchor {Anchor::None};
     bool line_break {false};
@@ -337,7 +345,7 @@ struct ItemOptions {
 };
 
 PUBLIC void SetMargins(Item& item, Margins m) {
-    ASSERT(All(m.lrtb >= 0 && m.lrtb < 10000));
+    ASSERT(All(m.lrtb >= 0 && m.lrtb < 65535));
     auto const ltrb = __builtin_shufflevector(m.lrtb, m.lrtb, 0, 2, 1, 3);
     SetMargins(item, ltrb);
 }
@@ -353,9 +361,9 @@ PUBLIC Id CreateItem(Context& ctx, ItemOptions options) {
     auto& item = *GetItem(ctx, id);
     SetItemSize(item, options.size);
     SetMargins(item, options.margins);
-    item.flags = ToInt(options.anchor) | (options.line_break ? flags::LineBreak : 0) |
-                 ToInt(options.contents_direction) | ToInt(options.contents_model) |
-                 ToInt(options.contents_align) | (options.contents_multiline ? flags::Wrap : flags::NoWrap);
+    item.flags |= ToInt(options.anchor) | (options.line_break ? flags::LineBreak : 0) |
+                  ToInt(options.contents_direction) | ToInt(options.contents_model) |
+                  ToInt(options.contents_align) | (options.contents_multiline ? flags::Wrap : flags::NoWrap);
     if (options.parent) Insert(ctx, *options.parent, id);
     return id;
 }

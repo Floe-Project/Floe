@@ -20,69 +20,60 @@ layout::Id LayoutParameterComponent(Gui* g,
                                     bool set_gapx_independent_of_size,
                                     bool set_bottom_gap_independent_of_size) {
     auto& imgui = g->imgui;
-    auto& lay = g->layout;
 
-    auto const param_component_large_width = LiveSize(imgui, UiSizeId::ParamComponentLargeWidth);
-    auto const param_component_small_width = LiveSize(imgui, UiSizeId::ParamComponentSmallWidth);
-    auto const param_component_extra_small_width = LiveSize(imgui, UiSizeId::ParamComponentExtraSmallWidth);
-    auto const param_component_height_offset = LiveSize(imgui, UiSizeId::ParamComponentHeightOffset);
-    auto const param_component_margin_lr = LiveSize(imgui, UiSizeId::ParamComponentMarginLR);
-    auto const param_component_margin_t = LiveSize(imgui, UiSizeId::ParamComponentMarginT);
-    auto const param_component_margin_b = LiveSize(imgui, UiSizeId::ParamComponentMarginB);
-    auto const param_component_label_gap_y = LiveSize(imgui, UiSizeId::ParamComponentLabelGapY);
-    auto const param_popup_button_height = LiveSize(imgui, UiSizeId::ParamPopupButtonHeight);
-    auto const menu_button_text_margin_l = LiveSize(imgui, UiSizeId::MenuButtonTextMarginL);
-    auto const fx_convo_ir_width = LiveSize(imgui, UiSizeId::FXConvoIRWidth);
-
-    auto width = type == LayoutType::Layer ? param_component_large_width
-                                           : (type == LayoutType::Effect ? param_component_small_width
-                                                                         : param_component_extra_small_width);
+    auto width = type == LayoutType::Layer ? LiveSize(imgui, UiSizeId::ParamComponentLargeWidth)
+                                           : (type == LayoutType::Effect
+                                                  ? LiveSize(imgui, UiSizeId::ParamComponentSmallWidth)
+                                                  : LiveSize(imgui, UiSizeId::ParamComponentExtraSmallWidth));
     auto const starting_width = width;
-    auto height = width - param_component_height_offset;
+    auto height = width - LiveSize(imgui, UiSizeId::ParamComponentHeightOffset);
     auto const starting_height = height;
-    auto gap_x = size_index_for_gapx ? LiveSize(imgui, *size_index_for_gapx) : param_component_margin_lr;
-    auto gap_bottom = param_component_margin_b;
-    auto gap_top = param_component_margin_t;
+    auto gap_x = size_index_for_gapx ? LiveSize(imgui, *size_index_for_gapx)
+                                     : LiveSize(imgui, UiSizeId::ParamComponentMarginLR);
+    auto gap_bottom = LiveSize(imgui, UiSizeId::ParamComponentMarginB);
+    auto gap_top = LiveSize(imgui, UiSizeId::ParamComponentMarginT);
 
+    auto const param_popup_button_height = LiveSize(imgui, UiSizeId::ParamPopupButtonHeight);
     if (index_for_menu_items) {
         auto const menu_items = ParameterMenuItems(*index_for_menu_items);
-        auto strings_width = MaxStringLength(g, menu_items) + menu_button_text_margin_l * 2;
-        width = (f32)strings_width;
-        height = (f32)param_popup_button_height;
+        auto strings_width =
+            MaxStringLength(g, menu_items) + LiveSize(imgui, UiSizeId::MenuButtonTextMarginL) * 2;
+        width = strings_width;
+        height = param_popup_button_height;
     } else if (is_convo_ir) {
-        height = (f32)param_popup_button_height;
-        width = fx_convo_ir_width;
+        height = param_popup_button_height;
+        width = LiveSize(imgui, UiSizeId::FXConvoIRWidth);
     }
 
     if (set_gapx_independent_of_size && width != starting_width)
-        gap_x -= (f32)Max(0.0f, (width - starting_width) / 2);
+        gap_x -= Max(0.0f, (width - starting_width) / 2);
 
     if (set_bottom_gap_independent_of_size && height != starting_height) {
-        auto const delta = (f32)Max(0.0f, starting_height - height);
-        gap_bottom += (f32)(delta / 2);
-        gap_top += (f32)(delta / 2);
+        auto const delta = Max(0.0f, starting_height - height);
+        gap_bottom += delta / 2;
+        gap_top += delta / 2;
     }
 
-    auto container = layout::CreateItem(lay,
+    auto container = layout::CreateItem(g->layout,
                                         {
                                             .parent = parent,
-                                            .size = {0, 0},
+                                            .size = layout::k_hug_contents,
                                             .margins {.lr = gap_x, .t = gap_top, .b = gap_bottom},
                                             .contents_direction = layout::Direction::Column,
                                             .contents_align = layout::JustifyContent::Start,
 
                                         });
 
-    param_layid = layout::CreateItem(lay,
+    param_layid = layout::CreateItem(g->layout,
                                      {
                                          .parent = container,
-                                         .size = {width, (f32)height},
-                                         .margins = {.b = param_component_label_gap_y},
+                                         .size = {width, height},
+                                         .margins = {.b = LiveSize(imgui, UiSizeId::ParamComponentLabelGapY)},
                                      });
-    name = layout::CreateItem(lay,
+    name = layout::CreateItem(g->layout,
                               {
                                   .parent = container,
-                                  .size = {width, (f32)(imgui.graphics->context->CurrentFontSize())},
+                                  .size = {width, (imgui.graphics->context->CurrentFontSize())},
                               });
 
     return container;
@@ -110,15 +101,13 @@ layout::Id LayoutParameterComponent(Gui* g,
         set_bottom_gap_independent_of_size);
 
     if (param.info.value_type == ParamValueType::Int) {
-        auto const dragger_width = LiveSize(g->imgui, UiSizeId::FXDraggerWidth);
-        auto const dragger_height = LiveSize(g->imgui, UiSizeId::FXDraggerHeight);
-        auto const dragger_margin_t = LiveSize(g->imgui, UiSizeId::FXDraggerMarginT);
-        auto const dragger_margin_b = LiveSize(g->imgui, UiSizeId::FXDraggerMarginB);
-
-        layout::SetSize(g->layout, param_layid, f32x2 {dragger_width, dragger_height});
+        layout::SetSize(g->layout,
+                        param_layid,
+                        f32x2 {LiveSize(g->imgui, UiSizeId::FXDraggerWidth),
+                               LiveSize(g->imgui, UiSizeId::FXDraggerHeight)});
         auto margins = layout::GetMargins(g->layout, param_layid);
-        margins.t = dragger_margin_t;
-        margins.b = dragger_margin_b;
+        margins.t = LiveSize(g->imgui, UiSizeId::FXDraggerMarginT);
+        margins.b = LiveSize(g->imgui, UiSizeId::FXDraggerMarginB);
         layout::SetMargins(g->layout, param_layid, margins);
     }
 

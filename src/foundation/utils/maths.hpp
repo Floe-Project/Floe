@@ -8,8 +8,6 @@ PUBLIC constexpr f64 SecondsToMilliseconds(f64 s) { return s * 1e3; }
 PUBLIC constexpr f64 SecondsToMicroseconds(f64 s) { return s * 1e6; }
 PUBLIC constexpr f64 SecondsToNanoseconds(f64 s) { return s * 1e9; }
 
-namespace maths {
-
 template <typename Type = f32>
 constexpr Type k_pi = (Type)3.14159265358979323846;
 template <typename Type = f32>
@@ -25,7 +23,8 @@ constexpr Type k_e32 = (Type)2.71828182845904523536;
 template <typename Type = f32>
 constexpr Type k_ln2 = (Type)0.69314718055994530942;
 
-} // namespace maths
+constexpr f32 k_nan32 = __builtin_nanf("");
+constexpr f64 k_nan64 = __builtin_nan("");
 
 template <typename T>
 PUBLIC ALWAYS_INLINE constexpr T Min(T a, T b) {
@@ -211,7 +210,7 @@ constexpr f32 k_quadrant1_of_sine[34] = {0.f,
                                          1.f,
                                          1.f};
 
-constexpr f32 k_three_over_two_pi = maths::k_pi<> + maths::k_half_pi<>;
+constexpr f32 k_three_over_two_pi = k_pi<> + k_half_pi<>;
 constexpr f32 k_max_index = (f32)ArraySize(k_quadrant1_of_sine) - 2;
 
 struct SineQuadrantInfo {
@@ -222,8 +221,8 @@ struct SineQuadrantInfo {
 
 constexpr SineQuadrantInfo k_quadrant_infos[4] = {
     {0, 1, false},
-    {maths::k_half_pi<>, 1, true},
-    {maths::k_pi<>, -1, false},
+    {k_half_pi<>, 1, true},
+    {k_pi<>, -1, false},
     {k_three_over_two_pi, -1, true},
 };
 
@@ -236,24 +235,24 @@ static constexpr f32 GetQuadrant1ValueFrom01(f32 val01) {
 }
 
 static constexpr f32 MapToRange0ToTwoPi(f32 rad) {
-    rad -= (f32)(int)(rad / maths::k_two_pi<>)*maths::k_two_pi<>;
-    if (rad < 0) rad = maths::k_two_pi<> + rad;
-    if (rad == maths::k_two_pi<>) rad = 0;
-    ASSERT(rad >= 0 && rad < maths::k_two_pi<>);
+    rad -= (f32)(int)(rad / k_two_pi<>)*k_two_pi<>;
+    if (rad < 0) rad = k_two_pi<> + rad;
+    if (rad == k_two_pi<>) rad = 0;
+    ASSERT(rad >= 0 && rad < k_two_pi<>);
     return rad;
 }
 
 PUBLIC constexpr f32 Sin(f32 rad) {
     rad = MapToRange0ToTwoPi(rad);
 
-    auto const quadrant = k_quadrant_infos[(unsigned)(rad / maths::k_half_pi<>)];
+    auto const quadrant = k_quadrant_infos[(unsigned)(rad / k_half_pi<>)];
     rad -= quadrant.start_value;
-    f32 pos = rad / maths::k_half_pi<>;
+    f32 pos = rad / k_half_pi<>;
     if (quadrant.inverted) pos = 1 - pos;
     return GetQuadrant1ValueFrom01(pos) * quadrant.sign;
 }
 
-PUBLIC constexpr f32 Cos(f32 rad) { return Sin(rad + maths::k_half_pi<>); }
+PUBLIC constexpr f32 Cos(f32 rad) { return Sin(rad + k_half_pi<>); }
 
 PUBLIC constexpr f32 Tan(f32 rad) { return Sin(rad) / Cos(rad); }
 

@@ -1737,25 +1737,25 @@ TEST_CASE(TestRect) {
 }
 
 TEST_CASE(TestTrigLookupTable) {
-    REQUIRE(trig_table_lookup::Sin(-maths::k_pi<>) == 0);
-    REQUIRE(trig_table_lookup::Sin(-maths::k_pi<> / 2) == -1);
+    REQUIRE(trig_table_lookup::Sin(-k_pi<>) == 0);
+    REQUIRE(trig_table_lookup::Sin(-k_pi<> / 2) == -1);
     REQUIRE(trig_table_lookup::Sin(0) == 0);
-    REQUIRE(trig_table_lookup::Sin(maths::k_pi<> / 2) == 1);
-    REQUIRE(trig_table_lookup::Sin(maths::k_pi<>) == 0);
-    REQUIRE(trig_table_lookup::Sin(maths::k_pi<> * (3.0f / 2.0f)) == -1);
-    REQUIRE(trig_table_lookup::Sin(maths::k_pi<> * 2) == 0);
+    REQUIRE(trig_table_lookup::Sin(k_pi<> / 2) == 1);
+    REQUIRE(trig_table_lookup::Sin(k_pi<>) == 0);
+    REQUIRE(trig_table_lookup::Sin(k_pi<> * (3.0f / 2.0f)) == -1);
+    REQUIRE(trig_table_lookup::Sin(k_pi<> * 2) == 0);
 
-    REQUIRE(trig_table_lookup::Cos(-maths::k_pi<>) == -1);
-    REQUIRE(trig_table_lookup::Cos(-maths::k_pi<> / 2) == 0);
+    REQUIRE(trig_table_lookup::Cos(-k_pi<>) == -1);
+    REQUIRE(trig_table_lookup::Cos(-k_pi<> / 2) == 0);
     REQUIRE(trig_table_lookup::Cos(0) == 1);
-    REQUIRE(trig_table_lookup::Cos(maths::k_pi<> / 2) == 0);
-    REQUIRE(trig_table_lookup::Cos(maths::k_pi<>) == -1);
-    REQUIRE(trig_table_lookup::Cos(maths::k_pi<> * (3.0f / 2.0f)) == 0);
-    REQUIRE(trig_table_lookup::Cos(maths::k_pi<> * 2) == 1);
+    REQUIRE(trig_table_lookup::Cos(k_pi<> / 2) == 0);
+    REQUIRE(trig_table_lookup::Cos(k_pi<>) == -1);
+    REQUIRE(trig_table_lookup::Cos(k_pi<> * (3.0f / 2.0f)) == 0);
+    REQUIRE(trig_table_lookup::Cos(k_pi<> * 2) == 1);
 
     REQUIRE(trig_table_lookup::Tan(0) == 0);
-    REQUIRE(trig_table_lookup::Tan(maths::k_pi<>) == 0);
-    REQUIRE(trig_table_lookup::Tan(-maths::k_pi<>) == 0);
+    REQUIRE(trig_table_lookup::Tan(k_pi<>) == 0);
+    REQUIRE(trig_table_lookup::Tan(-k_pi<>) == 0);
 
     f32 phase = -600;
     for (auto _ : Range(100)) {

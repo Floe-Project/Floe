@@ -253,7 +253,7 @@ inline void SetEqualPan(Voice& voice, f32 pan_pos) {
     f32 const sinx = trig_table_lookup::SinTurns(angle);
     f32 const cosx = trig_table_lookup::CosTurns(angle);
 
-    constexpr auto k_root_2_over_2 = maths::k_sqrt_two<> / 2;
+    constexpr auto k_root_2_over_2 = k_sqrt_two<> / 2;
     auto const left = k_root_2_over_2 * (cosx - sinx);
     auto const right = k_root_2_over_2 * (cosx + sinx);
     ASSERT_HOT(left >= 0 && right >= 0);

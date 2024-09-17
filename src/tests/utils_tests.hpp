@@ -753,7 +753,7 @@ TEST_CASE(TestJsonWriter) {
             bool const v12 {};
 
             TRY(WriteKeyValue(write_ctx, "smol", 1.0 / 7.0));
-            TRY(WriteKeyValue(write_ctx, "big", Pow(maths::k_pi<>, 25.0f)));
+            TRY(WriteKeyValue(write_ctx, "big", Pow(k_pi<>, 25.0f)));
 
             TRY(WriteKeyValue(write_ctx, "v1", v1));
             TRY(WriteKeyValue(write_ctx, "v2", v2));

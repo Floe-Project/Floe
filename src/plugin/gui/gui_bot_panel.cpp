@@ -16,8 +16,6 @@ void BotPanel(Gui* g) {
     auto& lay = g->layout;
     auto& engine = g->engine;
 
-    auto const slider_w = LiveSize(imgui, UiSizeId::MidiKeyboardSlider);
-    auto const control_w = LiveSize(imgui, UiSizeId::MidiKeyboardControlWidth);
     auto const button_h = LiveSize(imgui, UiSizeId::MidiKeyboardButtonSize);
     auto const button_ygap = LiveSize(imgui, UiSizeId::MidiKeyboardButtonYGap);
 
@@ -28,56 +26,55 @@ void BotPanel(Gui* g) {
                                        .contents_model = layout::Model::Layout,
                                        .contents_align = layout::JustifyContent::Start,
                                    });
-    auto controls = layout::CreateItem(lay,
-                                       {
-                                           .parent = root,
-                                           .size = {control_w, (f32)(imgui.Height() * 0.9f)},
-                                           .contents_direction = layout::Direction::Row,
-                                           .contents_align = layout::JustifyContent::Start,
-                                       });
-    auto oct = layout::CreateItem(lay,
-                                  {
-                                      .parent = controls,
-                                      .size = {(f32)(slider_w * 1.5f), 0},
-                                      .anchor = layout::Anchor::TopAndBottom,
-                                      .contents_direction = layout::Direction::Column,
-                                      .contents_align = layout::JustifyContent::Middle,
-                                  });
+    auto controls = layout::CreateItem(
+        lay,
+        {
+            .parent = root,
+            .size = {LiveSize(imgui, UiSizeId::MidiKeyboardControlWidth), imgui.Height() * 0.9f},
+            .contents_direction = layout::Direction::Row,
+            .contents_align = layout::JustifyContent::Start,
+        });
+
+    auto oct_container = layout::CreateItem(
+        lay,
+        {
+            .parent = controls,
+            .size = {LiveSize(imgui, UiSizeId::MidiKeyboardSlider) * 1.5f, layout::k_fill_parent},
+            .contents_direction = layout::Direction::Column,
+            .contents_align = layout::JustifyContent::Middle,
+        });
+
     auto oct_up = layout::CreateItem(lay,
                                      {
-                                         .parent = oct,
-                                         .size = {0, button_h},
-                                         .anchor = layout::Anchor::LeftAndRight,
+                                         .parent = oct_container,
+                                         .size = {layout::k_fill_parent, button_h},
                                      });
     auto oct_text = layout::CreateItem(lay,
                                        {
-                                           .parent = oct,
-                                           .size = {0, button_h},
+                                           .parent = oct_container,
+                                           .size = {layout::k_fill_parent, button_h},
                                            .margins = {.tb = button_ygap},
-                                           .anchor = layout::Anchor::LeftAndRight,
                                        });
     auto oct_dn = layout::CreateItem(lay,
                                      {
-                                         .parent = oct,
-                                         .size = {0, button_h},
-                                         .anchor = layout::Anchor::LeftAndRight,
+                                         .parent = oct_container,
+                                         .size = {layout::k_fill_parent, button_h},
                                      });
     auto keyboard = layout::CreateItem(lay,
                                        {
                                            .parent = root,
-                                           .size = {0, 0},
-                                           .anchor = layout::Anchor::All,
+                                           .size = layout::k_fill_parent,
                                        });
 
     layout::RunContext(lay);
+    DEFER { layout::ResetContext(lay); };
+
     Rect const keyboard_r = layout::GetRect(lay, keyboard);
     Rect const oct_up_r = layout::GetRect(lay, oct_up);
     Rect const oct_dn_r = layout::GetRect(lay, oct_dn);
     Rect const oct_text_r = layout::GetRect(lay, oct_text);
-    layout::ResetContext(lay);
 
     auto up_id = imgui.GetID("Up");
-    ;
     auto dn_id = imgui.GetID("Dn");
     auto& settings = g->settings.settings.gui;
     if (buttons::Button(g, up_id, oct_up_r, ICON_FA_CARET_UP, buttons::IconButton(imgui))) {

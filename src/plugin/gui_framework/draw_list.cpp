@@ -767,7 +767,7 @@ void DrawList::PathArcToFast(f32x2 const& centre, f32 radius, int amin, int amax
     auto const circle_vtx_count = (int)ArraySize(circle_vtx);
     if (!circle_vtx_builds) {
         for (int i = 0; i < circle_vtx_count; i++) {
-            f32 const a = ((f32)i / (f32)circle_vtx_count) * 2 * maths::k_pi<>;
+            f32 const a = ((f32)i / (f32)circle_vtx_count) * 2 * k_pi<>;
             circle_vtx[i].x = Cos(a);
             circle_vtx[i].y = Sin(a);
         }
@@ -1181,7 +1181,7 @@ void DrawList::AddTriangleFilled(f32x2 const& a, f32x2 const& b, f32x2 const& c,
 void DrawList::AddCircle(f32x2 const& centre, f32 radius, u32 col, int num_segments, f32 thickness) {
     if ((col & k_alpha_mask) == 0) return;
 
-    f32 const a_max = maths::k_pi<> * 2.0f * ((f32)num_segments - 1.0f) / (f32)num_segments;
+    f32 const a_max = k_pi<> * 2.0f * ((f32)num_segments - 1.0f) / (f32)num_segments;
     PathArcTo(centre, radius - 0.5f, 0.0f, a_max, num_segments);
     PathStroke(col, true, thickness);
 }
@@ -1189,7 +1189,7 @@ void DrawList::AddCircle(f32x2 const& centre, f32 radius, u32 col, int num_segme
 void DrawList::AddCircleFilled(f32x2 const& centre, f32 radius, u32 col, int num_segments) {
     if ((col & k_alpha_mask) == 0) return;
 
-    f32 const a_max = maths::k_pi<> * 2.0f * ((f32)num_segments - 1.0f) / (f32)num_segments;
+    f32 const a_max = k_pi<> * 2.0f * ((f32)num_segments - 1.0f) / (f32)num_segments;
     PathArcTo(centre, radius, 0.0f, a_max, num_segments);
     PathFill(col);
 }

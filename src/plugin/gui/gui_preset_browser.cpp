@@ -632,10 +632,9 @@ void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
             {
                 auto& lay = g->layout;
 
-                auto const heading_h = table_title_h;
                 auto root = layout::CreateItem(lay,
                                                {
-                                                   .size = {files_panel_width, heading_h},
+                                                   .size = {files_panel_width, table_title_h},
                                                    .contents_direction = layout::Direction::Row,
                                                    .contents_align = layout::JustifyContent::Middle,
                                                });
@@ -643,34 +642,25 @@ void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
                 auto title = layout::CreateItem(lay,
                                                 {
                                                     .parent = root,
-                                                    .size = {1, 1},
-                                                    .anchor = layout::Anchor::All,
+                                                    .size = layout::k_fill_parent,
                                                 });
 
-                layout::Id search;
-                {
-                    auto const h = LiveSize(imgui, UiSizeId::PresetSearchHeight);
-                    auto const w = LiveSize(imgui, UiSizeId::PresetSearchWidth);
-                    auto const pad_r = LiveSize(imgui, UiSizeId::PresetSearchPadR);
-                    search = layout::CreateItem(lay,
-                                                {
-                                                    .parent = root,
-                                                    .size = {w, h},
-                                                    .margins = {.r = pad_r},
-                                                });
-                }
+                auto search =
+                    layout::CreateItem(lay,
+                                       {
+                                           .parent = root,
+                                           .size = {LiveSize(imgui, UiSizeId::PresetSearchWidth),
+                                                    LiveSize(imgui, UiSizeId::PresetSearchHeight)},
+                                           .margins = {.r = LiveSize(imgui, UiSizeId::PresetSearchPadR)},
+                                       });
 
-                layout::Id random;
-                {
-                    auto const size = LiveSize(imgui, UiSizeId::PresetRandomButtonSize);
-                    auto const pad_r = LiveSize(imgui, UiSizeId::PresetRandomButtonPadR);
-                    random = layout::CreateItem(lay,
-                                                {
-                                                    .parent = root,
-                                                    .size = {size, size},
-                                                    .margins = {.r = pad_r},
-                                                });
-                }
+                auto random = layout::CreateItem(
+                    lay,
+                    {
+                        .parent = root,
+                        .size = LiveSize(imgui, UiSizeId::PresetRandomButtonSize),
+                        .margins = {.r = LiveSize(imgui, UiSizeId::PresetRandomButtonPadR)},
+                    });
 
                 layout::RunContext(lay);
 

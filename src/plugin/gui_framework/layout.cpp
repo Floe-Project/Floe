@@ -11,9 +11,9 @@ namespace layout {
 void ReserveItemsCapacity(Context& ctx, Id count) {
     if (count >= ctx.capacity) {
         ctx.capacity = count;
-        size_t const item_size = sizeof(Item) + sizeof(f32x4);
+        auto const item_size = sizeof(Item) + sizeof(f32x4);
         ctx.items = (Item*)GpaRealloc(ctx.items, ctx.capacity * item_size);
-        Item const* past_last = ctx.items + ctx.capacity;
+        auto const* past_last = ctx.items + ctx.capacity;
         ctx.rects = (f32x4*)past_last;
     }
 }
@@ -56,13 +56,13 @@ Id CreateItem(Context& ctx) {
 
     if (idx >= ctx.capacity) {
         ctx.capacity = ctx.capacity < 1 ? 32 : (ctx.capacity * 4);
-        size_t const item_size = sizeof(Item) + sizeof(f32x4);
+        auto const item_size = sizeof(Item) + sizeof(f32x4);
         ctx.items = (Item*)GpaRealloc(ctx.items, ctx.capacity * item_size);
-        Item const* past_last = ctx.items + ctx.capacity;
+        auto const* past_last = ctx.items + ctx.capacity;
         ctx.rects = (f32x4*)past_last;
     }
 
-    Item* item = GetItem(ctx, idx);
+    auto* item = GetItem(ctx, idx);
     // We can either do this here, or when creating/resetting buffer
     *item = {};
     item->first_child = k_invalid_id;
@@ -79,13 +79,13 @@ static ALWAYS_INLINE void AppendByPtr(Item* __restrict pearlier, Id later, Item*
 }
 
 Id LastChild(Context const& ctx, Id parent) {
-    Item* pparent = GetItem(ctx, parent);
-    Id child = pparent->first_child;
+    auto pparent = GetItem(ctx, parent);
+    auto child = pparent->first_child;
     if (child == k_invalid_id) return k_invalid_id;
-    Item* pchild = GetItem(ctx, child);
-    Id result = child;
+    auto pchild = GetItem(ctx, child);
+    auto result = child;
     for (;;) {
-        Id next = pchild->next_sibling;
+        auto next = pchild->next_sibling;
         if (next == k_invalid_id) break;
         result = next;
         pchild = GetItem(ctx, next);
@@ -114,7 +114,7 @@ void Insert(Context& ctx, Id parent, Id child) {
     } else {
         // Parent has existing items, iterate to find the last child and append the
         // inserted item after it.
-        Id next = pparent->first_child;
+        auto next = pparent->first_child;
         Item* __restrict pnext = GetItem(ctx, next);
         for (;;) {
             next = pnext->next_sibling;
@@ -129,7 +129,7 @@ void Push(Context& ctx, Id parent, Id new_child) {
     ASSERT(new_child != 0); // Must not be root item
     ASSERT(parent != new_child); // Must not be same item id
     Item* __restrict pparent = GetItem(ctx, parent);
-    Id old_child = pparent->first_child;
+    auto old_child = pparent->first_child;
     Item* __restrict pchild = GetItem(ctx, new_child);
     ASSERT(!(pchild->flags & flags::ItemInserted));
     pparent->first_child = new_child;
@@ -139,15 +139,15 @@ void Push(Context& ctx, Id parent, Id new_child) {
 
 // TODO restrict item ptrs correctly
 static ALWAYS_INLINE f32 CalcOverlayedSize(Context& ctx, Id item, int dim) {
-    int const wdim = dim + 2;
+    auto const wdim = dim + 2;
     Item* __restrict pitem = GetItem(ctx, item);
-    f32 need_size = 0;
-    Id child = pitem->first_child;
+    auto need_size = 0.0f;
+    auto child = pitem->first_child;
     while (child != k_invalid_id) {
-        Item* pchild = GetItem(ctx, child);
-        f32x4 rect = ctx.rects[child];
+        auto pchild = GetItem(ctx, child);
+        auto rect = ctx.rects[child];
         // width = start margin + calculated width + end margin
-        f32 child_size = rect[dim] + rect[2 + dim] + pchild->margins[wdim];
+        auto child_size = rect[dim] + rect[2 + dim] + pchild->margins[wdim];
         need_size = Max(need_size, child_size);
         child = pchild->next_sibling;
     }
@@ -155,13 +155,13 @@ static ALWAYS_INLINE f32 CalcOverlayedSize(Context& ctx, Id item, int dim) {
 }
 
 static ALWAYS_INLINE f32 CalcStackedSize(Context& ctx, Id item, int dim) {
-    int const wdim = dim + 2;
+    auto const wdim = dim + 2;
     Item* __restrict pitem = GetItem(ctx, item);
-    f32 need_size = 0;
-    Id child = pitem->first_child;
+    auto need_size = 0.0f;
+    auto child = pitem->first_child;
     while (child != k_invalid_id) {
-        Item* pchild = GetItem(ctx, child);
-        f32x4 rect = ctx.rects[child];
+        auto pchild = GetItem(ctx, child);
+        auto rect = ctx.rects[child];
         need_size += rect[dim] + rect[2 + dim] + pchild->margins[wdim];
         child = pchild->next_sibling;
     }
@@ -169,19 +169,19 @@ static ALWAYS_INLINE f32 CalcStackedSize(Context& ctx, Id item, int dim) {
 }
 
 static ALWAYS_INLINE f32 CalcWrappedOverlayedSize(Context& ctx, Id item, int dim) {
-    int const wdim = dim + 2;
+    auto const wdim = dim + 2;
     Item* __restrict pitem = GetItem(ctx, item);
-    f32 need_size = 0;
-    f32 need_size2 = 0;
-    Id child = pitem->first_child;
+    auto need_size = 0.0f;
+    auto need_size2 = 0.0f;
+    auto child = pitem->first_child;
     while (child != k_invalid_id) {
-        Item* pchild = GetItem(ctx, child);
-        f32x4 rect = ctx.rects[child];
+        auto pchild = GetItem(ctx, child);
+        auto rect = ctx.rects[child];
         if (pchild->flags & flags::LineBreak) {
             need_size2 += need_size;
             need_size = 0;
         }
-        f32 child_size = rect[dim] + rect[2 + dim] + pchild->margins[wdim];
+        auto child_size = rect[dim] + rect[2 + dim] + pchild->margins[wdim];
         need_size = Max(need_size, child_size);
         child = pchild->next_sibling;
     }
@@ -190,14 +190,14 @@ static ALWAYS_INLINE f32 CalcWrappedOverlayedSize(Context& ctx, Id item, int dim
 
 // Equivalent to uiComputeWrappedStackedSize
 static ALWAYS_INLINE f32 CalcWrappedStackedSize(Context& ctx, Id item, int dim) {
-    int const wdim = dim + 2;
+    auto const wdim = dim + 2;
     Item* __restrict pitem = GetItem(ctx, item);
-    f32 need_size = 0;
-    f32 need_size2 = 0;
-    Id child = pitem->first_child;
+    auto need_size = 0.0f;
+    auto need_size2 = 0.0f;
+    auto child = pitem->first_child;
     while (child != k_invalid_id) {
-        Item* pchild = GetItem(ctx, child);
-        f32x4 rect = ctx.rects[child];
+        auto pchild = GetItem(ctx, child);
+        auto rect = ctx.rects[child];
         if (pchild->flags & flags::LineBreak) {
             need_size2 = Max(need_size2, need_size);
             need_size = 0;
@@ -209,14 +209,14 @@ static ALWAYS_INLINE f32 CalcWrappedStackedSize(Context& ctx, Id item, int dim) 
 }
 
 static void CalcSize(Context& ctx, Id item, int dim) {
-    Item* pitem = GetItem(ctx, item);
+    auto pitem = GetItem(ctx, item);
 
-    Id child = pitem->first_child;
+    auto child = pitem->first_child;
     while (child != k_invalid_id) {
         // NOTE: this is recursive and will run out of stack space if items are
         // nested too deeply.
         CalcSize(ctx, child, dim);
-        Item* pchild = GetItem(ctx, child);
+        auto pchild = GetItem(ctx, child);
         child = pchild->next_sibling;
     }
 
@@ -268,16 +268,16 @@ static void CalcSize(Context& ctx, Id item, int dim) {
 }
 
 static ALWAYS_INLINE void ArrangeStacked(Context& ctx, Id item, int dim, bool wrap) {
-    int const wdim = dim + 2;
-    Item* pitem = GetItem(ctx, item);
+    auto const wdim = dim + 2;
+    auto pitem = GetItem(ctx, item);
 
-    u32 const item_flags = pitem->flags;
-    f32x4 rect = ctx.rects[item];
-    f32 space = rect[2 + dim];
+    auto const item_flags = pitem->flags;
+    auto rect = ctx.rects[item];
+    auto space = rect[2 + dim];
 
-    auto max_x2 = (f32)(rect[dim] + space);
+    auto max_x2 = rect[dim] + space;
 
-    Id start_child = pitem->first_child;
+    auto start_child = pitem->first_child;
     while (start_child != k_invalid_id) {
         f32 used = 0;
         u32 count = 0; // count of fillers
@@ -286,16 +286,16 @@ static ALWAYS_INLINE void ArrangeStacked(Context& ctx, Id item, int dim, bool wr
         bool hardbreak = false;
         // first pass: count items that need to be expanded,
         // and the space that is used
-        Id child = start_child;
-        Id end_child = k_invalid_id;
+        auto child = start_child;
+        auto end_child = k_invalid_id;
         while (child != k_invalid_id) {
-            Item* pchild = GetItem(ctx, child);
-            u32 const child_flags = pchild->flags;
-            u32 const flags = (child_flags & flags::ItemLayoutMask) >> dim;
-            u32 const fflags = (child_flags & flags::ItemFixedMask) >> dim;
-            f32x4 const child_margins = pchild->margins;
-            f32x4 child_rect = ctx.rects[child];
-            f32 extend = used;
+            auto* pchild = GetItem(ctx, child);
+            auto const child_flags = pchild->flags;
+            auto const flags = (child_flags & flags::ItemLayoutMask) >> dim;
+            auto const fflags = (child_flags & flags::ItemFixedMask) >> dim;
+            auto const child_margins = pchild->margins;
+            auto child_rect = ctx.rects[child];
+            auto extend = used;
             if ((flags & flags::FillHorizontal) == flags::FillHorizontal) {
                 ++count;
                 extend += child_rect[dim] + child_margins[wdim];
@@ -317,21 +317,21 @@ static ALWAYS_INLINE void ArrangeStacked(Context& ctx, Id item, int dim, bool wr
             ++total;
         }
 
-        f32 extra_space = space - used;
-        f32 filler = 0.0f;
-        f32 spacer = 0.0f;
-        f32 extra_margin = 0.0f;
+        auto extra_space = space - used;
+        auto filler = 0.0f;
+        auto spacer = 0.0f;
+        auto extra_margin = 0.0f;
 
         if (extra_space > 0) {
             if (count > 0)
-                filler = (f32)extra_space / (f32)count;
+                filler = extra_space / (f32)count;
             else if (total > 0) {
                 switch (item_flags & flags::Justify) {
                     case flags::Justify:
                         // justify when not wrapping or not in last line,
                         // or not manually breaking
                         if (!wrap || ((end_child != k_invalid_id) && !hardbreak))
-                            spacer = (f32)extra_space / (f32)(total - 1);
+                            spacer = extra_space / (f32)(total - 1);
                         break;
                     case flags::Start: break;
                     case flags::End: extra_margin = extra_space; break;
@@ -349,42 +349,42 @@ static ALWAYS_INLINE void ArrangeStacked(Context& ctx, Id item, int dim, bool wr
             ;
 
         // distribute width among items
-        auto x = (f32)rect[dim];
+        auto x = rect[dim];
         f32 x1;
         // second pass: distribute and rescale
         child = start_child;
         while (child != end_child) {
             f32 ix0;
             f32 ix1;
-            Item* pchild = GetItem(ctx, child);
-            u32 const child_flags = pchild->flags;
-            u32 const flags = (child_flags & flags::ItemLayoutMask) >> dim;
-            u32 const fflags = (child_flags & flags::ItemFixedMask) >> dim;
-            f32x4 const child_margins = pchild->margins;
-            f32x4 child_rect = ctx.rects[child];
+            auto* pchild = GetItem(ctx, child);
+            auto const child_flags = pchild->flags;
+            auto const flags = (child_flags & flags::ItemLayoutMask) >> dim;
+            auto const fflags = (child_flags & flags::ItemFixedMask) >> dim;
+            auto const child_margins = pchild->margins;
+            auto child_rect = ctx.rects[child];
 
-            x += (f32)child_rect[dim] + extra_margin;
+            x += child_rect[dim] + extra_margin;
             if ((flags & flags::FillHorizontal) == flags::FillHorizontal) // grow
                 x1 = x + filler;
             else if ((fflags & flags::ItemHorizontalFixed) == flags::ItemHorizontalFixed)
-                x1 = x + (f32)child_rect[2 + dim];
+                x1 = x + child_rect[2 + dim];
             else // squeeze
-                x1 = x + Max(0.0f, (f32)child_rect[2 + dim] /* + eater */);
+                x1 = x + Max(0.0f, child_rect[2 + dim] /* + eater */);
 
             // NOTE(Sam): I have removed the eater addition in the squeeze calculations,
             // so that when passing 0 as a width or height, the compenent will fit to the
             // size of it's children, even if it overruns the parent size. This is not fully
             // tested if it does what I expect all the time
 
-            ix0 = (f32)x;
+            ix0 = x;
             if (wrap)
-                ix1 = (f32)Min(max_x2 - (f32)child_margins[wdim], x1);
+                ix1 = Min(max_x2 - child_margins[wdim], x1);
             else
-                ix1 = (f32)x1;
+                ix1 = x1;
             child_rect[dim] = ix0; // pos
             child_rect[dim + 2] = ix1 - ix0; // size
             ctx.rects[child] = child_rect;
-            x = x1 + (f32)child_margins[wdim];
+            x = x1 + child_margins[wdim];
             child = pchild->next_sibling;
             extra_margin = spacer;
         }
@@ -394,18 +394,18 @@ static ALWAYS_INLINE void ArrangeStacked(Context& ctx, Id item, int dim, bool wr
 }
 
 static ALWAYS_INLINE void ArrangeOverlay(Context& ctx, Id item, int dim) {
-    int const wdim = dim + 2;
-    Item* pitem = GetItem(ctx, item);
-    f32x4 const rect = ctx.rects[item];
-    f32 const offset = rect[dim];
-    f32 const space = rect[2 + dim];
+    auto const wdim = dim + 2;
+    auto* pitem = GetItem(ctx, item);
+    auto const rect = ctx.rects[item];
+    auto const offset = rect[dim];
+    auto const space = rect[2 + dim];
 
-    Id child = pitem->first_child;
+    auto child = pitem->first_child;
     while (child != k_invalid_id) {
-        Item* pchild = GetItem(ctx, child);
-        u32 const b_flags = (pchild->flags & flags::ItemLayoutMask) >> dim;
-        f32x4 const child_margins = pchild->margins;
-        f32x4 child_rect = ctx.rects[child];
+        auto* pchild = GetItem(ctx, child);
+        auto const b_flags = (pchild->flags & flags::ItemLayoutMask) >> dim;
+        auto const child_margins = pchild->margins;
+        auto child_rect = ctx.rects[child];
 
         switch (b_flags & flags::FillHorizontal) {
             case flags::CentreHorizontal:
@@ -428,14 +428,14 @@ static ALWAYS_INLINE void ArrangeOverlay(Context& ctx, Id item, int dim) {
 
 static ALWAYS_INLINE void
 ArrangeOverlaySqueezedRange(Context& ctx, int dim, Id start_item, Id end_item, f32 offset, f32 space) {
-    int wdim = dim + 2;
-    Id item = start_item;
+    auto wdim = dim + 2;
+    auto item = start_item;
     while (item != end_item) {
-        Item* pitem = GetItem(ctx, item);
-        u32 const b_flags = (pitem->flags & flags::ItemLayoutMask) >> dim;
-        f32x4 const margins = pitem->margins;
-        f32x4 rect = ctx.rects[item];
-        f32 min_size = Max(0.0f, space - rect[dim] - margins[wdim]);
+        auto* pitem = GetItem(ctx, item);
+        auto const b_flags = (pitem->flags & flags::ItemLayoutMask) >> dim;
+        auto const margins = pitem->margins;
+        auto rect = ctx.rects[item];
+        auto min_size = Max(0.0f, space - rect[dim] - margins[wdim]);
         switch (b_flags & flags::FillHorizontal) {
             case flags::CentreHorizontal:
                 rect[2 + dim] = Min(rect[2 + dim], min_size);
@@ -455,12 +455,12 @@ ArrangeOverlaySqueezedRange(Context& ctx, int dim, Id start_item, Id end_item, f
 }
 
 static ALWAYS_INLINE f32 ArrangeWrappedOverlaySqueezed(Context& ctx, Id item, int dim) {
-    int const wdim = dim + 2;
-    Item* pitem = GetItem(ctx, item);
-    f32 offset = ctx.rects[item][dim];
-    f32 need_size = 0;
-    Id child = pitem->first_child;
-    Id start_child = child;
+    auto const wdim = dim + 2;
+    auto* pitem = GetItem(ctx, item);
+    auto offset = ctx.rects[item][dim];
+    auto need_size = 0.0f;
+    auto child = pitem->first_child;
+    auto start_child = child;
     while (child != k_invalid_id) {
         Item* pchild = GetItem(ctx, child);
         if (pchild->flags & flags::LineBreak) {
@@ -480,9 +480,9 @@ static ALWAYS_INLINE f32 ArrangeWrappedOverlaySqueezed(Context& ctx, Id item, in
 }
 
 static void Arrange(Context& ctx, Id item, int dim) {
-    Item* pitem = GetItem(ctx, item);
+    auto* pitem = GetItem(ctx, item);
 
-    u32 const flags = pitem->flags;
+    auto const flags = pitem->flags;
     switch (flags & flags::ItemBoxModelMask) {
         case flags::Column | flags::Wrap:
             if (dim != 0) {
@@ -514,12 +514,12 @@ static void Arrange(Context& ctx, Id item, int dim) {
             break;
         default: ArrangeOverlay(ctx, item, dim); break;
     }
-    Id child = pitem->first_child;
+    auto child = pitem->first_child;
     while (child != k_invalid_id) {
         // NOTE: this is recursive and will run out of stack space if items are
         // nested too deeply.
         Arrange(ctx, child, dim);
-        Item* pchild = GetItem(ctx, child);
+        auto* pchild = GetItem(ctx, child);
         child = pchild->next_sibling;
     }
 }

@@ -37,7 +37,6 @@ struct EffectIDs {
     layout::Id close;
 
     Effect* fx;
-    EffectType type;
 
     union {
         struct {
@@ -218,34 +217,14 @@ void DoEffectsWindow(Gui* g, Rect r) {
     auto& lay = g->layout;
     auto& engine = g->engine;
 
-    auto const fx_divider_margin_t = LiveSize(imgui, FXDividerMarginT);
     auto const fx_divider_margin_b = LiveSize(imgui, FXDividerMarginB);
-    auto const fx_knob_joining_line_thickness = LiveSize(imgui, FXKnobJoiningLineThickness);
-    auto const fx_knob_joining_line_pad_lr = LiveSize(imgui, FXKnobJoiningLinePadLR);
-    auto const fx_close_button_width = LiveSize(imgui, FXCloseButtonWidth);
-    auto const fx_close_button_height = LiveSize(imgui, FXCloseButtonHeight);
-    auto const fx_heading_h = LiveSize(imgui, FXHeadingH);
-    auto const fx_heading_extra_width = LiveSize(imgui, FXHeadingExtraWidth);
-    auto const fx_heading_l = LiveSize(imgui, FXHeadingL);
-    auto const fx_heading_r = LiveSize(imgui, FXHeadingR);
     auto const fx_param_button_height = LiveSize(imgui, FXParamButtonHeight);
-    auto const fx_delay_sync_btn_width = LiveSize(imgui, FXDelaySyncBtnWidth);
-    auto const fx_switch_board_item_height = LiveSize(imgui, FXSwitchBoardItemHeight);
-    auto const fx_compressor_auto_gain_width = LiveSize(imgui, FXCompressorAutoGainWidth);
-    auto const fx_switch_board_number_width = LiveSize(imgui, FXSwitchBoardNumberWidth);
-    auto const fx_switch_board_grab_region_width = LiveSize(imgui, FXSwitchBoardGrabRegionWidth);
     auto const corner_rounding = LiveSize(imgui, CornerRounding);
 
     auto settings = FloeWindowSettings(imgui, [](IMGUI_DRAW_WINDOW_BG_ARGS) {});
-    {
-        auto const fx_window_pad_l = LiveSize(imgui, FXWindowPadL);
-        auto const fx_window_pad_t = LiveSize(imgui, FXWindowPadT);
-        auto const fx_window_pad_r = LiveSize(imgui, FXWindowPadR);
-        auto const fx_window_pad_b = LiveSize(imgui, FXWindowPadB);
-        settings.flags |= imgui::WindowFlags_AlwaysDrawScrollY;
-        settings.pad_top_left = {(f32)fx_window_pad_l, (f32)fx_window_pad_t};
-        settings.pad_bottom_right = {(f32)fx_window_pad_r, (f32)fx_window_pad_b};
-    }
+    settings.flags |= imgui::WindowFlags_AlwaysDrawScrollY;
+    settings.pad_top_left = {LiveSize(imgui, FXWindowPadL), LiveSize(imgui, FXWindowPadT)};
+    settings.pad_bottom_right = {LiveSize(imgui, FXWindowPadR), LiveSize(imgui, FXWindowPadB)};
     imgui.BeginWindow(settings, r, "Effects");
     DEFER { imgui.EndWindow(); };
     DEFER { layout::ResetContext(lay); };
@@ -264,7 +243,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
     auto const root_width = imgui.Width();
     auto effects_root = layout::CreateItem(lay,
                                            {
-                                               .size = {root_width, imgui.Height()},
+                                               .size = imgui.Size(),
                                                .contents_direction = layout::Direction::Column,
                                                .contents_align = layout::JustifyContent::Start,
                                            });
@@ -273,39 +252,35 @@ void DoEffectsWindow(Gui* g, Rect r) {
 
     {
         auto const fx_switch_board_margin_l = LiveSize(imgui, FXSwitchBoardMarginL);
-        auto const fx_switch_board_margin_t = LiveSize(imgui, FXSwitchBoardMarginT);
         auto const fx_switch_board_margin_r = LiveSize(imgui, FXSwitchBoardMarginR);
-        auto const fx_switch_board_margin_b = LiveSize(imgui, FXSwitchBoardMarginB);
 
-        auto switches_container = layout::CreateItem(lay,
-                                                     {
-                                                         .parent = effects_root,
-                                                         .size = {1, 0},
-                                                         .margins = {.l = fx_switch_board_margin_l,
-                                                                     .r = fx_switch_board_margin_r,
-                                                                     .t = fx_switch_board_margin_t,
-                                                                     .b = fx_switch_board_margin_b},
-                                                         .anchor = layout::Anchor::LeftAndRight,
-                                                         .contents_direction = layout::Direction::Row,
-
-                                                     });
+        auto switches_container =
+            layout::CreateItem(lay,
+                               {
+                                   .parent = effects_root,
+                                   .size = {layout::k_fill_parent, layout::k_hug_contents},
+                                   .margins = {.l = fx_switch_board_margin_l,
+                                               .r = fx_switch_board_margin_r,
+                                               .t = LiveSize(imgui, FXSwitchBoardMarginT),
+                                               .b = LiveSize(imgui, FXSwitchBoardMarginB)},
+                                   .contents_direction = layout::Direction::Row,
+                               });
 
         auto left = layout::CreateItem(lay,
                                        {
                                            .parent = switches_container,
-                                           .size = {1, 0},
-                                           .anchor = layout::Anchor::LeftAndRight,
+                                           .size = {layout::k_fill_parent, layout::k_hug_contents},
                                            .contents_direction = layout::Direction::Column,
 
                                        });
         auto right = layout::CreateItem(lay,
                                         {
                                             .parent = switches_container,
-                                            .size = {1, 0},
-                                            .anchor = layout::Anchor::LeftAndRight,
+                                            .size = {layout::k_fill_parent, layout::k_hug_contents},
                                             .contents_direction = layout::Direction::Column,
                                         });
 
+        auto const fx_switch_board_item_height = LiveSize(imgui, FXSwitchBoardItemHeight);
         for (auto const i : Range(k_num_effect_types)) {
             auto const parent = (i < switches_left_col_size) ? left : right;
             switches[i] = layout::CreateItem(
@@ -321,9 +296,8 @@ void DoEffectsWindow(Gui* g, Rect r) {
     switches_bottom_divider = layout::CreateItem(lay,
                                                  {
                                                      .parent = effects_root,
-                                                     .size = {1, 1},
+                                                     .size = {layout::k_fill_parent, 1},
                                                      .margins = {.b = fx_divider_margin_b},
-                                                     .anchor = layout::Anchor::LeftAndRight,
                                                  });
 
     auto heading_font = g->fira_sans;
@@ -335,88 +309,78 @@ void DoEffectsWindow(Gui* g, Rect r) {
                                                 0.0f,
                                                 name);
         f32 const epsilon = 2;
-        return f32x2 {Round(size.x + epsilon) + (f32)fx_heading_extra_width, (f32)fx_heading_h};
+        return f32x2 {Round(size.x + epsilon) + LiveSize(imgui, FXHeadingExtraWidth),
+                      LiveSize(imgui, FXHeadingH)};
     };
 
     auto create_fx_ids = [&](Effect& fx, layout::Id* heading_container_out) {
         EffectIDs ids;
-        ids.type = fx.type;
         ids.fx = &fx;
 
         auto master_heading_container =
             layout::CreateItem(lay,
                                {
                                    .parent = effects_root,
-                                   .size = {1, 0},
-                                   .anchor = layout::Anchor::LeftAndRight,
+                                   .size = {layout::k_fill_parent, layout::k_hug_contents},
                                    .contents_direction = layout::Direction::Row,
                                    .contents_align = layout::JustifyContent::Start,
                                });
 
         auto const heading_size = get_heading_size(k_effect_info[ToInt(fx.type)].name);
-        ids.heading = layout::CreateItem(lay,
-                                         {
-                                             .parent = master_heading_container,
-                                             .size = {heading_size.x, heading_size.y},
-                                             .margins = {.l = fx_heading_l, .r = fx_heading_r},
-                                             .anchor = layout::Anchor::Left | layout::Anchor::Top,
-                                         });
+        ids.heading = layout::CreateItem(
+            lay,
+            {
+                .parent = master_heading_container,
+                .size = {heading_size.x, heading_size.y},
+                .margins = {.l = LiveSize(imgui, FXHeadingL), .r = LiveSize(imgui, FXHeadingR)},
+                .anchor = layout::Anchor::Left | layout::Anchor::Top,
+            });
 
-        auto heading_container = layout::CreateItem(lay,
-                                                    {
-                                                        .parent = master_heading_container,
-                                                        .size = {1, 0},
-                                                        .anchor = layout::Anchor::LeftAndRight,
-                                                        .contents_direction = layout::Direction::Row,
-                                                        .contents_align = layout::JustifyContent::End,
+        auto heading_container =
+            layout::CreateItem(lay,
+                               {
+                                   .parent = master_heading_container,
+                                   .size = {layout::k_fill_parent, layout::k_hug_contents},
+                                   .contents_direction = layout::Direction::Row,
+                                   .contents_align = layout::JustifyContent::End,
+                               });
 
-                                                    });
-
-        ids.close = layout::CreateItem(lay,
-                                       {
-                                           .parent = master_heading_container,
-                                           .size = {fx_close_button_width, fx_close_button_height},
-                                       });
+        ids.close = layout::CreateItem(
+            lay,
+            {
+                .parent = master_heading_container,
+                .size = {LiveSize(imgui, FXCloseButtonWidth), LiveSize(imgui, FXCloseButtonHeight)},
+            });
 
         if (heading_container_out) *heading_container_out = heading_container;
         return ids;
     };
 
-    auto create_divider_id = [&]() {
-        auto result = layout::CreateItem(lay,
-                                         {
-                                             .parent = effects_root,
-                                             .size = {1, 1},
-                                             .margins = {.t = fx_divider_margin_t, .b = fx_divider_margin_b},
-                                             .anchor = layout::Anchor::LeftAndRight,
-                                         });
-        return result;
+    auto const divider_options = layout::ItemOptions {
+        .parent = effects_root,
+        .size = {layout::k_fill_parent, 1},
+        .margins = {.t = LiveSize(imgui, FXDividerMarginT), .b = fx_divider_margin_b},
     };
 
-    auto create_param_container = [&]() {
-        return layout::CreateItem(lay,
-                                  {
-                                      .parent = effects_root,
-                                      .size = {1, 0},
-                                      .anchor = layout::Anchor::LeftAndRight,
-                                      .contents_direction = layout::Direction::Row,
-                                      .contents_multiline = true,
-                                      .contents_align = layout::JustifyContent::Middle,
-
-                                  });
+    auto const param_container_options = layout::ItemOptions {
+        .parent = effects_root,
+        .size = {layout::k_fill_parent, layout::k_hug_contents},
+        .contents_direction = layout::Direction::Row,
+        .contents_multiline = true,
+        .contents_align = layout::JustifyContent::Middle,
     };
 
     auto create_subcontainer = [&](layout::Id parent) {
         return layout::CreateItem(lay,
                                   {
                                       .parent = parent,
-                                      .size = {0, 0},
+                                      .size = layout::k_hug_contents,
                                       .contents_direction = layout::Direction::Row,
                                   });
     };
 
     auto layout_all = [&](Span<LayIDPair> ids, Span<ParamIndex const> params) {
-        auto param_container = create_param_container();
+        auto param_container = layout::CreateItem(lay, param_container_options);
 
         Optional<layout::Id> container {};
         u8 previous_group = 0;
@@ -443,7 +407,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
         switch (fx->type) {
             case EffectType::Distortion: {
                 auto ids = create_fx_ids(engine.processor.distortion, nullptr);
-                auto param_container = create_param_container();
+                auto param_container = layout::CreateItem(lay, param_container_options);
 
                 LayoutParameterComponent(g,
                                          param_container,
@@ -454,14 +418,14 @@ void DoEffectsWindow(Gui* g, Rect r) {
                                          ids.distortion.amount,
                                          engine.processor.params[ToInt(ParamIndex::DistortionDrive)]);
 
-                ids.divider = create_divider_id();
+                ids.divider = layout::CreateItem(lay, divider_options);
                 dyn::Append(effects, ids);
                 break;
             }
 
             case EffectType::BitCrush: {
                 auto ids = create_fx_ids(engine.processor.bit_crush, nullptr);
-                auto param_container = create_param_container();
+                auto param_container = layout::CreateItem(lay, param_container_options);
 
                 LayoutParameterComponent(g,
                                          param_container,
@@ -483,7 +447,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
                                          ids.bit_crush.dry,
                                          engine.processor.params[ToInt(ParamIndex::BitCrushDry)]);
 
-                ids.divider = create_divider_id();
+                ids.divider = layout::CreateItem(lay, divider_options);
                 dyn::Append(effects, ids);
                 break;
             }
@@ -491,14 +455,14 @@ void DoEffectsWindow(Gui* g, Rect r) {
             case EffectType::Compressor: {
                 layout::Id heading_container;
                 auto ids = create_fx_ids(engine.processor.compressor, &heading_container);
-                auto param_container = create_param_container();
+                auto param_container = layout::CreateItem(lay, param_container_options);
 
-                ids.compressor.auto_gain =
-                    layout::CreateItem(lay,
-                                       {
-                                           .parent = heading_container,
-                                           .size = {fx_compressor_auto_gain_width, fx_param_button_height},
-                                       });
+                ids.compressor.auto_gain = layout::CreateItem(
+                    lay,
+                    {
+                        .parent = heading_container,
+                        .size = {LiveSize(imgui, FXCompressorAutoGainWidth), fx_param_button_height},
+                    });
 
                 LayoutParameterComponent(g,
                                          param_container,
@@ -513,14 +477,14 @@ void DoEffectsWindow(Gui* g, Rect r) {
                                          ids.compressor.gain,
                                          engine.processor.params[ToInt(ParamIndex::CompressorGain)]);
 
-                ids.divider = create_divider_id();
+                ids.divider = layout::CreateItem(lay, divider_options);
                 dyn::Append(effects, ids);
                 break;
             }
 
             case EffectType::FilterEffect: {
                 auto ids = create_fx_ids(engine.processor.filter_effect, nullptr);
-                auto param_container = create_param_container();
+                auto param_container = layout::CreateItem(lay, param_container_options);
 
                 LayoutParameterComponent(g,
                                          param_container,
@@ -543,28 +507,28 @@ void DoEffectsWindow(Gui* g, Rect r) {
                                              engine.processor.params[ToInt(ParamIndex::FilterGain)]);
                 }
 
-                ids.divider = create_divider_id();
+                ids.divider = layout::CreateItem(lay, divider_options);
                 dyn::Append(effects, ids);
                 break;
             }
 
             case EffectType::StereoWiden: {
                 auto ids = create_fx_ids(engine.processor.stereo_widen, nullptr);
-                auto param_container = create_param_container();
+                auto param_container = layout::CreateItem(lay, param_container_options);
 
                 LayoutParameterComponent(g,
                                          param_container,
                                          ids.stereo.width,
                                          engine.processor.params[ToInt(ParamIndex::StereoWidenWidth)]);
 
-                ids.divider = create_divider_id();
+                ids.divider = layout::CreateItem(lay, divider_options);
                 dyn::Append(effects, ids);
                 break;
             }
 
             case EffectType::Chorus: {
                 auto ids = create_fx_ids(engine.processor.chorus, nullptr);
-                auto param_container = create_param_container();
+                auto param_container = layout::CreateItem(lay, param_container_options);
 
                 LayoutParameterComponent(g,
                                          param_container,
@@ -589,7 +553,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
                                          ids.chorus.dry,
                                          engine.processor.params[ToInt(ParamIndex::ChorusDry)]);
 
-                ids.divider = create_divider_id();
+                ids.divider = layout::CreateItem(lay, divider_options);
                 dyn::Append(effects, ids);
                 break;
             }
@@ -599,7 +563,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
 
                 layout_all(ids.reverb.ids, k_reverb_params);
 
-                ids.divider = create_divider_id();
+                ids.divider = layout::CreateItem(lay, divider_options);
                 dyn::Append(effects, ids);
                 break;
             }
@@ -609,7 +573,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
 
                 layout_all(ids.phaser.ids, k_phaser_params);
 
-                ids.divider = create_divider_id();
+                ids.divider = layout::CreateItem(lay, divider_options);
                 dyn::Append(effects, ids);
                 break;
             }
@@ -617,14 +581,14 @@ void DoEffectsWindow(Gui* g, Rect r) {
             case EffectType::Delay: {
                 layout::Id heading_container;
                 auto ids = create_fx_ids(engine.processor.delay, &heading_container);
-                auto param_container = create_param_container();
+                auto param_container = layout::CreateItem(lay, param_container_options);
 
-                ids.delay.sync_btn =
-                    layout::CreateItem(lay,
-                                       {
-                                           .parent = heading_container,
-                                           .size = {fx_delay_sync_btn_width, fx_param_button_height},
-                                       });
+                ids.delay.sync_btn = layout::CreateItem(
+                    lay,
+                    {
+                        .parent = heading_container,
+                        .size = {LiveSize(imgui, FXDelaySyncBtnWidth), fx_param_button_height},
+                    });
 
                 auto left = &engine.processor.params[ToInt(ParamIndex::DelayTimeSyncedL)];
                 auto right = &engine.processor.params[ToInt(ParamIndex::DelayTimeSyncedR)];
@@ -662,14 +626,14 @@ void DoEffectsWindow(Gui* g, Rect r) {
                                          ids.delay.mix,
                                          engine.processor.params[ToInt(ParamIndex::DelayMix)]);
 
-                ids.divider = create_divider_id();
+                ids.divider = layout::CreateItem(lay, divider_options);
                 dyn::Append(effects, ids);
                 break;
             }
 
             case EffectType::ConvolutionReverb: {
                 auto ids = create_fx_ids(engine.processor.convo, nullptr);
-                auto param_container = create_param_container();
+                auto param_container = layout::CreateItem(lay, param_container_options);
 
                 LayoutParameterComponent(g,
                                          param_container,
@@ -695,7 +659,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
                                          ids.convo.dry,
                                          engine.processor.params[ToInt(ParamIndex::ConvolutionReverbDry)]);
 
-                ids.divider = create_divider_id();
+                ids.divider = layout::CreateItem(lay, divider_options);
                 dyn::Append(effects, ids);
             } break;
 
@@ -741,6 +705,8 @@ void DoEffectsWindow(Gui* g, Rect r) {
                                                         : LiveCol(imgui, UiColMap::FXDividerLine));
     };
 
+    auto const fx_knob_joining_line_thickness = LiveSize(imgui, FXKnobJoiningLineThickness);
+    auto const fx_knob_joining_line_pad_lr = LiveSize(imgui, FXKnobJoiningLinePadLR);
     auto const draw_knob_joining_line = [&](layout::Id knob1, layout::Id knob2) {
         auto r1 = imgui.GetRegisteredAndConvertedRect(layout::GetRect(lay, knob1));
         auto r2 = imgui.GetRegisteredAndConvertedRect(layout::GetRect(lay, knob2));
@@ -750,7 +716,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
         imgui.graphics->AddLine(start,
                                 end,
                                 LiveCol(imgui, UiColMap::FXKnobJoiningLine),
-                                (f32)fx_knob_joining_line_thickness);
+                                fx_knob_joining_line_thickness);
     };
 
     auto const do_all_ids = [&](Span<LayIDPair> ids, Span<ParamIndex const> params, FXColours cols) {
@@ -819,9 +785,9 @@ void DoEffectsWindow(Gui* g, Rect r) {
             }
         };
 
-        switch (ids.type) {
+        switch (ids.fx->type) {
             case EffectType::Distortion: {
-                auto const cols = GetFxCols(imgui, ids.type);
+                auto const cols = GetFxCols(imgui, ids.fx->type);
 
                 do_heading(engine.processor.distortion, cols.back);
                 auto& d = ids.distortion;
@@ -842,7 +808,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
                 break;
             }
             case EffectType::BitCrush: {
-                auto const cols = GetFxCols(imgui, ids.type);
+                auto const cols = GetFxCols(imgui, ids.fx->type);
 
                 do_heading(engine.processor.bit_crush, cols.back);
                 auto& b = ids.bit_crush;
@@ -873,7 +839,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
                 break;
             }
             case EffectType::Compressor: {
-                auto const cols = GetFxCols(imgui, ids.type);
+                auto const cols = GetFxCols(imgui, ids.fx->type);
 
                 do_heading(engine.processor.compressor, cols.back);
                 auto& b = ids.compressor;
@@ -898,7 +864,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
                 break;
             }
             case EffectType::FilterEffect: {
-                auto const cols = GetFxCols(imgui, ids.type);
+                auto const cols = GetFxCols(imgui, ids.fx->type);
 
                 do_heading(engine.processor.filter_effect, cols.back);
                 auto& f = ids.filter;
@@ -929,7 +895,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
                 break;
             }
             case EffectType::StereoWiden: {
-                auto const cols = GetFxCols(imgui, ids.type);
+                auto const cols = GetFxCols(imgui, ids.fx->type);
 
                 do_heading(engine.processor.stereo_widen, cols.back);
                 KnobAndLabel(g,
@@ -939,7 +905,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
                 break;
             }
             case EffectType::Chorus: {
-                auto const cols = GetFxCols(imgui, ids.type);
+                auto const cols = GetFxCols(imgui, ids.fx->type);
 
                 do_heading(engine.processor.chorus, cols.back);
                 KnobAndLabel(g,
@@ -967,21 +933,21 @@ void DoEffectsWindow(Gui* g, Rect r) {
             }
 
             case EffectType::Reverb: {
-                auto const cols = GetFxCols(imgui, ids.type);
+                auto const cols = GetFxCols(imgui, ids.fx->type);
                 do_heading(engine.processor.reverb, cols.back);
                 do_all_ids(ids.reverb.ids, k_reverb_params, cols);
                 break;
             }
 
             case EffectType::Phaser: {
-                auto const cols = GetFxCols(imgui, ids.type);
+                auto const cols = GetFxCols(imgui, ids.fx->type);
                 do_heading(engine.processor.phaser, cols.back);
                 do_all_ids(ids.phaser.ids, k_phaser_params, cols);
                 break;
             }
 
             case EffectType::Delay: {
-                auto const cols = GetFxCols(imgui, ids.type);
+                auto const cols = GetFxCols(imgui, ids.fx->type);
                 do_heading(engine.processor.delay, cols.back);
                 auto const knob_style = knobs::DefaultKnob(imgui, cols.highlight);
 
@@ -1050,7 +1016,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
             }
 
             case EffectType::ConvolutionReverb: {
-                auto const cols = GetFxCols(imgui, ids.type);
+                auto const cols = GetFxCols(imgui, ids.fx->type);
 
                 do_heading(engine.processor.convo, cols.back);
 
@@ -1122,14 +1088,17 @@ void DoEffectsWindow(Gui* g, Rect r) {
     }
 
     {
+        auto const fx_switch_board_number_width = LiveSize(imgui, FXSwitchBoardNumberWidth);
+        auto const fx_switch_board_grab_region_width = LiveSize(imgui, FXSwitchBoardGrabRegionWidth);
+
         auto& dragging_fx = g->dragging_fx_switch;
         usize fx_index = 0;
         for (auto const slot : Range(k_num_effect_types)) {
             auto const whole_r = layout::GetRect(lay, switches[slot]);
-            auto const number_r = whole_r.WithW((f32)fx_switch_board_number_width);
-            auto const slot_r = whole_r.CutLeft((f32)fx_switch_board_number_width);
+            auto const number_r = whole_r.WithW(fx_switch_board_number_width);
+            auto const slot_r = whole_r.CutLeft(fx_switch_board_number_width);
             auto const converted_slot_r = imgui.GetRegisteredAndConvertedRect(slot_r);
-            auto const grabber_r = slot_r.CutLeft(slot_r.w - (f32)fx_switch_board_grab_region_width);
+            auto const grabber_r = slot_r.CutLeft(slot_r.w - fx_switch_board_grab_region_width);
 
             labels::Label(g,
                           number_r,
@@ -1144,7 +1113,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
                 imgui.graphics->AddRectFilled(converted_slot_r.Min(),
                                               converted_slot_r.Max(),
                                               LiveCol(imgui, UiColMap::FXButtonDropZone),
-                                              (f32)corner_rounding);
+                                              corner_rounding);
             } else {
                 auto fx = ordered_effects[fx_index++];
                 if (dragging_fx && fx == dragging_fx->fx) fx = ordered_effects[fx_index++];

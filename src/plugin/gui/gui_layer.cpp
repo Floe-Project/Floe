@@ -142,55 +142,53 @@ void Layout(Gui* g,
 
     auto container = layout::CreateItem(lay,
                                         {
-                                            .size = {(f32)width, (f32)height},
+                                            .size = {width, height},
                                             .contents_direction = layout::Direction::Column,
                                             .contents_align = layout::JustifyContent::Start,
                                         });
 
     // selector
     {
-        auto const layer_selector_box_height = LiveSize(imgui, LayerSelectorBoxHeight);
-        auto const layer_selector_button_w = LiveSize(imgui, LayerSelectorButtonW);
-        auto const layer_selector_box_buttons_margin_r = LiveSize(imgui, LayerSelectorBoxButtonsMarginR);
 
-        c.selector_box = layout::CreateItem(lay,
-                                            {
-                                                .parent = container,
-                                                .size = {1, layer_selector_box_height},
-                                                .margins = {.l = LiveSize(imgui, LayerSelectorBoxMarginL),
-                                                            .r = LiveSize(imgui, LayerSelectorBoxMarginR),
-                                                            .t = LiveSize(imgui, LayerSelectorBoxMarginT),
-                                                            .b = LiveSize(imgui, LayerSelectorBoxMarginB)},
-                                                .anchor = layout::Anchor::LeftAndRight,
-                                                .contents_direction = layout::Direction::Row,
-                                                .contents_align = layout::JustifyContent::Start,
-                                            });
+        c.selector_box =
+            layout::CreateItem(lay,
+                               {
+                                   .parent = container,
+                                   .size = {layout::k_fill_parent, LiveSize(imgui, LayerSelectorBoxHeight)},
+                                   .margins = {.l = LiveSize(imgui, LayerSelectorBoxMarginL),
+                                               .r = LiveSize(imgui, LayerSelectorBoxMarginR),
+                                               .t = LiveSize(imgui, LayerSelectorBoxMarginT),
+                                               .b = LiveSize(imgui, LayerSelectorBoxMarginB)},
+                                   .contents_direction = layout::Direction::Row,
+                                   .contents_align = layout::JustifyContent::Start,
+                               });
 
         c.selector_menu = layout::CreateItem(lay,
                                              {
                                                  .parent = c.selector_box,
-                                                 .size = {1, 1},
-                                                 .anchor = layout::Anchor::All,
+                                                 .size = layout::k_fill_parent,
                                              });
+
+        auto const layer_selector_button_w = LiveSize(imgui, LayerSelectorButtonW);
+        auto const layer_selector_box_buttons_margin_r = LiveSize(imgui, LayerSelectorBoxButtonsMarginR);
+
         c.selector_l = layout::CreateItem(lay,
                                           {
                                               .parent = c.selector_box,
-                                              .size = {layer_selector_button_w, 1},
-                                              .anchor = layout::Anchor::TopAndBottom,
+                                              .size = {layer_selector_button_w, layout::k_fill_parent},
                                           });
         c.selector_r = layout::CreateItem(lay,
                                           {
                                               .parent = c.selector_box,
-                                              .size = {layer_selector_button_w, 1},
-                                              .anchor = layout::Anchor::TopAndBottom,
+                                              .size = {layer_selector_button_w, layout::k_fill_parent},
                                           });
-        c.selector_randomise = layout::CreateItem(lay,
-                                                  {
-                                                      .parent = c.selector_box,
-                                                      .size = {layer_selector_button_w, 1},
-                                                      .margins = {.r = layer_selector_box_buttons_margin_r},
-                                                      .anchor = layout::Anchor::TopAndBottom,
-                                                  });
+        c.selector_randomise =
+            layout::CreateItem(lay,
+                               {
+                                   .parent = c.selector_box,
+                                   .size = {layer_selector_button_w, layout::k_fill_parent},
+                                   .margins = {.r = layer_selector_box_buttons_margin_r},
+                               });
     }
 
     if (layer->instrument.tag == InstrumentType::None) return;
@@ -200,14 +198,13 @@ void Layout(Gui* g,
         auto subcontainer_1 = layout::CreateItem(lay,
                                                  {
                                                      .parent = container,
-                                                     .size = {1, 0},
+                                                     .size = {layout::k_fill_parent, layout::k_hug_contents},
                                                      .margins {
                                                          .l = LiveSize(imgui, LayerMixerContainer1MarginL),
                                                          .r = LiveSize(imgui, LayerMixerContainer1MarginR),
                                                          .t = LiveSize(imgui, LayerMixerContainer1MarginT),
                                                          .b = LiveSize(imgui, LayerMixerContainer1MarginB),
                                                      },
-                                                     .anchor = layout::Anchor::LeftAndRight,
                                                      .contents_direction = layout::Direction::Row,
                                                      .contents_align = layout::JustifyContent::Middle,
                                                  });
@@ -238,7 +235,7 @@ void Layout(Gui* g,
         auto subcontainer_2 = layout::CreateItem(lay,
                                                  {
                                                      .parent = container,
-                                                     .size = {0, 0},
+                                                     .size = layout::k_hug_contents,
                                                      .contents_direction = layout::Direction::Row,
                                                      .contents_align = layout::JustifyContent::Middle,
                                                  });
@@ -247,12 +244,18 @@ void Layout(Gui* g,
                                  c.knob1,
                                  layer->params[ToInt(LayerParamIndex::TuneSemitone)],
                                  LayerPitchMarginLR);
-        auto const layer_pitch_width = LiveSize(imgui, LayerPitchWidth);
-        auto const layer_pitch_height = LiveSize(imgui, LayerPitchHeight);
-        auto const layer_pitch_margin_t = LiveSize(imgui, LayerPitchMarginT);
-        auto const layer_pitch_margin_b = LiveSize(imgui, LayerPitchMarginB);
-        layout::SetSize(lay, c.knob1.control, f32x2 {layer_pitch_width, layer_pitch_height});
-        layout::SetMargins(lay, c.knob1.control, {.t = layer_pitch_margin_t, .b = layer_pitch_margin_b});
+        layout::SetSize(lay,
+                        c.knob1.control,
+                        f32x2 {
+                            LiveSize(imgui, LayerPitchWidth),
+                            LiveSize(imgui, LayerPitchHeight),
+                        });
+        layout::SetMargins(lay,
+                           c.knob1.control,
+                           {
+                               .t = LiveSize(imgui, LayerPitchMarginT),
+                               .b = LiveSize(imgui, LayerPitchMarginB),
+                           });
 
         LayoutParameterComponent(g,
                                  subcontainer_2,
@@ -271,36 +274,34 @@ void Layout(Gui* g,
     c.divider = layout::CreateItem(lay,
                                    {
                                        .parent = container,
-                                       .size = {1, 1},
+                                       .size = {layout::k_fill_parent, 1},
                                        .margins = {.tb = layer_mixer_divider_vert_margins},
-                                       .anchor = layout::Anchor::LeftAndRight,
                                    });
 
     // tabs
     {
-        auto const layer_params_group_tabs_h = LiveSize(imgui, LayerParamsGroupTabsH);
-        auto const layer_params_group_box_gap_x = LiveSize(imgui, LayerParamsGroupBoxGapX);
+        auto tab_lay =
+            layout::CreateItem(lay,
+                               {
+                                   .parent = container,
+                                   .size = {layout::k_fill_parent, LiveSize(imgui, LayerParamsGroupTabsH)},
+                                   .margins = {.lr = LiveSize(imgui, LayerParamsGroupBoxGapX)},
+                                   .contents_direction = layout::Direction::Row,
+                                   .contents_align = layout::JustifyContent::Middle,
+                               });
+
         auto const layer_params_group_tabs_gap = LiveSize(imgui, LayerParamsGroupTabsGap);
-        auto tab_lay = layout::CreateItem(lay,
-                                          {
-                                              .parent = container,
-                                              .size = {1, layer_params_group_tabs_h},
-                                              .margins = {.lr = layer_params_group_box_gap_x},
-                                              .anchor = layout::Anchor::LeftAndRight,
-                                              .contents_direction = layout::Direction::Row,
-                                              .contents_align = layout::JustifyContent::Middle,
-                                          });
         for (auto const i : Range(k_num_pages)) {
             auto const page_type = (PageType)i;
             auto size = draw::GetTextWidth(imgui.graphics->context->CurrentFont(), GetPageTitle(page_type));
             if (page_type == PageType::Filter || page_type == PageType::Lfo || page_type == PageType::Eq)
                 size += LiveSize(imgui, LayerParamsGroupTabsIconW2);
-            c.tabs[i] = layout::CreateItem(lay,
-                                           {
-                                               .parent = tab_lay,
-                                               .size = {size + layer_params_group_tabs_gap, 1},
-                                               .anchor = layout::Anchor::TopAndBottom,
-                                           });
+            c.tabs[i] =
+                layout::CreateItem(lay,
+                                   {
+                                       .parent = tab_lay,
+                                       .size = {size + layer_params_group_tabs_gap, layout::k_fill_parent},
+                                   });
         }
     }
 
@@ -309,9 +310,8 @@ void Layout(Gui* g,
         c.divider2 = layout::CreateItem(lay,
                                         {
                                             .parent = container,
-                                            .size = {1, 1},
+                                            .size = {layout::k_fill_parent, 1},
                                             .margins = {.tb = layer_mixer_divider_vert_margins},
-                                            .anchor = layout::Anchor::LeftAndRight,
                                         });
     }
 
@@ -329,8 +329,7 @@ void Layout(Gui* g,
         auto page_container = layout::CreateItem(lay,
                                                  {
                                                      .parent = container,
-                                                     .size = {1, 1},
-                                                     .anchor = layout::Anchor::All,
+                                                     .size = layout::k_fill_parent,
                                                      .contents_direction = layout::Direction::Column,
                                                      .contents_align = layout::JustifyContent::Start,
                                                  });
@@ -339,47 +338,42 @@ void Layout(Gui* g,
 
         switch (layer_gui->selected_page) {
             case PageType::Main: {
-                auto const main_waveform_h = LiveSize(imgui, Main_WaveformH);
-                auto const main_waveform_margin_lr = LiveSize(imgui, Main_WaveformMarginLR);
-                auto const main_waveform_margin_tb = LiveSize(imgui, Main_WaveformMarginTB);
-                c.main.waveform = layout::CreateItem(lay,
-                                                     {
-                                                         .parent = page_container,
-                                                         .size = {1, main_waveform_h},
-                                                         .margins =
-                                                             {
-                                                                 .lr = main_waveform_margin_lr,
-                                                                 .tb = main_waveform_margin_tb,
-                                                             },
-                                                         .anchor = layout::Anchor::LeftAndRight,
-                                                     });
+                c.main.waveform =
+                    layout::CreateItem(lay,
+                                       {
+                                           .parent = page_container,
+                                           .size = {layout::k_fill_parent, LiveSize(imgui, Main_WaveformH)},
+                                           .margins =
+                                               {
+                                                   .lr = LiveSize(imgui, Main_WaveformMarginLR),
+                                                   .tb = LiveSize(imgui, Main_WaveformMarginTB),
+                                               },
+                                       });
 
                 auto const main_item_margin_lr = LiveSize(imgui, Main_ItemMarginLR);
                 auto const main_item_height = LiveSize(imgui, Main_ItemHeight);
                 auto const main_item_gap_y = LiveSize(imgui, Main_ItemGapY);
-                auto btn_container = layout::CreateItem(lay,
-                                                        {
-                                                            .parent = page_container,
-                                                            .size = {1, 0},
-                                                            .margins = {.lr = main_item_margin_lr},
-                                                            .anchor = layout::Anchor::LeftAndRight,
-                                                            .contents_direction = layout::Direction::Row,
-
-                                                        });
+                auto btn_container =
+                    layout::CreateItem(lay,
+                                       {
+                                           .parent = page_container,
+                                           .size = {layout::k_fill_parent, layout::k_hug_contents},
+                                           .margins = {.lr = main_item_margin_lr},
+                                           .contents_direction = layout::Direction::Row,
+                                       });
                 c.main.reverse = layout::CreateItem(lay,
                                                     {
                                                         .parent = btn_container,
-                                                        .size = {1, main_item_height},
+                                                        .size = {layout::k_fill_parent, main_item_height},
                                                         .margins = {.tb = main_item_gap_y},
-                                                        .anchor = layout::Anchor::LeftAndRight,
                                                     });
-                c.main.loop_mode = layout::CreateItem(lay,
-                                                      {
-                                                          .parent = btn_container,
-                                                          .size = {1, param_popup_button_height},
-                                                          .margins = {.tb = main_item_gap_y},
-                                                          .anchor = layout::Anchor::LeftAndRight,
-                                                      });
+                c.main.loop_mode =
+                    layout::CreateItem(lay,
+                                       {
+                                           .parent = btn_container,
+                                           .size = {layout::k_fill_parent, param_popup_button_height},
+                                           .margins = {.tb = main_item_gap_y},
+                                       });
 
                 auto const main_divider_margin_t = LiveSize(imgui, Main_DividerMarginT);
                 auto const main_divider_margin_b = LiveSize(imgui, Main_DividerMarginB);
@@ -387,34 +381,29 @@ void Layout(Gui* g,
                     lay,
                     {
                         .parent = page_container,
-                        .size = {1, 1},
+                        .size = {layout::k_fill_parent, 1},
                         .margins = {.t = main_divider_margin_t, .b = main_divider_margin_b},
-                        .anchor = layout::Anchor::LeftAndRight,
                     });
 
                 c.main.env_on = layout::CreateItem(lay,
                                                    {
                                                        .parent = page_container,
-                                                       .size = {1, page_heading_height},
+                                                       .size = {layout::k_fill_parent, page_heading_height},
                                                        .margins = ({
                                                            auto m = heading_margins;
                                                            m.b = 0;
                                                            m;
                                                        }),
-                                                       .anchor = layout::Anchor::LeftAndRight,
                                                    });
 
-                auto const main_envelope_margin_lr = LiveSize(imgui, Main_EnvelopeMarginLR);
-                auto const main_envelope_margin_tb = LiveSize(imgui, Main_EnvelopeMarginTB);
                 c.main.envelope = layout::CreateItem(lay,
                                                      {
                                                          .parent = page_container,
-                                                         .size = {1, main_envelope_h},
+                                                         .size = {layout::k_fill_parent, main_envelope_h},
                                                          .margins {
-                                                             .lr = main_envelope_margin_lr,
-                                                             .tb = main_envelope_margin_tb,
+                                                             .lr = LiveSize(imgui, Main_EnvelopeMarginLR),
+                                                             .tb = LiveSize(imgui, Main_EnvelopeMarginTB),
                                                          },
-                                                         .anchor = layout::Anchor::LeftAndRight,
                                                      });
                 break;
             }
@@ -425,33 +414,31 @@ void Layout(Gui* g,
                     layout::CreateItem(lay,
                                        {
                                            .parent = page_container,
-                                           .size = {1, 0},
+                                           .size = {layout::k_fill_parent, layout::k_hug_contents},
                                            .margins {.b = filter_gap_y_before_knobs},
-                                           .anchor = layout::Anchor::LeftAndRight,
                                            .contents_direction = layout::Direction::Row,
                                        });
                 c.filter.filter_on =
                     layout::CreateItem(lay,
                                        {
                                            .parent = filter_heading_container,
-                                           .size = {1, page_heading_height},
+                                           .size = {layout::k_fill_parent, page_heading_height},
                                            .margins = heading_margins,
-                                           .anchor = layout::Anchor::LeftAndRight | layout::Anchor::Top,
+                                           .anchor = layout::Anchor::Top,
                                        });
-                c.filter.filter_type = layout::CreateItem(lay,
-                                                          {
-                                                              .parent = filter_heading_container,
-                                                              .size = {1, param_popup_button_height},
-                                                              .margins = {.l = page_heading_margin_l},
-                                                              .anchor = layout::Anchor::LeftAndRight,
-                                                          });
+                c.filter.filter_type =
+                    layout::CreateItem(lay,
+                                       {
+                                           .parent = filter_heading_container,
+                                           .size = {layout::k_fill_parent, param_popup_button_height},
+                                           .margins = {.l = page_heading_margin_l},
+                                       });
 
                 auto filter_knobs_container =
                     layout::CreateItem(lay,
                                        {
                                            .parent = page_container,
-                                           .size = {1, 0},
-                                           .anchor = layout::Anchor::LeftAndRight,
+                                           .size = {layout::k_fill_parent, layout::k_hug_contents},
                                            .contents_direction = layout::Direction::Row,
                                            .contents_align = layout::JustifyContent::Middle,
                                        });
@@ -474,12 +461,11 @@ void Layout(Gui* g,
                 c.filter.envelope = layout::CreateItem(lay,
                                                        {
                                                            .parent = page_container,
-                                                           .size = {1, main_envelope_h},
+                                                           .size = {layout::k_fill_parent, main_envelope_h},
                                                            .margins {
                                                                .lr = LiveSize(imgui, Filter_EnvelopeMarginLR),
                                                                .tb = LiveSize(imgui, Filter_EnvelopeMarginTB),
                                                            },
-                                                           .anchor = layout::Anchor::LeftAndRight,
                                                        });
                 break;
             }
@@ -487,30 +473,28 @@ void Layout(Gui* g,
                 c.eq.on = layout::CreateItem(lay,
                                              {
                                                  .parent = page_container,
-                                                 .size = {1, page_heading_height},
+                                                 .size = {layout::k_fill_parent, page_heading_height},
                                                  .margins = heading_margins,
-                                                 .anchor = layout::Anchor::LeftAndRight,
                                              });
 
                 auto const eq_band_gap_y = LiveSize(imgui, EQ_BandGapY);
                 {
-                    c.eq.type[0] = layout::CreateItem(lay,
-                                                      {
-                                                          .parent = page_container,
-                                                          .size = {1, param_popup_button_height},
-                                                          .margins {
-                                                              .lr = page_heading_margin_l,
-                                                              .tb = eq_band_gap_y,
-                                                          },
-                                                          .anchor = layout::Anchor::LeftAndRight,
-                                                      });
+                    c.eq.type[0] =
+                        layout::CreateItem(lay,
+                                           {
+                                               .parent = page_container,
+                                               .size = {layout::k_fill_parent, param_popup_button_height},
+                                               .margins {
+                                                   .lr = page_heading_margin_l,
+                                                   .tb = eq_band_gap_y,
+                                               },
+                                           });
 
                     auto knob_container =
                         layout::CreateItem(lay,
                                            {
                                                .parent = page_container,
-                                               .size = {1, 0},
-                                               .anchor = layout::Anchor::LeftAndRight,
+                                               .size = {layout::k_fill_parent, layout::k_hug_contents},
                                                .contents_direction = layout::Direction::Row,
                                                .contents_align = layout::JustifyContent::Middle,
                                            });
@@ -533,22 +517,21 @@ void Layout(Gui* g,
                 }
 
                 {
-                    c.eq.type[1] = layout::CreateItem(lay,
-                                                      {
-                                                          .parent = page_container,
-                                                          .size = {1, param_popup_button_height},
-                                                          .margins {
-                                                              .lr = page_heading_margin_l,
-                                                              .tb = eq_band_gap_y,
-                                                          },
-                                                          .anchor = layout::Anchor::LeftAndRight,
-                                                      });
+                    c.eq.type[1] =
+                        layout::CreateItem(lay,
+                                           {
+                                               .parent = page_container,
+                                               .size = {layout::k_fill_parent, param_popup_button_height},
+                                               .margins {
+                                                   .lr = page_heading_margin_l,
+                                                   .tb = eq_band_gap_y,
+                                               },
+                                           });
                     auto knob_container =
                         layout::CreateItem(lay,
                                            {
                                                .parent = page_container,
-                                               .size = {1, 0},
-                                               .anchor = layout::Anchor::LeftAndRight,
+                                               .size = {layout::k_fill_parent, layout::k_hug_contents},
                                                .contents_direction = layout::Direction::Row,
                                                .contents_align = layout::JustifyContent::Middle,
                                            });
@@ -578,14 +561,14 @@ void Layout(Gui* g,
                 auto const midi_item_gap_y = LiveSize(imgui, MIDI_ItemGapY);
 
                 auto layout_item = [&](layout::Id& control, layout::Id& name, f32 height) {
-                    auto parent = layout::CreateItem(lay,
-                                                     {
-                                                         .parent = page_container,
-                                                         .size = {1, 0},
-                                                         .anchor = layout::Anchor::LeftAndRight,
-                                                         .contents_direction = layout::Direction::Row,
+                    auto parent =
+                        layout::CreateItem(lay,
+                                           {
+                                               .parent = page_container,
+                                               .size = {layout::k_fill_parent, layout::k_hug_contents},
+                                               .contents_direction = layout::Direction::Row,
 
-                                                     });
+                                           });
                     control = layout::CreateItem(lay,
                                                  {
                                                      .parent = parent,
@@ -598,8 +581,7 @@ void Layout(Gui* g,
                     name = layout::CreateItem(lay,
                                               {
                                                   .parent = parent,
-                                                  .size = {1, height},
-                                                  .anchor = layout::Anchor::LeftAndRight,
+                                                  .size = {layout::k_fill_parent, height},
                                               });
                 };
 
@@ -607,12 +589,11 @@ void Layout(Gui* g,
 
                 auto const button_options = layout::ItemOptions {
                     .parent = page_container,
-                    .size = {1, midi_item_height},
+                    .size = {layout::k_fill_parent, midi_item_height},
                     .margins {
                         .lr = midi_item_margin_lr,
                         .tb = midi_item_gap_y,
                     },
-                    .anchor = layout::Anchor::LeftAndRight,
                 };
                 c.midi.keytrack = layout::CreateItem(lay, button_options);
                 c.midi.mono = layout::CreateItem(lay, button_options);
@@ -624,39 +605,32 @@ void Layout(Gui* g,
                 c.lfo.on = layout::CreateItem(lay,
                                               {
                                                   .parent = page_container,
-                                                  .size = {1, page_heading_height},
+                                                  .size = {layout::k_fill_parent, page_heading_height},
                                                   .margins = heading_margins,
-                                                  .anchor = layout::Anchor::LeftAndRight,
                                               });
-
-                auto const lfo_item_width = LiveSize(imgui, LFO_ItemWidth);
-                auto const lfo_item_margin_l = LiveSize(imgui, LFO_ItemMarginL);
-                auto const lfo_item_gap_y = LiveSize(imgui, LFO_ItemGapY);
-                auto const lfo_item_margin_r = LiveSize(imgui, LFO_ItemMarginR);
-                auto const lfo_gap_y_before_knobs = LiveSize(imgui, LFO_GapYBeforeKnobs);
                 auto layout_item = [&](layout::Id& control, layout::Id& name) {
-                    auto parent = layout::CreateItem(lay,
-                                                     {
-                                                         .parent = page_container,
-                                                         .size = {1, 0},
-                                                         .anchor = layout::Anchor::LeftAndRight,
-                                                         .contents_direction = layout::Direction::Row,
-                                                     });
-                    control = layout::CreateItem(lay,
-                                                 {
-                                                     .parent = parent,
-                                                     .size = {lfo_item_width, param_popup_button_height},
-                                                     .margins {
-                                                         .l = lfo_item_margin_l,
-                                                         .r = lfo_item_margin_r,
-                                                         .tb = lfo_item_gap_y,
-                                                     },
-                                                 });
+                    auto parent =
+                        layout::CreateItem(lay,
+                                           {
+                                               .parent = page_container,
+                                               .size = {layout::k_fill_parent, layout::k_hug_contents},
+                                               .contents_direction = layout::Direction::Row,
+                                           });
+                    control = layout::CreateItem(
+                        lay,
+                        {
+                            .parent = parent,
+                            .size = {LiveSize(imgui, LFO_ItemWidth), param_popup_button_height},
+                            .margins {
+                                .l = LiveSize(imgui, LFO_ItemMarginL),
+                                .r = LiveSize(imgui, LFO_ItemMarginR),
+                                .tb = LiveSize(imgui, LFO_ItemGapY),
+                            },
+                        });
                     name = layout::CreateItem(lay,
                                               {
                                                   .parent = parent,
-                                                  .size = {1, param_popup_button_height},
-                                                  .anchor = layout::Anchor::LeftAndRight,
+                                                  .size = {layout::k_fill_parent, param_popup_button_height},
                                               });
                 };
 
@@ -664,15 +638,15 @@ void Layout(Gui* g,
                 layout_item(c.lfo.shape, c.lfo.shape_name);
                 layout_item(c.lfo.mode, c.lfo.mode_name);
 
-                auto knob_container = layout::CreateItem(lay,
-                                                         {
-                                                             .parent = page_container,
-                                                             .size = {1, 0},
-                                                             .margins = {.t = lfo_gap_y_before_knobs},
-                                                             .anchor = layout::Anchor::LeftAndRight,
-                                                             .contents_direction = layout::Direction::Row,
-                                                             .contents_align = layout::JustifyContent::Middle,
-                                                         });
+                auto knob_container =
+                    layout::CreateItem(lay,
+                                       {
+                                           .parent = page_container,
+                                           .size = {layout::k_fill_parent, layout::k_hug_contents},
+                                           .margins = {.t = LiveSize(imgui, LFO_GapYBeforeKnobs)},
+                                           .contents_direction = layout::Direction::Row,
+                                           .contents_align = layout::JustifyContent::Middle,
+                                       });
 
                 LayoutParameterComponent(g,
                                          knob_container,
@@ -680,11 +654,15 @@ void Layout(Gui* g,
                                          layer->params[ToInt(LayerParamIndex::LfoAmount)],
                                          Page_2KnobGapX);
 
-                auto& rate_param =
+                LayoutParameterComponent(
+                    g,
+                    knob_container,
+                    c.lfo.rate,
                     layer->params[layer->params[ToInt(LayerParamIndex::LfoSyncSwitch)].ValueAsBool()
                                       ? ToInt(LayerParamIndex::LfoRateTempoSynced)
-                                      : ToInt(LayerParamIndex::LfoRateHz)];
-                LayoutParameterComponent(g, knob_container, c.lfo.rate, rate_param, Page_2KnobGapX, true);
+                                      : ToInt(LayerParamIndex::LfoRateHz)],
+                    Page_2KnobGapX,
+                    true);
                 break;
             }
             case PageType::Count: PanicIfReached();
@@ -1197,9 +1175,8 @@ void Draw(Gui* g,
     }
 
     // overlay
-    auto const& layer_processor = engine->processor.layer_processors[(usize)layer->index];
-    if (layer_processor.is_silent.Load(LoadMemoryOrder::Relaxed)) {
-        auto pos = imgui.curr_window->unpadded_bounds.pos;
+    if (engine->processor.layer_processors[layer->index].is_silent.Load(LoadMemoryOrder::Relaxed)) {
+        auto const pos = imgui.curr_window->unpadded_bounds.pos;
         imgui.graphics->AddRectFilled(pos, pos + imgui.Size(), LiveCol(imgui, UiColMap::LayerMutedOverlay));
     }
 }

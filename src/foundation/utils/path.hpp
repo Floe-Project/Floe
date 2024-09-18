@@ -15,6 +15,7 @@ enum class Format {
 };
 
 constexpr char k_dir_separator = IS_WINDOWS ? '\\' : '/';
+constexpr String k_dir_separator_str = IS_WINDOWS ? "\\" : "/";
 
 PUBLIC constexpr bool IsDirectorySeparator(char c, Format format = Format::Native) {
     return (format == Format::Windows) ? (c == '\\' || c == '/') : (c == '/');

@@ -397,7 +397,7 @@ ALWAYS_INLINE constexpr bool NumberCastIsSafe(FromType val) {
 
     // from float to unsigned
     else if constexpr (FloatingPoint<FromType> && UnsignedInt<ToType>)
-        return val >= 0 && val <= LargestRepresentableValue<ToType>();
+        return val >= 0 && (u64)val <= LargestRepresentableValue<ToType>();
 
     // both enum
     else if constexpr (Enum<FromType> && Enum<ToType>)

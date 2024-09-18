@@ -10,6 +10,7 @@
 // - C++
 // - Remove config options and just use what we need
 // - Add a higher-level API for creating items
+// - Give things better names
 
 #pragma once
 #include "foundation/foundation.hpp"
@@ -26,7 +27,7 @@ struct Item {
     u32 flags;
     Id first_child;
     Id next_sibling;
-    f32x4 margins;
+    f32x4 margins_ltrb;
     f32x2 size;
 };
 
@@ -39,100 +40,82 @@ struct Context {
 
 namespace flags {
 
-// Container flags to pass to SetContainer()
+constexpr u32 BitRange(u32 from, u32 to) { return (u32)((1ull << (to + 1ull)) - (1ull << from)); }
+
 enum : u32 {
-    // If neither Row nor Column is set, the container will not arrange its children. In the original version
-    // of this code, this was called the 'layout model' instead of the 'flex model' (flex model which is where
-    // you use Row or Columm and the items are auto-arranged).
-    //
-    // In the 'layout model', the children can set their Anchor flags to position themselves. The children can
-    // combine the anchor flags Right|Bottom to position themselves in the bottom-right for example.
+    // Container flags
+    // ======================================================================================================
 
-    // flex-direction (bit 0+1)
-    Row = 0x002, // left to right
-    Column = 0x003, // top to bottom
+    // No auto-layout, children will all be positioned at the same position (as per the
+    // justify-content flags) unless they set their own anchors.
+    NoLayout = 0,
+    AutoLayout = 1 << 1, // don't use this directly, use Row or Column
+    // left to right, AKA horizontal, CSS flex-direction: row
+    Row = AutoLayout | 0,
+    // top to bottom, AKA vertical, CSS flex-direction: column
+    Column = AutoLayout | 1,
 
-    // flex-wrap (bit 2)
-    NoWrap = 0x000, // single-line
-    Wrap = 0x004, // multi-line, wrap left to right
+    // Bit 3 = wrap
+    NoWrap = 0, // single-line, does nothing if NoLayout
+    Wrap = 1 << 2, // items will be wrapped to a new line if needed, does nothing if NoLayout
 
-    // justify-content (start, end, center, space-between)
-    Start = 0x008, // at start of row/column
-    Middle = 0x000, // at center of row/column
-    End = 0x010, // at end of row/column
-    Justify = Start | End, // insert spacing to stretch across whole row/column
+    Start = 1 << 3, // at start of row/column, CSS justify-content: start
+    Middle = 0, // at middle of row/column, CSS justify-content: center
+    End = 1 << 4, // at end of row/column, CSS justify-content: end
+    // insert spacing to stretch across whole row/column, CSS justify-content: space-between
+    Justify = Start | End,
 
-    // CSS align-items can be implemented by putting a flex container in a layout container, then using
-    // LAY_TOP, LAY_BOTTOM, LAY_VFILL, LAY_VCENTER, etc. FILL is equivalent to stretch/grow
+    // Child behaviour flags (anchors, and line-break)
+    // ======================================================================================================
 
-    // CSS align-content (start, end, center, stretch) can be implemented by putting a flex container in a
-    // layout container, then using LAY_TOP, LAY_BOTTOM, LAY_VFILL, LAY_VCENTER, etc. FILL is equivalent to
-    // stretch; space-between is not supported.
-};
+    // Anchors cause an item to be positioned at the edge of its parent. All anchors are valid when the parent
+    // is NoLayout. When the parent is Row or Column, then only anchors that are in the cross-axis are valid.
+    // For example, if you have a row, then you can only use Top, Bottom. If you have a column, then you can
+    // only use Left, Right. You can simulate CSS align-content by setting all children to the required
+    // anchor.
 
-// child layout flags to pass to SetBehave()
-enum : u32 {
-    // attachments (bit 5-8)
-    // fully valid when parent uses LAY_LAYOUT model
-    // partially valid when in LAY_FLEX model
+    CentreHorizontal = 0,
+    CentreVertical = 0,
+    Centre = 0,
 
-    CentreHorizontal = 0x000, // center horizontally, with left margin as offset
-    CentreVertical = 0x000, // center vertically, with top margin as offset
-    Centre = 0x000, // center in both directions, with left/top margin as offset
+    AnchorLeft = 1 << 5,
+    AnchorTop = 1 << 6,
+    AnchorRight = 1 << 7,
+    AnchorBottom = 1 << 8,
 
-    Left = 0x020, // anchor to left item or left side of parent
-    Top = 0x040, // anchor to top item or top side of parent
-    Right = 0x080, // anchor to right item or right side of parent
-    Bottom = 0x100, // anchor to bottom item or bottom side of parent
-                    //
-    FillHorizontal = Left | Right, // anchor to both left and right item or parent borders
-    FillVertical = Top | Bottom, // anchor to both top and bottom item or parent borders
-    Fill = Left | Top | Right | Bottom, // anchor to all four directions
+    AnchorLeftAndRight = AnchorLeft | AnchorRight, // causes the item to stretch
+    AnchorTopAndBottom = AnchorTop | AnchorBottom, // causes the item to stretch
+    AnchorAll = AnchorLeft | AnchorTop | AnchorRight | AnchorBottom,
 
     // When in a wrapping container, put this element on a new line. Wrapping layout code auto-inserts
-    // LAY_BREAK flags as needed.
-    //
-    // Drawing routines can read this via item pointers as needed after performing layout calculations.
-    LineBreak = 0x200
-};
+    // LineBreak flags as needed. Drawing routines can read this via item pointers as needed after performing
+    // layout calculations.
+    LineBreak = 1 << 9,
 
-enum : u32 {
-    // these bits, starting at bit 16, can be safely assigned by the application, e.g. as item types, other
-    // event types, drop targets, etc. this is not yet exposed via API functions, you'll need to get/set these
-    // by directly accessing item pointers.
-    UserMask = 0x7fff0000,
-};
+    // Internal flags
+    // ======================================================================================================
 
-// extra item flags
-enum : u32 {
-    ItemBoxModelMask = 0x000007, // bit 0-2
-    ItemBoxMask = 0x00001F, // bit 0-4
-    ItemLayoutMask = 0x0003E0, // bit 5-9
-    ItemInserted = 0x400, // item has been inserted (bit 10)
-    ItemHorizontalFixed = 0x800, // horizontal size has been explicitly set (bit 11)
-    ItemVerticalFixed = 0x1000, // vertical size has been explicitly set (bit 12)
+    LayoutModeMask = BitRange(0, 2),
+    ContainerMask = BitRange(0, 4),
+    ChildBehaviourMask = BitRange(5, 9),
 
-    ItemFixedMask = ItemHorizontalFixed | ItemVerticalFixed,
+    ItemInserted = 1 << 10,
+    HorizontalSizeFixed = 1 << 11,
+    VerticalSizeFixed = 1 << 12,
 
-    // which flag bits will be compared
-    ItemCompareMask = ItemBoxModelMask | (ItemLayoutMask & ~LineBreak) | UserMask,
+    FixedSizeMask = HorizontalSizeFixed | VerticalSizeFixed,
+
+    // These bits can be used by the user.
+    UserMask = BitRange(13, 31),
 };
 
 } // namespace flags
 
-// Reserve enough heap memory to contain `count` items without needing to reallocate. The initial
-// InitContext() call does not allocate any heap memory, so if you init a context and then call this once with
-// a large enough number for the number of items you'll create, there will not be any further reallocations.
 void ReserveItemsCapacity(Context& ctx, Id count);
 
-// Frees any heap allocated memory used by a context. Don't call this on a context that did not have
-// InitContext() call on it. To reuse a context after destroying it, you will need to set it to {}.
 void DestroyContext(Context& ctx);
 
-// Clears all of the items in a context, setting its count to 0. Use this when you want to re-declare your
-// layout starting from the root item. This does not free any memory or perform allocations. It's safe to use
-// the context again after calling this. You should probably use this instead of init/destroy if you are
-// recalculating your layouts in a loop.
+// Resets but doesn't free memory.
 void ResetContext(Context& ctx);
 
 // Performs the layout calculations, starting at the root item (id 0). After calling this, you can use
@@ -170,10 +153,7 @@ void RunItem(Context& ctx, Id item);
 // need to call this.
 void ClearItemBreak(Context& ctx, Id item);
 
-// Returns the number of items that have been created in a context.
 Id ItemsCount(Context& ctx);
-
-// Returns the number of items the context can hold without performing a reallocation.
 Id ItemsCapacity(Context& ctx);
 
 // Create a new item, which can just be thought of as a rectangle. Returns the id (handle) used to identify
@@ -194,21 +174,19 @@ void Append(Context& ctx, Id earlier, Id later);
 // Like Insert, but puts the new item as the first child in a parent instead of as the last.
 void Push(Context& ctx, Id parent, Id child);
 
-// Get the pointer to an item in the buffer by its id. Don't keep this around -- it will become invalid as
-// soon as any reallocation occurs. Just store the id instead (it's smaller, anyway, and the lookup cost will
-// be nothing.)
+//  Don't keep this around -- it will become invalid as soon as any reallocation occurs.
 ALWAYS_INLINE inline Item* GetItem(Context const& ctx, Id id) {
     ASSERT(id != k_invalid_id && id < ctx.num_items);
     return ctx.items + id;
 }
 
-// Get the id of first child of an item, if any. Returns k_invalid_id if there is no child.
+// Returns k_invalid_id if there is no child.
 ALWAYS_INLINE inline Id FirstChild(Context const& ctx, Id id) {
     Item const* pitem = GetItem(ctx, id);
     return pitem->first_child;
 }
 
-// Get the id of the next sibling of an item, if any. Returns k_invalid_id if there is no next sibling.
+// Returns k_invalid_id if there is no next sibling.
 ALWAYS_INLINE inline Id NextSibling(Context const& ctx, Id id) {
     Item const* pitem = GetItem(ctx, id);
     return pitem->next_sibling;
@@ -235,54 +213,52 @@ ALWAYS_INLINE inline void SetItemSize(Item& item, f32x2 size) {
 
     auto const w = size[0];
     if (w == k_hug_contents)
-        item.flags &= ~flags::ItemHorizontalFixed;
+        item.flags &= ~flags::HorizontalSizeFixed;
     else if (w == k_fill_parent)
-        item.flags |= flags::FillHorizontal;
+        item.flags |= flags::AnchorLeftAndRight;
     else
-        item.flags |= flags::ItemHorizontalFixed;
+        item.flags |= flags::HorizontalSizeFixed;
 
     auto const h = size[1];
     if (h == k_hug_contents)
-        item.flags &= ~flags::ItemVerticalFixed;
+        item.flags &= ~flags::VerticalSizeFixed;
     else if (h == k_fill_parent)
-        item.flags |= flags::FillVertical;
+        item.flags |= flags::AnchorTopAndBottom;
     else
-        item.flags |= flags::ItemVerticalFixed;
+        item.flags |= flags::VerticalSizeFixed;
 }
 ALWAYS_INLINE inline void SetSize(Context& ctx, Id id, f32x2 size) { SetItemSize(*GetItem(ctx, id), size); }
 
-// Set the flags on an item which determines how it behaves as a child inside of a parent item. For example,
-// setting LAY_VFILL will make an item try to fill up all available vertical space inside of its parent.
+// Flags for how the item behaves inside a parent item.
 ALWAYS_INLINE inline void SetBehave(Item& item, u32 flags) {
-    ASSERT((flags & flags::ItemLayoutMask) == flags);
-    item.flags = (item.flags & ~flags::ItemLayoutMask) | flags;
+    ASSERT((flags & flags::ChildBehaviourMask) == flags);
+    item.flags = (item.flags & ~flags::ChildBehaviourMask) | flags;
 }
 ALWAYS_INLINE inline void SetBehave(Context& ctx, Id id, u32 flags) { SetBehave(*GetItem(ctx, id), flags); }
 
-// Set the flags on an item which determines how it behaves as a parent. For example, setting LAY_COLUMN will
-// make an item behave as if it were a column -- it will lay out its children vertically.
+// Flags for how the item arranges its children.
 ALWAYS_INLINE inline void SetContain(Item& item, u32 flags) {
-    ASSERT((flags & flags::ItemBoxMask) == flags);
-    item.flags = (item.flags & ~flags::ItemBoxMask) | flags;
+    ASSERT((flags & flags::ContainerMask) == flags);
+    item.flags = (item.flags & ~flags::ContainerMask) | flags;
 }
 ALWAYS_INLINE inline void SetContain(Context& ctx, Id id, u32 flags) { SetContain(*GetItem(ctx, id), flags); }
 
 // Set the margins on an item. The components of the vector are:
 // 0: left, 1: top, 2: right, 3: bottom.
-ALWAYS_INLINE inline void SetMargins(Item& item, f32x4 ltrb) { item.margins = ltrb; }
+ALWAYS_INLINE inline void SetMargins(Item& item, f32x4 ltrb) { item.margins_ltrb = ltrb; }
 ALWAYS_INLINE inline void SetMargins(Context& ctx, Id item, f32x4 ltrb) {
     SetMargins(*GetItem(ctx, item), ltrb);
 }
 
 // Get the margins that were set by SetMargins.
 // 0: left, 1: top, 2: right, 3: bottom.
-ALWAYS_INLINE inline f32x4& GetMarginsLtrb(Context& ctx, Id item) { return GetItem(ctx, item)->margins; }
+ALWAYS_INLINE inline f32x4& GetMarginsLtrb(Context& ctx, Id item) { return GetItem(ctx, item)->margins_ltrb; }
 
 // =========================================================================================================
 // Higher-level API focused on creating items using designated initialisers
 // =========================================================================================================
 
-// Lots of unions/structs here so that designated initialiser can be used really effectively to just set the
+// Lots of unions/structs here so that designated initialisers can be used really effectively to just set the
 // value you want, everything else will be zeroed out.
 struct Margins {
     union {
@@ -309,10 +285,10 @@ struct Margins {
 // It's not recommended to combine Left+Right or Top+Bottom, instead, set the size to k_fill_parent.
 enum class Anchor : u16 {
     None = 0, // no anchor, item will be in the centre
-    Left = flags::Left,
-    Top = flags::Top,
-    Right = flags::Right,
-    Bottom = flags::Bottom,
+    Left = flags::AnchorLeft,
+    Top = flags::AnchorTop,
+    Right = flags::AnchorRight,
+    Bottom = flags::AnchorBottom,
 };
 
 inline Anchor operator|(Anchor a, Anchor b) { return (Anchor)(ToInt(a) | ToInt(b)); }

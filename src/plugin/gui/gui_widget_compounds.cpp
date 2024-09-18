@@ -61,7 +61,6 @@ layout::Id LayoutParameterComponent(Gui* g,
                                             .margins {.lr = gap_x, .t = gap_top, .b = gap_bottom},
                                             .contents_direction = layout::Direction::Column,
                                             .contents_align = layout::JustifyContent::Start,
-
                                         });
 
     param_layid = layout::CreateItem(g->layout,

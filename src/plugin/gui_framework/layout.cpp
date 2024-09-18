@@ -31,8 +31,8 @@ void DestroyContext(Context& ctx) {
 
 void ResetContext(Context& ctx) { ctx.num_items = 0; }
 
-static void CalcSize(Context& ctx, Id item, int dim, f32 item_gap);
-static void Arrange(Context& ctx, Id item, int dim);
+static void CalcSize(Context& ctx, Id item, u32 dim, f32 item_gap);
+static void Arrange(Context& ctx, Id item, u32 dim);
 
 void RunContext(Context& ctx) {
     if (ctx.num_items > 0) RunItem(ctx, 0);
@@ -139,7 +139,7 @@ void Push(Context& ctx, Id parent_id, Id new_child_id) {
     child->next_sibling = old_child;
 }
 
-static ALWAYS_INLINE f32 MaxChildSize(Context& ctx, Id id, int dim) {
+static ALWAYS_INLINE f32 MaxChildSize(Context& ctx, Id id, u32 dim) {
     auto const size_dim = dim + 2;
     Item const* __restrict item = GetItem(ctx, id);
     auto max_child_size = 0.0f;
@@ -155,7 +155,7 @@ static ALWAYS_INLINE f32 MaxChildSize(Context& ctx, Id id, int dim) {
     return max_child_size;
 }
 
-static ALWAYS_INLINE f32 TotalChildSize(Context& ctx, Id id, int dim) {
+static ALWAYS_INLINE f32 TotalChildSize(Context& ctx, Id id, u32 dim) {
     auto const size_dim = dim + 2;
     Item const* __restrict item = GetItem(ctx, id);
     auto need_size = 0.0f;
@@ -170,7 +170,7 @@ static ALWAYS_INLINE f32 TotalChildSize(Context& ctx, Id id, int dim) {
     return need_size;
 }
 
-static ALWAYS_INLINE f32 MaxChildSizeWrapped(Context& ctx, Id id, int dim) {
+static ALWAYS_INLINE f32 MaxChildSizeWrapped(Context& ctx, Id id, u32 dim) {
     auto const size_dim = dim + 2;
     Item const* __restrict item = GetItem(ctx, id);
     auto max_child_size = 0.0f;
@@ -190,7 +190,7 @@ static ALWAYS_INLINE f32 MaxChildSizeWrapped(Context& ctx, Id id, int dim) {
     return max_child_size2 + max_child_size;
 }
 
-static ALWAYS_INLINE f32 TotalChildSizeWrapped(Context& ctx, Id id, int dim) {
+static ALWAYS_INLINE f32 TotalChildSizeWrapped(Context& ctx, Id id, u32 dim) {
     auto const size_dim = dim + 2;
     Item const* __restrict item = GetItem(ctx, id);
     auto max_child_size = 0.0f;
@@ -209,7 +209,7 @@ static ALWAYS_INLINE f32 TotalChildSizeWrapped(Context& ctx, Id id, int dim) {
     return Max(max_child_size2, max_child_size);
 }
 
-static void CalcSize(Context& ctx, Id id, int dim, f32 item_gap) {
+static void CalcSize(Context& ctx, Id id, u32 dim, f32 item_gap) {
     auto item = GetItem(ctx, id);
 
     auto const item_layout_dim = item->flags & 1;
@@ -217,7 +217,7 @@ static void CalcSize(Context& ctx, Id id, int dim, f32 item_gap) {
     auto child_id = item->first_child;
     while (child_id != k_invalid_id) {
         // NOTE: this is recursive and will run out of stack space if items are nested too deeply.
-        CalcSize(ctx, child_id, dim, (u32)dim == item_layout_dim ? item->gap[dim] : 0);
+        CalcSize(ctx, child_id, dim, dim == item_layout_dim ? item->gap[dim] : 0);
         auto child = GetItem(ctx, child_id);
         child_id = child->next_sibling;
     }
@@ -252,7 +252,7 @@ static void CalcSize(Context& ctx, Id id, int dim, f32 item_gap) {
             break;
         case flags::Column:
         case flags::Row:
-            if (item_layout_dim == (u32)dim) // direction
+            if (item_layout_dim == dim) // direction
                 cal_size = TotalChildSize(ctx, id, dim);
             else
                 cal_size = MaxChildSize(ctx, id, dim);
@@ -267,7 +267,7 @@ static void CalcSize(Context& ctx, Id id, int dim, f32 item_gap) {
     ctx.rects[id][2 + dim] = cal_size;
 }
 
-static ALWAYS_INLINE void ArrangeStacked(Context& ctx, Id id, int dim, bool wrap) {
+static ALWAYS_INLINE void ArrangeStacked(Context& ctx, Id id, u32 dim, bool wrap) {
     auto const size_dim = dim + 2;
     auto item = GetItem(ctx, id);
 
@@ -383,7 +383,7 @@ static ALWAYS_INLINE void ArrangeStacked(Context& ctx, Id id, int dim, bool wrap
     }
 }
 
-static ALWAYS_INLINE void ArrangeOverlay(Context& ctx, Id id, int dim) {
+static ALWAYS_INLINE void ArrangeOverlay(Context& ctx, Id id, u32 dim) {
     auto const size_dim = dim + 2;
     auto* item = GetItem(ctx, id);
     auto const rect = ctx.rects[id];
@@ -417,7 +417,7 @@ static ALWAYS_INLINE void ArrangeOverlay(Context& ctx, Id id, int dim) {
 }
 
 static ALWAYS_INLINE void
-ArrangeOverlaySqueezedRange(Context& ctx, int dim, Id start_item_id, Id end_item_id, f32 offset, f32 space) {
+ArrangeOverlaySqueezedRange(Context& ctx, u32 dim, Id start_item_id, Id end_item_id, f32 offset, f32 space) {
     auto size_dim = dim + 2;
     auto item_id = start_item_id;
     while (item_id != end_item_id) {
@@ -444,7 +444,7 @@ ArrangeOverlaySqueezedRange(Context& ctx, int dim, Id start_item_id, Id end_item
     }
 }
 
-static ALWAYS_INLINE f32 ArrangeWrappedOverlaySqueezed(Context& ctx, Id id, int dim) {
+static ALWAYS_INLINE f32 ArrangeWrappedOverlaySqueezed(Context& ctx, Id id, u32 dim) {
     auto const size_dim = dim + 2;
     auto* item = GetItem(ctx, id);
     auto offset = ctx.rects[id][dim];
@@ -469,7 +469,7 @@ static ALWAYS_INLINE f32 ArrangeWrappedOverlaySqueezed(Context& ctx, Id id, int 
     return offset;
 }
 
-static void Arrange(Context& ctx, Id id, int dim) {
+static void Arrange(Context& ctx, Id id, u32 dim) {
     auto* item = GetItem(ctx, id);
 
     auto const flags = item->flags;
@@ -490,7 +490,7 @@ static void Arrange(Context& ctx, Id id, int dim) {
             break;
         case flags::Column:
         case flags::Row:
-            if ((flags & 1) == (u32)dim) {
+            if ((flags & 1) == dim) {
                 ArrangeStacked(ctx, id, dim, false);
             } else {
                 f32x4 const rect = ctx.rects[id];

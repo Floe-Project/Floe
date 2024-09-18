@@ -13,23 +13,24 @@
 #include "utils_tests.hpp"
 
 #define TEST_REGISTER_FUNCTIONS                                                                              \
-    X(RegisterFoundationTests)                                                                               \
-    X(RegisterOsTests)                                                                                       \
-    X(RegisterUtilsTests)                                                                                    \
-    X(RegisterPackageFormatTests)                                                                            \
-    X(RegisterHostingTests)                                                                                  \
-    X(RegisterAudioUtilsTests)                                                                               \
-    X(RegisterVolumeFadeTests)                                                                               \
-    X(RegisterStateCodingTests)                                                                              \
     X(RegisterAudioFileTests)                                                                                \
+    X(RegisterAudioUtilsTests)                                                                               \
     X(RegisterChecksumFileTests)                                                                             \
-    X(RegisterPresetTests)                                                                                   \
+    X(RegisterDirectoryListingTests)                                                                         \
+    X(RegisterFoundationTests)                                                                               \
+    X(RegisterHostingTests)                                                                                  \
+    X(RegisterLayoutTests)                                                                                   \
     X(RegisterLibraryLuaTests)                                                                               \
     X(RegisterLibraryMdataTests)                                                                             \
-    X(RegisterSampleLibraryLoaderTests)                                                                      \
+    X(RegisterOsTests)                                                                                       \
+    X(RegisterPackageFormatTests)                                                                            \
     X(RegisterParamDescriptorTests)                                                                          \
-    X(RegisterDirectoryListingTests)                                                                         \
-    X(RegisterSettingsFileTests)
+    X(RegisterPresetTests)                                                                                   \
+    X(RegisterSampleLibraryLoaderTests)                                                                      \
+    X(RegisterSettingsFileTests)                                                                             \
+    X(RegisterStateCodingTests)                                                                              \
+    X(RegisterUtilsTests)                                                                                    \
+    X(RegisterVolumeFadeTests)
 
 #define WINDOWS_FP_TEST_REGISTER_FUNCTIONS X(RegisterWindowsSpecificTests)
 

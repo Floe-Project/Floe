@@ -29,6 +29,7 @@ struct Item {
     Id next_sibling;
     f32x4 margins_ltrb;
     f32x2 size;
+    f32x2 gap;
 };
 
 struct Context {
@@ -310,6 +311,7 @@ struct ItemOptions {
     Optional<Id> parent {};
     f32x2 size {}; // remember k_hug_contents and k_fill_parent
     Margins margins {};
+    f32x2 gap {};
     Anchor anchor {Anchor::None};
     bool line_break {false};
     Direction contents_direction {Direction::Row};
@@ -334,6 +336,7 @@ PUBLIC Id CreateItem(Context& ctx, ItemOptions options) {
     auto& item = *GetItem(ctx, id);
     SetItemSize(item, options.size);
     SetMargins(item, options.margins);
+    item.gap = options.gap;
     item.flags |= ToInt(options.anchor) | (options.line_break ? flags::LineBreak : 0) |
                   ToInt(options.contents_direction) | ToInt(options.contents_align) |
                   (options.contents_multiline ? flags::Wrap : flags::NoWrap);

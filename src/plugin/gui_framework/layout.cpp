@@ -31,18 +31,18 @@ void DestroyContext(Context& ctx) {
 
 void ResetContext(Context& ctx) { ctx.num_items = 0; }
 
-static void CalcSize(Context& ctx, Id item, int dim);
+static void CalcSize(Context& ctx, Id item, int dim, f32 item_gap);
 static void Arrange(Context& ctx, Id item, int dim);
 
 void RunContext(Context& ctx) {
     if (ctx.num_items > 0) RunItem(ctx, 0);
 }
 
-void RunItem(Context& ctx, Id item) {
-    CalcSize(ctx, item, 0);
-    Arrange(ctx, item, 0);
-    CalcSize(ctx, item, 1);
-    Arrange(ctx, item, 1);
+void RunItem(Context& ctx, Id id) {
+    CalcSize(ctx, id, 0, 0);
+    Arrange(ctx, id, 0);
+    CalcSize(ctx, id, 1, 0);
+    Arrange(ctx, id, 1);
 }
 
 void ClearItemBreak(Context& ctx, Id item) {
@@ -115,8 +115,7 @@ void Insert(Context& ctx, Id parent_id, Id child_id) {
         parent->first_child = child_id;
         child->flags |= flags::ItemInserted;
     } else {
-        // Parent has existing items, iterate to find the last child and append the
-        // inserted item after it.
+        // Parent has existing items, iterate to find the last child and append the inserted item after it.
         auto next_id = parent->first_child;
         Item* __restrict next = GetItem(ctx, next_id);
         for (;;) {
@@ -140,133 +139,136 @@ void Push(Context& ctx, Id parent_id, Id new_child_id) {
     child->next_sibling = old_child;
 }
 
-static ALWAYS_INLINE f32 CalcOverlayedSize(Context& ctx, Id id, int dim) {
-    auto const wdim = dim + 2;
-    Item* __restrict item = GetItem(ctx, id);
+static ALWAYS_INLINE f32 MaxChildSize(Context& ctx, Id id, int dim) {
+    auto const size_dim = dim + 2;
+    Item const* __restrict item = GetItem(ctx, id);
+    auto max_child_size = 0.0f;
+    auto child_id = item->first_child;
+    while (child_id != k_invalid_id) {
+        auto const child = GetItem(ctx, child_id);
+        // rect[dim] will contain the start margin already
+        auto const rect = ctx.rects[child_id];
+        auto const child_size = rect[dim] + rect[size_dim] + child->margins_ltrb[size_dim];
+        max_child_size = Max(max_child_size, child_size);
+        child_id = child->next_sibling;
+    }
+    return max_child_size;
+}
+
+static ALWAYS_INLINE f32 TotalChildSize(Context& ctx, Id id, int dim) {
+    auto const size_dim = dim + 2;
+    Item const* __restrict item = GetItem(ctx, id);
     auto need_size = 0.0f;
     auto child_id = item->first_child;
     while (child_id != k_invalid_id) {
-        auto child = GetItem(ctx, child_id);
-        auto rect = ctx.rects[child_id];
-        // width = start margin + calculated width + end margin
-        auto child_size = rect[dim] + rect[2 + dim] + child->margins_ltrb[wdim];
-        need_size = Max(need_size, child_size);
+        auto const child = GetItem(ctx, child_id);
+        auto const rect = ctx.rects[child_id];
+        // rect[dim] will contain the start margin already
+        need_size += rect[dim] + rect[size_dim] + child->margins_ltrb[size_dim];
         child_id = child->next_sibling;
     }
     return need_size;
 }
 
-static ALWAYS_INLINE f32 CalcStackedSize(Context& ctx, Id id, int dim) {
-    auto const wdim = dim + 2;
-    Item* __restrict item = GetItem(ctx, id);
-    auto need_size = 0.0f;
+static ALWAYS_INLINE f32 MaxChildSizeWrapped(Context& ctx, Id id, int dim) {
+    auto const size_dim = dim + 2;
+    Item const* __restrict item = GetItem(ctx, id);
+    auto max_child_size = 0.0f;
+    auto max_child_size2 = 0.0f;
     auto child_id = item->first_child;
     while (child_id != k_invalid_id) {
-        auto child = GetItem(ctx, child_id);
-        auto rect = ctx.rects[child_id];
-        need_size += rect[dim] + rect[2 + dim] + child->margins_ltrb[wdim];
-        child_id = child->next_sibling;
-    }
-    return need_size;
-}
-
-static ALWAYS_INLINE f32 CalcWrappedOverlayedSize(Context& ctx, Id id, int dim) {
-    auto const wdim = dim + 2;
-    Item* __restrict item = GetItem(ctx, id);
-    auto need_size = 0.0f;
-    auto need_size2 = 0.0f;
-    auto child_id = item->first_child;
-    while (child_id != k_invalid_id) {
-        auto child = GetItem(ctx, child_id);
-        auto rect = ctx.rects[child_id];
+        auto const child = GetItem(ctx, child_id);
+        auto const rect = ctx.rects[child_id];
         if (child->flags & flags::LineBreak) {
-            need_size2 += need_size;
-            need_size = 0;
+            max_child_size2 += max_child_size;
+            max_child_size = 0;
         }
-        auto child_size = rect[dim] + rect[2 + dim] + child->margins_ltrb[wdim];
-        need_size = Max(need_size, child_size);
+        auto const child_size = rect[dim] + rect[size_dim] + child->margins_ltrb[size_dim];
+        max_child_size = Max(max_child_size, child_size);
         child_id = child->next_sibling;
     }
-    return need_size2 + need_size;
+    return max_child_size2 + max_child_size;
 }
 
-static ALWAYS_INLINE f32 CalcWrappedStackedSize(Context& ctx, Id id, int dim) {
-    auto const wdim = dim + 2;
-    Item* __restrict item = GetItem(ctx, id);
-    auto need_size = 0.0f;
-    auto need_size2 = 0.0f;
+static ALWAYS_INLINE f32 TotalChildSizeWrapped(Context& ctx, Id id, int dim) {
+    auto const size_dim = dim + 2;
+    Item const* __restrict item = GetItem(ctx, id);
+    auto max_child_size = 0.0f;
+    auto max_child_size2 = 0.0f;
     auto child_id = item->first_child;
     while (child_id != k_invalid_id) {
-        auto child = GetItem(ctx, child_id);
-        auto rect = ctx.rects[child_id];
+        auto const child = GetItem(ctx, child_id);
+        auto const rect = ctx.rects[child_id];
         if (child->flags & flags::LineBreak) {
-            need_size2 = Max(need_size2, need_size);
-            need_size = 0;
+            max_child_size2 = Max(max_child_size2, max_child_size);
+            max_child_size = 0;
         }
-        need_size += rect[dim] + rect[2 + dim] + child->margins_ltrb[wdim];
+        max_child_size += rect[dim] + rect[size_dim] + child->margins_ltrb[size_dim];
         child_id = child->next_sibling;
     }
-    return Max(need_size2, need_size);
+    return Max(max_child_size2, max_child_size);
 }
 
-static void CalcSize(Context& ctx, Id id, int dim) {
+static void CalcSize(Context& ctx, Id id, int dim, f32 item_gap) {
     auto item = GetItem(ctx, id);
 
+    auto const item_layout_dim = item->flags & 1;
+
     auto child_id = item->first_child;
     while (child_id != k_invalid_id) {
-        // NOTE: this is recursive and will run out of stack space if items are
-        // nested too deeply.
-        CalcSize(ctx, child_id, dim);
+        // NOTE: this is recursive and will run out of stack space if items are nested too deeply.
+        CalcSize(ctx, child_id, dim, (u32)dim == item_layout_dim ? item->gap[dim] : 0);
         auto child = GetItem(ctx, child_id);
         child_id = child->next_sibling;
     }
+
+    if (item->next_sibling != k_invalid_id) item->margins_ltrb[dim + 2] += item_gap;
 
     // Set the mutable rect output data to the starting input data
     ctx.rects[id][dim] = item->margins_ltrb[dim];
 
-    // If we have an explicit input size, just set our output size (which other
-    // calc_size and arrange procedures will use) to it.
+    // If we have an explicit input size, just set our output size (which other calc_size and arrange
+    // procedures will use) to it.
     if (item->size[dim] != 0) {
         ctx.rects[id][2 + dim] = item->size[dim];
         return;
     }
 
-    // Calculate our size based on children items. Note that we've already
-    // called CalcSize on our children at this point.
+    // Calculate our size based on children items. Note that we've already called CalcSize on our children at
+    // this point.
     f32 cal_size;
     switch (item->flags & flags::LayoutModeMask) {
         case flags::Column | flags::Wrap:
             if (dim) // direction
-                cal_size = CalcStackedSize(ctx, id, 1);
+                cal_size = TotalChildSize(ctx, id, 1);
             else
-                cal_size = CalcOverlayedSize(ctx, id, 0);
+                cal_size = MaxChildSize(ctx, id, 0);
             break;
         case flags::Row | flags::Wrap:
             if (!dim) // direction
-                cal_size = CalcWrappedStackedSize(ctx, id, 0);
+                cal_size = TotalChildSizeWrapped(ctx, id, 0);
             else
-                cal_size = CalcWrappedOverlayedSize(ctx, id, 1);
+                cal_size = MaxChildSizeWrapped(ctx, id, 1);
             break;
         case flags::Column:
         case flags::Row:
-            if ((item->flags & 1) == (u32)dim) // direction
-                cal_size = CalcStackedSize(ctx, id, dim);
+            if (item_layout_dim == (u32)dim) // direction
+                cal_size = TotalChildSize(ctx, id, dim);
             else
-                cal_size = CalcOverlayedSize(ctx, id, dim);
+                cal_size = MaxChildSize(ctx, id, dim);
             break;
         default:
             // NoLayout
-            cal_size = CalcOverlayedSize(ctx, id, dim);
+            cal_size = MaxChildSize(ctx, id, dim);
             break;
     }
 
-    // Set our output data size. Will be used by parent calc_size procedures.,
-    // and by arrange procedures.
+    // Set our output data size. Will be used by parent calc_size procedures., and by arrange procedures.
     ctx.rects[id][2 + dim] = cal_size;
 }
 
 static ALWAYS_INLINE void ArrangeStacked(Context& ctx, Id id, int dim, bool wrap) {
-    auto const wdim = dim + 2;
+    auto const size_dim = dim + 2;
     auto item = GetItem(ctx, id);
 
     auto const item_flags = item->flags;
@@ -282,8 +284,7 @@ static ALWAYS_INLINE void ArrangeStacked(Context& ctx, Id id, int dim, bool wrap
         [[maybe_unused]] u32 squeezed_count = 0; // count of squeezable elements
         u32 total = 0;
         bool hardbreak = false;
-        // first pass: count items that need to be expanded,
-        // and the space that is used
+        // first pass: count items that need to be expanded, and the space that is used
         auto child_id = start_child_id;
         auto end_child_id = k_invalid_id;
         while (child_id != k_invalid_id) {
@@ -296,11 +297,11 @@ static ALWAYS_INLINE void ArrangeStacked(Context& ctx, Id id, int dim, bool wrap
             auto extend = used;
             if ((behaviour_flags & flags::AnchorLeftAndRight) == flags::AnchorLeftAndRight) {
                 ++count;
-                extend += child_rect[dim] + child_margins[wdim];
+                extend += child_rect[dim] + child_margins[size_dim];
             } else {
                 if ((fixed_size_flags & flags::HorizontalSizeFixed) != flags::HorizontalSizeFixed)
                     ++squeezed_count;
-                extend += child_rect[dim] + child_rect[2 + dim] + child_margins[wdim];
+                extend += child_rect[dim] + child_rect[2 + dim] + child_margins[size_dim];
             }
             // wrap on end of line or manual flag
             if (wrap && (total && ((extend > space) || (child_flags & flags::LineBreak)))) {
@@ -367,13 +368,13 @@ static ALWAYS_INLINE void ArrangeStacked(Context& ctx, Id id, int dim, bool wrap
 
             ix0 = x;
             if (wrap)
-                ix1 = Min(max_x2 - child_margins[wdim], x1);
+                ix1 = Min(max_x2 - child_margins[size_dim], x1);
             else
                 ix1 = x1;
             child_rect[dim] = ix0; // pos
             child_rect[dim + 2] = ix1 - ix0; // size
             ctx.rects[child_id] = child_rect;
-            x = x1 + child_margins[wdim];
+            x = x1 + child_margins[size_dim];
             child_id = child->next_sibling;
             extra_margin = spacer;
         }
@@ -383,7 +384,7 @@ static ALWAYS_INLINE void ArrangeStacked(Context& ctx, Id id, int dim, bool wrap
 }
 
 static ALWAYS_INLINE void ArrangeOverlay(Context& ctx, Id id, int dim) {
-    auto const wdim = dim + 2;
+    auto const size_dim = dim + 2;
     auto* item = GetItem(ctx, id);
     auto const rect = ctx.rects[id];
     auto const offset = rect[dim];
@@ -398,13 +399,13 @@ static ALWAYS_INLINE void ArrangeOverlay(Context& ctx, Id id, int dim) {
 
         switch (behaviour_flags & flags::AnchorLeftAndRight) {
             case flags::CentreHorizontal:
-                child_rect[dim] += (space - child_rect[2 + dim]) / 2 - child_margins[wdim];
+                child_rect[dim] += (space - child_rect[2 + dim]) / 2 - child_margins[size_dim];
                 break;
             case flags::AnchorRight:
-                child_rect[dim] += space - child_rect[2 + dim] - child_margins[dim] - child_margins[wdim];
+                child_rect[dim] += space - child_rect[2 + dim] - child_margins[dim] - child_margins[size_dim];
                 break;
             case flags::AnchorLeftAndRight:
-                child_rect[2 + dim] = Max(0.0f, space - child_rect[dim] - child_margins[wdim]);
+                child_rect[2 + dim] = Max(0.0f, space - child_rect[dim] - child_margins[size_dim]);
                 break;
             default: break;
         }
@@ -417,22 +418,22 @@ static ALWAYS_INLINE void ArrangeOverlay(Context& ctx, Id id, int dim) {
 
 static ALWAYS_INLINE void
 ArrangeOverlaySqueezedRange(Context& ctx, int dim, Id start_item_id, Id end_item_id, f32 offset, f32 space) {
-    auto wdim = dim + 2;
+    auto size_dim = dim + 2;
     auto item_id = start_item_id;
     while (item_id != end_item_id) {
         auto* item = GetItem(ctx, item_id);
         auto const behaviour_flags = (item->flags & flags::ChildBehaviourMask) >> dim;
         auto const margins = item->margins_ltrb;
         auto rect = ctx.rects[item_id];
-        auto min_size = Max(0.0f, space - rect[dim] - margins[wdim]);
+        auto min_size = Max(0.0f, space - rect[dim] - margins[size_dim]);
         switch (behaviour_flags & flags::AnchorLeftAndRight) {
             case flags::CentreHorizontal:
                 rect[2 + dim] = Min(rect[2 + dim], min_size);
-                rect[dim] += (space - rect[2 + dim]) / 2 - margins[wdim];
+                rect[dim] += (space - rect[2 + dim]) / 2 - margins[size_dim];
                 break;
             case flags::AnchorRight:
                 rect[2 + dim] = Min(rect[2 + dim], min_size);
-                rect[dim] = space - rect[2 + dim] - margins[wdim];
+                rect[dim] = space - rect[2 + dim] - margins[size_dim];
                 break;
             case flags::AnchorLeftAndRight: rect[2 + dim] = min_size; break;
             default: rect[2 + dim] = Min(rect[2 + dim], min_size); break;
@@ -444,7 +445,7 @@ ArrangeOverlaySqueezedRange(Context& ctx, int dim, Id start_item_id, Id end_item
 }
 
 static ALWAYS_INLINE f32 ArrangeWrappedOverlaySqueezed(Context& ctx, Id id, int dim) {
-    auto const wdim = dim + 2;
+    auto const size_dim = dim + 2;
     auto* item = GetItem(ctx, id);
     auto offset = ctx.rects[id][dim];
     auto need_size = 0.0f;
@@ -459,7 +460,7 @@ static ALWAYS_INLINE f32 ArrangeWrappedOverlaySqueezed(Context& ctx, Id id, int 
             need_size = 0;
         }
         f32x4 const rect = ctx.rects[child_id];
-        f32 child_size = rect[dim] + rect[2 + dim] + child->margins_ltrb[wdim];
+        f32 child_size = rect[dim] + rect[2 + dim] + child->margins_ltrb[size_dim];
         need_size = Max(need_size, child_size);
         child_id = child->next_sibling;
     }
@@ -505,8 +506,7 @@ static void Arrange(Context& ctx, Id id, int dim) {
     }
     auto child_id = item->first_child;
     while (child_id != k_invalid_id) {
-        // NOTE: this is recursive and will run out of stack space if items are
-        // nested too deeply.
+        // NOTE: this is recursive and will run out of stack space if items are nested too deeply.
         Arrange(ctx, child_id, dim);
         auto* child = GetItem(ctx, child_id);
         child_id = child->next_sibling;
@@ -706,6 +706,7 @@ TEST_CASE(TestLayout) {
                     .root_options =
                         {
                             .size = 128,
+                            .gap = 8,
                             .contents_direction = contents_direction,
                             .contents_align = contents_align,
                         },

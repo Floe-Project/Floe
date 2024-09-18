@@ -257,6 +257,11 @@ MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirecto
 
             return result;
         }
+        case KnownDirectoryType::UserData:
+            dir_type = NSApplicationSupportDirectory;
+            domain = NSUserDomainMask;
+            fallback = "Application Support";
+            break;
 
         case KnownDirectoryType::GlobalVst3Plugins:
             dir_type = NSLibraryDirectory;

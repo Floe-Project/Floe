@@ -139,6 +139,8 @@ enum class KnownDirectoryType : u8 {
     Logs,
     Temporary,
 
+    UserData,
+
     // Any user can read and write here. It's carefully picked to also work when we're running as an audio
     // plugin and even sandboxed.
     //

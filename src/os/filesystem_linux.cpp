@@ -284,6 +284,7 @@ MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirecto
         case KnownDirectoryType::Downloads: home_path = "Downloads"; break;
         case KnownDirectoryType::Logs: home_path = ".local/state"; break;
         case KnownDirectoryType::GlobalData: home_path = ""; break;
+        case KnownDirectoryType::UserData: home_path = ""; break;
 
         case KnownDirectoryType::UserClapPlugins: home_path = ".clap"; break;
         case KnownDirectoryType::UserVst3Plugins: home_path = ".vst3"; break;

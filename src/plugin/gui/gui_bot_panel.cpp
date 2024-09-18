@@ -23,7 +23,6 @@ void BotPanel(Gui* g) {
                                    {
                                        .size = imgui.Size(),
                                        .contents_direction = layout::Direction::Row,
-                                       .contents_model = layout::Model::Layout,
                                        .contents_align = layout::JustifyContent::Start,
                                    });
     auto controls = layout::CreateItem(

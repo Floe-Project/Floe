@@ -41,13 +41,16 @@ namespace flags {
 
 // Container flags to pass to SetContainer()
 enum : u32 {
+    // If neither Row nor Column is set, the container will not arrange its children. In the original version
+    // of this code, this was called the 'layout model' instead of the 'flex model' (flex model which is where
+    // you use Row or Columm and the items are auto-arranged).
+    //
+    // In the 'layout model', the children can set their Anchor flags to position themselves. The children can
+    // combine the anchor flags Right|Bottom to position themselves in the bottom-right for example.
+
     // flex-direction (bit 0+1)
     Row = 0x002, // left to right
     Column = 0x003, // top to bottom
-
-    // model (bit 1)
-    FreeLayout = 0x000, // free layout
-    Flex = 0x002, // flex model
 
     // flex-wrap (bit 2)
     NoWrap = 0x000, // single-line
@@ -320,11 +323,6 @@ enum class Direction : u8 {
     Column = flags::Column,
 };
 
-enum class Model : u8 {
-    Layout = flags::FreeLayout,
-    Flex = flags::Flex,
-};
-
 enum class JustifyContent : u8 {
     Start = flags::Start,
     Middle = flags::Middle,
@@ -339,7 +337,6 @@ struct ItemOptions {
     Anchor anchor {Anchor::None};
     bool line_break {false};
     Direction contents_direction {Direction::Row};
-    Model contents_model {Model::Layout};
     bool contents_multiline {false};
     JustifyContent contents_align {JustifyContent::Middle};
 };
@@ -362,8 +359,8 @@ PUBLIC Id CreateItem(Context& ctx, ItemOptions options) {
     SetItemSize(item, options.size);
     SetMargins(item, options.margins);
     item.flags |= ToInt(options.anchor) | (options.line_break ? flags::LineBreak : 0) |
-                  ToInt(options.contents_direction) | ToInt(options.contents_model) |
-                  ToInt(options.contents_align) | (options.contents_multiline ? flags::Wrap : flags::NoWrap);
+                  ToInt(options.contents_direction) | ToInt(options.contents_align) |
+                  (options.contents_multiline ? flags::Wrap : flags::NoWrap);
     if (options.parent) Insert(ctx, *options.parent, id);
     return id;
 }

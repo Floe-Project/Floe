@@ -609,6 +609,8 @@ struct LayoutImageArgs {
     Array<layout::ItemOptions, 3> child_options;
 };
 
+// TODO: use SVG instead of TGA, it will be quicker, smaller and we can easily combine images into a single
+// document with text labels.
 static ErrorCodeOr<void>
 GenerateLayoutImage(String filename, ArenaAllocator& arena, String folder, LayoutImageArgs args) {
     layout::Context ctx;

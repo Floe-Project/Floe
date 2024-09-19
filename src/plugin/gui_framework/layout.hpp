@@ -303,6 +303,7 @@ enum class Direction : u8 {
     Column = flags::Column,
 };
 
+// TODO: should this be called alignment?
 enum class JustifyContent : u8 {
     Start = flags::Start,
     Middle = flags::Middle,

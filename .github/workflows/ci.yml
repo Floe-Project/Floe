@@ -197,8 +197,8 @@ jobs:
       - name: Deploy GitHub Pages
         run: |
           cd docs
-          wget https://raw.githubusercontent.com/Floe-Project/Floe-Logos/main/release/favicon.png -P theme
-          wget https://raw.githubusercontent.com/Floe-Project/Floe-Logos/main/release/favicon.svg -P theme
+          wget https://raw.githubusercontent.com/Floe-Project/Floe-Logos/main/rasterized/favicon.png -P theme
+          wget https://raw.githubusercontent.com/Floe-Project/Floe-Logos/main/rasterized/favicon.svg -P theme
           mdbook build
           git worktree add gh-pages
           git config user.name github-actions[bot]

@@ -44,13 +44,14 @@ namespace flags {
 constexpr u32 BitRange(u32 from, u32 to) { return (u32)((1ull << (to + 1ull)) - (1ull << from)); }
 
 enum : u32 {
+    AutoLayout = 1 << 1, // don't use this directly, use Row or Column
+
     // Container flags
     // ======================================================================================================
 
     // No auto-layout, children will all be positioned at the same position (as per the
     // justify-content flags) unless they set their own anchors.
     NoLayout = 0,
-    AutoLayout = 1 << 1, // don't use this directly, use Row or Column
     // left to right, AKA horizontal, CSS flex-direction: row
     Row = AutoLayout | 0,
     // top to bottom, AKA vertical, CSS flex-direction: column
@@ -96,6 +97,8 @@ enum : u32 {
     // Internal flags
     // ======================================================================================================
 
+    // IMPORTANT: the direction of an autolayout is determined by the first bit. So flags & 1 will give you
+    // the dimension: row or column.
     LayoutModeMask = BitRange(0, 2),
     ContainerMask = BitRange(0, 4),
     ChildBehaviourMask = BitRange(5, 9),

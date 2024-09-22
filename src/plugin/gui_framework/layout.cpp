@@ -515,66 +515,6 @@ static void Arrange(Context& ctx, Id id, u32 dim) {
 
 } // namespace layout
 
-struct Bitmap {
-    u32 width;
-    u32 height;
-    u8* rgba;
-};
-
-ErrorCodeOr<void> WriteTga(File& file, Bitmap bitmap) {
-    // TGA wants bgra instead of rgba
-    for (usize i = 0; i < (size_t)bitmap.width * (size_t)bitmap.height; i++)
-        Swap(bitmap.rgba[4 * i + 0], bitmap.rgba[4 * i + 2]);
-
-    constexpr u8 k_uncompressed_true_color_image = 2;
-    constexpr u8 k_bits_per_pixel = 32;
-    u8 tga_header[] = {
-        0,
-        0,
-        k_uncompressed_true_color_image,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        (u8)(bitmap.width & 0xFF),
-        (u8)((bitmap.width >> 8) & 0xFF),
-        (u8)(bitmap.height & 0xFF),
-        (u8)((bitmap.height >> 8) & 0xFF),
-        k_bits_per_pixel,
-        8 | 0x20, // 32-bit image with top-left origin
-    };
-    TRY(file.Write({tga_header, sizeof(tga_header)}));
-    TRY(file.Write({bitmap.rgba, 4 * bitmap.width * bitmap.height}));
-    return k_success;
-}
-
-static void FillRect(Bitmap bitmap, Rect rect, u32 rgb_hex_colour) {
-    auto const x = (u32)rect.x;
-    auto const y = (u32)rect.y;
-    auto const width = (u32)rect.w;
-    auto const height = (u32)rect.h;
-
-    u8* rgba = bitmap.rgba;
-    auto r = (u8)((rgb_hex_colour >> 16) & 0xFF);
-    auto g = (u8)((rgb_hex_colour >> 8) & 0xFF);
-    auto b = (u8)(rgb_hex_colour & 0xFF);
-    for (u32 j = 0; j < height; ++j) {
-        for (u32 i = 0; i < width; ++i) {
-            auto const index = 4 * ((y + j) * bitmap.width + (x + i));
-            ASSERT(index + 3 < 4 * bitmap.width * bitmap.height);
-            rgba[index + 0] = r;
-            rgba[index + 1] = g;
-            rgba[index + 2] = b;
-            rgba[index + 3] = 0xFF;
-        }
-    }
-}
-
 enum Colours : u32 {
     Rosewater = 0xdc8a78,
     Flamingo = 0xdd7878,
@@ -609,8 +549,6 @@ struct LayoutImageArgs {
     Array<layout::ItemOptions, 3> child_options;
 };
 
-// TODO: use SVG instead of TGA, it will be quicker, smaller and we can easily combine images into a single
-// document with text labels.
 static ErrorCodeOr<void>
 GenerateLayoutImage(String filename, ArenaAllocator& arena, String folder, LayoutImageArgs args) {
     layout::Context ctx;
@@ -626,21 +564,33 @@ GenerateLayoutImage(String filename, ArenaAllocator& arena, String folder, Layou
 
     layout::RunContext(ctx);
 
-    Bitmap bitmap {
-        .width = CheckedCast<u32>(args.root_options.size.x),
-        .height = CheckedCast<u32>(args.root_options.size.y),
+    DynamicArray<char> svg {arena};
+    fmt::Append(svg,
+                "<svg width=\"{}\" height=\"{}\" xmlns=\"http://www.w3.org/2000/svg\">\n",
+                args.root_options.size.x,
+                args.root_options.size.y);
+
+    auto print_rect = [&](Rect rect, u32 colour) {
+        fmt::Append(svg,
+                    "<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"#{06x}\" />\n",
+                    rect.x,
+                    rect.y,
+                    rect.w,
+                    rect.h,
+                    colour);
     };
-    bitmap.rgba = arena.AllocateExactSizeUninitialised<u8>(4 * bitmap.width * bitmap.height).data;
-    ZeroMemory(bitmap.rgba, 4 * bitmap.width * bitmap.height);
-    FillRect(bitmap, layout::GetRect(ctx, root), Base);
+
+    print_rect({.xywh = {0, 0, args.root_options.size.x, args.root_options.size.y}}, Base);
 
     auto const colours = Array {Red, Green, Blue, Yellow, Peach, Pink, Mauve, Flamingo, Rosewater};
-    for (auto const i : Range(children.size))
-        FillRect(bitmap, layout::GetRect(ctx, children[i]), colours[i]);
 
-    auto f = TRY(OpenFile(CombineStrings(arena, Array {folder, path::k_dir_separator_str, filename, ".tga"}),
-                          FileMode::Write));
-    TRY(WriteTga(f, bitmap));
+    for (auto const i : Range(children.size)) {
+        auto const rect = layout::GetRect(ctx, children[i]);
+        print_rect(rect, colours[i]);
+    }
+    dyn::AppendSpan(svg, "</svg>\n");
+
+    TRY(WriteFile(CombineStrings(arena, Array {folder, path::k_dir_separator_str, filename, ".svg"}), svg));
 
     return k_success;
 }

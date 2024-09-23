@@ -549,8 +549,7 @@ struct LayoutImageArgs {
     Array<layout::ItemOptions, 3> child_options;
 };
 
-static ErrorCodeOr<void>
-GenerateLayoutImage(String filename, ArenaAllocator& arena, String folder, LayoutImageArgs args) {
+static ErrorCodeOr<String> GenerateLayoutSvg(ArenaAllocator& arena, LayoutImageArgs args) {
     layout::Context ctx;
     DEFER { layout::DestroyContext(ctx); };
 
@@ -580,7 +579,7 @@ GenerateLayoutImage(String filename, ArenaAllocator& arena, String folder, Layou
                     colour);
     };
 
-    print_rect({.xywh = {0, 0, args.root_options.size.x, args.root_options.size.y}}, Base);
+    print_rect({.pos = 0, .size = args.root_options.size}, Base);
 
     auto const colours = Array {Red, Green, Blue, Yellow, Peach, Pink, Mauve, Flamingo, Rosewater};
 
@@ -589,10 +588,7 @@ GenerateLayoutImage(String filename, ArenaAllocator& arena, String folder, Layou
         print_rect(rect, colours[i]);
     }
     dyn::AppendSpan(svg, "</svg>\n");
-
-    TRY(WriteFile(CombineStrings(arena, Array {folder, path::k_dir_separator_str, filename, ".svg"}), svg));
-
-    return k_success;
+    return svg.ToOwnedSpan();
 }
 
 static String DirectionName(layout::Direction direction) {
@@ -630,13 +626,16 @@ static String AnchorName(layout::Anchor a) {
 TEST_CASE(TestLayout) {
     using namespace layout;
 
-    auto const output_dir = path::Join(
+    auto const output_dir = String(path::Join(
         tester.arena,
         Array {String(KnownDirectory(tester.arena, KnownDirectoryType::UserData, {.create = true})),
                "Floe",
-               "layout-tests"});
+               "layout-tests"}));
     TRY(CreateDirectory(output_dir, {.create_intermediate_directories = true}));
     tester.log.Info({}, "Layout output directory: {}", output_dir);
+
+    DynamicArray<char> html {tester.arena};
+    fmt::Append(html, "<!DOCTYPE html><html>\n<head>\n<title>Layout Tests</title>\n</head>\n<body>\n");
 
     auto const basic_child = layout::ItemOptions {
         .size = 20,
@@ -650,7 +649,7 @@ TEST_CASE(TestLayout) {
             for (auto const middle_item_anchor :
                  Array {Anchor::None, Anchor::Left, Anchor::Right, Anchor::Top, Anchor::Bottom}) {
                 auto const filename = fmt::Format(tester.arena,
-                                                  "{}-{}-{}",
+                                                  "{}, {}, middle-anchor: {}",
                                                   DirectionName(contents_direction),
                                                   JustifyContentName(contents_align),
                                                   AnchorName(middle_item_anchor));
@@ -665,30 +664,15 @@ TEST_CASE(TestLayout) {
                     .child_options = {basic_child, basic_child, basic_child},
                 };
                 args.child_options[1].anchor = middle_item_anchor;
-                TRY(GenerateLayoutImage(filename, tester.arena, output_dir, args));
+                auto const svg = TRY(GenerateLayoutSvg(tester.arena, args));
+
+                fmt::Append(html, "<p>{}</p>\n{}", filename, svg);
             }
         }
     }
 
-    TRY(GenerateLayoutImage(
-        "0-flags",
-        tester.arena,
-        output_dir,
-        {
-            .root_options =
-                {
-                    .size = 128,
-                    .anchor = Anchor(0),
-                    .contents_direction = Direction(0),
-                    .contents_align = JustifyContent(0),
-                },
-            .child_options =
-                {
-                    ItemOptions {.size = 20, .anchor = Anchor::Top},
-                    ItemOptions {.size = 20, .anchor = Anchor::Top | Anchor::Bottom | Anchor::Left},
-                    ItemOptions {.size = 20, .anchor = Anchor::Bottom | Anchor::Left | Anchor::Right},
-                },
-        }));
+    fmt::Append(html, "</body>\n</html>\n");
+    TRY(WriteFile(path::Join(tester.arena, Array {output_dir, "layout-tests.html"}), html));
 
     return k_success;
 }

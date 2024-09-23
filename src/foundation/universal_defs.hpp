@@ -207,7 +207,7 @@ constexpr auto NumVectorElements() {
 template <Vector VecType>
 __attribute__((always_inline)) inline bool All(VecType x) {
     for (usize i = 0; i < NumVectorElements<VecType>(); ++i)
-        if (x[0] == 0) return false;
+        if (x[i] == 0) return false;
     return true;
 }
 
@@ -215,7 +215,7 @@ __attribute__((always_inline)) inline bool All(VecType x) {
 template <Vector VecType>
 __attribute__((always_inline)) inline bool Any(VecType x) {
     for (usize i = 0; i < NumVectorElements<VecType>(); ++i)
-        if (x[0] != 0) return true;
+        if (x[i] != 0) return true;
     return false;
 }
 

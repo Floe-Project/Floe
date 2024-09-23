@@ -68,7 +68,7 @@ struct Rect {
     f32x2 TopRight() const { return f32x2 {x + w, y}; }
     f32x2 BottomLeft() const { return f32x2 {x, y + h}; }
     f32x2 BottomRight() const { return Max(); }
-    bool Contains(f32x2 p) const { return p.x >= pos.x && p.x < Right() && p.y >= pos.y && p.y < Bottom(); }
+    bool Contains(f32x2 p) const { return All(p >= pos && p < Max()); }
 
     bool operator==(Rect const& other) const {
         return other.x == x && other.y == y && other.w == w && other.h == h;
@@ -77,10 +77,8 @@ struct Rect {
 
     Rect Reduced(f32 val) const {
         Rect result = *this;
-        result.x += val;
-        result.y += val;
-        result.w -= val * 2;
-        result.h -= val * 2;
+        result.pos += val;
+        result.size -= val * 2;
         return result;
     }
 
@@ -100,10 +98,8 @@ struct Rect {
 
     Rect Expanded(f32 val) const {
         Rect result = *this;
-        result.x -= val;
-        result.y -= val;
-        result.w += val * 2;
-        result.h += val * 2;
+        result.pos -= val;
+        result.size += val * 2;
         return result;
     }
 

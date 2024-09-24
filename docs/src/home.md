@@ -22,8 +22,8 @@ Some things may be incorrect, missing or broken. We are bit-by-bit filling in th
 
 ---
 
-<h1 style="text-align:center; font-size: 40px">No-hassle sample library player: free for all</h1>
-<p style="text-align:center; margin-bottom: 40px;">Floe is a free, open-source sample library engine in CLAP, VST3 and AU audio plugin formats. It provides expressive playback and sound-shaping of sample libraries in the [Floe format](./sample-library-format.md).</p>
+<h1 style="text-align:left; font-size: 40px">A sample library player, without the fuss.</h1>
+<p style="text-align:left; font-size: 20px; margin-bottom: 40px;">Floe is a free, open-source CLAP/VST3/AU plugin with powerful controls for expressive playback and sound-shaping of sample libraries in the <a href="https://floe.audio/sample-library-format.html">Floe format</a>.</p>
 
 ![Floe's GUI](https://frozenplain.com/wp-content/uploads/2019/09/wraith-2.jpg)
 
@@ -54,11 +54,11 @@ Developed by [FrozenPlain](https://frozenplain.com). Floe's ancestor, [Mirage](.
 - Combine sounds across all sample libraries
 - CPU-efficient
 
-#### Focused on helping you make music
+#### Focused on helping you make music - no lock-in
 - 100% free: no lock-in, no sign-up, no nagging, no features behind a paywall
 - 'Organic' software: made by a passionate developer who cares about making great software and is always open to feedback
 - [Open-source](https://github.com/Floe-Project/Floe), [free software](https://fsfe.org/freesoftware/freesoftware.en.html). Floe is always yours: the GPL license guarantees anyone can use, modify and share the code
-- Floe sample libraries are open packs of FLAC/WAV files: use them in other software too
+- Use samples from Floe's libraries in other software: they're open FLAC/WAV files
 - Thoughtfully designed; thoroughly documented
 
 #### Sample library development

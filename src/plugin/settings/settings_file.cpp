@@ -355,7 +355,7 @@ ErrorCodeOr<void> WriteFile(Settings const& data, String path) {
 
     auto writer = file.Writer();
 
-    TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::ShowKeyboard), data.gui.show_tooltips));
+    TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::ShowKeyboard), data.gui.show_keyboard));
     TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::GuiKeyboardOctave), data.gui.keyboard_octave));
     TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::ShowTooltips), data.gui.show_tooltips));
     TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::HighContrastGui), data.gui.high_contrast_gui));
@@ -363,10 +363,7 @@ ErrorCodeOr<void> WriteFile(Settings const& data, String path) {
                         "{} = {}",
                         Key(KeyType::SortLibrariesAlphabetically),
                         data.gui.sort_libraries_alphabetically));
-    TRY(fmt::AppendLine(writer,
-                        "{} = {}",
-                        Key(KeyType::SortLibrariesAlphabetically),
-                        data.gui.presets_random_mode));
+    TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::PresetsRandomMode), data.gui.presets_random_mode));
     TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::WindowWidth), data.gui.window_width));
 
     for (auto p : data.filesystem.extra_libraries_scan_folders)

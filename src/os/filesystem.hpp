@@ -33,6 +33,10 @@ enum class FileMode {
     Read,
     Write, // overwrites if it already exists
     WriteNoOverwrite,
+
+    // Overwrites if it already exists. If it creates it, it will have read/write permissions for everyone.
+    WriteEveryoneReadWrite,
+
     Append,
 };
 
@@ -41,6 +45,7 @@ enum class FileLockType {
     Shared,
 };
 
+// File is created with OpenFile()
 struct File {
     File(File&& other) {
         m_file = other.m_file;

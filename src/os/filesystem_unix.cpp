@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <sys/file.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #include "utils/logger/logger.hpp"
 
@@ -212,22 +213,45 @@ ErrorCodeOr<u64> File::FileSize() {
 ErrorCodeOr<File> OpenFile(String filename, FileMode mode) {
     PathArena temp_allocator;
 
-    FILE* file;
-    auto nullterm_filename = NullTerminated(filename, temp_allocator);
+    char const* mode_str {};
+    int flags = 0;
+    mode_t permissions = 0;
 
-    char const* mode_str = ({
-        char const* w;
-        switch (mode) {
-            case FileMode::Read: w = "rb"; break;
-            case FileMode::Write: w = "wb"; break;
-            case FileMode::Append: w = "ab"; break;
-            case FileMode::WriteNoOverwrite: w = "wxb"; break;
-        }
-        w;
-    });
+    switch (mode) {
+        case FileMode::Read:
+            mode_str = "rb";
+            flags = O_RDONLY;
+            break;
+        case FileMode::Write:
+            mode_str = "wb";
+            flags = O_WRONLY | O_CREAT | O_TRUNC;
+            permissions = 0644;
+            break;
+        case FileMode::WriteEveryoneReadWrite:
+            mode_str = "wb";
+            flags = O_WRONLY | O_CREAT | O_TRUNC;
+            permissions = 0666;
+            break;
+        case FileMode::Append:
+            mode_str = "ab";
+            flags = O_WRONLY | O_CREAT | O_APPEND;
+            permissions = 0644;
+            break;
+        case FileMode::WriteNoOverwrite:
+            mode_str = "wb";
+            flags = O_WRONLY | O_CREAT | O_EXCL;
+            permissions = 0644;
+            break;
+    }
 
-    file = ::fopen(nullterm_filename, mode_str);
-    if (file == nullptr) return FilesystemErrnoErrorCode(errno, "fopen");
-    ASSERT(file != nullptr);
+    auto fd = open(NullTerminated(filename, temp_allocator), flags, permissions);
+    if (fd == -1) return FilesystemErrnoErrorCode(errno, "open");
+
+    // we use FILE* because we want buffered I/O
+    auto file = fdopen(fd, mode_str);
+    if (file == nullptr) {
+        close(fd);
+        return FilesystemErrnoErrorCode(errno, "fopen");
+    }
     return File(file);
 }

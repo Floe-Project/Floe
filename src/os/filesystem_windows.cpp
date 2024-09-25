@@ -162,6 +162,7 @@ ErrorCodeOr<File> OpenFile(String filename, FileMode mode) {
             case FileMode::Write: d = GENERIC_WRITE; break;
             case FileMode::Append: d = FILE_APPEND_DATA; break;
             case FileMode::WriteNoOverwrite: d = GENERIC_WRITE; break;
+            case FileMode::WriteEveryoneReadWrite: d = GENERIC_WRITE; break;
         }
         d;
     });
@@ -173,6 +174,7 @@ ErrorCodeOr<File> OpenFile(String filename, FileMode mode) {
             case FileMode::Write: c = CREATE_ALWAYS; break;
             case FileMode::Append: c = OPEN_ALWAYS; break;
             case FileMode::WriteNoOverwrite: c = CREATE_NEW; break;
+            case FileMode::WriteEveryoneReadWrite: c = CREATE_ALWAYS; break;
         }
         c;
     });
@@ -184,14 +186,66 @@ ErrorCodeOr<File> OpenFile(String filename, FileMode mode) {
             case FileMode::Write: s = 0; break;
             case FileMode::Append: s = 0; break;
             case FileMode::WriteNoOverwrite: s = 0; break;
+            case FileMode::WriteEveryoneReadWrite: s = 0; break;
         }
         s;
     });
 
+    PSID everyone_sid = nullptr;
+    PACL acl = nullptr;
+    PSECURITY_DESCRIPTOR sd = nullptr;
+    DEFER {
+        if (everyone_sid) FreeSid(everyone_sid);
+        if (acl) LocalFree(acl);
+        if (sd) LocalFree(sd);
+    };
+    SECURITY_ATTRIBUTES sa {};
+
+    if (mode == FileMode::WriteEveryoneReadWrite) {
+        SID_IDENTIFIER_AUTHORITY sid_auth_world = SECURITY_WORLD_SID_AUTHORITY;
+        if (AllocateAndInitializeSid(&sid_auth_world,
+                                     1,
+                                     SECURITY_WORLD_RID,
+                                     0,
+                                     0,
+                                     0,
+                                     0,
+                                     0,
+                                     0,
+                                     0,
+                                     &everyone_sid) == 0)
+            return Win32ErrorCode(GetLastError(), "AllocateAndInitializeSid");
+
+        EXPLICIT_ACCESSW ea {
+            .grfAccessPermissions = SPECIFIC_RIGHTS_ALL | STANDARD_RIGHTS_ALL,
+            .grfAccessMode = SET_ACCESS,
+            .grfInheritance = NO_INHERITANCE,
+            .Trustee {
+                .TrusteeForm = TRUSTEE_IS_SID,
+                .TrusteeType = TRUSTEE_IS_WELL_KNOWN_GROUP,
+                .ptstrName = (LPWSTR)everyone_sid,
+            },
+        };
+
+        if (auto r = SetEntriesInAclW(1, &ea, nullptr, &acl) != ERROR_SUCCESS)
+            return Win32ErrorCode(r, "SetEntriesInAcl");
+
+        sd = (PSECURITY_DESCRIPTOR)LocalAlloc(LPTR, SECURITY_DESCRIPTOR_MIN_LENGTH);
+        if (InitializeSecurityDescriptor(sd, SECURITY_DESCRIPTOR_REVISION) == 0)
+            return Win32ErrorCode(GetLastError());
+        if (SetSecurityDescriptorDacl(sd, TRUE, acl, FALSE) == 0) return Win32ErrorCode(GetLastError());
+
+        sa = {
+            .nLength = sizeof(SECURITY_ATTRIBUTES),
+            .lpSecurityDescriptor = sd,
+            .bInheritHandle = FALSE,
+        };
+    }
+
     auto handle = CreateFileW(w_path.data,
                               desired_access,
                               share_mode,
-                              nullptr,
+                              sa.nLength ? &sa : nullptr,
                               creation_disposition,
                               FILE_ATTRIBUTE_NORMAL,
                               nullptr);

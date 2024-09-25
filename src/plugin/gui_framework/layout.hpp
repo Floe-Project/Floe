@@ -29,7 +29,8 @@ struct Item {
     Id next_sibling;
     f32x4 margins_ltrb;
     f32x2 size;
-    f32x2 gap;
+    f32x2 contents_gap; // gap between children
+    f32x4 container_padding_ltrb; // padding around all children
 };
 
 struct Context {
@@ -61,11 +62,16 @@ enum : u32 {
     NoWrap = 0, // single-line, does nothing if NoLayout
     Wrap = 1 << 2, // items will be wrapped to a new line if needed, does nothing if NoLayout
 
-    Start = 1 << 3, // at start of row/column, CSS justify-content: start
-    Middle = 0, // at middle of row/column, CSS justify-content: center
-    End = 1 << 4, // at end of row/column, CSS justify-content: end
+    Start = 1 << 3, // items at start of row/column, CSS justify-content: start
+    Middle = 0, // item at middle of row/column, CSS justify-content: center
+    End = 1 << 4, // item at end of row/column, CSS justify-content: end
     // insert spacing to stretch across whole row/column, CSS justify-content: space-between
     Justify = Start | End,
+
+    // Cross-axis alignment, CSS align-items
+    CrossAxisStart = 1 << 5,
+    CrossAxisMiddle = 0,
+    CrossAxisEnd = 1 << 7,
 
     // Child behaviour flags (anchors, and line-break)
     // ======================================================================================================
@@ -80,10 +86,10 @@ enum : u32 {
     CentreVertical = 0,
     Centre = 0,
 
-    AnchorLeft = 1 << 5,
-    AnchorTop = 1 << 6,
-    AnchorRight = 1 << 7,
-    AnchorBottom = 1 << 8,
+    AnchorLeft = 1 << 8,
+    AnchorTop = 1 << 9,
+    AnchorRight = 1 << 10,
+    AnchorBottom = 1 << 11,
 
     AnchorLeftAndRight = AnchorLeft | AnchorRight, // causes the item to stretch
     AnchorTopAndBottom = AnchorTop | AnchorBottom, // causes the item to stretch
@@ -92,7 +98,7 @@ enum : u32 {
     // When in a wrapping container, put this element on a new line. Wrapping layout code auto-inserts
     // LineBreak flags as needed. Drawing routines can read this via item pointers as needed after performing
     // layout calculations.
-    LineBreak = 1 << 9,
+    LineBreak = 1 << 12,
 
     // Internal flags
     // ======================================================================================================
@@ -100,17 +106,17 @@ enum : u32 {
     // IMPORTANT: the direction of an autolayout is determined by the first bit. So flags & 1 will give you
     // the dimension: row or column.
     LayoutModeMask = BitRange(0, 2),
-    ContainerMask = BitRange(0, 4),
-    ChildBehaviourMask = BitRange(5, 9),
+    ContainerMask = BitRange(0, 7),
+    ChildBehaviourMask = BitRange(8, 12),
 
-    ItemInserted = 1 << 10,
-    HorizontalSizeFixed = 1 << 11,
-    VerticalSizeFixed = 1 << 12,
+    ItemInserted = 1 << 13,
+    HorizontalSizeFixed = 1 << 14,
+    VerticalSizeFixed = 1 << 15,
 
     FixedSizeMask = HorizontalSizeFixed | VerticalSizeFixed,
 
     // These bits can be used by the user.
-    UserMask = BitRange(13, 31),
+    UserMask = BitRange(16, 31),
 };
 
 } // namespace flags
@@ -285,6 +291,7 @@ struct Margins {
         f32x4 lrtb {};
     };
 };
+static_assert(sizeof(float[4]) == sizeof(f32x4));
 
 // It's not recommended to combine Left+Right or Top+Bottom, instead, set the size to k_fill_parent.
 enum class Anchor : u16 {
@@ -295,8 +302,8 @@ enum class Anchor : u16 {
     Bottom = flags::AnchorBottom,
 };
 
-inline Anchor operator|(Anchor a, Anchor b) { return (Anchor)(ToInt(a) | ToInt(b)); }
-inline Anchor operator&(Anchor a, Anchor b) { return (Anchor)(ToInt(a) & ToInt(b)); }
+constexpr Anchor operator|(Anchor a, Anchor b) { return (Anchor)(ToInt(a) | ToInt(b)); }
+constexpr Anchor operator&(Anchor a, Anchor b) { return (Anchor)(ToInt(a) & ToInt(b)); }
 
 enum class Direction : u8 {
     Row = flags::Row,
@@ -311,20 +318,29 @@ enum class JustifyContent : u8 {
     Justify = flags::Justify,
 };
 
+enum class CrossAxisAlign : u8 {
+    Start = flags::CrossAxisStart,
+    Middle = flags::CrossAxisMiddle,
+    End = flags::CrossAxisEnd,
+};
+
 struct ItemOptions {
     Optional<Id> parent {};
     f32x2 size {}; // remember k_hug_contents and k_fill_parent
     Margins margins {};
-    f32x2 gap {};
     Anchor anchor {Anchor::None};
     bool line_break {false};
+    Margins contents_padding {};
+    f32x2 contents_gap {};
     Direction contents_direction {Direction::Row};
     bool contents_multiline {false};
     JustifyContent contents_align {JustifyContent::Middle};
+    CrossAxisAlign contents_cross_axis_align {CrossAxisAlign::Middle};
 };
 
 PUBLIC void SetMargins(Item& item, Margins m) {
-    ASSERT(All(m.lrtb >= 0 && m.lrtb < 65535));
+    ASSERT(All(m.lrtb >= 0));
+    ASSERT(All(m.lrtb < 65536)); // just some large value for sanity
     auto const ltrb = __builtin_shufflevector(m.lrtb, m.lrtb, 0, 2, 1, 3);
     SetMargins(item, ltrb);
 }
@@ -338,13 +354,24 @@ PUBLIC Margins GetMargins(Context& ctx, Id id) {
 PUBLIC Id CreateItem(Context& ctx, ItemOptions options) {
     auto const id = CreateItem(ctx);
     auto& item = *GetItem(ctx, id);
+    item.container_padding_ltrb =
+        __builtin_shufflevector(options.contents_padding.lrtb, options.contents_padding.lrtb, 0, 2, 1, 3);
     SetItemSize(item, options.size);
     SetMargins(item, options.margins);
-    item.gap = options.gap;
+    item.contents_gap = options.contents_gap;
     item.flags |= ToInt(options.anchor) | (options.line_break ? flags::LineBreak : 0) |
-                  ToInt(options.contents_direction) | ToInt(options.contents_align) |
-                  (options.contents_multiline ? flags::Wrap : flags::NoWrap);
-    if (options.parent) Insert(ctx, *options.parent, id);
+                  ToInt(options.contents_direction) | ToInt(options.contents_cross_axis_align) |
+                  ToInt(options.contents_align) | (options.contents_multiline ? flags::Wrap : flags::NoWrap);
+    if (options.parent) {
+        Insert(ctx, *options.parent, id);
+        auto& parent = *GetItem(ctx, *options.parent);
+        // there's no harm in setting both Top | Left, even though only one will be valid depending on if the
+        // parent is a row or column.
+        if (parent.flags & flags::CrossAxisStart)
+            item.flags |= flags::AnchorTop | flags::AnchorLeft;
+        else if (parent.flags & flags::CrossAxisEnd)
+            item.flags |= flags::AnchorBottom | flags::AnchorRight;
+    }
     return id;
 }
 

@@ -240,23 +240,21 @@ enum class KeyType : u32 {
     PresetsRandomMode,
     ShowKeyboard,
     ShowTooltips,
-    SortLibrariesAlphabetically,
     WindowWidth,
     Count,
 };
 
 constexpr String Key(KeyType k) {
     switch (k) {
-        case KeyType::ShowTooltips: return "show_tooltips"_s;
-        case KeyType::GuiKeyboardOctave: return "gui_keyboard_octave"_s;
-        case KeyType::HighContrastGui: return "high_contrast_gui"_s;
-        case KeyType::SortLibrariesAlphabetically: return "sort_libraries_alphabetically"_s;
-        case KeyType::ShowKeyboard: return "show_keyboard"_s;
-        case KeyType::PresetsRandomMode: return "presets_random_mode"_s;
-        case KeyType::WindowWidth: return "window_width"_s;
+        case KeyType::CcToParamIdMap: return "cc_to_param_id_map"_s;
         case KeyType::ExtraLibrariesFolder: return "extra_libraries_folder"_s;
         case KeyType::ExtraPresetsFolder: return "extra_presets_folder"_s;
-        case KeyType::CcToParamIdMap: return "cc_to_param_id_map"_s;
+        case KeyType::GuiKeyboardOctave: return "gui_keyboard_octave"_s;
+        case KeyType::HighContrastGui: return "high_contrast_gui"_s;
+        case KeyType::PresetsRandomMode: return "presets_random_mode"_s;
+        case KeyType::ShowKeyboard: return "show_keyboard"_s;
+        case KeyType::ShowTooltips: return "show_tooltips"_s;
+        case KeyType::WindowWidth: return "window_width"_s;
         case KeyType::Count: PanicIfReached();
     }
 }
@@ -272,24 +270,6 @@ Parse(Settings& content, ArenaAllocator& content_allocator, ArenaAllocator& scra
         auto const line = SplitWithIterator(file_data, cursor, '\n');
         if (line.size == 0) continue;
         if (StartsWith(line, ';')) continue;
-
-        {
-            // The same key is allowed to appear more than once. We just append each value to an array.
-            String path {};
-            if (SetIfMatching(line, Key(KeyType::ExtraLibrariesFolder), path)) {
-                if (path::IsAbsolute(path)) dyn::Append(extra_libraries_folders, path);
-                continue;
-            }
-        }
-
-        {
-            // The same key is allowed to appear more than once. We just append each value to an array.
-            String path {};
-            if (SetIfMatching(line, Key(KeyType::ExtraPresetsFolder), path)) {
-                if (path::IsAbsolute(path)) dyn::Append(presets_folders, path);
-                continue;
-            }
-        }
 
         {
             String value {};
@@ -321,12 +301,30 @@ Parse(Settings& content, ArenaAllocator& content_allocator, ArenaAllocator& scra
             }
         }
 
-        if (SetIfMatching(line, Key(KeyType::ShowTooltips), content.gui.show_tooltips)) continue;
-        if (SetIfMatching(line, Key(KeyType::WindowWidth), content.gui.window_width)) continue;
+        {
+            // The same key is allowed to appear more than once. We just append each value to an array.
+            String path {};
+            if (SetIfMatching(line, Key(KeyType::ExtraLibrariesFolder), path)) {
+                if (path::IsAbsolute(path)) dyn::Append(extra_libraries_folders, path);
+                continue;
+            }
+        }
+
+        {
+            // The same key is allowed to appear more than once. We just append each value to an array.
+            String path {};
+            if (SetIfMatching(line, Key(KeyType::ExtraPresetsFolder), path)) {
+                if (path::IsAbsolute(path)) dyn::Append(presets_folders, path);
+                continue;
+            }
+        }
+
         if (SetIfMatching(line, Key(KeyType::GuiKeyboardOctave), content.gui.keyboard_octave)) continue;
+        if (SetIfMatching(line, Key(KeyType::HighContrastGui), content.gui.high_contrast_gui)) continue;
         if (SetIfMatching(line, Key(KeyType::PresetsRandomMode), content.gui.presets_random_mode)) continue;
         if (SetIfMatching(line, Key(KeyType::ShowKeyboard), content.gui.show_keyboard)) continue;
-        if (SetIfMatching(line, Key(KeyType::HighContrastGui), content.gui.high_contrast_gui)) continue;
+        if (SetIfMatching(line, Key(KeyType::ShowTooltips), content.gui.show_tooltips)) continue;
+        if (SetIfMatching(line, Key(KeyType::WindowWidth), content.gui.window_width)) continue;
 
         dyn::Append(unknown_lines, line);
     }
@@ -353,18 +351,6 @@ ErrorCodeOr<void> WriteFile(Settings const& data, String path, s128 time) {
 
     auto writer = file.Writer();
 
-    TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::ShowKeyboard), data.gui.show_keyboard));
-    TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::GuiKeyboardOctave), data.gui.keyboard_octave));
-    TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::ShowTooltips), data.gui.show_tooltips));
-    TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::HighContrastGui), data.gui.high_contrast_gui));
-    TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::PresetsRandomMode), data.gui.presets_random_mode));
-    TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::WindowWidth), data.gui.window_width));
-
-    for (auto p : data.filesystem.extra_libraries_scan_folders)
-        TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::ExtraLibrariesFolder), p));
-    for (auto p : data.filesystem.extra_presets_scan_folders)
-        TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::ExtraPresetsFolder), p));
-
     for (auto cc = data.midi.cc_to_param_mapping; cc != nullptr; cc = cc->next) {
         DynamicArray<char> buf {scratch_arena};
         for (auto param = cc->param; param != nullptr; param = param->next)
@@ -374,6 +360,18 @@ ErrorCodeOr<void> WriteFile(Settings const& data, String path, s128 time) {
         dyn::Pop(buf); // remove last comma
         TRY(fmt::AppendLine(writer, "{} = {}:{}", Key(KeyType::CcToParamIdMap), cc->cc_num, buf));
     }
+
+    for (auto p : data.filesystem.extra_libraries_scan_folders)
+        TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::ExtraLibrariesFolder), p));
+    for (auto p : data.filesystem.extra_presets_scan_folders)
+        TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::ExtraPresetsFolder), p));
+
+    TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::GuiKeyboardOctave), data.gui.keyboard_octave));
+    TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::HighContrastGui), data.gui.high_contrast_gui));
+    TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::PresetsRandomMode), data.gui.presets_random_mode));
+    TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::ShowKeyboard), data.gui.show_keyboard));
+    TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::ShowTooltips), data.gui.show_tooltips));
+    TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::WindowWidth), data.gui.window_width));
 
     for (auto line : data.unknown_lines_from_file)
         TRY(fmt::AppendLineRaw(writer, line));
@@ -606,7 +604,6 @@ TEST_CASE(TestIniParsing) {
 gui_keyboard_octave = 0
 show_tooltips = true
 high_contrast_gui = true
-sort_libraries_alphabetically = true
 show_keyboard = true
 presets_random_mode = 3
 window_width = 1200

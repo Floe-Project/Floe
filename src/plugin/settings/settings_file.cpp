@@ -351,7 +351,7 @@ ErrorCodeOr<void> WriteFile(Settings const& data, String path, s128 time) {
                                  .fail_if_exists = false,
                              });
 
-    auto file = TRY(OpenFile(path, FileMode::Write));
+    auto file = TRY(OpenFile(path, FileMode::WriteEveryoneReadWrite));
 
     TRY(file.Lock(FileLockType::Exclusive));
     DEFER { auto _ = file.Unlock(); };

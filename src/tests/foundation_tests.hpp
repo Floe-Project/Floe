@@ -2106,44 +2106,44 @@ TEST_CASE(TestRandomFloatGenerator) {
 }
 
 TEST_CASE(TestVersion) {
-    REQUIRE(Version {1, 0, 0}.ToString() == "1.0.0"_s);
-    REQUIRE(Version {10, 99, 99}.ToString() == "10.99.99"_s);
-    REQUIRE(Version {10, 99, 99, 2u}.ToString() == "10.99.99-Beta2"_s);
+    CHECK(Version {1, 0, 0}.ToString() == "1.0.0"_s);
+    CHECK(Version {10, 99, 99}.ToString() == "10.99.99"_s);
+    CHECK(Version {10, 99, 99, 2u}.ToString() == "10.99.99-Beta2"_s);
 
-    REQUIRE(Version {1, 0, 0} == Version {1, 0, 0});
-    REQUIRE(Version {1, 1, 0} > Version {1, 0, 0});
-    REQUIRE(Version {1, 0, 0} < Version {1, 1, 0});
-    REQUIRE(Version {0, 0, 0} < Version {1, 0, 0});
-    REQUIRE(Version {1, 0, 100} < Version {2, 4, 10});
-    REQUIRE(Version {0, 0, 100} < Version {0, 0, 101});
+    CHECK(Version {1, 0, 0} == Version {1, 0, 0});
+    CHECK(Version {1, 1, 0} > Version {1, 0, 0});
+    CHECK(Version {1, 0, 0} < Version {1, 1, 0});
+    CHECK(Version {0, 0, 0} < Version {1, 0, 0});
+    CHECK(Version {1, 0, 100} < Version {2, 4, 10});
+    CHECK(Version {0, 0, 100} < Version {0, 0, 101});
 
-    REQUIRE(Version {1, 0, 0, 1u} < Version {1, 0, 0});
-    REQUIRE(Version {1, 0, 0, 1u} == Version {1, 0, 0, 1u});
-    REQUIRE(Version {1, 0, 0, 2u} > Version {1, 0, 0, 1u});
+    CHECK(Version {1, 0, 0, 1u} < Version {1, 0, 0});
+    CHECK(Version {1, 0, 0, 1u} == Version {1, 0, 0, 1u});
+    CHECK(Version {1, 0, 0, 2u} > Version {1, 0, 0, 1u});
 
     auto const check_string_parsing = [&](String str, Version ver) {
         CAPTURE(str);
         auto const parsed_ver = ParseVersionString(str);
-        REQUIRE(parsed_ver.HasValue());
+        CHECK(parsed_ver.HasValue());
         CAPTURE(parsed_ver->ToString(tester.scratch_arena));
         CAPTURE(ver.ToString(tester.scratch_arena));
-        REQUIRE(ver == *parsed_ver);
+        CHECK(ver == *parsed_ver);
     };
 
-    REQUIRE(!ParseVersionString("1"));
-    REQUIRE(!ParseVersionString("hello"));
-    REQUIRE(!ParseVersionString(",,what"));
-    REQUIRE(!ParseVersionString("1,1,2"));
-    REQUIRE(!ParseVersionString("1a,1,2bv"));
-    REQUIRE(!ParseVersionString("200a.200.400a"));
-    REQUIRE(!ParseVersionString(".."));
-    REQUIRE(!ParseVersionString("..."));
-    REQUIRE(!ParseVersionString("1.2.3.4"));
-    REQUIRE(!ParseVersionString(".1.2"));
-    REQUIRE(!ParseVersionString("12.."));
-    REQUIRE(!ParseVersionString(".1."));
-    REQUIRE(!ParseVersionString("1.1.0-blah1"));
-    REQUIRE(!ParseVersionString(""));
+    CHECK(!ParseVersionString("1"));
+    CHECK(!ParseVersionString("hello"));
+    CHECK(!ParseVersionString(",,what"));
+    CHECK(!ParseVersionString("1,1,2"));
+    CHECK(!ParseVersionString("1a,1,2bv"));
+    CHECK(!ParseVersionString("200a.200.400a"));
+    CHECK(!ParseVersionString(".."));
+    CHECK(!ParseVersionString("..."));
+    CHECK(!ParseVersionString("1.2.3.4"));
+    CHECK(!ParseVersionString(".1.2"));
+    CHECK(!ParseVersionString("12.."));
+    CHECK(!ParseVersionString(".1."));
+    CHECK(!ParseVersionString("1.1.0-blah1"));
+    CHECK(!ParseVersionString(""));
 
     check_string_parsing("1.1.1", {1, 1, 1});
     check_string_parsing(" 200   .  4.99 ", {200, 4, 99});
@@ -2166,61 +2166,73 @@ TEST_CASE(TestVersion) {
             }
 
             auto const version = PackVersionIntoU32(maj, min, pat);
-            REQUIRE(version > prev_version);
+            CHECK(version > prev_version);
             prev_version = version;
         }
     }
 
-    REQUIRE(PackVersionIntoU32(1, 1, 2) < PackVersionIntoU32(1, 2, 0));
+    CHECK(PackVersionIntoU32(1, 1, 2) < PackVersionIntoU32(1, 2, 0));
     return k_success;
 }
 
 TEST_CASE(TestMemoryUtils) {
-    REQUIRE(BytesToAddForAlignment(10, 1) == 0);
-    REQUIRE(BytesToAddForAlignment(9, 1) == 0);
-    REQUIRE(BytesToAddForAlignment(3333333, 1) == 0);
-    REQUIRE(BytesToAddForAlignment(0, 2) == 0);
-    REQUIRE(BytesToAddForAlignment(1, 2) == 1);
-    REQUIRE(BytesToAddForAlignment(2, 2) == 0);
-    REQUIRE(BytesToAddForAlignment(1, 4) == 3);
-    REQUIRE(BytesToAddForAlignment(2, 4) == 2);
-    REQUIRE(BytesToAddForAlignment(3, 4) == 1);
-    REQUIRE(BytesToAddForAlignment(4, 4) == 0);
-    REQUIRE(BytesToAddForAlignment(31, 32) == 1);
+    CHECK(BytesToAddForAlignment(10, 1) == 0);
+    CHECK(BytesToAddForAlignment(9, 1) == 0);
+    CHECK(BytesToAddForAlignment(3333333, 1) == 0);
+    CHECK(BytesToAddForAlignment(0, 2) == 0);
+    CHECK(BytesToAddForAlignment(1, 2) == 1);
+    CHECK(BytesToAddForAlignment(2, 2) == 0);
+    CHECK(BytesToAddForAlignment(1, 4) == 3);
+    CHECK(BytesToAddForAlignment(2, 4) == 2);
+    CHECK(BytesToAddForAlignment(3, 4) == 1);
+    CHECK(BytesToAddForAlignment(4, 4) == 0);
+    CHECK(BytesToAddForAlignment(31, 32) == 1);
+
+    // test NumBitsNeededToStore
+    CHECK_EQ(NumBitsNeededToStore(0), 1uz);
+    CHECK_EQ(NumBitsNeededToStore(1), 1uz);
+    CHECK_EQ(NumBitsNeededToStore(2), 2uz);
+    CHECK_EQ(NumBitsNeededToStore(3), 2uz);
+    CHECK_EQ(NumBitsNeededToStore(4), 3uz);
+    CHECK_EQ(NumBitsNeededToStore(5), 3uz);
+    CHECK_EQ(NumBitsNeededToStore(6), 3uz);
+    CHECK_EQ(NumBitsNeededToStore(7), 3uz);
+    CHECK_EQ(NumBitsNeededToStore(8), 4uz);
+
     return k_success;
 }
 
 TEST_CASE(TestAsciiToUppercase) {
-    REQUIRE(ToUppercaseAscii('a') == 'A');
-    REQUIRE(ToUppercaseAscii('z') == 'Z');
-    REQUIRE(ToUppercaseAscii('A') == 'A');
-    REQUIRE(ToUppercaseAscii('M') == 'M');
-    REQUIRE(ToUppercaseAscii('0') == '0');
-    REQUIRE(ToUppercaseAscii(' ') == ' ');
+    CHECK(ToUppercaseAscii('a') == 'A');
+    CHECK(ToUppercaseAscii('z') == 'Z');
+    CHECK(ToUppercaseAscii('A') == 'A');
+    CHECK(ToUppercaseAscii('M') == 'M');
+    CHECK(ToUppercaseAscii('0') == '0');
+    CHECK(ToUppercaseAscii(' ') == ' ');
     for (int i = SmallestRepresentableValue<char>(); i <= LargestRepresentableValue<char>(); ++i)
         ToUppercaseAscii((char)i);
     return k_success;
 }
 
 TEST_CASE(TestAsciiToLowercase) {
-    REQUIRE(ToLowercaseAscii('A') == 'a');
-    REQUIRE(ToLowercaseAscii('Z') == 'z');
-    REQUIRE(ToLowercaseAscii('a') == 'a');
-    REQUIRE(ToLowercaseAscii('m') == 'm');
-    REQUIRE(ToLowercaseAscii('0') == '0');
-    REQUIRE(ToLowercaseAscii(' ') == ' ');
+    CHECK(ToLowercaseAscii('A') == 'a');
+    CHECK(ToLowercaseAscii('Z') == 'z');
+    CHECK(ToLowercaseAscii('a') == 'a');
+    CHECK(ToLowercaseAscii('m') == 'm');
+    CHECK(ToLowercaseAscii('0') == '0');
+    CHECK(ToLowercaseAscii(' ') == ' ');
     for (int i = SmallestRepresentableValue<char>(); i <= LargestRepresentableValue<char>(); ++i)
         ToLowercaseAscii((char)i);
     return k_success;
 }
 
 TEST_CASE(TestNullTermStringsEqual) {
-    REQUIRE(NullTermStringsEqual("", ""));
-    REQUIRE(!NullTermStringsEqual("a", ""));
-    REQUIRE(!NullTermStringsEqual("", "a"));
-    REQUIRE(!NullTermStringsEqual("aaa", "a"));
-    REQUIRE(!NullTermStringsEqual("a", "aaa"));
-    REQUIRE(NullTermStringsEqual("aaa", "aaa"));
+    CHECK(NullTermStringsEqual("", ""));
+    CHECK(!NullTermStringsEqual("a", ""));
+    CHECK(!NullTermStringsEqual("", "a"));
+    CHECK(!NullTermStringsEqual("aaa", "a"));
+    CHECK(!NullTermStringsEqual("a", "aaa"));
+    CHECK(NullTermStringsEqual("aaa", "aaa"));
     return k_success;
 }
 

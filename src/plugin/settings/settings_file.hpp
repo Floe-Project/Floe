@@ -39,7 +39,6 @@ struct Settings {
         int keyboard_octave {0};
         bool show_tooltips {true};
         bool high_contrast_gui {false};
-        bool sort_libraries_alphabetically {false};
         bool show_keyboard {true};
         int presets_random_mode {0};
         u16 window_width {0};

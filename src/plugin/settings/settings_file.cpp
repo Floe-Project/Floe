@@ -135,7 +135,6 @@ struct LegacyJsonSettingsParser {
         if (SetIfMatching(event, "ShowNews", legacy.show_news_field)) return true;
         if (SetIfMatching(event, "ShowTooltips", content.gui.show_tooltips)) return true;
         if (SetIfMatching(event, "HighContrast", content.gui.high_contrast_gui)) return true;
-        if (SetIfMatching(event, "SortLibsAlpha", content.gui.sort_libraries_alphabetically)) return true;
         if (json::SetIfMatchingArray(handler_stack,
                                      event,
                                      "DismissedNotfications",
@@ -328,10 +327,6 @@ Parse(Settings& content, ArenaAllocator& content_allocator, ArenaAllocator& scra
         if (SetIfMatching(line, Key(KeyType::PresetsRandomMode), content.gui.presets_random_mode)) continue;
         if (SetIfMatching(line, Key(KeyType::ShowKeyboard), content.gui.show_keyboard)) continue;
         if (SetIfMatching(line, Key(KeyType::HighContrastGui), content.gui.high_contrast_gui)) continue;
-        if (SetIfMatching(line,
-                          Key(KeyType::SortLibrariesAlphabetically),
-                          content.gui.sort_libraries_alphabetically))
-            continue;
 
         dyn::Append(unknown_lines, line);
     }
@@ -362,10 +357,6 @@ ErrorCodeOr<void> WriteFile(Settings const& data, String path, s128 time) {
     TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::GuiKeyboardOctave), data.gui.keyboard_octave));
     TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::ShowTooltips), data.gui.show_tooltips));
     TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::HighContrastGui), data.gui.high_contrast_gui));
-    TRY(fmt::AppendLine(writer,
-                        "{} = {}",
-                        Key(KeyType::SortLibrariesAlphabetically),
-                        data.gui.sort_libraries_alphabetically));
     TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::PresetsRandomMode), data.gui.presets_random_mode));
     TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::WindowWidth), data.gui.window_width));
 

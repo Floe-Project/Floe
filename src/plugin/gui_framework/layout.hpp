@@ -19,7 +19,7 @@ namespace layout {
 
 using Id = u32;
 
-constexpr Id k_invalid_id = ~(u32)0;
+constexpr Id k_invalid_id = ~(Id)0;
 constexpr f32 k_hug_contents = 0.0f;
 constexpr f32 k_fill_parent = -1.0f;
 

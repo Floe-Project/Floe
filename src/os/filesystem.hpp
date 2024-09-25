@@ -29,21 +29,19 @@ ErrorCode FilesystemErrnoErrorCode(s64 error_code,
 
 // fopen()-like File API
 // =======================================================================================================
-enum class FileMode {
+enum class FileMode : u32 {
     Read,
     Write, // overwrites if it already exists
     WriteNoOverwrite,
 
-    // Overwrites if it already exists. If it creates it, it will have read/write permissions for everyone.
+    // Overwrites if it already exists (but doesn't change file permissions). If it doesn't exist, it will be
+    // created with read/write permissions for everyone.
     WriteEveryoneReadWrite,
 
     Append,
 };
 
-enum class FileLockType {
-    Exclusive,
-    Shared,
-};
+enum class FileLockType { Exclusive, Shared };
 
 // File is created with OpenFile()
 struct File {

@@ -64,19 +64,26 @@ struct SettingsFile {
     ArenaAllocator arena {PageAllocator::Instance()};
     SettingsTracking tracking;
     Settings settings;
+    s128 last_modified_time {};
     ArenaAllocator watcher_scratch {PageAllocator::Instance()};
     ArenaAllocator watcher_arena {PageAllocator::Instance()};
     Optional<DirectoryWatcher> watcher;
-    TimePoint last_watch_time {};
+    TimePoint last_watcher_poll_time {};
 };
 
 void InitSettingsFile(SettingsFile& settings, FloePaths const& paths);
 void DeinitSettingsFile(SettingsFile& settings);
 void PollForSettingsFileChanges(SettingsFile& settings);
 
+struct SettingsReadResult {
+    Settings settings {};
+    s128 last_modified_time {};
+};
+
 // The arena must outlive the Settings
-Optional<Settings> FindAndReadSettingsFile(ArenaAllocator& a, FloePaths const& paths);
+Optional<SettingsReadResult> FindAndReadSettingsFile(ArenaAllocator& a, FloePaths const& paths);
+ErrorCodeOr<SettingsReadResult> ReadSettingsFile(ArenaAllocator& a, String path);
 bool InitialiseSettingsFileData(Settings& file, ArenaAllocator& arena, bool file_is_brand_new);
 
-ErrorCodeOr<void> WriteSettingsFile(Settings const& data, String path);
+ErrorCodeOr<void> WriteSettingsFile(Settings const& data, String path, s128 last_write_time = {});
 ErrorCodeOr<void> WriteSettingsFileIfChanged(SettingsFile& settings);

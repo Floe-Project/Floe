@@ -8,6 +8,8 @@
 #include "tests/framework.hpp"
 #include "utils/json/json_reader.hpp"
 
+#include "common_infrastructure/common_errors.hpp"
+
 #include "config.h"
 #include "descriptors/param_descriptors.hpp"
 #include "settings_gui.hpp"
@@ -231,16 +233,16 @@ static bool SetIfMatching(String line, String key, Type& value) {
 }
 
 enum class KeyType : u32 {
-    ShowTooltips,
-    GuiKeyboardOctave,
-    HighContrastGui,
-    SortLibrariesAlphabetically,
-    ShowKeyboard,
-    PresetsRandomMode,
-    WindowWidth,
+    CcToParamIdMap,
     ExtraLibrariesFolder,
     ExtraPresetsFolder,
-    CcToParamIdMap,
+    GuiKeyboardOctave,
+    HighContrastGui,
+    PresetsRandomMode,
+    ShowKeyboard,
+    ShowTooltips,
+    SortLibrariesAlphabetically,
+    WindowWidth,
     Count,
 };
 
@@ -272,7 +274,8 @@ Parse(Settings& content, ArenaAllocator& content_allocator, ArenaAllocator& scra
         if (line.size == 0) continue;
         if (StartsWith(line, ';')) continue;
 
-        { // The same key is allowed to appear more than once. We just append each value to an array.
+        {
+            // The same key is allowed to appear more than once. We just append each value to an array.
             String path {};
             if (SetIfMatching(line, Key(KeyType::ExtraLibrariesFolder), path)) {
                 if (path::IsAbsolute(path)) dyn::Append(extra_libraries_folders, path);
@@ -339,7 +342,7 @@ Parse(Settings& content, ArenaAllocator& content_allocator, ArenaAllocator& scra
     content.unknown_lines_from_file = content_allocator.Clone(unknown_lines, CloneType::Deep);
 }
 
-ErrorCodeOr<void> WriteFile(Settings const& data, String path) {
+ErrorCodeOr<void> WriteFile(Settings const& data, String path, s128 time) {
     ArenaAllocatorWithInlineStorage<4000> scratch_arena;
 
     auto _ = CreateDirectory(path::Directory(path).ValueOr({}),
@@ -384,6 +387,10 @@ ErrorCodeOr<void> WriteFile(Settings const& data, String path) {
     for (auto line : data.unknown_lines_from_file)
         TRY(fmt::AppendLineRaw(writer, line));
 
+    TRY(file.Flush());
+
+    TRY(file.SetLastModifiedTimeNsSinceEpoch(time));
+
     return k_success;
 }
 
@@ -394,8 +401,10 @@ void InitSettingsFile(SettingsFile& settings, FloePaths const& paths) {
     auto opt_data = FindAndReadSettingsFile(settings.arena, paths);
     if (!opt_data)
         file_is_new = true;
-    else
-        settings.settings = *opt_data;
+    else {
+        settings.settings = opt_data->settings;
+        settings.last_modified_time = opt_data->last_modified_time;
+    }
     if (InitialiseSettingsFileData(settings.settings, settings.arena, file_is_new))
         settings.tracking.changed = true;
 
@@ -413,8 +422,8 @@ void DeinitSettingsFile(SettingsFile& settings) {
 void PollForSettingsFileChanges(SettingsFile& settings) {
     ASSERT(DebugCheckThreadName("main"));
 
-    if (settings.last_watch_time + 0.3 > TimePoint::Now()) return;
-    DEFER { settings.last_watch_time = TimePoint::Now(); };
+    if (settings.last_watcher_poll_time + 0.3 > TimePoint::Now()) return;
+    DEFER { settings.last_watcher_poll_time = TimePoint::Now(); };
 
     if (!settings.watcher.HasValue()) return;
 
@@ -435,10 +444,34 @@ void PollForSettingsFileChanges(SettingsFile& settings) {
 
     if (outcome.HasError()) return;
     auto const& changes = outcome.Value();
-    for (auto const& _ : changes) {
-        settings.arena.ResetCursorAndConsolidateRegions();
-        auto data = FindAndReadSettingsFile(settings.arena, settings.paths);
-        if (data) settings.settings = *data;
+    for (auto const& change : changes) {
+        for (auto const& subpath : change.subpath_changesets) {
+            if (path::Equal(subpath.subpath, path::Filename(settings.paths.settings_write_path))) {
+                auto const last_modified_time =
+                    LastModifiedTimeNsSinceEpoch(settings.paths.settings_write_path);
+
+                if (last_modified_time.HasError()) {
+                    if (last_modified_time.Error() == FilesystemError::PathDoesNotExist) {
+                        settings.arena.ResetCursorAndConsolidateRegions();
+                        settings.settings = {};
+                        settings.last_modified_time = 0;
+                    }
+                    continue;
+                }
+
+                if (last_modified_time.Value() != settings.last_modified_time) {
+                    settings.arena.ResetCursorAndConsolidateRegions();
+                    auto data = ReadSettingsFile(settings.arena, settings.paths.settings_write_path);
+                    if (data.HasValue()) {
+                        settings.settings = data.Value().settings;
+                        settings.last_modified_time = data.Value().last_modified_time;
+                    } else {
+                        settings.settings = {};
+                        settings.last_modified_time = 0;
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -453,47 +486,45 @@ bool InitialiseSettingsFileData(Settings& file, ArenaAllocator& arena, bool file
     return changed;
 }
 
-Optional<Settings> FindAndReadSettingsFile(ArenaAllocator& a, FloePaths const& paths) {
-    PageAllocator page_allocator;
-    ArenaAllocator scratch_arena {page_allocator};
+ErrorCodeOr<SettingsReadResult> ReadSettingsFile(ArenaAllocator& a, String path) {
+    auto file = TRY(OpenFile(path, FileMode::Read));
+    TRY(file.Lock(FileLockType::Shared));
+    DEFER { auto _ = file.Unlock(); };
 
-    String file_data {};
-    bool is_json {};
-    for (auto const p : paths.possible_settings_paths) {
-        auto file_outcome = OpenFile(p, FileMode::Read);
-        if (file_outcome.HasError()) continue;
-        auto& file = file_outcome.Value();
-        auto _ = file.Lock(FileLockType::Shared);
-        DEFER { auto _ = file.Unlock(); };
-        auto read_outcome = file.ReadWholeFile(a);
-        if (read_outcome.HasError()) continue;
+    SettingsReadResult result {};
+    result.last_modified_time = TRY(file.LastModifiedTimeNsSinceEpoch());
 
-        is_json = path::Extension(p) == ".json"_s;
-        file_data = read_outcome.ReleaseValue();
-        break;
-    }
+    auto const file_data = TRY(file.ReadWholeFile(a));
 
-    if (file_data.size == 0) return k_nullopt;
+    ArenaAllocator scratch_arena {PageAllocator::Instance()};
 
-    Settings result {};
-
-    if (!is_json) {
-        ini::Parse(result, a, scratch_arena, file_data);
-    } else if (auto parsed_json = ParseLegacyJsonFile(result, paths, a, scratch_arena, file_data);
-               !parsed_json) {
-        // The file is not valid json. Let's say it's not an error though. Instead, let's just use
-        // default values.
-        return k_nullopt;
+    if (path::Equal(path::Extension(path), ".json"_s)) {
+        if (!ParseLegacyJsonFile(result.settings, {}, a, scratch_arena, file_data))
+            return ErrorCode {CommonError::InvalidFileFormat};
+    } else {
+        ini::Parse(result.settings, a, scratch_arena, file_data);
     }
 
     return result;
 }
 
-ErrorCodeOr<void> WriteSettingsFile(Settings const& data, String path) { return ini::WriteFile(data, path); }
+Optional<SettingsReadResult> FindAndReadSettingsFile(ArenaAllocator& a, FloePaths const& paths) {
+    for (auto const p : paths.possible_settings_paths)
+        if (auto const o = ReadSettingsFile(a, p); o.HasValue()) return o.Value();
+    return k_nullopt;
+}
+
+ErrorCodeOr<void> WriteSettingsFile(Settings const& data, String path, s128 time) {
+    return ini::WriteFile(data, path, time);
+}
 
 ErrorCodeOr<void> WriteSettingsFileIfChanged(SettingsFile& settings) {
-    if (Exchange(settings.tracking.changed, false))
-        return ini::WriteFile(settings.settings, settings.paths.settings_write_path);
+    if (Exchange(settings.tracking.changed, false)) {
+        settings.last_modified_time = NanosecondsSinceEpoch();
+        return ini::WriteFile(settings.settings,
+                              settings.paths.settings_write_path,
+                              settings.last_modified_time);
+    }
     return k_success;
 }
 

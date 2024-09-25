@@ -58,6 +58,7 @@ static constexpr usize k_max_alignment = sizeof(void*) * 2;
 // https://en.wikipedia.org/wiki/False_sharing
 // The cppreference page suggests that, in certain cases, separating data accessed by multiple threads
 // by this value can speed up things by 6x. FreeBSD's buf_ring.h uses this technique.
+// IMPROVE: with LLVM 19 we will get __GCC_DESTRUCTIVE_SIZE and __GCC_CONSTRUCTIVE_SIZE, we should use them.
 static constexpr usize k_destructive_interference_size = []() {
     switch (k_arch) {
         case Arch::X86_64: return 64;

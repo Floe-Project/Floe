@@ -38,6 +38,9 @@ using s7 = signed _BitInt(7);
 using u4 = unsigned _BitInt(4);
 using s4 = signed _BitInt(4);
 
+// NOTE: with LLVM 19, we can use bit-precise-int-suffix _wb to create _BitInts with the automatically
+// correct number of bits. See https://en.cppreference.com/w/c/language/integer_constant.
+
 // We rely on Clang's vector extensions for both convenience (we don't have to define operator overloads for
 // +, -, *, etc.) and for the core of our SIMD code generation.
 // https://clang.llvm.org/docs/LanguageExtensions.html#vectors-and-extended-vectors
@@ -55,8 +58,8 @@ using s4 = signed _BitInt(4);
 // - If you assign a vector to a scalar, it will broadcast that scalar to all elements of the vector. You can
 //   also use a 'constructor' with brackets: vec(scalar) to do the same. Curly braces work the same as an
 //   array initializer: you may omit elements and the rest will be zeroed.
-//   f32x4 v(0); // v = {0, 0, 0, 0}
-//   f32x4 v = 0; // v = {0, 0, 0, 0}
+//   f32x4 v(1); // v = {1, 1, 1, 1}
+//   f32x4 v = 1; // v = {1, 1, 1, 1}
 //   f32x4 v = {1, 2}; // v = {1, 2, 0, 0}
 // - The generated assembly is dependent on the target architecture. If the target architecture doesn't
 //   support SIMD operations of the width you're using, it won't generate particularly fast code. For now, we
@@ -66,7 +69,7 @@ using s4 = signed _BitInt(4);
 //   architecture. For example for supporting AVX2 on x86_64, we'd use the <immintrin.h> header. NOTE: we
 //   might consider using __builtin_cpu_supports to detect CPU features on x86_64.
 // - Comparison operators work for floats/ints. They return a vector of signed integers where each element is
-//   ~0 (all 1 bits) if the comparison is true else 0. See the All() and Any() helpers for getting a scalar
+//   ~0 (all 1 bits) if the comparison is true, else 0. See the All() and Any() helpers for getting a scalar
 //   bool from the vector.
 
 using f32x2 = __attribute__((ext_vector_type(2))) f32;

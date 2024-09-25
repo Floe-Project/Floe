@@ -996,8 +996,7 @@ struct StateCoder {
 };
 
 ErrorCodeOr<void> CodeState(StateSnapshot& state, CodeStateArguments const& args) {
-    static_assert(__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__,
-                  "this code makes no attempt to be endian agnostic");
+    static_assert(k_endianness == Endianness::Little, "this code makes no attempt to be endian agnostic");
     ArenaAllocatorWithInlineStorage<1000> scratch_arena;
 
     StateCoder coder {

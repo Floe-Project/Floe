@@ -216,11 +216,11 @@ ErrorCodeOr<File> OpenFile(String filename, FileMode mode) {
     auto const mode_str = ({
         char const* m {};
         switch (mode) {
-            case FileMode::Read: m = "rb"; break;
-            case FileMode::Write: m = "wb"; break;
-            case FileMode::WriteEveryoneReadWrite: m = "wb"; break;
-            case FileMode::Append: m = "ab"; break;
-            case FileMode::WriteNoOverwrite: m = "wb"; break;
+            case FileMode::Read: m = "r"; break;
+            case FileMode::Write: m = "w"; break;
+            case FileMode::WriteEveryoneReadWrite: m = "w"; break;
+            case FileMode::Append: m = "a"; break;
+            case FileMode::WriteNoOverwrite: m = "w"; break;
         }
         m;
     });

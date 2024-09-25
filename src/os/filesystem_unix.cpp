@@ -213,45 +213,30 @@ ErrorCodeOr<u64> File::FileSize() {
 ErrorCodeOr<File> OpenFile(String filename, FileMode mode) {
     PathArena temp_allocator;
 
-    char const* mode_str {};
-    int flags = 0;
-    mode_t permissions = 0;
+    auto const mode_str = ({
+        char const* m {};
+        switch (mode) {
+            case FileMode::Read: m = "rb"; break;
+            case FileMode::Write: m = "wb"; break;
+            case FileMode::WriteEveryoneReadWrite: m = "wb"; break;
+            case FileMode::Append: m = "ab"; break;
+            case FileMode::WriteNoOverwrite: m = "wb"; break;
+        }
+        m;
+    });
 
-    switch (mode) {
-        case FileMode::Read:
-            mode_str = "rb";
-            flags = O_RDONLY;
-            break;
-        case FileMode::Write:
-            mode_str = "wb";
-            flags = O_WRONLY | O_CREAT | O_TRUNC;
-            permissions = 0644;
-            break;
-        case FileMode::WriteEveryoneReadWrite:
-            mode_str = "wb";
-            flags = O_WRONLY | O_CREAT | O_TRUNC;
-            permissions = 0666;
-            break;
-        case FileMode::Append:
-            mode_str = "ab";
-            flags = O_WRONLY | O_CREAT | O_APPEND;
-            permissions = 0644;
-            break;
-        case FileMode::WriteNoOverwrite:
-            mode_str = "wb";
-            flags = O_WRONLY | O_CREAT | O_EXCL;
-            permissions = 0644;
-            break;
+    auto file = fopen(NullTerminated(filename, temp_allocator), mode_str);
+    if (file == nullptr) return FilesystemErrnoErrorCode(errno, "fopen");
+
+    if (mode == FileMode::WriteEveryoneReadWrite) {
+        // It's necessary to use fchmod() to set the permissions instead of open(mode = 0666) because open()
+        // uses umask and so will likely not actually set the permissions we want. fchmod() doesn't have that
+        // problem.
+        if (fchmod(fileno((FILE*)file), 0666) != 0) {
+            fclose(file);
+            return FilesystemErrnoErrorCode(errno, "fchmod");
+        }
     }
 
-    auto fd = open(NullTerminated(filename, temp_allocator), flags, permissions);
-    if (fd == -1) return FilesystemErrnoErrorCode(errno, "open");
-
-    // we use FILE* because we want buffered I/O
-    auto file = fdopen(fd, mode_str);
-    if (file == nullptr) {
-        close(fd);
-        return FilesystemErrnoErrorCode(errno, "fopen");
-    }
     return File(file);
 }

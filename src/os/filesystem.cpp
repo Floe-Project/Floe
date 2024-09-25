@@ -304,10 +304,10 @@ ErrorCodeOr<MutableString> ReadSectionOfFile(String filename,
     return file.ReadSectionOfFile(bytes_offset_from_file_start, size_in_bytes, a);
 }
 
-ErrorCodeOr<u64> FileSize(String filename) {
-    auto file = OpenFile(filename, FileMode::Read);
-    if (file.HasError()) return file.Error();
-    return file.Value().FileSize();
+ErrorCodeOr<u64> FileSize(String filename) { return TRY(OpenFile(filename, FileMode::Read)).FileSize(); }
+
+ErrorCodeOr<s128> LastModifiedTimeNsSinceEpoch(String filename) {
+    return TRY(OpenFile(filename, FileMode::Read)).LastModifiedTimeNsSinceEpoch();
 }
 
 ErrorCodeOr<MutableString>

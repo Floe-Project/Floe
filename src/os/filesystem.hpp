@@ -67,6 +67,9 @@ struct File {
     ErrorCodeOr<void> Lock(FileLockType type);
     ErrorCodeOr<void> Unlock();
 
+    ErrorCodeOr<s128> LastModifiedTimeNsSinceEpoch();
+    ErrorCodeOr<void> SetLastModifiedTimeNsSinceEpoch(s128 time);
+
     void* NativeFileHandle();
     ErrorCodeOr<MutableString>
     ReadSectionOfFile(usize const bytes_offset_from_file_start, usize const size_in_bytes, Allocator& a);
@@ -110,6 +113,7 @@ ErrorCodeOr<MutableString> ReadSectionOfFile(String filename,
                                              Allocator& a);
 
 ErrorCodeOr<u64> FileSize(String filename);
+ErrorCodeOr<s128> LastModifiedTimeNsSinceEpoch(String filename);
 
 ErrorCodeOr<usize> WriteFile(String filename, Span<u8 const> data);
 inline ErrorCodeOr<usize> WriteFile(String filename, Span<char const> data) {
@@ -232,10 +236,6 @@ ErrorCodeOr<MutableString> AbsolutePath(Allocator& a, String path);
 // - Add the drive specifier if it's missing.
 // - Replaces / with \.
 ErrorCodeOr<MutableString> CanonicalizePath(Allocator& a, String path);
-
-// Returns a counter representing time since unix epoch
-// IMPROVE: use 128-bit nanosecond format that we use in misc.hpp
-ErrorCodeOr<s64> LastWriteTime(String path);
 
 Optional<Version> MacosBundleVersion(String path);
 

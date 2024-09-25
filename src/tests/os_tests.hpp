@@ -105,6 +105,21 @@ TEST_CASE(TestFileApi) {
         }
     }
 
+    SUBCASE("Last modified time") {
+        auto time = NanosecondsSinceEpoch();
+        {
+            auto f = TRY(OpenFile(filename1, FileMode::Write));
+            TRY(f.Write(k_data.ToByteSpan()));
+            TRY(f.Flush());
+            TRY(f.SetLastModifiedTimeNsSinceEpoch(time));
+        }
+        {
+            auto f = TRY(OpenFile(filename1, FileMode::Read));
+            auto last_modified = TRY(f.LastModifiedTimeNsSinceEpoch());
+            CHECK_EQ(last_modified, time);
+        }
+    }
+
     SUBCASE("Try opening a file that does not exist") {
         auto const f = OpenFile("foo", FileMode::Read);
         REQUIRE(f.HasError());

@@ -45,22 +45,6 @@ ErrorCodeOr<FileType> GetFileType(String path) {
     return FileType::File;
 }
 
-ErrorCodeOr<s64> LastWriteTime(String path) {
-    PathArena temp_path_allocator;
-    struct ::stat info;
-    auto r = ::stat(NullTerminated(path, temp_path_allocator), &info);
-    if (r != 0) return FilesystemErrnoErrorCode(errno);
-        // Is milliseconds what we want here?
-
-#if __APPLE__
-    auto timespec = info.st_mtimespec;
-#else
-    auto timespec = info.st_mtim;
-#endif
-
-    return timespec.tv_sec * 1000 + timespec.tv_nsec / 1000;
-}
-
 namespace dir_iterator {
 
 ErrorCodeOr<Iterator> Create(ArenaAllocator& arena, String path, Options options) {
@@ -146,6 +130,26 @@ ErrorCodeOr<void> File::Lock(FileLockType type) {
 ErrorCodeOr<void> File::Unlock() {
     auto const result = flock(fileno((FILE*)m_file), LOCK_UN);
     if (result != 0) return FilesystemErrnoErrorCode(errno, "flock");
+    return k_success;
+}
+
+ErrorCodeOr<s128> File::LastModifiedTimeNsSinceEpoch() {
+    struct stat file_stat;
+    if (fstat(fileno((FILE*)m_file), &file_stat) != 0) return FilesystemErrnoErrorCode(errno, "fstat");
+#if IS_LINUX
+    auto const modified_time = file_stat.st_mtim;
+#elif IS_MACOS
+    auto const modified_time = file_stat.st_mtimespec;
+#endif
+    return (s128)modified_time.tv_sec * (s128)1'000'000'000 + (s128)modified_time.tv_nsec;
+}
+
+ErrorCodeOr<void> File::SetLastModifiedTimeNsSinceEpoch(s128 ns_since_epoch) {
+    struct timespec times[2];
+    times[0].tv_sec = decltype(times[0].tv_sec)(ns_since_epoch / (s128)1'000'000'000);
+    times[0].tv_nsec = ns_since_epoch % 1'000'000'000;
+    times[1] = times[0];
+    if (futimens(fileno((FILE*)m_file), times) != 0) return FilesystemErrnoErrorCode(errno, "futimens");
     return k_success;
 }
 

@@ -68,6 +68,36 @@ ErrorCodeOr<void> File::Unlock() {
     return k_success;
 }
 
+ErrorCodeOr<s128> File::LastModifiedTimeNsSinceEpoch() {
+    FILETIME file_time;
+    if (!GetFileTime(m_file, nullptr, nullptr, &file_time))
+        return FilesystemWin32ErrorCode(GetLastError(), "GetFileTime");
+
+    ULARGE_INTEGER file_time_int;
+    file_time_int.LowPart = file_time.dwLowDateTime;
+    file_time_int.HighPart = file_time.dwHighDateTime;
+
+    // The windows epoch starts 1601-01-01T00:00:00Z. It's 11644473600 seconds before the UNIX/Linux epoch
+    // (1970-01-01T00:00:00Z). Windows ticks are in 100 nanoseconds.
+    return (s128)file_time_int.QuadPart * (s128)100 - (s128)11644473600ull * (s128)1'000'000'000ull;
+}
+
+ErrorCodeOr<void> File::SetLastModifiedTimeNsSinceEpoch(s128 time) {
+    ULARGE_INTEGER file_time_int;
+
+    // The windows epoch starts 1601-01-01T00:00:00Z. It's 11644473600 seconds before the UNIX/Linux epoch
+    // (1970-01-01T00:00:00Z). Windows ticks are in 100 nanoseconds.
+    file_time_int.QuadPart = (ULONGLONG)((time + (s128)11644473600ull * (s128)1'000'000'000ull) / (s128)100);
+
+    FILETIME file_time;
+    file_time.dwLowDateTime = file_time_int.LowPart;
+    file_time.dwHighDateTime = file_time_int.HighPart;
+
+    if (!SetFileTime(m_file, nullptr, nullptr, &file_time))
+        return FilesystemWin32ErrorCode(GetLastError(), "SetFileTime");
+    return k_success;
+}
+
 void File::CloseFile() {
     if (m_file) CloseHandle(m_file);
 }
@@ -810,36 +840,6 @@ ErrorCodeOr<void> Rename(String from, String to) {
         return FilesystemWin32ErrorCode(err, "MoveFileW");
     }
     return k_success;
-}
-
-ErrorCodeOr<s64> LastWriteTime(String path) {
-    ASSERT(path::IsAbsolute(path));
-    PathArena temp_path_arena;
-
-    auto handle = CreateFileW(TRY(path::MakePathForWin32(path, temp_path_arena, true)).path.data,
-                              GENERIC_READ,
-                              0,
-                              nullptr,
-                              OPEN_EXISTING,
-                              FILE_ATTRIBUTE_NORMAL,
-                              nullptr);
-    if (handle == INVALID_HANDLE_VALUE) return FilesystemWin32ErrorCode(GetLastError(), "CreateFileW");
-    DEFER { CloseHandle(handle); };
-
-    FILETIME file_time;
-    if (!GetFileTime(handle, nullptr, nullptr, &file_time))
-        return FilesystemWin32ErrorCode(GetLastError(), "GetFileTime");
-
-    ULARGE_INTEGER file_time_int;
-    file_time_int.LowPart = file_time.dwLowDateTime;
-    file_time_int.HighPart = file_time.dwHighDateTime;
-
-    // The windows epoch starts 1601-01-01T00:00:00Z. It's 11644473600 seconds before the UNIX/Linux epoch
-    // (1970-01-01T00:00:00Z). Windows ticks are in 100 nanoseconds.
-    constexpr s64 k_ticks_per_second = 10000000;
-    constexpr s64 k_sec_to_unix_epoch = 11644473600ll;
-
-    return (s64)((file_time_int.QuadPart / k_ticks_per_second) - k_sec_to_unix_epoch);
 }
 
 //

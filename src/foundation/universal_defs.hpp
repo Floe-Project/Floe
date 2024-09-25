@@ -24,6 +24,10 @@ using usize = __SIZE_TYPE__;
 using ssize = __PTRDIFF_TYPE__;
 using uintptr = __UINTPTR_TYPE__;
 
+// Sometimes we want to just check for non-zero. C++ bools are required to either equal true or false. And so
+// values must first be confirmed to that binary state. This is normally an extra assembly instruction.
+using bool32 = u32;
+
 using f32 = float;
 using f64 = double;
 

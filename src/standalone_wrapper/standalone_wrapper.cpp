@@ -60,6 +60,7 @@ struct Standalone {
                 auto& standalone = *(Standalone*)h->host_data;
                 if (CurrentThreadId() != standalone.main_thread_id)
                     PanicIfReached(); // IMPROVE: support request_resize from non-main thread
+                return false;
 
                 auto gui =
                     (clap_plugin_gui const*)standalone.plugin.get_extension(&standalone.plugin, CLAP_EXT_GUI);

@@ -232,7 +232,7 @@ ErrorCodeOr<File> OpenFile(String filename, FileMode mode) {
         // It's necessary to use fchmod() to set the permissions instead of open(mode = 0666) because open()
         // uses umask and so will likely not actually set the permissions we want. fchmod() doesn't have that
         // problem.
-        if (fchmod(fileno((FILE*)file), 0666) != 0) {
+        if (fchmod(fileno(file), 0666) != 0) {
             fclose(file);
             return FilesystemErrnoErrorCode(errno, "fchmod");
         }

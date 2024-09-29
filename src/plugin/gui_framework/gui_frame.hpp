@@ -119,6 +119,7 @@ struct GuiFrameInput {
     f32 draw_scale_factor {1}; // TODO: I think we can remove this since pugl always provides us with pixels
     UiSize window_size {};
     void* native_window {}; // HWND, NSView*, etc.
+    void* pugl_view {}; // PuglView* for the current frame
 
     Atomic<bool> request_update {false};
 

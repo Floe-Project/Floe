@@ -799,7 +799,7 @@ static void DoSettingsModal(Gui* g) {
 
             if (width_change) {
                 auto const new_width = (int)g->settings.settings.gui.window_width + *width_change;
-                if (new_width > 0 && new_width < UINT16_MAX)
+                if (new_width > 0 && new_width <= UINT16_MAX)
                     gui_settings::SetWindowSize(g->settings.settings.gui,
                                                 g->settings.tracking,
                                                 (u16)new_width);

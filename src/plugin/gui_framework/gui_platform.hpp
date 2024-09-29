@@ -621,6 +621,7 @@ static void UpdateAndRender(GuiPlatform& platform) {
     platform.frame_state.native_window = (void*)puglGetNativeView(platform.view);
     platform.frame_state.window_size = window_size;
     platform.frame_state.draw_scale_factor = (f32)scale_factor;
+    platform.frame_state.pugl_view = platform.view;
 
     u32 num_repeats = 0;
     do {

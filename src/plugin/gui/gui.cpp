@@ -478,8 +478,9 @@ Gui::Gui(GuiFrameInput& frame_input, Engine& engine)
             auto const& host = this->engine.host;
             auto const host_gui = (clap_host_gui const*)host.get_extension(&host, CLAP_EXT_GUI);
             if (host_gui) {
-                auto const size =
-                    gui_settings::WindowSize(this->engine.shared_engine_systems.settings.settings.gui);
+                auto const size = PhysicalPixelsToClapPixels(
+                    (PuglView*)this->frame_input.pugl_view,
+                    gui_settings::WindowSize(this->engine.shared_engine_systems.settings.settings.gui));
                 host_gui->resize_hints_changed(&host);
                 host_gui->request_resize(&host, size.width, size.height);
             }

@@ -76,8 +76,10 @@ PUBLIC UiSize WindowSize(Settings::Gui const& gui) {
 // We don't set the height because it's calculated based on the aspect ratio and whether the gui keyboard
 // is shown or not
 PUBLIC void SetWindowSize(Settings::Gui& gui, SettingsTracking& tracking, u16 width) {
-    gui.window_width = CreateFromWidth(width, k_aspect_ratio_without_keyboard).width;
+    auto const new_width = CreateFromWidth(width, k_aspect_ratio_without_keyboard).width;
     ASSERT(gui.window_width != 0);
+    if (gui.window_width == new_width) return;
+    gui.window_width = new_width;
     tracking.changed = true;
     tracking.window_size_change_listeners.Call();
 }

@@ -9,6 +9,7 @@
 #include "clap/ext/thread-check.h"
 #include "clap/stream.h"
 #include "config.h"
+#include "pugl/pugl.h"
 
 struct PluginActivateArgs {
     f64 sample_rate;
@@ -79,6 +80,24 @@ struct PluginCallbacks {
 
 constexpr char const* k_supported_gui_api =
     IS_WINDOWS ? CLAP_WINDOW_API_WIN32 : (IS_MACOS ? CLAP_WINDOW_API_COCOA : CLAP_WINDOW_API_X11);
+
+// CLAP uses logical pixels on macOS. We always use physical pixels.
+PUBLIC UiSize PhysicalPixelsToClapPixels(PuglView* view, UiSize size) {
+    if constexpr (IS_MACOS) {
+        auto scale_factor = puglGetScaleFactor(view);
+        size.width = CheckedCast<u16>(size.width / scale_factor);
+        size.height = CheckedCast<u16>(size.height / scale_factor);
+    }
+    return size;
+}
+PUBLIC UiSize ClapPixelsToPhysicalPixels(PuglView* view, u32 width, u32 height) {
+    if constexpr (IS_MACOS) {
+        auto scale_factor = puglGetScaleFactor(view);
+        width = u32(width * scale_factor);
+        height = u32(height * scale_factor);
+    }
+    return {CheckedCast<u16>(width), CheckedCast<u16>(height)};
+}
 
 // We use the clap extension interface for our plugin and "host" (wrapper) to communicate to each other.
 static constexpr char k_floe_clap_extension_id[] = "floe.floe";

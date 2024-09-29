@@ -141,10 +141,10 @@ clap_plugin_gui const floe_gui {
     .get_size = [](clap_plugin_t const* plugin, u32* width, u32* height) -> bool {
         auto& floe = *(FloePluginInstance*)plugin->plugin_data;
         ASSERT(IsMainThread(floe.host));
-        auto size = WindowSize(*floe.gui_platform);
+        auto const size = PhysicalPixelsToClapPixels(floe.gui_platform->view, WindowSize(*floe.gui_platform));
         *width = size.width;
         *height = size.height;
-        g_log.Debug(k_clap_log_module, "get_size {} {}", *width, *height);
+        g_log.Debug(k_clap_log_module, "get_size result {}x{}", *width, *height);
         return true;
     },
 
@@ -164,46 +164,56 @@ clap_plugin_gui const floe_gui {
         return true;
     },
 
-    .adjust_size = [](clap_plugin_t const*, u32* width, u32* height) -> bool {
-        *width = Clamp<u32>(*width, 1, k_largest_gui_size);
-        *height = Clamp<u32>(*height, 1, k_largest_gui_size);
+    .adjust_size = [](clap_plugin_t const* plugin, u32* clap_width, u32* clap_height) -> bool {
+        auto& floe = *(FloePluginInstance*)plugin->plugin_data;
+        *clap_width = Clamp<u32>(*clap_width, 1, k_largest_gui_size);
+        *clap_height = Clamp<u32>(*clap_height, 1, k_largest_gui_size);
+        auto const size = ClapPixelsToPhysicalPixels(floe.gui_platform->view, *clap_width, *clap_height);
 
         auto const aspect_ratio_conformed_size = gui_settings::GetNearestAspectRatioSizeInsideSize(
-            {CheckedCast<u16>(*width), CheckedCast<u16>(*height)},
+            size,
             gui_settings::CurrentAspectRatio(g_shared_engine_systems->settings.settings.gui));
+
+        auto const clap_size =
+            PhysicalPixelsToClapPixels(floe.gui_platform->view, aspect_ratio_conformed_size);
+
         g_log.Debug(k_clap_log_module,
                     "adjust_size in: {}x{}, out: {}x{}",
-                    *width,
-                    *height,
-                    aspect_ratio_conformed_size.width,
-                    aspect_ratio_conformed_size.height);
-        *width = aspect_ratio_conformed_size.width;
-        *height = aspect_ratio_conformed_size.height;
+                    *clap_width,
+                    *clap_height,
+                    clap_size.width,
+                    clap_size.height);
+
+        *clap_width = clap_size.width;
+        *clap_height = clap_size.height;
+
         return true;
     },
 
-    .set_size = [](clap_plugin_t const* plugin, u32 width, u32 height) -> bool {
+    .set_size = [](clap_plugin_t const* plugin, u32 clap_width, u32 clap_height) -> bool {
         auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-        ZoneScopedMessage(floe.trace_config, "gui set_size {} {}", width, height);
+        ZoneScopedMessage(floe.trace_config, "gui set_size {} {}", clap_width, clap_height);
         ASSERT(IsMainThread(floe.host));
 
-        if (width == 0 || height == 0) return false;
-        if (width > k_largest_gui_size || height > k_largest_gui_size) return false;
+        if (clap_width == 0 || clap_height == 0) return false;
+        if (clap_width > k_largest_gui_size || clap_height > k_largest_gui_size) return false;
+        auto const size = ClapPixelsToPhysicalPixels(floe.gui_platform->view, clap_width, clap_height);
 
         auto const aspect_ratio_conformed_size = gui_settings::GetNearestAspectRatioSizeInsideSize(
-            {CheckedCast<u16>(width), CheckedCast<u16>(height)},
+            size,
             gui_settings::CurrentAspectRatio(g_shared_engine_systems->settings.settings.gui));
         g_log.Debug(k_clap_log_module,
                     "set_size in: {}x{}, constrained {}x{}, result: {}",
-                    width,
-                    height,
+                    size.width,
+                    size.height,
                     aspect_ratio_conformed_size.width,
                     aspect_ratio_conformed_size.height,
-                    aspect_ratio_conformed_size.width == width &&
-                        aspect_ratio_conformed_size.height == height);
-        if (aspect_ratio_conformed_size.width != width || aspect_ratio_conformed_size.height != height)
+                    aspect_ratio_conformed_size.width == size.width &&
+                        aspect_ratio_conformed_size.height == size.height);
+        if (aspect_ratio_conformed_size.width != size.width ||
+            aspect_ratio_conformed_size.height != size.height)
             return false;
-        return SetSize(*floe.gui_platform, {CheckedCast<u16>(width), CheckedCast<u16>(height)});
+        return SetSize(*floe.gui_platform, size);
     },
 
     .set_parent = [](clap_plugin_t const* plugin, clap_window_t const* window) -> bool {

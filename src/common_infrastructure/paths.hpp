@@ -6,7 +6,7 @@
 #include "os/filesystem.hpp"
 #include "utils/logger/logger.hpp"
 
-enum class ScanFolderType { Presets, Libraries, Count };
+enum class ScanFolderType : u8 { Presets, Libraries, Count };
 
 struct FloePaths {
     String always_scanned_folder[ToInt(ScanFolderType::Count)];

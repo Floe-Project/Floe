@@ -11,7 +11,7 @@
 SharedEngineSystems::SharedEngineSystems()
     : arena(PageAllocator::Instance(), Kb(4))
     , paths(CreateFloePaths(arena))
-    , settings(paths)
+    , settings {.paths = paths}
     , sample_library_server(thread_pool,
                             paths.always_scanned_folder[ToInt(ScanFolderType::Libraries)],
                             error_notifications) {
@@ -24,7 +24,7 @@ SharedEngineSystems::SharedEngineSystems()
                 case ScanFolderType::Libraries: {
                     sample_lib_server::SetExtraScanFolders(
                         sample_library_server,
-                        settings.settings.filesystem.extra_libraries_scan_folders);
+                        settings.settings.filesystem.extra_scan_folders[ToInt(ScanFolderType::Libraries)]);
                     break;
                 }
                 case ScanFolderType::Count: PanicIfReached();
@@ -36,8 +36,9 @@ SharedEngineSystems::SharedEngineSystems()
 
     ASSERT(settings.settings.gui.window_width != 0);
 
-    sample_lib_server::SetExtraScanFolders(sample_library_server,
-                                           settings.settings.filesystem.extra_libraries_scan_folders);
+    sample_lib_server::SetExtraScanFolders(
+        sample_library_server,
+        settings.settings.filesystem.extra_scan_folders[ToInt(ScanFolderType::Libraries)]);
 }
 
 SharedEngineSystems::~SharedEngineSystems() {

@@ -15,8 +15,6 @@
 #include "settings_gui.hpp"
 #include "settings_midi.hpp"
 
-SettingsFile::SettingsFile(FloePaths const& paths) : paths(paths) {}
-
 struct LegacyJsonSettingsParser {
     LegacyJsonSettingsParser(Settings& content, ArenaAllocator& a, ArenaAllocator& scratch_arena)
         : content(content)
@@ -26,11 +24,8 @@ struct LegacyJsonSettingsParser {
     bool HandleEvent(json::EventHandlerStack& handler_stack, json::Event const& event) {
         Optional<String> folder {};
         if (SetIfMatchingRef(event, "extra_presets_folder", folder)) {
-            if (path::IsAbsolute(*folder)) {
-                auto paths = allocator.AllocateExactSizeUninitialised<String>(1);
-                PLACEMENT_NEW(&paths[0]) String(*folder);
-                content.filesystem.extra_presets_scan_folders = paths;
-            }
+            if (path::IsAbsolute(*folder))
+                dyn::Append(content.filesystem.extra_scan_folders[ToInt(ScanFolderType::Presets)], *folder);
             return true;
         }
         if (json::SetIfMatchingArray(
@@ -178,13 +173,15 @@ static bool ParseLegacyJsonFile(Settings& content,
                                {});
     if (o.HasError()) return false;
 
-    DynamicArray<String> folders {content_arena};
+    dyn::Clear(content.filesystem.extra_scan_folders[ToInt(ScanFolderType::Libraries)]);
     for (auto p : parser.libraries) {
         auto const dir = path::Directory(p);
         if (dir && *dir != paths.always_scanned_folder[ToInt(ScanFolderType::Libraries)])
-            if (auto const d = path::Directory(p)) dyn::AppendIfNotAlreadyThere(folders, *d);
+            if (auto const d = path::Directory(p))
+                dyn::AppendIfNotAlreadyThere(
+                    content.filesystem.extra_scan_folders[ToInt(ScanFolderType::Libraries)],
+                    *d);
     }
-    content.filesystem.extra_libraries_scan_folders = folders.ToOwnedSpan();
 
     return true;
 }
@@ -235,6 +232,8 @@ enum class KeyType : u32 {
     CcToParamIdMap,
     ExtraLibrariesFolder,
     ExtraPresetsFolder,
+    LibrariesInstallLocation,
+    PresetsInstallLocation,
     GuiKeyboardOctave,
     HighContrastGui,
     PresetsRandomMode,
@@ -249,6 +248,8 @@ constexpr String Key(KeyType k) {
         case KeyType::CcToParamIdMap: return "cc_to_param_id_map"_s;
         case KeyType::ExtraLibrariesFolder: return "extra_libraries_folder"_s;
         case KeyType::ExtraPresetsFolder: return "extra_presets_folder"_s;
+        case KeyType::LibrariesInstallLocation: return "libraries_install_location"_s;
+        case KeyType::PresetsInstallLocation: return "presets_install_location"_s;
         case KeyType::GuiKeyboardOctave: return "gui_keyboard_octave"_s;
         case KeyType::HighContrastGui: return "high_contrast_gui"_s;
         case KeyType::PresetsRandomMode: return "presets_random_mode"_s;
@@ -259,11 +260,27 @@ constexpr String Key(KeyType k) {
     }
 }
 
+constexpr KeyType ScanFolderKeyType(ScanFolderType scan_folder) {
+    switch (scan_folder) {
+        case ScanFolderType::Presets: return KeyType::ExtraPresetsFolder;
+        case ScanFolderType::Libraries: return KeyType::ExtraLibrariesFolder;
+        case ScanFolderType::Count: PanicIfReached();
+    }
+    return {};
+}
+
+constexpr KeyType InstallLocationKeyType(ScanFolderType scan_folder) {
+    switch (scan_folder) {
+        case ScanFolderType::Presets: return KeyType::PresetsInstallLocation;
+        case ScanFolderType::Libraries: return KeyType::LibrariesInstallLocation;
+        case ScanFolderType::Count: PanicIfReached();
+    }
+    return {};
+}
+
 static void
 Parse(Settings& content, ArenaAllocator& content_allocator, ArenaAllocator& scratch_arena, String file_data) {
     DynamicArray<String> unknown_lines {scratch_arena};
-    DynamicArray<String> extra_libraries_folders {scratch_arena};
-    DynamicArray<String> presets_folders {scratch_arena};
 
     Optional<usize> cursor = 0uz;
     while (cursor) {
@@ -301,23 +318,34 @@ Parse(Settings& content, ArenaAllocator& content_allocator, ArenaAllocator& scra
             }
         }
 
-        {
-            // The same key is allowed to appear more than once. We just append each value to an array.
-            String path {};
-            if (SetIfMatching(line, Key(KeyType::ExtraLibrariesFolder), path)) {
-                if (path::IsAbsolute(path)) dyn::Append(extra_libraries_folders, path);
-                continue;
+        bool matched = false;
+        for (auto const scan_folder_type : Range(ToInt(ScanFolderType::Count))) {
+            {
+                // The same key is allowed to appear more than once. We just append each value to an array.
+                String path {};
+                if (SetIfMatching(line, Key(ScanFolderKeyType((ScanFolderType)scan_folder_type)), path)) {
+                    if (path::IsAbsolute(path))
+                        dyn::Append(content.filesystem.extra_scan_folders[scan_folder_type],
+                                    content.path_pool.Clone(path, content_allocator));
+                    matched = true;
+                    break;
+                }
             }
-        }
 
-        {
-            // The same key is allowed to appear more than once. We just append each value to an array.
-            String path {};
-            if (SetIfMatching(line, Key(KeyType::ExtraPresetsFolder), path)) {
-                if (path::IsAbsolute(path)) dyn::Append(presets_folders, path);
-                continue;
+            {
+                String path {};
+                if (SetIfMatching(line,
+                                  Key(InstallLocationKeyType((ScanFolderType)scan_folder_type)),
+                                  path)) {
+                    if (path::IsAbsolute(path))
+                        content.filesystem.install_location[scan_folder_type] =
+                            content.path_pool.Clone(path, content_allocator);
+                    matched = true;
+                    break;
+                }
             }
         }
+        if (matched) continue;
 
         if (SetIfMatching(line, Key(KeyType::GuiKeyboardOctave), content.gui.keyboard_octave)) continue;
         if (SetIfMatching(line, Key(KeyType::HighContrastGui), content.gui.high_contrast_gui)) continue;
@@ -329,13 +357,10 @@ Parse(Settings& content, ArenaAllocator& content_allocator, ArenaAllocator& scra
         dyn::Append(unknown_lines, line);
     }
 
-    content.filesystem.extra_libraries_scan_folders =
-        content_allocator.Clone(extra_libraries_folders, CloneType::Deep);
-    content.filesystem.extra_presets_scan_folders = content_allocator.Clone(presets_folders, CloneType::Deep);
     content.unknown_lines_from_file = content_allocator.Clone(unknown_lines, CloneType::Deep);
 }
 
-ErrorCodeOr<void> WriteFile(Settings const& data, String path, s128 time) {
+ErrorCodeOr<void> WriteFile(Settings const& data, FloePaths const& paths, String path, s128 time) {
     ArenaAllocatorWithInlineStorage<4000> scratch_arena;
 
     auto _ = CreateDirectory(path::Directory(path).ValueOr({}),
@@ -361,10 +386,21 @@ ErrorCodeOr<void> WriteFile(Settings const& data, String path, s128 time) {
         TRY(fmt::AppendLine(writer, "{} = {}:{}", Key(KeyType::CcToParamIdMap), cc->cc_num, buf));
     }
 
-    for (auto p : data.filesystem.extra_libraries_scan_folders)
-        TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::ExtraLibrariesFolder), p));
-    for (auto p : data.filesystem.extra_presets_scan_folders)
-        TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::ExtraPresetsFolder), p));
+    for (auto const scan_folder_type : Range(ToInt(ScanFolderType::Count))) {
+        for (auto p : data.filesystem.extra_scan_folders[scan_folder_type]) {
+            TRY(fmt::AppendLine(writer,
+                                "{} = {}",
+                                Key(ScanFolderKeyType((ScanFolderType)scan_folder_type)),
+                                p));
+        }
+        if (path::IsAbsolute(data.filesystem.install_location[scan_folder_type]) &&
+            data.filesystem.install_location[scan_folder_type] !=
+                paths.always_scanned_folder[scan_folder_type])
+            TRY(fmt::AppendLine(writer,
+                                "{} = {}",
+                                Key(InstallLocationKeyType((ScanFolderType)scan_folder_type)),
+                                data.filesystem.install_location[scan_folder_type]));
+    }
 
     TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::GuiKeyboardOctave), data.gui.keyboard_octave));
     TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::HighContrastGui), data.gui.high_contrast_gui));
@@ -394,7 +430,7 @@ void InitSettingsFile(SettingsFile& settings, FloePaths const& paths) {
         settings.settings = opt_data->settings;
         settings.last_modified_time = opt_data->last_modified_time;
     }
-    if (InitialiseSettingsFileData(settings.settings, settings.arena, file_is_new))
+    if (InitialiseSettingsFileData(settings.settings, paths, settings.arena, file_is_new))
         settings.tracking.changed = true;
 
     auto watcher = CreateDirectoryWatcher(settings.watcher_arena);
@@ -464,13 +500,24 @@ void PollForSettingsFileChanges(SettingsFile& settings) {
     }
 }
 
-bool InitialiseSettingsFileData(Settings& file, ArenaAllocator& arena, bool file_is_brand_new) {
+bool InitialiseSettingsFileData(Settings& file,
+                                FloePaths const& floe_paths,
+                                ArenaAllocator& arena,
+                                bool file_is_brand_new) {
     bool changed = false;
     changed = changed || midi_settings::Initialise(file.midi, arena, file_is_brand_new);
     if (file.gui.window_width == 0) {
         file.gui.window_width = gui_settings::CreateFromWidth(gui_settings::k_default_gui_width_approx,
                                                               gui_settings::k_aspect_ratio_without_keyboard)
                                     .width;
+    }
+    for (auto const scan_folder_type : Range(ToInt(ScanFolderType::Count))) {
+        auto const default_folder = floe_paths.always_scanned_folder[scan_folder_type];
+        auto& loc = file.filesystem.install_location[scan_folder_type];
+        if (!path::IsAbsolute(loc))
+            loc = default_folder;
+        else if (loc != default_folder && !Find(file.filesystem.extra_scan_folders[scan_folder_type], loc))
+            loc = default_folder;
     }
     return changed;
 }
@@ -503,14 +550,15 @@ Optional<SettingsReadResult> FindAndReadSettingsFile(ArenaAllocator& a, FloePath
     return k_nullopt;
 }
 
-ErrorCodeOr<void> WriteSettingsFile(Settings const& data, String path, s128 time) {
-    return ini::WriteFile(data, path, time);
+ErrorCodeOr<void> WriteSettingsFile(Settings const& data, FloePaths const& paths, String path, s128 time) {
+    return ini::WriteFile(data, paths, path, time);
 }
 
 ErrorCodeOr<void> WriteSettingsFileIfChanged(SettingsFile& settings) {
     if (Exchange(settings.tracking.changed, false)) {
         settings.last_modified_time = NanosecondsSinceEpoch();
         return ini::WriteFile(settings.settings,
+                              settings.paths,
                               settings.paths.settings_write_path,
                               settings.last_modified_time);
     }
@@ -569,17 +617,17 @@ TEST_CASE(TestJsonParsing) {
 
     REQUIRE(parsed_json);
 
-    CHECK_EQ(result.filesystem.extra_libraries_scan_folders.size, 1uz);
-    if (result.filesystem.extra_libraries_scan_folders.size)
-        CHECK_EQ(result.filesystem.extra_libraries_scan_folders[0],
+    CHECK_EQ(result.filesystem.extra_scan_folders[ToInt(ScanFolderType::Libraries)].size, 1uz);
+    if (result.filesystem.extra_scan_folders[ToInt(ScanFolderType::Libraries)].size)
+        CHECK_EQ(result.filesystem.extra_scan_folders[ToInt(ScanFolderType::Libraries)][0],
                  fmt::Format(scratch_arena, "{}mdatas", root_dir));
 
-    auto const changed = InitialiseSettingsFileData(result, arena, false);
+    auto const changed = InitialiseSettingsFileData(result, paths, arena, false);
     CHECK(!changed);
 
-    CHECK_EQ(result.filesystem.extra_presets_scan_folders.size, 1uz);
-    if (result.filesystem.extra_presets_scan_folders.size) {
-        CHECK_EQ(result.filesystem.extra_presets_scan_folders[0],
+    CHECK_EQ(result.filesystem.extra_scan_folders[ToInt(ScanFolderType::Presets)].size, 1uz);
+    if (result.filesystem.extra_scan_folders[ToInt(ScanFolderType::Presets)].size) {
+        CHECK_EQ(result.filesystem.extra_scan_folders[ToInt(ScanFolderType::Presets)][0],
                  fmt::Format(scratch_arena, "{}Presets"_s, root_dir));
     }
 
@@ -599,6 +647,7 @@ TEST_CASE(TestJsonParsing) {
 TEST_CASE(TestIniParsing) {
     PageAllocator page_allocator;
     ArenaAllocator scratch_arena {page_allocator};
+    FloePaths const paths {};
 
     DynamicArray<char> ini {R"foo(show_tooltips = true
 gui_keyboard_octave = 0
@@ -622,19 +671,19 @@ non_existent_key = novalue)foo"_s,
     ini::Parse(data, arena, scratch_arena, ini);
 
     auto check_data = [&](Settings const& data) {
-        CHECK_EQ(data.filesystem.extra_libraries_scan_folders.size, 2uz);
-        if (data.filesystem.extra_libraries_scan_folders.size) {
-            CHECK_EQ(data.filesystem.extra_libraries_scan_folders[0],
+        CHECK_EQ(data.filesystem.extra_scan_folders[ToInt(ScanFolderType::Libraries)].size, 2uz);
+        if (data.filesystem.extra_scan_folders[ToInt(ScanFolderType::Libraries)].size) {
+            CHECK_EQ(data.filesystem.extra_scan_folders[ToInt(ScanFolderType::Libraries)][0],
                      fmt::Format(scratch_arena, "{}Libraries"_s, root_dir));
-            CHECK_EQ(data.filesystem.extra_libraries_scan_folders[1],
+            CHECK_EQ(data.filesystem.extra_scan_folders[ToInt(ScanFolderType::Libraries)][1],
                      fmt::Format(scratch_arena, "{}Floe Libraries"_s, root_dir));
         }
 
-        CHECK_EQ(data.filesystem.extra_presets_scan_folders.size, 2uz);
-        if (data.filesystem.extra_presets_scan_folders.size) {
-            CHECK_EQ(data.filesystem.extra_presets_scan_folders[0],
+        CHECK_EQ(data.filesystem.extra_scan_folders[ToInt(ScanFolderType::Presets)].size, 2uz);
+        if (data.filesystem.extra_scan_folders[ToInt(ScanFolderType::Presets)].size) {
+            CHECK_EQ(data.filesystem.extra_scan_folders[ToInt(ScanFolderType::Presets)][0],
                      fmt::Format(scratch_arena, "{}Projects/Test"_s, root_dir));
-            CHECK_EQ(data.filesystem.extra_presets_scan_folders[1],
+            CHECK_EQ(data.filesystem.extra_scan_folders[ToInt(ScanFolderType::Presets)][1],
                      fmt::Format(scratch_arena, "{}Presets"_s, root_dir));
         }
 
@@ -661,7 +710,7 @@ non_existent_key = novalue)foo"_s,
 
     {
         auto const path = path::Join(scratch_arena, Array {tests::TempFolder(tester), "settings.ini"_s});
-        TRY(WriteSettingsFile(data, path));
+        TRY(WriteSettingsFile(data, paths, path));
 
         Settings reparsed_data {};
         ini::Parse(reparsed_data, arena, scratch_arena, TRY(ReadEntireFile(path, arena)));

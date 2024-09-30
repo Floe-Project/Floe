@@ -511,11 +511,12 @@ Engine::Engine(clap_host const& host, SharedEngineSystems& shared_engine_systems
     presets_folder_listener_id =
         shared_engine_systems.preset_listing.scanned_folder.listeners.Add([&engine = *this]() {
             RunFunctionOnMainThread(engine, [&engine]() {
-                auto listing = FetchOrRescanPresetsFolder(
-                    engine.shared_engine_systems.preset_listing,
-                    RescanMode::DontRescan,
-                    engine.shared_engine_systems.settings.settings.filesystem.extra_presets_scan_folders,
-                    nullptr);
+                auto listing =
+                    FetchOrRescanPresetsFolder(engine.shared_engine_systems.preset_listing,
+                                               RescanMode::DontRescan,
+                                               engine.shared_engine_systems.settings.settings.filesystem
+                                                   .extra_scan_folders[ToInt(ScanFolderType::Presets)],
+                                               nullptr);
 
                 if (engine.pending_preset_selection_criteria) {
                     LoadPresetFromListing(engine, *engine.pending_preset_selection_criteria, listing);

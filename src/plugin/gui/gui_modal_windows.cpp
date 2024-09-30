@@ -405,10 +405,11 @@ static void DoLoadingOverlay(Gui* g) {
     auto const settings = ModalWindowSettings(g->imgui);
 
     if (g->engine.pending_state_change ||
-        FetchOrRescanPresetsFolder(g->shared_engine_systems.preset_listing,
-                                   RescanMode::DontRescan,
-                                   g->settings.settings.filesystem.extra_presets_scan_folders,
-                                   nullptr)
+        FetchOrRescanPresetsFolder(
+            g->shared_engine_systems.preset_listing,
+            RescanMode::DontRescan,
+            g->settings.settings.filesystem.extra_scan_folders[ToInt(ScanFolderType::Presets)],
+            nullptr)
             .is_loading) {
         imgui.BeginWindow(settings, r, "LoadingModal");
         DEFER { imgui.EndWindow(); };
@@ -904,7 +905,7 @@ static void DoSettingsModal(Gui* g) {
             auto edits = do_scan_folder_gui(
                 "Library scan-folders",
                 "Folders that contain libraries (scanned recursively)",
-                g->settings.settings.filesystem.extra_libraries_scan_folders,
+                g->settings.settings.filesystem.extra_scan_folders[ToInt(ScanFolderType::Libraries)],
                 g->shared_engine_systems.paths.always_scanned_folder[ToInt(ScanFolderType::Libraries)]);
 
             if (edits.remove)
@@ -917,7 +918,7 @@ static void DoSettingsModal(Gui* g) {
             auto edits = do_scan_folder_gui(
                 "Preset scan-folders",
                 "Folders that contain presets (scanned recursively)",
-                g->settings.settings.filesystem.extra_presets_scan_folders,
+                g->settings.settings.filesystem.extra_scan_folders[ToInt(ScanFolderType::Presets)],
                 g->shared_engine_systems.paths.always_scanned_folder[ToInt(ScanFolderType::Presets)]);
 
             if (edits.remove)

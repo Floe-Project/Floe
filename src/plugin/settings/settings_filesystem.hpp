@@ -6,41 +6,46 @@
 
 namespace filesystem_settings {
 
-namespace detail {
+PUBLIC void SetInstallLocation(SettingsFile& settings, ScanFolderType type, String path) {
+    if (!path::IsAbsolute(path)) return;
+    auto& install_location = settings.settings.filesystem.install_location[ToInt(type)];
+    if (install_location == path) return;
 
-static Span<String>* ScanFolderPaths(Settings& settings, ScanFolderType type) {
-    switch (type) {
-        case ScanFolderType::Presets: return &settings.filesystem.extra_presets_scan_folders;
-        case ScanFolderType::Libraries: return &settings.filesystem.extra_libraries_scan_folders;
-        case ScanFolderType::Count: PanicIfReached();
+    // the install location must be in the list of scan folders
+    if (path != settings.paths.always_scanned_folder[ToInt(type)] &&
+        !Find(settings.settings.filesystem.extra_scan_folders[ToInt(type)], path)) {
+        return;
     }
-    return nullptr;
+
+    settings.settings.path_pool.Free(install_location);
+    install_location = settings.settings.path_pool.Clone(path, settings.arena);
+    settings.tracking.changed = true;
 }
 
-} // namespace detail
-
 PUBLIC void AddScanFolder(SettingsFile& settings, ScanFolderType type, String path) {
+    if (!path::IsAbsolute(path)) return;
     if (path == settings.paths.always_scanned_folder[ToInt(type)]) return;
 
-    auto& paths = *detail::ScanFolderPaths(settings.settings, type);
-
-    auto folders = DynamicArray<String>::FromOwnedSpan(paths, settings.arena);
-    dyn::AppendIfNotAlreadyThere(folders, path);
-    paths = folders.ToOwnedSpan();
-
-    settings.tracking.changed = true;
-    settings.tracking.filesystem_change_listeners.Call(type);
+    if (dyn::AppendIfNotAlreadyThere(settings.settings.filesystem.extra_scan_folders[ToInt(type)],
+                                     settings.settings.path_pool.Clone(path, settings.arena))) {
+        settings.tracking.changed = true;
+        settings.tracking.filesystem_change_listeners.Call(type);
+    }
 }
 
 PUBLIC void RemoveScanFolder(SettingsFile& settings, ScanFolderType type, String path) {
-    auto& paths = *detail::ScanFolderPaths(settings.settings, type);
+    auto& paths = settings.settings.filesystem.extra_scan_folders[ToInt(type)];
+    auto opt_index = Find(paths, path);
+    if (opt_index) {
+        if (path == settings.settings.filesystem.install_location[ToInt(type)])
+            SetInstallLocation(settings, type, settings.paths.always_scanned_folder[ToInt(type)]);
 
-    auto folders = DynamicArray<String>::FromOwnedSpan(paths, settings.arena);
-    dyn::RemoveValueSwapLast(folders, path);
-    paths = folders.ToOwnedSpan();
+        settings.settings.path_pool.Free(path);
+        dyn::RemoveSwapLast(paths, *opt_index);
 
-    settings.tracking.changed = true;
-    settings.tracking.filesystem_change_listeners.Call(type);
+        settings.tracking.changed = true;
+        settings.tracking.filesystem_change_listeners.Call(type);
+    }
 }
 
 } // namespace filesystem_settings

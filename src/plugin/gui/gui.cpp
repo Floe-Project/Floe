@@ -359,7 +359,8 @@ static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
         }
         case DialogType::AddNewLibraryScanFolder: {
             Optional<String> default_folder {};
-            if (auto extra_paths = g->settings.settings.filesystem.extra_libraries_scan_folders;
+            if (auto extra_paths =
+                    g->settings.settings.filesystem.extra_scan_folders[ToInt(ScanFolderType::Libraries)];
                 extra_paths.size)
                 default_folder = extra_paths[0];
 
@@ -379,7 +380,8 @@ static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
         }
         case DialogType::AddNewPresetsScanFolder: {
             Optional<String> default_folder {};
-            if (auto extra_paths = g->settings.settings.filesystem.extra_presets_scan_folders;
+            if (auto extra_paths =
+                    g->settings.settings.filesystem.extra_scan_folders[ToInt(ScanFolderType::Presets)];
                 extra_paths.size)
                 default_folder = extra_paths[0];
 
@@ -400,8 +402,8 @@ static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
         case DialogType::LoadPreset:
         case DialogType::SavePreset: {
             Optional<String> default_path {};
-            auto& preset_scan_folders =
-                g->shared_engine_systems.settings.settings.filesystem.extra_presets_scan_folders;
+            auto& preset_scan_folders = g->shared_engine_systems.settings.settings.filesystem
+                                            .extra_scan_folders[ToInt(ScanFolderType::Presets)];
             if (preset_scan_folders.size) {
                 default_path =
                     path::Join(g->scratch_arena,

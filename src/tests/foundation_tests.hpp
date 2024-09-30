@@ -62,6 +62,31 @@ TEST_CASE(TestTaggedUnion) {
     return k_success;
 }
 
+TEST_CASE(TestPathPool) {
+    auto& a = tester.scratch_arena;
+
+    PathPool pool;
+
+    SUBCASE("all allocations are freed") {
+        DynamicArrayBounded<String, 10> paths;
+        dyn::Append(paths, pool.Clone("abcde", a));
+        dyn::Append(paths, pool.Clone("a", a));
+        dyn::Append(paths, pool.Clone("b", a));
+        dyn::Append(paths, pool.Clone("c", a));
+        dyn::Append(paths, pool.Clone("abc", a));
+        dyn::Append(paths, pool.Clone("ab", a));
+        dyn::Append(paths, pool.Clone("a", a));
+
+        for (auto p : paths)
+            pool.Free(p);
+
+        CHECK(pool.used_list == nullptr);
+        CHECK(pool.free_list != nullptr);
+    }
+
+    return k_success;
+}
+
 TEST_CASE(TestBitset) {
     {
         Bitset<65> b;
@@ -2754,9 +2779,9 @@ TEST_REGISTRATION(RegisterFoundationTests) {
     REGISTER_TEST(TestDynamicArrayBasics<AllocedString>);
     REGISTER_TEST(TestDynamicArrayBasics<Optional<AllocedString>>);
     REGISTER_TEST(TestDynamicArrayBasics<int>);
+    REGISTER_TEST(TestDynamicArrayBoundedBasics);
     REGISTER_TEST(TestDynamicArrayChar);
     REGISTER_TEST(TestDynamicArrayClone);
-    REGISTER_TEST(TestDynamicArrayBoundedBasics);
     REGISTER_TEST(TestDynamicArrayString);
     REGISTER_TEST(TestFormat);
     REGISTER_TEST(TestFormatStringReplace);
@@ -2775,6 +2800,7 @@ TEST_REGISTRATION(RegisterFoundationTests) {
     REGISTER_TEST(TestParseFloat);
     REGISTER_TEST(TestParseInt);
     REGISTER_TEST(TestPath);
+    REGISTER_TEST(TestPathPool);
     REGISTER_TEST(TestRandomFloatGenerator<f32>);
     REGISTER_TEST(TestRandomFloatGenerator<f64>);
     REGISTER_TEST(TestRandomIntGeneratorUnsigned);

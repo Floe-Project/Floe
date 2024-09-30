@@ -29,6 +29,7 @@
 #include "container/hash_table.hpp" // IWYU pragma: export
 #include "container/optional.hpp" // IWYU pragma: export
 #include "container/pair.hpp" // IWYU pragma: export
+#include "container/path_pool.hpp" // IWYU pragma: export
 #include "container/queue.hpp" // IWYU pragma: export
 #include "container/span.hpp" // IWYU pragma: export
 #include "container/tagged_union.hpp" // IWYU pragma: export

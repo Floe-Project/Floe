@@ -10,8 +10,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "utils/logger/logger.hpp"
-
 #if __linux__
 #include <sys/stat.h>
 #endif
@@ -19,6 +17,8 @@
 #include "foundation/foundation.hpp"
 
 #include "filesystem.hpp"
+
+static_assert(path::k_max >= PATH_MAX);
 
 ErrorCodeOr<void> WindowsSetFileAttributes(String, Optional<WindowsFileAttributes>) { return k_success; }
 

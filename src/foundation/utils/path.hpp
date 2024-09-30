@@ -8,6 +8,8 @@
 
 namespace path {
 
+constexpr usize k_max = IS_WINDOWS ? (32767 * 3 + 1) : 4096;
+
 enum class Format {
     Windows,
     Posix,
@@ -93,6 +95,7 @@ PUBLIC constexpr WindowsPathInfo ParseWindowsPath(String path) {
 }
 
 PUBLIC constexpr bool IsAbsolute(String path, Format format = Format::Native) {
+    if (path.size > k_max) return false;
     if (format == Format::Windows)
         return ParseWindowsPath(path).is_abs;
     else

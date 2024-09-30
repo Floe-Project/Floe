@@ -23,7 +23,7 @@ void BotPanel(Gui* g) {
                                    {
                                        .size = imgui.Size(),
                                        .contents_direction = layout::Direction::Row,
-                                       .contents_align = layout::JustifyContent::Start,
+                                       .contents_align = layout::Alignment::Start,
                                    });
     auto controls = layout::CreateItem(
         lay,
@@ -31,7 +31,7 @@ void BotPanel(Gui* g) {
             .parent = root,
             .size = {LiveSize(imgui, UiSizeId::MidiKeyboardControlWidth), imgui.Height() * 0.9f},
             .contents_direction = layout::Direction::Row,
-            .contents_align = layout::JustifyContent::Start,
+            .contents_align = layout::Alignment::Start,
         });
 
     auto oct_container = layout::CreateItem(
@@ -40,7 +40,7 @@ void BotPanel(Gui* g) {
             .parent = controls,
             .size = {LiveSize(imgui, UiSizeId::MidiKeyboardSlider) * 1.5f, layout::k_fill_parent},
             .contents_direction = layout::Direction::Column,
-            .contents_align = layout::JustifyContent::Middle,
+            .contents_align = layout::Alignment::Middle,
         });
 
     auto oct_up = layout::CreateItem(lay,

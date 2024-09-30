@@ -11,7 +11,7 @@
 
 namespace layout {
 
-void ReserveItemsCapacity(Context& ctx, Id count) {
+void ReserveItemsCapacity(Context& ctx, u32 count) {
     if (count >= ctx.capacity) {
         ctx.capacity = count;
         auto const item_size = sizeof(Item) + sizeof(f32x4);
@@ -34,10 +34,6 @@ void ResetContext(Context& ctx) { ctx.num_items = 0; }
 static void CalcSize(Context& ctx, Id item, u32 dim);
 static void Arrange(Context& ctx, Id item, u32 dim);
 
-void RunContext(Context& ctx) {
-    if (ctx.num_items > 0) RunItem(ctx, 0);
-}
-
 void RunItem(Context& ctx, Id id) {
     CalcSize(ctx, id, 0);
     Arrange(ctx, id, 0);
@@ -45,19 +41,23 @@ void RunItem(Context& ctx, Id id) {
     Arrange(ctx, id, 1);
 }
 
+void RunContext(Context& ctx) {
+    if (ctx.num_items > 0) RunItem(ctx, Id {0});
+}
+
 void ClearItemBreak(Context& ctx, Id item) {
     Item* pitem = GetItem(ctx, item);
     pitem->flags = pitem->flags & ~flags::LineBreak;
 }
 
-Id ItemsCount(Context& ctx) { return ctx.num_items; }
+u32 ItemsCount(Context& ctx) { return ctx.num_items; }
 
-Id ItemsCapacity(Context& ctx) { return ctx.capacity; }
+u32 ItemsCapacity(Context& ctx) { return ctx.capacity; }
 
 Id CreateItem(Context& ctx) {
-    Id idx = ctx.num_items++;
+    Id idx {ctx.num_items++};
 
-    if (idx >= ctx.capacity) {
+    if (ToInt(idx) >= ctx.capacity) {
         ctx.capacity = ctx.capacity < 1 ? 32 : (ctx.capacity * 4);
         auto const item_size = sizeof(Item) + sizeof(f32x4);
         ctx.items = (Item*)GpaRealloc(ctx.items, ctx.capacity * item_size);
@@ -71,7 +71,7 @@ Id CreateItem(Context& ctx) {
     item->first_child = k_invalid_id;
     item->next_sibling = k_invalid_id;
     // hmm
-    ctx.rects[idx] = {};
+    ctx.rects[ToInt(idx)] = {};
     return idx;
 }
 
@@ -97,7 +97,7 @@ Id LastChild(Context const& ctx, Id parent_id) {
 }
 
 void Append(Context& ctx, Id earlier_id, Id later_id) {
-    ASSERT(later_id != 0); // Must not be root item
+    ASSERT(later_id != Id {0}); // Must not be root item
     ASSERT(earlier_id != later_id); // Must not be same item id
     Item* __restrict earlier = GetItem(ctx, earlier_id);
     Item* __restrict later = GetItem(ctx, later_id);
@@ -105,7 +105,7 @@ void Append(Context& ctx, Id earlier_id, Id later_id) {
 }
 
 void Insert(Context& ctx, Id parent_id, Id child_id) {
-    ASSERT(child_id != 0); // Must not be root item
+    ASSERT(child_id != Id {0}); // Must not be root item
     ASSERT(parent_id != child_id); // Must not be same item id
     Item* __restrict parent = GetItem(ctx, parent_id);
     Item* __restrict child = GetItem(ctx, child_id);
@@ -128,7 +128,7 @@ void Insert(Context& ctx, Id parent_id, Id child_id) {
 }
 
 void Push(Context& ctx, Id parent_id, Id new_child_id) {
-    ASSERT(new_child_id != 0); // Must not be root item
+    ASSERT(new_child_id != Id {0}); // Must not be root item
     ASSERT(parent_id != new_child_id); // Must not be same item id
     Item* __restrict parent = GetItem(ctx, parent_id);
     auto old_child = parent->first_child;
@@ -147,7 +147,7 @@ static ALWAYS_INLINE f32 MaxChildSize(Context& ctx, Id id, u32 dim) {
     while (child_id != k_invalid_id) {
         auto const child = GetItem(ctx, child_id);
         // rect[dim] will contain the start margin already
-        auto const rect = ctx.rects[child_id];
+        auto const rect = ctx.rects[ToInt(child_id)];
         auto const child_size = rect[dim] + rect[size_dim] + child->margins_ltrb[size_dim];
         max_child_size = Max(max_child_size, child_size);
         child_id = child->next_sibling;
@@ -162,7 +162,7 @@ static ALWAYS_INLINE f32 TotalChildSize(Context& ctx, Id id, u32 dim) {
     auto child_id = item->first_child;
     while (child_id != k_invalid_id) {
         auto const child = GetItem(ctx, child_id);
-        auto const rect = ctx.rects[child_id];
+        auto const rect = ctx.rects[ToInt(child_id)];
         // rect[dim] will contain the start margin already
         need_size += rect[dim] + rect[size_dim] + child->margins_ltrb[size_dim];
         child_id = child->next_sibling;
@@ -178,7 +178,7 @@ static ALWAYS_INLINE f32 MaxChildSizeWrapped(Context& ctx, Id id, u32 dim) {
     auto child_id = item->first_child;
     while (child_id != k_invalid_id) {
         auto const child = GetItem(ctx, child_id);
-        auto const rect = ctx.rects[child_id];
+        auto const rect = ctx.rects[ToInt(child_id)];
         if (child->flags & flags::LineBreak) {
             max_child_size2 += max_child_size;
             max_child_size = 0;
@@ -198,7 +198,7 @@ static ALWAYS_INLINE f32 TotalChildSizeWrapped(Context& ctx, Id id, u32 dim) {
     auto child_id = item->first_child;
     while (child_id != k_invalid_id) {
         auto const child = GetItem(ctx, child_id);
-        auto const rect = ctx.rects[child_id];
+        auto const rect = ctx.rects[ToInt(child_id)];
         if (child->flags & flags::LineBreak) {
             max_child_size2 = Max(max_child_size2, max_child_size);
             max_child_size = 0;
@@ -242,12 +242,12 @@ static void CalcSize(Context& ctx, Id const id, u32 const dim) {
     }
 
     // Set the mutable rect output data to the starting input data
-    ctx.rects[id][dim] = item->margins_ltrb[dim];
+    ctx.rects[ToInt(id)][dim] = item->margins_ltrb[dim];
 
     // If we have an explicit input size, just set our output size (which other calc_size and arrange
     // procedures will use) to it.
     if (item->size[dim] != 0) {
-        ctx.rects[id][size_dim] = item->size[dim];
+        ctx.rects[ToInt(id)][size_dim] = item->size[dim];
         return;
     }
 
@@ -281,7 +281,7 @@ static void CalcSize(Context& ctx, Id const id, u32 const dim) {
     }
 
     // Set our output data size. Will be used by parent calc_size procedures., and by arrange procedures.
-    ctx.rects[id][size_dim] = cal_size;
+    ctx.rects[ToInt(id)][size_dim] = cal_size;
 }
 
 static ALWAYS_INLINE void ArrangeStacked(Context& ctx, Id id, u32 const dim, bool const wrap) {
@@ -289,7 +289,7 @@ static ALWAYS_INLINE void ArrangeStacked(Context& ctx, Id id, u32 const dim, boo
     auto item = GetItem(ctx, id);
 
     auto const item_flags = item->flags;
-    auto rect = ctx.rects[id];
+    auto rect = ctx.rects[ToInt(id)];
     auto space = rect[size_dim];
 
     auto max_x2 = rect[dim] + space;
@@ -308,7 +308,7 @@ static ALWAYS_INLINE void ArrangeStacked(Context& ctx, Id id, u32 const dim, boo
             auto const child_flags = child->flags;
             auto const behaviour_flags = (child_flags & flags::ChildBehaviourMask) >> dim;
             auto const child_margins = child->margins_ltrb;
-            auto child_rect = ctx.rects[child_id];
+            auto child_rect = ctx.rects[ToInt(child_id)];
             auto extend = used;
             if ((behaviour_flags & flags::AnchorLeftAndRight) == flags::AnchorLeftAndRight) {
                 ++count;
@@ -365,7 +365,7 @@ static ALWAYS_INLINE void ArrangeStacked(Context& ctx, Id id, u32 const dim, boo
             auto const behaviour_flags = (child_flags & flags::ChildBehaviourMask) >> dim;
             auto const fixed_size_flags = (child_flags & flags::FixedSizeMask) >> dim;
             auto const child_margins = child->margins_ltrb;
-            auto child_rect = ctx.rects[child_id];
+            auto child_rect = ctx.rects[ToInt(child_id)];
 
             x += child_rect[dim] + extra_margin;
             if ((behaviour_flags & flags::AnchorLeftAndRight) == flags::AnchorLeftAndRight) // grow
@@ -386,7 +386,7 @@ static ALWAYS_INLINE void ArrangeStacked(Context& ctx, Id id, u32 const dim, boo
                 ix1 = x1;
             child_rect[dim] = ix0; // pos
             child_rect[size_dim] = ix1 - ix0; // size
-            ctx.rects[child_id] = child_rect;
+            ctx.rects[ToInt(child_id)] = child_rect;
             x = x1 + child_margins[size_dim];
             child_id = child->next_sibling;
             extra_margin = spacer;
@@ -399,7 +399,7 @@ static ALWAYS_INLINE void ArrangeStacked(Context& ctx, Id id, u32 const dim, boo
 static ALWAYS_INLINE void ArrangeOverlay(Context& ctx, Id id, u32 dim) {
     auto const size_dim = dim + 2;
     auto* item = GetItem(ctx, id);
-    auto const rect = ctx.rects[id];
+    auto const rect = ctx.rects[ToInt(id)];
     auto const offset = rect[dim];
     auto const space = rect[size_dim];
 
@@ -408,7 +408,7 @@ static ALWAYS_INLINE void ArrangeOverlay(Context& ctx, Id id, u32 dim) {
         auto* child = GetItem(ctx, child_id);
         auto const behaviour_flags = (child->flags & flags::ChildBehaviourMask) >> dim;
         auto const child_margins = child->margins_ltrb;
-        auto child_rect = ctx.rects[child_id];
+        auto child_rect = ctx.rects[ToInt(child_id)];
 
         switch (behaviour_flags & flags::AnchorLeftAndRight) {
             case flags::CentreHorizontal:
@@ -425,7 +425,7 @@ static ALWAYS_INLINE void ArrangeOverlay(Context& ctx, Id id, u32 dim) {
         }
 
         child_rect[dim] += offset;
-        ctx.rects[child_id] = child_rect;
+        ctx.rects[ToInt(child_id)] = child_rect;
         child_id = child->next_sibling;
     }
 }
@@ -444,7 +444,7 @@ static ALWAYS_INLINE void ArrangeOverlaySqueezedRange(Context& ctx,
         // what dimension we are in
         auto const behaviour_flags = (item->flags & flags::ChildBehaviourMask) >> dim;
         auto const margins = item->margins_ltrb;
-        auto rect = ctx.rects[item_id];
+        auto rect = ctx.rects[ToInt(item_id)];
         auto min_size = Max(0.0f, space - rect[dim] - margins[size_dim]);
         switch (behaviour_flags & flags::AnchorLeftAndRight) {
             case flags::CentreHorizontal:
@@ -465,7 +465,7 @@ static ALWAYS_INLINE void ArrangeOverlaySqueezedRange(Context& ctx,
             }
         }
         rect[dim] += offset;
-        ctx.rects[item_id] = rect;
+        ctx.rects[ToInt(item_id)] = rect;
         item_id = item->next_sibling;
     }
 }
@@ -473,7 +473,7 @@ static ALWAYS_INLINE void ArrangeOverlaySqueezedRange(Context& ctx,
 static ALWAYS_INLINE f32 ArrangeWrappedOverlaySqueezed(Context& ctx, Id id, u32 dim) {
     auto const size_dim = dim + 2;
     auto* item = GetItem(ctx, id);
-    auto offset = ctx.rects[id][dim];
+    auto offset = ctx.rects[ToInt(id)][dim];
     auto need_size = 0.0f;
     auto child_id = item->first_child;
     auto start_child_id = child_id;
@@ -485,7 +485,7 @@ static ALWAYS_INLINE f32 ArrangeWrappedOverlaySqueezed(Context& ctx, Id id, u32 
             start_child_id = child_id;
             need_size = 0;
         }
-        f32x4 const rect = ctx.rects[child_id];
+        f32x4 const rect = ctx.rects[ToInt(child_id)];
         f32 child_size = rect[dim] + rect[size_dim] + child->margins_ltrb[size_dim];
         need_size = Max(need_size, child_size);
         child_id = child->next_sibling;
@@ -504,7 +504,7 @@ static void Arrange(Context& ctx, Id id, u32 dim) {
             if (dim != 0) {
                 ArrangeStacked(ctx, id, 1, true);
                 f32 offset = ArrangeWrappedOverlaySqueezed(ctx, id, 0);
-                ctx.rects[id][2 + 0] = offset - ctx.rects[id][0];
+                ctx.rects[ToInt(id)][2 + 0] = offset - ctx.rects[ToInt(id)][0];
             }
             break;
         case flags::Row | flags::Wrap:
@@ -519,7 +519,7 @@ static void Arrange(Context& ctx, Id id, u32 dim) {
             if ((flags & 1) == dim) {
                 ArrangeStacked(ctx, id, dim, false);
             } else {
-                f32x4 const rect = ctx.rects[id];
+                f32x4 const rect = ctx.rects[ToInt(id)];
                 ArrangeOverlaySqueezedRange(ctx,
                                             dim,
                                             item->first_child,
@@ -575,7 +575,88 @@ struct LayoutImageArgs {
     Array<layout::ItemOptions, 3> child_options;
 };
 
-static ErrorCodeOr<String> GenerateLayoutSvg(ArenaAllocator& arena, LayoutImageArgs args) {
+static ErrorCodeOr<String> GenerateSvgContainerHugChildFill(ArenaAllocator& arena) {
+    layout::Context ctx;
+    DEFER { layout::DestroyContext(ctx); };
+
+    auto const root = layout::CreateItem(ctx,
+                                         {
+                                             .size = layout::k_hug_contents,
+                                             .contents_direction = layout::Direction::Column,
+                                         });
+
+    auto const child1_wrapper =
+        layout::CreateItem(ctx,
+                           {
+                               .parent = root,
+                               .size = {layout::k_hug_contents, layout::k_hug_contents},
+                           });
+
+    auto const child1_inner = layout::CreateItem(ctx,
+                                                 {
+                                                     .parent = child1_wrapper,
+                                                     .size = {60, 20},
+                                                 });
+
+    auto const child2_wrapper =
+        layout::CreateItem(ctx,
+                           {
+                               .parent = root,
+                               .size = {layout::k_fill_parent, layout::k_hug_contents},
+                           });
+
+    auto const child2_inner = layout::CreateItem(ctx,
+                                                 {
+                                                     .parent = child2_wrapper,
+                                                     .size = {100, 20},
+                                                 });
+
+    layout::RunContext(ctx);
+
+    auto const root_rect = layout::GetRect(ctx, root);
+
+    DynamicArray<char> svg {arena};
+    fmt::Append(svg,
+                "<svg width=\"{}\" height=\"{}\" xmlns=\"http://www.w3.org/2000/svg\">\n",
+                root_rect.w,
+                root_rect.h);
+
+    auto draw_rect = [&](Rect rect, u32 colour) {
+        fmt::Append(svg,
+                    "<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"#{06x}\" />\n",
+                    rect.x,
+                    rect.y,
+                    rect.w,
+                    rect.h,
+                    colour);
+    };
+
+    draw_rect({.pos = 0, .size = root_rect.size}, Base);
+
+    draw_rect(layout::GetRect(ctx, child1_wrapper), Yellow);
+    draw_rect(layout::GetRect(ctx, child1_inner), Red);
+
+    draw_rect(layout::GetRect(ctx, child2_wrapper), Yellow);
+    draw_rect(layout::GetRect(ctx, child2_inner), Green);
+
+    fmt::Append(svg, "</svg>\n");
+
+    dyn::AppendSpan(svg, "<p>");
+    auto print_rect_desc = [&](String name, Rect rect) {
+        fmt::Append(svg, "{}: {.0}, {.0}, {.0}, {.0}<br>\n", name, rect.x, rect.y, rect.w, rect.h);
+    };
+
+    print_rect_desc("root", layout::GetRect(ctx, root));
+    print_rect_desc("child1_wrapper", layout::GetRect(ctx, child1_wrapper));
+    print_rect_desc("child1_inner", layout::GetRect(ctx, child1_inner));
+    print_rect_desc("child2_wrapper", layout::GetRect(ctx, child2_wrapper));
+    print_rect_desc("child2_inner", layout::GetRect(ctx, child2_inner));
+    dyn::AppendSpan(svg, "</p><hr>\n");
+
+    return svg.ToOwnedSpan();
+}
+
+static ErrorCodeOr<String> GenerateLayoutSvg3ChildElements(ArenaAllocator& arena, LayoutImageArgs args) {
     layout::Context ctx;
     DEFER { layout::DestroyContext(ctx); };
 
@@ -642,12 +723,12 @@ static String DirectionName(layout::Direction direction) {
     return {};
 }
 
-static String JustifyContentName(layout::JustifyContent j) {
+static String JustifyContentName(layout::Alignment j) {
     switch (j) {
-        case layout::JustifyContent::Start: return "start";
-        case layout::JustifyContent::Middle: return "middle";
-        case layout::JustifyContent::End: return "end";
-        case layout::JustifyContent::Justify: return "justify";
+        case layout::Alignment::Start: return "start";
+        case layout::Alignment::Middle: return "middle";
+        case layout::Alignment::End: return "end";
+        case layout::Alignment::Justify: return "justify";
     }
     PanicIfReached();
     return {};
@@ -688,10 +769,8 @@ TEST_CASE(TestLayout) {
     for (auto const padding : Array {0, 8}) {
         for (auto const gap : Array {0.0f, 8.0f}) {
             for (auto const contents_direction : Array {Direction::Row, Direction::Column}) {
-                for (auto const contents_align : Array {JustifyContent::Start,
-                                                        JustifyContent::Middle,
-                                                        JustifyContent::End,
-                                                        JustifyContent::Justify}) {
+                for (auto const contents_align :
+                     Array {Alignment::Start, Alignment::Middle, Alignment::End, Alignment::Justify}) {
                     for (auto const middle_item_anchor :
                          Array {Anchor::None,
                                 Anchor::Left,
@@ -720,7 +799,7 @@ TEST_CASE(TestLayout) {
                             .child_options = {basic_child, basic_child, basic_child},
                         };
                         args.child_options[1].anchor = middle_item_anchor;
-                        auto const svg = TRY(GenerateLayoutSvg(tester.arena, args));
+                        auto const svg = TRY(GenerateLayoutSvg3ChildElements(tester.arena, args));
 
                         fmt::Append(html, "<p>{}</p>\n{}", filename, svg);
                     }
@@ -728,6 +807,8 @@ TEST_CASE(TestLayout) {
             }
         }
     }
+
+    dyn::AppendSpan(html, TRY(GenerateSvgContainerHugChildFill(tester.arena)));
 
     fmt::Append(html, "</body>\n</html>\n");
     TRY(WriteFile(path::Join(tester.arena, Array {output_dir, "layout-tests.html"}), html));

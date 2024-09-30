@@ -60,7 +60,7 @@ layout::Id LayoutParameterComponent(Gui* g,
                                             .size = layout::k_hug_contents,
                                             .margins {.lr = gap_x, .t = gap_top, .b = gap_bottom},
                                             .contents_direction = layout::Direction::Column,
-                                            .contents_align = layout::JustifyContent::Start,
+                                            .contents_align = layout::Alignment::Start,
                                         });
 
     param_layid = layout::CreateItem(g->layout,

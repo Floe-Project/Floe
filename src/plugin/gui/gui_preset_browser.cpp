@@ -542,7 +542,7 @@ void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
                                                    .size = imgui.Size(),
                                                    .margins = {.t = gap_above_heading + pad_t},
                                                    .contents_direction = layout::Direction::Row,
-                                                   .contents_align = layout::JustifyContent::End,
+                                                   .contents_align = layout::Alignment::End,
                                                });
 
                 load_file_button = layout::CreateItem(lay,
@@ -637,7 +637,7 @@ void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
                                                {
                                                    .size = {files_panel_width, table_title_h},
                                                    .contents_direction = layout::Direction::Row,
-                                                   .contents_align = layout::JustifyContent::Middle,
+                                                   .contents_align = layout::Alignment::Middle,
                                                });
 
                 auto title = layout::CreateItem(lay,

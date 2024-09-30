@@ -56,7 +56,7 @@ void TopPanel(Gui* g) {
                                    {
                                        .size = g->imgui.Size(),
                                        .contents_direction = layout::Direction::Row,
-                                       .contents_align = layout::JustifyContent::Start,
+                                       .contents_align = layout::Alignment::Start,
                                    });
 
     auto left_container = layout::CreateItem(g->layout,
@@ -64,7 +64,7 @@ void TopPanel(Gui* g) {
                                                  .parent = root,
                                                  .size = {layout::k_hug_contents, layout::k_fill_parent},
                                                  .contents_direction = layout::Direction::Row,
-                                                 .contents_align = layout::JustifyContent::Start,
+                                                 .contents_align = layout::Alignment::Start,
                                              });
 
     auto title = layout::CreateItem(
@@ -80,7 +80,7 @@ void TopPanel(Gui* g) {
                                                   .parent = root,
                                                   .size = layout::k_fill_parent,
                                                   .contents_direction = layout::Direction::Row,
-                                                  .contents_align = layout::JustifyContent::End,
+                                                  .contents_align = layout::Alignment::End,
                                               });
 
     auto preset_box =
@@ -91,7 +91,7 @@ void TopPanel(Gui* g) {
                                .margins = {.l = LiveSize(g->imgui, UiSizeId::Top2PresetBoxMarginL),
                                            .r = LiveSize(g->imgui, UiSizeId::Top2PresetBoxMarginR)},
                                .contents_direction = layout::Direction::Row,
-                               .contents_align = layout::JustifyContent::Start,
+                               .contents_align = layout::Alignment::Start,
                            });
 
     auto preset_menu =

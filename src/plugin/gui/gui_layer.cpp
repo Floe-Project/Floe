@@ -140,7 +140,7 @@ void Layout(Gui* g,
                                         {
                                             .size = {width, height},
                                             .contents_direction = layout::Direction::Column,
-                                            .contents_align = layout::JustifyContent::Start,
+                                            .contents_align = layout::Alignment::Start,
                                         });
 
     // selector
@@ -156,7 +156,7 @@ void Layout(Gui* g,
                             .t = LiveSize(g->imgui, LayerSelectorBoxMarginT),
                             .b = LiveSize(g->imgui, LayerSelectorBoxMarginB)},
                 .contents_direction = layout::Direction::Row,
-                .contents_align = layout::JustifyContent::Start,
+                .contents_align = layout::Alignment::Start,
             });
 
         c.selector_menu = layout::CreateItem(g->layout,
@@ -202,7 +202,7 @@ void Layout(Gui* g,
                                                          .b = LiveSize(g->imgui, LayerMixerContainer1MarginB),
                                                      },
                                                      .contents_direction = layout::Direction::Row,
-                                                     .contents_align = layout::JustifyContent::Middle,
+                                                     .contents_align = layout::Alignment::Middle,
                                                  });
 
         c.volume = layout::CreateItem(g->layout,
@@ -233,7 +233,7 @@ void Layout(Gui* g,
                                                      .parent = container,
                                                      .size = layout::k_hug_contents,
                                                      .contents_direction = layout::Direction::Row,
-                                                     .contents_align = layout::JustifyContent::Middle,
+                                                     .contents_align = layout::Alignment::Middle,
                                                  });
         LayoutParameterComponent(g,
                                  subcontainer_2,
@@ -283,7 +283,7 @@ void Layout(Gui* g,
                                    .size = {layout::k_fill_parent, LiveSize(g->imgui, LayerParamsGroupTabsH)},
                                    .margins = {.lr = LiveSize(g->imgui, LayerParamsGroupBoxGapX)},
                                    .contents_direction = layout::Direction::Row,
-                                   .contents_align = layout::JustifyContent::Middle,
+                                   .contents_align = layout::Alignment::Middle,
                                });
 
         auto const layer_params_group_tabs_gap = LiveSize(g->imgui, LayerParamsGroupTabsGap);
@@ -328,7 +328,7 @@ void Layout(Gui* g,
                                                      .parent = container,
                                                      .size = layout::k_fill_parent,
                                                      .contents_direction = layout::Direction::Column,
-                                                     .contents_align = layout::JustifyContent::Start,
+                                                     .contents_align = layout::Alignment::Start,
                                                  });
 
         auto const main_envelope_h = LiveSize(g->imgui, Main_EnvelopeH);
@@ -437,7 +437,7 @@ void Layout(Gui* g,
                                            .parent = page_container,
                                            .size = {layout::k_fill_parent, layout::k_hug_contents},
                                            .contents_direction = layout::Direction::Row,
-                                           .contents_align = layout::JustifyContent::Middle,
+                                           .contents_align = layout::Alignment::Middle,
                                        });
                 LayoutParameterComponent(g,
                                          filter_knobs_container,
@@ -494,7 +494,7 @@ void Layout(Gui* g,
                                                .parent = page_container,
                                                .size = {layout::k_fill_parent, layout::k_hug_contents},
                                                .contents_direction = layout::Direction::Row,
-                                               .contents_align = layout::JustifyContent::Middle,
+                                               .contents_align = layout::Alignment::Middle,
                                            });
                     LayoutParameterComponent(g,
                                              knob_container,
@@ -531,7 +531,7 @@ void Layout(Gui* g,
                                                .parent = page_container,
                                                .size = {layout::k_fill_parent, layout::k_hug_contents},
                                                .contents_direction = layout::Direction::Row,
-                                               .contents_align = layout::JustifyContent::Middle,
+                                               .contents_align = layout::Alignment::Middle,
                                            });
                     LayoutParameterComponent(g,
                                              knob_container,
@@ -645,7 +645,7 @@ void Layout(Gui* g,
                                            .size = {layout::k_fill_parent, layout::k_hug_contents},
                                            .margins = {.t = LiveSize(g->imgui, LFO_GapYBeforeKnobs)},
                                            .contents_direction = layout::Direction::Row,
-                                           .contents_align = layout::JustifyContent::Middle,
+                                           .contents_align = layout::Alignment::Middle,
                                        });
 
                 LayoutParameterComponent(g,

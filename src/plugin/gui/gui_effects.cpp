@@ -245,7 +245,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
                                            {
                                                .size = imgui.Size(),
                                                .contents_direction = layout::Direction::Column,
-                                               .contents_align = layout::JustifyContent::Start,
+                                               .contents_align = layout::Alignment::Start,
                                            });
 
     int const switches_left_col_size = k_num_effect_types / 2 + (k_num_effect_types % 2);
@@ -323,7 +323,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
                                    .parent = effects_root,
                                    .size = {layout::k_fill_parent, layout::k_hug_contents},
                                    .contents_direction = layout::Direction::Row,
-                                   .contents_align = layout::JustifyContent::Start,
+                                   .contents_align = layout::Alignment::Start,
                                });
 
         auto const heading_size = get_heading_size(k_effect_info[ToInt(fx.type)].name);
@@ -342,7 +342,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
                                    .parent = master_heading_container,
                                    .size = {layout::k_fill_parent, layout::k_hug_contents},
                                    .contents_direction = layout::Direction::Row,
-                                   .contents_align = layout::JustifyContent::End,
+                                   .contents_align = layout::Alignment::End,
                                });
 
         ids.close = layout::CreateItem(
@@ -367,7 +367,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
         .size = {layout::k_fill_parent, layout::k_hug_contents},
         .contents_direction = layout::Direction::Row,
         .contents_multiline = true,
-        .contents_align = layout::JustifyContent::Middle,
+        .contents_align = layout::Alignment::Middle,
     };
 
     auto create_subcontainer = [&](layout::Id parent) {

@@ -17,9 +17,10 @@
 
 namespace layout {
 
-using Id = u32;
+// stronly-typed id
+enum class Id : u32 {};
 
-constexpr Id k_invalid_id = ~(Id)0;
+constexpr Id k_invalid_id {~(UnderlyingType<Id>)0};
 constexpr f32 k_hug_contents = 0.0f;
 constexpr f32 k_fill_parent = -1.0f;
 
@@ -36,8 +37,8 @@ struct Item {
 struct Context {
     Item* items {};
     f32x4* rects {};
-    Id capacity {};
-    Id num_items {};
+    u32 capacity {};
+    u32 num_items {};
 };
 
 namespace flags {
@@ -121,7 +122,7 @@ enum : u32 {
 
 } // namespace flags
 
-void ReserveItemsCapacity(Context& ctx, Id count);
+void ReserveItemsCapacity(Context& ctx, u32 count);
 
 void DestroyContext(Context& ctx);
 
@@ -139,14 +140,6 @@ void ResetContext(Context& ctx);
 // doing a resizing animation on items in a layout without any contents changing.
 void RunContext(Context& ctx);
 
-// Like RunContext(), this procedure will run layout calculations -- however, it lets you specify which item
-// you want to start from. RunContext() always starts with item 0, the first item, as the root. Running the
-// layout calculations from a specific item is useful if you want need to iteratively re-run parts of your
-// layout hierarchy, or if you are only interested in updating certain subsets of it. Be careful when using
-// this -- it's easy to generated bad output if the parent items haven't yet had their output rectangles
-// calculated, or if they've been invalidated (e.g. due to re-allocation).
-void RunItem(Context& ctx, Id item);
-
 // Performing a layout on items where wrapping is enabled in the parent container can cause flags to be
 // modified during the calculations. If you plan to call RunContext or RunItem multiple times without calling
 // Reset, and if you have a container that uses wrapping, and if the width or height of the container may have
@@ -163,8 +156,8 @@ void RunItem(Context& ctx, Id item);
 // need to call this.
 void ClearItemBreak(Context& ctx, Id item);
 
-Id ItemsCount(Context& ctx);
-Id ItemsCapacity(Context& ctx);
+u32 ItemsCount(Context& ctx);
+u32 ItemsCapacity(Context& ctx);
 
 // Create a new item, which can just be thought of as a rectangle. Returns the id (handle) used to identify
 // the item.
@@ -186,28 +179,28 @@ void Push(Context& ctx, Id parent, Id child);
 
 //  Don't keep this around -- it will become invalid as soon as any reallocation occurs.
 ALWAYS_INLINE inline Item* GetItem(Context const& ctx, Id id) {
-    ASSERT(id != k_invalid_id && id < ctx.num_items);
-    return ctx.items + id;
+    ASSERT(id != k_invalid_id && ToInt(id) < ctx.num_items);
+    return ctx.items + ToInt(id);
 }
 
 // Returns k_invalid_id if there is no child.
 ALWAYS_INLINE inline Id FirstChild(Context const& ctx, Id id) {
-    Item const* pitem = GetItem(ctx, id);
-    return pitem->first_child;
+    Item const* item = GetItem(ctx, id);
+    return item->first_child;
 }
 
 // Returns k_invalid_id if there is no next sibling.
 ALWAYS_INLINE inline Id NextSibling(Context const& ctx, Id id) {
-    Item const* pitem = GetItem(ctx, id);
-    return pitem->next_sibling;
+    Item const* item = GetItem(ctx, id);
+    return item->next_sibling;
 }
 
 // Returns the calculated rectangle of an item. This is only valid after calling RunContext and before any
 // other reallocation occurs. Otherwise, the result will be undefined. The vector components are: 0: x
 // starting position, 1: y starting position 2: width, 3: height
 ALWAYS_INLINE inline f32x4 GetRectXywh(Context const& ctx, Id id) {
-    ASSERT(id != k_invalid_id && id < ctx.num_items);
-    return ctx.rects[id];
+    ASSERT(id != k_invalid_id && ToInt(id) < ctx.num_items);
+    return ctx.rects[ToInt(id)];
 }
 ALWAYS_INLINE inline Rect GetRect(Context const& ctx, Id id) {
     auto const xywh = GetRectXywh(ctx, id);
@@ -314,8 +307,7 @@ enum class Direction : u8 {
     Column = flags::Column,
 };
 
-// TODO: should this be called alignment?
-enum class JustifyContent : u8 {
+enum class Alignment : u8 {
     Start = flags::Start,
     Middle = flags::Middle,
     End = flags::End,
@@ -338,7 +330,7 @@ struct ItemOptions {
     f32x2 contents_gap {};
     Direction contents_direction {Direction::Row};
     bool contents_multiline {false};
-    JustifyContent contents_align {JustifyContent::Middle};
+    Alignment contents_align {Alignment::Middle};
     CrossAxisAlign contents_cross_axis_align {CrossAxisAlign::Middle};
 };
 

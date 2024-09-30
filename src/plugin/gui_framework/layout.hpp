@@ -216,7 +216,7 @@ ALWAYS_INLINE inline Rect GetRect(Context const& ctx, Id id) {
 
 ALWAYS_INLINE inline f32x2 GetSize(Context& ctx, Id item) { return GetItem(ctx, item)->size; }
 
-// 0 means hug contents, use the constant k_hug_contents rather than set to zero.
+// 0 means hug contents, but use the constant k_hug_contents rather than 0.
 // You can also use k_fill_parent in either dimension.
 ALWAYS_INLINE inline void SetItemSize(Item& item, f32x2 size) {
     item.size = size;
@@ -224,17 +224,21 @@ ALWAYS_INLINE inline void SetItemSize(Item& item, f32x2 size) {
     auto const w = size[0];
     if (w == k_hug_contents)
         item.flags &= ~flags::HorizontalSizeFixed;
-    else if (w == k_fill_parent)
+    else if (w == k_fill_parent) {
+        item.size[0] = 0;
+        item.flags &= ~flags::HorizontalSizeFixed;
         item.flags |= flags::AnchorLeftAndRight;
-    else
+    } else
         item.flags |= flags::HorizontalSizeFixed;
 
     auto const h = size[1];
     if (h == k_hug_contents)
         item.flags &= ~flags::VerticalSizeFixed;
-    else if (h == k_fill_parent)
+    else if (h == k_fill_parent) {
+        item.size[1] = 0;
+        item.flags &= ~flags::VerticalSizeFixed;
         item.flags |= flags::AnchorTopAndBottom;
-    else
+    } else
         item.flags |= flags::VerticalSizeFixed;
 }
 ALWAYS_INLINE inline void SetSize(Context& ctx, Id id, f32x2 size) { SetItemSize(*GetItem(ctx, id), size); }

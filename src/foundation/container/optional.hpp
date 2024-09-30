@@ -92,7 +92,7 @@ class [[nodiscard]] Optional<Type> {
     constexpr Type& operator*() { return Value(); }
     constexpr Type const* operator->() const { return &Value(); }
     constexpr Type const& operator*() const { return Value(); }
-    constexpr Type ValueOr(Type fallback) {
+    constexpr Type ValueOr(Type fallback) const {
         if (has_value) return value;
         return fallback;
     }

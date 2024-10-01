@@ -10,10 +10,8 @@
 // Reading speed is the priority. Designed for the case where a background-thread is creating
 // expensive-to-construct objects (like file reading + decoding) and a reading thread (such as a GUI thread)
 // needs to use the objects with little overhead. The writing thread needs to frequently add or remove items
-// from the list. Nodes from this struct can be stored in other data structures such as hash tables if needed.
-// So long as node values are accessed with TryRetain and Release.
-//
-// It's like a bit like a mutex-protected std::list<std::weak_ptr<MyObject>>.
+// from the list. Nodes from this struct can be stored in other data structures such as hash tables if needed
+// so long as node values are accessed with TryRetain and Release.
 //
 // Usage of this class requires some careful considerations.
 //

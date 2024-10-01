@@ -51,7 +51,7 @@ enum class RefCountChange { Retain, Release };
 
 // NOTE: this doesn't do reference counting automatically. You must use Retain() and Release() manually.
 // We do this because things can get messy and inefficient doing ref-counting automatically in copy/move
-// constructors and assignment operators. You will get assertion failures if you have mismatched
+// constructors and assignment operators. Instead, you will get assertion failures if you have mismatched
 // retain/release.
 template <typename Type>
 struct RefCounted {
@@ -248,6 +248,7 @@ struct Server {
     // Connection-independent errors. If we have access to a channel, we post to the channel's
     // error_notifications instead of this.
     ThreadsafeErrorNotifications& error_notifications;
+    Atomic<u32> num_uncompleted_library_jobs {0};
     ThreadPool& thread_pool;
     Atomic<RequestId> request_id_counter {};
     MutexProtected<ArenaList<AsyncCommsChannel, true>> channels {Malloc::Instance()};
@@ -284,11 +285,21 @@ void CloseAsyncCommsChannel(Server& server, AsyncCommsChannel& channel);
 // [threadsafe]
 RequestId SendAsyncLoadRequest(Server& server, AsyncCommsChannel& channel, LoadRequest const& request);
 
+// Change the set of extra folders that will be scanned for libraries.
 // [threadsafe]
 void SetExtraScanFolders(Server& server, Span<String const> folders);
 
+// The server takes a lazy-loading approach. It only scans a folder when it's requested. Call this function to
+// trigger a scan of any unscanned folders.
+// [threadsafe]
+void RequestScanningOfUnscannedFolders(Server& server);
+
+// Returns true is the server scanning for sample libraries or is processing a scan-request.
+// [threadsafe]
+bool IsScanningSampleLibraries(Server& server);
+
 // You must call Release() on all results
-// [main-thread]
+// [threadsafe]
 Span<RefCounted<sample_lib::Library>> AllLibrariesRetained(Server& server, ArenaAllocator& arena);
 RefCounted<sample_lib::Library> FindLibraryRetained(Server& server, sample_lib::LibraryIdRef id);
 

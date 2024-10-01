@@ -73,11 +73,11 @@ struct PendingLibraryJobs {
     u64 server_thread_id;
     ThreadPool& thread_pool;
     WorkSignaller& work_signaller;
+    Atomic<u32>& num_uncompleted_jobs;
 
     Mutex job_mutex;
     ArenaAllocator job_arena {PageAllocator::Instance()};
     Atomic<Job*> jobs {};
-    Atomic<u32> num_uncompleted_jobs {0};
 };
 
 static void ReadLibraryAsync(PendingLibraryJobs& pending_library_jobs,
@@ -1343,13 +1343,15 @@ static void ServerThreadProc(Server& server) {
         PendingResources pending_resources {
             .server_thread_id = server.server_thread_id,
         };
-        PendingLibraryJobs libs_async_ctx {
+        PendingLibraryJobs pending_library_jobs {
             .server_thread_id = server.server_thread_id,
             .thread_pool = server.thread_pool,
             .work_signaller = server.work_signaller,
+            .num_uncompleted_jobs = server.num_uncompleted_library_jobs,
         };
 
         while (true) {
+            // We have a timeout because we want to check for directory watching events.
             server.work_signaller.WaitUntilSignalledOrSpurious(250u);
 
             if (!PRODUCTION_BUILD &&
@@ -1358,7 +1360,7 @@ static void ServerThreadProc(Server& server) {
                 g_log.Debug(k_log_module, "Dumping current state of loading thread");
                 g_log.Debug(k_log_module,
                             "Libraries currently loading: {}",
-                            libs_async_ctx.num_uncompleted_jobs.Load(LoadMemoryOrder::Relaxed));
+                            pending_library_jobs.num_uncompleted_jobs.Load(LoadMemoryOrder::Relaxed));
                 DumpPendingResourcesDebugInfo(pending_resources);
                 g_log.Debug(k_log_module, "\nAvailable Libraries:");
                 for (auto& lib : server.libraries) {
@@ -1384,7 +1386,7 @@ static void ServerThreadProc(Server& server) {
             // to have a loaded library. The library contains the information needed to locate the audio.
 
             auto const libraries_are_still_loading =
-                UpdateLibraryJobs(server, libs_async_ctx, scratch_arena, watcher);
+                UpdateLibraryJobs(server, pending_library_jobs, scratch_arena, watcher);
 
             auto const resources_are_still_loading =
                 UpdatePendingResources(pending_resources, server, libraries_are_still_loading);
@@ -1535,6 +1537,21 @@ RequestId SendAsyncLoadRequest(Server& server, AsyncCommsChannel& channel, LoadR
     server.request_queue.Push(queued_request);
     server.work_signaller.Signal();
     return queued_request.id;
+}
+
+void RequestScanningOfUnscannedFolders(Server& server) {
+    RequestLibraryFolderScanIfNeeded(server.scan_folders);
+}
+
+bool IsScanningSampleLibraries(Server& server) {
+    for (auto& n : server.scan_folders)
+        if (auto f = n.TryScoped()) {
+            auto const state = f->state.Load(LoadMemoryOrder::Relaxed);
+            if (state != ScanFolder::State::ScannedSuccessfully && state != ScanFolder::State::ScanFailed)
+                return true;
+        }
+
+    return server.num_uncompleted_library_jobs.Load(LoadMemoryOrder::Relaxed) != 0;
 }
 
 void SetExtraScanFolders(Server& server, Span<String const> extra_folders) {

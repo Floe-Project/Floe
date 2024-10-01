@@ -655,3 +655,14 @@ PUBLIC MutableString CombineStrings(Allocator& a, Span<String const> parts) {
 
     return result;
 }
+
+PUBLIC Span<String> CombineStringArrays(Allocator& allocator, Span<String const> a, Span<String const> b) {
+    auto result = allocator.AllocateExactSizeUninitialised<String>(a.size + b.size);
+    usize pos = 0;
+    for (auto const& part : a)
+        result[pos++] = part;
+    for (auto const& part : b)
+        result[pos++] = part;
+
+    return result;
+}

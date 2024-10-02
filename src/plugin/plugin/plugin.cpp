@@ -62,6 +62,7 @@ inline Allocator& FloeInstanceAllocator() { return PageAllocator::Instance(); }
 
 static u16 g_num_init_plugins = 0;
 
+// NOLINTNEXTLINE(cppcoreguidelines-interfaces-global-init): clang-tidy thinks g_log is initialised
 clap_plugin_state const floe_plugin_state {
     .save = [](clap_plugin const* plugin, clap_ostream const* stream) -> bool {
         auto& floe = *(FloePluginInstance*)plugin->plugin_data;
@@ -102,7 +103,7 @@ constexpr u32 k_largest_gui_size = LargestRepresentableValue<u16>();
 
 // Size (width, height) is in pixels; the corresponding windowing system extension is
 // responsible for defining if it is physical pixels or logical pixels.
-// NOLINTNEXTLINE(cppcoreguidelines-interfaces-global-init)
+// NOLINTNEXTLINE(cppcoreguidelines-interfaces-global-init): clang-tidy thinks g_log is initialised
 clap_plugin_gui const floe_gui {
     .is_api_supported = [](clap_plugin_t const*, char const* api, bool is_floating) -> bool {
         (void)is_floating;
@@ -403,6 +404,7 @@ static void CheckInputEvents(clap_input_events const* in) {
     }
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-interfaces-global-init): clang-tidy thinks g_log is initialised
 clap_plugin_params const floe_params {
     .count = [](clap_plugin_t const*) -> u32 { return (u32)k_num_parameters; },
 
@@ -524,6 +526,7 @@ clap_plugin_params const floe_params {
 static constexpr clap_id k_input_port_id = 1;
 static constexpr clap_id k_output_port_id = 2;
 
+// NOLINTNEXTLINE(cppcoreguidelines-interfaces-global-init): clang-tidy thinks g_log is initialised
 clap_plugin_audio_ports const floe_audio_ports {
     .count = [](clap_plugin_t const*, bool) -> u32 { return 1; },
 
@@ -556,6 +559,7 @@ clap_plugin_audio_ports const floe_audio_ports {
 static constexpr clap_id k_main_note_port_id = 1; // never change this
 
 // The note ports scan has to be done while the plugin is deactivated.
+// NOLINTNEXTLINE(cppcoreguidelines-interfaces-global-init): clang-tidy thinks g_log is initialised
 clap_plugin_note_ports const floe_note_ports {
     .count = [](clap_plugin_t const*, bool is_input) -> u32 { return is_input ? 1 : 0; },
 
@@ -591,6 +595,7 @@ clap_plugin_thread_pool const floe_thread_pool {
         },
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-interfaces-global-init): clang-tidy thinks g_log is initialised
 clap_plugin_timer_support const floe_timer {
     .on_timer =
         [](clap_plugin_t const* plugin, clap_id timer_id) {
@@ -618,6 +623,7 @@ clap_plugin_timer_support const floe_timer {
         },
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-interfaces-global-init): clang-tidy thinks g_log is initialised
 clap_plugin_posix_fd_support const floe_posix_fd {
     .on_fd =
         [](clap_plugin_t const* plugin, int fd, clap_posix_fd_flags_t) {
@@ -640,7 +646,7 @@ clap_plugin_posix_fd_support const floe_posix_fd {
         },
 };
 
-// NOLINTNEXTLINE(cppcoreguidelines-interfaces-global-init)
+// NOLINTNEXTLINE(cppcoreguidelines-interfaces-global-init): clang-tidy thinks g_log is initialised
 clap_plugin const floe_plugin {
     .desc = &k_plugin_info,
     .plugin_data = nullptr,

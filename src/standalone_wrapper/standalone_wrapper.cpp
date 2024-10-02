@@ -30,17 +30,36 @@ constexpr EncodedUiSize k_invalid_encoded_ui_size = ~(u32)0;
 static EncodedUiSize EncodeUiSize(u16 width, u16 height) { return (u32)width | ((u32)height << 16); }
 static UiSize DecodeUiSize(EncodedUiSize encoded) { return {(u16)(encoded & 0xFFFF), (u16)(encoded >> 16)}; }
 
+inline auto Factory() { return (clap_plugin_factory const*)clap_entry.get_factory(CLAP_PLUGIN_FACTORY_ID); }
+
 struct Standalone {
+    Standalone() : plugin(*Factory()->create_plugin(Factory(), &host, k_plugin_info.id)) {
+        plugin_created = true;
+    }
+
     clap_host_params const host_params {
-        .rescan = [](clap_host_t const*, clap_param_rescan_flags) {},
-        .clear = [](clap_host_t const*, clap_id, clap_param_clear_flags) {},
-        .request_flush = [](clap_host_t const*) {},
+        .rescan =
+            [](clap_host_t const* h, clap_param_rescan_flags) {
+                auto& standalone = *(Standalone*)h->host_data;
+                ASSERT(standalone.plugin_created);
+            },
+        .clear =
+            [](clap_host_t const* h, clap_id, clap_param_clear_flags) {
+                auto& standalone = *(Standalone*)h->host_data;
+                ASSERT(standalone.plugin_created);
+            },
+        .request_flush =
+            [](clap_host_t const* h) {
+                auto& standalone = *(Standalone*)h->host_data;
+                ASSERT(standalone.plugin_created);
+            },
     };
 
     clap_host_gui const host_gui {
         .resize_hints_changed =
             [](clap_host_t const* h) {
                 auto& standalone = *(Standalone*)h->host_data;
+                ASSERT(standalone.plugin_created);
                 auto gui =
                     (clap_plugin_gui const*)standalone.plugin.get_extension(&standalone.plugin, CLAP_EXT_GUI);
                 clap_gui_resize_hints resize_hints;
@@ -63,6 +82,7 @@ struct Standalone {
         .request_resize =
             [](clap_host_t const* h, uint32_t width, uint32_t height) {
                 auto& standalone = *(Standalone*)h->host_data;
+                ASSERT(standalone.plugin_created);
                 if (width > LargestRepresentableValue<u16>() || height > LargestRepresentableValue<u16>())
                     return false;
                 standalone.requested_resize.Exchange(EncodeUiSize((u16)width, (u16)height),
@@ -78,13 +98,15 @@ struct Standalone {
     clap_host_thread_check const host_thread_check {
         .is_main_thread =
             [](clap_host_t const* h) {
-                auto standalone = (Standalone*)h->host_data;
-                return CurrentThreadId() == standalone->main_thread_id;
+                auto& standalone = *(Standalone*)h->host_data;
+                ASSERT(standalone.plugin_created);
+                return CurrentThreadId() == standalone.main_thread_id;
             },
         .is_audio_thread =
             [](clap_host_t const* h) {
-                auto standalone = (Standalone*)h->host_data;
-                return CurrentThreadId() == standalone->audio_thread_id.Load(LoadMemoryOrder::Relaxed);
+                auto& standalone = *(Standalone*)h->host_data;
+                ASSERT(standalone.plugin_created);
+                return CurrentThreadId() == standalone.audio_thread_id.Load(LoadMemoryOrder::Relaxed);
             },
     };
 
@@ -97,28 +119,32 @@ struct Standalone {
         .version = "1",
 
         .get_extension = [](clap_host_t const* ch, char const* extension_id) -> void const* {
-            auto standalone = (Standalone*)ch->host_data;
+            auto& standalone = *(Standalone*)ch->host_data;
+            ASSERT(standalone.plugin_created);
 
             if (NullTermStringsEqual(extension_id, CLAP_EXT_PARAMS))
-                return &standalone->host_params;
+                return &standalone.host_params;
             else if (NullTermStringsEqual(extension_id, CLAP_EXT_GUI))
-                return &standalone->host_gui;
+                return &standalone.host_gui;
             else if (NullTermStringsEqual(extension_id, CLAP_EXT_THREAD_CHECK))
-                return &standalone->host_thread_check;
+                return &standalone.host_thread_check;
             else if (NullTermStringsEqual(extension_id, k_floe_clap_extension_id))
-                return &standalone->floe_host_ext;
+                return &standalone.floe_host_ext;
 
             return nullptr;
         },
         .request_restart = [](clap_host_t const*) { PanicIfReached(); },
         .request_process =
-            [](clap_host_t const*) {
+            [](clap_host_t const* h) {
+                auto& standalone = *(Standalone*)h->host_data;
+                ASSERT(standalone.plugin_created);
                 // Don't think we need to do anything here because we always call process() regardless
             },
         .request_callback =
-            [](clap_host_t const* ch) {
-                auto h = (Standalone*)ch->host_data;
-                h->callback_requested.Store(true, StoreMemoryOrder::Relaxed);
+            [](clap_host_t const* h) {
+                auto& standalone = *(Standalone*)h->host_data;
+                ASSERT(standalone.plugin_created);
+                standalone.callback_requested.Store(true, StoreMemoryOrder::Relaxed);
             },
     };
 
@@ -138,6 +164,7 @@ struct Standalone {
     Atomic<u32> requested_resize {k_invalid_encoded_ui_size};
 
     bool quit = false;
+    bool plugin_created = false; // plugins are forbidden to call host APIs while creating
     clap_plugin const& plugin;
 };
 
@@ -445,11 +472,7 @@ static ErrorCodeOr<void> Main() {
     clap_entry.init("plugin-path");
     DEFER { clap_entry.deinit(); };
 
-    auto const factory = (clap_plugin_factory const*)clap_entry.get_factory(CLAP_PLUGIN_FACTORY_ID);
-
-    Standalone standalone {
-        .plugin = *factory->create_plugin(factory, &standalone.host, k_plugin_info.id),
-    };
+    Standalone standalone {};
 
     standalone.plugin.init(&standalone.plugin);
     DEFER { standalone.plugin.destroy(&standalone.plugin); };

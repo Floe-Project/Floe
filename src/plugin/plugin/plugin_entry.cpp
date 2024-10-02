@@ -36,7 +36,19 @@ __attribute__((destructor)) void ZigBugWorkaround() {
 // NOLINTEND
 #endif
 
-static u16 g_init_count = 0;
+static void StartupTracy() {
+#ifdef TRACY_ENABLE
+    ___tracy_startup_profiler();
+#endif
+}
+
+static void ShutdownTracy() {
+#ifdef TRACY_ENABLE
+    ___tracy_shutdown_profiler();
+#endif
+}
+
+static bool g_init = false;
 
 extern "C" CLAP_EXPORT const clap_plugin_entry clap_entry = {
     .clap_version = CLAP_VERSION,
@@ -44,17 +56,15 @@ extern "C" CLAP_EXPORT const clap_plugin_entry clap_entry = {
     // init and deinit are never called at the same time as any other clap function, including itself.
     // Might be called more than once. See the clap docs for full details.
     .init = [](char const*) -> bool {
-        if (g_init_count++ == 0) {
-            g_panic_handler = [](char const* message, SourceLocation loc) {
-                g_log.Error(k_global_log_module, "Panic: {}: {}", loc, message);
-                DefaultPanicHandler(message, loc);
-            };
-#ifdef TRACY_ENABLE
-            ___tracy_startup_profiler();
-#endif
-            // after tracy
-            StartupCrashHandler();
-        }
+        if (Exchange(g_init, true)) return true; // already initialised
+
+        g_panic_handler = [](char const* message, SourceLocation loc) {
+            g_log.Error(k_global_log_module, "Panic: {}: {}", loc, message);
+            DefaultPanicHandler(message, loc);
+        };
+        StartupTracy();
+        StartupCrashHandler(); // after tracy
+
         g_log.Debug(k_clap_log_module, "init DSO");
         g_log.Info(k_global_log_module, "Floe version: " FLOE_VERSION_STRING);
         g_log.Info(k_global_log_module, "OS: {}", OperatingSystemName());
@@ -63,17 +73,16 @@ extern "C" CLAP_EXPORT const clap_plugin_entry clap_entry = {
     },
     .deinit =
         []() {
-            g_log_file.Debug(k_clap_log_module, "deinit");
-            if (--g_init_count == 0) {
-                ShutdownCrashHandler();
-#ifdef TRACY_ENABLE
-                ___tracy_shutdown_profiler();
-#endif
-            }
+            if (!Exchange(g_init, false)) return; // already deinitialised
+
+            g_log.Debug(k_clap_log_module, "deinit");
+
+            ShutdownCrashHandler(); // before tracy
+            ShutdownTracy();
         },
 
     .get_factory = [](char const* factory_id) -> void const* {
-        g_log_file.Debug(k_clap_log_module, "get_factory");
+        g_log.Debug(k_clap_log_module, "get_factory");
         if (NullTermStringsEqual(factory_id, CLAP_PLUGIN_FACTORY_ID)) return &factory;
         return nullptr;
     },

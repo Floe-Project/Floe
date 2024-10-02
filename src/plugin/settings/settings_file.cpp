@@ -445,7 +445,7 @@ void DeinitSettingsFile(SettingsFile& settings) {
 // there are multiple processes of Floe running. I don't think this is a common scenario though, plugins tend
 // to be in the same process and therefore if we are using global memory, they share the same memory.
 void PollForSettingsFileChanges(SettingsFile& settings) {
-    ASSERT(DebugCheckThreadName("main"));
+    ASSERT(CheckThreadName("main"));
 
     if (settings.last_watcher_poll_time + 0.3 > TimePoint::Now()) return;
     DEFER { settings.last_watcher_poll_time = TimePoint::Now(); };

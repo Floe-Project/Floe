@@ -81,7 +81,9 @@ struct PluginCallbacks {
 constexpr char const* k_supported_gui_api =
     IS_WINDOWS ? CLAP_WINDOW_API_WIN32 : (IS_MACOS ? CLAP_WINDOW_API_COCOA : CLAP_WINDOW_API_X11);
 
-// CLAP uses logical pixels on macOS. We always use physical pixels.
+// CLAP uses logical pixels on macOS or physical pixel on Windows/Linux. We always use physical pixels, and so
+// need to convert. See gui.h definitions of CLAP_WINDOW_API_WIN32, CLAP_WINDOW_API_COCOA,
+// CLAP_WINDOW_API_X11.
 PUBLIC UiSize PhysicalPixelsToClapPixels(PuglView* view, UiSize size) {
     if constexpr (IS_MACOS) {
         auto scale_factor = puglGetScaleFactor(view);
@@ -112,13 +114,31 @@ struct FloeClapExtensionHost {
 constexpr auto k_clap_log_module = "👏clap"_log_module;
 
 inline bool IsMainThread(clap_host const& host) {
-    if constexpr (PRODUCTION_BUILD) return true;
     if (auto const thread_check =
             (clap_host_thread_check const*)host.get_extension(&host, CLAP_EXT_THREAD_CHECK);
         thread_check)
         return thread_check->is_main_thread(&host);
     else
-        return DebugCheckThreadName("main");
+        return CheckThreadName("main");
+}
+
+enum class IsAudioThreadResult { No, Yes, Unknown };
+
+inline IsAudioThreadResult IsAudioThread(clap_host const& host) {
+    if (auto const thread_check =
+            (clap_host_thread_check const*)host.get_extension(&host, CLAP_EXT_THREAD_CHECK);
+        thread_check)
+        return thread_check->is_audio_thread(&host) ? IsAudioThreadResult::Yes : IsAudioThreadResult::No;
+    else {
+        // We can't know for sure without the host's extension since the CLAP spec allows there to be multiple
+        // audio threads.
+        return IsAudioThreadResult::Unknown;
+    }
+}
+
+inline bool RunningInStandalone(clap_host const& host) {
+    if constexpr (PRODUCTION_BUILD) return false;
+    return host.get_extension(&host, k_floe_clap_extension_id) != nullptr;
 }
 
 static constexpr char const* k_features[] = {CLAP_PLUGIN_FEATURE_INSTRUMENT,

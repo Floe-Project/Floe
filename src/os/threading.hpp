@@ -47,8 +47,7 @@ constexpr static usize k_max_thread_name_size = 16;
 void SetThreadName(String name);
 Optional<DynamicArrayBounded<char, k_max_thread_name_size>> ThreadName();
 
-inline bool DebugCheckThreadName(String name) {
-    if constexpr (PRODUCTION_BUILD) return true;
+inline bool CheckThreadName(String name) {
     auto thread_name = ThreadName();
     ASSERT(thread_name, "Thread name is not set");
     return *thread_name == name;

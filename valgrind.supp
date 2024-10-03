@@ -1,10 +1,27 @@
 # Copyright 2018-2024 Sam Windell
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# run valgrind with --gen-suppressions=all and it will print blocks like these
-# if you add the blocks to this file then they will be suppressed
+# Run valgrind with --gen-suppressions=all and it will print blocks like these.
+# If you add the blocks to this file then they will be suppressed. 
+# You can use ... to match multiple fun/obj lines.
+
 {
    stb_sprintf_suppression
    Memcheck:Cond
    fun:stbsp_vsprintfcb
+}
+
+# IMPROVE: remove these once the zig issue is fixed.
+# https://github.com/ziglang/zig/issues/17908
+{
+   dlopen_zig_workaround_badsize
+   Memcheck:BadSize
+   ...
+   fun:_dl_open
+}
+{
+   dlopen_zig_workaround_realloczero
+   Memcheck:ReallocZero
+   ...
+   fun:_dl_open
 }

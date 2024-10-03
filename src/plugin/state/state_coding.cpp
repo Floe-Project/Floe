@@ -1247,7 +1247,12 @@ ErrorCodeOr<StateSnapshot> LoadPresetFile(String const filepath, ArenaAllocator&
 }
 
 ErrorCodeOr<void> SavePresetFile(String path, StateSnapshot const& state) {
-    ASSERT(path::Extension(path) == FLOE_PRESET_FILE_EXTENSION);
+    ArenaAllocatorWithInlineStorage<4000> scratch_arena;
+    if (auto const ext = path::Extension(path); ext != FLOE_PRESET_FILE_EXTENSION) {
+        path = CombineStrings(scratch_arena,
+                              Array {path.SubSpan(0, path.size - ext.size), FLOE_PRESET_FILE_EXTENSION});
+    }
+
     auto file = TRY(OpenFile(path, FileMode::Write));
     TRY(CodeState(const_cast<StateSnapshot&>(state),
                   CodeStateArguments {

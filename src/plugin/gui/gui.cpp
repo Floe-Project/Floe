@@ -487,7 +487,6 @@ Gui::~Gui() {
             GuiNoteClickReleased {.key = midi_keyboard_note_held_with_mouse.Value()});
         engine.host.request_process(&engine.host);
     }
-
 }
 
 bool Tooltip(Gui* g, imgui::Id id, Rect r, char const* fmt, ...);

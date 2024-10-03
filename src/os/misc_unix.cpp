@@ -26,7 +26,7 @@
 void* AllocatePages(usize bytes) {
     if constexpr (!PRODUCTION_BUILD) {
         if (RUNNING_ON_VALGRIND) {
-            auto const p = malloc(bytes);
+            auto const p = aligned_alloc(256, bytes);
             TracyAlloc(p, bytes);
             return p;
         }

@@ -592,7 +592,8 @@ clap_plugin_thread_pool const floe_thread_pool {
         [](clap_plugin_t const* plugin, u32 task_index) {
             ZoneScopedN("clap_plugin_thread_pool exec");
             auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-            floe.engine->processor.host_thread_pool->OnThreadPoolExec(task_index);
+            floe.engine->processor.processor_callbacks.on_thread_pool_exec(floe.engine->processor,
+                                                                           task_index);
         },
 };
 

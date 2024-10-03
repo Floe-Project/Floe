@@ -697,7 +697,6 @@ static bool Activate(AudioProcessor& processor, PluginActivateArgs args) {
         return false;
     }
 
-    processor.host_thread_pool = HostThreadPool::Create(processor.host);
     processor.audio_processing_context.process_block_size_max = args.max_block_size;
     processor.audio_processing_context.sample_rate = (f32)args.sample_rate;
 
@@ -1251,10 +1250,7 @@ clap_process_status Process(AudioProcessor& processor, clap_process const& proce
     // ======================================================================================================
     // IMPROVE: support sending the host CLAP_EVENT_NOTE_END events when voices end
     auto const layer_buffers =
-        ProcessVoices(processor.voice_pool,
-                      num_sample_frames,
-                      processor.audio_processing_context,
-                      processor.host_thread_pool ? &processor.host_thread_pool.Value() : nullptr);
+        ProcessVoices(processor.voice_pool, num_sample_frames, processor.audio_processing_context);
 
     Span<f32> interleaved_outputs {};
     bool audio_was_generated_by_voices = false;
@@ -1419,8 +1415,13 @@ static void OnMainThread(AudioProcessor& processor, bool& update_gui) {
     }
 }
 
+static void OnThreadPoolExec(AudioProcessor& processor, u32 index) {
+    OnThreadPoolExec(processor.voice_pool, index);
+}
+
 AudioProcessor::AudioProcessor(clap_host const& host)
     : host(host)
+    , audio_processing_context {.host = host}
     , distortion(smoothed_value_system)
     , bit_crush(smoothed_value_system)
     , compressor(smoothed_value_system)
@@ -1464,6 +1465,7 @@ AudioProcessor::AudioProcessor(clap_host const& host)
         .process = Process,
         .flush_parameter_events = FlushParameterEvents,
         .on_main_thread = OnMainThread,
+        .on_thread_pool_exec = OnThreadPoolExec,
     };
 }
 

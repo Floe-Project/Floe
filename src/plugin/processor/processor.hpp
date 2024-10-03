@@ -22,7 +22,6 @@
 #include "effect_phaser.hpp"
 #include "effect_reverb.hpp"
 #include "effect_stereo_widen.hpp"
-#include "host_thread_pool.hpp"
 #include "layer_processor.hpp"
 #include "param.hpp"
 #include "plugin/plugin.hpp"
@@ -180,7 +179,7 @@ struct AudioProcessor {
 
     FloeSmoothedValueSystem smoothed_value_system;
     ArenaAllocator audio_data_allocator {PageAllocator::Instance()};
-    AudioProcessingContext audio_processing_context {};
+    AudioProcessingContext audio_processing_context;
 
     int restart_voices_for_layer_bitset {};
     bool fx_need_another_frame_of_processing = {};
@@ -198,7 +197,6 @@ struct AudioProcessor {
     u32 previous_block_size = 0;
 
     StereoPeakMeter peak_meter = {};
-    Optional<HostThreadPool> host_thread_pool;
 
     f32 dynamics_value_01 {};
     f32 velocity_to_volume_01 {};

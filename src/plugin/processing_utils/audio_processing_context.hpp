@@ -4,6 +4,7 @@
 #pragma once
 #include "foundation/foundation.hpp"
 
+#include "clap/host.h"
 #include "processing_utils/midi.hpp"
 
 struct MidiNoteState {
@@ -49,4 +50,5 @@ struct AudioProcessingContext {
     u32 process_block_size_max = 512;
     f64 tempo = 120;
     MidiNoteState midi_note_state;
+    clap_host const& host;
 };

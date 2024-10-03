@@ -8,6 +8,7 @@
 
 #include "common_infrastructure/constants.hpp"
 
+#include "clap/ext/thread-pool.h"
 #include "processing_utils/adsr.hpp"
 #include "processing_utils/audio_processing_context.hpp"
 #include "processing_utils/filters.hpp"
@@ -24,8 +25,6 @@ constexpr u32 k_max_num_voice_samples = 4;
 constexpr f32 k_erroneous_sample_value = 1000.0f;
 
 struct VoiceProcessingController;
-
-struct HostThreadPool;
 
 using VoiceSmoothedValueSystem = SmoothedValueSystem<7, 4, 0>;
 
@@ -215,6 +214,8 @@ struct VoicePool {
 
     unsigned int random_seed = FastRandSeedFromTime();
 
+    AudioProcessingContext const* audio_processing_context = nullptr; // temp for thread pool
+
     struct {
         u32 num_frames = 0;
     } multithread_processing;
@@ -276,7 +277,7 @@ void StartVoice(VoicePool& pool,
 
 void NoteOff(VoicePool& pool, VoiceProcessingController& controller, MidiChannelNote note);
 
-Array<Span<f32>, k_num_layers> ProcessVoices(VoicePool& pool,
-                                             u32 num_frames,
-                                             AudioProcessingContext const& context,
-                                             HostThreadPool* thread_pool);
+Array<Span<f32>, k_num_layers>
+ProcessVoices(VoicePool& pool, u32 num_frames, AudioProcessingContext const& context);
+
+void OnThreadPoolExec(VoicePool& pool, u32 task_index);

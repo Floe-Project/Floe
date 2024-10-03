@@ -67,6 +67,9 @@ struct PluginCallbacks {
     // [main-thread]
     void (*on_main_thread)(UserObject&, bool& update_gui) = [](UserObject&, bool&) {};
 
+    // [audio-thread]
+    void (*on_thread_pool_exec)(UserObject&, u32 task_index) {};
+
     // [main-thread]
     bool (*save_state)(UserObject&, clap_ostream const& stream) = [](UserObject&, clap_ostream const&) {
         return true;
@@ -168,4 +171,6 @@ static constexpr clap_plugin_descriptor k_plugin_info {
 // can return null
 clap_plugin const* CreateFloeInstance(clap_host const* clap_host);
 
+// Request that the host resize the available space for the plugin. The host will likely follow this up with a
+// call to set_size(). So we shouldn't do that ourselves.
 void RequestGuiResize(clap_plugin const& plugin);

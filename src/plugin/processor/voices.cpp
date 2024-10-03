@@ -8,7 +8,6 @@
 #include "common_infrastructure/constants.hpp"
 
 #include "descriptors/param_descriptors.hpp"
-#include "host_thread_pool.hpp"
 #include "layer_processor.hpp"
 #include "processing_utils/audio_processing_context.hpp"
 #include "processor/effect_stereo_widen.hpp"
@@ -925,28 +924,30 @@ inline void ProcessBuffer(Voice& voice, u32 num_frames, AudioProcessingContext c
     voice.written_to_buffer_this_block = processor.Process(num_frames);
 }
 
-Array<Span<f32>, k_num_layers> ProcessVoices(VoicePool& pool,
-                                             u32 num_frames,
-                                             AudioProcessingContext const& context,
-                                             HostThreadPool* thread_pool) {
+void OnThreadPoolExec(VoicePool& pool, u32 task_index) {
+    auto& voice = pool.voices[task_index];
+    if (voice.is_active)
+        ProcessBuffer(voice, voice.pool.multithread_processing.num_frames, *pool.audio_processing_context);
+}
+
+Array<Span<f32>, k_num_layers>
+ProcessVoices(VoicePool& pool, u32 num_frames, AudioProcessingContext const& context) {
     ZoneScoped;
     if (pool.num_active_voices.Load(LoadMemoryOrder::Relaxed) == 0) return {};
+
+    auto const thread_pool =
+        (clap_host_thread_pool const*)context.host.get_extension(&context.host, CLAP_EXT_THREAD_POOL);
 
     {
 
         bool failed_multithreaded_process = false;
-        if (thread_pool) {
+        if (thread_pool && thread_pool->request_exec) {
             pool.multithread_processing.num_frames = num_frames;
             for (auto& v : pool.voices)
                 v.written_to_buffer_this_block = false;
 
-            failed_multithreaded_process = !thread_pool->RequestMultithreadedExecution(
-                [&context, &pool](u32 index) {
-                    auto& voice = pool.voices[index];
-                    if (voice.is_active)
-                        ProcessBuffer(voice, voice.pool.multithread_processing.num_frames, context);
-                },
-                k_num_voices);
+            pool.audio_processing_context = &context;
+            failed_multithreaded_process = !thread_pool->request_exec(&context.host, k_num_voices);
         }
 
         if (!thread_pool || failed_multithreaded_process) {

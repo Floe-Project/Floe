@@ -64,6 +64,7 @@ extern "C" CLAP_EXPORT const clap_plugin_entry clap_entry = {
             g_log.Error(k_global_log_module, "Stacktrace:\n{}", buffer);
             DefaultPanicHandler(message, loc);
         };
+
         StartupTracy();
         StartupCrashHandler(); // after tracy
 

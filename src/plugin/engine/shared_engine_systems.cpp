@@ -6,6 +6,7 @@
 #include "foundation/foundation.hpp"
 #include "os/misc.hpp"
 
+#include "plugin/plugin.hpp"
 #include "settings/settings_file.hpp"
 
 SharedEngineSystems::SharedEngineSystems()
@@ -15,21 +16,29 @@ SharedEngineSystems::SharedEngineSystems()
     , sample_library_server(thread_pool,
                             paths.always_scanned_folder[ToInt(ScanFolderType::Libraries)],
                             error_notifications) {
-    folder_settings_listener_id =
-        settings.tracking.filesystem_change_listeners.Add([this](ScanFolderType type) {
-            switch (type) {
-                case ScanFolderType::Presets:
-                    preset_listing.scanned_folder.needs_rescan.Store(true, StoreMemoryOrder::Relaxed);
-                    break;
-                case ScanFolderType::Libraries: {
-                    sample_lib_server::SetExtraScanFolders(
-                        sample_library_server,
-                        settings.settings.filesystem.extra_scan_folders[ToInt(ScanFolderType::Libraries)]);
-                    break;
-                }
-                case ScanFolderType::Count: PanicIfReached();
+
+    settings.tracking.on_filesystem_change = [this](ScanFolderType type) {
+        ASSERT(CheckThreadName("main"));
+        switch (type) {
+            case ScanFolderType::Presets:
+                preset_listing.scanned_folder.needs_rescan.Store(true, StoreMemoryOrder::Relaxed);
+                break;
+            case ScanFolderType::Libraries: {
+                sample_lib_server::SetExtraScanFolders(
+                    sample_library_server,
+                    settings.settings.filesystem.extra_scan_folders[ToInt(ScanFolderType::Libraries)]);
+                break;
             }
-        });
+            case ScanFolderType::Count: PanicIfReached();
+        }
+    };
+
+    settings.tracking.on_window_size_change = [this]() {
+        ASSERT(CheckThreadName("main"));
+        for (auto plugin : floe_instances)
+            if (plugin) RequestGuiResize(*plugin);
+    };
+
     thread_pool.Init("global", {});
 
     InitSettingsFile(settings, paths);
@@ -42,6 +51,8 @@ SharedEngineSystems::SharedEngineSystems()
 }
 
 SharedEngineSystems::~SharedEngineSystems() {
+    settings.tracking.on_filesystem_change = {};
+
     DeinitSettingsFile(settings);
 
     {
@@ -49,6 +60,10 @@ SharedEngineSystems::~SharedEngineSystems() {
         if (outcome.HasError())
             g_log.Error("global"_log_module, "Failed to write settings file: {}", outcome.Error());
     }
-
-    settings.tracking.filesystem_change_listeners.Remove(folder_settings_listener_id);
 }
+
+void SharedEngineSystems::RegisterFloeInstance(clap_plugin const* plugin, FloeInstanceIndex index) {
+    floe_instances[index] = plugin;
+}
+
+void SharedEngineSystems::UnregisterFloeInstance(FloeInstanceIndex index) { floe_instances[index] = nullptr; }

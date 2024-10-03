@@ -7,6 +7,7 @@
 
 #include "common_infrastructure/paths.hpp"
 
+#include "clap/plugin.h"
 #include "presets/presets_folder.hpp"
 #include "sample_lib_server/sample_library_server.hpp"
 #include "settings/settings_file.hpp"
@@ -19,7 +20,12 @@ struct SharedEngineSystems {
     SharedEngineSystems();
     ~SharedEngineSystems();
 
-    u64 folder_settings_listener_id;
+    void RegisterFloeInstance(clap_plugin const* plugin, FloeInstanceIndex index);
+    void UnregisterFloeInstance(FloeInstanceIndex index);
+
+    // indexable by FloeInstanceInde
+    Array<clap_plugin const*, k_max_num_floe_instances> floe_instances {};
+
     ArenaAllocator arena;
     ThreadsafeErrorNotifications error_notifications {};
     FloePaths paths;

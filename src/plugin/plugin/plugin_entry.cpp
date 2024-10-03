@@ -17,8 +17,7 @@ static clap_plugin_factory const factory = {
                         clap_host_t const* host,
                         char const* plugin_id) -> clap_plugin_t const* {
         if (NullTermStringsEqual(plugin_id, k_plugin_info.id)) {
-            auto& p = CreateFloeInstance(host);
-            return &p;
+            return CreateFloeInstance(host);
         }
         return nullptr;
     },

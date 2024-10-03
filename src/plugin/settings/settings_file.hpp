@@ -4,7 +4,6 @@
 #pragma once
 #include "foundation/foundation.hpp"
 #include "os/misc.hpp"
-#include "utils/thread_extra/threadsafe_listener_array.hpp"
 
 #include "common_infrastructure/paths.hpp"
 
@@ -54,12 +53,10 @@ struct Settings {
     PathPool path_pool;
 };
 
-using FolderChangeListeners = ThreadsafeListenerArray<TrivialFixedSizeFunction<16, void(ScanFolderType)>>;
-
 struct SettingsTracking {
+    TrivialFixedSizeFunction<8, void()> on_window_size_change {};
+    TrivialFixedSizeFunction<8, void(ScanFolderType)> on_filesystem_change {}; // single function
     bool changed {};
-    ThreadsafeListenerArray<TrivialFixedSizeFunction<16, void()>> window_size_change_listeners;
-    FolderChangeListeners filesystem_change_listeners;
 };
 
 struct SettingsFile {

@@ -474,19 +474,6 @@ Gui::Gui(GuiFrameInput& frame_input, Engine& engine)
     imgui.user_callback_data = this;
 
     layout::ReserveItemsCapacity(layout, 2048);
-
-    m_window_size_listener_id =
-        engine.shared_engine_systems.settings.tracking.window_size_change_listeners.Add([this]() {
-            auto const& host = this->engine.host;
-            auto const host_gui = (clap_host_gui const*)host.get_extension(&host, CLAP_EXT_GUI);
-            if (host_gui) {
-                auto const size = PhysicalPixelsToClapPixels(
-                    (PuglView*)this->frame_input.pugl_view,
-                    gui_settings::WindowSize(this->engine.shared_engine_systems.settings.settings.gui));
-                host_gui->resize_hints_changed(&host);
-                host_gui->request_resize(&host, size.width, size.height);
-            }
-        });
 }
 
 Gui::~Gui() {
@@ -501,8 +488,6 @@ Gui::~Gui() {
         engine.host.request_process(&engine.host);
     }
 
-    engine.shared_engine_systems.settings.tracking.window_size_change_listeners.Remove(
-        m_window_size_listener_id);
 }
 
 bool Tooltip(Gui* g, imgui::Id id, Rect r, char const* fmt, ...);

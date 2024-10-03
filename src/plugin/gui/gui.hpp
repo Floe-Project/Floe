@@ -132,7 +132,6 @@ struct Gui {
 
     bool show_purchasable_libraries = false;
     bool show_news = false;
-    u64 m_window_size_listener_id {};
 
     InstallPackagesData install_packages_state {};
 

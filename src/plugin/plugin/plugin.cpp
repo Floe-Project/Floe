@@ -30,10 +30,8 @@
 
 [[clang::no_destroy]] Optional<SharedEngineSystems> g_shared_engine_systems {};
 
-static u16 g_floe_instance_id_counter = 0;
-
 struct FloePluginInstance {
-    FloePluginInstance(clap_host const* clap_host);
+    FloePluginInstance(clap_host const* clap_host, FloeInstanceIndex id);
     ~FloePluginInstance() { g_log.Trace(k_main_log_module); }
 
     clap_host const& host;
@@ -43,24 +41,27 @@ struct FloePluginInstance {
     bool active {false};
     bool processing {false};
 
-    u16 id = g_floe_instance_id_counter++;
+    FloeInstanceIndex const index;
 
     TracyMessageConfig trace_config {
         .category = "clap",
         .colour = 0xa88e39,
-        .object_id = id,
+        .object_id = index,
     };
 
     ArenaAllocator arena {PageAllocator::Instance()};
 
     Optional<Engine> engine {};
 
+    u64 window_size_listener_id {};
+
     Optional<GuiPlatform> gui_platform {};
 };
 
 inline Allocator& FloeInstanceAllocator() { return PageAllocator::Instance(); }
 
-static u16 g_num_init_plugins = 0;
+static u16 g_num_initialised_plugins = 0;
+static u16 g_num_floe_instances = 0;
 
 // NOLINTNEXTLINE(cppcoreguidelines-interfaces-global-init): clang-tidy thinks g_log is initialised
 clap_plugin_state const floe_plugin_state {
@@ -668,17 +669,17 @@ clap_plugin const floe_plugin {
             return false;
         }
 
-        if (g_num_init_plugins == LargestRepresentableValue<decltype(g_num_init_plugins)>()) {
-            g_log.Error(k_clap_log_module, "too many plugins initialised");
-            return false;
-        }
+        ASSERT(g_num_initialised_plugins != LargestRepresentableValue<decltype(g_num_initialised_plugins)>());
 
         ZoneScopedMessage(floe.trace_config, "plugin init");
 
-        if (g_num_init_plugins++ == 0) {
+        if (g_num_initialised_plugins++ == 0) {
             SetThreadName("main");
             g_shared_engine_systems.Emplace();
         }
+
+        g_shared_engine_systems->RegisterFloeInstance(&floe.clap_plugin, floe.index);
+
         floe.engine.Emplace(floe.host, *g_shared_engine_systems);
         floe.initialised = true;
         return true;
@@ -709,12 +710,15 @@ clap_plugin const floe_plugin {
                     floe_plugin.deactivate(plugin);
                 }
 
+                g_shared_engine_systems->UnregisterFloeInstance(floe.index);
+
                 floe.engine.Clear();
 
-                ASSERT(g_num_init_plugins);
-                if (--g_num_init_plugins == 0) g_shared_engine_systems.Clear();
+                ASSERT(g_num_initialised_plugins);
+                if (--g_num_initialised_plugins == 0) g_shared_engine_systems.Clear();
             }
 
+            --g_num_floe_instances;
             FloeInstanceAllocator().Delete(&floe);
         },
 
@@ -849,7 +853,7 @@ clap_plugin const floe_plugin {
     .process = [](clap_plugin const* plugin, clap_process_t const* process) -> clap_process_status {
         auto& floe = *(FloePluginInstance*)plugin->plugin_data;
         ZoneScopedMessage(floe.trace_config, "plugin process");
-        ZoneKeyNum("instance", floe.id);
+        ZoneKeyNum("instance", floe.index);
         ZoneKeyNum("events", process->in_events->size(process->in_events));
         ZoneKeyNum("num_frames", process->frames_count);
 
@@ -903,13 +907,29 @@ clap_plugin const floe_plugin {
         },
 };
 
-FloePluginInstance::FloePluginInstance(clap_host const* host) : host(*host) {
+FloePluginInstance::FloePluginInstance(clap_host const* host, FloeInstanceIndex index)
+    : host(*host)
+    , index(index) {
     g_log_file.Trace(k_main_log_module);
     clap_plugin = floe_plugin;
     clap_plugin.plugin_data = this;
 }
 
-clap_plugin const& CreateFloeInstance(clap_host const* host) {
-    auto result = FloeInstanceAllocator().New<FloePluginInstance>(host);
-    return result->clap_plugin;
+clap_plugin const* CreateFloeInstance(clap_host const* host) {
+    if (g_num_floe_instances == k_max_num_floe_instances) return nullptr;
+    auto result = FloeInstanceAllocator().New<FloePluginInstance>(host, g_num_floe_instances++);
+    return &result->clap_plugin;
+}
+
+void RequestGuiResize(clap_plugin const& plugin) {
+    auto const& floe = *(FloePluginInstance*)plugin.plugin_data;
+    if (!floe.gui_platform) return;
+    auto const host_gui = (clap_host_gui const*)floe.host.get_extension(&floe.host, CLAP_EXT_GUI);
+    if (host_gui) {
+        auto const size = PhysicalPixelsToClapPixels(
+            floe.gui_platform->view,
+            gui_settings::WindowSize(g_shared_engine_systems->settings.settings.gui));
+        host_gui->resize_hints_changed(&floe.host);
+        host_gui->request_resize(&floe.host, size.width, size.height);
+    }
 }

@@ -2,11 +2,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #pragma once
+#include "os/threading.hpp"
+
 #include "settings/settings_file.hpp"
 
 namespace filesystem_settings {
 
 PUBLIC void SetInstallLocation(SettingsFile& settings, ScanFolderType type, String path) {
+    ASSERT(CheckThreadName("main"));
     if (!path::IsAbsolute(path)) return;
     auto& install_location = settings.settings.filesystem.install_location[ToInt(type)];
     if (install_location == path) return;
@@ -23,17 +26,19 @@ PUBLIC void SetInstallLocation(SettingsFile& settings, ScanFolderType type, Stri
 }
 
 PUBLIC void AddScanFolder(SettingsFile& settings, ScanFolderType type, String path) {
+    ASSERT(CheckThreadName("main"));
     if (!path::IsAbsolute(path)) return;
     if (path == settings.paths.always_scanned_folder[ToInt(type)]) return;
 
     if (dyn::AppendIfNotAlreadyThere(settings.settings.filesystem.extra_scan_folders[ToInt(type)],
                                      settings.settings.path_pool.Clone(path, settings.arena))) {
         settings.tracking.changed = true;
-        settings.tracking.filesystem_change_listeners.Call(type);
+        if (settings.tracking.on_filesystem_change) settings.tracking.on_filesystem_change(type);
     }
 }
 
 PUBLIC void RemoveScanFolder(SettingsFile& settings, ScanFolderType type, String path) {
+    ASSERT(CheckThreadName("main"));
     auto& paths = settings.settings.filesystem.extra_scan_folders[ToInt(type)];
     auto opt_index = Find(paths, path);
     if (opt_index) {
@@ -44,7 +49,7 @@ PUBLIC void RemoveScanFolder(SettingsFile& settings, ScanFolderType type, String
         dyn::RemoveSwapLast(paths, *opt_index);
 
         settings.tracking.changed = true;
-        settings.tracking.filesystem_change_listeners.Call(type);
+        if (settings.tracking.on_filesystem_change) settings.tracking.on_filesystem_change(type);
     }
 }
 

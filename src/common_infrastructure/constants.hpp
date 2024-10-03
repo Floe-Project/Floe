@@ -5,3 +5,5 @@
 #include "foundation/foundation.hpp"
 
 constexpr u32 k_num_layers = 3;
+constexpr u16 k_max_num_floe_instances = 512;
+using FloeInstanceIndex = u16;

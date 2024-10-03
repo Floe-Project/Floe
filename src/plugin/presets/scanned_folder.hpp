@@ -16,7 +16,6 @@ struct ScannedFolder {
     bool recursive {};
     Atomic<bool> needs_rescan {true};
     Atomic<u32> async_scans {0};
-    Optional<u64> filesystem_settings_listener_id {};
     ThreadsafeListenerArray<TrivialFixedSizeFunction<16, void()>> listeners {};
     Mutex overall_mutex {};
     ArenaAllocator thread_arena {Malloc::Instance()};

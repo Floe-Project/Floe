@@ -260,6 +260,8 @@ struct Server {
     Atomic<bool> request_debug_dump_current_state {false};
 };
 
+// IMPROVE: we can set limits: we know there's only going to be k_max_num_floe_instances.
+
 // The server owns the channel, you just get a reference to it that will be valid until you close it. The
 // callback will be called whenever a request from this channel is completed. If you want to keep any of
 // the resources that are contained in the LoadResult, you must 'retain' them in the callback. You can release

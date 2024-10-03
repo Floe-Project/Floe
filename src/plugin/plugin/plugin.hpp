@@ -85,16 +85,22 @@ constexpr char const* k_supported_gui_api =
 // need to convert. See gui.h definitions of CLAP_WINDOW_API_WIN32, CLAP_WINDOW_API_COCOA,
 // CLAP_WINDOW_API_X11.
 PUBLIC UiSize PhysicalPixelsToClapPixels(PuglView* view, UiSize size) {
+    ASSERT(CheckThreadName("main"));
+    ASSERT(view);
     if constexpr (IS_MACOS) {
         auto scale_factor = puglGetScaleFactor(view);
+        ASSERT(scale_factor > 0);
         size.width = CheckedCast<u16>(size.width / scale_factor);
         size.height = CheckedCast<u16>(size.height / scale_factor);
     }
     return size;
 }
 PUBLIC UiSize ClapPixelsToPhysicalPixels(PuglView* view, u32 width, u32 height) {
+    ASSERT(CheckThreadName("main"));
+    ASSERT(view);
     if constexpr (IS_MACOS) {
         auto scale_factor = puglGetScaleFactor(view);
+        ASSERT(scale_factor > 0);
         width = u32(width * scale_factor);
         height = u32(height * scale_factor);
     }
@@ -159,4 +165,7 @@ static constexpr clap_plugin_descriptor k_plugin_info {
     .features = (char const**)k_features,
 };
 
-clap_plugin const& CreateFloeInstance(clap_host const* clap_host);
+// can return null
+clap_plugin const* CreateFloeInstance(clap_host const* clap_host);
+
+void RequestGuiResize(clap_plugin const& plugin);

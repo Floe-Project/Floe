@@ -99,12 +99,16 @@ PUBLIC InstallJob::State StartJobInternal(InstallJob& job) {
                 case package::SubfolderType::Libraries: {
                     sample_lib_server::RequestScanningOfUnscannedFolders(job.sample_lib_server);
 
-                    constexpr u32 k_max_wait_ms = 2 * 60 * 1000;
                     u32 wait_ms = 0;
-                    while (sample_lib_server::IsScanningSampleLibraries(job.sample_lib_server) &&
-                           wait_ms < k_max_wait_ms) {
+                    while (sample_lib_server::IsScanningSampleLibraries(job.sample_lib_server)) {
                         SleepThisThread(100);
                         wait_ms += 100;
+
+                        constexpr u32 k_max_wait_ms = 2 * 60 * 1000;
+                        if (wait_ms >= k_max_wait_ms) {
+                            job.error_log.Error({}, "timed out waiting for sample libraries to be scanned");
+                            return InstallJob::State::DoneError;
+                        }
                     }
 
                     auto existing_lib =

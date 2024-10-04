@@ -76,7 +76,7 @@ static void LoadNewState(Engine& engine, StateSnapshotWithMetadata const& state,
     });
 
     if (!async) {
-        for (auto [layer_index, i] : Enumerate<u32>(engine.last_snapshot.state.inst_ids)) {
+        for (auto [layer_index, i] : Enumerate<u32>(state.state.inst_ids)) {
             engine.processor.layer_processors[layer_index].instrument_id = i;
             switch (i.tag) {
                 case InstrumentType::None:

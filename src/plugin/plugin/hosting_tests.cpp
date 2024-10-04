@@ -360,6 +360,7 @@ enum class StateProperties : u32 {
     Sine = 1 << 1,
     WhiteNoise = 1 << 2,
     SampleInst = 1 << 3,
+    SoundShapersOn = 1 << 4,
 };
 
 inline StateProperties operator|(StateProperties a, StateProperties b) {
@@ -387,24 +388,45 @@ static ErrorCodeOr<Span<u8 const>> MakeState(ArenaAllocator& arena, StatePropert
         };
     }
 
-    u32 layer_index = 0;
+    u32 layer_assignment_index = 0;
 
     if (properties & StateProperties::Sine) {
-        state.inst_ids[layer_index] = WaveformType::Sine;
-        layer_index = (layer_index + 1) % k_num_layers;
+        state.inst_ids[layer_assignment_index] = WaveformType::Sine;
+        layer_assignment_index = (layer_assignment_index + 1) % k_num_layers;
     }
 
     if (properties & StateProperties::WhiteNoise) {
-        state.inst_ids[layer_index] = WaveformType::WhiteNoiseMono;
-        layer_index = (layer_index + 1) % k_num_layers;
+        state.inst_ids[layer_assignment_index] = WaveformType::WhiteNoiseMono;
+        layer_assignment_index = (layer_assignment_index + 1) % k_num_layers;
     }
 
     if (properties & StateProperties::SampleInst) {
-        state.inst_ids[layer_index] = sample_lib::InstrumentId {
+        state.inst_ids[layer_assignment_index] = sample_lib::InstrumentId {
             .library = sample_lib::LibraryIdRef {.author = "FrozenPlain", .name = "Wraith"},
             .inst_name = "Endless Stride"_s,
         };
-        layer_index = (layer_index + 1) % k_num_layers;
+        layer_assignment_index = (layer_assignment_index + 1) % k_num_layers;
+    }
+
+    if (properties & StateProperties::SoundShapersOn) {
+        state.param_values[ToInt(ParamIndex::DistortionOn)] = 1.0f;
+        state.param_values[ToInt(ParamIndex::BitCrushOn)] = 1.0f;
+        state.param_values[ToInt(ParamIndex::CompressorOn)] = 1.0f;
+        state.param_values[ToInt(ParamIndex::FilterOn)] = 1.0f;
+        state.param_values[ToInt(ParamIndex::StereoWidenOn)] = 1.0f;
+        state.param_values[ToInt(ParamIndex::ChorusOn)] = 1.0f;
+        state.param_values[ToInt(ParamIndex::ReverbOn)] = 1.0f;
+        state.param_values[ToInt(ParamIndex::DelayOn)] = 1.0f;
+        state.param_values[ToInt(ParamIndex::ConvolutionReverbOn)] = 1.0f;
+        state.param_values[ToInt(ParamIndex::PhaserOn)] = 1.0f;
+        for (auto const layer_index : Range(k_num_layers)) {
+            state.param_values[ToInt(ParamIndexFromLayerParamIndex(layer_index, LayerParamIndex::FilterOn))] =
+                1.0f;
+            state.param_values[ToInt(ParamIndexFromLayerParamIndex(layer_index, LayerParamIndex::LfoOn))] =
+                1.0f;
+            state.param_values[ToInt(ParamIndexFromLayerParamIndex(layer_index, LayerParamIndex::EqOn))] =
+                1.0f;
+        }
     }
 
     DynamicArray<u8> buffer {arena};
@@ -636,6 +658,26 @@ TEST_CASE(TestHostingClap) {
                                      StateProperties::SampleInst,
                                      {
                                          .seed = 0x1ce,
+                                         .num_frames = 44100,
+                                         .num_channels = 2,
+                                         .sample_rate = 44100,
+                                         .min_block_size = 1,
+                                         .max_block_size = 1024,
+                                         .constant_block_size = 0,
+                                         .events = events,
+                                         .capture_output = true,
+                                     });
+                }
+
+                SUBCASE("everything on") {
+                    ProcessWithState(tester,
+                                     plugin,
+                                     test_host,
+                                     StateProperties::Ir | StateProperties::Sine |
+                                         StateProperties::WhiteNoise | StateProperties::SampleInst |
+                                         StateProperties::SoundShapersOn,
+                                     {
+                                         .seed = 0xba7,
                                          .num_frames = 44100,
                                          .num_channels = 2,
                                          .sample_rate = 44100,

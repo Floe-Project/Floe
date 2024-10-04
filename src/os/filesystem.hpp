@@ -91,6 +91,11 @@ struct File {
 
     ErrorCodeOr<usize> Write(Span<u8 const> data);
     ErrorCodeOr<usize> Write(Span<char const> data) { return Write(data.ToByteSpan()); }
+
+    ErrorCodeOr<usize> WriteBinaryNumber(Integral auto number) {
+        return Write(Span<u8 const>((u8*)&number, sizeof(number)));
+    }
+
     ErrorCodeOr<usize> WriteAt(s64 position, Span<u8 const> data) {
         TRY(Seek(position, SeekOrigin::Start));
         return Write(data);

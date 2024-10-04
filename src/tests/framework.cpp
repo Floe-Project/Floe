@@ -77,6 +77,27 @@ String TestFilesFolder(Tester& tester) {
     return *tester.test_files_folder;
 }
 
+String HumanCheckableOutputFilesFolder(Tester& tester) {
+    if (!tester.human_checkable_output_files_folder) {
+        auto const output_dir = String(path::Join(
+            tester.arena,
+            Array {String(KnownDirectory(tester.arena, KnownDirectoryType::UserData, {.create = true})),
+                   "Floe",
+                   "Test-Output-Files"}));
+        auto const outcome = CreateDirectory(output_dir, {.create_intermediate_directories = true});
+        if (outcome.HasError()) {
+            Check(tester, false, "failed to create output directory", FailureAction::FailAndExitTest);
+            tester.human_checkable_output_files_folder = "ERROR";
+        } else {
+            tester.human_checkable_output_files_folder = output_dir;
+        }
+        tester.log.Info({},
+                        "Human checkable output files folder: {}",
+                        *tester.human_checkable_output_files_folder);
+    }
+    return *tester.human_checkable_output_files_folder;
+}
+
 Optional<String> BuildResourcesFolder(Tester& tester) {
     if (!tester.build_resources_folder)
         tester.build_resources_folder.Emplace(

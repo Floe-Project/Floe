@@ -751,14 +751,7 @@ static String AnchorName(layout::Anchor a) {
 TEST_CASE(TestLayout) {
     using namespace layout;
 
-    auto const output_dir = String(path::Join(
-        tester.arena,
-        Array {String(KnownDirectory(tester.arena, KnownDirectoryType::UserData, {.create = true})),
-               "Floe",
-               "layout-tests"}));
-    TRY(CreateDirectory(output_dir, {.create_intermediate_directories = true}));
-    tester.log.Info({}, "Layout output directory: {}", output_dir);
-
+    auto const output_dir = tests::HumanCheckableOutputFilesFolder(tester);
     DynamicArray<char> html {tester.arena};
     fmt::Append(html, "<!DOCTYPE html><html>\n<head>\n<title>Layout Tests</title>\n</head>\n<body>\n");
 

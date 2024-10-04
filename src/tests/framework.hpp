@@ -154,6 +154,7 @@ struct Tester {
     usize num_warnings = 0;
     Optional<String> temp_folder {};
     Optional<String> test_files_folder {};
+    Optional<String> human_checkable_output_files_folder {};
     Optional<Optional<String>> build_resources_folder {};
     ArenaAllocator fixture_arena {PageAllocator::Instance()};
     void* fixture_pointer {};
@@ -172,7 +173,8 @@ void Check(Tester& tester,
 constexpr auto k_build_resources_subdir = "build_resources"_s;
 
 String TempFolder(Tester& tester);
-String TestFilesFolder(Tester& tester);
+String TestFilesFolder(Tester& tester); // this repos folder that contains test files
+String HumanCheckableOutputFilesFolder(Tester& tester); // place to put files that need manually checking
 Optional<String> BuildResourcesFolder(Tester& tester);
 
 // Create some data that persists for all SUBCASEs rather than being created and destroyed every iteration.

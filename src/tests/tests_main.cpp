@@ -8,7 +8,6 @@
 #include "utils/debug/tracy_wrapped.hpp"
 
 #include "foundation_tests.hpp"
-#include "hosting_tests.hpp"
 #include "os_tests.hpp"
 #include "utils_tests.hpp"
 

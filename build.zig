@@ -1641,6 +1641,7 @@ pub fn build(b: *std.Build) void {
                     plugin_path ++ "/gui/gui_window.cpp",
                     plugin_path ++ "/descriptors/param_descriptors.cpp",
                     plugin_path ++ "/plugin/plugin.cpp",
+                    plugin_path ++ "/plugin/hosting_tests.cpp",
                     plugin_path ++ "/presets/directory_listing.cpp",
                     plugin_path ++ "/presets/presets_folder.cpp",
                     plugin_path ++ "/presets/scanned_folder.cpp",

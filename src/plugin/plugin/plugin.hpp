@@ -120,6 +120,10 @@ struct FloeClapExtensionHost {
     void* pugl_world;
 };
 
+struct FloeClapExtensionPlugin {
+    bool (*state_change_is_pending)(clap_plugin const* plugin) = nullptr;
+};
+
 constexpr auto k_clap_log_module = "👏clap"_log_module;
 
 inline bool IsMainThread(clap_host const& host) {

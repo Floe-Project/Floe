@@ -648,6 +648,13 @@ clap_plugin_posix_fd_support const floe_posix_fd {
         },
 };
 
+FloeClapExtensionPlugin const floe_custom_ext {
+    .state_change_is_pending = [](clap_plugin_t const* plugin) -> bool {
+        auto& floe = *(FloePluginInstance*)plugin->plugin_data;
+        return floe.engine->pending_state_change.HasValue();
+    },
+};
+
 // NOLINTNEXTLINE(cppcoreguidelines-interfaces-global-init): clang-tidy thinks g_log is initialised
 clap_plugin const floe_plugin {
     .desc = &k_plugin_info,
@@ -880,6 +887,7 @@ clap_plugin const floe_plugin {
         if (NullTermStringsEqual(id, CLAP_EXT_THREAD_POOL)) return &floe_thread_pool;
         if (NullTermStringsEqual(id, CLAP_EXT_TIMER_SUPPORT)) return &floe_timer;
         if (NullTermStringsEqual(id, CLAP_EXT_POSIX_FD_SUPPORT)) return &floe_posix_fd;
+        if (NullTermStringsEqual(id, k_floe_clap_extension_id)) return &floe_custom_ext;
         return nullptr;
     },
 

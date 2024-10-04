@@ -13,6 +13,7 @@
 //
 
 #include "foundation/foundation.hpp"
+#include "os/filesystem.hpp"
 #include "os/misc_windows.hpp"
 #include "os/threading.hpp"
 #include "tests/framework.hpp"
@@ -89,6 +90,23 @@ void TryShrinkPages(void* ptr, usize old_size, usize new_size) {
     (void)new_size;
     // IMPROVE: actually shrink the memory
 }
+
+ErrorCodeOr<LibraryHandle> LoadLibrary(String path) {
+    PathArena temp_allocator;
+    auto const w_path = TRY(path::MakePathForWin32(path, temp_allocator, true));
+    auto handle = LoadLibraryW(w_path.path.data);
+    if (handle == nullptr) return Win32ErrorCode(GetLastError(), "LoadLibrary");
+    return (LibraryHandle)(uintptr)handle;
+}
+
+ErrorCodeOr<void*> SymbolFromLibrary(LibraryHandle library, String symbol_name) {
+    ArenaAllocatorWithInlineStorage<200> temp_allocator;
+    auto result = GetProcAddress((HMODULE)library, NullTerminated(symbol_name, temp_allocator));
+    if (result == nullptr) return Win32ErrorCode(GetLastError(), "GetProcAddress");
+    return (void*)result;
+}
+
+void UnloadLibrary(LibraryHandle library) { FreeLibrary((HMODULE)(uintptr)library); }
 
 int CurrentProcessId() { return _getpid(); }
 

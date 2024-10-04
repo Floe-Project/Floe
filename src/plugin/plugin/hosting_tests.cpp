@@ -15,11 +15,6 @@
 #include "state/state_coding.hpp"
 #include "state/state_snapshot.hpp"
 
-#if IS_LINUX || IS_MACOS
-#include <dlfcn.h>
-#endif
-
-#if IS_LINUX || IS_MACOS
 struct TestHost {
     clap_host_params const host_params {
         .rescan =
@@ -521,18 +516,15 @@ static void ProcessWithState(tests::Tester& tester,
     }
 }
 
-#endif
-
 TEST_CASE(TestHostingClap) {
-#if IS_LINUX || IS_MACOS
     struct Fixture {
         [[maybe_unused]] Fixture(tests::Tester&) {}
         [[maybe_unused]] ~Fixture() {
-            if (handle) dlclose(handle);
+            if (handle) UnloadLibrary(*handle);
         }
         DynamicArrayBounded<char, path::k_max> clap_path {};
         bool initialised = false;
-        void* handle = nullptr;
+        Optional<LibraryHandle> handle = {};
     };
 
     auto& fixture = CreateOrFetchFixtureObject<Fixture>(tester);
@@ -540,13 +532,14 @@ TEST_CASE(TestHostingClap) {
     if (!fixture.initialised) {
         fixture.initialised = true;
         auto const exe_path = TRY(CurrentExecutablePath(tester.scratch_arena));
-        auto p = exe_path;
+        String dir = exe_path;
 
         for (auto _ : Range(6)) {
-            auto dir = path::Directory(p);
-            if (!dir) break;
+            auto p = path::Directory(dir);
+            if (!p) break;
+            dir = *p;
 
-            dyn::Assign(fixture.clap_path, *dir);
+            dyn::Assign(fixture.clap_path, dir);
             path::JoinAppend(fixture.clap_path, "Floe.clap"_s);
             if (auto const o = GetFileType(fixture.clap_path); o.HasValue() && o.Value() == FileType::File)
                 break;
@@ -559,13 +552,10 @@ TEST_CASE(TestHostingClap) {
             return k_success;
         }
 
-        fixture.handle =
-            dlopen(NullTerminated(fixture.clap_path, tester.scratch_arena), RTLD_LOCAL | RTLD_NOW);
-        if (!fixture.handle)
-            TEST_FAILED("Failed to load clap: {}", dlerror()); // NOLINT(concurrency-mt-unsafe)
+        fixture.handle = TRY(LoadLibrary(fixture.clap_path));
     }
 
-    auto const entry = (clap_plugin_entry const*)dlsym(fixture.handle, "clap_entry");
+    auto const entry = (clap_plugin_entry const*)TRY(SymbolFromLibrary(*fixture.handle, "clap_entry"));
     REQUIRE(entry != nullptr);
 
     CHECK(entry->init("plugin-path"));
@@ -691,8 +681,6 @@ TEST_CASE(TestHostingClap) {
             }
         }
     }
-
-#endif
 
     return k_success;
 }

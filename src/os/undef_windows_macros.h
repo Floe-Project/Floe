@@ -34,3 +34,6 @@
 #ifdef FillMemory
 #undef FillMemory
 #endif
+#ifdef LoadLibrary
+#undef LoadLibrary
+#endif

@@ -29,6 +29,11 @@ void* AllocatePages(usize bytes);
 void FreePages(void* ptr, usize bytes);
 void TryShrinkPages(void* ptr, usize old_size, usize new_size);
 
+enum class LibraryHandle : uintptr {};
+ErrorCodeOr<LibraryHandle> LoadLibrary(String path);
+ErrorCodeOr<void*> SymbolFromLibrary(LibraryHandle library, String symbol_name);
+void UnloadLibrary(LibraryHandle library);
+
 bool IsRunningUnderWine();
 
 // Allocate whole pages at a time: 4kb or 16kb each; this is the smallest size that the OS gives out.

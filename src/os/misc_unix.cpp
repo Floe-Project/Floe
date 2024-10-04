@@ -50,6 +50,22 @@ void FreePages(void* ptr, usize bytes) {
     munmap(ptr, bytes);
 }
 
+ErrorCodeOr<LibraryHandle> LoadLibrary(String path) {
+    PathArena path_arena;
+    auto handle = dlopen(NullTerminated(path, path_arena), RTLD_NOW | RTLD_LOCAL);
+    if (handle == nullptr) return ErrnoErrorCode(errno, "dlopen");
+    return (LibraryHandle)(uintptr)handle;
+}
+
+ErrorCodeOr<void*> SymbolFromLibrary(LibraryHandle library, String symbol_name) {
+    PathArena path_arena;
+    auto symbol = dlsym((void*)library, NullTerminated(symbol_name, path_arena));
+    if (symbol == nullptr) return ErrnoErrorCode(errno, "dlsym");
+    return symbol;
+}
+
+void UnloadLibrary(LibraryHandle library) { dlclose((void*)library); }
+
 int CurrentProcessId() { return getpid(); }
 
 void TryShrinkPages(void* ptr, usize old_size, usize new_size) {

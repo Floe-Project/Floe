@@ -451,6 +451,20 @@ static void ProcessWithState(tests::Tester& tester,
 
     LoadState(tester, plugin, REQUIRE_UNWRAP(MakeState(tester.scratch_arena, state_properties)));
 
+    // TODO: We might have loaded state that requires loading in a background thread, such as instruments that
+    // need to call into the sample library server. We are not about to process audio, but it will be silent
+    // due to our mechanisms for only applying changes once all loading is completed. We need to give the
+    // plugin time to load and we need to handle callback_requested requests. We could maybe use out_events of
+    // the process block. Floe could send Floe-specific events in there that we can understand here.
+    // Alternatively, we could have a Floe-specific extension (via get_extension) that we, as the host, can
+    // call and check if there's loading happening or not.
+    //
+    // for (auto const _ : Range(100)) {
+    //     SleepThisThread(10);
+    //     if (test_host.callback_requested.Exchange(false, RmwMemoryOrder::Relaxed))
+    //         plugin->on_main_thread(plugin);
+    // }
+
     REQUIRE(plugin->activate(plugin, options.sample_rate, options.min_block_size, options.max_block_size));
     DEFER { plugin->deactivate(plugin); };
 

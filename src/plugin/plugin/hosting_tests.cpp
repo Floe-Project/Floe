@@ -519,12 +519,10 @@ static void ProcessWithState(tests::Tester& tester,
 TEST_CASE(TestHostingClap) {
     struct Fixture {
         [[maybe_unused]] Fixture(tests::Tester&) {}
-        [[maybe_unused]] ~Fixture() {
-            if (handle) UnloadLibrary(*handle);
-        }
+        [[maybe_unused]] ~Fixture() {}
         DynamicArrayBounded<char, path::k_max> clap_path {};
         bool initialised = false;
-        Optional<LibraryHandle> handle = {};
+        Optional<LibraryHandle> handle = {}; // there is no need to unload the library
     };
 
     auto& fixture = CreateOrFetchFixtureObject<Fixture>(tester);

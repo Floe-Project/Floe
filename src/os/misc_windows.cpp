@@ -106,7 +106,10 @@ ErrorCodeOr<void*> SymbolFromLibrary(LibraryHandle library, String symbol_name) 
     return (void*)result;
 }
 
-void UnloadLibrary(LibraryHandle library) { FreeLibrary((HMODULE)(uintptr)library); }
+void UnloadLibrary(LibraryHandle library) {
+    auto const result = FreeLibrary((HMODULE)(uintptr)library);
+    ASSERT(result);
+}
 
 int CurrentProcessId() { return _getpid(); }
 

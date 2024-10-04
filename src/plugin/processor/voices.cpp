@@ -690,9 +690,15 @@ class ChunkwiseVoiceProcessor {
                                 samples[0] = trig_table_lookup::SinTurnsPositive((f32)s.pos);
                                 samples[1] = samples[0];
                                 s.pos += GetPitchRatio(s, frame);
-                                samples[2] = trig_table_lookup::SinTurnsPositive((f32)s.pos);
-                                samples[3] = samples[2];
-                                s.pos += GetPitchRatio(s, frame + 1);
+                                auto const frame_p1 = frame + 1;
+                                if (frame_p1 != num_frames) {
+                                    samples[2] = trig_table_lookup::SinTurnsPositive((f32)s.pos);
+                                    samples[3] = samples[2];
+                                    s.pos += GetPitchRatio(s, frame + 1);
+                                } else {
+                                    samples[2] = 0;
+                                    samples[3] = 0;
+                                }
 
                                 // prevent overflow
                                 if (s.pos > (1 << 24)) [[unlikely]]

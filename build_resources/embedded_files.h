@@ -18,7 +18,6 @@ typedef struct {
     uint8_t const* data;
     uint64_t size;
     EmbeddedString name;
-    EmbeddedString legacy_name;
     EmbeddedString filename;
 } BinaryData;
 

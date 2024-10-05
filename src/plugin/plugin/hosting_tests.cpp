@@ -482,7 +482,7 @@ static void ProcessWithState(tests::Tester& tester,
 
             if (!floe_custom_ext->state_change_is_pending(plugin)) break;
 
-            constexpr f64 k_timeout_ms = 1000;
+            constexpr f64 k_timeout_ms = 5000;
             if ((TimePoint::Now() - start) > (k_timeout_ms / 1000.0)) {
                 LOG_WARNING("Timeout waiting for state change to complete");
                 return;

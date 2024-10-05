@@ -635,8 +635,7 @@ clap_plugin_timer_support const floe_timer {
             // We don't care about the timer_id, we just want to poll.
             PollForSettingsFileChanges(g_shared_engine_systems->settings);
 
-            if (floe.gui_platform && timer_id == GuiPlatform::k_timer_id)
-                OnClapTimer(*floe.gui_platform, timer_id);
+            if (floe.gui_platform) OnClapTimer(*floe.gui_platform, timer_id);
         },
 };
 

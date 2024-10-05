@@ -23,14 +23,10 @@ constexpr bool k_debug_gui_platform = false;
 constexpr auto k_gui_platform_log_module = "🔳gui-platform"_log_module;
 
 struct GuiPlatform {
-    static constexpr uintptr_t k_timer_id = 200;
-
-    static int g_world_counter;
-    static PuglWorld* g_world;
+    static constexpr uintptr k_pugl_timer_id = 200;
 
     clap_host const& host;
     SettingsFile& settings;
-    bool realised = false;
     PuglWorld* world {};
     PuglView* view {};
     CursorType current_cursor {CursorType::Default};
@@ -38,8 +34,8 @@ struct GuiPlatform {
     GuiFrameResult last_result {};
     GuiFrameInput frame_state {};
     Optional<Gui> gui {};
-    Optional<clap_id> timer_id = {};
-    Optional<int> posix_fd = false;
+    Optional<clap_id> clap_timer_id = {};
+    Optional<int> clap_posix_fd = false;
 };
 
 // Public API
@@ -98,32 +94,36 @@ static ErrorCodeOr<void> Required(PuglStatus status) {
 namespace detail {
 static PuglStatus EventHandler(PuglView* view, PuglEvent const* event);
 static void LogIfSlow(Stopwatch& stopwatch, String message);
-} // namespace detail
+inline FloeClapExtensionHost const* CustomFloeHost(clap_host const& host);
 
 // Linux only, we need a way get the file descriptor from the X11 Display, but there's all kinds of macro
 // problems if we directly include X11 headers here, so we'll do it in a separate translation unit
 int FdFromPuglWorld(PuglWorld* world);
+void X11SetEmbedInformation(PuglView* view);
+void X11SetParent(PuglView* view, uintptr parent);
+} // namespace detail
 
 PUBLIC ErrorCodeOr<void> CreateView(GuiPlatform& platform, Engine& plugin) {
     g_log.Trace(k_gui_platform_log_module);
-    platform.g_world_counter++;
-    if (auto const floe_host =
-            (FloeClapExtensionHost const*)platform.host.get_extension(&platform.host,
-                                                                      k_floe_clap_extension_id);
-        floe_host != nullptr) {
-        platform.world = (PuglWorld*)floe_host->pugl_world;
+
+    ASSERT(platform.world == nullptr);
+    ASSERT(platform.view == nullptr);
+    ASSERT(platform.graphics_ctx == nullptr);
+    ASSERT(!platform.gui);
+    ASSERT(!platform.clap_timer_id);
+    ASSERT(!platform.clap_posix_fd);
+
+    if (auto const floe_custom_host = detail::CustomFloeHost(platform.host)) {
+        platform.world = (PuglWorld*)floe_custom_host->pugl_world;
         ASSERT(platform.world != nullptr);
-    } else if (platform.g_world_counter == 1) {
-        ASSERT(platform.g_world == nullptr);
-        platform.g_world = puglNewWorld(PUGL_MODULE, 0);
-        if (platform.g_world == nullptr) Panic("out of memory");
-        puglSetWorldString(platform.g_world, PUGL_CLASS_NAME, "Floe");
-        platform.world = platform.g_world;
-        g_log.Info(k_gui_platform_log_module, "creating new world");
     } else {
-        ASSERT(platform.g_world != nullptr);
-        platform.world = platform.g_world;
-        g_log.Info(k_gui_platform_log_module, "re-using existing world");
+        // NOTE: We create a world for each view. Sharing worlds between views was causing issues with Bitwig
+        // on Linux.
+        platform.world = puglNewWorld(PUGL_MODULE, 0);
+        if (platform.world == nullptr) Panic("out of memory");
+        puglSetWorldString(platform.world, PUGL_CLASS_NAME, "Floe");
+        platform.world = platform.world;
+        g_log.Info(k_gui_platform_log_module, "creating new world");
     }
 
     platform.view = puglNewView(platform.world);
@@ -144,6 +144,13 @@ PUBLIC ErrorCodeOr<void> CreateView(GuiPlatform& platform, Engine& plugin) {
     TRY(Required(puglSetSize(platform.view, size.width, size.height)));
     g_log.Debug(k_gui_platform_log_module, "creating size: {}x{}", size.width, size.height);
 
+    TRY(Required(puglRealize(platform.view)));
+    TRY(Required(puglStartTimer(platform.view, platform.k_pugl_timer_id, 1.0 / (f64)k_gui_refresh_rate_hz)));
+    g_log.Info(k_gui_platform_log_module,
+               "realised, native handle {}, world {}",
+               (void*)puglGetNativeView(platform.view),
+               (void*)puglGetWorld(platform.view));
+
     platform.gui.Emplace(platform.frame_state, plugin);
 
     if constexpr (IS_LINUX) {
@@ -152,11 +159,11 @@ PUBLIC ErrorCodeOr<void> CreateView(GuiPlatform& platform, Engine& plugin) {
             (clap_host_posix_fd_support const*)platform.host.get_extension(&platform.host,
                                                                            CLAP_EXT_POSIX_FD_SUPPORT);
         if (posix_fd && posix_fd->register_fd) {
-            auto const fd = FdFromPuglWorld(platform.world);
+            auto const fd = detail::FdFromPuglWorld(platform.world);
             ASSERT(fd != -1);
             if (posix_fd->register_fd(&platform.host, fd, CLAP_POSIX_FD_READ)) {
                 g_log.Info(k_gui_platform_log_module, "registered fd {}", fd);
-                platform.posix_fd = fd;
+                platform.clap_posix_fd = fd;
             } else
                 g_log.Error(k_gui_platform_log_module, "failed to register fd {}", fd);
         }
@@ -170,7 +177,7 @@ PUBLIC ErrorCodeOr<void> CreateView(GuiPlatform& platform, Engine& plugin) {
                                               (u32)(1000.0 / k_gui_refresh_rate_hz),
                                               &timer_id)) {
                 g_log.Info(k_gui_platform_log_module, "registered timer");
-                platform.timer_id = timer_id;
+                platform.clap_timer_id = timer_id;
             } else
                 g_log.Error(k_gui_platform_log_module, "failed to register timer");
         }
@@ -186,79 +193,65 @@ PUBLIC void DestroyView(GuiPlatform& platform) {
     platform.gui.Clear();
 
     if constexpr (IS_LINUX) {
-        if (platform.posix_fd) {
+        if (platform.clap_posix_fd) {
             auto const ext =
                 (clap_host_posix_fd_support const*)platform.host.get_extension(&platform.host,
                                                                                CLAP_EXT_POSIX_FD_SUPPORT);
             if (ext && ext->unregister_fd) {
-                bool const success = ext->unregister_fd(&platform.host, *platform.posix_fd);
+                bool const success = ext->unregister_fd(&platform.host, *platform.clap_posix_fd);
                 if (!success) g_log.Error(k_gui_platform_log_module, "failed to unregister fd");
-                platform.posix_fd = k_nullopt;
             }
+            platform.clap_posix_fd = k_nullopt;
         }
 
-        if (platform.timer_id) {
+        if (platform.clap_timer_id) {
             auto const ext =
                 (clap_host_timer_support const*)platform.host.get_extension(&platform.host,
                                                                             CLAP_EXT_TIMER_SUPPORT);
             if (ext && ext->unregister_timer) {
-                bool const success = ext->unregister_timer(&platform.host, *platform.timer_id);
+                bool const success = ext->unregister_timer(&platform.host, *platform.clap_timer_id);
                 if (!success) g_log.Error(k_gui_platform_log_module, "failed to unregister timer");
-                platform.timer_id = k_nullopt;
             }
+            platform.clap_timer_id = k_nullopt;
         }
     }
 
-    if (platform.realised) {
-        ASSERT(platform.view);
-        puglStopTimer(platform.view, platform.k_timer_id);
-        puglUnrealize(platform.view);
-        platform.realised = false;
-    }
+    ASSERT(platform.view);
+    puglStopTimer(platform.view, platform.k_pugl_timer_id);
+    puglUnrealize(platform.view);
+
     puglFreeView(platform.view);
     platform.view = nullptr;
 
-    if (--platform.g_world_counter == 0) {
-        if (platform.g_world) {
-            g_log.Info(k_gui_platform_log_module, "freeing world");
-            puglFreeWorld(platform.g_world);
-            platform.g_world = nullptr;
-        }
+    if (!detail::CustomFloeHost(platform.host)) {
+        g_log.Info(k_gui_platform_log_module, "freeing world");
+        puglFreeWorld(platform.world);
         platform.world = nullptr;
     }
 }
 
 PUBLIC void OnClapTimer(GuiPlatform& platform, clap_id timer_id) {
     Stopwatch stopwatch {};
-    if (platform.timer_id && *platform.timer_id == timer_id) puglUpdate(platform.world, 0);
+    if (platform.clap_timer_id && *platform.clap_timer_id == timer_id) puglUpdate(platform.world, 0);
     detail::LogIfSlow(stopwatch, "OnClapTimer");
 }
 
 PUBLIC void OnPosixFd(GuiPlatform& platform, int fd) {
     Stopwatch stopwatch {};
-    if (fd == FdFromPuglWorld(platform.world)) puglUpdate(platform.world, 0);
+    if (platform.clap_posix_fd && fd == *platform.clap_posix_fd) puglUpdate(platform.world, 0);
     detail::LogIfSlow(stopwatch, "OnPosixFd");
 }
 
 PUBLIC ErrorCodeOr<void> SetParent(GuiPlatform& platform, clap_window_t const& window) {
-    TRY(Required(puglSetParentWindow(platform.view, (uintptr_t)window.ptr)));
+    ASSERT(platform.view);
+    TRY(Required(puglSetParentWindow(platform.view, (uintptr)window.ptr)));
     puglSetPosition(platform.view, 0, 0);
     return k_success;
 }
 
-PUBLIC ErrorCodeOr<void> SetTransient(GuiPlatform& platform, clap_window_t const& window) {
-    TRY(Required(puglSetTransientParent(platform.view, (uintptr_t)window.ptr)));
-    return k_success;
-}
-
 PUBLIC ErrorCodeOr<void> SetVisible(GuiPlatform& platform, bool visible) {
+    ASSERT(platform.view);
     if (visible) {
-        if (!platform.realised) {
-            TRY(Required(puglRealize(platform.view)));
-            TRY(Required(
-                puglStartTimer(platform.view, platform.k_timer_id, 1.0 / (f64)k_gui_refresh_rate_hz)));
-            platform.realised = true;
-        }
         TRY(Required(puglShow(platform.view, PUGL_SHOW_PASSIVE)));
     } else {
         // IMRPOVE: stop update timers, make things more efficient
@@ -280,6 +273,11 @@ PUBLIC UiSize WindowSize(GuiPlatform& platform) {
 // ==========================================================================================================
 
 namespace detail {
+
+inline FloeClapExtensionHost const* CustomFloeHost(clap_host const& host) {
+    if constexpr (PRODUCTION_BUILD) return nullptr;
+    return (FloeClapExtensionHost const*)host.get_extension(&host, k_floe_clap_extension_id);
+}
 
 static void LogIfSlow(Stopwatch& stopwatch, String message) {
     auto const elapsed = stopwatch.MillisecondsElapsed();
@@ -711,7 +709,7 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
                 platform.graphics_ctx->Resize({event->configure.width, event->configure.height});
             gui_settings::SetWindowSize(platform.settings.settings.gui,
                                         platform.settings.tracking,
-                                        CheckedCast<u16>(event->configure.width));
+                                        event->configure.width);
             break;
         }
 
@@ -769,7 +767,7 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
         }
 
         case PUGL_TIMER: {
-            if (event->timer.id == platform.k_timer_id) post_redisplay = IsUpdateNeeded(platform);
+            if (event->timer.id == platform.k_pugl_timer_id) post_redisplay = IsUpdateNeeded(platform);
             break;
         }
 

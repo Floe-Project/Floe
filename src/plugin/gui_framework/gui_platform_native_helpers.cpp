@@ -3,9 +3,13 @@
 
 #include <pugl/pugl.h>
 
+#include "foundation/foundation.hpp"
+
 #ifdef __linux__
 #include <X11/Xlib.h>
 #endif
+
+namespace detail {
 
 int FdFromPuglWorld(PuglWorld* world) {
 #ifdef __linux__
@@ -16,3 +20,6 @@ int FdFromPuglWorld(PuglWorld* world) {
     return 0;
 #endif
 }
+
+
+} // namespace detail

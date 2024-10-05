@@ -25,8 +25,10 @@ struct ChorusProcessor {
     void SetRate(f32 sample_rate, f32 rate_hz) { chorus_lfo.SetRate(sample_rate, rate_hz); }
 
     void SetDelayTime(f32 sample_rate, f32 new_delay_time_ms) {
+        ASSERT_HOT(new_delay_time_ms > 0.0f);
+        ASSERT_HOT(sample_rate > 0.0f);
+
         if (delay_line.buffer.size) PageAllocator::Instance().Free(delay_line.buffer.ToByteSpan());
-        ASSERT(new_delay_time_ms > 0.0f);
         delay_line.size_float = (new_delay_time_ms / 1000) * sample_rate;
         delay_line.buffer = PageAllocator::Instance().AllocateExactSizeUninitialised<f32x2>(
             Max((u32)delay_line.size_float, 1u));
@@ -37,6 +39,8 @@ struct ChorusProcessor {
                              f32 depth01,
                              rbj_filter::Coeffs const& lowpass_coeffs,
                              rbj_filter::Coeffs const& highpass_coeffs) {
+        ASSERT_HOT(depth01 >= 0.0f && depth01 <= 1.0f);
+
         constexpr auto k_min_time_multiplier = 0.04f;
         auto const depth = -(0.5f - k_min_time_multiplier / 2) * depth01 + 1.0f;
         auto const time_multiplier =
@@ -45,10 +49,19 @@ struct ChorusProcessor {
         auto const dl_offset = time_multiplier * delay_line.size_float;
         auto const dl_offset_int = (u32)dl_offset;
 
+        ASSERT_HOT(delay_line.current >= delay_line.buffer.data);
+        ASSERT_HOT(delay_line.current < End(delay_line.buffer));
+        ASSERT_HOT(dl_offset_int <= delay_line.buffer.size);
+
         auto ptr1 = delay_line.current - dl_offset_int;
-        auto ptr2 = ptr1 - 1;
         if (ptr1 < delay_line.buffer.data) ptr1 += delay_line.buffer.size;
+        auto ptr2 = ptr1 - 1;
         if (ptr2 < delay_line.buffer.data) ptr2 += delay_line.buffer.size;
+
+        ASSERT_HOT(ptr1 >= delay_line.buffer.data);
+        ASSERT_HOT(ptr2 >= delay_line.buffer.data);
+        ASSERT_HOT(ptr1 < End(delay_line.buffer));
+        ASSERT_HOT(ptr2 < End(delay_line.buffer));
 
         auto const frac = 1 - (dl_offset - (f32)dl_offset_int);
         auto out = *ptr2 + *ptr1 * frac;

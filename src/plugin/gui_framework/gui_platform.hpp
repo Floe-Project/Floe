@@ -34,8 +34,8 @@ struct GuiPlatform {
     GuiFrameResult last_result {};
     GuiFrameInput frame_state {};
     Optional<Gui> gui {};
-    Optional<clap_id> clap_timer_id = {};
-    Optional<int> clap_posix_fd = false;
+    Optional<clap_id> clap_timer_id {};
+    Optional<int> clap_posix_fd {};
 };
 
 // Public API

@@ -150,6 +150,7 @@ PUBLIC ErrorCodeOr<void> CreateView(GuiPlatform& platform, Engine& plugin) {
                "realised, native handle {}, world {}",
                (void*)puglGetNativeView(platform.view),
                (void*)puglGetWorld(platform.view));
+    detail::X11SetEmbedInformation(platform.view);
 
     platform.gui.Emplace(platform.frame_state, plugin);
 
@@ -246,6 +247,7 @@ PUBLIC ErrorCodeOr<void> SetParent(GuiPlatform& platform, clap_window_t const& w
     ASSERT(platform.view);
     TRY(Required(puglSetParentWindow(platform.view, (uintptr)window.ptr)));
     puglSetPosition(platform.view, 0, 0);
+    detail::X11SetParent(platform.view, window.x11);
     return k_success;
 }
 

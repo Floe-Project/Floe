@@ -144,6 +144,8 @@ clap_plugin_gui const floe_gui {
             return false;
         }
 
+        g_log.Debug(k_clap_log_module, "#{} gui.create()", floe.index);
+
         ZoneScopedMessage(floe.trace_config, "gui create");
         floe.gui_platform.Emplace(floe.host, g_shared_engine_systems->settings);
         return LogIfError(CreateView(*floe.gui_platform, *floe.engine), "CreateView");
@@ -164,6 +166,8 @@ clap_plugin_gui const floe_gui {
                 ASSERT(!RunningInStandalone(floe.host));
                 return;
             }
+
+            g_log.Debug(k_clap_log_module, "#{} gui.destroy()", floe.index);
 
             ZoneScopedMessage(floe.trace_config, "gui destroy");
             DestroyView(*floe.gui_platform);
@@ -293,7 +297,8 @@ clap_plugin_gui const floe_gui {
             size,
             gui_settings::CurrentAspectRatio(g_shared_engine_systems->settings.settings.gui));
         g_log.Debug(k_clap_log_module,
-                    "set_size in: {}x{}, constrained {}x{}, result: {}",
+                    "#{} set_size in: {}x{}, constrained {}x{}, result: {}",
+                    floe.index,
                     size.width,
                     size.height,
                     aspect_ratio_conformed_size.width,
@@ -320,6 +325,14 @@ clap_plugin_gui const floe_gui {
             ASSERT(!RunningInStandalone(floe.host));
             return false;
         }
+
+        if (!window || !window->ptr) {
+            g_log.Warning(k_clap_log_module, "host misbehaving: gui.set_parent() called with invalid window");
+            ASSERT(!RunningInStandalone(floe.host));
+            return false;
+        }
+
+        g_log.Debug(k_clap_log_module, "#{} gui.set_parent()", floe.index);
 
         ZoneScopedMessage(floe.trace_config, "gui set_parent");
         auto const result = LogIfError(SetParent(*floe.gui_platform, *window), "SetParent");
@@ -354,6 +367,7 @@ clap_plugin_gui const floe_gui {
             return false;
         }
 
+        g_log.Debug(k_clap_log_module, "#{} gui.show()", floe.index);
         ZoneScopedMessage(floe.trace_config, "gui show");
         bool const result = LogIfError(SetVisible(*floe.gui_platform, true), "SetVisible");
         if (result) {
@@ -383,6 +397,7 @@ clap_plugin_gui const floe_gui {
             return false;
         }
 
+        g_log.Debug(k_clap_log_module, "gui.show()");
         ZoneScopedMessage(floe.trace_config, "gui hide");
         return LogIfError(SetVisible(*floe.gui_platform, false), "SetVisible");
     },
@@ -684,7 +699,15 @@ clap_plugin const floe_plugin {
         if (g_num_initialised_plugins++ == 0) {
             SetThreadName("main");
             g_shared_engine_systems.Emplace();
+
+            g_log.Info(k_main_log_module,
+                       "host: {} {} {}",
+                       floe.host.vendor,
+                       floe.host.name,
+                       floe.host.version);
         }
+
+        g_log.Debug(k_clap_log_module, "#{} init", floe.index);
 
         g_shared_engine_systems->RegisterFloeInstance(&floe.clap_plugin, floe.index);
 
@@ -725,6 +748,8 @@ clap_plugin const floe_plugin {
                 ASSERT(g_num_initialised_plugins);
                 if (--g_num_initialised_plugins == 0) g_shared_engine_systems.Clear();
             }
+
+            g_log.Debug(k_clap_log_module, "#{} destroy", floe.index);
 
             --g_num_floe_instances;
             FloeInstanceAllocator().Delete(&floe);

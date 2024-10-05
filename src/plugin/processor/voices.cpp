@@ -493,13 +493,13 @@ class ChunkwiseVoiceProcessor {
     }
 
   private:
-    void CheckSamplesAreValid([[maybe_unused]] usize buffer_pos, [[maybe_unused]] u32 num) {
-        if constexpr (RUNTIME_SAFETY_CHECKS_ON && !PRODUCTION_BUILD) {
-            for (usize i = buffer_pos; i < buffer_pos + (usize)num; ++i) {
-                auto const s = m_buffer[i];
-                ASSERT(s >= -k_erroneous_sample_value && s <= k_erroneous_sample_value);
-            }
-        }
+    void CheckSamplesAreValid(usize buffer_pos, usize num) {
+        ASSERT_HOT(buffer_pos + num <= m_buffer.size);
+        for (usize i = buffer_pos; i < (buffer_pos + num); ++i)
+            ASSERT_HOT(m_buffer[i] >= -k_erroneous_sample_value && m_buffer[i] <= k_erroneous_sample_value);
+    }
+    static void CheckSamplesAreValid(f32x4 samples) {
+        ASSERT_HOT(All(samples >= -k_erroneous_sample_value && samples <= k_erroneous_sample_value));
     }
 
     void UpdateLastValidFrame(u32 chunk_size) {
@@ -534,8 +534,8 @@ class ChunkwiseVoiceProcessor {
         ASSERT_HOT(pos + 4 <= m_buffer.size);
         auto p = LoadUnalignedToType<f32x4>(&m_buffer[pos]);
         p *= gain;
+        CheckSamplesAreValid(p);
         StoreToUnaligned(&m_buffer[pos], p);
-        CheckSamplesAreValid(pos, 4);
     }
 
     void AddVectorToBufferAtPos(usize const pos, f32x4 const& addition) {
@@ -543,14 +543,14 @@ class ChunkwiseVoiceProcessor {
         f32x4 p;
         p = LoadUnalignedToType<f32x4>(&m_buffer[pos]);
         p += addition;
+        CheckSamplesAreValid(p);
         StoreToUnaligned(&m_buffer[pos], p);
-        CheckSamplesAreValid(pos, 4);
     }
 
     void CopyVectorToBufferAtPos(usize const pos, f32x4 const& data) {
         ASSERT_HOT(pos + 4 <= m_buffer.size);
+        CheckSamplesAreValid(data);
         StoreToUnaligned(&m_buffer[pos], data);
-        CheckSamplesAreValid(pos, 4);
     }
 
     f64 GetPitchRatio(VoiceSample& w, u32 frame) {
@@ -629,8 +629,8 @@ class ChunkwiseVoiceProcessor {
         for (u32 frame = 0; frame < num_frames; frame += 2) {
             auto buf = LoadAlignedToType<f32x4>(&m_buffer[sample_pos]);
             buf = ((buf * randon_num_to_01_scale) * 2 - 1) * scale;
+            CheckSamplesAreValid(buf);
             StoreToAligned(&m_buffer[sample_pos], buf);
-            CheckSamplesAreValid(sample_pos, 4);
             sample_pos += 4;
         }
     }

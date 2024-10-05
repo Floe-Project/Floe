@@ -699,13 +699,7 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
         }
 
         case PUGL_CLOSE: {
-            g_log.Debug(k_gui_platform_log_module, "close {}", fmt::DumpStruct(event->any));
-            auto const host_gui =
-                (clap_host_gui const*)platform.host.get_extension(&platform.host, CLAP_EXT_GUI);
-            if (host_gui) {
-                g_log.Debug(k_gui_platform_log_module, "calling host_gui->closed");
-                host_gui->closed(&platform.host, false);
-            }
+            // If we support floating windows, we might need to call the host's closed() function here.
             break;
         }
 

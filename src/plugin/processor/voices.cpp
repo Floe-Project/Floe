@@ -435,14 +435,11 @@ class ChunkwiseVoiceProcessor {
 
             m_voice.smoothing_system.ProcessBlock(chunk_size);
 
-            UpdateLastValidFrame(chunk_size);
             FillLFOBuffer(chunk_size);
             FillBufferWithSampleData(chunk_size);
 
             auto num_valid_frames = ApplyVolumeEnvelope(chunk_size);
-            UpdateLastValidFrame(num_valid_frames);
             num_valid_frames = ApplyGain(num_valid_frames);
-            UpdateLastValidFrame(num_valid_frames);
             ApplyVolumeLFO(num_valid_frames);
             ApplyPan(num_valid_frames);
             ApplyFilter(num_valid_frames);
@@ -500,10 +497,6 @@ class ChunkwiseVoiceProcessor {
     }
     static void CheckSamplesAreValid(f32x4 samples) {
         ASSERT_HOT(All(samples >= -k_erroneous_sample_value && samples <= k_erroneous_sample_value));
-    }
-
-    void UpdateLastValidFrame(u32 chunk_size) {
-        m_last_frame_in_odd_num_frames = GetLastFrameInOddNumFrames(chunk_size);
     }
 
     bool HasPitchLfo() const {
@@ -607,8 +600,9 @@ class ChunkwiseVoiceProcessor {
 
             bool sample_still_going = SampleGetAndIncWithXFade(w, frame, sl1, sr1);
 
-            if (sample_still_going && frame != m_last_frame_in_odd_num_frames)
-                sample_still_going = SampleGetAndIncWithXFade(w, frame + 1, sl2, sr2);
+            auto const frame_p1 = frame + 1;
+            if (sample_still_going && frame_p1 != num_frames)
+                sample_still_going = SampleGetAndIncWithXFade(w, frame_p1, sl2, sr2);
 
             // sl2 and sl2 will be 0 if the second sample was not fetched so there is no harm in
             // adding that too
@@ -690,8 +684,7 @@ class ChunkwiseVoiceProcessor {
                                 samples[0] = trig_table_lookup::SinTurnsPositive((f32)s.pos);
                                 samples[1] = samples[0];
                                 s.pos += GetPitchRatio(s, frame);
-                                auto const frame_p1 = frame + 1;
-                                if (frame_p1 != num_frames) {
+                                if ((frame + 1) != num_frames) {
                                     samples[2] = trig_table_lookup::SinTurnsPositive((f32)s.pos);
                                     samples[3] = samples[2];
                                     s.pos += GetPitchRatio(s, frame + 1);
@@ -746,7 +739,8 @@ class ChunkwiseVoiceProcessor {
                 auto const b = k_base - (Fabs(lfo_amp) / 2);
                 auto const half_amp = lfo_amp / 2;
                 v1 = b + m_lfo_amounts[frame] * half_amp;
-                auto const v2 = b + m_lfo_amounts[frame + 1] * half_amp;
+                auto const frame_p1 = frame + 1;
+                auto const v2 = (frame_p1 != num_frames) ? b + m_lfo_amounts[frame_p1] * half_amp : 0.0f;
                 f32x4 v {v1, v1, v2, v2};
                 v = Min<f32x4>(v, 1.0f);
                 v = Max<f32x4>(v, 0.0f);
@@ -771,7 +765,8 @@ class ChunkwiseVoiceProcessor {
         for (u32 frame = 0; frame < num_frames; frame += 2) {
             env1 = vol_env.Process(vol_env_params);
             f32 env2 = 1;
-            if (frame != m_last_frame_in_odd_num_frames) env2 = vol_env.Process(vol_env_params);
+            auto const frame_p1 = frame + 1;
+            if (frame_p1 != num_frames) env2 = vol_env.Process(vol_env_params);
             if (env_on) {
                 f32x4 const gain {env1, env1, env2, env2};
                 MultiplyVectorToBufferAtPos(sample_pos, gain);
@@ -793,7 +788,7 @@ class ChunkwiseVoiceProcessor {
         for (u32 frame = 0; frame < num_frames; frame += 2) {
             fade1 = m_voice.volume_fade.GetFade() * m_voice.aftertouch_multiplier;
             f32 fade2 = 1;
-            if (frame != m_last_frame_in_odd_num_frames)
+            if (frame + 1 != num_frames)
                 fade2 = m_voice.volume_fade.GetFade() * m_voice.aftertouch_multiplier;
 
             f32x4 const gain {fade1, fade1, fade2, fade2};
@@ -914,7 +909,6 @@ class ChunkwiseVoiceProcessor {
 
     AudioProcessingContext const& m_audio_context;
     Voice& m_voice;
-    u32 m_last_frame_in_odd_num_frames {};
 
     u32 m_frame_index = 0;
     f32 m_position_for_gui = 0;

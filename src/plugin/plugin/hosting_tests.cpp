@@ -396,6 +396,7 @@ static ErrorCodeOr<Span<u8 const>> MakeState(ArenaAllocator& arena, StatePropert
     }
 
     if (properties & StateProperties::SampleInst) {
+        // TODO: we need to somehow get a library that is widely available: e.g. on CI.
         state.inst_ids[layer_assignment_index] = sample_lib::InstrumentId {
             .library = sample_lib::LibraryIdRef {.author = "FrozenPlain", .name = "Wraith"},
             .inst_name = "Endless Stride"_s,

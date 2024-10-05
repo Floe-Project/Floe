@@ -39,6 +39,7 @@ struct GuiPlatform {
     GuiFrameInput frame_state {};
     Optional<Gui> gui {};
     Optional<clap_id> timer_id = {};
+    Optional<int> posix_fd = false;
 };
 
 // Public API
@@ -118,9 +119,11 @@ PUBLIC ErrorCodeOr<void> CreateView(GuiPlatform& platform, Engine& plugin) {
         if (platform.g_world == nullptr) Panic("out of memory");
         puglSetWorldString(platform.g_world, PUGL_CLASS_NAME, "Floe");
         platform.world = platform.g_world;
+        g_log.Info(k_gui_platform_log_module, "creating new world");
     } else {
         ASSERT(platform.g_world != nullptr);
         platform.world = platform.g_world;
+        g_log.Info(k_gui_platform_log_module, "re-using existing world");
     }
 
     platform.view = puglNewView(platform.world);
@@ -148,16 +151,28 @@ PUBLIC ErrorCodeOr<void> CreateView(GuiPlatform& platform, Engine& plugin) {
         auto const posix_fd =
             (clap_host_posix_fd_support const*)platform.host.get_extension(&platform.host,
                                                                            CLAP_EXT_POSIX_FD_SUPPORT);
-        if (posix_fd)
-            posix_fd->register_fd(&platform.host, FdFromPuglWorld(platform.world), CLAP_POSIX_FD_READ);
+        if (posix_fd && posix_fd->register_fd) {
+            auto const fd = FdFromPuglWorld(platform.world);
+            ASSERT(fd != -1);
+            if (posix_fd->register_fd(&platform.host, fd, CLAP_POSIX_FD_READ)) {
+                g_log.Info(k_gui_platform_log_module, "registered fd {}", fd);
+                platform.posix_fd = fd;
+            } else
+                g_log.Error(k_gui_platform_log_module, "failed to register fd {}", fd);
+        }
 
         auto const timer_support =
             (clap_host_timer_support const*)platform.host.get_extension(&platform.host,
                                                                         CLAP_EXT_TIMER_SUPPORT);
-        if (timer_support) {
+        if (timer_support && timer_support->register_timer) {
             clap_id timer_id;
-            if (timer_support->register_timer(&platform.host, 1000 / k_gui_refresh_rate_hz, &timer_id))
+            if (timer_support->register_timer(&platform.host,
+                                              (u32)(1000.0 / k_gui_refresh_rate_hz),
+                                              &timer_id)) {
+                g_log.Info(k_gui_platform_log_module, "registered timer");
                 platform.timer_id = timer_id;
+            } else
+                g_log.Error(k_gui_platform_log_module, "failed to register timer");
         }
     }
 
@@ -171,21 +186,31 @@ PUBLIC void DestroyView(GuiPlatform& platform) {
     platform.gui.Clear();
 
     if constexpr (IS_LINUX) {
-        auto const posix_fd =
-            (clap_host_posix_fd_support const*)platform.host.get_extension(&platform.host,
-                                                                           CLAP_EXT_POSIX_FD_SUPPORT);
-        if (posix_fd) posix_fd->unregister_fd(&platform.host, FdFromPuglWorld(platform.world));
+        if (platform.posix_fd) {
+            auto const ext =
+                (clap_host_posix_fd_support const*)platform.host.get_extension(&platform.host,
+                                                                               CLAP_EXT_POSIX_FD_SUPPORT);
+            if (ext && ext->unregister_fd) {
+                bool const success = ext->unregister_fd(&platform.host, *platform.posix_fd);
+                if (!success) g_log.Error(k_gui_platform_log_module, "failed to unregister fd");
+                platform.posix_fd = k_nullopt;
+            }
+        }
 
-        auto const timer_support =
-            (clap_host_timer_support const*)platform.host.get_extension(&platform.host,
-                                                                        CLAP_EXT_TIMER_SUPPORT);
-        if (timer_support && platform.timer_id) {
-            timer_support->unregister_timer(&platform.host, *platform.timer_id);
-            platform.timer_id = k_nullopt;
+        if (platform.timer_id) {
+            auto const ext =
+                (clap_host_timer_support const*)platform.host.get_extension(&platform.host,
+                                                                            CLAP_EXT_TIMER_SUPPORT);
+            if (ext && ext->unregister_timer) {
+                bool const success = ext->unregister_timer(&platform.host, *platform.timer_id);
+                if (!success) g_log.Error(k_gui_platform_log_module, "failed to unregister timer");
+                platform.timer_id = k_nullopt;
+            }
         }
     }
 
     if (platform.realised) {
+        ASSERT(platform.view);
         puglStopTimer(platform.view, platform.k_timer_id);
         puglUnrealize(platform.view);
         platform.realised = false;
@@ -195,6 +220,7 @@ PUBLIC void DestroyView(GuiPlatform& platform) {
 
     if (--platform.g_world_counter == 0) {
         if (platform.g_world) {
+            g_log.Info(k_gui_platform_log_module, "freeing world");
             puglFreeWorld(platform.g_world);
             platform.g_world = nullptr;
         }

@@ -22,7 +22,10 @@ class ConvolutionReverb final : public Effect {
         : Effect(s, EffectType::ConvolutionReverb)
         , m_filter_coeffs_smoother_id(s.CreateFilterSmoother())
         , m_wet_dry(s) {}
-    ~ConvolutionReverb() { DeletedUnusedConvolvers(); }
+    ~ConvolutionReverb() {
+        DeletedUnusedConvolvers();
+        if (m_convolver) DestroyStereoConvolver(m_convolver);
+    }
 
     struct ConvoProcessResult {
         EffectProcessResult effect_process_state;

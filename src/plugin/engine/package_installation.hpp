@@ -153,6 +153,8 @@ PUBLIC InstallJob::State CompleteJobInternal(InstallJob& job) {
     using H = package::detail::TryHelpersToState;
 
     for (auto& folder : job.folders) {
+        if (folder.check_result.installation_status.tag == InstallationStatusType::AlreadyInstalled) continue;
+
         if (folder.check_result.recommended_action == RecommendedAction::AskUser)
             ASSERT(folder.user_decision != InstallJob::UserDecision::Unknown);
 

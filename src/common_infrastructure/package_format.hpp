@@ -748,7 +748,7 @@ PUBLIC VoidOrError<PackageError> ReaderExtractFolder(PackageReader& package,
                     return detail::CreatePackageError(
                         error_log,
                         o.Error(),
-                        "could'nt create directory(s) in your install folder: {}",
+                        "couldn't create directory(s) in your install folder: {}",
                         to_path);
                 }
 

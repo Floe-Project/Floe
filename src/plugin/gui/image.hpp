@@ -69,7 +69,9 @@ PUBLIC ErrorCodeOr<ImageBytesManaged> DecodeImage(Span<u8 const> image_data) {
 PUBLIC ErrorCodeOr<ImageBytesManaged> DecodeImageFromFile(String filename) {
     PageAllocator allocator;
     auto const file_data = TRY(ReadEntireFile(filename, allocator));
-    DEFER { allocator.Free(file_data.ToByteSpan()); };
+    DEFER {
+        if (file_data.size) allocator.Free(file_data.ToByteSpan());
+    };
     return DecodeImage(file_data.ToByteSpan());
 }
 

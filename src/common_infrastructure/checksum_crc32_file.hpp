@@ -139,7 +139,9 @@ ChecksumsForFolder(String folder, ArenaAllocator& arena, ArenaAllocator& scratch
             auto const file_data =
                 TRY(ReadEntireFile(dir_iterator::FullPath(it, *entry, scratch_arena), scratch_arena))
                     .ToByteSpan();
-            DEFER { scratch_arena.Free(file_data); };
+            DEFER {
+                if (file_data.size) scratch_arena.Free(file_data);
+            };
 
             checksums.Insert(relative_path,
                              ChecksumValues {

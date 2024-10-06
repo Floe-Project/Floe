@@ -25,3 +25,15 @@
    ...
    fun:_dl_open
 }
+{
+   zig_workaround_vital_global
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:_Znam
+   fun:_ZNSt3__111make_uniqueB8de180100IA_N5vital10poly_floatEEENS_11__unique_ifIT_E28__unique_array_unknown_boundEm
+   fun:_ZN5vital6OutputC2Eii
+   fun:__cxx_global_var_init.9
+   fun:_GLOBAL__sub_I_processor.cpp
+   fun:__libc_start_main@@GLIBC_2.34
+   fun:(below main)
+}

@@ -113,10 +113,6 @@ fn tryConcatCompileCommands(step: *std.Build.Step) !void {
                     var to_remove = std.ArrayList(u32).init(arena.allocator());
                     var index: u32 = 0;
                     for (args.items) |arg| {
-                        // clangd crashes when using c++2b on mac (May 2023)
-                        // if (std.mem.eql(u8, arg.*, "-std=c++2b"))
-                        //     arg.* = try arena.allocator().dupe(u8, "-std=c++20");
-
                         // clangd doesn't like this flag
                         if (std.mem.eql(u8, arg, "--no-default-config"))
                             try to_remove.append(index);

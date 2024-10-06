@@ -5,7 +5,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Installing Floe
 
-There's two ways to install Floe: using the installer, or manually. Floe is backwards-compatible. This means that you can install a new version of Floe over an old version.
+There's two ways to install Floe: using the installer, or manually. Either way, Floe is backwards-compatible. This means that you can install a new version of Floe over an old version, everything will work.
 
 ## Installer (recommended)
 

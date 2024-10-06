@@ -16,6 +16,8 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Sample Library Development
 - [Floe Sample Libraries](./sample-library-format.md)
+- [Floe Package Format](./package-format.md)
+- [Floe Packager Tool](./packager-tool.md)
 
 -----------
 

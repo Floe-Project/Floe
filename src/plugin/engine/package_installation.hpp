@@ -18,7 +18,6 @@ struct InstallJob {
         AwaitingUserInput, // worker thread is not running, user input needed
         DoneSuccess, // worker thread is not running, packages install completed
         DoneError, // worker thread is not running, packages install failed
-        ResultNotified, // main thread
     };
 
     enum class UserDecision {
@@ -184,7 +183,7 @@ PUBLIC InstallJob::State CompleteJobInternal(InstallJob& job) {
 } // namespace detail
 
 PUBLIC void StartJob(InstallJob& job) {
-    ASSERT(job.state.Load(LoadMemoryOrder::Relaxed) == InstallJob::State::Installing);
+    ASSERT(job.state.Load(LoadMemoryOrder::Acquire) == InstallJob::State::Installing);
     auto const result = detail::StartJobInternal(job);
     if (result != InstallJob::State::Installing) {
         job.state.Store(result, StoreMemoryOrder::Release);
@@ -195,7 +194,7 @@ PUBLIC void StartJob(InstallJob& job) {
 }
 
 PUBLIC void CompleteJob(InstallJob& job) {
-    ASSERT(job.state.Load(LoadMemoryOrder::Relaxed) == InstallJob::State::Installing);
+    ASSERT(job.state.Load(LoadMemoryOrder::Acquire) == InstallJob::State::Installing);
     auto const result = detail::CompleteJobInternal(job);
     job.state.Store(result, StoreMemoryOrder::Release);
 }

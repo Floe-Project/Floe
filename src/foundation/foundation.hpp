@@ -21,6 +21,7 @@
 #include "container/arena_stack.hpp" // IWYU pragma: export
 #include "container/array.hpp" // IWYU pragma: export
 #include "container/bitset.hpp" // IWYU pragma: export
+#include "container/bounded_list.hpp" // IWYU pragma: export
 #include "container/circular_buffer.hpp" // IWYU pragma: export
 #include "container/contiguous.hpp" // IWYU pragma: export
 #include "container/dynamic_array.hpp" // IWYU pragma: export

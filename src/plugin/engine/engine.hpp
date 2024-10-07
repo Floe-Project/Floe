@@ -6,6 +6,7 @@
 
 #include "common_infrastructure/constants.hpp"
 
+#include "engine/package_installation.hpp"
 #include "processor/processor.hpp"
 #include "sample_lib_server/sample_library_server.hpp"
 #include "shared_engine_systems.hpp"
@@ -56,6 +57,8 @@ struct Engine {
     AudioProcessor processor {host};
 
     u64 random_seed = SeedFromTime();
+
+    package::InstallJobs package_install_jobs {};
 
     // IMPORTANT: debug-only, remove this
     DynamicArrayBounded<char, 200> state_change_description {};

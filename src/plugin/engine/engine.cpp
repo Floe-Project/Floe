@@ -530,6 +530,7 @@ Engine::Engine(clap_host const& host, SharedEngineSystems& shared_engine_systems
 }
 
 Engine::~Engine() {
+    package::ShutdownJobs(package_install_jobs);
     shared_engine_systems.preset_listing.scanned_folder.listeners.Remove(presets_folder_listener_id);
 
     sample_lib_server::CloseAsyncCommsChannel(shared_engine_systems.sample_library_server,

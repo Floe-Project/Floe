@@ -13,25 +13,31 @@
 #include "miniz_zip.h"
 #include "sample_library/sample_library.hpp"
 
+// Floe's package file format.
+//
+// See the markdown docs file for information on the package format.
+//
+// We use the term 'component' to mean the individual, installable parts of a package. These are either
+// libraries or preset folders.
+
 namespace package {
 
 constexpr auto k_log_mod = "📦pkg"_log_module;
 
 constexpr String k_libraries_subdir = "Libraries";
 constexpr String k_presets_subdir = "Presets";
-constexpr auto k_folders = Array {k_libraries_subdir, k_presets_subdir};
+constexpr auto k_component_subdirs = Array {k_libraries_subdir, k_presets_subdir};
 constexpr String k_file_extension = ".floe.zip"_s;
 constexpr String k_checksums_file = "Floe-Details/checksums.crc32"_s;
-enum class SubfolderType : u8 { Libraries, Presets, Count };
-constexpr usize k_max_total_subfolders = 16; // combined Libraries and Presets
+enum class ComponentType : u8 { Library, Presets, Count };
 
 PUBLIC bool IsPathPackageFile(String path) { return EndsWithSpan(path, k_file_extension); }
 
-PUBLIC String SubfolderTypeString(SubfolderType type) {
+PUBLIC String ComponentTypeString(ComponentType type) {
     switch (type) {
-        case SubfolderType::Libraries: return "Library"_s;
-        case SubfolderType::Presets: return "Presets"_s;
-        case SubfolderType::Count: break;
+        case ComponentType::Library: return "Library"_s;
+        case ComponentType::Presets: return "Presets"_s;
+        case ComponentType::Count: break;
     }
     PanicIfReached();
 }
@@ -542,22 +548,23 @@ PUBLIC VoidOrError<PackageError> ReaderInit(PackageReader& package, Logger& erro
 
 PUBLIC void ReaderDeinit(PackageReader& package) { mz_zip_reader_end(&package.zip); }
 
-struct PackageFolder {
+// The individual parts of a package, either a library or a presets folder.
+struct Component {
     String path; // path in the zip
-    SubfolderType type;
-    sample_lib::Library* library; // can be null
+    ComponentType type;
+    sample_lib::Library* library; // library only, nullptr for presets
     HashTable<String, ChecksumValues> checksum_values;
 };
 
 // init to 0
-using PackageFolderIteratorIndex = mz_uint;
+using PackageComponentIndex = mz_uint;
 
 // Call this repeatedly until it returns nullopt
-PUBLIC ValueOrError<Optional<PackageFolder>, PackageError>
-IteratePackageFolders(PackageReader& package,
-                      PackageFolderIteratorIndex& file_index,
-                      ArenaAllocator& arena,
-                      Logger& error_log) {
+PUBLIC ValueOrError<Optional<Component>, PackageError>
+IteratePackageComponents(PackageReader& package,
+                         PackageComponentIndex& file_index,
+                         ArenaAllocator& arena,
+                         Logger& error_log) {
     DEFER { ++file_index; };
     for (; file_index < mz_zip_reader_get_num_files(&package.zip); ++file_index) {
         auto const file_stat = ({
@@ -566,7 +573,7 @@ IteratePackageFolders(PackageReader& package,
             o.Value();
         });
         auto const path = detail::PathWithoutTrailingSlash(file_stat.m_filename);
-        for (auto const folder : k_folders) {
+        for (auto const folder : k_component_subdirs) {
             auto const relative_path = detail::RelativePathIfInFolder(path, folder);
             if (!relative_path) continue;
             if (relative_path->size == 0) continue;
@@ -574,14 +581,14 @@ IteratePackageFolders(PackageReader& package,
 
             g_log.Info(k_log_mod, "Package contains folder: {}", path);
 
-            return Optional<PackageFolder> {PackageFolder {
+            return Optional<Component> {Component {
                 .path = path.Clone(arena),
                 .type = ({
-                    SubfolderType t;
+                    ComponentType t;
                     if (folder == k_libraries_subdir)
-                        t = SubfolderType::Libraries;
+                        t = ComponentType::Library;
                     else if (folder == k_presets_subdir)
-                        t = SubfolderType::Presets;
+                        t = ComponentType::Presets;
                     else
                         PanicIfReached();
                     t;
@@ -605,17 +612,17 @@ IteratePackageFolders(PackageReader& package,
             }};
         }
     }
-    return Optional<PackageFolder> {k_nullopt};
+    return Optional<Component> {k_nullopt};
 }
 
 enum class DestinationType {
-    FullPath, // install all files inside the PackageFolder into a specific folder
+    FullPath, // install all files inside the PackageComponent into a specific folder
     DefaultFolderWithSubfolderFromPackage,
 };
 
 using Destination = TaggedUnion<DestinationType, TypeAndTag<String, DestinationType::FullPath>>;
 
-struct ExtractOptions {
+struct InstallComponentOptions {
     Destination destination = DestinationType::DefaultFolderWithSubfolderFromPackage;
     bool overwrite_existing_files;
     bool resolve_install_folder_name_conflicts;
@@ -626,19 +633,20 @@ struct ExtractOptions {
 // Extracts to a temp folder than then renames to the final location. This ensures we either fail or succeed,
 // with no in-between cases where the folder is partially extracted. Additionally, it doesn't generate lots of
 // filesystem-change notifications which Floe might try to process and fail on.
-PUBLIC VoidOrError<PackageError> ReaderExtractFolder(PackageReader& package,
-                                                     PackageFolder const& folder,
-                                                     String default_destination_folder,
-                                                     ArenaAllocator& scratch_arena,
-                                                     Logger& error_log,
-                                                     ExtractOptions options) {
+PUBLIC VoidOrError<PackageError> ReaderInstallComponent(PackageReader& package,
+                                                        Component const& component,
+                                                        String default_destination_folder,
+                                                        ArenaAllocator& scratch_arena,
+                                                        Logger& error_log,
+                                                        InstallComponentOptions options) {
     auto const destination_folder = ({
         String f {};
+
         switch (options.destination.tag) {
             case DestinationType::FullPath: f = options.destination.Get<String>(); break;
             case DestinationType::DefaultFolderWithSubfolderFromPackage: {
                 f = path::Join(scratch_arena,
-                               Array {default_destination_folder, path::Filename(folder.path)});
+                               Array {default_destination_folder, path::Filename(component.path)});
                 break;
             }
         }
@@ -662,6 +670,7 @@ PUBLIC VoidOrError<PackageError> ReaderExtractFolder(PackageReader& package,
     // of leaving partially extracted files and generating lots of filesystem-change events.
     auto const temp_folder = ({
         ASSERT(GetFileType(default_destination_folder).HasValue());
+
         // try getting an 'official' temp folder
         auto o = TemporaryDirectoryOnSameFilesystemAs(default_destination_folder, scratch_arena);
         if (o.HasError()) {
@@ -673,6 +682,7 @@ PUBLIC VoidOrError<PackageError> ReaderExtractFolder(PackageReader& package,
                                                   "couldn't access destination folder: {}",
                                                   default_destination_folder);
         }
+
         String(o.Value());
     });
     DEFER {
@@ -683,8 +693,11 @@ PUBLIC VoidOrError<PackageError> ReaderExtractFolder(PackageReader& package,
                         });
     };
 
-    if (auto const o =
-            detail::ExtractFolder(package, folder.path, temp_folder, scratch_arena, folder.checksum_values);
+    if (auto const o = detail::ExtractFolder(package,
+                                             component.path,
+                                             temp_folder,
+                                             scratch_arena,
+                                             component.checksum_values);
         o.HasError()) {
         return detail::CreatePackageError(error_log, o.Error(), "in folder: {}", temp_folder);
     }
@@ -699,7 +712,7 @@ PUBLIC VoidOrError<PackageError> ReaderExtractFolder(PackageReader& package,
                 });
                 if (file_stat.m_is_directory) continue;
                 auto const path = detail::PathWithoutTrailingSlash(file_stat.m_filename);
-                auto const relative_path = detail::RelativePathIfInFolder(path, folder.path);
+                auto const relative_path = detail::RelativePathIfInFolder(path, component.path);
                 if (!relative_path) continue;
 
                 auto const to_path = path::Join(scratch_arena, Array {destination_folder, *relative_path});
@@ -766,17 +779,17 @@ PUBLIC bool32 NoInstallationRequired(ExistingInstallationStatus status) {
 }
 
 PUBLIC ValueOrError<ExistingInstallationStatus, PackageError>
-LibraryCheckExistingInstallation(PackageFolder const& folder,
+LibraryCheckExistingInstallation(Component const& component,
                                  sample_lib::Library const* existing_matching_library,
                                  ArenaAllocator& scratch_arena,
                                  Logger& error_log) {
-    ASSERT(folder.type == SubfolderType::Libraries);
-    ASSERT(folder.library);
+    ASSERT(component.type == ComponentType::Library);
+    ASSERT(component.library);
 
     if (!existing_matching_library) return ExistingInstallationStatus {.installed = false};
 
     auto const existing_folder = *path::Directory(existing_matching_library->path);
-    ASSERT(existing_matching_library->Id() == folder.library->Id());
+    ASSERT(existing_matching_library->Id() == component.library->Id());
 
     auto const actual_checksums = ({
         auto const o = ChecksumsForFolder(existing_folder, scratch_arena, scratch_arena);
@@ -785,7 +798,7 @@ LibraryCheckExistingInstallation(PackageFolder const& folder,
         o.Value();
     });
 
-    if (!ChecksumsDiffer(folder.checksum_values, actual_checksums, nullptr))
+    if (!ChecksumsDiffer(component.checksum_values, actual_checksums, nullptr))
         return ExistingInstallationStatus {
             .installed = true,
             .version_difference = ExistingInstallationStatus::Equal,
@@ -802,10 +815,9 @@ LibraryCheckExistingInstallation(PackageFolder const& folder,
         auto const stored_checksums = ParseChecksumFile(o.Value(), scratch_arena);
         if (stored_checksums.HasValue() &&
             !ChecksumsDiffer(stored_checksums.Value(), actual_checksums, &error_log)) {
-            // unmodified since installed, don't add the flag
             result.modified_since_installed = ExistingInstallationStatus::Unmodified;
         } else {
-            // The library has been modified since it was installed. OR the checksums file is badly formatted,
+            // The library has been modified since it was installed. OR the checksum file is badly formatted,
             // which presumably means it was modified.
             result.modified_since_installed = ExistingInstallationStatus::Modified;
         }
@@ -813,9 +825,9 @@ LibraryCheckExistingInstallation(PackageFolder const& folder,
         result.modified_since_installed = ExistingInstallationStatus::MaybeModified;
     }
 
-    if (existing_matching_library->minor_version < folder.library->minor_version)
+    if (existing_matching_library->minor_version < component.library->minor_version)
         result.version_difference = ExistingInstallationStatus::InstalledIsOlder;
-    else if (existing_matching_library->minor_version > folder.library->minor_version)
+    else if (existing_matching_library->minor_version > component.library->minor_version)
         result.version_difference = ExistingInstallationStatus::InstalledIsNewer;
     else
         result.version_difference = ExistingInstallationStatus::Equal;
@@ -831,7 +843,7 @@ LibraryCheckExistingInstallation(PackageFolder const& folder,
 // We take this approach because there is no reason to overwrite preset files. Preset files are tiny. If
 // there's a 'version 2' of a preset pack, then it might as well be installed alongside version 1.
 PUBLIC ValueOrError<ExistingInstallationStatus, PackageError>
-PresetsCheckExistingInstallation(PackageFolder const& package_folder,
+PresetsCheckExistingInstallation(Component const& component,
                                  Span<String const> presets_folders,
                                  ArenaAllocator& scratch_arena,
                                  Logger& error_log) {
@@ -857,7 +869,7 @@ PresetsCheckExistingInstallation(PackageFolder const& package_folder,
             if (dir_entry.type != FileType::Directory) continue;
 
             bool dir_contains_all_expected_files = true;
-            for (auto const [expected_path, checksum] : package_folder.checksum_values) {
+            for (auto const [expected_path, checksum] : component.checksum_values) {
                 bool found_expected = false;
                 for (auto const file_entry : entries) {
                     if (file_entry.type != FileType::File) continue;
@@ -879,7 +891,7 @@ PresetsCheckExistingInstallation(PackageFolder const& package_folder,
                 bool matches_exactly = true;
 
                 // check the checksums of all files
-                for (auto const [expected_path, checksum] : package_folder.checksum_values) {
+                for (auto const [expected_path, checksum] : component.checksum_values) {
                     auto const cursor = scratch_arena.TotalUsed();
                     DEFER { scratch_arena.TryShrinkTotalUsed(cursor); };
 

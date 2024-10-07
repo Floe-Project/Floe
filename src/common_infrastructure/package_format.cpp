@@ -60,12 +60,12 @@ static ErrorCodeOr<void> ReadTestPackage(tests::Tester& tester, Span<u8 const> z
     DEFER { package::ReaderDeinit(package); };
     CHECK(error_log.buffer.size == 0);
 
-    package::PackageFolderIteratorIndex iterator = 0;
+    package::PackageComponentIndex iterator = 0;
 
     usize folders_found = 0;
     while (true) {
         auto const folder = ({
-            auto const o = package::IteratePackageFolders(package, iterator, tester.scratch_arena, error_log);
+            auto const o = package::IteratePackageComponents(package, iterator, tester.scratch_arena, error_log);
             if (o.HasError()) {
                 TEST_FAILED("Failed to read package folder: {}, error_log: {}",
                             ErrorCode {o.Error()},
@@ -78,7 +78,7 @@ static ErrorCodeOr<void> ReadTestPackage(tests::Tester& tester, Span<u8 const> z
 
         ++folders_found;
         switch (folder->type) {
-            case package::SubfolderType::Libraries: {
+            case package::ComponentType::Library: {
                 REQUIRE(folder->library);
                 CHECK_EQ(folder->library->name, "Test Lua"_s);
 
@@ -126,7 +126,7 @@ static ErrorCodeOr<void> ReadTestPackage(tests::Tester& tester, Span<u8 const> z
 
                     // Initial extraction
                     {
-                        auto const extract_result = package::ReaderExtractFolder(
+                        auto const extract_result = package::ReaderInstallComponent(
                             package,
                             *folder,
                             dest_dir,
@@ -147,7 +147,7 @@ static ErrorCodeOr<void> ReadTestPackage(tests::Tester& tester, Span<u8 const> z
 
                     // We should fail when the folder is not empty
                     {
-                        auto const extract_result = package::ReaderExtractFolder(
+                        auto const extract_result = package::ReaderInstallComponent(
                             package,
                             *folder,
                             dest_dir,
@@ -168,7 +168,7 @@ static ErrorCodeOr<void> ReadTestPackage(tests::Tester& tester, Span<u8 const> z
 
                     // We should succeed when we allow overwriting
                     {
-                        auto const extract_result = package::ReaderExtractFolder(
+                        auto const extract_result = package::ReaderInstallComponent(
                             package,
                             *folder,
                             dest_dir,
@@ -186,7 +186,7 @@ static ErrorCodeOr<void> ReadTestPackage(tests::Tester& tester, Span<u8 const> z
 
                     // We should succeed when we allow name conflict resolution
                     {
-                        auto const extract_result = package::ReaderExtractFolder(
+                        auto const extract_result = package::ReaderInstallComponent(
                             package,
                             *folder,
                             dest_dir,
@@ -210,7 +210,7 @@ static ErrorCodeOr<void> ReadTestPackage(tests::Tester& tester, Span<u8 const> z
 
                 break;
             }
-            case package::SubfolderType::Presets: {
+            case package::ComponentType::Presets: {
                 auto const o = package::PresetsCheckExistingInstallation(
                     *folder,
                     Array {*path::Directory(TestPresetsFolder(tester))},
@@ -221,7 +221,7 @@ static ErrorCodeOr<void> ReadTestPackage(tests::Tester& tester, Span<u8 const> z
                 CHECK(status.installed);
                 break;
             }
-            case package::SubfolderType::Count: PanicIfReached();
+            case package::ComponentType::Count: PanicIfReached();
         }
     }
 

@@ -7,9 +7,10 @@
 #include "sample_lib_server/sample_library_server.hpp"
 #include "settings/settings_file.hpp"
 
-// This is a higher-level API on top of package_format.hpp. It provides an API for multi-threaded code to
-// install packages. It references other parts of the codebase such as the sample library server in order to
-// make the best decisions.
+// This is a higher-level API on top of package_format.hpp.
+//
+// It provides an API for multi-threaded code to install packages. It brings together other parts of the
+// codebase such as the sample library server in order to make the best decisions when installing.
 
 namespace package {
 
@@ -25,16 +26,6 @@ struct InstallJob {
         Unknown,
         Overwrite,
         Skip,
-    };
-
-    enum class FolderInstallationOutcome : u8 {
-        Skipped,
-        Overwritten,
-        Installed,
-        Updated,
-        DoneNothingAlreadyInstalled,
-        DoneNothingNewerVersionAlreadyInstalled,
-        Count,
     };
 
     struct InitOptions {
@@ -59,9 +50,9 @@ struct InstallJob {
     Atomic<State> state {State::Installing};
     Atomic<bool> abort {false};
     ArenaAllocator arena {PageAllocator::Instance()}; // never freed
-    String const path; // always valid
-    String const libraries_install_folder; // always valid
-    String const presets_install_folder; // always valid
+    String const path;
+    String const libraries_install_folder;
+    String const presets_install_folder;
     sample_lib_server::Server& sample_lib_server;
     Span<String> const preset_folders;
 
@@ -69,13 +60,12 @@ struct InstallJob {
     Optional<PackageReader> reader {};
     BufferLogger error_log {arena};
 
-    struct Folder {
-        PackageFolder folder;
+    struct Component {
+        package::Component component;
         ExistingInstallationStatus existing_installation_status {};
         UserDecision user_decision {UserDecision::Unknown};
-        FolderInstallationOutcome outcome {FolderInstallationOutcome::Skipped};
     };
-    ArenaList<Folder, false> folders {arena};
+    ArenaList<Component, false> components {arena};
 };
 
 PUBLIC void CompleteJob(InstallJob& job);
@@ -104,26 +94,26 @@ PUBLIC InstallJob::State StartJobInternal(InstallJob& job) {
 
     TRY_H(ReaderInit(*job.reader, job.error_log));
 
-    PackageFolderIteratorIndex it {};
+    PackageComponentIndex it {};
     bool user_input_needed = false;
-    u32 num_folders = 0;
-    constexpr u32 k_max_folders = 4000;
-    for (; num_folders < k_max_folders; ++num_folders) {
+    u32 num_components = 0;
+    constexpr u32 k_max_components = 4000;
+    for (; num_components < k_max_components; ++num_components) {
         if (job.abort.Load(LoadMemoryOrder::Acquire)) {
             job.error_log.Error({}, "aborted");
             return InstallJob::State::DoneError;
         }
 
-        auto const folder = TRY_H(IteratePackageFolders(*job.reader, it, job.arena, job.error_log));
-        if (!folder) {
+        auto const component = TRY_H(IteratePackageComponents(*job.reader, it, job.arena, job.error_log));
+        if (!component) {
             // end of folders
             break;
         }
 
         auto const existing_check = ({
             ExistingInstallationStatus r;
-            switch (folder->type) {
-                case package::SubfolderType::Libraries: {
+            switch (component->type) {
+                case package::ComponentType::Library: {
                     sample_lib_server::RequestScanningOfUnscannedFolders(job.sample_lib_server);
 
                     u32 wait_ms = 0;
@@ -139,41 +129,40 @@ PUBLIC InstallJob::State StartJobInternal(InstallJob& job) {
                         }
                     }
 
-                    auto existing_lib =
-                        sample_lib_server::FindLibraryRetained(job.sample_lib_server, folder->library->Id());
+                    auto existing_lib = sample_lib_server::FindLibraryRetained(job.sample_lib_server,
+                                                                               component->library->Id());
                     DEFER { existing_lib.Release(); };
 
-                    r = TRY_H(LibraryCheckExistingInstallation(*folder,
+                    r = TRY_H(LibraryCheckExistingInstallation(*component,
                                                                existing_lib ? &*existing_lib : nullptr,
                                                                job.arena,
                                                                job.error_log));
                     break;
                 }
-                case package::SubfolderType::Presets: {
-                    r = TRY_H(PresetsCheckExistingInstallation(*folder,
+                case package::ComponentType::Presets: {
+                    r = TRY_H(PresetsCheckExistingInstallation(*component,
                                                                job.preset_folders,
                                                                job.arena,
                                                                job.error_log));
                     break;
                 }
-                case package::SubfolderType::Count: PanicIfReached();
+                case package::ComponentType::Count: PanicIfReached();
             }
             r;
         });
 
         if (UserInputIsRequired(existing_check)) user_input_needed = true;
 
-        auto* f = job.folders.PrependUninitialised();
-        PLACEMENT_NEW(f)
-        InstallJob::Folder {
-            .folder = *folder,
+        PLACEMENT_NEW(job.components.PrependUninitialised())
+        InstallJob::Component {
+            .component = *component,
             .existing_installation_status = existing_check,
             .user_decision = InstallJob::UserDecision::Unknown,
         };
     }
 
-    if (num_folders == k_max_folders) {
-        job.error_log.Error({}, "too many folders in package");
+    if (num_components == k_max_components) {
+        job.error_log.Error({}, "too many components in package");
         return InstallJob::State::DoneError;
     }
 
@@ -185,42 +174,42 @@ PUBLIC InstallJob::State StartJobInternal(InstallJob& job) {
 PUBLIC InstallJob::State CompleteJobInternal(InstallJob& job) {
     using H = package::detail::TryHelpersToState;
 
-    for (auto& folder : job.folders) {
+    for (auto& component : job.components) {
         if (job.abort.Load(LoadMemoryOrder::Acquire)) {
             job.error_log.Error({}, "aborted");
             return InstallJob::State::DoneError;
         }
 
-        if (NoInstallationRequired(folder.existing_installation_status)) continue;
+        if (NoInstallationRequired(component.existing_installation_status)) continue;
 
-        if (UserInputIsRequired(folder.existing_installation_status))
-            ASSERT(folder.user_decision != InstallJob::UserDecision::Unknown);
+        if (UserInputIsRequired(component.existing_installation_status))
+            ASSERT(component.user_decision != InstallJob::UserDecision::Unknown);
 
-        ExtractOptions options {
+        InstallComponentOptions install_options {
             .destination = ({
                 Destination d {DestinationType::DefaultFolderWithSubfolderFromPackage};
-                if (folder.folder.library) d = *path::Directory(folder.folder.library->path);
+                if (component.component.library) d = *path::Directory(component.component.library->path);
                 d;
             }),
-            .overwrite_existing_files = folder.folder.type == SubfolderType::Libraries &&
-                                        folder.existing_installation_status.installed &&
-                                        folder.user_decision == InstallJob::UserDecision::Overwrite,
-            .resolve_install_folder_name_conflicts = folder.folder.type == SubfolderType::Presets,
+            .overwrite_existing_files = component.component.type == ComponentType::Library &&
+                                        component.existing_installation_status.installed &&
+                                        component.user_decision == InstallJob::UserDecision::Overwrite,
+            .resolve_install_folder_name_conflicts = component.component.type == ComponentType::Presets,
         };
 
         String destination_folder {};
-        switch (folder.folder.type) {
-            case package::SubfolderType::Libraries: destination_folder = job.libraries_install_folder; break;
-            case package::SubfolderType::Presets: destination_folder = job.presets_install_folder; break;
-            case package::SubfolderType::Count: PanicIfReached();
+        switch (component.component.type) {
+            case package::ComponentType::Library: destination_folder = job.libraries_install_folder; break;
+            case package::ComponentType::Presets: destination_folder = job.presets_install_folder; break;
+            case package::ComponentType::Count: PanicIfReached();
         }
 
-        TRY_H(ReaderExtractFolder(*job.reader,
-                                  folder.folder,
-                                  destination_folder,
-                                  job.arena,
-                                  job.error_log,
-                                  options));
+        TRY_H(ReaderInstallComponent(*job.reader,
+                                     component.component,
+                                     destination_folder,
+                                     job.arena,
+                                     job.error_log,
+                                     install_options));
     }
 
     return InstallJob::State::DoneSuccess;
@@ -250,9 +239,9 @@ PUBLIC void CompleteJob(InstallJob& job) {
 // [main thread]
 PUBLIC void AllUserInputReceived(InstallJob& job, ThreadPool& thread_pool) {
     ASSERT(job.state.Load(LoadMemoryOrder::Acquire) == InstallJob::State::AwaitingUserInput);
-    for (auto& folder : job.folders)
-        if (UserInputIsRequired(folder.existing_installation_status))
-            ASSERT(folder.user_decision != InstallJob::UserDecision::Unknown);
+    for (auto& component : job.components)
+        if (UserInputIsRequired(component.existing_installation_status))
+            ASSERT(component.user_decision != InstallJob::UserDecision::Unknown);
 
     job.state.Store(InstallJob::State::Installing, StoreMemoryOrder::Release);
     thread_pool.AddJob([&job]() { package::CompleteJob(job); });
@@ -332,11 +321,9 @@ PUBLIC void ShutdownJobs(InstallJobs& jobs) {
 }
 
 // [threadsafe]
-PUBLIC InstallJob::FolderInstallationOutcome Outcome(ExistingInstallationStatus existing_installation_status,
-                                                     InstallJob::UserDecision user_decision) {
-    using enum InstallJob::FolderInstallationOutcome;
-
-    if (!existing_installation_status.installed) return Installed;
+PUBLIC String ActionTaken(ExistingInstallationStatus existing_installation_status,
+                          InstallJob::UserDecision user_decision) {
+    if (!existing_installation_status.installed) return "installed";
 
     if (UserInputIsRequired(existing_installation_status)) {
         switch (user_decision) {
@@ -344,44 +331,29 @@ PUBLIC InstallJob::FolderInstallationOutcome Outcome(ExistingInstallationStatus 
             case InstallJob::UserDecision::Overwrite: {
                 if (existing_installation_status.version_difference ==
                     ExistingInstallationStatus::InstalledIsOlder)
-                    return Updated;
+                    return "updated";
                 else
-                    return Overwritten;
+                    return "overwritten";
             }
-            case InstallJob::UserDecision::Skip: return Skipped;
+            case InstallJob::UserDecision::Skip: return "skipped";
         }
     }
 
     if (NoInstallationRequired(existing_installation_status)) {
         if (existing_installation_status.version_difference == ExistingInstallationStatus::InstalledIsNewer) {
-            return DoneNothingNewerVersionAlreadyInstalled;
+            return "newer version already installed";
         } else {
             ASSERT(existing_installation_status.installed);
-            return DoneNothingAlreadyInstalled;
+            return "already installed";
         }
     }
 
     PanicIfReached();
 }
 
-PUBLIC String OutcomeString(InstallJob::FolderInstallationOutcome outcome) {
-    switch (outcome) {
-        case package::InstallJob::FolderInstallationOutcome::Overwritten: return "overwritten";
-        case package::InstallJob::FolderInstallationOutcome::Skipped: return "skipped";
-        case package::InstallJob::FolderInstallationOutcome::Installed: return "installed";
-        case package::InstallJob::FolderInstallationOutcome::DoneNothingAlreadyInstalled:
-            return "already installed";
-        case package::InstallJob::FolderInstallationOutcome::DoneNothingNewerVersionAlreadyInstalled:
-            return "newer version already installed";
-        case package::InstallJob::FolderInstallationOutcome::Updated: return "updated";
-        case package::InstallJob::FolderInstallationOutcome::Count: PanicIfReached();
-    }
-    return {};
-}
-
 // [main-thread]
-PUBLIC InstallJob::FolderInstallationOutcome Outcome(InstallJob::Folder const& folder) {
-    return Outcome(folder.existing_installation_status, folder.user_decision);
+PUBLIC String ActionTaken(InstallJob::Component const& component) {
+    return ActionTaken(component.existing_installation_status, component.user_decision);
 }
 
 } // namespace package

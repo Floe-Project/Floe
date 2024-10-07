@@ -129,16 +129,16 @@ void TopPanel(Gui* g) {
                                .margins = {.r = LiveSize(g->imgui, UiSizeId::Top2PresetBoxPadR)},
                            });
 
-    auto box = layout::CreateItem(g->layout,
-                                  {
-                                      .parent = right_container,
-                                      .size = {icon_width, icon_height},
-                                  });
     auto cog = layout::CreateItem(g->layout,
                                   {
                                       .parent = right_container,
                                       .size = {icon_width, icon_height},
                                   });
+    auto cog2 = layout::CreateItem(g->layout,
+                                   {
+                                       .parent = right_container,
+                                       .size = {icon_width, icon_height},
+                                   });
     auto menu = layout::CreateItem(g->layout,
                                    {
                                        .parent = right_container,
@@ -349,19 +349,18 @@ void TopPanel(Gui* g) {
     }
 
     {
-        auto btn_id = g->imgui.GetID("install");
-        auto btn_r = layout::GetRect(g->layout, box);
-        if (buttons::Button(g, btn_id, btn_r, ICON_FA_BOX_OPEN, large_icon_button_style))
-            OpenInstallPackagesModal(g);
-        Tooltip(g, btn_id, btn_r, "Install libraries & presets"_s);
-    }
-
-    {
         auto btn_id = g->imgui.GetID("sets");
         auto btn_r = layout::GetRect(g->layout, cog);
         if (buttons::Button(g, btn_id, btn_r, ICON_FA_COG, large_icon_button_style))
             OpenModalIfNotAlready(g->imgui, ModalWindowType::Settings);
         Tooltip(g, btn_id, btn_r, "Open settings window"_s);
+    }
+
+    {
+        auto btn_id = g->imgui.GetID("sets2");
+        auto btn_r = layout::GetRect(g->layout, cog2);
+        if (buttons::Button(g, btn_id, btn_r, ICON_FA_COG, large_icon_button_style)) g->settings2_open = true;
+        Tooltip(g, btn_id, btn_r, "Open settings window 2"_s);
     }
 
     {

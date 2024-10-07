@@ -7,6 +7,7 @@
 
 #include "foundation/foundation.hpp"
 #include "os/misc.hpp"
+#include "utils/logger/logger.hpp"
 
 #include "gui_frame.hpp"
 
@@ -1067,15 +1068,15 @@ void Context::RegisterAndConvertRect(Rect* r) {
     // overlay_graphics.AddRect(r->Min(), r->Max(), 0xff0000ff);
 }
 
-bool Context::RegisterRegionForMouseTracking(Rect* r, bool check_intersection) {
+bool Context::RegisterRegionForMouseTracking(Rect r, bool check_intersection) {
     auto this_window_is_apopup =
         (curr_window->flags & WindowFlags_Popup) | (curr_window->flags & WindowFlags_NestedInsidePopup);
     if (focused_popup_window != nullptr && !this_window_is_apopup) return false;
-    if (check_intersection && !Rect::Intersection(*r, GetCurrentClipRect())) return false;
+    if (check_intersection && !Rect::Intersection(r, GetCurrentClipRect())) return false;
 
     MouseTrackedRect widget = {};
-    widget.rect = *r;
-    widget.mouse_over = r->Contains(frame_input.cursor_pos);
+    widget.rect = r;
+    widget.mouse_over = r.Contains(frame_input.cursor_pos);
     dyn::Append(mouse_tracked_rects, widget);
     return true;
 }
@@ -1086,21 +1087,24 @@ Window* Context::GetPopupFromID(Id id) {
     return nullptr;
 }
 
-bool Context::SetHot(Rect r, Id id, bool is_not_window_content) {
-    //
+bool Context::SetHot(Rect r, Id id, bool32 is_not_window_content) {
     // if there is a popup window focused and it is not this window we can leave
     // early as the popup has focus (we also check that this current window is not
     // nested inside a popup - in that case we proceed as normal)
-    //
-    Window* window = curr_window;
-    if (focused_popup_window != nullptr && focused_popup_window != window) {
-
-        auto this_window_is_inside_apopup = window->flags & WindowFlags_NestedInsidePopup;
-        auto this_windows_root_is_the_focused_popup = window->root_window == focused_popup_window;
-        auto this_window_is_apopup =
-            (window->flags & WindowFlags_Popup) | (window->flags & WindowFlags_NestedInsidePopup);
+    if (focused_popup_window != nullptr && focused_popup_window != curr_window) {
+        auto const this_window_is_inside_apopup = curr_window->flags & WindowFlags_NestedInsidePopup;
+        auto const this_windows_root_is_the_focused_popup = curr_window->root_window == focused_popup_window;
+        auto const this_window_is_apopup =
+            (curr_window->flags & WindowFlags_Popup) | (curr_window->flags & WindowFlags_NestedInsidePopup);
 
         HandleHoverPopupOpeningAndClosing(id);
+
+        if (focused_popup_window->flags & WindowFlags_ChildPopup &&
+            !(focused_popup_window->flags & WindowFlags_NestedInsidePopup) &&
+            (curr_window->flags & WindowFlags_ModalPopup ||
+             (curr_window->flags & WindowFlags_NestedInsidePopup &&
+              curr_window->root_window->flags & WindowFlags_ModalPopup)))
+            return false;
 
         if (!this_window_is_apopup) {
             if (!(this_window_is_inside_apopup && this_windows_root_is_the_focused_popup)) return false;
@@ -1111,8 +1115,8 @@ bool Context::SetHot(Rect r, Id id, bool is_not_window_content) {
     if ((curr_window == hovered_window_content || (is_not_window_content && curr_window == hovered_window)) &&
         r.Contains(frame_input.cursor_pos)) {
         temp_hovered_item = id;
+        // only allow it if there is not active item (for example a disallow when a slider is held down)
         if (GetActive() == 0) {
-            // only allow it if there is not active item (for example a disallow when a slider is held down)
             SetHotRaw(id);
             return true;
         }
@@ -1438,7 +1442,7 @@ bool Context::PopupButtonBehavior(Rect r, Id button_id, Id popup_id, ButtonFlags
 bool Context::ButtonBehavior(Rect r, Id id, ButtonFlags flags) {
     bool result = false;
 
-    RegisterRegionForMouseTracking(&r);
+    RegisterRegionForMouseTracking(r);
 
     if (flags.disabled) return false;
 
@@ -1446,7 +1450,7 @@ bool Context::ButtonBehavior(Rect r, Id id, ButtonFlags flags) {
         if (WakeupAtTimedInterval(button_repeat_counter, button_repeat_rate)) result = true;
     }
 
-    if (SetHot(r, id, (flags.is_non_window_content) != 0)) {
+    if (SetHot(r, id, flags.is_non_window_content)) {
         // IMPROVE: check for mouse-pressed not just mouse-down
         bool const clicked = CheckForValidMouseDown(flags, frame_input);
 
@@ -1580,7 +1584,8 @@ void Context::BeginWindow(WindowSettings settings, Window* window, Rect r, Strin
             if (needs_yscroll) size.x += scrollbar_size;
             if (needs_xscroll) size.y += scrollbar_size;
 
-            bool const has_parent_popup = curr_window && curr_window->flags & WindowFlags_Popup;
+            bool const has_parent_popup = curr_window && curr_window->flags & WindowFlags_Popup &&
+                                          !(curr_window->flags & WindowFlags_ModalPopup);
 
             auto base_r = Rect {.pos = r.pos, .size = size};
             if (has_parent_popup) {
@@ -1597,7 +1602,7 @@ void Context::BeginWindow(WindowSettings settings, Window* window, Rect r, Strin
             auto window_size = frame_input.window_size.ToFloat2();
 
             r.pos = BestPopupPos(base_r, avoid_r, window_size, has_parent_popup);
-            r.pos = {(f32)(int)r.x, (f32)(int)r.y};
+            r.pos = Trunc(r.pos);
         }
     }
 
@@ -1803,7 +1808,7 @@ void Context::BeginWindow(WindowSettings settings, Window* window, Rect r, Strin
     if (auto_width) window->x_contents_was_auto = false;
     if (auto_height) window->y_contents_was_auto = false;
 
-    RegisterRegionForMouseTracking(&window->unpadded_bounds, false);
+    RegisterRegionForMouseTracking(window->unpadded_bounds, false);
 }
 
 void Context::EndWindow() {
@@ -1976,10 +1981,6 @@ bool Context::BeginWindowPopup(WindowSettings settings, Id id, Rect r, String na
     auto is_first_of_wnd_stack = false;
     is_first_of_wnd_stack =
         !((curr_wnd->flags & WindowFlags_Popup) || (curr_wnd->flags & WindowFlags_NestedInsidePopup));
-
-    if (settings.flags & WindowFlags_AutoPosition) {
-        if (is_first_of_wnd_stack) popup->auto_pos_last_direction = 1; // set it so that popups appear below
-    }
 
     if (!is_first_of_wnd_stack) {
         settings.flags |= WindowFlags_ChildPopup;

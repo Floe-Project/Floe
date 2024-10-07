@@ -51,7 +51,8 @@ constexpr Id k_imgui_app_window_id = 4; // id of the full size window created wi
     X(ChildPopup, 1, 13)                                                                                     \
     X(Nested, 1, 14)                                                                                         \
     X(AlwaysDrawScrollX, 1, 15)                                                                              \
-    X(AlwaysDrawScrollY, 1, 16)
+    X(AlwaysDrawScrollY, 1, 16)                                                                              \
+    X(ModalPopup, 1, 17)
 
 enum WindowFlagsEnum : u32 {
 #define X(name, val, num) WindowFlags_##name = val << num,
@@ -72,34 +73,34 @@ constexpr String k_imgui_window_flag_text[] = {
 };
 
 struct ButtonFlags {
-    u32 closes_popups : 1; // when inside a popup, close it when this button is clicked
-    u32 left_mouse : 1;
-    u32 double_left_mouse : 1;
-    u32 right_mouse : 1;
-    u32 middle_mouse : 1;
-    u32 triggers_on_mouse_down : 1;
-    u32 triggers_on_mouse_up : 1;
-    u32 requires_modifer : 1;
-    u32 requires_shift : 1;
-    u32 requires_alt : 1;
-    u32 disabled : 1;
-    u32 is_non_window_content : 1; // is something that does not live inside a window (e.g. scrollbar)
-    u32 hold_to_repeat : 1;
-    u32 dont_check_for_release : 1;
+    bool32 closes_popups : 1; // when inside a popup, close it when this button is clicked
+    bool32 left_mouse : 1;
+    bool32 double_left_mouse : 1;
+    bool32 right_mouse : 1;
+    bool32 middle_mouse : 1;
+    bool32 triggers_on_mouse_down : 1;
+    bool32 triggers_on_mouse_up : 1;
+    bool32 requires_modifer : 1;
+    bool32 requires_shift : 1;
+    bool32 requires_alt : 1;
+    bool32 disabled : 1;
+    bool32 is_non_window_content : 1; // is something that does not live inside a window (e.g. scrollbar)
+    bool32 hold_to_repeat : 1;
+    bool32 dont_check_for_release : 1;
 };
 
 struct SliderFlags {
-    u32 slower_with_shift : 1;
-    u32 default_on_modifer : 1;
+    bool32 slower_with_shift : 1;
+    bool32 default_on_modifer : 1;
 };
 
 struct TextInputFlags {
-    u32 chars_decimal : 1; // Allow 0123456789.+-*/
-    u32 chars_hexadecimal : 1; // Allow 0123456789ABCDEFabcdef
-    u32 chars_uppercase : 1; // Turn a..z into A..Z
-    u32 chars_no_blank : 1; // Filter out spaces, tabs
-    u32 tab_focuses_next_input : 1;
-    u32 centre_align : 1;
+    bool32 chars_decimal : 1; // Allow 0123456789.+-*/
+    bool32 chars_hexadecimal : 1; // Allow 0123456789ABCDEFabcdef
+    bool32 chars_uppercase : 1; // Turn a..z into A..Z
+    bool32 chars_no_blank : 1; // Filter out spaces, tabs
+    bool32 tab_focuses_next_input : 1;
+    bool32 centre_align : 1;
 };
 
 //
@@ -107,7 +108,7 @@ struct TextInputFlags {
 //
 
 #define IMGUI_DRAW_WINDOW_SCROLLBAR_ARGS                                                                     \
-    const imgui::Context &imgui, Rect bounds, Rect handle_rect, imgui::Id id
+    const imgui::Context &imgui, MAYBE_UNUSED Rect bounds, Rect handle_rect, imgui::Id id
 #define IMGUI_DRAW_WINDOW_SCROLLBAR(name) void name(IMGUI_DRAW_WINDOW_SCROLLBAR_ARGS)
 using DrawWindowScrollbar = void(IMGUI_DRAW_WINDOW_SCROLLBAR_ARGS);
 
@@ -238,10 +239,6 @@ struct Window {
     f32x2 scroll_max = {};
     bool has_yscrollbar = false;
     bool has_xscrollbar = false;
-
-    // IMPROVE: make a proper function for setting this
-    int auto_pos_last_direction =
-        -1; // which side the popup window appears of it's parent, see FindWindowPos function
 };
 
 struct ActiveItem {
@@ -487,6 +484,9 @@ struct Context {
     // > Misc
     //
     f32 PointsToPixels(f32 points) const { return points * pixels_per_point; }
+    f32x2 PointsToPixels(f32x2 points) const { return points * pixels_per_point; }
+    f32 PixelsToPoints(f32 pixels) const { return pixels / pixels_per_point; }
+    f32x2 PixelsToPoints(f32x2 pixels) const { return pixels / pixels_per_point; }
     void SetPixelsPerPoint(f32 v) { pixels_per_point = v; }
 
     f32x2 WindowPosToScreenPos(f32x2 rel_pos);
@@ -572,11 +572,11 @@ struct Context {
     //
 
     bool
-    RegisterRegionForMouseTracking(Rect* r,
+    RegisterRegionForMouseTracking(Rect r,
                                    bool check_intersection = true); // returns true if the widget is visible
 
     // is_not_window_content == something that is not inside a window, but part of it e.g. scrollbar
-    bool SetHot(Rect r, Id id, bool is_not_window_content = false);
+    bool SetHot(Rect r, Id id, bool32 is_not_window_content = false);
     void SetActiveID(Id id, bool closes_popups, ButtonFlags button_flags, bool check_for_release);
     void SetActiveIDZero();
 

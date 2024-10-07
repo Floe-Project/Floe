@@ -89,6 +89,31 @@ PUBLIC void SinglyLinkedListSort(NodeType* first, NodeType* last, auto less_than
     if (pivot != nullptr && first != pivot) SinglyLinkedListSort(first, pivot, less_than_function);
 }
 
+template <typename NodeType>
+PUBLIC void SinglyLinkedListInsertInMemoryOrder(NodeType*& head, NodeType* new_node) {
+    if (!head) {
+        head = new_node;
+        new_node->next = nullptr;
+        return;
+    }
+
+    NodeType* previous = nullptr;
+    for (auto i = head; i != nullptr; i = i->next) {
+        if (i > new_node) {
+            if (previous)
+                previous->next = new_node;
+            else
+                head = new_node;
+            new_node->next = i;
+            return;
+        }
+        previous = i;
+    }
+
+    // all nodes are less than new_node, previous is the last node
+    previous->next = new_node;
+}
+
 template <typename List, typename Node>
 PUBLIC void DoublyLinkedListAppend(List& list, Node* new_node) {
     if constexpr (requires { new_node->prev; }) new_node->prev = list.last;
@@ -123,6 +148,18 @@ PUBLIC void DoublyLinkedListRemoveFirst(List& list) {
         list.first->prev = nullptr;
     else
         list.last = nullptr;
+}
+
+template <typename List, typename Node>
+PUBLIC void DoublyLinkedListRemove(List& list, Node* node) {
+    if (node->prev)
+        node->prev->next = node->next;
+    else
+        list.first = node->next;
+    if (node->next)
+        node->next->prev = node->prev;
+    else
+        list.last = node->prev;
 }
 
 template <typename NodeType, typename ValueType>

@@ -5,6 +5,7 @@
 #include "foundation/foundation.hpp"
 
 #include "engine/engine.hpp"
+#include "fonts.hpp"
 #include "gui/gui_modal_windows.hpp"
 #include "gui_editor_widgets.hpp"
 #include "gui_envelope.hpp"
@@ -118,7 +119,6 @@ enum class DialogType {
     AddNewPresetsScanFolder,
     SavePreset,
     LoadPreset,
-    InstallPackage,
 };
 
 struct Gui {
@@ -133,7 +133,8 @@ struct Gui {
     bool show_purchasable_libraries = false;
     bool show_news = false;
 
-    InstallPackagesData install_packages_state {};
+    bool settings2_open {};
+    Notifications notifications {};
 
     GuiFrameInput& frame_input;
     GuiFrameResult frame_output;
@@ -149,6 +150,7 @@ struct Gui {
     graphics::Font* mada_big {};
     graphics::Font* mada {};
     graphics::Font* icons {};
+    Fonts fonts {}; // new system
     PresetBrowserPersistentData preset_browser_data {};
 
     layer_gui::LayerLayout layer_gui[k_num_layers] = {};

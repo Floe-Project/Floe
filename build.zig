@@ -1607,6 +1607,7 @@ pub fn build(b: *std.Build) void {
                 .files = &(.{
                     plugin_path ++ "/engine/engine.cpp",
                     plugin_path ++ "/engine/shared_engine_systems.cpp",
+                    plugin_path ++ "/engine/package_installation.cpp",
                     plugin_path ++ "/gui_framework/draw_list.cpp",
                     plugin_path ++ "/gui_framework/draw_list_opengl.cpp",
                     plugin_path ++ "/gui_framework/gui_imgui.cpp",

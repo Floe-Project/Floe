@@ -23,6 +23,7 @@
     X(RegisterLibraryMdataTests)                                                                             \
     X(RegisterOsTests)                                                                                       \
     X(RegisterPackageFormatTests)                                                                            \
+    X(RegisterPackageInstallationTests)                                                                      \
     X(RegisterParamDescriptorTests)                                                                          \
     X(RegisterPresetTests)                                                                                   \
     X(RegisterSampleLibraryLoaderTests)                                                                      \

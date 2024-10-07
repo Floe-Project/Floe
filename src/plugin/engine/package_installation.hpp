@@ -49,7 +49,7 @@ struct InstallJob {
 
     Atomic<State> state {State::Installing};
     Atomic<bool> abort {false};
-    ArenaAllocator arena {PageAllocator::Instance()}; // never freed
+    ArenaAllocator arena {PageAllocator::Instance()};
     String const path;
     String const libraries_install_folder;
     String const presets_install_folder;

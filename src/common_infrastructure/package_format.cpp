@@ -99,7 +99,7 @@ static ErrorCodeOr<void> ReadTestPackage(tests::Tester& tester, Span<u8 const> z
                                                                                  error_log);
                         if (o.HasError()) return ErrorCode {o.Error()};
                         auto status = o.ReleaseValue();
-                        CHECK(status.installation_status == package::InstallationStatusType::NotInstalled);
+                        CHECK(status == package::ExistingInstallationStatus::NotInstalled);
                     }
 
                     // Check installed if we provide a library
@@ -111,8 +111,7 @@ static ErrorCodeOr<void> ReadTestPackage(tests::Tester& tester, Span<u8 const> z
                                                                                  error_log);
                         if (o.HasError()) return ErrorCode {o.Error()};
                         auto status = o.ReleaseValue();
-                        CHECK(status.installation_status ==
-                              package::InstallationStatusType::AlreadyInstalled);
+                        CHECK(status == package::ExistingInstallationStatus::Installed);
                     }
 
                     // Initially should be empty
@@ -216,7 +215,7 @@ static ErrorCodeOr<void> ReadTestPackage(tests::Tester& tester, Span<u8 const> z
                     error_log);
                 if (o.HasError()) return ErrorCode {o.Error()};
                 auto const status = o.ReleaseValue();
-                CHECK(status.installation_status == package::InstallationStatusType::AlreadyInstalled);
+                CHECK(status == package::ExistingInstallationStatus::Installed);
                 break;
             }
             case package::SubfolderType::Count: PanicIfReached();

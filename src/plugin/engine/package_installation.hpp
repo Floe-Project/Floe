@@ -27,6 +27,16 @@ struct InstallJob {
         Skip,
     };
 
+    enum class FolderInstallationOutcome : u8 {
+        Skipped,
+        Overwritten,
+        Installed,
+        Updated,
+        DoneNothingAlreadyInstalled,
+        DoneNothingNewerVersionAlreadyInstalled,
+        Count,
+    };
+
     struct InitOptions {
         String zip_path;
         String libraries_install_folder;
@@ -61,8 +71,9 @@ struct InstallJob {
 
     struct Folder {
         PackageFolder folder;
-        FolderCheckResult check_result;
-        UserDecision user_decision {};
+        ExistingInstallationStatus existing_installation_status {};
+        UserDecision user_decision {UserDecision::Unknown};
+        FolderInstallationOutcome outcome {FolderInstallationOutcome::Skipped};
     };
     ArenaList<Folder, false> folders {arena};
 };
@@ -109,8 +120,8 @@ PUBLIC InstallJob::State StartJobInternal(InstallJob& job) {
             break;
         }
 
-        auto const check_result = ({
-            FolderCheckResult r;
+        auto const existing_check = ({
+            ExistingInstallationStatus r;
             switch (folder->type) {
                 case package::SubfolderType::Libraries: {
                     sample_lib_server::RequestScanningOfUnscannedFolders(job.sample_lib_server);
@@ -150,13 +161,13 @@ PUBLIC InstallJob::State StartJobInternal(InstallJob& job) {
             r;
         });
 
-        if (check_result.recommended_action == RecommendedAction::AskUser) user_input_needed = true;
+        if (UserInputIsRequired(existing_check)) user_input_needed = true;
 
         auto* f = job.folders.PrependUninitialised();
         PLACEMENT_NEW(f)
         InstallJob::Folder {
             .folder = *folder,
-            .check_result = check_result,
+            .existing_installation_status = existing_check,
             .user_decision = InstallJob::UserDecision::Unknown,
         };
     }
@@ -180,15 +191,23 @@ PUBLIC InstallJob::State CompleteJobInternal(InstallJob& job) {
             return InstallJob::State::DoneError;
         }
 
-        if (folder.check_result.installation_status.tag == InstallationStatusType::AlreadyInstalled) continue;
+        if (NoInstallationRequired(folder.existing_installation_status)) continue;
 
-        if (folder.check_result.recommended_action == RecommendedAction::AskUser)
+        if (UserInputIsRequired(folder.existing_installation_status))
             ASSERT(folder.user_decision != InstallJob::UserDecision::Unknown);
 
-        if (folder.user_decision == InstallJob::UserDecision::Skip)
-            continue;
-        else if (folder.user_decision == InstallJob::UserDecision::Overwrite)
-            folder.check_result.extract_options.overwrite_existing_files = true;
+        ExtractOptions options {
+            .destination = ({
+                Destination d {DestinationType::DefaultFolderWithSubfolderFromPackage};
+                if (folder.folder.library) d = *path::Directory(folder.folder.library->path);
+                d;
+            }),
+            .overwrite_existing_files =
+                folder.folder.type == SubfolderType::Libraries &&
+                folder.existing_installation_status & ExistingInstallationStatus::Installed &&
+                folder.user_decision == InstallJob::UserDecision::Overwrite,
+            .resolve_install_folder_name_conflicts = folder.folder.type == SubfolderType::Presets,
+        };
 
         String destination_folder {};
         switch (folder.folder.type) {
@@ -202,7 +221,7 @@ PUBLIC InstallJob::State CompleteJobInternal(InstallJob& job) {
                                   destination_folder,
                                   job.arena,
                                   job.error_log,
-                                  folder.check_result.extract_options));
+                                  options));
     }
 
     return InstallJob::State::DoneSuccess;
@@ -233,7 +252,7 @@ PUBLIC void CompleteJob(InstallJob& job) {
 PUBLIC void AllUserInputReceived(InstallJob& job, ThreadPool& thread_pool) {
     ASSERT(job.state.Load(LoadMemoryOrder::Acquire) == InstallJob::State::AwaitingUserInput);
     for (auto& folder : job.folders)
-        if (folder.check_result.recommended_action == RecommendedAction::AskUser)
+        if (UserInputIsRequired(folder.existing_installation_status))
             ASSERT(folder.user_decision != InstallJob::UserDecision::Unknown);
 
     job.state.Store(InstallJob::State::Installing, StoreMemoryOrder::Release);
@@ -311,6 +330,58 @@ PUBLIC void ShutdownJobs(InstallJobs& jobs) {
     ASSERT(wait_ms < k_timeout_ms);
 
     jobs.RemoveAll();
+}
+
+// [threadsafe]
+PUBLIC InstallJob::FolderInstallationOutcome Outcome(ExistingInstallationStatus existing_installation_status,
+                                                     InstallJob::UserDecision user_decision) {
+    using enum InstallJob::FolderInstallationOutcome;
+
+    if (existing_installation_status == ExistingInstallationStatus::NotInstalled) return Installed;
+
+    if (UserInputIsRequired(existing_installation_status)) {
+        switch (user_decision) {
+            case InstallJob::UserDecision::Unknown: PanicIfReached();
+            case InstallJob::UserDecision::Overwrite: {
+                if (existing_installation_status & ExistingInstallationStatus::InstalledIsOlder)
+                    return Updated;
+                else
+                    return Overwritten;
+            }
+            case InstallJob::UserDecision::Skip: return Skipped;
+        }
+    }
+
+    if (NoInstallationRequired(existing_installation_status)) {
+        if (existing_installation_status & ExistingInstallationStatus::InstalledIsNewer) {
+            return DoneNothingNewerVersionAlreadyInstalled;
+        } else {
+            ASSERT(existing_installation_status == ExistingInstallationStatus::Installed);
+            return DoneNothingAlreadyInstalled;
+        }
+    }
+
+    PanicIfReached();
+}
+
+PUBLIC String OutcomeString(InstallJob::FolderInstallationOutcome outcome) {
+    switch (outcome) {
+        case package::InstallJob::FolderInstallationOutcome::Overwritten: return "overwritten";
+        case package::InstallJob::FolderInstallationOutcome::Skipped: return "skipped";
+        case package::InstallJob::FolderInstallationOutcome::Installed: return "installed";
+        case package::InstallJob::FolderInstallationOutcome::DoneNothingAlreadyInstalled:
+            return "already installed";
+        case package::InstallJob::FolderInstallationOutcome::DoneNothingNewerVersionAlreadyInstalled:
+            return "newer version already installed";
+        case package::InstallJob::FolderInstallationOutcome::Updated: return "updated";
+        case package::InstallJob::FolderInstallationOutcome::Count: PanicIfReached();
+    }
+    return {};
+}
+
+// [main-thread]
+PUBLIC InstallJob::FolderInstallationOutcome Outcome(InstallJob::Folder const& folder) {
+    return Outcome(folder.existing_installation_status, folder.user_decision);
 }
 
 } // namespace package

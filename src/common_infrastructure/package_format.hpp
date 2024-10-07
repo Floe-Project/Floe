@@ -7,7 +7,6 @@
 #include "foundation/foundation.hpp"
 #include "foundation/utils/path.hpp"
 #include "os/filesystem.hpp"
-#include "os/threading.hpp"
 #include "utils/debug/debug.hpp"
 
 #include "checksum_crc32_file.hpp"
@@ -24,8 +23,18 @@ constexpr auto k_folders = Array {k_libraries_subdir, k_presets_subdir};
 constexpr String k_file_extension = ".floe.zip"_s;
 constexpr String k_checksums_file = "Floe-Details/checksums.crc32"_s;
 enum class SubfolderType : u8 { Libraries, Presets, Count };
+constexpr usize k_max_total_subfolders = 16; // combined Libraries and Presets
 
 PUBLIC bool IsPathPackageFile(String path) { return EndsWithSpan(path, k_file_extension); }
+
+PUBLIC String SubfolderTypeString(SubfolderType type) {
+    switch (type) {
+        case SubfolderType::Libraries: return "Library"_s;
+        case SubfolderType::Presets: return "Presets"_s;
+        case SubfolderType::Count: break;
+    }
+    PanicIfReached();
+}
 
 enum class PackageError {
     FileCorrupted,
@@ -270,50 +279,6 @@ PUBLIC ErrorCodeOr<void> WriterAddPresetsFolder(mz_zip_archive& zip,
 }
 
 // =================================================================================================
-
-/* TODO: the loading a package format
- *
- * There's 3 checksums: the zip file, the checksums.crc32 file, and the actual current filesystem.
- * For a library, we should also consider the version number in the floe.lua file.
- * For writing, we want to embed the checksums.crc32 file in the zip file because it might be installed
- * manually rather than via this extractor.
- *
- *
- * InstallLibrary:
- * - extract the library to a temp folder
- *   - If the extraction completed successfully
- *     - do an atomic rename to the final location
- *     - done, success
- *   - If the extraction failed
- *     - delete the temp folder
- *     - done, show an error
- *   - If the checksums.crc32 file is missing, create it from the zip data
- *
- * IsUnchangedSinceInstalled:
- * - if the library folder doesn't have a .checksums.crc32 file return 'false'
- * - read the .checksums.crc32 file
- * - if any current file's checksum deviates from the stored checksum return 'false'
- * - else return 'true'
- *
- *
- * For each library in the package:
- * - Get the floe.lua file from the package
- * - Read the floe.lua file
- * - If the library author+name is not already installed in any library folder (ask the sample library server)
- *   - InstallPackage
- * - If it is
- *   - Compare the version of the installed library vs the version in the package
- *   - If IsUnchangedSinceInstalled
- *     - If the version in the package is newer or equal
- *       - InstallPackage, it's safe to overwrite: libraries are backwards compatible
- *         If the version is equal then the developer forgot to increment the version number
- *       - return
- *     - Else
- *       - return: nothing to do, it's already installed
- *   - Else
- *     - Ask the user if they want to overwrite, giving information about versions and files that have changed
- *
- */
 
 struct PackageReader {
     Reader& zip_file_reader;
@@ -780,46 +745,46 @@ PUBLIC VoidOrError<PackageError> ReaderExtractFolder(PackageReader& package,
     return k_success;
 }
 
-struct ExistingInstalltionInfo {
-    enum class ModifiedSinceInstalled {
-        Unmodified,
-        Modified,
-        Unknown,
-    };
-    enum class VersionComparison {
-        Equal,
-        PackageIsNewer,
-        PackageIsOlder,
-    };
+enum class ExistingInstallationStatus : u8 {
+    NotInstalled = 0,
 
-    ModifiedSinceInstalled modified_since_installed;
-    VersionComparison version_comparison;
+    // The item is already installed.
+    Installed = 1 << 0,
+
+    // The installed version is different from the package version.
+    InstalledIsOlder = 1 << 1,
+    InstalledIsNewer = 1 << 2,
+    InstalledIsEqual = 0,
+
+    // The installed version has definitely been modified since it was installed.
+    ModifiedSinceInstalled = 1 << 3,
+    // The installed version might have been modified since it was installed.
+    MaybeModifiedSinceInstalled = 1 << 4,
+    // The installed version definitely has not been modified since it was installed.
+    UnmodifiedSinceInstalled = 0,
 };
 
-enum class InstallationStatusType {
-    NotInstalled,
-    AlreadyInstalled,
-    InstalledButDifferent,
-};
+inline ExistingInstallationStatus operator|(ExistingInstallationStatus a, ExistingInstallationStatus b) {
+    return (ExistingInstallationStatus)(ToInt(a) | ToInt(b));
+}
+inline ExistingInstallationStatus& operator|=(ExistingInstallationStatus& a, ExistingInstallationStatus b) {
+    return a = a | b;
+}
+inline u8 operator&(ExistingInstallationStatus a, ExistingInstallationStatus b) {
+    return (u8)(ToInt(a) & ToInt(b));
+}
 
-using InstallationStatus =
-    TaggedUnion<InstallationStatusType,
-                TypeAndTag<ExistingInstalltionInfo, InstallationStatusType::InstalledButDifferent>>;
+PUBLIC bool32 UserInputIsRequired(ExistingInstallationStatus status) {
+    return status & (ExistingInstallationStatus::ModifiedSinceInstalled |
+                     ExistingInstallationStatus::MaybeModifiedSinceInstalled);
+}
 
-enum class RecommendedAction {
-    Install,
-    InstallAndOverwriteWithoutAsking,
-    DoNothing,
-    AskUser,
-};
+PUBLIC bool32 NoInstallationRequired(ExistingInstallationStatus status) {
+    using enum ExistingInstallationStatus;
+    return (status == Installed) || (status == (Installed | InstalledIsNewer));
+}
 
-struct FolderCheckResult {
-    InstallationStatus installation_status {InstallationStatusType::NotInstalled};
-    RecommendedAction recommended_action;
-    ExtractOptions extract_options;
-};
-
-PUBLIC ValueOrError<FolderCheckResult, PackageError>
+PUBLIC ValueOrError<ExistingInstallationStatus, PackageError>
 LibraryCheckExistingInstallation(PackageFolder const& folder,
                                  sample_lib::Library const* existing_matching_library,
                                  ArenaAllocator& scratch_arena,
@@ -827,17 +792,7 @@ LibraryCheckExistingInstallation(PackageFolder const& folder,
     ASSERT(folder.type == SubfolderType::Libraries);
     ASSERT(folder.library);
 
-    if (!existing_matching_library)
-        return FolderCheckResult {
-            .installation_status = InstallationStatusType::NotInstalled,
-            .recommended_action = RecommendedAction::Install,
-            .extract_options =
-                {
-                    .destination = DestinationType::DefaultFolderWithSubfolderFromPackage,
-                    .overwrite_existing_files = false,
-                    .resolve_install_folder_name_conflicts = true,
-                },
-        };
+    if (!existing_matching_library) return ExistingInstallationStatus::NotInstalled;
 
     auto const existing_folder = *path::Directory(existing_matching_library->path);
     ASSERT(existing_matching_library->Id() == folder.library->Id());
@@ -850,67 +805,34 @@ LibraryCheckExistingInstallation(PackageFolder const& folder,
     });
 
     if (!ChecksumsDiffer(folder.checksum_values, actual_checksums, nullptr))
-        return FolderCheckResult {
-            .installation_status = InstallationStatusType::AlreadyInstalled,
-            .recommended_action = RecommendedAction::DoNothing,
-            .extract_options = {},
-        };
+        return ExistingInstallationStatus::Installed;
 
     // The installed version DIFFERS from the package version.
     // HOW it differs will effect the recommendation we give to the user.
 
-    ExistingInstalltionInfo existing {};
+    ExistingInstallationStatus result = ExistingInstallationStatus::Installed;
+
     auto const checksum_file_path = path::Join(scratch_arena, Array {existing_folder, k_checksums_file});
     if (auto const o = ReadEntireFile(checksum_file_path, scratch_arena); !o.HasError()) {
         auto const stored_checksums = ParseChecksumFile(o.Value(), scratch_arena);
         if (stored_checksums.HasValue() &&
             !ChecksumsDiffer(stored_checksums.Value(), actual_checksums, &error_log)) {
-            existing.modified_since_installed = ExistingInstalltionInfo::ModifiedSinceInstalled::Unmodified;
+            // unmodified since installed, don't add the flag
         } else {
             // The library has been modified since it was installed. OR the checksums file is badly formatted,
             // which presumably means it was modified.
-            existing.modified_since_installed = ExistingInstalltionInfo::ModifiedSinceInstalled::Modified;
+            result |= ExistingInstallationStatus::ModifiedSinceInstalled;
         }
     } else {
-        existing.modified_since_installed = ExistingInstalltionInfo::ModifiedSinceInstalled::Unknown;
+        result |= ExistingInstallationStatus::MaybeModifiedSinceInstalled;
     }
 
-    if (folder.library->minor_version > existing_matching_library->minor_version)
-        existing.version_comparison = ExistingInstalltionInfo::VersionComparison::PackageIsNewer;
-    else if (folder.library->minor_version < existing_matching_library->minor_version)
-        existing.version_comparison = ExistingInstalltionInfo::VersionComparison::PackageIsOlder;
-    else
-        existing.version_comparison = ExistingInstalltionInfo::VersionComparison::Equal;
+    if (existing_matching_library->minor_version < folder.library->minor_version)
+        result |= ExistingInstallationStatus::InstalledIsOlder;
+    else if (existing_matching_library->minor_version > folder.library->minor_version)
+        result |= ExistingInstallationStatus::InstalledIsNewer;
 
-    RecommendedAction recommended_action;
-    switch (existing.modified_since_installed) {
-        case ExistingInstalltionInfo::ModifiedSinceInstalled::Unmodified: {
-            if (existing.version_comparison == ExistingInstalltionInfo::VersionComparison::PackageIsNewer)
-                recommended_action = RecommendedAction::InstallAndOverwriteWithoutAsking; // safe update
-            else
-                recommended_action = RecommendedAction::DoNothing;
-            break;
-        }
-        case ExistingInstalltionInfo::ModifiedSinceInstalled::Modified: {
-            recommended_action = RecommendedAction::AskUser;
-            break;
-        }
-        case ExistingInstalltionInfo::ModifiedSinceInstalled::Unknown: {
-            recommended_action = RecommendedAction::AskUser;
-            break;
-        }
-    }
-
-    return FolderCheckResult {
-        .installation_status = existing,
-        .recommended_action = recommended_action,
-        .extract_options =
-            {
-                .destination = existing_folder,
-                .overwrite_existing_files = true,
-                .resolve_install_folder_name_conflicts = false,
-            },
-    };
+    return result;
 }
 
 // We don't actually check the checksums file of a presets folder. All we do is check if the exact files from
@@ -920,7 +842,7 @@ LibraryCheckExistingInstallation(PackageFolder const& folder,
 //
 // We take this approach because there is no reason to overwrite preset files. Preset files are tiny. If
 // there's a 'version 2' of a preset pack, then it might as well be installed alongside version 1.
-PUBLIC ValueOrError<FolderCheckResult, PackageError>
+PUBLIC ValueOrError<ExistingInstallationStatus, PackageError>
 PresetsCheckExistingInstallation(PackageFolder const& package_folder,
                                  Span<String const> presets_folders,
                                  ArenaAllocator& scratch_arena,
@@ -989,26 +911,14 @@ PresetsCheckExistingInstallation(PackageFolder const& package_folder,
                     }
                 }
 
-                if (matches_exactly)
-                    return FolderCheckResult {
-                        .installation_status = InstallationStatusType::AlreadyInstalled,
-                        .recommended_action = RecommendedAction::DoNothing,
-                        .extract_options = {},
-                    };
+                if (matches_exactly) return ExistingInstallationStatus::Installed;
             }
         }
     }
 
-    return FolderCheckResult {
-        .installation_status = InstallationStatusType::NotInstalled,
-        .recommended_action = RecommendedAction::Install,
-        .extract_options =
-            {
-                .destination = DestinationType::DefaultFolderWithSubfolderFromPackage,
-                .overwrite_existing_files = false,
-                .resolve_install_folder_name_conflicts = true,
-            },
-    };
+    // It may actually be installed, but for presets we take the approach of just installing the package again
+    // unless it is already exactly installed.
+    return ExistingInstallationStatus::NotInstalled;
 }
 
 } // namespace package

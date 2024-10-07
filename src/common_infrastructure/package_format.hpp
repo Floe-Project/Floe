@@ -745,43 +745,24 @@ PUBLIC VoidOrError<PackageError> ReaderExtractFolder(PackageReader& package,
     return k_success;
 }
 
-enum class ExistingInstallationStatus : u8 {
-    NotInstalled = 0,
-
-    // The item is already installed.
-    Installed = 1 << 0,
-
-    // The installed version is different from the package version.
-    InstalledIsOlder = 1 << 1,
-    InstalledIsNewer = 1 << 2,
-    InstalledIsEqual = 0,
-
-    // The installed version has definitely been modified since it was installed.
-    ModifiedSinceInstalled = 1 << 3,
-    // The installed version might have been modified since it was installed.
-    MaybeModifiedSinceInstalled = 1 << 4,
-    // The installed version definitely has not been modified since it was installed.
-    UnmodifiedSinceInstalled = 0,
+struct ExistingInstallationStatus {
+    enum class VersionDifference : u8 { Equal, InstalledIsOlder, InstalledIsNewer };
+    enum class ModifiedSinceInstalled : u8 { Unmodified, MaybeModified, Modified };
+    using enum VersionDifference;
+    using enum ModifiedSinceInstalled;
+    bool installed;
+    VersionDifference version_difference; // if installed
+    ModifiedSinceInstalled modified_since_installed; // if installed
 };
 
-inline ExistingInstallationStatus operator|(ExistingInstallationStatus a, ExistingInstallationStatus b) {
-    return (ExistingInstallationStatus)(ToInt(a) | ToInt(b));
-}
-inline ExistingInstallationStatus& operator|=(ExistingInstallationStatus& a, ExistingInstallationStatus b) {
-    return a = a | b;
-}
-inline u8 operator&(ExistingInstallationStatus a, ExistingInstallationStatus b) {
-    return (u8)(ToInt(a) & ToInt(b));
-}
-
 PUBLIC bool32 UserInputIsRequired(ExistingInstallationStatus status) {
-    return status & (ExistingInstallationStatus::ModifiedSinceInstalled |
-                     ExistingInstallationStatus::MaybeModifiedSinceInstalled);
+    return status.installed && status.modified_since_installed != ExistingInstallationStatus::Unmodified;
 }
 
 PUBLIC bool32 NoInstallationRequired(ExistingInstallationStatus status) {
-    using enum ExistingInstallationStatus;
-    return (status == Installed) || (status == (Installed | InstalledIsNewer));
+    return status.installed && status.modified_since_installed == ExistingInstallationStatus::Unmodified &&
+           (status.version_difference == ExistingInstallationStatus::Equal ||
+            status.version_difference == ExistingInstallationStatus::InstalledIsNewer);
 }
 
 PUBLIC ValueOrError<ExistingInstallationStatus, PackageError>
@@ -792,7 +773,7 @@ LibraryCheckExistingInstallation(PackageFolder const& folder,
     ASSERT(folder.type == SubfolderType::Libraries);
     ASSERT(folder.library);
 
-    if (!existing_matching_library) return ExistingInstallationStatus::NotInstalled;
+    if (!existing_matching_library) return ExistingInstallationStatus {.installed = false};
 
     auto const existing_folder = *path::Directory(existing_matching_library->path);
     ASSERT(existing_matching_library->Id() == folder.library->Id());
@@ -805,12 +786,16 @@ LibraryCheckExistingInstallation(PackageFolder const& folder,
     });
 
     if (!ChecksumsDiffer(folder.checksum_values, actual_checksums, nullptr))
-        return ExistingInstallationStatus::Installed;
+        return ExistingInstallationStatus {
+            .installed = true,
+            .version_difference = ExistingInstallationStatus::Equal,
+            .modified_since_installed = ExistingInstallationStatus::Unmodified,
+        };
 
     // The installed version DIFFERS from the package version.
     // HOW it differs will effect the recommendation we give to the user.
 
-    ExistingInstallationStatus result = ExistingInstallationStatus::Installed;
+    ExistingInstallationStatus result = {.installed = true};
 
     auto const checksum_file_path = path::Join(scratch_arena, Array {existing_folder, k_checksums_file});
     if (auto const o = ReadEntireFile(checksum_file_path, scratch_arena); !o.HasError()) {
@@ -818,19 +803,22 @@ LibraryCheckExistingInstallation(PackageFolder const& folder,
         if (stored_checksums.HasValue() &&
             !ChecksumsDiffer(stored_checksums.Value(), actual_checksums, &error_log)) {
             // unmodified since installed, don't add the flag
+            result.modified_since_installed = ExistingInstallationStatus::Unmodified;
         } else {
             // The library has been modified since it was installed. OR the checksums file is badly formatted,
             // which presumably means it was modified.
-            result |= ExistingInstallationStatus::ModifiedSinceInstalled;
+            result.modified_since_installed = ExistingInstallationStatus::Modified;
         }
     } else {
-        result |= ExistingInstallationStatus::MaybeModifiedSinceInstalled;
+        result.modified_since_installed = ExistingInstallationStatus::MaybeModified;
     }
 
     if (existing_matching_library->minor_version < folder.library->minor_version)
-        result |= ExistingInstallationStatus::InstalledIsOlder;
+        result.version_difference = ExistingInstallationStatus::InstalledIsOlder;
     else if (existing_matching_library->minor_version > folder.library->minor_version)
-        result |= ExistingInstallationStatus::InstalledIsNewer;
+        result.version_difference = ExistingInstallationStatus::InstalledIsNewer;
+    else
+        result.version_difference = ExistingInstallationStatus::Equal;
 
     return result;
 }
@@ -911,14 +899,19 @@ PresetsCheckExistingInstallation(PackageFolder const& package_folder,
                     }
                 }
 
-                if (matches_exactly) return ExistingInstallationStatus::Installed;
+                if (matches_exactly)
+                    return ExistingInstallationStatus {
+                        .installed = true,
+                        .version_difference = ExistingInstallationStatus::Equal,
+                        .modified_since_installed = ExistingInstallationStatus::Unmodified,
+                    };
             }
         }
     }
 
     // It may actually be installed, but for presets we take the approach of just installing the package again
     // unless it is already exactly installed.
-    return ExistingInstallationStatus::NotInstalled;
+    return ExistingInstallationStatus {.installed = false};
 }
 
 } // namespace package

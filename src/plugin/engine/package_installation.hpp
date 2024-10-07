@@ -202,10 +202,9 @@ PUBLIC InstallJob::State CompleteJobInternal(InstallJob& job) {
                 if (folder.folder.library) d = *path::Directory(folder.folder.library->path);
                 d;
             }),
-            .overwrite_existing_files =
-                folder.folder.type == SubfolderType::Libraries &&
-                folder.existing_installation_status & ExistingInstallationStatus::Installed &&
-                folder.user_decision == InstallJob::UserDecision::Overwrite,
+            .overwrite_existing_files = folder.folder.type == SubfolderType::Libraries &&
+                                        folder.existing_installation_status.installed &&
+                                        folder.user_decision == InstallJob::UserDecision::Overwrite,
             .resolve_install_folder_name_conflicts = folder.folder.type == SubfolderType::Presets,
         };
 
@@ -337,13 +336,14 @@ PUBLIC InstallJob::FolderInstallationOutcome Outcome(ExistingInstallationStatus 
                                                      InstallJob::UserDecision user_decision) {
     using enum InstallJob::FolderInstallationOutcome;
 
-    if (existing_installation_status == ExistingInstallationStatus::NotInstalled) return Installed;
+    if (!existing_installation_status.installed) return Installed;
 
     if (UserInputIsRequired(existing_installation_status)) {
         switch (user_decision) {
             case InstallJob::UserDecision::Unknown: PanicIfReached();
             case InstallJob::UserDecision::Overwrite: {
-                if (existing_installation_status & ExistingInstallationStatus::InstalledIsOlder)
+                if (existing_installation_status.version_difference ==
+                    ExistingInstallationStatus::InstalledIsOlder)
                     return Updated;
                 else
                     return Overwritten;
@@ -353,10 +353,10 @@ PUBLIC InstallJob::FolderInstallationOutcome Outcome(ExistingInstallationStatus 
     }
 
     if (NoInstallationRequired(existing_installation_status)) {
-        if (existing_installation_status & ExistingInstallationStatus::InstalledIsNewer) {
+        if (existing_installation_status.version_difference == ExistingInstallationStatus::InstalledIsNewer) {
             return DoneNothingNewerVersionAlreadyInstalled;
         } else {
-            ASSERT(existing_installation_status == ExistingInstallationStatus::Installed);
+            ASSERT(existing_installation_status.installed);
             return DoneNothingAlreadyInstalled;
         }
     }

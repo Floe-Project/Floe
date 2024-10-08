@@ -461,12 +461,33 @@ static bool UpdateLibraryJobs(Server& server,
                         continue;
                     }
 
-                    // changes to the watched directory itself
+                    // Changes to the watched directory itself.
                     if (subpath_changeset.subpath.size == 0) continue;
 
                     auto const full_path =
                         path::Join(scratch_arena,
                                    Array {(String)scan_folder.path, subpath_changeset.subpath});
+
+                    // If a directory has been renamed, it might have moved from somewhere else and it
+                    // might contain libraries. We need to rescan because we likely won't get 'created'
+                    // notifications for the files inside it.
+                    if (subpath_changeset.changes & (DirectoryWatcher::ChangeType::RenamedNewName |
+                                                     DirectoryWatcher::ChangeType::RenamedOldOrNewName)) {
+                        auto const file_type = ({
+                            Optional<FileType> t {};
+                            if (subpath_changeset.file_type)
+                                t = subpath_changeset.file_type;
+                            else if (auto const o = GetFileType(full_path); o.HasValue())
+                                t = o.Value();
+                            t;
+                        });
+
+                        if (file_type == FileType::Directory) {
+                            scan_folder.state.Store(ScanFolder::State::RescanRequested,
+                                                    StoreMemoryOrder::Relaxed);
+                            continue;
+                        }
+                    }
 
                     if (auto const lib_format = sample_lib::DetermineFileFormat(full_path)) {
                         // We queue-up a scan of the file. It will handle new/deleted/modified.

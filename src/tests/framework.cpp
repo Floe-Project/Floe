@@ -49,6 +49,12 @@ String TempFolder(Tester& tester) {
     return *tester.temp_folder;
 }
 
+String TempFilename(Tester& tester) {
+    auto folder = TempFolder(tester);
+    auto filename = UniqueFilename("tmp-", tester.random_seed);
+    return path::Join(tester.scratch_arena, Array {folder, filename});
+}
+
 static Optional<String> SearchUpwardsFromExeForFolder(Tester& tester, String folder_name) {
     auto const path_outcome = CurrentExecutablePath(tester.scratch_arena);
     if (path_outcome.HasError()) {

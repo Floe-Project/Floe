@@ -640,7 +640,7 @@ LoadAudioAsync(ListedAudioData& audio_data, sample_lib::Library const& lib, Thre
         };
 
         {
-            auto state = audio_data.state.Load(LoadMemoryOrder::Relaxed);
+            auto state = audio_data.state.Load(LoadMemoryOrder::Acquire);
             FileLoadingState new_state;
             do {
                 if (state == FileLoadingState::PendingLoad)

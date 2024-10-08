@@ -47,34 +47,79 @@ static ErrorCodeOr<Span<u8 const>> CreateValidTestPackage(tests::Tester& tester)
     return zip_data.ToOwnedSpan();
 }
 
-static ErrorCodeOr<void> ReadTestPackage(tests::Tester& tester, String zip_path) {
-    auto const temp_folder = tests::TempFilename(tester);
-    TRY(CreateDirectory(temp_folder, {.create_intermediate_directories = false, .fail_if_exists = false}));
+TEST_CASE(TestPackageInstallation) {
+    struct Fixture {
+        Fixture(tests::Tester& tester) : destination_folder {tests::TempFilename(tester)} {
+            REQUIRE(!CreateDirectory(destination_folder,
+                                     {.create_intermediate_directories = false, .fail_if_exists = false})
+                         .HasError());
+            thread_pool.Init("pkg-install", {});
 
-    ThreadPool thread_pool;
-    thread_pool.Init("pkginstall", {});
-    ThreadsafeErrorNotifications error_notif;
-    sample_lib_server::Server server {thread_pool, temp_folder, error_notif};
+            auto const zip_data = ({
+                auto o = package::CreateValidTestPackage(tester);
+                REQUIRE(!o.HasError());
+                o.ReleaseValue();
+            });
+            CHECK_NEQ(zip_data.size, 0uz);
 
-    auto job = CreateInstallJob(tester.scratch_arena,
-                                {
-                                    .zip_path = zip_path,
-                                    .libraries_install_folder = temp_folder,
-                                    .presets_install_folder = temp_folder,
-                                    .server = server,
-                                    .preset_folders = {},
-                                });
-    DEFER { DestroyInstallJob(job); };
+            zip_path = tests::TempFilename(tester);
+            REQUIRE(!WriteFile(zip_path, zip_data).HasError());
+        }
+        DynamicArrayBounded<char, path::k_max> destination_folder;
+        DynamicArrayBounded<char, path::k_max> zip_path;
+        ThreadPool thread_pool;
+        ThreadsafeErrorNotifications error_notif;
+        sample_lib_server::Server server {thread_pool, destination_folder, error_notif};
+    };
 
-    StartJob(*job);
+    // We use a fixture just for better errors. The SUBCASEs here depend on their predecessors, they're not
+    // isolated.
+    auto& fixture = tests::CreateOrFetchFixtureObject<Fixture>(tester);
 
-    auto const state = job->state.Load(LoadMemoryOrder::Acquire);
-    CHECK_EQ(state, InstallJob::State::DoneSuccess);
+    CreateJobOptions const job_options {
+        .zip_path = fixture.zip_path,
+        .libraries_install_folder = fixture.destination_folder,
+        .presets_install_folder = fixture.destination_folder,
+        .server = fixture.server,
+        .preset_folders = Array {String(fixture.destination_folder)},
+    };
 
-    for (auto& comp : job->components)
-        tester.log.Debug({}, "action taken for {}: {}", comp.component.path, TypeOfActionTaken(comp));
+    // Initially we're expecting success without any user input because the package is valid, it's not
+    // installed anywhere else, and the destination folder is empty.
+    SUBCASE("installing package for the 1st time succeeds") {
+        auto job = CreateInstallJob(tester.scratch_arena, job_options);
+        DEFER { DestroyInstallJob(job); };
 
-    tester.log.Debug({}, "error log: {}", job->error_log.buffer);
+        StartJob(*job);
+
+        CHECK_EQ(job->state.Load(LoadMemoryOrder::Acquire), InstallJob::State::DoneSuccess);
+
+        for (auto& comp : job->components)
+            CHECK_EQ(TypeOfActionTaken(comp), "installed"_s);
+
+        CHECK(job->error_log.buffer.size == 0);
+        if (job->error_log.buffer.size > 0) tester.log.Debug({}, "Error log: {}", job->error_log.buffer);
+
+        // NOTE: We can't be sure of how long it takes for the OS to post filesystem events to the sample
+        // library server. So instead, we force a rescan. In a real-world scenario this call isn't needed.
+        sample_lib_server::ForceRescanOfAllFolders(fixture.server);
+    }
+
+    // If we try to install the exact same package again, it should notice that and do nothing.
+    SUBCASE("installing the same package again does nothing") {
+        auto job = CreateInstallJob(tester.scratch_arena, job_options);
+        DEFER { DestroyInstallJob(job); };
+
+        StartJob(*job);
+
+        CHECK_EQ(job->state.Load(LoadMemoryOrder::Acquire), InstallJob::State::DoneSuccess);
+
+        for (auto& comp : job->components)
+            CHECK_EQ(TypeOfActionTaken(comp), "already installed"_s);
+
+        CHECK(job->error_log.buffer.size == 0);
+        if (job->error_log.buffer.size > 0) tester.log.Debug({}, "Error log: {}", job->error_log.buffer);
+    }
 
     // TODO: lots more tests (differing checksums, different folders, overwrite, user-input, etc)
 
@@ -302,14 +347,4 @@ static ErrorCodeOr<void> ReadTestPackage(tests::Tester& tester, String zip_path)
 
 } // namespace package
 
-TEST_CASE(TestPackageInstallation) {
-    auto const zip_data = TRY(package::CreateValidTestPackage(tester));
-    CHECK_NEQ(zip_data.size, 0uz);
-    auto const package_path = tests::TempFilename(tester);
-    TRY(WriteFile(package_path, zip_data));
-    TRY(package::ReadTestPackage(tester, package_path));
-
-    return k_success;
-}
-
-TEST_REGISTRATION(RegisterPackageInstallationTests) { REGISTER_TEST(TestPackageInstallation); }
+TEST_REGISTRATION(RegisterPackageInstallationTests) { REGISTER_TEST(package::TestPackageInstallation); }

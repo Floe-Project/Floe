@@ -368,6 +368,9 @@ ReaderReadLibraryLua(PackageReader& package, String library_dir_in_zip, ArenaAll
     auto const floe_lua_data = TRY(detail::ExtractFileToMem(package, *floe_lua_stat, arena));
 
     auto lua_reader = ::Reader::FromMemory(floe_lua_data);
+    // We create a fake path that is easy to spot if it's mistakenly used. With a library, the path of the Lua
+    // file is used to determine relative paths of other files. We don't have access to other files since
+    // they're unextracted.
     auto const full_lua_path = path::Join(arena,
                                           Array {String(FAKE_ABSOLUTE_PATH_PREFIX),
                                                  "UNEXTRACTED-ZIP",

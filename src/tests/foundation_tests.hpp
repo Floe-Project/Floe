@@ -1914,11 +1914,15 @@ TEST_CASE(TestPath) {
         }
     }
 
-    SUBCASE("Split") {
+    SUBCASE("Utils") {
         CHECK_EQ(Filename("foo"), "foo"_s);
         CHECK_EQ(Extension("/file.txt"_s), ".txt"_s);
         CHECK(IsAbsolute("/file.txt"_s, Format::Posix));
         CHECK(IsAbsolute("C:/file.txt"_s, Format::Windows));
+        CHECK(IsAbsolute("C:\\file.txt"_s, Format::Windows));
+        CHECK(IsAbsolute("\\\\server\\share"_s, Format::Windows));
+        CHECK(!IsAbsolute("C:"_s, Format::Windows));
+        CHECK(!IsAbsolute(""_s, Format::Windows));
     }
 
     // This SUBCASE is based on Zig's code

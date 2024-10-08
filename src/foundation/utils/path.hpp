@@ -96,10 +96,34 @@ PUBLIC constexpr WindowsPathInfo ParseWindowsPath(String path) {
 
 PUBLIC constexpr bool IsAbsolute(String path, Format format = Format::Native) {
     if (path.size > k_max) return false;
-    if (format == Format::Windows)
-        return ParseWindowsPath(path).is_abs;
-    else
+
+    if (format == Format::Windows) {
+        if (path.size < 2) return false;
+        if (path[1] == ':') return path.size > 2 && IsDirectorySeparator(path[2], Format::Windows);
+
+        if (path.size < "//a/b"_s.size) return false;
+
+        for (auto const sep : "\\/"_s) {
+            if (path[0] == sep && path[1] == sep) {
+                if (path[2] == sep) return false;
+
+                usize slash_between_server_and_share = 0;
+                for (usize i = 2; i < path.size; ++i) {
+                    if (path[i] == sep) {
+                        slash_between_server_and_share = i;
+                        break;
+                    }
+                }
+                if (slash_between_server_and_share == 0) return false;
+                if (slash_between_server_and_share == path.size - 1) return false;
+
+                return true;
+            }
+        }
+        return false;
+    } else {
         return path.size && IsDirectorySeparator(path[0], Format::Posix);
+    }
 }
 
 PUBLIC constexpr usize Depth(String subpath, Format format = Format::Native) {

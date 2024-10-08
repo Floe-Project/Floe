@@ -206,7 +206,7 @@ MutableString FloeKnownDirectory(Allocator& a,
                                  Optional<String> filename,
                                  KnownDirectoryOptions options);
 
-inline DynamicArrayBounded<char, 32> UniqueFilename(String prefix, u64 seed) {
+inline DynamicArrayBounded<char, 32> UniqueFilename(String prefix, u64& seed) {
     ASSERT(prefix.size <= 16);
     DynamicArrayBounded<char, 32> name {prefix};
     auto const chars_added = fmt::IntToString(RandomU64(seed),

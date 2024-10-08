@@ -38,6 +38,7 @@ struct ThreadPool {
     void AddJob(FunctionType f) {
         ZoneScoped;
         ASSERT(f);
+        ASSERT(m_workers.size > 0);
         {
             ScopedMutexLock const lock(m_mutex);
             m_job_queue.Push(f);

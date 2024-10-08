@@ -904,6 +904,7 @@ static ErrorCodeOr<Reader> CreateLuaFileReader(Library const& library, String pa
     auto const dir = ({
         auto d = path::Directory(library.path);
         if (!d) return ErrorCode {FilesystemError::PathDoesNotExist};
+        ASSERT(path::IsAbsolute(*d));
         *d;
     });
     return Reader::FromFile(path::Join(arena, Array {dir, path}));
@@ -1126,6 +1127,7 @@ LibraryPtrOrError ReadLua(Reader& reader,
                           ArenaAllocator& result_arena,
                           ArenaAllocator& scratch_arena,
                           Options options) {
+    ASSERT(path::IsAbsolute(lua_filepath));
     LuaState ctx {
         .result_arena = result_arena,
         .lua_arena = scratch_arena,
@@ -1609,7 +1611,7 @@ TEST_CASE(TestDocumentedExampleIsValid) {
     TRY(printer.PrintWholeLua(dyn::WriterFor(buf),
                               {.mode_flags = LuaCodePrinter::PrintModeFlagsDocumentedExample}));
     tester.log.Debug(k_log_module, "{}", buf);
-    auto o = ReadLua(buf, "doc.lua", result_arena, scratch_arena);
+    auto o = ReadLua(buf, FAKE_ABSOLUTE_PATH_PREFIX "doc.lua", result_arena, scratch_arena);
     if (auto err = o.TryGet<Error>())
         tester.log.Error(k_log_module, "Error: {}, {}", err->code, err->message);
     CHECK(o.Is<Library*>());
@@ -1623,7 +1625,7 @@ TEST_CASE(TestIncorrectParameters) {
 
     auto check_error = [&](String lua) {
         ArenaAllocator result_arena {PageAllocator::Instance()};
-        auto o = ReadLua(lua, "test.lua", result_arena, arena);
+        auto o = ReadLua(lua, FAKE_ABSOLUTE_PATH_PREFIX "test.lua", result_arena, arena);
         CHECK(o.Is<Error>());
         if (o.Is<Error>()) {
             auto const err = o.Get<Error>();
@@ -1731,7 +1733,8 @@ TEST_CASE(TestAutoMapKeyRange) {
     };
 
     SUBCASE("2 files") {
-        auto r = ReadLua(create_lua(Array {10, 30}), "test.lua", result_arena, arena);
+        auto r =
+            ReadLua(create_lua(Array {10, 30}), FAKE_ABSOLUTE_PATH_PREFIX "test.lua", result_arena, arena);
         if (auto err = r.TryGet<Error>())
             tester.log.Error(k_log_module, "Error: {}, {}", err->code, err->message);
         REQUIRE(!r.Is<Error>());
@@ -1751,7 +1754,7 @@ TEST_CASE(TestAutoMapKeyRange) {
     }
 
     SUBCASE("1 file") {
-        auto r = ReadLua(create_lua(Array {60}), "test.lua", result_arena, arena);
+        auto r = ReadLua(create_lua(Array {60}), FAKE_ABSOLUTE_PATH_PREFIX "test.lua", result_arena, arena);
         if (auto err = r.TryGet<Error>())
             tester.log.Error(k_log_module, "Error: {}, {}", err->code, err->message);
         REQUIRE(!r.Is<Error>());
@@ -1808,7 +1811,7 @@ TEST_CASE(TestBasicFile) {
     })
     return library
     )aaa",
-                     "test.lua",
+                     FAKE_ABSOLUTE_PATH_PREFIX "test.lua",
                      result_arena,
                      arena);
     if (auto err = r.TryGet<Error>())
@@ -1869,7 +1872,7 @@ TEST_CASE(TestBasicFile) {
 
 TEST_CASE(TestErrorHandling) {
     auto& scratch_arena = tester.scratch_arena;
-    auto const lua_filepath = "test.lua"_s;
+    auto const lua_filepath = FAKE_ABSOLUTE_PATH_PREFIX "test.lua"_s;
 
     auto check = [&](ErrorCodeOr<void> expected, String lua_code, Options options = {}) {
         ArenaAllocator result_arena {PageAllocator::Instance()};

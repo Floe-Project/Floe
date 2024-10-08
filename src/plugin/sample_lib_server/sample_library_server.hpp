@@ -300,6 +300,9 @@ void RequestScanningOfUnscannedFolders(Server& server);
 // [threadsafe]
 bool IsScanningSampleLibraries(Server& server);
 
+// [threadsafe]
+void ForceRescanOfAllFolders(Server& server);
+
 // You must call Release() on all results
 // [threadsafe]
 Span<RefCounted<sample_lib::Library>> AllLibrariesRetained(Server& server, ArenaAllocator& arena);

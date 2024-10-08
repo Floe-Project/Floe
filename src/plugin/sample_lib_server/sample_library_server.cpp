@@ -374,10 +374,11 @@ static bool UpdateLibraryJobs(Server& server,
 
                     auto const folder_error_id = ThreadsafeErrorNotifications::Id("libs", path);
 
+                    ScanFolder::State new_state {};
+
                     if (!j.result.outcome.HasError()) {
                         server.error_notifications.RemoveError(folder_error_id);
-                        folder->state.Store(ScanFolder::State::ScannedSuccessfully,
-                                            StoreMemoryOrder::Relaxed);
+                        new_state = ScanFolder::State::ScannedSuccessfully;
                     } else {
                         auto const is_always_scanned_folder =
                             folder->source == ScanFolder::Source::AlwaysScannedFolder;
@@ -392,8 +393,18 @@ static bool UpdateLibraryJobs(Server& server,
                             };
                             server.error_notifications.AddOrUpdateError(err);
                         }
-                        folder->state.Store(ScanFolder::State::ScanFailed, StoreMemoryOrder::Relaxed);
+                        new_state = ScanFolder::State::ScanFailed;
                     }
+
+                    // This scan folder might have been given another request for a rescan while it was
+                    // mid-scan. We want to honour that request still, so we use a CAS to ensure that we only
+                    // mark this as completed if no rescan request was given.
+                    ScanFolder::State expected = ScanFolder::State::Scanning;
+                    if (!folder->state.CompareExchangeStrong(expected,
+                                                             new_state,
+                                                             RmwMemoryOrder::AcquireRelease,
+                                                             LoadMemoryOrder::Relaxed))
+                        ASSERT(expected == ScanFolder::State::RescanRequested);
                 }
                 break;
             }
@@ -1562,6 +1573,12 @@ RequestId SendAsyncLoadRequest(Server& server, AsyncCommsChannel& channel, LoadR
 
 void RequestScanningOfUnscannedFolders(Server& server) {
     RequestLibraryFolderScanIfNeeded(server.scan_folders);
+}
+
+void ForceRescanOfAllFolders(Server& server) {
+    for (auto& n : server.scan_folders)
+        if (auto f = n.TryScoped())
+            f->state.Store(ScanFolder::State::RescanRequested, StoreMemoryOrder::Relaxed);
 }
 
 bool IsScanningSampleLibraries(Server& server) {

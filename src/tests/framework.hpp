@@ -204,7 +204,7 @@ Type& CreateOrFetchFixtureObject(Tester& tester) {
 } // namespace tests
 
 #define REQUIRE_APPROX_EQ_HELPER(a, b, epsilon, level)                                                       \
-    {                                                                                                        \
+    do {                                                                                                     \
         auto x = a;                                                                                          \
         auto y = b;                                                                                          \
         const bool condition = ApproxEqual(x, y, epsilon);                                                   \
@@ -215,10 +215,10 @@ Type& CreateOrFetchFixtureObject(Tester& tester) {
                 ? MutableString {}                                                                           \
                 : fmt::Format(tester.scratch_arena, "Expected: {} ~ {}\n          {} ~ {}", #a, #b, x, y),   \
             tests::FailureAction::level);                                                                    \
-    }
+    } while (0)
 
 #define REQUIRE_HELPER(a, b, op, level)                                                                      \
-    {                                                                                                        \
+    do {                                                                                                     \
         auto x = a;                                                                                          \
         auto y = b;                                                                                          \
         const bool condition = x op y;                                                                       \
@@ -236,7 +236,7 @@ Type& CreateOrFetchFixtureObject(Tester& tester) {
                      tests::FailureAction::level);                                                           \
         if constexpr (tests::FailureAction::level == tests::FailureAction::FailAndExitTest)                  \
             if (!condition) PanicIfReached();                                                                \
-    }
+    } while (0)
 
 #define REQUIRE(...)                                                                                         \
     tests::Check(tester, !!(__VA_ARGS__), #__VA_ARGS__, tests::FailureAction::FailAndExitTest)

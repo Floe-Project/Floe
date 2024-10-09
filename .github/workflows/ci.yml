@@ -36,9 +36,9 @@ jobs:
         if: '!cancelled()'
         uses: actions/upload-artifact@v4
         with:
-          name: log-macos
+          name: logs-macos
           if-no-files-found: ignore
-          path: /Users/runner/Library/Logs/Floe/floe.log
+          path: ${{ env.HOME }}/Library/Logs/Floe/*
 
   linux-compile-and-test:
     runs-on: ubuntu-latest
@@ -99,9 +99,9 @@ jobs:
         if: '!cancelled()'
         uses: actions/upload-artifact@v4
         with:
-          name: log-linux
+          name: logs-linux
           if-no-files-found: ignore
-          path: /home/runner/.local/state/Floe/floe.log
+          path: ${{ env.HOME }}/.local/state/Floe/*
 
       - if: '!cancelled()'
         run: |
@@ -140,9 +140,9 @@ jobs:
         if: '!cancelled()'
         uses: actions/upload-artifact@v4
         with:
-          name: log-windows-${{ matrix.test }}
+          name: logs-windows
           if-no-files-found: ignore
-          path: C:/Users/runner/AppData/Local/Floe/floe.log
+          path: ${{ env.USERPROFILE }}/AppData/Local/Floe/*
   
   notify:
     if: ${{ github.ref == 'refs/heads/main' && !cancelled() }}

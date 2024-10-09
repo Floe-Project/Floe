@@ -1575,10 +1575,12 @@ void RequestScanningOfUnscannedFolders(Server& server) {
     RequestLibraryFolderScanIfNeeded(server.scan_folders);
 }
 
-void ForceRescanOfAllFolders(Server& server) {
+void RescanFolder(Server& server, String path) {
     for (auto& n : server.scan_folders)
-        if (auto f = n.TryScoped())
-            f->state.Store(ScanFolder::State::RescanRequested, StoreMemoryOrder::Relaxed);
+        if (auto f = n.TryScoped()) {
+            if (path::Equal(f->path, path) || path::IsWithinDirectory(path, f->path))
+                f->state.Store(ScanFolder::State::RescanRequested, StoreMemoryOrder::Relaxed);
+        }
 }
 
 bool IsScanningSampleLibraries(Server& server) {

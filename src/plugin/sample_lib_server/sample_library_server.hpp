@@ -301,7 +301,7 @@ void RequestScanningOfUnscannedFolders(Server& server);
 bool IsScanningSampleLibraries(Server& server);
 
 // [threadsafe]
-void ForceRescanOfAllFolders(Server& server);
+void RescanFolder(Server& server, String folder);
 
 // You must call Release() on all results
 // [threadsafe]

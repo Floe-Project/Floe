@@ -48,6 +48,15 @@ struct InstallJob {
         Skip,
     };
 
+    enum class DestinationWriteMode {
+        // Create a subfolder based on the package name. Resolve subfolder name conflicts by automatically
+        // appending a number.
+        CreateUniqueSubfolder,
+
+        // No subfolder. Files are overwritten.
+        OverwriteDirectly,
+    };
+
     ArenaAllocator& arena;
     Atomic<State> state {State::Installing};
     Atomic<bool> abort {false};
@@ -65,7 +74,8 @@ struct InstallJob {
         package::Component component;
         ExistingInstalledComponent existing_installation_status {};
         UserDecision user_decision {UserDecision::Unknown};
-        Optional<String> full_destination_folder;
+        String destination_folder;
+        DestinationWriteMode destination_write_mode;
     };
     ArenaList<Component, false> components;
 };
@@ -121,7 +131,7 @@ LibraryCheckExistingInstallation(Component const& component,
     if (auto const o = ReadEntireFile(checksum_file_path, scratch_arena); !o.HasError()) {
         auto const stored_checksums = ParseChecksumFile(o.Value(), scratch_arena);
         if (stored_checksums.HasValue() &&
-            !ChecksumsDiffer(stored_checksums.Value(), actual_checksums, &error_log)) {
+            !ChecksumsDiffer(stored_checksums.Value(), actual_checksums, nullptr)) {
             result.modified_since_installed = ExistingInstalledComponent::Unmodified;
         } else {
             // The library has been modified since it was installed. OR the checksum file is badly formatted,
@@ -311,19 +321,6 @@ static ErrorCodeOr<void> ExtractFolder(PackageReader& package,
     return k_success;
 }
 
-enum class DestinationType {
-    FullPath, // install all files inside the PackageComponent into a specific folder
-    DefaultFolderWithSubfolderFromPackage,
-};
-
-using Destination = TaggedUnion<DestinationType, TypeAndTag<String, DestinationType::FullPath>>;
-
-struct InstallOptions {
-    Destination destination = DestinationType::DefaultFolderWithSubfolderFromPackage;
-    bool overwrite_existing_files;
-    bool resolve_install_folder_name_conflicts;
-};
-
 // Destination folder is the folder where the package will be installed. e.g. /home/me/Libraries
 // The final folder name is determined by options.destination.
 // Extracts to a temp folder than then renames to the final location. This ensures we either fail or succeed,
@@ -331,28 +328,18 @@ struct InstallOptions {
 // filesystem-change notifications which Floe might try to process and fail on.
 static VoidOrError<PackageError> ReaderInstallComponent(PackageReader& package,
                                                         Component const& component,
-                                                        String default_destination_folder,
                                                         ArenaAllocator& scratch_arena,
                                                         Logger& error_log,
-                                                        InstallOptions options) {
-    ASSERT(path::IsAbsolute(default_destination_folder));
+                                                        String destination_folder,
+                                                        InstallJob::DestinationWriteMode write_mode) {
+    ASSERT(path::IsAbsolute(destination_folder));
 
-    auto const destination_folder = ({
-        String f {};
+    auto const resolved_destination_folder = ({
+        String f = destination_folder;
 
-        switch (options.destination.tag) {
-            case DestinationType::FullPath:
-                f = options.destination.Get<String>();
-                ASSERT(path::IsAbsolute(f));
-                break;
-            case DestinationType::DefaultFolderWithSubfolderFromPackage: {
-                f = path::Join(scratch_arena,
-                               Array {default_destination_folder, path::Filename(component.path)});
-                break;
-            }
-        }
+        if (write_mode == InstallJob::DestinationWriteMode::CreateUniqueSubfolder) {
+            f = path::Join(scratch_arena, Array {f, path::Filename(component.path)});
 
-        if (options.resolve_install_folder_name_conflicts) {
             auto const o = detail::ResolvePossibleFilenameConflicts(f, scratch_arena);
             if (o.HasError())
                 return detail::CreatePackageError(error_log,
@@ -366,23 +353,19 @@ static VoidOrError<PackageError> ReaderInstallComponent(PackageReader& package,
 
         f;
     });
-    ASSERT(path::IsAbsolute(destination_folder));
+    ASSERT(path::IsAbsolute(resolved_destination_folder));
 
     // Try to get a folder on the same filesystem so that we can atomic-rename and therefore reduce the chance
     // of leaving partially extracted files and generating lots of filesystem-change events.
     auto const temp_folder = ({
-        ASSERT(GetFileType(default_destination_folder).HasValue());
+        ASSERT(GetFileType(destination_folder).HasValue());
 
-        // try getting an 'official' temp folder
-        auto o = TemporaryDirectoryOnSameFilesystemAs(default_destination_folder, scratch_arena);
+        auto const o = TemporaryDirectoryOnSameFilesystemAs(destination_folder, scratch_arena);
         if (o.HasError()) {
-            // fallback to a folder within the destination folder
-            o = TemporaryDirectoryWithinFolder(default_destination_folder, scratch_arena, package.seed);
-            if (o.HasError())
-                return detail::CreatePackageError(error_log,
-                                                  o.Error(),
-                                                  "Couldn't access destination folder \"{}\"",
-                                                  default_destination_folder);
+            return detail::CreatePackageError(error_log,
+                                              o.Error(),
+                                              "Unable to access a temporary folder for \"{}\"",
+                                              destination_folder);
         }
 
         String(o.Value());
@@ -407,57 +390,64 @@ static VoidOrError<PackageError> ReaderInstallComponent(PackageReader& package,
                                           temp_folder);
     }
 
-    if (auto const rename_o = Rename(temp_folder, destination_folder); rename_o.HasError()) {
-        if (options.overwrite_existing_files && rename_o.Error() == FilesystemError::NotEmpty) {
-            for (auto const file_index : Range(mz_zip_reader_get_num_files(&package.zip))) {
-                auto const file_stat = ({
-                    auto const o = detail::FileStat(package, file_index);
-                    if (o.HasError()) return detail::CreatePackageError(error_log, o.Error());
-                    o.Value();
-                });
-                if (file_stat.m_is_directory) continue;
-                auto const path = detail::PathWithoutTrailingSlash(file_stat.m_filename);
-                auto const relative_path = detail::RelativePathIfInFolder(path, component.path);
-                if (!relative_path) continue;
+    if (auto const rename_o = Rename(temp_folder, resolved_destination_folder); rename_o.HasError()) {
+        if (write_mode == InstallJob::DestinationWriteMode::OverwriteDirectly &&
+            rename_o.Error() == FilesystemError::NotEmpty) {
+            // Rather than overwrite files one-by-one, we delete the whole folder and replace it with the new
+            // component. We do this because overwriting files could leave unwanted files behind if the
+            // component has fewer files than the existing installation. This is confusing in general, but in
+            // particular, it's bad for a library because there could be 2 Lua files.
 
-                auto const to_path = path::Join(scratch_arena, Array {destination_folder, *relative_path});
-                DEFER { scratch_arena.Free(to_path.ToByteSpan()); };
-                if (auto const o = CreateDirectory(*path::Directory(to_path),
-                                                   {
-                                                       .create_intermediate_directories = true,
-                                                       .fail_if_exists = false,
-                                                   });
-                    o.HasError()) {
-                    return detail::CreatePackageError(
-                        error_log,
-                        o.Error(),
-                        "Couldn't create directory(s) in your install folder \"{}\"",
-                        to_path);
-                }
-
-                auto const from_path = path::Join(scratch_arena, Array {temp_folder, *relative_path});
-                DEFER { scratch_arena.Free(from_path.ToByteSpan()); };
-                if (auto const copy_o = Rename(from_path, to_path); copy_o.HasError()) {
+            // Step 1: move the old folder to a unique temp folder adjacent to the destination folder
+            auto const old_path_temp = ({
+                auto const o = TemporaryDirectoryOnSameFilesystemAs(destination_folder, scratch_arena);
+                if (o.HasError()) {
                     return detail::CreatePackageError(error_log,
-                                                      copy_o.Error(),
-                                                      "Couldn't install file to your install folder \"{}\"",
-                                                      to_path);
+                                                      o.Error(),
+                                                      "Couldn't access destination folder \"{}\"",
+                                                      destination_folder);
                 }
+                o.Value();
+            });
+            if (auto const o = Rename(resolved_destination_folder, old_path_temp); o.HasError()) {
+                return detail::CreatePackageError(error_log,
+                                                  o.Error(),
+                                                  "Couldn't install files to your install folder \"{}\"",
+                                                  resolved_destination_folder);
             }
+
+            // Step 2. intall the new files to the final location
+            if (auto const rename2_o = Rename(temp_folder, resolved_destination_folder);
+                rename2_o.HasError()) {
+                // We failed to install the new files, try to restore the old files.
+                auto const _ = Rename(old_path_temp, resolved_destination_folder);
+
+                return detail::CreatePackageError(error_log,
+                                                  rename2_o.Error(),
+                                                  "Couldn't install files to your install folder \"{}\"",
+                                                  resolved_destination_folder);
+            }
+
+            // Step 3. the new files are successfully installed, delete the old files
+            auto const _ = Delete(old_path_temp,
+                                  {
+                                      .type = DeleteOptions::Type::DirectoryRecursively,
+                                      .fail_if_not_exists = false,
+                                  });
         } else {
             return detail::CreatePackageError(error_log,
                                               rename_o.Error(),
                                               "Couldn't install files to your install folder \"{}\"",
-                                              destination_folder);
+                                              resolved_destination_folder);
         }
     }
 
     // remove hidden
-    if (auto const o = WindowsSetFileAttributes(destination_folder, k_nullopt); o.HasError()) {
+    if (auto const o = WindowsSetFileAttributes(resolved_destination_folder, k_nullopt); o.HasError()) {
         return detail::CreatePackageError(error_log,
                                           o.Error(),
                                           "Failed to make the folder \"{}\" visible",
-                                          destination_folder);
+                                          resolved_destination_folder);
     }
 
     return k_success;
@@ -501,7 +491,8 @@ static InstallJob::State StartJobInternal(InstallJob& job) {
             break;
         }
 
-        Optional<String> full_destination_folder = k_nullopt;
+        String destination_folder = {};
+        InstallJob::DestinationWriteMode write_mode {};
 
         auto const existing_check = ({
             ExistingInstalledComponent r;
@@ -531,7 +522,13 @@ static InstallJob::State StartJobInternal(InstallJob& job) {
                                                                  existing_lib ? &*existing_lib : nullptr,
                                                                  job.arena,
                                                                  job.error_log));
-                    if (existing_lib) full_destination_folder = job.arena.Clone(existing_lib->path);
+                    if (existing_lib) {
+                        destination_folder = job.arena.Clone(*path::Directory(existing_lib->path));
+                        write_mode = InstallJob::DestinationWriteMode::OverwriteDirectly;
+                    } else {
+                        destination_folder = job.libraries_install_folder;
+                        write_mode = InstallJob::DestinationWriteMode::CreateUniqueSubfolder;
+                    }
 
                     break;
                 }
@@ -540,6 +537,8 @@ static InstallJob::State StartJobInternal(InstallJob& job) {
                                                                        job.preset_folders,
                                                                        job.arena,
                                                                        job.error_log));
+                    destination_folder = job.presets_install_folder;
+                    write_mode = InstallJob::DestinationWriteMode::CreateUniqueSubfolder;
                     break;
                 }
                 case package::ComponentType::Count: PanicIfReached();
@@ -554,7 +553,8 @@ static InstallJob::State StartJobInternal(InstallJob& job) {
             .component = *component,
             .existing_installation_status = existing_check,
             .user_decision = InstallJob::UserDecision::Unknown,
-            .full_destination_folder = full_destination_folder,
+            .destination_folder = destination_folder,
+            .destination_write_mode = write_mode,
         };
     }
 
@@ -579,40 +579,25 @@ static InstallJob::State CompleteJobInternal(InstallJob& job) {
 
         if (NoInstallationRequired(component.existing_installation_status)) continue;
 
-        if (UserInputIsRequired(component.existing_installation_status))
+        if (UserInputIsRequired(component.existing_installation_status)) {
             ASSERT(component.user_decision != InstallJob::UserDecision::Unknown);
-
-        InstallOptions const install_options {
-            .destination = ({
-                Destination d {DestinationType::DefaultFolderWithSubfolderFromPackage};
-                if (component.full_destination_folder) {
-                    ASSERT(path::IsAbsolute(*component.full_destination_folder));
-                    d = *component.full_destination_folder;
-                }
-                d;
-            }),
-            .overwrite_existing_files = component.component.type == ComponentType::Library &&
-                                        component.existing_installation_status.installed &&
-                                        component.user_decision == InstallJob::UserDecision::Overwrite,
-            .resolve_install_folder_name_conflicts = component.component.type == ComponentType::Presets,
-        };
-
-        auto const destination_folder = ({
-            String d {};
-            switch (component.component.type) {
-                case package::ComponentType::Library: d = job.libraries_install_folder; break;
-                case package::ComponentType::Presets: d = job.presets_install_folder; break;
-                case package::ComponentType::Count: PanicIfReached();
-            }
-            d;
-        });
+            if (component.user_decision == InstallJob::UserDecision::Skip) continue;
+        }
 
         TRY_H(ReaderInstallComponent(*job.reader,
                                      component.component,
-                                     destination_folder,
                                      job.arena,
                                      job.error_log,
-                                     install_options));
+                                     component.destination_folder,
+                                     component.destination_write_mode));
+
+        if (component.component.type == ComponentType::Library) {
+            // The sample library server should receive filesystem-events about the move and rescan
+            // automatically. But the timing of filesystem events is not reliable. As we already know that the
+            // folder has changed, we can issue a rescan immediately. This way, the changes will be reflected
+            // sooner.
+            sample_lib_server::RescanFolder(job.sample_lib_server, component.destination_folder);
+        }
     }
 
     return InstallJob::State::DoneSuccess;

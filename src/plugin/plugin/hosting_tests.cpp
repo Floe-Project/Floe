@@ -550,9 +550,10 @@ TEST_CASE(TestHostingClap) {
 
             dyn::Assign(fixture.clap_path, dir);
             path::JoinAppend(fixture.clap_path, "Floe.clap"_s);
-            if (auto const o = GetFileType(fixture.clap_path); o.HasValue() && o.Value() == FileType::File)
+            if (auto const o = GetFileType(fixture.clap_path); o.HasValue()) {
+                if constexpr (IS_MACOS) path::JoinAppend(fixture.clap_path, "Contents/MacOS/Floe"_s);
                 break;
-            else
+            } else
                 dyn::Clear(fixture.clap_path);
         }
 

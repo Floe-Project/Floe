@@ -419,7 +419,7 @@ static bool UpdateLibraryJobs(Server& server,
             DynamicArray<DirectoryToWatch> dirs {scratch_arena};
             for (auto& node : server.scan_folders) {
                 if (auto f = node.TryRetain()) {
-                    if (f->state.Load(LoadMemoryOrder::Relaxed) == ScanFolder::State::ScannedSuccessfully)
+                    if (f->state.Load(LoadMemoryOrder::Acquire) == ScanFolder::State::ScannedSuccessfully)
                         dyn::Append(dirs,
                                     {
                                         .path = f->path,

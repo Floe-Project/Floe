@@ -592,13 +592,13 @@ struct DirectoryWatcher {
                         if (path::Equal(dir.path, dir_to_watch.path) &&
                             dir.recursive == dir_to_watch.recursive) {
                             d = &dir;
-                            dir.directory_changes.linked_dir_to_watch = &dir_to_watch;
                             break;
                         }
                     }
                     d;
                 })) {
                 dir_ptr->is_desired = true;
+                dir_ptr->directory_changes.linked_dir_to_watch = &dir_to_watch;
                 if (retry_failed_directories && dir_ptr->state == WatchedDirectory::State::WatchingFailed) {
                     dir_ptr->state = WatchedDirectory::State::NeedsWatching;
                     any_states_changed = true;
@@ -629,6 +629,20 @@ struct DirectoryWatcher {
                 dir.state = DirectoryWatcher::WatchedDirectory::State::NeedsUnwatching;
                 any_states_changed = true;
             }
+
+        for (auto& dir : watched_dirs) {
+            bool is_withing_input = false;
+            for (auto const& dir_to_watch : dirs_to_watch)
+                if (dir.directory_changes.linked_dir_to_watch == &dir_to_watch) {
+                    is_withing_input = true;
+                    break;
+                }
+
+            if (!is_withing_input) {
+                bool b = 0;
+                (void)b;
+            }
+        }
 
         return any_states_changed;
     }

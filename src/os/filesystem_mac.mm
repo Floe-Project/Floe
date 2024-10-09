@@ -641,6 +641,12 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
             FSEventStreamRelease(mac_watcher.stream);
         }
 
+        // fsevents is batched, we don't need to individually stop watching each directory, so at this stage
+        // all NeedsUnwatching directories are not watched.
+        for (auto& dir : watcher.watched_dirs)
+            if (dir.state == DirectoryWatcher::WatchedDirectory::State::NeedsUnwatching)
+                dir.state = DirectoryWatcher::WatchedDirectory::State::NotWatching;
+
         CFMutableArrayRef paths = CFArrayCreateMutable(nullptr, 0, &kCFTypeArrayCallBacks);
         DEFER { CFRelease(paths); };
         for (auto& dir : watcher.watched_dirs) {
@@ -665,17 +671,21 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
         }
 
         if (CFArrayGetCount(paths) != 0) {
-            bool success = false;
-            DEFER {
-                if (!success) {
-                    mac_watcher.stream = {};
-                    for (auto& dir : watcher.watched_dirs)
-                        dir.state = DirectoryWatcher::WatchedDirectory::State::WatchingFailed;
-                }
-            };
-
             FSEventStreamContext context {};
             context.info = &mac_watcher;
+
+            bool succeeded = false;
+            DEFER {
+                for (auto& dir : watcher.watched_dirs) {
+                    if (dir.state == DirectoryWatcher::WatchedDirectory::State::Watching ||
+                        dir.state == DirectoryWatcher::WatchedDirectory::State::NeedsWatching) {
+                        if (!succeeded)
+                            dir.state = DirectoryWatcher::WatchedDirectory::State::WatchingFailed;
+                        else
+                            dir.state = DirectoryWatcher::WatchedDirectory::State::Watching;
+                    }
+                }
+            };
 
             mac_watcher.stream =
                 FSEventStreamCreate(kCFAllocatorDefault,
@@ -700,10 +710,11 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
             if (!FSEventStreamStart(mac_watcher.stream)) {
                 FSEventStreamInvalidate(mac_watcher.stream);
                 FSEventStreamRelease(mac_watcher.stream);
+                mac_watcher.stream = {};
                 return ErrorCode {FilesystemError::FileWatcherCreationFailed};
             }
 
-            success = true;
+            succeeded = true;
         }
     }
 

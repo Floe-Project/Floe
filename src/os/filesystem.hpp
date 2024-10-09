@@ -618,8 +618,8 @@ struct DirectoryWatcher {
             };
             auto const path = new_dir->arena.Clone(dir_to_watch.path);
             new_dir->path = path;
-            // some backends (FSEvents) give use events containing paths with resolved symlinks, so we need
-            // to resolve it ourselves to be able to correctly compare paths
+            // Some backends (FSEvents) give us events containing paths with resolved symlinks, so we need
+            // to resolve it ourselves to be able to correctly compare paths.
             new_dir->resolved_path = CanonicalizePath(new_dir->arena, dir_to_watch.path).ValueOr(path);
             new_dir->directory_changes.linked_dir_to_watch = &dir_to_watch;
         }

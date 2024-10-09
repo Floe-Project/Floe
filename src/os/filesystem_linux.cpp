@@ -359,10 +359,7 @@ static ErrorCodeOr<int> InotifyWatch(int inotify_id, char const* path) {
     return watch_id;
 }
 
-static void InotifyUnwatch(int inotify_id, int watch_id) {
-    auto const rc = inotify_rm_watch(inotify_id, watch_id);
-    ASSERT(rc == 0);
-}
+static void InotifyUnwatch(int inotify_id, int watch_id) { inotify_rm_watch(inotify_id, watch_id); }
 
 static void UnwatchDirectory(int inotify_id, DirectoryWatcher::WatchedDirectory& d) {
     auto native_data = (LinuxWatchedDirectory*)d.native_data.pointer;

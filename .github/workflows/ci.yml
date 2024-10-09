@@ -38,7 +38,7 @@ jobs:
         with:
           name: logs-macos
           if-no-files-found: ignore
-          path: ${{ env.HOME }}/Library/Logs/Floe/*
+          path: ~/Library/Logs/Floe/*
 
   linux-compile-and-test:
     runs-on: ubuntu-latest
@@ -101,7 +101,7 @@ jobs:
         with:
           name: logs-linux
           if-no-files-found: ignore
-          path: ${{ env.HOME }}/.local/state/Floe/*
+          path: ~/.local/state/Floe/*
 
       - if: '!cancelled()'
         run: |
@@ -142,7 +142,7 @@ jobs:
         with:
           name: logs-windows
           if-no-files-found: ignore
-          path: ${{ env.USERPROFILE }}/AppData/Local/Floe/*
+          path: ~/AppData/Local/Floe/*
   
   notify:
     if: ${{ github.ref == 'refs/heads/main' && !cancelled() }}

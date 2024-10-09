@@ -283,7 +283,15 @@ static void SignalHandler(int signal_num, siginfo_t* info, void* context) {
         PrintCurrentStacktrace(k_signal_output_stream, {.ansi_colours = true, .demangle = false}, 0);
 
         {
-            auto const timestamp = Timestamp();
+            auto timestamp = Timestamp();
+
+            // Make the timestamp safe for a filename even on Windows (where we might want to copy the file).
+            for (auto& c : timestamp)
+                if (c == ':')
+                    c = '-';
+                else if (c == '.')
+                    c = '-';
+
             auto const file_path =
                 fmt::FormatInline<400>("{}/crash_{}.log\0", g_crash_folder_path, timestamp);
             auto const fd = open(file_path.data, O_WRONLY | O_CREAT | O_TRUNC, 0666);

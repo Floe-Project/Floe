@@ -630,20 +630,6 @@ struct DirectoryWatcher {
                 any_states_changed = true;
             }
 
-        for (auto& dir : watched_dirs) {
-            bool is_withing_input = false;
-            for (auto const& dir_to_watch : dirs_to_watch)
-                if (dir.directory_changes.linked_dir_to_watch == &dir_to_watch) {
-                    is_withing_input = true;
-                    break;
-                }
-
-            if (!is_withing_input) {
-                bool b = 0;
-                (void)b;
-            }
-        }
-
         return any_states_changed;
     }
 

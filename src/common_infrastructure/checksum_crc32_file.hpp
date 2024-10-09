@@ -29,7 +29,7 @@ using DynamicChecksumTable = DynamicHashTable<String, ChecksumValues>;
 PUBLIC void AppendChecksumLine(DynamicArray<char>& buffer, ChecksumLine line) {
     if constexpr (IS_WINDOWS)
         for (auto c : line.path)
-            ASSERT(c != '\\'); // zip files use forward slashes
+            ASSERT(c != '\\');
 
     fmt::Append(buffer, "{08x} {} {}\n", line.crc32, line.file_size, line.path);
 }

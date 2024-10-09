@@ -71,45 +71,38 @@ static ErrorCodeOr<void> RenameAnyFileWithExt(tests::Tester& tester, String fold
 }
 
 TEST_CASE(TestPackageInstallation) {
-    struct Fixture {
-        Fixture(tests::Tester& tester) : destination_folder {tests::TempFilename(tester)} {
-            REQUIRE(!CreateDirectory(destination_folder,
-                                     {.create_intermediate_directories = false, .fail_if_exists = false})
-                         .HasError());
-            thread_pool.Init("pkg-install", {});
+    auto const destination_folder {tests::TempFilename(tester)};
+    REQUIRE(!CreateDirectory(destination_folder,
+                             {.create_intermediate_directories = false, .fail_if_exists = false})
+                 .HasError());
 
-            auto const zip_data = ({
-                auto o = package::CreateValidTestPackage(tester);
-                REQUIRE(!o.HasError());
-                o.ReleaseValue();
-            });
-            CHECK_NEQ(zip_data.size, 0uz);
+    ThreadPool thread_pool;
+    thread_pool.Init("pkg-install", {});
 
-            zip_path = tests::TempFilename(tester);
-            REQUIRE(!WriteFile(zip_path, zip_data).HasError());
-        }
-        DynamicArrayBounded<char, path::k_max> const destination_folder;
-        DynamicArrayBounded<char, path::k_max> zip_path;
-        ThreadPool thread_pool;
-        ThreadsafeErrorNotifications error_notif;
-        sample_lib_server::Server server {thread_pool, destination_folder, error_notif};
-    };
+    ThreadsafeErrorNotifications error_notif;
+    sample_lib_server::Server server {thread_pool, destination_folder, error_notif};
 
-    // We use a fixture just for better errors. The SUBCASEs here depend on their predecessors, they're not
-    // isolated.
-    auto& fixture = tests::CreateOrFetchFixtureObject<Fixture>(tester);
+    auto const zip_data = ({
+        auto o = package::CreateValidTestPackage(tester);
+        REQUIRE(!o.HasError());
+        o.ReleaseValue();
+    });
+    CHECK_NEQ(zip_data.size, 0uz);
+
+    auto const zip_path = tests::TempFilename(tester);
+    REQUIRE(!WriteFile(zip_path, zip_data).HasError());
 
     CreateJobOptions const job_options {
-        .zip_path = fixture.zip_path,
-        .libraries_install_folder = fixture.destination_folder,
-        .presets_install_folder = fixture.destination_folder,
-        .server = fixture.server,
-        .preset_folders = Array {String(fixture.destination_folder)},
+        .zip_path = zip_path,
+        .libraries_install_folder = destination_folder,
+        .presets_install_folder = destination_folder,
+        .server = server,
+        .preset_folders = Array {String(destination_folder)},
     };
 
     // Initially we're expecting success without any user input because the package is valid, it's not
     // installed anywhere else, and the destination folder is empty.
-    SUBCASE("installing package for the 1st time succeeds") {
+    {
         auto job = CreateInstallJob(tester.scratch_arena, job_options);
         DEFER { DestroyInstallJob(job); };
 
@@ -125,7 +118,7 @@ TEST_CASE(TestPackageInstallation) {
     }
 
     // If we try to install the exact same package again, it should notice that and do nothing.
-    SUBCASE("installing the same package again does nothing") {
+    {
         auto job = CreateInstallJob(tester.scratch_arena, job_options);
         DEFER { DestroyInstallJob(job); };
 
@@ -140,10 +133,16 @@ TEST_CASE(TestPackageInstallation) {
         if (job->error_log.buffer.size > 0) tester.log.Debug({}, "Error log: {}", job->error_log.buffer);
     }
 
-    SUBCASE("libraries that are modified should prompt user input") {
-        TRY(RenameAnyFileWithExt(tester, fixture.destination_folder, ".lua"));
-        TRY(RenameAnyFileWithExt(tester, fixture.destination_folder, ".floe-preset"));
+    // Modify the installed components
+    TRY(RenameAnyFileWithExt(tester, destination_folder, ".lua"));
+    TRY(RenameAnyFileWithExt(
+        tester,
+        path::Join(tester.scratch_arena,
+                   Array {destination_folder, path::Filename(TestPresetsFolder(tester))}),
+        ".floe-preset"));
 
+    // If the components are modified and we set to Skip, it should skip them.
+    {
         auto job = CreateInstallJob(tester.scratch_arena, job_options);
         DEFER { DestroyInstallJob(job); };
 
@@ -151,45 +150,54 @@ TEST_CASE(TestPackageInstallation) {
 
         CHECK_EQ(job->state.Load(LoadMemoryOrder::Acquire), InstallJob::State::AwaitingUserInput);
 
-        SUBCASE("skip") {
-            for (auto& comp : job->components)
-                if (UserInputIsRequired(comp.existing_installation_status)) {
-                    CHECK(comp.component.type == ComponentType::Library);
-                    comp.user_decision = InstallJob::UserDecision::Skip;
-                }
-
-            job->state.Store(InstallJob::State::Installing, StoreMemoryOrder::Release);
-            CompleteJob(*job);
-
-            for (auto& comp : job->components)
-                if (comp.component.type == ComponentType::Library)
-                    CHECK_EQ(TypeOfActionTaken(comp), "skipped"_s);
-                else
-                    // presets never require user input, they're always installed or skipped automatically
-                    CHECK_EQ(TypeOfActionTaken(comp), "installed"_s);
-        }
-
-        SUBCASE("overwrite") {
-            for (auto& comp : job->components) {
-                if (UserInputIsRequired(comp.existing_installation_status)) {
-                    CHECK(comp.component.type == ComponentType::Library);
-                    comp.user_decision = InstallJob::UserDecision::Overwrite;
-                }
+        for (auto& comp : job->components)
+            if (UserInputIsRequired(comp.existing_installation_status)) {
+                CHECK(comp.component.type == ComponentType::Library);
+                comp.user_decision = InstallJob::UserDecision::Skip;
             }
 
-            job->state.Store(InstallJob::State::Installing, StoreMemoryOrder::Release);
-            CompleteJob(*job);
+        job->state.Store(InstallJob::State::Installing, StoreMemoryOrder::Release);
+        CompleteJob(*job);
 
-            for (auto& comp : job->components) {
-                if (comp.component.type == ComponentType::Library) {
-                    CHECK_EQ(TypeOfActionTaken(comp), "overwritten"_s);
-                } else {
-                    // presets never require user input, they're always installed or skipped automatically
-                    CHECK_EQ(TypeOfActionTaken(comp), "installed"_s);
-                }
+        for (auto& comp : job->components)
+            if (comp.component.type == ComponentType::Library)
+                CHECK_EQ(TypeOfActionTaken(comp), "skipped"_s);
+            else
+                // presets never require user input, they're always installed or skipped automatically
+                CHECK_EQ(TypeOfActionTaken(comp), "installed"_s);
+
+        CHECK(job->error_log.buffer.size == 0);
+        if (job->error_log.buffer.size > 0) tester.log.Debug({}, "Error log: {}", job->error_log.buffer);
+    }
+
+    // If the components are modified and we set the Overwrite, it should overwrite them.
+    {
+        auto job = CreateInstallJob(tester.scratch_arena, job_options);
+        DEFER { DestroyInstallJob(job); };
+
+        StartJob(*job);
+
+        CHECK_EQ(job->state.Load(LoadMemoryOrder::Acquire), InstallJob::State::AwaitingUserInput);
+        for (auto& comp : job->components) {
+            if (UserInputIsRequired(comp.existing_installation_status)) {
+                CHECK(comp.component.type == ComponentType::Library);
+                comp.user_decision = InstallJob::UserDecision::Overwrite;
             }
         }
 
+        job->state.Store(InstallJob::State::Installing, StoreMemoryOrder::Release);
+        CompleteJob(*job);
+
+        for (auto& comp : job->components) {
+            if (comp.component.type == ComponentType::Library) {
+                CHECK_EQ(TypeOfActionTaken(comp), "overwritten"_s);
+            } else {
+                // In our previous 'skip' case, the presets we reinstalled. They would be put in a
+                // separate folder, name appended with a number. So we expect the system to have found
+                // this installation.
+                CHECK_EQ(TypeOfActionTaken(comp), "already installed"_s);
+            }
+        }
         CHECK(job->error_log.buffer.size == 0);
         if (job->error_log.buffer.size > 0) tester.log.Debug({}, "Error log: {}", job->error_log.buffer);
     }

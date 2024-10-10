@@ -296,6 +296,7 @@ static bool UpdateLibraryJobs(Server& server,
         switch (job.data.tag) {
             case PendingLibraryJobs::Job::Type::ReadLibrary: {
                 auto& j = *job.data.Get<PendingLibraryJobs::Job::ReadLibrary*>();
+                DEFER { j.PendingLibraryJobs::Job::ReadLibrary::~ReadLibrary(); };
                 auto const& args = j.args;
                 String const path =
                     args.path_or_memory.Is<String>() ? args.path_or_memory.Get<String>() : ":memory:";
@@ -367,6 +368,7 @@ static bool UpdateLibraryJobs(Server& server,
             }
             case PendingLibraryJobs::Job::Type::ScanFolder: {
                 auto const& j = *job.data.Get<PendingLibraryJobs::Job::ScanFolder*>();
+                DEFER { j.PendingLibraryJobs::Job::ScanFolder::~ScanFolder(); };
                 if (auto folder = j.args.folder->TryScoped()) {
                     auto const& path = folder->path;
                     ZoneScopedN("job completed: folder scanned");

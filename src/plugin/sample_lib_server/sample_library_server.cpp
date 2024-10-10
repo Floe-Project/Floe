@@ -454,8 +454,8 @@ static bool UpdateLibraryJobs(Server& server,
             auto const dir_changes_span = outcome.Value();
             for (auto const& dir_changes : dir_changes_span) {
                 bool found = false;
-                for (auto &node : server.scan_folders) {
-                    if ((void *)&node == dir_changes.linked_dir_to_watch->user_data) {
+                for (auto& node : server.scan_folders) {
+                    if ((void*)&node == dir_changes.linked_dir_to_watch->user_data) {
                         found = true;
                         break;
                     }
@@ -1590,6 +1590,7 @@ void RescanFolder(Server& server, String path) {
             if (path::Equal(f->path, path) || path::IsWithinDirectory(path, f->path))
                 f->state.Store(ScanFolder::State::RescanRequested, StoreMemoryOrder::Relaxed);
         }
+    server.work_signaller.Signal();
 }
 
 bool IsScanningSampleLibraries(Server& server) {

@@ -318,22 +318,36 @@ static bool UpdateLibraryJobs(Server& server,
                                        "adding new library {}",
                                        path::Filename(path));
 
-                        // if one already exists with the same path, remove it and replace it with the new one
+                        bool not_wanted = false;
+
+                        // Check if we actually want this library
                         for (auto it = server.libraries.begin(); it != server.libraries.end();)
                             if (path::Equal(it->value.lib->path, lib->path)) {
                                 it = server.libraries.Remove(it);
                                 NotifyAllChannelsOfLibraryChange(server, lib->Id());
-                            } else
+                            } else if (it->value.lib->Id() == lib->Id()) {
+                                if (it->value.lib->minor_version > lib->minor_version) {
+                                    // the existing library is newer
+                                    not_wanted = true;
+                                    ++it;
+                                } else {
+                                    NotifyAllChannelsOfLibraryChange(server, lib->Id());
+                                    it = server.libraries.Remove(it);
+                                }
+                            } else {
                                 ++it;
+                            }
 
-                        auto new_node = server.libraries.AllocateUninitialised();
-                        PLACEMENT_NEW(&new_node->value)
-                        ListedLibrary {
-                            .arena = Move(j.result.arena),
-                            .lib = lib,
-                            .scan_timepoint = TimePoint::Now(),
-                        };
-                        server.libraries.Insert(new_node);
+                        if (!not_wanted) {
+                            auto new_node = server.libraries.AllocateUninitialised();
+                            PLACEMENT_NEW(&new_node->value)
+                            ListedLibrary {
+                                .arena = Move(j.result.arena),
+                                .lib = lib,
+                                .scan_timepoint = TimePoint::Now(),
+                            };
+                            server.libraries.Insert(new_node);
+                        }
 
                         server.error_notifications.RemoveError(error_id);
                         break;

@@ -47,27 +47,15 @@ static ErrorCodeOr<Span<u8 const>> CreateValidTestPackage(tests::Tester& tester)
     return zip_data.ToOwnedSpan();
 }
 
-static ErrorCodeOr<String> FindFileWithExt(tests::Tester& tester, String folder, String ext) {
-    ASSERT(ext.size);
-    ASSERT(ext[0] == '.');
-
-    auto& arena = tester.scratch_arena;
-
-    auto it = TRY(dir_iterator::RecursiveCreate(arena, folder, {.wildcard = fmt::Format(arena, "*{}", ext)}));
+static ErrorCodeOr<void> PrintDirectory(tests::Tester& tester, String dir, String heading) {
+    auto it = TRY(dir_iterator::RecursiveCreate(tester.scratch_arena, dir, {}));
     DEFER { dir_iterator::Destroy(it); };
-    auto const entry = TRY(dir_iterator::Next(it, arena));
-    REQUIRE(entry);
-    REQUIRE(path::Extension(entry->subpath) == ext);
 
-    return dir_iterator::FullPath(it, *entry, arena);
-}
+    tester.log.Debug({}, "{} Contents of '{}':", heading, dir);
+    while (auto const entry = TRY(dir_iterator::Next(it, tester.scratch_arena)))
+        tester.log.Debug({}, "  {}", entry->subpath);
 
-static ErrorCodeOr<void> RenameAnyFileWithExt(tests::Tester& tester, String folder, String ext) {
-    auto const path = TRY(FindFileWithExt(tester, folder, ext));
-    auto const new_path =
-        fmt::Format(tester.scratch_arena, "{}-renamed{}", path.SubSpan(0, path.size - ext.size), ext);
-    tester.log.Debug({}, "Renaming {} to {}", path, new_path);
-    return Rename(path, new_path);
+    return k_success;
 }
 
 TEST_CASE(TestPackageInstallation) {
@@ -133,13 +121,17 @@ TEST_CASE(TestPackageInstallation) {
         if (job->error_log.buffer.size > 0) tester.log.Debug({}, "Error log: {}", job->error_log.buffer);
     }
 
-    // Modify the installed components
-    TRY(RenameAnyFileWithExt(tester, destination_folder, ".lua"));
-    TRY(RenameAnyFileWithExt(
-        tester,
-        path::Join(tester.scratch_arena,
-                   Array {destination_folder, path::Filename(TestPresetsFolder(tester))}),
-        ".floe-preset"));
+    TRY(PrintDirectory(tester, destination_folder, "Post-installation"));
+
+    // Modify the installed components. If this fails then it might mean the test files have moved.
+    TRY(Rename(path::Join(tester.scratch_arena, Array {destination_folder, "Tester - Test Lua", "floe.lua"}),
+               path::Join(tester.scratch_arena,
+                          Array {destination_folder, "Tester - Test Lua", "renamed.floe.lua"})));
+    TRY(Rename(
+        path::Join(tester.scratch_arena, Array {destination_folder, "presets", "sine.floe-preset"}),
+        path::Join(tester.scratch_arena, Array {destination_folder, "presets", "renamed-sine.floe-preset"})));
+
+    TRY(PrintDirectory(tester, destination_folder, "Post-rename"));
 
     // If the components are modified and we set to Skip, it should skip them.
     {
@@ -170,6 +162,8 @@ TEST_CASE(TestPackageInstallation) {
         if (job->error_log.buffer.size > 0) tester.log.Debug({}, "Error log: {}", job->error_log.buffer);
     }
 
+    TRY(PrintDirectory(tester, destination_folder, "Post-skip-install"));
+
     // If the components are modified and we set the Overwrite, it should overwrite them.
     {
         auto job = CreateInstallJob(tester.scratch_arena, job_options);
@@ -178,6 +172,7 @@ TEST_CASE(TestPackageInstallation) {
         StartJob(*job);
 
         CHECK_EQ(job->state.Load(LoadMemoryOrder::Acquire), InstallJob::State::AwaitingUserInput);
+
         for (auto& comp : job->components) {
             if (UserInputIsRequired(comp.existing_installation_status)) {
                 CHECK(comp.component.type == ComponentType::Library);
@@ -201,6 +196,8 @@ TEST_CASE(TestPackageInstallation) {
         CHECK(job->error_log.buffer.size == 0);
         if (job->error_log.buffer.size > 0) tester.log.Debug({}, "Error log: {}", job->error_log.buffer);
     }
+
+    TRY(PrintDirectory(tester, destination_folder, "Post-overwrite-install"));
 
     // IMPROVE: test error conditions and different conditions for destination folders
 

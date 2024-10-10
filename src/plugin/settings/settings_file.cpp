@@ -361,7 +361,7 @@ Parse(Settings& content, ArenaAllocator& content_allocator, ArenaAllocator& scra
 }
 
 ErrorCodeOr<void> WriteFile(Settings const& data, FloePaths const& paths, String path, s128 time) {
-    ArenaAllocatorWithInlineStorage<4000> scratch_arena;
+    ArenaAllocatorWithInlineStorage<4000> scratch_arena {Malloc::Instance()};
 
     auto _ = CreateDirectory(path::Directory(path).ValueOr({}),
                              {

@@ -156,7 +156,7 @@ static InstallResult TryInstall(Component const& comp) {
 
             auto path_component = path::TrimDirectorySeparatorsEnd(FromNullTerminated(file_stat.m_filename));
 
-            ArenaAllocatorWithInlineStorage<1000> arena;
+            ArenaAllocatorWithInlineStorage<1000> arena {Malloc::Instance()};
             auto out_path = path::Join(arena, Array {comp.install_dir, comp.info.filename, path_component});
 
             g_log.Debug(k_log_module, "Zip component {} has root_path {}", path_component, out_path);
@@ -185,7 +185,7 @@ static InstallResult TryInstall(Component const& comp) {
         }
 
     } else {
-        ArenaAllocatorWithInlineStorage<1000> arena;
+        ArenaAllocatorWithInlineStorage<1000> arena {Malloc::Instance()};
         if (auto const o =
                 WriteFile(path::Join(arena, Array {comp.install_dir, comp.info.filename}), comp.data);
             o.HasError()) {
@@ -199,7 +199,7 @@ static InstallResult TryInstall(Component const& comp) {
 }
 
 static void BackgroundInstallingThread(Application& app) {
-    ArenaAllocatorWithInlineStorage<1000> arena;
+    ArenaAllocatorWithInlineStorage<1000> arena {Malloc::Instance()};
     for (auto const i : Range(ToInt(ComponentTypes::Count))) {
         if (!app.components_selected[i]) continue;
         auto const& comp = app.components[i];
@@ -485,7 +485,7 @@ Application* CreateApplication(GuiFramework& framework, u32 root_layout_id) {
                                  });
 
                 for (auto const& comp : app->components) {
-                    FixedSizeAllocator<32> allocator;
+                    FixedSizeAllocator<32> allocator {&Malloc::Instance()};
                     EditWidget(framework,
                                app->plugin_checkboxes,
                                {

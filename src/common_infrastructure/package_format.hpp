@@ -114,7 +114,7 @@ static bool AlreadyExists(mz_zip_archive& zip, String path) {
 } // namespace detail
 
 PUBLIC void WriterAddFolder(mz_zip_archive& zip, String path) {
-    ArenaAllocatorWithInlineStorage<200> scratch_arena;
+    ArenaAllocatorWithInlineStorage<200> scratch_arena {Malloc::Instance()};
     DynamicArray<char> archived_path {scratch_arena};
     dyn::Assign(archived_path, path);
     if (!EndsWith(archived_path, '/')) dyn::Append(archived_path, '/');
@@ -142,7 +142,7 @@ PUBLIC void WriterAddParentFolders(mz_zip_archive& zip, String path) {
 }
 
 PUBLIC void WriterAddFile(mz_zip_archive& zip, String path, Span<u8 const> data) {
-    ArenaAllocatorWithInlineStorage<200> scratch_arena;
+    ArenaAllocatorWithInlineStorage<200> scratch_arena {Malloc::Instance()};
     DynamicArray<char> archived_path {scratch_arena};
     dyn::Assign(archived_path, path);
 

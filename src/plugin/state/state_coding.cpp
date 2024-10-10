@@ -997,7 +997,7 @@ struct StateCoder {
 
 ErrorCodeOr<void> CodeState(StateSnapshot& state, CodeStateArguments const& args) {
     static_assert(k_endianness == Endianness::Little, "this code makes no attempt to be endian agnostic");
-    ArenaAllocatorWithInlineStorage<1000> scratch_arena;
+    ArenaAllocatorWithInlineStorage<1000> scratch_arena {Malloc::Instance()};
 
     StateCoder coder {
         .args = args,
@@ -1247,7 +1247,7 @@ ErrorCodeOr<StateSnapshot> LoadPresetFile(String const filepath, ArenaAllocator&
 }
 
 ErrorCodeOr<void> SavePresetFile(String path, StateSnapshot const& state) {
-    ArenaAllocatorWithInlineStorage<4000> scratch_arena;
+    ArenaAllocatorWithInlineStorage<4000> scratch_arena {Malloc::Instance()};
     if (auto const ext = path::Extension(path); ext != FLOE_PRESET_FILE_EXTENSION) {
         path = CombineStrings(scratch_arena,
                               Array {path.SubSpan(0, path.size - ext.size), FLOE_PRESET_FILE_EXTENSION});

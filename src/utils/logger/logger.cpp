@@ -118,7 +118,7 @@ void FileLogger::Log(LogModuleName module_name, LogLevel level, String str) {
                                     FileLogger::State::Initialising,
                                     RmwMemoryOrder::Acquire,
                                     LoadMemoryOrder::Relaxed)) {
-        ArenaAllocatorWithInlineStorage<1000> arena;
+        ArenaAllocatorWithInlineStorage<1000> arena {Malloc::Instance()};
 
         auto error_log = StdWriter(StdStream::Out);
         auto const path = FloeKnownDirectory(arena,

@@ -475,7 +475,7 @@ void RunFunctionOnMainThread(Engine& engine, ThreadsafeFunctionQueue::Function f
 static void OnMainThread(Engine& engine, bool& update_gui) {
     (void)update_gui;
 
-    ArenaAllocatorWithInlineStorage<4000> scratch_arena {};
+    ArenaAllocatorWithInlineStorage<4000> scratch_arena {Malloc::Instance()};
     while (auto f = engine.main_thread_callbacks.TryPop(scratch_arena))
         (*f)();
 

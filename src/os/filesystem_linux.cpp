@@ -88,7 +88,7 @@ static ErrorCodeOr<ssize> CopyFile(char const* source, char const* destination) 
 }
 
 ErrorCodeOr<void> CopyFile(String from, String to, ExistingDestinationHandling existing) {
-    PathArena temp_path_allocator;
+    PathArena temp_path_allocator {Malloc::Instance()};
     auto from_nt = NullTerminated(from, temp_path_allocator);
     auto to_nt = NullTerminated(to, temp_path_allocator);
 
@@ -107,7 +107,7 @@ ErrorCodeOr<void> CopyFile(String from, String to, ExistingDestinationHandling e
 ErrorCodeOr<MutableString> AbsolutePath(Allocator& a, String path) {
     ASSERT(path.size);
 
-    PathArena temp_path_allocator;
+    PathArena temp_path_allocator {Malloc::Instance()};
     DynamicArray<char> path_nt(path, temp_path_allocator);
 
     if (StartsWith(path_nt, '~')) {
@@ -128,7 +128,7 @@ ErrorCodeOr<MutableString> AbsolutePath(Allocator& a, String path) {
 ErrorCodeOr<MutableString> CanonicalizePath(Allocator& a, String path) { return AbsolutePath(a, path); }
 
 ErrorCodeOr<void> Delete(String path, DeleteOptions options) {
-    PathArena temp_path_allocator;
+    PathArena temp_path_allocator {Malloc::Instance()};
     auto const path_ptr = NullTerminated(path, temp_path_allocator);
 
     if (remove(path_ptr) == 0)
@@ -164,7 +164,7 @@ ErrorCodeOr<void> Delete(String path, DeleteOptions options) {
 }
 
 ErrorCodeOr<void> CreateDirectory(String path, CreateDirectoryOptions options) {
-    PathArena temp_path_allocator;
+    PathArena temp_path_allocator {Malloc::Instance()};
     DynamicArray<char> buffer {path, temp_path_allocator};
 
     if (mkdir(dyn::NullTerminated(buffer), 0700) == 0) {
@@ -238,7 +238,7 @@ ErrorCodeOr<MutableString> TemporaryDirectoryOnSameFilesystemAs(String path, All
         str;
     });
 
-    PathArena temp_path_allocator;
+    PathArena temp_path_allocator {Malloc::Instance()};
     auto const path_nt = NullTerminated(path, temp_path_allocator);
 
     String base_path {};
@@ -383,7 +383,7 @@ ErrorCodeOr<DirectoryWatcher> CreateDirectoryWatcher(Allocator& a) {
 
 void DestoryDirectoryWatcher(DirectoryWatcher& watcher) {
     ZoneScoped;
-    ArenaAllocatorWithInlineStorage<1000> scratch_arena;
+    ArenaAllocatorWithInlineStorage<1000> scratch_arena {Malloc::Instance()};
 
     // We do not need to close each watch: "all associated watches are automatically freed"
     for (auto& dir : watcher.watched_dirs)

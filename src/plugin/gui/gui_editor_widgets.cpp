@@ -88,7 +88,7 @@ bool EditorSlider(EditorGUI* g, Rect r, imgui::Id id, f32 min, f32 max, f32& val
 }
 
 bool EditorSlider(EditorGUI* g, String label, f32 min, f32 max, f32& val) {
-    ArenaAllocatorWithInlineStorage<100> allocator;
+    ArenaAllocatorWithInlineStorage<100> allocator {Malloc::Instance()};
     EditorLabel(g, fmt::Format(allocator, "{} ({.2})", label, val));
     auto res = EditorSlider(g, EditorGetRightR(g), g->imgui->GetID(label), min, max, val);
     EditorIncrementPos(g);
@@ -96,7 +96,7 @@ bool EditorSlider(EditorGUI* g, String label, f32 min, f32 max, f32& val) {
 }
 
 bool EditorSlider(EditorGUI* g, String label, int min, int max, int& val) {
-    ArenaAllocatorWithInlineStorage<100> allocator;
+    ArenaAllocatorWithInlineStorage<100> allocator {Malloc::Instance()};
     EditorLabel(g, fmt::Format(allocator, "{} ({})", label, val));
     auto id = g->imgui->GetID(label);
     auto fval = (f32)val;
@@ -108,7 +108,7 @@ bool EditorSlider(EditorGUI* g, String label, int min, int max, int& val) {
 }
 
 bool EditorDragger(EditorGUI* g, String label, int min, int max, int& val) {
-    ArenaAllocatorWithInlineStorage<100> allocator;
+    ArenaAllocatorWithInlineStorage<100> allocator {Malloc::Instance()};
     EditorLabel(g, fmt::Format(allocator, "{} ({})", label, val));
     auto id = g->imgui->GetID(label);
     auto sets = imgui::DefTextInputDraggerInt();

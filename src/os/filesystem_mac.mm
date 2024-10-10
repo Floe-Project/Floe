@@ -101,7 +101,7 @@ ErrorCodeOr<MutableString> CanonicalizePath(Allocator& a, String path) {
 }
 
 ErrorCodeOr<void> Delete(String path, DeleteOptions options) {
-    PathArena path_arena;
+    PathArena path_arena {Malloc::Instance()};
     switch (options.type) {
         case DeleteOptions::Type::Any:
         case DeleteOptions::Type::File:
@@ -406,7 +406,7 @@ Optional<Version> MacosBundleVersion(String path) {
     if (bundle == nil) return {};
     NSString* version_string = bundle.infoDictionary[@"CFBundleVersion"];
     NSString* beta_version = bundle.infoDictionary[@"Beta_Version"];
-    FixedSizeAllocator<64> temp_mem;
+    FixedSizeAllocator<64> temp_mem {&Malloc::Instance()};
     DynamicArray<char> str {FromNullTerminated(version_string.UTF8String), temp_mem};
     if (beta_version != nil && beta_version.length) fmt::Append(str, "-Beta{}", beta_version.UTF8String);
     return ParseVersionString(str);

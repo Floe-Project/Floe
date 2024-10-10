@@ -28,7 +28,7 @@ struct Version {
         return ((u8*)&major)[index];
     }
 
-    DynamicArray<char> ToString(Allocator& a = Malloc::Instance()) const {
+    DynamicArray<char> ToString(Allocator& a) const {
         DynamicArray<char> result {a};
         fmt::Assign(result, "{}.{}.{}", major, minor, patch);
         if (beta) fmt::Append(result, "-Beta{}", beta);

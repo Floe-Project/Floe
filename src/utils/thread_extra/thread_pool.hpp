@@ -49,7 +49,7 @@ struct ThreadPool {
   private:
     static void WorkerProc(ThreadPool* thread_pool) {
         ZoneScoped;
-        ArenaAllocatorWithInlineStorage<4000> scratch_arena {};
+        ArenaAllocatorWithInlineStorage<4000> scratch_arena {Malloc::Instance()};
         while (true) {
             Optional<FunctionQueue<>::Function> f {};
             {

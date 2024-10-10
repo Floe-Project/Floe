@@ -32,7 +32,7 @@ DirectoryListing::Index DirectoryListing::Entry::NumChildren(bool recursive) con
             ++n;
         return n;
     } else {
-        RecursiveDirectoryIteratorAllocator allocator;
+        RecursiveDirectoryIteratorAllocator allocator {Malloc::Instance()};
         Index count = 0;
         RecursiveTreeWalker recursive_walker {(Entry*)this, allocator};
         while (auto child = recursive_walker.Next(true))
@@ -47,7 +47,7 @@ DirectoryListing::Index DirectoryListing::Entry::NumChildrenFiles(bool recursive
             if (e->IsFile()) ++n;
         return n;
     } else {
-        RecursiveDirectoryIteratorAllocator allocator;
+        RecursiveDirectoryIteratorAllocator allocator {Malloc::Instance()};
         Index count = 0;
         RecursiveTreeWalker recursive_walker {(Entry*)this, allocator};
         while (auto child = recursive_walker.Next(true))
@@ -62,7 +62,7 @@ DirectoryListing::Index DirectoryListing::Entry::NumChildrenDirectories(bool rec
             if (e->IsDirectory()) ++n;
         return n;
     } else {
-        RecursiveDirectoryIteratorAllocator allocator;
+        RecursiveDirectoryIteratorAllocator allocator {Malloc::Instance()};
         Index count = 0;
         RecursiveTreeWalker recursive_walker {(Entry*)this, allocator};
         while (auto child = recursive_walker.Next(true))
@@ -118,7 +118,7 @@ template <typename CreateFunction, typename CallbackType>
 static ErrorCodeOr<void>
 IterateDirTemplate(CreateFunction create_function, String dir, CallbackType callback) {
     ASSERT(path::IsAbsolute(dir));
-    ArenaAllocatorWithInlineStorage<1000> allocator;
+    ArenaAllocatorWithInlineStorage<1000> allocator {Malloc::Instance()};
     auto it = TRY(create_function(allocator, dir, {}));
     DEFER { dir_iterator::Destroy(it); };
     while (auto entry = TRY(dir_iterator::Next(it, allocator)))
@@ -135,7 +135,7 @@ static ErrorCodeOr<void> IterateDir(String dir, bool recursive, CallbackType cal
 }
 
 DirectoryListing::ScanResult DirectoryListing::Rescan() {
-    ArenaAllocatorWithInlineStorage<4000> allocator;
+    ArenaAllocatorWithInlineStorage<4000> allocator {Malloc::Instance()};
     auto temp_root_paths = allocator.Clone(m_root_paths, CloneType::Deep);
     auto temp_wildcards = allocator.Clone(m_file_name_wildcards, CloneType::Deep);
     DynamicArray<Index> root_entry_indexes {allocator};

@@ -23,6 +23,12 @@
 
 #include "time.h"
 
+void* AlignedAlloc(usize alignment, usize size) {
+    ASSERT(IsPowerOfTwo(alignment));
+    return aligned_alloc(alignment, size);
+}
+void AlignedFree(void* ptr) { free(ptr); }
+
 void* AllocatePages(usize bytes) {
     if constexpr (!PRODUCTION_BUILD) {
         if (RUNNING_ON_VALGRIND) {
@@ -51,14 +57,14 @@ void FreePages(void* ptr, usize bytes) {
 }
 
 ErrorCodeOr<LibraryHandle> LoadLibrary(String path) {
-    PathArena path_arena;
+    PathArena path_arena {Malloc::Instance()};
     auto handle = dlopen(NullTerminated(path, path_arena), RTLD_NOW | RTLD_LOCAL);
     if (handle == nullptr) return ErrnoErrorCode(errno, "dlopen");
     return (LibraryHandle)(uintptr)handle;
 }
 
 ErrorCodeOr<void*> SymbolFromLibrary(LibraryHandle library, String symbol_name) {
-    PathArena path_arena;
+    PathArena path_arena {Malloc::Instance()};
     auto symbol = dlsym((void*)library, NullTerminated(symbol_name, path_arena));
     if (symbol == nullptr) return ErrnoErrorCode(errno, "dlsym");
     return symbol;
@@ -421,7 +427,7 @@ void StartupCrashHandler() {
 
     InitStacktraceState();
 
-    ArenaAllocatorWithInlineStorage<500> scratch_arena;
+    ArenaAllocatorWithInlineStorage<500> scratch_arena {Malloc::Instance()};
     dyn::Assign(g_crash_folder_path,
                 FloeKnownDirectory(scratch_arena, FloeKnownDirectoryType::Logs, k_nullopt, {.create = true}));
 

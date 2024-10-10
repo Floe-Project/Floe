@@ -141,7 +141,7 @@ PresetsFolderScanResult FetchOrRescanPresetsFolder(PresetsListing& listing,
                                                    RescanMode mode,
                                                    Span<String const> extra_scan_folders,
                                                    ThreadPool* thread_pool) {
-    ArenaAllocatorWithInlineStorage<1000> scratch_arena;
+    ArenaAllocatorWithInlineStorage<1000> scratch_arena {Malloc::Instance()};
     DynamicArray<String> scan_folders {scratch_arena};
     dyn::Append(scan_folders, listing.always_scanned_folder);
     dyn::AppendSpan(scan_folders, extra_scan_folders);

@@ -149,7 +149,7 @@ TemporaryDirectoryWithinFolder(String existing_abs_folder, Allocator& a, u64& se
 
 // uses Rename() to move a file or folder into a given destination folder
 ErrorCodeOr<void> MoveIntoFolder(String from, String destination_folder) {
-    PathArena path_allocator;
+    PathArena path_allocator {Malloc::Instance()};
     auto new_name = path::Join(path_allocator, Array {destination_folder, path::Filename(from)});
     return Rename(from, new_name);
 }
@@ -160,7 +160,7 @@ ErrorCodeOr<Span<dir_iterator::Entry>> AllEntriesRecursive(ArenaAllocator& a,
                                                            dir_iterator::Options options) {
     DynamicArray<dir_iterator::Entry> result {a};
 
-    ArenaAllocatorWithInlineStorage<4000> scratch_arena;
+    ArenaAllocatorWithInlineStorage<4000> scratch_arena {Malloc::Instance()};
     auto it = TRY(dir_iterator::RecursiveCreate(scratch_arena, folder, options));
     DEFER { dir_iterator::Destroy(it); };
     while (auto const entry = TRY(dir_iterator::Next(it, a)))
@@ -351,7 +351,7 @@ ErrorCodeOr<void> ReadSectionOfFileAndWriteToOtherFile(File& file_to_read_from,
 
 Optional<String>
 SearchForExistingFolderUpwards(String dir, String folder_name_to_find, Allocator& allocator) {
-    ArenaAllocatorWithInlineStorage<4000> scratch_arena;
+    ArenaAllocatorWithInlineStorage<4000> scratch_arena {Malloc::Instance()};
     DynamicArray<char> buf {dir, scratch_arena};
     dyn::AppendSpan(buf, "/.");
 

@@ -71,6 +71,12 @@ bool IsRunningUnderWine() {
     return false;
 }
 
+void* AlignedAlloc(usize alignment, usize size) {
+    ASSERT(IsPowerOfTwo(alignment));
+    return _aligned_malloc(size, alignment);
+}
+void AlignedFree(void* ptr) { return _aligned_free(ptr); }
+
 void* AllocatePages(usize bytes) {
     auto p = VirtualAlloc(nullptr, (DWORD)bytes, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
     TracyAlloc(p, bytes);
@@ -92,7 +98,7 @@ void TryShrinkPages(void* ptr, usize old_size, usize new_size) {
 }
 
 ErrorCodeOr<LibraryHandle> LoadLibrary(String path) {
-    PathArena temp_allocator;
+    PathArena temp_allocator {Malloc::Instance()};
     auto const w_path = TRY(path::MakePathForWin32(path, temp_allocator, true));
     auto handle = LoadLibraryW(w_path.path.data);
     if (handle == nullptr) return Win32ErrorCode(GetLastError(), "LoadLibrary");
@@ -100,7 +106,7 @@ ErrorCodeOr<LibraryHandle> LoadLibrary(String path) {
 }
 
 ErrorCodeOr<void*> SymbolFromLibrary(LibraryHandle library, String symbol_name) {
-    ArenaAllocatorWithInlineStorage<200> temp_allocator;
+    ArenaAllocatorWithInlineStorage<200> temp_allocator {Malloc::Instance()};
     auto result = GetProcAddress((HMODULE)library, NullTerminated(symbol_name, temp_allocator));
     if (result == nullptr) return Win32ErrorCode(GetLastError(), "GetProcAddress");
     return (void*)result;
@@ -164,7 +170,7 @@ void StartupCrashHandler() {
             // unix this isn't possible because we have to be signal-safe.
             g_log.Error(k_global_log_module, "Unhandled exception: \n{}", msg);
             {
-                ArenaAllocatorWithInlineStorage<2000> a;
+                ArenaAllocatorWithInlineStorage<2000> a {Malloc::Instance()};
                 g_log.Error(k_global_log_module, CurrentStacktraceString(a));
             }
 
@@ -320,7 +326,7 @@ static constexpr ErrorCodeCategory k_error_category {
             WString error_text_wide {(const WCHAR*)buf, num_chars_written};
             while (error_text_wide.size && (Last(error_text_wide) == L'\n' || Last(error_text_wide) == L'\r'))
                 error_text_wide.size--;
-            ArenaAllocatorWithInlineStorage<sizeof(buf) * 4> temp_allocator;
+            ArenaAllocatorWithInlineStorage<sizeof(buf) * 4> temp_allocator {Malloc::Instance()};
             if (auto o = Narrow(temp_allocator, error_text_wide); o.HasValue())
                 return writer.WriteChars(o.Value());
         }

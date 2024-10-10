@@ -29,12 +29,70 @@ void* AllocatePages(usize bytes);
 void FreePages(void* ptr, usize bytes);
 void TryShrinkPages(void* ptr, usize old_size, usize new_size);
 
+void* AlignedAlloc(usize alignment, usize size);
+void AlignedFree(void* ptr);
+
 enum class LibraryHandle : uintptr {};
 ErrorCodeOr<LibraryHandle> LoadLibrary(String path);
 ErrorCodeOr<void*> SymbolFromLibrary(LibraryHandle library, String symbol_name);
 void UnloadLibrary(LibraryHandle library);
 
 bool IsRunningUnderWine();
+
+class Malloc final : public Allocator {
+  public:
+    Span<u8> DoCommand(AllocatorCommandUnion const& command) override {
+        CheckAllocatorCommandIsValid(command);
+
+        switch (command.tag) {
+            case AllocatorCommand::Allocate: {
+                auto const& cmd = command.Get<AllocateCommand>();
+                auto ptr = AlignedAlloc(cmd.alignment, cmd.size);
+                if (ptr == nullptr) Panic("out of memory");
+                return {(u8*)ptr, cmd.size};
+            }
+            case AllocatorCommand::Free: {
+                auto const& cmd = command.Get<FreeCommand>();
+                AlignedFree(cmd.allocation.data);
+                break;
+            }
+            case AllocatorCommand::Resize: {
+                auto const& cmd = command.Get<ResizeCommand>();
+
+                if (cmd.new_size > cmd.allocation.size) {
+                    // IMPROVE: use realloc if no move_mem
+
+                    auto const alignment =
+                        Max((uintptr)cmd.allocation.data & (~(uintptr)cmd.allocation.data - 1),
+                            k_max_alignment);
+
+                    // fallback: new allocation and move memory
+                    auto new_allocation = AlignedAlloc(alignment, cmd.new_size);
+                    if (cmd.move_memory_handler.function)
+                        cmd.move_memory_handler.function({.context = cmd.move_memory_handler.context,
+                                                          .destination = new_allocation,
+                                                          .source = cmd.allocation.data,
+                                                          .num_bytes = cmd.allocation.size});
+                    AlignedFree(cmd.allocation.data);
+
+                    return {(u8*)new_allocation, cmd.new_size};
+                } else if (cmd.new_size < cmd.allocation.size) {
+                    // IMPROVE: use realloc
+
+                    return {cmd.allocation.data, cmd.new_size};
+                } else {
+                    return cmd.allocation;
+                }
+            }
+        }
+        return {};
+    }
+
+    static Allocator& Instance() {
+        static Malloc a;
+        return a;
+    }
+};
 
 // Allocate whole pages at a time: 4kb or 16kb each; this is the smallest size that the OS gives out.
 class PageAllocator final : public Allocator {

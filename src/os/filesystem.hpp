@@ -4,6 +4,8 @@
 #pragma once
 #include "foundation/foundation.hpp"
 
+#include "misc.hpp"
+
 enum class FilesystemError : u32 {
     PathDoesNotExist,
     PathAlreadyExists,

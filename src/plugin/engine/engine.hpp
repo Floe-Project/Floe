@@ -40,7 +40,7 @@ struct Engine {
             metadata = m.Clone(metadata_arena);
         }
 
-        ArenaAllocatorWithInlineStorage<1000> metadata_arena {};
+        ArenaAllocatorWithInlineStorage<1000> metadata_arena {Malloc::Instance()};
         StateSnapshot state {};
         StateSnapshotMetadata metadata {};
     };

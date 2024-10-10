@@ -1512,7 +1512,7 @@ static sample_lib::Library* BuiltinLibrary() {
             };
         }
 
-        static FixedSizeAllocator<1000> alloc;
+        static FixedSizeAllocator<1000> alloc {nullptr};
         builtin_library.irs_by_name =
             decltype(builtin_library.irs_by_name)::Create(alloc, ToInt(EmbeddedIr_Count));
 
@@ -1529,7 +1529,7 @@ Server::Server(ThreadPool& pool,
     : error_notifications(error_notifications)
     , thread_pool(pool) {
     if (always_scanned_folder.size) {
-        ArenaAllocatorWithInlineStorage<1000> scratch_arena;
+        ArenaAllocatorWithInlineStorage<1000> scratch_arena {Malloc::Instance()};
         auto node = scan_folders.AllocateUninitialised();
         PLACEMENT_NEW(&node->value) ScanFolder();
         dyn::Assign(node->value.path, always_scanned_folder);
@@ -1636,7 +1636,7 @@ void SetExtraScanFolders(Server& server, Span<String const> extra_folders) {
             if (l.value.path == e) already_present = true;
         if (already_present) continue;
 
-        ArenaAllocatorWithInlineStorage<1000> scratch_arena;
+        ArenaAllocatorWithInlineStorage<1000> scratch_arena {Malloc::Instance()};
         auto node = server.scan_folders.AllocateUninitialised();
         PLACEMENT_NEW(&node->value) ScanFolder();
         dyn::Assign(node->value.path, e);
@@ -1720,9 +1720,9 @@ static Type& ExtractSuccess(tests::Tester& tester, LoadResult const& result, Loa
 
 TEST_CASE(TestSampleLibraryLoader) {
     struct Fixture {
-        Fixture(tests::Tester&) { thread_pool.Init("pool", 8u); }
+        [[maybe_unused]] Fixture(tests::Tester&) { thread_pool.Init("pool", 8u); }
         bool initialised = false;
-        ArenaAllocatorWithInlineStorage<2000> arena;
+        ArenaAllocatorWithInlineStorage<2000> arena {Malloc::Instance()};
         String test_lib_path;
         ThreadPool thread_pool;
         ThreadsafeErrorNotifications error_notif {};

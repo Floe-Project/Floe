@@ -150,7 +150,7 @@ ErrorCodeOr<u64> File::FileSize() {
 }
 
 ErrorCodeOr<File> OpenFile(String filename, FileMode mode) {
-    PathArena temp_allocator;
+    PathArena temp_allocator {Malloc::Instance()};
 
     auto const w_path =
         TRY(path::MakePathForWin32(filename, temp_allocator, path::IsAbsolute(filename))).path;
@@ -265,7 +265,7 @@ ErrorCodeOr<void> WindowsSetFileAttributes(String path, Optional<WindowsFileAttr
         if (attributes->hidden) attribute_flags |= FILE_ATTRIBUTE_HIDDEN;
     }
 
-    PathArena temp_path_arena;
+    PathArena temp_path_arena {Malloc::Instance()};
     if (!SetFileAttributesW(TRY(path::MakePathForWin32(path, temp_path_arena, true)).path.data,
                             attribute_flags))
         return FilesystemWin32ErrorCode(GetLastError(), "SetFileAttributesW");
@@ -299,7 +299,7 @@ static DWORD AttributesForDir(WCHAR* path, usize path_size, CreateDirectoryOptio
 
 ErrorCodeOr<void> CreateDirectory(String path, CreateDirectoryOptions options) {
     ASSERT(path::IsAbsolute(path));
-    PathArena temp_path_arena;
+    PathArena temp_path_arena {Malloc::Instance()};
     auto const wide_path = TRY(path::MakePathForWin32(path, temp_path_arena, true));
 
     if (CreateDirectoryW(wide_path.path.data, nullptr) != 0)
@@ -378,13 +378,13 @@ static ErrorCodeOr<DynamicArray<wchar_t>> Win32GetRunningProgramName(Allocator& 
 }
 
 ErrorCodeOr<MutableString> CurrentExecutablePath(Allocator& a) {
-    PathArena temp_path_arena;
+    PathArena temp_path_arena {Malloc::Instance()};
     auto const full_wide_path = TRY(Win32GetRunningProgramName(temp_path_arena));
     return Narrow(a, full_wide_path).Value();
 }
 
 ErrorCodeOr<DynamicArrayBounded<char, 200>> NameOfRunningExecutableOrLibrary() {
-    PathArena temp_path_arena;
+    PathArena temp_path_arena {Malloc::Instance()};
     auto const full_wide_path = TRY(Win32GetRunningProgramName(temp_path_arena));
     auto full_path = Narrow(temp_path_arena, full_wide_path).Value();
     return String {path::Filename(full_path)};
@@ -399,7 +399,7 @@ static ErrorCodeOr<WString> VolumeName(const WCHAR* path, ArenaAllocator& arena)
 
 ErrorCodeOr<MutableString> TemporaryDirectoryOnSameFilesystemAs(String path, Allocator& a) {
     ASSERT(path::IsAbsolute(path));
-    PathArena temp_path_arena;
+    PathArena temp_path_arena {Malloc::Instance()};
 
     // standard temporary directory
     Array<WCHAR, MAX_PATH + 1> standard_temp_dir_buffer;
@@ -469,7 +469,7 @@ MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirecto
                 auto const err = GetLastError();
                 if (err != ERROR_ALREADY_EXISTS) {
                     if (options.error_log) {
-                        PathArena temp_path_arena;
+                        PathArena temp_path_arena {Malloc::Instance()};
                         auto _ = fmt::FormatToWriter(*options.error_log,
                                                      "Failed to create directory '{}': {}",
                                                      Narrow(temp_path_arena, wide_path),
@@ -631,7 +631,7 @@ MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirecto
 
     MutableString result;
     if (config.subfolders.size) {
-        PathArena temp_path_arena;
+        PathArena temp_path_arena {Malloc::Instance()};
         DynamicArray<wchar_t> wide_result {wide_path, temp_path_arena};
         for (auto const subfolder : config.subfolders) {
             dyn::Append(wide_result, L'\\');
@@ -662,7 +662,7 @@ MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirecto
 }
 
 ErrorCodeOr<FileType> GetFileType(String absolute_path) {
-    PathArena temp_path_arena;
+    PathArena temp_path_arena {Malloc::Instance()};
 
     auto const attributes =
         GetFileAttributesW(TRY(path::MakePathForWin32(absolute_path, temp_path_arena, true)).path.data);
@@ -676,7 +676,7 @@ ErrorCodeOr<FileType> GetFileType(String absolute_path) {
 ErrorCodeOr<MutableString> AbsolutePath(Allocator& a, String path) {
     ASSERT(path.size);
 
-    PathArena temp_path_arena;
+    PathArena temp_path_arena {Malloc::Instance()};
     // relative paths cannot start with the long-path prefix: //?/
     auto const wide_path = TRY(path::MakePathForWin32(path, temp_path_arena, false));
 
@@ -752,7 +752,7 @@ static ErrorCodeOr<void> Win32DeleteDirectory(WString windows_path, ArenaAllocat
 }
 
 ErrorCodeOr<void> Delete(String path, DeleteOptions options) {
-    PathArena temp_path_arena;
+    PathArena temp_path_arena {Malloc::Instance()};
     auto const wide_path = TRY(path::MakePathForWin32(path, temp_path_arena, true));
 
     if (options.type == DeleteOptions::Type::Any) {
@@ -806,7 +806,7 @@ ErrorCodeOr<void> Delete(String path, DeleteOptions options) {
 ErrorCodeOr<void> CopyFile(String from, String to, ExistingDestinationHandling existing) {
     ASSERT(path::IsAbsolute(from));
     ASSERT(path::IsAbsolute(to));
-    PathArena temp_path_arena;
+    PathArena temp_path_arena {Malloc::Instance()};
 
     auto const fail_if_exists = ({
         BOOL f = TRUE;
@@ -838,7 +838,7 @@ ErrorCodeOr<void> CopyFile(String from, String to, ExistingDestinationHandling e
 // There's a function PathIsDirectoryEmptyW but it does not seem to support long paths, so we implement our
 // own.
 static bool PathIsANonEmptyDirectory(WString path) {
-    PathArena temp_path_arena;
+    PathArena temp_path_arena {Malloc::Instance()};
 
     WIN32_FIND_DATAW data {};
     DynamicArray<wchar_t> search_path {path, temp_path_arena};
@@ -872,7 +872,7 @@ static bool PathIsANonEmptyDirectory(WString path) {
 ErrorCodeOr<void> Rename(String from, String to) {
     ASSERT(path::IsAbsolute(from));
     ASSERT(path::IsAbsolute(to));
-    PathArena temp_path_arena;
+    PathArena temp_path_arena {Malloc::Instance()};
 
     auto to_wide = TRY(path::MakePathForWin32(to, temp_path_arena, true)).path;
 
@@ -926,7 +926,7 @@ static bool ShouldSkipFile(ContiguousContainer auto const& filename, bool skip_d
 ErrorCodeOr<Iterator> Create(ArenaAllocator& a, String path, Options options) {
     auto result = TRY(Iterator::InternalCreate(a, path, options));
 
-    PathArena temp_path_arena;
+    PathArena temp_path_arena {Malloc::Instance()};
     auto wpath = path::MakePathForWin32(ArrayT<WString>({Widen(temp_path_arena, result.base_path).Value(),
                                                          Widen(temp_path_arena, options.wildcard).Value()}),
                                         temp_path_arena,
@@ -1027,7 +1027,7 @@ ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments args) {
     DEFER { f->Release(); };
 
     if (args.default_path) {
-        PathArena temp_path_arena;
+        PathArena temp_path_arena {Malloc::Instance()};
 
         if (auto const narrow_dir = path::Directory(*args.default_path)) {
             auto dir = WidenAllocNullTerm(temp_path_arena, *narrow_dir).Value();
@@ -1050,7 +1050,7 @@ ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments args) {
     }
 
     if (args.filters.size) {
-        PathArena temp_path_arena;
+        PathArena temp_path_arena {Malloc::Instance()};
         DynamicArray<COMDLG_FILTERSPEC> win32_filters {temp_path_arena};
         win32_filters.Reserve(args.filters.size);
         for (auto filter : args.filters) {
@@ -1065,7 +1065,7 @@ ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments args) {
     }
 
     {
-        PathArena temp_path_arena;
+        PathArena temp_path_arena {Malloc::Instance()};
         auto wide_title = WidenAllocNullTerm(temp_path_arena, args.title).Value();
         FP_HRESULT_TRY(f->SetTitle(wide_title.data));
     }

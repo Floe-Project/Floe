@@ -288,57 +288,6 @@ static void CheckAllocatorCommandIsValid(AllocatorCommandUnion const& command_un
     }
 }
 
-class Malloc final : public Allocator {
-  public:
-    Span<u8> DoCommand(AllocatorCommandUnion const& command) override {
-        CheckAllocatorCommandIsValid(command);
-
-        switch (command.tag) {
-            case AllocatorCommand::Allocate: {
-                auto const& cmd = command.Get<AllocateCommand>();
-                auto ptr = GpaAlloc(cmd.size);
-                if (ptr == nullptr) Panic("out of memory");
-                return {(u8*)ptr, cmd.size};
-            }
-            case AllocatorCommand::Free: {
-                auto const& cmd = command.Get<FreeCommand>();
-                GpaFree(cmd.allocation.data);
-                break;
-            }
-            case AllocatorCommand::Resize: {
-                auto const& cmd = command.Get<ResizeCommand>();
-
-                if (cmd.new_size > cmd.allocation.size) {
-                    // IMPROVE: use realloc if no move_mem
-
-                    // fallback: new allocation and move memory
-                    auto new_allocation = GpaAlloc(cmd.new_size);
-                    if (cmd.move_memory_handler.function)
-                        cmd.move_memory_handler.function({.context = cmd.move_memory_handler.context,
-                                                          .destination = new_allocation,
-                                                          .source = cmd.allocation.data,
-                                                          .num_bytes = cmd.allocation.size});
-                    GpaFree(cmd.allocation.data);
-
-                    return {(u8*)new_allocation, cmd.new_size};
-                } else if (cmd.new_size < cmd.allocation.size) {
-                    // IMPROVE: use realloc
-
-                    return {cmd.allocation.data, cmd.new_size};
-                } else {
-                    return cmd.allocation;
-                }
-            }
-        }
-        return {};
-    }
-
-    static Allocator& Instance() {
-        static Malloc a;
-        return a;
-    }
-};
-
 static constexpr Optional<Span<u8>>
 HandleBumpAllocation(Span<u8> stack, usize& cursor, AllocateCommand const& cmd) {
     if (!stack.size) return k_nullopt;
@@ -622,12 +571,11 @@ struct ArenaAllocator : public Allocator {
 
 // If there is no fallback allocator then there is no need to call Free().
 template <usize static_size>
-class FixedSizeAllocator final : public Allocator {
+class FixedSizeAllocator : public Allocator {
   public:
     NON_COPYABLE_AND_MOVEABLE(FixedSizeAllocator);
 
-    FixedSizeAllocator(Allocator* fallback_allocator = &Malloc::Instance())
-        : m_fallback_allocator(fallback_allocator) {}
+    FixedSizeAllocator(Allocator* fallback_allocator) : m_fallback_allocator(fallback_allocator) {}
 
     Span<u8> DoCommand(AllocatorCommandUnion const& command) override {
         auto stack = StackView();
@@ -687,9 +635,10 @@ class FixedSizeAllocator final : public Allocator {
 // IMRPOVE: make a proper specialisation of this; there's lots of room for more efficiency
 template <usize static_size>
 struct ArenaAllocatorWithInlineStorage final : public ArenaAllocator {
-    ArenaAllocatorWithInlineStorage() : ArenaAllocator(inline_allocator) {
+    ArenaAllocatorWithInlineStorage(Allocator& fallback)
+        : ArenaAllocator(inline_allocator)
+        , inline_allocator(&fallback) {
         CreateAndPrependRegionToList(static_size, 0);
     }
-    Malloc gpa;
-    FixedSizeAllocator<static_size> inline_allocator {&gpa};
+    FixedSizeAllocator<static_size> inline_allocator;
 };

@@ -508,11 +508,11 @@ struct AllocedString {
 template <typename Type>
 TEST_CASE(TestDynamicArrayBasics) {
     Malloc a1;
-    FixedSizeAllocator<50> fixed_size_a;
+    FixedSizeAllocator<50> fixed_size_a {&Malloc::Instance()};
     LeakDetectingAllocator a5;
     ArenaAllocator a2(fixed_size_a);
     ArenaAllocator a3(a5);
-    FixedSizeAllocator<512> a4;
+    FixedSizeAllocator<512> a4 {&Malloc::Instance()};
     Allocator* allocators[] = {&a1, &a2, &a3, &a4, &a5};
 
     for (auto a_ptr : allocators) {
@@ -739,7 +739,7 @@ TEST_CASE(TestDynamicArrayBasics) {
                 }
 
                 SUBCASE("assign operator with different allocator") {
-                    FixedSizeAllocator<512> other_a;
+                    FixedSizeAllocator<512> other_a {&Malloc::Instance()};
                     DynamicArray<Type> other(other_a);
                     dyn::Append(other, 99);
                     other = Move(buf);
@@ -2135,9 +2135,9 @@ TEST_CASE(TestRandomFloatGenerator) {
 }
 
 TEST_CASE(TestVersion) {
-    CHECK(Version {1, 0, 0}.ToString() == "1.0.0"_s);
-    CHECK(Version {10, 99, 99}.ToString() == "10.99.99"_s);
-    CHECK(Version {10, 99, 99, 2u}.ToString() == "10.99.99-Beta2"_s);
+    CHECK(Version {1, 0, 0}.ToString(tester.scratch_arena) == "1.0.0"_s);
+    CHECK(Version {10, 99, 99}.ToString(tester.scratch_arena) == "10.99.99"_s);
+    CHECK(Version {10, 99, 99, 2u}.ToString(tester.scratch_arena) == "10.99.99-Beta2"_s);
 
     CHECK(Version {1, 0, 0} == Version {1, 0, 0});
     CHECK(Version {1, 1, 0} > Version {1, 0, 0});
@@ -2512,7 +2512,17 @@ struct ArenaAllocatorPage : ArenaAllocator {
 
 struct ArenaAllocatorBigBuf : ArenaAllocator {
     ArenaAllocatorBigBuf() : ArenaAllocator(big_buf) {}
-    FixedSizeAllocator<1000> big_buf;
+    FixedSizeAllocator<1000> big_buf {&Malloc::Instance()};
+};
+
+struct FixedSizeAllocatorTiny : FixedSizeAllocator<1> {
+    FixedSizeAllocatorTiny() : FixedSizeAllocator(&Malloc::Instance()) {}
+};
+struct FixedSizeAllocatorSmall : FixedSizeAllocator<16> {
+    FixedSizeAllocatorSmall() : FixedSizeAllocator(&Malloc::Instance()) {}
+};
+struct FixedSizeAllocatorLarge : FixedSizeAllocator<1000> {
+    FixedSizeAllocatorLarge() : FixedSizeAllocator(&Malloc::Instance()) {}
 };
 
 template <typename AllocatorType>
@@ -2694,12 +2704,12 @@ TEST_CASE(TestAllocatorTypes) {
                 a.Free(alloc);
 
         String type_name {};
-        if constexpr (Same<AllocatorType, FixedSizeAllocator<1>>)
-            type_name = "FixedSizeAllocator<1>";
-        else if constexpr (Same<AllocatorType, FixedSizeAllocator<16>>)
-            type_name = "FixedSizeAllocator<16>";
-        else if constexpr (Same<AllocatorType, FixedSizeAllocator<1000>>)
-            type_name = "FixedSizeAllocator<1000>";
+        if constexpr (Same<AllocatorType, FixedSizeAllocatorTiny>)
+            type_name = "FixedSizeAllocatorTiny";
+        else if constexpr (Same<AllocatorType, FixedSizeAllocatorSmall>)
+            type_name = "FixedSizeAllocatorSmall";
+        else if constexpr (Same<AllocatorType, FixedSizeAllocatorLarge>)
+            type_name = "FixedSizeAllocatorLarge";
         else if constexpr (Same<AllocatorType, Malloc>)
             type_name = "Malloc";
         else if constexpr (Same<AllocatorType, PageAllocator>)
@@ -2872,9 +2882,9 @@ TEST_REGISTRATION(RegisterFoundationTests) {
     REGISTER_TEST(TestAllocatorTypes<ArenaAllocatorBigBuf>);
     REGISTER_TEST(TestAllocatorTypes<ArenaAllocatorMalloc>);
     REGISTER_TEST(TestAllocatorTypes<ArenaAllocatorPage>);
-    REGISTER_TEST(TestAllocatorTypes<FixedSizeAllocator<1000>>);
-    REGISTER_TEST(TestAllocatorTypes<FixedSizeAllocator<16>>);
-    REGISTER_TEST(TestAllocatorTypes<FixedSizeAllocator<1>>);
+    REGISTER_TEST(TestAllocatorTypes<FixedSizeAllocatorLarge>);
+    REGISTER_TEST(TestAllocatorTypes<FixedSizeAllocatorSmall>);
+    REGISTER_TEST(TestAllocatorTypes<FixedSizeAllocatorTiny>);
     REGISTER_TEST(TestAllocatorTypes<LeakDetectingAllocator>);
     REGISTER_TEST(TestAllocatorTypes<Malloc>);
     REGISTER_TEST(TestAllocatorTypes<PageAllocator>);

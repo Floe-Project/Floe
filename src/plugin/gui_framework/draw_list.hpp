@@ -7,6 +7,7 @@
 
 #pragma once
 #include "foundation/foundation.hpp"
+#include "os/misc.hpp"
 
 // TODO: replace corner_rounding_flags with a bitfield probably
 

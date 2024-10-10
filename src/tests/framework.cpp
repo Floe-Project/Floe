@@ -16,7 +16,7 @@ struct TestFailed {};
 
 void TestLogger::Log(LogModuleName module_name, LogLevel level, String str) {
     if (level < max_level_allowed) return;
-    ArenaAllocatorWithInlineStorage<1000> arena;
+    ArenaAllocatorWithInlineStorage<1000> arena {Malloc::Instance()};
     DynamicArray<char> buf {arena};
     if (tester.current_test_case) fmt::Append(buf, "[ {} ] ", tester.current_test_case->title);
     if (level == LogLevel::Error) dyn::AppendSpan(buf, ANSI_COLOUR_SET_FOREGROUND_RED);

@@ -83,14 +83,14 @@ struct WindowRect {
 #undef CreateWindow
 
 static void ErrorDialog(HWND parent, String title) {
-    ArenaAllocatorWithInlineStorage<4000> allocator;
+    ArenaAllocatorWithInlineStorage<4000> allocator {Malloc::Instance()};
     wchar_t null {};
     auto wstr = Widen(allocator, title).ValueOr({&null, 1});
     MessageBoxW(parent, wstr.data, L"Error", MB_OK | MB_ICONEXCLAMATION);
 }
 
 static void AbortWithError(ErrorCode error) {
-    ArenaAllocatorWithInlineStorage<2000> allocator;
+    ArenaAllocatorWithInlineStorage<2000> allocator {Malloc::Instance()};
     ErrorDialog(nullptr, fmt::Format(allocator, "Fatal error: {d}", error));
     Panic("error");
 }
@@ -157,7 +157,7 @@ static UiSize LabelSize(HWND label, Optional<UiSize> container) {
 
     RECT r {};
     r.right = container ? container->width : LargestRepresentableValue<decltype(r.right)>();
-    ArenaAllocatorWithInlineStorage<4096> allocator;
+    ArenaAllocatorWithInlineStorage<4096> allocator {Malloc::Instance()};
     auto const text = WindowText(allocator, label);
     DrawTextW(dc, text.data, (int)text.size, &r, DT_CALCRECT | k_label_draw_text_flags);
 

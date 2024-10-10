@@ -900,7 +900,7 @@ static constexpr luaL_Reg k_lua_standard_libs[] = {
 };
 
 static ErrorCodeOr<Reader> CreateLuaFileReader(Library const& library, String path) {
-    PathArena arena;
+    PathArena arena {Malloc::Instance()};
     auto const dir = ({
         auto d = path::Directory(library.path);
         if (!d) return ErrorCode {FilesystemError::PathDoesNotExist};

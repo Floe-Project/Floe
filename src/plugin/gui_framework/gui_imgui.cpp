@@ -1310,7 +1310,7 @@ TextInputResult Context::SingleLineTextInput(Rect r,
     }
 
     if (frame_input.clipboard_text.size) {
-        ArenaAllocatorWithInlineStorage<2000> allocator;
+        ArenaAllocatorWithInlineStorage<2000> allocator {Malloc::Instance()};
         DynamicArray<Char32> w_text {allocator};
         dyn::Resize(w_text, frame_input.clipboard_text.size + 1);
         dyn::Resize(w_text,
@@ -2133,7 +2133,7 @@ void Context::DebugWindow(Rect r) {
                       "%s",
                       HoveredWindow() ? dyn::NullTerminated(HoveredWindow()->name) : "");
         DebugTextItem("Hovered Root", "%u", HoveredWindow() ? HoveredWindow()->root_window->id : 0);
-        ArenaAllocatorWithInlineStorage<2000> allocator;
+        ArenaAllocatorWithInlineStorage<2000> allocator {Malloc::Instance()};
         DynamicArray<char> buffer {allocator};
         if (HoveredWindow()) {
             auto wnd = HoveredWindow();
@@ -2297,7 +2297,7 @@ bool Context::TextInputDraggerInt(TextInputDraggerSettings settings,
                                   int& value,
                                   int default_value) {
     auto val = (f32)value;
-    ArenaAllocatorWithInlineStorage<100> allocator;
+    ArenaAllocatorWithInlineStorage<100> allocator {Malloc::Instance()};
     auto result = TextInputDraggerCustom(settings,
                                          r,
                                          id,
@@ -2325,7 +2325,7 @@ bool Context::TextInputDraggerFloat(TextInputDraggerSettings settings,
                                     f32 max,
                                     f32& value,
                                     f32 default_value) {
-    ArenaAllocatorWithInlineStorage<100> allocator;
+    ArenaAllocatorWithInlineStorage<100> allocator {Malloc::Instance()};
     auto result = TextInputDraggerCustom(settings,
                                          r,
                                          id,

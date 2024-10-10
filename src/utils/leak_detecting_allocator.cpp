@@ -8,7 +8,7 @@
 #include "utils/logger/logger.hpp"
 
 LeakDetectingAllocator::~LeakDetectingAllocator() {
-    ArenaAllocatorWithInlineStorage<1000> scratch_arena;
+    ArenaAllocatorWithInlineStorage<1000> scratch_arena {Malloc::Instance()};
     for (auto& i : m_allocations) {
         if (!i.stack_trace)
             g_log.Debug({}, "ERROR: memory leak detected of {} bytes, no stacktrace available", i.data.size);

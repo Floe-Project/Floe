@@ -23,7 +23,7 @@ static_assert(path::k_max >= PATH_MAX);
 ErrorCodeOr<void> WindowsSetFileAttributes(String, Optional<WindowsFileAttributes>) { return k_success; }
 
 ErrorCodeOr<void> Rename(String from, String to) {
-    PathArena temp_path_allocator;
+    PathArena temp_path_allocator {Malloc::Instance()};
     auto const result =
         rename(NullTerminated(from, temp_path_allocator), NullTerminated(to, temp_path_allocator));
     if (result != 0) {
@@ -37,7 +37,7 @@ ErrorCodeOr<void> Rename(String from, String to) {
 }
 
 ErrorCodeOr<FileType> GetFileType(String path) {
-    PathArena temp_path_allocator;
+    PathArena temp_path_allocator {Malloc::Instance()};
     struct ::stat info;
     auto r = ::stat(NullTerminated(path, temp_path_allocator), &info);
     if (r != 0) return FilesystemErrnoErrorCode(errno);
@@ -51,7 +51,7 @@ namespace dir_iterator {
 ErrorCodeOr<Iterator> Create(ArenaAllocator& arena, String path, Options options) {
     auto result = TRY(Iterator::InternalCreate(arena, path, options));
 
-    ArenaAllocatorWithInlineStorage<1024> scratch_arena;
+    ArenaAllocatorWithInlineStorage<1024> scratch_arena {Malloc::Instance()};
     auto handle = opendir(NullTerminated(result.base_path, scratch_arena));
     if (!handle) return FilesystemErrnoErrorCode(errno, "opendir");
     result.handle = handle;
@@ -86,7 +86,7 @@ ErrorCodeOr<Optional<Entry>> Next(Iterator& it, ArenaAllocator& result_arena) {
                     .file_size = ({
                         u64 s = 0;
                         if (it.options.get_file_size) {
-                            PathArena temp_path_allocator;
+                            PathArena temp_path_allocator {Malloc::Instance()};
                             auto const full_path = CombineStrings(temp_path_allocator,
                                                                   Array {
                                                                       it.base_path,
@@ -211,7 +211,7 @@ ErrorCodeOr<u64> File::FileSize() {
 }
 
 ErrorCodeOr<File> OpenFile(String filename, FileMode mode) {
-    PathArena temp_allocator;
+    PathArena temp_allocator {Malloc::Instance()};
 
     auto const mode_str = ({
         char const* m {};

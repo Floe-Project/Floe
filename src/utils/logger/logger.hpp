@@ -54,7 +54,7 @@ struct Logger {
     template <typename... Args>
     void Log(LogModuleName module_name, LogLevel level, String format, Args const&... args) {
         static_assert(sizeof...(args) != 0);
-        LogAllocator log_allocator;
+        LogAllocator log_allocator {Malloc::Instance()};
         Log(module_name, level, fmt::Format(log_allocator, format, args...));
     }
 
@@ -70,7 +70,7 @@ struct Logger {
         if constexpr (sizeof...(args) == 0) {                                                                \
             Log(module_name, LogLevel::level, format);                                                       \
         } else {                                                                                             \
-            LogAllocator log_allocator;                                                                      \
+            LogAllocator log_allocator {Malloc::Instance()};                                                 \
             Log(module_name, LogLevel::level, fmt::Format(log_allocator, format, args...));                  \
         }                                                                                                    \
     }

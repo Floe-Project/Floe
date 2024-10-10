@@ -1253,7 +1253,7 @@ void DrawList::AddTextJustified(Rect r,
     auto const display_scale = font->font_size_no_scale / font->font_size;
     auto font_size = context->CurrentFontSize() * font_scaling;
 
-    ArenaAllocatorWithInlineStorage<1000> temp_allocator;
+    ArenaAllocatorWithInlineStorage<1000> temp_allocator {Malloc::Instance()};
     DynamicArray<char> buffer(temp_allocator);
     String const dots {".."};
 

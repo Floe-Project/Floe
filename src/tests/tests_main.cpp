@@ -100,7 +100,7 @@ ErrorCodeOr<int> Main(ArgsCstr args) {
         },
     });
 
-    ArenaAllocatorWithInlineStorage<1000> arena {Malloc::Instance()};
+    ArenaAllocatorWithInlineStorage<1000> arena {PageAllocator::Instance()};
     auto const cli_args = TRY(ParseCommandLineArgsStandard(arena,
                                                            args,
                                                            k_cli_arg_defs,

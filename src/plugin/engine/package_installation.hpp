@@ -19,6 +19,7 @@ struct ExistingInstalledComponent {
     enum class ModifiedSinceInstalled : u8 { Unmodified, MaybeModified, Modified };
     using enum VersionDifference;
     using enum ModifiedSinceInstalled;
+    inline bool operator==(ExistingInstalledComponent const& o) const = default;
     bool installed;
     VersionDifference version_difference; // if installed
     ModifiedSinceInstalled modified_since_installed; // if installed
@@ -44,7 +45,7 @@ struct InstallJob {
 
     enum class UserDecision {
         Unknown,
-        Overwrite,
+        Overwrite, // IMPORTANT: this will delete the entire folder - users must be explicitly warned
         Skip,
     };
 
@@ -121,9 +122,6 @@ LibraryCheckExistingInstallation(Component const& component,
             .version_difference = ExistingInstalledComponent::Equal,
             .modified_since_installed = ExistingInstalledComponent::Unmodified,
         };
-
-    // The installed version DIFFERS from the package version.
-    // HOW it differs will effect the recommendation we give to the user.
 
     ExistingInstalledComponent result = {.installed = true};
 

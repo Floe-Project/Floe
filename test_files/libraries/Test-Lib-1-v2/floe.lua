@@ -4,7 +4,7 @@ local library = floe.new_library({
     author = "Tester",
     background_image_path = "images/background.jpg",
     icon_image_path = "images/icon.png",
-    minor_version = 1,
+    minor_version = 2,
 })
 
 -- ================================================================================

@@ -63,8 +63,10 @@ class Malloc final : public Allocator {
                     // IMPROVE: use realloc if no move_mem
 
                     auto const alignment =
-                        Max((uintptr)cmd.allocation.data & (~(uintptr)cmd.allocation.data - 1),
-                            k_max_alignment);
+                        cmd.allocation.data
+                            ? Max((uintptr)cmd.allocation.data & (~(uintptr)cmd.allocation.data - 1),
+                                  k_max_alignment)
+                            : k_max_alignment;
 
                     // fallback: new allocation and move memory
                     auto new_allocation = AlignedAlloc(alignment, cmd.new_size);

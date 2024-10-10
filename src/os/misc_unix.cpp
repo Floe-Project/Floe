@@ -24,8 +24,11 @@
 #include "time.h"
 
 void* AlignedAlloc(usize alignment, usize size) {
-    ASSERT(IsPowerOfTwo(alignment));
-    return aligned_alloc(alignment, size);
+    // posix_memalign requires alignment to be a multiple of sizeof(void*).
+    alignment = __builtin_align_up(alignment, sizeof(void*));
+    void* result = nullptr;
+    posix_memalign(&result, alignment, size);
+    return result;
 }
 void AlignedFree(void* ptr) { free(ptr); }
 

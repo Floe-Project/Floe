@@ -24,6 +24,7 @@
 #include "time.h"
 
 void* AlignedAlloc(usize alignment, usize size) {
+    if (alignment <= k_max_alignment) return malloc(size);
     // posix_memalign requires alignment to be a multiple of sizeof(void*).
     alignment = __builtin_align_up(alignment, sizeof(void*));
     void* result = nullptr;

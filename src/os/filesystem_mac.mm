@@ -100,6 +100,28 @@ ErrorCodeOr<MutableString> CanonicalizePath(Allocator& a, String path) {
     return a.Clone(FromNullTerminated(resolved_path));
 }
 
+ErrorCodeOr<String> TrashFileOrDirectory(String path, Allocator &a) {
+    NSURL* url = [NSURL fileURLWithPath:StringToNSString(path)];
+    NSError* error = nil;
+    NSURL *resulting_url = nil;
+    auto const did_trash_item = [[NSFileManager defaultManager] trashItemAtURL:url
+                                                              resultingItemURL:&resulting_url
+                                                                         error:&error];
+    (void)did_trash_item;
+    if (error) return FilesystemErrorFromNSError(error);
+    return a.Clone(NSStringToString([resulting_url path]));
+}
+
+ErrorCodeOr<void> RestoreTrashedFileOrDirectory(String trashed_path, String original_path) {
+    NSError* error = nil;
+    auto const success = [[NSFileManager defaultManager] moveItemAtPath:StringToNSString(trashed_path)
+                                                                 toPath:StringToNSString(original_path)
+                                                                  error:&error]; 
+    (void)success;
+    if (error) return FilesystemErrorFromNSError(error);
+    return k_success;
+}
+
 ErrorCodeOr<void> Delete(String path, DeleteOptions options) {
     PathArena path_arena {Malloc::Instance()};
     switch (options.type) {

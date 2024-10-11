@@ -127,6 +127,16 @@ ErrorCodeOr<MutableString> AbsolutePath(Allocator& a, String path) {
 
 ErrorCodeOr<MutableString> CanonicalizePath(Allocator& a, String path) { return AbsolutePath(a, path); }
 
+ErrorCodeOr<String> TrashFileOrDirectory(String path, Allocator&) {
+    // IMPROVE: try to work out the trash directory from the environment and use that
+    TRY(Delete(path, {.type = DeleteOptions::Type::Any, .fail_if_not_exists = true}));
+    return path;
+}
+
+ErrorCodeOr<void> RestoreTrashedFileOrDirectory(String, String) {
+    return ErrorCode {FilesystemError::PathDoesNotExist};
+}
+
 ErrorCodeOr<void> Delete(String path, DeleteOptions options) {
     PathArena temp_path_allocator {Malloc::Instance()};
     auto const path_ptr = NullTerminated(path, temp_path_allocator);

@@ -264,6 +264,16 @@ struct CreateDirectoryOptions {
 };
 ErrorCodeOr<void> CreateDirectory(String path, CreateDirectoryOptions options = {});
 
+#if IS_WINDOWS
+#define TRASH_NAME "Recycle Bin"
+#else
+#define TRASH_NAME "Trash"
+#endif
+
+// Returns the path to the trashed file or directory which you can use to restore it.
+ErrorCodeOr<String> TrashFileOrDirectory(String path, Allocator& a);
+ErrorCodeOr<void> RestoreTrashedFileOrDirectory(String trashed_path, String original_path);
+
 struct DeleteOptions {
     enum class Type { Any, File, DirectoryRecursively, DirectoryOnlyIfEmpty };
     Type type = Type::Any;

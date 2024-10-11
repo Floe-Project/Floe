@@ -522,6 +522,40 @@ TEST_CASE(TestFilesystem) {
         }
     }
 
+    if constexpr (!IS_LINUX) {
+        SUBCASE("Trash") {
+            SUBCASE("file") {
+                auto const filename = tests::TempFilename(tester);
+                TRY(WriteFile(filename, "data"_s));
+                auto trashed_file = TRY(TrashFileOrDirectory(filename, tester.scratch_arena));
+                tester.log.Debug(k_os_log_module, "File in trash: {}", trashed_file);
+                CHECK(GetFileType(filename).HasError());
+
+                if (!IsRunningUnderWine()) {
+                    TRY(RestoreTrashedFileOrDirectory(trashed_file, filename));
+                    auto const restored_data = REQUIRE_UNWRAP(ReadEntireFile(filename, tester.scratch_arena));
+                    CHECK_EQ(restored_data, "data"_s);
+                }
+            }
+
+            SUBCASE("folder") {
+                auto const folder = tests::TempFilename(tester);
+                TRY(CreateDirectory(folder, {.create_intermediate_directories = false}));
+                auto const subfile = path::Join(tester.scratch_arena, Array {folder, "subfile.txt"});
+                TRY(WriteFile(subfile, "data"_s));
+                auto trashed_folder = TRY(TrashFileOrDirectory(folder, tester.scratch_arena));
+                tester.log.Debug(k_os_log_module, "Folder in trash: {}", trashed_folder);
+
+                if (!IsRunningUnderWine()) {
+                    CHECK(GetFileType(folder).HasError());
+                    TRY(RestoreTrashedFileOrDirectory(trashed_folder, folder));
+                    auto const restored_data = REQUIRE_UNWRAP(ReadEntireFile(subfile, tester.scratch_arena));
+                    CHECK_EQ(restored_data, "data"_s);
+                }
+            }
+        }
+    }
+
     return k_success;
 }
 

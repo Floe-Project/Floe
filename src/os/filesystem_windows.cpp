@@ -6,6 +6,7 @@
 #include <dbghelp.h>
 #include <fileapi.h>
 #include <lmcons.h>
+#include <shellapi.h>
 #include <shlobj.h>
 #include <shlwapi.h>
 #include <winnt.h>
@@ -23,6 +24,11 @@
 #include "utils/logger/logger.hpp"
 
 #include "filesystem.hpp"
+
+#define HRESULT_TRY(windows_call)                                                                            \
+    if (auto hr = windows_call; !SUCCEEDED(hr)) {                                                            \
+        return FilesystemWin32ErrorCode(HresultToWin32(hr), #windows_call);                                  \
+    }
 
 static constexpr Optional<FilesystemError> TranslateWin32Code(DWORD win32_code) {
     switch (win32_code) {
@@ -751,6 +757,94 @@ static ErrorCodeOr<void> Win32DeleteDirectory(WString windows_path, ArenaAllocat
     return k_success;
 }
 
+ErrorCodeOr<String> TrashFileOrDirectory(String path, Allocator&) {
+    ASSERT(path::IsAbsolute(path));
+    auto const com_library_usage = TRY(ScopedWin32ComUsage::Create());
+
+    PathArena temp_path_arena {Malloc::Instance()};
+    DynamicArray<WCHAR> wide_path {temp_path_arena};
+    WidenAppend(wide_path, path);
+    dyn::AppendSpan(wide_path, L"\0\0"); // double null terminated
+    Replace(wide_path, L'/', L'\\');
+
+    SHFILEOPSTRUCTW file_op {
+        .hwnd = nullptr,
+        .wFunc = FO_DELETE,
+        .pFrom = wide_path.data,
+        .pTo = nullptr,
+        .fFlags = FOF_ALLOWUNDO | FOF_NO_UI | FOF_WANTNUKEWARNING,
+    };
+
+    if (auto const r = SHFileOperationW(&file_op); r != 0)
+        return FilesystemWin32ErrorCode((DWORD)r, "SHFileOperationW");
+
+    return path;
+}
+
+void InvokeVerb(IContextMenu* pcm, PCSTR pszVerb) {
+    HMENU hmenu = CreatePopupMenu();
+    if (hmenu) {
+        HRESULT hr = pcm->QueryContextMenu(hmenu, 0, 1, 0x7FFF, CMF_NORMAL);
+        if (SUCCEEDED(hr)) {
+            CMINVOKECOMMANDINFO info = {0};
+            info.cbSize = sizeof(info);
+            info.lpVerb = pszVerb;
+            pcm->InvokeCommand(&info);
+        }
+        DestroyMenu(hmenu);
+    }
+}
+
+ErrorCodeOr<void> RestoreTrashedFileOrDirectory(String trashed_path, String original_path) {
+    if (IsRunningUnderWine()) return ErrorCode {FilesystemError::PathDoesNotExist};
+
+    ASSERT(path::IsAbsolute(trashed_path));
+    ASSERT(path::IsAbsolute(original_path));
+
+    auto const com_library_usage = TRY(ScopedWin32ComUsage::Create());
+
+    PathArena temp_path_arena {Malloc::Instance()};
+
+    auto wide_original_path = WidenAllocNullTerm(temp_path_arena, original_path).Value();
+    Replace(wide_original_path, L'/', L'\\');
+
+    IShellItem* psi_recycle_bin = nullptr;
+    HRESULT_TRY(SHGetKnownFolderItem(FOLDERID_RecycleBinFolder,
+                                     KF_FLAG_DEFAULT,
+                                     nullptr,
+                                     IID_PPV_ARGS(&psi_recycle_bin)));
+    DEFER { psi_recycle_bin->Release(); };
+
+    IEnumShellItems* pesi;
+    HRESULT_TRY(psi_recycle_bin->BindToHandler(nullptr, BHID_EnumItems, IID_PPV_ARGS(&pesi)));
+
+    for (int i = 0; i < 9000; ++i) {
+        IShellItem* psi {};
+        if (auto const next_hr = pesi->Next(1, &psi, nullptr); next_hr != S_OK) {
+            if (next_hr == S_FALSE) break;
+            return FilesystemWin32ErrorCode(HresultToWin32(next_hr), "IEnumIDList::Next");
+        }
+
+        PWSTR recycle_bin_item_path;
+        HRESULT_TRY(psi->GetDisplayName(SIGDN_FILESYSPATH, &recycle_bin_item_path));
+
+        g_debug_log.Debug({},
+                          "Recycle bin item: '{}'",
+                          Narrow(temp_path_arena, FromNullTerminated(recycle_bin_item_path)).Value());
+
+        if (wcscmp(recycle_bin_item_path, wide_original_path.data) == 0) {
+            IContextMenu* pcm;
+            HRESULT_TRY(psi->BindToHandler(nullptr, BHID_SFUIObject, IID_PPV_ARGS(&pcm)));
+            DEFER { pcm->Release(); };
+            InvokeVerb(pcm, "undelete");
+        }
+
+        return k_success;
+    }
+
+    return ErrorCode {FilesystemError::PathDoesNotExist};
+}
+
 ErrorCodeOr<void> Delete(String path, DeleteOptions options) {
     PathArena temp_path_arena {Malloc::Instance()};
     auto const wide_path = TRY(path::MakePathForWin32(path, temp_path_arena, true));
@@ -992,11 +1086,6 @@ ErrorCodeOr<Optional<Entry>> Next(Iterator& it, ArenaAllocator& result_arena) {
 //
 // ==========================================================================================================
 
-#define FP_HRESULT_TRY(windows_call)                                                                         \
-    if (auto hr = windows_call; !SUCCEEDED(hr)) {                                                            \
-        return FilesystemWin32ErrorCode(HresultToWin32(hr), #windows_call);                                  \
-    }
-
 ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments args) {
     auto const com_library_usage = TRY(ScopedWin32ComUsage::Create());
 
@@ -1023,7 +1112,7 @@ ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments args) {
     });
 
     IFileDialog* f;
-    FP_HRESULT_TRY(CoCreateInstance(ids.rclsid, nullptr, CLSCTX_ALL, ids.riid, reinterpret_cast<void**>(&f)));
+    HRESULT_TRY(CoCreateInstance(ids.rclsid, nullptr, CLSCTX_ALL, ids.riid, reinterpret_cast<void**>(&f)));
     DEFER { f->Release(); };
 
     if (args.default_path) {
@@ -1033,7 +1122,7 @@ ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments args) {
             auto dir = WidenAllocNullTerm(temp_path_arena, *narrow_dir).Value();
             Replace(dir, L'/', L'\\');
             IShellItem* item = nullptr;
-            FP_HRESULT_TRY(SHCreateItemFromParsingName(dir.data, nullptr, IID_PPV_ARGS(&item)));
+            HRESULT_TRY(SHCreateItemFromParsingName(dir.data, nullptr, IID_PPV_ARGS(&item)));
             DEFER { item->Release(); };
 
             constexpr bool k_forced_default_folder = true;
@@ -1067,20 +1156,20 @@ ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments args) {
     {
         PathArena temp_path_arena {Malloc::Instance()};
         auto wide_title = WidenAllocNullTerm(temp_path_arena, args.title).Value();
-        FP_HRESULT_TRY(f->SetTitle(wide_title.data));
+        HRESULT_TRY(f->SetTitle(wide_title.data));
     }
 
     if (args.type == DialogArguments::Type::SelectFolder) {
         DWORD flags = 0;
-        FP_HRESULT_TRY(f->GetOptions(&flags));
-        FP_HRESULT_TRY(f->SetOptions(flags | FOS_PICKFOLDERS));
+        HRESULT_TRY(f->GetOptions(&flags));
+        HRESULT_TRY(f->SetOptions(flags | FOS_PICKFOLDERS));
     }
 
     auto const multiple_selection = ids.rclsid == CLSID_FileOpenDialog && args.allow_multiple_selection;
     if (multiple_selection) {
         DWORD flags = 0;
-        FP_HRESULT_TRY(f->GetOptions(&flags));
-        FP_HRESULT_TRY(f->SetOptions(flags | FOS_ALLOWMULTISELECT));
+        HRESULT_TRY(f->GetOptions(&flags));
+        HRESULT_TRY(f->SetOptions(flags | FOS_ALLOWMULTISELECT));
     }
 
     if (auto hr = f->Show((HWND)args.parent_window); hr != S_OK) {
@@ -1090,7 +1179,7 @@ ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments args) {
 
     auto utf8_path_from_shell_item = [&](IShellItem* p_item) -> ErrorCodeOr<MutableString> {
         PWSTR wide_path = nullptr;
-        FP_HRESULT_TRY(p_item->GetDisplayName(SIGDN_FILESYSPATH, &wide_path));
+        HRESULT_TRY(p_item->GetDisplayName(SIGDN_FILESYSPATH, &wide_path));
         DEFER { CoTaskMemFree(wide_path); };
 
         auto narrow_path = Narrow(args.allocator, FromNullTerminated(wide_path)).Value();
@@ -1101,7 +1190,7 @@ ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments args) {
 
     if (!multiple_selection) {
         IShellItem* p_item = nullptr;
-        FP_HRESULT_TRY(f->GetResult(&p_item));
+        HRESULT_TRY(f->GetResult(&p_item));
         DEFER { p_item->Release(); };
 
         auto span = args.allocator.AllocateExactSizeUninitialised<MutableString>(1);
@@ -1109,15 +1198,15 @@ ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments args) {
         return span;
     } else {
         IShellItemArray* p_items = nullptr;
-        FP_HRESULT_TRY(((IFileOpenDialog*)f)->GetResults(&p_items));
+        HRESULT_TRY(((IFileOpenDialog*)f)->GetResults(&p_items));
         DEFER { p_items->Release(); };
 
         DWORD count;
-        FP_HRESULT_TRY(p_items->GetCount(&count));
+        HRESULT_TRY(p_items->GetCount(&count));
         auto result = args.allocator.AllocateExactSizeUninitialised<MutableString>(CheckedCast<usize>(count));
         for (auto const item_index : Range(count)) {
             IShellItem* p_item = nullptr;
-            FP_HRESULT_TRY(p_items->GetItemAt(item_index, &p_item));
+            HRESULT_TRY(p_items->GetItemAt(item_index, &p_item));
             DEFER { p_item->Release(); };
 
             result[item_index] = TRY(utf8_path_from_shell_item(p_item));

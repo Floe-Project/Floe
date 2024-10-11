@@ -100,10 +100,10 @@ ErrorCodeOr<MutableString> CanonicalizePath(Allocator& a, String path) {
     return a.Clone(FromNullTerminated(resolved_path));
 }
 
-ErrorCodeOr<String> TrashFileOrDirectory(String path, Allocator &a) {
+ErrorCodeOr<String> TrashFileOrDirectory(String path, Allocator& a) {
     NSURL* url = [NSURL fileURLWithPath:StringToNSString(path)];
     NSError* error = nil;
-    NSURL *resulting_url = nil;
+    NSURL* resulting_url = nil;
     auto const did_trash_item = [[NSFileManager defaultManager] trashItemAtURL:url
                                                               resultingItemURL:&resulting_url
                                                                          error:&error];

@@ -5,17 +5,17 @@
 #include "foundation/foundation.hpp"
 
 #include "engine/engine.hpp"
+#include "gui/gui2_notifications.hpp"
 #include "gui/gui_modal_windows.hpp"
 #include "gui_editor_widgets.hpp"
 #include "gui_envelope.hpp"
 #include "gui_framework/draw_list.hpp"
+#include "gui_framework/fonts.hpp"
 #include "gui_framework/gui_imgui.hpp"
 #include "gui_framework/layout.hpp"
 #include "gui_layer.hpp"
 #include "gui_preset_browser.hpp"
 #include "settings/settings_file.hpp"
-
-constexpr auto k_gui_log_module = "gui"_log_module;
 
 struct GuiFrameInput;
 
@@ -118,7 +118,6 @@ enum class DialogType {
     AddNewPresetsScanFolder,
     SavePreset,
     LoadPreset,
-    InstallPackage,
 };
 
 struct Gui {
@@ -133,7 +132,8 @@ struct Gui {
     bool show_purchasable_libraries = false;
     bool show_news = false;
 
-    InstallPackagesData install_packages_state {};
+    bool settings2_open {};
+    Notifications notifications {};
 
     GuiFrameInput& frame_input;
     GuiFrameResult frame_output;
@@ -149,6 +149,7 @@ struct Gui {
     graphics::Font* mada_big {};
     graphics::Font* mada {};
     graphics::Font* icons {};
+    Fonts fonts {}; // new system
     PresetBrowserPersistentData preset_browser_data {};
 
     layer_gui::LayerLayout layer_gui[k_num_layers] = {};

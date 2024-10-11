@@ -86,6 +86,15 @@ PUBLIC constexpr u32 Hash32(auto data) { return HashDbj(data); }
 PUBLIC constexpr u64 HashMultiple(auto const& data) { return HashMultipleFnv1a(data); }
 PUBLIC constexpr u32 HashMultiple32(auto const& data) { return HashMultipleDbj(data); }
 
+PUBLIC constexpr u64 HashComptime(String data) {
+    u64 hash = 0xcbf29ce484222325;
+    for (auto c : data) {
+        hash ^= (u64)c;
+        hash *= 0x100000001b3;
+    }
+    return hash;
+}
+
 PUBLIC constexpr usize TotalSize(ContiguousContainerOfContiguousContainers auto const& c_of_c) {
     usize total_size = 0;
     for (auto const& c : c_of_c)

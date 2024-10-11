@@ -1133,7 +1133,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
                     buttons::FakeButton(g, grabber_r, {}, grabber_style);
 
                     auto converted_grabber_r = imgui.GetRegisteredAndConvertedRect(grabber_r);
-                    imgui.RegisterRegionForMouseTracking(&converted_grabber_r);
+                    imgui.RegisterRegionForMouseTracking(converted_grabber_r);
 
                     if (converted_grabber_r.Contains(g->frame_input.cursor_pos))
                         g->frame_output.cursor_type = CursorType::AllArrows;

@@ -45,7 +45,7 @@ struct InstallJob {
 
     enum class UserDecision {
         Unknown,
-        Overwrite, // IMPORTANT: this will delete the entire folder - users must be explicitly warned
+        Overwrite,
         Skip,
     };
 

@@ -37,6 +37,13 @@ static void Arrange(Context& ctx, Id item, u32 dim);
 void RunItem(Context& ctx, Id id) {
     CalcSize(ctx, id, 0);
     Arrange(ctx, id, 0);
+
+    for (u32 i = 0; i < ctx.num_items; ++i)
+        if (ctx.items[i].flags & flags::SetItemHeightAfterWidth) {
+            ctx.items[i].size[1] = ctx.item_height_from_width_calculation(Id {i}, ctx.rects[i][2]);
+            ctx.items[i].flags |= flags::VerticalSizeFixed;
+        }
+
     CalcSize(ctx, id, 1);
     Arrange(ctx, id, 1);
 }

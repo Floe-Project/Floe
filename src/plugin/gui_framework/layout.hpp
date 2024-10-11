@@ -39,6 +39,7 @@ struct Context {
     f32x4* rects {};
     u32 capacity {};
     u32 num_items {};
+    TrivialFixedSizeFunction<8, f32(Id id, f32 width)> item_height_from_width_calculation {};
 };
 
 namespace flags {
@@ -101,6 +102,8 @@ enum : u32 {
     // layout calculations.
     LineBreak = 1 << 12,
 
+    SetItemHeightAfterWidth = 1 << 13,
+
     // Internal flags
     // ======================================================================================================
 
@@ -108,16 +111,16 @@ enum : u32 {
     // the dimension: row or column.
     LayoutModeMask = BitRange(0, 2),
     ContainerMask = BitRange(0, 7),
-    ChildBehaviourMask = BitRange(8, 12),
+    ChildBehaviourMask = BitRange(8, 13),
 
-    ItemInserted = 1 << 13,
-    HorizontalSizeFixed = 1 << 14,
-    VerticalSizeFixed = 1 << 15,
+    ItemInserted = 1 << 14,
+    HorizontalSizeFixed = 1 << 15,
+    VerticalSizeFixed = 1 << 16,
 
     FixedSizeMask = HorizontalSizeFixed | VerticalSizeFixed,
 
     // These bits can be used by the user.
-    UserMask = BitRange(16, 31),
+    UserMask = BitRange(17, 31),
 };
 
 } // namespace flags
@@ -330,6 +333,7 @@ struct ItemOptions {
     f32x2 contents_gap {};
     Direction contents_direction {Direction::Row};
     bool contents_multiline {false};
+    bool set_item_height_after_width_calculated {false};
     Alignment contents_align {Alignment::Middle};
     CrossAxisAlign contents_cross_axis_align {CrossAxisAlign::Middle};
 };
@@ -357,7 +361,8 @@ PUBLIC Id CreateItem(Context& ctx, ItemOptions options) {
     item.contents_gap = options.contents_gap;
     item.flags |= ToInt(options.anchor) | (options.line_break ? flags::LineBreak : 0) |
                   ToInt(options.contents_direction) | ToInt(options.contents_cross_axis_align) |
-                  ToInt(options.contents_align) | (options.contents_multiline ? flags::Wrap : flags::NoWrap);
+                  ToInt(options.contents_align) | (options.contents_multiline ? flags::Wrap : flags::NoWrap) |
+                  (options.set_item_height_after_width_calculated ? flags::SetItemHeightAfterWidth : 0);
     if (options.parent) {
         Insert(ctx, *options.parent, id);
         auto& parent = *GetItem(ctx, *options.parent);

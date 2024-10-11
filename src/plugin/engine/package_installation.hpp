@@ -394,31 +394,54 @@ static VoidOrError<PackageError> ReaderInstallComponent(PackageReader& package,
             // Rather than overwrite files one-by-one, we delete the whole folder and replace it with the new
             // component. We do this because overwriting files could leave unwanted files behind if the
             // component has fewer files than the existing installation. This is confusing in general, but in
-            // particular, it's bad for a library because there could be 2 Lua files.
+            // particular it's bad for a library because there could be 2 Lua files.
 
-            // Step 1: move the old folder to a unique temp folder adjacent to the destination folder
-            auto const old_path_temp = ({
-                auto const o = TemporaryDirectoryOnSameFilesystemAs(destination_folder, scratch_arena);
+            MutableString new_name {};
+            // Rename the existing folder so that it's got a unique, recognizable name that will be easy to
+            // spot in the Trash.
+            {
+                constexpr usize k_max_suffix_length = " (old-)"_s.size + 13;
+                new_name = scratch_arena.AllocateExactSizeUninitialised<char>(
+                    resolved_destination_folder.size + k_max_suffix_length);
+                usize pos = 0;
+                WriteAndIncrement(pos, new_name, resolved_destination_folder);
+                WriteAndIncrement(pos, new_name, " (old-"_s);
+                auto const chars_written = fmt::IntToString(RandomU64(package.seed),
+                                                            new_name.data + pos,
+                                                            {.base = fmt::IntToStringOptions::Base::Base32});
+                ASSERT(chars_written <= 13);
+                pos += chars_written;
+                WriteAndIncrement(pos, new_name, ')');
+                new_name.size = pos;
+
+                auto const o = Rename(resolved_destination_folder, new_name);
                 if (o.HasError()) {
                     return detail::CreatePackageError(error_log,
                                                       o.Error(),
-                                                      "Couldn't access destination folder \"{}\"",
-                                                      destination_folder);
+                                                      "Couldn't install files to your install folder \"{}\"",
+                                                      resolved_destination_folder);
                 }
-                o.Value();
-            });
-            if (auto const o = Rename(resolved_destination_folder, old_path_temp); o.HasError()) {
+            }
+
+            String folder_in_trash {};
+            if (auto const o = TrashFileOrDirectory(new_name, scratch_arena); o.HasValue()) {
+                folder_in_trash = o.Value();
+            } else {
+                // Try to undo the rename
+                auto const _ = Rename(new_name, resolved_destination_folder);
+
                 return detail::CreatePackageError(error_log,
                                                   o.Error(),
-                                                  "Couldn't install files to your install folder \"{}\"",
+                                                  "Couldn't send folder \"{}\" to your " TRASH_NAME,
                                                   resolved_destination_folder);
             }
 
-            // Step 2. intall the new files to the final location
+            // Step 2. install the new files to the final location
             if (auto const rename2_o = Rename(temp_folder, resolved_destination_folder);
                 rename2_o.HasError()) {
                 // We failed to install the new files, try to restore the old files.
-                auto const _ = Rename(old_path_temp, resolved_destination_folder);
+                auto const _ = RestoreTrashedFileOrDirectory(folder_in_trash, new_name);
+                auto const _ = Rename(new_name, resolved_destination_folder);
 
                 return detail::CreatePackageError(error_log,
                                                   rename2_o.Error(),
@@ -426,12 +449,6 @@ static VoidOrError<PackageError> ReaderInstallComponent(PackageReader& package,
                                                   resolved_destination_folder);
             }
 
-            // Step 3. the new files are successfully installed, delete the old files
-            auto const _ = Delete(old_path_temp,
-                                  {
-                                      .type = DeleteOptions::Type::DirectoryRecursively,
-                                      .fail_if_not_exists = false,
-                                  });
         } else {
             return detail::CreatePackageError(error_log,
                                               rename_o.Error(),

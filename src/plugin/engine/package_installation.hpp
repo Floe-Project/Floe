@@ -396,13 +396,12 @@ static VoidOrError<PackageError> ReaderInstallComponent(PackageReader& package,
             // component has fewer files than the existing installation. This is confusing in general, but in
             // particular it's bad for a library because there could be 2 Lua files.
 
-            MutableString new_name {};
             // Rename the existing folder so that it's got a unique, recognizable name that will be easy to
             // spot in the Trash.
+            MutableString new_name {};
             {
-                constexpr usize k_max_suffix_length = " (old-)"_s.size + 13;
                 new_name = scratch_arena.AllocateExactSizeUninitialised<char>(
-                    resolved_destination_folder.size + k_max_suffix_length);
+                    resolved_destination_folder.size + " (old-)"_s.size + 13);
                 usize pos = 0;
                 WriteAndIncrement(pos, new_name, resolved_destination_folder);
                 WriteAndIncrement(pos, new_name, " (old-"_s);
@@ -423,6 +422,19 @@ static VoidOrError<PackageError> ReaderInstallComponent(PackageReader& package,
                 }
             }
 
+            // The old folder is out of the way so we can now install the new component.
+            if (auto const rename2_o = Rename(temp_folder, resolved_destination_folder);
+                rename2_o.HasError()) {
+                // We failed to install the new files, try to restore the old files.
+                auto const _ = Rename(new_name, resolved_destination_folder);
+
+                return detail::CreatePackageError(error_log,
+                                                  rename2_o.Error(),
+                                                  "Couldn't install files to your install folder \"{}\"",
+                                                  resolved_destination_folder);
+            }
+
+            // The new component is installed, let's try to trash the old folder.
             String folder_in_trash {};
             if (auto const o = TrashFileOrDirectory(new_name, scratch_arena); o.HasValue()) {
                 folder_in_trash = o.Value();
@@ -433,19 +445,6 @@ static VoidOrError<PackageError> ReaderInstallComponent(PackageReader& package,
                 return detail::CreatePackageError(error_log,
                                                   o.Error(),
                                                   "Couldn't send folder \"{}\" to your " TRASH_NAME,
-                                                  resolved_destination_folder);
-            }
-
-            // Step 2. install the new files to the final location
-            if (auto const rename2_o = Rename(temp_folder, resolved_destination_folder);
-                rename2_o.HasError()) {
-                // We failed to install the new files, try to restore the old files.
-                auto const _ = RestoreTrashedFileOrDirectory(folder_in_trash, new_name);
-                auto const _ = Rename(new_name, resolved_destination_folder);
-
-                return detail::CreatePackageError(error_log,
-                                                  rename2_o.Error(),
-                                                  "Couldn't install files to your install folder \"{}\"",
                                                   resolved_destination_folder);
             }
 

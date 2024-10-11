@@ -112,16 +112,6 @@ ErrorCodeOr<String> TrashFileOrDirectory(String path, Allocator &a) {
     return a.Clone(NSStringToString([resulting_url path]));
 }
 
-ErrorCodeOr<void> RestoreTrashedFileOrDirectory(String trashed_path, String original_path) {
-    NSError* error = nil;
-    auto const success = [[NSFileManager defaultManager] moveItemAtPath:StringToNSString(trashed_path)
-                                                                 toPath:StringToNSString(original_path)
-                                                                  error:&error]; 
-    (void)success;
-    if (error) return FilesystemErrorFromNSError(error);
-    return k_success;
-}
-
 ErrorCodeOr<void> Delete(String path, DeleteOptions options) {
     PathArena path_arena {Malloc::Instance()};
     switch (options.type) {

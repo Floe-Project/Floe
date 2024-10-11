@@ -133,10 +133,6 @@ ErrorCodeOr<String> TrashFileOrDirectory(String path, Allocator&) {
     return path;
 }
 
-ErrorCodeOr<void> RestoreTrashedFileOrDirectory(String, String) {
-    return ErrorCode {FilesystemError::PathDoesNotExist};
-}
-
 ErrorCodeOr<void> Delete(String path, DeleteOptions options) {
     PathArena temp_path_allocator {Malloc::Instance()};
     auto const path_ptr = NullTerminated(path, temp_path_allocator);

@@ -13,6 +13,9 @@
 
 #include "build_resources/embedded_files.h"
 #include "engine/engine.hpp"
+#include "gui/gui2_notifications.hpp"
+#include "gui/gui2_package_install.hpp"
+#include "gui/gui2_settings_panel.hpp"
 #include "gui_editor_widgets.hpp"
 #include "gui_editors.hpp"
 #include "gui_framework/draw_list.hpp"
@@ -283,6 +286,8 @@ static void CreateFontsIfNeeded(Gui* g) {
     if (graphics_ctx->fonts.tex_id == nullptr) {
         graphics_ctx->fonts.Clear();
 
+        LoadFonts(*graphics_ctx, g->fonts);
+
         auto const fira_sans_size = g->imgui.PointsToPixels(16);
         auto const roboto_small_size = g->imgui.PointsToPixels(16);
         auto const mada_big_size = g->imgui.PointsToPixels(23);
@@ -292,7 +297,7 @@ static void CreateFontsIfNeeded(Gui* g) {
 
         auto const load_font = [&](Span<u8 const> data, f32 size, Span<graphics::GlyphRange const> ranges) {
             graphics::FontConfig config {};
-            config.font_data_reference_only = true; // we handle it in font_arena
+            config.font_data_reference_only = true;
             auto font = graphics_ctx->fonts.AddFontFromMemoryTTF((void*)data.data,
                                                                  (int)data.size,
                                                                  size * g->frame_input.draw_scale_factor,
@@ -306,6 +311,7 @@ static void CreateFontsIfNeeded(Gui* g) {
 
         {
             auto const data = EmbeddedFontAwesome();
+            // IMPROVE: don't load all icons
             g->icons = load_font({data.data, data.size},
                                  mada_size,
                                  Array {graphics::GlyphRange {ICON_MIN_FA, ICON_MAX_FA}});
@@ -337,26 +343,6 @@ static void CreateFontsIfNeeded(Gui* g) {
 
 static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
     switch (type) {
-        case DialogType::InstallPackage: {
-            auto downloads_folder =
-                KnownDirectory(g->scratch_arena, KnownDirectoryType::Downloads, {.create = false});
-
-            auto const paths = TRY(FilesystemDialog({
-                .type = DialogArguments::Type::OpenFile,
-                .allocator = g->scratch_arena,
-                .title = "Select Floe Package",
-                .default_path = downloads_folder,
-                .filters = ArrayT<DialogArguments::FileFilter>({
-                    {
-                        .description = "Floe Package"_s,
-                        .wildcard_filter = "*.floe.zip"_s,
-                    },
-                }),
-                .parent_window = g->frame_input.native_window,
-            }));
-            if (paths.size) InstallPackagesSelectFilesDialogResults(g, paths);
-            break;
-        }
         case DialogType::AddNewLibraryScanFolder: {
             Optional<String> default_folder {};
             if (auto extra_paths =
@@ -478,7 +464,6 @@ Gui::Gui(GuiFrameInput& frame_input, Engine& engine)
 
 Gui::~Gui() {
     layout::DestroyContext(layout);
-    ShutdownInstallPackagesModal(install_packages_state);
     sample_lib_server::CloseAsyncCommsChannel(engine.shared_engine_systems.sample_library_server,
                                               sample_lib_server_async_channel);
     g_log_file.Trace(k_gui_log_module);
@@ -688,6 +673,33 @@ GuiFrameResult GuiUpdate(Gui* g) {
     if (HasAnyErrorNotifications(g)) OpenModalIfNotAlready(imgui, ModalWindowType::LoadError);
 
     DoModalWindows(g);
+
+    // GUI2 panels. This is the future.
+    {
+        GuiBoxSystem box_system {
+            .arena = g->scratch_arena,
+            .imgui = g->imgui,
+            .fonts = g->fonts,
+            .layout = g->layout,
+        };
+
+        SettingsPanelContext context {
+            .settings = g->settings,
+            .sample_lib_server = g->shared_engine_systems.sample_library_server,
+            .package_install_jobs = g->engine.package_install_jobs,
+            .thread_pool = g->shared_engine_systems.thread_pool,
+        };
+
+        DoSettingsPanel(box_system, context, g->settings2_open);
+
+        DoNotifications(box_system, g->notifications);
+
+        DoPackageInstallNotifications(box_system,
+                                      g->engine.package_install_jobs,
+                                      g->notifications,
+                                      g->engine.error_notifications,
+                                      g->shared_engine_systems.thread_pool);
+    }
 
     DoWholeEditor(g);
     imgui.End(g->scratch_arena);

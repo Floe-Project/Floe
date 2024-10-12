@@ -1716,7 +1716,7 @@ pub fn build(b: *std.Build) void {
 
         {
             var packager = b.addExecutable(.{
-                .name = "packager",
+                .name = "floe-packager",
                 .target = target,
                 .optimize = build_context.optimise,
             });

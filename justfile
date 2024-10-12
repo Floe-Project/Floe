@@ -455,6 +455,7 @@ windows-prepare-release:
 
   # just windows-codesign-file Floe.vst3 "Floe VST3" # TODO: re-enable when wrappers are supported
   just windows-codesign-file Floe.clap "Floe CLAP"
+  just windows-codesign-file floe-packager.exe "Floe Packager"
 
   installer_file=$(find . -type f -name "*Installer*.exe")
   just windows-codesign-file $installer_file "Installer for Floe"
@@ -474,11 +475,36 @@ windows-prepare-release:
   rm readme.txt
   mv $final_manual_zip_name {{release_files_dir}}
 
+  # zip the packager
+  final_packager_zip_name="Floe-Packager-v$version-Windows.zip"
+  zip -r $final_package_zip_name floe-packager.exe
+  mv $final_package_zip_name {{release_files_dir}}
+
 [macos, no-cd]
 macos-notarize file:
   #!/usr/bin/env bash
   set -euo pipefail # don't use 'set -x' because it might print sensitive information
   xcrun notarytool submit {{file}} --apple-id "$MACOS_NOTARIZATION_USERNAME" --password "$MACOS_NOTARIZATION_PASSWORD" --team-id $MACOS_TEAM_ID --wait
+
+[macos]
+macos-prepare-packager:
+  #!/usr/bin/env bash
+  set -euo pipefail # don't use 'set -x' because it might print sensitive information
+  [[ ! -f version.txt ]] && echo "version.txt file not found" && exit 1
+  [[ ! -d zig-out/universal-macos ]] && echo "universal-macos folder not found" && exit 1
+
+  version=$(cat version.txt)
+  mkdir -p {{release_files_dir}}
+
+  cd zig-out/universal-macos
+
+  codesign --sign "$MACOS_DEV_ID_APP_NAME" --timestamp --options=runtime --deep --force floe-packager
+  just macos-notarize floe-packager
+  xcrun stapler staple floe-packager
+
+  final_packager_zip_name="Floe-Packager-v$version-macOS.zip"
+  zip -r $final_packager_zip_name floe-packager
+  mv $final_packager_zip_name {{release_files_dir}}
 
 [macos]
 macos-prepare-release-plugins:
@@ -693,4 +719,4 @@ macos-build-installer:
   mv "$final_zip_name" "{{release_files_dir}}"
 
 [macos]
-macos-prepare-release: (macos-prepare-release-plugins) (macos-build-installer)
+macos-prepare-release: (macos-prepare-packager) (macos-prepare-release-plugins) (macos-build-installer)

@@ -13,6 +13,8 @@
 #include "common_infrastructure/sample_library/sample_library.hpp"
 
 // Library packager CLI tool
+// - Packages Floe libraries and presets into a single Floe Package file
+// - Embeds a checksum file into the package for better change detection when installed
 // - Generates an 'About' HTML file for a Floe library
 // - Ensures there's a license file
 // - Validates that the Lua file is correct
@@ -218,7 +220,7 @@ auto constexpr k_command_line_args_defs = MakeCommandLineArgDefs<CliArgId>({
     {
         .id = (u32)CliArgId::LibraryFolder,
         .key = "library-folders",
-        .description = "Path to the library folder",
+        .description = "Library folder path",
         .value_type = "path",
         .required = false,
         .num_values = -1,
@@ -226,7 +228,7 @@ auto constexpr k_command_line_args_defs = MakeCommandLineArgDefs<CliArgId>({
     {
         .id = (u32)CliArgId::PresetFolder,
         .key = "presets-folders",
-        .description = "Path to the presets folder",
+        .description = "Presets folder path",
         .value_type = "path",
         .required = false,
         .num_values = -1,
@@ -287,13 +289,22 @@ static ErrorCodeOr<int> Main(ArgsCstr args) {
     ArenaAllocator arena {PageAllocator::Instance()};
     auto const program_name = path::Filename(FromNullTerminated(args.args[0]));
 
-    auto const cli_args = TRY(ParseCommandLineArgsStandard(arena,
-                                                           args,
-                                                           k_command_line_args_defs,
-                                                           {
-                                                               .handle_help_option = true,
-                                                               .print_usage_on_error = true,
-                                                           }));
+    auto const cli_args = TRY(ParseCommandLineArgsStandard(
+        arena,
+        args,
+        k_command_line_args_defs,
+        {
+            .handle_help_option = true,
+            .print_usage_on_error = true,
+            .description =
+                "Takes libraries and presets and turns them into a Floe package file (floe.zip).\n"
+                "You can specify multiple libraries and presets. Additionally:\n"
+                "- Validates any Lua files\n"
+                "- Ensures there's a license file\n"
+                "- Generates an 'About' HTML file for each library\n"
+                "- Embeds a checksum file into the package for better change detection when installed",
+            .version = FLOE_VERSION_STRING,
+        }));
     TRY(CheckNeededPackageCliArgs(cli_args));
 
     DynamicArray<u8> zip_data {arena};
@@ -342,7 +353,9 @@ static ErrorCodeOr<int> Main(ArgsCstr args) {
         TRY(WriteFile(package_path, zip_data));
         g_cli_out.Info({}, "Created package file: {}", package_path);
     } else {
-        g_cli_out.Info({}, "No output packge folder provided, not creating a package file");
+        g_cli_out.Info(
+            {},
+            "No output packge folder provided, not creating a package file\nRun with --help for usage info");
     }
 
     return 0;

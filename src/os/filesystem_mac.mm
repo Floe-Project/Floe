@@ -557,6 +557,7 @@ void DestoryDirectoryWatcher(DirectoryWatcher& watcher) {
     }
     watcher.watched_dirs.Clear();
     watcher.allocator.Delete(mac_w);
+    watcher.native_data.pointer = nullptr;
 }
 
 void EventCallback([[maybe_unused]] ConstFSEventStreamRef stream_ref,
@@ -645,6 +646,7 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
     for (auto& dir : watcher.watched_dirs)
         dir.directory_changes.Clear();
 
+    ASSERT(watcher.native_data.pointer != nullptr);
     auto& mac_watcher = *(MacWatcher*)watcher.native_data.pointer;
     if (any_states_changed) {
         if (mac_watcher.stream) {

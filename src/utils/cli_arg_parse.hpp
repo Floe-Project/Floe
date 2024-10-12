@@ -32,8 +32,9 @@ struct ArgsCstr {
 };
 
 PUBLIC ErrorCodeOr<void>
-PrintUsage(Writer writer, String exe_name, Span<CommandLineArgDefinition const> args) {
+PrintUsage(Writer writer, String exe_name, String description, Span<CommandLineArgDefinition const> args) {
     TRY(fmt::FormatToWriter(writer, "Usage: {} [ARGS]\n\n", exe_name));
+    if (description.size) TRY(fmt::FormatToWriter(writer, "{}\n\n", description));
 
     static auto print_arg_key_val = [](Writer writer,
                                        CommandLineArgDefinition const& arg) -> ErrorCodeOr<void> {
@@ -202,6 +203,7 @@ PUBLIC ErrorCodeCategory const& ErrorCategoryForEnum(CliError) { return CliError
 struct ParseCommandLineArgsOptions {
     bool handle_help_option = true;
     bool print_usage_on_error = true;
+    String description {};
 };
 
 // always returns a span the same size as the arg_defs, if an arg wasn't set it will have was_provided = false
@@ -212,7 +214,8 @@ PUBLIC ErrorCodeOr<Span<CommandLineArg>> ParseCommandLineArgs(Writer writer,
                                                               Span<CommandLineArgDefinition const> arg_defs,
                                                               ParseCommandLineArgsOptions options = {}) {
     auto error = [&](CliError e) -> ErrorCode {
-        if (options.print_usage_on_error) TRY(PrintUsage(writer, program_name, arg_defs));
+        if (options.print_usage_on_error)
+            TRY(PrintUsage(writer, program_name, options.description, arg_defs));
         return ErrorCode {e};
     };
 
@@ -228,7 +231,7 @@ PUBLIC ErrorCodeOr<Span<CommandLineArg>> ParseCommandLineArgs(Writer writer,
 
     for (auto [key, values] : ArgsToKeyValueTable(arena, args)) {
         if (options.handle_help_option && key == "help") {
-            TRY(PrintUsage(writer, program_name, arg_defs));
+            TRY(PrintUsage(writer, program_name, options.description, arg_defs));
             return ErrorCode {CliError::HelpRequested};
         }
 

@@ -191,6 +191,22 @@ TEST_CASE(TestParseCommandLineArgs) {
             CHECK(buffer.size > 0);
         }
 
+        SUBCASE("version is handled when requested") {
+            auto const o = ParseCommandLineArgs(writer,
+                                                a,
+                                                "my-program",
+                                                Array {"--version"_s},
+                                                k_arg_defs,
+                                                {
+                                                    .handle_help_option = true,
+                                                    .print_usage_on_error = false,
+                                                    .version = "1.0.0"_s,
+                                                });
+            REQUIRE(o.HasError());
+            CHECK(o.Error() == CliError::VersionRequested);
+            CHECK(buffer.size > 0);
+        }
+
         SUBCASE("arg that requires exactly 2 values") {
             auto const o = ParseCommandLineArgs(writer,
                                                 a,

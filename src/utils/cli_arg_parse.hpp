@@ -33,8 +33,9 @@ struct ArgsCstr {
 
 PUBLIC ErrorCodeOr<void>
 PrintUsage(Writer writer, String exe_name, String description, Span<CommandLineArgDefinition const> args) {
-    TRY(fmt::FormatToWriter(writer, "Usage: {} [ARGS]\n\n", exe_name));
     if (description.size) TRY(fmt::FormatToWriter(writer, "{}\n\n", description));
+
+    TRY(fmt::FormatToWriter(writer, "Usage: {} [ARGS]\n\n", exe_name));
 
     static auto print_arg_key_val = [](Writer writer,
                                        CommandLineArgDefinition const& arg) -> ErrorCodeOr<void> {
@@ -180,6 +181,7 @@ PUBLIC HashTable<String, Span<String>> ArgsToKeyValueTable(ArenaAllocator& arena
 enum class CliError {
     InvalidArguments,
     HelpRequested,
+    VersionRequested,
 };
 PUBLIC ErrorCodeCategory const& CliErrorCodeType() {
     static constexpr ErrorCodeCategory const k_cat {
@@ -191,6 +193,7 @@ PUBLIC ErrorCodeCategory const& CliErrorCodeType() {
                     switch ((CliError)e.code) {
                         case CliError::InvalidArguments: s = "Invalid arguments"; break;
                         case CliError::HelpRequested: s = "Help requested"; break;
+                        case CliError::VersionRequested: s = "Version requested"; break;
                     }
                     s;
                 }));
@@ -204,6 +207,7 @@ struct ParseCommandLineArgsOptions {
     bool handle_help_option = true;
     bool print_usage_on_error = true;
     String description {};
+    String version {}; // if present will be printed on --version
 };
 
 // always returns a span the same size as the arg_defs, if an arg wasn't set it will have was_provided = false
@@ -233,6 +237,11 @@ PUBLIC ErrorCodeOr<Span<CommandLineArg>> ParseCommandLineArgs(Writer writer,
         if (options.handle_help_option && key == "help") {
             TRY(PrintUsage(writer, program_name, options.description, arg_defs));
             return ErrorCode {CliError::HelpRequested};
+        }
+
+        if (options.version.size && key == "version") {
+            TRY(fmt::FormatToWriter(writer, "Version {}\n", options.version));
+            return ErrorCode {CliError::VersionRequested};
         }
 
         auto const arg_index = FindIf(arg_defs, [&](auto const& arg) { return arg.key == key; });
@@ -291,7 +300,10 @@ ParseCommandLineArgsStandard(ArenaAllocator& arena,
     auto writer = StdWriter(g_cli_out.stream);
     auto result = ParseCommandLineArgs(writer, arena, args, arg_defs, options);
     if (result.HasError()) {
-        if (result.Error() == CliError::HelpRequested) return 0;
+        if (result.Error() == CliError::HelpRequested)
+            return 0;
+        else if (result.Error() == CliError::VersionRequested)
+            return 0;
         return 1;
     }
     return result.Value();

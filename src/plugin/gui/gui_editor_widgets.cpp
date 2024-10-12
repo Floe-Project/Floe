@@ -155,7 +155,7 @@ bool EditorMenuItems(EditorGUI* g, Span<String const> items, int& current) {
 
 bool EditorMenu(EditorGUI* g, Rect r, Span<String const> items, int& current) {
     auto sets = imgui::DefButtonPopup();
-    auto id = g->imgui->GetID(items.data);
+    auto id = g->imgui->GetID((uintptr)items.data);
     auto curr_text = items[(usize)current];
     bool result = false;
     if (g->imgui->PopupButton(sets, r, id, id + 1, curr_text)) {

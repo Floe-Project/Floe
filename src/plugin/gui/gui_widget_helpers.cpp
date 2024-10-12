@@ -137,7 +137,7 @@ void MidiLearnMenu(Gui* g, ParamIndex param, Rect r) { MidiLearnMenu(g, {&param,
 void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
     auto& imgui = g->imgui;
     auto& engine = g->engine;
-    imgui.PushID((int)params[0]);
+    imgui.PushID((uintptr)params[0]);
     auto popup_id = imgui.GetID("MidiLearnPopup");
     auto right_clicker_id = imgui.GetID("MidiLearnClicker");
     imgui.PopID();
@@ -209,7 +209,7 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
         f32 pos = 0;
 
         for (auto param : params) {
-            imgui.PushID((int)param);
+            imgui.PushID((uintptr)param);
             DEFER { imgui.PopID(); };
 
             if (params.size != 1) {
@@ -354,7 +354,7 @@ bool DoMultipleMenuItems(Gui* g,
     for (auto const i : Range(num_items)) {
         bool state = i == current;
         if (buttons::Toggle(g,
-                            g->imgui.GetID(i),
+                            g->imgui.GetID((uintptr)i),
                             {.xywh {0, h * (f32)i, w, h}},
                             state,
                             GetStr(items, i),

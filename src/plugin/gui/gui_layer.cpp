@@ -688,7 +688,7 @@ void Draw(Gui* g,
 
     auto settings = FloeWindowSettings(g->imgui, [&](IMGUI_DRAW_WINDOW_BG_ARGS) {});
     settings.flags |= imgui::WindowFlags_NoScrollbarY;
-    g->imgui.BeginWindow(settings, g->imgui.GetID(layer), r);
+    g->imgui.BeginWindow(settings, g->imgui.GetID((uintptr)layer), r);
     DEFER { g->imgui.EndWindow(); };
 
     auto const draw_divider = [&](layout::Id id) {

@@ -513,45 +513,20 @@ void Context::AddTimedWakeup(TimePoint time, char const* timer_name) {
 
 void Context::PushID(String str) { dyn::Append(id_stack, GetID(str)); }
 
-void Context::PushID(char const* str) { dyn::Append(id_stack, GetID(str)); }
-
-void Context::PushID(void const* ptr) { dyn::Append(id_stack, GetID(ptr)); }
-
-void Context::PushID(u64 int_id) { dyn::Append(id_stack, GetID(int_id)); }
-
-void Context::PushID(int int_id) {
-    auto* ptr_id = (void*)(uintptr)int_id;
-    dyn::Append(id_stack, GetID(ptr_id));
-}
-
-void Context::PushID(Id id) { dyn::Append(id_stack, GetID((u64)id)); }
+void Context::PushID(uintptr num) { dyn::Append(id_stack, GetID(num)); }
 
 void Context::PopID() { dyn::Pop(id_stack); }
 
-Id Context::GetID(char const* str) { return GetID(str, nullptr); }
-
-Id Context::GetID(char const* str, char const* str_end) {
+Id Context::GetID(String str) {
     auto const seed = Last(id_stack);
-    auto const result = ImguiHash(str, str_end ? (int)(str_end - str) : 0, seed);
+    auto const result = ImguiHash(str.data, (int)str.size, seed);
     ASSERT(result != 0 && result != k_imgui_misc_id); // by chance we have landed on one of the reserved ids
     return result;
 }
 
-Id Context::GetID(String str) { return GetID(str.data, str.data + str.size); }
-
-Id Context::GetID(u64 int_id) {
-    void const* ptr_id = (void*)(uintptr)int_id;
-    return GetID(ptr_id);
-}
-
-Id Context::GetID(int int_id) {
-    void const* ptr_id = (void*)(uintptr)int_id;
-    return GetID(ptr_id);
-}
-
-Id Context::GetID(void const* ptr) {
+Id Context::GetID(uintptr i) {
     auto const seed = Last(id_stack);
-    auto const result = ImguiHash(&ptr, sizeof(void*), seed);
+    auto const result = ImguiHash(&i, (int)sizeof(i), seed);
     ASSERT(result != 0 && result != k_imgui_misc_id); // by chance we have landed on one of the reserved ids
     return result;
 }
@@ -2067,8 +2042,10 @@ void Context::DebugTextItem(char const* label, char const* text, ...) {
 bool Context::DebugTextHeading(bool& state, char const* text) {
     f32 const height = graphics->context->CurrentFontSize() + 4;
 
-    bool const clicked =
-        Button(DefButton(), {.xywh {0, debug_y_pos, Width(), height}}, GetID(text), FromNullTerminated(text));
+    bool const clicked = Button(DefButton(),
+                                {.xywh {0, debug_y_pos, Width(), height}},
+                                GetID(FromNullTerminated(text)),
+                                FromNullTerminated(text));
     debug_y_pos += height;
     if (clicked) state = !state;
     return state;
@@ -2079,7 +2056,7 @@ bool Context::DebugButton(char const* text) {
 
     bool const clicked = ToggleButton(DefToggleButton(),
                                       {.xywh {0, debug_y_pos, Width(), height}},
-                                      GetID(text),
+                                      GetID(FromNullTerminated(text)),
                                       debug_show_register_widget_overlay,
                                       FromNullTerminated(text));
     debug_y_pos += height;

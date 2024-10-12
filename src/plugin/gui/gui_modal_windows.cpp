@@ -256,7 +256,7 @@ static void DoErrorsModal(Gui* g) {
                     DEFER { it->Release(); };
                     auto& e = *e_ptr;
 
-                    imgui.PushID((int)e.id);
+                    imgui.PushID((uintptr)e.id);
                     DEFER { imgui.PopID(); };
 
                     // title
@@ -448,7 +448,7 @@ static void DoLicencesModal(Gui* g) {
             auto& txt = k_third_party_licence_texts[i];
             bool state = open[i];
             bool const changed = buttons::Toggle(g,
-                                                 imgui.GetID(&txt),
+                                                 imgui.GetID((uintptr)&txt),
                                                  {.xywh {0, y_pos, imgui.Width(), h}},
                                                  state,
                                                  txt.name,

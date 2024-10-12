@@ -511,7 +511,7 @@ void GUIDoSampleWaveform(Gui* g, LayerProcessor* layer, Rect r) {
     auto& imgui = g->imgui;
     auto reg_r = r;
     g->imgui.RegisterAndConvertRect(&reg_r);
-    g->imgui.PushID(layer);
+    g->imgui.PushID((uintptr)layer);
     DEFER { g->imgui.PopID(); };
 
     auto const rounding = LiveSize(g->imgui, UiSizeId::CornerRounding);

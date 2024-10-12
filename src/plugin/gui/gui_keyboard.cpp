@@ -81,7 +81,7 @@ Optional<KeyboardGuiKeyPressed> KeyboardGui(Gui* g, Rect r, int starting_octave)
         key_r.h = white_height;
 
         imgui.RegisterAndConvertRect(&key_r);
-        auto const id = imgui.GetID(i);
+        auto const id = imgui.GetID((uintptr)i);
         if (!keyboard.Get((usize)this_abs_note)) {
             if (imgui.ButtonBehavior(key_r, id, {.left_mouse = true, .triggers_on_mouse_down = true})) {
                 g->midi_keyboard_note_held_with_mouse = CheckedCast<u7>(this_abs_note);
@@ -115,7 +115,7 @@ Optional<KeyboardGuiKeyPressed> KeyboardGui(Gui* g, Rect r, int starting_octave)
         key_r.h = black_height;
 
         imgui.RegisterAndConvertRect(&key_r);
-        auto const id = imgui.GetID(i);
+        auto const id = imgui.GetID((uintptr)i);
         if (!keyboard.Get((usize)this_abs_note)) {
             if (imgui.ButtonBehavior(key_r, id, {.left_mouse = true, .triggers_on_mouse_down = true})) {
                 g->midi_keyboard_note_held_with_mouse = CheckedCast<u7>(this_abs_note);

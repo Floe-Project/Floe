@@ -426,18 +426,10 @@ struct Context {
     // so the hash will be different depending on what is pushed onto the id stack
     // before with PushID()/PopID()
     Id GetID(String str);
-    Id GetID(char const* str);
-    Id GetID(char const* str, char const* str_end);
-    Id GetID(void const* ptr);
-    Id GetID(int int_id);
-    Id GetID(u64 id);
+    Id GetID(uintptr num);
 
     void PushID(String str);
-    void PushID(char const* str);
-    void PushID(void const* ptr);
-    void PushID(int id);
-    void PushID(u64 id);
-    void PushID(Id id);
+    void PushID(uintptr num);
     void PopID();
 
     bool IsActive(Id id) const;

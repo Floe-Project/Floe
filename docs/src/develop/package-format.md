@@ -5,17 +5,17 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Floe Packages
 
-Floe Packages are ZIP files that contain [Floe sample libraries](sample-library-format.md) and/or presets. These are the files that users download to install new libraries and presets into Floe.
+Floe Packages are ZIP files that contain [Floe sample libraries](../about/sample-libraries.md) and/or presets. These are the files that users download to install new libraries and presets into Floe.
 
-Floe offers an easy-to-use GUI for [installing these Packages](installation/installing-libraries.md). This installation process carefully considers the user's existing libraries and presets, their versions, their installation preferences, even whether their installed libraries have been modified or not. The result is something that should 'just work' or at least provide clear instructions on what to do next.
+Floe offers an easy-to-use GUI for [installing these Packages](../installation/installing-libraries-and-presets.md). This installation process carefully considers the user's existing libraries and presets, their versions, their installation preferences, even whether their installed libraries have been modified or not. The result is something that should 'just work' or at least provide clear instructions on what to do next.
 
 As with Floe's sample library format, openness is key. That's why Floe Packages are just normal ZIP files with a specific structure. Anyone can create them and anyone can open them. Additionally, it gives the user the option to extract them manually rather than use Floe's GUI if they wish. 
 
-You can create Floe Packages with any ZIP program, but if you can, we recommend using the [command-line tool](packager-tool.md) that we provide.
+You can create Floe Packages with any ZIP program, but if you can, we recommend using the command-line tool that we provide.
 
 ## Structure
 
-A Floe Package is a ZIP file with the ending `.floe.zip`. It must contain either a subfolder called `Libraries` containing [sample libraries](sample-library-format.md), or a subfolder called `Presets` containing preset folders, or both. 
+A Floe Package is a ZIP file with the ending `.floe.zip`. It must contain either a subfolder called `Libraries` containing [sample libraries](../about/sample-libraries.md), or a subfolder called `Presets` containing preset folders, or both. 
 
 ### Single library + factory presets
 Floe Packages typically contain a single library and a set of factory presets.
@@ -69,3 +69,6 @@ Floe Packages can contain multiple libraries or presets.
         ├── 📄Bright.floe-preset
         └── 📄Warm.floe-preset
 ```
+
+### Floe packager tool
+Floe Packages can be created using any ZIP tool. But if possible, we recommend using our packager command-line tool. It adds a few things to the Floe Package that provide a slightly better experience for the user when installing your packages with Floe's GUI.

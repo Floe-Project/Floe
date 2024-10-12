@@ -13,7 +13,7 @@ There's two ways to install Floe: using the installer, or manually. Either way, 
 1. Close your DAW.
 1. Run the installer program.
 1. Follow the instructions, including choosing the plugin formats you want to install.
-1. Done. Floe will be available to your DAW - but you might yet need to [install sample libraries](installing-libraries.md).
+1. Done. Floe will be available to your DAW - but you might yet need to [install sample libraries](installing-libraries-and-presets.md).
 
 ## Manual Installation
 
@@ -28,5 +28,5 @@ Normally you'll want to use the installer, but there could be some cases where y
 - VST3: Move `Floe.vst3` into `/Library/Audio/Plug-Ins/VST3`
 - AU: Move `Floe.component` into `/Library/Audio/Plug-Ins/Components`
 
-Next, you might need to [install sample libraries](installing-libraries.md). 
+Next, you might need to [install sample libraries](installing-libraries-and-presets.md). 
 

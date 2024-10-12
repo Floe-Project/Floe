@@ -23,7 +23,7 @@ Some things may be incorrect, missing or broken. We are bit-by-bit filling in th
 ---
 
 <h1 style="text-align:left; font-size: 40px">A sample library player, without the fuss.</h1>
-<p style="text-align:left; font-size: 20px; margin-bottom: 40px;">Floe is a free, open-source CLAP/VST3/AU plugin with powerful controls for expressive playback and sound-shaping of sample libraries in the <a href="https://floe.audio/sample-library-format.html">Floe format</a>.</p>
+<p style="text-align:left; font-size: 20px; margin-bottom: 40px;">Floe is a free, open-source CLAP/VST3/AU plugin with powerful controls for expressive playback and sound-shaping of sample libraries in the <a href="https://floe.audio/about/sample-libraries.html">Floe format</a>.</p>
 
 ![Floe's GUI](https://frozenplain.com/wp-content/uploads/2019/09/wraith-2.jpg)
 
@@ -31,11 +31,11 @@ Some things may be incorrect, missing or broken. We are bit-by-bit filling in th
 
 Floe is a free, open-source sample library engine.
 
-It loads sample libraries in the [Floe format](./sample-library-format.md): supporting both realistic virtual instruments and sample-based synthesis. Sample libraries are installed separately from Floe.
+It loads sample libraries in the [Floe format](./about/sample-libraries.md): supporting both realistic virtual instruments and sample-based synthesis. Sample libraries are installed separately from Floe.
 
 Floe is a CLAP, VST3 or AU plugin on <i class="fa fa-windows"></i> Windows and <i class="fa fa-apple"></i> macOS.
 
-Developed by [FrozenPlain](https://frozenplain.com). Floe's ancestor, [Mirage](./mirage.md), has been used by thousands of musicians and producers in 13 products.
+Developed by [FrozenPlain](https://frozenplain.com). Floe's ancestor, [Mirage](./about/mirage.md), has been used by thousands of musicians and producers in 13 products.
 
 > ### Floe's mission
 > 1. Make sample libraries more expressive, playable and effective in music production.

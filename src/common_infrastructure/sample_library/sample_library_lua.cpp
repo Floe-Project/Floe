@@ -324,7 +324,7 @@ struct TableFields<Region::File> {
                 return {
                     .name = "path",
                     .description_sentence = "A path to an audio file, relative to this current lua file.",
-                    .example = "One-shots/Resonating String.flac",
+                    .example = "Samples/One-shots/Resonating String.flac",
                     .lua_type = LUA_TSTRING,
                     .required = true,
                     .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.path = PathFromTop(ctx); },
@@ -714,7 +714,7 @@ struct TableFields<Instrument> {
                     .name = "waveform_audio_path",
                     .description_sentence =
                         "Path to an audio file relative to this script that should be used as the waveform on Floe's GUI.",
-                    .example = "samples/file1.flac",
+                    .example = "Samples/file1.flac",
                     .default_value = "first region path",
                     .lua_type = LUA_TSTRING,
                     .required = false,
@@ -826,7 +826,7 @@ struct TableFields<Library> {
                     .name = "background_image_path",
                     .description_sentence =
                         "Path relative to this script for the background image. It should be a jpg or png.",
-                    .example = "images/background.jpg",
+                    .example = "Images/background.jpg",
                     .lua_type = LUA_TSTRING,
                     .required = false,
                     .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.background_image_path = PathFromTop(ctx); },
@@ -836,7 +836,7 @@ struct TableFields<Library> {
                     .name = "icon_image_path",
                     .description_sentence =
                         "Path relative to this script for the icon image. It should be a square jpg or png.",
-                    .example = "images/icon.png",
+                    .example = "Images/icon.png",
                     .lua_type = LUA_TSTRING,
                     .required = false,
                     .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.icon_image_path = PathFromTop(ctx); },

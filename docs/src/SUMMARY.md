@@ -6,18 +6,21 @@ SPDX-License-Identifier: GPL-3.0-or-later
 # Summary
 
 [Home](./home.md)
-[Previously known as Mirage](./mirage.md)
 
-# Installation
-- [Requirements](./installation/requirements.md)
-- [Installing Floe](./installation/installing-floe.md)
-- [Installing Sample Libraries](./installation/installing-libraries.md)
-- [Uninstalling](./installation/uninstalling.md)
+- [Installation]()
+  - [Requirements](./installation/requirements.md)
+  - [Installing Floe](./installation/installing-floe.md)
+  - [Installing Libraries & Presets](./installation/installing-libraries-and-presets.md)
+  - [Uninstalling](./installation/uninstalling.md)
 
-# Sample Library Development
-- [Floe Sample Libraries](./sample-library-format.md)
-- [Floe Package Format](./package-format.md)
-- [Floe Packager Tool](./packager-tool.md)
+- [About]()
+  - [Sample Libraries](./about/sample-libraries.md)
+  - [Previously known as Mirage](./about/mirage.md)
+
+- [Developers]()
+  - [Develop Libraries](./develop/develop-libraries.md)
+  - [Package Libraries & Presets](./develop/package-format.md)
+  - [Library Lua API](./develop/library-lua-api.md)
 
 -----------
 

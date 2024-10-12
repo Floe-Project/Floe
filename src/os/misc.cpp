@@ -24,9 +24,14 @@ static constexpr ErrorCodeCategory k_errno_category {
             if (buffer[0] != '\0') buffer[0] = ToUppercaseAscii(buffer[0]);
             return writer.WriteChars(FromNullTerminated(buffer));
         }
-#else
+#elif IS_LINUX
         char buffer[200] {};
-        strerror_r((int)code.code, buffer, ArraySize(buffer));
+        auto const err_str = strerror_r((int)code.code, buffer, ArraySize(buffer));
+        if (buffer[0] != '\0') buffer[0] = ToUppercaseAscii(buffer[0]);
+        return writer.WriteChars(FromNullTerminated(err_str ? err_str : buffer));
+#elif IS_MACOS
+        char buffer[200] {};
+        auto _ = strerror_r((int)code.code, buffer, ArraySize(buffer));
         if (buffer[0] != '\0') buffer[0] = ToUppercaseAscii(buffer[0]);
         return writer.WriteChars(FromNullTerminated(buffer));
 #endif

@@ -28,7 +28,7 @@ void* AlignedAlloc(usize alignment, usize size) {
     // posix_memalign requires alignment to be a multiple of sizeof(void*).
     alignment = __builtin_align_up(alignment, sizeof(void*));
     void* result = nullptr;
-    posix_memalign(&result, alignment, size);
+    if (posix_memalign(&result, alignment, size) != 0) Panic("posix_memalign failed");
     return result;
 }
 void AlignedFree(void* ptr) { free(ptr); }
@@ -308,11 +308,11 @@ static void SignalHandler(int signal_num, siginfo_t* info, void* context) {
             DEFER { close(fd); };
 
             auto const signal_num_str = fmt::FormatInline<50>("{}\n Signal {}\n", timestamp, signal_num);
-            write(fd, signal_num_str.data, signal_num_str.size);
+            auto _ = write(fd, signal_num_str.data, signal_num_str.size);
 
             auto const signal_string = SignalString(signal_num, info);
-            write(fd, signal_string.data, signal_string.size);
-            write(fd, "\n", 1);
+            auto _ = write(fd, signal_string.data, signal_string.size);
+            auto _ = write(fd, "\n", 1);
 
             Writer writer {};
             writer.SetContained<int>(fd, [](int fd, Span<u8 const> bytes) -> ErrorCodeOr<void> {
@@ -326,7 +326,7 @@ static void SignalHandler(int signal_num, siginfo_t* info, void* context) {
                                        .demangle = false,
                                    },
                                    0);
-            write(fd, "\n", 1);
+            auto _ = write(fd, "\n", 1);
 
             fsync(fd);
         }
@@ -446,12 +446,17 @@ void StartupCrashHandler() {
         int const r = sigaction(signal, &action, &g_previous_signal_actions[index]);
         if (r != 0) {
             char buffer[200] = {};
-            strerror_r(errno, buffer, sizeof(buffer));
+#if IS_LINUX
+            auto const err_str = strerror_r(errno, buffer, sizeof(buffer));
+#else
+            auto _ = strerror_r(errno, buffer, sizeof(buffer));
+            auto const err_str = buffer;
+#endif
             g_log.Error(k_global_log_module,
                         "failed setting signal handler {}, errno({}) {}",
                         signal,
                         errno,
-                        FromNullTerminated(buffer));
+                        FromNullTerminated(err_str ? err_str : buffer));
         }
     }
 }

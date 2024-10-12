@@ -273,7 +273,7 @@ StateSnapshot CurrentStateSnapshot(Engine const& engine) {
     return MakeStateSnapshot(engine.processor);
 }
 
-static auto PrintInstrumentId(InstrumentId id) {
+[[maybe_unused]] auto PrintInstrumentId(InstrumentId id) {
     DynamicArrayBounded<char, 100> result {};
     switch (id.tag) {
         case InstrumentType::None: fmt::Append(result, "None"_s); break;
@@ -291,9 +291,9 @@ static auto PrintInstrumentId(InstrumentId id) {
     return result;
 }
 
-static void AssignDiffDescription(dyn::DynArray auto& diff_desc,
-                                  StateSnapshot const& old_state,
-                                  StateSnapshot const& new_state) {
+[[maybe_unused]] void AssignDiffDescription(dyn::DynArray auto& diff_desc,
+                                            StateSnapshot const& old_state,
+                                            StateSnapshot const& new_state) {
     dyn::Clear(diff_desc);
 
     if (old_state.ir_id != new_state.ir_id) {

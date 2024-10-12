@@ -19,7 +19,7 @@ struct ExistingInstalledComponent {
     enum class ModifiedSinceInstalled : u8 { Unmodified, MaybeModified, Modified };
     using enum VersionDifference;
     using enum ModifiedSinceInstalled;
-    inline bool operator==(ExistingInstalledComponent const& o) const = default;
+    bool operator==(ExistingInstalledComponent const& o) const = default;
     bool installed;
     VersionDifference version_difference; // if installed
     ModifiedSinceInstalled modified_since_installed; // if installed

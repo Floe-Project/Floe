@@ -501,7 +501,7 @@ macos-prepare-packager:
   codesign --sign "$MACOS_DEV_ID_APP_NAME" --timestamp --options=runtime --deep --force floe-packager
 
   final_packager_zip_name="Floe-Packager-v$version-macOS.zip"
-  zip -r $final_packager_zip_name floe-packager
+  zip $final_packager_zip_name floe-packager
 
   just macos-notarize "$final_packager_zip_name"
   xcrun stapler staple floe-packager

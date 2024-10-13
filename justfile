@@ -477,8 +477,8 @@ windows-prepare-release:
 
   # zip the packager
   final_packager_zip_name="Floe-Packager-v$version-Windows.zip"
-  zip -r $final_package_zip_name floe-packager.exe
-  mv $final_package_zip_name {{release_files_dir}}
+  zip -r $final_packager_zip_name floe-packager.exe
+  mv $final_packager_zip_name {{release_files_dir}}
 
 [macos, no-cd]
 macos-notarize file:

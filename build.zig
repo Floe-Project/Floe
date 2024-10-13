@@ -1729,6 +1729,7 @@ pub fn build(b: *std.Build) void {
             packager.addConfigHeader(build_config_step);
             packager.linkLibrary(miniz);
             join_compile_commands.step.dependOn(&packager.step);
+            addToLipoSteps(&build_context, packager, false) catch @panic("OOM");
             applyUniversalSettings(&build_context, packager);
             b.getInstallStep().dependOn(&b.addInstallArtifact(packager, .{ .dest_dir = install_subfolder }).step);
         }

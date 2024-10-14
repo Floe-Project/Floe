@@ -498,13 +498,13 @@ macos-prepare-packager:
 
   cd zig-out/universal-macos
 
-  codesign --sign "$MACOS_DEV_ID_APP_NAME" --timestamp --options=runtime --deep --force floe-packager
+  codesign --sign "$MACOS_DEV_ID_APP_NAME" --timestamp --options=runtime --force floe-packager
 
   final_packager_zip_name="Floe-Packager-v$version-macOS.zip"
   zip $final_packager_zip_name floe-packager
 
   just macos-notarize "$final_packager_zip_name"
-  xcrun stapler staple floe-packager
+  # NOTE: we can't staple the packager because it's a unix binary 
 
   mv $final_packager_zip_name {{release_files_dir}}
 

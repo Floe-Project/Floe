@@ -331,8 +331,8 @@ static bool UpdateLibraryJobs(Server& server,
                                     not_wanted = true;
                                     ++it;
                                 } else {
-                                    NotifyAllChannelsOfLibraryChange(server, lib->Id());
                                     it = server.libraries.Remove(it);
+                                    NotifyAllChannelsOfLibraryChange(server, lib->Id());
                                 }
                             } else {
                                 ++it;

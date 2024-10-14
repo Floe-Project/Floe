@@ -322,7 +322,13 @@ TryGrowingInPlace(Span<u8> stack, usize& cursor, ResizeCommand const& cmd) {
 }
 
 static constexpr void HandleBumpFree(Span<u8> data_to_free, u8* stack_data, usize& cursor) {
-    if (data_to_free.data && End(data_to_free) == (stack_data + cursor)) cursor -= data_to_free.size;
+    if (data_to_free.data && End(data_to_free) == (stack_data + cursor)) {
+        if constexpr (RUNTIME_SAFETY_CHECKS_ON) {
+            // fill the memory with a pattern to help catch use-after-free bugs
+            FillMemory(data_to_free.data, 0xCD, data_to_free.size);
+        }
+        cursor -= data_to_free.size;
+    }
 }
 
 static constexpr Span<u8>
@@ -520,6 +526,11 @@ struct ArenaAllocator : public Allocator {
             auto const next_pos = pos + r->BufferSize();
             if (size >= pos && size < next_pos) {
                 if (r == first) {
+                    if constexpr (RUNTIME_SAFETY_CHECKS_ON) {
+                        ASSERT(size <= r->BufferSize());
+                        // fill the memory with a pattern to help catch use-after-free bugs
+                        FillMemory(r->BufferData() + size, 0xCD, r->BufferSize() - size);
+                    }
                     current_region_cursor = size - pos;
                     return size;
                 } else {

@@ -53,6 +53,8 @@ class Malloc final : public Allocator {
             }
             case AllocatorCommand::Free: {
                 auto const& cmd = command.Get<FreeCommand>();
+                if constexpr (RUNTIME_SAFETY_CHECKS_ON)
+                    FillMemory(cmd.allocation.data, 0xCD, cmd.allocation.size);
                 AlignedFree(cmd.allocation.data);
                 break;
             }

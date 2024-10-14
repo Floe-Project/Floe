@@ -212,7 +212,10 @@ PresetsCheckExistingInstallation(Component const& component,
                 // check the checksums of all files
                 for (auto const [expected_path, checksum] : component.checksum_values) {
                     auto const cursor = scratch_arena.TotalUsed();
-                    DEFER { scratch_arena.TryShrinkTotalUsed(cursor); };
+                    DEFER {
+                        scratch_arena.TryShrinkTotalUsed(cursor);
+                        ASSERT(scratch_arena.TotalUsed() >= cursor);
+                    };
 
                     auto const full_path =
                         path::Join(scratch_arena, Array {folder, dir_entry.subpath, expected_path});

@@ -653,6 +653,7 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
             FSEventStreamStop(mac_watcher.stream);
             FSEventStreamInvalidate(mac_watcher.stream);
             FSEventStreamRelease(mac_watcher.stream);
+            mac_watcher.stream = {};
         }
 
         // fsevents is batched, we don't need to individually stop watching each directory, so at this stage

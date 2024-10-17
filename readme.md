@@ -147,8 +147,8 @@ Floe is a [CLAP](https://github.com/free-audio/clap) plugin written in C++. The 
 | Audio parameters            | System for configuring/using audio plugin parameters | 🟦     |
 | GUI                         | Graphical user interface                             | 🟩     |
 | Audio/GUI communication     | Communication between audio and GUI threads          | 🟩     |
+| CLAP format                 | CLAP                                                 | 🟩     |
 | Audio processing pipeline   | Sound shaping, MIDI, modulation, effects, etc.       | 🟨     |
-| CLAP format                 | CLAP                                                 | 🟨     |
 | VST3 format                 | VST3                                                 | 🟥     |
 | AUv2 format                 | Audio Unit (v2)                                      | 🟥     |
 | Presets server              | Async loading & scanning of presets                  | 🟥     |

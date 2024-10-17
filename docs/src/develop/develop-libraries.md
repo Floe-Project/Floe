@@ -10,7 +10,7 @@ This document explains the details of Floe's sample library format and how to de
 Be sure to read the [About Sample Libraries](../about/sample-libraries.md) page first.
 
 ## Why a new format?
-No existing format met our required criteria for Floe:
+No existing format met our requirements for Floe, which are:
 - Libraries should be plain folders of audio files.
 - Libraries should be portable across filesystems & operating systems.
 - Libraries should be configured using a proper programming language to enable creating complex libraries in a maintainable way.

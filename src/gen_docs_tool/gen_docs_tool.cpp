@@ -5,9 +5,12 @@
 
 #include "foundation/foundation.hpp"
 #include "os/misc.hpp"
+#include "os/web.hpp"
 #include "utils/cli_arg_parse.hpp"
+#include "utils/json/json_reader.hpp"
 #include "utils/logger/logger.hpp"
 
+#include "common_infrastructure/common_errors.hpp"
 #include "common_infrastructure/sample_library/sample_library.hpp"
 
 #include "config.h"
@@ -116,6 +119,29 @@ ErrorCodeOr<void> Main(String destination_folder) {
             fmt::Append(macos_version_str, " ({})", release_name);
 
             TRY(write_value("min-macos-version", macos_version_str));
+        }
+
+        {
+            auto const json_data =
+                TRY(HttpsGet("https://api.github.com/repos/Floe-Project/Floe/releases/latest", arena));
+
+            String latest_release_version {};
+            auto const o =
+                json::Parse(json_data,
+                            [&latest_release_version](json::EventHandlerStack&, json::Event const& event) {
+                                json::SetIfMatchingRef(event, "tag_name", latest_release_version);
+                                return true;
+                            },
+                            arena,
+                            {});
+
+            if (o.HasError()) return ErrorCode {CommonError::InvalidFileFormat};
+
+            if (StartsWith(latest_release_version, 'v')) latest_release_version.RemovePrefix(1);
+
+            if (latest_release_version.size == 0) return ErrorCode {CommonError::InvalidFileFormat};
+
+            TRY(write_value("latest-release-version", latest_release_version));
         }
     }
 

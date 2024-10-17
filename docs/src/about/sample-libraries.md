@@ -15,7 +15,7 @@ Access to the audio files gives you the freedom to use a library's sounds in oth
 
 You can use libraries developed by others or you can [develop your own](../develop/develop-libraries.md). Developing your own libraries does require some basic programming knowledge.
 
-Sample libraries are easily installed when they're packaged into [Floe's package format](package-format.md); on the settings panel there is a 'install package' button. You can also manually install libraries by placing them in a folder that Floe scans.
+Sample libraries are easily installed when they're packaged into [Floe's package format](../develop/package-format.md); on the settings panel there is a 'install package' button. You can also manually install libraries by placing them in a folder that Floe scans.
 
 For backward compatibility, Floe also supports [Mirage's](mirage.md) sample library format.
 

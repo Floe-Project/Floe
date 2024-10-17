@@ -1343,18 +1343,21 @@ pub fn build(b: *std.Build) void {
                 library_path ++ "/os/filesystem_windows.cpp",
                 library_path ++ "/os/misc_windows.cpp",
                 library_path ++ "/os/threading_windows.cpp",
+                library_path ++ "/os/web_windows.cpp",
             };
 
             const macos_source_files = .{
                 library_path ++ "/os/filesystem_mac.mm",
                 library_path ++ "/os/misc_mac.mm",
                 library_path ++ "/os/threading_mac.cpp",
+                library_path ++ "/os/web_mac.mm",
             };
 
             const linux_source_files = .{
                 library_path ++ "/os/filesystem_linux.cpp",
                 library_path ++ "/os/misc_linux.cpp",
                 library_path ++ "/os/threading_linux.cpp",
+                library_path ++ "/os/web_linux.cpp",
             };
 
             switch (target.result.os.tag) {
@@ -1365,6 +1368,7 @@ pub fn build(b: *std.Build) void {
                     library.linkSystemLibrary("ole32");
                     library.linkSystemLibrary("crypt32");
                     library.linkSystemLibrary("uuid");
+                    library.linkSystemLibrary("winhttp");
 
                     // synchronization.lib (https://github.com/ziglang/zig/issues/14919)
                     library.linkSystemLibrary("api-ms-win-core-synch-l1-2-0");
@@ -1379,6 +1383,7 @@ pub fn build(b: *std.Build) void {
                 .linux => {
                     library.addCSourceFiles(.{ .files = &unix_source_files, .flags = cpp_fp_flags });
                     library.addCSourceFiles(.{ .files = &linux_source_files, .flags = cpp_fp_flags });
+                    library.linkSystemLibrary2("libcurl", .{ .use_pkg_config = use_pkg_config });
                 },
                 else => {
                     unreachable;

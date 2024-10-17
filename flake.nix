@@ -156,6 +156,7 @@
             (pkgs.writeShellScriptBin "lipo" "llvm-lipo $@")
           ] ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
             pkgs.pkg-config
+            pkgs.curl
             pkgs.gnome.zenity
             pkgs.kcov
             pkgs.patchelf

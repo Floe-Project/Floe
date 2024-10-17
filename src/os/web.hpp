@@ -1,0 +1,30 @@
+#pragma once
+#include "foundation/foundation.hpp"
+
+enum class WebError : u32 {
+    ApiError,
+    NetworkError,
+    Non200Response,
+    Count,
+};
+
+static constexpr ErrorCodeCategory k_web_error_category {
+    .category_id = "FS",
+    .message = [](Writer const& writer, ErrorCode e) -> ErrorCodeOr<void> {
+        auto const get_str = [code = e.code]() -> String {
+            switch ((WebError)code) {
+                case WebError::ApiError: return "API error";
+                case WebError::NetworkError: return "network error";
+                case WebError::Non200Response: return "non-200 response";
+                case WebError::Count: break;
+            }
+            return "";
+        };
+        return writer.WriteChars(get_str());
+    },
+};
+
+PUBLIC ErrorCodeCategory const& ErrorCategoryForEnum(WebError) { return k_web_error_category; }
+
+// blocking
+ErrorCodeOr<String> HttpsGet(String url, Allocator& a);

@@ -10,9 +10,6 @@
 enum class ComponentTypes : u32 {
     Clap,
     VST3,
-#ifdef CORE_LIBRARY_ZIP_PATH
-    CoreLibrary,
-#endif
     Count,
 };
 
@@ -36,14 +33,6 @@ constexpr auto k_plugin_infos = Array {
         .filename = path::Filename(VST3_PLUGIN_PATH),
         .resource_id = VST3_PLUGIN_RC_ID,
     },
-#ifdef CORE_LIBRARY_ZIP_PATH
-    ComponentInfo {
-        .name = "Floe Core Library",
-        .install_dir = k_nullopt,
-        .filename = "Core",
-        .resource_id = CORE_LIBRARY_RC_ID,
-    },
-#endif
 };
 
 static_assert(k_plugin_infos.size == ToInt(ComponentTypes::Count));

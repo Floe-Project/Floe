@@ -26,16 +26,12 @@ run_windows_program := if os() == 'windows' {
 # path into our zig build script for it to lookup filenames within it. These resources are not requirements: if 
 # anything is missing you will get a warning, not an error, and some aspect of the build might be missing.
 #
-# Core: we keep the Core library external because it's a library of audio files that will likely grow quite large and 
-# it can be developed and distributed separately from source code.
-#
 # Logos: the logos represent Floe's quality-assurance and recognition and so we don't use a GPL licence for them. 
 # Therefore they're kept separate and they're optional.
 
 external_build_resources := "build_resources/external"
 
 # IMPORTANT: these must be kept in sync with the build.zig file
-core_library_abs_dir := join(justfile_directory(), external_build_resources, "Core")
 logos_abs_dir := join(justfile_directory(), external_build_resources, "Logos")
 
 patch-rpath:
@@ -386,32 +382,14 @@ _fetch-external-github-repo owner repo destination:
   rm -rf "{{destination}}"
   mv "{{repo}}-main" "{{destination}}"
 
-[unix]
-fetch-core-library: (_fetch-external-github-repo "Floe-Project" "Core-Library" core_library_abs_dir)
-
 # NOTE: the logos probably have reserved copyright
 [unix]
 fetch-logos: (_fetch-external-github-repo "Floe-Project" "Floe-Logos" logos_abs_dir)
 
 [unix, no-cd]
-_try-add-core-library-to-zip zip-path:
-  #!/usr/bin/env bash
-  if [[ -d "{{core_library_abs_dir}}" ]]; then
-    # TODO: either use the packager or skip including the core library in distributions
-    # {{native_binary_dir_abs}}/packager "{{core_library_abs_dir}}"
-    # need to do some faffing with folders so that we only zip the library and none of the parent folders
-    full_zip_path=$(realpath "{{zip-path}}")
-    core_dirname=$(dirname "{{core_library_abs_dir}}")
-    core_filename=$(basename "{{core_library_abs_dir}}")
-    pushd "$core_dirname"
-    zip -r "$full_zip_path" "$core_filename" -x "*/\.*" # exclude hidden files
-    popd
-  fi
-
-[unix, no-cd]
 _create-manual-install-readme os_name:
   #!/usr/bin/env bash
-  echo "These are the manual-install {{os_name}} plugin files and Core library for Floe version $(cat {{justfile_directory()}}/version.txt)." > readme.txt
+  echo "These are the manual-install {{os_name}} plugin files for Floe version $(cat {{justfile_directory()}}/version.txt)." > readme.txt
   echo "" >> readme.txt
   echo "It's normally easier to use the installer instead of these manual-install files." >> readme.txt
   echo "The installer is a separate download to this." >> readme.txt
@@ -471,7 +449,6 @@ windows-prepare-release:
   final_manual_zip_name="Floe-Manual-Install-v$version-Windows.zip"
   # TODO: add Floe.vst3 to zip when wrappers are supported
   zip -r $final_manual_zip_name Floe.clap readme.txt
-  just _try-add-core-library-to-zip $final_manual_zip_name
   rm readme.txt
   mv $final_manual_zip_name {{release_files_dir}}
 
@@ -579,7 +556,6 @@ macos-prepare-release-plugins:
   final_manual_zip_name="Floe-Manual-Install-v$version-macOS.zip"
   rm -f $final_manual_zip_name
   zip -r $final_manual_zip_name $plugin_list readme.txt
-  just _try-add-core-library-to-zip $final_manual_zip_name
   mv $final_manual_zip_name {{release_files_dir}}
   rm readme.txt
 
@@ -661,28 +637,6 @@ macos-build-installer:
     "Floe Folders" \
     "Create empty folders ready for Floe to use to look for libraries and presets" \
     floe_dirs.pkg
-  
-  # step 3: make a package for the core library
-  if [[ -d "{{core_library_abs_dir}}" ]]; then
-    # TODO: either use the packager or skip including the core library in distributions
-    # {{native_binary_dir_abs}}/packager "{{core_library_abs_dir}}"
-    mkdir -p core_library
-    pushd core_library
-    install_folder="Library/Application Support/Floe/Libraries"
-    mkdir -p "$install_folder"
-    cp -r "{{core_library_abs_dir}}" "$install_folder"
-    find "$install_folder" -name ".*" -exec rm -rf {} \;
-    popd
-    pkgbuild --root core_library --identifier com.Floe.Core --install-location / --version "$version" core_library.pkg
-
-    identifier=com.Floe.core
-
-    add_package_to_distribution_xml \
-      "com.Floe.core" \
-      "Core Library" \
-      "Core Floe library containing a few reverb impulses responses" \
-      core_library.pkg
-  fi
 
   # step 4: make the final installer combining all the packages
   mkdir -p productbuild_files

@@ -2460,18 +2460,6 @@ pub fn build(b: *std.Build) void {
                 });
                 var flags = std.ArrayList([]const u8).init(b.allocator);
 
-                // The core library is optionally packaged
-                const core_library = getExternalResource(&build_context, "Core");
-                if (core_library != null) {
-                    const core_library_zip_path_relative = b.pathJoin(&.{ build_gen_relative, "floe-core-library.zip" });
-                    // IMPROVE: it's slow to zip this every time
-                    // NOTE: we enter the library folder and build the zip from there. This way, the zip contains only the contents of the Core Library folder, not the folder itself. Additionally, we exclude the .git folder.
-                    const zip_core = b.addSystemCommand(&.{ "zip", "-x", ".git/*", "-r", b.pathJoin(&.{ rootdir, core_library_zip_path_relative }), "." });
-                    zip_core.setCwd(.{ .cwd_relative = core_library.?.absolute_path });
-                    win_installer.step.dependOn(&zip_core.step);
-                    flags.append(b.fmt("-DCORE_LIBRARY_ZIP_PATH=\"{s}\"", .{core_library_zip_path_relative})) catch unreachable;
-                }
-
                 if (sidebar_image != null) {
                     flags.append(b.fmt("-DSIDEBAR_IMAGE_PATH=\"{s}\"", .{sidebar_image.?.relative_path})) catch unreachable;
                 }

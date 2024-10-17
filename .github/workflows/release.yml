@@ -23,7 +23,6 @@ jobs:
             build_gen
 
       - run: |
-          just fetch-core-library
           # NOTE: the logos probably have copyright so this should only be done if you have permission
           just fetch-logos 
           just build-release windows
@@ -60,7 +59,6 @@ jobs:
             build_gen
 
       - run: |
-          just fetch-core-library
           just build-release mac_ub
 
       - uses: apple-actions/import-codesign-certs@v3
@@ -108,13 +106,6 @@ jobs:
           just echo-latest-changes > latest_changes.md
 
           mkdir -p "$RELEASE_ARTIFACTS_FOLDER"
-          cd "$RELEASE_ARTIFACTS_FOLDER"
-          wget "https://github.com/Floe-Project/Core-Library/archive/refs/heads/main.zip"
-          unzip "main.zip"
-          rm "main.zip"
-          mv "Core-Library-main" "Core"
-          zip -r "Floe-Core-Library.zip" "Core"
-          rm -rf "Core"
 
       - uses: actions/download-artifact@v4
         with:

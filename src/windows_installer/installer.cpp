@@ -3,7 +3,6 @@
 
 #include "installer.hpp"
 
-#include <miniz.h>
 #include <stb_image.h>
 #include <windows.h>
 
@@ -103,17 +102,6 @@ ErrorCodeOr<Span<u8 const>> GetResource(int resource_id) {
     return Span<u8 const> {res_data, (size_t)res_size};
 }
 
-template <typename... Args>
-static void MinizErrorPanic(SourceLocation loc, mz_zip_archive& zip, String format, Args const&... args) {
-    DynamicArrayBounded<char, 1000> buffer {};
-    fmt::Append(buffer, "{}: ", mz_zip_get_error_string(mz_zip_get_last_error(&zip)));
-    fmt::Append(buffer, format, args...);
-    fmt::Append(buffer, "\nAt {}", loc);
-    Panic(dyn::NullTerminated(buffer));
-}
-
-#define MINIZ_PANICF(format, ...) MinizErrorPanic(SourceLocation::Current(), zip, format, ##__VA_ARGS__)
-
 static InstallResult TryInstall(Component const& comp) {
     // IMPROVE: error messages could be more helpful here for the end-user. Explain what they could try to fix
     // the issue.
@@ -129,70 +117,12 @@ static InstallResult TryInstall(Component const& comp) {
         return error;
     }
 
-    if (comp.info.resource_id == CORE_LIBRARY_RC_ID) {
-        mz_zip_archive zip {};
-        mz_zip_zero_struct(&zip);
-        if (!mz_zip_reader_init_mem(&zip, comp.data.data, comp.data.size, 0))
-            MINIZ_PANICF("Failed to init zip");
-        DEFER { mz_zip_reader_end(&zip); };
-
-        DynamicArray<u8> file_data_buffer {PageAllocator::Instance()};
-        file_data_buffer.Reserve(12 * 1024);
-
-        for (auto const file_index : Range(mz_zip_reader_get_num_files(&zip))) {
-            mz_zip_archive_file_stat file_stat;
-            if (!mz_zip_reader_file_stat(&zip, file_index, &file_stat))
-                MINIZ_PANICF("Failed to get zip file stat, index: {}", file_index);
-
-            dyn::Resize(file_data_buffer, (usize)file_stat.m_uncomp_size);
-
-            if (!mz_zip_reader_extract_to_mem(&zip,
-                                              file_index,
-                                              file_data_buffer.data,
-                                              file_data_buffer.size,
-                                              0)) {
-                MINIZ_PANICF("Failed to extract zip file data, index: {}", file_index);
-            }
-
-            auto path_component = path::TrimDirectorySeparatorsEnd(FromNullTerminated(file_stat.m_filename));
-
-            ArenaAllocatorWithInlineStorage<1000> arena {Malloc::Instance()};
-            auto out_path = path::Join(arena, Array {comp.install_dir, comp.info.filename, path_component});
-
-            g_log.Debug(k_log_module, "Zip component {} has root_path {}", path_component, out_path);
-
-            auto const dir = file_stat.m_is_directory ? String(out_path) : path::Directory(String(out_path));
-            if (dir) {
-                if (auto const o = CreateDirectory(*dir,
-                                                   {
-                                                       .create_intermediate_directories = true,
-                                                       .fail_if_exists = false,
-                                                   });
-                    o.HasError()) {
-                    fmt::Assign(error.message, "Failed to create directory: {}", o.Error());
-                    error.error = o.Error();
-                    return error;
-                }
-            }
-
-            if (!file_stat.m_is_directory) {
-                if (auto const o = WriteFile(out_path, file_data_buffer.Items()); o.HasError()) {
-                    fmt::Assign(error.message, "Failed to write file: {}", o.Error());
-                    error.error = o.Error();
-                    return error;
-                }
-            }
-        }
-
-    } else {
-        ArenaAllocatorWithInlineStorage<1000> arena {Malloc::Instance()};
-        if (auto const o =
-                WriteFile(path::Join(arena, Array {comp.install_dir, comp.info.filename}), comp.data);
-            o.HasError()) {
-            fmt::Assign(error.message, "Failed to write file: {}", o.Error());
-            error.error = o.Error();
-            return error;
-        }
+    ArenaAllocatorWithInlineStorage<1000> arena {Malloc::Instance()};
+    if (auto const o = WriteFile(path::Join(arena, Array {comp.install_dir, comp.info.filename}), comp.data);
+        o.HasError()) {
+        fmt::Assign(error.message, "Failed to write file: {}", o.Error());
+        error.error = o.Error();
+        return error;
     }
 
     return k_success;
@@ -332,13 +262,8 @@ Application* CreateApplication(GuiFramework& framework, u32 root_layout_id) {
         app->components[i] = {
             .info = info,
             .install_dir = ({
-                String p;
-                if (info.install_dir)
-                    p = KnownDirectory(app->arena, *info.install_dir, {.create = true});
-                else {
-                    ASSERT(info.resource_id == CORE_LIBRARY_RC_ID);
-                    p = AlwaysScannedFolder(ScanFolderType::Libraries, app->arena);
-                }
+                String p {};
+                if (info.install_dir) p = KnownDirectory(app->arena, *info.install_dir, {.create = true});
                 p;
             }),
             .data = data.Value(),

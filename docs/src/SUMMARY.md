@@ -9,7 +9,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 - [Installation]()
   - [Requirements](./installation/requirements.md)
-  - [Installing Floe](./installation/installing-floe.md)
+  - [Download & Install Floe](./installation/installing-floe.md)
   - [Installing Libraries & Presets](./installation/installing-libraries-and-presets.md)
   - [Uninstalling](./installation/uninstalling.md)
 

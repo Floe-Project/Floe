@@ -7,7 +7,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 This document explains the details of Floe's sample library format and how to develop libraries for it. Developing libraries for Floe does require some basic programming knowledge.
 
-Be sure to read the [About Sample Libraries](../about/sample-libraries.md) document first.
+Be sure to read the [About Sample Libraries](../about/sample-libraries.md) page first.
 
 ## Why a new format?
 No existing format met our required criteria for Floe:

@@ -7,7 +7,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 Floe Packages are ZIP files that contain [Floe sample libraries](../about/sample-libraries.md) and/or presets. These are the files that users download to install new libraries and presets into Floe.
 
-Floe offers an easy-to-use GUI for [installing these Packages](../installation/installing-libraries-and-presets.md). This installation process carefully considers the user's existing libraries and presets, their versions, their installation preferences, even whether their installed libraries have been modified or not. The result is something that should 'just work' or at least provide clear instructions on what to do next.
+Floe offers an easy-to-use GUI for [installing these Packages](../installation/install-libraries-and-presets.md). This installation process carefully considers the user's existing libraries and presets, their versions, their installation preferences, even whether their installed libraries have been modified or not. The result is something that should 'just work' or at least provide clear instructions on what to do next.
 
 As with Floe's sample library format, openness is key. That's why Floe Packages are just normal ZIP files with a specific structure. Anyone can create them and anyone can open them. Additionally, it gives the user the option to extract them manually rather than use Floe's GUI if they wish. 
 

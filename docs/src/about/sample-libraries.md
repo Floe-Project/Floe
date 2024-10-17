@@ -5,7 +5,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Sample Libraries
 
-Floe uses a custom sample library format. It's an open format consisting simply of a folder of audio files plus a [Lua](https://en.wikipedia.org/wiki/Lua_(programming_language)) file called `floe.lua`. Access to the audio files gives you the freedom to use a library's sounds in other software too.
+Floe uses a custom sample library format. It's an open format consisting of a folder of audio files and a file in the [Lua](https://en.wikipedia.org/wiki/Lua_(programming_language)) programming language called `floe.lua`. Access to the audio files gives you the freedom to use a library's sounds in other software too.
 
 > Openness is a key goal of Floe sample libraries. 
 > 
@@ -13,7 +13,7 @@ Floe uses a custom sample library format. It's an open format consisting simply 
 
 You can use libraries developed by others or you can [develop your own](../develop/develop-libraries.md). Developing your own libraries does require some basic programming knowledge.
 
-Sample libraries are easily [installed](../installation/installing-libraries-and-presets.md) using Floe's GUI. You can also manually install them by placing the library in a folder that Floe scans.
+Sample libraries are easily [installed](../installation/install-libraries-and-presets.md) using Floe's GUI. You can also manually install them by placing the library in a folder that Floe scans.
 
 For backward compatibility, Floe also supports [Mirage's](mirage.md) sample library format.
 

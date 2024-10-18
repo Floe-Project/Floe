@@ -5,9 +5,9 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Library Lua API
 
-This document describes the functions you can use your sample library's [`floe.lua` script](develop-libraries.md#the-floelua-file) to create and configure the library and its instruments.
+This document describes the functions you can use in your sample library's [`floe.lua` script](develop-libraries.md#the-floelua-file) to create and configure the library and its instruments.
 
-Floe runs your script using Lua {{#include ../../mdbook_config.txt:lua-version}}. You have access to some of [Lua's standard libraries](https://www.lua.org/manual/5.4/manual.html#6): `math`, `string`, `table` and `utf8`. The other standard libraries are not available - including the `require` function. This is to minimise security risks.
+Floe runs your script using Lua v{{#include ../../mdbook_config.txt:lua-version}}. You have access to some of [Lua's standard libraries](https://www.lua.org/manual/5.4/manual.html#6): `math`, `string`, `table` and `utf8`. The other standard libraries are not available - including the `require` function. This is to minimise security risks.
 
 If there are any errors in your script, Floe will show them on the GUI along with a line number and a description of the problem.
 

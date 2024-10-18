@@ -14,6 +14,7 @@
 #include "common_infrastructure/sample_library/sample_library.hpp"
 
 #include "config.h"
+#include "packager_tool/packager.hpp"
 
 // From public domain https://github.com/reactos/reactos/blob/master/sdk/include/psdk/sdkddkver.h
 #define NTDDI_WIN7         0x06010000 // Windows 7
@@ -121,27 +122,82 @@ ErrorCodeOr<void> Main(String destination_folder) {
             TRY(write_value("min-macos-version", macos_version_str));
         }
 
+        // get the latest release version and the download links
         {
             auto const json_data =
                 TRY(HttpsGet("https://api.github.com/repos/Floe-Project/Floe/releases/latest", arena));
 
             String latest_release_version {};
-            auto const o =
-                json::Parse(json_data,
-                            [&latest_release_version](json::EventHandlerStack&, json::Event const& event) {
-                                json::SetIfMatchingRef(event, "tag_name", latest_release_version);
-                                return true;
-                            },
-                            arena,
-                            {});
+            struct Asset {
+                String name;
+                usize size;
+            };
+            ArenaList<Asset, false> assets {arena};
+
+            auto const handle_asset_object = [&](json::EventHandlerStack&, json::Event const& event) {
+                if (event.type == json::EventType::HandlingStarted) {
+                    *assets.PrependUninitialised() = {};
+                    return true;
+                }
+
+                if (json::SetIfMatchingRef(event, "name", assets.first->data.name)) return true;
+                if (json::SetIfMatching(event, "size", assets.first->data.size)) return true;
+
+                return false;
+            };
+
+            auto const handle_assets_array = [&](json::EventHandlerStack& handler_stack,
+                                                 json::Event const& event) {
+                if (SetIfMatchingObject(handler_stack, event, "", handle_asset_object)) return true;
+                return false;
+            };
+
+            auto const handle_root_object = [&](json::EventHandlerStack& handler_stack,
+                                                json::Event const& event) {
+                json::SetIfMatchingRef(event, "tag_name", latest_release_version);
+                if (SetIfMatchingArray(handler_stack, event, "assets", handle_assets_array)) return true;
+                return false;
+            };
+
+            auto const o = json::Parse(json_data, handle_root_object, arena, {});
 
             if (o.HasError()) return ErrorCode {CommonError::InvalidFileFormat};
 
-            if (StartsWith(latest_release_version, 'v')) latest_release_version.RemovePrefix(1);
+            {
+                DynamicArrayBounded<char, 250> name {};
+                for (auto& asset : assets) {
+                    dyn::Assign(name, "latest-download-");
+                    dyn::AppendSpan(name, asset.name);
+                    dyn::Replace(name, latest_release_version, ""_s);
+                    dyn::Replace(name, "--"_s, "-"_s);
+                    name.size -= path::Extension(name).size;
 
-            if (latest_release_version.size == 0) return ErrorCode {CommonError::InvalidFileFormat};
+                    auto const base_size = name.size;
 
-            TRY(write_value("latest-release-version", latest_release_version));
+                    dyn::AppendSpan(name, "-filename");
+                    TRY(write_value(name, asset.name));
+                    name.size = base_size;
+
+                    dyn::AppendSpan(name, "-size-mb");
+                    TRY(write_value(name, fmt::Format(arena, "{} MB", asset.size / 1024 / 1024)));
+                }
+            }
+
+            {
+                if (StartsWith(latest_release_version, 'v')) latest_release_version.RemovePrefix(1);
+                if (latest_release_version.size == 0) return ErrorCode {CommonError::InvalidFileFormat};
+                TRY(write_value("latest-release-version", latest_release_version));
+            }
+        }
+
+        // packger tool --help
+        {
+            DynamicArray<char> packager_help {arena};
+            TRY(PrintUsage(dyn::WriterFor(packager_help),
+                           "floe-packager",
+                           k_packager_description,
+                           k_packager_command_line_args_defs));
+            TRY(write_value("packager-help", WhitespaceStrippedEnd(String(packager_help))));
         }
     }
 

@@ -11,11 +11,13 @@ Either way, Floe is backwards-compatible. This means that you can replace an old
 
 After installing Floe, you might want to [install sample libraries](install-libraries-and-presets.md) or [develop your own](../develop/develop-libraries.md) (programming required). 
 
+> The latest released version of Floe is v{{#include ../../mdbook_config.txt:latest-release-version}}.
+
 ## Installer
 
-**<i class="fa fa-windows"></i> Floe Windows Installer**: [Download Floe-Installer-v{{#include ../../mdbook_config.txt:latest-release-version}}-Windows.zip](https://github.com/Floe-Project/Floe/releases/download/v{{#include ../../mdbook_config.txt:latest-release-version}}/Floe-Installer-v{{#include ../../mdbook_config.txt:latest-release-version}}-Windows.zip)
+**<i class="fa fa-windows"></i> Floe Installer Windows**: [Download {{#include ../../mdbook_config.txt:latest-download-Floe-Installer-Windows-filename}}](https://github.com/Floe-Project/Floe/releases/download/v{{#include ../../mdbook_config.txt:latest-release-version}}/{{#include ../../mdbook_config.txt:latest-download-Floe-Installer-Windows-filename}}) ({{#include ../../mdbook_config.txt:latest-download-Floe-Installer-Windows-size-mb}})
 
-**<i class="fa fa-apple"></i> Floe macOS Installer**: [Download Floe-Installer-v{{#include ../../mdbook_config.txt:latest-release-version}}-macOS.zip](https://github.com/Floe-Project/Floe/releases/download/v{{#include ../../mdbook_config.txt:latest-release-version}}/Floe-Installer-v{{#include ../../mdbook_config.txt:latest-release-version}}-macOS.zip)
+**<i class="fa fa-apple"></i> Floe Installer macOS**: [Download {{#include ../../mdbook_config.txt:latest-download-Floe-Installer-macOS-filename}}](https://github.com/Floe-Project/Floe/releases/download/v{{#include ../../mdbook_config.txt:latest-release-version}}/{{#include ../../mdbook_config.txt:latest-download-Floe-Installer-macOS-filename}}) ({{#include ../../mdbook_config.txt:latest-download-Floe-Installer-macOS-size-mb}})
 
 Download, unzip, and run the installer program. The installer will guide you through the installation process, including choosing the plugin formats you want to install. 
 
@@ -23,10 +25,9 @@ Once the installation is complete you might need to restart your DAW in order fo
 
 ## Manual Installation
 
-**<i class="fa fa-windows"></i> Floe Windows Manual Install**: [Download Floe-Manual-Install-v{{#include ../../mdbook_config.txt:latest-release-version}}-Windows.zip](https://github.com/Floe-Project/Floe/releases/download/v{{#include ../../mdbook_config.txt:latest-release-version}}/Floe-Manual-Install-v{{#include ../../mdbook_config.txt:latest-release-version}}-Windows.zip)
+**<i class="fa fa-windows"></i> Floe Manual Install Windows**: [Download {{#include ../../mdbook_config.txt:latest-download-Floe-Manual-Install-Windows-filename}}](https://github.com/Floe-Project/Floe/releases/download/v{{#include ../../mdbook_config.txt:latest-release-version}}/{{#include ../../mdbook_config.txt:latest-download-Floe-Manual-Install-Windows-filename}}) ({{#include ../../mdbook_config.txt:latest-download-Floe-Manual-Install-Windows-size-mb}})
 
-**<i class="fa fa-apple"></i> Floe macOS Manual Install**: [Download Floe-Manual-Install-v{{#include ../../mdbook_config.txt:latest-release-version}}-macOS.zip](https://github.com/Floe-Project/Floe/releases/download/v{{#include ../../mdbook_config.txt:latest-release-version}}/Floe-Manual-Install-v{{#include ../../mdbook_config.txt:latest-release-version}}-macOS.zip)
-
+**<i class="fa fa-apple"></i> Floe Manual Install macOS**: [Download {{#include ../../mdbook_config.txt:latest-download-Floe-Manual-Install-macOS-filename}}](https://github.com/Floe-Project/Floe/releases/download/v{{#include ../../mdbook_config.txt:latest-release-version}}/{{#include ../../mdbook_config.txt:latest-download-Floe-Manual-Install-macOS-filename}}) ({{#include ../../mdbook_config.txt:latest-download-Floe-Manual-Install-macOS-size-mb}})
 
 
 Normally you'll want to use the installer, but there could be some cases where you'd prefer to install Floe manually. To allow for this, we provide a zip file that contains Floe's plugin files. Extract it and move the files to your plugin folders.

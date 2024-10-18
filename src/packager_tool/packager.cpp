@@ -1,6 +1,8 @@
 // Copyright 2018-2024 Sam Windell
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "packager.hpp"
+
 #include <miniz.h>
 
 #include "foundation/foundation.hpp"
@@ -208,54 +210,11 @@ static ErrorCodeOr<void> WriteAboutLibraryHtml(sample_lib::Library const& lib,
     return k_success;
 }
 
-enum class CliArgId : u32 {
-    LibraryFolder,
-    PresetFolder,
-    OutputPackageFolder,
-    PackageName,
-    Count,
-};
-
-auto constexpr k_command_line_args_defs = MakeCommandLineArgDefs<CliArgId>({
-    {
-        .id = (u32)CliArgId::LibraryFolder,
-        .key = "library-folders",
-        .description = "Library folder path",
-        .value_type = "path",
-        .required = false,
-        .num_values = -1,
-    },
-    {
-        .id = (u32)CliArgId::PresetFolder,
-        .key = "presets-folders",
-        .description = "Presets folder path",
-        .value_type = "path",
-        .required = false,
-        .num_values = -1,
-    },
-    {
-        .id = (u32)CliArgId::OutputPackageFolder,
-        .key = "output-package-folder",
-        .description = "Folder to write the created package to",
-        .value_type = "path",
-        .required = false,
-        .num_values = 1,
-    },
-    {
-        .id = (u32)CliArgId::PackageName,
-        .key = "package-name",
-        .description = "Package name - inferred from library name if not provided",
-        .value_type = "name",
-        .required = false,
-        .num_values = 1,
-    },
-});
-
 static ErrorCodeOr<void> CheckNeededPackageCliArgs(Span<CommandLineArg const> args) {
-    if (!args[ToInt(CliArgId::OutputPackageFolder)].was_provided) return k_success;
+    if (!args[ToInt(PackagerCliArgId::OutputPackageFolder)].was_provided) return k_success;
 
-    auto const library_folders_arg = args[ToInt(CliArgId::LibraryFolder)];
-    auto const presets_folders_arg = args[ToInt(CliArgId::PresetFolder)];
+    auto const library_folders_arg = args[ToInt(PackagerCliArgId::LibraryFolder)];
+    auto const presets_folders_arg = args[ToInt(PackagerCliArgId::PresetFolder)];
 
     if (!library_folders_arg.values.size && !presets_folders_arg.values.size) {
         g_cli_out.Error({},
@@ -265,13 +224,21 @@ static ErrorCodeOr<void> CheckNeededPackageCliArgs(Span<CommandLineArg const> ar
         return ErrorCode {CliError::InvalidArguments};
     }
 
-    auto const package_name_arg = args[ToInt(CliArgId::PackageName)];
+    auto const package_name_arg = args[ToInt(PackagerCliArgId::PackageName)];
     if (library_folders_arg.values.size != 1 && !package_name_arg.was_provided) {
         g_cli_out.Error({},
                         "If --{} is not set to 1 folder, --{} must be",
                         library_folders_arg.info.key,
                         package_name_arg.info.key);
         return ErrorCode {CliError::InvalidArguments};
+    }
+
+    if (package_name_arg.was_provided) {
+        if (EndsWithSpan(package_name_arg.values[0], package::k_file_extension) ||
+            EndsWithSpan(package_name_arg.values[0], ".zip"_s)) {
+            g_cli_out.Error({}, "Don't include the file extension in the package name");
+            return ErrorCode {CliError::InvalidArguments};
+        }
     }
 
     return k_success;
@@ -289,22 +256,15 @@ static ErrorCodeOr<int> Main(ArgsCstr args) {
     ArenaAllocator arena {PageAllocator::Instance()};
     auto const program_name = path::Filename(FromNullTerminated(args.args[0]));
 
-    auto const cli_args = TRY(ParseCommandLineArgsStandard(
-        arena,
-        args,
-        k_command_line_args_defs,
-        {
-            .handle_help_option = true,
-            .print_usage_on_error = true,
-            .description =
-                "Takes libraries and presets and turns them into a Floe package file (floe.zip).\n"
-                "You can specify multiple libraries and presets. Additionally:\n"
-                "- Validates any Lua files\n"
-                "- Ensures there's a license file\n"
-                "- Generates an 'About' HTML file for each library\n"
-                "- Embeds a checksum file into the package for better change detection when installed",
-            .version = FLOE_VERSION_STRING,
-        }));
+    auto const cli_args = TRY(ParseCommandLineArgsStandard(arena,
+                                                           args,
+                                                           k_packager_command_line_args_defs,
+                                                           {
+                                                               .handle_help_option = true,
+                                                               .print_usage_on_error = true,
+                                                               .description = k_packager_description,
+                                                               .version = FLOE_VERSION_STRING,
+                                                           }));
     TRY(CheckNeededPackageCliArgs(cli_args));
 
     DynamicArray<u8> zip_data {arena};
@@ -312,11 +272,11 @@ static ErrorCodeOr<int> Main(ArgsCstr args) {
     auto package = package::WriterCreate(writer);
     DEFER { package::WriterDestroy(package); };
 
-    auto const create_package = cli_args[ToInt(CliArgId::OutputPackageFolder)].was_provided;
+    auto const create_package = cli_args[ToInt(PackagerCliArgId::OutputPackageFolder)].was_provided;
 
     sample_lib::Library* lib_for_package_name = nullptr;
 
-    for (auto const library_folder : cli_args[ToInt(CliArgId::LibraryFolder)].values) {
+    for (auto const library_folder : cli_args[ToInt(PackagerCliArgId::LibraryFolder)].values) {
         auto const paths = TRY(ScanLibraryFolder(arena, library_folder));
 
         auto lib = TRY(ReadLua(paths.lua, arena));
@@ -333,7 +293,7 @@ static ErrorCodeOr<int> Main(ArgsCstr args) {
     }
 
     if (create_package)
-        for (auto const preset_folder : cli_args[ToInt(CliArgId::PresetFolder)].values)
+        for (auto const preset_folder : cli_args[ToInt(PackagerCliArgId::PresetFolder)].values)
             TRY(package::WriterAddPresetsFolder(package, preset_folder, arena, program_name));
 
     if (create_package) {
@@ -347,8 +307,8 @@ static ErrorCodeOr<int> Main(ArgsCstr args) {
 
         auto const package_path = path::Join(
             arena,
-            Array {cli_args[ToInt(CliArgId::OutputPackageFolder)].values[0],
-                   PackageName(arena, lib_for_package_name, cli_args[ToInt(CliArgId::PackageName)])});
+            Array {cli_args[ToInt(PackagerCliArgId::OutputPackageFolder)].values[0],
+                   PackageName(arena, lib_for_package_name, cli_args[ToInt(PackagerCliArgId::PackageName)])});
         package::WriterFinalise(package);
         TRY(WriteFile(package_path, zip_data));
         g_cli_out.Info({}, "Created package file: {}", package_path);

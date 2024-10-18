@@ -11,6 +11,8 @@ on:
   pull_request:
     branches:
       - main
+  release:
+    types: [published] # our website needs to update its download links
 
 jobs:
   mac-compile-and-test:

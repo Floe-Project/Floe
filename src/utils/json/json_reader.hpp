@@ -4,6 +4,11 @@
 #pragma once
 #include "foundation/foundation.hpp"
 
+// WARNING: This API leaves a lot to be desired...
+// - Be careful with lifetime of lambdas that you pass into this API. You might need to keep the functions
+//   alive longer than you's expect.
+// - The callback-based approach is pretty cumbersome. An iterator-based approach would be better.
+
 namespace json {
 
 enum class EventType {

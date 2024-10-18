@@ -43,9 +43,9 @@ These examples use bash syntax.
                 --output-folder .
 
 # Creates a Floe Package containing multiple libraries and no presets
-./floe-packager --library-folders "C:\Users\Sam\Floe-Dev\Strings" \
-                                "C:\Users\Sam\Floe-Dev\Common-IRs" \
-                --output-folder "C:\Users\Sam\Floe-Dev\Releases" \
+./floe-packager --library-folders "C:/Users/Sam/Floe-Dev/Strings" \
+                                "C:/Users/Sam/Floe-Dev/Common-IRs" \
+                --output-folder "C:/Users/Sam/Floe-Dev/Releases" \
                 --package-name "FrozenPlain - Strings"
 ```
 

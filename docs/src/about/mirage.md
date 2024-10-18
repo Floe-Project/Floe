@@ -5,7 +5,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Previously known as Mirage
 
-Floe is a continuation of FrozenPlain's Mirage plugin (developed from 2018 to 2023). It adds new features and improvements but is similar in a lot of ways. Floe is backwards-compatible with Mirage in a few ways. Mirage will no longer be developed.
+Floe is a continuation of FrozenPlain's Mirage plugin (developed from 2018 to 2023). It adds new features and improvements but is similar in a lot of ways. Floe is backwards-compatible with Mirage libraries and presets. Mirage will no longer be developed.
 
 ### Why the name change?
 The project has taken a new direction and so we decided to give it a new name.
@@ -14,7 +14,7 @@ The project has taken a new direction and so we decided to give it a new name.
 - Mirage is already the name of a hardware sampler from the 80s - we wanted to avoid confusion.
 
 ### Backwards-compatible with Mirage
-Floe can load Mirage's libraries and presets. If you have Mirage installed already, Floe will be able to find the same libraries and presets as Mirage. 
+Floe can load Mirage's libraries, presets and settings file. If you have Mirage installed already, Floe will be able to find the same libraries and presets as Mirage. 
 
 You can leave Mirage installed if you want to keep using it: Floe will not interfere with Mirage's installation.
 

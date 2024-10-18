@@ -14,13 +14,16 @@ SPDX-License-Identifier: GPL-3.0-or-later
   - [Uninstalling](./installation/uninstalling.md)
 
 - [About]()
-  - [Sample Libraries](./about/sample-libraries.md)
   - [Previously known as Mirage](./about/mirage.md)
+  - [Sample Libraries](./about/sample-libraries.md)
+  - [Library Folders](./about/library-folders.md)
+  - [Preset Folders](./about/preset-folders.md)
 
 - [Developers]()
   - [Develop Libraries](./develop/develop-libraries.md)
-  - [Package Libraries & Presets](./develop/package-format.md)
   - [Library Lua API](./develop/library-lua-api.md)
+  - [Develop Preset Packs](./develop/develop-preset-packs.md)
+  - [Package Libraries & Presets](./develop/packaging.md)
 
 -----------
 

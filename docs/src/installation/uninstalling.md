@@ -19,12 +19,12 @@ Repeat this for each folder in Floe settings panel.
 ### Delete settings and plugins
 Settings are tiny files that store your preferences. Plugins files are normally ~15 MB in size.
 
-#### Windows
+##### Windows
 - Settings: `C:\Users\Public\Floe\Settings`
 - CLAP: `C:\Program Files\Common Files\CLAP\Floe.clap`
 - VST3: `C:\Program Files\Common Files\VST3\Floe.vst3`
 
-#### macOS
+##### macOS
 - Settings: `/Users/Shared/Floe/Settings`
 - CLAP: `/Library/Audio/Plug-Ins/CLAP/Floe.clap`
 - VST3: `/Library/Audio/Plug-Ins/VST3/Floe.vst3`
@@ -33,10 +33,10 @@ Settings are tiny files that store your preferences. Plugins files are normally 
 ### Mirage locations (legacy)
 If you used to have [Mirage](../about/mirage.md) installed then some additional files may be present.
 
-#### Windows
+##### Windows
 - Settings: `C:/Users/<your-name>/AppData/Local/FrozenPlain/Mirage`
 - Settings: `C:/ProgramData/Mirage/Settings`
 
-#### macOS
+##### macOS
 - Settings: `/Users/your-name/Music/Audio Music Apps/Plug-In Settings/FrozenPlain`
 - Settings: `/Library/Application Support/FrozenPlain/Mirage/Settings`

@@ -32,7 +32,7 @@ Floe is an engine, *it requires sample libraries to play*.
 
 
 #### Create expressive sounds
-Floe is a powerful audio plugin for sound design, music production and live performance. It excels at exploring the world between realistic multi-sampling and sample-based synthesis. It loads libraries in the [Floe format](./about/sample-libraries.md), and provides an intuitive interface for shaping, layering and performing the library's sounds.
+Floe loads libraries in the [Floe format](./about/sample-libraries.md), and provides an intuitive interface for shaping, layering and performing the library's sounds. Its a powerful audio plugin for sound design, music production and live performance. It excels at enabling exploration between realistic multi-sampling and sample-based synthesis. 
 
 It's based on an architecture of 3 sound layers that can be shaped and blended together, and additionally processed with a rack of built-in effects. It features comprehensive systems for discovering sounds and presets, and for creating your own sample libraries (programming required).
 

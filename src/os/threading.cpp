@@ -10,12 +10,15 @@ thread_local DynamicArrayBounded<char, k_max_thread_name_size> g_thread_name {};
 
 namespace detail {
 
-void SetThreadLocalThreadName(String name) {
+void AssertThreadNameIsValid(String name) {
     ASSERT(name.size < k_max_thread_name_size, "Thread name is too long");
     for (auto c : name)
         ASSERT(c != ' ' && c != '_' && !IsUppercaseAscii(c),
                "Thread names must be lowercase and not contain spaces");
+}
 
+void SetThreadLocalThreadName(String name) {
+    AssertThreadNameIsValid(name);
     dyn::Assign(g_thread_name, name);
     tracy::SetThreadName(dyn::NullTerminated(g_thread_name));
 }

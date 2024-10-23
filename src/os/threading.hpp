@@ -54,6 +54,7 @@ inline bool CheckThreadName(String name) {
 }
 
 namespace detail {
+void AssertThreadNameIsValid(String name);
 void SetThreadLocalThreadName(String name);
 Optional<String> GetThreadLocalThreadName();
 } // namespace detail
@@ -83,8 +84,10 @@ class Thread {
     struct ThreadStartData {
         ThreadStartData(StartFunction&& f, String name, ThreadStartOptions o)
             : start_function(Move(f))
-            , options(o)
-            , thread_name(name) {}
+            , options(o) {
+            detail::AssertThreadNameIsValid(name);
+            thread_name = name;
+        }
         void StartThread() {
             SetThreadName(thread_name);
             start_function();

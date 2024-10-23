@@ -54,7 +54,7 @@ These examples use bash syntax.
 
 If you're not using the packager tool, you need to know the structure of the Floe Package. It's very simple.
 
-Requirments of a floe package:
+Requirements of a floe package:
 - The filename must end with `.floe.zip`
 - The ZIP must contain a folder called `Libraries` and/or a folder called `Presets`. If present, these folders must contain the libraries and presets respectively.
 

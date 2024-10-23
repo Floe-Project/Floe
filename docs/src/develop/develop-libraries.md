@@ -76,17 +76,17 @@ It's important to ensure your audio samples have the the right levels. This make
 [Signet](https://github.com/SamWindell/Signet) can be a useful tool for changing the levels of your samples. When changing the volume levels of a multi-sampled instrument, you probably don't want to normalise each sample individually because part of the character of the instrument is it's different volume levels. Instead, you could change the gain of the instrument as a whole. Signet has features for this. It also has features for proportionally moving levels towards a target level. This allows you to keep some of the character of an instrument while nudging it towards a more consistent level.
 
 We will be updating this section with our own experience, but to get started we suggest:
-- Peak levels should be less than -3dB.
-- RMS levels for an instrument as a whole should be around -18dB. Play the instrument polyphonically and watch the RMS level. If the instrument is designed to be monophonic, then adjust for that.
-- Impulse responses should have an RMS level of around -16dB.
-- The noise floor should be as low as possible: -60dB is a good target. Use high-quality noise reduction tools to remove noise from your samples if you need to. Noise levels can quickly stack up with a multi-sampled instrument played polyphonically. Being too aggressive with algorithmic noise reduction can make your samples sound unnatural - so it's a balance.
+- Peak levels should be less than -3 dB.
+- RMS levels for an instrument as a whole should be around -18 dB. Play the instrument polyphonically and watch the RMS level. If the instrument is designed to be monophonic, then adjust for that.
+- Impulse responses should have an RMS level of around -16 dB.
+- The noise floor should be as low as possible: -60 dB is a good target. Use high-quality noise reduction tools to remove noise from your samples if you need to. Noise levels can quickly stack up with a multi-sampled instrument played polyphonically. Being too aggressive with algorithmic noise reduction can make your samples sound unnatural - so it's a balance.
 
 ### Sample rate, bit depth, and file format
 Floe only supports FLAC and WAV files. We recommend using FLAC for your samples. It's lossless and can reduce the file size by 50% to 70%. Floe is fast at loading FLAC files.
 
-We find 44.1kHz and 16-bit is often a perfectly fine choice. 48kHz and 24-bit might be appropriate options in certain cases.
+We find 44.1 kHz and 16-bit is often a perfectly fine choice. 48 kHz and 24-bit might be appropriate options in certain cases.
 
 ### Volume envelopes of samples
-If your sample is a single continuous sound, then don't include a fade-in or fade-out in the sample. Floe has a GUI for volume envolopes that offer more control: they can be adjusted to any value, automated by the DAW, and then are independent of the playback speed of the sample. If you have a sample that is stretched across a keyboard range, it will be sped-up or slowed-down in order to be the correct pitch. If there's a volume fade then the speed of the fade will change depending on the pitch of the voice. This is not normally a desirable effect.
+If your sample is a single continuous sound, then don't include a fade-in or fade-out in the sample. Floe has a GUI for volume envelopes that offer more control: they can be adjusted to any value, automated by the DAW, and then are independent of the playback speed of the sample. If you have a sample that is stretched across a keyboard range, it will be sped-up or slowed-down in order to be the correct pitch. If there's a volume fade then the speed of the fade will change depending on the pitch of the voice. This is not normally a desirable effect.
 
-If you sound has important timbral variation over time, then don't cut that away. Only if the sound is a contant tone should you remove the fade.
+If you sound has important timbral variation over time, then don't cut that away. Only if the sound is a constant tone should you remove the fade.

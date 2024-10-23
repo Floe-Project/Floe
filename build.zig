@@ -2465,6 +2465,8 @@ pub fn build(b: *std.Build) void {
                 });
                 var flags = std.ArrayList([]const u8).init(b.allocator);
 
+                win_installer.subsystem = .Windows;
+
                 if (sidebar_image != null) {
                     flags.append(b.fmt("-DSIDEBAR_IMAGE_PATH=\"{s}\"", .{sidebar_image.?.relative_path})) catch unreachable;
                 }

@@ -2469,7 +2469,7 @@ pub fn build(b: *std.Build) void {
                     flags.append(b.fmt("-DSIDEBAR_IMAGE_PATH=\"{s}\"", .{sidebar_image.?.relative_path})) catch unreachable;
                 }
                 flags.append("-DCLAP_PLUGIN_PATH=\"zig-out/x86_64-windows/Floe.clap\"") catch unreachable;
-                flags.append("-DVST3_PLUGIN_PATH=\"zig-out/x86_64-windows/Floe.vst3\"") catch unreachable;
+                // flags.append("-DVST3_PLUGIN_PATH=\"zig-out/x86_64-windows/Floe.vst3\"") catch unreachable; // TODO: renable when we build VST3
                 win_installer.addWin32ResourceFile(.{
                     .file = b.path(installer_path ++ "/resources.rc"),
                     .flags = flags.items,

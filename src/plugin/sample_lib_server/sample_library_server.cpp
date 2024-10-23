@@ -419,8 +419,13 @@ static bool UpdateLibraryJobs(Server& server,
                     if (!folder->state.CompareExchangeStrong(expected,
                                                              new_state,
                                                              RmwMemoryOrder::AcquireRelease,
-                                                             LoadMemoryOrder::Relaxed))
+                                                             LoadMemoryOrder::Relaxed)) {
+                        if (expected != ScanFolder::State::RescanRequested)
+                            g_debug_log.Error(k_log_module,
+                                              "Unexpected value for scan-folder state: {}",
+                                              expected);
                         ASSERT(expected == ScanFolder::State::RescanRequested);
+                    }
                 }
                 break;
             }

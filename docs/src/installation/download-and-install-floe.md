@@ -15,6 +15,9 @@ After installing Floe, you might want to [install sample libraries](install-libr
 
 ## Installer
 
+<img src="../images/installer-macos-gui.png" width="49%" style="display: inline;">
+<img src="../images/installer-macos-gui.png" width="49%" style="display: inline;">
+
 **<i class="fa fa-windows"></i> Floe Installer Windows**: [Download {{#include ../../mdbook_config.txt:latest-download-Floe-Installer-Windows-filename}}](https://github.com/Floe-Project/Floe/releases/download/v{{#include ../../mdbook_config.txt:latest-release-version}}/{{#include ../../mdbook_config.txt:latest-download-Floe-Installer-Windows-filename}}) ({{#include ../../mdbook_config.txt:latest-download-Floe-Installer-Windows-size-mb}})
 
 **<i class="fa fa-apple"></i> Floe Installer macOS**: [Download {{#include ../../mdbook_config.txt:latest-download-Floe-Installer-macOS-filename}}](https://github.com/Floe-Project/Floe/releases/download/v{{#include ../../mdbook_config.txt:latest-release-version}}/{{#include ../../mdbook_config.txt:latest-download-Floe-Installer-macOS-filename}}) ({{#include ../../mdbook_config.txt:latest-download-Floe-Installer-macOS-size-mb}})

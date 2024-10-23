@@ -17,8 +17,6 @@
 #include "os/threading.hpp"
 #include "utils/logger/logger.hpp"
 
-#include "common_infrastructure/paths.hpp"
-
 #include "gui.hpp"
 
 constexpr auto k_log_module = "installer"_log_module;
@@ -39,7 +37,7 @@ constexpr auto k_page_infos = Array {
     PageInfo {
         .title = "Configuration",
         .label =
-            "Welcome to the installer for Floe, " FLOE_DESCRIPTION
+            "Welcome to the installer for Floe"
             ".\n\nPlease close your DAW before clicking install. Plugins are installed to standard locations so that any DAW can find them.\n\nSelect which plugin formats you want to install.",
     },
     PageInfo {

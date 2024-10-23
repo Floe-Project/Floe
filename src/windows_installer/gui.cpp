@@ -689,7 +689,24 @@ u32 CreateWidget(GuiFramework& framework, u32 page, WidgetOptions options) {
                 bitmap_info.bmiHeader.biWidth = image_opts.size.width;
                 bitmap_info.bmiHeader.biPlanes = 1;
                 bitmap_info.bmiHeader.biCompression = BI_RGB;
-                SetDIBits(dc, bitmap, 0, image_opts.size.height, image_opts.rgba_data, &bitmap_info, 0);
+
+                auto const bgra_data = PageAllocator::Instance().AllocateExactSizeUninitialised<u8>(
+                    image_opts.size.width * image_opts.size.height * 4);
+                for (auto const i : Range<u32>(image_opts.size.width * image_opts.size.height)) {
+                    bgra_data[i * 4u + 0] = image_opts.rgba_data[i * 4u + 2];
+                    bgra_data[i * 4u + 1] = image_opts.rgba_data[i * 4u + 1];
+                    bgra_data[i * 4u + 2] = image_opts.rgba_data[i * 4u + 0];
+                    bgra_data[i * 4u + 3] = image_opts.rgba_data[i * 4u + 3];
+                }
+                DEFER { PageAllocator::Instance().Free(bgra_data); };
+
+                SetDIBits(dc,
+                          bitmap,
+                          0,
+                          image_opts.size.height,
+                          bgra_data.data,
+                          &bitmap_info,
+                          DIB_RGB_COLORS);
 
                 SendMessageW(widget.window, STM_SETIMAGE, IMAGE_BITMAP, (LPARAM)bitmap);
 

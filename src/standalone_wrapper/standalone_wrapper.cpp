@@ -505,6 +505,17 @@ static ErrorCodeOr<void> Main() {
     u32 clap_width;
     u32 clap_height;
     TRY_CLAP(gui->get_size(&standalone.plugin, &clap_width, &clap_height));
+
+    {
+        auto const original_width = clap_width;
+        auto const original_height = clap_height;
+        TRY_CLAP(gui->adjust_size(&standalone.plugin, &clap_width, &clap_height));
+
+        // We should have created a view that conforms to our own requirements.
+        ASSERT(original_width == clap_width);
+        ASSERT(original_height == clap_height);
+    }
+
     auto const size = ClapPixelsToPhysicalPixels(standalone.gui_view, clap_width, clap_height);
     TRY_PUGL(
         puglSetSizeHint(standalone.gui_view, PUGL_DEFAULT_SIZE, (PuglSpan)size.width, (PuglSpan)size.height));

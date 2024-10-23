@@ -241,6 +241,8 @@ clap_plugin_gui const floe_gui {
             size,
             gui_settings::CurrentAspectRatio(g_shared_engine_systems->settings.settings.gui));
 
+        if (aspect_ratio_conformed_size.width < gui_settings::k_min_gui_width) return false;
+
         auto const clap_size =
             PhysicalPixelsToClapPixels(floe.gui_platform->view, aspect_ratio_conformed_size);
 

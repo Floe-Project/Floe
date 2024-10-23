@@ -506,7 +506,7 @@ bool InitialiseSettingsFileData(Settings& file,
                                 bool file_is_brand_new) {
     bool changed = false;
     changed = changed || midi_settings::Initialise(file.midi, arena, file_is_brand_new);
-    if (file.gui.window_width == 0) {
+    if (file.gui.window_width < gui_settings::k_min_gui_width) {
         file.gui.window_width = gui_settings::CreateFromWidth(gui_settings::k_default_gui_width_approx,
                                                               gui_settings::k_aspect_ratio_without_keyboard)
                                     .width;

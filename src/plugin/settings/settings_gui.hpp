@@ -14,6 +14,8 @@ constexpr u16 k_default_gui_width_approx = 910;
 constexpr UiSize k_aspect_ratio_without_keyboard = {100, 61};
 constexpr UiSize k_aspect_ratio_with_keyboard = {100, 68};
 
+constexpr u16 k_min_gui_width = k_aspect_ratio_with_keyboard.width * 2;
+
 static_assert(k_aspect_ratio_with_keyboard.width == k_aspect_ratio_without_keyboard.width,
               "We assume this to be the case in a couple of places.");
 
@@ -72,15 +74,17 @@ PUBLIC UiSize CurrentAspectRatio(Settings::Gui const& gui) {
 
 PUBLIC UiSize WindowSize(Settings::Gui const& gui) {
     ASSERT(CheckThreadName("main"));
-    return CreateFromWidth(gui.window_width, CurrentAspectRatio(gui));
+    auto const w = CreateFromWidth(gui.window_width, CurrentAspectRatio(gui));
+    ASSERT(w.width >= k_min_gui_width);
+    return w;
 }
 
 // We don't set the height because it's calculated based on the aspect ratio and whether the gui keyboard
 // is shown or not
 PUBLIC void SetWindowSize(Settings::Gui& gui, SettingsTracking& tracking, u16 width) {
     ASSERT(CheckThreadName("main"));
-    auto const new_width = CreateFromWidth(width, k_aspect_ratio_without_keyboard).width;
-    ASSERT(gui.window_width != 0);
+    auto new_width = CreateFromWidth(width, k_aspect_ratio_without_keyboard).width;
+    if (new_width < k_min_gui_width) new_width = k_min_gui_width;
     if (gui.window_width == new_width) return;
     gui.window_width = new_width;
     tracking.changed = true;

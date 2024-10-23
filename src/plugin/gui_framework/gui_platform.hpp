@@ -709,9 +709,10 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
             g_log.Debug(k_gui_platform_log_module, "configure {}", fmt::DumpStruct(event->configure));
             if (platform.graphics_ctx)
                 platform.graphics_ctx->Resize({event->configure.width, event->configure.height});
-            gui_settings::SetWindowSize(platform.settings.settings.gui,
-                                        platform.settings.tracking,
-                                        event->configure.width);
+            if (event->configure.width)
+                gui_settings::SetWindowSize(platform.settings.settings.gui,
+                                            platform.settings.tracking,
+                                            event->configure.width);
             break;
         }
 

@@ -230,7 +230,7 @@ static void SwitchPage(Application& app, GuiFramework& framework, Pages page) {
         case Pages::Installing: {
             if (app.installing_thread.Joinable()) app.installing_thread.Join();
             app.installing_completed.Store(false, StoreMemoryOrder::Release);
-            app.installing_thread.Start([&app]() { BackgroundInstallingThread(app); }, "Installing thread");
+            app.installing_thread.Start([&app]() { BackgroundInstallingThread(app); }, "install");
             break;
         }
         case Pages::Summary: break;

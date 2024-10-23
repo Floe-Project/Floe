@@ -20,6 +20,8 @@
 #include "os/misc.hpp"
 #include "os/misc_windows.hpp"
 #include "os/threading.hpp"
+#include "utils/debug/debug.hpp"
+#include "utils/logger/logger.hpp"
 
 #include "gui.hpp"
 
@@ -1051,6 +1053,14 @@ static LRESULT CALLBACK PageWindowProc(HWND window, UINT msg, WPARAM w_param, LP
 
 static ErrorCodeOr<void> Main(HINSTANCE h_instance, int cmd_show) {
     SetThreadName("main");
+    StartupCrashHandler();
+    g_panic_handler = [](char const* message, SourceLocation loc) {
+        g_log.Error({}, "Panic: {}: {}", loc, message);
+        DynamicArrayBounded<char, 2000> buffer {};
+        WriteCurrentStacktrace(dyn::WriterFor(buffer), {}, 1);
+        g_log.Error({}, "Stacktrace:\n{}", buffer);
+        DefaultPanicHandler(message, loc);
+    };
 
     constexpr INITCOMMONCONTROLSEX k_init_cc {.dwSize = sizeof(INITCOMMONCONTROLSEX),
                                               .dwICC = ICC_LINK_CLASS};

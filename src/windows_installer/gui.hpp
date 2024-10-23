@@ -18,7 +18,7 @@ struct GuiFramework;
 #define WIDEN_STRING_LITERAL(x) WIDEN_MACRO_HELPER(x)
 
 constexpr u16 k_window_width = 620;
-constexpr u16 k_window_height = 500;
+constexpr u16 k_window_height = 470;
 constexpr u32 k_timer_ms = 20;
 constexpr usize k_max_widgets = 150;
 constexpr wchar_t const* k_window_title = L"Floe Installer v" WIDEN_STRING_LITERAL(FLOE_VERSION_STRING);
@@ -26,7 +26,7 @@ constexpr wchar_t const* k_window_title = L"Floe Installer v" WIDEN_STRING_LITER
 enum class Orientation { Vertical, Horizontal };
 enum class Alignment { Start, End };
 enum class TextAlignment { Left, Right, Centre };
-enum class LabelStyle { Regular, DullColour, Bold };
+enum class LabelStyle { Regular, DullColour, Bold, Heading };
 enum class ButtonStyle { Push, ExpandCollapseToggle };
 struct Margins {
     u16 l {}, r {}, t {}, b {};

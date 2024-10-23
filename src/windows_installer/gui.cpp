@@ -481,7 +481,9 @@ void EditWidget(GuiFramework& framework, u32 id, EditWidgetOptions const& option
             case LabelStyle::Bold:
                 SendMessageW(widget.window, WM_SETFONT, (WPARAM)framework.bold_font, TRUE);
                 break;
-            default: PanicIfReached();
+            case LabelStyle::Heading:
+                SendMessageW(widget.window, WM_SETFONT, (WPARAM)framework.heading_font, TRUE);
+                break;
         }
     }
 }
@@ -662,7 +664,8 @@ u32 CreateWidget(GuiFramework& framework, u32 page, WidgetOptions options) {
                 switch (label_opts.style) {
                     case LabelStyle::DullColour:
                     case LabelStyle::Regular: f = framework.regular_font; break;
-                    case LabelStyle::Bold: f = framework.heading_font; break;
+                    case LabelStyle::Bold: f = framework.bold_font; break;
+                    case LabelStyle::Heading: f = framework.heading_font; break;
                 }
                 f;
             });
@@ -750,6 +753,7 @@ u32 CreateWidget(GuiFramework& framework, u32 page, WidgetOptions options) {
                 ListView_InsertColumn(widget.window, i, &col);
                 ListView_SetColumnWidth(widget.window, i, column.default_width);
             }
+            SendMessageW(widget.window, WM_SETFONT, (WPARAM)framework.regular_font, TRUE);
             break;
         }
         case WidgetType::Container: {
@@ -1035,8 +1039,8 @@ static LRESULT CALLBACK PageWindowProc(HWND window, UINT msg, WPARAM w_param, LP
                 switch (static_widget->label_style) {
                     case LabelStyle::DullColour: SetTextColor(hdc_static, RGB(140, 140, 140)); break;
                     case LabelStyle::Regular:
+                    case LabelStyle::Heading:
                     case LabelStyle::Bold: SetTextColor(hdc_static, RGB(0, 0, 0)); break;
-                    default: PanicIfReached();
                 }
             }
             auto const bk_colour = RGB(255, 255, 255);
@@ -1143,9 +1147,9 @@ static ErrorCodeOr<void> Main(HINSTANCE h_instance, int cmd_show) {
         return result;
     };
 
-    framework.regular_font = win32_create_font(14, false, L"Tahoma");
-    framework.bold_font = win32_create_font(14, true, L"Tahoma");
-    framework.heading_font = win32_create_font(15, true, L"Tahoma");
+    framework.regular_font = win32_create_font(16, false, L"Tahoma");
+    framework.bold_font = win32_create_font(16, true, L"Tahoma");
+    framework.heading_font = win32_create_font(24, false, L"Tahoma");
 
     if (framework.regular_font == nullptr || framework.heading_font == nullptr ||
         framework.bold_font == nullptr)
@@ -1176,7 +1180,7 @@ static ErrorCodeOr<void> Main(HINSTANCE h_instance, int cmd_show) {
     root_layout.window = CreatePageWindow(root_layout, framework.root);
     root_layout.options.debug_name = "Root";
     root_layout.options.type = WidgetOptions::Container {
-        .orientation = Orientation::Horizontal,
+        .orientation = Orientation::Vertical,
         .alignment = Alignment::Start,
     };
     auto const root_size = WindowContentsSize(framework.root);

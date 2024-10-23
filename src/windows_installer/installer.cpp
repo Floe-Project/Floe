@@ -38,7 +38,7 @@ constexpr auto k_page_infos = Array {
         .title = "Configuration",
         .label =
             "Welcome to the installer for Floe"
-            ".\n\nPlease close your DAW before clicking install. Plugins are installed to standard locations so that any DAW can find them.\n\nSelect which plugin formats you want to install.",
+            ".\n\nPlease close your DAW before clicking install. Plugins are installed to standard locations so that any DAW can find them.",
     },
     PageInfo {
         .title = "Installing",
@@ -271,45 +271,59 @@ Application* CreateApplication(GuiFramework& framework, u32 root_layout_id) {
     constexpr u16 k_margin = 10;
 
     {
+        auto const found_sidebar_image = GetResource(SIDEBAR_IMAGE_RC_ID);
+        if (found_sidebar_image.HasValue()) {
+            auto const& bin_data = found_sidebar_image.Value();
+
+            int width;
+            int height;
+            int channels;
+            auto rgba_data = stbi_load_from_memory((stbi_uc const*)bin_data.data,
+                                                   (int)bin_data.size,
+                                                   &width,
+                                                   &height,
+                                                   &channels,
+                                                   4);
+            if (rgba_data == nullptr) Panic("Failed to load image");
+            DEFER { stbi_image_free(rgba_data); };
+            CreateWidget(framework,
+                         root_layout_id,
+                         {
+                             .margins = {16, 16, 8, 8},
+                             .type = WidgetOptions::Image {.rgba_data = rgba_data,
+                                                           .size = {CheckedCast<u16>(width),
+                                                                    CheckedCast<u16>(height)}},
+                         });
+        }
+    }
+
+    CreateWidget(framework,
+                 root_layout_id,
+                 {
+                     .expand_x = true,
+                     .type = WidgetOptions::Divider {.orientation = Orientation::Horizontal},
+                 });
+
+    auto const main = CreateStackLayoutWidget(framework,
+                                              root_layout_id,
+                                              {
+                                                  .expand_x = true,
+                                                  .expand_y = true,
+                                                  .type =
+                                                      WidgetOptions::Container {
+                                                          .orientation = Orientation::Horizontal,
+                                                          .alignment = Alignment::Start,
+                                                      },
+                                              });
+
+    {
         auto const lhs = CreateStackLayoutWidget(framework,
-                                                 root_layout_id,
+                                                 main,
                                                  {
                                                      .expand_y = true,
                                                      .debug_name = "LHS",
                                                      .type = WidgetOptions::Container {},
                                                  });
-        {
-            auto const found_sidebar_image = GetResource(SIDEBAR_IMAGE_RC_ID);
-            if (found_sidebar_image.HasValue()) {
-                auto const& bin_data = found_sidebar_image.Value();
-
-                int width;
-                int height;
-                int channels;
-                auto rgba_data = stbi_load_from_memory((stbi_uc const*)bin_data.data,
-                                                       (int)bin_data.size,
-                                                       &width,
-                                                       &height,
-                                                       &channels,
-                                                       4);
-                if (rgba_data == nullptr) Panic("Failed to load image");
-                DEFER { stbi_image_free(rgba_data); };
-                CreateWidget(framework,
-                             lhs,
-                             {
-                                 .margins = {16, 16, 8, 8},
-                                 .type = WidgetOptions::Image {.rgba_data = rgba_data,
-                                                               .size = {CheckedCast<u16>(width),
-                                                                        CheckedCast<u16>(height)}},
-                             });
-            }
-        }
-
-        CreateWidget(framework,
-                     lhs,
-                     {
-                         .type = WidgetOptions::Divider {.orientation = Orientation::Horizontal},
-                     });
 
         for (auto const i : Range(k_page_infos.size)) {
             app->page_sidebar_labels[i] =
@@ -326,15 +340,16 @@ Application* CreateApplication(GuiFramework& framework, u32 root_layout_id) {
                              });
         }
     }
+
     CreateWidget(framework,
-                 root_layout_id,
+                 main,
                  {
                      .type = WidgetOptions::Divider {.orientation = Orientation::Vertical},
                  });
 
     {
         auto const rhs = CreateStackLayoutWidget(framework,
-                                                 root_layout_id,
+                                                 main,
                                                  {
                                                      .expand_x = true,
                                                      .expand_y = true,
@@ -361,7 +376,7 @@ Application* CreateApplication(GuiFramework& framework, u32 root_layout_id) {
                                            {
                                                .expand_x = true,
                                                .text = "title",
-                                               .type = WidgetOptions::Label {.style = LabelStyle::Bold},
+                                               .type = WidgetOptions::Label {.style = LabelStyle::Heading},
                                            });
             app->page_label = CreateWidget(framework,
                                            rhs_inner,

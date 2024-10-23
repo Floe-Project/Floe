@@ -598,7 +598,7 @@ macos-build-installer:
     distribution_xml_choice_outlines=$(printf "%s%s\n" "$distribution_xml_choice_outlines" "<line choice=\"$identifier\" />")
   }
 
-  # step 1: make packages for each plugin so they are selectable options in the final installer
+  # make packages for each plugin so they are selectable options in the final installer
   make_package() {
     local file_extension="$1"
     local destination_plugin_folder="$2"
@@ -625,20 +625,7 @@ macos-build-installer:
   # make_package component Components "Floe AudioUnit (AUv2)" "AudioUnit (version 2) format of the Floe plugin"
   make_package clap CLAP "Floe CLAP" "CLAP format of the Floe plugin"
 
-  # step 2: make a package to create empty folders that Floe might use
-  mkdir -p floe_dirs
-  pushd floe_dirs
-  mkdir -p "Library/Application Support/Floe/Presets"
-  mkdir -p "Library/Application Support/Floe/Libraries"
-  popd
-  pkgbuild --root floe_dirs --identifier com.Floe.dirs --install-location / --version "$version" floe_dirs.pkg
-  add_package_to_distribution_xml \
-    com.Floe.dirs \
-    "Floe Folders" \
-    "Create empty folders ready for Floe to use to look for libraries and presets" \
-    floe_dirs.pkg
-
-  # step 4: make the final installer combining all the packages
+  # make the final installer combining all the packages
   mkdir -p productbuild_files
   echo "This application will install Floe on your computer. You will be able to select which types of audio plugin format you would like to install. Please note that sample libraries are separate: this installer just installs the Floe engine." > productbuild_files/welcome.txt
 

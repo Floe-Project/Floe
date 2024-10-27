@@ -9,12 +9,20 @@ For instance: 0.0.1. Don't change the headings.
 
 # Changelog
 
+## 0.0.2
+- Fix Windows installer crash
+- Don't show a console window with the Windows installer
+- Better logo for Windows installer
+- Remove unecessary 'Floe Folders' component from macOS installer
+
 ## 0.0.1
 This is the first release of Floe. It's 'alpha quality' at the moment - there will be bugs and there are a couple of missing features. This release is designed mostly to test our release process.
 
 This release only contains the CLAP plugin. The VST3 and AU plugins will be released soon.
 
-- [Renamed from Mirage to Floe](https://floe.audio/about/mirage.html).
+## Mirage
+Floe used to be called [Mirage](https://floe.audio/about/mirage.html). Mirage contained many of the same features seen in Floe v0.0.1. But there are large structural changes, and some new features and improvements:
+
 - Use multiple different libraries in the same instance.
 - CLAP version added - VST3 and AU coming soon, VST2 support dropped.
 - New installer: offline, no account/download-tickets needed. Libraries are installed separately.
@@ -32,6 +40,3 @@ Technical changes:
 - New build system using Zig; cross-compilation, dependency management, etc.
 - Comprehensive CI/CD pipeline for testing and creating release builds.
 - New 'sample library server', our system for providing libraries and audio files to Floe in a fast, async way.
-
-## Mirage
-Prior to 0.0.1, Floe was known as Mirage. The last Mirage version was 2.0.5.

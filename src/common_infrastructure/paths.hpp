@@ -41,21 +41,27 @@ static Span<String> PossibleSettingsPaths(ArenaAllocator& arena) {
                                                          {.create = false, .error_log = nullptr}));
         };
 
+        // C:/ProgramData/FrozenPlain/Mirage/mirage.json
+        // /Library/Application Support/FrozenPlain/Mirage/mirage.json
         try_add_path(KnownDirectoryType::LegacyAllUsersSettings,
                      Array {"FrozenPlain"_s, "Mirage", "Settings"},
                      "mirage.json"_s);
 
         if constexpr (IS_WINDOWS)
+            // ~/AppData/Roaming/FrozenPlain/Mirage/mirage.json
             try_add_path(KnownDirectoryType::LegacyPluginSettings,
                          Array {"FrozenPlain"_s, "Mirage"},
                          "mirage.json"_s);
         else
+            // ~/Music/Audio Music Apps/Plug-In Settings/FrozenPlain/Mirage/mirage.json
             try_add_path(KnownDirectoryType::LegacyPluginSettings, Array {"FrozenPlain"_s}, "mirage.json"_s);
 
         if constexpr (IS_MACOS) {
+            // /Library/Application Support/FrozenPlain/Mirage/mirage.json
             try_add_path(KnownDirectoryType::LegacyAllUsersData,
                          Array {"FrozenPlain"_s, "Mirage"},
                          "mirage.json");
+            // ~/Library/Application Support/FrozenPlain/Mirage/mirage.json
             try_add_path(KnownDirectoryType::LegacyData, Array {"FrozenPlain"_s, "Mirage"}, "mirage.json");
         }
     }

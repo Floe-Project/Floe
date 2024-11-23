@@ -2303,6 +2303,7 @@ pub fn build(b: *std.Build) void {
                         "detail/auv2/process.cpp",
                         "detail/auv2/wrappedview.mm",
                         "detail/auv2/parameter.cpp",
+                        "detail/auv2/auv2_shared.mm",
                     },
                     .flags = flags.items,
                 });

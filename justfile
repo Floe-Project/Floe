@@ -84,6 +84,7 @@ check-format:
 
 # hunspell doesn't do anything fancy at all, it just checks each word for spelling. It means we get lots of
 # false positives, but I think it's still worth it. We can just add words to ignored-spellings.dic.
+# In vim, use :sort u to remove duplicates>
 [unix]
 check-spelling:
   #!/usr/bin/env bash

@@ -3,15 +3,22 @@ SPDX-FileCopyrightText: 2024 Sam Windell
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
+<div class="warning">
+IMPORTANT: Floe is heavily under development. Expect bugs, missing features and broken things.
+
+We are bit-by-bit filling in the gaps ahead of version 1.0.0.
+</div>
+
 # Download & Install Floe
 
 There's two ways to install Floe: use the installer, or manually move files. 
 
 Either way, Floe is backwards-compatible. This means that you can replace an old version of Floe with a new version and everything will work.
 
-After installing Floe, you might want to [install sample libraries](install-libraries-and-presets.md) or [develop your own](../develop/develop-libraries.md) (programming required). 
+Check the [requirements](requirements.md) before downloading. After installing Floe, you might want to [install sample libraries](install-libraries-and-presets.md) or [develop your own](../develop/develop-libraries.md) (programming required). 
 
 > The latest released version of Floe is v{{#include ../../mdbook_config.txt:latest-release-version}}.
+
 
 ## Installer
 

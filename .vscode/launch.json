@@ -1,0 +1,22 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Standalone",
+            "runInTerminal": true,
+            "program": "zig-out/x86_64-linux/floe_standalone"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Tests",
+            "runInTerminal": true,
+            "program": "zig-out/x86_64-linux/tests",
+            "args": [
+                "--log-level=debug"
+            ]
+        }
+    ]
+}

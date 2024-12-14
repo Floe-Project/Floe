@@ -34,6 +34,13 @@ external_build_resources := "build_resources/external"
 # IMPORTANT: these must be kept in sync with the build.zig file
 logos_abs_dir := join(justfile_directory(), external_build_resources, "Logos")
 
+# first recipe is the default
+build target_os='native':
+  zig build compile -Dtargets={{target_os}} -Dbuild-mode=development -Dexternal-resources="{{external_build_resources}}"
+  just patch-rpath
+
+alias pre-debug := build
+
 patch-rpath:
   #!/usr/bin/env bash
   if [[ "{{os()}}" == "linux" && ! -f "/etc/NIXOS" ]]; then
@@ -52,10 +59,6 @@ patch-rpath:
     patch_file patchinterpreter "{{native_binary_dir}}/gen_docs_tool"
     patch_file patchinterpreter "{{native_binary_dir}}/VST3-Validator"
   fi
-
-build target_os='native':
-  zig build compile -Dtargets={{target_os}} -Dbuild-mode=development -Dexternal-resources="{{external_build_resources}}"
-  just patch-rpath
 
 build-tracy:
   zig build compile -Dtargets=native -Dbuild-mode=development -Dtracy

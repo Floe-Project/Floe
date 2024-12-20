@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: CC0-1.0
+# SPDX-FileCopyrightText: 2024 Sam Windell
+
+version = 1
+SPDX-PackageName = "Floe"
+SPDX-PackageSupplier = "Sam Windell"
+SPDX-PackageDownloadLocation = "https://github.com/floe-synth/floe"
+
+[[annotations]]
+path = "test_files/**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2024 Sam Windell"
+SPDX-License-Identifier = "GPL-3.0-or-later"
+
+[[annotations]]
+path = ["**.lock", "build_resources/**.lock", "version.txt"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2024 Sam Windell"
+SPDX-License-Identifier = "CC0-1.0"

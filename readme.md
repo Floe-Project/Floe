@@ -38,7 +38,7 @@ Linux is only used for development purposes at the moment, and you can't cross-c
 Floe is a [CLAP](https://github.com/free-audio/clap) plugin written in C++. The [clap-wrapper project](https://github.com/free-audio/clap-wrapper) is used to provide VST3 and AU versions. Eventually, we plan to use the Zig programming language.
 
 ## Discussion
-Feel free to use the discussions on GitHub for questions, feedback, and ideas. Report bugs to the Github issue tracker. Also, FrozenPlain have a Floe section on their forum.
+Feel free to use the discussions on GitHub for questions, feedback, and ideas. Report bugs to the Github issue tracker. Also, FrozenPlain has a Floe section on their [forum](https://forum.frozenplain.com).
 
 ### Project structure
 #### Helpers

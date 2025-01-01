@@ -231,6 +231,27 @@ PUBLIC DynamicArray<String> Split(String str, char token, Allocator& allocator) 
     return result;
 }
 
+// for (const auto& part : StringSplitIterator{whole_string, ','}) {
+//     // Use part
+// }
+struct StringSplitIterator {
+    String whole;
+    char token;
+    Optional<usize> cursor {0uz};
+
+    struct Iterator {
+        StringSplitIterator* parent;
+
+        String operator*() const { return SplitWithIterator(parent->whole, parent->cursor, parent->token); }
+
+        Iterator& operator++() { return *this; }
+        bool operator!=(Iterator const&) const { return parent->cursor.HasValue(); }
+    };
+
+    Iterator begin() { return Iterator {this}; }
+    Iterator end() { return Iterator {this}; }
+};
+
 // Supports * and ? wildcards
 // https://research.swtch.com/glob
 PUBLIC constexpr bool MatchWildcard(String wildcard, String haystack) {

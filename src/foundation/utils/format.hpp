@@ -559,4 +559,20 @@ PUBLIC MutableString FormatStringReplace(Allocator& a,
     return result.ToOwnedSpan();
 }
 
+PUBLIC MutableString Join(Allocator& a, Span<String const> strings, String separator = {}) {
+    if (strings.size == 0) return {};
+
+    DynamicArray<char> result {a};
+    result.Reserve(strings.size * 2);
+
+    auto const& last = Last(strings);
+
+    for (auto const& s : strings) {
+        dyn::AppendSpan(result, s);
+        if (separator.size && &s != &last) dyn::AppendSpan(result, separator);
+    }
+
+    return result.ToOwnedSpan();
+}
+
 } // namespace fmt

@@ -5,4 +5,4 @@ Diagnostics:
   UnusedIncludes: Strict
   Suppress: [ "unused-function" ]
 CompileFlags:
-  CompilationDatabase: build_gen/  # Extra search path for compile_commands.json
+  CompilationDatabase: .floe-cache/  # Extra search path for compile_commands.json

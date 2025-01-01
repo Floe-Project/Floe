@@ -20,7 +20,7 @@ jobs:
       - uses: Hanaasagi/zig-action-cache@master
         with:
           cache-directories: |
-            build_gen
+            .floe-cache
 
       - run: |
           # NOTE: the logos probably have copyright so this should only be done if you have permission
@@ -56,7 +56,7 @@ jobs:
       - uses: Hanaasagi/zig-action-cache@master
         with:
           cache-directories: |
-            build_gen
+            .floe-cache
 
       - run: |
           just build-release mac_ub

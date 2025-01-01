@@ -35,8 +35,8 @@ const rootdir = struct {
     }
 }.getSrcDir();
 
-const build_gen_relative = "build_gen";
-const build_gen_abs = rootdir ++ "/" ++ build_gen_relative;
+const floe_cache_relative = ".floe-cache";
+const floe_cache_abs = rootdir ++ "/" ++ floe_cache_relative;
 
 const ConcatCompileCommandsStep = struct {
     step: std.Build.Step,
@@ -51,7 +51,7 @@ fn archAndOsPair(target: std.Target) std.BoundedArray(u8, 32) {
 }
 
 fn compileCommandsDirForTarget(alloc: std.mem.Allocator, target: std.Target) ![]u8 {
-    return std.fmt.allocPrint(alloc, "{s}/compile_commands_{s}", .{ build_gen_abs, archAndOsPair(target).slice() });
+    return std.fmt.allocPrint(alloc, "{s}/compile_commands_{s}", .{ floe_cache_abs, archAndOsPair(target).slice() });
 }
 
 fn compileCommandsFileForTarget(alloc: std.mem.Allocator, target: std.Target) ![]u8 {
@@ -59,7 +59,7 @@ fn compileCommandsFileForTarget(alloc: std.mem.Allocator, target: std.Target) ![
 }
 
 fn tryCopyCompileCommandsForTargetFileToDefault(alloc: std.mem.Allocator, target: std.Target) void {
-    const generic_out_path = std.fs.path.join(alloc, &.{ build_gen_abs, "compile_commands.json" }) catch @panic("OOM");
+    const generic_out_path = std.fs.path.join(alloc, &.{ floe_cache_abs, "compile_commands.json" }) catch @panic("OOM");
     const out_path = compileCommandsFileForTarget(alloc, target) catch @panic("OOM");
     std.fs.copyFileAbsolute(out_path, generic_out_path, .{ .override_mode = null }) catch {};
 }
@@ -429,7 +429,7 @@ fn addWin32EmbedInfo(step: *std.Build.Step.Compile, info: Win32EmbedInfo) !void 
     const b = step.step.owner;
     const arena = b.allocator;
 
-    const path = try std.fmt.allocPrint(arena, "{s}/{s}.rc", .{ build_gen_relative, step.name });
+    const path = try std.fmt.allocPrint(arena, "{s}/{s}.rc", .{ floe_cache_relative, step.name });
     const file = try std.fs.createFileAbsolute(b.pathJoin(&.{ rootdir, path }), .{});
     defer file.close();
 
@@ -538,7 +538,7 @@ const BuildContext = struct {
     master_step: *std.Build.Step,
     test_step: *std.Build.Step,
     optimise: std.builtin.OptimizeMode,
-    external_build_resources_subdir: ?[]const u8,
+    external_resources_subdir: ?[]const u8,
     dep_xxhash: *std.Build.Dependency,
     dep_stb: *std.Build.Dependency,
     dep_au_sdk: *std.Build.Dependency,
@@ -831,12 +831,12 @@ const ExternalResource = struct {
 };
 
 fn getExternalResource(context: *BuildContext, name: []const u8) ?ExternalResource {
-    if (context.external_build_resources_subdir == null) {
+    if (context.external_resources_subdir == null) {
         std.debug.print("WARNING: external resource folder is not set. Some aspects of the final build might be empty\n", .{});
         return null;
     }
 
-    const relative_path = context.b.pathJoin(&.{ context.external_build_resources_subdir.?, name });
+    const relative_path = context.b.pathJoin(&.{ context.external_resources_subdir.?, name });
     const absolute_path = context.b.pathJoin(&.{ rootdir, relative_path });
 
     var found = true;
@@ -846,7 +846,7 @@ fn getExternalResource(context: *BuildContext, name: []const u8) ?ExternalResour
     if (found) {
         return .{ .relative_path = relative_path, .absolute_path = absolute_path };
     } else {
-        std.debug.print("WARNING: external resource \"{s}\" not found in {s}. Some aspects of the final build might be empty\n", .{ name, context.external_build_resources_subdir.? });
+        std.debug.print("WARNING: external resource \"{s}\" not found in {s}. Some aspects of the final build might be empty\n", .{ name, context.external_resources_subdir.? });
         return null;
     }
 }
@@ -883,7 +883,7 @@ pub fn build(b: *std.Build) void {
             .development => std.builtin.OptimizeMode.Debug,
             .performance_profiling, .production => std.builtin.OptimizeMode.ReleaseSafe,
         },
-        .external_build_resources_subdir = b.option([]const u8, "external-resources", "Path relative to build.zig that contains external build resources"),
+        .external_resources_subdir = b.option([]const u8, "external-resources", "Path relative to build.zig that contains external build resources"),
         .dep_xxhash = b.dependency("xxhash", .{}),
         .dep_stb = b.dependency("stb", .{}),
         .dep_au_sdk = b.dependency("audio_unit_sdk", .{}),
@@ -907,7 +907,7 @@ pub fn build(b: *std.Build) void {
     const user_given_target_presets = b.option([]const u8, "targets", "Target operating system");
 
     // ignore any error
-    std.fs.makeDirAbsolute(build_gen_abs) catch {};
+    std.fs.makeDirAbsolute(floe_cache_abs) catch {};
 
     // const install_dir = b.install_path; // zig-out
 
@@ -2309,7 +2309,7 @@ pub fn build(b: *std.Build) void {
                 });
 
                 {
-                    const file = std.fs.createFileAbsolute(b.pathJoin(&.{ rootdir, build_gen_relative, "generated_entrypoints.hxx" }), .{ .truncate = true }) catch @panic("could not create file");
+                    const file = std.fs.createFileAbsolute(b.pathJoin(&.{ rootdir, floe_cache_relative, "generated_entrypoints.hxx" }), .{ .truncate = true }) catch @panic("could not create file");
                     defer file.close();
                     file.writeAll(b.fmt(
                         \\ #pragma once
@@ -2326,7 +2326,7 @@ pub fn build(b: *std.Build) void {
                 }
 
                 {
-                    const file = std.fs.createFileAbsolute(b.pathJoin(&.{ rootdir, build_gen_relative, "generated_cocoaclasses.hxx" }), .{ .truncate = true }) catch @panic("could not create file");
+                    const file = std.fs.createFileAbsolute(b.pathJoin(&.{ rootdir, floe_cache_relative, "generated_cocoaclasses.hxx" }), .{ .truncate = true }) catch @panic("could not create file");
                     defer file.close();
                     // TODO: add version to "floeinst" string for better objc name collision prevention
                     file.writeAll(b.fmt(
@@ -2355,7 +2355,7 @@ pub fn build(b: *std.Build) void {
                 au.addIncludePath(build_context.dep_clap_wrapper.path("include"));
                 au.addIncludePath(build_context.dep_clap_wrapper.path("libs/fmt"));
                 au.addIncludePath(build_context.dep_clap_wrapper.path("src"));
-                au.addIncludePath(b.path(build_gen_relative));
+                au.addIncludePath(b.path(floe_cache_relative));
                 au.linkLibCpp();
 
                 au.linkLibrary(plugin);
@@ -2397,7 +2397,7 @@ pub fn build(b: *std.Build) void {
 
             {
                 const win_installer_description = "Installer for Floe plugins";
-                const manifest_path = std.fs.path.join(b.allocator, &.{ build_gen_relative, "installer.manifest" }) catch @panic("OOM");
+                const manifest_path = std.fs.path.join(b.allocator, &.{ floe_cache_relative, "installer.manifest" }) catch @panic("OOM");
                 {
                     const file = std.fs.createFileAbsolute(b.pathJoin(&.{ rootdir, manifest_path }), .{ .truncate = true }) catch @panic("could not create file");
                     defer file.close();

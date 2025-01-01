@@ -66,7 +66,7 @@ static ErrorCodeOr<void> WriteValueIndent(WriteContext& ctx) {
 }
 
 template <typename T>
-static ErrorCodeOr<void> WriteFloat(WriteContext& ctx, T val) {
+[[maybe_unused]] static ErrorCodeOr<void> WriteFloat(WriteContext& ctx, T val) {
     constexpr usize k_buf_size = 128;
     char buffer[k_buf_size];
     char const* format;

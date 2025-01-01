@@ -223,4 +223,33 @@ PUBLIC ErrorCodeOr<void> WriteKeyValue(WriteContext& ctx, String key, char const
     return WriteKeyValue(ctx, key, String(arr));
 }
 
+PUBLIC String EncodeString(String str, Allocator& alloc) {
+    DynamicArray<char> result(alloc);
+    result.Reserve(str.size + 2);
+
+    for (auto c : str) {
+        switch (c) {
+            case '"': dyn::AppendSpan(result, "\\\""); break;
+            case '\\': dyn::AppendSpan(result, "\\\\"); break;
+            case '\b': dyn::AppendSpan(result, "\\b"); break;
+            case '\f': dyn::AppendSpan(result, "\\f"); break;
+            case '\n': dyn::AppendSpan(result, "\\n"); break;
+            case '\r': dyn::AppendSpan(result, "\\r"); break;
+            case '\t': dyn::AppendSpan(result, "\\t"); break;
+            default: {
+                if (c < 0x20) {
+                    dyn::AppendSpan(result, "\\u00");
+                    dyn::AppendSpan(
+                        result,
+                        fmt::IntToString((u8)c, {.base = fmt::IntToStringOptions::Base::Hexadecimal}));
+                } else {
+                    dyn::Append(result, c);
+                }
+            }
+        }
+    }
+
+    return result.ToOwnedSpan();
+}
+
 } // namespace json

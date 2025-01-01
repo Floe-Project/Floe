@@ -2277,6 +2277,13 @@ TEST_CASE(TestSplitWithIterator) {
             REQUIRE(part == expected_parts[index++]);
         }
 
+        index = 0;
+        for (auto const& part : StringSplitIterator {whole, token}) {
+            CHECK_LT(index, expected_parts.size);
+            CHECK_EQ(part, expected_parts[index]);
+            ++index;
+        }
+
         REQUIRE(index == expected_parts.size);
     };
 
@@ -2284,6 +2291,7 @@ TEST_CASE(TestSplitWithIterator) {
     check("aa", '\n', Array {"aa"_s});
     check("aa\n\nbb", '\n', ArrayT<String>({"aa", "", "bb"}));
     check("\n\nbb", '\n', ArrayT<String>({"", "", "bb"}));
+
     return k_success;
 }
 

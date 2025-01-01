@@ -60,6 +60,18 @@ void FreePages(void* ptr, usize bytes) {
     munmap(ptr, bytes);
 }
 
+ErrorCodeOr<String> ReadAllStdin(Allocator& allocator) {
+    DynamicArray<char> result {allocator};
+    char buffer[4096];
+    while (true) {
+        auto const read = ::read(STDIN_FILENO, buffer, sizeof(buffer));
+        if (read == -1) return ErrnoErrorCode(errno);
+        if (read == 0) break;
+        dyn::AppendSpan(result, Span {buffer, (usize)read});
+    }
+    return result.ToOwnedSpan();
+}
+
 ErrorCodeOr<LibraryHandle> LoadLibrary(String path) {
     PathArena path_arena {Malloc::Instance()};
     auto handle = dlopen(NullTerminated(path, path_arena), RTLD_NOW | RTLD_LOCAL);

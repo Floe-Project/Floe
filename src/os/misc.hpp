@@ -164,6 +164,8 @@ Writer StdWriter(StdStream stream);
 
 Mutex& StdStreamMutex(StdStream stream);
 
+ErrorCodeOr<String> ReadAllStdin(Allocator& allocator);
+
 constexpr String k_day_names_short[] = {
     "Sun"_s,
     "Mon"_s,

@@ -97,6 +97,23 @@ void TryShrinkPages(void* ptr, usize old_size, usize new_size) {
     // IMPROVE: actually shrink the memory
 }
 
+ErrorCodeOr<String> ReadAllStdin(Allocator& allocator) {
+    DynamicArray<char> result {allocator};
+    HANDLE stdin_handle = GetStdHandle(STD_INPUT_HANDLE);
+    if (stdin_handle == INVALID_HANDLE_VALUE) return Win32ErrorCode(GetLastError(), "GetStdHandle");
+
+    while (true) {
+        char buffer[4096];
+        DWORD num_read = 0;
+        if (!ReadFile(stdin_handle, buffer, sizeof(buffer), &num_read, nullptr))
+            return Win32ErrorCode(GetLastError(), "ReadFile");
+        if (num_read == 0) break;
+        dyn::AppendSpan(result, Span {buffer, num_read});
+    }
+
+    return result.ToOwnedSpan();
+}
+
 ErrorCodeOr<LibraryHandle> LoadLibrary(String path) {
     PathArena temp_allocator {Malloc::Instance()};
     auto const w_path = TRY(path::MakePathForWin32(path, temp_allocator, true));

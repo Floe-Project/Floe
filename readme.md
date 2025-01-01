@@ -65,7 +65,7 @@ Feel free to use the discussions on GitHub for questions, feedback, and ideas. R
 #### Auxiliaries/tools
 - `src/standalone_wrapper`: wraps the audio plugin in a 'standalone' app (dev only)
 - `src/windows_installer`: installer for windows
-- `src/gen_docs_tool`: cli tool to generate things for the mkdocs site
+- `src/docs_preprocessor`: tool to preprocess markdown files for the docs
 - `src/packager`: tool to package up libraries/presets for distribution
 
 #### Other key components

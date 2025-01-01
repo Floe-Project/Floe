@@ -1702,21 +1702,27 @@ pub fn build(b: *std.Build) void {
         }
 
         if (build_context.build_mode != .production) {
-            var gen_docs = b.addExecutable(.{
-                .name = "gen_docs_tool",
+            var docs_preprocessor = b.addExecutable(.{
+                .name = "docs_preprocessor",
                 .target = target,
                 .optimize = build_context.optimise,
             });
-            const gen_docs_path = "src/gen_docs_tool";
-            gen_docs.addCSourceFiles(.{ .files = &.{
-                gen_docs_path ++ "/gen_docs_tool.cpp",
+            const gen_docs_path = "src/docs_preprocessor/";
+            docs_preprocessor.addCSourceFiles(.{ .files = &.{
+                gen_docs_path ++ "/docs_preprocessor.cpp",
             }, .flags = cpp_fp_flags });
-            gen_docs.linkLibrary(common_infrastructure);
-            gen_docs.addIncludePath(b.path("src"));
-            gen_docs.addConfigHeader(build_config_step);
-            join_compile_commands.step.dependOn(&gen_docs.step);
-            applyUniversalSettings(&build_context, gen_docs);
-            b.getInstallStep().dependOn(&b.addInstallArtifact(gen_docs, .{ .dest_dir = install_subfolder }).step);
+            docs_preprocessor.linkLibrary(common_infrastructure);
+            docs_preprocessor.addIncludePath(b.path("src"));
+            docs_preprocessor.addConfigHeader(build_config_step);
+            join_compile_commands.step.dependOn(&docs_preprocessor.step);
+            applyUniversalSettings(&build_context, docs_preprocessor);
+            b.getInstallStep().dependOn(&b.addInstallArtifact(docs_preprocessor, .{ .dest_dir = install_subfolder }).step);
+
+            // mdbook needs to find preprocessor in a generic location rather than the os-specific one
+            if (target.query.isNative()) {
+                const out_path = b.fmt("{s}{s}", .{ docs_preprocessor.name, if (target.result.os.tag == .windows) ".exe" else "" });
+                b.getInstallStep().dependOn(&b.addInstallBinFile(docs_preprocessor.getEmittedBin(), out_path).step);
+            }
         }
 
         {

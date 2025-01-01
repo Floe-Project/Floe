@@ -33,7 +33,9 @@ external_resources := join(cache_dir, "external_resources")
 # IMPORTANT: these must be kept in sync with the build.zig file
 logos_abs_dir := join(justfile_directory(), external_resources, "Logos")
 
-default: build
+default: 
+  just build 
+
 alias pre-debug := build
 
 build target_os='native':

@@ -1500,13 +1500,12 @@ struct LuaCodePrinter {
     ErrorCodeOr<void> PrintWholeLua(Writer writer, PrintMode mode) {
         auto begin_function = [&](String name) -> ErrorCodeOr<void> {
             if (mode.mode_flags & PrintModeFlagsDocumentedExample)
-                if (mode.mode_flags & PrintModeFlagsDocumentedExample)
-                    TRY(fmt::FormatToWriter(writer, "-- ANCHOR: {}\n", name));
+                TRY(fmt::FormatToWriter(writer, "-- SECTION: {}\n", name));
             return k_success;
         };
         auto end_function = [&](String name) -> ErrorCodeOr<void> {
             if (mode.mode_flags & PrintModeFlagsDocumentedExample)
-                TRY(fmt::FormatToWriter(writer, "-- ANCHOR_END: {}\n", name));
+                TRY(fmt::FormatToWriter(writer, "-- SECTION_END: {}\n", name));
             TRY(writer.WriteChars("\n"));
             return k_success;
         };

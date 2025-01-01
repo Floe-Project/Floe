@@ -18,3 +18,6 @@ smart-punctuation = true
 git-repository-url = "https://github.com/Floe-Project/Floe"
 cname = "floe.audio"
 additional-css = ["theme/floe-theme.css"]
+
+[preprocessor.floe]
+command = "../zig-out/bin/docs_preprocessor"

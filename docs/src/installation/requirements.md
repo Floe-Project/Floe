@@ -8,7 +8,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 ### <i class="fa fa-windows"></i> Windows
 On Windows, Floe is available in the CLAP and VST3 formats. We recommend using the CLAP version where possible. Requirements:
 
-- {{#include ../../mdbook_config.txt:min-windows-version}} or later
+- ==min-windows-version== or later
 - 64-bit computer
 - x86-64 processor with SSE2 support (almost all processors in a Windows PC since ~2006 have this)
 - 64-bit CLAP or VST3 host
@@ -16,7 +16,7 @@ On Windows, Floe is available in the CLAP and VST3 formats. We recommend using t
 ### <i class="fa fa-apple"></i> macOS
 On macOS, Floe is available in the CLAP, VST3 and AU (v2) formats. We recommend using the CLAP version where possible. Requirements:
 
-- {{#include ../../mdbook_config.txt:min-macos-version}} or later
+- ==min-macos-version== or later
 - Apple Silicon or Intel (Floe is a universal binary)
 - CLAP, AU (v2) or VST3 host
 

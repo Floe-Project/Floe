@@ -21,16 +21,16 @@ However, you can use any ZIP program to create Floe Packages. Just make sure the
 
 #### Download packager
 
-**<i class="fa fa-windows"></i> Floe Packager Windows**: [Download {{#include ../../mdbook_config.txt:latest-download-Floe-Packager-Windows-filename}}](https://github.com/Floe-Project/Floe/releases/download/v{{#include ../../mdbook_config.txt:latest-release-version}}/{{#include ../../mdbook_config.txt:latest-download-Floe-Packager-Windows-filename}}) ({{#include ../../mdbook_config.txt:latest-download-Floe-Packager-Windows-size-mb}})
+**<i class="fa fa-windows"></i> Floe Packager Windows**: [Download ==latest-download-Floe-Packager-Windows-filename==](https://github.com/Floe-Project/Floe/releases/download/v==latest-release-version==/==latest-download-Floe-Packager-Windows-filename==) (==latest-download-Floe-Packager-Windows-size-mb==)
 
-**<i class="fa fa-apple"></i> Floe Packager macOS**: [Download {{#include ../../mdbook_config.txt:latest-download-Floe-Packager-macOS-filename}}](https://github.com/Floe-Project/Floe/releases/download/v{{#include ../../mdbook_config.txt:latest-release-version}}/{{#include ../../mdbook_config.txt:latest-download-Floe-Packager-macOS-filename}}) ({{#include ../../mdbook_config.txt:latest-download-Floe-Packager-macOS-size-mb}})
+**<i class="fa fa-apple"></i> Floe Packager macOS**: [Download ==latest-download-Floe-Packager-macOS-filename==](https://github.com/Floe-Project/Floe/releases/download/v==latest-release-version==/==latest-download-Floe-Packager-macOS-filename==) (==latest-download-Floe-Packager-macOS-size-mb==)
 
 Download the program, extract it, and run it from the command line. 
 
 #### Usage
 Here's the output of `floe-packager --help`:
 ```
-{{#include ../../mdbook_config.txt:packager-help}}
+==packager-help==
 ```
 
 #### Examples

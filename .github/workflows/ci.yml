@@ -105,17 +105,13 @@ jobs:
           if-no-files-found: ignore
           path: ~/.local/state/Floe/*
 
-      - if: '!cancelled()'
-        run: |
-          mkdir -p build_gen/generated_docs
-          zig-out/x86_64-linux/gen_docs_tool --out-folder build_gen/generated_docs
-      - name: Upload generated docs
+      - name: Upload docs_preprocessor
         if: '!cancelled()'
         uses: actions/upload-artifact@v4
         with:
-          name: generated-docs
+          name: docs_preprocessor
           if-no-files-found: error
-          path: build_gen/generated_docs
+          path: zig-out/x86_64-linux/docs_preprocessor
 
   windows-test:
     runs-on: windows-latest
@@ -184,8 +180,8 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: generated-docs
-          path: docs
+          name: docs_preprocessor
+          path: zig-out/bin
 
       # https://github.com/rust-lang/mdBook/wiki/Automated-Deployment%3A-GitHub-Actions
       - name: Install latest mdbook

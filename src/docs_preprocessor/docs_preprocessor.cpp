@@ -142,6 +142,7 @@ static ErrorCodeOr<String> PreprocessMarkdownBlob(String markdown_blob) {
             struct Asset {
                 String name;
                 usize size;
+                String url;
             };
             ArenaList<Asset, false> assets {scratch};
 
@@ -153,6 +154,8 @@ static ErrorCodeOr<String> PreprocessMarkdownBlob(String markdown_blob) {
 
                 if (json::SetIfMatchingRef(event, "name", assets.first->data.name)) return true;
                 if (json::SetIfMatching(event, "size", assets.first->data.size)) return true;
+                if (json::SetIfMatchingRef(event, "browser_download_url", assets.first->data.url))
+                    return true;
 
                 return false;
             };
@@ -177,8 +180,7 @@ static ErrorCodeOr<String> PreprocessMarkdownBlob(String markdown_blob) {
             {
                 DynamicArrayBounded<char, 250> name {};
                 for (auto& asset : assets) {
-                    dyn::Assign(name, "latest-download-");
-                    dyn::AppendSpan(name, asset.name);
+                    dyn::Assign(name, asset.name);
                     dyn::Replace(name, latest_release_version, ""_s);
                     dyn::Replace(name, "--"_s, "-"_s);
                     name.size -= path::Extension(name).size;
@@ -194,6 +196,10 @@ static ErrorCodeOr<String> PreprocessMarkdownBlob(String markdown_blob) {
                                      Identifier(name),
                                      fmt::Format(scratch, "{} MB", asset.size / 1024 / 1024),
                                      scratch);
+                    name.size = base_size;
+
+                    dyn::AppendSpan(name, "-url");
+                    ExpandIdentifier(result, Identifier(name), asset.url, scratch);
                 }
             }
 

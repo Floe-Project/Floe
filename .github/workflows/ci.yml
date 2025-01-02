@@ -197,10 +197,19 @@ jobs:
           curl -sSL $url | tar -xz --directory=./mdbook
           echo `pwd`/mdbook >> $GITHUB_PATH
 
+      - name: Test docs_preprocessor
+        run: |
+          ls -la bin/
+          file bin/docs_preprocessor 
+          echo "Path is: $PATH"
+          which docs_preprocessor
+
       - name: Deploy GitHub Pages
         run: |
           find .
+          which docs_preprocessor
           cd docs
+          which docs_preprocessor
           wget https://raw.githubusercontent.com/Floe-Project/Floe-Logos/main/rasterized/favicon.png -P theme
           wget https://raw.githubusercontent.com/Floe-Project/Floe-Logos/main/rasterized/favicon.svg -P theme
           mdbook build

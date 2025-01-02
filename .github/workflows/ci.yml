@@ -183,6 +183,9 @@ jobs:
           name: docs_preprocessor
           path: zig-out/bin
 
+      - name: Make sure the docs_preprocessor is executable
+        run: chmod +x zig-out/bin/docs_preprocessor
+
       # https://github.com/rust-lang/mdBook/wiki/Automated-Deployment%3A-GitHub-Actions
       - name: Install latest mdbook
         run: |

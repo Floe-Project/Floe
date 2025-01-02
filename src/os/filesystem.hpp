@@ -151,7 +151,7 @@ enum class KnownDirectoryType : u8 {
     Documents,
     Downloads,
     Logs,
-    Temporary,
+    Temporary, // Don't delete this directory, delete the file in it
 
     UserData,
 

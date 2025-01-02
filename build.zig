@@ -1707,9 +1707,8 @@ pub fn build(b: *std.Build) void {
                 .target = target,
                 .optimize = build_context.optimise,
             });
-            const gen_docs_path = "src/docs_preprocessor/";
             docs_preprocessor.addCSourceFiles(.{ .files = &.{
-                gen_docs_path ++ "/docs_preprocessor.cpp",
+                "src/docs_preprocessor/docs_preprocessor.cpp",
             }, .flags = cpp_fp_flags });
             docs_preprocessor.linkLibrary(common_infrastructure);
             docs_preprocessor.addIncludePath(b.path("src"));

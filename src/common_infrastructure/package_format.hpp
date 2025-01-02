@@ -194,6 +194,9 @@ static ErrorCodeOr<void> WriterAddAllFiles(mz_zip_archive& zip,
     while (auto entry = TRY(dir_iterator::Next(it, scratch_arena))) {
         inner_arena.ResetCursorAndConsolidateRegions();
 
+        // we will manually add the checksums file later
+        if (entry->subpath == k_checksums_file) continue;
+
         DynamicArray<char> archive_path {inner_arena};
         path::JoinAppend(archive_path, subdirs_in_zip);
         path::JoinAppend(archive_path, entry->subpath);

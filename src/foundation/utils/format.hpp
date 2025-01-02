@@ -511,7 +511,7 @@ PUBLIC inline void Assign(DynCharArray& output, String format, Args const&... ar
 }
 
 template <usize k_size, typename... Args>
-PUBLIC inline DynamicArrayBounded<char, k_size> FormatInline(String format, Args const&... args) {
+PUBLIC_INLINE DynamicArrayBounded<char, k_size> FormatInline(String format, Args const&... args) {
     DynamicArrayBounded<char, k_size> result;
     auto const outcome = FormatToWriter(dyn::WriterFor(result), format, args...);
     if (outcome.HasError()) __builtin_debugtrap();

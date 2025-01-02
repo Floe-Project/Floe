@@ -206,17 +206,9 @@ jobs:
 
       - name: Deploy GitHub Pages
         run: |
-          find .
           cd docs
           wget https://raw.githubusercontent.com/Floe-Project/Floe-Logos/main/rasterized/favicon.png -P theme
           wget https://raw.githubusercontent.com/Floe-Project/Floe-Logos/main/rasterized/favicon.svg -P theme
-          # First get the absolute path
-          PREPROCESSOR_PATH=$(which docs_preprocessor)
-          # Replace the command in book.toml with the absolute path
-          sed -i "s|command = \"docs_preprocessor\"|command = \"$PREPROCESSOR_PATH\"|" book.toml
-          # Verify the change
-          cat book.toml
-          # Then run mdbook
           mdbook build
           git worktree add gh-pages
           git config user.name github-actions[bot]

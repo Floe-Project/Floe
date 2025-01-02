@@ -20,4 +20,4 @@ cname = "floe.audio"
 additional-css = ["theme/floe-theme.css"]
 
 [preprocessor.floe]
-command = "../zig-out/bin/docs_preprocessor"
+command = "docs_preprocessor"

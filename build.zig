@@ -1717,12 +1717,6 @@ pub fn build(b: *std.Build) void {
             join_compile_commands.step.dependOn(&docs_preprocessor.step);
             applyUniversalSettings(&build_context, docs_preprocessor);
             b.getInstallStep().dependOn(&b.addInstallArtifact(docs_preprocessor, .{ .dest_dir = install_subfolder }).step);
-
-            // mdbook needs to find preprocessor in a generic location rather than the os-specific one
-            if (target.query.isNativeOs()) {
-                const out_path = b.fmt("{s}{s}", .{ docs_preprocessor.name, if (target.result.os.tag == .windows) ".exe" else "" });
-                b.getInstallStep().dependOn(&b.addInstallBinFile(docs_preprocessor.getEmittedBin(), out_path).step);
-            }
         }
 
         {

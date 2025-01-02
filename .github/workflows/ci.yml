@@ -181,10 +181,12 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: docs_preprocessor
-          path: zig-out/bin
+          path: bin/docs_preprocessor
 
-      - name: Make sure the docs_preprocessor is executable
-        run: chmod +x zig-out/bin/docs_preprocessor
+      - name: Set docs_preprocessor executable and in path
+        run: |
+          chmod +x bin/docs_preprocessor
+          echo `pwd`/bin >> $GITHUB_PATH
 
       # https://github.com/rust-lang/mdBook/wiki/Automated-Deployment%3A-GitHub-Actions
       - name: Install latest mdbook

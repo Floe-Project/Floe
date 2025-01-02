@@ -20,6 +20,8 @@
       let
         pkgs = import nixpkgs { inherit system; };
 
+        nativeBinSubdir = "zig-out/${builtins.replaceStrings [ "darwin" ] [ "macos" ] system}";
+
         macosx-sdks = pkgs.stdenv.mkDerivation {
           pname = "macosx-sdks";
           version = "12.0";
@@ -212,6 +214,7 @@
             ];
           shellHook = ''
             export MACOSX_SDK_SYSROOT="${macosx-sdks}"
+            export PATH="$PWD/${nativeBinSubdir}:$PATH"
           '';
         };
       }

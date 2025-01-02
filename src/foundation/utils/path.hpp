@@ -322,6 +322,23 @@ PUBLIC constexpr MutableString Join(Allocator& a, Span<String const> parts, Form
     return a.ResizeType(buffer, pos, pos);
 }
 
+template <usize k_size>
+PUBLIC_INLINE DynamicArrayBounded<char, k_size> JoinInline(Span<String const> parts,
+                                                           Format format = Format::Native) {
+    if (!parts.size) return {};
+    DynamicArrayBounded<char, k_size> buffer;
+    buffer.size = TotalSize(parts) + parts.size - 1;
+    usize pos = 0;
+    for (auto const part : parts) {
+        if (!part.size) continue;
+        if (pos && !IsDirectorySeparator(buffer[pos - 1], format))
+            WriteAndIncrement(pos, MutableString {buffer}, format == Format::Windows ? '\\' : '/');
+        WriteAndIncrement(pos, MutableString {buffer}, part);
+    }
+    buffer.size = pos;
+    return buffer;
+}
+
 constexpr WString k_win32_long_path_prefix {L"\\\\?\\"};
 
 PUBLIC constexpr bool IsNetworkShare(WString path) {

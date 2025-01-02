@@ -51,6 +51,7 @@ constexpr String k_packager_description =
     "You can specify multiple libraries and preset-folders. Additionally:\n"
     "- Validates any Lua files.\n"
     "- Ensures libraries have a License file.\n"
-    "- Generates an 'About' HTML file for each library.\n"
+    "- Adds an 'About' HTML file for each library.\n"
+    "- Adds a 'How to Install' HTML file for the package.\n"
     "- Embeds a checksum file into the package for better change detection if the package\n"
     "  is installed manually.";

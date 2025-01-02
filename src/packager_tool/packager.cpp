@@ -14,12 +14,7 @@
 #include "common_infrastructure/package_format.hpp"
 #include "common_infrastructure/sample_library/sample_library.hpp"
 
-// Library packager CLI tool
-// - Packages Floe libraries and presets into a single Floe Package file
-// - Embeds a checksum file into the package for better change detection when installed
-// - Generates an 'About' HTML file for a Floe library
-// - Ensures there's a license file
-// - Validates that the Lua file is correct
+// Library packager CLI tool - see packager.hpp for more info
 
 struct Paths {
     String lua;
@@ -27,6 +22,8 @@ struct Paths {
 };
 
 ErrorCodeOr<Paths> ScanLibraryFolder(ArenaAllocator& arena, String library_folder) {
+    library_folder = path::TrimDirectorySeparatorsEnd(library_folder);
+
     Paths result {};
 
     auto it = TRY(dir_iterator::Create(arena,
@@ -247,9 +244,9 @@ static ErrorCodeOr<void> CheckNeededPackageCliArgs(Span<CommandLineArg const> ar
 static String
 PackageName(ArenaAllocator& arena, sample_lib::Library const* lib, CommandLineArg const& package_name_arg) {
     if (package_name_arg.was_provided)
-        return fmt::Format(arena, "{}{}", package_name_arg.values[0], package::k_file_extension);
+        return fmt::Format(arena, "{} Package{}", package_name_arg.values[0], package::k_file_extension);
     ASSERT(lib);
-    return fmt::Format(arena, "{} - {}{}", lib->author, lib->name, package::k_file_extension);
+    return fmt::Format(arena, "{} {} Package{}", lib->author, lib->name, package::k_file_extension);
 }
 
 static ErrorCodeOr<int> Main(ArgsCstr args) {

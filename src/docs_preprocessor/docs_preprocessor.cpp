@@ -236,7 +236,7 @@ static ErrorCodeOr<String> PreprocessMarkdownBlob(String markdown_blob) {
 //
 // We can avoid parsing the JSON and instead just find the book object through some simple string
 // manipulation.
-static String FindBookJson(String json) {
+static ErrorCodeOr<String> FindBookJson(String json) {
     // [
     //    {
     //      <PreprocessorContext object (we don't care about this)>
@@ -251,25 +251,35 @@ static String FindBookJson(String json) {
     char const* p = json.data;
     char const* end = json.data + json.size;
 
-    auto const skip_whitespace = [&p, end]() {
+    auto const skip_whitespace = [&p, end]() -> ErrorCodeOr<void> {
         while (p != end && IsWhitespace(*p))
             ++p;
+        if (p == end) return ErrorCode {CommonError::InvalidFileFormat};
+        return k_success;
     };
 
-    ++p; // Skip the array opening bracket
-    skip_whitespace();
+    auto const skip_char = [&p, end](char c) -> ErrorCodeOr<void> {
+        if (p == end || *p != c) return ErrorCode {CommonError::InvalidFileFormat};
+        ++p;
+        return k_success;
+    };
 
-    ++p; // Skip the object opening bracket
+    TRY(skip_char('['));
+    TRY(skip_whitespace());
+
+    TRY(skip_char('{'));
     // Skip everything until this current object ends, considering nested objects
     u8 nesting = 1;
     while (p != end && nesting) {
+        // IMPROVE: this doesn't handle nested objects properly - what if { is in a string? It doesn't seem to
+        // be a problem for the current input though.
         if (*p == '{') ++nesting;
         if (*p == '}') --nesting;
         ++p;
     }
-    ++p; // Skip the comma
+    TRY(skip_char(','));
 
-    skip_whitespace();
+    TRY(skip_whitespace());
 
     char const* book_start = p;
     char const* book_end = end;
@@ -286,14 +296,20 @@ static ErrorCodeOr<int> Main(ArgsCstr args) {
         if (NullTermStringsEqual(args.args[1], "supports")) return 0;
     }
 
-    // An mdbook preprocessor receives JSON on stdin (an array: [context, book]) and should output
-    // the modified book JSON to stdout.
-
     ArenaAllocator arena {PageAllocator::Instance()};
+
+    // A mdbook preprocessor receives JSON on stdin (an array: [context, book]) and should output
+    // the modified book JSON to stdout.
 
     auto const raw_json_input = TRY(ReadAllStdin(arena));
 
-    auto const preprocessed_book_json = TRY(PreprocessMarkdownBlob(FindBookJson(raw_json_input)));
+    auto const book_json = TRY(FindBookJson(raw_json_input));
+
+    // We just manipulate the unparsed JSON string directly - we're only doing simple text expansions. It
+    // would be good to parse it but it's a faff with our current JSON parser. We'd also need to re-serialize
+    // it back to JSON.
+    auto const preprocessed_book_json = TRY(PreprocessMarkdownBlob(book_json));
+
     TRY(StdPrint(StdStream::Out, preprocessed_book_json));
 
     return 0;

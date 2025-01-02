@@ -194,6 +194,7 @@ jobs:
 
       - name: Deploy GitHub Pages
         run: |
+          find .
           cd docs
           wget https://raw.githubusercontent.com/Floe-Project/Floe-Logos/main/rasterized/favicon.png -P theme
           wget https://raw.githubusercontent.com/Floe-Project/Floe-Logos/main/rasterized/favicon.svg -P theme

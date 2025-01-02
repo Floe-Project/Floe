@@ -50,16 +50,14 @@ patch-rpath:
       command=$1
       file=$2
 
-      if [[ -f $file ]]; then
-        $command $file
-      fi
+      $command $file
     }
 
     patch_file patchrpath "{{native_binary_dir}}/Floe.clap"
-    patch_file patchrpath "{{native_binary_dir}}/Floe.vst3/Contents/x86_64-linux/Floe.so"
+    # patch_file patchrpath "{{native_binary_dir}}/Floe.vst3/Contents/x86_64-linux/Floe.so"
     patch_file patchinterpreter "{{native_binary_dir}}/tests"
-    patch_file patchinterpreter "{{native_binary_dir}}/gen_docs_tool"
-    patch_file patchinterpreter "{{native_binary_dir}}/VST3-Validator"
+    patch_file patchinterpreter "{{native_binary_dir}}/docs_preprocessor"
+    # patch_file patchinterpreter "{{native_binary_dir}}/VST3-Validator"
   fi
 
 build-tracy:

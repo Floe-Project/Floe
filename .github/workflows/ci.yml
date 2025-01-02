@@ -181,7 +181,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: docs_preprocessor
-          path: bin/docs_preprocessor
+          path: bin
 
       - name: Set docs_preprocessor executable and in path
         run: |

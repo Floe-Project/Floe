@@ -575,4 +575,20 @@ PUBLIC MutableString Join(Allocator& a, Span<String const> strings, String separ
     return result.ToOwnedSpan();
 }
 
+template <usize k_size>
+PUBLIC_INLINE DynamicArrayBounded<char, k_size> JoinInline(Span<String const> strings,
+                                                           String separator = {}) {
+    DynamicArrayBounded<char, k_size> result;
+    result.size = 0;
+
+    auto const& last = Last(strings);
+
+    for (auto const& s : strings) {
+        dyn::AppendSpan(result, s);
+        if (separator.size && &s != &last) dyn::AppendSpan(result, separator);
+    }
+
+    return result;
+}
+
 } // namespace fmt

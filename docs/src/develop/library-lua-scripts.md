@@ -3,7 +3,7 @@ SPDX-FileCopyrightText: 2024 Sam Windell
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
-# Library Lua API
+# Library Lua Scripts
 
 This document describes the functions you can use in your sample library's [`floe.lua` script](develop-libraries.md#the-floelua-file) to create and configure the library and its instruments.
 
@@ -11,7 +11,7 @@ Floe runs your script using Lua v==lua-version==. You have access to some of [Lu
 
 If there are any errors in your script, Floe will show them on the GUI along with a line number and a description of the problem.
 
-## Library API
+## Library Functions
 Use these functions to create your sample library. Take note of the `[required]` annotations - omitting these fields will cause an error. 
 
 
@@ -52,7 +52,7 @@ Adds an reverb impulse response to the library. It takes 2 parameters: the libra
 ```
 
 
-## Support API
+## Support Function
 Floe provides some additional functions to make developing libraries easier.
 
 

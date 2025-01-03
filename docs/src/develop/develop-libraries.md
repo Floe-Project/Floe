@@ -46,7 +46,7 @@ The rest of the structure are conventions that are recommended but not required:
 
 The `floe.lua` file is the most important part of a library. It's a script that maps and configures the audio files into playable instruments, written in the Lua ==lua-version== programming language.
 
-This file uses [Floe's Lua API](library-lua-api.md) to create the library, create instruments, and add regions and impulse responses. It references the audio files in the library using relative paths.
+This file uses [Floe's Lua functions](library-lua-script.md) to create the library, create instruments, and add regions and impulse responses. It references the audio files in the library using relative paths.
 
 Here's an example of a `floe.lua` file:
 ```lua
@@ -65,7 +65,7 @@ For now, we'll assume that you have a folder of audio samples and know what note
 1. Create a file in that folder called `my-library.floe.lua`.
 1. Create a subfolder called `Samples` and put your audio files in there.
 1. Open the Lua file in your text editor. Sublime Text or Visual Studio Code are good choices.
-1. Use the `floe.new_library()` function to create your library, filling in all the fields marked `[required]` in the [API reference](library-lua-api.md).
+1. Use the `floe.new_library()` function to create your library, filling in all the fields marked `[required]` in the [Floe's Lua reference](library-lua-scripts.md).
 1. Use `floe.new_instrument()` to create an instrument, and then add regions to it using `floe.add_region()`.
 1. At the end of the file, return the library object you just created.
 1. Floe automatically scans its library folders and will tell you if there's any errors.

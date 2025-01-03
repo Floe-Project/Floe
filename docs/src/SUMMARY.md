@@ -22,7 +22,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 - [Developers]()
   - [Develop Libraries](./develop/develop-libraries.md)
-  - [Library Lua API](./develop/library-lua-api.md)
+  - [Library Lua Scripts](./develop/library-lua-scripts.md)
   - [Develop Preset Packs](./develop/develop-preset-packs.md)
   - [Package Libraries & Presets](./develop/packaging.md)
 

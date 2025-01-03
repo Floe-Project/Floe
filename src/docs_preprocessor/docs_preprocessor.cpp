@@ -185,21 +185,15 @@ static ErrorCodeOr<String> PreprocessMarkdownBlob(String markdown_blob) {
                     dyn::Replace(name, "--"_s, "-"_s);
                     name.size -= path::Extension(name).size;
 
-                    auto const base_size = name.size;
-
-                    dyn::AppendSpan(name, "-filename");
-                    ExpandIdentifier(result, Identifier(name), asset.name, scratch);
-                    name.size = base_size;
-
-                    dyn::AppendSpan(name, "-size-mb");
+                    dyn::AppendSpan(name, "-markdown-link");
                     ExpandIdentifier(result,
                                      Identifier(name),
-                                     fmt::Format(scratch, "{} MB", asset.size / 1024 / 1024),
+                                     fmt::Format(scratch,
+                                                 "[Download {}]({}) ({} MB)",
+                                                 asset.name,
+                                                 asset.url,
+                                                 asset.size / 1024 / 1024),
                                      scratch);
-                    name.size = base_size;
-
-                    dyn::AppendSpan(name, "-url");
-                    ExpandIdentifier(result, Identifier(name), asset.url, scratch);
                 }
             }
 

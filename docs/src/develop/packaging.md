@@ -21,9 +21,9 @@ However, you can use any ZIP program to create Floe Packages. Just make sure the
 
 #### Download packager
 
-**<i class="fa fa-windows"></i> Floe Packager Windows**: [Download ==Floe-Packager-Windows-filename==](==Floe-Packager-Windows-url==) (==Floe-Packager-Windows-size-mb==)
+**<i class="fa fa-windows"></i> Floe Packager Windows**: ==Floe-Packager-Windows-markdown-link==
 
-**<i class="fa fa-apple"></i> Floe Packager macOS**: [Download ==Floe-Packager-macOS-filename==](==Floe-Packager-macOS-url==) (==Floe-Packager-macOS-size-mb==)
+**<i class="fa fa-apple"></i> Floe Packager macOS**: ==Floe-Packager-macOS-markdown-link==
 
 Download the program, extract it, and run it from the command line. 
 

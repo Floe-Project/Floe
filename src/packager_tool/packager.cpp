@@ -275,8 +275,8 @@ static ErrorCodeOr<int> Main(ArgsCstr args) {
 
     for (auto const path : cli_args[ToInt(PackagerCliArgId::LibraryFolder)].values) {
         auto const library_path = TRY(AbsolutePath(arena, path));
-        // library_folder can actually be a MDATA file but this is a uncommon legacy case so we don't document
-        // it.
+        // library_folder can actually be a MDATA file but this is an uncommon legacy case so we don't
+        // document it.
         if (path::Extension(library_path) == ".mdata") {
             auto reader = TRY(Reader::FromFile(library_path));
             ArenaAllocator scratch_arena {PageAllocator::Instance()};

@@ -30,7 +30,7 @@ auto constexpr k_packager_command_line_args_defs = MakeCommandLineArgDefs<Packag
     },
     {
         .id = (u32)PackagerCliArgId::OutputPackageFolder,
-        .key = "output-package-folder",
+        .key = "output-folder",
         .description = "Folder to write the created package to",
         .value_type = "path",
         .required = false,

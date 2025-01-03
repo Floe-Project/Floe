@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "error_trace.hpp"
+
 struct SuccessType {
     enum class Construct { Token };
     explicit constexpr SuccessType(Construct) {}
@@ -25,8 +27,10 @@ struct TryHelpers {
 #define TRY_X(try_helpers, expression)                                                                       \
     ({                                                                                                       \
         auto&& CONCAT(try_result, __LINE__) = (expression);                                                  \
-        if (try_helpers::IsError(CONCAT(try_result, __LINE__))) [[unlikely]]                                 \
+        if (try_helpers::IsError(CONCAT(try_result, __LINE__))) [[unlikely]] {                               \
+            g_error_trace.Trace(SourceLocation::Current());                                                  \
             return try_helpers::ExtractError(CONCAT(try_result, __LINE__));                                  \
+        }                                                                                                    \
         try_helpers::ExtractValue(CONCAT(try_result, __LINE__));                                             \
     })
 

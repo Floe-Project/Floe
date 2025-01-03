@@ -8,6 +8,7 @@
 #include "foundation/container/span.hpp"
 #include "foundation/container/tagged_union.hpp"
 #include "foundation/error/error_code.hpp"
+#include "foundation/error/error_trace.hpp"
 #include "foundation/universal_defs.hpp"
 #include "foundation/utils/string.hpp"
 #include "foundation/utils/writer.hpp"
@@ -317,6 +318,15 @@ PUBLIC ErrorCodeOr<void> ValueToString(Writer writer, T const& value, FormatOpti
             if (value.extra_debug_info) {
                 TRY(writer.WriteChars(", "));
                 TRY(writer.WriteChars(FromNullTerminated(value.extra_debug_info)));
+            }
+
+            for (auto const& trace_loc : Span {g_error_trace.error_trace, g_error_trace.count}) {
+                TRY(writer.WriteChar('\n'));
+                TRY(writer.WriteChars(FromNullTerminated(trace_loc.file)));
+                TRY(writer.WriteChar(':'));
+                TRY(writer.WriteChars(IntToString(trace_loc.line)));
+                TRY(writer.WriteChars(": "));
+                TRY(writer.WriteChars(FromNullTerminated(trace_loc.function)));
             }
         }
         return k_success;

@@ -105,14 +105,6 @@ jobs:
           if-no-files-found: ignore
           path: ~/.local/state/Floe/*
 
-      - name: Upload docs_preprocessor
-        if: '!cancelled()'
-        uses: actions/upload-artifact@v4
-        with:
-          name: docs_preprocessor
-          if-no-files-found: error
-          path: zig-out/x86_64-linux/docs_preprocessor
-
   windows-test:
     runs-on: windows-latest
     needs: linux-compile-and-test
@@ -166,43 +158,25 @@ jobs:
           
 
   generate-docs:
-    # !cancelled() ensures this is run even if the compile-and-test job failed, unless it was manually cancelled. 
-    # We want this because a test failure needn't stop us from updating the docs.
     if: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && !cancelled() }}
     runs-on: ubuntu-latest
-    needs: linux-compile-and-test
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
         with:
+          submodules: recursive
           fetch-depth: 0
 
-      - uses: actions/download-artifact@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - uses: nicknovitski/nix-develop@v1.2.1
+      - uses: Hanaasagi/zig-action-cache@master
         with:
-          name: docs_preprocessor
-          path: bin
+          cache-directories: |
+            .floe-cache
 
-      - name: Set docs_preprocessor executable and in path
-        run: |
-          chmod +x bin/docs_preprocessor
-          echo `pwd`/bin >> $GITHUB_PATH
-
-      # https://github.com/rust-lang/mdBook/wiki/Automated-Deployment%3A-GitHub-Actions
-      - name: Install latest mdbook
-        run: |
-          tag=$(curl 'https://api.github.com/repos/rust-lang/mdbook/releases/latest' | jq -r '.tag_name')
-          url="https://github.com/rust-lang/mdbook/releases/download/${tag}/mdbook-${tag}-x86_64-unknown-linux-gnu.tar.gz"
-          mkdir mdbook
-          curl -sSL $url | tar -xz --directory=./mdbook
-          echo `pwd`/mdbook >> $GITHUB_PATH
-
-      - name: Test docs_preprocessor
-        run: |
-          ls -la bin/
-          file bin/docs_preprocessor 
-          echo "Path is: $PATH"
-          which docs_preprocessor
+      - run: just build native
 
       - name: Deploy GitHub Pages
         run: |

@@ -11,8 +11,6 @@ Floe runs your script using Lua v==lua-version==. You have access to some of [Lu
 
 If there are any errors in your script, Floe will show them on the GUI along with a line number and a description of the problem.
 
-See the [`floe.lua` section of "Develop Libraries"](develop-libraries.md#the-floelua-file) to see a complete example of a Floe Lua file.
-
 ## Library API
 Use these functions to create your sample library. Take note of the `[required]` annotations - omitting these fields will cause an error. 
 

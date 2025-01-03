@@ -19,7 +19,7 @@ We recommend using our command-line tool to create Floe Packages. It ensures eve
 
 However, you can use any ZIP program to create Floe Packages. Just make sure they follow the structure described in the next section.
 
-#### Download packager
+#### Download
 
 **<i class="fa fa-windows"></i> Floe Packager Windows**: ==Floe-Packager-Windows-markdown-link==
 
@@ -62,7 +62,7 @@ Be careful that your ZIP program is not adding an extra folder when you create t
 
 #### Example: single library & factory presets
 ```
-📦FrozenPlain - Arctic Strings.floe.zip/
+📦FrozenPlain - Arctic Strings Package.floe.zip/
 ├── 📁Libraries
 │   └── 📁Arctic Strings
 │       ├── 📄arctic-strings.floe.lua
@@ -84,7 +84,7 @@ Be careful that your ZIP program is not adding an extra folder when you create t
 
 #### Example: multiple libraries
 ```
-📦Audioata - Synthwave Bundle.floe.zip/
+📦Audioata - Synthwave Bundle Package.floe.zip/
 ├── 📁Libraries
 │   ├── 📁Synthwave Bass
 │   │   ├── 📄synthwave-bass.floe.lua

@@ -178,6 +178,11 @@ jobs:
 
       - run: just build native
 
+      - name: Install docs_preprocessor system-wide
+        run: |
+          BINARY_PATH=$(which docs_preprocessor)
+          sudo install "$BINARY_PATH" /usr/local/bin/
+
       - name: Deploy GitHub Pages
         run: |
           cd docs

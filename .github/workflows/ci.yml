@@ -180,8 +180,11 @@ jobs:
 
       - name: Install docs_preprocessor system-wide
         run: |
-          BINARY_PATH=$(which docs_preprocessor)
-          sudo install "$BINARY_PATH" /usr/local/bin/
+          set -x  # Print commands as they're executed
+          BINARY_PATH=$(which docs_preprocessor) || { echo "Failed to find docs_preprocessor"; exit 1; }
+          echo "Found binary at: $BINARY_PATH"
+          sudo install "$BINARY_PATH" /usr/local/bin/ 2>&1 || { echo "Failed to install binary: $?"; exit 1; }
+          echo "Installation completed"
 
       - name: Deploy GitHub Pages
         run: |

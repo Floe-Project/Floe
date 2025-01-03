@@ -246,7 +246,7 @@ PackageName(ArenaAllocator& arena, sample_lib::Library const* lib, CommandLineAr
     if (package_name_arg.was_provided)
         return fmt::Format(arena, "{} Package{}", package_name_arg.values[0], package::k_file_extension);
     ASSERT(lib);
-    return fmt::Format(arena, "{} {} Package{}", lib->author, lib->name, package::k_file_extension);
+    return fmt::Format(arena, "{} - {} Package{}", lib->author, lib->name, package::k_file_extension);
 }
 
 static ErrorCodeOr<int> Main(ArgsCstr args) {
@@ -273,18 +273,40 @@ static ErrorCodeOr<int> Main(ArgsCstr args) {
 
     sample_lib::Library* lib_for_package_name = nullptr;
 
-    for (auto const library_folder : cli_args[ToInt(PackagerCliArgId::LibraryFolder)].values) {
-        auto const paths = TRY(ScanLibraryFolder(arena, library_folder));
+    for (auto const path : cli_args[ToInt(PackagerCliArgId::LibraryFolder)].values) {
+        auto const library_path = TRY(AbsolutePath(arena, path));
+        // library_folder can actually be a MDATA file but this is a uncommon legacy case so we don't document
+        // it.
+        if (path::Extension(library_path) == ".mdata") {
+            auto reader = TRY(Reader::FromFile(library_path));
+            ArenaAllocator scratch_arena {PageAllocator::Instance()};
+            auto outcome = sample_lib::ReadMdata(reader, library_path, arena, scratch_arena);
+            if (outcome.HasError()) {
+                g_cli_out.Error({},
+                                "Error reading {}: {}, {}",
+                                library_path,
+                                outcome.Error().message,
+                                outcome.Error().code);
+                return outcome.Error().code;
+            }
+            auto lib = outcome.Get<sample_lib::Library*>();
+            lib_for_package_name = lib;
+            if (create_package) TRY(package::WriterAddLibrary(package, *lib, arena, program_name));
+
+            continue;
+        }
+
+        auto const paths = TRY(ScanLibraryFolder(arena, library_path));
 
         auto lib = TRY(ReadLua(paths.lua, arena));
         lib_for_package_name = lib;
         if (!sample_lib::CheckAllReferencedFilesExist(*lib, g_cli_out))
             return ErrorCode {CommonError::NotFound};
 
-        auto const metadata_outcome = ReadMetadata(library_folder, arena);
+        auto const metadata_outcome = ReadMetadata(library_path, arena);
         (void)metadata_outcome; // NOTE: unused at the moment
 
-        TRY(WriteAboutLibraryHtml(*lib, arena, paths, library_folder));
+        TRY(WriteAboutLibraryHtml(*lib, arena, paths, library_path));
 
         if (create_package) TRY(package::WriterAddLibrary(package, *lib, arena, program_name));
     }

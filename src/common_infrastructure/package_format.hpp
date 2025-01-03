@@ -156,12 +156,14 @@ PUBLIC void WriterAddFile(mz_zip_archive& zip, String path, Span<u8 const> data)
 
     WriterAddParentFolders(zip, path);
 
+    auto const ext = path::Extension(path);
+
     if (!mz_zip_writer_add_mem(
             &zip,
             dyn::NullTerminated(archived_path),
             data.data,
             data.size,
-            (mz_uint)(path::Extension(path) != ".flac" ? MZ_DEFAULT_COMPRESSION : MZ_NO_COMPRESSION))) {
+            (mz_uint)((ext == ".flac" || ext == ".mdata") ? MZ_NO_COMPRESSION : MZ_DEFAULT_COMPRESSION))) {
         PanicF(SourceLocation::Current(),
                "Failed to add file to zip: {}",
                mz_zip_get_error_string(mz_zip_get_last_error(&zip)));
@@ -262,6 +264,17 @@ PUBLIC ErrorCodeOr<void> WriterAddLibrary(mz_zip_archive& zip,
                                           sample_lib::Library const& lib,
                                           ArenaAllocator& scratch_arena,
                                           String program_name) {
+    if (lib.file_format_specifics.tag == sample_lib::FileFormat::Mdata) {
+        g_log.Info(k_log_mod, "Adding mdata file for library '{}'", lib.path);
+        auto const mdata = TRY(ReadEntireFile(lib.path, scratch_arena)).ToByteSpan();
+        WriterAddFile(zip,
+                      path::Join(scratch_arena,
+                                 Array {k_libraries_subdir, fmt::JoinInline<100>(Array {lib.name, ".mdata"})},
+                                 path::Format::Posix),
+                      mdata);
+        return k_success;
+    }
+
     auto const subdirs =
         Array {k_libraries_subdir, fmt::Format(scratch_arena, "{} - {}", lib.author, lib.name)};
 

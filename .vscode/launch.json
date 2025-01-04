@@ -19,6 +19,19 @@
             "args": [
                 "--log-level=debug"
             ]
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Floe Packager",
+            "runInTerminal": true,
+            "program": "zig-out/x86_64-linux/floe-packager",
+            "args": [
+                "--library-folders",
+                "~/Floe/Libraries/music_box_suite.mdata",
+                "--output-folder",
+                ".floe-cache/"
+            ]
         }
     ]
 }

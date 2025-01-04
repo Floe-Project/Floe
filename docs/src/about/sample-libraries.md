@@ -5,7 +5,16 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Sample Libraries
 
-Floe uses a custom sample library format. It's an open format consisting of a folder of audio files and a file in the [Lua](https://en.wikipedia.org/wiki/Lua_(programming_language)) programming language called `floe.lua`. 
+Floe uses a custom sample library format. It supports lots of features for multisampling and will be extended in the future.
+- Velocity layers
+- Round-robin
+- Crossfade layers
+- Loop points with crossfade 
+- Convolution reverb IRs
+- Velocity layer feathering
+- Trigger samples on note-off
+
+It's an open format consisting of a folder of audio files and a file in the [Lua](https://en.wikipedia.org/wiki/Lua_(programming_language)) programming language called `floe.lua`. 
 
 Access to the audio files gives you the freedom to use a library's sounds in other software too.
 

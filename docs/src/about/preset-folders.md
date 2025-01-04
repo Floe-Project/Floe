@@ -4,6 +4,9 @@ SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
 # Preset Folders
+
+![Folder Settings GUI](../images/folder-settings.png)
+
 Floe automatically scans for presets in a set of folders - including subfolders. This works in the exact same way as your [library folders](./library-folders.md).
 
 Presets are tiny files and so there's typically no need to move then to an external hard-drive.

@@ -46,7 +46,7 @@ The rest of the structure are conventions that are recommended but not required:
 
 The `floe.lua` file is the most important part of a library. It's a script that maps and configures the audio files into playable instruments, written in the Lua ==lua-version== programming language.
 
-This file uses [Floe's Lua functions](library-lua-script.md) to create the library, create instruments, and add regions and impulse responses. It references the audio files in the library using relative paths.
+This file uses [Floe's Lua functions](library-lua-scripts.md) to create the library, create instruments, and add regions and impulse responses. It references the audio files in the library using relative paths.
 
 Here's an example of a `floe.lua` file:
 ```lua

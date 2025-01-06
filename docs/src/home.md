@@ -45,7 +45,7 @@ Floe's ancestor, Mirage, has been used by thousands of musicians and producers, 
 #### Ongoing development
 Floe is an ongoing project. We plan to expand its capabilities while always maintaining backwards compatibility. We're always open to feedback and suggestions. Floe is designed for professional and hobbyist musicians, sound designers and producers.
 
-Developed by the creator of [FrozenPlain](https://frozenplain.com). FrozenPlain offer a range of sample libraries that well be updated to support the Floe format. We're looking to see other developers adopt the format too.
+Developed by the creator of [FrozenPlain](https://frozenplain.com). FrozenPlain offer a range of sample libraries that will be updated to support the Floe format. We're looking to see other developers adopt the format too.
 
 > **Floe's mission**
 > 1. Make sample libraries more expressive, playable and effective in music production.

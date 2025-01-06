@@ -5,7 +5,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Sample Libraries
 
-Floe uses a custom sample library format. It supports lots of features for multisampling and will be extended in the future.
+Floe uses a custom sample library format which supports the following features: 
 - Velocity layers
 - Round-robin
 - Crossfade layers

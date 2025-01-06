@@ -6,7 +6,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 # Package libraries & presets for distribution
 The easiest and most reliable way to distribute your Floe sample libraries and presets is with Floe Packages.
 
-Floe Packages are ZIP files that contain [Floe sample libraries](../about/sample-libraries.md) and/or presets. These are the files that users will download and use to install new libraries and presets into Floe.
+Floe Packages are ZIP files that contain [Floe sample libraries](../about/sample-libraries.md) and/or presets. Packages are the files that users will download and use to install new libraries and presets into Floe.
 
 Floe offers an easy-to-use GUI for [installing these Packages](../installation/install-libraries-and-presets.md). This installation process carefully considers the user's existing libraries and presets, their versions, their installation preferences, even whether their installed libraries have been modified or not. The result is something that should 'just work' or at least provide clear instructions on what to do next.
 
@@ -103,10 +103,10 @@ Be careful that your ZIP program is not adding an extra folder when you create t
 │           └── 📄synth_d4.flac
 └── 📁Presets
     └── 📁Synthwave Factory
-        ├── 📄Clean.floe-preset
-        ├── 📄Dirty.floe-preset
-        ├── 📄Big.floe-preset
-        ├── 📄Small.floe-preset
-        ├── 📄Bright.floe-preset
-        └── 📄Warm.floe-preset
+        ├── 📄Clean Pad.floe-preset
+        ├── 📄Dirty Lead.floe-preset
+        ├── 📄Nebula Drone.floe-preset
+        ├── 📄Punchy Kickdrum.floe-preset
+        ├── 📄Backing FX.floe-preset
+        └── 📄Full Effect.floe-preset
 ```

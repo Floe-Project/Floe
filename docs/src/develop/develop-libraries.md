@@ -17,6 +17,9 @@ No existing format met our requirements for Floe, which are:
 - The format should be extensible - allowing us to innovate in the field of sampling.
 - The solution should easily integrate into Floe's codebase.
 
+## Simple configuration
+This format is designed for configuring audio files into playable instruments. It does not add any programming logic or custom GUIs. Floe has a ready-to-use GUI and lots of audio parameters.
+
 ## The structure
 
 Let's look at the structure of a Floe sample library:

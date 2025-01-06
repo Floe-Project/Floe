@@ -13,6 +13,8 @@
 
 namespace sample_lib {
 
+constexpr auto k_log_mod = "🔊sample-lib"_log_module;
+
 static Range ConvertVelocityToStartEndRange(s8 low_velo, s8 high_velo) {
     auto const lo = Max((s8)1, low_velo) - 1;
     auto const hi = high_velo - 1;
@@ -528,7 +530,10 @@ ReadMdata(Reader& reader, String filepath, ArenaAllocator& result_arena, ArenaAl
 
     auto library = ({
         auto o = ReadMdataFile(result_arena, scratch_arena, reader);
-        if (o.HasError()) return Error {o.Error(), {}};
+        if (o.HasError()) {
+            g_log.Debug(k_log_mod, "Failed to read mdata file: {}", o.Error());
+            return Error {o.Error(), {}};
+        }
         o.Value();
     });
 

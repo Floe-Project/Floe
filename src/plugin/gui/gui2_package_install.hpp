@@ -141,6 +141,8 @@ PUBLIC void DoPackageInstallNotifications(GuiBoxSystem& box_system,
                 },
                 .id = k_installing_packages_notif_id,
             };
+            box_system.imgui.frame_output.ElevateUpdateRequest(
+                GuiFrameResult::UpdateRequest::ImmediatelyUpdate);
         }
 
         bool user_input_needed = false;
@@ -169,7 +171,7 @@ PUBLIC void DoPackageInstallNotifications(GuiBoxSystem& box_system,
                     break;
                 }
                 case package::InstallJob::State::DoneSuccess: {
-                    DynamicArrayBounded<char, k_notification_buffer_size - 16> buffer {};
+                    DynamicArrayBounded<char, k_notification_buffer_size - 24> buffer {};
                     u8 num_truncated = 0;
                     for (auto [index, component] : Enumerate(job.job->components)) {
                         if (!num_truncated) {
@@ -202,6 +204,8 @@ PUBLIC void DoPackageInstallNotifications(GuiBoxSystem& box_system,
                         },
                         .id = HashComptime("package install success"),
                     };
+                    box_system.imgui.frame_output.ElevateUpdateRequest(
+                        GuiFrameResult::UpdateRequest::ImmediatelyUpdate);
 
                     next = package::RemoveJob(package_install_jobs, it);
                     break;

@@ -22,6 +22,7 @@ struct Notification {
     TrivialFixedSizeFunction<k_notification_buffer_size, NotificationDisplayInfo(ArenaAllocator& arena)>
         get_diplay_info;
     u64 id;
+    TimePoint time_added = TimePoint::Now();
 };
 
 struct Notifications : BoundedList<Notification, 10> {
@@ -30,9 +31,12 @@ struct Notifications : BoundedList<Notification, 10> {
             if (n.id == id) return &n;
         return nullptr;
     }
+    TimePoint dismiss_check_counter {};
 };
 
 PUBLIC void NotificationsPanel(GuiBoxSystem& box_system, Notifications& notifications) {
+    constexpr f64 k_dismiss_seconds = 6;
+
     auto const root = DoBox(
         box_system,
         {
@@ -51,6 +55,11 @@ PUBLIC void NotificationsPanel(GuiBoxSystem& box_system, Notifications& notifica
         DEFER { it = next; };
 
         auto const config = n.get_diplay_info(box_system.arena);
+
+        if (config.dismissable && n.time_added.SecondsFromNow() > k_dismiss_seconds) {
+            next = notifications.Remove(it);
+            continue;
+        }
 
         auto const notification = DoBox(box_system,
                                         {
@@ -187,5 +196,7 @@ PUBLIC void DoNotifications(GuiBoxSystem& box_system, Notifications& notificatio
                              .transparent_panel = true,
                          },
                  });
+
+        box_system.imgui.WakeupAtTimedInterval(notifications.dismiss_check_counter, 1);
     }
 }

@@ -396,6 +396,19 @@ ReaderReadLibraryLua(PackageReader& package, String library_dir_in_zip, ArenaAll
     return lib_outcome.ReleaseValue();
 }
 
+static ErrorCodeOr<sample_lib::Library*> ReaderReadLibraryMdata(PackageReader& package,
+                                                                mz_uint file_index,
+                                                                String path_in_zip,
+                                                                ArenaAllocator& arena) {
+    auto const stat = TRY(detail::FileStat(package, file_index));
+    auto const mdata = TRY(detail::ExtractFileToMem(package, stat, arena));
+    auto reader = ::Reader::FromMemory(mdata);
+    g_log.Debug(k_log_mod, "Reading mdata file: {}", path_in_zip);
+    auto const lib_outcome = sample_lib::ReadMdata(reader, path_in_zip, arena, arena);
+    if (lib_outcome.HasError()) return ErrorCode {PackageError::InvalidLibrary};
+    return lib_outcome.ReleaseValue();
+}
+
 static ErrorCodeOr<HashTable<String, ChecksumValues>>
 ReaderChecksumValuesForDir(PackageReader& package, String dir_in_zip, ArenaAllocator& arena) {
     DynamicHashTable<String, ChecksumValues> table {arena};
@@ -451,7 +464,7 @@ static PackageError CreatePackageError(Logger& error_log, ErrorCode error, Args 
     if (possible_fix.size) fmt::Append(error_buffer, " {}.", possible_fix);
 
     error_log.Error({}, error_buffer);
-    g_log.Info(k_log_mod, "Package error: {}", error_buffer);
+    g_log.Info(k_log_mod, "Package error: {}. {}", error_buffer, error);
 
     return package_error;
 }
@@ -538,7 +551,7 @@ IteratePackageComponents(PackageReader& package,
             if (relative_path->size == 0) continue;
             if (Contains(*relative_path, '/')) continue;
 
-            g_log.Info(k_log_mod, "Package contains folder: {}", path);
+            g_log.Debug(k_log_mod, "Package contains component: {}", path);
 
             return Optional<Component> {Component {
                 .path = path.Clone(arena),
@@ -561,8 +574,14 @@ IteratePackageComponents(PackageReader& package,
                     sample_lib::Library* lib = nullptr;
                     if (folder == k_libraries_subdir) {
                         lib = ({
-                            auto const o = detail::ReaderReadLibraryLua(package, path, arena);
+                            auto const o =
+                                path::Extension(path) != ".mdata"
+                                    ? detail::ReaderReadLibraryLua(package, path, arena)
+                                    : detail::ReaderReadLibraryMdata(package, file_index, path, arena);
                             if (o.HasError()) return detail::CreatePackageError(error_log, o.Error());
+                            if (!o.Value())
+                                return detail::CreatePackageError(error_log,
+                                                                  ErrorCode {PackageError::InvalidLibrary});
                             o.Value();
                         });
                     }

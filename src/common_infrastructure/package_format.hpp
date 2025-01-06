@@ -269,7 +269,8 @@ PUBLIC ErrorCodeOr<void> WriterAddLibrary(mz_zip_archive& zip,
         auto const mdata = TRY(ReadEntireFile(lib.path, scratch_arena)).ToByteSpan();
         WriterAddFile(zip,
                       path::Join(scratch_arena,
-                                 Array {k_libraries_subdir, fmt::JoinInline<100>(Array {lib.name, ".mdata"})},
+                                 Array {k_libraries_subdir,
+                                        fmt::FormatInline<100>("{} - {}.mdata", lib.author, lib.name)},
                                  path::Format::Posix),
                       mdata);
         return k_success;

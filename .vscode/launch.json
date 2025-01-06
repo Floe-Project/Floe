@@ -28,7 +28,7 @@
             "program": "zig-out/x86_64-linux/floe-packager",
             "args": [
                 "--library-folders",
-                "~/Floe/Libraries/music_box_suite.mdata",
+                "~/Floe/Libraries/wraith.mdata",
                 "--output-folder",
                 ".floe-cache/"
             ]

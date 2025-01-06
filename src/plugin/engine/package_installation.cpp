@@ -16,7 +16,7 @@ CustomValueToString(Writer writer, package::ExistingInstalledComponent value, Fo
 
 namespace package {
 
-static String TestLibFolder(tests::Tester& tester, String lib_folder_name) {
+static MutableString FullTestLibraryPath(tests::Tester& tester, String lib_folder_name) {
     return path::Join(
         tester.scratch_arena,
         Array {tests::TestFilesFolder(tester), tests::k_libraries_test_files_subdir, lib_folder_name});
@@ -27,12 +27,18 @@ static String TestPresetsFolder(tests::Tester& tester) {
                       Array {tests::TestFilesFolder(tester), tests::k_preset_test_files_subdir});
 }
 
-static ErrorCodeOr<sample_lib::Library*> LoadTestLibrary(tests::Tester& tester, String lib_folder_name) {
-    auto const test_floe_lua_path =
-        (String)path::Join(tester.scratch_arena, Array {TestLibFolder(tester, lib_folder_name), "floe.lua"});
-    auto reader = TRY(Reader::FromFile(test_floe_lua_path));
+static ErrorCodeOr<sample_lib::Library*> LoadTestLibrary(tests::Tester& tester, String lib_subpath) {
+    auto const format = sample_lib::DetermineFileFormat(lib_subpath);
+    if (!format.HasValue()) {
+        tester.log.Error({}, "Unknown file format for '{}'", lib_subpath);
+        return ErrorCode {PackageError::InvalidLibrary};
+    }
+
+    auto const path = FullTestLibraryPath(tester, lib_subpath);
+    auto reader = TRY(Reader::FromFile(path));
     auto lib_outcome =
-        sample_lib::ReadLua(reader, test_floe_lua_path, tester.scratch_arena, tester.scratch_arena);
+        sample_lib::Read(reader, format.Value(), path, tester.scratch_arena, tester.scratch_arena);
+
     if (lib_outcome.HasError()) {
         tester.log.Error({}, "Failed to read library from test lua file: {}", lib_outcome.Error().message);
         return lib_outcome.Error().code;
@@ -41,16 +47,18 @@ static ErrorCodeOr<sample_lib::Library*> LoadTestLibrary(tests::Tester& tester, 
     return lib;
 }
 
-static ErrorCodeOr<Span<u8 const>> CreateValidTestPackage(tests::Tester& tester, String lib_folder_name) {
+static ErrorCodeOr<Span<u8 const>>
+CreateValidTestPackage(tests::Tester& tester, String lib_subpath, bool include_presets) {
     DynamicArray<u8> zip_data {tester.scratch_arena};
     auto writer = dyn::WriterFor(zip_data);
     auto package = WriterCreate(writer);
     DEFER { WriterDestroy(package); };
 
-    auto lib = TRY(LoadTestLibrary(tester, lib_folder_name));
+    auto lib = TRY(LoadTestLibrary(tester, lib_subpath));
     TRY(WriterAddLibrary(package, *lib, tester.scratch_arena, "tester"));
 
-    TRY(WriterAddPresetsFolder(package, TestPresetsFolder(tester), tester.scratch_arena, "tester"));
+    if (include_presets)
+        TRY(WriterAddPresetsFolder(package, TestPresetsFolder(tester), tester.scratch_arena, "tester"));
 
     WriterFinalise(package);
     return zip_data.ToOwnedSpan();
@@ -143,9 +151,9 @@ static ErrorCodeOr<void> Test(tests::Tester& tester, TestOptions options) {
     return k_success;
 }
 
-String CreatePackageZipFile(tests::Tester& tester, String lib_folder_name) {
+String CreatePackageZipFile(tests::Tester& tester, String lib_subpath, bool include_presets) {
     auto const zip_data = ({
-        auto o = package::CreateValidTestPackage(tester, lib_folder_name);
+        auto o = package::CreateValidTestPackage(tester, lib_subpath, include_presets);
         REQUIRE(!o.HasError());
         o.ReleaseValue();
     });
@@ -169,7 +177,7 @@ TEST_CASE(TestPackageInstallation) {
     ThreadsafeErrorNotifications error_notif;
     sample_lib_server::Server server {thread_pool, destination_folder, error_notif};
 
-    auto const zip_path = CreatePackageZipFile(tester, "Test-Lib-1");
+    auto const zip_path = CreatePackageZipFile(tester, "Test-Lib-1/floe.lua", true);
 
     // Initially we're expecting success without any user input because the package is valid, it's not
     // installed anywhere else, and the destination folder is empty.
@@ -313,7 +321,7 @@ TEST_CASE(TestPackageInstallation) {
              {
                  .test_name = "Updating library to newer version",
                  .destination_folder = destination_folder,
-                 .zip_path = CreatePackageZipFile(tester, "Test-Lib-1-v2"),
+                 .zip_path = CreatePackageZipFile(tester, "Test-Lib-1-v2/floe.lua", true),
                  .server = server,
                  .expected_state = InstallJob::State::DoneSuccess,
 
@@ -354,6 +362,39 @@ TEST_CASE(TestPackageInstallation) {
                      .modified_since_installed = ExistingInstalledComponent::Unmodified,
                  },
                  .expected_presets_action = "already installed"_s,
+             }));
+
+    // Try installing a MDATA library
+    auto const mdata_package = CreatePackageZipFile(tester, "shared_files_test_lib.mdata", false);
+    TRY(Test(tester,
+             {
+                 .test_name = "Installing MDATA library",
+                 .destination_folder = destination_folder,
+                 .zip_path = mdata_package,
+                 .server = server,
+                 .expected_state = InstallJob::State::DoneSuccess,
+
+                 .expected_library_status {
+                     .installed = false,
+                 },
+                 .expected_library_action = "installed"_s,
+             }));
+
+    // Try installing a MDATA library again to see if it skips
+    TRY(Test(tester,
+             {
+                 .test_name = "Installing MDATA library again does nothing",
+                 .destination_folder = destination_folder,
+                 .zip_path = mdata_package,
+                 .server = server,
+                 .expected_state = InstallJob::State::DoneSuccess,
+
+                 .expected_library_status {
+                     .installed = true,
+                     .version_difference = ExistingInstalledComponent::Equal,
+                     .modified_since_installed = ExistingInstalledComponent::Unmodified,
+                 },
+                 .expected_library_action = "already installed"_s,
              }));
 
     return k_success;

@@ -525,9 +525,6 @@ ErrorCodeOr<u64> MdataHash(Reader& reader) {
 
 LibraryPtrOrError
 ReadMdata(Reader& reader, String filepath, ArenaAllocator& result_arena, ArenaAllocator& scratch_arena) {
-    auto const scratch_cursor = scratch_arena.TotalUsed();
-    DEFER { scratch_arena.TryShrinkTotalUsed(scratch_cursor); };
-
     auto library = ({
         auto o = ReadMdataFile(result_arena, scratch_arena, reader);
         if (o.HasError()) {

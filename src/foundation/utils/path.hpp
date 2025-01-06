@@ -291,10 +291,10 @@ JoinAppend(dyn::DynArray auto& output, Span<String const> parts, Format format =
         JoinAppend(output, p, format);
 }
 
-PUBLIC constexpr MutableString JoinAppendResizeAllocation(Allocator& a,
-                                                          MutableString allocated_path,
-                                                          Span<String const> parts,
-                                                          Format format = Format::Native) {
+[[nodiscard]] PUBLIC constexpr MutableString JoinAppendResizeAllocation(Allocator& a,
+                                                                        MutableString allocated_path,
+                                                                        Span<String const> parts,
+                                                                        Format format = Format::Native) {
     if (!parts.size) return allocated_path;
     auto buffer = a.ResizeType(allocated_path,
                                allocated_path.size,

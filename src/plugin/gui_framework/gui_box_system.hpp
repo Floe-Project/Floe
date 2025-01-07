@@ -370,24 +370,20 @@ static bool Tooltip(GuiBoxSystem& builder, imgui::Id id, Rect r, String str) {
         auto const pad_x = imgui.PointsToPixels(style::k_tooltip_pad_x);
         auto const pad_y = imgui.PointsToPixels(style::k_tooltip_pad_y);
 
-        auto size = imgui.PointsToPixels(style::k_tooltip_max_width);
-        auto wrapped_size = draw::GetTextSize(font, str, size);
-        size = Min(size, wrapped_size.x);
-
-        auto abs_pos = r.pos;
+        auto text_size = draw::GetTextSize(font, str, imgui.PointsToPixels(style::k_tooltip_max_width));
 
         Rect popup_r;
-        popup_r.x = abs_pos.x;
-        popup_r.y = abs_pos.y + r.h;
-        popup_r.w = size + pad_x * 2;
-        popup_r.h = wrapped_size.y + pad_y * 2;
+        popup_r.x = r.x;
+        popup_r.y = r.y + r.h;
+        popup_r.w = text_size.x + pad_x * 2;
+        popup_r.h = text_size.y + pad_y * 2;
 
-        popup_r.x = popup_r.x + ((r.w / 2) - (popup_r.w / 2));
+        auto const cursor_pos = imgui.frame_input.cursor_pos;
 
-        popup_r.pos = imgui::BestPopupPos(popup_r,
-                                          {.pos = abs_pos, .size = r.size},
-                                          imgui.frame_input.window_size.ToFloat2(),
-                                          false);
+        // shift the x so that it's centred on the cursor
+        popup_r.x = cursor_pos.x - popup_r.w / 2;
+
+        popup_r.pos = imgui::BestPopupPos(popup_r, r, imgui.frame_input.window_size.ToFloat2(), false);
 
         f32x2 text_start;
         text_start.x = popup_r.x + pad_x;
@@ -403,7 +399,7 @@ static bool Tooltip(GuiBoxSystem& builder, imgui::Id id, Rect r, String str) {
                                        text_start,
                                        style::Col(style::Colour::Text),
                                        str,
-                                       size + 1);
+                                       text_size.x + 1);
         return true;
     }
     return false;

@@ -540,13 +540,22 @@ static bool UpdateLibraryJobs(Server& server,
                         for (auto& node : server.libraries) {
                             auto const& lib = *node.value.lib;
                             if (lib.file_format_specifics.tag != sample_lib::FileFormat::Lua) continue;
-                            if (path::IsWithinDirectory(full_path, path::Directory(lib.path).ValueOr(""_s))) {
+                            auto const lib_dir = TRY_OPT_OR(path::Directory(lib.path), continue);
+
+                            if (path::Equal(full_path, lib_dir)) {
+                                // The library folder itself has changed. We queue-up a scan of the library.
+                                // It will handle new/deleted/modified.
+                                ReadLibraryAsync(pending_library_jobs,
+                                                 server.libraries,
+                                                 lib.path,
+                                                 lib.file_format_specifics.tag);
+                            } else if (path::IsWithinDirectory(full_path, lib_dir)) {
+                                // Something within the library folder has changed
                                 dyn::AppendIfNotAlreadyThere(libraries_that_changed, &node);
 
                                 for (auto& d : node.value.audio_datas) {
                                     auto const full_audio_path =
-                                        path::Join(scratch_arena,
-                                                   Array {path::Directory(lib.path).ValueOr(""), d.path});
+                                        path::Join(scratch_arena, Array {lib_dir, d.path});
                                     if (path::Equal(full_audio_path, full_path)) d.file_modified = true;
                                 }
                             }

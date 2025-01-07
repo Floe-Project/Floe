@@ -767,9 +767,6 @@ static ListedAudioData* FetchOrCreateAudioData(LibrariesList::Node& lib_node,
                                                u32 debug_inst_id) {
     auto const& lib = *lib_node.value.lib;
     for (auto& d : lib_node.value.audio_datas) {
-        // TODO: we need a better way to determine if the audio is the same. Because the file content might
-        // have change, and here we're just checking the path. Perhaps the hash of the file? Or the last
-        // modified time? Or just flag it as changed when we get a file change notification?
         if (d.path == path && !d.file_modified) {
             TriggerReloadIfAudioIsCancelled(d, lib, thread_pool_args, debug_inst_id);
             return &d;

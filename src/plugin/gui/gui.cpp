@@ -602,8 +602,9 @@ GuiFrameResult GuiUpdate(Gui* g) {
         imgui.graphics->AddRectFilledMultiColor(r.Min(), r.Max(), top, top, bot, bot);
     };
     auto draw_mid_window = [&](IMGUI_DRAW_WINDOW_BG_ARGS) {
-        bool has_image_bg = false;
         auto r = window->unpadded_bounds;
+
+        imgui.graphics->AddRectFilled(r.Min(), r.Max(), LiveCol(imgui, UiColMap::MidPanelBack));
 
         if (!settings.high_contrast_gui) {
             auto overall_library = LibraryForOverallBackground(g->engine);
@@ -617,14 +618,11 @@ GuiFrameResult GuiUpdate(Gui* g) {
                                                  r.Max(),
                                                  {0, 0},
                                                  GetMaxUVToMaintainAspectRatio(*imgs->background, r.size));
-                        has_image_bg = true;
                     }
                 }
             }
         }
 
-        if (!has_image_bg)
-            imgui.graphics->AddRectFilled(r.Min(), r.Max(), LiveCol(imgui, UiColMap::MidPanelBack));
         imgui.graphics->AddLine(r.TopLeft(), r.TopRight(), LiveCol(imgui, UiColMap::MidPanelTopLine));
     };
     auto draw_bot_window = [](IMGUI_DRAW_WINDOW_BG_ARGS) {

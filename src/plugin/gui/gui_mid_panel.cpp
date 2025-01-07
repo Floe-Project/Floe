@@ -129,32 +129,36 @@ void MidPanel(Gui* g) {
         auto settings = FloeWindowSettings(imgui, [&](IMGUI_DRAW_WINDOW_BG_ARGS) {
             auto const& r = window->bounds;
 
-            auto const overall_lib = LibraryForOverallBackground(engine);
-            if (overall_lib)
-                DoBlurredBackground(g,
-                                    r,
-                                    r,
-                                    window,
-                                    *overall_lib,
-                                    mid_panel_size,
-                                    Clamp01(LiveSize(imgui, UiSizeId::BackgroundBlurringOpacity) / 100.0f));
-
             auto const layer_width_without_pad = RoundUpToNearestMultiple(r.w, k_num_layers) / k_num_layers;
-            auto const layer_opacity =
-                Clamp01(LiveSize(imgui, UiSizeId::BackgroundBlurringOpacitySingleLayer) / 100.0f);
-            for (auto layer_index : Range(k_num_layers)) {
-                if (auto const lib_id = g->engine.Layer(layer_index).LibId(); lib_id) {
-                    if (*lib_id == overall_lib) continue;
-                    auto const layer_r = Rect {.x = r.x + (f32)layer_index * layer_width_without_pad,
-                                               .y = r.y,
-                                               .w = layer_width_without_pad,
-                                               .h = r.h}
-                                             .CutTop(mid_panel_title_height);
-                    DoBlurredBackground(g, r, layer_r, window, *lib_id, mid_panel_size, layer_opacity);
-                }
-            }
 
-            DoOverlayGradient(g, r);
+            if (!g->settings.settings.gui.high_contrast_gui) {
+                auto const overall_lib = LibraryForOverallBackground(engine);
+                if (overall_lib)
+                    DoBlurredBackground(
+                        g,
+                        r,
+                        r,
+                        window,
+                        *overall_lib,
+                        mid_panel_size,
+                        Clamp01(LiveSize(imgui, UiSizeId::BackgroundBlurringOpacity) / 100.0f));
+
+                auto const layer_opacity =
+                    Clamp01(LiveSize(imgui, UiSizeId::BackgroundBlurringOpacitySingleLayer) / 100.0f);
+                for (auto layer_index : Range(k_num_layers)) {
+                    if (auto const lib_id = g->engine.Layer(layer_index).LibId(); lib_id) {
+                        if (*lib_id == overall_lib) continue;
+                        auto const layer_r = Rect {.x = r.x + (f32)layer_index * layer_width_without_pad,
+                                                   .y = r.y,
+                                                   .w = layer_width_without_pad,
+                                                   .h = r.h}
+                                                 .CutTop(mid_panel_title_height);
+                        DoBlurredBackground(g, r, layer_r, window, *lib_id, mid_panel_size, layer_opacity);
+                    }
+                }
+
+                DoOverlayGradient(g, r);
+            }
 
             imgui.graphics->AddRect(r.Min(),
                                     r.Max(),

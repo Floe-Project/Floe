@@ -820,8 +820,9 @@ PUBLIC void AddJob(InstallJobs& jobs,
         CreateJobOptions {
             .zip_path = zip_path,
             .libraries_install_folder =
-                settings.paths.always_scanned_folder[ToInt(ScanFolderType::Libraries)],
-            .presets_install_folder = settings.paths.always_scanned_folder[ToInt(ScanFolderType::Presets)],
+                settings.settings.filesystem.install_location[ToInt(ScanFolderType::Libraries)],
+            .presets_install_folder =
+                settings.settings.filesystem.install_location[ToInt(ScanFolderType::Presets)],
             .server = sample_library_server,
             .preset_folders = CombineStringArrays(
                 scratch_arena,

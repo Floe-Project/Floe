@@ -307,3 +307,12 @@ class [[nodiscard]] OptionalIndex {
         if (!CONCAT(try_result, __LINE__).HasValue()) return failure_return_value;                           \
         CONCAT(try_result, __LINE__).ReleaseValue();                                                         \
     })
+
+#define TRY_UNWRAP_OPTIONAL_OR(expression, fallback_code)                                                    \
+    ({                                                                                                       \
+        auto&& CONCAT(try_result, __LINE__) = (expression);                                                  \
+        if (!CONCAT(try_result, __LINE__).HasValue()) {                                                      \
+            fallback_code;                                                                                   \
+        }                                                                                                    \
+        CONCAT(try_result, __LINE__).ReleaseValue();                                                         \
+    })

@@ -586,13 +586,12 @@ static void PackagesSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext
                              rhs,
                              "Install package",
                              "Install libraries and presets from a '.floe.zip' file")) {
-            auto downloads_folder =
-                KnownDirectory(box_system.arena, KnownDirectoryType::Downloads, {.create = false});
             if (auto const o = FilesystemDialog({
                     .type = DialogArguments::Type::OpenFile,
                     .allocator = box_system.arena,
                     .title = "Select Floe Package",
-                    .default_path = downloads_folder,
+                    .default_path =
+                        KnownDirectory(box_system.arena, KnownDirectoryType::Downloads, {.create = false}),
                     .filters = ArrayT<DialogArguments::FileFilter>({
                         {
                             .description = "Floe Package"_s,

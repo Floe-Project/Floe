@@ -1748,10 +1748,10 @@ TEST_CASE(TestFormat) {
     SUBCASE("Join") {
         CHECK_EQ(fmt::Join(a, {}, ""), ""_s);
         CHECK_EQ(fmt::Join(a, {}, ","), ""_s);
-        CHECK_EQ(fmt::Join(a, Array{"a"_s}, ""), "a"_s);
-        CHECK_EQ(fmt::Join(a, Array{"a"_s, "b"_s}, ""), "ab"_s);
-        CHECK_EQ(fmt::Join(a, Array{"a"_s, "b"_s, "c"_s}, ""), "abc"_s);
-        CHECK_EQ(fmt::Join(a, Array{"a"_s, "b"_s, "c"_s}, ","), "a,b,c"_s);
+        CHECK_EQ(fmt::Join(a, Array {"a"_s}, ""), "a"_s);
+        CHECK_EQ(fmt::Join(a, Array {"a"_s, "b"_s}, ""), "ab"_s);
+        CHECK_EQ(fmt::Join(a, Array {"a"_s, "b"_s, "c"_s}, ""), "abc"_s);
+        CHECK_EQ(fmt::Join(a, Array {"a"_s, "b"_s, "c"_s}, ","), "a,b,c"_s);
     }
 
     return k_success;

@@ -690,6 +690,8 @@ GuiFrameResult GuiUpdate(Gui* g) {
             .thread_pool = g->shared_engine_systems.thread_pool,
         };
 
+        box_system.show_tooltips = g->settings.settings.gui.show_tooltips;
+
         DoSettingsPanel(box_system, context, g->settings2_open);
 
         DoNotifications(box_system, g->notifications);

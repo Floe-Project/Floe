@@ -109,6 +109,7 @@ struct GuiBoxSystem {
     imgui::Context& imgui;
     Fonts& fonts;
     layout::Context& layout;
+    bool show_tooltips;
 
     Panel* current_panel {};
     u32 box_counter {};
@@ -349,7 +350,64 @@ struct BoxConfig {
     u8 extra_margin_for_mouse_events = 0;
 
     layout::ItemOptions layout {};
+
+    String tooltip {};
 };
+
+static bool Tooltip(GuiBoxSystem& builder, imgui::Id id, Rect r, String str) {
+    if (!builder.show_tooltips) return false;
+
+    auto& imgui = builder.imgui;
+    if (imgui.WasJustMadeHot(id))
+        imgui.AddTimedWakeup(imgui.frame_input.current_time + style::k_tooltip_open_delay, "Tooltip");
+
+    auto hot_seconds = imgui.SecondsSpentHot();
+    if (imgui.IsHot(id) && hot_seconds >= style::k_tooltip_open_delay) {
+        builder.imgui.graphics->context->PushFont(builder.fonts[ToInt(FontType::Body)]);
+        DEFER { builder.imgui.graphics->context->PopFont(); };
+
+        auto const font = imgui.overlay_graphics.context->CurrentFont();
+        auto const pad_x = imgui.PointsToPixels(style::k_tooltip_pad_x);
+        auto const pad_y = imgui.PointsToPixels(style::k_tooltip_pad_y);
+
+        auto size = imgui.PointsToPixels(style::k_tooltip_max_width);
+        auto wrapped_size = draw::GetTextSize(font, str, size);
+        size = Min(size, wrapped_size.x);
+
+        auto abs_pos = r.pos;
+
+        Rect popup_r;
+        popup_r.x = abs_pos.x;
+        popup_r.y = abs_pos.y + r.h;
+        popup_r.w = size + pad_x * 2;
+        popup_r.h = wrapped_size.y + pad_y * 2;
+
+        popup_r.x = popup_r.x + ((r.w / 2) - (popup_r.w / 2));
+
+        popup_r.pos = imgui::BestPopupPos(popup_r,
+                                          {.pos = abs_pos, .size = r.size},
+                                          imgui.frame_input.window_size.ToFloat2(),
+                                          false);
+
+        f32x2 text_start;
+        text_start.x = popup_r.x + pad_x;
+        text_start.y = popup_r.y + pad_y;
+
+        draw::DropShadow(imgui, popup_r);
+        imgui.overlay_graphics.AddRectFilled(popup_r.Min(),
+                                             popup_r.Max(),
+                                             style::Col(style::Colour::Background0),
+                                             style::k_tooltip_rounding);
+        imgui.overlay_graphics.AddText(font,
+                                       font->font_size_no_scale,
+                                       text_start,
+                                       style::Col(style::Colour::Text),
+                                       str,
+                                       size + 1);
+        return true;
+    }
+    return false;
+}
 
 PUBLIC Box DoBox(GuiBoxSystem& builder, BoxConfig const& config) {
     auto const box_index = builder.box_counter++;
@@ -527,6 +585,8 @@ PUBLIC Box DoBox(GuiBoxSystem& builder, BoxConfig const& config) {
                 }
             }
 
+            if (config.tooltip.size) Tooltip(builder, box.imgui_id, rect, config.tooltip);
+
             return box;
         }
     }
@@ -546,7 +606,7 @@ PUBLIC Rect CentredRect(Rect container, f32x2 size) {
 // =================================================================================================================
 // Prebuilt boxes
 
-PUBLIC bool DialogTextButton(GuiBoxSystem& builder, Box parent, String text) {
+PUBLIC bool DialogTextButton(GuiBoxSystem& builder, Box parent, String text, String tooltip) {
     auto const button =
         DoBox(builder,
               {
@@ -560,6 +620,7 @@ PUBLIC bool DialogTextButton(GuiBoxSystem& builder, Box parent, String text) {
                       .size = layout::k_hug_contents,
                       .contents_padding = {.lr = style::k_button_padding_x, .tb = style::k_button_padding_y},
                   },
+                  .tooltip = tooltip,
               });
 
     DoBox(builder,

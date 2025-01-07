@@ -109,6 +109,7 @@ constexpr u32 k_highlight_hue = 212;
 constexpr auto k_colours = [] {
     Array<u32, ToInt(Colour::Count)> result {};
 
+    // automatically generate tints from dark to light
     for (auto const col_index : Range(ToInt(Colour::Background0), ToInt(Colour::Text) + 1)) {
         constexpr auto k_size = ToInt(Colour::Text) - ToInt(Colour::Background0) + 1;
         auto const pos = (f32)(col_index - ToInt(Colour::Background0)) / (f32)(k_size - 1);
@@ -120,11 +121,13 @@ constexpr auto k_colours = [] {
         result[col_index] = Hsla(h, s, l, a);
     }
 
+    // check that text is readable on all backgrounds
     for (auto const bg : Array {Colour::Background0, Colour::Background1, Colour::Background2}) {
         for (auto const fg : Array {Colour::Text, Colour::Subtext1})
             if (Contrast(result[ToInt(bg)], result[ToInt(fg)]) < 4.5f) throw "";
     }
 
+    // manually set the rest
     for (auto const i : Range(ToInt(Colour::Count))) {
         switch (Colour(i)) {
             case Colour::None: result[i] = 0; break;
@@ -171,6 +174,13 @@ constexpr f32 k_install_dialog_width = 400;
 constexpr f32 k_install_dialog_height = 300;
 constexpr f32 k_settings_dialog_width = 625;
 constexpr f32 k_settings_dialog_height = 443;
+
+constexpr f64 k_tooltip_open_delay = 0.5;
+
+constexpr f32 k_tooltip_max_width = 200;
+constexpr f32 k_tooltip_pad_x = 5;
+constexpr f32 k_tooltip_pad_y = 2;
+constexpr f32 k_tooltip_rounding = k_button_rounding;
 
 constexpr u32 k_auto_hot_white_overlay = Hsla(k_highlight_hue, 35, 70, 20);
 constexpr u32 k_auto_active_white_overlay = Hsla(k_highlight_hue, 35, 70, 38);

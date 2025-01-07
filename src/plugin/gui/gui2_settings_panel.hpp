@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "os/misc.hpp"
+
 #include "engine/package_installation.hpp"
 #include "gui_framework/gui_box_system.hpp"
 #include "sample_lib_server/sample_library_server.hpp"
@@ -35,7 +37,7 @@ static void SettingsRhsText(GuiBoxSystem& box_system, Box parent, String text) {
           });
 }
 
-static Box SettingsMenuButton(GuiBoxSystem& box_system, Box parent, String text) {
+static Box SettingsMenuButton(GuiBoxSystem& box_system, Box parent, String text, String tooltip) {
     auto const button =
         DoBox(box_system,
               {
@@ -50,6 +52,7 @@ static Box SettingsMenuButton(GuiBoxSystem& box_system, Box parent, String text)
                       .contents_padding = {.lr = style::k_button_padding_x, .tb = style::k_button_padding_y},
                       .contents_align = layout::Alignment::Justify,
                   },
+                  .tooltip = tooltip,
               });
 
     DoBox(box_system,
@@ -206,25 +209,28 @@ SettingsFolderSelector(GuiBoxSystem& box_system, Box parent, String path, String
                                           .activate_on_click_button = MouseButton::Left,
                                           .activation_click_event = ActivationClickEvent::Up,
                                           .extra_margin_for_mouse_events = 2,
+                                          .tooltip = "Stop scanning this folder"_s,
                                       })
                                     .button_fired;
     }
-    result.open_pressed = DoBox(box_system,
-                                {
-                                    .parent = icon_button_container,
-                                    .text = ICON_FA_EXTERNAL_LINK_ALT,
-                                    .font = FontType::Icons,
-                                    .text_fill = style::Colour::Subtext0,
-                                    .text_fill_hot = style::Colour::Subtext0,
-                                    .text_fill_active = style::Colour::Subtext0,
-                                    .size_from_text = true,
-                                    .background_fill_auto_hot_active_overlay = true,
-                                    .round_background_corners = 0b1111,
-                                    .activate_on_click_button = MouseButton::Left,
-                                    .activation_click_event = ActivationClickEvent::Up,
-                                    .extra_margin_for_mouse_events = 2,
-                                })
-                              .button_fired;
+    result.open_pressed =
+        DoBox(box_system,
+              {
+                  .parent = icon_button_container,
+                  .text = ICON_FA_EXTERNAL_LINK_ALT,
+                  .font = FontType::Icons,
+                  .text_fill = style::Colour::Subtext0,
+                  .text_fill_hot = style::Colour::Subtext0,
+                  .text_fill_active = style::Colour::Subtext0,
+                  .size_from_text = true,
+                  .background_fill_auto_hot_active_overlay = true,
+                  .round_background_corners = 0b1111,
+                  .activate_on_click_button = MouseButton::Left,
+                  .activation_click_event = ActivationClickEvent::Up,
+                  .extra_margin_for_mouse_events = 2,
+                  .tooltip = fmt::FormatInline<64>("Open folder in {}"_s, GetFileBrowserAppName()),
+              })
+            .button_fired;
 
     if (subtext.size) SettingsRhsText(box_system, container, subtext);
 
@@ -371,9 +377,21 @@ static void FolderSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& 
                                                   (ScanFolderType)scan_folder_type,
                                                   *to_remove);
 
+        auto const contents_name = ({
+            String s;
+            switch ((ScanFolderType)scan_folder_type) {
+                case ScanFolderType::Libraries: s = "sample libraries"; break;
+                case ScanFolderType::Presets: s = "presets"; break;
+                case ScanFolderType::Count: PanicIfReached();
+            }
+            s;
+        });
         if (context.settings.settings.filesystem.extra_scan_folders[scan_folder_type].size !=
                 k_max_extra_scan_folders &&
-            DialogTextButton(box_system, rhs_column, "Add folder")) {
+            DialogTextButton(box_system,
+                             rhs_column,
+                             "Add folder",
+                             fmt::FormatInline<100>("Add a folder to scan for {}", contents_name))) {
             AddExtraScanFolderDialog(box_system, context, (ScanFolderType)scan_folder_type, false);
         }
     }
@@ -493,6 +511,7 @@ static void InstallLocationMenu(GuiBoxSystem& box_system,
                                           .contents_direction = layout::Direction::Row,
                                           .contents_align = layout::Alignment::Start,
                                       },
+                                      .tooltip = "Select a new folder"_s,
                                   });
     DoBox(box_system,
           {
@@ -540,7 +559,7 @@ static void PackagesSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext
             menu_text = "Default";
         }
 
-        auto const btn = SettingsMenuButton(box_system, row, menu_text);
+        auto const btn = SettingsMenuButton(box_system, row, menu_text, "Select install location");
         if (btn.button_fired) box_system.imgui.OpenPopup(popup_id, btn.imgui_id);
 
         AddPanel(box_system,
@@ -562,7 +581,11 @@ static void PackagesSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext
         SettingsLhsTextWidget(box_system, row, "Install");
         auto const rhs = SettingsRhsColumn(box_system, row, style::k_settings_small_gap);
         SettingsRhsText(box_system, rhs, "Install libraries and presets from a '.floe.zip' file");
-        if (!context.package_install_jobs.Full() && DialogTextButton(box_system, rhs, "Install package")) {
+        if (!context.package_install_jobs.Full() &&
+            DialogTextButton(box_system,
+                             rhs,
+                             "Install package",
+                             "Install libraries and presets from a '.floe.zip' file")) {
             auto downloads_folder =
                 KnownDirectory(box_system.arena, KnownDirectoryType::Downloads, {.create = false});
             if (auto const o = FilesystemDialog({
@@ -639,6 +662,7 @@ static void AppearanceSettingsPanel(GuiBoxSystem& box_system, SettingsPanelConte
                       .layout {
                           .size = style::k_settings_icon_button_size,
                       },
+                      .tooltip = "Decrease GUI size"_s,
                   })
                 .button_fired) {
             width_change = -1;
@@ -665,6 +689,7 @@ static void AppearanceSettingsPanel(GuiBoxSystem& box_system, SettingsPanelConte
                       .layout {
                           .size = style::k_settings_icon_button_size,
                       },
+                      .tooltip = "Increase GUI size"_s,
                   })
                 .button_fired) {
             width_change = 1;

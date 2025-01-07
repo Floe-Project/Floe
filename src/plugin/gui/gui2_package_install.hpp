@@ -109,9 +109,9 @@ PUBLIC void PackageInstallAlertsPanel(GuiBoxSystem& box_system, package::Install
                                               },
                                           });
 
-            if (DialogTextButton(box_system, button_row, "Skip"))
+            if (DialogTextButton(box_system, button_row, "Skip", {}))
                 component.user_decision = package::InstallJob::UserDecision::Skip;
-            if (DialogTextButton(box_system, button_row, "Overwrite"))
+            if (DialogTextButton(box_system, button_row, "Overwrite", {}))
                 component.user_decision = package::InstallJob::UserDecision::Overwrite;
         }
     }

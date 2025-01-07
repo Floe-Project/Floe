@@ -589,7 +589,7 @@ static void PackagesSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext
             if (auto const o = FilesystemDialog({
                     .type = DialogArguments::Type::OpenFile,
                     .allocator = box_system.arena,
-                    .title = "Select Floe Package",
+                    .title = "Select 1 or more Floe Package",
                     .default_path =
                         KnownDirectory(box_system.arena, KnownDirectoryType::Downloads, {.create = false}),
                     .filters = ArrayT<DialogArguments::FileFilter>({
@@ -598,6 +598,7 @@ static void PackagesSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext
                             .wildcard_filter = "*.floe.zip"_s,
                         },
                     }),
+                    .allow_multiple_selection = true,
                     .parent_window = box_system.imgui.frame_input.native_window,
                 });
                 o.HasValue()) {

@@ -100,7 +100,7 @@ PUBLIC constexpr Optional<usize> NarrowToBuffer(char* out, WString wstr) {
 PUBLIC constexpr bool WidenAppend(DynamicArray<wchar_t>& out, String utf8_str) {
     auto const reserved = out.Reserve(out.size + MaxWidenedStringSize(utf8_str));
     ASSERT(reserved);
-    auto const size = TRY_UNWRAP_OPTIONAL(WidenToBuffer(out.data + out.size, utf8_str), false);
+    auto const size = TRY_OPT_OR(WidenToBuffer(out.data + out.size, utf8_str), return false);
     out.ResizeWithoutCtorDtor(out.size + size);
     return true;
 }
@@ -108,14 +108,14 @@ PUBLIC constexpr bool WidenAppend(DynamicArray<wchar_t>& out, String utf8_str) {
 PUBLIC constexpr bool NarrowAppend(DynamicArray<char>& out, WString wstr) {
     auto const reserved = out.Reserve(out.size + MaxNarrowedStringSize(wstr));
     ASSERT(reserved);
-    auto const size = TRY_UNWRAP_OPTIONAL(NarrowToBuffer(out.data + out.size, wstr), false);
+    auto const size = TRY_OPT_OR(NarrowToBuffer(out.data + out.size, wstr), return false);
     out.ResizeWithoutCtorDtor(out.size + size);
     return true;
 }
 
 PUBLIC constexpr Optional<Span<wchar_t>> Widen(Allocator& a, String utf8_str) {
     Span<wchar_t> const result = a.AllocateExactSizeUninitialised<wchar_t>(MaxWidenedStringSize(utf8_str));
-    auto const size = TRY_UNWRAP_OPTIONAL(WidenToBuffer(result.data, utf8_str), k_nullopt);
+    auto const size = TRY_OPT_OR(WidenToBuffer(result.data, utf8_str), return k_nullopt);
     return a.ResizeType(result, size, size);
 }
 

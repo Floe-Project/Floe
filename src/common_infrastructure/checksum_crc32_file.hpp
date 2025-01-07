@@ -72,14 +72,14 @@ struct ChecksumFileParser {
             if (line.size == 0) continue;
             if (StartsWith(line, ';')) continue;
 
-            auto const crc = TRY_UNWRAP_OPTIONAL(ParseIntTrimString(line, ParseIntBase::Hexadecimal, false),
-                                                 ErrorCode {CommonError::InvalidFileFormat});
+            auto const crc = TRY_OPT_OR(ParseIntTrimString(line, ParseIntBase::Hexadecimal, false),
+                                        return ErrorCode {CommonError::InvalidFileFormat});
 
             if (!StartsWith(line, ' ')) return ErrorCode {CommonError::InvalidFileFormat};
             line.RemovePrefix(1);
 
-            auto const file_size = TRY_UNWRAP_OPTIONAL(ParseIntTrimString(line, ParseIntBase::Decimal, false),
-                                                       ErrorCode {CommonError::InvalidFileFormat});
+            auto const file_size = TRY_OPT_OR(ParseIntTrimString(line, ParseIntBase::Decimal, false),
+                                              return ErrorCode {CommonError::InvalidFileFormat});
 
             if (!StartsWith(line, ' ')) return ErrorCode {CommonError::InvalidFileFormat};
             line.RemovePrefix(1);

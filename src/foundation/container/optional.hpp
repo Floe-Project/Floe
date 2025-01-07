@@ -301,14 +301,7 @@ class [[nodiscard]] OptionalIndex {
     Type m_value {-1};
 };
 
-#define TRY_UNWRAP_OPTIONAL(expression, failure_return_value)                                                \
-    ({                                                                                                       \
-        auto&& CONCAT(try_result, __LINE__) = (expression);                                                  \
-        if (!CONCAT(try_result, __LINE__).HasValue()) return failure_return_value;                           \
-        CONCAT(try_result, __LINE__).ReleaseValue();                                                         \
-    })
-
-#define TRY_UNWRAP_OPTIONAL_OR(expression, fallback_code)                                                    \
+#define TRY_OPT_OR(expression, fallback_code)                                                                \
     ({                                                                                                       \
         auto&& CONCAT(try_result, __LINE__) = (expression);                                                  \
         if (!CONCAT(try_result, __LINE__).HasValue()) {                                                      \

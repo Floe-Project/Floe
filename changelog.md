@@ -9,6 +9,13 @@ For instance: 0.0.1. Don't change the headings.
 
 # Changelog
 
+## 0.0.3
+- Add support for packaging and installing MDATA libraries (Mirage)
+- Add tooltips to the settings GUI
+- Make notifications dismiss themselves after a few seconds
+- Fixed externally deleted or moved-to-trash libraries not being removed from Floe
+- Fixed not installing to the chosen location
+
 ## 0.0.2
 - Fix Windows installer crash
 - Don't show a console window with the Windows installer

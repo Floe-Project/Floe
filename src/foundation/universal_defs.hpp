@@ -444,6 +444,30 @@ ALWAYS_INLINE constexpr auto ToInt(Type value) {
     return (UnderlyingType<Type>)value;
 }
 
+template <Enum Type>
+ALWAYS_INLINE constexpr auto& ToIntRef(Type& value) {
+    return (UnderlyingType<Type>&)value;
+}
+
+template <EnumWithCount EnumType>
+struct EnumIterator {
+    struct Iterator {
+        EnumType value;
+
+        constexpr bool operator!=(Iterator const& other) const { return ToInt(value) != ToInt(other.value); }
+
+        constexpr EnumType operator*() const { return value; }
+
+        constexpr Iterator& operator++() {
+            value = static_cast<EnumType>(ToInt(value) + 1);
+            return *this;
+        }
+    };
+
+    constexpr Iterator begin() const { return Iterator {static_cast<EnumType>(0)}; }
+    constexpr Iterator end() const { return Iterator {EnumType::Count}; }
+};
+
 // ==========================================================================================================
 template <typename T>
 constexpr T&& Move([[clang::lifetimebound]] T& arg) {

@@ -6,6 +6,8 @@
 #include "os/misc.hpp"
 
 #include "engine/package_installation.hpp"
+#include "gui2_common_modal_panel.hpp"
+#include "gui2_settings_panel_state.hpp"
 #include "gui_framework/gui_box_system.hpp"
 #include "sample_lib_server/sample_library_server.hpp"
 #include "settings/settings_file.hpp"
@@ -738,140 +740,48 @@ static void AppearanceSettingsPanel(GuiBoxSystem& box_system, SettingsPanelConte
     }
 }
 
-static void SettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& context) {
-    auto const root = DoBox(box_system,
-                            {
-                                .layout {
-                                    .size = box_system.imgui.PixelsToPoints(box_system.imgui.Size()),
-                                    .contents_direction = layout::Direction::Column,
-                                    .contents_align = layout::Alignment::Start,
-                                },
-                            });
+static void
+SettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& context, SettingsPanelState& state) {
+    constexpr auto k_tab_config = []() {
+        Array<ModalTabConfig, ToInt(SettingsPanelState::Tab::Count)> tabs {};
+        for (auto const tab : EnumIterator<SettingsPanelState::Tab>()) {
+            auto const index = ToInt(tab);
+            switch (tab) {
+                case SettingsPanelState::Tab::Appearance:
+                    tabs[index] = {.icon = ICON_FA_PAINT_BRUSH, .text = "Appearance"};
+                    break;
+                case SettingsPanelState::Tab::Folders:
+                    tabs[index] = {.icon = ICON_FA_FOLDER_OPEN, .text = "Folders"};
+                    break;
+                case SettingsPanelState::Tab::Packages:
+                    tabs[index] = {.icon = ICON_FA_BOX_OPEN, .text = "Packages"};
+                    break;
+                case SettingsPanelState::Tab::Count: PanicIfReached();
+            }
+        }
+        return tabs;
+    }();
 
-    auto const title_container = DoBox(box_system,
-                                       {
-                                           .parent = root,
-                                           .layout {
-                                               .size = {layout::k_fill_parent, layout::k_hug_contents},
-                                               .contents_padding = {.lrtb = style::k_spacing},
-                                               .contents_direction = layout::Direction::Row,
-                                               .contents_align = layout::Alignment::Justify,
-                                           },
-                                       });
+    auto const root = DoModal(box_system,
+                              {
+                                  .title = "Settings"_s,
+                                  .on_close = [&state] { state.open = false; },
+                                  .tabs = k_tab_config,
+                                  .current_tab_index = ToIntRef(state.tab),
+                              });
 
-    DoBox(box_system,
-          {
-              .parent = title_container,
-              .text = "Settings",
-              .font = FontType::Heading1,
-              .size_from_text = true,
-          });
-
-    if (auto const close = DoBox(box_system,
-                                 {
-                                     .parent = title_container,
-                                     .text = ICON_FA_TIMES,
-                                     .font = FontType::Icons,
-                                     .size_from_text = true,
-                                     .background_fill_auto_hot_active_overlay = true,
-                                     .round_background_corners = 0b1111,
-                                     .activate_on_click_button = MouseButton::Left,
-                                     .activation_click_event = ActivationClickEvent::Up,
-                                     .extra_margin_for_mouse_events = 8,
-                                 });
-        close.button_fired) {
-        box_system.current_panel->data.Get<ModalPanel>().on_close();
-    }
-
-    auto const divider_options = BoxConfig {
-        .parent = root,
-        .background_fill = style::Colour::Surface2,
-        .layout {
-            .size = {layout::k_fill_parent, box_system.imgui.PixelsToPoints(1)},
-        },
-    };
-
-    DoBox(box_system, divider_options);
-
-    auto const tab_container = DoBox(box_system,
-                                     {
-                                         .parent = root,
-                                         .background_fill = style::Colour::Background1,
-                                         .layout {
-                                             .size = {layout::k_fill_parent, layout::k_hug_contents},
-                                             .contents_direction = layout::Direction::Row,
-                                             .contents_align = layout::Alignment::Start,
-                                         },
-                                     });
-
-    enum class Tab {
-        Appearance,
-        Folders,
-        Packages,
-        Count,
-    };
-
-    static Tab current_tab = Tab::Appearance;
-
-    auto do_tab = [&](String icon, String text, Tab tab) {
-        bool const is_current = tab == current_tab;
-        auto const appearance_tab = DoBox(
-            box_system,
-            {
-                .parent = tab_container,
-                .background_fill_auto_hot_active_overlay = true,
-                .round_background_corners = 0b1111,
-                .activate_on_click_button = MouseButton::Left,
-                .activation_click_event = !is_current ? ActivationClickEvent::Up : ActivationClickEvent::None,
-                .layout {
-                    .size = {layout::k_hug_contents, layout::k_hug_contents},
-                    .contents_padding = {.lr = style::k_spacing, .tb = 4},
-                    .contents_gap = 5,
-                    .contents_direction = layout::Direction::Row,
-                },
-            });
-        if (appearance_tab.button_fired) current_tab = tab;
-
-        DoBox(box_system,
-              {
-                  .parent = appearance_tab,
-                  .text = icon,
-                  .font = FontType::Icons,
-                  .text_fill = is_current ? style::Colour::Subtext0 : style::Colour::Surface2,
-                  .size_from_text = true,
-              });
-        DoBox(box_system,
-              {
-                  .parent = appearance_tab,
-                  .text = text,
-                  .text_fill = is_current ? style::Colour::Text : style::Colour::Subtext0,
-                  .size_from_text = true,
-              });
-    };
-
-    do_tab(ICON_FA_PAINT_BRUSH, "Appearance", Tab::Appearance);
-    do_tab(ICON_FA_FOLDER_OPEN, "Folders", Tab::Folders);
-    do_tab(ICON_FA_BOX_OPEN, "Packages", Tab::Packages);
-
-    DoBox(box_system, divider_options);
-
+    using TabPanelFunction = void (*)(GuiBoxSystem&, SettingsPanelContext&);
     AddPanel(box_system,
              Panel {
                  .run = ({
-                     PanelFunction f;
-                     switch (current_tab) {
-                         case Tab::Appearance:
-                             f = [&context](GuiBoxSystem& b) { AppearanceSettingsPanel(b, context); };
-                             break;
-                         case Tab::Folders:
-                             f = [&context](GuiBoxSystem& b) { FolderSettingsPanel(b, context); };
-                             break;
-                         case Tab::Packages:
-                             f = [&context](GuiBoxSystem& b) { PackagesSettingsPanel(b, context); };
-                             break;
-                         case Tab::Count: PanicIfReached();
+                     TabPanelFunction f {};
+                     switch (state.tab) {
+                         case SettingsPanelState::Tab::Appearance: f = AppearanceSettingsPanel; break;
+                         case SettingsPanelState::Tab::Folders: f = FolderSettingsPanel; break;
+                         case SettingsPanelState::Tab::Packages: f = PackagesSettingsPanel; break;
+                         case SettingsPanelState::Tab::Count: PanicIfReached();
                      }
-                     f;
+                     [f, &context](GuiBoxSystem& box_system) { f(box_system, context); };
                  }),
                  .data =
                      Subpanel {
@@ -883,16 +793,17 @@ static void SettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& contex
                                          },
                                      })
                                    .layout_id,
-                         .imgui_id = box_system.imgui.GetID((u64)current_tab + 999999),
+                         .imgui_id = box_system.imgui.GetID((u64)state.tab + 999999),
                      },
              });
 }
 
-PUBLIC void DoSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& context, bool& is_open) {
-    if (is_open) {
+PUBLIC void
+DoSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& context, SettingsPanelState& state) {
+    if (state.open) {
         RunPanel(box_system,
                  Panel {
-                     .run = [&context](GuiBoxSystem& b) { SettingsPanel(b, context); },
+                     .run = [&context, &state](GuiBoxSystem& b) { SettingsPanel(b, context, state); },
                      .data =
                          ModalPanel {
                              .r = CentredRect(
@@ -900,7 +811,7 @@ PUBLIC void DoSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& cont
                                  f32x2 {box_system.imgui.PointsToPixels(style::k_settings_dialog_width),
                                         box_system.imgui.PointsToPixels(style::k_settings_dialog_height)}),
                              .imgui_id = box_system.imgui.GetID("new settings"),
-                             .on_close = [&is_open]() { is_open = false; },
+                             .on_close = [&state]() { state.open = false; },
                              .close_on_click_outside = true,
                              .darken_background = true,
                              .disable_other_interaction = true,

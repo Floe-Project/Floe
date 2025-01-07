@@ -346,7 +346,8 @@ void TopPanel(Gui* g) {
     {
         auto btn_id = g->imgui.GetID("sets");
         auto btn_r = layout::GetRect(g->layout, cog);
-        if (buttons::Button(g, btn_id, btn_r, ICON_FA_COG, large_icon_button_style)) g->settings2_open = true;
+        if (buttons::Button(g, btn_id, btn_r, ICON_FA_COG, large_icon_button_style))
+            g->settings_panel_state.open = true;
         Tooltip(g, btn_id, btn_r, "Open settings window"_s);
     }
 

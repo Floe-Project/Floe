@@ -691,7 +691,7 @@ GuiFrameResult GuiUpdate(Gui* g) {
 
         box_system.show_tooltips = g->settings.settings.gui.show_tooltips;
 
-        DoSettingsPanel(box_system, context, g->settings2_open);
+        DoSettingsPanel(box_system, context, g->settings_panel_state);
 
         DoNotifications(box_system, g->notifications);
 

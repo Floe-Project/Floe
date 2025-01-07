@@ -6,6 +6,7 @@
 
 #include "engine/engine.hpp"
 #include "gui/gui2_notifications.hpp"
+#include "gui/gui2_settings_panel_state.hpp"
 #include "gui/gui_modal_windows.hpp"
 #include "gui_editor_widgets.hpp"
 #include "gui_envelope.hpp"
@@ -132,7 +133,7 @@ struct Gui {
     bool show_purchasable_libraries = false;
     bool show_news = false;
 
-    bool settings2_open {};
+    SettingsPanelState settings_panel_state {};
     Notifications notifications {};
 
     GuiFrameInput& frame_input;

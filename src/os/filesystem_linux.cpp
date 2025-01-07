@@ -53,15 +53,15 @@ ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments args) {
         auto _ = fgets(filenames, ArraySize(filenames), f);
         pclose(f);
 
-        auto const output = FromNullTerminated(filenames);
+        auto output = FromNullTerminated(filenames);
         g_log.Debug({}, "zenity output: {}", output);
 
+        while (output.size && Last(output) == '\n')
+            output.RemoveSuffix(1);
+
         DynamicArray<MutableString> result {args.allocator};
-        Optional<usize> cursor {0uz};
-        while (cursor) {
-            auto const part = WhitespaceStripped(SplitWithIterator(output, cursor, '\n'));
+        for (auto part : StringSplitIterator {output, '|'})
             if (path::IsAbsolute(part)) dyn::Append(result, result.allocator.Clone(part));
-        }
         return result.ToOwnedSpan();
     } else {
         return FilesystemErrnoErrorCode(errno);

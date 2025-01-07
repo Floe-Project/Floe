@@ -252,15 +252,24 @@ PresetsCheckExistingInstallation(Component const& component,
 }
 
 static ErrorCodeOr<String> ResolvePossibleFilenameConflicts(String path, ArenaAllocator& arena) {
-    if (auto const o = GetFileType(path); o.HasError() && o.Error() == FilesystemError::PathDoesNotExist)
-        return path;
+    auto const does_not_exist = [&](String path) -> ErrorCodeOr<bool> {
+        auto o = GetFileType(path);
+        if (o.HasError()) {
+            if (o.Error() == FilesystemError::PathDoesNotExist) return true;
+            return o.Error();
+        }
+        return false;
+    };
+
+    if (TRY(does_not_exist(path))) return path;
 
     constexpr usize k_max_suffix_number = 999;
     constexpr usize k_max_suffix_str_size = " (999)"_s.size;
 
     auto buffer = arena.AllocateExactSizeUninitialised<char>(path.size + k_max_suffix_str_size);
     usize pos = 0;
-    WriteAndIncrement(pos, buffer, path);
+    auto const ext = path::Extension(path);
+    WriteAndIncrement(pos, buffer, path.SubSpan(0, path.size - ext.size));
     WriteAndIncrement(pos, buffer, " ("_s);
 
     Optional<ErrorCode> error {};
@@ -268,14 +277,13 @@ static ErrorCodeOr<String> ResolvePossibleFilenameConflicts(String path, ArenaAl
     for (usize suffix_num = 1; suffix_num <= k_max_suffix_number; ++suffix_num) {
         usize initial_pos = pos;
         DEFER { pos = initial_pos; };
+
         pos +=
             fmt::IntToString(suffix_num, buffer.data + pos, {.base = fmt::IntToStringOptions::Base::Decimal});
         WriteAndIncrement(pos, buffer, ')');
+        WriteAndIncrement(pos, buffer, ext);
 
-        if (auto const o = GetFileType({buffer.data, pos}); o.HasError()) {
-            if (o.Error() == FilesystemError::PathDoesNotExist) return arena.ResizeType(buffer, pos, pos);
-            error = o.Error();
-        }
+        if (TRY(does_not_exist({buffer.data, pos}))) return arena.ResizeType(buffer, pos, pos);
     }
 
     return error ? *error : ErrorCode {FilesystemError::FolderContainsTooManyFiles};

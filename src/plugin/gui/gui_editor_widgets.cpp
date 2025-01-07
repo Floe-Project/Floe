@@ -9,6 +9,7 @@
 
 #include "common_infrastructure/constants.hpp"
 
+#include "gui_editors.hpp"
 #include "gui_framework/colours.hpp"
 #include "gui_window.hpp"
 
@@ -360,6 +361,7 @@ static auto GetColourNames(LiveEditGui const& gui, bool include_none) {
 }
 
 static int FindColourIndex(LiveEditGui const& gui, String col_string) {
+    if (col_string.size == 0) return -1;
     for (auto const i : Range(k_max_num_colours))
         if (String(gui.ui_cols[i].name) == col_string) return i;
     return -1;
@@ -398,13 +400,14 @@ void ColourMapGUIMenus(EditorGUI* g, String search, String colour_search, bool h
         EditorHeading(g, cat);
 
         for (auto const i : Range(ToInt(UiColMap::Count))) {
-            auto& col_map =
-                high_contrast ? live_gui.ui_col_map[i].high_contrast_colour : live_gui.ui_col_map[i].colour;
-
             if (k_ui_col_map_categories[i] != cat) continue;
-            auto name = k_ui_col_map_names[i];
+
+            auto const name = k_ui_col_map_names[i];
             if (!ContainsCaseInsensitiveAscii(name, search) && !ContainsCaseInsensitiveAscii(cat, search))
                 continue;
+
+            auto& col_map =
+                high_contrast ? live_gui.ui_col_map[i].high_contrast_colour : live_gui.ui_col_map[i].colour;
             if (col_map.size && !ContainsCaseInsensitiveAscii(col_map, colour_search)) continue;
 
             g->imgui->PushID((u64)i);
@@ -421,7 +424,7 @@ void ColourMapGUIMenus(EditorGUI* g, String search, String colour_search, bool h
                 if (high_contrast && index == 0)
                     col_map.size = 0;
                 else
-                    col_map = String(live_gui.ui_cols[index + high_contrast].name);
+                    col_map = String(live_gui.ui_cols[index].name);
                 WriteColourMapFile(live_gui);
             }
 
@@ -445,7 +448,7 @@ void ColoursGUISliders(EditorGUI* gui, String search) {
 
     EditorHeading(gui, "Colours");
 
-    for (auto const index : Range(k_max_num_colours)) {
+    for (auto const index : Range<uintptr>(k_max_num_colours)) {
         auto& c = live_gui.ui_cols[index];
         if (c.name.size && !ContainsCaseInsensitiveAscii(c.name, search)) continue;
 
@@ -470,20 +473,20 @@ void ColoursGUISliders(EditorGUI* gui, String search) {
         auto id = imgui->GetID(index);
 
         f32 x_pos = 0;
-        Rect const label_r = {x_pos, gui->y_pos, imgui->Width() / 3.5f, h};
+        Rect const label_r = {.xywh {x_pos, gui->y_pos, imgui->Width() / 3.5f, h}};
         x_pos += label_r.w;
-        Rect const hex_col_r = {x_pos, gui->y_pos, imgui->Width() / 8, h};
+        Rect const hex_col_r = {.xywh {x_pos, gui->y_pos, imgui->Width() / 8, h}};
         x_pos += hex_col_r.w + pad;
-        Rect col_preview_r = {x_pos, gui->y_pos, h - pad, h};
+        Rect col_preview_r = {.xywh {x_pos, gui->y_pos, h - pad, h}};
         x_pos += col_preview_r.w + pad;
         auto remaining_w = imgui->Width() - x_pos;
-        Rect const edit_button_r = {x_pos, gui->y_pos, (remaining_w / 12) * 2 - pad, h};
+        Rect const edit_button_r = {.xywh {x_pos, gui->y_pos, (remaining_w / 12) * 2 - pad, h}};
         x_pos += edit_button_r.w + pad;
-        Rect const based_on_r = {x_pos, gui->y_pos, (remaining_w / 12) * 6 - pad, h};
+        Rect const based_on_r = {.xywh {x_pos, gui->y_pos, (remaining_w / 12) * 6 - pad, h}};
         x_pos += based_on_r.w + pad;
-        Rect const bright_r = {x_pos, gui->y_pos, (remaining_w / 12) * 2 - pad, h};
+        Rect const bright_r = {.xywh {x_pos, gui->y_pos, (remaining_w / 12) * 2 - pad, h}};
         x_pos += bright_r.w + pad;
-        Rect const alpha_r = {x_pos, gui->y_pos, (remaining_w / 12) * 2 - pad, h};
+        Rect const alpha_r = {.xywh {x_pos, gui->y_pos, (remaining_w / 12) * 2 - pad, h}};
 
         bool hex_code_changed = false;
         bool hsv_changed = false;
@@ -539,40 +542,44 @@ void ColoursGUISliders(EditorGUI* gui, String search) {
                 dragger_set.format = "{.4}";
                 dragger_set.slider_settings.sensitivity = 100;
 
-                imgui->Text(imgui::DefText(), {0, pop_pos, text_size, h}, "Alpha");
-                hsv_changed |= imgui->TextInputDraggerFloat(dragger_set,
-                                                            {text_size + 0 * itm_w, pop_pos, itm_w - pad, h},
-                                                            imgui->GetID(&alpha),
-                                                            0,
-                                                            1,
-                                                            static_alpha);
+                imgui->Text(imgui::DefText(), {.xywh {0, pop_pos, text_size, h}}, "Alpha");
+                hsv_changed |=
+                    imgui->TextInputDraggerFloat(dragger_set,
+                                                 {.xywh {text_size + 0 * itm_w, pop_pos, itm_w - pad, h}},
+                                                 imgui->GetID((uintptr)&alpha),
+                                                 0,
+                                                 1,
+                                                 static_alpha);
                 pop_pos += h + pad;
 
-                imgui->Text(imgui::DefText(), {0, pop_pos, text_size, h}, "Hue");
-                hsv_changed |= imgui->TextInputDraggerFloat(dragger_set,
-                                                            {text_size + 0 * itm_w, pop_pos, itm_w - pad, h},
-                                                            imgui->GetID(&hue),
-                                                            0,
-                                                            1,
-                                                            static_hue);
+                imgui->Text(imgui::DefText(), {.xywh {0, pop_pos, text_size, h}}, "Hue");
+                hsv_changed |=
+                    imgui->TextInputDraggerFloat(dragger_set,
+                                                 {.xywh {text_size + 0 * itm_w, pop_pos, itm_w - pad, h}},
+                                                 imgui->GetID((uintptr)&hue),
+                                                 0,
+                                                 1,
+                                                 static_hue);
                 pop_pos += h + pad;
 
-                imgui->Text(imgui::DefText(), {0, pop_pos, text_size, h}, "Sat");
-                hsv_changed |= imgui->TextInputDraggerFloat(dragger_set,
-                                                            {text_size + 0 * itm_w, pop_pos, itm_w - pad, h},
-                                                            imgui->GetID(&sat),
-                                                            0,
-                                                            1,
-                                                            static_sat);
+                imgui->Text(imgui::DefText(), {.xywh {0, pop_pos, text_size, h}}, "Sat");
+                hsv_changed |=
+                    imgui->TextInputDraggerFloat(dragger_set,
+                                                 {.xywh {text_size + 0 * itm_w, pop_pos, itm_w - pad, h}},
+                                                 imgui->GetID((uintptr)&sat),
+                                                 0,
+                                                 1,
+                                                 static_sat);
                 pop_pos += h + pad;
 
-                imgui->Text(imgui::DefText(), {0, pop_pos, text_size, h}, "Val");
-                hsv_changed |= imgui->TextInputDraggerFloat(dragger_set,
-                                                            {text_size + 0 * itm_w, pop_pos, itm_w - pad, h},
-                                                            imgui->GetID(&val),
-                                                            0,
-                                                            1,
-                                                            static_val);
+                imgui->Text(imgui::DefText(), {.xywh {0, pop_pos, text_size, h}}, "Val");
+                hsv_changed |=
+                    imgui->TextInputDraggerFloat(dragger_set,
+                                                 {.xywh {text_size + 0 * itm_w, pop_pos, itm_w - pad, h}},
+                                                 imgui->GetID((uintptr)&val),
+                                                 0,
+                                                 1,
+                                                 static_val);
 
                 if (hsv_changed) {
                     f32 r1;

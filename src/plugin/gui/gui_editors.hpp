@@ -84,7 +84,10 @@ static void DoGUIColourMapEditor(Gui* g, Rect r) {
     EditorTextInput(&g->editor, "Colour Search:", colour_search);
 
     static bool show_high_contrast = false;
-    if (EditorButton(&g->editor, "On", "Show High Contrast:")) show_high_contrast = !show_high_contrast;
+    if (EditorButton(&g->editor,
+                     show_high_contrast ? "Current: On"_s : "Current: Off",
+                     "Show colours for high contrast mode"))
+        show_high_contrast = !show_high_contrast;
 
     ColourMapGUIMenus(&g->editor, search, colour_search, show_high_contrast);
 
@@ -167,7 +170,7 @@ static void DoCommandPanel(Gui* g, Rect r) {
     imgui.EndWindow();
 }
 
-static void DoWholeEditor(Gui* g) {
+PUBLIC void DoWholeEditor(Gui* g) {
     if constexpr (!k_editor_enabled) return;
     auto& imgui = g->imgui;
 

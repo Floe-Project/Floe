@@ -363,6 +363,7 @@ Parse(Settings& content, ArenaAllocator& content_allocator, ArenaAllocator& scra
 }
 
 ErrorCodeOr<void> WriteFile(Settings const& data, FloePaths const& paths, String path, s128 time) {
+    g_log.Debug(k_log_mod, "Writing settings file: {}. Gui size: {}", path, data.gui.window_width);
     ArenaAllocatorWithInlineStorage<4000> scratch_arena {Malloc::Instance()};
 
     auto _ = CreateDirectory(path::Directory(path).ValueOr({}),
@@ -554,7 +555,6 @@ Optional<SettingsReadResult> FindAndReadSettingsFile(ArenaAllocator& a, FloePath
 }
 
 ErrorCodeOr<void> WriteSettingsFile(Settings const& data, FloePaths const& paths, String path, s128 time) {
-    g_log.Debug(k_log_mod, "Reading settings file: {}. Gui size: {}", path, data.gui.window_width);
     return ini::WriteFile(data, paths, path, time);
 }
 

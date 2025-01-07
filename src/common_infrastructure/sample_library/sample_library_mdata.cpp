@@ -58,9 +58,9 @@ static String GetString(Library const& library, mdata::StringInPool s) {
                                        s);
 }
 
-static ErrorCodeOr<Reader> CreateMdataFileReader(Library const& library, String library_file_path) {
+static ErrorCodeOr<Reader> CreateMdataFileReader(Library const& library, LibraryPath library_file_path) {
     auto const mdata_info = library.file_format_specifics.Get<MdataSpecifics>();
-    auto f = mdata_info.files_by_path.Find(library_file_path);
+    auto f = mdata_info.files_by_path.Find(library_file_path.str);
     if (!f) return ErrorCode {FilesystemError::PathDoesNotExist};
     auto& file = **f;
 
@@ -257,7 +257,7 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
                     ImpulseResponse {
                         .library = library,
                         .name = name,
-                        .path = path,
+                        .path = {path},
                     };
                     library.irs_by_name.InsertGrowIfNeeded(arena, name, ir);
                 }
@@ -345,7 +345,7 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
                 inst->regions[regions_span_index++] = Region {
                     .file =
                         {
-                            .path = file_path,
+                            .path = {file_path},
                             .root_key = CheckedCast<u8>(region_info.root_note),
                             .loop = ({
                                 Optional<Loop> l {};

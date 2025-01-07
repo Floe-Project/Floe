@@ -163,7 +163,7 @@ enum class FileLoadingState : u32 {
 struct ListedAudioData {
     ~ListedAudioData();
 
-    String path;
+    sample_lib::LibraryPath path;
     bool file_modified {};
     AudioData audio_data;
     Atomic<u32> ref_count {};

@@ -237,12 +237,12 @@ static String StringFromTop(LuaState& ctx) {
     return ctx.result_arena.Clone(FromNullTerminated(luaL_checkstring(ctx.lua, -1)));
 }
 
-static String PathFromTop(LuaState& ctx) {
+static LibraryPath PathFromTop(LuaState& ctx) {
     auto const path = FromNullTerminated(luaL_checkstring(ctx.lua, -1));
     // we wan't Floe libraries to be portable and therefore they shouldn't reference files outside the library
     if (path::IsAbsolute(path) || StartsWithSpan(path, ".."_s))
         luaL_error(ctx.lua, "Path '{}' must be a relaive path to within the folder of floe.lua", path);
-    return ctx.result_arena.Clone(path);
+    return {ctx.result_arena.Clone(path)};
 }
 
 template <typename Type>
@@ -899,7 +899,7 @@ static constexpr luaL_Reg k_lua_standard_libs[] = {
     {LUA_UTF8LIBNAME, luaopen_utf8},
 };
 
-static ErrorCodeOr<Reader> CreateLuaFileReader(Library const& library, String path) {
+static ErrorCodeOr<Reader> CreateLuaFileReader(Library const& library, LibraryPath path) {
     PathArena arena {Malloc::Instance()};
     auto const dir = ({
         auto d = path::Directory(library.path);
@@ -907,7 +907,7 @@ static ErrorCodeOr<Reader> CreateLuaFileReader(Library const& library, String pa
         ASSERT(path::IsAbsolute(*d));
         *d;
     });
-    return Reader::FromFile(path::Join(arena, Array {dir, path}));
+    return Reader::FromFile(path::Join(arena, Array {dir, path.str}));
 }
 
 static int NewLibrary(lua_State* lua) {
@@ -999,7 +999,7 @@ static int AddRegion(lua_State* lua) {
 
     InterpretTable(ctx, 2, region);
 
-    if (instrument->audio_file_path_for_waveform.size == 0)
+    if (instrument->audio_file_path_for_waveform.str.size == 0)
         instrument->audio_file_path_for_waveform = region.file.path;
 
     if (region.trigger.round_robin_index)
@@ -1563,7 +1563,7 @@ ErrorCodeOr<void> WriteDocumentedLuaExample(Writer writer, bool include_comments
 
 bool CheckAllReferencedFilesExist(Library const& lib, Logger& logger) {
     bool success = true;
-    auto check_file = [&](String path) {
+    auto check_file = [&](LibraryPath path) {
         auto outcome = lib.create_file_reader(lib, path);
         if (outcome.HasError()) {
             logger.Error(k_log_module,

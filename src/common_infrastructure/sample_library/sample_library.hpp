@@ -17,6 +17,15 @@ constexpr usize k_max_ir_name_size = 64;
 
 namespace sample_lib {
 
+// A type-safe wrapper to hold a relative path inside a library. This is used to refer to audio files, images,
+// etc. It might not represent an actual file on disk. Give these to the library to get Reader.
+struct LibraryPath {
+    String str;
+    constexpr bool operator==(LibraryPath const& other) const { return str == other.str; }
+    constexpr bool operator==(String const& other) const { return str == other; }
+    explicit operator String() const { return str; }
+};
+
 struct Range {
     constexpr bool operator==(Range const& other) const = default;
     constexpr u8 Size() const {
@@ -41,7 +50,7 @@ struct Loop {
 
 struct Region {
     struct File {
-        String path {};
+        LibraryPath path {};
         u8 root_key {};
         Optional<Loop> loop {};
     };
@@ -75,7 +84,7 @@ struct Instrument {
     Optional<String> folders {};
     Optional<String> description {};
     Span<String> tags {};
-    String audio_file_path_for_waveform {};
+    LibraryPath audio_file_path_for_waveform {};
     Span<Region> regions {};
     usize regions_allocated_capacity {}; // private
 
@@ -93,7 +102,7 @@ struct ImpulseResponse {
     Library const& library;
 
     String name {};
-    String path {};
+    LibraryPath path {};
 };
 
 // An impulse response that has all it's audio data loaded into memory.
@@ -140,13 +149,13 @@ struct Library {
     Optional<String> description {};
     String author {};
     u32 minor_version {1};
-    Optional<String> background_image_path {};
-    Optional<String> icon_image_path {};
+    Optional<LibraryPath> background_image_path {};
+    Optional<LibraryPath> icon_image_path {};
     HashTable<String, Instrument*> insts_by_name {};
     HashTable<String, ImpulseResponse*> irs_by_name {};
-    String path {}; // path to mdata or lua file
+    String path {}; // real filesystem path to mdata or lua file
     u64 file_hash {};
-    ErrorCodeOr<Reader> (*create_file_reader)(Library const&, String path) {};
+    ErrorCodeOr<Reader> (*create_file_reader)(Library const&, LibraryPath path) {};
     FileFormatSpecifics file_format_specifics;
 };
 

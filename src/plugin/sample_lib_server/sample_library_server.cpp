@@ -555,7 +555,7 @@ static bool UpdateLibraryJobs(Server& server,
 
                                 for (auto& d : node.value.audio_datas) {
                                     auto const full_audio_path =
-                                        path::Join(scratch_arena, Array {lib_dir, d.path});
+                                        path::Join(scratch_arena, Array {lib_dir, d.path.str});
                                     if (path::Equal(full_audio_path, full_path)) d.file_modified = true;
                                 }
                             }
@@ -714,7 +714,7 @@ LoadAudioAsync(ListedAudioData& audio_data, sample_lib::Library const& lib, Thre
 
         auto const outcome = [&audio_data, &lib]() -> ErrorCodeOr<AudioData> {
             auto reader = TRY(lib.create_file_reader(lib, audio_data.path));
-            return DecodeAudioFile(reader, audio_data.path, AudioDataAllocator::Instance());
+            return DecodeAudioFile(reader, audio_data.path.str, AudioDataAllocator::Instance());
         }();
 
         FileLoadingState result;
@@ -762,7 +762,7 @@ static void TriggerReloadIfAudioIsCancelled(ListedAudioData& audio_data,
 }
 
 static ListedAudioData* FetchOrCreateAudioData(LibrariesList::Node& lib_node,
-                                               String path,
+                                               sample_lib::LibraryPath path,
                                                ThreadPoolArgs thread_pool_args,
                                                u32 debug_inst_id) {
     auto const& lib = *lib_node.value.lib;
@@ -1501,10 +1501,11 @@ static sample_lib::Library* BuiltinLibrary() {
         .irs_by_name = {},
         .path = ":memory:",
         .file_hash = 100,
-        .create_file_reader = [](sample_lib::Library const&, String path) -> ErrorCodeOr<Reader> {
+        .create_file_reader = [](sample_lib::Library const&,
+                                 sample_lib::LibraryPath path) -> ErrorCodeOr<Reader> {
             auto const embedded_irs = EmbeddedIrs();
             for (auto& ir : embedded_irs.irs)
-                if (ToString(ir.filename) == path) return Reader::FromMemory({ir.data, ir.size});
+                if (ToString(ir.filename) == path.str) return Reader::FromMemory({ir.data, ir.size});
             return ErrorCode(FilesystemError::PathDoesNotExist);
         },
         .file_format_specifics = sample_lib::LuaSpecifics {}, // unused
@@ -1519,7 +1520,7 @@ static sample_lib::Library* BuiltinLibrary() {
             sample_lib::ImpulseResponse {
                 .library = builtin_library,
                 .name = ToString(embedded.name),
-                .path = ToString(embedded.filename),
+                .path = {ToString(embedded.filename)},
             };
         }
 

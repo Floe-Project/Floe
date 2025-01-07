@@ -46,7 +46,8 @@ static String FilenameForLibraryImageType(LibraryImageType type) {
     return {};
 }
 
-static Optional<String> PathInLibraryForImageType(sample_lib::Library const& lib, LibraryImageType type) {
+static Optional<sample_lib::LibraryPath> PathInLibraryForImageType(sample_lib::Library const& lib,
+                                                                   LibraryImageType type) {
     switch (type) {
         case LibraryImageType::Icon: return lib.icon_image_path;
         case LibraryImageType::Background: return lib.background_image_path;

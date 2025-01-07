@@ -737,7 +737,7 @@ static void AppearanceSettingsPanel(GuiBoxSystem& box_system, SettingsPanelConte
     }
 }
 
-static void NewSettingsWindow(GuiBoxSystem& box_system, SettingsPanelContext& context) {
+static void SettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& context) {
     auto const root = DoBox(box_system,
                             {
                                 .layout {
@@ -891,7 +891,7 @@ PUBLIC void DoSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& cont
     if (is_open) {
         RunPanel(box_system,
                  Panel {
-                     .run = [&context](GuiBoxSystem& b) { NewSettingsWindow(b, context); },
+                     .run = [&context](GuiBoxSystem& b) { SettingsPanel(b, context); },
                      .data =
                          ModalPanel {
                              .r = CentredRect(

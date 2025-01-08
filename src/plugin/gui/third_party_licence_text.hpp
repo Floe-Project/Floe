@@ -149,11 +149,6 @@ static constexpr ThirdPartyLicence k_third_party_licence_texts[] = {
         .licence = MIT_LICENSE,
     },
     {
-        .name = "GCEM",
-        .copyright = "Copyright (C) 2016-2023 Keith O'Hara",
-        .licence = APACHE_2_0_LICENSE,
-    },
-    {
         .name = "Folly",
         .copyright = "Copyright (c) Meta Platforms, Inc. and affiliates.",
         .licence = APACHE_2_0_LICENSE,

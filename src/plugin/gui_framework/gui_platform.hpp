@@ -389,11 +389,12 @@ static bool EventMouseButton(GuiPlatform& platform, PuglButtonEvent const& butto
         if ((e.time - btn.last_pressed_time) <= k_double_click_interval_seconds) btn.double_click = true;
         btn.last_pressed_point = e.point;
         btn.last_pressed_time = e.time;
+        btn.presses.Append(e, platform.frame_state.event_arena);
     } else {
         if (btn.is_dragging) btn.dragging_ended = true;
         btn.is_dragging = false;
+        btn.releases.Append(e, platform.frame_state.event_arena);
     }
-    btn.presses.Append(e, platform.frame_state.event_arena);
 
     bool result = false;
     if (platform.last_result.mouse_tracked_rects.size == 0 || platform.last_result.wants_mouse_capture ||

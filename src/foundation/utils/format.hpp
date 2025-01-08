@@ -576,17 +576,15 @@ PUBLIC MutableString FormatStringReplace(Allocator& a,
 PUBLIC MutableString Join(Allocator& a, Span<String const> strings, String separator = {}) {
     if (strings.size == 0) return {};
 
-    DynamicArray<char> result {a};
-    result.Reserve(strings.size * 2);
-
-    auto const& last = Last(strings);
-
-    for (auto const& s : strings) {
-        dyn::AppendSpan(result, s);
-        if (separator.size && &s != &last) dyn::AppendSpan(result, separator);
+    auto const total_size = TotalSize(strings) + (separator.size * (strings.size - 1));
+    auto result = a.AllocateExactSizeUninitialised<char>(total_size);
+    usize pos = 0;
+    for (auto const [i, part] : Enumerate(strings)) {
+        WriteAndIncrement(pos, result, part);
+        if (separator.size && i != strings.size - 1) WriteAndIncrement(pos, result, separator);
     }
 
-    return result.ToOwnedSpan();
+    return result;
 }
 
 template <usize k_size>

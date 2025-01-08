@@ -612,13 +612,13 @@ MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirecto
                                                  FilesystemWin32ErrorCode(GetLastError(), "GetUserNameW"));
                 }
 
-                f = CombineStrings(a,
-                                   Array {
-                                       "C:\\Users\\"_s,
-                                       username,
-                                       "\\"_s,
-                                       config.fallback_user,
-                                   });
+                f = fmt::Join(a,
+                              Array {
+                                  "C:\\Users\\"_s,
+                                  username,
+                                  "\\"_s,
+                                  config.fallback_user,
+                              });
             }
             f;
         });

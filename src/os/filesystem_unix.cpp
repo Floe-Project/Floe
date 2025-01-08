@@ -87,13 +87,13 @@ ErrorCodeOr<Optional<Entry>> Next(Iterator& it, ArenaAllocator& result_arena) {
                         u64 s = 0;
                         if (it.options.get_file_size) {
                             PathArena temp_path_allocator {Malloc::Instance()};
-                            auto const full_path = CombineStrings(temp_path_allocator,
-                                                                  Array {
-                                                                      it.base_path,
-                                                                      "/"_s,
-                                                                      entry_name,
-                                                                      "\0"_s,
-                                                                  });
+                            auto const full_path = fmt::Join(temp_path_allocator,
+                                                             Array {
+                                                                 it.base_path,
+                                                                 "/"_s,
+                                                                 entry_name,
+                                                                 "\0"_s,
+                                                             });
                             struct stat info;
                             if (stat(full_path.data, &info) != 0) return FilesystemErrnoErrorCode(errno);
                             s = (u64)info.st_size;

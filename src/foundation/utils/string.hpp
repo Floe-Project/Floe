@@ -668,15 +668,6 @@ constexpr auto EnumStrings() {
 // Only works for enums with a final value called Count and contiguous values starting from 0.
 constexpr String EnumToString(Enum auto e) { return EnumStrings<decltype(e)>()[ToInt(e)]; }
 
-PUBLIC MutableString CombineStrings(Allocator& a, Span<String const> parts) {
-    auto result = a.AllocateExactSizeUninitialised<char>(TotalSize(parts));
-    usize pos = 0;
-    for (auto const& part : parts)
-        WriteAndIncrement(pos, result, part);
-
-    return result;
-}
-
 PUBLIC Span<String> CombineStringArrays(Allocator& allocator, Span<String const> a, Span<String const> b) {
     auto result = allocator.AllocateExactSizeUninitialised<String>(a.size + b.size);
     usize pos = 0;

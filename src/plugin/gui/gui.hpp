@@ -5,6 +5,7 @@
 #include "foundation/foundation.hpp"
 
 #include "engine/engine.hpp"
+#include "gui/gui2_info_panel_state.hpp"
 #include "gui/gui2_notifications.hpp"
 #include "gui/gui2_settings_panel_state.hpp"
 #include "gui/gui_modal_windows.hpp"
@@ -134,6 +135,7 @@ struct Gui {
     bool show_news = false;
 
     SettingsPanelState settings_panel_state {};
+    InfoPanelState info_panel_state {};
     Notifications notifications {};
 
     GuiFrameInput& frame_input;

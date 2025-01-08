@@ -13,6 +13,7 @@
 
 // GUI Box System (working prototype)
 //
+//
 // This is a new GUI system that we intend to use universally. For now only a couple of parts use it.
 //
 // This API is a mostly a wrapper on top of the existing Gui systems. When we do the GUI overhaul the
@@ -32,6 +33,9 @@
 // - Boxes are the basic building block of the system. Boxes are configured using a bit BoxConfig struct.
 //   Designated initialisers are great and this whole system relies on them.
 //
+// IMPORTANT: you must have the same boxes in the same order within every frame. For example if you are
+// getting data from an external function that may produce different results based on when it's called, and
+// building boxes based on it, cache the data and use that.
 //
 // The flexbox-like layout system is in layout.hpp.
 //
@@ -117,6 +121,7 @@ struct GuiBoxSystem {
     State state {State::LayoutBoxes};
     DynamicArray<Box> boxes {arena};
     DynamicArray<WordWrappedText> word_wrapped_texts {arena};
+    bool mouse_down_on_modal_background = false;
 
     f32 const scrollbar_width = imgui.PointsToPixels(8);
     f32 const scrollbar_padding = imgui.PointsToPixels(style::k_scrollbar_rhs_space);
@@ -207,7 +212,10 @@ PUBLIC void Run(GuiBoxSystem& builder, Panel* panel) {
                 if (modal.close_on_click_outside) {
                     if (builder.imgui.IsWindowHovered(invis_window)) {
                         builder.imgui.frame_output.cursor_type = CursorType::Hand;
-                        if (builder.imgui.frame_input.Mouse(MouseButton::Left).presses.size) modal.on_close();
+                        if (builder.imgui.frame_input.Mouse(MouseButton::Left).presses.size) {
+                            [[maybe_unused]] int b = 0;
+                            modal.on_close();
+                        }
                     }
                 }
             }
@@ -311,7 +319,7 @@ PUBLIC f32x2 AlignWithin(Rect container, f32x2 size, TextAlignX align_x, TextAli
 }
 
 constexpr f32 k_no_wrap = 0;
-constexpr f32 k_wrap_to_parent = -1;
+constexpr f32 k_wrap_to_parent = -1; // set size_from_text = true
 constexpr f32 k_default_font_size = 0;
 
 struct BoxConfig {
@@ -411,6 +419,12 @@ PUBLIC Box DoBox(GuiBoxSystem& builder, BoxConfig const& config) {
     auto const font_size =
         config.font_size != 0 ? builder.imgui.PointsToPixels(config.font_size) : font->font_size_no_scale;
 
+    // IMPORTANT: if the string is very long, it needs to be word-wrapped manually by including newlines in
+    // the text. This is necessary because our text rendering system is bad at doing huge amounts of
+    // word-wrapping. It still renders text that isn't visible unless there's no word-wrapping, in which case
+    // it's does skip rendering off-screen text.
+    f32 const wrap_width = config.text.size < 10000 ? config.wrap_width : k_no_wrap;
+
     switch (builder.state) {
         case GuiBoxSystem::State::LayoutBoxes: {
             auto const box = Box {
@@ -430,9 +444,9 @@ PUBLIC Box DoBox(GuiBoxSystem& builder, BoxConfig const& config) {
                         layout.contents_padding.lrtb *= builder.imgui.pixels_per_point;
 
                         if (config.size_from_text) {
-                            if (config.wrap_width != k_wrap_to_parent)
+                            if (wrap_width != k_wrap_to_parent)
                                 layout.size =
-                                    font->CalcTextSizeA(font_size, FLT_MAX, config.wrap_width, config.text);
+                                    font->CalcTextSizeA(font_size, FLT_MAX, wrap_width, config.text);
                             else {
                                 // We can't know the text size until we know the parent width.
                                 layout.size = {layout::k_fill_parent, 1};
@@ -445,7 +459,7 @@ PUBLIC Box DoBox(GuiBoxSystem& builder, BoxConfig const& config) {
                 .imgui_id = {},
             };
 
-            if (config.size_from_text && config.wrap_width == k_wrap_to_parent) {
+            if (config.size_from_text && wrap_width == k_wrap_to_parent) {
                 dyn::Append(builder.word_wrapped_texts,
                             {
                                 .id = box.layout_id,
@@ -559,25 +573,23 @@ PUBLIC Box DoBox(GuiBoxSystem& builder, BoxConfig const& config) {
                     auto const text_size = font->CalcTextSizeA(font_size, FLT_MAX, 0, config.text);
                     auto const text_pos =
                         AlignWithin(rect, text_size, config.text_align_x, config.text_align_y);
-                    builder.imgui.graphics->AddText(
-                        font,
-                        font_size,
-                        text_pos,
-                        style::Col(is_hot      ? config.text_fill_hot
-                                   : is_active ? config.text_fill_active
-                                               : config.text_fill),
-                        config.text,
-                        config.wrap_width == k_wrap_to_parent ? rect.w : config.wrap_width);
+                    builder.imgui.graphics->AddText(font,
+                                                    font_size,
+                                                    text_pos,
+                                                    style::Col(is_hot      ? config.text_fill_hot
+                                                               : is_active ? config.text_fill_active
+                                                                           : config.text_fill),
+                                                    config.text,
+                                                    wrap_width == k_wrap_to_parent ? rect.w : wrap_width);
                 } else {
-                    builder.imgui.graphics->AddText(
-                        font,
-                        font_size,
-                        rect.pos,
-                        style::Col(is_hot      ? config.text_fill_hot
-                                   : is_active ? config.text_fill_active
-                                               : config.text_fill),
-                        config.text,
-                        config.wrap_width == k_wrap_to_parent ? rect.w : config.wrap_width);
+                    builder.imgui.graphics->AddText(font,
+                                                    font_size,
+                                                    rect.pos,
+                                                    style::Col(is_hot      ? config.text_fill_hot
+                                                               : is_active ? config.text_fill_active
+                                                                           : config.text_fill),
+                                                    config.text,
+                                                    wrap_width == k_wrap_to_parent ? rect.w : wrap_width);
                 }
             }
 

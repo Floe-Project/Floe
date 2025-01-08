@@ -26,22 +26,12 @@ static void PresetsWindowButton(Gui* g, Engine* a, Rect r) {
     Tooltip(g, button_id, r, "Open presets window"_s);
 }
 
-static void DoSettingsMenuItems(Gui* g) {
+static void DoDotsMenu(Gui* g) {
     String const longest_string_in_menu = "Randomise All Parameters";
     PopupMenuItems top_menu(g, {&longest_string_in_menu, 1});
 
     if (top_menu.DoButton("Reset All Parameters")) SetAllParametersToDefaultValues(g->engine.processor);
     if (top_menu.DoButton("Randomise All Parameters")) RandomiseAllParameterValues(g->engine.processor);
-    top_menu.Divider();
-
-    if (top_menu.DoSubMenuButton("Information", g->imgui.GetID("about"))) {
-        String const longest_string_in_submenu = "Licences";
-        PopupMenuItems submenu(g, {&longest_string_in_submenu, 1});
-        if (submenu.DoButton("About")) OpenModalIfNotAlready(g->imgui, ModalWindowType::About);
-        if (submenu.DoButton("Metrics")) OpenModalIfNotAlready(g->imgui, ModalWindowType::Metrics);
-        if (submenu.DoButton("Licences")) OpenModalIfNotAlready(g->imgui, ModalWindowType::Licences);
-        g->imgui.EndWindow();
-    }
 }
 
 void TopPanel(Gui* g) {
@@ -134,11 +124,16 @@ void TopPanel(Gui* g) {
                                       .parent = right_container,
                                       .size = {icon_width, icon_height},
                                   });
-    auto menu = layout::CreateItem(g->layout,
+    auto info = layout::CreateItem(g->layout,
                                    {
                                        .parent = right_container,
                                        .size = {icon_width, icon_height},
                                    });
+    auto dots_menu = layout::CreateItem(g->layout,
+                                        {
+                                            .parent = right_container,
+                                            .size = {icon_width, icon_height},
+                                        });
 
     auto knob_container =
         layout::CreateItem(g->layout,
@@ -352,7 +347,15 @@ void TopPanel(Gui* g) {
     }
 
     {
-        auto const additonal_menu_r = layout::GetRect(g->layout, menu);
+        auto btn_id = g->imgui.GetID("info");
+        auto btn_r = layout::GetRect(g->layout, info);
+        if (buttons::Button(g, btn_id, btn_r, ICON_FA_INFO_CIRCLE, large_icon_button_style))
+            g->info_panel_state.open = true;
+        Tooltip(g, btn_id, btn_r, "Open information window"_s);
+    }
+
+    {
+        auto const additonal_menu_r = layout::GetRect(g->layout, dots_menu);
         auto const additional_menu_id = g->imgui.GetID("Menu");
         auto const popup_id = g->imgui.GetID("MenuPopup");
         if (buttons::Popup(g,
@@ -361,7 +364,7 @@ void TopPanel(Gui* g) {
                            additonal_menu_r,
                            ICON_FA_ELLIPSIS_V,
                            large_icon_button_style)) {
-            DoSettingsMenuItems(g);
+            DoDotsMenu(g);
             g->imgui.EndWindow();
         }
         Tooltip(g, additional_menu_id, additonal_menu_r, "Additional functions and information"_s);

@@ -154,6 +154,8 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
     Span<mdata::ExtendedInstrumentInfo> ex_inst_infos {};
     Span<mdata::InstrumentInfo> inst_infos {};
     Span<mdata::SamplerRegionInfo> sampler_region_infos {};
+    u32 num_instrument_samples = 0;
+    u32 num_regions = 0;
 
     while (reader.pos < reader.size) {
         mdata::ChunkHeader header;
@@ -261,6 +263,10 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
                     };
                     library.irs_by_name.InsertGrowIfNeeded(arena, name, ir);
                 }
+
+                for (auto const& f : mdata_info.file_infos)
+                    if (f.folder_type == mdata::FolderTypeSampler) ++num_instrument_samples;
+
                 break;
             }
 
@@ -394,6 +400,8 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
                             .feather_overlapping_velocity_regions = velocity_layers_are_feathered,
                         },
                 };
+
+                ++num_regions;
             }
         }
         ASSERT((mdata::Index)inst->regions.size == i.total_num_regions);
@@ -511,6 +519,9 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
             }
         }
     }
+
+    library_ptr->num_regions = num_regions;
+    library_ptr->num_instrument_samples = num_instrument_samples;
 
     return library_ptr;
 }

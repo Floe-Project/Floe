@@ -6,6 +6,7 @@
 #include <lualib.h>
 #include <xxhash.h>
 
+#include "foundation/container/hash_table.hpp"
 #include "foundation/foundation.hpp"
 #include "foundation/utils/format.hpp"
 #include "os/filesystem.hpp"
@@ -1296,6 +1297,22 @@ LibraryPtrOrError ReadLua(Reader& reader,
                     previous = ref;
                 }
             };
+        }
+
+        library->num_regions = 0;
+        for (auto [key, inst_ptr] : library->insts_by_name) {
+            auto const& inst = *inst_ptr;
+            library->num_regions += inst->regions.size;
+        }
+
+        {
+            auto audio_paths = Set<String>::Create(scratch_arena, library->num_regions);
+            for (auto [key, inst_ptr] : library->insts_by_name) {
+                auto const& inst = *inst_ptr;
+                for (auto& region : inst->regions)
+                    audio_paths.InsertWithoutGrowing(region.file.path.str);
+            }
+            library->num_instrument_samples = (u32)audio_paths.size;
         }
 
         return library;

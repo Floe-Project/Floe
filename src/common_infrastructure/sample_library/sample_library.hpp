@@ -153,6 +153,8 @@ struct Library {
     Optional<LibraryPath> icon_image_path {};
     HashTable<String, Instrument*> insts_by_name {};
     HashTable<String, ImpulseResponse*> irs_by_name {};
+    u32 num_instrument_samples {};
+    u32 num_regions {};
     String path {}; // real filesystem path to mdata or lua file
     u64 file_hash {};
     ErrorCodeOr<Reader> (*create_file_reader)(Library const&, LibraryPath path) {};

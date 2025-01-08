@@ -8,9 +8,6 @@
 struct Gui;
 
 enum class ModalWindowType {
-    About,
-    Licences,
-    Metrics,
     LoadError,
     Count,
 };

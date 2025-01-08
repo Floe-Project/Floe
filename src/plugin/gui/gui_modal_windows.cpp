@@ -6,17 +6,14 @@
 #include <IconsFontAwesome5.h>
 
 #include "foundation/foundation.hpp"
-#include "os/misc.hpp"
 
 #include "common_infrastructure/paths.hpp"
 
 #include "engine/engine.hpp"
-#include "engine/package_installation.hpp"
 #include "gui.hpp"
 #include "gui/gui_button_widgets.hpp"
 #include "gui_drawing_helpers.hpp"
 #include "gui_framework/draw_list.hpp"
-#include "gui_framework/gui_box_system.hpp"
 #include "gui_framework/gui_frame.hpp"
 #include "gui_framework/gui_imgui.hpp"
 #include "gui_framework/gui_live_edit.hpp"
@@ -24,11 +21,7 @@
 #include "gui_widget_helpers.hpp"
 #include "gui_window.hpp"
 #include "presets/presets_folder.hpp"
-#include "processor/layer_processor.hpp"
-#include "sample_lib_server/sample_library_server.hpp"
 #include "settings/settings_file.hpp"
-#include "settings/settings_filesystem.hpp"
-#include "settings/settings_gui.hpp"
 
 PUBLIC Rect ModalRect(imgui::Context const& imgui, f32 width, f32 height) {
     auto const size = f32x2 {width, height};
@@ -43,30 +36,6 @@ PUBLIC Rect ModalRect(imgui::Context const& imgui, UiSizeId width_id, UiSizeId h
 }
 
 static imgui::Id IdForModal(ModalWindowType type) { return (imgui::Id)(ToInt(type) + 1000); }
-
-static void DoMultilineText(Gui* g,
-                            String text,
-                            f32& y_pos,
-                            f32 x_offset = 0,
-                            UiColMap col_map = UiColMap::PopupItemText) {
-    auto& imgui = g->imgui;
-    auto font = imgui.graphics->context->CurrentFont();
-    auto const line_height = imgui.graphics->context->CurrentFontSize();
-
-    // IMPORTANT: if the string is very long, it needs to be word-wrapped manually by including newlines in
-    // the text. This is necessary because our text rendering system is bad at doing huge amounts of
-    // word-wrapping. It still renders text that isn't visible unless there's no word-wrapping, in which case
-    // it's does skip rendering off-screen text.
-    f32 const wrap_width = text.size < 10000 ? Max(imgui.Width() - x_offset, 0.0f) : 0.0f;
-
-    auto const size = draw::GetTextSize(font, text, wrap_width);
-
-    auto const text_r = imgui.GetRegisteredAndConvertedRect({.xywh {x_offset, y_pos, size.x, size.y}});
-    imgui.graphics
-        ->AddText(font, font->font_size_no_scale, text_r.pos, LiveCol(imgui, col_map), text, wrap_width);
-
-    y_pos += size.y + line_height / 2;
-}
 
 struct IncrementingY {
     f32& y;
@@ -184,20 +153,6 @@ static bool DoButton(Gui* g, String button_text, f32& y_pos, f32 x_offset) {
                     });
 }
 
-static void DoLabelLine(imgui::Context& imgui, f32& y_pos, String label, String value) {
-    auto const line_height = imgui.graphics->context->CurrentFontSize();
-    auto const text_r = imgui.GetRegisteredAndConvertedRect({.xywh {0, y_pos, imgui.Width(), line_height}});
-    imgui.graphics->AddTextJustified(text_r,
-                                     label,
-                                     LiveCol(imgui, UiColMap::PopupItemText),
-                                     TextJustification::CentredLeft);
-    imgui.graphics->AddTextJustified(text_r,
-                                     value,
-                                     LiveCol(imgui, UiColMap::PopupItemText),
-                                     TextJustification::CentredRight);
-    y_pos += line_height;
-}
-
 static void
 DoHeading(Gui* g, f32& y_pos, String str, TextJustification justification = TextJustification::CentredLeft) {
     auto& imgui = g->imgui;
@@ -210,16 +165,6 @@ DoHeading(Gui* g, f32& y_pos, String str, TextJustification justification = Text
     g->imgui.graphics->AddTextJustified(r, str, LiveCol(imgui, UiColMap::PopupItemText), justification);
 
     y_pos += window_title_h + window_title_gap_y;
-}
-
-static bool DoWindowCloseButton(Gui* g) {
-    if (DoCloseButtonForCurrentWindow(g,
-                                      "Close this window",
-                                      buttons::BrowserIconButton(g->imgui).WithLargeIcon())) {
-        g->imgui.CloseTopPopupOnly();
-        return true;
-    }
-    return false;
 }
 
 static void DoErrorsModal(Gui* g) {
@@ -322,84 +267,6 @@ static void DoErrorsModal(Gui* g) {
     }
 }
 
-static void DoMetricsModal(Gui* g) {
-    auto a = &g->engine;
-    g->frame_input.graphics_ctx->PushFont(g->roboto_small);
-    DEFER { g->frame_input.graphics_ctx->PopFont(); };
-    auto& imgui = g->imgui;
-
-    auto const r = ModalRect(imgui, UiSizeId::MetricsWindowWidth, UiSizeId::MetricsWindowHeight);
-    auto const settings = ModalWindowSettings(g->imgui);
-
-    if (imgui.BeginWindowPopup(settings, IdForModal(ModalWindowType::Metrics), r, "MetricsModal")) {
-        DEFER { imgui.EndWindow(); };
-
-        DoWindowCloseButton(g);
-        f32 y_pos = 0;
-        DoHeading(g, y_pos, "Metrics");
-
-        auto& sample_library_server = g->shared_engine_systems.sample_library_server;
-        DoLabelLine(imgui,
-                    y_pos,
-                    "Number of active voices:",
-                    fmt::Format(g->scratch_arena,
-                                "{}",
-                                a->processor.voice_pool.num_active_voices.Load(LoadMemoryOrder::Relaxed)));
-        DoLabelLine(imgui,
-                    y_pos,
-                    "Memory:",
-                    fmt::Format(g->scratch_arena, "{} MB", MegabytesUsedBySamples(*a)));
-        DoLabelLine(
-            imgui,
-            y_pos,
-            "Memory (all instances):",
-            fmt::Format(g->scratch_arena,
-                        "{} MB",
-                        sample_library_server.total_bytes_used_by_samples.Load(LoadMemoryOrder::Relaxed) /
-                            (1024 * 1024)));
-        DoLabelLine(imgui,
-                    y_pos,
-                    "Num Loaded Instruments:",
-                    fmt::Format(g->scratch_arena,
-                                "{}",
-                                sample_library_server.num_insts_loaded.Load(LoadMemoryOrder::Relaxed)));
-        DoLabelLine(imgui,
-                    y_pos,
-                    "Num Loaded Samples:",
-                    fmt::Format(g->scratch_arena,
-                                "{}",
-                                sample_library_server.num_samples_loaded.Load(LoadMemoryOrder::Relaxed)));
-    }
-}
-
-static void DoAboutModal(Gui* g) {
-    g->frame_input.graphics_ctx->PushFont(g->roboto_small);
-    DEFER { g->frame_input.graphics_ctx->PopFont(); };
-    auto& imgui = g->imgui;
-
-    auto const r = ModalRect(imgui, UiSizeId::AboutWindowWidth, UiSizeId::AboutWindowHeight);
-    auto const settings = ModalWindowSettings(g->imgui);
-
-    if (imgui.BeginWindowPopup(settings, IdForModal(ModalWindowType::About), r, "AboutModal")) {
-        DEFER { imgui.EndWindow(); };
-        DoWindowCloseButton(g);
-        f32 y_pos = 0;
-        DoHeading(g, y_pos, "About");
-
-        DoLabelLine(imgui, y_pos, "Name:", "Floe");
-
-        DoLabelLine(
-            imgui,
-            y_pos,
-            "Version:",
-            fmt::Format(g->scratch_arena, "{}{}", FLOE_VERSION_STRING, PRODUCTION_BUILD ? "" : " Debug"));
-        DoLabelLine(imgui,
-                    y_pos,
-                    "Compiled Date:",
-                    fmt::Format(g->scratch_arena, "{}, {}", __DATE__, __TIME__));
-    }
-}
-
 static void DoLoadingOverlay(Gui* g) {
     g->frame_input.graphics_ctx->PushFont(g->roboto_small);
     DEFER { g->frame_input.graphics_ctx->PopFont(); };
@@ -423,55 +290,6 @@ static void DoLoadingOverlay(Gui* g) {
     }
 }
 
-static void DoLicencesModal(Gui* g) {
-#include "third_party_licence_text.hpp"
-    static bool open[ArraySize(k_third_party_licence_texts)];
-
-    g->frame_input.graphics_ctx->PushFont(g->roboto_small);
-    DEFER { g->frame_input.graphics_ctx->PopFont(); };
-    auto& imgui = g->imgui;
-    auto const r = ModalRect(imgui, UiSizeId::LicencesWindowWidth, UiSizeId::LicencesWindowHeight);
-    auto const settings = ModalWindowSettings(g->imgui);
-
-    if (imgui.BeginWindowPopup(settings, IdForModal(ModalWindowType::Licences), r, "LicencesModal")) {
-        DoWindowCloseButton(g);
-        auto const h = LiveSize(imgui, UiSizeId::MenuItemHeight);
-        f32 y_pos = 0;
-        DoHeading(g, y_pos, "Licences");
-
-        DoMultilineText(
-            g,
-            "Floe is free and open source under the GPLv3 licence. We use the following third-party libraries:",
-            y_pos);
-
-        for (auto const i : Range((int)ArraySize(k_third_party_licence_texts))) {
-            auto& txt = k_third_party_licence_texts[i];
-            bool state = open[i];
-            bool const changed = buttons::Toggle(g,
-                                                 imgui.GetID((uintptr)&txt),
-                                                 {.xywh {0, y_pos, imgui.Width(), h}},
-                                                 state,
-                                                 txt.name,
-                                                 buttons::LicencesFoldButton(imgui));
-            if (changed) {
-                open[i] = !open[i];
-                for (auto const j : Range((int)ArraySize(k_third_party_licence_texts))) {
-                    if (j == i) continue;
-                    open[j] = false;
-                }
-            }
-            y_pos += h;
-
-            if (open[i]) {
-                DoMultilineText(g, txt.copyright, y_pos);
-                DoMultilineText(g, txt.licence, y_pos);
-            }
-        }
-
-        imgui.EndWindow();
-    }
-}
-
 // ===============================================================================================================
 
 static bool AnyModalOpen(imgui::Context& imgui) {
@@ -492,8 +310,5 @@ void OpenModalIfNotAlready(imgui::Context& imgui, ModalWindowType type) {
 void DoModalWindows(Gui* g) {
     if (AnyModalOpen(g->imgui)) DoOverlayClickableBackground(g);
     DoErrorsModal(g);
-    DoMetricsModal(g);
-    DoAboutModal(g);
     DoLoadingOverlay(g);
-    DoLicencesModal(g);
 }

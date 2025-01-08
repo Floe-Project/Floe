@@ -13,6 +13,7 @@
 
 #include "build_resources/embedded_files.h"
 #include "engine/engine.hpp"
+#include "gui/gui2_info_panel.hpp"
 #include "gui/gui2_notifications.hpp"
 #include "gui/gui2_package_install.hpp"
 #include "gui/gui2_settings_panel.hpp"
@@ -681,17 +682,32 @@ GuiFrameResult GuiUpdate(Gui* g) {
             .fonts = g->fonts,
             .layout = g->layout,
         };
-
-        SettingsPanelContext context {
-            .settings = g->settings,
-            .sample_lib_server = g->shared_engine_systems.sample_library_server,
-            .package_install_jobs = g->engine.package_install_jobs,
-            .thread_pool = g->shared_engine_systems.thread_pool,
-        };
-
         box_system.show_tooltips = g->settings.settings.gui.show_tooltips;
 
-        DoSettingsPanel(box_system, context, g->settings_panel_state);
+        {
+            SettingsPanelContext context {
+                .settings = g->settings,
+                .sample_lib_server = g->shared_engine_systems.sample_library_server,
+                .package_install_jobs = g->engine.package_install_jobs,
+                .thread_pool = g->shared_engine_systems.thread_pool,
+            };
+
+            DoSettingsPanel(box_system, context, g->settings_panel_state);
+        }
+
+        {
+            InfoPanelContext context {
+                .server = g->shared_engine_systems.sample_library_server,
+                .voice_pool = g->engine.processor.voice_pool,
+                .scratch_arena = g->scratch_arena,
+                .libraries =
+                    sample_lib_server::AllLibrariesRetained(g->shared_engine_systems.sample_library_server,
+                                                            g->scratch_arena),
+            };
+            DEFER { sample_lib_server::ReleaseAll(context.libraries); };
+
+            DoInfoPanel(box_system, context, g->info_panel_state);
+        }
 
         DoNotifications(box_system, g->notifications);
 

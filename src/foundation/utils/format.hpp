@@ -517,11 +517,12 @@ PUBLIC inline void Append(DynCharArray& output, String format, Args const&... ar
 }
 
 template <dyn::DynArray DynCharArray, typename... Args>
-PUBLIC inline void Assign(DynCharArray& output, String format, Args const&... args) {
+PUBLIC inline auto& Assign(DynCharArray& output, String format, Args const&... args) {
     dyn::Clear(output);
     output.Reserve(format.size * 2);
     auto const outcome = FormatToWriter(dyn::WriterFor(output), format, args...);
     if (outcome.HasError()) __builtin_debugtrap();
+    return output;
 }
 
 template <usize k_size, typename... Args>

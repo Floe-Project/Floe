@@ -37,12 +37,14 @@ static void LibrariesInfoPanel(GuiBoxSystem& box_system, InfoPanelContext& conte
     DoBox(box_system,
           {
               .parent = root,
-              .text = fmt::Assign(buffer, "Installed Libraries ({})", context.libraries.size),
+              .text = fmt::Assign(buffer, "Installed Libraries ({})", context.libraries.size - 1),
               .font = FontType::Heading1,
               .size_from_text = true,
           });
 
     for (auto lib : context.libraries) {
+        if (lib->Id() == sample_lib::k_builtin_library_id) continue;
+
         // create a 'card' container object
         auto const card = DoBox(box_system,
                                 {

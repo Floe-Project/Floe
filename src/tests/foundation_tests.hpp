@@ -1752,6 +1752,22 @@ TEST_CASE(TestFormat) {
         CHECK_EQ(fmt::Join(a, Array {"a"_s, "b"_s}, ""), "ab"_s);
         CHECK_EQ(fmt::Join(a, Array {"a"_s, "b"_s, "c"_s}, ""), "abc"_s);
         CHECK_EQ(fmt::Join(a, Array {"a"_s, "b"_s, "c"_s}, ","), "a,b,c"_s);
+
+        CHECK_EQ(fmt::JoinInline<8>({}, ""), ""_s);
+        CHECK_EQ(fmt::JoinInline<8>({}, ","), ""_s);
+        CHECK_EQ(fmt::JoinInline<8>(Array {"a"_s}, ""), "a"_s);
+        CHECK_EQ(fmt::JoinInline<8>(Array {"a"_s, "b"_s}, ""), "ab"_s);
+        CHECK_EQ(fmt::JoinInline<8>(Array {"a"_s, "b"_s, "c"_s}, ""), "abc"_s);
+        CHECK_EQ(fmt::JoinInline<8>(Array {"a"_s, "b"_s, "c"_s}, ","), "a,b,c"_s);
+    }
+
+    SUBCASE("PrettyFileSize") {
+        CHECK_EQ(fmt::PrettyFileSize(0), "0 B"_s);
+        CHECK_EQ(fmt::PrettyFileSize(1024), "1 kB"_s);
+        CHECK_EQ(fmt::PrettyFileSize(1524), "1 kB"_s);
+        CHECK_EQ(fmt::PrettyFileSize(1024 * 1024), "1 MB"_s);
+        CHECK_EQ(fmt::PrettyFileSize(1024 * 1024 * 1024), "1.00 GB"_s);
+        CHECK_EQ(fmt::PrettyFileSize(1024 * 1024 * 1024 + 1024 * 1024 * 100), "1.10 GB"_s);
     }
 
     return k_success;

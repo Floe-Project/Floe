@@ -592,15 +592,43 @@ template <usize k_size>
 PUBLIC_INLINE DynamicArrayBounded<char, k_size> JoinInline(Span<String const> strings,
                                                            String separator = {}) {
     DynamicArrayBounded<char, k_size> result;
-    result.size = 0;
 
-    auto const& last = Last(strings);
-
-    for (auto const& s : strings) {
-        dyn::AppendSpan(result, s);
-        if (separator.size && &s != &last) dyn::AppendSpan(result, separator);
+    for (auto const [i, part] : Enumerate(strings)) {
+        if (auto const p = part.SubSpan(0, Min(k_size - result.size, part.size)); p.size)
+            WriteAndIncrement(result.size, (char*)result.data, part);
+        else
+            return result;
+        if (separator.size && i != strings.size - 1 && result.size != k_size)
+            WriteAndIncrement(result.size, (char*)result.data, separator);
     }
 
+    return result;
+}
+
+// buffer must be at least 8 bytes
+PUBLIC usize PrettyFileSize(f64 size, char* buffer) {
+    char const* units[] = {"B", "kB", "MB", "GB", "TB", "PB"};
+    u32 unit = 0;
+
+    // Max string: "999.99 PB" (9 chars), so we need to limit the size
+    if (size >= 1000.0 * 1024.0 * 1024.0 * 1024.0 * 1024.0) // 1000 PB
+        return 0;
+
+    while (size >= 1024.0 && unit < 5) {
+        size /= 1024.0;
+        unit++;
+    }
+
+    // Format based on unit size
+    if (unit >= 3) // GB and above
+        return CheckedCast<usize>(stbsp_snprintf(buffer, 8, "%.2f %s", size, units[unit]));
+    else
+        return CheckedCast<usize>(stbsp_snprintf(buffer, 8, "%.0f %s", size, units[unit]));
+}
+
+PUBLIC_INLINE DynamicArrayBounded<char, 8> PrettyFileSize(f64 size) {
+    DynamicArrayBounded<char, 8> result;
+    result.size = PrettyFileSize(size, result.data);
     return result;
 }
 

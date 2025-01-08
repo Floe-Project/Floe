@@ -644,7 +644,7 @@ class ExitScopeHelper {
 
 #define PUBLIC [[maybe_unused]] static
 
-#define PUBLIC_INLINE __attribute__((always_inline)) [[maybe_unused]] inline
+#define PUBLIC_INLINE [[maybe_unused]] inline __attribute__((always_inline))
 
 // [[maybe_unused]] can't be used in a few situations whereas the attribute syntax version can
 #define MAYBE_UNUSED __attribute__((__unused__))

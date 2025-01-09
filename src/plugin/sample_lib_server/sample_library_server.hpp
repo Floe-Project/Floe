@@ -197,7 +197,7 @@ struct ListedLibrary {
     sample_lib::Library* lib {};
     TimePoint scan_timepoint {};
 
-    ArenaList<ListedAudioData, true> audio_datas {arena};
+    ArenaList<ListedAudioData, false> audio_datas {arena};
     ArenaList<ListedInstrument, false> instruments {arena};
     ArenaList<ListedImpulseResponse, false> irs {arena};
 };

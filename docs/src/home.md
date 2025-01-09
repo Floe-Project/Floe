@@ -20,11 +20,10 @@ Some things may be incorrect, missing or broken. We are bit-by-bit filling in th
 </p>
 
 
-<!-- <h1 style="text-align:left; font-size: 3rem"> Streamlined sample-based instruments</h1> -->
 <h1 style="font-size: 3.1rem">Streamlined sample-based instrument platform</h1>
 <p style="font-size: 2rem; margin-bottom: 4px;">Floe lets you find, perform and transform sounds from sample libraries — from realistic instruments to synthesised tones. No-hassle, open-source and always free.</p>
 
-Floe is an engine, *it requires sample libraries to play*.
+Floe is an engine, it requires sample libraries to play.
 
 <div style="padding-bottom: 10px;"></div>
 
@@ -43,9 +42,9 @@ It's available as a plugin for your DAW (CLAP, VST3 and AU) on Windows and macOS
 Floe's ancestor, Mirage, has been used by thousands of musicians and producers, professional and indie, in 13 products. Floe is the next step in the evolution of Mirage, with a focus on developing a hassle-free platform for new sample libraries.
 
 #### Ongoing development
-Floe is an ongoing project. We plan to expand its capabilities while always maintaining backwards compatibility. We're always open to feedback and suggestions. Floe is designed for professional and hobbyist musicians, sound designers and producers.
+Floe is an ongoing project. We plan to expand its capabilities while always maintaining backwards compatibility. We're always open to feedback and suggestions. By consolidating our efforts into improving this engine, we improve the capabilities of all its libraries.
 
-Developed by the creator of [FrozenPlain](https://frozenplain.com). FrozenPlain offer a range of sample libraries that will be updated to support the Floe format. We're looking to see other developers adopt the format too.
+Developed by the creator of [FrozenPlain](https://frozenplain.com). FrozenPlain offer a range of sample libraries that will be updated to support the Floe format. We're hoping to see other developers adopt the format too.
 
 > **Floe's mission**
 > 1. Make sample libraries more expressive, playable and effective in music production.

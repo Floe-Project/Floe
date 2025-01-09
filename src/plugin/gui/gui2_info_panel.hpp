@@ -83,6 +83,15 @@ static void LibrariesInfoPanel(GuiBoxSystem& box_system, InfoPanelContext& conte
                       .size_from_text = true,
                   });
         }
+        if (lib->additional_author_info) {
+            DoBox(box_system,
+                  {
+                      .parent = card,
+                      .text = *lib->additional_author_info,
+                      .wrap_width = k_wrap_to_parent,
+                      .size_from_text = true,
+                  });
+        }
 
         auto do_text_line = [&](String text) {
             DoBox(box_system,
@@ -100,8 +109,8 @@ static void LibrariesInfoPanel(GuiBoxSystem& box_system, InfoPanelContext& conte
                                  lib->insts_by_name.size,
                                  lib->num_instrument_samples,
                                  lib->num_regions));
-        do_text_line(fmt::Assign(buffer, "Impulse Responses: {}", lib->irs_by_name.size));
-        do_text_line(fmt::Assign(buffer, "Library type: {}", ({
+        do_text_line(fmt::Assign(buffer, "Impulse responses: {}", lib->irs_by_name.size));
+        do_text_line(fmt::Assign(buffer, "Library format: {}", ({
                                      String s {};
                                      switch (lib->file_format_specifics.tag) {
                                          case sample_lib::FileFormat::Mdata: s = "Mirage (MDATA)"; break;
@@ -109,6 +118,12 @@ static void LibrariesInfoPanel(GuiBoxSystem& box_system, InfoPanelContext& conte
                                      }
                                      s;
                                  })));
+        if (lib->license_name) do_text_line(fmt::Assign(buffer, "License: {}", lib->license_name));
+        if (lib->converted_by)
+            do_text_line(fmt::Assign(buffer, "Converted to Floe by: {}", *lib->converted_by));
+
+        if (lib->attribution_required || lib->files_requiring_attribution.size)
+            do_text_line("Attribution required: true");
 
         auto const button_row = DoBox(box_system,
                                       {
@@ -121,8 +136,13 @@ static void LibrariesInfoPanel(GuiBoxSystem& box_system, InfoPanelContext& conte
                                               .contents_align = layout::Alignment::Start,
                                           },
                                       });
-        if (lib->url)
-            if (DialogTextButton(box_system, button_row, "Website", *lib->url)) OpenUrlInBrowser(*lib->url);
+        if (lib->library_url)
+            if (DialogTextButton(box_system, button_row, "Library Website", *lib->library_url))
+                OpenUrlInBrowser(*lib->library_url);
+
+        if (lib->author_url)
+            if (DialogTextButton(box_system, button_row, "Author Website", *lib->author_url))
+                OpenUrlInBrowser(*lib->author_url);
 
         if (auto const dir = path::Directory(lib->path))
             if (DialogTextButton(box_system,
@@ -130,6 +150,10 @@ static void LibrariesInfoPanel(GuiBoxSystem& box_system, InfoPanelContext& conte
                                  "Open Folder",
                                  fmt::Assign(buffer, "Open {} in {}", *dir, GetFileBrowserAppName())))
                 OpenFolderInFileBrowser(*dir);
+
+        if (lib->license_url)
+            if (DialogTextButton(box_system, button_row, "License", *lib->license_url))
+                OpenUrlInBrowser(*lib->license_url);
     }
 
     // make sure there's a gap at the end of the scroll region

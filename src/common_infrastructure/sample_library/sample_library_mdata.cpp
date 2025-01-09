@@ -116,7 +116,7 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
 
                                 String url {};
                                 if (SetIfMatching(event, "url", url, arena)) {
-                                    library.url = url;
+                                    library.library_url = url;
                                     return true;
                                 }
 

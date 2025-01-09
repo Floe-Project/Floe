@@ -78,6 +78,7 @@ struct LuaState {
     Options const& options;
     TimePoint const start_time;
     String filepath;
+    DynamicHashTable<LibraryPath, FileAttribution, Hash> files_requiring_attribution {result_arena};
 };
 
 #define SET_FIELD_VALUE_ARGS                                                                                 \
@@ -92,6 +93,7 @@ enum class InterpretedTypes : u32 {
     File,
     TriggerCriteria,
     RegionOptions,
+    FileLicenseInfo,
     Count,
 };
 
@@ -605,6 +607,73 @@ struct TableFields<Region> {
 };
 
 template <>
+struct TableFields<FileAttribution> {
+    using Type = FileAttribution;
+
+    enum class Field : u32 {
+        Title,
+        LicenseName,
+        LicenseUrl,
+        AttributionText,
+        AttributionUrl,
+        Count,
+    };
+
+    static constexpr FieldInfo FieldInfo(Field f) {
+        switch (f) {
+            case Field::Title:
+                return {
+                    .name = "title",
+                    .description_sentence = "The title of the work.",
+                    .example = "Bell Strike",
+                    .lua_type = LUA_TSTRING,
+                    .required = true,
+                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.title = StringFromTop(ctx); },
+                };
+            case Field::LicenseName:
+                return {
+                    .name = "license_name",
+                    .description_sentence = "Name of the license.",
+                    .example = "CC-BY-4.0",
+                    .lua_type = LUA_TSTRING,
+                    .required = true,
+                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.license_name = StringFromTop(ctx); },
+                };
+            case Field::LicenseUrl:
+                return {
+                    .name = "license_url",
+                    .description_sentence = "URL to the license.",
+                    .example = "https://creativecommons.org/licenses/by/4.0/",
+                    .lua_type = LUA_TSTRING,
+                    .required = true,
+                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.license_url = StringFromTop(ctx); },
+                };
+            case Field::AttributionText:
+                return {
+                    .name = "attributed_to",
+                    .description_sentence =
+                        "The name/identification of the persons or entities to attribute the work to.",
+                    .example = "John Doe",
+                    .lua_type = LUA_TSTRING,
+                    .required = true,
+                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.attributed_to = StringFromTop(ctx); },
+                };
+            case Field::AttributionUrl:
+                return {
+                    .name = "attribution_url",
+                    .description_sentence = "URL to the original work if possible.",
+                    .example = "https://example.com",
+                    .lua_type = LUA_TSTRING,
+                    .required = false,
+                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.attribution_url = StringFromTop(ctx); },
+                };
+            case Field::Count: break;
+        }
+        return {};
+    }
+};
+
+template <>
 struct TableFields<ImpulseResponse> {
     using Type = ImpulseResponse;
 
@@ -647,6 +716,7 @@ struct TableFields<ImpulseResponse> {
         return {};
     }
 };
+
 template <>
 struct TableFields<Instrument> {
     using Type = Instrument;
@@ -737,9 +807,14 @@ struct TableFields<Library> {
     enum class Field : u32 {
         Name,
         Tagline,
-        Url,
+        LibraryUrl,
         Description,
         Author,
+        LicenseName,
+        LicenseUrl,
+        AdditionalAuthorInfo,
+        AuthorUrl,
+        AttributionRequired,
         MinorVersion,
         BackgroundImagePath,
         IconImagePath,
@@ -773,15 +848,15 @@ struct TableFields<Library> {
                     .required = true,
                     .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.tagline = StringFromTop(ctx); },
                 };
-            case Field::Url:
+            case Field::LibraryUrl:
                 return {
-                    .name = "url",
-                    .description_sentence = "The URL associated with the library.",
+                    .name = "library_url",
+                    .description_sentence = "The URL for this Floe library.",
                     .example = "https://example.com/iron-vibrations",
                     .default_value = "no url",
                     .lua_type = LUA_TSTRING,
                     .required = false,
-                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.url = StringFromTop(ctx); },
+                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.library_url = StringFromTop(ctx); },
                 };
             case Field::Description:
                 return {
@@ -797,7 +872,8 @@ struct TableFields<Library> {
             case Field::Author:
                 return {
                     .name = "author",
-                    .description_sentence = "The name of the creator of this library.",
+                    .description_sentence =
+                        "Who created this library. Keep it short and use additional_author_info for more details.",
                     .example = "Found-sound Labs",
                     .lua_type = LUA_TSTRING,
                     .required = true,
@@ -808,6 +884,58 @@ struct TableFields<Library> {
                                 luaL_error(ctx.lua,
                                            "Library author must be less than %d characters long.",
                                            (int)k_max_library_author_size);
+                        },
+                };
+            case Field::LicenseName:
+                return {
+                    .name = "license_name",
+                    .description_sentence = "Name of the license.",
+                    .example = "CC-BY-4.0",
+                    .lua_type = LUA_TSTRING,
+                    .required = false,
+                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.license_name = StringFromTop(ctx); },
+                };
+            case Field::LicenseUrl:
+                return {
+                    .name = "license_url",
+                    .description_sentence = "URL to the license.",
+                    .example = "https://creativecommons.org/licenses/by/4.0/",
+                    .lua_type = LUA_TSTRING,
+                    .required = false,
+                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.license_url = StringFromTop(ctx); },
+                };
+            case Field::AdditionalAuthorInfo:
+                return {
+                    .name = "additional_author_info",
+                    .description_sentence =
+                        "Additional information about the author: the institution, the team, etc.",
+                    .example = "John Doe & Audio Team, University of Example",
+                    .lua_type = LUA_TSTRING,
+                    .required = false,
+                    .set =
+                        [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.additional_author_info = StringFromTop(ctx); },
+                };
+            case Field::AuthorUrl:
+                return {
+                    .name = "author_url",
+                    .description_sentence = "URL relating to the author or their work.",
+                    .example = "https://example.com",
+                    .lua_type = LUA_TSTRING,
+                    .required = false,
+                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.author_url = StringFromTop(ctx); },
+                };
+            case Field::AttributionRequired:
+                return {
+                    .name = "attribution_required",
+                    .description_sentence =
+                        "Whether or not attribution is required when you use this library. If true, you must fill in the license name and license URL too.",
+                    .example = "true",
+                    .default_value = "false",
+                    .lua_type = LUA_TBOOLEAN,
+                    .required = false,
+                    .set =
+                        [](SET_FIELD_VALUE_ARGS) {
+                            FIELD_OBJ.attribution_required = lua_toboolean(ctx.lua, -1);
                         },
                 };
             case Field::MinorVersion:
@@ -956,6 +1084,21 @@ static int NewInstrument(lua_State* lua) {
     return 1;
 }
 
+static int SetFileLicense(lua_State* lua) {
+    auto& ctx = **(LuaState**)lua_getextraspace(lua);
+
+    // function takes 2 args, first is the path to a file, second is a table of config
+    luaL_checktype(lua, 1, LUA_TSTRING);
+    luaL_checktype(lua, 2, LUA_TTABLE);
+
+    LibraryPath path = {ctx.result_arena.Clone(LuaString(lua, 1))};
+    FileAttribution info {};
+    InterpretTable<FileAttribution>(ctx, 2, info);
+    ctx.files_requiring_attribution.Insert(path, info);
+
+    return 0;
+}
+
 static int AddIr(lua_State* lua) {
     auto& ctx = **(LuaState**)lua_getextraspace(lua);
 
@@ -1048,6 +1191,7 @@ static const struct luaL_Reg k_floe_lib[] = {
     {"new_instrument", NewInstrument},
     {"add_region", AddRegion},
     {"add_ir", AddIr},
+    {"set_file_license", SetFileLicense},
     {nullptr, nullptr},
 };
 
@@ -1315,6 +1459,30 @@ LibraryPtrOrError ReadLua(Reader& reader,
             library->num_instrument_samples = (u32)audio_paths.size;
         }
 
+        library->files_requiring_attribution = ctx.files_requiring_attribution.ToOwnedTable();
+
+        if (library->attribution_required) {
+            String missing_field {};
+            if (!library->license_name)
+                missing_field =
+                    TableFields<Library>::FieldInfo(TableFields<Library>::Field::LicenseName).name;
+            else if (!library->license_url)
+                missing_field = TableFields<Library>::FieldInfo(TableFields<Library>::Field::LicenseUrl).name;
+            else if (!library->additional_author_info)
+                missing_field =
+                    TableFields<Library>::FieldInfo(TableFields<Library>::Field::AdditionalAuthorInfo).name;
+
+            if (missing_field.size)
+                return ErrorAndNotify(ctx, LuaErrorCode::Runtime, [&](DynamicArray<char>& message) {
+                    fmt::Append(
+                        message,
+                        "missing field: {}, required when {} is set",
+                        missing_field,
+                        TableFields<Library>::FieldInfo(TableFields<Library>::Field::AttributionRequired)
+                            .name);
+                });
+        }
+
         return library;
     } catch (OutOfMemory const& e) {
         return Error {LuaErrorCode::Memory, {}};
@@ -1405,6 +1573,9 @@ struct LuaCodePrinter {
                     break;
                 case InterpretedTypes::RegionOptions:
                     struct_fields[i] = FieldInfosSpan<Region::Options>();
+                    break;
+                case InterpretedTypes::FileLicenseInfo:
+                    struct_fields[i] = FieldInfosSpan<FileAttribution>();
                     break;
                 case InterpretedTypes::Count: break;
             }
@@ -1544,6 +1715,12 @@ struct LuaCodePrinter {
         TRY(PrintStruct(writer, InterpretedTypes::Region, mode, 1));
         TRY(writer.WriteChars("})\n"));
         TRY(end_function("add_region"));
+
+        TRY(begin_function("set_file_license"));
+        TRY(writer.WriteChars("floe.set_file_license(\"Samples/bell.flac\", {\n"));
+        TRY(PrintStruct(writer, InterpretedTypes::FileLicenseInfo, mode, 1));
+        TRY(writer.WriteChars("})\n"));
+        TRY(end_function("set_file_license"));
 
         if (mode.mode_flags & LuaCodePrinter::PrintModeFlagsDocumentedExample) {
             TRY(begin_function("extend_table"));

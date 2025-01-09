@@ -13,6 +13,7 @@ For instance: 0.0.1. Don't change the headings.
 - Add support for packaging and installing MDATA libraries (Mirage)
 - Add tooltips to the settings GUI
 - Add new Info panel featuring info about installed libraries. 'About', 'Metrics' and 'Licenses' have been moved here too instead of being separate panels.
+- Add new fields to the Lua API to support license info and attribution, such as CC BY
 - Enable selecting multiple package to install at once
 - Make notifications dismiss themselves after a few seconds
 - Fixed externally deleted or moved-to-trash libraries not being removed from Floe

@@ -26,6 +26,8 @@ struct LibraryPath {
     explicit operator String() const { return str; }
 };
 
+PUBLIC constexpr u64 Hash(LibraryPath path) { return HashFnv1a(path.str); }
+
 struct Range {
     constexpr bool operator==(Range const& other) const = default;
     constexpr u8 Size() const {
@@ -91,7 +93,7 @@ struct Instrument {
     u32 max_rr_pos {};
 };
 
-// An instrument that has all it's audio data loaded into memory.
+// An instrument that has all its audio data loaded into memory.
 struct LoadedInstrument {
     Instrument const& instrument;
     Span<AudioData const*> audio_datas {}; // parallel to instrument.regions
@@ -105,7 +107,7 @@ struct ImpulseResponse {
     LibraryPath path {};
 };
 
-// An impulse response that has all it's audio data loaded into memory.
+// An impulse response that has its audio data loaded into memory.
 struct LoadedIr {
     ImpulseResponse const& ir;
     AudioData const* audio_data;
@@ -141,18 +143,33 @@ struct LibraryIdRef {
     String name;
 };
 
+struct FileAttribution {
+    String title {}; // title of the work
+    String license_name {};
+    String license_url {};
+    String attributed_to {};
+    Optional<String> attribution_url {};
+};
+
 struct Library {
     LibraryIdRef Id() const { return {.author = author, .name = name}; }
     String name {};
     String tagline {};
-    Optional<String> url {};
+    Optional<String> library_url {};
     Optional<String> description {};
     String author {};
+    Optional<String> license_name {};
+    Optional<String> license_url {};
+    Optional<String> additional_author_info {};
+    Optional<String> author_url {};
+    bool attribution_required {}; // true means any use of the the library requires attribution
+    Optional<String> converted_by {};
     u32 minor_version {1};
     Optional<LibraryPath> background_image_path {};
     Optional<LibraryPath> icon_image_path {};
     HashTable<String, Instrument*> insts_by_name {};
     HashTable<String, ImpulseResponse*> irs_by_name {};
+    HashTable<LibraryPath, FileAttribution, Hash> files_requiring_attribution {};
     u32 num_instrument_samples {};
     u32 num_regions {};
     String path {}; // real filesystem path to mdata or lua file

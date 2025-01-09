@@ -105,6 +105,7 @@ struct ImpulseResponse {
 
     String name {};
     LibraryPath path {};
+    Span<String> tags {};
 };
 
 // An impulse response that has its audio data loaded into memory.

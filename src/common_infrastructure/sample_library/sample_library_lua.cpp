@@ -680,6 +680,7 @@ struct TableFields<ImpulseResponse> {
     enum class Field : u32 {
         Name,
         Path,
+        Tags,
         Count,
     };
 
@@ -710,6 +711,17 @@ struct TableFields<ImpulseResponse> {
                     .lua_type = LUA_TSTRING,
                     .required = true,
                     .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.path = PathFromTop(ctx); },
+                };
+            case Field::Tags:
+                return {
+                    .name = "tags",
+                    .description_sentence = "An array of strings to denote properties of the IR.",
+                    .example = "{ \"Cathedral\", \"Bright\" }",
+                    .default_value = "no tags",
+                    .lua_type = LUA_TTABLE,
+                    .required = false,
+                    .is_array = true,
+                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.tags = SetArrayOfStrings(ctx, info); },
                 };
             case Field::Count: break;
         }

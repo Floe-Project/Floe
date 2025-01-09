@@ -55,6 +55,7 @@ struct Reader {
     ErrorCodeOr<usize> Read(Span<u8> bytes_out) {
         ASSERT(size >= pos);
         auto bytes = Min(bytes_out.size, size - pos);
+        if (!bytes) return bytes;
 
         if (memory) {
             CopyMemory(bytes_out.data, memory + pos, bytes);

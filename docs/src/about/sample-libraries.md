@@ -5,6 +5,10 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Sample Libraries
 
+View your installed libraries by clicking the <i class="fa fa-info-circle"></i> info button on Floe's main window.
+
+## Open format
+
 Floe uses a custom sample library format which supports the following features: 
 - Velocity layers
 - Round-robin

@@ -623,10 +623,11 @@ static void HandlePostUpdateRequests(GuiPlatform& platform) {
         // we can re-use the 'paste' clipboard buffer even though this is a 'copy' operation
         auto& buffer = platform.frame_state.clipboard_text;
         dyn::Assign(buffer, cb);
-        // IMPORTANT: pugl needs a null terminator despite also taking a size
-        dyn::Append(buffer, '\0');
 
-        puglSetClipboard(platform.view, "text/plain", buffer.data, buffer.size);
+        // IMPORTANT: pugl needs a null terminator despite also taking a size
+        if (!IS_LINUX && !EndsWith(buffer, '\0')) dyn::Append(buffer, '\0');
+
+        puglSetClipboard(platform.view, IS_LINUX ? "UTF8_STRING" : "text/plain", buffer.data, buffer.size);
     }
 }
 

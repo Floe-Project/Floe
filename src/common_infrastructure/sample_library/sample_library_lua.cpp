@@ -838,7 +838,8 @@ struct TableFields<Library> {
             case Field::Name:
                 return {
                     .name = "name",
-                    .description_sentence = "The name of the library.",
+                    .description_sentence =
+                        "The name of the library. Keep it short and use tagline for more details.",
                     .example = "Iron Vibrations",
                     .lua_type = LUA_TSTRING,
                     .required = true,
@@ -885,7 +886,7 @@ struct TableFields<Library> {
                 return {
                     .name = "author",
                     .description_sentence =
-                        "Who created this library. Keep it short and use additional_author_info for more details.",
+                        "Who created this library. Keep it short and use additional_authors for more details.",
                     .example = "Found-sound Labs",
                     .lua_type = LUA_TSTRING,
                     .required = true,
@@ -918,14 +919,12 @@ struct TableFields<Library> {
                 };
             case Field::AdditionalAuthorInfo:
                 return {
-                    .name = "additional_author_info",
-                    .description_sentence =
-                        "Additional information about the author: the institution, the team, etc.",
+                    .name = "additional_authors",
+                    .description_sentence = "Additional authors: the institution, the team, etc.",
                     .example = "John Doe & Audio Team, University of Example",
                     .lua_type = LUA_TSTRING,
                     .required = false,
-                    .set =
-                        [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.additional_author_info = StringFromTop(ctx); },
+                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.additional_authors = StringFromTop(ctx); },
                 };
             case Field::AuthorUrl:
                 return {
@@ -1480,7 +1479,7 @@ LibraryPtrOrError ReadLua(Reader& reader,
                     TableFields<Library>::FieldInfo(TableFields<Library>::Field::LicenseName).name;
             else if (!library->license_url)
                 missing_field = TableFields<Library>::FieldInfo(TableFields<Library>::Field::LicenseUrl).name;
-            else if (!library->additional_author_info)
+            else if (!library->additional_authors)
                 missing_field =
                     TableFields<Library>::FieldInfo(TableFields<Library>::Field::AdditionalAuthorInfo).name;
 

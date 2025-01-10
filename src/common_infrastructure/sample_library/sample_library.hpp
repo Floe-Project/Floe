@@ -161,9 +161,9 @@ struct Library {
     String author {};
     Optional<String> license_name {};
     Optional<String> license_url {};
-    Optional<String> additional_author_info {};
+    Optional<String> additional_authors {};
     Optional<String> author_url {};
-    bool attribution_required {}; // true means any use of the the library requires attribution
+    bool attribution_required {}; // true means using the library requires attribution
     Optional<String> converted_by {};
     u32 minor_version {1};
     Optional<LibraryPath> background_image_path {};

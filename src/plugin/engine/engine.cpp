@@ -9,6 +9,7 @@
 
 #include "common_infrastructure/common_errors.hpp"
 #include "common_infrastructure/constants.hpp"
+#include "common_infrastructure/sample_library/attribution_generation.hpp"
 
 #include "descriptors/param_descriptors.hpp"
 #include "plugin/plugin.hpp"
@@ -44,6 +45,120 @@ Optional<sample_lib::LibraryIdRef> LibraryForOverallBackground(Engine const& eng
     }
 
     return *first_lib_id;
+}
+
+static void UpdateAttributionText(Engine& engine, ArenaAllocator& scratch_arena) {
+    ASSERT(IsMainThread(engine.host));
+
+    struct AttributionUntitled {
+        Optional<String> license_name;
+        Optional<String> license_url;
+        String attributed_to;
+        Optional<String> attribution_url;
+    };
+
+    struct Attribution : public AttributionUntitled {
+        ArenaList<String, false> titles;
+    };
+
+    DynamicArray<Attribution> attributions {scratch_arena};
+
+    auto add_attribution = [&](String title, AttributionUntitled info) {
+        for (auto& a : attributions) {
+            if (a.license_url == info.license_url && a.license_name == info.license_name &&
+                a.attributed_to == info.attributed_to && a.attribution_url == info.attribution_url) {
+                for (auto& t : a.titles)
+                    if (t == title) return;
+                a.titles.Prepend(title);
+                return;
+            }
+        }
+        Attribution new_attribution {
+            .titles = {scratch_arena},
+        };
+        *(AttributionUntitled*)&new_attribution = info;
+        new_attribution.titles.Prepend(title);
+        dyn::Append(attributions, new_attribution);
+    };
+
+    for (auto& l : engine.processor.layer_processors) {
+        if (auto opt_i = l.instrument.TryGet<sample_lib_server::RefCounted<sample_lib::LoadedInstrument>>()) {
+            auto const& i = **opt_i;
+            auto const& lib = i.instrument.library;
+
+            if (lib.attribution_required) {
+                String attributed_to = lib.author;
+                if (lib.additional_authors)
+                    attributed_to =
+                        fmt::Format(scratch_arena, "{}, {}", attributed_to, *lib.additional_authors);
+                add_attribution(lib.name,
+                                {
+                                    .license_name = lib.license_name,
+                                    .license_url = lib.license_url,
+                                    .attributed_to = attributed_to,
+                                    .attribution_url = lib.author_url,
+                                });
+            }
+            if (lib.files_requiring_attribution.size) {
+                for (auto const& r : i.instrument.regions) {
+                    if (auto const attr = lib.files_requiring_attribution.Find({r.file.path})) {
+                        add_attribution(attr->title,
+                                        {
+                                            .license_name = attr->license_name,
+                                            .license_url = attr->license_url,
+                                            .attributed_to = attr->attributed_to,
+                                            .attribution_url = attr->attribution_url,
+                                        });
+                    }
+                }
+            }
+        }
+    }
+
+    if (auto const ir_id = engine.processor.convo.ir_id) {
+        for (auto& node : engine.shared_engine_systems.sample_library_server.libraries) {
+            if (auto l = node.TryScoped()) {
+                auto const& lib = *l->lib;
+                if (lib.Id() != ir_id->library) continue;
+                if (lib.files_requiring_attribution.size == 0) continue;
+                if (auto const ir = lib.irs_by_name.Find(ir_id->ir_name)) {
+                    if (auto const attr = lib.files_requiring_attribution.Find((*ir)->path)) {
+                        add_attribution(attr->title,
+                                        {
+                                            .license_name = attr->license_name,
+                                            .license_url = attr->license_url,
+                                            .attributed_to = attr->attributed_to,
+                                            .attribution_url = attr->attribution_url,
+                                        });
+                    }
+                }
+            }
+        }
+    }
+
+    auto& out = engine.attribution_text;
+
+    dyn::Clear(out);
+
+    for (auto const& a : attributions) {
+        if (out.size)
+            fmt::Append(out, "\n");
+        else
+            dyn::AppendSpan(out, "Source Material Credits:\n"_s);
+
+        auto title_it = a.titles.begin();
+        fmt::Append(out, "\"{}\"", *title_it);
+        ++title_it;
+        for (; title_it != a.titles.end(); ++title_it)
+            if (title_it.node->next == nullptr)
+                fmt::Append(out, ", and \"{}\"", *title_it);
+            else
+                fmt::Append(out, ", \"{}\"", *title_it);
+        fmt::Append(out, " by {}", a.attributed_to);
+        if (a.attribution_url) fmt::Append(out, " ({})", a.attribution_url);
+        if (a.license_name) fmt::Append(out, " | {}", a.license_name);
+        if (a.license_url) fmt::Append(out, " ({})", a.license_url);
+    }
 }
 
 static void RequestGuiRedraw(Engine& engine) {
@@ -97,6 +212,9 @@ static void LoadNewState(Engine& engine, StateSnapshotWithMetadata const& state,
 
         ApplyNewState(engine.processor, state.state, source);
         SetLastSnapshot(engine, state);
+
+        ArenaAllocatorWithInlineStorage<1000> scratch_arena {PageAllocator::Instance()};
+        UpdateAttributionText(engine, scratch_arena);
     } else {
         engine.pending_state_change.Emplace();
         auto& pending = *engine.pending_state_change;
@@ -475,14 +593,17 @@ void RunFunctionOnMainThread(Engine& engine, ThreadsafeFunctionQueue::Function f
 static void OnMainThread(Engine& engine, bool& update_gui) {
     (void)update_gui;
 
-    ArenaAllocatorWithInlineStorage<4000> scratch_arena {Malloc::Instance()};
+    ArenaAllocatorWithInlineStorage<4000> scratch_arena {PageAllocator::Instance()};
     while (auto f = engine.main_thread_callbacks.TryPop(scratch_arena))
         (*f)();
 
-    while (auto f = engine.sample_lib_server_async_channel.results.TryPop()) {
-        SampleLibraryResourceLoaded(engine, *f);
-        f->Release();
+    bool resources_loaded = false;
+    while (auto r = engine.sample_lib_server_async_channel.results.TryPop()) {
+        SampleLibraryResourceLoaded(engine, *r);
+        r->Release();
+        resources_loaded = true;
     }
+    if (resources_loaded) UpdateAttributionText(engine, scratch_arena);
 }
 
 Engine::Engine(clap_host const& host, SharedEngineSystems& shared_engine_systems)

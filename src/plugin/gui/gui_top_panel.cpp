@@ -129,6 +129,16 @@ void TopPanel(Gui* g) {
                                        .parent = right_container,
                                        .size = {icon_width, icon_height},
                                    });
+
+    auto attribution_icon =
+        g->engine.attribution_text.size
+            ? Optional<layout::Id> {layout::CreateItem(g->layout,
+                                                       {
+                                                           .parent = right_container,
+                                                           .size = {icon_width, icon_height},
+                                                       })}
+            : k_nullopt;
+
     auto dots_menu = layout::CreateItem(g->layout,
                                         {
                                             .parent = right_container,
@@ -352,6 +362,18 @@ void TopPanel(Gui* g) {
         if (buttons::Button(g, btn_id, btn_r, ICON_FA_INFO_CIRCLE, large_icon_button_style))
             g->info_panel_state.open = true;
         Tooltip(g, btn_id, btn_r, "Open information window"_s);
+    }
+
+    if (attribution_icon) {
+        auto btn_id = g->imgui.GetID("attribution");
+        auto btn_r = layout::GetRect(g->layout, *attribution_icon);
+        if (buttons::Button(g,
+                            btn_id,
+                            btn_r,
+                            ICON_FA_FILE_SIGNATURE,
+                            buttons::TopPanelAttributionIconButton(g->imgui)))
+            g->attribution_panel_open = true;
+        Tooltip(g, btn_id, btn_r, "Open attribution requirments"_s);
     }
 
     {

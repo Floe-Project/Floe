@@ -83,11 +83,11 @@ static void LibrariesInfoPanel(GuiBoxSystem& box_system, InfoPanelContext& conte
                       .size_from_text = true,
                   });
         }
-        if (lib->additional_author_info) {
+        if (lib->additional_authors) {
             DoBox(box_system,
                   {
                       .parent = card,
-                      .text = *lib->additional_author_info,
+                      .text = *lib->additional_authors,
                       .wrap_width = k_wrap_to_parent,
                       .size_from_text = true,
                   });

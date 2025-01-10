@@ -141,6 +141,17 @@ PUBLIC Style TopPanelIconButton(imgui::Context const& imgui) {
     return s;
 }
 
+PUBLIC Style TopPanelAttributionIconButton(imgui::Context const& imgui) {
+    auto s = IconButton(imgui).WithLargeIcon();
+    s.main_cols.reg = LiveCol(imgui, UiColMap::TopPanelAttributionIconButtonRegular);
+    s.main_cols.on = LiveCol(imgui, UiColMap::TopPanelAttributionIconButtonOn);
+    s.main_cols.hot_on = LiveCol(imgui, UiColMap::TopPanelAttributionIconButtonHover);
+    s.main_cols.hot_off = s.main_cols.hot_on;
+    s.main_cols.active_on = LiveCol(imgui, UiColMap::TopPanelAttributionIconButtonActive);
+    s.main_cols.active_off = s.main_cols.active_on;
+    return s;
+}
+
 PUBLIC Style BrowserIconButton(imgui::Context const& imgui) {
     auto s = IconButton(imgui);
     s.main_cols.reg = LiveCol(imgui, UiColMap::BrowserIconButtonRegular);

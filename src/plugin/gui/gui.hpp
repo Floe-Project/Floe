@@ -136,6 +136,7 @@ struct Gui {
 
     SettingsPanelState settings_panel_state {};
     InfoPanelState info_panel_state {};
+    bool attribution_panel_open {};
     Notifications notifications {};
 
     GuiFrameInput& frame_input;

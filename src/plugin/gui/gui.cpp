@@ -13,6 +13,7 @@
 
 #include "build_resources/embedded_files.h"
 #include "engine/engine.hpp"
+#include "gui/gui2_attribution_panel.hpp"
 #include "gui/gui2_info_panel.hpp"
 #include "gui/gui2_notifications.hpp"
 #include "gui/gui2_package_install.hpp"
@@ -581,6 +582,8 @@ GuiFrameResult GuiUpdate(Gui* g) {
     auto& imgui = g->imgui;
     imgui.SetPixelsPerPoint(PixelsPerPoint(g));
 
+    if (!g->engine.attribution_text.size) g->attribution_panel_open = false;
+
     g->waveforms.StartFrame();
     DEFER { g->waveforms.EndFrame(*g->frame_input.graphics_ctx); };
 
@@ -707,6 +710,14 @@ GuiFrameResult GuiUpdate(Gui* g) {
             DEFER { sample_lib_server::ReleaseAll(context.libraries); };
 
             DoInfoPanel(box_system, context, g->info_panel_state);
+        }
+
+        {
+            AttributionPanelContext context {
+                .engine = g->engine,
+            };
+
+            DoAttributionPanel(box_system, context, g->attribution_panel_open);
         }
 
         DoNotifications(box_system, g->notifications);

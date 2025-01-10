@@ -22,6 +22,9 @@ struct ArenaList {
         , first(Exchange(other.first, nullptr))
         , free_list(Exchange(other.free_list, nullptr)) {}
 
+    ~ArenaList() requires(TriviallyDestructible<Type>)
+    = default;
+
     ~ArenaList() {
         if constexpr (!TriviallyDestructible<Type>) ASSERT(first == nullptr);
     }

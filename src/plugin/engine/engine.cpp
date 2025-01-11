@@ -216,17 +216,18 @@ CurrentAttributionItems(Engine& engine, DynamicArray<AttributionStore::Item>& it
 static void UpdateSharedAttributions(Engine& engine,
                                      DynamicArray<AttributionStore::Item>& items,
                                      ArenaAllocator& scratch_arena) {
-    if (!engine.shared_memory) {
+    if (!engine.shared_attributions_memory) {
         auto o = CreateLockableSharedMemory("floe_attribution", Kb(100));
-        if (o.HasValue()) engine.shared_memory = o.Value();
+        if (o.HasValue()) engine.shared_attributions_memory = o.Value();
     }
+    if (!engine.shared_attributions_memory) return;
 
-    LockSharedMemory(*engine.shared_memory);
-    DEFER { UnlockSharedMemory(*engine.shared_memory); };
+    LockSharedMemory(*engine.shared_attributions_memory);
+    DEFER { UnlockSharedMemory(*engine.shared_attributions_memory); };
 
     AttributionStore store {
         .mode = AttributionStore::Mode::Read,
-        .data = engine.shared_memory->data,
+        .data = engine.shared_attributions_memory->data,
         .pos = 0,
     };
 
@@ -251,14 +252,14 @@ static void UpdateSharedAttributions(Engine& engine,
 static void ClearOurAttributionsIfNeeded(Engine& engine, ArenaAllocator& scratch_arena) {
     ASSERT(IsMainThread(engine.host));
 
-    if (!engine.shared_memory) return;
+    if (!engine.shared_attributions_memory) return;
 
-    LockSharedMemory(*engine.shared_memory);
-    DEFER { UnlockSharedMemory(*engine.shared_memory); };
+    LockSharedMemory(*engine.shared_attributions_memory);
+    DEFER { UnlockSharedMemory(*engine.shared_attributions_memory); };
 
     AttributionStore store {
         .mode = AttributionStore::Mode::Read,
-        .data = engine.shared_memory->data,
+        .data = engine.shared_attributions_memory->data,
         .pos = 0,
     };
     DynamicArray<AttributionStore::Item> items {scratch_arena};
@@ -776,7 +777,11 @@ static void OnMainThread(Engine& engine, bool& update_gui) {
         r->Release();
         resources_loaded = true;
     }
-    if (resources_loaded) UpdateAttributionText(engine, scratch_arena);
+    auto const now = TimePoint::Now();
+    if (resources_loaded || (now - engine.last_attribution_update_time) > 3) {
+        UpdateAttributionText(engine, scratch_arena);
+        engine.last_attribution_update_time = now;
+    }
 }
 
 Engine::Engine(clap_host const& host, SharedEngineSystems& shared_engine_systems)

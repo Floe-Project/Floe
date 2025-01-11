@@ -61,8 +61,9 @@ struct Engine {
     package::InstallJobs package_install_jobs {};
 
     u64 const engine_instance_id = SeedFromTime();
-    Optional<LockableSharedMemory> shared_memory {};
+    Optional<LockableSharedMemory> shared_attributions_memory {};
     DynamicArray<char> attribution_text {Malloc::Instance()}; // empty if none needed
+    TimePoint last_attribution_update_time {};
 
     // IMPORTANT: debug-only, remove this
     DynamicArrayBounded<char, 200> state_change_description {};

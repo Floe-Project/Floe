@@ -114,6 +114,75 @@ ErrorCodeOr<String> ReadAllStdin(Allocator& allocator) {
     return result.ToOwnedSpan();
 }
 
+struct LockableSharedMemoryNative {
+    HANDLE mutex;
+    HANDLE mapping;
+};
+
+ErrorCodeOr<LockableSharedMemory> CreateLockableSharedMemory(String name, usize size) {
+    ASSERT(name.size <= 32);
+    LockableSharedMemory result {};
+    auto& native = result.native.As<LockableSharedMemoryNative>();
+
+    // Create mutex name and mapping name
+    auto mutex_name = fmt::FormatInline<40>("Global\\{}_mutex", name);
+    auto mapping_name = fmt::FormatInline<40>("Global\\{}_mapping", name);
+
+    // Create or open mutex
+    native.mutex = CreateMutexA(nullptr, FALSE, mutex_name.data);
+    if (!native.mutex) return Win32ErrorCode(GetLastError(), "CreateMutexA");
+
+    // Wait for mutex to ensure atomic initialization
+    if (WaitForSingleObject(native.mutex, INFINITE) != WAIT_OBJECT_0) {
+        CloseHandle(native.mutex);
+        return Win32ErrorCode(GetLastError(), "WaitForSingleObject");
+    }
+
+    DEFER { ReleaseMutex(native.mutex); };
+
+    // Create or open file mapping
+    // Create file mapping and immediately check if it was newly created
+    native.mapping = CreateFileMappingA(INVALID_HANDLE_VALUE, // Use paging file
+                                        nullptr, // Default security attributes
+                                        PAGE_READWRITE, // Read/write access
+                                        (DWORD)((size >> 32) & 0xFFFFFFFF), // High-order DWORD of size
+                                        (DWORD)(size & 0xFFFFFFFF), // Low-order DWORD of size
+                                        mapping_name.data);
+    DWORD last_error = GetLastError(); // Must check immediately after create
+
+    if (!native.mapping) {
+        CloseHandle(native.mutex);
+        return Win32ErrorCode(last_error, "CreateFileMappingA");
+    }
+
+    bool created = (last_error != ERROR_ALREADY_EXISTS);
+
+    // Map view of the file
+    void* data = MapViewOfFile(native.mapping, FILE_MAP_ALL_ACCESS, 0, 0, size);
+
+    if (!data) {
+        CloseHandle(native.mapping);
+        CloseHandle(native.mutex);
+        return Win32ErrorCode(GetLastError(), "MapViewOfFile");
+    }
+
+    // Initialize memory if we created it
+    if (created) FillMemory(data, 0, size);
+
+    result.data = {(u8*)data, size};
+    return result;
+}
+
+void LockSharedMemory(LockableSharedMemory& memory) {
+    auto& native = memory.native.As<LockableSharedMemoryNative>();
+    WaitForSingleObject(native.mutex, INFINITE);
+}
+
+void UnlockSharedMemory(LockableSharedMemory& memory) {
+    auto& native = memory.native.As<LockableSharedMemoryNative>();
+    ReleaseMutex(native.mutex);
+}
+
 ErrorCodeOr<LibraryHandle> LoadLibrary(String path) {
     PathArena temp_allocator {Malloc::Instance()};
     auto const w_path = TRY(path::MakePathForWin32(path, temp_allocator, true));

@@ -1046,6 +1046,38 @@ TEST_CASE(TestThread) {
     return k_success;
 }
 
+TEST_CASE(TestLockableSharedMemory) {
+    SUBCASE("Basic creation and initialization") {
+        constexpr usize k_size = 1024;
+        auto mem1 = TRY(CreateLockableSharedMemory("test1"_s, k_size));
+        // Check size is correct
+        CHECK_EQ(mem1.data.size, k_size);
+        // Check memory is zero initialized
+        for (usize i = 0; i < k_size; i++)
+            CHECK_EQ(mem1.data[i], 0);
+    }
+
+    SUBCASE("Multiple opens see same memory") {
+        constexpr usize k_size = 1024;
+        auto mem1 = TRY(CreateLockableSharedMemory("test2"_s, k_size));
+        auto mem2 = TRY(CreateLockableSharedMemory("test2"_s, k_size));
+
+        // Write pattern through first mapping
+        LockSharedMemory(mem1);
+        for (usize i = 0; i < k_size; i++)
+            mem1.data[i] = (u8)(i & 0xFF);
+        UnlockSharedMemory(mem1);
+
+        // Verify pattern through second mapping
+        LockSharedMemory(mem2);
+        for (usize i = 0; i < k_size; i++)
+            CHECK_EQ(mem2.data[i], (u8)(i & 0xFF));
+        UnlockSharedMemory(mem2);
+    }
+
+    return k_success;
+}
+
 TEST_REGISTRATION(RegisterOsTests) {
     REGISTER_TEST(TestEpochTime);
     REGISTER_TEST(TestThread);
@@ -1057,4 +1089,5 @@ TEST_REGISTRATION(RegisterOsTests) {
     REGISTER_TEST(TestDirectoryWatcherErrors);
     REGISTER_TEST(TestFileApi);
     REGISTER_TEST(TestTimePoint);
+    REGISTER_TEST(TestLockableSharedMemory);
 }

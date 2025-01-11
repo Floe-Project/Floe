@@ -32,10 +32,11 @@ void TryShrinkPages(void* ptr, usize old_size, usize new_size);
 void* AlignedAlloc(usize alignment, usize size);
 void AlignedFree(void* ptr);
 
-// LockableSharedMemory is never closed, we rely on the OS to clean it up.
+// LockableSharedMemory is never closed, we rely on the OS to clean it up which usually happens after reboot.
+// The memory is shared between processes.
 struct LockableSharedMemory {
-    Span<u8> data;
-    OpaqueHandle<8> native;
+    Span<u8> data; // initialised to 0
+    OpaqueHandle<IS_WINDOWS ? 16 : 8> native;
 };
 
 // name must be alphanumeric 32 characters or less

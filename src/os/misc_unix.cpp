@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <execinfo.h>
 #include <fcntl.h>
+#include <semaphore.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h> // strerror
@@ -58,6 +59,88 @@ void FreePages(void* ptr, usize bytes) {
         }
     }
     munmap(ptr, bytes);
+}
+
+struct LockableSharedMemoryNative {
+    sem_t* sema;
+};
+
+static void SemWait(sem_t* sema) {
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    ts.tv_sec += 3;
+    if (auto r = sem_timedwait(sema, &ts); r == -1) {
+        if (errno == ETIMEDOUT) {
+            // in the case another process crashed while holding the semaphore, we can't wait forever, so we
+            // just try to reset and try again
+            sem_post(sema);
+            SemWait(sema);
+        }
+    }
+}
+
+ErrorCodeOr<LockableSharedMemory> CreateLockableSharedMemory(String name, usize size) {
+    ASSERT(name.size <= 32);
+
+    LockableSharedMemory result {};
+    auto& native = result.native.As<LockableSharedMemoryNative>();
+
+    auto posix_name = fmt::FormatInline<100>("/{}\0", name);
+
+    // open sema for use by all processes, if it already exists, we just open it
+    native.sema = sem_open(posix_name.data, O_CREAT | O_EXCL, 0666, 1);
+    if (native.sema == SEM_FAILED) {
+        if (errno == EEXIST) {
+            native.sema = sem_open(posix_name.data, O_RDWR);
+            if (native.sema == SEM_FAILED) return ErrnoErrorCode(errno, "sem_open");
+        } else {
+            return ErrnoErrorCode(errno, "sem_open");
+        }
+    }
+
+    // lock the semaphore so that we can initialize the shared memory
+    SemWait(native.sema);
+    DEFER { sem_post(native.sema); };
+
+    // create shared memory, if it fails because it already exists, we just open it
+    auto fd = shm_open(posix_name.data, O_CREAT | O_EXCL | O_RDWR, 0666);
+    bool created = false;
+    if (fd == -1) {
+        if (errno == EEXIST) {
+            fd = shm_open(posix_name.data, O_RDWR, 0666);
+            if (fd == -1) return ErrnoErrorCode(errno, "shm_open");
+        } else {
+            return ErrnoErrorCode(errno, "shm_open");
+        }
+    } else {
+        created = true;
+        // we created it, so we need to set the size
+        if (ftruncate(fd, (off_t)size) == -1) {
+            close(fd);
+            return ErrnoErrorCode(errno, "ftruncate");
+        }
+    }
+    DEFER { close(fd); };
+
+    // map the shared memory
+    auto data = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (data == MAP_FAILED) Panic("mmap failed");
+
+    // init to zero if we created it
+    if (created) FillMemory(data, 0, size);
+
+    result.data = {(u8*)data, size};
+    return result;
+}
+
+void LockSharedMemory(LockableSharedMemory& memory) {
+    auto& native = memory.native.As<LockableSharedMemoryNative>();
+    SemWait(native.sema);
+}
+
+void UnlockSharedMemory(LockableSharedMemory& memory) {
+    auto& native = memory.native.As<LockableSharedMemoryNative>();
+    sem_post(native.sema);
 }
 
 ErrorCodeOr<String> ReadAllStdin(Allocator& allocator) {

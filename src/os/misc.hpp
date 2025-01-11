@@ -32,6 +32,17 @@ void TryShrinkPages(void* ptr, usize old_size, usize new_size);
 void* AlignedAlloc(usize alignment, usize size);
 void AlignedFree(void* ptr);
 
+// LockableSharedMemory is never closed, we rely on the OS to clean it up.
+struct LockableSharedMemory {
+    Span<u8> data;
+    OpaqueHandle<8> native;
+};
+
+// name must be alphanumeric 32 characters or less
+ErrorCodeOr<LockableSharedMemory> CreateLockableSharedMemory(String name, usize size);
+void LockSharedMemory(LockableSharedMemory& memory);
+void UnlockSharedMemory(LockableSharedMemory& memory);
+
 enum class LibraryHandle : uintptr {};
 ErrorCodeOr<LibraryHandle> LoadLibrary(String path);
 ErrorCodeOr<void*> SymbolFromLibrary(LibraryHandle library, String symbol_name);

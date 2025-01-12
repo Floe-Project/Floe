@@ -2159,6 +2159,16 @@ TEST_CASE(TestRandomFloatGenerator) {
     return k_success;
 }
 
+TEST_CASE(TestRandomBasics) {
+    {
+        auto const r1 = SeedFromTime();
+        auto const r2 = SeedFromTime();
+        CHECK_NEQ(r1, r2);
+    }
+
+    return k_success;
+}
+
 TEST_CASE(TestVersion) {
     CHECK(Version {1, 0, 0}.ToString(tester.scratch_arena) == "1.0.0"_s);
     CHECK(Version {10, 99, 99}.ToString(tester.scratch_arena) == "10.99.99"_s);
@@ -2968,4 +2978,5 @@ TEST_REGISTRATION(RegisterFoundationTests) {
     REGISTER_TEST(TestTrigLookupTable);
     REGISTER_TEST(TestVersion);
     REGISTER_TEST(TestWriter);
+    REGISTER_TEST(TestRandomBasics);
 }

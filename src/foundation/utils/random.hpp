@@ -18,7 +18,11 @@ PUBLIC inline u64 RandomU64(u64& seed) {
     return z ^ (z >> 31);
 }
 
-PUBLIC inline u64 SeedFromTime() { return __builtin_readcyclecounter(); }
+PUBLIC inline u64 SeedFromTime() {
+    auto r = __builtin_readcyclecounter();
+    if (r) return r;
+    return (u64)__builtin_frame_address(0);
+}
 
 constexpr u64 k_rand_max = u64(-1);
 

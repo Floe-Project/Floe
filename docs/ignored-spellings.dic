@@ -18,8 +18,8 @@ Async
 Audioata
 Bitwig
 C3
-CC0
 CC
+CC0
 Changelog
 CodeFactor
 Cubase
@@ -27,6 +27,7 @@ DAW
 DAWs
 DecentSampler
 Dtargets
+FX
 FileCopyrightText
 FrozenPlain
 GPL
@@ -35,6 +36,7 @@ GUIs
 GarageBand
 GitHub
 IRs
+Kickdrum
 Kontakt
 LFOs
 Lua
@@ -74,6 +76,7 @@ codecov
 codesigning
 color
 config
+copyable
 cppcheck
 crossfade
 d1
@@ -98,6 +101,7 @@ justfile
 linux
 lua
 macOS
+macos
 malloc
 math
 md
@@ -106,10 +110,13 @@ mdbook
 mkdocs
 notarization
 os
+pdf
 performant
 pluginval
 png
 polyphonically
+preprocess
+preprocessor
 roadmap
 src
 srcset
@@ -119,6 +126,7 @@ subfolders
 synthesiser
 synthwave
 timbral
+tooltips
 ub
 utf8
 utils

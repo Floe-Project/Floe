@@ -66,17 +66,43 @@ struct LockableSharedMemoryNative {
 };
 
 static void SemWait(sem_t* sema) {
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    ts.tv_sec += 3;
-    if (auto r = sem_timedwait(sema, &ts); r == -1) {
+    // In the case another process crashed while holding the semaphore, we can't wait forever, so when we
+    // detect a significant delay we try to recover. It's not perfect.
+
+    constexpr u8 k_deadlock_timeout_seconds = 3;
+
+    struct timespec start;
+    clock_gettime(CLOCK_REALTIME, &start);
+    start.tv_sec += k_deadlock_timeout_seconds;
+
+#if _POSIX_C_SOURCE >= 200112L || _XOPEN_SOURCE >= 600
+    if (auto r = sem_timedwait(sema, &start); r == -1) {
         if (errno == ETIMEDOUT) {
-            // in the case another process crashed while holding the semaphore, we can't wait forever, so we
-            // just try to reset and try again
             sem_post(sema);
             SemWait(sema);
         }
     }
+#else
+    struct timespec current;
+    while (1) {
+        if (sem_trywait(sema) == 0) return; // Successfully acquired
+
+        if (errno != EAGAIN) return; // Error occurred
+
+        // Check if we've exceeded our timeout
+        clock_gettime(CLOCK_REALTIME, &current);
+        if (current.tv_sec > start.tv_sec ||
+            (current.tv_sec == start.tv_sec && current.tv_nsec >= start.tv_nsec)) {
+            sem_post(sema);
+            SemWait(sema);
+            return;
+        }
+
+        // sleep for 1ms
+        struct timespec sleep_time = {.tv_sec = 0, .tv_nsec = 1'000'000};
+        nanosleep(&sleep_time, nullptr);
+    }
+#endif
 }
 
 ErrorCodeOr<LockableSharedMemory> CreateLockableSharedMemory(String name, usize size) {

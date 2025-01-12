@@ -107,11 +107,12 @@ static void SemWait(sem_t* sema) {
 
 ErrorCodeOr<LockableSharedMemory> CreateLockableSharedMemory(String name, usize size) {
     ASSERT(name.size <= 32);
+    ASSERT(!Contains(name, '/'));
 
     LockableSharedMemory result {};
     auto& native = result.native.As<LockableSharedMemoryNative>();
 
-    auto posix_name = fmt::FormatInline<40>("/{}\0", name);
+    auto const posix_name = fmt::FormatInline<40>("/{}\0", name);
 
     // open sema for use by all processes, if it already exists, we just open it
     native.sema = sem_open(posix_name.data, O_CREAT | O_EXCL, 0666, 1);

@@ -34,7 +34,7 @@ external_resources := join(cache_dir, "external_resources")
 logos_abs_dir := join(justfile_directory(), external_resources, "Logos")
 
 default: 
-  just build
+  just build $DEFAULT_BUILD_ARGS
 
 alias pre-debug := build
 

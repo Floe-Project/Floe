@@ -131,7 +131,7 @@ void TopPanel(Gui* g) {
                                    });
 
     auto attribution_icon =
-        g->engine.attribution_text.size
+        g->engine.attribution_requirements.formatted_text.size
             ? Optional<layout::Id> {layout::CreateItem(g->layout,
                                                        {
                                                            .parent = right_container,

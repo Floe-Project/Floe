@@ -2,12 +2,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #pragma once
-#include "engine/engine.hpp"
 #include "gui2_common_modal_panel.hpp"
 #include "gui_framework/gui_box_system.hpp"
 
 struct AttributionPanelContext {
-    Engine& engine;
+    String attribution_text;
 };
 
 static void AttributionPanel(GuiBoxSystem& box_system, AttributionPanelContext& context, bool& open) {
@@ -49,7 +48,7 @@ static void AttributionPanel(GuiBoxSystem& box_system, AttributionPanelContext& 
         {
             .parent = main_container,
             .text =
-                "This text is generated based on the sounds you have loaded. This window will disappear if there's no sounds loaded that require attribution.",
+                "This text is generated based on the sounds you have loaded in any instance of Floe. This window will disappear if there's no attribution required.",
             .wrap_width = k_wrap_to_parent,
             .size_from_text = true,
         });
@@ -66,18 +65,22 @@ static void AttributionPanel(GuiBoxSystem& box_system, AttributionPanelContext& 
                                         });
 
     if (DialogTextButton(box_system, button_container, "Copy to clipboard", {}))
-        dyn::Assign(box_system.imgui.clipboard_for_os, context.engine.attribution_text);
+        dyn::Assign(box_system.imgui.clipboard_for_os, context.attribution_text);
 
     DoBox(box_system,
           {
               .parent = main_container,
-              .text = context.engine.attribution_text,
+              .text = context.attribution_text,
               .wrap_width = k_wrap_to_parent,
               .size_from_text = true,
           });
 }
 
 PUBLIC void DoAttributionPanel(GuiBoxSystem& box_system, AttributionPanelContext& context, bool& open) {
+    if (context.attribution_text.size == 0) {
+        open = false;
+        return;
+    }
     if (open) {
         RunPanel(box_system,
                  Panel {

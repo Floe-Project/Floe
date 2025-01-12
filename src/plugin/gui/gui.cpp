@@ -582,8 +582,6 @@ GuiFrameResult GuiUpdate(Gui* g) {
     auto& imgui = g->imgui;
     imgui.SetPixelsPerPoint(PixelsPerPoint(g));
 
-    if (!g->engine.attribution_text.size) g->attribution_panel_open = false;
-
     g->waveforms.StartFrame();
     DEFER { g->waveforms.EndFrame(*g->frame_input.graphics_ctx); };
 
@@ -714,7 +712,7 @@ GuiFrameResult GuiUpdate(Gui* g) {
 
         {
             AttributionPanelContext context {
-                .engine = g->engine,
+                .attribution_text = g->engine.attribution_requirements.formatted_text,
             };
 
             DoAttributionPanel(box_system, context, g->attribution_panel_open);

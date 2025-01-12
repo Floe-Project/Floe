@@ -9,6 +9,7 @@
 
 #include "common_infrastructure/common_errors.hpp"
 #include "common_infrastructure/constants.hpp"
+#include "common_infrastructure/sample_library/attribution_requirements.hpp"
 
 #include "descriptors/param_descriptors.hpp"
 #include "plugin/plugin.hpp"
@@ -46,291 +47,26 @@ Optional<sample_lib::LibraryIdRef> LibraryForOverallBackground(Engine const& eng
     return *first_lib_id;
 }
 
-struct AttributionStore {
-    struct Item {
-        u64 instance_id;
-        u32 time_seconds_since_epoch;
-        String title;
-        Optional<String> license_name;
-        Optional<String> license_url;
-        String attributed_to;
-        Optional<String> attribution_url;
-    };
-
-    enum class Mode { Read, Write };
-
-    bool SerialiseNumber(Integral auto& value) {
-        if (mode == Mode::Read) {
-            if (pos + sizeof(value) > data.size) return false;
-            __builtin_memcpy_inline(&value, data.data + pos, sizeof(value));
-            pos += sizeof(value);
-            return true;
-        } else {
-            if (pos + sizeof(value) > data.size) return false;
-            __builtin_memcpy_inline(data.data + pos, &value, sizeof(value));
-            pos += sizeof(value);
-            return true;
-        }
-    }
-
-    bool SerialiseString(String& str, ArenaAllocator& arena) {
-        auto size = (u16)Min(str.size, LargestRepresentableValue<u16>() - 1uz);
-        if (!SerialiseNumber(size)) return false;
-        ASSERT(size < 200);
-        if (mode == Mode::Read) {
-            if (pos + size > data.size) return false;
-            str = arena.Clone(Span {(char*)data.data + pos, size});
-            pos += size;
-            return true;
-        } else {
-            if (pos + size > data.size) return false;
-            for (auto c : str)
-                ASSERT(c >= 32 && c <= 126);
-            CopyMemory(data.data + pos, str.data, size);
-            pos += size;
-            return true;
-        }
-    }
-
-    bool SerialiseString(Optional<String>& str, ArenaAllocator& arena) {
-        String s = str.ValueOr({});
-        if (!SerialiseString(s, arena)) return false;
-        if (s.size)
-            str = s;
-        else
-            str = {};
-        return true;
-    }
-
-    bool Serialise(DynamicArray<Item>& items, ArenaAllocator& arena) {
-        auto num_items = CheckedCast<u16>(items.size);
-        if (!SerialiseNumber(num_items)) return false;
-        if (mode == Mode::Read) dyn::Resize(items, num_items);
-
-        for (auto& item : items) {
-            if (!SerialiseNumber(item.instance_id)) return false;
-            if (!SerialiseNumber(item.time_seconds_since_epoch)) return false;
-            if (!SerialiseString(item.title, arena)) return false;
-            if (!SerialiseString(item.license_name, arena)) return false;
-            if (!SerialiseString(item.license_url, arena)) return false;
-            if (!SerialiseString(item.attributed_to, arena)) return false;
-            if (!SerialiseString(item.attribution_url, arena)) return false;
-        }
-
-        return true;
-    }
-
-    Mode mode;
-    Span<u8> data;
-    u32 pos;
-};
-
-static void
-CurrentAttributionItems(Engine& engine, DynamicArray<AttributionStore::Item>& items, ArenaAllocator& arena) {
-    ASSERT(IsMainThread(engine.host));
-    auto const timestamp = CheckedCast<u32>(NanosecondsSinceEpoch() / 1'000'000'000);
-
-    auto add_if_not_already_there = [&](AttributionStore::Item const& item) {
-        for (auto const& i : items)
-            if (i.title == item.title && i.attributed_to == item.attributed_to &&
-                i.attribution_url == item.attribution_url && i.license_name == item.license_name &&
-                i.license_url == item.license_url)
-                return;
-        dyn::Append(items, item);
-    };
-
-    auto attribution_for_path = [&](sample_lib::Library const& lib,
-                                    String path) -> sample_lib::FileAttribution* {
-        if (auto const attr = lib.files_requiring_attribution.Find({path})) return attr;
-
-        // folders are also supported in files_requiring_attribution
-        for (auto dir = path::Directory(path, path::Format::Posix); dir;
-             dir = path::Directory(*dir, path::Format::Posix)) {
-            if (auto const attr = lib.files_requiring_attribution.Find({*dir})) return attr;
-        }
-
-        return nullptr;
-    };
-
-    for (auto& l : engine.processor.layer_processors) {
-        if (auto opt_i = l.instrument.TryGet<sample_lib_server::RefCounted<sample_lib::LoadedInstrument>>()) {
-            auto const& i = **opt_i;
-            auto const& lib = i.instrument.library;
-
-            if (lib.attribution_required) {
-                String attributed_to = lib.author;
-                if (lib.additional_authors)
-                    attributed_to = fmt::Format(arena, "{}, {}", attributed_to, *lib.additional_authors);
-                add_if_not_already_there({
-                    .instance_id = engine.engine_instance_id,
-                    .time_seconds_since_epoch = timestamp,
-                    .title = lib.name,
-                    .license_name = lib.license_name,
-                    .license_url = lib.license_url,
-                    .attributed_to = attributed_to,
-                    .attribution_url = lib.author_url,
-                });
-            }
-            if (lib.files_requiring_attribution.size) {
-                for (auto const& r : i.instrument.regions) {
-                    if (auto const attr = attribution_for_path(lib, r.file.path.str)) {
-                        add_if_not_already_there({
-                            .instance_id = engine.engine_instance_id,
-                            .time_seconds_since_epoch = timestamp,
-                            .title = attr->title,
-                            .license_name = attr->license_name,
-                            .license_url = attr->license_url,
-                            .attributed_to = attr->attributed_to,
-                            .attribution_url = attr->attribution_url,
-                        });
-                    }
-                }
-            }
-        }
-    }
-
-    if (auto const ir_id = engine.processor.convo.ir_id) {
-        for (auto& node : engine.shared_engine_systems.sample_library_server.libraries) {
-            if (auto l = node.TryScoped()) {
-                auto const& lib = *l->lib;
-                if (lib.Id() != ir_id->library) continue;
-                if (lib.files_requiring_attribution.size == 0) continue;
-                if (auto const ir = lib.irs_by_name.Find(ir_id->ir_name)) {
-                    if (auto const attr = attribution_for_path(lib, (*ir)->path.str)) {
-                        add_if_not_already_there({
-                            .instance_id = engine.engine_instance_id,
-                            .time_seconds_since_epoch = timestamp,
-                            .title = attr->title,
-                            .license_name = attr->license_name,
-                            .license_url = attr->license_url,
-                            .attributed_to = attr->attributed_to,
-                            .attribution_url = attr->attribution_url,
-                        });
-                    }
-                }
-            }
-        }
-    }
-}
-
-static void UpdateSharedAttributions(Engine& engine,
-                                     DynamicArray<AttributionStore::Item>& items,
-                                     ArenaAllocator& scratch_arena) {
-    if (!engine.shared_attributions_memory) {
-        auto o = CreateLockableSharedMemory("floe_attribution", Kb(100));
-        if (o.HasValue()) engine.shared_attributions_memory = o.Value();
-    }
-    if (!engine.shared_attributions_memory) return;
-
-    LockSharedMemory(*engine.shared_attributions_memory);
-    DEFER { UnlockSharedMemory(*engine.shared_attributions_memory); };
-
-    AttributionStore store {
-        .mode = AttributionStore::Mode::Read,
-        .data = engine.shared_attributions_memory->data,
-        .pos = 0,
-    };
-
-    DynamicArray<AttributionStore::Item> existing_items {scratch_arena};
-
-    // read
-    store.Serialise(existing_items, scratch_arena);
-
-    // write
-    // add the existing items if they're not too old, and not from this instance
-    constexpr u32 k_max_age_seconds = 60 * 60 * 12; // 12 hours
-    auto const now = CheckedCast<u32>(NanosecondsSinceEpoch() / 1'000'000'000);
-    for (auto const& i : existing_items)
-        if (i.instance_id != engine.engine_instance_id &&
-            now - i.time_seconds_since_epoch <= k_max_age_seconds)
-            dyn::Append(items, i);
-    store.mode = AttributionStore::Mode::Write;
-    store.pos = 0;
-    store.Serialise(items, scratch_arena);
-}
-
-static void ClearOurAttributionsIfNeeded(Engine& engine, ArenaAllocator& scratch_arena) {
-    ASSERT(IsMainThread(engine.host));
-
-    if (!engine.shared_attributions_memory) return;
-
-    LockSharedMemory(*engine.shared_attributions_memory);
-    DEFER { UnlockSharedMemory(*engine.shared_attributions_memory); };
-
-    AttributionStore store {
-        .mode = AttributionStore::Mode::Read,
-        .data = engine.shared_attributions_memory->data,
-        .pos = 0,
-    };
-    DynamicArray<AttributionStore::Item> items {scratch_arena};
-    store.Serialise(items, scratch_arena);
-
-    dyn::RemoveValueIf(items, [&](AttributionStore::Item const& i) {
-        return i.instance_id == engine.engine_instance_id;
-    });
-
-    store.mode = AttributionStore::Mode::Write;
-    store.pos = 0;
-    store.Serialise(items, scratch_arena);
-}
-
 static void UpdateAttributionText(Engine& engine, ArenaAllocator& scratch_arena) {
     ASSERT(IsMainThread(engine.host));
 
-    DynamicArray<AttributionStore::Item> items {scratch_arena};
-    CurrentAttributionItems(engine, items, scratch_arena);
-    UpdateSharedAttributions(engine, items, scratch_arena);
+    DynamicArrayBounded<sample_lib::Instrument const*, k_num_layers> insts {};
+    for (auto& l : engine.processor.layer_processors)
+        if (auto opt_i = l.instrument.TryGet<sample_lib_server::RefCounted<sample_lib::LoadedInstrument>>())
+            dyn::Append(insts, &(*opt_i)->instrument);
 
-    auto& out = engine.attribution_text;
-
-    dyn::Clear(out);
-
-    auto used = scratch_arena.NewMultiple<bool>(items.size);
-
-    for (auto const [i, a] : Enumerate(items)) {
-        if (used[i]) continue;
-        if (out.size)
-            fmt::Append(out, "\n");
-        else
-            dyn::AppendSpan(out, "Source Material Credits:\n"_s);
-
-        fmt::Append(out, "\"{}\"", a.title);
-        used[i] = true;
-        u32 num_other_titles = 0;
-        auto const items_have_same_attribution = [](AttributionStore::Item const& lhs,
-                                                    AttributionStore::Item const& rhs) {
-            return lhs.license_name == rhs.license_name && lhs.license_url == rhs.license_url &&
-                   lhs.attributed_to == rhs.attributed_to && lhs.attribution_url == rhs.attribution_url;
-        };
-        for (auto const [j, other_a] : Enumerate(items)) {
-            if (used[j]) continue;
-            if (!items_have_same_attribution(a, other_a)) continue;
-            if (other_a.title == a.title) {
-                used[j] = true; // skip if it's an exact duplicate
-                continue;
-            }
-            num_other_titles++;
+    sample_lib::ImpulseResponse const* ir = nullptr;
+    sample_lib_server::RefCounted<sample_lib::Library> ir_lib {};
+    DEFER { ir_lib.Release(); };
+    if (auto const ir_id = engine.processor.convo.ir_id) {
+        ir_lib = sample_lib_server::FindLibraryRetained(engine.shared_engine_systems.sample_library_server,
+                                                        ir_id->library);
+        if (ir_lib) {
+            if (auto const found_ir = ir_lib->irs_by_name.Find(ir_id->ir_name)) ir = *found_ir;
         }
-        if (num_other_titles) {
-            // write the other titles, considering correct grammar
-            u32 num_other_titles_written = 0;
-            for (auto const [j, other_a] : Enumerate(items)) {
-                if (used[j]) continue;
-                if (!items_have_same_attribution(a, other_a)) continue;
-                if (num_other_titles_written == num_other_titles - 1)
-                    fmt::Append(out, ", and \"{}\"", other_a.title);
-                else
-                    fmt::Append(out, ", \"{}\"", other_a.title);
-                num_other_titles_written++;
-                used[j] = true;
-            }
-        }
-
-        fmt::Append(out, " by {}", a.attributed_to);
-        if (a.attribution_url) fmt::Append(out, " ({})", a.attribution_url);
-        if (a.license_name) fmt::Append(out, " | {}", a.license_name);
-        if (a.license_url) fmt::Append(out, " ({})", a.license_url);
     }
+
+    UpdateAttributionText(engine.attribution_requirements, scratch_arena, insts, ir);
 }
 
 static void RequestGuiRedraw(Engine& engine) {
@@ -664,10 +400,12 @@ void LoadInstrument(Engine& engine, u32 layer_index, InstrumentId inst_id) {
                                  });
             break;
         case InstrumentType::None: {
+            engine.attribution_requirements.last_update_time = {};
             SetInstrument(engine.processor, layer_index, InstrumentType::None);
             break;
         }
         case InstrumentType::WaveformSynth:
+            engine.attribution_requirements.last_update_time = {};
             SetInstrument(engine.processor, layer_index, inst_id.Get<WaveformType>());
             break;
     }
@@ -777,11 +515,8 @@ static void OnMainThread(Engine& engine, bool& update_gui) {
         r->Release();
         resources_loaded = true;
     }
-    auto const now = TimePoint::Now();
-    if (resources_loaded || (now - engine.last_attribution_update_time) > 3) {
+    if (resources_loaded || AttributionTextNeedsUpdate(engine.attribution_requirements))
         UpdateAttributionText(engine, scratch_arena);
-        engine.last_attribution_update_time = now;
-    }
 }
 
 Engine::Engine(clap_host const& host, SharedEngineSystems& shared_engine_systems)
@@ -830,7 +565,7 @@ Engine::Engine(clap_host const& host, SharedEngineSystems& shared_engine_systems
 
 Engine::~Engine() {
     ArenaAllocatorWithInlineStorage<1000> scratch_arena {PageAllocator::Instance()};
-    ClearOurAttributionsIfNeeded(*this, scratch_arena);
+    DeinitAttributionRequirements(attribution_requirements, scratch_arena);
     package::ShutdownJobs(package_install_jobs);
     shared_engine_systems.preset_listing.scanned_folder.listeners.Remove(presets_folder_listener_id);
 

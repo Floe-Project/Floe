@@ -433,7 +433,7 @@ ErrorCodeOr<MutableString> TemporaryDirectoryOnSameFilesystemAs(String path, All
 
     WString wide_result {};
     {
-        u64 random_seed = (u64)NanosecondsSinceEpoch();
+        auto random_seed = (u64)NanosecondsSinceEpoch();
         auto const filename =
             Widen(temp_path_arena, UniqueFilename(k_temporary_directory_prefix, random_seed)).Value();
 

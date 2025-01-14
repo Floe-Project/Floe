@@ -1409,7 +1409,7 @@ TEST_CASE(TestNewSerialisation) {
         CAPTURE(source);
 
         StateSnapshot state {};
-        u64 random_seed = (u64)NanosecondsSinceEpoch();
+        auto random_seed = (u64)NanosecondsSinceEpoch();
         for (auto [index, param] : Enumerate(state.param_values)) {
             auto const& info = k_param_descriptors[index];
             param = RandomFloatInRange(random_seed, info.linear_range.min, info.linear_range.max);

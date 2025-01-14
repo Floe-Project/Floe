@@ -305,7 +305,7 @@ PUBLIC ErrorCodeOr<void> WriterAddPresetsFolder(mz_zip_archive& zip,
 struct PackageReader {
     Reader& zip_file_reader;
     mz_zip_archive zip {};
-    u64 seed = SeedFromCpu();
+    u64 seed = (u64)NanosecondsSinceEpoch();
     Optional<ErrorCode> zip_file_read_error {};
 };
 

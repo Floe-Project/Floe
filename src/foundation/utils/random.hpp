@@ -18,60 +18,6 @@ PUBLIC inline u64 RandomU64(u64& seed) {
     return z ^ (z >> 31);
 }
 
-#ifdef __x86_64__
-static bool IsRdrandAvailable(void) {
-    u32 eax;
-    u32 ebx;
-    u32 ecx;
-    u32 edx;
-
-    // Check if CPUID leaf 1 is supported
-    __asm__ volatile("cpuid" : "=a"(eax) : "a"(0) : "ebx", "ecx", "edx");
-    if (eax < 1) return false;
-
-    // Get feature flags from leaf 1
-    __asm__ volatile("cpuid" : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx) : "a"(1), "c"(0));
-
-    return (ecx & (1 << 30)) != 0; // Check RDRAND support bit
-}
-
-// RDRAND instruction - get a 64-bit hardware-generated random value.
-// returns 1 if the value was successfully generated.
-static __inline__ int __attribute__((__nodebug__, __target__("rdrnd"))) Rdrand64Step(unsigned long long* p) {
-    return (int)__builtin_ia32_rdrand64_step(p);
-}
-#endif
-
-PUBLIC inline u64 SeedFromCpu() {
-#if defined(__aarch64__)
-    u64 id;
-    u64 x;
-    u64 nzcv;
-    asm volatile("mrs %0, s3_0_c0_c6_0" : "=r"(id) : : "memory"); // ID_AA64ISAR0_EL1
-    if (((id >> 60) & 0xf) >= 1) { // Check if RNDR is available
-        for (int i = 0; i < 5; i++) {
-            asm volatile("mrs %0, s3_3_c2_c4_0\n\t" // RNDR
-                         "mrs %1, s3_3_c4_c2_0" // NZCV
-                         : "=r"(x), "=r"(nzcv)
-                         :
-                         : "memory");
-            if (nzcv == 0) return x;
-        }
-    }
-#elif defined(__x86_64__)
-    if (IsRdrandAvailable()) {
-        unsigned long long x;
-        for (int i = 0; i < 5; i++)
-            if (Rdrand64Step(&x)) return x;
-    }
-#endif
-
-    auto r = __builtin_readcyclecounter();
-    if (r) return r;
-
-    return (u64)__builtin_frame_address(0);
-}
-
 constexpr u64 k_rand_max = u64(-1);
 
 template <Integral Type>

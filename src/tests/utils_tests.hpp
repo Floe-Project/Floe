@@ -271,7 +271,7 @@ TEST_CASE(TestErrorNotifications) {
                 thread_ready.Store(true, StoreMemoryOrder::Relaxed);
                 starting_gun.WaitUntilFired();
 
-                auto seed = SeedFromCpu();
+                auto seed = (u64)NanosecondsSinceEpoch();
                 while (iterations.Load(LoadMemoryOrder::Relaxed) < k_num_iterations) {
                     auto const id = RandomIntInRange<u64>(seed, 0, 20);
                     if (RandomIntInRange<u32>(seed, 0, 5) == 0) {
@@ -298,7 +298,7 @@ TEST_CASE(TestErrorNotifications) {
         YieldThisThread();
 
     starting_gun.Fire();
-    auto seed = SeedFromCpu();
+    auto seed = (u64)NanosecondsSinceEpoch();
     while (iterations.Load(LoadMemoryOrder::Relaxed) < k_num_iterations) {
         for (auto& n : no.items) {
             if (auto error = n.TryRetain()) {
@@ -437,7 +437,7 @@ void DoAtomicQueueTest(tests::Tester& tester, String name) {
             starting_gun.WaitUntilFired();
             Array<int, 1> small_item {};
             Array<int, 4> big_item {};
-            u64 seed = SeedFromCpu();
+            u64 seed = (u64)NanosecondsSinceEpoch();
             for (auto _ : Range(10000)) {
                 if (RandomIntInRange<int>(seed, 0, 1) == 0)
                     if (push)
@@ -682,7 +682,7 @@ TEST_CASE(TestAtomicRefList) {
             [&]() {
                 thread_ready.Store(true, StoreMemoryOrder::Relaxed);
                 starting_gun.WaitUntilFired();
-                auto seed = SeedFromCpu();
+                auto seed = (u64)NanosecondsSinceEpoch();
                 for (auto _ : Range(5000)) {
                     for (char c = 'a'; c <= 'z'; ++c) {
                         auto const r = RandomIntInRange(seed, 0, 2);

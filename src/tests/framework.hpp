@@ -140,7 +140,7 @@ struct Tester {
     TestLogger log {*this};
     ArenaAllocator scratch_arena {PageAllocator::Instance()};
     FixedSizeAllocator<Kb(8)> capture_buffer {&PageAllocator::Instance()};
-    u64 random_seed = SeedFromTime();
+    u64 random_seed = SeedFromCpu();
 
     // private
     ArenaAllocator arena {PageAllocator::Instance()};

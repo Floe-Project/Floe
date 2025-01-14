@@ -1357,7 +1357,7 @@ static void CheckStateIsValid(tests::Tester& tester, StateSnapshot const& state)
 
 TEST_CASE(TestParsersHandleInvalidData) {
     auto& scratch_arena = tester.scratch_arena;
-    u64 seed = SeedFromTime();
+    u64 seed = SeedFromCpu();
 
     auto const make_random_data = [&]() {
         auto const data_size = RandomIntInRange<usize>(seed, 1, 1000);
@@ -1409,7 +1409,7 @@ TEST_CASE(TestNewSerialisation) {
         CAPTURE(source);
 
         StateSnapshot state {};
-        u64 random_seed = SeedFromTime();
+        u64 random_seed = SeedFromCpu();
         for (auto [index, param] : Enumerate(state.param_values)) {
             auto const& info = k_param_descriptors[index];
             param = RandomFloatInRange(random_seed, info.linear_range.min, info.linear_range.max);
@@ -1552,7 +1552,7 @@ TEST_CASE(TestBackwardCompat) {
 }
 
 TEST_CASE(TestFuzzingJsonState) {
-    u64 seed = SeedFromTime();
+    u64 seed = SeedFromCpu();
     StateSnapshot state;
 
     for (auto const i : Range((u32)k_num_parameters)) {

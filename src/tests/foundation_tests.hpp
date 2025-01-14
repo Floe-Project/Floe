@@ -2054,7 +2054,7 @@ constexpr int k_num_rand_test_repititions = 200;
 TEST_CASE(TestRandomIntGeneratorUnsigned) {
     SUBCASE("unsigned") {
         RandomIntGenerator<unsigned int> generator;
-        u64 seed = SeedFromTime();
+        u64 seed = SeedFromCpu();
 
         SUBCASE("Correct generation in range 0 to 3 with repeating last value allowed") {
             constexpr unsigned int k_max_val = 3;
@@ -2090,7 +2090,7 @@ TEST_CASE(TestRandomIntGeneratorUnsigned) {
     }
     SUBCASE("signed") {
         RandomIntGenerator<int> generator;
-        u64 seed = SeedFromTime();
+        u64 seed = SeedFromCpu();
 
         SUBCASE("Correct generation in range -10 to 10 with repeating last value allowed") {
             constexpr int k_max_val = 10;
@@ -2112,7 +2112,7 @@ TEST_CASE(TestRandomIntGeneratorUnsigned) {
     }
     SUBCASE("move object") {
         RandomIntGenerator<int> generator;
-        u64 seed = SeedFromTime();
+        u64 seed = SeedFromCpu();
 
         constexpr int k_max_val = 10;
         {
@@ -2141,7 +2141,7 @@ TEST_CASE(TestRandomIntGeneratorUnsigned) {
 template <typename T>
 TEST_CASE(TestRandomFloatGenerator) {
     RandomFloatGenerator<T> generator;
-    u64 seed = SeedFromTime();
+    u64 seed = SeedFromCpu();
 
     SUBCASE("random values are in a correct range") {
         auto test = [&](bool allow_repititions) {
@@ -2161,8 +2161,8 @@ TEST_CASE(TestRandomFloatGenerator) {
 
 TEST_CASE(TestRandomBasics) {
     {
-        auto const r1 = SeedFromTime();
-        auto const r2 = SeedFromTime();
+        auto const r1 = SeedFromCpu();
+        auto const r2 = SeedFromCpu();
         CHECK_NEQ(r1, r2);
     }
 
@@ -2668,7 +2668,7 @@ TEST_CASE(TestAllocatorTypes) {
             if (align_index == ArraySize(alignments)) align_index = 0;
         }
 
-        u64 seed = SeedFromTime();
+        u64 seed = SeedFromCpu();
         RandomIntGenerator<usize> rand_gen;
         usize index = 0;
         for (auto _ : Range(ArraySize(sizes) * 5)) {

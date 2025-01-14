@@ -2160,7 +2160,7 @@ TEST_CASE(TestSampleLibraryLoader) {
         auto const builtin_irs = EmbeddedIrs();
 
         constexpr u32 k_num_calls = 200;
-        u64 random_seed = SeedFromTime();
+        u64 random_seed = SeedFromCpu();
         AtomicCountdown countdown {k_num_calls};
 
         auto& channel = OpenAsyncCommsChannel(server,

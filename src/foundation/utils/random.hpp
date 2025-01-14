@@ -18,10 +18,31 @@ PUBLIC inline u64 RandomU64(u64& seed) {
     return z ^ (z >> 31);
 }
 
-PUBLIC inline u64 SeedFromTime() {
-    auto r = __builtin_readcyclecounter();
-    if (r) return r;
+#ifdef __x86_64__
+static bool IsRdrandAvailable(void) {
+    u32 eax;
+    u32 ebx;
+    u32 ecx;
+    u32 edx;
 
+    // Check if CPUID leaf 1 is supported
+    __asm__ volatile("cpuid" : "=a"(eax) : "a"(0) : "ebx", "ecx", "edx");
+    if (eax < 1) return false;
+
+    // Get feature flags from leaf 1
+    __asm__ volatile("cpuid" : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx) : "a"(1), "c"(0));
+
+    return (ecx & (1 << 30)) != 0; // Check RDRAND support bit
+}
+
+// RDRAND instruction - get a 64-bit hardware-generated random value.
+// returns 1 if the value was successfully generated.
+static __inline__ int __attribute__((__nodebug__, __target__("rdrnd"))) Rdrand64Step(unsigned long long* p) {
+    return (int)__builtin_ia32_rdrand64_step(p);
+}
+#endif
+
+PUBLIC inline u64 SeedFromCpu() {
 #if defined(__aarch64__)
     u64 id;
     u64 x;
@@ -37,7 +58,16 @@ PUBLIC inline u64 SeedFromTime() {
             if (nzcv == 0) return x;
         }
     }
+#elif defined(__x86_64__)
+    if (IsRdrandAvailable()) {
+        unsigned long long x;
+        for (int i = 0; i < 5; i++)
+            if (Rdrand64Step(&x)) return x;
+    }
 #endif
+
+    auto r = __builtin_readcyclecounter();
+    if (r) return r;
 
     return (u64)__builtin_frame_address(0);
 }

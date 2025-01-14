@@ -57,7 +57,7 @@ struct Engine {
     ThreadsafeErrorNotifications error_notifications {};
     AudioProcessor processor {host};
 
-    u64 random_seed = SeedFromTime();
+    u64 random_seed = SeedFromCpu();
 
     package::InstallJobs package_install_jobs {};
 

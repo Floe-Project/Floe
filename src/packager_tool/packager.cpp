@@ -82,14 +82,14 @@ static ErrorCodeOr<MutableString> FileDataFromBuildResources(ArenaAllocator& are
         return ErrorCode {CommonError::NotFound};
     }
 
-    auto const html_dir = SearchForExistingFolderUpwards(*exe_dir, "build_resources", arena);
-    if (!html_dir) {
+    auto const docs_dir = SearchForExistingFolderUpwards(*exe_dir, "build_resources", arena);
+    if (!docs_dir) {
         g_cli_out.Error({}, "Could not find 'build_resources' folder upwards from '{}'", exe_path);
         return ErrorCode {CommonError::NotFound};
     }
 
-    auto const html_path = path::Join(arena, Array {html_dir.Value(), filename});
-    return TRY(ReadEntireFile(html_path, arena));
+    auto const path = path::Join(arena, Array {docs_dir.Value(), filename});
+    return TRY(ReadEntireFile(path, arena));
 }
 
 constexpr String k_metadata_ini_filename = ".metadata.ini"_s;
@@ -181,14 +181,14 @@ static ErrorCodeOr<void> WriteAboutLibraryHtml(sample_lib::Library const& lib,
                                                ArenaAllocator& arena,
                                                Paths paths,
                                                String library_folder) {
-    auto const html_template = TRY(FileDataFromBuildResources(arena, "about_library_template.html"_s));
+    auto const doc_template = TRY(FileDataFromBuildResources(arena, "about_library_template.rtf"_s));
 
-    String description_html = {};
-    if (lib.description) description_html = fmt::Format(arena, "<p>{}</p>", *lib.description);
+    String description = {};
+    if (lib.description) description = *lib.description;
 
-    auto const result_html =
+    auto const result_data =
         fmt::FormatStringReplace(arena,
-                                 html_template,
+                                 doc_template,
                                  ArrayT<fmt::StringReplacement>({
                                      {"__LIBRARY_NAME__", lib.name},
                                      {"__LUA_FILENAME__", path::Filename(paths.lua)},
@@ -196,12 +196,12 @@ static ErrorCodeOr<void> WriteAboutLibraryHtml(sample_lib::Library const& lib,
                                      {"__FLOE_HOMEPAGE_URL__", FLOE_HOMEPAGE_URL},
                                      {"__FLOE_MANUAL_URL__", FLOE_MANUAL_URL},
                                      {"__FLOE_DOWNLOAD_URL__", FLOE_DOWNLOAD_URL},
-                                     {"__LIBRARY_DESCRIPTION_HTML__", description_html},
+                                     {"__LIBRARY_DESCRIPTION__", description},
                                  }));
 
     auto const output_path =
-        path::Join(arena, Array {library_folder, fmt::Format(arena, "About {}.html"_s, lib.name)});
-    TRY(WriteFile(output_path, result_html));
+        path::Join(arena, Array {library_folder, fmt::Format(arena, "About {}.rtf"_s, lib.name)});
+    TRY(WriteFile(output_path, result_data));
 
     g_cli_out.Info({}, "Successfully wrote '{}'", output_path);
     return k_success;
@@ -316,13 +316,13 @@ static ErrorCodeOr<int> Main(ArgsCstr args) {
             TRY(package::WriterAddPresetsFolder(package, preset_folder, arena, program_name));
 
     if (create_package) {
-        auto const html_template = TRY(FileDataFromBuildResources(arena, "how_to_install_template.html"_s));
-        auto const result_html = fmt::FormatStringReplace(arena,
-                                                          html_template,
-                                                          ArrayT<fmt::StringReplacement>({
-                                                              {"__FLOE_MANUAL_URL__", FLOE_MANUAL_URL},
-                                                          }));
-        package::WriterAddFile(package, "How to Install.html"_s, result_html.ToByteSpan());
+        auto const doc_template = TRY(FileDataFromBuildResources(arena, "how_to_install_template.rtf"_s));
+        auto const result_rtf = fmt::FormatStringReplace(arena,
+                                                         doc_template,
+                                                         ArrayT<fmt::StringReplacement>({
+                                                             {"__FLOE_MANUAL_URL__", FLOE_MANUAL_URL},
+                                                         }));
+        package::WriterAddFile(package, "How to Install.rtf"_s, result_rtf.ToByteSpan());
 
         auto const package_path = path::Join(
             arena,

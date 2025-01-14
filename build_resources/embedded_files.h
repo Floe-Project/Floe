@@ -38,6 +38,8 @@ BinaryData EmbeddedMada();
 BinaryData EmbeddedRoboto();
 BinaryData EmbeddedFiraSans();
 BinaryData EmbeddedDefaultBackground();
+BinaryData EmbeddedAboutLibraryTemplateRtf();
+BinaryData EmbeddedPackageInstallationRtf();
 
 EmbeddedIrData EmbeddedIrs();
 

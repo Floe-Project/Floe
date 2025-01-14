@@ -35,6 +35,14 @@ export fn EmbeddedDefaultBackground() c.BinaryData {
     return embeddedFile("images/default-background.jpg");
 }
 
+export fn EmbeddedAboutLibraryTemplateRtf() c.BinaryData {
+    return embeddedFile("about_library_template.rtf");
+}
+
+export fn EmbeddedPackageInstallationRtf() c.BinaryData {
+    return embeddedFile("package_installation.rtf");
+}
+
 export fn EmbeddedIrs() c.EmbeddedIrData {
     var result: c.EmbeddedIrData = undefined;
     result.irs[c.EmbeddedIr_Cold] = embeddedFile(

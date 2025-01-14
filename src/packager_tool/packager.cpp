@@ -14,6 +14,8 @@
 #include "common_infrastructure/package_format.hpp"
 #include "common_infrastructure/sample_library/sample_library.hpp"
 
+#include "build_resources/embedded_files.h"
+
 // Library packager CLI tool - see packager.hpp for more info
 
 struct Paths {
@@ -73,122 +75,21 @@ static ErrorCodeOr<sample_lib::Library*> ReadLua(String lua_path, ArenaAllocator
     return outcome.Get<sample_lib::Library*>();
 }
 
-static ErrorCodeOr<MutableString> FileDataFromBuildResources(ArenaAllocator& arena, String filename) {
-    auto const exe_path = String(TRY(CurrentExecutablePath(arena)));
-
-    auto const exe_dir = path::Directory(exe_path);
-    if (!exe_dir) {
-        g_cli_out.Error({}, "Could not executable's path");
-        return ErrorCode {CommonError::NotFound};
-    }
-
-    auto const docs_dir = SearchForExistingFolderUpwards(*exe_dir, "build_resources", arena);
-    if (!docs_dir) {
-        g_cli_out.Error({}, "Could not find 'build_resources' folder upwards from '{}'", exe_path);
-        return ErrorCode {CommonError::NotFound};
-    }
-
-    auto const path = path::Join(arena, Array {docs_dir.Value(), filename});
-    return TRY(ReadEntireFile(path, arena));
-}
-
-constexpr String k_metadata_ini_filename = ".metadata.ini"_s;
-
-static ErrorCodeOr<String> MetadataIni(String library_folder, ArenaAllocator& arena) {
-    auto const metadata_ini_path = path::Join(arena, Array {library_folder, k_metadata_ini_filename});
-    auto const outcome = ReadEntireFile(metadata_ini_path, arena);
-    if (outcome.HasError()) {
-        g_cli_out.Error({}, "ERROR {}: {}", metadata_ini_path, outcome.Error());
-        return outcome.Error();
-    }
-    return outcome.Value();
-}
-
-struct Metadata {
-    // NOTE: empty at the moment
-};
-
-// INI-like file format:
-// - Key = Value
-// - Lines starting with ';' are comments
-// - Multiline values are supported with triple quotes
-struct MetadataParser {
-    struct KeyVal {
-        String key, value;
-    };
-
-    ErrorCodeOr<Optional<KeyVal>> ReadLine() {
-        while (cursor) {
-            auto const line = WhitespaceStripped(SplitWithIterator(ini, cursor, '\n'));
-
-            if (line.size == 0) continue;
-            if (StartsWith(line, ';')) continue;
-
-            auto const equals_pos = Find(line, '=');
-            if (!equals_pos) {
-                g_cli_out.Error({}, "Invalid line in {}: {}", k_metadata_ini_filename, line);
-                return ErrorCode {CommonError::InvalidFileFormat};
-            }
-
-            auto const key = WhitespaceStrippedEnd(line.SubSpan(0, *equals_pos));
-            auto value = WhitespaceStrippedStart(line.SubSpan(*equals_pos + 1));
-
-            if (StartsWithSpan(value, k_multiline_delim)) {
-                cursor = (usize)(value.data - ini.data) + k_multiline_delim.size;
-                auto const end = FindSpan(ini, k_multiline_delim, *cursor);
-                if (!end) {
-                    g_cli_out.Error({},
-                                    "Unterminated multiline value in {}: {}",
-                                    k_metadata_ini_filename,
-                                    key);
-                    return ErrorCode {CommonError::InvalidFileFormat};
-                }
-
-                value = ini.SubSpan(*cursor, *end - *cursor);
-                cursor = *end;
-                SplitWithIterator(ini, cursor, '\n');
-            }
-
-            return KeyVal {key, value};
-        }
-
-        return k_nullopt;
-    }
-
-    static constexpr String k_multiline_delim = "\"\"\"";
-
-    String const ini;
-    Optional<usize> cursor = 0uz;
-};
-
-static ErrorCodeOr<Metadata> ReadMetadata(String library_folder, ArenaAllocator& arena) {
-    Metadata result {};
-    MetadataParser parser {TRY(MetadataIni(library_folder, arena))};
-
-    while (auto const opt_line = TRY(parser.ReadLine())) {
-        auto const& [key, value] = *opt_line;
-
-        if (key.size) {
-            g_cli_out.Error({}, "Unknown key in {}: {}", k_metadata_ini_filename, key);
-            return ErrorCode {CommonError::InvalidFileFormat};
-        }
-    }
-
-    return result;
-}
-
 static ErrorCodeOr<void> WriteAboutLibraryHtml(sample_lib::Library const& lib,
                                                ArenaAllocator& arena,
                                                Paths paths,
                                                String library_folder) {
-    auto const doc_template = TRY(FileDataFromBuildResources(arena, "about_library_template.rtf"_s));
+    auto const about_library_doc = ({
+        auto data = EmbeddedAboutLibraryTemplateRtf();
+        arena.Clone(Span {(char const*)data.data, data.size});
+    });
 
     String description = {};
     if (lib.description) description = *lib.description;
 
     auto const result_data =
         fmt::FormatStringReplace(arena,
-                                 doc_template,
+                                 about_library_doc,
                                  ArrayT<fmt::StringReplacement>({
                                      {"__LIBRARY_NAME__", lib.name},
                                      {"__LUA_FILENAME__", path::Filename(paths.lua)},
@@ -303,9 +204,6 @@ static ErrorCodeOr<int> Main(ArgsCstr args) {
         if (!sample_lib::CheckAllReferencedFilesExist(*lib, g_cli_out))
             return ErrorCode {CommonError::NotFound};
 
-        auto const metadata_outcome = ReadMetadata(library_path, arena);
-        (void)metadata_outcome; // NOTE: unused at the moment
-
         TRY(WriteAboutLibraryHtml(*lib, arena, paths, library_path));
 
         if (create_package) TRY(package::WriterAddLibrary(package, *lib, arena, program_name));
@@ -316,13 +214,11 @@ static ErrorCodeOr<int> Main(ArgsCstr args) {
             TRY(package::WriterAddPresetsFolder(package, preset_folder, arena, program_name));
 
     if (create_package) {
-        auto const doc_template = TRY(FileDataFromBuildResources(arena, "how_to_install_template.rtf"_s));
-        auto const result_rtf = fmt::FormatStringReplace(arena,
-                                                         doc_template,
-                                                         ArrayT<fmt::StringReplacement>({
-                                                             {"__FLOE_MANUAL_URL__", FLOE_MANUAL_URL},
-                                                         }));
-        package::WriterAddFile(package, "How to Install.rtf"_s, result_rtf.ToByteSpan());
+        auto const how_to_install_doc = ({
+            auto data = EmbeddedPackageInstallationRtf();
+            arena.Clone(Span {(char const*)data.data, data.size});
+        });
+        package::WriterAddFile(package, "Installation.rtf"_s, how_to_install_doc.ToByteSpan());
 
         auto const package_path = path::Join(
             arena,

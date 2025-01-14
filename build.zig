@@ -1602,6 +1602,16 @@ pub fn build(b: *std.Build) void {
             join_compile_commands.step.dependOn(&common_infrastructure.step);
         }
 
+        const embedded_files = b.addObject(.{
+            .name = "embedded_files",
+            .root_source_file = b.path("build_resources/embedded_files.zig"),
+            .target = target,
+            .optimize = build_context.optimise,
+            .pic = true,
+        });
+        embedded_files.linkLibC();
+        embedded_files.addIncludePath(b.path("build_resources"));
+
         const plugin = b.addStaticLibrary(.{
             .name = "plugin",
             .target = target,
@@ -1683,15 +1693,6 @@ pub fn build(b: *std.Build) void {
             plugin.linkLibrary(library);
             plugin.linkLibrary(common_infrastructure);
             plugin.linkLibrary(fft_convolver);
-            const embedded_files = b.addObject(.{
-                .name = "embedded_files",
-                .root_source_file = b.path("build_resources/embedded_files.zig"),
-                .target = target,
-                .optimize = build_context.optimise,
-                .pic = true,
-            });
-            embedded_files.linkLibC();
-            embedded_files.addIncludePath(b.path("build_resources"));
             plugin.addObject(embedded_files);
             plugin.linkLibrary(tracy);
             plugin.linkLibrary(pugl);
@@ -1734,6 +1735,7 @@ pub fn build(b: *std.Build) void {
             packager.addIncludePath(b.path("src"));
             packager.addConfigHeader(build_config_step);
             packager.linkLibrary(miniz);
+            packager.addObject(embedded_files);
             join_compile_commands.step.dependOn(&packager.step);
             addToLipoSteps(&build_context, packager, false) catch @panic("OOM");
             applyUniversalSettings(&build_context, packager);

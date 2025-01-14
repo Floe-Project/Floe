@@ -92,7 +92,7 @@ static void ProcessorRandomiseAllParamsInternal(AudioProcessor& processor, bool 
 #if 0
     RandomIntGenerator<int> int_gen;
     RandomFloatGenerator<f32> float_gen;
-    u64 seed = SeedFromTime();
+    u64 seed = SeedFromCpu();
     RandomNormalDistribution normal_dist {0.5, 0.20};
     RandomNormalDistribution normal_dist_strong {0.5, 0.10};
 

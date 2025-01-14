@@ -302,7 +302,7 @@ TEST_CASE(TestPresetBrowserFilters) {
 TEST_CASE(TestCurrentPresetInfo) {
     auto listing = TRY(TestListing(tester.scratch_arena));
     CoreLibrary core;
-    u64 random_seed = SeedFromTime();
+    u64 random_seed = SeedFromCpu();
 
     // Correctly updates preset info
     {

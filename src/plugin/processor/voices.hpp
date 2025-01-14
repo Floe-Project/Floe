@@ -212,7 +212,7 @@ struct VoicePool {
     AtomicSwapBuffer<Array<VoiceEnvelopeMarkerForGui, k_num_voices>, true> voice_fil_env_markers_for_gui {};
     Array<Atomic<s16>, 128> voices_per_midi_note_for_gui {};
 
-    unsigned int random_seed = FastRandSeedFromTime();
+    unsigned int random_seed = FastRandSeedFromCpu();
 
     AudioProcessingContext const* audio_processing_context = nullptr; // temp for thread pool
 

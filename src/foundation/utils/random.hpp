@@ -122,7 +122,7 @@ struct RandomNormalDistribution {
     bool has_spare = false;
 };
 
-inline unsigned int FastRandSeedFromTime() { return (unsigned int)__builtin_readcyclecounter(); }
+inline unsigned int FastRandSeedFromCpu() { return (unsigned int)__builtin_readcyclecounter(); }
 
 inline int FastRand(unsigned int& seed) {
     seed = (214013 * seed + 2531011);

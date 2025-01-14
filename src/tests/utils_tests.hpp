@@ -437,7 +437,7 @@ void DoAtomicQueueTest(tests::Tester& tester, String name) {
             starting_gun.WaitUntilFired();
             Array<int, 1> small_item {};
             Array<int, 4> big_item {};
-            u64 seed = (u64)NanosecondsSinceEpoch();
+            auto seed = (u64)NanosecondsSinceEpoch();
             for (auto _ : Range(10000)) {
                 if (RandomIntInRange<int>(seed, 0, 1) == 0)
                     if (push)

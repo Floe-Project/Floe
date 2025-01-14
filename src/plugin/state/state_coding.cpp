@@ -1357,7 +1357,7 @@ static void CheckStateIsValid(tests::Tester& tester, StateSnapshot const& state)
 
 TEST_CASE(TestParsersHandleInvalidData) {
     auto& scratch_arena = tester.scratch_arena;
-    u64 seed = (u64)NanosecondsSinceEpoch();
+    auto seed = (u64)NanosecondsSinceEpoch();
 
     auto const make_random_data = [&]() {
         auto const data_size = RandomIntInRange<usize>(seed, 1, 1000);
@@ -1552,7 +1552,7 @@ TEST_CASE(TestBackwardCompat) {
 }
 
 TEST_CASE(TestFuzzingJsonState) {
-    u64 seed = (u64)NanosecondsSinceEpoch();
+    auto seed = (u64)NanosecondsSinceEpoch();
     StateSnapshot state;
 
     for (auto const i : Range((u32)k_num_parameters)) {

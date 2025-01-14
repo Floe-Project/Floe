@@ -21,6 +21,24 @@ PUBLIC inline u64 RandomU64(u64& seed) {
 PUBLIC inline u64 SeedFromTime() {
     auto r = __builtin_readcyclecounter();
     if (r) return r;
+
+#if defined(__aarch64__)
+    u64 id;
+    u64 x;
+    u64 nzcv;
+    __asm__ volatile("mrs %0, s3_0_c0_c6_0" : "=r"(id)); // ID_AA64ISAR0_EL1
+    if (((id >> 60) & 0xf) >= 1) { // Check if RNDR is available
+        for (int i = 0; i < 5; i++) {
+            __asm__ volatile("mrs %0, s3_3_c2_c4_0\n\t" // RNDR
+                             "mrs %1, s3_3_c4_c2_0" // NZCV
+                             : "=r"(x), "=r"(nzcv)
+                             :
+                             : "memory");
+            if (nzcv == 0) return x;
+        }
+    }
+#endif
+
     return (u64)__builtin_frame_address(0);
 }
 

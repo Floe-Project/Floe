@@ -138,6 +138,7 @@ class ConvolutionReverb final : public Effect {
         auto num_channels = audio_data.channels;
         auto num_frames = audio_data.num_frames;
 
+        // TODO: we need to ensure this is the case before calling this function - show an error message
         ASSERT(num_channels && num_frames);
         ASSERT(num_channels == 2);
 

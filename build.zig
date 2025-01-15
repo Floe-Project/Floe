@@ -661,6 +661,8 @@ fn genericFlags(context: *BuildContext, target: std.Build.ResolvedTarget, extra_
             "-Wno-missing-method-return-type",
             "-Wno-deprecated-declarations",
             "-Wno-deprecated-anon-enum-enum-conversion",
+            "-D__kernel_ptr_semantics=",
+            "-Wno-c99-extensions",
         });
     }
 
@@ -1267,7 +1269,7 @@ pub fn build(b: *std.Build) void {
                             "mac_gl.m",
                             "mac_stub.m",
                         },
-                        .flags = &.{
+                        .flags = genericFlags(&build_context, target, &.{
                             b.fmt("-DPuglWindow=PuglWindowFPFloe{}{}{}", .{
                                 floe_version.major,
                                 floe_version.minor,
@@ -1283,7 +1285,7 @@ pub fn build(b: *std.Build) void {
                                 floe_version.minor,
                                 floe_version.patch,
                             }),
-                        },
+                        }) catch @panic("OOM"),
                     });
                     pugl.linkFramework("OpenGL");
                     pugl.linkFramework("CoreVideo");
@@ -1536,6 +1538,7 @@ pub fn build(b: *std.Build) void {
                 fft_convolver.addCSourceFile(.{ .file = build_context.dep_pffft.path("pffft.c"), .flags = &.{} });
                 fft_flags = &.{"-DAUDIOFFT_PFFFT"};
             }
+            fft_flags = genericFlags(&build_context, target, fft_flags) catch unreachable;
 
             fft_convolver.addCSourceFiles(.{ .files = &.{
                 "third_party_libs/FFTConvolver/AudioFFT.cpp",

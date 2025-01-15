@@ -51,10 +51,10 @@ Adds an reverb impulse response to the library. It takes 2 parameters: the libra
 ==sample-library-example-lua:add_ir==
 ```
 
-### `floe.set_file_license`
+### `floe.set_attribution_requirement`
 Sets the license information for a particular file or folder. It takes 2 parameters: a path to the file or folder whose license information you want to set, and a table of configuration. This is useful if your library contains files with different licenses. If the path is a folder, the license information will be applied to all files in that folder and its subfolders.
 ```lua
-==sample-library-example-lua:set_file_license==
+==sample-library-example-lua:set_attribution_requirement==
 ```
 
 ## Support Function

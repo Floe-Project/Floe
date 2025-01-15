@@ -93,7 +93,7 @@ enum class InterpretedTypes : u32 {
     File,
     TriggerCriteria,
     RegionOptions,
-    FileLicenseInfo,
+    FileAttribution,
     Count,
 };
 
@@ -1095,7 +1095,7 @@ static int NewInstrument(lua_State* lua) {
     return 1;
 }
 
-static int SetFileLicense(lua_State* lua) {
+static int SetAttributionRequirement(lua_State* lua) {
     auto& ctx = **(LuaState**)lua_getextraspace(lua);
 
     // function takes 2 args, first is the path to a file, second is a table of config
@@ -1202,7 +1202,7 @@ static const struct luaL_Reg k_floe_lib[] = {
     {"new_instrument", NewInstrument},
     {"add_region", AddRegion},
     {"add_ir", AddIr},
-    {"set_file_license", SetFileLicense},
+    {"set_attribution_requirement", SetAttributionRequirement},
     {nullptr, nullptr},
 };
 
@@ -1585,7 +1585,7 @@ struct LuaCodePrinter {
                 case InterpretedTypes::RegionOptions:
                     struct_fields[i] = FieldInfosSpan<Region::Options>();
                     break;
-                case InterpretedTypes::FileLicenseInfo:
+                case InterpretedTypes::FileAttribution:
                     struct_fields[i] = FieldInfosSpan<FileAttribution>();
                     break;
                 case InterpretedTypes::Count: break;
@@ -1727,11 +1727,11 @@ struct LuaCodePrinter {
         TRY(writer.WriteChars("})\n"));
         TRY(end_function("add_region"));
 
-        TRY(begin_function("set_file_license"));
-        TRY(writer.WriteChars("floe.set_file_license(\"Samples/bell.flac\", {\n"));
-        TRY(PrintStruct(writer, InterpretedTypes::FileLicenseInfo, mode, 1));
+        TRY(begin_function("set_attribution_requirement"));
+        TRY(writer.WriteChars("floe.set_attribution_requirement(\"Samples/bell.flac\", {\n"));
+        TRY(PrintStruct(writer, InterpretedTypes::FileAttribution, mode, 1));
         TRY(writer.WriteChars("})\n"));
-        TRY(end_function("set_file_license"));
+        TRY(end_function("set_attribution_requirement"));
 
         if (mode.mode_flags & LuaCodePrinter::PrintModeFlagsDocumentedExample) {
             TRY(begin_function("extend_table"));

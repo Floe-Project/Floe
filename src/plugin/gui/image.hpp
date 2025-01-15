@@ -317,7 +317,8 @@ PUBLIC ImageBytes CreateBlurredLibraryBackground(ImageBytes original,
     };
 
     // Shrink the image down for better speed. We are about to blur it, we don't need detail.
-    auto const shrunk_width = CheckedCast<u16>(original.size.width * options.downscale_factor);
+    auto const shrunk_width =
+        Max(CheckedCast<u16>(original.size.width * options.downscale_factor), original.size.width);
     auto const result = ShrinkImageIfNeeded(original, shrunk_width, shrunk_width, arena, true);
 
     // For ease-of-use and performance, we convert the image to f32x4 format

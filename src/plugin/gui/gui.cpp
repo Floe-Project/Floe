@@ -131,14 +131,13 @@ static void CreateLibraryBackgroundImageTextures(Gui* g,
                                                  bool reload_blurred_background) {
     ArenaAllocator arena {PageAllocator::Instance()};
 
+    auto const scaled_width = CheckedCast<u16>(g->frame_input.window_size.width * 1.3f);
+    if (!scaled_width) return;
+
     // If the image is quite a lot larger than we need, resize it down to avoid storing a huge image on the
     // GPU
     auto const scaled_background =
-        ShrinkImageIfNeeded(background_image,
-                            CheckedCast<u16>(g->frame_input.window_size.width * 1.3f),
-                            g->frame_input.window_size.width,
-                            arena,
-                            false);
+        ShrinkImageIfNeeded(background_image, scaled_width, g->frame_input.window_size.width, arena, false);
     if (reload_background)
         imgs.background = TryCreateImageOnGpu(*g->frame_input.graphics_ctx, scaled_background);
 

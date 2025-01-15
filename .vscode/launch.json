@@ -8,14 +8,14 @@
             "request": "launch",
             "name": "Standalone",
             "runInTerminal": true,
-            "program": "zig-out/x86_64-linux/floe_standalone"
+            "program": "floe_standalone"
         },
         {
             "type": "lldb",
             "request": "launch",
             "name": "Tests",
             "runInTerminal": true,
-            "program": "zig-out/x86_64-linux/tests",
+            "program": "tests",
             "args": [
                 "--log-level=debug"
             ]
@@ -25,7 +25,7 @@
             "request": "launch",
             "name": "Floe Packager",
             "runInTerminal": true,
-            "program": "zig-out/x86_64-linux/floe-packager",
+            "program": "floe-packager",
             "args": [
                 "--library-folders",
                 "~/Floe/Libraries/wraith.mdata",

@@ -52,7 +52,7 @@ Adds an reverb impulse response to the library. It takes 2 parameters: the libra
 ```
 
 ### `floe.set_attribution_requirement`
-Sets the license information for a particular file or folder. It takes 2 parameters: a path to the file or folder whose license information you want to set, and a table of configuration. This is useful if your library contains files with different licenses. If the path is a folder, the license information will be applied to all files in that folder and its subfolders.
+Sets the attribution information for a particular audio file or folder. It takes 2 parameters: a path to the file or folder whose license information you want to set, and a table of configuration. This is necessary if your library contains samples created by different people (licensed under CC BY, for example). If the path is a folder, the attribution requirement will be applied to all audio files in that folder and its subfolders.
 ```lua
 ==sample-library-example-lua:set_attribution_requirement==
 ```

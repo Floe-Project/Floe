@@ -215,10 +215,10 @@ void UpdateLoopInfo(Voice& v) {
         auto const mode = v.controller->loop_mode;
         switch (mode) {
             case param_values::LoopMode::InstrumentDefault: {
-                if (sampler.region->file.loop)
+                if (sampler.region->file.loop) {
                     sampler.loop =
                         CreateBoundsCheckedLoop(*sampler.region->file.loop, sampler.data->num_frames);
-                else
+                } else
                     sampler.loop = k_nullopt;
                 break;
             }
@@ -236,13 +236,18 @@ void UpdateLoopInfo(Voice& v) {
                     },
                     sampler.data->num_frames);
 
-                sampler.loop_and_reverse_flags =
-                    loop_and_reverse_flags::CorrectLoopFlagsIfNeeded(sampler.loop_and_reverse_flags,
-                                                                     *sampler.loop,
-                                                                     s.pos);
                 break;
             }
             case param_values::LoopMode::Count: break;
+        }
+
+        sampler.loop_and_reverse_flags = 0;
+        if (v.controller->reverse) sampler.loop_and_reverse_flags = loop_and_reverse_flags::CurrentlyReversed;
+        if (sampler.loop) {
+            sampler.loop_and_reverse_flags =
+                loop_and_reverse_flags::CorrectLoopFlagsIfNeeded(sampler.loop_and_reverse_flags,
+                                                                 *sampler.loop,
+                                                                 s.pos);
         }
     }
 }

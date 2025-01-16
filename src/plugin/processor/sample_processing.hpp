@@ -125,7 +125,7 @@ enum Bits : u32 {
     InLoopingRegion = InFirstLoop | LoopedManyTimes,
 };
 
-inline u32 CorrectLoopFlagsIfNeeded(u32 flags, BoundsCheckedLoop const loop, f64 frame_pos) {
+[[nodiscard]] inline u32 CorrectLoopFlagsIfNeeded(u32 flags, BoundsCheckedLoop const loop, f64 frame_pos) {
     auto const end = (f64)loop.end;
     auto const start = (f64)loop.start;
 

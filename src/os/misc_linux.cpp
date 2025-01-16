@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <stdlib.h>
+#include <sys/random.h>
 #include <unistd.h>
 
 #include "foundation/foundation.hpp"
@@ -19,6 +20,12 @@ SystemStats GetSystemStats() {
                   .page_size = (u32)sysconf(_SC_PAGESIZE)};
     }
     return result;
+}
+
+u64 RandomSeed() {
+    u64 seed = 0;
+    auto _ = getrandom(&seed, sizeof(seed), 0);
+    return seed;
 }
 
 void OpenFolderInFileBrowser(String path) {

@@ -64,6 +64,12 @@ DynamicArrayBounded<char, 64> OperatingSystemName() {
     return {};
 }
 
+u64 RandomSeed() {
+    auto ticks = GetTickCount64();
+    auto pid = GetCurrentProcessId();
+    return (ticks << 32) | pid;
+}
+
 bool IsRunningUnderWine() {
     if (HMODULE nt = GetModuleHandleW(L"ntdll.dll")) {
         if (GetProcAddress(nt, "wine_get_version")) return true;

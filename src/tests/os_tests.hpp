@@ -1078,6 +1078,11 @@ TEST_CASE(TestLockableSharedMemory) {
     return k_success;
 }
 
+TEST_CASE(TestOsRandom) {
+    CHECK_NEQ(RandomSeed(), 0u);
+    return k_success;
+}
+
 TEST_REGISTRATION(RegisterOsTests) {
     REGISTER_TEST(TestEpochTime);
     REGISTER_TEST(TestThread);
@@ -1090,4 +1095,5 @@ TEST_REGISTRATION(RegisterOsTests) {
     REGISTER_TEST(TestFileApi);
     REGISTER_TEST(TestTimePoint);
     REGISTER_TEST(TestLockableSharedMemory);
+    REGISTER_TEST(TestOsRandom);
 }

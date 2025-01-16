@@ -25,6 +25,8 @@ int CurrentProcessId();
 void OpenFolderInFileBrowser(String path);
 void OpenUrlInBrowser(String url);
 
+u64 RandomSeed();
+
 void* AllocatePages(usize bytes);
 void FreePages(void* ptr, usize bytes);
 void TryShrinkPages(void* ptr, usize old_size, usize new_size);

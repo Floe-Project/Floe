@@ -2365,6 +2365,39 @@ f32 Context::LargestStringWidth(f32 pad, Span<String const> strs) {
     return LargestStringWidth(pad, (void*)strs.data, (int)strs.size, str_get);
 }
 
+LiveEditGui g_live_edit_values {
+    .ui_sizes =
+        {
+#define GUI_SIZE(cat, n, v, unit) v,
+#include SIZES_DEF_FILENAME
+#undef GUI_SIZE
+        },
+    .ui_sizes_units =
+        {
+#define GUI_SIZE(cat, n, v, unit) UiSizeUnit::unit,
+#include SIZES_DEF_FILENAME
+#undef GUI_SIZE
+        },
+    .ui_sizes_names =
+        {
+#define GUI_SIZE(cat, n, v, unit) #n,
+#include SIZES_DEF_FILENAME
+#undef GUI_SIZE
+        },
+    .ui_cols =
+        {
+#define GUI_COL(name, val, based_on, bright, alpha) {String(name), val, String(based_on), bright, alpha},
+#include COLOURS_DEF_FILENAME
+#undef GUI_COL
+        },
+    .ui_col_map =
+        {
+#define GUI_COL_MAP(cat, n, col, high_contrast_col) {String(col), String(high_contrast_col)},
+#include COLOUR_MAP_DEF_FILENAME
+#undef GUI_COL_MAP
+        },
+};
+
 } // namespace imgui
 
 namespace live_edit {

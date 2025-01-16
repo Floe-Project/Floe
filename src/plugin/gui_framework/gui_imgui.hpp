@@ -281,6 +281,8 @@ struct TextInputResult {
     bool show_cursor = false;
 };
 
+extern LiveEditGui g_live_edit_values;
+
 struct Context {
     Context(GuiFrameInput& frame_input, GuiFrameResult& frame_output);
     ~Context();
@@ -719,48 +721,6 @@ struct Context {
     int dragged_mouse = -1;
 
     DynamicArray<Id> id_stack {Malloc::Instance()};
-
-#if !FLOE_EDITOR_ENABLED
-    // WARNING: this is broken - possibily a bug in Clang's constexpr handling because the non-constexpr
-    // version works fine. It results in really strange memory corruption when the constexpr version is used.
-    //
-    // TODO: maybe make this global again rather than a member of Context because it's a huge amount of memory
-    //
-    // static constexpr
-#endif
-    // NOLINTNEXTLINE(readability-identifier-naming)
-    LiveEditGui live_edit_values {
-        .ui_sizes =
-            {
-#define GUI_SIZE(cat, n, v, unit) v,
-#include SIZES_DEF_FILENAME
-#undef GUI_SIZE
-            },
-        .ui_sizes_units =
-            {
-#define GUI_SIZE(cat, n, v, unit) UiSizeUnit::unit,
-#include SIZES_DEF_FILENAME
-#undef GUI_SIZE
-            },
-        .ui_sizes_names =
-            {
-#define GUI_SIZE(cat, n, v, unit) #n,
-#include SIZES_DEF_FILENAME
-#undef GUI_SIZE
-            },
-        .ui_cols =
-            {
-#define GUI_COL(name, val, based_on, bright, alpha) {String(name), val, String(based_on), bright, alpha},
-#include COLOURS_DEF_FILENAME
-#undef GUI_COL
-            },
-        .ui_col_map =
-            {
-#define GUI_COL_MAP(cat, n, col, high_contrast_col) {String(col), String(high_contrast_col)},
-#include COLOUR_MAP_DEF_FILENAME
-#undef GUI_COL_MAP
-            },
-    };
 };
 
 f32x2 BestPopupPos(Rect base_r, Rect avoid_r, f32x2 window_size, bool find_left_or_right);
@@ -962,29 +922,29 @@ extern bool g_high_contrast_gui; // IMPROVE: this is hacky
 } // namespace live_edit
 
 // IMPROVE: separate out possibly constexpr lookup from runtime calculation for better performance
-inline u32 LiveCol(imgui::Context const& imgui, UiColMap type) {
+inline u32 LiveCol(imgui::Context const&, UiColMap type) {
     auto const map_index = ToInt(type);
 
     String const col_string = (live_edit::g_high_contrast_gui &&
-                               imgui.live_edit_values.ui_col_map[map_index].high_contrast_colour.size)
-                                  ? imgui.live_edit_values.ui_col_map[map_index].high_contrast_colour
-                                  : imgui.live_edit_values.ui_col_map[map_index].colour;
+                               imgui::g_live_edit_values.ui_col_map[map_index].high_contrast_colour.size)
+                                  ? imgui::g_live_edit_values.ui_col_map[map_index].high_contrast_colour
+                                  : imgui::g_live_edit_values.ui_col_map[map_index].colour;
 
     // NOTE: linear search but probably ok
     for (auto const i : Range(k_max_num_colours))
-        if (String(imgui.live_edit_values.ui_cols[i].name) == col_string)
-            return imgui.live_edit_values.ui_cols[i].col;
+        if (String(imgui::g_live_edit_values.ui_cols[i].name) == col_string)
+            return imgui::g_live_edit_values.ui_cols[i].col;
 
     return {};
 }
 
 inline f32 LiveSize(imgui::Context const& imgui, UiSizeId size_id) {
     f32 res = 1;
-    switch (imgui.live_edit_values.ui_sizes_units[ToInt(size_id)]) {
+    switch (imgui::g_live_edit_values.ui_sizes_units[ToInt(size_id)]) {
         case UiSizeUnit::Points:
-            res = imgui.PointsToPixels(imgui.live_edit_values.ui_sizes[ToInt(size_id)]);
+            res = imgui.PointsToPixels(imgui::g_live_edit_values.ui_sizes[ToInt(size_id)]);
             break;
-        case UiSizeUnit::None: res = imgui.live_edit_values.ui_sizes[ToInt(size_id)]; break;
+        case UiSizeUnit::None: res = imgui::g_live_edit_values.ui_sizes[ToInt(size_id)]; break;
         case UiSizeUnit::Count: PanicIfReached();
     }
     return res;

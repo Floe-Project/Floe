@@ -299,7 +299,7 @@ static void WriteColourMapFile(LiveEditGui const& gui) {
 }
 
 void SizesGUISliders(EditorGUI* g, String search) {
-    auto& live_gui = g->imgui->live_edit_values;
+    auto& live_gui = imgui::g_live_edit_values;
     EditorHeading(g, "Sizes");
 
     static DynamicArrayBounded<String, ToInt(UiSizeId::Count)> categories {};
@@ -368,7 +368,7 @@ static int FindColourIndex(LiveEditGui const& gui, String col_string) {
 }
 
 void ColourMapGUIMenus(EditorGUI* g, String search, String colour_search, bool high_contrast) {
-    auto& live_gui = g->imgui->live_edit_values;
+    auto& live_gui = imgui::g_live_edit_values;
     EditorHeading(g, "Colour Mapping");
 
     static DynamicArrayBounded<String, ToInt(UiColMap::Count)> categories {};
@@ -441,7 +441,7 @@ static void RecalculateBasedOnCol(EditorCol& c, EditorCol const& other_c) {
 }
 
 void ColoursGUISliders(EditorGUI* gui, String search) {
-    auto& live_gui = gui->imgui->live_edit_values;
+    auto& live_gui = imgui::g_live_edit_values;
     auto imgui = gui->imgui;
     auto pad = 1.0f;
     auto h = gui->item_h;

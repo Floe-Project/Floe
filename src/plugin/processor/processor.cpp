@@ -737,7 +737,7 @@ static bool Activate(AudioProcessor& processor, PluginActivateArgs args) {
 static void ProcessClapNoteOrMidi(AudioProcessor& processor,
                                   clap_event_header const& event,
                                   clap_output_events const& out,
-                                  bool& request_main_thread_callback) {
+                                  ProcessorListener::ChangeFlags& change_flags) {
     // IMPROVE: support per-param modulation and automation - each param can opt in to it individually
 
     Bitset<k_num_parameters> changed_params {};
@@ -820,9 +820,7 @@ static void ProcessClapNoteOrMidi(AudioProcessor& processor,
             auto type = message.Type();
             if (type == MidiMessageType::NoteOn || type == MidiMessageType::NoteOff ||
                 type == MidiMessageType::ControlChange) {
-                processor.for_main_thread.flags.FetchOr(AudioProcessor::MainThreadCallbackFlagsUpdateGui,
-                                                        RmwMemoryOrder::Relaxed);
-                request_main_thread_callback = true;
+                change_flags |= ProcessorListener::NotesChanged;
             }
 
             switch (message.Type()) {
@@ -1082,16 +1080,14 @@ clap_process_status Process(AudioProcessor& processor, clap_process const& proce
     Bitset<k_num_parameters> params_changed {};
     Array<bool, k_num_layers> layers_changed {};
     bool mark_convolution_for_fade_out = false;
+    ProcessorListener::ChangeFlags change_flags = {};
 
-    bool request_main_thread_callback = false;
     DEFER {
-        if (processor.previous_process_status != result) {
-            result = processor.previous_process_status;
-            request_main_thread_callback = true;
-        }
-        if (request_main_thread_callback) processor.host.request_callback(&processor.host);
-        processor.for_main_thread.notes_currently_held.AssignBlockwise(
+        if (processor.previous_process_status != result) change_flags |= ProcessorListener::StatusChanged;
+        processor.previous_process_status = result;
+        processor.notes_currently_held.AssignBlockwise(
             processor.audio_processing_context.midi_note_state.NotesCurrentlyHeldAllChannels());
+        if (change_flags) processor.listener.OnProcessorChange(change_flags);
     };
 
     ConsumeParamEventsFromGui(processor, *process.out_events, params_changed);
@@ -1132,6 +1128,9 @@ clap_process_status Process(AudioProcessor& processor, clap_process const& proce
             case EventForAudioThreadType::EndNote: break;
         }
     }
+
+    if (params_changed.Get(ToInt(ParamIndex::ConvolutionReverbOn)))
+        change_flags |= ProcessorListener::IrChanged;
 
     if (new_fade_type) {
         processor.whole_engine_volume_fade_type = *new_fade_type;
@@ -1210,7 +1209,7 @@ clap_process_status Process(AudioProcessor& processor, clap_process const& proce
     {
         for (auto const i : Range(process.in_events->size(process.in_events))) {
             auto e = process.in_events->get(process.in_events, i);
-            ProcessClapNoteOrMidi(processor, *e, *process.out_events, request_main_thread_callback);
+            ProcessClapNoteOrMidi(processor, *e, *process.out_events, change_flags);
         }
         for (auto& e : internal_events) {
             switch (e.tag) {
@@ -1222,10 +1221,7 @@ clap_process_status Process(AudioProcessor& processor, clap_process const& proce
                     note.key = start.key;
                     note.velocity = (f64)start.velocity;
                     note.note_id = -1;
-                    ProcessClapNoteOrMidi(processor,
-                                          note.header,
-                                          *process.out_events,
-                                          request_main_thread_callback);
+                    ProcessClapNoteOrMidi(processor, note.header, *process.out_events, change_flags);
                     break;
                 }
                 case EventForAudioThreadType::EndNote: {
@@ -1235,10 +1231,7 @@ clap_process_status Process(AudioProcessor& processor, clap_process const& proce
                     note.header.size = sizeof(note);
                     note.key = end.key;
                     note.note_id = -1;
-                    ProcessClapNoteOrMidi(processor,
-                                          note.header,
-                                          *process.out_events,
-                                          request_main_thread_callback);
+                    ProcessClapNoteOrMidi(processor, note.header, *process.out_events, change_flags);
                     break;
                 }
                 default: break;
@@ -1273,7 +1266,7 @@ clap_process_status Process(AudioProcessor& processor, clap_process const& proce
         }
 
         if (process_result.instrument_swapped) {
-            request_main_thread_callback = true;
+            change_flags |= ProcessorListener::InstrumentChanged;
 
             // Start new voices. We don't want to do that here because we want all parameter changes
             // to be applied beforehand.
@@ -1329,7 +1322,7 @@ clap_process_status Process(AudioProcessor& processor, clap_process const& proce
                                                              mark_convolution_for_fade_out);
                 if (r.effect_process_state == EffectProcessResult::ProcessingTail)
                     fx_need_another_frame_of_processing = true;
-                if (r.changed_ir) request_main_thread_callback = true;
+                if (r.changed_ir) change_flags |= ProcessorListener::IrChanged;
             } else {
                 auto const r = fx->ProcessBlock(interleaved_stereo_samples,
                                                 scratch_buffers,
@@ -1363,15 +1356,9 @@ clap_process_status Process(AudioProcessor& processor, clap_process const& proce
 
     // Mark gui dirty
     {
-        bool mark_gui_dirty = false;
-        if (!processor.peak_meter.Silent()) mark_gui_dirty = true;
+        if (!processor.peak_meter.Silent()) change_flags |= ProcessorListener::PeakMeterChanged;
         for (auto& layer : processor.layer_processors)
-            if (!layer.peak_meter.Silent()) mark_gui_dirty = true;
-        if (mark_gui_dirty) {
-            processor.for_main_thread.flags.FetchOr(AudioProcessor::MainThreadCallbackFlagsUpdateGui,
-                                                    RmwMemoryOrder::Relaxed);
-            request_main_thread_callback = true;
-        }
+            if (!layer.peak_meter.Silent()) change_flags |= ProcessorListener::PeakMeterChanged;
     }
 
     return result;
@@ -1385,17 +1372,9 @@ static void Reset(AudioProcessor&) {
     // - clap_process.steady_time may jump backward.
 }
 
-static void OnMainThread(AudioProcessor& processor, bool& update_gui) {
+static void OnMainThread(AudioProcessor& processor) {
     ZoneScoped;
     processor.convo.DeletedUnusedConvolvers();
-
-    auto flags = processor.for_main_thread.flags.Exchange(0, RmwMemoryOrder::Relaxed);
-    if (flags & AudioProcessor::MainThreadCallbackFlagsRescanParameters) {
-        auto host_params =
-            (clap_host_params const*)processor.host.get_extension(&processor.host, CLAP_EXT_PARAMS);
-        if (host_params) host_params->rescan(&processor.host, CLAP_PARAM_RESCAN_VALUES);
-    }
-    if (flags & AudioProcessor::MainThreadCallbackFlagsUpdateGui) update_gui = true;
 
     // Clear any instruments that aren't used anymore. The audio thread will request this callback after it
     // swaps any instruments.
@@ -1419,9 +1398,10 @@ static void OnThreadPoolExec(AudioProcessor& processor, u32 index) {
     OnThreadPoolExec(processor.voice_pool, index);
 }
 
-AudioProcessor::AudioProcessor(clap_host const& host)
+AudioProcessor::AudioProcessor(clap_host const& host, ProcessorListener& listener)
     : host(host)
     , audio_processing_context {.host = host}
+    , listener(listener)
     , distortion(smoothed_value_system)
     , bit_crush(smoothed_value_system)
     , compressor(smoothed_value_system)

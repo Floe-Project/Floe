@@ -20,10 +20,13 @@ struct SharedEngineSystems {
     SharedEngineSystems();
     ~SharedEngineSystems();
 
+    void StartPollingThreadIfNeeded();
+
     void RegisterFloeInstance(clap_plugin const* plugin, FloeInstanceIndex index);
     void UnregisterFloeInstance(FloeInstanceIndex index);
 
-    // indexable by FloeInstanceInde
+    // indexable by FloeInstanceIndex
+    Mutex floe_instances_mutex {};
     Array<clap_plugin const*, k_max_num_floe_instances> floe_instances {};
 
     ArenaAllocator arena;
@@ -34,4 +37,9 @@ struct SharedEngineSystems {
     PresetsListing preset_listing {paths.always_scanned_folder[ToInt(ScanFolderType::Presets)],
                                    error_notifications};
     sample_lib_server::Server sample_library_server;
+    Optional<LockableSharedMemory> shared_attributions_store {};
+
+    Thread polling_thread {};
+    Mutex polling_mutex {};
+    Atomic<u32> polling_running = 0;
 };

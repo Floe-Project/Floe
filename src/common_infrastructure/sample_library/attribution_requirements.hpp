@@ -11,9 +11,9 @@
 
 struct AttributionRequirementsState {
     u64 const instance_id = (u64)NanosecondsSinceEpoch();
-    Optional<LockableSharedMemory> shared_attributions_store {};
+    Optional<LockableSharedMemory>& shared_attributions_store;
     DynamicArray<char> formatted_text {Malloc::Instance()}; // empty if none needed
-    TimePoint last_update_time {};
+    Atomic<TimePoint> last_update_time {};
 };
 
 struct AttributionsStore {
@@ -301,10 +301,14 @@ PUBLIC void UpdateAttributionText(AttributionRequirementsState& reqs,
         if (a.license_url) fmt::Append(out, " ({})", a.license_url);
     }
 
-    reqs.last_update_time = TimePoint::Now();
+    reqs.last_update_time.Store(TimePoint::Now(), StoreMemoryOrder::Relaxed);
 }
 
 PUBLIC bool AttributionTextNeedsUpdate(AttributionRequirementsState const& reqs) {
     constexpr f64 k_refresh_seconds = 3;
-    return (TimePoint::Now() - reqs.last_update_time) > k_refresh_seconds;
+    return (TimePoint::Now() - reqs.last_update_time.Load(LoadMemoryOrder::Relaxed)) > k_refresh_seconds;
+}
+
+PUBLIC void MarkNeedsAttributionTextUpdate(AttributionRequirementsState& reqs) {
+    reqs.last_update_time.Store({}, StoreMemoryOrder::Relaxed);
 }

@@ -65,7 +65,13 @@ struct PluginCallbacks {
     // Called by the host on the main thread in response to a previous call to:
     //   host->request_callback(host);
     // [main-thread]
-    void (*on_main_thread)(UserObject&, bool& update_gui) = [](UserObject&, bool&) {};
+    void (*on_main_thread)(UserObject&) = [](UserObject&) {};
+
+    // [main-thread]
+    void (*on_timer)(UserObject&, clap_id timer_id) = [](UserObject&, clap_id) {};
+
+    // [polling-thread]
+    void (*on_poll_thread)(UserObject&) = [](UserObject&) {};
 
     // [audio-thread]
     void (*on_thread_pool_exec)(UserObject&, u32 task_index) {};
@@ -79,6 +85,11 @@ struct PluginCallbacks {
     bool (*load_state)(UserObject&, clap_istream const& stream) = [](UserObject&, clap_istream const&) {
         return true;
     };
+};
+
+struct PluginInstanceMessages {
+    virtual void UpdateGui() = 0;
+    virtual ~PluginInstanceMessages() = default;
 };
 
 constexpr char const* k_supported_gui_api =
@@ -180,3 +191,5 @@ clap_plugin const* CreateFloeInstance(clap_host const* clap_host);
 // Request that the host resize the available space for the plugin. The host will likely follow this up with a
 // call to set_size(). So we shouldn't do that ourselves.
 void RequestGuiResize(clap_plugin const& plugin);
+
+void OnPollThread(clap_plugin const& plugin);

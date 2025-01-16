@@ -30,7 +30,7 @@
 
 [[clang::no_destroy]] Optional<SharedEngineSystems> g_shared_engine_systems {};
 
-struct FloePluginInstance {
+struct FloePluginInstance : PluginInstanceMessages {
     FloePluginInstance(clap_host const* clap_host, FloeInstanceIndex id);
     ~FloePluginInstance() { g_log.Trace(k_main_log_module); }
 
@@ -48,6 +48,12 @@ struct FloePluginInstance {
         .colour = 0xa88e39,
         .object_id = index,
     };
+
+    void UpdateGui() override {
+        ASSERT(IsMainThread(host));
+        if (gui_platform)
+            gui_platform->last_result.ElevateUpdateRequest(GuiFrameResult::UpdateRequest::Animate);
+    }
 
     ArenaAllocator arena {PageAllocator::Instance()};
 
@@ -638,6 +644,7 @@ clap_plugin_timer_support const floe_timer {
             PollForSettingsFileChanges(g_shared_engine_systems->settings);
 
             if (floe.gui_platform) OnClapTimer(*floe.gui_platform, timer_id);
+            if (floe.engine) EngineCallbacks().on_timer(*floe.engine, timer_id);
         },
 };
 
@@ -710,9 +717,11 @@ clap_plugin const floe_plugin {
 
         g_log.Debug(k_clap_log_module, "#{} init", floe.index);
 
+        floe.engine.Emplace(floe.host, *g_shared_engine_systems, floe);
+
+        // IMPORTANT: engine is initialised first
         g_shared_engine_systems->RegisterFloeInstance(&floe.clap_plugin, floe.index);
 
-        floe.engine.Emplace(floe.host, *g_shared_engine_systems);
         floe.initialised = true;
         return true;
     },
@@ -742,6 +751,7 @@ clap_plugin const floe_plugin {
                     floe_plugin.deactivate(plugin);
                 }
 
+                // IMPORTANT: engine is cleared after
                 g_shared_engine_systems->UnregisterFloeInstance(floe.index);
 
                 floe.engine.Clear();
@@ -931,13 +941,9 @@ clap_plugin const floe_plugin {
             if (floe.engine) {
                 PollForSettingsFileChanges(g_shared_engine_systems->settings);
 
-                bool update_gui = false;
                 auto& processor = floe.engine->processor;
-                processor.processor_callbacks.on_main_thread(processor, update_gui);
-                EngineCallbacks().on_main_thread(*floe.engine, update_gui);
-                if (update_gui && floe.gui_platform)
-                    floe.gui_platform->last_result.ElevateUpdateRequest(
-                        GuiFrameResult::UpdateRequest::Animate);
+                processor.processor_callbacks.on_main_thread(processor);
+                EngineCallbacks().on_main_thread(*floe.engine);
             }
         },
 };
@@ -951,6 +957,7 @@ FloePluginInstance::FloePluginInstance(clap_host const* host, FloeInstanceIndex 
 }
 
 clap_plugin const* CreateFloeInstance(clap_host const* host) {
+    // TODO: fix g_num_floe_instances; instances can be added and removed - we can't just count it
     if (g_num_floe_instances == k_max_num_floe_instances) return nullptr;
     auto result = FloeInstanceAllocator().New<FloePluginInstance>(host, g_num_floe_instances++);
     return &result->clap_plugin;
@@ -958,6 +965,7 @@ clap_plugin const* CreateFloeInstance(clap_host const* host) {
 
 void RequestGuiResize(clap_plugin const& plugin) {
     auto const& floe = *(FloePluginInstance*)plugin.plugin_data;
+    ASSERT(IsMainThread(floe.host));
     if (!floe.gui_platform) return;
     auto const host_gui = (clap_host_gui const*)floe.host.get_extension(&floe.host, CLAP_EXT_GUI);
     if (host_gui) {
@@ -967,4 +975,12 @@ void RequestGuiResize(clap_plugin const& plugin) {
         host_gui->resize_hints_changed(&floe.host);
         host_gui->request_resize(&floe.host, size.width, size.height);
     }
+}
+
+void OnPollThread(clap_plugin const& plugin) {
+    // We're on the polling thread, but we can be sure that the engine is active because our
+    // Register/Unregister calls are correctly before/after.
+    auto& floe = *(FloePluginInstance*)plugin.plugin_data;
+    ASSERT(floe.engine);
+    EngineCallbacks().on_poll_thread(*floe.engine);
 }

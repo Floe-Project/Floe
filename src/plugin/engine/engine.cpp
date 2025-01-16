@@ -11,6 +11,7 @@
 #include "common_infrastructure/constants.hpp"
 #include "common_infrastructure/sample_library/attribution_requirements.hpp"
 
+#include "clap/ext/timer-support.h"
 #include "descriptors/param_descriptors.hpp"
 #include "plugin/plugin.hpp"
 #include "processor/layer_processor.hpp"
@@ -57,27 +58,27 @@ static void UpdateAttributionText(Engine& engine, ArenaAllocator& scratch_arena)
 
     sample_lib::ImpulseResponse const* ir = nullptr;
     sample_lib_server::RefCounted<sample_lib::Library> ir_lib {};
-    DEFER { ir_lib.Release(); };
-    if (auto const ir_id = engine.processor.convo.ir_id) {
-        ir_lib = sample_lib_server::FindLibraryRetained(engine.shared_engine_systems.sample_library_server,
-                                                        ir_id->library);
-        if (ir_lib) {
-            if (auto const found_ir = ir_lib->irs_by_name.Find(ir_id->ir_name)) ir = *found_ir;
+    DEFER { ir_lib.Release(); }; // IMPORTANT: release before we return
+    if (engine.processor.params[(usize)ParamIndex::ConvolutionReverbOn].ValueAsBool()) {
+        if (auto const ir_id = engine.processor.convo.ir_id) {
+            ir_lib =
+                sample_lib_server::FindLibraryRetained(engine.shared_engine_systems.sample_library_server,
+                                                       ir_id->library);
+            if (ir_lib) {
+                if (auto const found_ir = ir_lib->irs_by_name.Find(ir_id->ir_name)) ir = *found_ir;
+            }
         }
     }
 
     UpdateAttributionText(engine.attribution_requirements, scratch_arena, insts, ir);
-}
 
-static void RequestGuiRedraw(Engine& engine) {
-    engine.processor.for_main_thread.flags.FetchOr(AudioProcessor::MainThreadCallbackFlagsUpdateGui,
-                                                   RmwMemoryOrder::Acquire);
-    engine.processor.host.request_callback(&engine.host);
+    // TODO: if the attributions have changed, we should update the GUI
 }
 
 static void SetLastSnapshot(Engine& engine, StateSnapshotWithMetadata const& state) {
     engine.last_snapshot.Set(state);
-    RequestGuiRedraw(engine);
+    engine.update_gui.Store(true, StoreMemoryOrder::Relaxed);
+    engine.host.request_callback(&engine.host);
     // do this at the end because the pending state could be the arg of this function
     engine.pending_state_change.Clear();
 }
@@ -121,8 +122,8 @@ static void LoadNewState(Engine& engine, StateSnapshotWithMetadata const& state,
         ApplyNewState(engine.processor, state.state, source);
         SetLastSnapshot(engine, state);
 
-        ArenaAllocatorWithInlineStorage<1000> scratch_arena {PageAllocator::Instance()};
-        UpdateAttributionText(engine, scratch_arena);
+        MarkNeedsAttributionTextUpdate(engine.attribution_requirements);
+        engine.host.request_callback(&engine.host);
     } else {
         engine.pending_state_change.Emplace();
         auto& pending = *engine.pending_state_change;
@@ -290,8 +291,8 @@ static void SampleLibraryResourceLoaded(Engine& engine, sample_lib_server::LoadR
         case Source::Count: PanicIfReached(); break;
     }
 
-    engine.processor.for_main_thread.flags.FetchOr(AudioProcessor::MainThreadCallbackFlagsUpdateGui,
-                                                   RmwMemoryOrder::Relaxed);
+    engine.update_gui.Store(true, StoreMemoryOrder::Relaxed);
+    engine.host.request_callback(&engine.host);
 }
 
 StateSnapshot CurrentStateSnapshot(Engine const& engine) {
@@ -380,7 +381,8 @@ void LoadConvolutionIr(Engine& engine, Optional<sample_lib::IrId> ir_id) {
                              engine.sample_lib_server_async_channel,
                              *ir_id);
     else {
-        UpdateAttributionText(engine, engine.error_arena);
+        MarkNeedsAttributionTextUpdate(engine.attribution_requirements);
+        engine.host.request_callback(&engine.host);
         SetConvolutionIrAudioData(engine.processor, nullptr);
     }
 }
@@ -400,12 +402,12 @@ void LoadInstrument(Engine& engine, u32 layer_index, InstrumentId inst_id) {
                                  });
             break;
         case InstrumentType::None: {
-            engine.attribution_requirements.last_update_time = {};
+            MarkNeedsAttributionTextUpdate(engine.attribution_requirements);
             SetInstrument(engine.processor, layer_index, InstrumentType::None);
             break;
         }
         case InstrumentType::WaveformSynth:
-            engine.attribution_requirements.last_update_time = {};
+            MarkNeedsAttributionTextUpdate(engine.attribution_requirements);
             SetInstrument(engine.processor, layer_index, inst_id.Get<WaveformType>());
             break;
     }
@@ -502,26 +504,35 @@ void RunFunctionOnMainThread(Engine& engine, ThreadsafeFunctionQueue::Function f
     engine.host.request_callback(&engine.host);
 }
 
-static void OnMainThread(Engine& engine, bool& update_gui) {
-    (void)update_gui;
-
+static void OnMainThread(Engine& engine) {
     ArenaAllocatorWithInlineStorage<4000> scratch_arena {PageAllocator::Instance()};
     while (auto f = engine.main_thread_callbacks.TryPop(scratch_arena))
         (*f)();
 
-    bool resources_loaded = false;
     while (auto r = engine.sample_lib_server_async_channel.results.TryPop()) {
         SampleLibraryResourceLoaded(engine, *r);
         r->Release();
-        resources_loaded = true;
+        MarkNeedsAttributionTextUpdate(engine.attribution_requirements);
     }
-    if (resources_loaded || AttributionTextNeedsUpdate(engine.attribution_requirements))
+    if (AttributionTextNeedsUpdate(engine.attribution_requirements))
         UpdateAttributionText(engine, scratch_arena);
+
+    if (engine.update_gui.Exchange(false, RmwMemoryOrder::Relaxed))
+        engine.plugin_instance_messages.UpdateGui();
 }
 
-Engine::Engine(clap_host const& host, SharedEngineSystems& shared_engine_systems)
+void Engine::OnProcessorChange(ChangeFlags flags) {
+    if (flags & ProcessorListener::IrChanged) MarkNeedsAttributionTextUpdate(attribution_requirements);
+    update_gui.Store(true, StoreMemoryOrder::Relaxed);
+    host.request_callback(&host);
+}
+
+Engine::Engine(clap_host const& host,
+               SharedEngineSystems& shared_engine_systems,
+               PluginInstanceMessages& plugin_instance_messages)
     : host(host)
     , shared_engine_systems(shared_engine_systems)
+    , plugin_instance_messages(plugin_instance_messages)
     , sample_lib_server_async_channel {sample_lib_server::OpenAsyncCommsChannel(
           shared_engine_systems.sample_library_server,
           {
@@ -561,6 +572,16 @@ Engine::Engine(clap_host const& host, SharedEngineSystems& shared_engine_systems
                                      listing.listing ? &*listing.listing : nullptr);
             });
         });
+
+    {
+        if (auto const timer_support =
+                (clap_host_timer_support const*)host.get_extension(&host, CLAP_EXT_TIMER_SUPPORT);
+            timer_support && timer_support->register_timer) {
+            clap_id timer_id;
+            if (timer_support->register_timer(&host, 1000, &timer_id)) attributions_poll_timer_id = timer_id;
+        }
+        if (!attributions_poll_timer_id) shared_engine_systems.StartPollingThreadIfNeeded();
+    }
 }
 
 Engine::~Engine() {
@@ -571,6 +592,26 @@ Engine::~Engine() {
 
     sample_lib_server::CloseAsyncCommsChannel(shared_engine_systems.sample_library_server,
                                               sample_lib_server_async_channel);
+
+    if (attributions_poll_timer_id) {
+        auto const timer_support =
+            (clap_host_timer_support const*)host.get_extension(&host, CLAP_EXT_TIMER_SUPPORT);
+        if (timer_support && timer_support->unregister_timer)
+            timer_support->unregister_timer(&host, *attributions_poll_timer_id);
+    }
+}
+
+static void PluginOnTimer(Engine& engine, clap_id timer_id) {
+    ASSERT(IsMainThread(engine.host));
+    if (timer_id == *engine.attributions_poll_timer_id) {
+        if (AttributionTextNeedsUpdate(engine.attribution_requirements))
+            UpdateAttributionText(engine, engine.error_arena);
+    }
+}
+
+static void PluginOnPollThread(Engine& engine) {
+    // we want to poll for attribution text updates
+    engine.host.request_callback(&engine.host);
 }
 
 usize MegabytesUsedBySamples(Engine const& engine) {
@@ -659,6 +700,8 @@ static bool PluginLoadState(Engine& engine, clap_istream const& stream) {
 PluginCallbacks<Engine> EngineCallbacks() {
     PluginCallbacks<Engine> result {
         .on_main_thread = OnMainThread,
+        .on_timer = PluginOnTimer,
+        .on_poll_thread = PluginOnPollThread,
         .save_state = PluginSaveState,
         .load_state = PluginLoadState,
     };

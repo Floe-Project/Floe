@@ -171,8 +171,22 @@ class AtomicBitset {
     Array<Atomic<u64>, k_num_elements> m_elements {};
 };
 
+struct ProcessorListener {
+    enum : u32 {
+        ParamChanged = 1 << 0,
+        StatusChanged = 1 << 1,
+        InstrumentChanged = 1 << 2,
+        NotesChanged = 1 << 3,
+        IrChanged = 1 << 4,
+        PeakMeterChanged = 1 << 5,
+    };
+    using ChangeFlags = u32;
+    virtual void OnProcessorChange(ChangeFlags) = 0; // called from audio thread
+    virtual ~ProcessorListener() = default;
+};
+
 struct AudioProcessor {
-    AudioProcessor(clap_host const& host);
+    AudioProcessor(clap_host const& host, ProcessorListener& listener);
     ~AudioProcessor();
 
     clap_host const& host;
@@ -180,6 +194,8 @@ struct AudioProcessor {
     FloeSmoothedValueSystem smoothed_value_system;
     ArenaAllocator audio_data_allocator {PageAllocator::Instance()};
     AudioProcessingContext audio_processing_context;
+
+    ProcessorListener& listener;
 
     int restart_voices_for_layer_bitset {};
     bool fx_need_another_frame_of_processing = {};
@@ -211,15 +227,7 @@ struct AudioProcessor {
 
     Bitset<k_num_parameters> pending_param_changes;
 
-    enum MainThreadCallbackFlags {
-        MainThreadCallbackFlagsUpdateGui = 1 << 0,
-        MainThreadCallbackFlagsRescanParameters = 1 << 1,
-    };
-
-    struct {
-        AtomicBitset<128> notes_currently_held;
-        Atomic<u32> flags {0}; // MainThreadCallbackFlags bitset
-    } for_main_thread;
+    AtomicBitset<128> notes_currently_held;
 
     clap_process_status previous_process_status {-1};
 

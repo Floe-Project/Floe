@@ -10,7 +10,7 @@
 Optional<KeyboardGuiKeyPressed> KeyboardGui(Gui* g, Rect r, int starting_octave) {
     auto& imgui = g->imgui;
 
-    auto const keyboard = g->engine.processor.for_main_thread.notes_currently_held.GetBlockwise();
+    auto const keyboard = g->engine.processor.notes_currently_held.GetBlockwise();
     auto const& voices_per_midi_note = g->engine.processor.voice_pool.voices_per_midi_note_for_gui;
 
     auto const col_black_key = LiveCol(imgui, UiColMap::KeyboardBlackKey);

@@ -9,6 +9,24 @@
 #include "plugin/plugin.hpp"
 #include "settings/settings_file.hpp"
 
+void SharedEngineSystems::StartPollingThreadIfNeeded() {
+    if (polling_running.Load(LoadMemoryOrder::Relaxed)) return;
+    polling_running.Store(1, StoreMemoryOrder::Relaxed);
+    polling_thread.Start(
+        [this]() {
+            while (polling_running.Load(LoadMemoryOrder::Relaxed)) {
+                WaitIfValueIsExpected(polling_running, 1, 1000u);
+                {
+                    floe_instances_mutex.Lock();
+                    DEFER { floe_instances_mutex.Unlock(); };
+                    for (auto plugin : floe_instances)
+                        if (plugin) OnPollThread(*plugin);
+                }
+            }
+        },
+        "polling");
+}
+
 SharedEngineSystems::SharedEngineSystems()
     : arena(PageAllocator::Instance(), Kb(4))
     , paths(CreateFloePaths(arena))
@@ -51,6 +69,12 @@ SharedEngineSystems::SharedEngineSystems()
 }
 
 SharedEngineSystems::~SharedEngineSystems() {
+    if (polling_running.Load(LoadMemoryOrder::Relaxed)) {
+        polling_running.Store(0, StoreMemoryOrder::Relaxed);
+        WakeWaitingThreads(polling_running, NumWaitingThreads::All);
+        polling_thread.Join();
+    }
+
     settings.tracking.on_filesystem_change = {};
 
     DeinitSettingsFile(settings);
@@ -63,7 +87,13 @@ SharedEngineSystems::~SharedEngineSystems() {
 }
 
 void SharedEngineSystems::RegisterFloeInstance(clap_plugin const* plugin, FloeInstanceIndex index) {
+    floe_instances_mutex.Lock();
+    DEFER { floe_instances_mutex.Unlock(); };
     floe_instances[index] = plugin;
 }
 
-void SharedEngineSystems::UnregisterFloeInstance(FloeInstanceIndex index) { floe_instances[index] = nullptr; }
+void SharedEngineSystems::UnregisterFloeInstance(FloeInstanceIndex index) {
+    floe_instances_mutex.Lock();
+    DEFER { floe_instances_mutex.Unlock(); };
+    floe_instances[index] = nullptr;
+}

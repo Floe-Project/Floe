@@ -14,7 +14,7 @@
 #include "state/instrument.hpp"
 #include "state/state_snapshot.hpp"
 
-struct Engine {
+struct Engine : ProcessorListener {
     struct PendingStateChange {
         ~PendingStateChange() {
             for (auto& r : retained_results)
@@ -46,22 +46,32 @@ struct Engine {
         StateSnapshotMetadata metadata {};
     };
 
-    Engine(clap_host const& host, SharedEngineSystems& shared_engine_systems);
+    Engine(clap_host const& host,
+           SharedEngineSystems& shared_engine_systems,
+           PluginInstanceMessages& plugin_instance_messages);
     ~Engine();
 
     auto& Layer(u32 index) { return processor.layer_processors[index]; }
+
+    void OnProcessorChange(ChangeFlags) override;
 
     clap_host const& host;
     SharedEngineSystems& shared_engine_systems;
     ArenaAllocator error_arena {PageAllocator::Instance()};
     ThreadsafeErrorNotifications error_notifications {};
-    AudioProcessor processor {host};
+    AudioProcessor processor {host, *this};
+    PluginInstanceMessages& plugin_instance_messages;
 
     u64 random_seed = (u64)NanosecondsSinceEpoch();
 
+    Atomic<bool> update_gui = false;
+
     package::InstallJobs package_install_jobs {};
 
-    AttributionRequirementsState attribution_requirements {};
+    AttributionRequirementsState attribution_requirements {
+        .shared_attributions_store = shared_engine_systems.shared_attributions_store,
+    };
+    Optional<clap_id> attributions_poll_timer_id {};
 
     // IMPORTANT: debug-only, remove this
     DynamicArrayBounded<char, 200> state_change_description {};

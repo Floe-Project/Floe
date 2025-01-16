@@ -186,10 +186,16 @@ PUBLIC Style LayerHeadingButton(imgui::Context const& imgui, u32 highlight_col =
     return s;
 }
 
-PUBLIC Style ParameterToggleButton(imgui::Context const& imgui, u32 highlight_col = {}) {
+PUBLIC Style ParameterToggleButton(imgui::Context const& imgui,
+                                   u32 highlight_col = {},
+                                   bool _greyed_out = false) {
     auto s = LayerHeadingButton(imgui, highlight_col);
     s.icon_and_text.on_icon = ICON_FA_TOGGLE_ON;
     s.icon_and_text.off_icon = ICON_FA_TOGGLE_OFF;
+    s.text_cols.grey_out_aware = true;
+    s.greyed_out = _greyed_out;
+    s.text_cols.greyed_out = LiveCol(imgui, UiColMap::MenuButtonTextInactive);
+    s.text_cols.greyed_out_on = s.text_cols.greyed_out;
     return s;
 }
 

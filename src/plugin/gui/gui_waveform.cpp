@@ -15,6 +15,8 @@
 #include "processor/sample_processing.hpp"
 
 static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Rect waveform_r) {
+    if (layer->inst.tag == InstrumentType::WaveformSynth) return;
+
     auto& engine = g->engine;
     auto& imgui = g->imgui;
 

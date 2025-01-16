@@ -872,15 +872,16 @@ void Draw(Gui* g,
             {
                 GUIDoSampleWaveform(g, layer, layout::GetRect(g->layout, c.main.waveform));
 
+                bool const greyed_out = layer->inst.tag == InstrumentType::WaveformSynth;
                 buttons::Toggle(g,
                                 layer->params[ToInt(LayerParamIndex::Reverse)],
                                 c.main.reverse,
-                                buttons::ParameterToggleButton(g->imgui));
+                                buttons::ParameterToggleButton(g->imgui, {}, greyed_out));
 
                 buttons::PopupWithItems(g,
                                         layer->params[ToInt(LayerParamIndex::LoopMode)],
                                         c.main.loop_mode,
-                                        buttons::ParameterPopupButton(g->imgui));
+                                        buttons::ParameterPopupButton(g->imgui, greyed_out));
             }
 
             draw_divider(c.main.divider);

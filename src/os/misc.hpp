@@ -180,51 +180,19 @@ Mutex& StdStreamMutex(StdStream stream);
 
 ErrorCodeOr<String> ReadAllStdin(Allocator& allocator);
 
-constexpr String k_day_names_short[] = {
-    "Sun"_s,
-    "Mon"_s,
-    "Tue"_s,
-    "Wed"_s,
-    "Thu"_s,
-    "Fri"_s,
-    "Sat"_s,
-};
-
-constexpr String k_month_names_short[] = {
-    "Jan"_s,
-    "Feb"_s,
-    "Mar"_s,
-    "Apr"_s,
-    "May"_s,
-    "Jun"_s,
-    "Jul"_s,
-    "Aug"_s,
-    "Sep"_s,
-    "Oct"_s,
-    "Nov"_s,
-    "Dec"_s,
-};
-
-struct DateAndTime {
-    String MonthName() const { return k_month_names_short[months_since_jan]; }
-    String DayName() const { return k_day_names_short[days_since_sunday]; }
-    s16 year;
-    s8 months_since_jan; // 0-11
-    s8 day_of_month; // 0-31
-    s8 days_since_sunday; // 0-6
-    s8 hour;
-    s8 minute;
-    s8 second;
-    s16 millisecond;
-    s16 microsecond;
-    s16 nanosecond;
-};
-
 s128 NanosecondsSinceEpoch();
 DateAndTime LocalTimeFromNanosecondsSinceEpoch(s128 nanoseconds);
+DateAndTime UtcTimeFromNanosecondsSinceEpoch(s128 nanoseconds);
+PUBLIC inline DateAndTime LocalTimeNow() {
+    return LocalTimeFromNanosecondsSinceEpoch(NanosecondsSinceEpoch());
+}
+PUBLIC inline DateAndTime UtcTimeNow() { return UtcTimeFromNanosecondsSinceEpoch(NanosecondsSinceEpoch()); }
 
 constexpr auto k_timestamp_max_str_size = "2022-12-31 23:59:59.999"_s.size;
 DynamicArrayBounded<char, k_timestamp_max_str_size> Timestamp();
+
+// RFC 3339, YYYY-MM-DDThh:mm:ss.sssZ
+ErrorCodeOr<void> IsoUtcTimestamp(DateAndTime date, Writer writer);
 
 // A point in time. It has no defined reference. You can't get seconds-from-Epoch from it, for example.
 class TimePoint {

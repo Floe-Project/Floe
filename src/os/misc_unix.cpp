@@ -273,6 +273,33 @@ DateAndTime LocalTimeFromNanosecondsSinceEpoch(s128 nanoseconds) {
     };
 }
 
+DateAndTime UtcTimeFromNanosecondsSinceEpoch(s128 nanoseconds) {
+    timespec ts;
+    ts.tv_sec = (time_t)(nanoseconds / (s128)1e+9);
+    ts.tv_nsec = (long)(nanoseconds % (s128)1e+9);
+    struct tm result {};
+    gmtime_r(&ts.tv_sec, &result);
+
+    auto ns = ts.tv_nsec;
+    auto const milliseconds = CheckedCast<s16>(ns / 1'000'000);
+    ns %= 1'000'000;
+    auto const microseconds = CheckedCast<s16>(ns / 1'000);
+    ns %= 1'000;
+
+    return DateAndTime {
+        .year = (s16)(result.tm_year + 1900),
+        .months_since_jan = (s8)result.tm_mon,
+        .day_of_month = (s8)result.tm_mday,
+        .days_since_sunday = (s8)result.tm_wday,
+        .hour = (s8)result.tm_hour,
+        .minute = (s8)result.tm_min,
+        .second = (s8)result.tm_sec,
+        .millisecond = milliseconds,
+        .microsecond = microseconds,
+        .nanosecond = (s16)ns,
+    };
+}
+
 TimePoint TimePoint::Now() {
 #if __APPLE__
     return TimePoint((s64)clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW));

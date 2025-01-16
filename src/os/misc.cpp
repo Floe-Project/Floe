@@ -69,13 +69,7 @@ bool IsRunningUnderWine() { return false; }
 #endif
 
 DynamicArrayBounded<char, k_timestamp_max_str_size> Timestamp() {
-    auto const t = LocalTimeFromNanosecondsSinceEpoch(NanosecondsSinceEpoch());
-    return fmt::FormatInline<k_timestamp_max_str_size>("{}-{02}-{02} {02}:{02}:{02}.{03} ",
-                                                       t.year,
-                                                       t.months_since_jan + 1,
-                                                       t.day_of_month,
-                                                       t.hour,
-                                                       t.minute,
-                                                       t.second,
-                                                       t.millisecond);
+    return fmt::FormatInline<k_timestamp_max_str_size>(
+        "{}",
+        LocalTimeFromNanosecondsSinceEpoch(NanosecondsSinceEpoch()));
 }

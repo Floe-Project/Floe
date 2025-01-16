@@ -345,6 +345,32 @@ DateAndTime LocalTimeFromNanosecondsSinceEpoch(s128 nanoseconds) {
     };
 }
 
+DateAndTime UtctimeFromNanosecondsSinceEpoch(s128 nanoseconds) {
+    ULARGE_INTEGER const li {
+        .QuadPart = (ULONGLONG)(nanoseconds / 100) + k_epoch_offset,
+    };
+    FILETIME const gmt {
+        .dwLowDateTime = li.LowPart,
+        .dwHighDateTime = li.HighPart,
+    };
+
+    // IMPROVE: find a way to get beyond millisecond precision
+    SYSTEMTIME st;
+    FileTimeToSystemTime(&gmt, &st);
+    return {
+        .year = (s16)st.wYear,
+        .months_since_jan = (s8)(st.wMonth - 1),
+        .day_of_month = (s8)st.wDay,
+        .days_since_sunday = (s8)st.wDayOfWeek,
+        .hour = (s8)st.wHour,
+        .minute = (s8)st.wMinute,
+        .second = (s8)st.wSecond,
+        .millisecond = (s16)st.wMilliseconds,
+        .microsecond = 0,
+        .nanosecond = 0,
+    };
+}
+
 TimePoint TimePoint::Now() {
     s64 result;
     LARGE_INTEGER counter;

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "foundation/foundation.hpp"
+#include "os/misc.hpp"
 #include "tests/framework.hpp"
 #include "utils/leak_detecting_allocator.hpp"
 
@@ -1743,6 +1744,20 @@ TEST_CASE(TestFormat) {
         tester.log.Debug(k_foundation_mod_cat, "struct3 is: {}", fmt::DumpStruct(other));
 
         tester.log.Debug(k_foundation_mod_cat, "struct4 is: {}", fmt::DumpStruct(tester));
+    }
+
+    SUBCASE("DateAndTime") {
+        DateAndTime date {
+            .year = 2021,
+            .months_since_jan = 1,
+            .day_of_month = 1,
+            .hour = 12,
+            .minute = 30,
+            .second = 45,
+            .millisecond = 123,
+        };
+        CHECK_EQ(fmt::Format(a, "{}", date), "2021-02-01 12:30:45.123"_s);
+        CHECK_EQ(fmt::Format(a, "{t}", date), "2021-02-01T12:30:45.123Z"_s);
     }
 
     SUBCASE("Join") {

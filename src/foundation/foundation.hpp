@@ -14,6 +14,7 @@
 #include "utils/random.hpp" // IWYU pragma: export
 #include "utils/simd.hpp" // IWYU pragma: export
 #include "utils/string.hpp" // IWYU pragma: export
+#include "utils/time.hpp" // IWYU pragma: export
 #include "utils/version.hpp" // IWYU pragma: export
 #include "utils/writer.hpp" // IWYU pragma: export
 

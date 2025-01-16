@@ -10,7 +10,9 @@
 #include "foundation/error/error_code.hpp"
 #include "foundation/error/error_trace.hpp"
 #include "foundation/universal_defs.hpp"
+#include "foundation/utils/random.hpp"
 #include "foundation/utils/string.hpp"
+#include "foundation/utils/time.hpp"
 #include "foundation/utils/writer.hpp"
 
 namespace fmt {
@@ -49,6 +51,7 @@ integer              | x          | Hexadecimal (lowercase)
 integer              | X          | Hexadecimal (uppercase)
 integer              | +          | Show a + if the number is positive
 ErrorCode            | u          | Don't print the debug info of the error
+DateAndTime          | t          | Print as RFC 3339 with UTC timezone
 
 */
 
@@ -62,6 +65,7 @@ struct FormatOptions {
     bool error_debug_info = true;
     u64 required_width {};
     char padding_character {};
+    bool rfc3339_utc = false;
 };
 
 PUBLIC constexpr ErrorCodeOr<void>
@@ -241,6 +245,30 @@ PUBLIC ErrorCodeOr<void> ValueToString(Writer writer, T const& value, FormatOpti
         return k_success;
     }
 
+    else if constexpr (Same<Type, DateAndTime>) {
+        auto size = "YYYY-MM-DDThh:mm:ss.sssZ"_s.size;
+        if (!options.rfc3339_utc) size -= 1; // we don't need the Z
+
+        TRY(PadToRequiredWidthIfNeeded(writer, options, size));
+        TRY(ValueToString(writer, value.year, {.required_width = 4, .padding_character = '0'}));
+        TRY(writer.WriteChar('-'));
+        TRY(ValueToString(writer,
+                          value.months_since_jan + 1,
+                          {.required_width = 2, .padding_character = '0'}));
+        TRY(writer.WriteChar('-'));
+        TRY(ValueToString(writer, value.day_of_month, {.required_width = 2, .padding_character = '0'}));
+        TRY(writer.WriteChar(options.rfc3339_utc ? 'T' : ' '));
+        TRY(ValueToString(writer, value.hour, {.required_width = 2, .padding_character = '0'}));
+        TRY(writer.WriteChar(':'));
+        TRY(ValueToString(writer, value.minute, {.required_width = 2, .padding_character = '0'}));
+        TRY(writer.WriteChar(':'));
+        TRY(ValueToString(writer, value.second, {.required_width = 2, .padding_character = '0'}));
+        TRY(writer.WriteChar('.'));
+        TRY(ValueToString(writer, value.millisecond, {.required_width = 3, .padding_character = '0'}));
+        if (options.rfc3339_utc) TRY(writer.WriteChar('Z'));
+        return k_success;
+    }
+
     else if constexpr (Convertible<Type, String> || ConstructibleWithArgs<String, Type>) {
         String const str {value};
         TRY(PadToRequiredWidthIfNeeded(writer, options, str.size));
@@ -413,6 +441,7 @@ static ErrorCodeOr<BraceSectionResult> ParseBraceSection(Writer writer, char con
                         break;
                     }
                     case 'u': options.error_debug_info = false; break;
+                    case 't': options.rfc3339_utc = true; break;
                     default: Panic("Unknown options inside {}");
                 }
             }
@@ -629,6 +658,22 @@ PUBLIC usize PrettyFileSize(f64 size, char* buffer) {
 PUBLIC_INLINE DynamicArrayBounded<char, 8> PrettyFileSize(f64 size) {
     DynamicArrayBounded<char, 8> result;
     result.size = PrettyFileSize(size, result.data);
+    return result;
+}
+
+// Write 32 chars, using all 8 bytes of each u64
+PUBLIC void Uuid(u64& seed, char* out) {
+    for (usize i = 0; i < 4; i++) {
+        u64 const r = RandomU64(seed);
+        for (usize j = 0; j < 8; j++)
+            out[i * 8 + j] = "0123456789abcdef"[r >> (j * 4) & 0xf];
+    }
+}
+
+PUBLIC DynamicArrayBounded<char, 32> Uuid(u64& seed) {
+    DynamicArrayBounded<char, 32> result;
+    result.size = 32;
+    Uuid(seed, (char*)result.data);
     return result;
 }
 

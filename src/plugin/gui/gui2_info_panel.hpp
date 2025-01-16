@@ -83,15 +83,6 @@ static void LibrariesInfoPanel(GuiBoxSystem& box_system, InfoPanelContext& conte
                       .size_from_text = true,
                   });
         }
-        if (lib->additional_authors) {
-            DoBox(box_system,
-                  {
-                      .parent = card,
-                      .text = *lib->additional_authors,
-                      .wrap_width = k_wrap_to_parent,
-                      .size_from_text = true,
-                  });
-        }
 
         auto do_text_line = [&](String text) {
             DoBox(box_system,
@@ -118,12 +109,6 @@ static void LibrariesInfoPanel(GuiBoxSystem& box_system, InfoPanelContext& conte
                                      }
                                      s;
                                  })));
-        if (lib->license_name) do_text_line(fmt::Assign(buffer, "License: {}", lib->license_name));
-        if (lib->converted_by)
-            do_text_line(fmt::Assign(buffer, "Converted to Floe by: {}", *lib->converted_by));
-
-        if (lib->attribution_required || lib->files_requiring_attribution.size)
-            do_text_line("Attribution required: true");
 
         auto const button_row = DoBox(box_system,
                                       {
@@ -150,10 +135,6 @@ static void LibrariesInfoPanel(GuiBoxSystem& box_system, InfoPanelContext& conte
                                  "Open Folder",
                                  fmt::Assign(buffer, "Open {} in {}", *dir, GetFileBrowserAppName())))
                 OpenFolderInFileBrowser(*dir);
-
-        if (lib->license_url)
-            if (DialogTextButton(box_system, button_row, "License", *lib->license_url))
-                OpenUrlInBrowser(*lib->license_url);
     }
 
     // make sure there's a gap at the end of the scroll region

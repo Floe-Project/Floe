@@ -822,11 +822,7 @@ struct TableFields<Library> {
         LibraryUrl,
         Description,
         Author,
-        LicenseName,
-        LicenseUrl,
-        AdditionalAuthorInfo,
         AuthorUrl,
-        AttributionRequired,
         MinorVersion,
         BackgroundImagePath,
         IconImagePath,
@@ -886,7 +882,7 @@ struct TableFields<Library> {
                 return {
                     .name = "author",
                     .description_sentence =
-                        "Who created this library. Keep it short and use additional_authors for more details.",
+                        "Who created this library. Keep it short, use the description for more details.",
                     .example = "Found-sound Labs",
                     .lua_type = LUA_TSTRING,
                     .required = true,
@@ -899,33 +895,6 @@ struct TableFields<Library> {
                                            (int)k_max_library_author_size);
                         },
                 };
-            case Field::LicenseName:
-                return {
-                    .name = "license_name",
-                    .description_sentence = "Name of the license.",
-                    .example = "CC-BY-4.0",
-                    .lua_type = LUA_TSTRING,
-                    .required = false,
-                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.license_name = StringFromTop(ctx); },
-                };
-            case Field::LicenseUrl:
-                return {
-                    .name = "license_url",
-                    .description_sentence = "URL to the license.",
-                    .example = "https://creativecommons.org/licenses/by/4.0/",
-                    .lua_type = LUA_TSTRING,
-                    .required = false,
-                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.license_url = StringFromTop(ctx); },
-                };
-            case Field::AdditionalAuthorInfo:
-                return {
-                    .name = "additional_authors",
-                    .description_sentence = "Additional authors: the institution, the team, etc.",
-                    .example = "John Doe & Audio Team, University of Example",
-                    .lua_type = LUA_TSTRING,
-                    .required = false,
-                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.additional_authors = StringFromTop(ctx); },
-                };
             case Field::AuthorUrl:
                 return {
                     .name = "author_url",
@@ -934,20 +903,6 @@ struct TableFields<Library> {
                     .lua_type = LUA_TSTRING,
                     .required = false,
                     .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.author_url = StringFromTop(ctx); },
-                };
-            case Field::AttributionRequired:
-                return {
-                    .name = "attribution_required",
-                    .description_sentence =
-                        "Whether or not attribution is required when you use this library. If true, you must fill in the license name and license URL too.",
-                    .example = "true",
-                    .default_value = "false",
-                    .lua_type = LUA_TBOOLEAN,
-                    .required = false,
-                    .set =
-                        [](SET_FIELD_VALUE_ARGS) {
-                            FIELD_OBJ.attribution_required = lua_toboolean(ctx.lua, -1);
-                        },
                 };
             case Field::MinorVersion:
                 return {
@@ -1471,28 +1426,6 @@ LibraryPtrOrError ReadLua(Reader& reader,
         }
 
         library->files_requiring_attribution = ctx.files_requiring_attribution.ToOwnedTable();
-
-        if (library->attribution_required) {
-            String missing_field {};
-            if (!library->license_name)
-                missing_field =
-                    TableFields<Library>::FieldInfo(TableFields<Library>::Field::LicenseName).name;
-            else if (!library->license_url)
-                missing_field = TableFields<Library>::FieldInfo(TableFields<Library>::Field::LicenseUrl).name;
-            else if (!library->additional_authors)
-                missing_field =
-                    TableFields<Library>::FieldInfo(TableFields<Library>::Field::AdditionalAuthorInfo).name;
-
-            if (missing_field.size)
-                return ErrorAndNotify(ctx, LuaErrorCode::Runtime, [&](DynamicArray<char>& message) {
-                    fmt::Append(
-                        message,
-                        "missing field: {}, required when {} is set",
-                        missing_field,
-                        TableFields<Library>::FieldInfo(TableFields<Library>::Field::AttributionRequired)
-                            .name);
-                });
-        }
 
         return library;
     } catch (OutOfMemory const& e) {

@@ -101,7 +101,6 @@ struct AttributionsStore {
 
 static void AddAttributionItems(AttributionRequirementsState& reqs,
                                 DynamicArray<AttributionsStore::Item>& items,
-                                ArenaAllocator& arena,
                                 Span<sample_lib::Instrument const*> insts,
                                 sample_lib::ImpulseResponse const* ir) {
     auto const timestamp = CheckedCast<u32>(NanosecondsSinceEpoch() / 1'000'000'000);
@@ -128,26 +127,9 @@ static void AddAttributionItems(AttributionRequirementsState& reqs,
         return nullptr;
     };
 
-    auto add_library_whole_attribution_if_needed = [&](sample_lib::Library const& lib) {
-        if (!lib.attribution_required) return;
-        String attributed_to = lib.author;
-        if (lib.additional_authors)
-            attributed_to = fmt::Format(arena, "{}, {}", attributed_to, *lib.additional_authors);
-        add_if_not_already_there({
-            .instance_id = reqs.instance_id,
-            .time_seconds_since_epoch = timestamp,
-            .title = lib.name,
-            .license_name = lib.license_name,
-            .license_url = lib.license_url,
-            .attributed_to = attributed_to,
-            .attribution_url = lib.author_url,
-        });
-    };
-
     for (auto& i : insts) {
         auto const& lib = i->library;
 
-        add_library_whole_attribution_if_needed(lib);
         if (lib.files_requiring_attribution.size) {
             for (auto const& r : i->regions) {
                 if (auto const attr = attribution_for_path(lib, r.file.path.str)) {
@@ -167,7 +149,6 @@ static void AddAttributionItems(AttributionRequirementsState& reqs,
 
     if (ir) {
         auto const& lib = ir->library;
-        add_library_whole_attribution_if_needed(lib);
         if (lib.files_requiring_attribution.size) {
             if (auto const attr = attribution_for_path(lib, ir->path.str)) {
                 add_if_not_already_there({
@@ -247,7 +228,7 @@ PUBLIC void UpdateAttributionText(AttributionRequirementsState& reqs,
                                   Span<sample_lib::Instrument const*> insts,
                                   sample_lib::ImpulseResponse const* ir) {
     DynamicArray<AttributionsStore::Item> items {scratch_arena};
-    AddAttributionItems(reqs, items, scratch_arena, insts, ir);
+    AddAttributionItems(reqs, items, insts, ir);
     SyncItemsWithSharedMemory(reqs, items, scratch_arena);
 
     auto& out = reqs.formatted_text;

@@ -29,4 +29,4 @@ static constexpr ErrorCodeCategory k_web_error_category {
 PUBLIC ErrorCodeCategory const& ErrorCategoryForEnum(WebError) { return k_web_error_category; }
 
 // blocking
-ErrorCodeOr<String> HttpsGet(String url, Allocator& a);
+ErrorCodeOr<void> HttpsGet(String url, Writer writer);

@@ -10,7 +10,7 @@
 #include "misc.hpp"
 #include "web.hpp"
 
-ErrorCodeOr<String> HttpsGet(String url, Allocator& a) {
+ErrorCodeOr<void> HttpsGet(String url, Writer writer) {
     ArenaAllocatorWithInlineStorage<1000> temp_arena {Malloc::Instance()};
 
     URL_COMPONENTS url_comps {};
@@ -55,23 +55,19 @@ ErrorCodeOr<String> HttpsGet(String url, Allocator& a) {
         return ErrorCode {WebError::NetworkError};
 
     DWORD bytes_available = 0;
-    DynamicArray<char> out_buffer {a};
+    DynamicArray<u8> out_buffer {PageAllocator::Instance()};
     do {
         bytes_available = 0;
         if (WinHttpQueryDataAvailable(request, &bytes_available)) {
-            auto const write_index = out_buffer.size;
-            dyn::Resize(out_buffer, out_buffer.size + bytes_available);
+            dyn::Resize(out_buffer, bytes_available);
             DWORD bytes_read = 0;
-            if (!WinHttpReadData(request,
-                                 (LPVOID)(out_buffer.data + write_index),
-                                 bytes_available,
-                                 &bytes_read)) {
+            if (!WinHttpReadData(request, (LPVOID)(out_buffer.data), bytes_available, &bytes_read))
                 return ErrorCode {WebError::NetworkError};
-            }
+            TRY(writer.WriteBytes({out_buffer.data, bytes_read}));
         } else {
             return ErrorCode {WebError::NetworkError};
         }
     } while (bytes_available > 0);
 
-    return out_buffer.ToOwnedSpan();
+    return k_success;
 }

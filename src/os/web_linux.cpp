@@ -8,12 +8,12 @@
 #include "web.hpp"
 
 size_t WriteFunction(void* ptr, size_t size, size_t nmemb, void* data) {
-    auto& array = *(DynamicArray<char>*)data;
-    dyn::AppendSpan(array, String {(char const*)ptr, size * nmemb});
+    auto& writer = *(Writer*)data;
+    auto _ = writer.WriteBytes({(u8 const*)ptr, size * nmemb});
     return size * nmemb;
 }
 
-ErrorCodeOr<String> HttpsGet(String url, Allocator& a) {
+ErrorCodeOr<void> HttpsGet(String url, Writer writer) {
     // TODO: this shouldn't happen every call
     curl_global_init(CURL_GLOBAL_DEFAULT);
     DEFER { curl_global_cleanup(); };
@@ -27,9 +27,8 @@ ErrorCodeOr<String> HttpsGet(String url, Allocator& a) {
     curl_easy_setopt(curl, CURLOPT_URL, NullTerminated(url, arena));
     curl_easy_setopt(curl, CURLOPT_USERAGENT, "curl/7.42.0");
 
-    DynamicArray<char> result {a};
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteFunction);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &result);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &writer);
 
     char error_buffer[CURL_ERROR_SIZE] {};
     curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, error_buffer);
@@ -49,5 +48,5 @@ ErrorCodeOr<String> HttpsGet(String url, Allocator& a) {
         return ErrorCode {WebError::ApiError};
     }
 
-    return result.ToOwnedSpan();
+    return k_success;
 }

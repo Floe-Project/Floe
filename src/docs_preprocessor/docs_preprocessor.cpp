@@ -135,8 +135,9 @@ static ErrorCodeOr<String> PreprocessMarkdownBlob(String markdown_blob) {
 
         // get the latest release version and the download links
         {
-            auto const json_data =
-                TRY(HttpsGet("https://api.github.com/repos/Floe-Project/Floe/releases/latest", scratch));
+            DynamicArray<char> json_data {scratch};
+            TRY(HttpsGet("https://api.github.com/repos/Floe-Project/Floe/releases/latest",
+                         dyn::WriterFor(json_data)));
 
             String latest_release_version {};
             struct Asset {

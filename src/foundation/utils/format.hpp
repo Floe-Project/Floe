@@ -670,6 +670,12 @@ PUBLIC void Uuid(u64& seed, char* out) {
     }
 }
 
+PUBLIC String Uuid(u64& seed, Allocator& a) {
+    auto result = a.AllocateExactSizeUninitialised<char>(32);
+    Uuid(seed, result.data);
+    return result;
+}
+
 PUBLIC DynamicArrayBounded<char, 32> Uuid(u64& seed) {
     DynamicArrayBounded<char, 32> result;
     result.size = 32;

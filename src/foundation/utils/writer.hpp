@@ -54,39 +54,3 @@ struct Writer {
     void* object = {};
     usize bytes_written = {};
 };
-
-struct BufferedData {
-    ::Writer Writer() {
-        ::Writer result;
-        result.Set<BufferedData>(*this, [](BufferedData& self, Span<u8 const> bytes) -> ErrorCodeOr<void> {
-            // if we can't fit the bytes in the buffer, flush the buffer and try again
-            if (bytes.size > self.buffer.size - self.pos) {
-                auto const to_write = self.buffer.SubSpan(0, self.pos);
-                TRY(self.sub_writer.WriteBytes(to_write));
-                self.pos = 0;
-            }
-
-            // if the bytes are still too big, write them directly
-            if (bytes.size > self.buffer.size) return self.sub_writer.WriteBytes(bytes);
-
-            // otherwise, write them to the buffer
-            auto const to_write = bytes.SubSpan(0, self.buffer.size - self.pos);
-            CopyMemory(self.buffer.SubSpan(self.pos), to_write);
-
-            return k_success;
-        });
-        return result;
-    }
-
-    ErrorCodeOr<void> Flush() {
-        if (pos == 0) return k_success;
-        auto const to_write = buffer.SubSpan(0, pos);
-        TRY(sub_writer.WriteBytes(to_write));
-        pos = 0;
-        return k_success;
-    }
-
-    ::Writer sub_writer;
-    Span<u8> buffer;
-    usize pos = 0;
-};

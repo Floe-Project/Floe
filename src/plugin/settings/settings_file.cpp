@@ -377,16 +377,7 @@ ErrorCodeOr<void> WriteFile(Settings const& data, FloePaths const& paths, String
     TRY(file.Lock(FileLockType::Exclusive));
     DEFER { auto _ = file.Unlock(); };
 
-    auto file_writer = file.Writer();
-    BufferedData buffered_data {
-        .sub_writer = file_writer,
-        .buffer = scratch_arena.AllocateExactSizeUninitialised<u8>(2000),
-    };
-    Writer writer;
-    if constexpr (!file.k_is_buffered)
-        writer = buffered_data.Writer();
-    else
-        writer = file_writer;
+    auto writer = file.Writer();
 
     for (auto cc = data.midi.cc_to_param_mapping; cc != nullptr; cc = cc->next) {
         DynamicArray<char> buf {scratch_arena};
@@ -424,7 +415,6 @@ ErrorCodeOr<void> WriteFile(Settings const& data, FloePaths const& paths, String
     for (auto line : data.unknown_lines_from_file)
         TRY(fmt::AppendLineRaw(writer, line));
 
-    TRY(buffered_data.Flush());
     TRY(file.Flush());
 
     TRY(file.SetLastModifiedTimeNsSinceEpoch(time));
@@ -706,7 +696,7 @@ non_existent_key = novalue)foo"_s,
         CHECK_EQ(data.gui.high_contrast_gui, true);
         CHECK_EQ(data.gui.show_keyboard, true);
 
-        CHECK(data.midi.cc_to_param_mapping);
+        REQUIRE(data.midi.cc_to_param_mapping);
         CHECK_EQ(data.midi.cc_to_param_mapping->cc_num, 10);
         DynamicArrayBounded<u32, 3> expected_ids {ArrayT<u32>({1, 3, 4})};
         for (auto param = data.midi.cc_to_param_mapping->param; param != nullptr; param = param->next) {

@@ -53,8 +53,20 @@ using StacktraceStack = DynamicArrayBounded<uintptr, 32>;
 Optional<StacktraceStack> CurrentStacktrace(int skip_frames = 1);
 void InitStacktraceState();
 
+struct FrameInfo {
+    String function_name;
+    String filename;
+    int line;
+};
+
 MutableString CurrentStacktraceString(Allocator& a, StacktraceOptions options = {}, int skip_frames = 1);
 MutableString StacktraceString(StacktraceStack const&, Allocator& a, StacktraceOptions options = {});
+void CurrentStacktraceToCallback(FunctionRef<void(FrameInfo const&)> callback,
+                                 StacktraceOptions options = {},
+                                 int skip_frames = 1);
+void StacktraceToCallback(StacktraceStack const&,
+                          FunctionRef<void(FrameInfo const&)> callback,
+                          StacktraceOptions options = {});
 void PrintCurrentStacktrace(StdStream stream, StacktraceOptions options, int skip_frames);
 void WriteCurrentStacktrace(Writer writer, StacktraceOptions options, int skip_frames);
 

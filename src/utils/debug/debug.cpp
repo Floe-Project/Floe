@@ -428,6 +428,56 @@ MutableString CurrentStacktraceString(Allocator& a, StacktraceOptions options, i
     return result.ToOwnedSpan();
 }
 
+void StacktraceToCallback(StacktraceStack const& stack,
+                          FunctionRef<void(FrameInfo const&)> callback,
+                          StacktraceOptions options) {
+    auto& state = BacktraceState::Instance();
+    if (state.failed_init_error) return;
+
+    using CallbackType = decltype(callback);
+
+    struct Context {
+        CallbackType& callback;
+        StacktraceOptions const& options;
+    };
+    Context context {callback, options};
+
+    for (auto const pc : stack)
+        backtrace_pcinfo(
+            state.state,
+            pc,
+            [](void* data,
+               [[maybe_unused]] uintptr_t program_counter,
+               char const* filename,
+               int lineno,
+               char const* function) {
+                auto& ctx = *(Context*)data;
+
+                String function_name = {};
+                char* demangled_func = nullptr;
+                DEFER { free(demangled_func); };
+                if (function && ctx.options.demangle) {
+                    int status;
+                    demangled_func = abi::__cxa_demangle(function, nullptr, nullptr, &status);
+                    if (status == 0) function_name = FromNullTerminated(demangled_func);
+                }
+                if (!function_name.size) function_name = function ? FromNullTerminated(function) : ""_s;
+
+                ctx.callback({function_name, filename ? FromNullTerminated(filename) : ""_s, lineno});
+
+                return 0;
+            },
+            [](void*, char const*, int) {},
+            &context);
+}
+
+void CurrentStacktraceToCallback(FunctionRef<void(FrameInfo const&)> callback,
+                                 StacktraceOptions options,
+                                 int skip_frames) {
+    auto stack = CurrentStacktrace(skip_frames);
+    if (stack) StacktraceToCallback(*stack, callback, options);
+}
+
 void PrintCurrentStacktrace(StdStream stream, StacktraceOptions options, int skip_frames) {
     WriteCurrentStacktrace(StdWriter(stream), options, skip_frames);
 }

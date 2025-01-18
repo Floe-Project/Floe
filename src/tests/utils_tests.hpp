@@ -828,7 +828,7 @@ TEST_CASE(TestJsonWriter) {
         TRY(WriteArrayEnd(write_ctx));
 
         tester.log.Debug(k_utils_log_module, "{}", output);
-        REQUIRE(output.Items() == "[\"H:/Floe PresetsÉe\"]"_s);
+        CHECK_EQ(output.Items(), "[\"H:/Floe PresetsÉe\"]"_s);
     }
     return k_success;
 }

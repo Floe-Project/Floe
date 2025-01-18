@@ -22,6 +22,60 @@ struct WriteContext {
     int current_indent {0};
 };
 
+// we assume utf-8
+PUBLIC ErrorCodeOr<void> EncodeString(String str, Writer& out) {
+    for (usize i = 0; i < str.size;) {
+        auto const c = str[i];
+
+        usize utf8_size;
+        if (0 == ((s32)0xffffff80 & c))
+            utf8_size = 1;
+        else if (0 == ((s32)0xfffff800 & c))
+            utf8_size = 2;
+        else if (0 == ((s32)0xffff0000 & c))
+            utf8_size = 3;
+        else
+            utf8_size = 4;
+        DEFER { i += utf8_size; };
+
+        if (utf8_size == 1) {
+            switch (c) {
+                case '"': TRY(out.WriteChars("\\\"")); break;
+                case '\\': TRY(out.WriteChars("\\\\")); break;
+                case '\b': TRY(out.WriteChars("\\b")); break;
+                case '\f': TRY(out.WriteChars("\\f")); break;
+                case '\n': TRY(out.WriteChars("\\n")); break;
+                case '\r': TRY(out.WriteChars("\\r")); break;
+                case '\t': TRY(out.WriteChars("\\t")); break;
+                default: {
+                    if (c < 0x20) {
+                        TRY(out.WriteChars("\\u00"));
+                        auto hex =
+                            fmt::IntToString((u8)c, {.base = fmt::IntToStringOptions::Base::Hexadecimal});
+                        TRY(out.WriteChars(hex));
+                    } else {
+                        TRY(out.WriteChar(c));
+                    }
+                }
+            }
+        } else {
+            TRY(out.WriteChars(str.SubSpan(i, utf8_size)));
+        }
+    }
+
+    return k_success;
+}
+
+PUBLIC String EncodeString(String str, Allocator& alloc) {
+    DynamicArray<char> result(alloc);
+    result.Reserve(str.size + 2);
+    auto writer = dyn::WriterFor(result);
+
+    auto _ = EncodeString(str, writer);
+
+    return result.ToOwnedSpan();
+}
+
 namespace detail {
 
 static ErrorCodeOr<void> Append(WriteContext& ctx, char c) {
@@ -109,7 +163,6 @@ static ErrorCodeOr<void> WriteCloseContainer(WriteContext& ctx, char c) {
 } // namespace detail
 
 PUBLIC void ResetWriter(WriteContext& ctx) {
-    ctx.out = {};
     ctx.current_indent = 0;
     ctx.last_type = WrittenType::None;
 }
@@ -122,7 +175,7 @@ PUBLIC ErrorCodeOr<void> WriteKey(WriteContext& ctx, String key) {
     TRY(WriteCommaAndNewLine(ctx));
     TRY(WriteIndent(ctx));
     TRY(Append(ctx, '\"'));
-    TRY(Append(ctx, key));
+    TRY(EncodeString(key, ctx.out));
     TRY(Append(ctx, "\":"));
     if (ctx.add_whitespace) TRY(Append(ctx, ' '));
     ctx.last_type = WrittenType::Key;
@@ -175,12 +228,10 @@ PUBLIC ErrorCodeOr<void> WriteNull(WriteContext& ctx) {
 
 PUBLIC ErrorCodeOr<void> WriteValue(WriteContext& ctx, String val) {
     using namespace detail;
-    // IMPROVE: ensure escape characters are correct, and add slashes if they need
-    // it
 
     TRY(WriteValueIndent(ctx));
     TRY(Append(ctx, '\"'));
-    TRY(Append(ctx, val));
+    TRY(EncodeString(val, ctx.out));
     TRY(Append(ctx, '\"'));
     return k_success;
 }
@@ -221,35 +272,6 @@ PUBLIC ErrorCodeOr<void> WriteValue(WriteContext& ctx, Span<Type> const& val) {
 template <usize N>
 PUBLIC ErrorCodeOr<void> WriteKeyValue(WriteContext& ctx, String key, char const (&arr)[N]) {
     return WriteKeyValue(ctx, key, String(arr));
-}
-
-PUBLIC String EncodeString(String str, Allocator& alloc) {
-    DynamicArray<char> result(alloc);
-    result.Reserve(str.size + 2);
-
-    for (auto c : str) {
-        switch (c) {
-            case '"': dyn::AppendSpan(result, "\\\""); break;
-            case '\\': dyn::AppendSpan(result, "\\\\"); break;
-            case '\b': dyn::AppendSpan(result, "\\b"); break;
-            case '\f': dyn::AppendSpan(result, "\\f"); break;
-            case '\n': dyn::AppendSpan(result, "\\n"); break;
-            case '\r': dyn::AppendSpan(result, "\\r"); break;
-            case '\t': dyn::AppendSpan(result, "\\t"); break;
-            default: {
-                if (c < 0x20) {
-                    dyn::AppendSpan(result, "\\u00");
-                    dyn::AppendSpan(
-                        result,
-                        fmt::IntToString((u8)c, {.base = fmt::IntToStringOptions::Base::Hexadecimal}));
-                } else {
-                    dyn::Append(result, c);
-                }
-            }
-        }
-    }
-
-    return result.ToOwnedSpan();
 }
 
 } // namespace json

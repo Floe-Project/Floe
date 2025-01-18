@@ -34,7 +34,12 @@ external_resources := join(cache_dir, "external_resources")
 logos_abs_dir := join(justfile_directory(), external_resources, "Logos")
 
 default: 
-  just $DEFAULT_CMD
+  #!/usr/bin/env bash
+  if [[ -z "${DEFAULT_CMD:-}" ]]; then
+    just build native
+  else
+    just $DEFAULT_CMD
+  fi
 
 alias pre-debug := build
 

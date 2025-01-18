@@ -155,7 +155,7 @@ ErrorCodeOr<void> File::SetLastModifiedTimeNsSinceEpoch(s128 ns_since_epoch) {
 }
 
 void File::CloseFile() {
-    if (handle) close(handle);
+    if (handle != -1) close(handle);
     handle = -1;
 }
 

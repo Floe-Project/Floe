@@ -110,7 +110,7 @@ void OpenUrlInBrowser(String url) {
 }
 
 u64 RandomSeed() {
-    u32 low = arc4random();
-    u32 high = arc4random();
-    return (u64)low | ((u64)high << 32);
+    u64 result;
+    arc4random_buf(&result, sizeof(result));
+    return result;
 }

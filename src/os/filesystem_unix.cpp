@@ -123,20 +123,20 @@ ErrorCodeOr<void> File::Lock(FileLockType type) {
         }
         r;
     });
-    auto const result = flock(fileno((FILE*)m_file), operation);
+    auto const result = flock(handle, operation);
     if (result != 0) return FilesystemErrnoErrorCode(errno, "flock");
     return k_success;
 }
 
 ErrorCodeOr<void> File::Unlock() {
-    auto const result = flock(fileno((FILE*)m_file), LOCK_UN);
+    auto const result = flock(handle, LOCK_UN);
     if (result != 0) return FilesystemErrnoErrorCode(errno, "flock");
     return k_success;
 }
 
 ErrorCodeOr<s128> File::LastModifiedTimeNsSinceEpoch() {
     struct stat file_stat;
-    if (fstat(fileno((FILE*)m_file), &file_stat) != 0) return FilesystemErrnoErrorCode(errno, "fstat");
+    if (fstat(handle, &file_stat) != 0) return FilesystemErrnoErrorCode(errno, "fstat");
 #if IS_LINUX
     auto const modified_time = file_stat.st_mtim;
 #elif IS_MACOS
@@ -150,25 +150,26 @@ ErrorCodeOr<void> File::SetLastModifiedTimeNsSinceEpoch(s128 ns_since_epoch) {
     times[0].tv_sec = decltype(times[0].tv_sec)(ns_since_epoch / (s128)1'000'000'000);
     times[0].tv_nsec = ns_since_epoch % 1'000'000'000;
     times[1] = times[0];
-    if (futimens(fileno((FILE*)m_file), times) != 0) return FilesystemErrnoErrorCode(errno, "futimens");
+    if (futimens(handle, times) != 0) return FilesystemErrnoErrorCode(errno, "futimens");
     return k_success;
 }
 
 void File::CloseFile() {
-    if (m_file) fclose((FILE*)m_file);
+    if (handle) close(handle);
+    handle = -1;
 }
 
 ErrorCodeOr<void> File::Flush() {
-    auto result = fflush((FILE*)m_file);
+    auto result = fsync(handle);
     if (result == 0) return k_success;
-    return FilesystemErrnoErrorCode(errno, "fflush");
+    return FilesystemErrnoErrorCode(errno, "fsync");
 }
 
 static_assert(sizeof(off_t) == 8, "you must #define _FILE_OFFSET_BITS 64");
 
 ErrorCodeOr<u64> File::CurrentPosition() {
-    auto const result = (s64)ftello((FILE*)m_file);
-    if (result == k_ftell_error) return FilesystemErrnoErrorCode(errno, "ftell");
+    auto const result = lseek(handle, 0, SEEK_CUR);
+    if (result == -1) return FilesystemErrnoErrorCode(errno, "lseek");
     ASSERT(result >= 0);
     if (result < 0) return 0ull;
     return (u64)result;
@@ -180,27 +181,25 @@ ErrorCodeOr<void> File::Seek(s64 const offset, SeekOrigin origin) {
         switch (origin) {
             case SeekOrigin::Start: r = SEEK_SET; break;
             case SeekOrigin::End: r = SEEK_END; break;
-            case SeekOrigin::Current: SEEK_CUR; break;
+            case SeekOrigin::Current: r = SEEK_CUR; break;
         }
         r;
     });
-    auto const result = fseeko((FILE*)m_file, offset, origin_flag);
-    if (result != k_fseek_success) return FilesystemErrnoErrorCode(errno, "fseek");
+    auto const result = lseek(handle, offset, origin_flag);
+    if (result == -1) return FilesystemErrnoErrorCode(errno, "lseek");
     return k_success;
 }
 
 ErrorCodeOr<usize> File::Write(Span<u8 const> data) {
-    clearerr((FILE*)m_file);
-    auto const num_written = ::fwrite(data.data, 1, data.size, (FILE*)m_file);
-    if (auto ec = ferror((FILE*)m_file)) return FilesystemErrnoErrorCode(ec, "fwrite");
-    return num_written;
+    auto const num_written = ::write(handle, data.data, data.size);
+    if (num_written == -1) return FilesystemErrnoErrorCode(errno, "write");
+    return static_cast<usize>(num_written);
 }
 
 ErrorCodeOr<usize> File::Read(void* data, usize num_bytes) {
-    clearerr((FILE*)m_file);
-    auto const num_read = ::fread(data, 1, num_bytes, (FILE*)m_file);
-    if (auto ec = ferror((FILE*)m_file)) return FilesystemErrnoErrorCode(ec, "fread");
-    return num_read;
+    auto const num_read = ::read(handle, data, num_bytes);
+    if (num_read == -1) return FilesystemErrnoErrorCode(errno, "read");
+    return static_cast<usize>(num_read);
 }
 
 ErrorCodeOr<u64> File::FileSize() {
@@ -210,33 +209,45 @@ ErrorCodeOr<u64> File::FileSize() {
     return size.Value();
 }
 
+ErrorCodeOr<void> File::Truncate(u64 new_size) {
+    auto const result = ftruncate(handle, (off_t)new_size);
+    if (result != 0) return FilesystemErrnoErrorCode(errno, "ftruncate");
+    return k_success;
+}
+
 ErrorCodeOr<File> OpenFile(String filename, FileMode mode) {
     PathArena temp_allocator {Malloc::Instance()};
 
-    auto const mode_str = ({
-        char const* m {};
-        switch (mode) {
-            case FileMode::Read: m = "r"; break;
-            case FileMode::Write: m = "w"; break;
-            case FileMode::WriteEveryoneReadWrite: m = "w"; break;
-            case FileMode::Append: m = "a"; break;
-            case FileMode::WriteNoOverwrite: m = "w"; break;
-        }
-        m;
-    });
+    int flags = 0;
+    mode_t perms = 0644; // Default permissions
 
-    auto file = fopen(NullTerminated(filename, temp_allocator), mode_str);
-    if (file == nullptr) return FilesystemErrnoErrorCode(errno, "fopen");
+    switch (mode) {
+        case FileMode::Read: flags = O_RDONLY; break;
+        case FileMode::Write: flags = O_WRONLY | O_CREAT | O_TRUNC; break;
+        case FileMode::WriteNoOverwrite:
+            flags = O_WRONLY | O_CREAT | O_EXCL; // O_EXCL ensures file doesn't exist
+            break;
+        case FileMode::ReadWrite:
+            flags = O_RDWR | O_CREAT; // Create if doesn't exist, open for read/write
+            break;
+        case FileMode::WriteEveryoneReadWrite:
+            flags = O_WRONLY | O_CREAT | O_TRUNC; // Will set permissions with fchmod later
+            break;
+        case FileMode::Append: flags = O_WRONLY | O_CREAT | O_APPEND; break;
+    }
+
+    int fd = open(NullTerminated(filename, temp_allocator), flags, perms);
+    if (fd == -1) return FilesystemErrnoErrorCode(errno, "open");
 
     if (mode == FileMode::WriteEveryoneReadWrite) {
         // It's necessary to use fchmod() to set the permissions instead of open(mode = 0666) because open()
         // uses umask and so will likely not actually set the permissions we want. fchmod() doesn't have that
         // problem.
-        if (fchmod(fileno(file), 0666) != 0) {
-            fclose(file);
+        if (fchmod(fd, 0666) != 0) {
+            close(fd);
             return FilesystemErrnoErrorCode(errno, "fchmod");
         }
     }
 
-    return File(file);
+    return File(fd);
 }

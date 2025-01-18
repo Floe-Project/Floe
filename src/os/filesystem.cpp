@@ -272,11 +272,9 @@ ErrorCodeOr<Optional<Entry>> Next(RecursiveIterator& it, ArenaAllocator& result_
 ErrorCodeOr<bool> DeleteDirectoryIfMacBundle(String) { return false; }
 #endif
 
-void* File::NativeFileHandle() { return m_file; }
-
 File::~File() {
     CloseFile();
-    m_file = nullptr;
+    handle = File::k_invalid_file_handle;
 }
 
 ErrorCodeOr<usize> WriteFile(String filename, Span<u8 const> data) {

@@ -35,6 +35,7 @@ enum class FileMode : u32 {
     Read,
     Write, // overwrites if it already exists
     WriteNoOverwrite,
+    ReadWrite, // create if it doesn't exist
 
     // Overwrites if it already exists (but doesn't change file permissions). If it doesn't exist, it will be
     // created with read/write permissions for everyone.
@@ -47,14 +48,24 @@ enum class FileLockType { Exclusive, Shared };
 
 // File is created with OpenFile()
 struct File {
+#if IS_WINDOWS
+    using NativeFileHandle = void*;
+    static constexpr NativeFileHandle k_invalid_file_handle = nullptr;
+    static constexpr bool k_is_buffered = true;
+#else
+    using NativeFileHandle = int;
+    static constexpr NativeFileHandle k_invalid_file_handle = -1;
+    static constexpr bool k_is_buffered = false;
+#endif
+
     File(File&& other) {
-        m_file = other.m_file;
-        other.m_file = nullptr;
+        handle = other.handle;
+        other.handle = k_invalid_file_handle;
     }
     File& operator=(File&& other) {
         CloseFile();
-        m_file = other.m_file;
-        other.m_file = nullptr;
+        handle = other.handle;
+        other.handle = k_invalid_file_handle;
         return *this;
     }
     File(File const& other) = delete;
@@ -75,7 +86,6 @@ struct File {
     ErrorCodeOr<s128> LastModifiedTimeNsSinceEpoch();
     ErrorCodeOr<void> SetLastModifiedTimeNsSinceEpoch(s128 time);
 
-    void* NativeFileHandle();
     ErrorCodeOr<MutableString>
     ReadSectionOfFile(usize const bytes_offset_from_file_start, usize const size_in_bytes, Allocator& a);
     ErrorCodeOr<MutableString> ReadWholeFile(Allocator& a);
@@ -91,6 +101,8 @@ struct File {
         return result;
     }
 
+    ErrorCodeOr<void> Truncate(u64 new_size);
+
     ErrorCodeOr<usize> Write(Span<u8 const> data);
     ErrorCodeOr<usize> Write(Span<char const> data) { return Write(data.ToByteSpan()); }
 
@@ -105,14 +117,13 @@ struct File {
 
     friend ErrorCodeOr<File> OpenFile(String filename, FileMode mode);
 
-  private:
-    File(void* file) : m_file(file) {}
+    NativeFileHandle handle {};
 
+  private:
+    File(NativeFileHandle file) : handle(file) {}
     void CloseFile();
     static constexpr int k_fseek_success = 0;
     static constexpr s64 k_ftell_error = -1;
-
-    void* m_file {};
 };
 
 ErrorCodeOr<File> OpenFile(String filename, FileMode mode);

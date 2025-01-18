@@ -62,21 +62,28 @@ ErrorCodeOr<void> File::Lock(FileLockType type) {
     }
 
     OVERLAPPED overlapped {};
-    if (!LockFileEx(m_file, flags, 0, MAXDWORD, MAXDWORD, &overlapped))
+    if (!LockFileEx(handle, flags, 0, MAXDWORD, MAXDWORD, &overlapped))
         return FilesystemWin32ErrorCode(GetLastError(), "LockFileEx");
     return k_success;
 }
 
 ErrorCodeOr<void> File::Unlock() {
     OVERLAPPED overlapped {};
-    if (!UnlockFileEx(m_file, 0, MAXDWORD, MAXDWORD, &overlapped))
+    if (!UnlockFileEx(handle, 0, MAXDWORD, MAXDWORD, &overlapped))
         return FilesystemWin32ErrorCode(GetLastError(), "UnlockFileEx");
+    return k_success;
+}
+
+ErrorCodeOr<void> File::Truncate(u64 new_size) {
+    if (!SetFilePointerEx(handle, {.QuadPart = (LONGLONG)new_size}, nullptr, FILE_BEGIN))
+        return FilesystemWin32ErrorCode(GetLastError(), "SetFilePointerEx");
+    if (!SetEndOfFile(handle)) return FilesystemWin32ErrorCode(GetLastError(), "SetEndOfFile");
     return k_success;
 }
 
 ErrorCodeOr<s128> File::LastModifiedTimeNsSinceEpoch() {
     FILETIME file_time;
-    if (!GetFileTime(m_file, nullptr, nullptr, &file_time))
+    if (!GetFileTime(handle, nullptr, nullptr, &file_time))
         return FilesystemWin32ErrorCode(GetLastError(), "GetFileTime");
 
     ULARGE_INTEGER file_time_int;
@@ -99,23 +106,23 @@ ErrorCodeOr<void> File::SetLastModifiedTimeNsSinceEpoch(s128 time) {
     file_time.dwLowDateTime = file_time_int.LowPart;
     file_time.dwHighDateTime = file_time_int.HighPart;
 
-    if (!SetFileTime(m_file, nullptr, nullptr, &file_time))
+    if (!SetFileTime(handle, nullptr, nullptr, &file_time))
         return FilesystemWin32ErrorCode(GetLastError(), "SetFileTime");
     return k_success;
 }
 
 void File::CloseFile() {
-    if (m_file) CloseHandle(m_file);
+    if (handle) CloseHandle(handle);
 }
 
 ErrorCodeOr<void> File::Flush() {
-    if (!FlushFileBuffers(m_file)) return FilesystemWin32ErrorCode(GetLastError(), "Flush");
+    if (!FlushFileBuffers(handle)) return FilesystemWin32ErrorCode(GetLastError(), "Flush");
     return k_success;
 }
 
 ErrorCodeOr<u64> File::CurrentPosition() {
     LARGE_INTEGER pos;
-    if (!SetFilePointerEx(m_file, {.QuadPart = 0}, &pos, FILE_CURRENT))
+    if (!SetFilePointerEx(handle, {.QuadPart = 0}, &pos, FILE_CURRENT))
         return FilesystemWin32ErrorCode(GetLastError(), "SetFilePointerEx");
     return (u64)pos.QuadPart;
 }
@@ -130,28 +137,28 @@ ErrorCodeOr<void> File::Seek(int64_t offset, SeekOrigin origin) {
         }
         m;
     });
-    if (!SetFilePointerEx(m_file, {.QuadPart = offset}, nullptr, move_method))
+    if (!SetFilePointerEx(handle, {.QuadPart = offset}, nullptr, move_method))
         return FilesystemWin32ErrorCode(GetLastError(), "SetFilePointerEx");
     return k_success;
 }
 
 ErrorCodeOr<usize> File::Write(Span<u8 const> data) {
     DWORD num_written;
-    if (!WriteFile(m_file, data.data, CheckedCast<DWORD>(data.size), &num_written, nullptr))
+    if (!WriteFile(handle, data.data, CheckedCast<DWORD>(data.size), &num_written, nullptr))
         return FilesystemWin32ErrorCode(GetLastError(), "WriteFile");
     return CheckedCast<usize>(num_written);
 }
 
 ErrorCodeOr<usize> File::Read(void* data, usize num_bytes) {
     DWORD num_read;
-    if (!ReadFile(m_file, data, CheckedCast<DWORD>(num_bytes), &num_read, nullptr))
+    if (!ReadFile(handle, data, CheckedCast<DWORD>(num_bytes), &num_read, nullptr))
         return FilesystemWin32ErrorCode(GetLastError(), "ReadFile");
     return CheckedCast<usize>(num_read);
 }
 
 ErrorCodeOr<u64> File::FileSize() {
     LARGE_INTEGER size;
-    if (!GetFileSizeEx(m_file, &size)) return FilesystemWin32ErrorCode(GetLastError(), "GetFileSize");
+    if (!GetFileSizeEx(handle, &size)) return FilesystemWin32ErrorCode(GetLastError(), "GetFileSize");
     return CheckedCast<u64>(size.QuadPart);
 }
 
@@ -166,6 +173,7 @@ ErrorCodeOr<File> OpenFile(String filename, FileMode mode) {
         switch (mode) {
             case FileMode::Read: d = GENERIC_READ; break;
             case FileMode::Write: d = GENERIC_WRITE; break;
+            case FileMode::ReadWrite: d = GENERIC_READ | GENERIC_WRITE; break;
             case FileMode::Append: d = FILE_APPEND_DATA; break;
             case FileMode::WriteNoOverwrite: d = GENERIC_WRITE; break;
             case FileMode::WriteEveryoneReadWrite: d = GENERIC_WRITE; break;
@@ -178,6 +186,7 @@ ErrorCodeOr<File> OpenFile(String filename, FileMode mode) {
         switch (mode) {
             case FileMode::Read: c = OPEN_EXISTING; break;
             case FileMode::Write: c = CREATE_ALWAYS; break;
+            case FileMode::ReadWrite: c = OPEN_ALWAYS; break;
             case FileMode::Append: c = OPEN_ALWAYS; break;
             case FileMode::WriteNoOverwrite: c = CREATE_NEW; break;
             case FileMode::WriteEveryoneReadWrite: c = CREATE_ALWAYS; break;
@@ -190,6 +199,7 @@ ErrorCodeOr<File> OpenFile(String filename, FileMode mode) {
         switch (mode) {
             case FileMode::Read: s = FILE_SHARE_READ; break;
             case FileMode::Write: s = 0; break;
+            case FileMode::ReadWrite: s = FILE_SHARE_READ | FILE_SHARE_WRITE; break;
             case FileMode::Append: s = 0; break;
             case FileMode::WriteNoOverwrite: s = 0; break;
             case FileMode::WriteEveryoneReadWrite: s = 0; break;

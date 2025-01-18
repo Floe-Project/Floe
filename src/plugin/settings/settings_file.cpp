@@ -377,7 +377,16 @@ ErrorCodeOr<void> WriteFile(Settings const& data, FloePaths const& paths, String
     TRY(file.Lock(FileLockType::Exclusive));
     DEFER { auto _ = file.Unlock(); };
 
-    auto writer = file.Writer();
+    auto file_writer = file.Writer();
+    BufferedData buffered_data {
+        .sub_writer = file_writer,
+        .buffer = scratch_arena.AllocateExactSizeUninitialised<u8>(2000),
+    };
+    Writer writer;
+    if constexpr (!file.k_is_buffered)
+        writer = buffered_data.Writer();
+    else
+        writer = file_writer;
 
     for (auto cc = data.midi.cc_to_param_mapping; cc != nullptr; cc = cc->next) {
         DynamicArray<char> buf {scratch_arena};
@@ -415,6 +424,7 @@ ErrorCodeOr<void> WriteFile(Settings const& data, FloePaths const& paths, String
     for (auto line : data.unknown_lines_from_file)
         TRY(fmt::AppendLineRaw(writer, line));
 
+    TRY(buffered_data.Flush());
     TRY(file.Flush());
 
     TRY(file.SetLastModifiedTimeNsSinceEpoch(time));

@@ -27,6 +27,12 @@ PUBLIC inline void CopyMemory(void* destination, void const* source, usize num_b
         ((u8*)destination)[i] = ((u8 const*)source)[i];
 }
 
+PUBLIC inline void CopyMemory(Span<u8> destination, Span<u8 const> source) {
+    ASSERT(destination.size >= source.size);
+    for (auto const i : Range(source.size))
+        destination[i] = source[i];
+}
+
 // aka memmove
 PUBLIC inline void MoveMemory(void* destination, void const* source, usize num_bytes) {
     if (destination == source) return;

@@ -36,3 +36,13 @@ struct TryHelpers {
 
 #define TRY(expression)   TRY_X(TryHelpers, expression)
 #define TRY_H(expression) TRY_X(H, expression) // you must define a custom TryHelpers with the name H
+
+#define TRY_OR(expression, fallback_code)                                                                    \
+    ({                                                                                                       \
+        auto&& CONCAT(try_result, __LINE__) = (expression);                                                  \
+        if (TryHelpers::IsError(CONCAT(try_result, __LINE__))) [[unlikely]] {                                \
+            [[maybe_unused]] auto const error = TryHelpers::ExtractError(CONCAT(try_result, __LINE__));      \
+            fallback_code;                                                                                   \
+        }                                                                                                    \
+        TryHelpers::ExtractValue(CONCAT(try_result, __LINE__));                                              \
+    })

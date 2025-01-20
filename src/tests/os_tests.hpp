@@ -1083,6 +1083,12 @@ TEST_CASE(TestOsRandom) {
     return k_success;
 }
 
+TEST_CASE(TestGetInfo) {
+    GetOsInfo();
+    GetSystemStats();
+    return k_success;
+}
+
 TEST_REGISTRATION(RegisterOsTests) {
     REGISTER_TEST(TestEpochTime);
     REGISTER_TEST(TestThread);
@@ -1096,4 +1102,5 @@ TEST_REGISTRATION(RegisterOsTests) {
     REGISTER_TEST(TestTimePoint);
     REGISTER_TEST(TestLockableSharedMemory);
     REGISTER_TEST(TestOsRandom);
+    REGISTER_TEST(TestGetInfo);
 }

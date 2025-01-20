@@ -55,6 +55,8 @@ DateAndTime          | t          | Print as RFC 3339 with UTC timezone
 
 */
 
+constexpr usize k_rfc3339_utc_size = "YYYY-MM-ddTHH:mm:ss.sssZ"_s.size;
+
 struct FormatOptions {
     bool auto_float_format = false;
     bool lowercase_hex = false;
@@ -246,7 +248,7 @@ PUBLIC ErrorCodeOr<void> ValueToString(Writer writer, T const& value, FormatOpti
     }
 
     else if constexpr (Same<Type, DateAndTime>) {
-        auto size = "YYYY-MM-DDThh:mm:ss.sssZ"_s.size;
+        auto size = k_rfc3339_utc_size;
         if (!options.rfc3339_utc) size -= 1; // we don't need the Z
 
         TRY(PadToRequiredWidthIfNeeded(writer, options, size));
@@ -683,6 +685,14 @@ PUBLIC String Uuid(u64& seed, Allocator& a) {
 PUBLIC UuidArray Uuid(u64& seed) {
     UuidArray result;
     Uuid(seed, (char*)result.data);
+    return result;
+}
+
+using TimestampRfc3339UtcArray = DynamicArrayBounded<char, k_rfc3339_utc_size>;
+
+PUBLIC TimestampRfc3339UtcArray TimestampRfc3339Utc(DateAndTime date) {
+    DynamicArrayBounded<char, k_rfc3339_utc_size> result;
+    auto const _ = ValueToString(dyn::WriterFor(result), date, {.rfc3339_utc = true});
     return result;
 }
 

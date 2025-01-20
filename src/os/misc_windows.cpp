@@ -359,7 +359,7 @@ DateAndTime LocalTimeFromNanosecondsSinceEpoch(s128 nanoseconds) {
     };
 }
 
-DateAndTime UtctimeFromNanosecondsSinceEpoch(s128 nanoseconds) {
+DateAndTime UtcTimeFromNanosecondsSinceEpoch(s128 nanoseconds) {
     ULARGE_INTEGER const li {
         .QuadPart = (ULONGLONG)(nanoseconds / 100) + k_epoch_offset,
     };

@@ -213,6 +213,9 @@ PUBLIC inline DateAndTime LocalTimeNow() {
     return LocalTimeFromNanosecondsSinceEpoch(NanosecondsSinceEpoch());
 }
 PUBLIC inline DateAndTime UtcTimeNow() { return UtcTimeFromNanosecondsSinceEpoch(NanosecondsSinceEpoch()); }
+PUBLIC fmt::TimestampRfc3339UtcArray TimestampRfc3339UtcNow() {
+    return fmt::TimestampRfc3339Utc(UtcTimeNow());
+}
 
 constexpr auto k_timestamp_max_str_size = "2022-12-31 23:59:59.999"_s.size;
 DynamicArrayBounded<char, k_timestamp_max_str_size> Timestamp();

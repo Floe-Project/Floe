@@ -4,7 +4,9 @@
 #include <time.h>
 
 #include "os/filesystem.hpp"
+#include "os/web.hpp"
 #include "tests/framework.hpp"
+#include "utils/json/json_reader.hpp"
 
 constexpr auto k_os_log_module = "os"_log_module;
 
@@ -1089,6 +1091,67 @@ TEST_CASE(TestGetInfo) {
     return k_success;
 }
 
+TEST_CASE(TestWeb) {
+    // get/post to httpbin.org
+    WebGlobalInit();
+    DEFER { WebGlobalCleanup(); };
+
+    {
+        DynamicArray<char> buffer {tester.scratch_arena};
+        auto o = HttpsGet("https://httpbin.org/get", dyn::WriterFor(buffer));
+        if (o.HasError()) {
+            LOG_WARNING("Failed to HttpsGet: {}", o.Error());
+        } else {
+            tester.log.Debug(k_os_log_module, "GET response: {}", buffer);
+
+            using namespace json;
+            auto parse_o = json::Parse(buffer,
+                                       [&](EventHandlerStack&, Event const& event) {
+                                           String url;
+                                           if (SetIfMatchingRef(event, "url", url)) {
+                                               CHECK_EQ(url, "https://httpbin.org/get"_s);
+                                               return true;
+                                           }
+                                           return false;
+                                       },
+                                       tester.scratch_arena,
+                                       {});
+            if (parse_o.HasError())
+                TEST_FAILED("Invalid HTTP GET JSON response: {}", parse_o.Error().message);
+        }
+    }
+
+    {
+        DynamicArray<char> buffer {tester.scratch_arena};
+        auto o = HttpsPost("https://httpbin.org/post",
+                           "data",
+                           Array {"Content-Type: text/plain"_s},
+                           dyn::WriterFor(buffer));
+        if (o.HasError()) {
+            LOG_WARNING("Failed to HttpsPost: {}", o.Error());
+        } else {
+            tester.log.Debug(k_os_log_module, "POST response: {}", buffer);
+
+            using namespace json;
+            auto parse_o = json::Parse(buffer,
+                                       [&](EventHandlerStack&, Event const& event) {
+                                           String data;
+                                           if (SetIfMatchingRef(event, "data", data)) {
+                                               CHECK_EQ(data, "data"_s);
+                                               return true;
+                                           }
+                                           return false;
+                                       },
+                                       tester.scratch_arena,
+                                       {});
+            if (parse_o.HasError())
+                TEST_FAILED("Invalid HTTP POST JSON response: {}", parse_o.Error().message);
+        }
+    }
+
+    return k_success;
+}
+
 TEST_REGISTRATION(RegisterOsTests) {
     REGISTER_TEST(TestEpochTime);
     REGISTER_TEST(TestThread);
@@ -1103,4 +1166,5 @@ TEST_REGISTRATION(RegisterOsTests) {
     REGISTER_TEST(TestLockableSharedMemory);
     REGISTER_TEST(TestOsRandom);
     REGISTER_TEST(TestGetInfo);
+    REGISTER_TEST(TestWeb);
 }

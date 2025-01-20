@@ -135,6 +135,7 @@ static ErrorCodeOr<String> PreprocessMarkdownBlob(String markdown_blob) {
 
         // get the latest release version and the download links
         {
+
             DynamicArray<char> json_data {scratch};
             TRY(HttpsGet("https://api.github.com/repos/Floe-Project/Floe/releases/latest",
                          dyn::WriterFor(json_data)));
@@ -290,6 +291,9 @@ static ErrorCodeOr<int> Main(ArgsCstr args) {
         // Behaviour matching mdbook's python example
         if (NullTermStringsEqual(args.args[1], "supports")) return 0;
     }
+
+    WebGlobalInit();
+    DEFER { WebGlobalCleanup(); };
 
     ArenaAllocator arena {PageAllocator::Instance()};
 

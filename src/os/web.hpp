@@ -28,5 +28,9 @@ static constexpr ErrorCodeCategory k_web_error_category {
 
 PUBLIC ErrorCodeCategory const& ErrorCategoryForEnum(WebError) { return k_web_error_category; }
 
+void WebGlobalInit();
+void WebGlobalCleanup();
+
 // blocking
 ErrorCodeOr<void> HttpsGet(String url, Writer writer);
+ErrorCodeOr<void> HttpsPost(String url, String body, Span<String> headers, Optional<Writer> response_writer);

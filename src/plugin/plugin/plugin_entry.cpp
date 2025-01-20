@@ -70,7 +70,7 @@ extern "C" CLAP_EXPORT const clap_plugin_entry clap_entry = {
 
         g_log.Debug(k_clap_log_module, "init DSO");
         g_log.Info(k_global_log_module, "Floe version: " FLOE_VERSION_STRING);
-        g_log.Info(k_global_log_module, "OS: {}", OperatingSystemName());
+        g_log.Info(k_global_log_module, "OS: {}", GetOsInfo().name);
 
         return true;
     },

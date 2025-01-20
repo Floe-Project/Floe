@@ -11,6 +11,7 @@
 #include <AppKit/AppKit.h>
 #include <CoreServices/CoreServices.h>
 #include <sys/sysctl.h>
+#include <sys/utsname.h>
 #pragma clang diagnostic pop
 
 #include "foundation/foundation.hpp"
@@ -77,13 +78,32 @@ ErrorCode ErrorFromNSError(NSError* error, char const* extra_debug_info, SourceL
     return {*code_type, (s64)error.code, extra_debug_info, loc};
 }
 
-DynamicArrayBounded<char, 64> OperatingSystemName() {
-    NSOperatingSystemVersion version = [[NSProcessInfo processInfo] operatingSystemVersion];
+OsInfo GetOsInfo() {
+    OsInfo result {
+        .name = "macOS"_s,
+    };
 
-    return fmt::FormatInline<64>("macOS {}.{}.{}",
-                                 version.majorVersion,
-                                 version.minorVersion,
-                                 version.patchVersion);
+    // This code is based on Sentry's Native SDK
+    // Copyright (c) 2019 Sentry (https://sentry.io) and individual contributors.
+    // SPDX-License-Identifier: MIT
+    usize size = result.version.Capacity();
+    if (sysctlbyname("kern.osproductversion", result.version.data, &size, nullptr, 0) == 0) {
+        if (size <= result.version.Capacity()) {
+            result.version.size = size;
+            auto const num_dots = Count(result.version, '.');
+            if (num_dots < 2) dyn::AppendSpan(result.version, ".0");
+        }
+    }
+
+    size = result.build.Capacity();
+    if (sysctlbyname("kern.osversion", result.build.data, &size, nullptr, 0) == 0) {
+        if (size <= result.build.Capacity()) result.build.size = size;
+    }
+
+    struct utsname uts {};
+    if (uname(&uts) == 0) result.kernel_version = FromNullTerminated((char const*)uts.release);
+
+    return result;
 }
 
 String GetFileBrowserAppName() { return "Finder"; }

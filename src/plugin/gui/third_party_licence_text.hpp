@@ -92,6 +92,11 @@ static constexpr ThirdPartyLicence k_third_party_licence_texts[] = {
         .licence = MIT_LICENSE,
     },
     {
+        .name = "Sentry Native SDK",
+        .copyright = "Copyright (c) 2019 Sentry (https://sentry.io) and individual contributors",
+        .licence = MIT_LICENSE,
+    },
+    {
         .name = "FLAC Codec",
         .copyright = "Copyright (C) 2000-2009  Josh Coalson\nCopyright (C) 2011-2023  Xiph.Org Foundation",
         .licence = BSD_3_CLAUSE_LICENSE,

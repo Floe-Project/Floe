@@ -22,11 +22,11 @@
 #include "misc.hpp"
 #include "misc_windows.hpp"
 
-// This function is from the JUCE core library
+// This function based on code from the JUCE core library
 // https://github.com/juce-framework/JUCE/blob/master/modules/juce_foundation/native/juce_SystemStats_windows.cpp
 // Copyright (c) 2022 - Raw Material Software Limited
 // SPDX-License-Identifier: ISC
-DynamicArrayBounded<char, 64> OperatingSystemName() {
+OsInfo GetOsInfo() {
     auto const windows_version_info = []() -> RTL_OSVERSIONINFOW {
         RTL_OSVERSIONINFOW version_info = {};
 
@@ -49,19 +49,33 @@ DynamicArrayBounded<char, 64> OperatingSystemName() {
     auto const minor = version_info.dwMinorVersion;
     auto const build = version_info.dwBuildNumber;
 
-    ASSERT(major <= 10); // need to add support for new version
+    OsInfo result {};
+    result.name = "Windows"_s;
+    fmt::Assign(result.version, "{}.{}.{}"_s, major, minor, build);
 
-    if (major == 10 && build >= 22000) return "Windows 11"_s;
-    if (major == 10) return "Windows 10"_s;
-    if (major == 6 && minor == 3) return "Windows 8.1"_s;
-    if (major == 6 && minor == 2) return "Windows 8"_s;
-    if (major == 6 && minor == 1) return "Windows 7"_s;
-    if (major == 6 && minor == 0) return "Windows Vista"_s;
-    if (major == 5 && minor == 1) return "Windows XP"_s;
-    if (major == 5 && minor == 0) return "Windows 2000"_s;
+    // pretty name
+    if (!PRODUCTION_BUILD) ASSERT(major <= 10); // update so we have a pretty name for new versions
 
-    PanicIfReached();
-    return {};
+    if (major == 10 && build >= 22000)
+        result.pretty_name = "Windows 11"_s;
+    else if (major == 10)
+        result.pretty_name = "Windows 10"_s;
+    else if (major == 6 && minor == 3)
+        result.pretty_name = "Windows 8.1"_s;
+    else if (major == 6 && minor == 2)
+        result.pretty_name = "Windows 8"_s;
+    else if (major == 6 && minor == 1)
+        result.pretty_name = "Windows 7"_s;
+    else if (major == 6 && minor == 0)
+        result.pretty_name = "Windows Vista"_s;
+    else if (major == 5 && minor == 1)
+        result.pretty_name = "Windows XP"_s;
+    else if (major == 5 && minor == 0)
+        result.pretty_name = "Windows 2000"_s;
+
+    fmt::Assign(result.build, "{}"_s, build);
+
+    return result;
 }
 
 u64 RandomSeed() {

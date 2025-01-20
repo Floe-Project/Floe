@@ -10,7 +10,19 @@ ErrorCode ErrnoErrorCode(s64 error_code,
                          char const* info_for_developer = nullptr,
                          SourceLocation source_location = SourceLocation::Current());
 
-DynamicArrayBounded<char, 64> OperatingSystemName();
+// Strings can be empty
+struct OsInfo {
+    DynamicArrayBounded<char, 48> name; // never empty
+    DynamicArrayBounded<char, 32> version;
+    DynamicArrayBounded<char, 96> pretty_name;
+    DynamicArrayBounded<char, 32> build;
+    DynamicArrayBounded<char, 32> kernel_version;
+    DynamicArrayBounded<char, 96> distribution_name; // linux only
+    DynamicArrayBounded<char, 32> distribution_version; // linux only
+    DynamicArrayBounded<char, 96> distribution_pretty_name; // linux only
+};
+OsInfo GetOsInfo();
+
 String GetFileBrowserAppName();
 
 struct SystemStats {

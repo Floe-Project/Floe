@@ -125,7 +125,7 @@ static Optional<SentryDsn> ParseSentryDsn(String dsn) {
 static Optional<fmt::UuidArray> DeviceId(u64& seed) {
     PathArena path_arena {PageAllocator::Instance()};
     auto const dir = KnownDirectory(path_arena, KnownDirectoryType::UserData, {.create = true});
-    auto const path = path::JoinAppendResizeAllocation(path_arena, dir, Array {"device_id"_s});
+    auto const path = path::JoinAppendResizeAllocation(path_arena, dir, Array {"Floe"_s, "device_id"_s});
 
     auto file = TRY_OR(OpenFile(path, FileMode::ReadWrite), {
         g_log.Error(k_main_log_module, "Failed to create device_id file: {}, {}", path, error);

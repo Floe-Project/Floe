@@ -713,6 +713,21 @@ clap_plugin const floe_plugin {
                        floe.host.vendor,
                        floe.host.name,
                        floe.host.version);
+
+            // DynamicArrayBounded<sentry::SenderThread::Message::Tag, 3> tags {};
+            // ASSERT(floe.host.name && floe.host.name[0]);
+            // dyn::Append(tags, {"host_name"_s, FromNullTerminated(floe.host.name)});
+            // ASSERT(floe.host.version && floe.host.version[0]);
+            // dyn::Append(tags, {"host_version"_s, FromNullTerminated(floe.host.version)});
+            // if (floe.host.vendor && floe.host.vendor[0])
+            //     dyn::Append(tags, {"host_vendor"_s, FromNullTerminated(floe.host.vendor)});
+            //
+            // sentry::SendEvent(g_shared_engine_systems->sentry_sender_thread,
+            //                   {
+            //                       .level = sentry::Sentry::Event::Level::Info,
+            //                       .message = "Session start"_s,
+            //                       .tags = Span<sentry::SenderThread::Message::Tag const> {tags.Items()},
+            //                   });
         }
 
         g_log.Debug(k_clap_log_module, "#{} init", floe.index);

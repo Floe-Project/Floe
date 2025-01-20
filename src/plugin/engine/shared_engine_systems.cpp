@@ -27,6 +27,13 @@ void SharedEngineSystems::StartPollingThreadIfNeeded() {
         "polling");
 }
 
+constexpr String k_sentry_dsn =
+#ifdef SENTRY_DSN
+    SENTRY_DSN;
+#else
+    "";
+#endif
+
 SharedEngineSystems::SharedEngineSystems()
     : arena(PageAllocator::Instance(), Kb(4))
     , paths(CreateFloePaths(arena))
@@ -34,6 +41,7 @@ SharedEngineSystems::SharedEngineSystems()
     , sample_library_server(thread_pool,
                             paths.always_scanned_folder[ToInt(ScanFolderType::Libraries)],
                             error_notifications) {
+    if constexpr (k_sentry_dsn.size) sentry::StartSenderThread(sentry_sender_thread, k_sentry_dsn);
 
     settings.tracking.on_filesystem_change = [this](ScanFolderType type) {
         ASSERT(CheckThreadName("main"));
@@ -83,6 +91,11 @@ SharedEngineSystems::~SharedEngineSystems() {
         auto outcome = WriteSettingsFileIfChanged(settings);
         if (outcome.HasError())
             g_log.Error("global"_log_module, "Failed to write settings file: {}", outcome.Error());
+    }
+
+    if constexpr (k_sentry_dsn.size) {
+        sentry::RequestEndSenderThread(sentry_sender_thread, sentry::Sentry::Session::Status::Exited);
+        sentry::WaitForSenderThreadEnd(sentry_sender_thread);
     }
 }
 

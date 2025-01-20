@@ -1018,12 +1018,15 @@ pub fn build(b: *std.Build) void {
             .FLOE_MANUAL_INSTALL_INSTRUCTIONS_URL = floe_manual_install_instructions_url,
             .FLOE_PACKAGES_INFO_URL = floe_packages_info_url,
             .FLOE_SOURCE_CODE_URL = floe_source_code_url,
+            .FLOE_PROJECT_ROOT_PATH = rootdir,
             .FLOE_VENDOR = floe_vendor,
             .IS_WINDOWS = target.result.os.tag == .windows,
             .IS_MACOS = target.result.os.tag == .macos,
             .IS_LINUX = target.result.os.tag == .linux,
             .MIN_WINDOWS_NTDDI_VERSION = windows_ntddi_version,
             .MIN_MACOS_VERSION = min_macos_version,
+            // get sentry dsn from environment variable, else null
+            .SENTRY_DSN = b.graph.env_map.get("SENTRY_DSN"),
         });
 
         var stb_sprintf = b.addObject(.{
@@ -1586,6 +1589,7 @@ pub fn build(b: *std.Build) void {
                     path ++ "/common_errors.cpp",
                     path ++ "/checksum_crc32_file.cpp",
                     path ++ "/package_format.cpp",
+                    path ++ "/sentry/sentry.cpp",
                     path ++ "/sample_library/audio_file.cpp",
                     path ++ "/sample_library/sample_library_lua.cpp",
                     path ++ "/sample_library/sample_library_mdata.cpp",

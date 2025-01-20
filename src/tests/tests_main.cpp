@@ -30,6 +30,7 @@
     X(RegisterSettingsFileTests)                                                                             \
     X(RegisterStateCodingTests)                                                                              \
     X(RegisterUtilsTests)                                                                                    \
+    X(RegisterSentryTests)                                                                                   \
     X(RegisterVolumeFadeTests)
 
 #define WINDOWS_FP_TEST_REGISTER_FUNCTIONS X(RegisterWindowsSpecificTests)

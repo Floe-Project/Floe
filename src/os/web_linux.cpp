@@ -31,6 +31,13 @@ ErrorCodeOr<void> HttpsGet(String url, Writer writer) {
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteFunction);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &writer);
 
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L); 
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10L); 
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 3L);
+
     char error_buffer[CURL_ERROR_SIZE] {};
     curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, error_buffer);
     auto const return_code = curl_easy_perform(curl);
@@ -67,13 +74,10 @@ ErrorCodeOr<void> HttpsPost(String url, String body, Span<String> headers, Optio
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteFunction);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, response_writer ? &*response_writer : nullptr);
 
-    // Add timeout options to prevent hanging
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L); // Overall timeout
-    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10L); // Connection timeout
-    // Add these options for proper SSL verification
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L); 
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10L); 
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
-    // Follow redirects
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 3L);
 

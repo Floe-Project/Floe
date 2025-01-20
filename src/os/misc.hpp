@@ -26,11 +26,25 @@ OsInfo GetOsInfo();
 String GetFileBrowserAppName();
 
 struct SystemStats {
+    static constexpr String Arch() {
+        switch (k_arch) {
+            case Arch::X86_64: return "x86_64"_s; break;
+            case Arch::Aarch64: return "aarch64"_s; break;
+        }
+        return "";
+    }
     u32 num_logical_cpus = 0;
     u32 page_size = 0;
+    DynamicArrayBounded<char, 256> cpu_name {};
+    double frequency_mhz = 0;
 };
 
 SystemStats GetSystemStats();
+
+PUBLIC SystemStats CachedSystemStats() {
+    static SystemStats stats = GetSystemStats();
+    return stats;
+}
 
 int CurrentProcessId();
 
@@ -126,7 +140,7 @@ class Malloc final : public Allocator {
 
 // Allocate whole pages at a time: 4kb or 16kb each; this is the smallest size that the OS gives out.
 class PageAllocator final : public Allocator {
-    static usize AlignUpToPageSize(usize size) { return AlignForward(size, GetSystemStats().page_size); }
+    static usize AlignUpToPageSize(usize size) { return AlignForward(size, CachedSystemStats().page_size); }
 
   public:
     Span<u8> DoCommand(AllocatorCommandUnion const& command_union) {

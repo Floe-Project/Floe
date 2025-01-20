@@ -109,13 +109,22 @@ OsInfo GetOsInfo() {
 String GetFileBrowserAppName() { return "Finder"; }
 
 SystemStats GetSystemStats() {
-    static SystemStats result {};
-    if (!result.page_size) {
-        result = {
-            .num_logical_cpus = (u32)[[NSProcessInfo processInfo] activeProcessorCount],
-            .page_size = (u32)NSPageSize(),
-        };
+    SystemStats result {};
+
+    result.num_logical_cpus = (u32)[[NSProcessInfo processInfo] activeProcessorCount];
+    result.page_size = (u32)NSPageSize();
+
+    auto size = result.cpu_name.Capacity();
+    if (sysctlbyname("machdep.cpu.brand_string", result.cpu_name.data, &size, nullptr, 0) == 0) {
+        if (size <= result.cpu_name.Capacity()) result.cpu_name.size = size;
     }
+
+    u64 freq = 0;
+    size = sizeof(freq);
+    if (sysctlbyname("hw.cpufrequency", &freq, &size, nullptr, 0) == 0) {
+        result.frequency_mhz = (double)freq / 1000000.0;
+    }
+
     return result;
 }
 

@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <stdlib.h>
+#include <sys/file.h>
 #include <sys/random.h>
+#include <sys/utsname.h>
 #include <unistd.h>
 
 #include "foundation/foundation.hpp"
@@ -66,11 +68,40 @@ OsInfo GetOsInfo() {
 
 String GetFileBrowserAppName() { return "File Explorer"; }
 
+bool FillCpuInfo(SystemStats& stats, char const* filename) {
+    auto fd = open(filename, O_RDONLY);
+    if (fd == -1) return false;
+    DEFER { close(fd); };
+
+    constexpr usize k_max_file_size = Kb(16);
+    DynamicArrayBounded<char, k_max_file_size> file_data {};
+
+    auto const num_read = read(fd, file_data.data, k_max_file_size);
+    if (num_read == -1) return false;
+    file_data.size = (usize)num_read;
+
+    for (auto const line : StringSplitIterator {file_data, '\n'}) {
+        auto const colon_pos = Find(line, ':');
+        if (!colon_pos) continue;
+
+        auto const key = WhitespaceStripped(line.SubSpan(0, *colon_pos));
+        auto value = WhitespaceStripped(line.SubSpan(*colon_pos + 1));
+
+        if (key == "model name")
+            stats.cpu_name = value;
+        else if (key == "cpu MHz")
+            if (auto const mhz = ParseFloat(value)) stats.frequency_mhz = *mhz;
+    }
+
+    return true;
+}
+
 SystemStats GetSystemStats() {
-    static SystemStats result {};
+    SystemStats result {};
     if (!result.page_size) {
-        result = {.num_logical_cpus = (u32)sysconf(_SC_NPROCESSORS_ONLN),
-                  .page_size = (u32)sysconf(_SC_PAGESIZE)};
+        result.num_logical_cpus = (u32)sysconf(_SC_NPROCESSORS_ONLN);
+        result.page_size = (u32)sysconf(_SC_PAGESIZE);
+        FillCpuInfo(result, "/proc/cpuinfo");
     }
     return result;
 }

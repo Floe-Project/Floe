@@ -412,13 +412,38 @@ TimePoint operator+(TimePoint t, f64 s) {
 String GetFileBrowserAppName() { return "File Explorer"; }
 
 SystemStats GetSystemStats() {
-    static SystemStats result {};
-    if (!result.page_size) {
-        SYSTEM_INFO system_info;
-        GetNativeSystemInfo(&system_info);
-        result = {.num_logical_cpus = (u32)system_info.dwNumberOfProcessors,
-                  .page_size = (u32)system_info.dwPageSize};
+    SystemStats result {};
+    SYSTEM_INFO system_info;
+    GetNativeSystemInfo(&system_info);
+    result.num_logical_cpus = (u32)system_info.dwNumberOfProcessors;
+    result.page_size = (u32)system_info.dwPageSize;
+
+    HKEY hkey;
+    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE,
+                      L"HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0",
+                      0,
+                      KEY_READ,
+                      &hkey) == ERROR_SUCCESS) {
+        // Get CPU Name
+        DWORD size = result.cpu_name.Capacity();
+        if (RegQueryValueExW(hkey,
+                             L"ProcessorNameString",
+                             nullptr,
+                             nullptr,
+                             (u8*)(char*)result.cpu_name.data,
+                             &size) == ERROR_SUCCESS) {
+            if (size <= result.cpu_name.Capacity()) result.cpu_name.size = size;
+        }
+
+        // Get CPU Frequency
+        size = sizeof(DWORD);
+        DWORD mhz;
+        if (RegQueryValueExW(hkey, L"~MHz", nullptr, nullptr, (LPBYTE)&mhz, &size) == ERROR_SUCCESS)
+            result.frequency_mhz = mhz;
+
+        RegCloseKey(hkey);
     }
+
     return result;
 }
 

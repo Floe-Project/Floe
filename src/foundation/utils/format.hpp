@@ -661,6 +661,10 @@ PUBLIC_INLINE DynamicArrayBounded<char, 8> PrettyFileSize(f64 size) {
     return result;
 }
 
+constexpr usize k_uuid_size = 32;
+
+using UuidArray = Array<char, k_uuid_size>;
+
 // Write 32 chars, using all 8 bytes of each u64
 PUBLIC void Uuid(u64& seed, char* out) {
     for (usize i = 0; i < 4; i++) {
@@ -671,14 +675,13 @@ PUBLIC void Uuid(u64& seed, char* out) {
 }
 
 PUBLIC String Uuid(u64& seed, Allocator& a) {
-    auto result = a.AllocateExactSizeUninitialised<char>(32);
+    auto result = a.AllocateExactSizeUninitialised<char>(k_uuid_size);
     Uuid(seed, result.data);
     return result;
 }
 
-PUBLIC DynamicArrayBounded<char, 32> Uuid(u64& seed) {
-    DynamicArrayBounded<char, 32> result;
-    result.size = 32;
+PUBLIC UuidArray Uuid(u64& seed) {
+    UuidArray result;
     Uuid(seed, (char*)result.data);
     return result;
 }

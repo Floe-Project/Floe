@@ -51,13 +51,13 @@ ErrorCodeOr<void> HttpsPost(String url, String body, Span<String> headers, Optio
     [request setHTTPMethod:@"POST"];
     
     // Set request body
-    NSData* requestBody = [NSData dataWithBytes:body.data length:body.size];
-    [request setHTTPBody:requestBody];
+    NSData* request_body = [NSData dataWithBytes:body.data length:body.size];
+    [request setHTTPBody:request_body];
     
     // Add custom headers
     for (auto const& header : headers) {
-        NSString* headerString = StringToNSString(header);
-        NSArray* components = [headerString componentsSeparatedByString:@": "];
+        NSString* header_string = StringToNSString(header);
+        NSArray* components = [header_string componentsSeparatedByString:@": "];
         if (components.count == 2) {
             [request setValue:components[1] forHTTPHeaderField:components[0]];
         }

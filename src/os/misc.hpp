@@ -193,8 +193,15 @@ class PageAllocator final : public Allocator {
     }
 };
 
-void StartupCrashHandler();
-void ShutdownCrashHandler();
+// Call once at the start/end of your progam. When a crash occurs g_crash_handler will be called. It must be
+// async-signal-safe on unix.
+using CrashHookFunction = void (*)(String message);
+void BeginCrashDetection(CrashHookFunction);
+void EndCrashDetection();
+
+// signal-safe write to a unique crash file in a predefined location
+// includes a stack trace
+void UnixWriteCrashFile(String message, String folder);
 
 enum class StdStream { Out, Err };
 
@@ -228,7 +235,8 @@ inline DateAndTime UtcTimeFromMicrosecondsSinceEpoch(s64 microseconds) {
 }
 
 constexpr auto k_timestamp_max_str_size = "2022-12-31 23:59:59.999"_s.size;
-DynamicArrayBounded<char, k_timestamp_max_str_size> Timestamp();
+DynamicArrayBounded<char, k_timestamp_max_str_size> Timestamp(); // not signal-safe
+DynamicArrayBounded<char, k_timestamp_max_str_size> TimestampUtc(); // signal-safe
 
 // RFC 3339, YYYY-MM-DDThh:mm:ss.sssZ
 ErrorCodeOr<void> IsoUtcTimestamp(DateAndTime date, Writer writer);

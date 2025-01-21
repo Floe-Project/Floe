@@ -731,6 +731,22 @@ clap_plugin const floe_plugin {
 
             g_shared_engine_systems.Emplace(tags);
 
+            // TODO: consolidate panic handling
+            g_panic_handler = [](char const* message, SourceLocation loc) {
+                sentry::SenderThread::ErrorMessage err {{
+                    .level = sentry::ErrorEvent::Level::Error,
+                    .stacktrace = CurrentStacktrace(1),
+                }};
+                err.message = fmt::Format(err.arena, "Panic: {}: {}", loc, message);
+                sentry::SendErrorMessage(g_shared_engine_systems->sentry_sender_thread, Move(err));
+
+                g_log.Error(k_global_log_module, "Panic: {}: {}", loc, message);
+                DynamicArrayBounded<char, 2000> buffer {};
+                WriteCurrentStacktrace(dyn::WriterFor(buffer), {}, 1);
+                g_log.Error(k_global_log_module, "Stacktrace:\n{}", buffer);
+                DefaultPanicHandler(message, loc);
+            };
+
             g_log.Info(k_main_log_module,
                        "host: {} {} {}",
                        floe.host.vendor,
@@ -784,6 +800,15 @@ clap_plugin const floe_plugin {
                 g_shared_engine_systems->UnregisterFloeInstance(floe.index);
 
                 floe.engine.Clear();
+
+                // TODO: consolidate panic handling
+                g_panic_handler = [](char const* message, SourceLocation loc) {
+                    g_log.Error(k_global_log_module, "Panic: {}: {}", loc, message);
+                    DynamicArrayBounded<char, 2000> buffer {};
+                    WriteCurrentStacktrace(dyn::WriterFor(buffer), {}, 1);
+                    g_log.Error(k_global_log_module, "Stacktrace:\n{}", buffer);
+                    DefaultPanicHandler(message, loc);
+                };
 
                 ASSERT(g_num_initialised_plugins);
                 if (--g_num_initialised_plugins == 0) g_shared_engine_systems.Clear();

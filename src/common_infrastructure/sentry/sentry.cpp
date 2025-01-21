@@ -105,6 +105,7 @@ static Optional<SentryDsn> ParseSentryDsn(String dsn) {
 // not thread-safe, dsn must be static, tags are cloned
 static void InitSentry(Sentry& sentry, SentryDsn dsn, Span<Tag const> tags) {
     ASSERT(sentry.dsn.dsn.size == 0);
+    sentry.seed.Store(RandomSeed(), StoreMemoryOrder::Relaxed);
     sentry.dsn = dsn;
     sentry.device_id = DeviceId(sentry.seed);
 
@@ -199,6 +200,12 @@ Sentry* InitGlobalSentry(String dsn, Span<Tag const> tags) {
 
     g_instance.Store(sentry, StoreMemoryOrder::Relaxed);
     return sentry;
+}
+
+void InitBarebonesSentry(Sentry& sentry) {
+    sentry.seed.Store((u64)MicrosecondsSinceEpoch() + __builtin_readcyclecounter(),
+                      StoreMemoryOrder::Relaxed);
+    sentry.session_id = detail::Uuid(sentry.seed);
 }
 
 TEST_CASE(TestSentry) {

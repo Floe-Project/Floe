@@ -3,6 +3,7 @@
 
 #pragma once
 #include "foundation/foundation.hpp"
+#include "os/filesystem.hpp"
 #include "os/web.hpp"
 #include "utils/debug/debug.hpp"
 #include "utils/json/json_writer.hpp"
@@ -61,7 +62,7 @@ struct Sentry {
     fmt::UuidArray session_id {};
     Atomic<u32> session_num_errors = 0;
     Atomic<s64> session_started_microsecs {};
-    Atomic<u64> seed = RandomSeed();
+    Atomic<u64> seed = {};
     ArenaAllocator arena {PageAllocator::Instance()};
     Span<char> event_context_json {};
     Span<Tag> tags {};
@@ -82,7 +83,11 @@ static fmt::UuidArray Uuid(Atomic<u64>& seed) {
 } // namespace detail
 
 // not thread-safe, not signal-safe, inits g_instance
+// add device_id, OS info, CPU info
 Sentry* InitGlobalSentry(String dsn, Span<Tag const> tag);
+
+// threadsafe, signal-safe, doesn't include useful context info
+void InitBarebonesSentry(Sentry& sentry);
 
 // threadsafe, not signal-safe
 PUBLIC ErrorCodeOr<void> SendSentryEnvelope(Sentry const& sentry,
@@ -220,7 +225,7 @@ enum class SessionUpdateType { Start, EndedNormally, EndedCrashed };
 
 // thread-safe, signal-safe
 // NOTE (Jan 2025): all events are 'errors' in Sentry, there's no plain logging concept
-[[maybe_unused]] PUBLIC ErrorCodeOr<void> EnvelopeAddEvent(Sentry& sentry, Writer& writer, ErrorEvent event) {
+[[maybe_unused]] PUBLIC ErrorCodeOr<void> EnvelopeAddEvent(Sentry& sentry, Writer writer, ErrorEvent event) {
     ASSERT(event.message.size <= Sentry::k_max_message_length, "message too long");
     ASSERT(event.tags.size < 100, "too many tags");
 
@@ -312,6 +317,32 @@ enum class SessionUpdateType { Start, EndedNormally, EndedCrashed };
 
     TRY(json::WriteObjectEnd(json_writer));
     TRY(writer.WriteChar('\n'));
+
+    return k_success;
+}
+
+// thread-safe, signal-safe
+PUBLIC ErrorCodeOr<void> WriteCrashToFile(Sentry& sentry,
+                                          bool is_barebones,
+                                          String folder,
+                                          Optional<StacktraceStack> const& stacktrace,
+                                          String message,
+                                          ArenaAllocator& scratch_arena) {
+    auto const timestamp = TimestampUtc();
+    auto const filename = fmt::Format(scratch_arena, "floe_crash_{}.sentry-envelope", timestamp);
+    auto path = path::Join(scratch_arena, Array {folder, filename});
+
+    auto file = TRY(OpenFile(path, FileMode::Write));
+
+    if (is_barebones) TRY(EnvelopeAddSessionUpdate(sentry, file.Writer(), SessionUpdateType::Start));
+    TRY(EnvelopeAddEvent(sentry,
+                         file.Writer(),
+                         {
+                             .level = ErrorEvent::Level::Error,
+                             .message = message,
+                             .stacktrace = stacktrace,
+                         }));
+    TRY(EnvelopeAddSessionUpdate(sentry, file.Writer(), SessionUpdateType::EndedCrashed));
 
     return k_success;
 }

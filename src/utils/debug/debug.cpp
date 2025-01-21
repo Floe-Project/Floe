@@ -38,7 +38,9 @@ void (*g_panic_handler)(char const* message, SourceLocation loc) = DefaultPanicH
 
 [[noreturn]] void Panic(char const* message, SourceLocation loc) {
     g_panic_handler(message, loc);
-    __builtin_abort();
+
+    // We should never get here, g_panic_handler should be [[noreturn]]
+    throw "panicked";
 }
 
 void AssertionFailed(char const* expression, SourceLocation loc, char const* message) {
@@ -49,11 +51,9 @@ void AssertionFailed(char const* expression, SourceLocation loc, char const* mes
 }
 
 static void HandleUbsanError(String msg) {
-    auto _ = StdPrint(k_panic_stream, ANSI_COLOUR_FOREGROUND_RED("UBSan: undefined behaviour detected: "));
-    auto _ = StdPrint(k_panic_stream, msg);
-    auto _ = StdPrint(k_panic_stream, "\n");
-    PrintCurrentStacktrace(k_panic_stream, {.ansi_colours = true}, 3);
-    __builtin_abort();
+    InlineSprintfBuffer buffer;
+    buffer.Append("undefined behaviour detected: %.*s", (int)msg.size, msg.data);
+    Panic(buffer.CString(), SourceLocation::Current());
 }
 
 #define INTERFACE extern "C" __attribute__((visibility("default")))

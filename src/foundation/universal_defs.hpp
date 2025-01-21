@@ -324,7 +324,7 @@ using IndexSequenceFor = MakeIndexSequence<sizeof...(Types)>;
 // ==========================================================================================================
 [[noreturn]] void AssertionFailed(char const* expression, SourceLocation loc, char const* message = nullptr);
 [[noreturn]] void Panic(char const* message, SourceLocation loc = SourceLocation::Current());
-extern void (*g_panic_handler)(char const* message, SourceLocation loc);
+extern void (*g_panic_handler)(char const* message, SourceLocation loc); // must be [[noreturn]]
 
 // NOTE: the expression may be discarded so it mustn't have side effects
 #define ASSERT(expression, ...)                                                                              \

@@ -7,6 +7,8 @@
 #include "utils/debug/tracy_wrapped.hpp"
 #include "utils/logger/logger.hpp"
 
+#include "common_infrastructure/crash_hook.hpp"
+
 #include "clap/factory/plugin-factory.h"
 #include "plugin.hpp"
 
@@ -57,6 +59,7 @@ extern "C" CLAP_EXPORT const clap_plugin_entry clap_entry = {
     .init = [](char const*) -> bool {
         if (Exchange(g_init, true)) return true; // already initialised
 
+        // TODO: consolidate panic handling
         g_panic_handler = [](char const* message, SourceLocation loc) {
             g_log.Error(k_global_log_module, "Panic: {}: {}", loc, message);
             DynamicArrayBounded<char, 2000> buffer {};
@@ -66,7 +69,7 @@ extern "C" CLAP_EXPORT const clap_plugin_entry clap_entry = {
         };
 
         StartupTracy();
-        StartupCrashHandler(); // after tracy
+        FloeBeginCrashDetection(); // after tracy
 
         g_log.Debug(k_clap_log_module, "init DSO");
         g_log.Info(k_global_log_module, "Floe version: " FLOE_VERSION_STRING);
@@ -80,7 +83,7 @@ extern "C" CLAP_EXPORT const clap_plugin_entry clap_entry = {
 
             g_log.Debug(k_clap_log_module, "deinit");
 
-            ShutdownCrashHandler(); // before tracy
+            FloeEndCrashDetection(); // before tracy
             ShutdownTracy();
         },
 

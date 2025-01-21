@@ -386,19 +386,8 @@ static constexpr auto k_signals = Array {
 
 bool g_signals_installed = false;
 static struct sigaction g_previous_signal_actions[k_signals.size] {};
-static DynamicArrayBounded<char, 200> g_crash_folder_path {};
 
-#if defined(__has_feature)
-#if __has_feature(undefined_behavior_sanitizer)
-#define HAS_UBSAN 1
-#endif
-#endif
-
-#if HAS_UBSAN
-constexpr bool k_ubsan = true;
-#else
-constexpr bool k_ubsan = false;
-#endif
+CrashHookFunction g_crash_hook {};
 
 static String SignalString(int signal_num, siginfo_t* info) {
     String message = "Unknown signal";
@@ -457,6 +446,40 @@ static String SignalString(int signal_num, siginfo_t* info) {
     return message;
 }
 
+void UnixWriteCrashFile(String message, String folder) {
+    auto timestamp = TimestampUtc();
+
+    // Make the timestamp safe for a filename even on Windows (where we might want to copy the file).
+    for (auto& c : timestamp)
+        if (c == ':')
+            c = '-';
+        else if (c == '.')
+            c = '-';
+
+    auto const file_path = fmt::FormatInline<400>("{}/crash_{}.log\0", folder, timestamp);
+    auto const fd = open(file_path.data, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    DEFER { close(fd); };
+
+    auto _ = write(fd, message.data, message.size);
+    auto _ = write(fd, "\n", 1);
+
+    Writer writer {};
+    writer.SetContained<int>(fd, [](int fd, Span<u8 const> bytes) -> ErrorCodeOr<void> {
+        auto const num_written = write(fd, bytes.data, bytes.size);
+        if (num_written < 0) return ErrnoErrorCode(errno, "write");
+        return k_success;
+    });
+    WriteCurrentStacktrace(writer,
+                           {
+                               .ansi_colours = false,
+                               .demangle = false,
+                           },
+                           0);
+    auto _ = write(fd, "\n", 1);
+
+    fsync(fd);
+}
+
 constexpr StdStream k_signal_output_stream = StdStream::Out;
 
 // remember we can only use async-signal-safe functions here:
@@ -467,75 +490,19 @@ static void SignalHandler(int signal_num, siginfo_t* info, void* context) {
     if (first_call) {
         first_call = 0;
 
+        auto signal_description = SignalString(signal_num, info);
+
+        if constexpr (!PRODUCTION_BUILD) {
 #if IS_LINUX
-        psiginfo(info, nullptr);
+            psiginfo(info, nullptr);
 #else
-        auto _ = StdPrint(
-            k_signal_output_stream,
-            fmt::FormatInline<200>("Received signal {} ({})\n", signal_num, SignalString(signal_num, info)));
+            auto _ = StdPrint(k_signal_output_stream,
+                              fmt::FormatInline<200>("Received signal {} ({})\n", signal_num, signal_info));
 #endif
-
-        {
-            bool possibly_ubsan_error = false;
-            if constexpr (k_arch == Arch::Aarch64) {
-                if (signal_num == SIGTRAP && info && info->si_addr) {
-                    uint32_t insn;
-                    CopyMemory(&insn, info->si_addr, sizeof(insn));
-                    if ((insn & 0xffe0001f) == 0xd4200000 && ((insn >> 13) & 255) == 'U')
-                        possibly_ubsan_error = true;
-                }
-            } else if constexpr (k_arch == Arch::X86_64) {
-                if (signal_num == SIGILL && info && info->si_code == ILL_ILLOPN && info->si_addr) {
-                    auto* pc = reinterpret_cast<unsigned char const*>(info->si_addr);
-                    if (pc[0] == 0x67 && pc[1] == 0x0f && pc[2] == 0xb9 && pc[3] == 0x40)
-                        possibly_ubsan_error = true;
-                }
-            }
-            if (signal_num == SIGTRAP && k_ubsan) possibly_ubsan_error = true;
-
-            if (possibly_ubsan_error) DumpInfoAboutUBSan(k_signal_output_stream);
+            PrintCurrentStacktrace(k_signal_output_stream, {.ansi_colours = true, .demangle = false}, 0);
         }
 
-        PrintCurrentStacktrace(k_signal_output_stream, {.ansi_colours = true, .demangle = false}, 0);
-
-        {
-            auto timestamp = Timestamp();
-
-            // Make the timestamp safe for a filename even on Windows (where we might want to copy the file).
-            for (auto& c : timestamp)
-                if (c == ':')
-                    c = '-';
-                else if (c == '.')
-                    c = '-';
-
-            auto const file_path =
-                fmt::FormatInline<400>("{}/crash_{}.log\0", g_crash_folder_path, timestamp);
-            auto const fd = open(file_path.data, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-            DEFER { close(fd); };
-
-            auto const signal_num_str = fmt::FormatInline<50>("{}\n Signal {}\n", timestamp, signal_num);
-            auto _ = write(fd, signal_num_str.data, signal_num_str.size);
-
-            auto const signal_string = SignalString(signal_num, info);
-            auto _ = write(fd, signal_string.data, signal_string.size);
-            auto _ = write(fd, "\n", 1);
-
-            Writer writer {};
-            writer.SetContained<int>(fd, [](int fd, Span<u8 const> bytes) -> ErrorCodeOr<void> {
-                auto const num_written = write(fd, bytes.data, bytes.size);
-                if (num_written < 0) return ErrnoErrorCode(errno, "write");
-                return k_success;
-            });
-            WriteCurrentStacktrace(writer,
-                                   {
-                                       .ansi_colours = false,
-                                       .demangle = false,
-                                   },
-                                   0);
-            auto _ = write(fd, "\n", 1);
-
-            fsync(fd);
-        }
+        if (g_crash_hook) g_crash_hook(signal_description);
 
         for (auto [index, s] : Enumerate(k_signals)) {
             if (s == signal_num) {
@@ -631,43 +598,45 @@ static void SignalHandler(int signal_num, siginfo_t* info, void* context) {
     _exit(EXIT_FAILURE);
 }
 
-void StartupCrashHandler() {
+bool TrySigFunction(int return_code, String message) {
+    if (return_code == 0) return true;
+
+    char buffer[200] = {};
+#if IS_LINUX
+    auto const err_str = strerror_r(errno, buffer, sizeof(buffer));
+#else
+    auto _ = strerror_r(errno, buffer, sizeof(buffer));
+    auto const err_str = buffer;
+#endif
+    g_log.Error(k_global_log_module,
+                "failed {}, errno({}) {}",
+                message,
+                errno,
+                FromNullTerminated(err_str ? err_str : buffer));
+
+    return false;
+}
+
+void BeginCrashDetection(CrashHookFunction hook) {
+    g_crash_hook = hook;
     if (g_signals_installed) return;
     g_signals_installed = true;
 
     InitStacktraceState();
 
-    ArenaAllocatorWithInlineStorage<500> scratch_arena {Malloc::Instance()};
-    dyn::Assign(g_crash_folder_path,
-                FloeKnownDirectory(scratch_arena, FloeKnownDirectoryType::Logs, k_nullopt, {.create = true}));
-
     for (auto [index, signal] : Enumerate(k_signals)) {
         struct sigaction action {};
         action.sa_flags =
             (int)(SA_SIGINFO | SA_NODEFER | SA_RESETHAND); // NOLINT(readability-redundant-casting)
-        sigfillset(&action.sa_mask);
-        sigdelset(&action.sa_mask, signal);
+        if (!TrySigFunction(sigfillset(&action.sa_mask), "sigfillset")) continue;
+        if (!TrySigFunction(sigdelset(&action.sa_mask, signal), "sigdelset")) continue;
         action.sa_sigaction = &SignalHandler;
 
-        int const r = sigaction(signal, &action, &g_previous_signal_actions[index]);
-        if (r != 0) {
-            char buffer[200] = {};
-#if IS_LINUX
-            auto const err_str = strerror_r(errno, buffer, sizeof(buffer));
-#else
-            auto _ = strerror_r(errno, buffer, sizeof(buffer));
-            auto const err_str = buffer;
-#endif
-            g_log.Error(k_global_log_module,
-                        "failed setting signal handler {}, errno({}) {}",
-                        signal,
-                        errno,
-                        FromNullTerminated(err_str ? err_str : buffer));
-        }
+        TrySigFunction(sigaction(signal, &action, &g_previous_signal_actions[index]), "sigaction");
     }
 }
 
-void ShutdownCrashHandler() {
+void EndCrashDetection() {
     if (!g_signals_installed) return;
     g_signals_installed = false;
 

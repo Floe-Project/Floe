@@ -73,3 +73,8 @@ DynamicArrayBounded<char, k_timestamp_max_str_size> Timestamp() {
         "{}",
         LocalTimeFromNanosecondsSinceEpoch(NanosecondsSinceEpoch()));
 }
+DynamicArrayBounded<char, k_timestamp_max_str_size> TimestampUtc() {
+    return fmt::FormatInline<k_timestamp_max_str_size>(
+        "{}",
+        UtcTimeFromNanosecondsSinceEpoch(NanosecondsSinceEpoch()));
+}

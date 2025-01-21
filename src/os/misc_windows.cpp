@@ -267,8 +267,10 @@ static String ExceptionCodeString(DWORD code) {
 }
 
 void* g_exception_handler = nullptr;
+CrashHookFunction g_crash_hook {};
 
-void StartupCrashHandler() {
+void BeginCrashDetection(CrashHookFunction hook) {
+    g_crash_hook = hook;
     g_exception_handler = AddVectoredExceptionHandler(1, [](PEXCEPTION_POINTERS exception_info) -> LONG {
         // some exceptions are expected and should be ignored; for example lua will trigger exceptions.
         if (auto const msg = ExceptionCodeString(exception_info->ExceptionRecord->ExceptionCode); msg.size) {
@@ -295,7 +297,7 @@ void StartupCrashHandler() {
         return EXCEPTION_CONTINUE_SEARCH;
     });
 }
-void ShutdownCrashHandler() {
+void EndCrashDetection() {
     if (g_exception_handler) RemoveVectoredContinueHandler(g_exception_handler);
 }
 

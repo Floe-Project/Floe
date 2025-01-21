@@ -32,7 +32,7 @@ struct Queue {
         DEFER { mutex.Unlock(); };
 
         if (!first) return k_nullopt;
-        auto result = first->data;
+        auto result = Move(first->data);
 
         DoublyLinkedListRemoveFirst(*this);
         if (!first) arena.ResetCursorAndConsolidateRegions();

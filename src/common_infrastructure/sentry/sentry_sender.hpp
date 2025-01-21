@@ -4,7 +4,7 @@
 #pragma once
 
 #include "os/threading.hpp"
-#include "utils/thread_extra/atomic_queue.hpp"
+#include "utils/thread_extra/thread_extra.hpp"
 
 #include "sentry.hpp"
 
@@ -16,22 +16,10 @@
 
 namespace sentry {
 
-struct Queue {
-    Mutex mutex;
-    ArenaAllocator arena {PageAllocator::Instance()};
-};
-
 struct SenderThread {
-    // TODO: we are memcpy'ing this struct lots when queueing and its big.
     struct Message {
-        struct Tag {
-            DynamicArrayBounded<char, 50> key;
-            DynamicArrayBounded<char, 180> value;
-        };
-        Sentry::Event::Level level;
-        DynamicArrayBounded<char, 2000> message;
-        Optional<StacktraceStack> stacktrace;
-        DynamicArrayBounded<Tag, 5> tags;
+        ArenaAllocator arena {Malloc::Instance()};
+        Sentry::Event event;
     };
 
     constexpr static u32 k_dont_end = (u32)-1;
@@ -40,7 +28,7 @@ struct SenderThread {
     Atomic<UnderlyingType<Sentry::Sentry::Session::Status>> end_with_status = (u32)-1;
     WorkSignaller signaller;
     String dsn; // must be static
-    AtomicQueue<Message, 16, NumProducers::Many, NumConsumers::One> messages;
+    ThreadsafeQueue<Message> messages {Malloc::Instance()};
 };
 
 namespace detail {
@@ -71,20 +59,9 @@ static void BackgroundThread(SenderThread& sender_thread) {
         DynamicArray<char> envelope {scratch_arena};
         auto writer = dyn::WriterFor(envelope);
 
-        SenderThread::Message msg;
-        while (sender_thread.messages.Pop(msg)) {
-            DynamicArray<Sentry::Event::Tag> tags {scratch_arena};
-            for (auto const& t : msg.tags)
-                dyn::Append(tags, {t.key, t.value});
+        while (auto msg = sender_thread.messages.TryPop()) {
             if (!envelope.size) auto _ = EnvelopeAddHeader(sentry, writer);
-            auto _ = EnvelopeAddEvent(sentry,
-                                      writer,
-                                      {
-                                          .level = msg.level,
-                                          .message = msg.message,
-                                          .stacktrace = msg.stacktrace,
-                                          .tags = tags,
-                                      });
+            auto _ = EnvelopeAddEvent(sentry, writer, msg->event);
         }
 
         bool end = false;
@@ -122,8 +99,8 @@ PUBLIC void RequestEndSenderThread(SenderThread& sender_thread, Sentry::Session:
 
 PUBLIC void WaitForSenderThreadEnd(SenderThread& sender_thread) { sender_thread.thread.Join(); }
 
-PUBLIC void SendEvent(SenderThread& sender_thread, SenderThread::Message const& msg) {
-    sender_thread.messages.Push(msg);
+PUBLIC void SendEvent(SenderThread& sender_thread, SenderThread::Message&& msg) {
+    sender_thread.messages.Push(Move(msg));
     sender_thread.signaller.Signal();
 }
 

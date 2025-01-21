@@ -27,7 +27,6 @@ struct Sentry {
     fmt::UuidArray session_id;
     u32 session_sequence = 0;
     u32 session_num_errors = 0;
-    bool session_ended = false;
     fmt::TimestampRfc3339UtcArray session_started_at {};
     u64 seed = RandomSeed();
     DynamicArray<char> event_context_json {PageAllocator::Instance()};
@@ -255,11 +254,6 @@ enum class SessionUpdateType { Start, End };
                                                                    Writer writer,
                                                                    SessionUpdateType session_update_type,
                                                                    Optional<u32> extra_num_errors = {}) {
-    switch (session_update_type) {
-        case SessionUpdateType::Start: ASSERT(sentry.session_ended == true); break;
-        case SessionUpdateType::End: ASSERT(sentry.session_ended == false); break;
-    }
-
     json::WriteContext json_writer {
         .out = writer,
         .add_whitespace = false,

@@ -33,11 +33,12 @@ struct Queue {
 
         if (!first) return k_nullopt;
         auto result = Move(first->data);
+        first->data.~Type();
 
         DoublyLinkedListRemoveFirst(*this);
         if (!first) arena.ResetCursorAndConsolidateRegions();
 
-        return result;
+        return Move(result);
     }
 
     bool Empty() {

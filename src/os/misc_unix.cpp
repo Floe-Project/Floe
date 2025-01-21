@@ -246,6 +246,12 @@ s128 NanosecondsSinceEpoch() {
 #endif
 }
 
+s64 MicrosecondsSinceEpoch() {
+    timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return CheckedCast<s64>((u64)ts.tv_sec * 1'000'000 + (u64)ts.tv_nsec / 1'000);
+}
+
 DateAndTime LocalTimeFromNanosecondsSinceEpoch(s128 nanoseconds) {
     timespec ts;
     ts.tv_sec = (time_t)(nanoseconds / (s128)1e+9);
@@ -273,31 +279,82 @@ DateAndTime LocalTimeFromNanosecondsSinceEpoch(s128 nanoseconds) {
     };
 }
 
+static bool IsLeapYear(int year) {
+    if (year % 4 != 0) return false;
+    if (year % 100 != 0) return true;
+    if (year % 400 != 0) return false;
+    return true;
+}
+
+// Returns number of days in the given month (0-11) for the given year
+static int DaysOfMonth(int month, int year) {
+    // Days in each month (non-leap year)
+    constexpr int k_days_in_month[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+
+    if (month == 1 && IsLeapYear(year)) // February in leap year
+        return 29;
+    return k_days_in_month[month];
+}
+
 DateAndTime UtcTimeFromNanosecondsSinceEpoch(s128 nanoseconds) {
-    timespec ts;
-    ts.tv_sec = (time_t)(nanoseconds / (s128)1e+9);
-    ts.tv_nsec = (long)(nanoseconds % (s128)1e+9);
-    struct tm result {};
-    gmtime_r(&ts.tv_sec, &result);
+    // We don't use gmtime_r because it's not signal safe.
 
-    auto ns = ts.tv_nsec;
-    auto const milliseconds = CheckedCast<s16>(ns / 1'000'000);
-    ns %= 1'000'000;
-    auto const microseconds = CheckedCast<s16>(ns / 1'000);
-    ns %= 1'000;
+    DateAndTime dt {};
 
-    return DateAndTime {
-        .year = (s16)(result.tm_year + 1900),
-        .months_since_jan = (s8)result.tm_mon,
-        .day_of_month = (s8)result.tm_mday,
-        .days_since_sunday = (s8)result.tm_wday,
-        .hour = (s8)result.tm_hour,
-        .minute = (s8)result.tm_min,
-        .second = (s8)result.tm_sec,
-        .millisecond = milliseconds,
-        .microsecond = microseconds,
-        .nanosecond = (s16)ns,
-    };
+    // Extract nanosecond components
+    dt.nanosecond = nanoseconds % 1000;
+    nanoseconds /= 1000;
+
+    dt.microsecond = nanoseconds % 1000;
+    nanoseconds /= 1000;
+
+    dt.millisecond = nanoseconds % 1000;
+    nanoseconds /= 1000;
+
+    // Now we have seconds since epoch
+    auto total_seconds = CheckedCast<s64>(nanoseconds);
+
+    // Extract time components
+    dt.second = total_seconds % 60;
+    total_seconds /= 60;
+
+    dt.minute = total_seconds % 60;
+    total_seconds /= 60;
+
+    dt.hour = total_seconds % 24;
+    total_seconds /= 24;
+
+    // Now we have days since epoch (January 1, 1970)
+    s64 total_days = total_seconds;
+
+    // Calculate day of week (January 1, 1970 was a Thursday, so add 4)
+    dt.days_since_sunday = (total_days + 4) % 7;
+    ASSERT(dt.days_since_sunday >= 0 && dt.days_since_sunday <= 6);
+
+    // Calculate year and remaining days
+    dt.year = 1970;
+    while (true) {
+        int days_in_year = IsLeapYear(dt.year) ? 366 : 365;
+        if (total_days < days_in_year) break;
+        total_days -= days_in_year;
+        dt.year++;
+        ASSERT(dt.year < 3000);
+    }
+
+    // Calculate month and day
+    dt.months_since_jan = 0;
+    while (dt.months_since_jan < 12) {
+        int days_in_month = DaysOfMonth(dt.months_since_jan, dt.year);
+        if (total_days < days_in_month) break;
+        total_days -= days_in_month;
+        dt.months_since_jan++;
+        ASSERT(dt.months_since_jan < 12);
+    }
+
+    dt.day_of_month = CheckedCast<s8>(total_days + 1);
+    ASSERT(dt.day_of_month >= 1 && dt.day_of_month <= 31);
+
+    return dt;
 }
 
 TimePoint TimePoint::Now() {
@@ -305,7 +362,7 @@ TimePoint TimePoint::Now() {
     return TimePoint((s64)clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW));
 #else
     timespec ts;
-    clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+    clock_gettime(CLOCK_MONOTONIC_RAW, &ts); // signal-safe
     return TimePoint((s64)ts.tv_sec * (s64)1e+9 + (s64)ts.tv_nsec);
 #endif
 }

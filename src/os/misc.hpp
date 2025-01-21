@@ -206,15 +206,25 @@ Mutex& StdStreamMutex(StdStream stream);
 
 ErrorCodeOr<String> ReadAllStdin(Allocator& allocator);
 
-s128 NanosecondsSinceEpoch();
-DateAndTime LocalTimeFromNanosecondsSinceEpoch(s128 nanoseconds);
-DateAndTime UtcTimeFromNanosecondsSinceEpoch(s128 nanoseconds);
+s128 NanosecondsSinceEpoch(); // signal-safe
+s64 MicrosecondsSinceEpoch(); // signal-safe
+DateAndTime LocalTimeFromNanosecondsSinceEpoch(s128 nanoseconds); // not signal-safe
+DateAndTime UtcTimeFromNanosecondsSinceEpoch(s128 nanoseconds); // signal-safe
+
 PUBLIC inline DateAndTime LocalTimeNow() {
     return LocalTimeFromNanosecondsSinceEpoch(NanosecondsSinceEpoch());
 }
+
 PUBLIC inline DateAndTime UtcTimeNow() { return UtcTimeFromNanosecondsSinceEpoch(NanosecondsSinceEpoch()); }
 PUBLIC fmt::TimestampRfc3339UtcArray TimestampRfc3339UtcNow() {
     return fmt::TimestampRfc3339Utc(UtcTimeNow());
+}
+
+inline DateAndTime LocalTimeFromMicrosecondsSinceEpoch(s64 microseconds) {
+    return LocalTimeFromNanosecondsSinceEpoch((s128)microseconds * 1'000);
+}
+inline DateAndTime UtcTimeFromMicrosecondsSinceEpoch(s64 microseconds) {
+    return UtcTimeFromNanosecondsSinceEpoch((s128)microseconds * 1'000);
 }
 
 constexpr auto k_timestamp_max_str_size = "2022-12-31 23:59:59.999"_s.size;

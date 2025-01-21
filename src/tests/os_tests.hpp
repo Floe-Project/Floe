@@ -11,12 +11,6 @@
 constexpr auto k_os_log_module = "os"_log_module;
 
 TEST_CASE(TestEpochTime) {
-    auto const ns = NanosecondsSinceEpoch();
-    auto const t = LocalTimeFromNanosecondsSinceEpoch(ns);
-
-    auto std_time = time(nullptr);
-    auto std_local_time = *localtime(&std_time); // NOLINT(concurrency-mt-unsafe)
-
     auto check_approx = [&](s64 a, s64 b, Optional<s64> wrap_max) {
         auto b_below = b - 1;
         if (wrap_max && b_below < 0) b_below = wrap_max.Value();
@@ -25,12 +19,33 @@ TEST_CASE(TestEpochTime) {
         CHECK(a == b || a == b_below || a == b_above);
     };
 
-    check_approx(t.year, (std_local_time.tm_year + 1900), {});
-    check_approx(t.months_since_jan, std_local_time.tm_mon, 11);
-    check_approx(t.day_of_month, std_local_time.tm_mday, 31);
-    check_approx(t.hour, std_local_time.tm_hour, 23);
-    check_approx(t.minute, std_local_time.tm_min, 59);
-    check_approx(t.second, std_local_time.tm_sec, 59);
+    auto check_against_std = [&](DateAndTime t, tm const& std_time) {
+        check_approx(t.year, (std_time.tm_year + 1900), {});
+        check_approx(t.months_since_jan, std_time.tm_mon, 11);
+        check_approx(t.day_of_month, std_time.tm_mday, 31);
+        check_approx(t.hour, std_time.tm_hour, 23);
+        check_approx(t.minute, std_time.tm_min, 59);
+        check_approx(t.second, std_time.tm_sec, 59);
+    };
+
+    SUBCASE("local") {
+        auto const ns = NanosecondsSinceEpoch();
+        auto const t = LocalTimeFromNanosecondsSinceEpoch(ns);
+
+        auto std_time = time(nullptr);
+        auto std_local_time = *localtime(&std_time); // NOLINT(concurrency-mt-unsafe)
+
+        check_against_std(t, std_local_time);
+    }
+
+    SUBCASE("utc") {
+        auto const ns = NanosecondsSinceEpoch();
+        auto const t = UtcTimeFromNanosecondsSinceEpoch(ns);
+
+        auto std_time = time(nullptr);
+        auto std_utc_time = *gmtime(&std_time); // NOLINT(concurrency-mt-unsafe)
+        check_against_std(t, std_utc_time);
+    }
 
     return k_success;
 }

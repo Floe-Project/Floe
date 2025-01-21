@@ -34,7 +34,7 @@ struct DateAndTime {
     String DayName() const { return k_day_names_short[days_since_sunday]; }
     s16 year;
     s8 months_since_jan; // 0-11
-    s8 day_of_month; // 0-31
+    s8 day_of_month; // 1-31
     s8 days_since_sunday; // 0-6
     s8 hour;
     s8 minute;

@@ -34,14 +34,14 @@ constexpr String k_sentry_dsn =
     "";
 #endif
 
-SharedEngineSystems::SharedEngineSystems()
+SharedEngineSystems::SharedEngineSystems(Span<sentry::ErrorEvent::Tag const> tags)
     : arena(PageAllocator::Instance(), Kb(4))
     , paths(CreateFloePaths(arena))
     , settings {.paths = paths}
     , sample_library_server(thread_pool,
                             paths.always_scanned_folder[ToInt(ScanFolderType::Libraries)],
                             error_notifications) {
-    if constexpr (k_sentry_dsn.size) sentry::StartSenderThread(sentry_sender_thread, k_sentry_dsn);
+    if constexpr (k_sentry_dsn.size) sentry::StartSenderThread(sentry_sender_thread, k_sentry_dsn, tags);
 
     settings.tracking.on_filesystem_change = [this](ScanFolderType type) {
         ASSERT(CheckThreadName("main"));

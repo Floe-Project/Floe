@@ -18,7 +18,7 @@
 // crash-protection.
 
 struct SharedEngineSystems {
-    SharedEngineSystems();
+    SharedEngineSystems(Span<sentry::ErrorEvent::Tag const> tags);
     ~SharedEngineSystems();
 
     void StartPollingThreadIfNeeded();

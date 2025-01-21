@@ -30,6 +30,8 @@ struct SenderThread {
     WorkSignaller signaller;
     String dsn; // must outlive this object
     ThreadsafeQueue<ErrorMessage> messages {Malloc::Instance()};
+    ArenaAllocator tag_arena {Malloc::Instance()};
+    Span<ErrorEvent::Tag> tags {}; // allocate with tag_arena
 };
 
 namespace detail {
@@ -62,6 +64,18 @@ static void BackgroundThread(SenderThread& sender_thread) {
 
         while (auto msg = sender_thread.messages.TryPop()) {
             if (!envelope.size) auto _ = EnvelopeAddHeader(sentry, writer);
+
+            auto const tags = scratch_arena.AllocateExactSizeUninitialised<ErrorEvent::Tag>(
+                msg->tags.size + sender_thread.tags.size);
+            {
+                usize tag_index = 0;
+                for (auto const& tag : sender_thread.tags)
+                    tags[tag_index++] = tag;
+                for (auto const& tag : msg->tags)
+                    tags[tag_index++] = tag;
+            }
+            msg->tags = tags;
+
             auto _ = EnvelopeAddEvent(sentry, writer, *msg);
         }
 
@@ -85,7 +99,14 @@ static void BackgroundThread(SenderThread& sender_thread) {
 } // namespace detail
 
 // dsn must be static
-PUBLIC bool StartSenderThread(SenderThread& sender_thread, String dsn) {
+PUBLIC bool StartSenderThread(SenderThread& sender_thread, String dsn, Span<ErrorEvent::Tag const> tags) {
+    sender_thread.tags = sender_thread.tag_arena.AllocateExactSizeUninitialised<ErrorEvent::Tag>(tags.size);
+    for (auto i : Range(tags.size))
+        sender_thread.tags[i] = {
+            sender_thread.tag_arena.Clone(tags[i].key),
+            sender_thread.tag_arena.Clone(tags[i].value),
+        };
+
     sender_thread.dsn = dsn;
     sender_thread.thread.Start([&sender_thread]() { detail::BackgroundThread(sender_thread); }, "sentry", {});
     return true;

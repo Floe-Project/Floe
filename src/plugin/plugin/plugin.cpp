@@ -706,7 +706,30 @@ clap_plugin const floe_plugin {
 
         if (g_num_initialised_plugins++ == 0) {
             SetThreadName("main");
-            g_shared_engine_systems.Emplace();
+
+            DynamicArrayBounded<sentry::ErrorEvent::Tag, 4> tags {};
+            {
+                // the clap spec says these should be valid
+                ASSERT(floe.host.name && floe.host.name[0]);
+                ASSERT(floe.host.version && floe.host.version[0]);
+
+                auto const host_name = FromNullTerminated(floe.host.name);
+                dyn::Append(tags, {"host_name"_s, host_name});
+                dyn::Append(tags, {"host_version"_s, FromNullTerminated(floe.host.version)});
+                if (floe.host.vendor && floe.host.vendor[0])
+                    dyn::Append(tags, {"host_vendor"_s, FromNullTerminated(floe.host.vendor)});
+
+                String plugin_type = "CLAP"_s;
+                if (ContainsCaseInsensitiveAscii(host_name, "vst3"))
+                    plugin_type = "VST3"_s;
+                else if (ContainsCaseInsensitiveAscii(host_name, "auv2"))
+                    plugin_type = "AUv2"_s;
+                else if (ContainsCaseInsensitiveAscii(host_name, "standalone"))
+                    plugin_type = "Standalone"_s;
+                dyn::Append(tags, {"plugin_type"_s, plugin_type});
+            }
+
+            g_shared_engine_systems.Emplace(tags);
 
             g_log.Info(k_main_log_module,
                        "host: {} {} {}",
@@ -714,19 +737,10 @@ clap_plugin const floe_plugin {
                        floe.host.name,
                        floe.host.version);
 
-            sentry::SenderThread::ErrorMessage message {};
-
-            DynamicArray<sentry::ErrorEvent::Tag> tags {message.arena};
-            tags.Reserve(3);
-            ASSERT(floe.host.name && floe.host.name[0]);
-            dyn::Append(tags, {"host_name"_s, FromNullTerminated(floe.host.name)});
-            ASSERT(floe.host.version && floe.host.version[0]);
-            dyn::Append(tags, {"host_version"_s, FromNullTerminated(floe.host.version)});
-            if (floe.host.vendor && floe.host.vendor[0])
-                dyn::Append(tags, {"host_vendor"_s, FromNullTerminated(floe.host.vendor)});
-            message.tags = tags.ToOwnedSpan();
-
-            message.level = sentry::ErrorEvent::Level::Info, message.message = "Host start"_s,
+            sentry::SenderThread::ErrorMessage message {{
+                .level = sentry::ErrorEvent::Level::Info,
+                .message = "Host start"_s,
+            }};
             sentry::SendErrorMessage(g_shared_engine_systems->sentry_sender_thread, Move(message));
         }
 

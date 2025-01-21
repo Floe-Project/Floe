@@ -418,8 +418,11 @@ struct ErrorEvent {
         TRY(json::WriteObjectEnd(json_writer));
     }
 
-    TRY(writer.WriteChar(','));
-    TRY(writer.WriteChars(sentry.event_context_json));
+    // insert the common context
+    {
+        TRY(writer.WriteChar(','));
+        TRY(writer.WriteChars(sentry.event_context_json));
+    }
 
     TRY(json::WriteObjectEnd(json_writer));
     TRY(writer.WriteChar('\n'));

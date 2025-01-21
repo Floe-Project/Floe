@@ -19,57 +19,6 @@ struct SentryDsn {
 };
 
 struct Sentry {
-    struct Session {
-        enum class Status : u32 {
-            Ok,
-
-            // session end statuses
-            Exited,
-            Crashed,
-            Abnormal,
-        };
-        String StatusString() const {
-            switch (status) {
-                case Status::Ok: return "ok"_s;
-                case Status::Exited: return "exited"_s;
-                case Status::Crashed: return "crashed"_s;
-                case Status::Abnormal: return "abnormal"_s;
-            }
-            PanicIfReached();
-        }
-
-        Status status;
-    };
-
-    struct Event {
-        struct Tag {
-            String key;
-            String value;
-        };
-        enum class Level {
-            Fatal,
-            Error,
-            Warning,
-            Info,
-            Debug,
-        };
-        String LevelString() const {
-            switch (level) {
-                case Level::Fatal: return "fatal"_s;
-                case Level::Error: return "error"_s;
-                case Level::Warning: return "warning"_s;
-                case Level::Info: return "info"_s;
-                case Level::Debug: return "debug"_s;
-            }
-            PanicIfReached();
-        }
-
-        Level level;
-        String message;
-        Optional<StacktraceStack> stacktrace;
-        Span<Tag const> tags;
-    };
-
     static constexpr usize k_max_message_length = 8192;
     static constexpr String k_release = "floe@" FLOE_VERSION_STRING;
     static constexpr String k_environment = PRODUCTION_BUILD ? "production"_s : "development"_s;
@@ -300,16 +249,15 @@ PUBLIC ErrorCodeOr<void> EnvelopeAddHeader(Sentry& sentry, Writer writer) {
     return k_success;
 }
 
-[[maybe_unused]] PUBLIC ErrorCodeOr<void>
-EnvelopeAddSessionUpdate(Sentry& sentry, Writer writer, Sentry::Session session) {
-    switch (session.status) {
-        case Sentry::Session::Status::Exited:
-        case Sentry::Session::Status::Crashed:
-        case Sentry::Session::Status::Abnormal:
-            ASSERT(!sentry.session_ended);
-            sentry.session_ended = true;
-            break;
-        case Sentry::Session::Status::Ok: break;
+enum class SessionUpdateType { Start, End };
+
+[[maybe_unused]] PUBLIC ErrorCodeOr<void> EnvelopeAddSessionUpdate(Sentry& sentry,
+                                                                   Writer writer,
+                                                                   SessionUpdateType session_update_type,
+                                                                   Optional<u32> extra_num_errors = {}) {
+    switch (session_update_type) {
+        case SessionUpdateType::Start: ASSERT(sentry.session_ended == true); break;
+        case SessionUpdateType::End: ASSERT(sentry.session_ended == false); break;
     }
 
     json::WriteContext json_writer {
@@ -317,8 +265,11 @@ EnvelopeAddSessionUpdate(Sentry& sentry, Writer writer, Sentry::Session session)
         .add_whitespace = false,
     };
     auto const timestamp = TimestampRfc3339UtcNow();
-    auto const init = sentry.session_sequence == 0;
+    auto const init = session_update_type == SessionUpdateType::Start;
     if (init) sentry.session_started_at = timestamp;
+
+    auto num_errors = sentry.session_num_errors;
+    if (extra_num_errors) num_errors += *extra_num_errors;
 
     // Item header (session)
     json::ResetWriter(json_writer);
@@ -331,14 +282,25 @@ EnvelopeAddSessionUpdate(Sentry& sentry, Writer writer, Sentry::Session session)
     json::ResetWriter(json_writer);
     TRY(json::WriteObjectBegin(json_writer));
     TRY(json::WriteKeyValue(json_writer, "sid", sentry.session_id));
-    TRY(json::WriteKeyValue(json_writer, "status", session.StatusString()));
+    TRY(json::WriteKeyValue(json_writer, "status", ({
+                                String s;
+                                switch (session_update_type) {
+                                    case SessionUpdateType::Start: s = "ok"; break;
+                                    case SessionUpdateType::End:
+                                        if (num_errors)
+                                            s = "crashed";
+                                        else
+                                            s = "exited";
+                                        break;
+                                }
+                                s;
+                            })));
     if (sentry.device_id) TRY(json::WriteKeyValue(json_writer, "did", *sentry.device_id));
     TRY(json::WriteKeyValue(json_writer, "init", init));
     TRY(json::WriteKeyValue(json_writer, "seq", sentry.session_sequence++));
     TRY(json::WriteKeyValue(json_writer, "timestamp", timestamp));
     TRY(json::WriteKeyValue(json_writer, "started", sentry.session_started_at));
-    TRY(json::WriteKeyValue(json_writer, "errors", sentry.session_num_errors));
-    // attrs
+    TRY(json::WriteKeyValue(json_writer, "errors", num_errors));
     {
         TRY(json::WriteKeyObjectBegin(json_writer, "attrs"));
         TRY(json::WriteKeyValue(json_writer, "release", sentry.k_release));
@@ -352,15 +314,39 @@ EnvelopeAddSessionUpdate(Sentry& sentry, Writer writer, Sentry::Session session)
     return k_success;
 }
 
-[[maybe_unused]] PUBLIC ErrorCodeOr<void>
-EnvelopeAddEvent(Sentry& sentry, Writer& writer, Sentry::Event event) {
-    switch (event.level) {
-        case Sentry::Event::Level::Fatal:
-        case Sentry::Event::Level::Error: sentry.session_num_errors++; break;
-        case Sentry::Event::Level::Warning:
-        case Sentry::Event::Level::Info:
-        case Sentry::Event::Level::Debug: break;
+struct ErrorEvent {
+    struct Tag {
+        String key;
+        String value;
+    };
+    // NOTE: in Sentry, all events are 'errors' regardless of their level
+    enum class Level {
+        Fatal,
+        Error,
+        Warning,
+        Info,
+        Debug,
+    };
+    String LevelString() const {
+        switch (level) {
+            case Level::Fatal: return "fatal"_s;
+            case Level::Error: return "error"_s;
+            case Level::Warning: return "warning"_s;
+            case Level::Info: return "info"_s;
+            case Level::Debug: return "debug"_s;
+        }
+        PanicIfReached();
     }
+
+    Level level;
+    String message;
+    Optional<StacktraceStack> stacktrace;
+    Span<Tag const> tags;
+};
+
+// NOTE (Jan 2025): all events are 'errors' in Sentry, there's no plain logging concept
+[[maybe_unused]] PUBLIC ErrorCodeOr<void> EnvelopeAddEvent(Sentry& sentry, Writer& writer, ErrorEvent event) {
+    sentry.session_num_errors++;
 
     json::WriteContext json_writer {
         .out = writer,

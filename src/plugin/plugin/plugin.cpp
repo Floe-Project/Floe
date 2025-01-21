@@ -714,20 +714,20 @@ clap_plugin const floe_plugin {
                        floe.host.name,
                        floe.host.version);
 
-            // DynamicArrayBounded<sentry::SenderThread::Message::Tag, 3> tags {};
-            // ASSERT(floe.host.name && floe.host.name[0]);
-            // dyn::Append(tags, {"host_name"_s, FromNullTerminated(floe.host.name)});
-            // ASSERT(floe.host.version && floe.host.version[0]);
-            // dyn::Append(tags, {"host_version"_s, FromNullTerminated(floe.host.version)});
-            // if (floe.host.vendor && floe.host.vendor[0])
-            //     dyn::Append(tags, {"host_vendor"_s, FromNullTerminated(floe.host.vendor)});
-            //
-            // sentry::SendEvent(g_shared_engine_systems->sentry_sender_thread,
-            //                   {
-            //                       .level = sentry::Sentry::Event::Level::Info,
-            //                       .message = "Session start"_s,
-            //                       .tags = Span<sentry::SenderThread::Message::Tag const> {tags.Items()},
-            //                   });
+            sentry::SenderThread::ErrorMessage message {};
+
+            DynamicArray<sentry::ErrorEvent::Tag> tags {message.arena};
+            tags.Reserve(3);
+            ASSERT(floe.host.name && floe.host.name[0]);
+            dyn::Append(tags, {"host_name"_s, FromNullTerminated(floe.host.name)});
+            ASSERT(floe.host.version && floe.host.version[0]);
+            dyn::Append(tags, {"host_version"_s, FromNullTerminated(floe.host.version)});
+            if (floe.host.vendor && floe.host.vendor[0])
+                dyn::Append(tags, {"host_vendor"_s, FromNullTerminated(floe.host.vendor)});
+            message.tags = tags.ToOwnedSpan();
+
+            message.level = sentry::ErrorEvent::Level::Info, message.message = "Host start"_s,
+            sentry::SendErrorMessage(g_shared_engine_systems->sentry_sender_thread, Move(message));
         }
 
         g_log.Debug(k_clap_log_module, "#{} init", floe.index);

@@ -94,7 +94,7 @@ SharedEngineSystems::~SharedEngineSystems() {
     }
 
     if constexpr (k_sentry_dsn.size) {
-        sentry::RequestEndSenderThread(sentry_sender_thread, sentry::Sentry::Session::Status::Exited);
+        sentry::RequestEndSenderThread(sentry_sender_thread);
         sentry::WaitForSenderThreadEnd(sentry_sender_thread);
     }
 }

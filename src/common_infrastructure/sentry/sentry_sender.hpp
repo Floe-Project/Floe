@@ -17,18 +17,19 @@
 namespace sentry {
 
 struct SenderThread {
-    struct Message {
+    // Create a message and then fill in the fields, allocating using the message's arena. Move the message
+    // into the queue.
+    struct ErrorMessage : ErrorEvent {
         ArenaAllocator arena {Malloc::Instance()};
-        Sentry::Event event;
     };
 
     constexpr static u32 k_dont_end = (u32)-1;
 
     Thread thread;
-    Atomic<UnderlyingType<Sentry::Sentry::Session::Status>> end_with_status = (u32)-1;
+    Atomic<bool> end_thread = false;
     WorkSignaller signaller;
-    String dsn; // must be static
-    ThreadsafeQueue<Message> messages {Malloc::Instance()};
+    String dsn; // must outlive this object
+    ThreadsafeQueue<ErrorMessage> messages {Malloc::Instance()};
 };
 
 namespace detail {
@@ -44,7 +45,7 @@ static void BackgroundThread(SenderThread& sender_thread) {
         DynamicArray<char> envelope {scratch_arena};
         auto writer = dyn::WriterFor(envelope);
         auto _ = EnvelopeAddHeader(sentry, writer);
-        auto _ = EnvelopeAddSessionUpdate(sentry, writer, {.status = Sentry::Session::Status::Ok});
+        auto _ = EnvelopeAddSessionUpdate(sentry, writer, SessionUpdateType::Start);
 
         auto const o = SendSentryEnvelope(sentry, envelope, {}, scratch_arena);
         if (o.HasError()) {
@@ -61,15 +62,13 @@ static void BackgroundThread(SenderThread& sender_thread) {
 
         while (auto msg = sender_thread.messages.TryPop()) {
             if (!envelope.size) auto _ = EnvelopeAddHeader(sentry, writer);
-            auto _ = EnvelopeAddEvent(sentry, writer, msg->event);
+            auto _ = EnvelopeAddEvent(sentry, writer, *msg);
         }
 
-        bool end = false;
-        if (auto const status = sender_thread.end_with_status.Load(LoadMemoryOrder::Relaxed);
-            status != SenderThread::k_dont_end) {
+        auto const end = sender_thread.end_thread.Load(LoadMemoryOrder::Relaxed);
+        if (end) {
             if (!envelope.size) auto _ = EnvelopeAddHeader(sentry, writer);
-            auto _ = EnvelopeAddSessionUpdate(sentry, writer, {.status = Sentry::Session::Status(status)});
-            end = true;
+            auto _ = EnvelopeAddSessionUpdate(sentry, writer, SessionUpdateType::End);
         }
 
         if (envelope.size) {
@@ -92,14 +91,15 @@ PUBLIC bool StartSenderThread(SenderThread& sender_thread, String dsn) {
     return true;
 }
 
-PUBLIC void RequestEndSenderThread(SenderThread& sender_thread, Sentry::Session::Status status) {
-    sender_thread.end_with_status.Store(ToInt(status), StoreMemoryOrder::Relaxed);
+PUBLIC void RequestEndSenderThread(SenderThread& sender_thread) {
+    ASSERT(sender_thread.end_thread.Load(LoadMemoryOrder::Relaxed) == false);
+    sender_thread.end_thread.Store(true, StoreMemoryOrder::Relaxed);
     sender_thread.signaller.Signal();
 }
 
 PUBLIC void WaitForSenderThreadEnd(SenderThread& sender_thread) { sender_thread.thread.Join(); }
 
-PUBLIC void SendEvent(SenderThread& sender_thread, SenderThread::Message&& msg) {
+PUBLIC void SendErrorMessage(SenderThread& sender_thread, SenderThread::ErrorMessage&& msg) {
     sender_thread.messages.Push(Move(msg));
     sender_thread.signaller.Signal();
 }

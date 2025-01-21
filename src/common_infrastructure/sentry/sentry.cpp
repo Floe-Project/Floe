@@ -31,18 +31,18 @@ TEST_CASE(TestSentry) {
         DynamicArray<char> envelope {tester.scratch_arena};
         auto writer = dyn::WriterFor(envelope);
         TRY(EnvelopeAddHeader(sentry, writer));
-        TRY(EnvelopeAddSessionUpdate(sentry, writer, {.status = Sentry::Session::Status::Ok}));
+        TRY(EnvelopeAddSessionUpdate(sentry, writer, SessionUpdateType::Start));
         TRY(EnvelopeAddEvent(sentry,
                              writer,
                              {
-                                 .level = Sentry::Event::Level::Info,
+                                 .level = ErrorEvent::Level::Info,
                                  .message = "Test event message"_s,
-                                 .tags = ArrayT<Sentry::Event::Tag>({
+                                 .tags = ArrayT<ErrorEvent::Tag>({
                                      {"tag1", "value1"},
                                      {"tag2", "value2"},
                                  }),
                              }));
-        TRY(EnvelopeAddSessionUpdate(sentry, writer, {.status = Sentry::Session::Status::Exited}));
+        TRY(EnvelopeAddSessionUpdate(sentry, writer, SessionUpdateType::End));
 
         CHECK(envelope.size > 0);
     }

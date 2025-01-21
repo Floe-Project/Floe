@@ -201,6 +201,7 @@ struct KnownDirectoryOptions {
     Writer* error_log;
 };
 
+// You'll probably want to use KnownDirectoryWithSubdirectories instead.
 MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirectoryOptions options);
 
 // Gets a known directory and adds subdirectories and (optionally) a filename. It will create the

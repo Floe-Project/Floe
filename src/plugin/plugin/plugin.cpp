@@ -707,7 +707,7 @@ clap_plugin const floe_plugin {
         if (g_num_initialised_plugins++ == 0) {
             SetThreadName("main");
 
-            DynamicArrayBounded<sentry::ErrorEvent::Tag, 4> tags {};
+            DynamicArrayBounded<sentry::Tag, 4> tags {};
             {
                 // the clap spec says these should be valid
                 ASSERT(floe.host.name && floe.host.name[0]);

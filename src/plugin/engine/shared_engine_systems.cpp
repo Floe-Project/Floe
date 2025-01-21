@@ -34,7 +34,7 @@ constexpr String k_sentry_dsn =
     "";
 #endif
 
-SharedEngineSystems::SharedEngineSystems(Span<sentry::ErrorEvent::Tag const> tags)
+SharedEngineSystems::SharedEngineSystems(Span<sentry::Tag const> tags)
     : arena(PageAllocator::Instance(), Kb(4))
     , paths(CreateFloePaths(arena))
     , settings {.paths = paths}

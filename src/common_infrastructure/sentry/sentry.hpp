@@ -3,7 +3,6 @@
 
 #pragma once
 #include "foundation/foundation.hpp"
-#include "os/filesystem.hpp"
 #include "os/web.hpp"
 #include "utils/debug/debug.hpp"
 #include "utils/json/json_writer.hpp"
@@ -18,193 +17,75 @@ struct SentryDsn {
     String public_key;
 };
 
+struct Tag {
+    Tag Clone(ArenaAllocator& arena) const {
+        return Tag {.key = key.Clone(arena), .value = value.Clone(arena)};
+    }
+
+    String key;
+    String value;
+};
+
+struct ErrorEvent {
+    // NOTE: in Sentry, all events are 'errors' regardless of their level
+    enum class Level {
+        Fatal,
+        Error,
+        Warning,
+        Info,
+        Debug,
+    };
+    String LevelString() const {
+        switch (level) {
+            case Level::Fatal: return "fatal"_s;
+            case Level::Error: return "error"_s;
+            case Level::Warning: return "warning"_s;
+            case Level::Info: return "info"_s;
+            case Level::Debug: return "debug"_s;
+        }
+        PanicIfReached();
+    }
+
+    Level level;
+    String message;
+    Optional<StacktraceStack> stacktrace;
+    Span<Tag const> tags;
+};
+
 struct Sentry {
     static constexpr usize k_max_message_length = 8192;
     static constexpr String k_release = "floe@" FLOE_VERSION_STRING;
     static constexpr String k_environment = PRODUCTION_BUILD ? "production"_s : "development"_s;
-    SentryDsn dsn;
-    Optional<fmt::UuidArray> device_id;
-    fmt::UuidArray session_id;
-    u32 session_sequence = 0;
-    u32 session_num_errors = 0;
-    fmt::TimestampRfc3339UtcArray session_started_at {};
-    u64 seed = RandomSeed();
-    DynamicArray<char> event_context_json {PageAllocator::Instance()};
+    SentryDsn dsn {};
+    Optional<fmt::UuidArray> device_id {};
+    fmt::UuidArray session_id {};
+    Atomic<u32> session_num_errors = 0;
+    Atomic<s64> session_started_microsecs {};
+    Atomic<u64> seed = RandomSeed();
+    ArenaAllocator arena {PageAllocator::Instance()};
+    Span<char> event_context_json {};
+    Span<Tag> tags {};
 };
+
+// never destroyed, once set (InitGlobalSentry) it's good for the lifetime
+extern Atomic<Sentry*> g_instance;
 
 namespace detail {
 
-// We only support the format: https://<public_key>@<host>/<project_id>
-static Optional<SentryDsn> ParseSentryDsn(String dsn) {
-    auto read_until = [](String& s, char c) {
-        auto const i = Find(s, c);
-        if (!i) return String {};
-        auto const result = s.SubSpan(0, *i);
-        s.RemovePrefix(*i + 1);
-        return result;
-    };
-
-    SentryDsn result {.dsn = dsn};
-
-    // Skip https://
-    if (!StartsWithSpan(dsn, "https://"_s)) return k_nullopt;
-    if (dsn.size < 8) return k_nullopt;
-    dsn.RemovePrefix(8);
-
-    // Get public key (everything before @)
-    auto key = read_until(dsn, '@');
-    if (key.size == 0) return k_nullopt;
-    result.public_key = key;
-
-    // Get host (everything before last /)
-    auto last_slash = Find(dsn, '/');
-    if (!last_slash) return k_nullopt;
-
-    result.host = dsn.SubSpan(0, *last_slash);
-    dsn.RemovePrefix(*last_slash + 1);
-
-    // Remaining part is project_id
-    if (dsn.size == 0) return k_nullopt;
-    result.project_id = dsn;
-
+static fmt::UuidArray Uuid(Atomic<u64>& seed) {
+    u64 s = seed.Load(LoadMemoryOrder::Relaxed);
+    auto result = fmt::Uuid(s);
+    seed.Store(s, StoreMemoryOrder::Relaxed);
     return result;
-}
-
-static Optional<fmt::UuidArray> DeviceId(u64& seed) {
-    PathArena path_arena {PageAllocator::Instance()};
-    auto const dir = KnownDirectory(path_arena, KnownDirectoryType::UserData, {.create = true});
-    auto const path = path::JoinAppendResizeAllocation(path_arena, dir, Array {"Floe"_s, "device_id"_s});
-
-    auto file = TRY_OR(OpenFile(path, FileMode::ReadWrite), {
-        g_log.Error(k_main_log_module, "Failed to create device_id file: {}, {}", path, error);
-        return k_nullopt;
-    });
-
-    TRY_OR(file.Lock(FileLockType::Exclusive), {
-        g_log.Error(k_main_log_module, "Failed to lock device_id file: {}, {}", path, error);
-        return k_nullopt;
-    });
-    DEFER { auto _ = file.Unlock(); };
-
-    auto const size = TRY_OR(file.FileSize(), {
-        g_log.Error(k_main_log_module, "Failed to get size of device_id file: {}, {}", path, error);
-        return k_nullopt;
-    });
-
-    if (size == fmt::k_uuid_size) {
-        fmt::UuidArray uuid {};
-        TRY_OR(file.Read(uuid.data, uuid.size), {
-            g_log.Error(k_main_log_module, "Failed to read device_id file: {}, {}", path, error);
-            return k_nullopt;
-        });
-
-        bool valid = true;
-        for (auto c : uuid) {
-            if (!IsHexDigit(c)) {
-                valid = false;
-                break;
-            }
-        }
-        if (valid) return uuid;
-    }
-
-    // File is invalid or empty, let's recreate it
-    auto const uuid = fmt::Uuid(seed);
-
-    TRY_OR(file.Seek(0, File::SeekOrigin::Start),
-           { g_log.Error(k_main_log_module, "Failed to seek device_id file: {}, {}", path, error); });
-
-    TRY_OR(file.Truncate(0),
-           { g_log.Error(k_main_log_module, "Failed to truncate device_id file: {}, {}", path, error); });
-
-    TRY_OR(file.Write(uuid),
-           { g_log.Error(k_main_log_module, "Failed to write device_id file: {}, {}", path, error); });
-
-    auto _ = file.Flush();
-
-    return uuid;
 }
 
 } // namespace detail
 
-PUBLIC bool InitSentry(Sentry& sentry, String dsn) {
-    auto parsed_dsn = TRY_OPT_OR(detail::ParseSentryDsn(dsn), {
-        g_log.Error(k_main_log_module, "Failed to parse Sentry DSN: {}", dsn);
-        return false;
-    });
-    sentry.dsn = parsed_dsn;
-    sentry.device_id = detail::DeviceId(sentry.seed);
-    sentry.session_id = fmt::Uuid(sentry.seed);
+// not thread-safe, not signal-safe, inits g_instance
+Sentry* InitGlobalSentry(String dsn, Span<Tag const> tag);
 
-    // this data is common to every event we want to send, so let's cache it as a JSON blob
-    {
-        json::WriteContext json_writer {
-            .out = dyn::WriterFor(sentry.event_context_json),
-            .add_whitespace = false,
-        };
-
-        auto _ = json::WriteObjectBegin(json_writer);
-
-        // user
-        if (sentry.device_id) {
-            auto _ = json::WriteKeyObjectBegin(json_writer, "user");
-            auto _ = json::WriteKeyValue(json_writer, "id", *sentry.device_id);
-            auto _ = json::WriteObjectEnd(json_writer);
-        }
-
-        // contexts
-        {
-            auto _ = json::WriteKeyObjectBegin(json_writer, "contexts");
-
-            // device
-            {
-                auto const system = GetSystemStats();
-                auto _ = json::WriteKeyObjectBegin(json_writer, "device");
-                auto _ = json::WriteKeyValue(json_writer, "name", "desktop");
-                auto _ = json::WriteKeyValue(json_writer, "arch", system.Arch());
-                auto _ = json::WriteKeyValue(json_writer, "cpu_description", system.cpu_name);
-                auto _ = json::WriteKeyValue(json_writer, "processor_count", system.num_logical_cpus);
-                auto _ = json::WriteKeyValue(json_writer, "processor_frequency", system.frequency_mhz);
-                auto _ = json::WriteObjectEnd(json_writer);
-            }
-
-            // os
-            {
-                auto const os = GetOsInfo();
-                auto _ = json::WriteKeyObjectBegin(json_writer, "os");
-                auto _ = json::WriteKeyValue(json_writer, "name", os.name);
-                if (os.version.size) auto _ = json::WriteKeyValue(json_writer, "version", os.version);
-                if (os.build.size) auto _ = json::WriteKeyValue(json_writer, "build", os.build);
-                if (os.kernel_version.size)
-                    auto _ = json::WriteKeyValue(json_writer, "kernel_version", os.kernel_version);
-                if (os.pretty_name.size)
-                    auto _ = json::WriteKeyValue(json_writer, "pretty_name", os.pretty_name);
-                if (os.distribution_name.size)
-                    auto _ = json::WriteKeyValue(json_writer, "distribution_name", os.distribution_name);
-                if (os.distribution_version.size)
-                    auto _ =
-                        json::WriteKeyValue(json_writer, "distribution_version", os.distribution_version);
-                if (os.distribution_pretty_name.size)
-                    auto _ = json::WriteKeyValue(json_writer,
-                                                 "distribution_pretty_name",
-                                                 os.distribution_pretty_name);
-                auto _ = json::WriteObjectEnd(json_writer);
-            }
-
-            auto _ = json::WriteObjectEnd(json_writer);
-        }
-        auto _ = json::WriteObjectEnd(json_writer);
-
-        // we want to be able to print the context directly into an existing JSON event so we remove the
-        // object braces
-        dyn::Pop(sentry.event_context_json);
-        dyn::Remove(sentry.event_context_json, 0);
-    }
-
-    return true;
-}
-
-PUBLIC ErrorCodeOr<void> SendSentryEnvelope(Sentry& sentry,
+// threadsafe, not signal-safe
+PUBLIC ErrorCodeOr<void> SendSentryEnvelope(Sentry const& sentry,
                                             String envelope,
                                             Optional<Writer> response,
                                             ArenaAllocator& scratch_arena) {
@@ -233,7 +114,8 @@ PUBLIC ErrorCodeOr<void> SendSentryEnvelope(Sentry& sentry,
         response);
 }
 
-PUBLIC ErrorCodeOr<void> EnvelopeAddHeader(Sentry& sentry, Writer writer) {
+// thread-safe, signal-safe
+PUBLIC ErrorCodeOr<void> EnvelopeAddHeader(Sentry const& sentry, Writer writer) {
     json::WriteContext json_writer {
         .out = writer,
         .add_whitespace = false,
@@ -248,22 +130,40 @@ PUBLIC ErrorCodeOr<void> EnvelopeAddHeader(Sentry& sentry, Writer writer) {
     return k_success;
 }
 
-enum class SessionUpdateType { Start, End };
+enum class SessionUpdateType { Start, EndedNormally, EndedCrashed };
 
+// thread-safe, signal-safe
 [[maybe_unused]] PUBLIC ErrorCodeOr<void> EnvelopeAddSessionUpdate(Sentry& sentry,
                                                                    Writer writer,
                                                                    SessionUpdateType session_update_type,
                                                                    Optional<u32> extra_num_errors = {}) {
+    auto const now = MicrosecondsSinceEpoch();
+    auto const timestamp = fmt::TimestampRfc3339Utc(UtcTimeFromMicrosecondsSinceEpoch(now));
+    auto const init = session_update_type == SessionUpdateType::Start;
+
+    switch (session_update_type) {
+        case SessionUpdateType::Start:
+            ASSERT(sentry.session_started_microsecs.Load(LoadMemoryOrder::Relaxed) == 0,
+                   "session already started");
+            sentry.session_id = detail::Uuid(sentry.seed);
+            sentry.session_started_microsecs.Store(now, StoreMemoryOrder::Release);
+            break;
+        case SessionUpdateType::EndedNormally:
+        case SessionUpdateType::EndedCrashed:
+            ASSERT(sentry.session_started_microsecs.Load(LoadMemoryOrder::Relaxed) > 0,
+                   "missing session start");
+    }
+
+    auto const num_errors = ({
+        auto e = sentry.session_num_errors.Load(LoadMemoryOrder::Relaxed);
+        if (extra_num_errors) e += *extra_num_errors;
+        e;
+    });
+
     json::WriteContext json_writer {
         .out = writer,
         .add_whitespace = false,
     };
-    auto const timestamp = TimestampRfc3339UtcNow();
-    auto const init = session_update_type == SessionUpdateType::Start;
-    if (init) sentry.session_started_at = timestamp;
-
-    auto num_errors = sentry.session_num_errors;
-    if (extra_num_errors) num_errors += *extra_num_errors;
 
     // Item header (session)
     json::ResetWriter(json_writer);
@@ -280,20 +180,25 @@ enum class SessionUpdateType { Start, End };
                                 String s;
                                 switch (session_update_type) {
                                     case SessionUpdateType::Start: s = "ok"; break;
-                                    case SessionUpdateType::End:
-                                        if (num_errors)
-                                            s = "crashed";
-                                        else
-                                            s = "exited";
-                                        break;
+                                    case SessionUpdateType::EndedNormally: s = "exited"; break;
+                                    case SessionUpdateType::EndedCrashed: s = "crashed"; break;
                                 }
                                 s;
                             })));
     if (sentry.device_id) TRY(json::WriteKeyValue(json_writer, "did", *sentry.device_id));
     TRY(json::WriteKeyValue(json_writer, "init", init));
-    TRY(json::WriteKeyValue(json_writer, "seq", sentry.session_sequence++));
+    TRY(json::WriteKeyValue(json_writer, "seq", init ? 0 : 1));
     TRY(json::WriteKeyValue(json_writer, "timestamp", timestamp));
-    TRY(json::WriteKeyValue(json_writer, "started", sentry.session_started_at));
+    TRY(json::WriteKeyValue(json_writer, "started", ({
+                                fmt::TimestampRfc3339UtcArray s;
+                                if (init) {
+                                    s = timestamp;
+                                } else {
+                                    s = fmt::TimestampRfc3339Utc(UtcTimeFromMicrosecondsSinceEpoch(
+                                        sentry.session_started_microsecs.Load(LoadMemoryOrder::Acquire)));
+                                }
+                                s;
+                            })));
     TRY(json::WriteKeyValue(json_writer, "errors", num_errors));
     {
         TRY(json::WriteKeyObjectBegin(json_writer, "attrs"));
@@ -305,49 +210,28 @@ enum class SessionUpdateType { Start, End };
     TRY(json::WriteObjectEnd(json_writer));
     TRY(writer.WriteChar('\n'));
 
+    if (session_update_type != SessionUpdateType::Start) {
+        sentry.session_num_errors.Store(0, StoreMemoryOrder::Relaxed);
+        sentry.session_started_microsecs.Store(0, StoreMemoryOrder::Relaxed);
+    }
+
     return k_success;
 }
 
-struct ErrorEvent {
-    struct Tag {
-        String key;
-        String value;
-    };
-    // NOTE: in Sentry, all events are 'errors' regardless of their level
-    enum class Level {
-        Fatal,
-        Error,
-        Warning,
-        Info,
-        Debug,
-    };
-    String LevelString() const {
-        switch (level) {
-            case Level::Fatal: return "fatal"_s;
-            case Level::Error: return "error"_s;
-            case Level::Warning: return "warning"_s;
-            case Level::Info: return "info"_s;
-            case Level::Debug: return "debug"_s;
-        }
-        PanicIfReached();
-    }
-
-    Level level;
-    String message;
-    Optional<StacktraceStack> stacktrace;
-    Span<Tag const> tags;
-};
-
+// thread-safe, signal-safe
 // NOTE (Jan 2025): all events are 'errors' in Sentry, there's no plain logging concept
 [[maybe_unused]] PUBLIC ErrorCodeOr<void> EnvelopeAddEvent(Sentry& sentry, Writer& writer, ErrorEvent event) {
-    sentry.session_num_errors++;
+    ASSERT(event.message.size <= Sentry::k_max_message_length, "message too long");
+    ASSERT(event.tags.size < 100, "too many tags");
+
+    sentry.session_num_errors.FetchAdd(1, RmwMemoryOrder::Relaxed);
 
     json::WriteContext json_writer {
         .out = writer,
         .add_whitespace = false,
     };
     auto const timestamp = TimestampRfc3339UtcNow();
-    auto const event_id = fmt::Uuid(sentry.seed);
+    auto const event_id = detail::Uuid(sentry.seed);
 
     // Item header (event)
     json::ResetWriter(json_writer);
@@ -368,14 +252,16 @@ struct ErrorEvent {
     TRY(json::WriteKeyValue(json_writer, "environment", sentry.k_environment));
 
     // tags
-    if (event.tags.size) {
+    if (event.tags.size || sentry.tags.size) {
         TRY(json::WriteKeyObjectBegin(json_writer, "tags"));
-        for (auto const& tag : event.tags) {
-            if (!tag.key.size) continue;
-            if (!tag.value.size) continue;
-            if (tag.key.size >= 200) continue;
-            if (tag.value.size >= 200) continue;
-            TRY(json::WriteKeyValue(json_writer, tag.key, tag.value));
+        for (auto tags : Array {event.tags, sentry.tags}) {
+            for (auto const& tag : tags) {
+                if (!tag.key.size) continue;
+                if (!tag.value.size) continue;
+                if (tag.key.size >= 200) continue;
+                if (tag.value.size >= 200) continue;
+                TRY(json::WriteKeyValue(json_writer, tag.key, tag.value));
+            }
         }
         TRY(json::WriteObjectEnd(json_writer));
     }

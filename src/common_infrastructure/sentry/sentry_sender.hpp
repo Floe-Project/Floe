@@ -8,12 +8,6 @@
 
 #include "sentry.hpp"
 
-// - In Sentry, events are 'errors' even if they have the level Info.
-// - We should allow setting additional tags and breadcrumbs (perhaps a ring buffer) on the sentry object, and
-// then add them to the envelope when sending. For example, we should add DAW name info, and add breadcrumbs
-// for significant things in the plugin's lifetime, so that if there is an error or crash we have some more
-// info.
-
 namespace sentry {
 
 struct SenderThread {
@@ -31,14 +25,17 @@ struct SenderThread {
     String dsn; // must outlive this object
     ThreadsafeQueue<ErrorMessage> messages {Malloc::Instance()};
     ArenaAllocator tag_arena {Malloc::Instance()};
-    Span<ErrorEvent::Tag> tags {}; // allocate with tag_arena
+    Span<Tag> tags {}; // allocate with tag_arena
 };
 
 namespace detail {
 
 static void BackgroundThread(SenderThread& sender_thread) {
-    Sentry sentry;
-    if (!InitSentry(sentry, sender_thread.dsn)) return;
+    auto& sentry = *({
+        auto s = InitGlobalSentry(sender_thread.dsn, sender_thread.tags);
+        if (!s) return;
+        s;
+    });
 
     ArenaAllocatorWithInlineStorage<4000> scratch_arena {PageAllocator::Instance()};
 
@@ -64,25 +61,13 @@ static void BackgroundThread(SenderThread& sender_thread) {
 
         while (auto msg = sender_thread.messages.TryPop()) {
             if (!envelope.size) auto _ = EnvelopeAddHeader(sentry, writer);
-
-            auto const tags = scratch_arena.AllocateExactSizeUninitialised<ErrorEvent::Tag>(
-                msg->tags.size + sender_thread.tags.size);
-            {
-                usize tag_index = 0;
-                for (auto const& tag : sender_thread.tags)
-                    tags[tag_index++] = tag;
-                for (auto const& tag : msg->tags)
-                    tags[tag_index++] = tag;
-            }
-            msg->tags = tags;
-
             auto _ = EnvelopeAddEvent(sentry, writer, *msg);
         }
 
         auto const end = sender_thread.end_thread.Load(LoadMemoryOrder::Relaxed);
         if (end) {
             if (!envelope.size) auto _ = EnvelopeAddHeader(sentry, writer);
-            auto _ = EnvelopeAddSessionUpdate(sentry, writer, SessionUpdateType::End);
+            auto _ = EnvelopeAddSessionUpdate(sentry, writer, SessionUpdateType::EndedNormally);
         }
 
         if (envelope.size) {
@@ -99,14 +84,8 @@ static void BackgroundThread(SenderThread& sender_thread) {
 } // namespace detail
 
 // dsn must be static
-PUBLIC bool StartSenderThread(SenderThread& sender_thread, String dsn, Span<ErrorEvent::Tag const> tags) {
-    sender_thread.tags = sender_thread.tag_arena.AllocateExactSizeUninitialised<ErrorEvent::Tag>(tags.size);
-    for (auto i : Range(tags.size))
-        sender_thread.tags[i] = {
-            sender_thread.tag_arena.Clone(tags[i].key),
-            sender_thread.tag_arena.Clone(tags[i].value),
-        };
-
+PUBLIC bool StartSenderThread(SenderThread& sender_thread, String dsn, Span<Tag const> tags) {
+    sender_thread.tags = sender_thread.tag_arena.Clone(tags, CloneType::Deep);
     sender_thread.dsn = dsn;
     sender_thread.thread.Start([&sender_thread]() { detail::BackgroundThread(sender_thread); }, "sentry", {});
     return true;

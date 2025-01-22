@@ -332,6 +332,16 @@ s128 NanosecondsSinceEpoch() {
     return ((s128)(li.QuadPart) - k_epoch_offset) * 100;
 }
 
+s64 MicrosecondsSinceEpoch() {
+    FILETIME ft;
+    GetSystemTimePreciseAsFileTime(&ft);
+    ULARGE_INTEGER const li {
+        .LowPart = ft.dwLowDateTime,
+        .HighPart = ft.dwHighDateTime,
+    };
+    return ((s64)(li.QuadPart) - k_epoch_offset) / 10;
+}
+
 DateAndTime LocalTimeFromNanosecondsSinceEpoch(s128 nanoseconds) {
     ULARGE_INTEGER const li {
         .QuadPart = (ULONGLONG)(nanoseconds / 100) + k_epoch_offset,

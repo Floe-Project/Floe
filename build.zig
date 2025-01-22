@@ -1025,7 +1025,6 @@ pub fn build(b: *std.Build) void {
             .IS_LINUX = target.result.os.tag == .linux,
             .MIN_WINDOWS_NTDDI_VERSION = windows_ntddi_version,
             .MIN_MACOS_VERSION = min_macos_version,
-            // get sentry dsn from environment variable, else null
             .SENTRY_DSN = b.graph.env_map.get("SENTRY_DSN"),
         });
 
@@ -1734,10 +1733,11 @@ pub fn build(b: *std.Build) void {
                 .target = target,
                 .optimize = build_context.optimise,
             });
-            const packager_path = "src/packager_tool";
             packager.addCSourceFiles(.{ .files = &.{
-                packager_path ++ "/packager.cpp",
+                "src/packager_tool/packager.cpp",
+                "src/common_infrastructure/final_binary_type.cpp",
             }, .flags = cpp_fp_flags });
+            packager.defineCMacro("FINAL_BINARY_TYPE", "Packager");
             packager.linkLibrary(common_infrastructure);
             packager.addIncludePath(b.path("src"));
             packager.addConfigHeader(build_config_step);
@@ -1758,7 +1758,11 @@ pub fn build(b: *std.Build) void {
                 .version = floe_version,
                 .pic = true,
             });
-            clap.addCSourceFiles(.{ .files = &.{"src/plugin/plugin/plugin_entry.cpp"}, .flags = cpp_fp_flags });
+            clap.addCSourceFiles(.{ .files = &.{
+                "src/plugin/plugin/plugin_entry.cpp",
+                "src/common_infrastructure/final_binary_type.cpp",
+            }, .flags = cpp_fp_flags });
+            clap.defineCMacro("FINAL_BINARY_TYPE", "Clap");
             clap.addConfigHeader(build_config_step);
             clap.addIncludePath(b.path("src"));
             clap.linkLibrary(plugin);
@@ -1896,10 +1900,12 @@ pub fn build(b: *std.Build) void {
                 .files = &.{
                     "src/standalone_wrapper/standalone_wrapper.cpp",
                     "src/plugin/plugin/plugin_entry.cpp",
+                    "src/common_infrastructure/final_binary_type.cpp",
                 },
                 .flags = cpp_fp_flags,
             });
 
+            floe_standalone.defineCMacro("FINAL_BINARY_TYPE", "Standalone");
             floe_standalone.addConfigHeader(build_config_step);
             floe_standalone.addIncludePath(b.path("src"));
             floe_standalone.linkLibrary(portmidi);
@@ -2137,7 +2143,9 @@ pub fn build(b: *std.Build) void {
 
             vst3.addCSourceFiles(.{ .files = &.{
                 "src/plugin/plugin/plugin_entry.cpp",
+                "src/common_infrastructure/final_binary_type.cpp",
             }, .flags = cpp_fp_flags });
+            vst3.defineCMacro("FINAL_BINARY_TYPE", "Vst3");
 
             const wrapper_src_path = build_context.dep_clap_wrapper.path("src");
             vst3.addCSourceFiles(.{
@@ -2298,7 +2306,9 @@ pub fn build(b: *std.Build) void {
 
                 au.addCSourceFiles(.{ .files = &.{
                     "src/plugin/plugin/plugin_entry.cpp",
+                    "src/common_infrastructure/final_binary_type.cpp",
                 }, .flags = cpp_fp_flags });
+                au.defineCMacro("FINAL_BINARY_TYPE", "AuV2");
 
                 const wrapper_src_path = build_context.dep_clap_wrapper.path("src");
                 au.addCSourceFiles(.{
@@ -2493,10 +2503,12 @@ pub fn build(b: *std.Build) void {
                     .files = &.{
                         installer_path ++ "/installer.cpp",
                         installer_path ++ "/gui.cpp",
+                        "src/common_infrastructure/final_binary_type.cpp",
                     },
                     .flags = flags.items,
                 });
 
+                win_installer.defineCMacro("FINAL_BINARY_TYPE", "WindowsInstaller");
                 win_installer.linkSystemLibrary("gdi32");
                 win_installer.linkSystemLibrary("version");
                 win_installer.linkSystemLibrary("comctl32");
@@ -2511,6 +2523,7 @@ pub fn build(b: *std.Build) void {
                 win_installer.addObject(stb_image);
                 win_installer.linkLibrary(library);
                 win_installer.linkLibrary(miniz);
+                win_installer.linkLibrary(common_infrastructure);
                 applyUniversalSettings(&build_context, win_installer);
 
                 // everything needs to be installed before we compile the installer because it needs to embed the plugins
@@ -2531,7 +2544,9 @@ pub fn build(b: *std.Build) void {
             });
             tests.addCSourceFiles(.{ .files = &.{
                 "src/tests/tests_main.cpp",
+                "src/common_infrastructure/final_binary_type.cpp",
             }, .flags = cpp_fp_flags });
+            tests.defineCMacro("FINAL_BINARY_TYPE", "Tests");
             tests.addConfigHeader(build_config_step);
             tests.linkLibrary(plugin);
             b.getInstallStep().dependOn(&b.addInstallArtifact(tests, .{ .dest_dir = install_subfolder }).step);

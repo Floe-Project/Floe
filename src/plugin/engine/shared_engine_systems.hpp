@@ -6,7 +6,7 @@
 #include "utils/thread_extra/thread_pool.hpp"
 
 #include "common_infrastructure/paths.hpp"
-#include "common_infrastructure/sentry/sentry_sender.hpp"
+#include "common_infrastructure/sentry/sentry_worker.hpp"
 
 #include "clap/plugin.h"
 #include "presets/presets_folder.hpp"
@@ -44,5 +44,5 @@ struct SharedEngineSystems {
     Mutex polling_mutex {};
     Atomic<u32> polling_running = 0;
 
-    sentry::SenderThread sentry_sender_thread;
+    sentry::Worker sentry_worker;
 };

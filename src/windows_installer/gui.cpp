@@ -23,6 +23,9 @@
 #include "utils/debug/debug.hpp"
 #include "utils/logger/logger.hpp"
 
+#include "common_infrastructure/crash_hook.hpp"
+#include "common_infrastructure/sentry/sentry_worker.hpp"
+
 #include "gui.hpp"
 
 constexpr auto k_page_class_name = L"floe-page";
@@ -1055,10 +1058,25 @@ static LRESULT CALLBACK PageWindowProc(HWND window, UINT msg, WPARAM w_param, LP
     return DefWindowProcW(window, msg, w_param, l_param);
 }
 
+[[clang::no_destroy]] Optional<sentry::Worker> g_sentry_worker;
+
 static ErrorCodeOr<void> Main(HINSTANCE h_instance, int cmd_show) {
     SetThreadName("main");
-    StartupCrashHandler();
+    if constexpr (sentry::k_active) g_sentry_worker.Emplace();
+    DEFER {
+        if constexpr (sentry::k_active) {
+            sentry::RequestThreadEnd(*g_sentry_worker);
+            sentry::WaitForThreadEnd(*g_sentry_worker);
+            g_sentry_worker.Clear();
+        }
+    };
+
+    FloeBeginCrashDetection();
     g_panic_handler = [](char const* message, SourceLocation loc) {
+        if constexpr (sentry::k_active) {
+            // TODO
+        }
+
         g_log.Error({}, "Panic: {}: {}", loc, message);
         DynamicArrayBounded<char, 2000> buffer {};
         WriteCurrentStacktrace(dyn::WriterFor(buffer), {}, 1);

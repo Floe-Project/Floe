@@ -718,27 +718,18 @@ clap_plugin const floe_plugin {
                 dyn::Append(tags, {"host_version"_s, FromNullTerminated(floe.host.version)});
                 if (floe.host.vendor && floe.host.vendor[0])
                     dyn::Append(tags, {"host_vendor"_s, FromNullTerminated(floe.host.vendor)});
-
-                String plugin_type = "CLAP"_s;
-                if (ContainsCaseInsensitiveAscii(host_name, "vst3"))
-                    plugin_type = "VST3"_s;
-                else if (ContainsCaseInsensitiveAscii(host_name, "auv2"))
-                    plugin_type = "AUv2"_s;
-                else if (ContainsCaseInsensitiveAscii(host_name, "standalone"))
-                    plugin_type = "Standalone"_s;
-                dyn::Append(tags, {"plugin_type"_s, plugin_type});
             }
 
             g_shared_engine_systems.Emplace(tags);
 
             // TODO: consolidate panic handling
             g_panic_handler = [](char const* message, SourceLocation loc) {
-                sentry::SenderThread::ErrorMessage err {{
+                sentry::Worker::ErrorMessage err {{
                     .level = sentry::ErrorEvent::Level::Error,
                     .stacktrace = CurrentStacktrace(1),
                 }};
                 err.message = fmt::Format(err.arena, "Panic: {}: {}", loc, message);
-                sentry::SendErrorMessage(g_shared_engine_systems->sentry_sender_thread, Move(err));
+                sentry::SendErrorMessage(g_shared_engine_systems->sentry_worker, Move(err));
 
                 g_log.Error(k_global_log_module, "Panic: {}: {}", loc, message);
                 DynamicArrayBounded<char, 2000> buffer {};
@@ -753,11 +744,11 @@ clap_plugin const floe_plugin {
                        floe.host.name,
                        floe.host.version);
 
-            sentry::SenderThread::ErrorMessage message {{
+            sentry::Worker::ErrorMessage message {{
                 .level = sentry::ErrorEvent::Level::Info,
                 .message = "Host start"_s,
             }};
-            sentry::SendErrorMessage(g_shared_engine_systems->sentry_sender_thread, Move(message));
+            sentry::SendErrorMessage(g_shared_engine_systems->sentry_worker, Move(message));
         }
 
         g_log.Debug(k_clap_log_module, "#{} init", floe.index);

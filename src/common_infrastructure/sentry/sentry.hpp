@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #pragma once
+
 #include "foundation/foundation.hpp"
 #include "os/filesystem.hpp"
 #include "os/web.hpp"
@@ -9,18 +10,16 @@
 #include "utils/json/json_writer.hpp"
 #include "utils/logger/logger.hpp"
 
+#include "common_infrastructure/final_binary_type.hpp"
+
 namespace sentry {
 
-struct SentryDsn {
-    String dsn;
-    String host;
-    String project_id;
-    String public_key;
-};
-
 struct Tag {
-    Tag Clone(ArenaAllocator& arena) const {
-        return Tag {.key = key.Clone(arena), .value = value.Clone(arena)};
+    Tag Clone(Allocator& arena) const {
+        return Tag {
+            .key = key.Clone(arena),
+            .value = value.Clone(arena),
+        };
     }
 
     String key;
@@ -53,17 +52,25 @@ struct ErrorEvent {
     Span<Tag const> tags;
 };
 
+struct DsnInfo {
+    String dsn;
+    String host;
+    String project_id;
+    String public_key;
+};
+
+static constexpr usize k_max_message_length = 8192;
+static constexpr String k_release = "floe@" FLOE_VERSION_STRING;
+static constexpr String k_environment = PRODUCTION_BUILD ? "production"_s : "development"_s;
+
 struct Sentry {
-    static constexpr usize k_max_message_length = 8192;
-    static constexpr String k_release = "floe@" FLOE_VERSION_STRING;
-    static constexpr String k_environment = PRODUCTION_BUILD ? "production"_s : "development"_s;
-    SentryDsn dsn {};
     Optional<fmt::UuidArray> device_id {};
+    DsnInfo dsn {};
     fmt::UuidArray session_id {};
     Atomic<u32> session_num_errors = 0;
     Atomic<s64> session_started_microsecs {};
     Atomic<u64> seed = {};
-    ArenaAllocator arena {PageAllocator::Instance()};
+    FixedSizeAllocator<Kb(4)> arena {nullptr};
     Span<char> event_context_json {};
     Span<Tag> tags {};
 };
@@ -82,12 +89,56 @@ static fmt::UuidArray Uuid(Atomic<u64>& seed) {
 
 } // namespace detail
 
+// We only support the format: https://<public_key>@<host>/<project_id>
+constexpr Optional<DsnInfo> ParseDsn(String dsn) {
+    auto read_until = [](String& s, char c) {
+        auto const i = Find(s, c);
+        if (!i) return String {};
+        auto const result = s.SubSpan(0, *i);
+        s.RemovePrefix(*i + 1);
+        return result;
+    };
+
+    DsnInfo result {.dsn = dsn};
+
+    // Skip https://
+    if (!StartsWithSpan(dsn, "https://"_s)) return k_nullopt;
+    if (dsn.size < 8) return k_nullopt;
+    dsn.RemovePrefix(8);
+
+    // Get public key (everything before @)
+    auto key = read_until(dsn, '@');
+    if (key.size == 0) return k_nullopt;
+    result.public_key = key;
+
+    // Get host (everything before last /)
+    auto last_slash = Find(dsn, '/');
+    if (!last_slash) return k_nullopt;
+
+    result.host = dsn.SubSpan(0, *last_slash);
+    dsn.RemovePrefix(*last_slash + 1);
+
+    // Remaining part is project_id
+    if (dsn.size == 0) return k_nullopt;
+    result.project_id = dsn;
+
+    return result;
+}
+
+consteval DsnInfo ParseDsnOrThrow(String dsn) {
+    auto o = ParseDsn(dsn);
+    if (!o) throw "invalid DSN";
+    return *o;
+}
+
 // not thread-safe, not signal-safe, inits g_instance
-// add device_id, OS info, CPU info
-Sentry* InitGlobalSentry(String dsn, Span<Tag const> tag);
+// adds device_id, OS info, CPU info
+// dsn must be valid and static
+Sentry* InitGlobalSentry(DsnInfo dsn, Span<Tag const> tag);
 
 // threadsafe, signal-safe, doesn't include useful context info
-void InitBarebonesSentry(Sentry& sentry);
+// dsn must be valid and static
+void InitBarebonesSentry(Sentry& sentry, DsnInfo dsn, Span<Tag const> tags);
 
 // threadsafe, not signal-safe
 PUBLIC ErrorCodeOr<void> SendSentryEnvelope(Sentry const& sentry,
@@ -207,8 +258,8 @@ enum class SessionUpdateType { Start, EndedNormally, EndedCrashed };
     TRY(json::WriteKeyValue(json_writer, "errors", num_errors));
     {
         TRY(json::WriteKeyObjectBegin(json_writer, "attrs"));
-        TRY(json::WriteKeyValue(json_writer, "release", sentry.k_release));
-        TRY(json::WriteKeyValue(json_writer, "environment", sentry.k_environment));
+        TRY(json::WriteKeyValue(json_writer, "release", k_release));
+        TRY(json::WriteKeyValue(json_writer, "environment", k_environment));
         TRY(json::WriteKeyValue(json_writer, "user_agent", "floe/" FLOE_VERSION_STRING));
         TRY(json::WriteObjectEnd(json_writer));
     }
@@ -226,7 +277,7 @@ enum class SessionUpdateType { Start, EndedNormally, EndedCrashed };
 // thread-safe, signal-safe
 // NOTE (Jan 2025): all events are 'errors' in Sentry, there's no plain logging concept
 [[maybe_unused]] PUBLIC ErrorCodeOr<void> EnvelopeAddEvent(Sentry& sentry, Writer writer, ErrorEvent event) {
-    ASSERT(event.message.size <= Sentry::k_max_message_length, "message too long");
+    ASSERT(event.message.size <= k_max_message_length, "message too long");
     ASSERT(event.tags.size < 100, "too many tags");
 
     sentry.session_num_errors.FetchAdd(1, RmwMemoryOrder::Relaxed);
@@ -253,13 +304,14 @@ enum class SessionUpdateType { Start, EndedNormally, EndedCrashed };
     TRY(json::WriteKeyValue(json_writer, "timestamp", timestamp));
     TRY(json::WriteKeyValue(json_writer, "platform", "native"));
     TRY(json::WriteKeyValue(json_writer, "level", event.LevelString()));
-    TRY(json::WriteKeyValue(json_writer, "release", sentry.k_release));
-    TRY(json::WriteKeyValue(json_writer, "environment", sentry.k_environment));
+    TRY(json::WriteKeyValue(json_writer, "release", k_release));
+    TRY(json::WriteKeyValue(json_writer, "environment", k_environment));
 
     // tags
     if (event.tags.size || sentry.tags.size) {
         TRY(json::WriteKeyObjectBegin(json_writer, "tags"));
-        for (auto tags : Array {event.tags, sentry.tags}) {
+        for (auto tags :
+             Array {event.tags, sentry.tags, Array {Tag {"app_type", ToString(g_final_binary_type)}}}) {
             for (auto const& tag : tags) {
                 if (!tag.key.size) continue;
                 if (!tag.value.size) continue;
@@ -274,9 +326,7 @@ enum class SessionUpdateType { Start, EndedNormally, EndedCrashed };
     // message
     {
         TRY(json::WriteKeyObjectBegin(json_writer, "message"));
-        TRY(json::WriteKeyValue(json_writer,
-                                "formatted",
-                                event.message.SubSpan(0, sentry.k_max_message_length)));
+        TRY(json::WriteKeyValue(json_writer, "formatted", event.message.SubSpan(0, k_max_message_length)));
         TRY(json::WriteObjectEnd(json_writer));
     }
 
@@ -321,20 +371,22 @@ enum class SessionUpdateType { Start, EndedNormally, EndedCrashed };
     return k_success;
 }
 
+constexpr auto k_crash_file_extension = ".floe-crash"_ca;
+
 // thread-safe, signal-safe
 PUBLIC ErrorCodeOr<void> WriteCrashToFile(Sentry& sentry,
-                                          bool is_barebones,
+                                          bool new_session,
                                           String folder,
                                           Optional<StacktraceStack> const& stacktrace,
                                           String message,
                                           ArenaAllocator& scratch_arena) {
     auto const timestamp = TimestampUtc();
-    auto const filename = fmt::Format(scratch_arena, "floe_crash_{}.sentry-envelope", timestamp);
+    auto const filename = fmt::Format(scratch_arena, "crash_{}.{}", timestamp, k_crash_file_extension);
     auto path = path::Join(scratch_arena, Array {folder, filename});
 
     auto file = TRY(OpenFile(path, FileMode::Write));
 
-    if (is_barebones) TRY(EnvelopeAddSessionUpdate(sentry, file.Writer(), SessionUpdateType::Start));
+    if (new_session) TRY(EnvelopeAddSessionUpdate(sentry, file.Writer(), SessionUpdateType::Start));
     TRY(EnvelopeAddEvent(sentry,
                          file.Writer(),
                          {
@@ -346,5 +398,11 @@ PUBLIC ErrorCodeOr<void> WriteCrashToFile(Sentry& sentry,
 
     return k_success;
 }
+
+// PUBLIC ErrorCodeOr<void> ConsumeCrashFiles(String folder, ArenaAllocator& scratch_arena) {
+//     constexpr auto k_wildcard = ConcatArrays("*"_ca, k_crash_file_extension);
+//     auto it = TRY(dir_iterator::Create(scratch_arena, folder, {.wildcard = k_wildcard}));
+//
+// }
 
 } // namespace sentry

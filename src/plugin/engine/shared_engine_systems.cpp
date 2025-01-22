@@ -27,13 +27,6 @@ void SharedEngineSystems::StartPollingThreadIfNeeded() {
         "polling");
 }
 
-constexpr String k_sentry_dsn =
-#ifdef SENTRY_DSN
-    SENTRY_DSN;
-#else
-    "";
-#endif
-
 SharedEngineSystems::SharedEngineSystems(Span<sentry::Tag const> tags)
     : arena(PageAllocator::Instance(), Kb(4))
     , paths(CreateFloePaths(arena))
@@ -41,7 +34,7 @@ SharedEngineSystems::SharedEngineSystems(Span<sentry::Tag const> tags)
     , sample_library_server(thread_pool,
                             paths.always_scanned_folder[ToInt(ScanFolderType::Libraries)],
                             error_notifications) {
-    if constexpr (k_sentry_dsn.size) sentry::StartSenderThread(sentry_sender_thread, k_sentry_dsn, tags);
+    sentry::StartThread(sentry_worker, tags);
 
     settings.tracking.on_filesystem_change = [this](ScanFolderType type) {
         ASSERT(CheckThreadName("main"));
@@ -93,10 +86,8 @@ SharedEngineSystems::~SharedEngineSystems() {
             g_log.Error("global"_log_module, "Failed to write settings file: {}", outcome.Error());
     }
 
-    if constexpr (k_sentry_dsn.size) {
-        sentry::RequestEndSenderThread(sentry_sender_thread);
-        sentry::WaitForSenderThreadEnd(sentry_sender_thread);
-    }
+    sentry::RequestThreadEnd(sentry_worker);
+    sentry::WaitForThreadEnd(sentry_worker);
 }
 
 void SharedEngineSystems::RegisterFloeInstance(clap_plugin const* plugin, FloeInstanceIndex index) {

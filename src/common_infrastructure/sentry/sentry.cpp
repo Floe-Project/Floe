@@ -66,47 +66,30 @@ static Optional<fmt::UuidArray> DeviceId(Atomic<u64>& seed) {
     return uuid;
 }
 
-// We only support the format: https://<public_key>@<host>/<project_id>
-static Optional<SentryDsn> ParseSentryDsn(String dsn) {
-    auto read_until = [](String& s, char c) {
-        auto const i = Find(s, c);
-        if (!i) return String {};
-        auto const result = s.SubSpan(0, *i);
-        s.RemovePrefix(*i + 1);
-        return result;
-    };
+static void CheckDsn(DsnInfo dsn) {
+    ASSERT(dsn.dsn.size);
+    ASSERT(dsn.host.size);
+    ASSERT(dsn.project_id.size);
+    ASSERT(dsn.public_key.size);
+}
 
-    SentryDsn result {.dsn = dsn};
-
-    // Skip https://
-    if (!StartsWithSpan(dsn, "https://"_s)) return k_nullopt;
-    if (dsn.size < 8) return k_nullopt;
-    dsn.RemovePrefix(8);
-
-    // Get public key (everything before @)
-    auto key = read_until(dsn, '@');
-    if (key.size == 0) return k_nullopt;
-    result.public_key = key;
-
-    // Get host (everything before last /)
-    auto last_slash = Find(dsn, '/');
-    if (!last_slash) return k_nullopt;
-
-    result.host = dsn.SubSpan(0, *last_slash);
-    dsn.RemovePrefix(*last_slash + 1);
-
-    // Remaining part is project_id
-    if (dsn.size == 0) return k_nullopt;
-    result.project_id = dsn;
-
-    return result;
+static void CheckTags(Span<Tag const> tags) {
+    ASSERT(tags.size < 20);
+    for (auto const& tag : tags) {
+        ASSERT(tag.key.size);
+        ASSERT(tag.value.size);
+        ASSERT(tag.key.size < 200);
+        ASSERT(tag.value.size < 200);
+    }
 }
 
 // not thread-safe, dsn must be static, tags are cloned
-static void InitSentry(Sentry& sentry, SentryDsn dsn, Span<Tag const> tags) {
-    ASSERT(sentry.dsn.dsn.size == 0);
-    sentry.seed.Store(RandomSeed(), StoreMemoryOrder::Relaxed);
+static void InitSentry(Sentry& sentry, DsnInfo dsn, Span<Tag const> tags) {
+    CheckDsn(dsn);
+    CheckTags(tags);
+
     sentry.dsn = dsn;
+    sentry.seed.Store(RandomSeed(), StoreMemoryOrder::Relaxed);
     sentry.device_id = DeviceId(sentry.seed);
 
     // clone the tags
@@ -186,45 +169,47 @@ static void InitSentry(Sentry& sentry, SentryDsn dsn, Span<Tag const> tags) {
 alignas(Sentry) u8 g_sentry_storage[sizeof(Sentry)];
 Atomic<Sentry*> g_instance {nullptr};
 
-Sentry* InitGlobalSentry(String dsn, Span<Tag const> tags) {
+Sentry* InitGlobalSentry(DsnInfo dsn, Span<Tag const> tags) {
     auto existing = g_instance.Load(LoadMemoryOrder::Relaxed);
     if (existing) return existing;
 
-    auto parsed_dsn = TRY_OPT_OR(ParseSentryDsn(dsn), {
-        g_log.Error(k_main_log_module, "Failed to parse Sentry DSN: {}", dsn);
-        return nullptr;
-    });
-
     auto sentry = PLACEMENT_NEW(g_sentry_storage) Sentry {};
-    InitSentry(*sentry, parsed_dsn, tags);
+    InitSentry(*sentry, dsn, tags);
 
     g_instance.Store(sentry, StoreMemoryOrder::Relaxed);
     return sentry;
 }
 
-void InitBarebonesSentry(Sentry& sentry) {
+// signal-safe
+void InitBarebonesSentry(Sentry& sentry, DsnInfo dsn, Span<Tag const> tags) {
+    ASSERT(dsn.dsn.size);
+    ASSERT(dsn.host.size);
+    ASSERT(dsn.project_id.size);
+    ASSERT(dsn.public_key.size);
+
+    sentry.dsn = dsn;
     sentry.seed.Store((u64)MicrosecondsSinceEpoch() + __builtin_readcyclecounter(),
                       StoreMemoryOrder::Relaxed);
-    sentry.session_id = detail::Uuid(sentry.seed);
+    sentry.tags = sentry.arena.Clone(tags, CloneType::Deep);
 }
 
 TEST_CASE(TestSentry) {
     SUBCASE("Parse DSN") {
-        auto o = ParseSentryDsn("https://publickey@host.com/123");
+        auto o = ParseDsn("https://publickey@host.com/123");
         REQUIRE(o.HasValue());
         CHECK_EQ(o->dsn, "https://publickey@host.com/123"_s);
         CHECK_EQ(o->host, "host.com"_s);
         CHECK_EQ(o->project_id, "123"_s);
         CHECK_EQ(o->public_key, "publickey"_s);
 
-        CHECK(!ParseSentryDsn("https://host.com/123"));
-        CHECK(!ParseSentryDsn("https://publickey@host.com"));
-        CHECK(!ParseSentryDsn("  "));
-        CHECK(!ParseSentryDsn(""));
+        CHECK(!ParseDsn("https://host.com/123"));
+        CHECK(!ParseDsn("https://publickey@host.com"));
+        CHECK(!ParseDsn("  "));
+        CHECK(!ParseDsn(""));
     }
 
     SUBCASE("Basics") {
-        auto sentry = InitGlobalSentry("https://publickey@host.com/123", {});
+        auto sentry = InitGlobalSentry(ParseDsnOrThrow("https://publickey@host.com/123"), {});
         REQUIRE(sentry);
         CHECK(sentry->device_id);
 

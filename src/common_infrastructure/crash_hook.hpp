@@ -3,6 +3,7 @@
 
 #pragma once
 #include "sentry/sentry.hpp"
+#include "sentry/sentry_config.hpp"
 
 // Higher-level API building on top of BeginCrashDetection
 
@@ -22,7 +23,7 @@ PUBLIC void FloeBeginCrashDetection() {
         bool is_barebones = false;
         if (!sentry) {
             is_barebones = true;
-            sentry::InitBarebonesSentry(fallback_sentry_instance);
+            sentry::InitBarebonesSentry(fallback_sentry_instance, sentry::ParseDsnOrThrow(sentry::k_dsn), {});
             sentry = &fallback_sentry_instance;
         }
         auto const o = sentry::WriteCrashToFile(*sentry,

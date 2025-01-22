@@ -4,13 +4,17 @@
 #pragma once
 
 #include "os/threading.hpp"
+#include "utils/logger/logger.hpp"
 #include "utils/thread_extra/thread_extra.hpp"
 
 #include "sentry.hpp"
+#include "sentry_config.hpp"
 
 namespace sentry {
 
-struct SenderThread {
+constexpr auto k_log_module = "sentry"_log_module;
+
+struct Worker {
     // Create a message and then fill in the fields, allocating using the message's arena. Move the message
     // into the queue.
     struct ErrorMessage : ErrorEvent {
@@ -22,7 +26,6 @@ struct SenderThread {
     Thread thread;
     Atomic<bool> end_thread = false;
     WorkSignaller signaller;
-    String dsn; // must outlive this object
     ThreadsafeQueue<ErrorMessage> messages {Malloc::Instance()};
     ArenaAllocator tag_arena {Malloc::Instance()};
     Span<Tag> tags {}; // allocate with tag_arena
@@ -30,9 +33,11 @@ struct SenderThread {
 
 namespace detail {
 
-static void BackgroundThread(SenderThread& sender_thread) {
+static void BackgroundThread(Worker& worker) {
+    if constexpr (!k_active) PanicIfReached();
+
     auto& sentry = *({
-        auto s = InitGlobalSentry(sender_thread.dsn, sender_thread.tags);
+        auto s = InitGlobalSentry(ParseDsnOrThrow(k_dsn), worker.tags);
         if (!s) return;
         s;
     });
@@ -53,28 +58,31 @@ static void BackgroundThread(SenderThread& sender_thread) {
     }
 
     while (true) {
-        sender_thread.signaller.WaitUntilSignalledOrSpurious(1000u);
+        worker.signaller.WaitUntilSignalledOrSpurious(1000u);
         scratch_arena.ResetCursorAndConsolidateRegions();
 
         DynamicArray<char> envelope {scratch_arena};
         auto writer = dyn::WriterFor(envelope);
 
-        while (auto msg = sender_thread.messages.TryPop()) {
+        bool repeat = false;
+        while (auto msg = worker.messages.TryPop()) {
             if (!envelope.size) auto _ = EnvelopeAddHeader(sentry, writer);
             auto _ = EnvelopeAddEvent(sentry, writer, *msg);
+            repeat = true;
         }
+        if (repeat) worker.signaller.Signal();
 
-        auto const end = sender_thread.end_thread.Load(LoadMemoryOrder::Relaxed);
+        auto const end = worker.end_thread.Load(LoadMemoryOrder::Relaxed);
         if (end) {
             if (!envelope.size) auto _ = EnvelopeAddHeader(sentry, writer);
             auto _ = EnvelopeAddSessionUpdate(sentry, writer, SessionUpdateType::EndedNormally);
         }
 
         if (envelope.size) {
-            auto const o = SendSentryEnvelope(sentry, envelope, {}, scratch_arena);
-            if (o.HasError()) {
-                if constexpr (!PRODUCTION_BUILD) __builtin_debugtrap();
-            }
+            DynamicArray<char> response {scratch_arena};
+            auto const o = SendSentryEnvelope(sentry, envelope, dyn::WriterFor(response), scratch_arena);
+            if (o.HasError())
+                g_log.Error(k_log_module, "Failed to send Sentry envelope: {}, {}", o.Error(), response);
         }
 
         if (end) break;
@@ -83,25 +91,29 @@ static void BackgroundThread(SenderThread& sender_thread) {
 
 } // namespace detail
 
-// dsn must be static
-PUBLIC bool StartSenderThread(SenderThread& sender_thread, String dsn, Span<Tag const> tags) {
-    sender_thread.tags = sender_thread.tag_arena.Clone(tags, CloneType::Deep);
-    sender_thread.dsn = dsn;
-    sender_thread.thread.Start([&sender_thread]() { detail::BackgroundThread(sender_thread); }, "sentry", {});
+PUBLIC bool StartThread(Worker& worker, Span<Tag const> tags) {
+    if constexpr (!k_active) return true;
+    worker.tags = worker.tag_arena.Clone(tags, CloneType::Deep);
+    worker.thread.Start([&worker]() { detail::BackgroundThread(worker); }, "sentry", {});
     return true;
 }
 
-PUBLIC void RequestEndSenderThread(SenderThread& sender_thread) {
-    ASSERT(sender_thread.end_thread.Load(LoadMemoryOrder::Relaxed) == false);
-    sender_thread.end_thread.Store(true, StoreMemoryOrder::Relaxed);
-    sender_thread.signaller.Signal();
+PUBLIC void RequestThreadEnd(Worker& worker) {
+    if constexpr (!k_active) return;
+    ASSERT(worker.end_thread.Load(LoadMemoryOrder::Relaxed) == false);
+    worker.end_thread.Store(true, StoreMemoryOrder::Relaxed);
+    worker.signaller.Signal();
 }
 
-PUBLIC void WaitForSenderThreadEnd(SenderThread& sender_thread) { sender_thread.thread.Join(); }
+PUBLIC void WaitForThreadEnd(Worker& worker) {
+    if constexpr (!k_active) return;
+    worker.thread.Join();
+}
 
-PUBLIC void SendErrorMessage(SenderThread& sender_thread, SenderThread::ErrorMessage&& msg) {
-    sender_thread.messages.Push(Move(msg));
-    sender_thread.signaller.Signal();
+PUBLIC void SendErrorMessage(Worker& worker, Worker::ErrorMessage&& msg) {
+    if constexpr (!k_active) return;
+    worker.messages.Push(Move(msg));
+    worker.signaller.Signal();
 }
 
 } // namespace sentry

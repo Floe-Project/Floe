@@ -496,8 +496,9 @@ static void SignalHandler(int signal_num, siginfo_t* info, void* context) {
 #if IS_LINUX
             psiginfo(info, nullptr);
 #else
-            auto _ = StdPrint(k_signal_output_stream,
-                              fmt::FormatInline<200>("Received signal {} ({})\n", signal_num, signal_info));
+            auto _ =
+                StdPrint(k_signal_output_stream,
+                         fmt::FormatInline<200>("Received signal {} ({})\n", signal_num, signal_description));
 #endif
             PrintCurrentStacktrace(k_signal_output_stream, {.ansi_colours = true, .demangle = false}, 0);
         }

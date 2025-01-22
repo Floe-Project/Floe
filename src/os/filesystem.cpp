@@ -154,17 +154,25 @@ ErrorCodeOr<void> MoveIntoFolder(String from, String destination_folder) {
     return Rename(from, new_name);
 }
 
-ErrorCodeOr<Span<dir_iterator::Entry>> AllEntriesRecursive(ArenaAllocator& a,
-                                                           String folder,
-                                                           Optional<FileType> only_file_type,
-                                                           dir_iterator::Options options) {
+ErrorCodeOr<Span<dir_iterator::Entry>>
+FindEntriesInFolder(ArenaAllocator& a, String folder, FindEntriesInFolderOptions options) {
     DynamicArray<dir_iterator::Entry> result {a};
 
     ArenaAllocatorWithInlineStorage<4000> scratch_arena {Malloc::Instance()};
-    auto it = TRY(dir_iterator::RecursiveCreate(scratch_arena, folder, options));
-    DEFER { dir_iterator::Destroy(it); };
-    while (auto const entry = TRY(dir_iterator::Next(it, a)))
-        if (!only_file_type || *only_file_type == entry->type) dyn::Append(result, *entry);
+
+    auto iterate = [&](auto create_function) -> ErrorCodeOr<void> {
+        auto it = TRY(create_function(scratch_arena, folder, options.options));
+        DEFER { dir_iterator::Destroy(it); };
+        while (auto const entry = TRY(dir_iterator::Next(it, a)))
+            if (!options.only_file_type || *options.only_file_type == entry->type)
+                dyn::Append(result, *entry);
+        return k_success;
+    };
+
+    if (options.recursive)
+        TRY(iterate(dir_iterator::RecursiveCreate));
+    else
+        TRY(iterate(dir_iterator::Create));
 
     return result.ToOwnedSpan();
 }

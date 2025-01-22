@@ -233,8 +233,8 @@ inline DynamicArrayBounded<char, 32> UniqueFilename(String prefix, u64& seed) {
 
 constexpr String k_temporary_directory_prefix = ".floe-temp-";
 
-// Creates a directory on the same filesystem as an already existing path. Delete the directory when you're
-// done with it.
+// Creates a unique directory on the same filesystem as an already existing path. Delete the directory when
+// you're done with it.
 ErrorCodeOr<MutableString> TemporaryDirectoryOnSameFilesystemAs(String existing_abs_path, Allocator& a);
 
 // Creates a directory with the prefix k_temporary_directory_prefix in the given folder. Delete the directory
@@ -406,12 +406,16 @@ inline MutableString FullPath(auto& iterator, Entry const& entry, ArenaAllocator
 
 } // namespace dir_iterator
 
-// =======================================================================================================
+struct FindEntriesInFolderOptions {
+    dir_iterator::Options options;
+    bool recursive = false;
+    Optional<FileType> only_file_type;
+};
 
-ErrorCodeOr<Span<dir_iterator::Entry>> AllEntriesRecursive(ArenaAllocator& a,
-                                                           String directory,
-                                                           Optional<FileType> only_type,
-                                                           dir_iterator::Options options);
+ErrorCodeOr<Span<dir_iterator::Entry>>
+FindEntriesInFolder(ArenaAllocator& a, String directory, FindEntriesInFolderOptions options);
+
+// =======================================================================================================
 
 // Directory watcher
 // =======================================================================================================

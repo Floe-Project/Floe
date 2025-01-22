@@ -164,13 +164,15 @@ PresetsCheckExistingInstallation(Component const& component,
                                  Logger& error_log) {
     for (auto const folder : presets_folders) {
         auto const entries = ({
-            auto const o = AllEntriesRecursive(scratch_arena,
+            auto const o = FindEntriesInFolder(scratch_arena,
                                                folder,
-                                               k_nullopt,
                                                {
-                                                   .wildcard = "*",
-                                                   .get_file_size = true,
-                                                   .skip_dot_files = true,
+                                                   .options {
+                                                       .wildcard = "*",
+                                                       .get_file_size = true,
+                                                       .skip_dot_files = true,
+                                                   },
+                                                   .recursive = true,
                                                });
             if (o.HasError())
                 return detail::CreatePackageError(error_log,

@@ -11,8 +11,10 @@
 #include "utils/logger/logger.hpp"
 
 #include "common_infrastructure/common_errors.hpp"
+#include "common_infrastructure/crash_hooks.hpp"
 #include "common_infrastructure/package_format.hpp"
 #include "common_infrastructure/sample_library/sample_library.hpp"
+#include "common_infrastructure/sentry/sentry_worker.hpp"
 
 #include "build_resources/embedded_files.h"
 
@@ -238,6 +240,17 @@ static ErrorCodeOr<int> Main(ArgsCstr args) {
 
 int main(int argc, char** argv) {
     SetThreadName("main");
+
+    BeginCrashDetection(CrashHookWriteCrashReport);
+    DEFER { EndCrashDetection(); };
+
+    sentry::Worker sentry_worker {};
+    sentry::StartThread(sentry_worker, {});
+    DEFER {
+        sentry::RequestThreadEnd(sentry_worker);
+        sentry::WaitForThreadEnd(sentry_worker);
+    };
+
     auto const result = Main({argc, argv});
     if (result.HasError()) {
         g_cli_out.Error({}, "Error: {}", result.Error());

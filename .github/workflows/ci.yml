@@ -34,6 +34,7 @@ jobs:
       - run: just build mac_ub
       - run: just test-ci
 
+      # TODO: use sentry-cli to upload crash reports possible made by the tests (via clap hosting)
       - name: Upload logs
         if: '!cancelled()'
         uses: actions/upload-artifact@v4
@@ -97,6 +98,7 @@ jobs:
             zig-out/x86_64-windows/tests.exe
             zig-out/x86_64-windows/VST3-Validator.exe
 
+      # TODO: use sentry-cli to upload crash reports possible made by the tests (via clap hosting)
       - name: Upload logs
         if: '!cancelled()'
         uses: actions/upload-artifact@v4
@@ -126,6 +128,7 @@ jobs:
 
       - run: just test-ci-windows
 
+      # TODO: use sentry-cli to upload crash reports possible made by the tests (via clap hosting)
       - name: Upload logs
         if: '!cancelled()'
         uses: actions/upload-artifact@v4

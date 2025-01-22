@@ -12,8 +12,6 @@
 
 namespace sentry {
 
-constexpr auto k_log_module = "sentry"_log_module;
-
 struct Worker {
     // Create a message and then fill in the fields, allocating using the message's arena. Move the message
     // into the queue.
@@ -44,6 +42,12 @@ static void BackgroundThread(Worker& worker) {
 
     ArenaAllocatorWithInlineStorage<4000> scratch_arena {PageAllocator::Instance()};
 
+    auto const crash_folder =
+        FloeKnownDirectory(scratch_arena, FloeKnownDirectoryType::Logs, {}, {.create = true});
+
+    if (auto const o = ConsumeAndSendCrashFiles(sentry, crash_folder, scratch_arena); o.HasError())
+        g_log.Error(k_log_module, "Failed to check for crash files: {}", o.Error());
+
     // start session
     {
         DynamicArray<char> envelope {scratch_arena};
@@ -67,7 +71,7 @@ static void BackgroundThread(Worker& worker) {
         bool repeat = false;
         while (auto msg = worker.messages.TryPop()) {
             if (!envelope.size) auto _ = EnvelopeAddHeader(sentry, writer);
-            auto _ = EnvelopeAddEvent(sentry, writer, *msg);
+            auto _ = EnvelopeAddEvent(sentry, writer, *msg, false);
             repeat = true;
         }
         if (repeat) worker.signaller.Signal();

@@ -194,14 +194,10 @@ class PageAllocator final : public Allocator {
 };
 
 // Call once at the start/end of your progam. When a crash occurs g_crash_handler will be called. It must be
-// async-signal-safe on unix.
+// async-signal-safe on unix. It should return normally, not throw exceptions or call abort().
 using CrashHookFunction = void (*)(String message);
 void BeginCrashDetection(CrashHookFunction);
 void EndCrashDetection();
-
-// signal-safe write to a unique crash file in a predefined location
-// includes a stack trace
-void UnixWriteCrashFile(String message, String folder);
 
 enum class StdStream { Out, Err };
 

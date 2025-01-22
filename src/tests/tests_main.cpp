@@ -7,7 +7,7 @@
 #include "utils/cli_arg_parse.hpp"
 #include "utils/debug/tracy_wrapped.hpp"
 
-#include "common_infrastructure/crash_hook.hpp"
+#include "common_infrastructure/crash_hooks.hpp"
 
 #include "foundation_tests.hpp"
 #include "os_tests.hpp"
@@ -71,7 +71,7 @@ ErrorCodeOr<int> Main(ArgsCstr args) {
     DEFER { ___tracy_shutdown_profiler(); };
 #endif
 
-    FloeBeginCrashDetection();
+    BeginCrashDetection(CrashHookWriteToStdout);
     DEFER { EndCrashDetection(); };
 
     ZoneScoped;

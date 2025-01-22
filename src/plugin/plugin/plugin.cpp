@@ -733,7 +733,7 @@ clap_plugin const floe_plugin {
 
                 g_log.Error(k_global_log_module, "Panic: {}: {}", loc, message);
                 DynamicArrayBounded<char, 2000> buffer {};
-                WriteCurrentStacktrace(dyn::WriterFor(buffer), {}, 1);
+                auto _ = WriteCurrentStacktrace(dyn::WriterFor(buffer), {}, 1);
                 g_log.Error(k_global_log_module, "Stacktrace:\n{}", buffer);
                 DefaultPanicHandler(message, loc);
             };
@@ -796,7 +796,7 @@ clap_plugin const floe_plugin {
                 g_panic_handler = [](char const* message, SourceLocation loc) {
                     g_log.Error(k_global_log_module, "Panic: {}: {}", loc, message);
                     DynamicArrayBounded<char, 2000> buffer {};
-                    WriteCurrentStacktrace(dyn::WriterFor(buffer), {}, 1);
+                    auto _ = WriteCurrentStacktrace(dyn::WriterFor(buffer), {}, 1);
                     g_log.Error(k_global_log_module, "Stacktrace:\n{}", buffer);
                     DefaultPanicHandler(message, loc);
                 };

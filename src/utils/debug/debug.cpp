@@ -360,6 +360,7 @@ struct StacktraceContext {
     StacktraceOptions options;
     Writer writer;
     u32 line_num = 1;
+    ErrorCodeOr<void> return_value;
 };
 
 static int HandleStacktraceLine(void* data,
@@ -379,14 +380,14 @@ static int HandleStacktraceLine(void* data,
     }
     if (!function_name.size) function_name = function ? FromNullTerminated(function) : ""_s;
 
-    auto _ = fmt::FormatToWriter(ctx.writer,
-                                 "[{}] {}{}{}:{}: {}\n",
-                                 ctx.line_num++,
-                                 ctx.options.ansi_colours ? ANSI_COLOUR_SET_FOREGROUND_BLUE : ""_s,
-                                 filename ? FromNullTerminated(filename) : "unknown-file"_s,
-                                 ctx.options.ansi_colours ? ANSI_COLOUR_RESET : ""_s,
-                                 lineno,
-                                 function_name);
+    ctx.return_value = fmt::FormatToWriter(ctx.writer,
+                                           "[{}] {}{}{}:{}: {}\n",
+                                           ctx.line_num++,
+                                           ctx.options.ansi_colours ? ANSI_COLOUR_SET_FOREGROUND_BLUE : ""_s,
+                                           filename ? FromNullTerminated(filename) : "unknown-file"_s,
+                                           ctx.options.ansi_colours ? ANSI_COLOUR_RESET : ""_s,
+                                           lineno,
+                                           function_name);
     return 0;
 }
 
@@ -399,15 +400,26 @@ static void HandleStacktraceError(void* data, char const* message, [[maybe_unuse
                                  FromNullTerminated(message));
 }
 
-void WriteCurrentStacktrace(Writer writer, StacktraceOptions options, int skip_frames) {
+ErrorCodeOr<void> WriteStacktrace(StacktraceStack const& stack, Writer writer, StacktraceOptions options) {
     auto& state = BacktraceState::Instance();
-    if (state.failed_init_error) {
-        auto _ = fmt::FormatToWriter(writer, "{}", *state.failed_init_error);
-        return;
+    if (state.failed_init_error) return fmt::FormatToWriter(writer, "{}", *state.failed_init_error);
+
+    StacktraceContext ctx {.options = options, .writer = writer};
+    for (auto const pc : stack) {
+        backtrace_pcinfo(state.state, pc, HandleStacktraceLine, HandleStacktraceError, &ctx);
+        if (ctx.return_value.HasError()) return ctx.return_value;
     }
+
+    return k_success;
+}
+
+ErrorCodeOr<void> WriteCurrentStacktrace(Writer writer, StacktraceOptions options, int skip_frames) {
+    auto& state = BacktraceState::Instance();
+    if (state.failed_init_error) return fmt::FormatToWriter(writer, "{}", *state.failed_init_error);
 
     StacktraceContext ctx {.options = options, .writer = writer};
     backtrace_full(state.state, skip_frames, HandleStacktraceLine, HandleStacktraceError, &ctx);
+    return ctx.return_value;
 }
 
 MutableString StacktraceString(StacktraceStack const& stack, Allocator& a, StacktraceOptions options) {
@@ -424,7 +436,7 @@ MutableString StacktraceString(StacktraceStack const& stack, Allocator& a, Stack
 
 MutableString CurrentStacktraceString(Allocator& a, StacktraceOptions options, int skip_frames) {
     DynamicArray<char> result {a};
-    WriteCurrentStacktrace(dyn::WriterFor(result), options, skip_frames);
+    auto _ = WriteCurrentStacktrace(dyn::WriterFor(result), options, skip_frames);
     return result.ToOwnedSpan();
 }
 
@@ -479,5 +491,5 @@ void CurrentStacktraceToCallback(FunctionRef<void(FrameInfo const&)> callback,
 }
 
 void PrintCurrentStacktrace(StdStream stream, StacktraceOptions options, int skip_frames) {
-    WriteCurrentStacktrace(StdWriter(stream), options, skip_frames);
+    auto _ = WriteCurrentStacktrace(StdWriter(stream), options, skip_frames);
 }

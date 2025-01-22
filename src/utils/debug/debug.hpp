@@ -68,7 +68,8 @@ void StacktraceToCallback(StacktraceStack const&,
                           FunctionRef<void(FrameInfo const&)> callback,
                           StacktraceOptions options = {});
 void PrintCurrentStacktrace(StdStream stream, StacktraceOptions options, int skip_frames);
-void WriteCurrentStacktrace(Writer writer, StacktraceOptions options, int skip_frames);
+ErrorCodeOr<void> WriteStacktrace(StacktraceStack const&, Writer writer, StacktraceOptions options);
+ErrorCodeOr<void> WriteCurrentStacktrace(Writer writer, StacktraceOptions options, int skip_frames);
 
 void DumpInfoAboutUBSan(StdStream stream);
 

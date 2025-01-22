@@ -390,94 +390,60 @@ static struct sigaction g_previous_signal_actions[k_signals.size] {};
 CrashHookFunction g_crash_hook {};
 
 static String SignalString(int signal_num, siginfo_t* info) {
-    String message = "Unknown signal";
+    String message = "unknown signal";
     switch (signal_num) {
         case SIGILL:
-            message = "Illegal Instruction";
+            message = "illegal Instruction";
             switch (info->si_code) {
-                case ILL_ILLOPC: message = "Illegal opcode"; break;
-                case ILL_ILLOPN: message = "Illegal operand"; break;
-                case ILL_ILLADR: message = "Illegal addressing mode"; break;
-                case ILL_ILLTRP: message = "Illegal trap"; break;
-                case ILL_PRVOPC: message = "Privileged opcode"; break;
-                case ILL_PRVREG: message = "Privileged register"; break;
-                case ILL_COPROC: message = "Coprocessor error"; break;
-                case ILL_BADSTK: message = "Internal stack error"; break;
+                case ILL_ILLOPC: message = "illegal opcode"; break;
+                case ILL_ILLOPN: message = "illegal operand"; break;
+                case ILL_ILLADR: message = "illegal addressing mode"; break;
+                case ILL_ILLTRP: message = "illegal trap"; break;
+                case ILL_PRVOPC: message = "privileged opcode"; break;
+                case ILL_PRVREG: message = "privileged register"; break;
+                case ILL_COPROC: message = "coprocessor error"; break;
+                case ILL_BADSTK: message = "internal stack error"; break;
                 default: break;
             }
             break;
         case SIGFPE:
-            message = "Floating-point exception";
+            message = "floating-point exception";
             switch (info->si_code) {
-                case FPE_INTDIV: message = "Integer divide by zero"; break;
-                case FPE_INTOVF: message = "Integer overflow"; break;
-                case FPE_FLTDIV: message = "Floating-point divide by zero"; break;
-                case FPE_FLTOVF: message = "Floating-point overflow"; break;
-                case FPE_FLTUND: message = "Floating-point underflow"; break;
-                case FPE_FLTRES: message = "Floating-point inexact result"; break;
-                case FPE_FLTINV: message = "Floating-point invalid operation"; break;
-                case FPE_FLTSUB: message = "Subscript out of range"; break;
+                case FPE_INTDIV: message = "integer divide by zero"; break;
+                case FPE_INTOVF: message = "integer overflow"; break;
+                case FPE_FLTDIV: message = "floating-point divide by zero"; break;
+                case FPE_FLTOVF: message = "floating-point overflow"; break;
+                case FPE_FLTUND: message = "floating-point underflow"; break;
+                case FPE_FLTRES: message = "floating-point inexact result"; break;
+                case FPE_FLTINV: message = "floating-point invalid operation"; break;
+                case FPE_FLTSUB: message = "subscript out of range"; break;
                 default: break;
             }
             break;
         case SIGSEGV:
-            message = "Invalid memory reference";
+            message = "invalid memory reference";
             switch (info->si_code) {
-                case SEGV_MAPERR: message = "Address not mapped to object"; break;
-                case SEGV_ACCERR: message = "Invalid permissions for mapped object"; break;
+                case SEGV_MAPERR: message = "address not mapped to object"; break;
+                case SEGV_ACCERR: message = "invalid permissions for mapped object"; break;
                 default: break;
             }
             break;
-        case SIGPIPE: message = "Broken pipe"; break;
+        case SIGPIPE: message = "broken pipe"; break;
         case SIGBUS:
-            message = "Bus error";
+            message = "bus error";
             switch (info->si_code) {
-                case BUS_ADRALN: message = "Invalid address alignment"; break;
-                case BUS_ADRERR: message = "Nonexistent physical address"; break;
-                case BUS_OBJERR: message = "Object-specific hardware error"; break;
+                case BUS_ADRALN: message = "invalid address alignment"; break;
+                case BUS_ADRERR: message = "nonexistent physical address"; break;
+                case BUS_OBJERR: message = "object-specific hardware error"; break;
                 default: break;
             }
             break;
-        case SIGTRAP: message = "Trace/breakpoint"; break;
+        case SIGTRAP: message = "trace/breakpoint"; break;
         case SIGABRT: message = "abort() called"; break;
-        case SIGTERM: message = "Termination request"; break;
-        case SIGINT: message = "Interactive attention signal"; break;
+        case SIGTERM: message = "termination request"; break;
+        case SIGINT: message = "interactive attention signal"; break;
     }
     return message;
-}
-
-void UnixWriteCrashFile(String message, String folder) {
-    auto timestamp = TimestampUtc();
-
-    // Make the timestamp safe for a filename even on Windows (where we might want to copy the file).
-    for (auto& c : timestamp)
-        if (c == ':')
-            c = '-';
-        else if (c == '.')
-            c = '-';
-
-    auto const file_path = fmt::FormatInline<400>("{}/crash_{}.log\0", folder, timestamp);
-    auto const fd = open(file_path.data, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-    DEFER { close(fd); };
-
-    auto _ = write(fd, message.data, message.size);
-    auto _ = write(fd, "\n", 1);
-
-    Writer writer {};
-    writer.SetContained<int>(fd, [](int fd, Span<u8 const> bytes) -> ErrorCodeOr<void> {
-        auto const num_written = write(fd, bytes.data, bytes.size);
-        if (num_written < 0) return ErrnoErrorCode(errno, "write");
-        return k_success;
-    });
-    WriteCurrentStacktrace(writer,
-                           {
-                               .ansi_colours = false,
-                               .demangle = false,
-                           },
-                           0);
-    auto _ = write(fd, "\n", 1);
-
-    fsync(fd);
 }
 
 constexpr StdStream k_signal_output_stream = StdStream::Out;
@@ -500,7 +466,6 @@ static void SignalHandler(int signal_num, siginfo_t* info, void* context) {
                 StdPrint(k_signal_output_stream,
                          fmt::FormatInline<200>("Received signal {} ({})\n", signal_num, signal_description));
 #endif
-            PrintCurrentStacktrace(k_signal_output_stream, {.ansi_colours = true, .demangle = false}, 0);
         }
 
         if (g_crash_hook) g_crash_hook(signal_description);

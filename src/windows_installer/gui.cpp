@@ -23,7 +23,7 @@
 #include "utils/debug/debug.hpp"
 #include "utils/logger/logger.hpp"
 
-#include "common_infrastructure/crash_hook.hpp"
+#include "common_infrastructure/crash_hooks.hpp"
 #include "common_infrastructure/sentry/sentry_worker.hpp"
 
 #include "gui.hpp"
@@ -1058,20 +1058,19 @@ static LRESULT CALLBACK PageWindowProc(HWND window, UINT msg, WPARAM w_param, LP
     return DefWindowProcW(window, msg, w_param, l_param);
 }
 
-[[clang::no_destroy]] Optional<sentry::Worker> g_sentry_worker;
-
 static ErrorCodeOr<void> Main(HINSTANCE h_instance, int cmd_show) {
     SetThreadName("main");
-    if constexpr (sentry::k_active) g_sentry_worker.Emplace();
+
+    BeginCrashDetection(CrashHookWriteCrashReport);
+    DEFER { EndCrashDetection(); };
+
+    sentry::Worker sentry_worker {};
+    sentry::StartThread(sentry_worker, {});
     DEFER {
-        if constexpr (sentry::k_active) {
-            sentry::RequestThreadEnd(*g_sentry_worker);
-            sentry::WaitForThreadEnd(*g_sentry_worker);
-            g_sentry_worker.Clear();
-        }
+        sentry::RequestThreadEnd(sentry_worker);
+        sentry::WaitForThreadEnd(sentry_worker);
     };
 
-    FloeBeginCrashDetection();
     g_panic_handler = [](char const* message, SourceLocation loc) {
         if constexpr (sentry::k_active) {
             // TODO
@@ -1079,7 +1078,7 @@ static ErrorCodeOr<void> Main(HINSTANCE h_instance, int cmd_show) {
 
         g_log.Error({}, "Panic: {}: {}", loc, message);
         DynamicArrayBounded<char, 2000> buffer {};
-        WriteCurrentStacktrace(dyn::WriterFor(buffer), {}, 1);
+        auto _ = WriteCurrentStacktrace(dyn::WriterFor(buffer), {}, 1);
         g_log.Error({}, "Stacktrace:\n{}", buffer);
         DefaultPanicHandler(message, loc);
     };

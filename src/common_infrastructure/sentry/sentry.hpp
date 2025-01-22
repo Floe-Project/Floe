@@ -14,6 +14,8 @@
 
 namespace sentry {
 
+constexpr auto k_log_module = "sentry"_log_module;
+
 struct Tag {
     Tag Clone(Allocator& arena) const {
         return Tag {
@@ -75,7 +77,7 @@ struct Sentry {
     Span<Tag> tags {};
 };
 
-// never destroyed, once set (InitGlobalSentry) it's good for the lifetime
+// never destroyed, once set (InitGlobalSentry) it's good for the entire program
 extern Atomic<Sentry*> g_instance;
 
 namespace detail {
@@ -138,7 +140,7 @@ Sentry* InitGlobalSentry(DsnInfo dsn, Span<Tag const> tag);
 
 // threadsafe, signal-safe, doesn't include useful context info
 // dsn must be valid and static
-void InitBarebonesSentry(Sentry& sentry, DsnInfo dsn, Span<Tag const> tags);
+void InitBarebonesSentry(Sentry& sentry);
 
 // threadsafe, not signal-safe
 PUBLIC ErrorCodeOr<void> SendSentryEnvelope(Sentry const& sentry,
@@ -172,6 +174,8 @@ PUBLIC ErrorCodeOr<void> SendSentryEnvelope(Sentry const& sentry,
 
 // thread-safe, signal-safe
 PUBLIC ErrorCodeOr<void> EnvelopeAddHeader(Sentry const& sentry, Writer writer) {
+    ASSERT(sentry.dsn.dsn.size);
+
     json::WriteContext json_writer {
         .out = writer,
         .add_whitespace = false,
@@ -274,9 +278,10 @@ enum class SessionUpdateType { Start, EndedNormally, EndedCrashed };
     return k_success;
 }
 
-// thread-safe, signal-safe
+// thread-safe, signal-safe if signal_safe is true
 // NOTE (Jan 2025): all events are 'errors' in Sentry, there's no plain logging concept
-[[maybe_unused]] PUBLIC ErrorCodeOr<void> EnvelopeAddEvent(Sentry& sentry, Writer writer, ErrorEvent event) {
+[[maybe_unused]] PUBLIC ErrorCodeOr<void>
+EnvelopeAddEvent(Sentry& sentry, Writer writer, ErrorEvent event, bool signal_safe) {
     ASSERT(event.message.size <= k_max_message_length, "message too long");
     ASSERT(event.tags.size < 100, "too many tags");
 
@@ -335,25 +340,31 @@ enum class SessionUpdateType { Start, EndedNormally, EndedCrashed };
         TRY(json::WriteKeyObjectBegin(json_writer, "stacktrace"));
         TRY(json::WriteKeyArrayBegin(json_writer, "frames"));
         ErrorCodeOr<void> stacktrace_error = k_success;
-        StacktraceToCallback(*event.stacktrace, [&](FrameInfo const& frame) {
-            auto try_write = [&]() -> ErrorCodeOr<void> {
-                TRY(json::WriteObjectBegin(json_writer));
+        StacktraceToCallback(
+            *event.stacktrace,
+            [&](FrameInfo const& frame) {
+                auto try_write = [&]() -> ErrorCodeOr<void> {
+                    TRY(json::WriteObjectBegin(json_writer));
 
-                auto filename = TrimStartIfMatches(frame.filename, String {FLOE_PROJECT_ROOT_PATH});
-                if (filename.size) {
-                    TRY(json::WriteKeyValue(json_writer, "filename", filename));
-                    TRY(json::WriteKeyValue(json_writer, "in_app", true));
-                    TRY(json::WriteKeyValue(json_writer, "lineno", frame.line));
-                }
+                    auto filename = TrimStartIfMatches(frame.filename, String {FLOE_PROJECT_ROOT_PATH});
+                    if (filename.size) {
+                        TRY(json::WriteKeyValue(json_writer, "filename", filename));
+                        TRY(json::WriteKeyValue(json_writer, "in_app", true));
+                        TRY(json::WriteKeyValue(json_writer, "lineno", frame.line));
+                    }
 
-                if (frame.function_name.size)
-                    TRY(json::WriteKeyValue(json_writer, "function", frame.function_name));
+                    if (frame.function_name.size)
+                        TRY(json::WriteKeyValue(json_writer, "function", frame.function_name));
 
-                TRY(json::WriteObjectEnd(json_writer));
-                return k_success;
-            };
-            if (!stacktrace_error.HasError()) stacktrace_error = try_write();
-        });
+                    TRY(json::WriteObjectEnd(json_writer));
+                    return k_success;
+                };
+                if (!stacktrace_error.HasError()) stacktrace_error = try_write();
+            },
+            {
+                .ansi_colours = false,
+                .demangle = !signal_safe,
+            });
         TRY(stacktrace_error);
         TRY(json::WriteArrayEnd(json_writer));
         TRY(json::WriteObjectEnd(json_writer));
@@ -371,7 +382,7 @@ enum class SessionUpdateType { Start, EndedNormally, EndedCrashed };
     return k_success;
 }
 
-constexpr auto k_crash_file_extension = ".floe-crash"_ca;
+constexpr auto k_crash_file_extension = "floe-crash"_ca;
 
 // thread-safe, signal-safe
 PUBLIC ErrorCodeOr<void> WriteCrashToFile(Sentry& sentry,
@@ -381,7 +392,7 @@ PUBLIC ErrorCodeOr<void> WriteCrashToFile(Sentry& sentry,
                                           String message,
                                           ArenaAllocator& scratch_arena) {
     auto const timestamp = TimestampUtc();
-    auto const filename = fmt::Format(scratch_arena, "crash_{}.{}", timestamp, k_crash_file_extension);
+    auto const filename = fmt::Format(scratch_arena, "crash {}.{}", timestamp, k_crash_file_extension);
     auto path = path::Join(scratch_arena, Array {folder, filename});
 
     auto file = TRY(OpenFile(path, FileMode::Write));
@@ -393,16 +404,89 @@ PUBLIC ErrorCodeOr<void> WriteCrashToFile(Sentry& sentry,
                              .level = ErrorEvent::Level::Error,
                              .message = message,
                              .stacktrace = stacktrace,
-                         }));
+                         },
+                         true));
     TRY(EnvelopeAddSessionUpdate(sentry, file.Writer(), SessionUpdateType::EndedCrashed));
+
+    // NOTE: if you want to send one of these generated floe-crash files via sentry-cli, you must append
+    // "{}\n" to the start for it to be a valid envelope
 
     return k_success;
 }
 
-// PUBLIC ErrorCodeOr<void> ConsumeCrashFiles(String folder, ArenaAllocator& scratch_arena) {
-//     constexpr auto k_wildcard = ConcatArrays("*"_ca, k_crash_file_extension);
-//     auto it = TRY(dir_iterator::Create(scratch_arena, folder, {.wildcard = k_wildcard}));
-//
-// }
+PUBLIC ErrorCodeOr<void>
+ConsumeAndSendCrashFiles(Sentry const& sentry, String folder, ArenaAllocator& scratch_arena) {
+    constexpr auto k_wildcard = ConcatArrays("*."_ca, k_crash_file_extension);
+    auto const entries = TRY(FindEntriesInFolder(scratch_arena,
+                                                 folder,
+                                                 {
+                                                     .options {
+                                                         .wildcard = k_wildcard,
+                                                     },
+                                                     .recursive = false,
+                                                     .only_file_type = FileType::File,
+                                                 }));
+
+    if (entries.size) {
+        auto const temp_dir = TRY(TemporaryDirectoryOnSameFilesystemAs(folder, scratch_arena));
+        DEFER { auto _ = Delete(temp_dir, {.type = DeleteOptions::Type::DirectoryRecursively}); };
+
+        DynamicArray<char> full_path {scratch_arena};
+        dyn::Assign(full_path, folder);
+        dyn::Append(full_path, path::k_dir_separator);
+        auto const full_path_len = full_path.size;
+        full_path.Reserve(full_path.size + 40);
+
+        DynamicArray<char> temp_full_path {scratch_arena};
+        dyn::Assign(temp_full_path, temp_dir);
+        dyn::Append(temp_full_path, path::k_dir_separator);
+        auto const temp_full_path_len = temp_full_path.size;
+        temp_full_path.Reserve(temp_full_path.size + 40);
+
+        for (auto const entry : entries) {
+            // construct the full path
+            dyn::Resize(full_path, full_path_len);
+            dyn::AppendSpan(full_path, entry.subpath);
+
+            // construct the new temp path
+            dyn::Resize(temp_full_path, temp_full_path_len);
+            dyn::AppendSpan(temp_full_path, entry.subpath);
+
+            // Move the file into the temporary directory, this should be atomic so that other processes don't
+            // try and submit the same crash report.
+            if (auto const o = Rename(full_path, temp_full_path); o.HasError()) {
+                if (o.Error() == FilesystemError::PathDoesNotExist) continue;
+                g_log.Error(k_main_log_module, "Couldn't move crash file: {}", o.Error());
+                continue;
+            }
+
+            // We now have exclusive access to the file, read it and try sending it to Sentry. If we fail, put
+            // the file back where we found it, it can be tried again later.
+            bool success = false;
+            DEFER {
+                if (!success) auto _ = Rename(temp_full_path, full_path);
+            };
+
+            auto const crash_payload = TRY_OR(ReadEntireFile(temp_full_path, scratch_arena), {
+                g_log.Error(k_main_log_module, "Couldn't read crash file: {}", error);
+                continue;
+            });
+
+            DynamicArray<char> envelope {scratch_arena};
+            envelope.Reserve(crash_payload.size + 100);
+            auto _ = EnvelopeAddHeader(sentry, dyn::WriterFor(envelope));
+            dyn::AppendSpan(envelope, crash_payload);
+
+            TRY_OR(SendSentryEnvelope(sentry, envelope, k_nullopt, scratch_arena), {
+                g_log.Error(k_main_log_module, "Couldn't send crash report to Sentry: {}", error);
+                continue;
+            });
+
+            success = true;
+        }
+    }
+
+    return k_success;
+}
 
 } // namespace sentry

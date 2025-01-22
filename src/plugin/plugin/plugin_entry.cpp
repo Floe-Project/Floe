@@ -7,7 +7,7 @@
 #include "utils/debug/tracy_wrapped.hpp"
 #include "utils/logger/logger.hpp"
 
-#include "common_infrastructure/crash_hook.hpp"
+#include "common_infrastructure/crash_hooks.hpp"
 
 #include "clap/factory/plugin-factory.h"
 #include "plugin.hpp"
@@ -63,13 +63,13 @@ extern "C" CLAP_EXPORT const clap_plugin_entry clap_entry = {
         g_panic_handler = [](char const* message, SourceLocation loc) {
             g_log.Error(k_global_log_module, "Panic: {}: {}", loc, message);
             DynamicArrayBounded<char, 2000> buffer {};
-            WriteCurrentStacktrace(dyn::WriterFor(buffer), {}, 1);
+            auto _ = WriteCurrentStacktrace(dyn::WriterFor(buffer), {}, 1);
             g_log.Error(k_global_log_module, "Stacktrace:\n{}", buffer);
             DefaultPanicHandler(message, loc);
         };
 
         StartupTracy();
-        FloeBeginCrashDetection(); // after tracy
+        BeginCrashDetection(CrashHookWriteCrashReport); // after tracy
 
         g_log.Debug(k_clap_log_module, "init DSO");
         g_log.Info(k_global_log_module, "Floe version: " FLOE_VERSION_STRING);
@@ -83,7 +83,7 @@ extern "C" CLAP_EXPORT const clap_plugin_entry clap_entry = {
 
             g_log.Debug(k_clap_log_module, "deinit");
 
-            FloeEndCrashDetection(); // before tracy
+            EndCrashDetection(); // before tracy
             ShutdownTracy();
         },
 

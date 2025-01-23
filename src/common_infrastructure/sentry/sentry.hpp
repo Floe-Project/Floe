@@ -397,6 +397,8 @@ PUBLIC ErrorCodeOr<void> WriteCrashToFile(Sentry& sentry,
 
     auto file = TRY(OpenFile(path, FileMode::Write));
 
+    TRY(file.Write("{}\n"_s)); // empty envelope header, we will replace it if we need to, but it makes it a
+                               // valid envelope for sentry-cli
     if (new_session) TRY(EnvelopeAddSessionUpdate(sentry, file.Writer(), SessionUpdateType::Start));
     TRY(EnvelopeAddEvent(sentry,
                          file.Writer(),
@@ -407,9 +409,6 @@ PUBLIC ErrorCodeOr<void> WriteCrashToFile(Sentry& sentry,
                          },
                          true));
     TRY(EnvelopeAddSessionUpdate(sentry, file.Writer(), SessionUpdateType::EndedCrashed));
-
-    // NOTE: if you want to send one of these generated floe-crash files via sentry-cli, you must append
-    // "{}\n" to the start for it to be a valid envelope
 
     return k_success;
 }
@@ -467,10 +466,13 @@ ConsumeAndSendCrashFiles(Sentry const& sentry, String folder, ArenaAllocator& sc
                 if (!success) auto _ = Rename(temp_full_path, full_path);
             };
 
-            auto const crash_payload = TRY_OR(ReadEntireFile(temp_full_path, scratch_arena), {
+            auto crash_payload = TRY_OR(ReadEntireFile(temp_full_path, scratch_arena), {
                 g_log.Error(k_main_log_module, "Couldn't read crash file: {}", error);
                 continue;
             });
+
+            // Remove the empty envelope header, we will add a new one with correct sent_at, etc.
+            crash_payload = TrimStartIfMatches(crash_payload, "{}\n"_s);
 
             DynamicArray<char> envelope {scratch_arena};
             envelope.Reserve(crash_payload.size + 100);

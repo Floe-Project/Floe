@@ -34,7 +34,12 @@ jobs:
       - run: just build mac_ub
       - run: just test-ci
 
-      # TODO: use sentry-cli to upload crash reports possible made by the tests (via clap hosting)
+      - name: Upload crashes
+        if: '!cancelled()'
+        env:
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+        run: just upload-crashes
+
       - name: Upload logs
         if: '!cancelled()'
         uses: actions/upload-artifact@v4
@@ -98,7 +103,12 @@ jobs:
             zig-out/x86_64-windows/tests.exe
             zig-out/x86_64-windows/VST3-Validator.exe
 
-      # TODO: use sentry-cli to upload crash reports possible made by the tests (via clap hosting)
+      - name: Upload crashes
+        if: '!cancelled()'
+        env:
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+        run: just upload-crashes
+
       - name: Upload logs
         if: '!cancelled()'
         uses: actions/upload-artifact@v4
@@ -128,7 +138,17 @@ jobs:
 
       - run: just test-ci-windows
 
-      # TODO: use sentry-cli to upload crash reports possible made by the tests (via clap hosting)
+      - name: Install sentry-cli
+        run: |
+          choco install sentry-cli -y --no-progress
+          sentry-cli --version
+
+      - name: Upload crashes
+        if: '!cancelled()'
+        env:
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+        run: just upload-crashes
+
       - name: Upload logs
         if: '!cancelled()'
         uses: actions/upload-artifact@v4

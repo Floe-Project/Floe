@@ -123,6 +123,24 @@ clang-tidy arch_os_pair=native_arch_os_pair: (install-cbd arch_os_pair)
 
 clang-tidy-all: (clang-tidy "x86_64-linux") (clang-tidy "x86_64-windows") (clang-tidy "aarch64-macos")
 
+upload-crashes:
+  #!/usr/bin/env bash
+  set -euxo pipefail
+  
+  case "$(uname -s)" in
+    Linux*)   dir="$HOME/.local/state/Floe" ;;
+    Darwin*)  dir="$HOME/Library/Logs/Floe" ;;
+    MINGW*|CYGWIN*|MSYS*) dir="$LOCALAPPDATA/Floe" ;;
+    *) echo "Unsupported OS" && exit 1 ;;
+  esac
+  
+  cd "$dir" || exit 1
+  for crash in *.floe-crash; do
+    if [ -f "$crash" ]; then
+      sentry-cli send-envelope --raw "$crash"
+    fi
+  done
+
 # IMPROVE: (June 2024) cppcheck v2.14.0 and v2.14.1 thinks there are syntax errors in valid code. It could be a cppcheck bug or it could be an incompatibility in how we are using it. Regardless, we should try again in the future and see if it's fixed. If it works it should run alongside clang-tidy in CI, etc.
 # cppcheck arch_os_pair=native_arch_os_pair:
 #   # IMPROVE: use --check-level=exhaustive?

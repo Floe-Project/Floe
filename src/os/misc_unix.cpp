@@ -206,7 +206,7 @@ void TryShrinkPages(void* ptr, usize old_size, usize new_size) {
     }
 
     TracyFree(ptr);
-    auto const page_size = GetSystemStats().page_size;
+    auto const page_size = CachedSystemStats().page_size;
     auto const current_num_pages = old_size / page_size;
     auto const new_num_pages = (new_size == 0) ? 0 : ((new_size / page_size) + 1);
     if (current_num_pages != new_num_pages) {

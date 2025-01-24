@@ -1026,6 +1026,7 @@ pub fn build(b: *std.Build) void {
             .MIN_WINDOWS_NTDDI_VERSION = windows_ntddi_version,
             .MIN_MACOS_VERSION = min_macos_version,
             .SENTRY_DSN = b.graph.env_map.get("SENTRY_DSN"),
+            .GIT_COMMIT_HASH = std.mem.trim(u8, b.run(&.{ "git", "rev-parse", "HEAD" }), " \r\n\t"),
         });
 
         var stb_sprintf = b.addObject(.{

@@ -262,7 +262,7 @@ void Check(Tester& tester,
             if (capture_str.size) tester.log.Error({}, capture_str);
         }
 
-        PrintCurrentStacktrace(StdStream::Err, {}, 2);
+        auto _ = PrintCurrentStacktrace(StdStream::Err, {}, 2);
 
         if (failure_aciton != FailureAction::LogWarningAndContinue) {
             tester.should_reenter = false;

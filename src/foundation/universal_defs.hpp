@@ -322,15 +322,26 @@ using IndexSequenceFor = MakeIndexSequence<sizeof...(Types)>;
 #define CONCAT(x, y)        CONCAT_HELPER(x, y)
 
 // ==========================================================================================================
-[[noreturn]] void AssertionFailed(char const* expression, SourceLocation loc, char const* message = nullptr);
+// Calls the panic hook, sets 'panic occurred' and then throws an exception. This is used for unrecoverable
+// errors (bugs). However, the exception can be caught and some sort of damage control can be done. For
+// example, we want to make a reasonable effort to not abort the host if a bug is encountered in our plugin.
+// Use lowercase for your message; just say the reason without a prefix like 'Panic: '.
+struct PanicException {};
 [[noreturn]] void Panic(char const* message, SourceLocation loc = SourceLocation::Current());
-extern void (*g_panic_handler)(char const* message, SourceLocation loc); // must be [[noreturn]]
 
-// NOTE: the expression may be discarded so it mustn't have side effects
+bool PanicOccurred(); // thread-safe
+
+// Before throwing the PanicException, the panic hook is called. This is useful for logging the panic.
+// Set the hook at the very start of your program and never change it.
+extern void (*g_panic_hook)(char const* message, SourceLocation loc);
+
+// NOTE: The expression may be discarded so it mustn't have side effects.
+// NOTE: We don't panic if PanicOccurred() is true because if a panic has happened the state of the program
+// can't be trusted to assert anything about it. Instead, we are just in a 'damage control' mode.
 #define ASSERT(expression, ...)                                                                              \
     do {                                                                                                     \
         if constexpr (RUNTIME_SAFETY_CHECKS_ON) {                                                            \
-            if (!(expression)) AssertionFailed(#expression, SourceLocation::Current(), ##__VA_ARGS__);       \
+            if (!(expression) && !PanicOccurred()) Panic("assertion failed: " #expression " " __VA_ARGS__);  \
         } else                                                                                               \
             _Pragma("clang diagnostic push") _Pragma("clang diagnostic ignored \"-Wassume\"")                \
                 __builtin_assume(!!(expression));                                                            \
@@ -341,7 +352,7 @@ extern void (*g_panic_handler)(char const* message, SourceLocation loc); // must
 #define ASSERT_HOT(expression, ...)                                                                          \
     do {                                                                                                     \
         if constexpr (RUNTIME_SAFETY_CHECKS_ON && !PRODUCTION_BUILD) {                                       \
-            if (!(expression)) AssertionFailed(#expression, SourceLocation::Current(), ##__VA_ARGS__);       \
+            if (!(expression) && !PanicOccurred()) Panic("assertion failed: " #expression " " __VA_ARGS__);  \
         } else                                                                                               \
             _Pragma("clang diagnostic push") _Pragma("clang diagnostic ignored \"-Wassume\"")                \
                 __builtin_assume(!!(expression));                                                            \

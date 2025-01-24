@@ -45,20 +45,20 @@ static void BackgroundThread(Worker& worker) {
     auto const crash_folder =
         FloeKnownDirectory(scratch_arena, FloeKnownDirectoryType::Logs, {}, {.create = true});
 
-    if (auto const o = ConsumeAndSendCrashFiles(sentry, crash_folder, scratch_arena); o.HasError())
+    if (auto const o = ConsumeAndSendErrorFiles(sentry, crash_folder, scratch_arena); o.HasError())
         g_log.Error(k_log_module, "Failed to check for crash files: {}", o.Error());
 
     // start session
     {
         DynamicArray<char> envelope {scratch_arena};
         auto writer = dyn::WriterFor(envelope);
-        auto _ = EnvelopeAddHeader(sentry, writer);
-        auto _ = EnvelopeAddSessionUpdate(sentry, writer, SessionUpdateType::Start);
+        auto _ = EnvelopeAddSessionUpdate(sentry, writer, SessionStatus::Ok);
 
-        auto const o = SendSentryEnvelope(sentry, envelope, {}, scratch_arena);
-        if (o.HasError()) {
-            if constexpr (!PRODUCTION_BUILD) __builtin_debugtrap();
-        }
+        DynamicArray<char> response {scratch_arena};
+
+        auto const o = SendSentryEnvelope(sentry, envelope, dyn::WriterFor(response), true, scratch_arena);
+        if (o.HasError())
+            g_log.Error(k_log_module, "Failed to send Sentry envelope: {}, {}", o.Error(), response);
     }
 
     while (true) {
@@ -70,21 +70,18 @@ static void BackgroundThread(Worker& worker) {
 
         bool repeat = false;
         while (auto msg = worker.messages.TryPop()) {
-            if (!envelope.size) auto _ = EnvelopeAddHeader(sentry, writer);
             auto _ = EnvelopeAddEvent(sentry, writer, *msg, false);
             repeat = true;
         }
         if (repeat) worker.signaller.Signal();
 
         auto const end = worker.end_thread.Load(LoadMemoryOrder::Relaxed);
-        if (end) {
-            if (!envelope.size) auto _ = EnvelopeAddHeader(sentry, writer);
-            auto _ = EnvelopeAddSessionUpdate(sentry, writer, SessionUpdateType::EndedNormally);
-        }
+        if (end) auto _ = EnvelopeAddSessionUpdate(sentry, writer, SessionStatus::EndedNormally);
 
         if (envelope.size) {
             DynamicArray<char> response {scratch_arena};
-            auto const o = SendSentryEnvelope(sentry, envelope, dyn::WriterFor(response), scratch_arena);
+            auto const o =
+                SendSentryEnvelope(sentry, envelope, dyn::WriterFor(response), true, scratch_arena);
             if (o.HasError())
                 g_log.Error(k_log_module, "Failed to send Sentry envelope: {}, {}", o.Error(), response);
         }

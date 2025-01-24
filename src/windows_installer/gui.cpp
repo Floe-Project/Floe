@@ -1059,29 +1059,13 @@ static LRESULT CALLBACK PageWindowProc(HWND window, UINT msg, WPARAM w_param, LP
 }
 
 static ErrorCodeOr<void> Main(HINSTANCE h_instance, int cmd_show) {
+    g_panic_hook = PanicHook;
+    InitCrashFolder();
+
     SetThreadName("main");
 
     BeginCrashDetection(CrashHookWriteCrashReport);
     DEFER { EndCrashDetection(); };
-
-    sentry::Worker sentry_worker {};
-    sentry::StartThread(sentry_worker, {});
-    DEFER {
-        sentry::RequestThreadEnd(sentry_worker);
-        sentry::WaitForThreadEnd(sentry_worker);
-    };
-
-    g_panic_handler = [](char const* message, SourceLocation loc) {
-        if constexpr (sentry::k_active) {
-            // TODO
-        }
-
-        g_log.Error({}, "Panic: {}: {}", loc, message);
-        DynamicArrayBounded<char, 2000> buffer {};
-        auto _ = WriteCurrentStacktrace(dyn::WriterFor(buffer), {}, 1);
-        g_log.Error({}, "Stacktrace:\n{}", buffer);
-        DefaultPanicHandler(message, loc);
-    };
 
     constexpr INITCOMMONCONTROLSEX k_init_cc {.dwSize = sizeof(INITCOMMONCONTROLSEX),
                                               .dwICC = ICC_LINK_CLASS};

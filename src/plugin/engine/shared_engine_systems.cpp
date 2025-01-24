@@ -14,14 +14,17 @@ void SharedEngineSystems::StartPollingThreadIfNeeded() {
     polling_running.Store(1, StoreMemoryOrder::Relaxed);
     polling_thread.Start(
         [this]() {
-            while (polling_running.Load(LoadMemoryOrder::Relaxed)) {
-                WaitIfValueIsExpected(polling_running, 1, 1000u);
-                {
-                    floe_instances_mutex.Lock();
-                    DEFER { floe_instances_mutex.Unlock(); };
-                    for (auto plugin : floe_instances)
-                        if (plugin) OnPollThread(*plugin);
+            try {
+                while (polling_running.Load(LoadMemoryOrder::Relaxed)) {
+                    WaitIfValueIsExpected(polling_running, 1, 1000u);
+                    {
+                        floe_instances_mutex.Lock();
+                        DEFER { floe_instances_mutex.Unlock(); };
+                        for (auto plugin : floe_instances)
+                            if (plugin) OnPollThread(*plugin);
+                    }
                 }
+            } catch (PanicException) {
             }
         },
         "polling");

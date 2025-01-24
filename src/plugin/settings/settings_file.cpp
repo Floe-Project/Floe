@@ -366,58 +366,69 @@ ErrorCodeOr<void> WriteFile(Settings const& data, FloePaths const& paths, String
     g_log.Debug(k_log_mod, "Writing settings file: {}. Gui size: {}", path, data.gui.window_width);
     ArenaAllocatorWithInlineStorage<4000> scratch_arena {Malloc::Instance()};
 
-    auto _ = CreateDirectory(path::Directory(path).ValueOr({}),
-                             {
-                                 .create_intermediate_directories = true,
-                                 .fail_if_exists = false,
-                             });
+    DynamicArray<char> file_data {scratch_arena};
 
-    auto file = TRY(OpenFile(path, FileMode::WriteEveryoneReadWrite));
+    // generate the file data
+    {
+        auto writer = dyn::WriterFor(file_data);
 
-    TRY(file.Lock(FileLockType::Exclusive));
-    DEFER { auto _ = file.Unlock(); };
+        for (auto cc = data.midi.cc_to_param_mapping; cc != nullptr; cc = cc->next) {
+            DynamicArray<char> buf {scratch_arena};
+            for (auto param = cc->param; param != nullptr; param = param->next)
+                fmt::Append(buf, "{},", param->id);
+            if (!buf.size) continue;
 
-    auto writer = file.Writer();
-
-    for (auto cc = data.midi.cc_to_param_mapping; cc != nullptr; cc = cc->next) {
-        DynamicArray<char> buf {scratch_arena};
-        for (auto param = cc->param; param != nullptr; param = param->next)
-            fmt::Append(buf, "{},", param->id);
-        if (!buf.size) continue;
-
-        dyn::Pop(buf); // remove last comma
-        TRY(fmt::AppendLine(writer, "{} = {}:{}", Key(KeyType::CcToParamIdMap), cc->cc_num, buf));
-    }
-
-    for (auto const scan_folder_type : Range(ToInt(ScanFolderType::Count))) {
-        for (auto p : data.filesystem.extra_scan_folders[scan_folder_type]) {
-            TRY(fmt::AppendLine(writer,
-                                "{} = {}",
-                                Key(ScanFolderKeyType((ScanFolderType)scan_folder_type)),
-                                p));
+            dyn::Pop(buf); // remove last comma
+            TRY(fmt::AppendLine(writer, "{} = {}:{}", Key(KeyType::CcToParamIdMap), cc->cc_num, buf));
         }
-        if (path::IsAbsolute(data.filesystem.install_location[scan_folder_type]) &&
-            data.filesystem.install_location[scan_folder_type] !=
-                paths.always_scanned_folder[scan_folder_type])
-            TRY(fmt::AppendLine(writer,
-                                "{} = {}",
-                                Key(InstallLocationKeyType((ScanFolderType)scan_folder_type)),
-                                data.filesystem.install_location[scan_folder_type]));
+
+        for (auto const scan_folder_type : Range(ToInt(ScanFolderType::Count))) {
+            for (auto p : data.filesystem.extra_scan_folders[scan_folder_type]) {
+                TRY(fmt::AppendLine(writer,
+                                    "{} = {}",
+                                    Key(ScanFolderKeyType((ScanFolderType)scan_folder_type)),
+                                    p));
+            }
+            if (path::IsAbsolute(data.filesystem.install_location[scan_folder_type]) &&
+                data.filesystem.install_location[scan_folder_type] !=
+                    paths.always_scanned_folder[scan_folder_type])
+                TRY(fmt::AppendLine(writer,
+                                    "{} = {}",
+                                    Key(InstallLocationKeyType((ScanFolderType)scan_folder_type)),
+                                    data.filesystem.install_location[scan_folder_type]));
+        }
+
+        TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::GuiKeyboardOctave), data.gui.keyboard_octave));
+        TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::HighContrastGui), data.gui.high_contrast_gui));
+        TRY(fmt::AppendLine(writer,
+                            "{} = {}",
+                            Key(KeyType::PresetsRandomMode),
+                            data.gui.presets_random_mode));
+        TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::ShowKeyboard), data.gui.show_keyboard));
+        TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::ShowTooltips), data.gui.show_tooltips));
+        TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::WindowWidth), data.gui.window_width));
+
+        for (auto line : data.unknown_lines_from_file)
+            TRY(fmt::AppendLineRaw(writer, line));
     }
 
-    TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::GuiKeyboardOctave), data.gui.keyboard_octave));
-    TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::HighContrastGui), data.gui.high_contrast_gui));
-    TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::PresetsRandomMode), data.gui.presets_random_mode));
-    TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::ShowKeyboard), data.gui.show_keyboard));
-    TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::ShowTooltips), data.gui.show_tooltips));
-    TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::WindowWidth), data.gui.window_width));
+    // write the file
+    {
+        auto _ = CreateDirectory(path::Directory(path).ValueOr({}),
+                                 {
+                                     .create_intermediate_directories = true,
+                                     .fail_if_exists = false,
+                                 });
 
-    for (auto line : data.unknown_lines_from_file)
-        TRY(fmt::AppendLineRaw(writer, line));
+        auto file = TRY(OpenFile(path, FileMode::WriteEveryoneReadWrite));
 
-    TRY(file.Flush());
+        TRY(file.Lock(FileLockType::Exclusive));
+        DEFER { auto _ = file.Unlock(); };
 
-    TRY(file.SetLastModifiedTimeNsSinceEpoch(time));
+        TRY(file.Write(file_data));
+        TRY(file.Flush());
+        TRY(file.SetLastModifiedTimeNsSinceEpoch(time));
+    }
 
     return k_success;
 }

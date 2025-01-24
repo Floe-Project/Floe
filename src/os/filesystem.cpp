@@ -134,6 +134,21 @@ MutableString FloeKnownDirectory(Allocator& a,
     return KnownDirectoryWithSubdirectories(a, known_dir_type, subdirectories, filename, options);
 }
 
+static FixedSizeAllocator<256> g_crash_folder_allocator {&PageAllocator::Instance()};
+static Span<char> g_crash_folder_path = {};
+
+void InitCrashFolder() {
+    g_crash_folder_path = FloeKnownDirectory(g_crash_folder_allocator,
+                                             FloeKnownDirectoryType::Logs,
+                                             k_nullopt,
+                                             {.create = true});
+}
+
+Optional<String> CrashFolder() {
+    if (g_crash_folder_path.size) return g_crash_folder_path;
+    return k_nullopt;
+}
+
 ErrorCodeOr<MutableString>
 TemporaryDirectoryWithinFolder(String existing_abs_folder, Allocator& a, u64& seed) {
     auto result =

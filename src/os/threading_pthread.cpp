@@ -16,9 +16,7 @@ u64 CurrentThreadId() { return (u64)(uintptr)pthread_self(); }
 void SetCurrentThreadPriorityRealTime() {
     struct sched_param params = {};
     params.sched_priority = sched_get_priority_max(SCHED_RR);
-    // IMPROVE: warn about the error somehow
-    auto ret = pthread_setschedparam(pthread_self(), SCHED_RR, &params);
-    (void)ret;
+    pthread_setschedparam(pthread_self(), SCHED_RR, &params);
 }
 
 Mutex::Mutex() { pthread_mutex_init(&mutex.As<pthread_mutex_t>(), nullptr); }
@@ -67,10 +65,13 @@ Optional<DynamicArrayBounded<char, k_max_thread_name_size>> ThreadName() {
 }
 
 static void* ThreadStartProc(void* data) {
-    auto d = (Thread::ThreadStartData*)data;
-    SetThreadName(d->thread_name);
-    d->StartThread();
-    delete d;
+    try {
+        auto d = (Thread::ThreadStartData*)data;
+        SetThreadName(d->thread_name);
+        d->StartThread();
+        delete d;
+    } catch (char const*) {
+    }
     return nullptr;
 }
 

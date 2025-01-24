@@ -683,118 +683,124 @@ static void UpdateAndRender(GuiPlatform& platform) {
 }
 
 static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
-    if constexpr (k_debug_gui_platform)
-        if (event->type != PUGL_UPDATE && event->type != PUGL_TIMER && event->type != PUGL_MOTION)
-            printEvent(event, "PUGL: ", true);
-    auto& platform = *(GuiPlatform*)puglGetHandle(view);
+    if (PanicOccurred()) return PUGL_FAILURE;
 
-    bool post_redisplay = false;
+    try {
+        if constexpr (k_debug_gui_platform)
+            if (event->type != PUGL_UPDATE && event->type != PUGL_TIMER && event->type != PUGL_MOTION)
+                printEvent(event, "PUGL: ", true);
+        auto& platform = *(GuiPlatform*)puglGetHandle(view);
 
-    switch (event->type) {
-        case PUGL_NOTHING: break;
+        bool post_redisplay = false;
 
-        case PUGL_REALIZE: {
-            g_log.Debug(k_gui_platform_log_module, "realize: {}", fmt::DumpStruct(event->any));
-            puglGrabFocus(platform.view);
-            CreateGraphicsContext(platform);
-            break;
+        switch (event->type) {
+            case PUGL_NOTHING: break;
+
+            case PUGL_REALIZE: {
+                g_log.Debug(k_gui_platform_log_module, "realize: {}", fmt::DumpStruct(event->any));
+                puglGrabFocus(platform.view);
+                CreateGraphicsContext(platform);
+                break;
+            }
+
+            case PUGL_UNREALIZE: {
+                g_log.Debug(k_gui_platform_log_module, "unrealize {}", fmt::DumpStruct(event->any));
+                DestroyGraphicsContext(platform);
+                break;
+            }
+
+            // resized or moved
+            case PUGL_CONFIGURE: {
+                g_log.Debug(k_gui_platform_log_module, "configure {}", fmt::DumpStruct(event->configure));
+                if (platform.graphics_ctx)
+                    platform.graphics_ctx->Resize({event->configure.width, event->configure.height});
+                if (event->configure.width)
+                    gui_settings::SetWindowSize(platform.settings.settings.gui,
+                                                platform.settings.tracking,
+                                                event->configure.width);
+                break;
+            }
+
+            case PUGL_UPDATE: {
+                break;
+            }
+
+            case PUGL_EXPOSE: {
+                UpdateAndRender(platform);
+                break;
+            }
+
+            case PUGL_CLOSE: {
+                // If we support floating windows, we might need to call the host's closed() function here.
+                break;
+            }
+
+            case PUGL_FOCUS_IN:
+            case PUGL_FOCUS_OUT: break;
+
+            case PUGL_KEY_PRESS: {
+                post_redisplay = EventKey(platform, event->key, true);
+                break;
+            }
+
+            case PUGL_KEY_RELEASE: {
+                post_redisplay = EventKey(platform, event->key, false);
+                break;
+            }
+
+            case PUGL_TEXT: {
+                post_redisplay = EventText(platform, event->text);
+                break;
+            }
+
+            case PUGL_POINTER_IN: puglGrabFocus(platform.view); break;
+            case PUGL_POINTER_OUT: {
+                break;
+            }
+
+            case PUGL_BUTTON_PRESS:
+            case PUGL_BUTTON_RELEASE: {
+                post_redisplay = EventMouseButton(platform, event->button, event->type == PUGL_BUTTON_PRESS);
+                break;
+            }
+
+            case PUGL_MOTION: {
+                post_redisplay = EventMotion(platform, event->motion);
+                break;
+            }
+
+            case PUGL_SCROLL: {
+                post_redisplay = EventWheel(platform, event->scroll);
+                break;
+            }
+
+            case PUGL_TIMER: {
+                if (event->timer.id == platform.k_pugl_timer_id) post_redisplay = IsUpdateNeeded(platform);
+                break;
+            }
+
+            case PUGL_DATA_OFFER: {
+                post_redisplay = EventDataOffer(platform, event->offer);
+                break;
+            }
+
+            case PUGL_DATA: {
+                post_redisplay = EventData(platform, event->data);
+                break;
+            }
+
+            case PUGL_CLIENT: break;
+
+            case PUGL_LOOP_ENTER:
+            case PUGL_LOOP_LEAVE: break;
         }
 
-        case PUGL_UNREALIZE: {
-            g_log.Debug(k_gui_platform_log_module, "unrealize {}", fmt::DumpStruct(event->any));
-            DestroyGraphicsContext(platform);
-            break;
-        }
+        if (post_redisplay) puglPostRedisplay(view);
 
-        // resized or moved
-        case PUGL_CONFIGURE: {
-            g_log.Debug(k_gui_platform_log_module, "configure {}", fmt::DumpStruct(event->configure));
-            if (platform.graphics_ctx)
-                platform.graphics_ctx->Resize({event->configure.width, event->configure.height});
-            if (event->configure.width)
-                gui_settings::SetWindowSize(platform.settings.settings.gui,
-                                            platform.settings.tracking,
-                                            event->configure.width);
-            break;
-        }
-
-        case PUGL_UPDATE: {
-            break;
-        }
-
-        case PUGL_EXPOSE: {
-            UpdateAndRender(platform);
-            break;
-        }
-
-        case PUGL_CLOSE: {
-            // If we support floating windows, we might need to call the host's closed() function here.
-            break;
-        }
-
-        case PUGL_FOCUS_IN:
-        case PUGL_FOCUS_OUT: break;
-
-        case PUGL_KEY_PRESS: {
-            post_redisplay = EventKey(platform, event->key, true);
-            break;
-        }
-
-        case PUGL_KEY_RELEASE: {
-            post_redisplay = EventKey(platform, event->key, false);
-            break;
-        }
-
-        case PUGL_TEXT: {
-            post_redisplay = EventText(platform, event->text);
-            break;
-        }
-
-        case PUGL_POINTER_IN: puglGrabFocus(platform.view); break;
-        case PUGL_POINTER_OUT: {
-            break;
-        }
-
-        case PUGL_BUTTON_PRESS:
-        case PUGL_BUTTON_RELEASE: {
-            post_redisplay = EventMouseButton(platform, event->button, event->type == PUGL_BUTTON_PRESS);
-            break;
-        }
-
-        case PUGL_MOTION: {
-            post_redisplay = EventMotion(platform, event->motion);
-            break;
-        }
-
-        case PUGL_SCROLL: {
-            post_redisplay = EventWheel(platform, event->scroll);
-            break;
-        }
-
-        case PUGL_TIMER: {
-            if (event->timer.id == platform.k_pugl_timer_id) post_redisplay = IsUpdateNeeded(platform);
-            break;
-        }
-
-        case PUGL_DATA_OFFER: {
-            post_redisplay = EventDataOffer(platform, event->offer);
-            break;
-        }
-
-        case PUGL_DATA: {
-            post_redisplay = EventData(platform, event->data);
-            break;
-        }
-
-        case PUGL_CLIENT: break;
-
-        case PUGL_LOOP_ENTER:
-        case PUGL_LOOP_LEAVE: break;
+        return PUGL_SUCCESS;
+    } catch (PanicException) {
+        return PUGL_FAILURE;
     }
-
-    if (post_redisplay) puglPostRedisplay(view);
-
-    return PUGL_SUCCESS;
 }
 
 } // namespace detail

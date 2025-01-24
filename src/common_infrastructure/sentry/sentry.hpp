@@ -62,8 +62,10 @@ struct DsnInfo {
 };
 
 static constexpr usize k_max_message_length = 8192;
-static constexpr String k_release = "floe@" FLOE_VERSION_STRING;
+static constexpr String k_release = PRODUCTION_BUILD ? String {"floe@" FLOE_VERSION_STRING} : GIT_COMMIT_HASH;
 static constexpr String k_environment = PRODUCTION_BUILD ? "production"_s : "development"_s;
+static constexpr String k_user_agent =
+    PRODUCTION_BUILD ? String {"floe/" FLOE_VERSION_STRING} : "floe/" GIT_COMMIT_HASH;
 
 struct Sentry {
     Optional<fmt::UuidArray> device_id {};
@@ -71,7 +73,9 @@ struct Sentry {
     fmt::UuidArray session_id {};
     Atomic<u32> session_num_errors = 0;
     Atomic<s64> session_started_microsecs {};
+    Atomic<u32> session_sequence = 0;
     Atomic<u64> seed = {};
+    Atomic<bool> session_ended = false;
     FixedSizeAllocator<Kb(4)> arena {nullptr};
     Span<char> event_context_json {};
     Span<Tag> tags {};
@@ -142,37 +146,7 @@ Sentry* InitGlobalSentry(DsnInfo dsn, Span<Tag const> tag);
 // dsn must be valid and static
 void InitBarebonesSentry(Sentry& sentry);
 
-// threadsafe, not signal-safe
-PUBLIC ErrorCodeOr<void> SendSentryEnvelope(Sentry const& sentry,
-                                            String envelope,
-                                            Optional<Writer> response,
-                                            ArenaAllocator& scratch_arena) {
-    auto const envelope_url =
-        fmt::Format(scratch_arena, "https://{}:443/api/{}/envelope/", sentry.dsn.host, sentry.dsn.project_id);
-
-    g_log.Debug(k_main_log_module, "Posting to Sentry: {}", envelope);
-
-    return HttpsPost(
-        envelope_url,
-        envelope,
-        Array {
-            "Content-Type: application/x-sentry-envelope"_s,
-            fmt::Format(scratch_arena,
-                        "X-Sentry-Auth: Sentry sentry_version=7, sentry_client=floe/{}, sentry_key={}",
-                        FLOE_VERSION_STRING,
-                        sentry.dsn.public_key),
-            fmt::Format(scratch_arena, "Content-Length: {}", envelope.size),
-            fmt::Format(scratch_arena,
-                        "User-Agent: floe/{} ({})"_s,
-                        FLOE_VERSION_STRING,
-                        IS_WINDOWS ? "Windows"
-                        : IS_LINUX ? "Linux"
-                                   : "macOS"),
-        },
-        response);
-}
-
-// thread-safe, signal-safe
+// thread-safe (for Sentry), signal-safe
 PUBLIC ErrorCodeOr<void> EnvelopeAddHeader(Sentry const& sentry, Writer writer) {
     ASSERT(sentry.dsn.dsn.size);
 
@@ -190,33 +164,58 @@ PUBLIC ErrorCodeOr<void> EnvelopeAddHeader(Sentry const& sentry, Writer writer) 
     return k_success;
 }
 
-enum class SessionUpdateType { Start, EndedNormally, EndedCrashed };
+// An empty envelope header makes an envelope valid for `sentry-cli send-evelope --raw <file>`
+// If Floe is sending it, it will replace this empty one with better one.
+constexpr String k_empty_header = "{}\n"_s;
 
-// thread-safe, signal-safe
+enum class SessionStatus {
+    Ok,
+    EndedNormally,
+    Crashed,
+};
+
+// thread-safe (for Sentry), signal-safe
+// https://develop.sentry.dev/sdk/telemetry/sessions/
+// "Sessions are updated from events sent in. The most recent event holds the entire session state."
+// "A session does not have to be started in order to crash. Just reporting a crash is sufficient."
 [[maybe_unused]] PUBLIC ErrorCodeOr<void> EnvelopeAddSessionUpdate(Sentry& sentry,
                                                                    Writer writer,
-                                                                   SessionUpdateType session_update_type,
+                                                                   SessionStatus status,
                                                                    Optional<u32> extra_num_errors = {}) {
-    auto const now = MicrosecondsSinceEpoch();
-    auto const timestamp = fmt::TimestampRfc3339Utc(UtcTimeFromMicrosecondsSinceEpoch(now));
-    auto const init = session_update_type == SessionUpdateType::Start;
-
-    switch (session_update_type) {
-        case SessionUpdateType::Start:
-            ASSERT(sentry.session_started_microsecs.Load(LoadMemoryOrder::Relaxed) == 0,
-                   "session already started");
-            sentry.session_id = detail::Uuid(sentry.seed);
-            sentry.session_started_microsecs.Store(now, StoreMemoryOrder::Release);
+    switch (status) {
+        case SessionStatus::Ok: break;
+        case SessionStatus::EndedNormally:
+        case SessionStatus::Crashed:
+            // "A session can exist in two states: in progress or terminated. A terminated session must not
+            // receive further updates. exited, crashed and abnormal are all terminal states. When a session
+            // reaches this state the client must not report any more session updates or start a new session."
+            if (sentry.session_ended.Exchange(true, RmwMemoryOrder::AcquireRelease)) return k_success;
             break;
-        case SessionUpdateType::EndedNormally:
-        case SessionUpdateType::EndedCrashed:
-            ASSERT(sentry.session_started_microsecs.Load(LoadMemoryOrder::Relaxed) > 0,
-                   "missing session start");
     }
 
+    auto const now = MicrosecondsSinceEpoch();
+    auto const timestamp = fmt::TimestampRfc3339Utc(UtcTimeFromMicrosecondsSinceEpoch(now));
+
+    s64 expected = 0;
+    auto const init = sentry.session_started_microsecs.CompareExchangeStrong(expected,
+                                                                             now,
+                                                                             RmwMemoryOrder::AcquireRelease,
+                                                                             LoadMemoryOrder::Acquire);
+    auto const started = ({
+        fmt::TimestampRfc3339UtcArray s;
+        if (init)
+            s = timestamp;
+        else
+            s = fmt::TimestampRfc3339Utc(UtcTimeFromMicrosecondsSinceEpoch(expected));
+        s;
+    });
+
     auto const num_errors = ({
-        auto e = sentry.session_num_errors.Load(LoadMemoryOrder::Relaxed);
+        auto e = sentry.session_num_errors.Load(LoadMemoryOrder::Acquire);
         if (extra_num_errors) e += *extra_num_errors;
+        // "It's important that this counter is also incremented when a session goes to crashed. (eg: the
+        // crash itself is always an error as well)."
+        if (status == SessionStatus::Crashed) e += 1;
         e;
     });
 
@@ -238,54 +237,42 @@ enum class SessionUpdateType { Start, EndedNormally, EndedCrashed };
     TRY(json::WriteKeyValue(json_writer, "sid", sentry.session_id));
     TRY(json::WriteKeyValue(json_writer, "status", ({
                                 String s;
-                                switch (session_update_type) {
-                                    case SessionUpdateType::Start: s = "ok"; break;
-                                    case SessionUpdateType::EndedNormally: s = "exited"; break;
-                                    case SessionUpdateType::EndedCrashed: s = "crashed"; break;
+                                switch (status) {
+                                    case SessionStatus::Ok: s = "ok"; break;
+                                    case SessionStatus::EndedNormally: s = "exited"; break;
+                                    case SessionStatus::Crashed: s = "crashed"; break;
                                 }
                                 s;
                             })));
     if (sentry.device_id) TRY(json::WriteKeyValue(json_writer, "did", *sentry.device_id));
-    TRY(json::WriteKeyValue(json_writer, "init", init));
-    TRY(json::WriteKeyValue(json_writer, "seq", init ? 0 : 1));
+    TRY(json::WriteKeyValue(json_writer,
+                            "seq",
+                            sentry.session_sequence.FetchAdd(1, RmwMemoryOrder::AcquireRelease)));
     TRY(json::WriteKeyValue(json_writer, "timestamp", timestamp));
-    TRY(json::WriteKeyValue(json_writer, "started", ({
-                                fmt::TimestampRfc3339UtcArray s;
-                                if (init) {
-                                    s = timestamp;
-                                } else {
-                                    s = fmt::TimestampRfc3339Utc(UtcTimeFromMicrosecondsSinceEpoch(
-                                        sentry.session_started_microsecs.Load(LoadMemoryOrder::Acquire)));
-                                }
-                                s;
-                            })));
+    TRY(json::WriteKeyValue(json_writer, "started", started));
+    TRY(json::WriteKeyValue(json_writer, "init", init));
     TRY(json::WriteKeyValue(json_writer, "errors", num_errors));
     {
         TRY(json::WriteKeyObjectBegin(json_writer, "attrs"));
         TRY(json::WriteKeyValue(json_writer, "release", k_release));
         TRY(json::WriteKeyValue(json_writer, "environment", k_environment));
-        TRY(json::WriteKeyValue(json_writer, "user_agent", "floe/" FLOE_VERSION_STRING));
+        TRY(json::WriteKeyValue(json_writer, "user_agent", k_user_agent));
         TRY(json::WriteObjectEnd(json_writer));
     }
     TRY(json::WriteObjectEnd(json_writer));
     TRY(writer.WriteChar('\n'));
 
-    if (session_update_type != SessionUpdateType::Start) {
-        sentry.session_num_errors.Store(0, StoreMemoryOrder::Relaxed);
-        sentry.session_started_microsecs.Store(0, StoreMemoryOrder::Relaxed);
-    }
-
     return k_success;
 }
 
-// thread-safe, signal-safe if signal_safe is true
+// thread-safe (for Sentry), signal-safe if signal_safe is true
 // NOTE (Jan 2025): all events are 'errors' in Sentry, there's no plain logging concept
 [[maybe_unused]] PUBLIC ErrorCodeOr<void>
 EnvelopeAddEvent(Sentry& sentry, Writer writer, ErrorEvent event, bool signal_safe) {
     ASSERT(event.message.size <= k_max_message_length, "message too long");
     ASSERT(event.tags.size < 100, "too many tags");
 
-    sentry.session_num_errors.FetchAdd(1, RmwMemoryOrder::Relaxed);
+    sentry.session_num_errors.FetchAdd(1, RmwMemoryOrder::AcquireRelease);
 
     json::WriteContext json_writer {
         .out = writer,
@@ -382,39 +369,107 @@ EnvelopeAddEvent(Sentry& sentry, Writer writer, ErrorEvent event, bool signal_sa
     return k_success;
 }
 
-constexpr auto k_crash_file_extension = "floe-crash"_ca;
+constexpr auto k_crash_file_extension = "floe-error"_ca;
+
+PUBLIC String UniqueErrorFilepath(String folder, ArenaAllocator& arena) {
+    auto const timestamp = TimestampUtc();
+    auto const filename = fmt::Format(arena, "{}.{}", timestamp, k_crash_file_extension);
+    return path::Join(arena, Array {folder, filename});
+}
+
+// threadsafe (for Sentry), not signal-safe
+PUBLIC ErrorCodeOr<void> SendSentryEnvelope(Sentry& sentry,
+                                            String envelope_without_header,
+                                            Optional<Writer> response,
+                                            bool fallback_write_to_file,
+                                            ArenaAllocator& scratch_arena) {
+    auto const envelope_url =
+        fmt::Format(scratch_arena, "https://{}:443/api/{}/envelope/", sentry.dsn.host, sentry.dsn.project_id);
+
+    DynamicArray<char> envelope {scratch_arena};
+    envelope.Reserve(envelope_without_header.size + 200);
+    auto envelope_writer = dyn::WriterFor(envelope);
+
+    auto _ = EnvelopeAddHeader(sentry, envelope_writer);
+    auto const envelop_header_size = envelope.size;
+    dyn::AppendSpan(envelope, envelope_without_header);
+
+    g_log.Debug(k_main_log_module, "Posting to Sentry: {}", envelope);
+
+    auto const result =
+        HttpsPost(envelope_url,
+                  envelope,
+                  Array {
+                      "Content-Type: application/x-sentry-envelope"_s,
+                      fmt::Format(scratch_arena,
+                                  "X-Sentry-Auth: Sentry sentry_version=7, sentry_client={}, sentry_key={}",
+                                  k_user_agent,
+                                  sentry.dsn.public_key),
+                      fmt::Format(scratch_arena, "Content-Length: {}", envelope.size),
+                      fmt::Format(scratch_arena,
+                                  "User-Agent: {} ({})"_s,
+                                  k_user_agent,
+                                  IS_WINDOWS ? "Windows"
+                                  : IS_LINUX ? "Linux"
+                                             : "macOS"),
+                  },
+                  response);
+
+    auto const crash_folder = CrashFolder();
+
+    if (result.HasError() && fallback_write_to_file && crash_folder) {
+        // We've failed to send it to the server. We don't want to loose the information, so write it to a
+        // file.
+
+        // If there's an error other than just the internet being down, we want to capture that too.
+        if (result.Error() != WebError::NetworkError) {
+            auto _ = EnvelopeAddEvent(
+                sentry,
+                envelope_writer,
+                {
+                    .level = ErrorEvent::Level::Error,
+                    .message = fmt::Format(scratch_arena, "Failed to send to Sentry: {}", result.Error()),
+                },
+                false);
+        }
+
+        auto file =
+            TRY(OpenFile(UniqueErrorFilepath(*crash_folder, scratch_arena), FileMode::WriteNoOverwrite));
+
+        TRY(file.Write(k_empty_header));
+        TRY(file.Write(envelope.Items().SubSpan(envelop_header_size)));
+
+        return k_success;
+    }
+
+    return result;
+}
 
 // thread-safe, signal-safe
-PUBLIC ErrorCodeOr<void> WriteCrashToFile(Sentry& sentry,
-                                          bool new_session,
-                                          String folder,
+PUBLIC ErrorCodeOr<void> WriteErrorToFile(Sentry& sentry,
                                           Optional<StacktraceStack> const& stacktrace,
+                                          String folder,
                                           String message,
                                           ArenaAllocator& scratch_arena) {
-    auto const timestamp = TimestampUtc();
-    auto const filename = fmt::Format(scratch_arena, "crash {}.{}", timestamp, k_crash_file_extension);
-    auto path = path::Join(scratch_arena, Array {folder, filename});
+    auto file = TRY(OpenFile(UniqueErrorFilepath(folder, scratch_arena), FileMode::WriteNoOverwrite));
 
-    auto file = TRY(OpenFile(path, FileMode::Write));
+    TRY(file.Write(k_empty_header));
 
-    TRY(file.Write("{}\n"_s)); // empty envelope header, we will replace it if we need to, but it makes it a
-                               // valid envelope for sentry-cli
-    if (new_session) TRY(EnvelopeAddSessionUpdate(sentry, file.Writer(), SessionUpdateType::Start));
     TRY(EnvelopeAddEvent(sentry,
                          file.Writer(),
                          {
-                             .level = ErrorEvent::Level::Error,
+                             .level = ErrorEvent::Level::Fatal,
                              .message = message,
                              .stacktrace = stacktrace,
                          },
                          true));
-    TRY(EnvelopeAddSessionUpdate(sentry, file.Writer(), SessionUpdateType::EndedCrashed));
+    TRY(EnvelopeAddSessionUpdate(sentry, file.Writer(), SessionStatus::Crashed));
 
     return k_success;
 }
 
 PUBLIC ErrorCodeOr<void>
-ConsumeAndSendCrashFiles(Sentry const& sentry, String folder, ArenaAllocator& scratch_arena) {
+ConsumeAndSendErrorFiles(Sentry& sentry, String folder, ArenaAllocator& scratch_arena) {
     constexpr auto k_wildcard = ConcatArrays("*."_ca, k_crash_file_extension);
     auto const entries = TRY(FindEntriesInFolder(scratch_arena,
                                                  folder,
@@ -466,23 +521,28 @@ ConsumeAndSendCrashFiles(Sentry const& sentry, String folder, ArenaAllocator& sc
                 if (!success) auto _ = Rename(temp_full_path, full_path);
             };
 
-            auto crash_payload = TRY_OR(ReadEntireFile(temp_full_path, scratch_arena), {
+            auto envelope_without_header = TRY_OR(ReadEntireFile(temp_full_path, scratch_arena), {
                 g_log.Error(k_main_log_module, "Couldn't read crash file: {}", error);
                 continue;
             });
 
-            // Remove the empty envelope header, we will add a new one with correct sent_at, etc.
-            crash_payload = TrimStartIfMatches(crash_payload, "{}\n"_s);
+            // Remove the empty envelope header, SendSentryEnvelope will add a correct one.
+            envelope_without_header = TrimStartIfMatches(envelope_without_header, "{}\n"_s);
 
-            DynamicArray<char> envelope {scratch_arena};
-            envelope.Reserve(crash_payload.size + 100);
-            auto _ = EnvelopeAddHeader(sentry, dyn::WriterFor(envelope));
-            dyn::AppendSpan(envelope, crash_payload);
+            DynamicArray<char> response {scratch_arena};
 
-            TRY_OR(SendSentryEnvelope(sentry, envelope, k_nullopt, scratch_arena), {
-                g_log.Error(k_main_log_module, "Couldn't send crash report to Sentry: {}", error);
-                continue;
-            });
+            TRY_OR(SendSentryEnvelope(sentry,
+                                      envelope_without_header,
+                                      dyn::WriterFor(response),
+                                      false,
+                                      scratch_arena),
+                   {
+                       g_log.Error(k_main_log_module,
+                                   "Couldn't send crash report to Sentry: {}. {}",
+                                   error,
+                                   response);
+                       continue;
+                   });
 
             success = true;
         }

@@ -239,17 +239,13 @@ static ErrorCodeOr<int> Main(ArgsCstr args) {
 }
 
 int main(int argc, char** argv) {
+    g_panic_hook = PanicHook;
+    InitCrashFolder();
+
     SetThreadName("main");
 
     BeginCrashDetection(CrashHookWriteCrashReport);
     DEFER { EndCrashDetection(); };
-
-    sentry::Worker sentry_worker {};
-    sentry::StartThread(sentry_worker, {});
-    DEFER {
-        sentry::RequestThreadEnd(sentry_worker);
-        sentry::WaitForThreadEnd(sentry_worker);
-    };
 
     auto const result = Main({argc, argv});
     if (result.HasError()) {

@@ -13,41 +13,49 @@
 #include "os/filesystem.hpp"
 #include "os/misc.hpp"
 
-constexpr StdStream k_panic_stream = StdStream::Out;
-
-[[noreturn]] void DefaultPanicHandler(char const* message, SourceLocation loc) {
-    auto const filename = FromNullTerminated(loc.file);
-    InlineSprintfBuffer buffer;
-    // we style the source location to look like the first item of a call stack and then print the stack
-    // skipping one extra frame
-    buffer.Append("\nPanic: " ANSI_COLOUR_SET_FOREGROUND_RED "%s" ANSI_COLOUR_RESET
-                  "\n[0] " ANSI_COLOUR_SET_FOREGROUND_BLUE "%.*s" ANSI_COLOUR_RESET ":%d: %s\n",
-                  message,
-                  (int)filename.size,
-                  filename.data,
-                  loc.line,
-                  loc.function);
-    auto _ = StdPrint(k_panic_stream, buffer.AsString());
-    PrintCurrentStacktrace(k_panic_stream, {.ansi_colours = true}, 4);
-    auto _ = StdPrint(k_panic_stream, "\n");
-    if constexpr (!PRODUCTION_BUILD) __builtin_debugtrap();
-    __builtin_abort();
+static void DefaultPanicHook(char const* message, SourceLocation loc) {
+    if (!PRODUCTION_BUILD) {
+        constexpr StdStream k_panic_stream = StdStream::Out;
+        InlineSprintfBuffer buffer;
+        // we style the source location to look like the first item of a call stack and then print the stack
+        // skipping one extra frame
+        buffer.Append("\nPanic: " ANSI_COLOUR_SET_FOREGROUND_RED "%s" ANSI_COLOUR_RESET
+                      "\n[0] " ANSI_COLOUR_SET_FOREGROUND_BLUE "%s" ANSI_COLOUR_RESET ":%d: %s\n",
+                      message,
+                      loc.file,
+                      loc.line,
+                      loc.function);
+        auto _ = StdPrint(k_panic_stream, buffer.AsString());
+        auto _ = PrintCurrentStacktrace(k_panic_stream, {.ansi_colours = true}, 4);
+        auto _ = StdPrint(k_panic_stream, "\n");
+    }
 }
 
-void (*g_panic_handler)(char const* message, SourceLocation loc) = DefaultPanicHandler;
+void (*g_panic_hook)(char const* message, SourceLocation loc) = DefaultPanicHook;
+
+static Atomic<bool> g_panic_occurred {};
+
+bool PanicOccurred() { return g_panic_occurred.Load(LoadMemoryOrder::Acquire); }
 
 [[noreturn]] void Panic(char const* message, SourceLocation loc) {
-    g_panic_handler(message, loc);
+    static thread_local u8 in_panic_hook {};
 
-    // We should never get here, g_panic_handler should be [[noreturn]]
-    throw "panicked";
-}
+    switch (in_panic_hook) {
+        case 0: {
+            // First time we've panicked.
+            ++in_panic_hook;
+            g_panic_hook(message, loc);
+            --in_panic_hook;
 
-void AssertionFailed(char const* expression, SourceLocation loc, char const* message) {
-    InlineSprintfBuffer buffer;
-    buffer.Append("assertion failed: %s", expression);
-    if (message) buffer.Append(",  \"%s\"", message);
-    Panic(buffer.CString(), loc);
+            g_panic_occurred.Store(true, StoreMemoryOrder::Release);
+            throw PanicException();
+        }
+        default: {
+            // We've panicked while in a panic hook. Hopefully we have a crash handler installed.
+            __builtin_abort();
+            break;
+        }
+    }
 }
 
 static void HandleUbsanError(String msg) {
@@ -490,6 +498,6 @@ void CurrentStacktraceToCallback(FunctionRef<void(FrameInfo const&)> callback,
     if (stack) StacktraceToCallback(*stack, callback, options);
 }
 
-void PrintCurrentStacktrace(StdStream stream, StacktraceOptions options, int skip_frames) {
-    auto _ = WriteCurrentStacktrace(StdWriter(stream), options, skip_frames);
+ErrorCodeOr<void> PrintCurrentStacktrace(StdStream stream, StacktraceOptions options, int skip_frames) {
+    return WriteCurrentStacktrace(StdWriter(stream), options, skip_frames);
 }

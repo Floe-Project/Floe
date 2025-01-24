@@ -399,7 +399,7 @@ static ErrorCodeOr<BraceSectionResult> ParseBraceSection(Writer writer, char con
     ASSERT(*p == '{');
     for (; p < end; ++p) {
         ++p;
-        if (p == end) Panic("Mismatched {}");
+        if (p == end) Panic("mismatched {}");
         if (*p == '{') {
             TRY(writer.WriteChar('{'));
             return BraceSectionResult {.new_p = p, .should_format_type = false};
@@ -407,7 +407,7 @@ static ErrorCodeOr<BraceSectionResult> ParseBraceSection(Writer writer, char con
 
         auto const start = p;
         while (*p != '}') {
-            if (p == end) Panic("Mismatched {}");
+            if (p == end) Panic("mismatched {}");
             ++p;
         }
         String brace_contents {start, (usize)(p - start)};
@@ -436,7 +436,7 @@ static ErrorCodeOr<BraceSectionResult> ParseBraceSection(Writer writer, char con
                                 ++num_numbers;
                             else
                                 break;
-                        if (num_numbers == 1) Panic("Expected numbers after . in format string");
+                        if (num_numbers == 1) Panic("expected numbers after . in format string");
 
                         options.float_precision = brace_contents.SubSpan(i, num_numbers);
                         i += num_numbers;
@@ -444,7 +444,7 @@ static ErrorCodeOr<BraceSectionResult> ParseBraceSection(Writer writer, char con
                     }
                     case 'u': options.error_debug_info = false; break;
                     case 't': options.rfc3339_utc = true; break;
-                    default: Panic("Unknown options inside {}");
+                    default: Panic("unknown options inside {}");
                 }
             }
         }
@@ -477,14 +477,14 @@ static ErrorCodeOr<void> FindAndWriteNextValue(Writer writer, String& format, Ar
             break;
         } else if (*p == '}') {
             ++p;
-            if (p == end || *p != '}') Panic("Mismatched }");
+            if (p == end || *p != '}') Panic("mismatched }");
             TRY(writer.WriteChar('}'));
         } else {
             TRY(writer.WriteChar(*p));
         }
     }
 
-    if (starting_size == format.size) Panic("More args than {}");
+    if (starting_size == format.size) Panic("more args than {}");
 
     return k_success;
 }
@@ -494,10 +494,10 @@ static constexpr ErrorCodeOr<void> WriteRemaining(Writer writer, String format) 
     for (auto p = format.begin(); p != end; ++p) {
         if (*p == '{') {
             ++p;
-            if (p == end || *p != '{') Panic("More {} than args");
+            if (p == end || *p != '{') Panic("more {} than args");
         } else if (*p == '}') {
             ++p;
-            if (p == end || *p != '}') Panic("Mismatched {}");
+            if (p == end || *p != '}') Panic("mismatched {}");
         }
         TRY(writer.WriteChar(*p));
     }

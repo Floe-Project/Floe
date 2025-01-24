@@ -220,6 +220,11 @@ MutableString FloeKnownDirectory(Allocator& a,
                                  Optional<String> filename,
                                  KnownDirectoryOptions options);
 
+// The path where crash reports are written to. This is static and doesn't change during the lifetime of the
+// program.
+void InitCrashFolder();
+Optional<String> CrashFolder(); // thread-safe, signal-safe
+
 inline DynamicArrayBounded<char, 32> UniqueFilename(String prefix, u64& seed) {
     ASSERT(prefix.size <= 16);
     DynamicArrayBounded<char, 32> name {prefix};

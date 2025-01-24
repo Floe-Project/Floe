@@ -272,27 +272,9 @@ CrashHookFunction g_crash_hook {};
 void BeginCrashDetection(CrashHookFunction hook) {
     g_crash_hook = hook;
     g_exception_handler = AddVectoredExceptionHandler(1, [](PEXCEPTION_POINTERS exception_info) -> LONG {
-        // some exceptions are expected and should be ignored; for example lua will trigger exceptions.
+        // Some exceptions are expected and should be ignored; for example Lua will trigger exceptions.
         if (auto const msg = ExceptionCodeString(exception_info->ExceptionRecord->ExceptionCode); msg.size) {
-            // We don't need a separate crash file because it should be fine to just add it to the log. On
-            // unix this isn't possible because we have to be signal-safe.
-            g_log.Error(k_global_log_module, "Unhandled exception: \n{}", msg);
-            {
-                ArenaAllocatorWithInlineStorage<2000> a {Malloc::Instance()};
-                g_log.Error(k_global_log_module, CurrentStacktraceString(a));
-            }
-
-#ifdef __x86_64__
-            if (exception_info->ExceptionRecord->ExceptionCode == EXCEPTION_ILLEGAL_INSTRUCTION &&
-                exception_info->ExceptionRecord->ExceptionAddress) {
-                auto* pc =
-                    reinterpret_cast<unsigned char const*>(exception_info->ExceptionRecord->ExceptionAddress);
-                if (pc[0] == 0x67 && pc[1] == 0x0f && pc[2] == 0xb9 && pc[3] == 0x40)
-                    DumpInfoAboutUBSan(StdStream::Err);
-            }
-#endif
-
-            PrintCurrentStacktrace(StdStream::Err, {}, 0);
+            if (g_crash_hook) g_crash_hook(msg);
         }
         return EXCEPTION_CONTINUE_SEARCH;
     });
@@ -467,9 +449,13 @@ static void WindowsShellExecute(String arg) {
         Thread thread;
         thread.Start(
             [wide_arg = wide_arg.ToOwnedSpan()]() mutable {
-                DEFER { Malloc::Instance().Free(wide_arg.ToByteSpan()); };
-                if (auto scoped_com = ScopedWin32ComUsage::Create(); scoped_com.HasValue())
-                    ShellExecuteW(nullptr, L"open", wide_arg.data, nullptr, nullptr, SW_SHOW);
+                try {
+                    DEFER { Malloc::Instance().Free(wide_arg.ToByteSpan()); };
+                    if (auto scoped_com = ScopedWin32ComUsage::Create(); scoped_com.HasValue())
+                        ShellExecuteW(nullptr, L"open", wide_arg.data, nullptr, nullptr, SW_SHOW);
+                } catch (PanicException) {
+                    // pass
+                }
             },
             "WindowsShellExecute");
         thread.Detach();

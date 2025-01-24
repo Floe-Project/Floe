@@ -740,7 +740,14 @@ PUBLIC void OnAllUserInputReceived(InstallJob& job, ThreadPool& thread_pool) {
             ASSERT(component.user_decision != InstallJob::UserDecision::Unknown);
 
     job.state.Store(InstallJob::State::Installing, StoreMemoryOrder::Release);
-    thread_pool.AddJob([&job]() { package::CompleteJob(job); });
+    thread_pool.AddJob([&job]() {
+        try {
+            package::CompleteJob(job);
+        } catch (PanicException) {
+            job.error_log.Error({}, "fatal error");
+            job.state.Store(InstallJob::State::DoneError, StoreMemoryOrder::Release);
+        }
+    });
 }
 
 // [threadsafe]
@@ -831,7 +838,14 @@ PUBLIC void AddJob(InstallJobs& jobs,
                 settings.settings.filesystem.extra_scan_folders[ToInt(ScanFolderType::Presets)],
                 Array {settings.paths.always_scanned_folder[ToInt(ScanFolderType::Presets)]}),
         });
-    thread_pool.AddJob([job]() { package::StartJob(*job->job); });
+    thread_pool.AddJob([job]() {
+        try {
+            package::StartJob(*job->job);
+        } catch (PanicException) {
+            job->job->error_log.Error({}, "fatal error");
+            job->job->state.Store(InstallJob::State::DoneError, StoreMemoryOrder::Release);
+        }
+    });
 }
 
 // [main thread]

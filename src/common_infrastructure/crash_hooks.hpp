@@ -6,63 +6,84 @@
 
 // Higher-level API building on top of BeginCrashDetection
 
-static Span<char> g_crash_folder_path {};
-
-PUBLIC void InitCrashFolder() {
-    g_crash_folder_path = FloeKnownDirectory(PageAllocator::Instance(),
-                                             FloeKnownDirectoryType::Logs,
-                                             k_nullopt,
-                                             {.create = true});
-}
-
-PUBLIC void DeinitCrashFolder() { PageAllocator::Instance().Free(g_crash_folder_path.ToByteSpan()); }
-
-PUBLIC void WriteCrashInfoToStdout(String crash_message, Optional<StacktraceStack> const& stacktrace) {
+static void
+WriteErrorToStdout(String crash_message, Optional<StacktraceStack> const& stacktrace, bool signal_safe) {
     auto writer = StdWriter(StdStream::Out);
     auto _ = fmt::FormatToWriter(writer,
-                                 "\nA fatal error occured: " ANSI_COLOUR_SET_FOREGROUND_RED
-                                 "{}" ANSI_COLOUR_RESET "\n",
+                                 "\n" ANSI_COLOUR_SET_FOREGROUND_RED "{}" ANSI_COLOUR_RESET "\n",
                                  crash_message);
     if (stacktrace) {
         auto _ = WriteStacktrace(*stacktrace,
                                  writer,
                                  {
                                      .ansi_colours = true,
-                                     .demangle = false,
+                                     .demangle = !signal_safe,
                                  });
     }
     auto _ = writer.WriteChar('\n');
 }
 
-PUBLIC ErrorCodeOr<void> ReportDumpSentryCrashFile(String crash_message,
-                                                   Optional<StacktraceStack> const& stacktrace) {
-    ArenaAllocatorWithInlineStorage<1000> arena {PageAllocator::Instance()};
-
+static sentry::Sentry* GetSentry(sentry::Sentry& fallback) {
     auto sentry = sentry::g_instance.Load(LoadMemoryOrder::Acquire);
-    sentry::Sentry fallback_sentry_instance {};
-    bool is_barebones = false;
     if (!sentry) {
         // we've crashed without there being rich context available, but we can still generate a barebones
         // crash report
-        is_barebones = true;
-        sentry::InitBarebonesSentry(fallback_sentry_instance);
-        sentry = &fallback_sentry_instance;
+        sentry::InitBarebonesSentry(fallback);
+        sentry = &fallback;
     }
-    return sentry::WriteCrashToFile(*sentry,
-                                    is_barebones,
-                                    g_crash_folder_path,
-                                    stacktrace,
-                                    crash_message,
-                                    arena);
+    return sentry;
+}
+
+static ErrorCodeOr<void> WriteErrorToFile(String crash_message, Optional<StacktraceStack> const& stacktrace) {
+    auto const crash_folder = CrashFolder();
+    if (!crash_folder) {
+        auto _ = StdPrint(StdStream::Out, "Crash folder is not set, cannot write crash report\n");
+        return ErrorCode {FilesystemError::PathDoesNotExist};
+    }
+
+    ArenaAllocatorWithInlineStorage<1000> arena {PageAllocator::Instance()};
+
+    sentry::Sentry fallback_sentry_instance {};
+    auto sentry = GetSentry(fallback_sentry_instance);
+    return sentry::WriteErrorToFile(*sentry, stacktrace, *crash_folder, crash_message, arena);
 }
 
 PUBLIC void CrashHookWriteToStdout(String message) {
     auto const stacktrace = CurrentStacktrace(IS_LINUX || IS_MACOS ? 6 : 3);
-    WriteCrashInfoToStdout(message, stacktrace);
+    WriteErrorToStdout(message, stacktrace, true);
 }
 
 PUBLIC void CrashHookWriteCrashReport(String crash_message) {
     auto const stacktrace = CurrentStacktrace(IS_LINUX || IS_MACOS ? 6 : 3);
-    TRY_OR(ReportDumpSentryCrashFile(crash_message, stacktrace),
-           WriteCrashInfoToStdout(crash_message, stacktrace));
+    auto _ = WriteErrorToFile(crash_message, stacktrace);
+    WriteErrorToStdout(crash_message, stacktrace, true);
+}
+
+PUBLIC void PanicHook(char const* message_c_str, SourceLocation loc) {
+    ArenaAllocatorWithInlineStorage<2000> arena {PageAllocator::Instance()};
+
+    auto const stacktrace = CurrentStacktrace(2);
+    auto const message = fmt::Format(arena, "{}\nAt {}", FromNullTerminated(message_c_str), loc);
+    WriteErrorToStdout(message, stacktrace, false);
+
+    {
+        sentry::Sentry fallback_sentry_instance {};
+        auto sentry = GetSentry(fallback_sentry_instance);
+
+        DynamicArray<char> envelope {arena};
+        auto envelope_writer = dyn::WriterFor(envelope);
+
+        auto _ = sentry::EnvelopeAddEvent(*sentry,
+                                          envelope_writer,
+                                          {
+                                              .level = sentry::ErrorEvent::Level::Fatal,
+                                              .message = message,
+                                              .stacktrace = stacktrace,
+                                          },
+                                          false);
+        auto _ = sentry::EnvelopeAddSessionUpdate(*sentry, envelope_writer, sentry::SessionStatus::Crashed);
+
+        DynamicArray<char> response {arena};
+        auto const _ = sentry::SendSentryEnvelope(*sentry, envelope, dyn::WriterFor(response), true, arena);
+    }
 }

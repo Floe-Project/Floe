@@ -83,6 +83,7 @@ Feel free to use the discussions on GitHub for questions, feedback, and ideas. R
 - We only support one compiler: Clang (via Zig), and so we wholeheartedly use Clang-specific features and features from C++20/23 and above.
 - Good tooling is a priority. The build system generates a compile_commands.json, so clangd, clang-tidy, cppcheck, etc. are all supported.
 - We try to focus on making the code a joy to work on: programming can be fun.
+- Try not to crash the host. When we enter a 'panic' state we make reasonable efforts to be harmless instead of crashing the host.
 - Incrementally improve the codebase, it's still a work-in-progress. Unfortunately there's still some technical debt to pay off.
 
 ### CI

@@ -90,6 +90,7 @@ static void InitSentry(Sentry& sentry, DsnInfo dsn, Span<Tag const> tags) {
 
     sentry.dsn = dsn;
     sentry.seed.Store(RandomSeed(), StoreMemoryOrder::Relaxed);
+    sentry.session_id = detail::Uuid(sentry.seed);
     sentry.device_id = DeviceId(sentry.seed);
 
     // clone the tags
@@ -120,7 +121,7 @@ static void InitSentry(Sentry& sentry, DsnInfo dsn, Span<Tag const> tags) {
 
             // device
             {
-                auto const system = GetSystemStats();
+                auto const system = CachedSystemStats();
                 auto _ = json::WriteKeyObjectBegin(json_writer, "device");
                 auto _ = json::WriteKeyValue(json_writer, "name", "desktop");
                 auto _ = json::WriteKeyValue(json_writer, "arch", system.Arch());
@@ -170,13 +171,13 @@ alignas(Sentry) u8 g_sentry_storage[sizeof(Sentry)];
 Atomic<Sentry*> g_instance {nullptr};
 
 Sentry* InitGlobalSentry(DsnInfo dsn, Span<Tag const> tags) {
-    auto existing = g_instance.Load(LoadMemoryOrder::Relaxed);
+    auto existing = g_instance.Load(LoadMemoryOrder::Acquire);
     if (existing) return existing;
 
     auto sentry = PLACEMENT_NEW(g_sentry_storage) Sentry {};
     InitSentry(*sentry, dsn, tags);
 
-    g_instance.Store(sentry, StoreMemoryOrder::Relaxed);
+    g_instance.Store(sentry, StoreMemoryOrder::Release);
     return sentry;
 }
 
@@ -184,6 +185,62 @@ Sentry* InitGlobalSentry(DsnInfo dsn, Span<Tag const> tags) {
 void InitBarebonesSentry(Sentry& sentry) {
     sentry.seed.Store((u64)MicrosecondsSinceEpoch() + __builtin_readcyclecounter(),
                       StoreMemoryOrder::Relaxed);
+    sentry.session_id = detail::Uuid(sentry.seed);
+
+    // this data is common to every event we want to send, so let's cache it as a JSON blob
+    {
+        DynamicArray<char> event_context_json {sentry.arena};
+        event_context_json.Reserve(1024);
+        json::WriteContext json_writer {
+            .out = dyn::WriterFor(event_context_json),
+            .add_whitespace = false,
+        };
+
+        auto _ = json::WriteObjectBegin(json_writer);
+
+        // contexts
+        {
+            auto _ = json::WriteKeyObjectBegin(json_writer, "contexts");
+
+            // device
+            {
+                auto _ = json::WriteKeyObjectBegin(json_writer, "device");
+                auto _ = json::WriteKeyValue(json_writer, "name", "desktop");
+                auto _ = json::WriteKeyValue(json_writer, "arch", ({
+                                                 String s;
+                                                 switch (k_arch) {
+                                                     case Arch::X86_64: s = "x86_64"; break;
+                                                     case Arch::Aarch64: s = "aarch64"; break;
+                                                 }
+                                                 s;
+                                             }));
+                auto _ = json::WriteObjectEnd(json_writer);
+            }
+
+            // os
+            {
+                auto _ = json::WriteKeyObjectBegin(json_writer, "os");
+                auto _ = json::WriteKeyValue(json_writer, "name", ({
+                                                 String s {};
+                                                 if (IS_WINDOWS) s = "Windows";
+                                                 if (IS_LINUX) s = "Linux";
+                                                 if (IS_MACOS) s = "macOS";
+                                                 s;
+                                             }));
+                auto _ = json::WriteObjectEnd(json_writer);
+            }
+
+            auto _ = json::WriteObjectEnd(json_writer);
+        }
+        auto _ = json::WriteObjectEnd(json_writer);
+
+        // we want to be able to print the context directly into an existing JSON event so we remove the
+        // object braces
+        dyn::Pop(event_context_json);
+        dyn::Remove(event_context_json, 0);
+
+        sentry.event_context_json = event_context_json.ToOwnedSpan();
+    }
 }
 
 TEST_CASE(TestSentry) {
@@ -210,7 +267,7 @@ TEST_CASE(TestSentry) {
         DynamicArray<char> envelope {tester.scratch_arena};
         auto writer = dyn::WriterFor(envelope);
         TRY(EnvelopeAddHeader(*sentry, writer));
-        TRY(EnvelopeAddSessionUpdate(*sentry, writer, SessionUpdateType::Start));
+        TRY(EnvelopeAddSessionUpdate(*sentry, writer, SessionStatus::Ok));
         TRY(EnvelopeAddEvent(*sentry,
                              writer,
                              {
@@ -222,7 +279,7 @@ TEST_CASE(TestSentry) {
                                  }),
                              },
                              false));
-        TRY(EnvelopeAddSessionUpdate(*sentry, writer, SessionUpdateType::EndedNormally));
+        TRY(EnvelopeAddSessionUpdate(*sentry, writer, SessionStatus::EndedNormally));
 
         CHECK(envelope.size > 0);
     }

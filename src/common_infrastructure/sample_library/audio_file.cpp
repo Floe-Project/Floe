@@ -26,7 +26,7 @@ ErrorCodeCategory const audio_file_error_category {
 
 static ErrorCodeOr<AudioData> DecodeFlac(Reader& reader, Allocator& allocator) {
     auto decoder = FLAC__stream_decoder_new();
-    if (decoder == nullptr) Panic("Out of memory");
+    if (decoder == nullptr) Panic("out of memory");
     DEFER { FLAC__stream_decoder_delete(decoder); };
 
     struct Context {

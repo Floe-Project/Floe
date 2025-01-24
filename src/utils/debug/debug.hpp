@@ -33,8 +33,6 @@ struct InlineSprintfBuffer {
     char* write_ptr = buffer;
 };
 
-[[noreturn]] void DefaultPanicHandler(char const* message, SourceLocation loc);
-
 template <typename... Args>
 [[noreturn]] PUBLIC void PanicF(SourceLocation loc, String format, Args const&... args) {
     DynamicArrayBounded<char, 1000> buffer {};
@@ -67,7 +65,7 @@ void CurrentStacktraceToCallback(FunctionRef<void(FrameInfo const&)> callback,
 void StacktraceToCallback(StacktraceStack const&,
                           FunctionRef<void(FrameInfo const&)> callback,
                           StacktraceOptions options = {});
-void PrintCurrentStacktrace(StdStream stream, StacktraceOptions options, int skip_frames);
+ErrorCodeOr<void> PrintCurrentStacktrace(StdStream stream, StacktraceOptions options, int skip_frames);
 ErrorCodeOr<void> WriteStacktrace(StacktraceStack const&, Writer writer, StacktraceOptions options);
 ErrorCodeOr<void> WriteCurrentStacktrace(Writer writer, StacktraceOptions options, int skip_frames);
 

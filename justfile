@@ -135,7 +135,7 @@ upload-crashes:
   esac
   
   cd "$dir" || exit 1
-  for crash in *.floe-crash; do
+  for crash in *.floe-error; do
     if [ -f "$crash" ]; then
       sentry-cli send-envelope --raw "$crash"
     fi

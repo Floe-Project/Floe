@@ -172,24 +172,28 @@ static void AddAsyncJob(PendingLibraryJobs& pending_library_jobs,
     pending_library_jobs.num_uncompleted_jobs.FetchAdd(1, RmwMemoryOrder::Relaxed);
 
     pending_library_jobs.thread_pool.AddJob([&pending_library_jobs, &job = *job, &lib_list]() {
-        ZoneNamed(do_job, true);
-        ArenaAllocator scratch_arena {PageAllocator::Instance()};
-        switch (job.data.tag) {
-            case PendingLibraryJobs::Job::Type::ReadLibrary: {
-                DoReadLibraryJob(*job.data.Get<PendingLibraryJobs::Job::ReadLibrary*>(), scratch_arena);
-                break;
+        try {
+            ZoneNamed(do_job, true);
+            ArenaAllocator scratch_arena {PageAllocator::Instance()};
+            switch (job.data.tag) {
+                case PendingLibraryJobs::Job::Type::ReadLibrary: {
+                    DoReadLibraryJob(*job.data.Get<PendingLibraryJobs::Job::ReadLibrary*>(), scratch_arena);
+                    break;
+                }
+                case PendingLibraryJobs::Job::Type::ScanFolder: {
+                    DoScanFolderJob(*job.data.Get<PendingLibraryJobs::Job::ScanFolder*>(),
+                                    scratch_arena,
+                                    pending_library_jobs,
+                                    lib_list);
+                    break;
+                }
             }
-            case PendingLibraryJobs::Job::Type::ScanFolder: {
-                DoScanFolderJob(*job.data.Get<PendingLibraryJobs::Job::ScanFolder*>(),
-                                scratch_arena,
-                                pending_library_jobs,
-                                lib_list);
-                break;
-            }
-        }
 
-        job.completed.Store(true, StoreMemoryOrder::Release);
-        pending_library_jobs.work_signaller.Signal();
+            job.completed.Store(true, StoreMemoryOrder::Release);
+            pending_library_jobs.work_signaller.Signal();
+        } catch (PanicException) {
+            // pass
+        }
     });
 }
 
@@ -420,10 +424,6 @@ static bool UpdateLibraryJobs(Server& server,
                                                              new_state,
                                                              RmwMemoryOrder::AcquireRelease,
                                                              LoadMemoryOrder::Relaxed)) {
-                        if (expected != ScanFolder::State::RescanRequested)
-                            g_debug_log.Error(k_log_module,
-                                              "Unexpected value for scan-folder state: {}",
-                                              expected);
                         ASSERT(expected == ScanFolder::State::RescanRequested);
                     }
                 }
@@ -680,52 +680,56 @@ static void
 LoadAudioAsync(ListedAudioData& audio_data, sample_lib::Library const& lib, ThreadPoolArgs thread_pool_args) {
     thread_pool_args.num_thread_pool_jobs.Increase();
     thread_pool_args.pool.AddJob([&, thread_pool_args]() {
-        ZoneScoped;
-        DEFER {
-            thread_pool_args.completed_signaller.Signal();
+        try {
+            ZoneScoped;
+            DEFER {
+                thread_pool_args.completed_signaller.Signal();
 
-            // NOTE: it's important that we do this last, because once the number of thread pool jobs reaches
-            // 0, objects in the thread_pool_args could be destroyed.
-            thread_pool_args.num_thread_pool_jobs.CountDown();
-        };
+                // NOTE: it's important that we do this last, because once the number of thread pool jobs
+                // reaches 0, objects in the thread_pool_args could be destroyed.
+                thread_pool_args.num_thread_pool_jobs.CountDown();
+            };
 
-        {
-            auto state = audio_data.state.Load(LoadMemoryOrder::Acquire);
-            FileLoadingState new_state;
-            do {
-                if (state == FileLoadingState::PendingLoad)
-                    new_state = FileLoadingState::Loading;
-                else if (state == FileLoadingState::PendingCancel)
-                    new_state = FileLoadingState::CompletedCancelled;
-                else
-                    PanicIfReached();
-            } while (!audio_data.state.CompareExchangeWeak(state,
-                                                           new_state,
-                                                           RmwMemoryOrder::Acquire,
-                                                           LoadMemoryOrder::Relaxed));
+            {
+                auto state = audio_data.state.Load(LoadMemoryOrder::Acquire);
+                FileLoadingState new_state;
+                do {
+                    if (state == FileLoadingState::PendingLoad)
+                        new_state = FileLoadingState::Loading;
+                    else if (state == FileLoadingState::PendingCancel)
+                        new_state = FileLoadingState::CompletedCancelled;
+                    else
+                        PanicIfReached();
+                } while (!audio_data.state.CompareExchangeWeak(state,
+                                                               new_state,
+                                                               RmwMemoryOrder::Acquire,
+                                                               LoadMemoryOrder::Relaxed));
 
-            if (new_state == FileLoadingState::CompletedCancelled) return;
+                if (new_state == FileLoadingState::CompletedCancelled) return;
+            }
+
+            // At this point we must be in the Loading state so other threads know not to interfere. The
+            // memory ordering used with the atomic 'state' variable reflects this: the Acquire memory order
+            // above, and the Release memory order at the end.
+            ASSERT(audio_data.state.Load(LoadMemoryOrder::Relaxed) == FileLoadingState::Loading);
+
+            auto const outcome = [&audio_data, &lib]() -> ErrorCodeOr<AudioData> {
+                auto reader = TRY(lib.create_file_reader(lib, audio_data.path));
+                return DecodeAudioFile(reader, audio_data.path.str, AudioDataAllocator::Instance());
+            }();
+
+            FileLoadingState result;
+            if (outcome.HasValue()) {
+                audio_data.audio_data = outcome.Value();
+                result = FileLoadingState::CompletedSucessfully;
+            } else {
+                audio_data.error = outcome.Error();
+                result = FileLoadingState::CompletedWithError;
+            }
+            audio_data.state.Store(result, StoreMemoryOrder::Release);
+        } catch (PanicException) {
+            // Pass. We're an audio plugin, we don't want to crash the host.
         }
-
-        // At this point we must be in the Loading state so other threads know not to interfere. The memory
-        // ordering used with the atomic 'state' variable reflects this: the Acquire memory order above, and
-        // the Release memory order at the end.
-        ASSERT(audio_data.state.Load(LoadMemoryOrder::Relaxed) == FileLoadingState::Loading);
-
-        auto const outcome = [&audio_data, &lib]() -> ErrorCodeOr<AudioData> {
-            auto reader = TRY(lib.create_file_reader(lib, audio_data.path));
-            return DecodeAudioFile(reader, audio_data.path.str, AudioDataAllocator::Instance());
-        }();
-
-        FileLoadingState result;
-        if (outcome.HasValue()) {
-            audio_data.audio_data = outcome.Value();
-            result = FileLoadingState::CompletedSucessfully;
-        } else {
-            audio_data.error = outcome.Error();
-            result = FileLoadingState::CompletedWithError;
-        }
-        audio_data.state.Store(result, StoreMemoryOrder::Release);
     });
 }
 
@@ -1404,6 +1408,7 @@ static void ServerThreadProc(Server& server) {
     ArenaAllocator scratch_arena {PageAllocator::Instance(), Kb(128)};
     auto watcher = CreateDirectoryWatcher(server.error_notifications);
     DEFER {
+        if (PanicOccurred()) return;
         if (watcher) DestoryDirectoryWatcher(*watcher);
     };
 
@@ -1559,7 +1564,15 @@ Server::Server(ThreadPool& pool,
         libraries_by_id.Insert(BuiltinLibrary()->Id(), node);
     }
 
-    thread.Start([this]() { ServerThreadProc(*this); }, "samp-lib-server");
+    thread.Start(
+        [this]() {
+            try {
+                ServerThreadProc(*this);
+            } catch (PanicException) {
+                // pass
+            }
+        },
+        "samp-lib-server");
 }
 
 Server::~Server() {

@@ -12,14 +12,18 @@
 #include "clap/factory/plugin-factory.h"
 #include "plugin.hpp"
 
+// NOLINTNEXTLINE(cppcoreguidelines-interfaces-global-init): clang-tidy thinks g_panicking is initialised
 static clap_plugin_factory const factory = {
     .get_plugin_count = [](clap_plugin_factory const*) -> uint32_t { return 1; },
     .get_plugin_descriptor = [](clap_plugin_factory const*, uint32_t) { return &k_plugin_info; },
     .create_plugin = [](clap_plugin_factory const*,
                         clap_host_t const* host,
                         char const* plugin_id) -> clap_plugin_t const* {
-        if (NullTermStringsEqual(plugin_id, k_plugin_info.id)) {
-            return CreateFloeInstance(host);
+        if (PanicOccurred()) return nullptr;
+
+        try {
+            if (NullTermStringsEqual(plugin_id, k_plugin_info.id)) return CreateFloeInstance(host);
+        } catch (PanicException) {
         }
         return nullptr;
     },
@@ -51,43 +55,50 @@ static void ShutdownTracy() {
 
 static bool g_init = false;
 
+// NOLINTNEXTLINE(cppcoreguidelines-interfaces-global-init): clang-tidy thinks g_panicking is initialised
 extern "C" CLAP_EXPORT const clap_plugin_entry clap_entry = {
     .clap_version = CLAP_VERSION,
 
     // init and deinit are never called at the same time as any other clap function, including itself.
     // Might be called more than once. See the clap docs for full details.
     .init = [](char const*) -> bool {
-        if (Exchange(g_init, true)) return true; // already initialised
+        if (PanicOccurred()) return false;
 
-        // TODO: consolidate panic handling
-        g_panic_handler = [](char const* message, SourceLocation loc) {
-            g_log.Error(k_global_log_module, "Panic: {}: {}", loc, message);
-            DynamicArrayBounded<char, 2000> buffer {};
-            auto _ = WriteCurrentStacktrace(dyn::WriterFor(buffer), {}, 1);
-            g_log.Error(k_global_log_module, "Stacktrace:\n{}", buffer);
-            DefaultPanicHandler(message, loc);
-        };
+        try {
+            if (Exchange(g_init, true)) return true; // already initialised
 
-        StartupTracy();
-        BeginCrashDetection(CrashHookWriteCrashReport); // after tracy
+            g_panic_hook = PanicHook;
+            InitCrashFolder();
 
-        g_log.Debug(k_clap_log_module, "init DSO");
-        g_log.Info(k_global_log_module, "Floe version: " FLOE_VERSION_STRING);
-        g_log.Info(k_global_log_module, "OS: {}", GetOsInfo().name);
+            StartupTracy();
+            BeginCrashDetection(CrashHookWriteCrashReport); // after tracy
 
-        return true;
+            g_log.Debug(k_clap_log_module, "init DSO");
+            g_log.Info(k_global_log_module, "Floe version: " FLOE_VERSION_STRING);
+            g_log.Info(k_global_log_module, "OS: {}", GetOsInfo().name);
+
+            return true;
+        } catch (PanicException) {
+            return false;
+        }
     },
     .deinit =
         []() {
-            if (!Exchange(g_init, false)) return; // already deinitialised
+            if (PanicOccurred()) return;
 
-            g_log.Debug(k_clap_log_module, "deinit");
+            try {
+                if (!Exchange(g_init, false)) return; // already deinitialised
 
-            EndCrashDetection(); // before tracy
-            ShutdownTracy();
+                g_log.Debug(k_clap_log_module, "deinit");
+
+                EndCrashDetection(); // before tracy
+                ShutdownTracy();
+            } catch (PanicException) {
+            }
         },
 
     .get_factory = [](char const* factory_id) -> void const* {
+        if (PanicOccurred()) return nullptr;
         g_log.Debug(k_clap_log_module, "get_factory");
         if (NullTermStringsEqual(factory_id, CLAP_PLUGIN_FACTORY_ID)) return &factory;
         return nullptr;

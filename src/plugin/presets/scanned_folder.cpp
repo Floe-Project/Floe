@@ -54,7 +54,11 @@ bool HandleRescanRequest(ScannedFolder& folder,
                     [folders_to_scan = folder.thread_arena.Clone(folders_to_scan, CloneType::Deep),
                      &folder,
                      scan = scan]() {
-                        scan(folders_to_scan);
+                        try {
+                            scan(folders_to_scan);
+                        } catch (PanicException) {
+                            // pass
+                        }
                         folder.async_scans.FetchSub(1, RmwMemoryOrder::Release);
                     });
             } else {

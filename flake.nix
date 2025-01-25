@@ -172,7 +172,6 @@
             ]
             ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
               pkgs.pkg-config
-              pkgs.curl
               pkgs.zenity
               pkgs.kcov
               pkgs.patchelf
@@ -209,6 +208,7 @@
               pkgs.xorg.libXext
               pkgs.xorg.libXcursor
               pkgs.libGL
+              pkgs.curl
               pkgs.libGLU
               pkgs.glibc
             ];

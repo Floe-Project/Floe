@@ -133,6 +133,10 @@ upload-crashes:
     MINGW*|CYGWIN*|MSYS*) dir="$LOCALAPPDATA/Floe" ;;
     *) echo "Unsupported OS" && exit 1 ;;
   esac
+
+  if [ ! -d "$dir" ]; then
+    exit 0
+  fi
   
   cd "$dir" || exit 1
   for crash in *.floe-error; do

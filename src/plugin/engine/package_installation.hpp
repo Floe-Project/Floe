@@ -513,7 +513,7 @@ struct TryHelpersToState {
     static auto ExtractValue(auto& o) { return o.ReleaseValue(); }
 };
 
-static InstallJob::State StartJobInternal(InstallJob& job) {
+static InstallJob::State DoJobPhase1(InstallJob& job) {
     using H = package::detail::TryHelpersToState;
 
     job.file_reader = ({
@@ -623,7 +623,7 @@ static InstallJob::State StartJobInternal(InstallJob& job) {
     return InstallJob::State::Installing;
 }
 
-static InstallJob::State CompleteJobInternal(InstallJob& job) {
+static InstallJob::State DoJobPhase2(InstallJob& job) {
     using H = package::detail::TryHelpersToState;
 
     for (auto& component : job.components) {
@@ -708,26 +708,26 @@ PUBLIC void DestroyInstallJob(InstallJob* job) {
     job->~InstallJob();
 }
 
-PUBLIC void CompleteJob(InstallJob& job);
+PUBLIC void DoJobPhase2(InstallJob& job);
 
 // Run this and then check the 'state' variable. You might need to ask the user a question on the main thread
 // and then call OnAllUserInputReceived.
 // [worker thread (probably)]
-PUBLIC void StartJob(InstallJob& job) {
+PUBLIC void DoJobPhase1(InstallJob& job) {
     ASSERT(job.state.Load(LoadMemoryOrder::Acquire) == InstallJob::State::Installing);
-    auto const result = detail::StartJobInternal(job);
+    auto const result = detail::DoJobPhase1(job);
     if (result != InstallJob::State::Installing) {
         job.state.Store(result, StoreMemoryOrder::Release);
         return;
     }
 
-    CompleteJob(job);
+    DoJobPhase2(job);
 }
 
 // [worker thread (probably)]
-PUBLIC void CompleteJob(InstallJob& job) {
+PUBLIC void DoJobPhase2(InstallJob& job) {
     ASSERT(job.state.Load(LoadMemoryOrder::Acquire) == InstallJob::State::Installing);
-    auto const result = detail::CompleteJobInternal(job);
+    auto const result = detail::DoJobPhase2(job);
     job.state.Store(result, StoreMemoryOrder::Release);
 }
 
@@ -742,7 +742,7 @@ PUBLIC void OnAllUserInputReceived(InstallJob& job, ThreadPool& thread_pool) {
     job.state.Store(InstallJob::State::Installing, StoreMemoryOrder::Release);
     thread_pool.AddJob([&job]() {
         try {
-            package::CompleteJob(job);
+            package::DoJobPhase2(job);
         } catch (PanicException) {
             job.error_log.Error({}, "fatal error");
             job.state.Store(InstallJob::State::DoneError, StoreMemoryOrder::Release);
@@ -840,7 +840,7 @@ PUBLIC void AddJob(InstallJobs& jobs,
         });
     thread_pool.AddJob([job]() {
         try {
-            package::StartJob(*job->job);
+            package::DoJobPhase1(*job->job);
         } catch (PanicException) {
             job->job->error_log.Error({}, "fatal error");
             job->job->state.Store(InstallJob::State::DoneError, StoreMemoryOrder::Release);

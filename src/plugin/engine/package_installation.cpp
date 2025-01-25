@@ -12,6 +12,18 @@ CustomValueToString(Writer writer, package::ExistingInstalledComponent value, Fo
     return FormatToWriter(writer, "{}", DumpStruct(value));
 }
 
+PUBLIC ErrorCodeOr<void>
+CustomValueToString(Writer writer, package::InstallJob::State state, FormatOptions o) {
+    String s = {"Unknown"};
+    switch (state) {
+        case package::InstallJob::State::Installing: s = "Installing"; break;
+        case package::InstallJob::State::AwaitingUserInput: s = "AwaitingUserInput"; break;
+        case package::InstallJob::State::DoneSuccess: s = "DoneSuccess"; break;
+        case package::InstallJob::State::DoneError: s = "DoneError"; break;
+    }
+    return ValueToString(writer, s, o);
+}
+
 } // namespace fmt
 
 namespace package {
@@ -104,7 +116,7 @@ static ErrorCodeOr<void> Test(tests::Tester& tester, TestOptions options) {
                                 });
     DEFER { DestroyInstallJob(job); };
 
-    StartJob(*job);
+    DoJobPhase1(*job);
 
     CHECK_EQ(job->state.Load(LoadMemoryOrder::Acquire), options.expected_state);
 
@@ -130,7 +142,7 @@ static ErrorCodeOr<void> Test(tests::Tester& tester, TestOptions options) {
 
     if (options.expected_state == InstallJob::State::AwaitingUserInput) {
         job->state.Store(InstallJob::State::Installing, StoreMemoryOrder::Release);
-        CompleteJob(*job);
+        DoJobPhase2(*job);
 
         for (auto& comp : job->components)
             if (comp.component.type == ComponentType::Library)
@@ -141,7 +153,8 @@ static ErrorCodeOr<void> Test(tests::Tester& tester, TestOptions options) {
 
     if (options.expected_state != InstallJob::State::DoneError) {
         CHECK(job->error_log.buffer.size == 0);
-        if (job->error_log.buffer.size > 0) tester.log.Debug({}, "Error log: {}", job->error_log.buffer);
+        if (job->error_log.buffer.size > 0)
+            tester.log.Error({}, "Unexpected errors: {}", job->error_log.buffer);
     }
 
     TRY(PrintDirectory(tester,

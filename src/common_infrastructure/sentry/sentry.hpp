@@ -61,11 +61,12 @@ struct DsnInfo {
     String public_key;
 };
 
+// NOTE: in Sentry, releases are created when an event payload (error) is sent with a release tag for the
+// first time. We use an unchanging release tag for dev builds.
+static constexpr String k_release = PRODUCTION_BUILD ? String {"floe@" FLOE_VERSION_STRING} : "floe@dev";
 static constexpr usize k_max_message_length = 8192;
-static constexpr String k_release = PRODUCTION_BUILD ? String {"floe@" FLOE_VERSION_STRING} : GIT_COMMIT_HASH;
 static constexpr String k_environment = PRODUCTION_BUILD ? "production"_s : "development"_s;
-static constexpr String k_user_agent =
-    PRODUCTION_BUILD ? String {"floe/" FLOE_VERSION_STRING} : "floe/" GIT_COMMIT_HASH;
+static constexpr String k_user_agent = PRODUCTION_BUILD ? String {"floe/" FLOE_VERSION_STRING} : "floe/dev";
 
 struct Sentry {
     Optional<fmt::UuidArray> device_id {};
@@ -147,7 +148,7 @@ Sentry* InitGlobalSentry(DsnInfo dsn, Span<Tag const> tag);
 void InitBarebonesSentry(Sentry& sentry);
 
 // thread-safe (for Sentry), signal-safe
-PUBLIC ErrorCodeOr<void> EnvelopeAddHeader(Sentry const& sentry, Writer writer) {
+PUBLIC ErrorCodeOr<void> EnvelopeAddHeader(Sentry& sentry, Writer writer) {
     ASSERT(sentry.dsn.dsn.size);
 
     json::WriteContext json_writer {
@@ -155,9 +156,12 @@ PUBLIC ErrorCodeOr<void> EnvelopeAddHeader(Sentry const& sentry, Writer writer) 
         .add_whitespace = false,
     };
 
+    auto const event_id = detail::Uuid(sentry.seed);
+
     TRY(json::WriteObjectBegin(json_writer));
     TRY(json::WriteKeyValue(json_writer, "dsn", sentry.dsn.dsn));
     TRY(json::WriteKeyValue(json_writer, "sent_at", TimestampRfc3339UtcNow()));
+    TRY(json::WriteKeyValue(json_writer, "event_id", event_id));
     TRY(json::WriteObjectEnd(json_writer));
     TRY(writer.WriteChar('\n'));
 

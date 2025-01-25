@@ -36,6 +36,7 @@ void (*g_panic_hook)(char const* message, SourceLocation loc) = DefaultPanicHook
 static Atomic<bool> g_panic_occurred {};
 
 bool PanicOccurred() { return g_panic_occurred.Load(LoadMemoryOrder::Acquire); }
+void ResetPanic() { g_panic_occurred.Store(false, StoreMemoryOrder::Release); }
 
 [[noreturn]] void Panic(char const* message, SourceLocation loc) {
     static thread_local u8 in_panic_hook {};

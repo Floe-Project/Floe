@@ -330,6 +330,7 @@ struct PanicException {};
 [[noreturn]] void Panic(char const* message, SourceLocation loc = SourceLocation::Current());
 
 bool PanicOccurred(); // thread-safe
+void ResetPanic(); // thread-safe
 
 // Before throwing the PanicException, the panic hook is called. This is useful for logging the panic.
 // Set the hook at the very start of your program and never change it.

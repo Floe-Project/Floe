@@ -272,12 +272,13 @@ Type& CreateOrFetchFixtureObject(Tester& tester) {
 #define CHECK_PANICS(...)                                                                                    \
     {                                                                                                        \
         auto initial_panic_hook = g_panic_hook;                                                              \
-        g_panic_hook = [](const char*, SourceLocation) { throw "panicked"; };                                \
+        g_panic_hook = [](const char*, SourceLocation) {};                                                   \
         bool panicked = false;                                                                               \
         try {                                                                                                \
             __VA_ARGS__;                                                                                     \
-        } catch (...) {                                                                                      \
+        } catch (PanicException) {                                                                           \
             panicked = true;                                                                                 \
+            ResetPanic();                                                                                    \
         }                                                                                                    \
         g_panic_hook = initial_panic_hook;                                                                   \
         tests::Check(tester, panicked, "Expected to panic", tests::FailureAction::FailAndContinue);          \

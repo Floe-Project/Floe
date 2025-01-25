@@ -856,7 +856,7 @@ clap_plugin const floe_plugin {
 
                 // sentry::Worker::ErrorMessage message {{
                 //     .level = sentry::ErrorEvent::Level::Info,
-                //     .message = "Host start"_s,
+                //     .message = "Host start 2"_s,
                 // }};
                 // sentry::SendErrorMessage(g_shared_engine_systems->sentry_worker, Move(message));
             }

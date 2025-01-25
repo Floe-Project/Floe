@@ -59,6 +59,8 @@ static void BackgroundThread(Worker& worker) {
         auto const o = SendSentryEnvelope(sentry, envelope, dyn::WriterFor(response), true, scratch_arena);
         if (o.HasError())
             g_log.Error(k_log_module, "Failed to send Sentry envelope: {}, {}", o.Error(), response);
+        else
+            g_log.Info(k_log_module, "Sent Sentry envelope: {}", response);
     }
 
     while (true) {
@@ -84,6 +86,8 @@ static void BackgroundThread(Worker& worker) {
                 SendSentryEnvelope(sentry, envelope, dyn::WriterFor(response), true, scratch_arena);
             if (o.HasError())
                 g_log.Error(k_log_module, "Failed to send Sentry envelope: {}, {}", o.Error(), response);
+            else
+                g_log.Info(k_log_module, "Sent Sentry envelope: {}", response);
         }
 
         if (end) break;

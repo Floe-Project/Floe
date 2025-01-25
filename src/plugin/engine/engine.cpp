@@ -232,8 +232,6 @@ static void SampleLibraryResourceLoaded(Engine& engine, sample_lib_server::LoadR
 
     enum class Source : u32 { OneOff, PartOfPendingStateChange, LastInPendingStateChange, Count };
 
-    raise(SIGSEGV);
-
     auto const source = ({
         Source s {Source::OneOff};
         if (engine.pending_state_change) {

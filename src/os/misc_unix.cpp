@@ -446,7 +446,7 @@ static String SignalString(int signal_num, siginfo_t* info) {
     return message;
 }
 
-constexpr StdStream k_signal_output_stream = StdStream::Out;
+constexpr StdStream k_signal_output_stream = StdStream::Err;
 
 // remember we can only use async-signal-safe functions here:
 // https://man7.org/linux/man-pages/man7/signal-safety.7.html

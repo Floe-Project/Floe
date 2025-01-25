@@ -7,8 +7,8 @@
 // Higher-level API building on top of BeginCrashDetection
 
 static void
-WriteErrorToStdout(String crash_message, Optional<StacktraceStack> const& stacktrace, bool signal_safe) {
-    auto writer = StdWriter(StdStream::Out);
+WriteErrorToStderr(String crash_message, Optional<StacktraceStack> const& stacktrace, bool signal_safe) {
+    auto writer = StdWriter(StdStream::Err);
     auto _ = fmt::FormatToWriter(writer,
                                  "\n" ANSI_COLOUR_SET_FOREGROUND_RED "{}" ANSI_COLOUR_RESET "\n",
                                  crash_message);
@@ -37,7 +37,7 @@ static sentry::Sentry* GetSentry(sentry::Sentry& fallback) {
 static ErrorCodeOr<void> WriteErrorToFile(String crash_message, Optional<StacktraceStack> const& stacktrace) {
     auto const crash_folder = CrashFolder();
     if (!crash_folder) {
-        auto _ = StdPrint(StdStream::Out, "Crash folder is not set, cannot write crash report\n");
+        auto _ = StdPrint(StdStream::Err, "Crash folder is not set, cannot write crash report\n");
         return ErrorCode {FilesystemError::PathDoesNotExist};
     }
 
@@ -50,13 +50,13 @@ static ErrorCodeOr<void> WriteErrorToFile(String crash_message, Optional<Stacktr
 
 PUBLIC void CrashHookWriteToStdout(String message) {
     auto const stacktrace = CurrentStacktrace(IS_LINUX || IS_MACOS ? 6 : 3);
-    WriteErrorToStdout(message, stacktrace, true);
+    WriteErrorToStderr(message, stacktrace, true);
 }
 
 PUBLIC void CrashHookWriteCrashReport(String crash_message) {
     auto const stacktrace = CurrentStacktrace(IS_LINUX || IS_MACOS ? 6 : 3);
     auto _ = WriteErrorToFile(crash_message, stacktrace);
-    WriteErrorToStdout(crash_message, stacktrace, true);
+    WriteErrorToStderr(crash_message, stacktrace, true);
 }
 
 PUBLIC void PanicHook(char const* message_c_str, SourceLocation loc) {
@@ -64,7 +64,7 @@ PUBLIC void PanicHook(char const* message_c_str, SourceLocation loc) {
 
     auto const stacktrace = CurrentStacktrace(2);
     auto const message = fmt::Format(arena, "{}\nAt {}", FromNullTerminated(message_c_str), loc);
-    WriteErrorToStdout(message, stacktrace, false);
+    WriteErrorToStderr(message, stacktrace, false);
 
     {
         sentry::Sentry fallback_sentry_instance {};

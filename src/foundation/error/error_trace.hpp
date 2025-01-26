@@ -6,7 +6,7 @@
 #include "foundation/universal_defs.hpp"
 
 struct ErrorTrace {
-    static constexpr u32 k_max_errors = 8; // must be a power of 2
+    static constexpr u32 k_max_errors = 8;
     SourceLocation error_trace[k_max_errors] {};
     u32 count = 0;
 
@@ -20,4 +20,4 @@ struct ErrorTrace {
     }
 };
 
-static ErrorTrace g_error_trace;
+static thread_local ErrorTrace g_error_trace;

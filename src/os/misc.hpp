@@ -212,6 +212,11 @@ Writer StdWriter(StdStream stream);
 
 Mutex& StdStreamMutex(StdStream stream);
 
+template <typename... Args>
+void StdPrintF(StdStream stream, String format, Args const&... args) {
+    auto _ = fmt::FormatToWriter(StdWriter(stream), format, args...);
+}
+
 ErrorCodeOr<String> ReadAllStdin(Allocator& allocator);
 
 s128 NanosecondsSinceEpoch(); // signal-safe

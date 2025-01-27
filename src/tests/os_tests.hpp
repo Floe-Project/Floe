@@ -88,6 +88,17 @@ TEST_CASE(TestFileApi) {
         CHECK_EQ(String(buffer, 2), k_data.SubSpan(2));
     }
 
+    SUBCASE("Lock a file") {
+        for (auto const type : Array {FileLockOptions::Type::Exclusive, FileLockOptions::Type::Shared}) {
+            for (auto const non_blocking : Array {true, false}) {
+                auto f = TRY(OpenFile(filename1, FileMode::Write));
+                auto locked = TRY(f.Lock({.type = type, .non_blocking = non_blocking}));
+                CHECK(locked);
+                if (locked) TRY(f.Unlock());
+            }
+        }
+    }
+
     SUBCASE("Move a File object") {
         auto f = OpenFile(filename1, FileMode::Read);
         auto f2 = Move(f);

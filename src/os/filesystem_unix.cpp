@@ -114,18 +114,22 @@ ErrorCodeOr<Optional<Entry>> Next(Iterator& it, ArenaAllocator& result_arena) {
 
 } // namespace dir_iterator
 
-ErrorCodeOr<void> File::Lock(FileLockType type) {
+ErrorCodeOr<bool> File::Lock(FileLockOptions options) {
     int const operation = ({
         int r {LOCK_UN};
-        switch (type) {
-            case FileLockType::Shared: r = LOCK_SH; break;
-            case FileLockType::Exclusive: r = LOCK_EX; break;
+        switch (options.type) {
+            case FileLockOptions::Type::Shared: r = LOCK_SH; break;
+            case FileLockOptions::Type::Exclusive: r = LOCK_EX; break;
         }
+        if (options.non_blocking) r |= LOCK_NB;
         r;
     });
     auto const result = flock(handle, operation);
-    if (result != 0) return FilesystemErrnoErrorCode(errno, "flock");
-    return k_success;
+    if (result != 0) {
+        if (errno == EWOULDBLOCK) return false;
+        return FilesystemErrnoErrorCode(errno, "flock");
+    }
+    return true;
 }
 
 ErrorCodeOr<void> File::Unlock() {

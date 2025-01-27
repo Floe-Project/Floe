@@ -422,7 +422,7 @@ ErrorCodeOr<void> WriteFile(Settings const& data, FloePaths const& paths, String
 
         auto file = TRY(OpenFile(path, FileMode::WriteEveryoneReadWrite));
 
-        TRY(file.Lock(FileLockType::Exclusive));
+        TRY(file.Lock({.type = FileLockOptions::Type::Exclusive}));
         DEFER { auto _ = file.Unlock(); };
 
         TRY(file.Write(file_data));
@@ -539,7 +539,7 @@ bool InitialiseSettingsFileData(Settings& file,
 ErrorCodeOr<SettingsReadResult> ReadSettingsFile(ArenaAllocator& a, String path) {
     g_log.Debug(k_log_mod, "Reading settings file: {}", path);
     auto file = TRY(OpenFile(path, FileMode::Read));
-    TRY(file.Lock(FileLockType::Shared));
+    TRY(file.Lock({.type = FileLockOptions::Type::Shared}));
     DEFER { auto _ = file.Unlock(); };
 
     SettingsReadResult result {};

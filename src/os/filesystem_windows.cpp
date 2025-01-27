@@ -54,17 +54,22 @@ static ErrorCode FilesystemWin32ErrorCode(DWORD win32_code,
     return Win32ErrorCode(win32_code, extra_debug_info, loc);
 }
 
-ErrorCodeOr<void> File::Lock(FileLockType type) {
+ErrorCodeOr<bool> File::Lock(FileLockOptions options) {
     DWORD flags = 0;
-    switch (type) {
-        case FileLockType::Exclusive: flags = LOCKFILE_EXCLUSIVE_LOCK; break;
-        case FileLockType::Shared: flags = 0; break;
+    switch (options.type) {
+        case FileLockOptions::Type::Exclusive: flags = LOCKFILE_EXCLUSIVE_LOCK; break;
+        case FileLockOptions::Type::Shared: flags = 0; break;
     }
+    if (options.non_blocking) flags |= LOCKFILE_FAIL_IMMEDIATELY;
 
     OVERLAPPED overlapped {};
-    if (!LockFileEx(handle, flags, 0, MAXDWORD, MAXDWORD, &overlapped))
-        return FilesystemWin32ErrorCode(GetLastError(), "LockFileEx");
-    return k_success;
+    if (!LockFileEx(handle, flags, 0, MAXDWORD, MAXDWORD, &overlapped)) {
+        auto const error = GetLastError();
+        if (options.non_blocking && (error == ERROR_LOCK_VIOLATION || error == ERROR_SHARING_VIOLATION))
+            return false;
+        return FilesystemWin32ErrorCode(error, "LockFileEx");
+    }
+    return true;
 }
 
 ErrorCodeOr<void> File::Unlock() {

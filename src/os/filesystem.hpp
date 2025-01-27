@@ -44,7 +44,11 @@ enum class FileMode : u32 {
     Append,
 };
 
-enum class FileLockType { Exclusive, Shared };
+struct FileLockOptions {
+    enum class Type { Exclusive, Shared };
+    Type type = Type::Exclusive;
+    bool non_blocking = false;
+};
 
 // File is created with OpenFile()
 struct File {
@@ -80,7 +84,8 @@ struct File {
 
     ErrorCodeOr<void> Flush();
 
-    ErrorCodeOr<void> Lock(FileLockType type);
+    // returns true if the lock was acquired (always true for non-blocking locks)
+    ErrorCodeOr<bool> Lock(FileLockOptions options);
     ErrorCodeOr<void> Unlock();
 
     ErrorCodeOr<s128> LastModifiedTimeNsSinceEpoch();

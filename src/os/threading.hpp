@@ -344,6 +344,38 @@ struct AtomicCountdown {
 inline void AtomicThreadFence(RmwMemoryOrder memory_order) { __atomic_thread_fence(int(memory_order)); }
 inline void AtomicSignalFence(RmwMemoryOrder memory_order) { __atomic_signal_fence(int(memory_order)); }
 
+using CallOnceFlag = Atomic<u32>; // you must init to 0
+constexpr u32 k_once_flag_not_called = 0;
+constexpr u32 k_once_flag_calling = 1;
+constexpr u32 k_once_flag_called = 2;
+PUBLIC bool OnceFlagCalled(CallOnceFlag& flag) {
+    return flag.Load(LoadMemoryOrder::Acquire) == k_once_flag_called;
+}
+// If the function hasn't been called before, it will call it once, even if multiple threads run this function
+// at the same time. In any case, after this function returns, the function has been called.
+// Same as pthread_once.
+PUBLIC void CallOnce(Atomic<u32>& flag, FunctionRef<void()> function) {
+    if (flag.Load(LoadMemoryOrder::Acquire) == k_once_flag_not_called) {
+        // IMPROVE: probably faster to use a mutex here but we want to avoid initialising a global mutex at
+        // the moment (pthread_mutex_init, InitializeCriticalSection); the order of initialisation of global
+        // objects with constructors can be bug-prone.
+
+        u32 expected = k_once_flag_not_called;
+        if (flag.CompareExchangeStrong(expected,
+                                       k_once_flag_calling,
+                                       RmwMemoryOrder::AcquireRelease,
+                                       LoadMemoryOrder::Acquire)) {
+            function();
+            flag.Store(k_once_flag_called, StoreMemoryOrder::Release);
+            WakeWaitingThreads(flag, NumWaitingThreads::All);
+        } else {
+            while (flag.Load(LoadMemoryOrder::Relaxed) != k_once_flag_called)
+                WaitIfValueIsExpected(flag, k_once_flag_called, 100u);
+        }
+    }
+    ASSERT(flag.Load(LoadMemoryOrder::Relaxed) == k_once_flag_called);
+}
+
 struct WorkSignaller {
     void Signal() {
         if (flag.Exchange(k_signalled, RmwMemoryOrder::AcquireRelease) == k_not_signalled)

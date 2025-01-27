@@ -138,7 +138,7 @@ PUBLIC constexpr usize IntToString(IntType num, char* buffer, IntToStringOptions
     *ptr = '\0';
 
     // Reverse the string
-    auto length = (usize)(ptr - buffer);
+    auto const length = (usize)(ptr - buffer);
     char* start = buffer;
     char* end = buffer + length - 1;
     while (start < end) {

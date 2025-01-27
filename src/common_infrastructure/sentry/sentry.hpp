@@ -412,12 +412,17 @@ EnvelopeAddEvent(Sentry& sentry, Writer writer, ErrorEvent event, bool signal_sa
     return k_success;
 }
 
+struct SubmissionOptions {
+    bool write_to_file_if_needed = true;
+    Optional<Writer> response = k_nullopt;
+    RequestOptions request_options {};
+};
+
 // threadsafe (for Sentry), not signal-safe
 PUBLIC ErrorCodeOr<void> SubmitEnvelope(Sentry& sentry,
                                         String envelope_without_header,
-                                        Optional<Writer> response,
-                                        bool write_to_file_if_needed,
-                                        ArenaAllocator& scratch_arena) {
+                                        ArenaAllocator& scratch_arena,
+                                        SubmissionOptions options) {
     if (envelope_without_header.size == 0) return k_success;
 
     DynamicArray<char> envelope {scratch_arena};
@@ -456,10 +461,11 @@ PUBLIC ErrorCodeOr<void> SubmitEnvelope(Sentry& sentry,
                             : IS_LINUX ? "Linux"
                                        : "macOS"),
             },
-            response);
+            options.response,
+            options.request_options);
 
         // If there's an error other than just the internet being down, we want to capture that too.
-        if (write_to_file_if_needed && o.HasError() && o.Error() != WebError::NetworkError) {
+        if (options.write_to_file_if_needed && o.HasError() && o.Error() != WebError::NetworkError) {
             auto _ = EnvelopeAddEvent(
                 sentry,
                 envelope_writer,
@@ -475,7 +481,7 @@ PUBLIC ErrorCodeOr<void> SubmitEnvelope(Sentry& sentry,
         result = o;
     }
 
-    if (!sent_online_successfully && write_to_file_if_needed) {
+    if (!sent_online_successfully && options.write_to_file_if_needed) {
         InitLogFolderIfNeeded();
         auto file = TRY(OpenFile(detail::UniqueErrorFilepath(*LogFolder(), sentry.seed, scratch_arena),
                                  FileMode::WriteNoOverwrite));
@@ -518,8 +524,8 @@ PUBLIC ErrorCodeOr<void> WriteCrashToFile(Sentry& sentry,
 PUBLIC ErrorCodeOr<void> SubmitCrash(Sentry& sentry,
                                      Optional<StacktraceStack> const& stacktrace,
                                      String message,
-                                     Optional<Writer> response,
-                                     ArenaAllocator& scratch_arena) {
+                                     ArenaAllocator& scratch_arena,
+                                     SubmissionOptions options) {
     DynamicArray<char> envelope_without_header {scratch_arena};
     auto writer = dyn::WriterFor(envelope_without_header);
 
@@ -532,7 +538,7 @@ PUBLIC ErrorCodeOr<void> SubmitCrash(Sentry& sentry,
                          },
                          true));
     TRY(EnvelopeAddSessionUpdate(sentry, writer, SessionStatus::Crashed));
-    TRY(SubmitEnvelope(sentry, envelope_without_header, response, true, scratch_arena));
+    TRY(SubmitEnvelope(sentry, envelope_without_header, scratch_arena, options));
 
     return k_success;
 }
@@ -622,9 +628,15 @@ ConsumeAndSubmitErrorFiles(Sentry& sentry, String folder, ArenaAllocator& scratc
 
             TRY_OR(SubmitEnvelope(sentry,
                                   envelope_without_header,
-                                  dyn::WriterFor(response),
-                                  false,
-                                  scratch_arena),
+                                  scratch_arena,
+                                  {
+                                      .write_to_file_if_needed = false,
+                                      .response = dyn::WriterFor(response),
+                                      .request_options =
+                                          {
+                                              .timeout_seconds = 5,
+                                          },
+                                  }),
                    {
                        g_log.Error(k_main_log_module,
                                    "Couldn't send error report to Sentry: {}. {}",

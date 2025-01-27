@@ -64,8 +64,23 @@ PUBLIC void PanicHook(char const* message_c_str, SourceLocation loc) {
     {
         sentry::SentryOrFallback sentry {};
         DynamicArray<char> response {arena};
-        TRY_OR(sentry::SubmitCrash(*sentry, stacktrace, message, {}, arena), {
-            g_log.Error(sentry::k_log_module, "Failed to submit panic to Sentry: {}, {}", error, response);
-        });
+        TRY_OR(sentry::SubmitCrash(*sentry,
+                                   stacktrace,
+                                   message,
+                                   arena,
+                                   {
+                                       .write_to_file_if_needed = true,
+                                       .response = dyn::WriterFor(response),
+                                       .request_options =
+                                           {
+                                               .timeout_seconds = 3,
+                                           },
+                                   }),
+               {
+                   g_log.Error(sentry::k_log_module,
+                               "Failed to submit panic to Sentry: {}, {}",
+                               error,
+                               response);
+               });
     }
 }

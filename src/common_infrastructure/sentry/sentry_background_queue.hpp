@@ -36,7 +36,17 @@ static void BackgroundThread(BackgroundQueue& queue, Span<Tag const> tags) {
 
         DynamicArray<char> response {scratch_arena};
 
-        auto const o = SubmitEnvelope(sentry, envelope, dyn::WriterFor(response), true, scratch_arena);
+        auto const o = SubmitEnvelope(sentry,
+                                      envelope,
+                                      scratch_arena,
+                                      {
+                                          .write_to_file_if_needed = true,
+                                          .response = dyn::WriterFor(response),
+                                          .request_options =
+                                              {
+                                                  .timeout_seconds = 5,
+                                              },
+                                      });
         if (o.HasError())
             g_log.Error(k_log_module, "Failed to send Sentry envelope: {}, {}", o.Error(), response);
         else
@@ -62,7 +72,17 @@ static void BackgroundThread(BackgroundQueue& queue, Span<Tag const> tags) {
 
         if (envelope.size) {
             DynamicArray<char> response {scratch_arena};
-            auto const o = SubmitEnvelope(sentry, envelope, dyn::WriterFor(response), true, scratch_arena);
+            auto const o = SubmitEnvelope(sentry,
+                                          envelope,
+                                          scratch_arena,
+                                          {
+                                              .write_to_file_if_needed = true,
+                                              .response = dyn::WriterFor(response),
+                                              .request_options =
+                                                  {
+                                                      .timeout_seconds = 5,
+                                                  },
+                                          });
             if (o.HasError())
                 g_log.Error(k_log_module, "Failed to send Sentry envelope: {}, {}", o.Error(), response);
             else

@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "sentry/sentry_background_queue.hpp"
+#include "sentry/sentry.hpp"
 
 // not thread-safe, call once near the start of the program
 void InitErrorReporting(Span<sentry::Tag const> tags);

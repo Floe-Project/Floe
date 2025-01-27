@@ -33,12 +33,16 @@ static void DefaultPanicHook(char const* message, SourceLocation loc) {
 
 void (*g_panic_hook)(char const* message, SourceLocation loc) = DefaultPanicHook;
 
+thread_local bool g_in_signal_handler {};
+
 static Atomic<bool> g_panic_occurred {};
 
 bool PanicOccurred() { return g_panic_occurred.Load(LoadMemoryOrder::Acquire); }
 void ResetPanic() { g_panic_occurred.Store(false, StoreMemoryOrder::Release); }
 
 [[noreturn]] void Panic(char const* message, SourceLocation loc) {
+    if (g_in_signal_handler) __builtin_abort();
+
     static thread_local u8 in_panic_hook {};
 
     switch (in_panic_hook) {

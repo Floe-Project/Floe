@@ -31,6 +31,14 @@ PUBLIC ErrorCodeCategory const& ErrorCategoryForEnum(WebError) { return k_web_er
 void WebGlobalInit();
 void WebGlobalCleanup();
 
+struct RequestOptions {
+    f32 timeout_seconds = 10.0f;
+};
+
 // blocking
-ErrorCodeOr<void> HttpsGet(String url, Writer writer);
-ErrorCodeOr<void> HttpsPost(String url, String body, Span<String> headers, Optional<Writer> response_writer);
+ErrorCodeOr<void> HttpsGet(String url, Writer writer, RequestOptions options = {});
+ErrorCodeOr<void> HttpsPost(String url,
+                            String body,
+                            Span<String> headers,
+                            Optional<Writer> response_writer,
+                            RequestOptions options = {});

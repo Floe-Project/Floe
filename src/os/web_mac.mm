@@ -14,10 +14,14 @@
 #include "misc_mac.hpp"
 #include "web.hpp"
 
-ErrorCodeOr<void> HttpsGet(String url, Writer writer) {
+ErrorCodeOr<void> HttpsGet(String url, Writer writer, RequestOptions options) {
     NSURL* nsurl = [NSURL URLWithString:StringToNSString(url)];
     NSURLRequest* request = [NSURLRequest requestWithURL:nsurl];
-    NSURLSession* session = [NSURLSession sharedSession];
+
+    NSURLSessionConfiguration* session_config = [NSURLSessionConfiguration defaultSessionConfiguration];
+    session_config.timeoutIntervalForRequest = (f64)options.timeout_seconds;
+    session_config.timeoutIntervalForResource = (f64)options.timeout_seconds;
+    NSURLSession* session = [NSURLSession sessionWithConfiguration:session_config];
 
     __block ErrorCodeOr<void> result {};
     dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
@@ -45,29 +49,35 @@ ErrorCodeOr<void> HttpsGet(String url, Writer writer) {
     return result;
 }
 
-ErrorCodeOr<void> HttpsPost(String url, String body, Span<String> headers, Optional<Writer> response_writer) {
+ErrorCodeOr<void> HttpsPost(String url,
+                            String body,
+                            Span<String> headers,
+                            Optional<Writer> response_writer,
+                            RequestOptions options) {
     NSURL* nsurl = [NSURL URLWithString:StringToNSString(url)];
     NSMutableURLRequest* request = [NSMutableURLRequest requestWithURL:nsurl];
     [request setHTTPMethod:@"POST"];
-    
+
     // Set request body
     NSData* request_body = [NSData dataWithBytes:body.data length:body.size];
     [request setHTTPBody:request_body];
-    
+
     // Add custom headers
     for (auto const& header : headers) {
         NSString* header_string = StringToNSString(header);
         NSArray* components = [header_string componentsSeparatedByString:@": "];
-        if (components.count == 2) {
-            [request setValue:components[1] forHTTPHeaderField:components[0]];
-        }
+        if (components.count == 2) [request setValue:components[1] forHTTPHeaderField:components[0]];
     }
-    
-    NSURLSession* session = [NSURLSession sharedSession];
+
+    NSURLSessionConfiguration* session_config = [NSURLSessionConfiguration defaultSessionConfiguration];
+    session_config.timeoutIntervalForRequest = (f64)options.timeout_seconds;
+    session_config.timeoutIntervalForResource = (f64)options.timeout_seconds;
+    NSURLSession* session = [NSURLSession sessionWithConfiguration:session_config];
+
     __block ErrorCodeOr<void> result {};
     dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
     if (semaphore == nullptr) Panic("Failed to create semaphore");
-    
+
     @try {
         NSURLSessionDataTask* task =
             [session dataTaskWithRequest:request
@@ -88,7 +98,7 @@ ErrorCodeOr<void> HttpsPost(String url, String body, Span<String> headers, Optio
     } @catch (NSException* e) {
         return ErrorCode {WebError::NetworkError};
     }
-    
+
     return result;
 }
 

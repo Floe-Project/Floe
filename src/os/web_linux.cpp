@@ -18,7 +18,7 @@ void WebGlobalInit() { curl_global_init(CURL_GLOBAL_DEFAULT); }
 
 void WebGlobalCleanup() { curl_global_cleanup(); }
 
-ErrorCodeOr<void> HttpsGet(String url, Writer writer) {
+ErrorCodeOr<void> HttpsGet(String url, Writer writer, RequestOptions options) {
     auto curl = curl_easy_init();
     if (!curl) return ErrorCode {WebError::ApiError};
     DEFER { curl_easy_cleanup(curl); };
@@ -31,8 +31,8 @@ ErrorCodeOr<void> HttpsGet(String url, Writer writer) {
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteFunction);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &writer);
 
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
-    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, (unsigned)options.timeout_seconds);
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, (unsigned)options.timeout_seconds);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
@@ -52,6 +52,10 @@ ErrorCodeOr<void> HttpsGet(String url, Writer writer) {
         return ErrorCode {WebError::Non200Response};
     }
     if (return_code != CURLE_OK) {
+        if (return_code == CURLE_OPERATION_TIMEDOUT || return_code == CURLE_COULDNT_CONNECT ||
+            return_code == CURLE_COULDNT_RESOLVE_HOST) {
+            return ErrorCode {WebError::NetworkError};
+        }
         g_debug_log.Debug({}, "CURL ERROR: {}, {}", (int)return_code, FromNullTerminated(error_buffer));
         return ErrorCode {WebError::ApiError};
     }
@@ -59,7 +63,11 @@ ErrorCodeOr<void> HttpsGet(String url, Writer writer) {
     return k_success;
 }
 
-ErrorCodeOr<void> HttpsPost(String url, String body, Span<String> headers, Optional<Writer> response_writer) {
+ErrorCodeOr<void> HttpsPost(String url,
+                            String body,
+                            Span<String> headers,
+                            Optional<Writer> response_writer,
+                            RequestOptions options) {
     auto curl = curl_easy_init();
     if (!curl) return ErrorCode {WebError::ApiError};
     DEFER { curl_easy_cleanup(curl); };
@@ -74,8 +82,8 @@ ErrorCodeOr<void> HttpsPost(String url, String body, Span<String> headers, Optio
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteFunction);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, response_writer ? &*response_writer : nullptr);
 
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
-    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, (unsigned)options.timeout_seconds);
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, (unsigned)options.timeout_seconds);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);

@@ -10,7 +10,7 @@
 #include "misc.hpp"
 #include "web.hpp"
 
-ErrorCodeOr<void> HttpsGet(String url, Writer writer) {
+ErrorCodeOr<void> HttpsGet(String url, Writer writer, RequestOptions options) {
     ArenaAllocatorWithInlineStorage<1000> temp_arena {Malloc::Instance()};
 
     URL_COMPONENTS url_comps {};
@@ -33,6 +33,9 @@ ErrorCodeOr<void> HttpsGet(String url, Writer writer) {
         WinHttpOpen(L"Floe", WINHTTP_ACCESS_TYPE_NO_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
     if (session == nullptr) return ErrorCode {WebError::NetworkError};
     DEFER { WinHttpCloseHandle(session); };
+
+    auto const timeout_ms = int(options.timeout_seconds * 1000);
+    WinHttpSetTimeouts(session, timeout_ms, timeout_ms, timeout_ms, timeout_ms);
 
     unsigned long protocols = WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_2 | WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_3;
     WinHttpSetOption(session, WINHTTP_OPTION_SECURE_PROTOCOLS, &protocols, sizeof(protocols));
@@ -72,7 +75,11 @@ ErrorCodeOr<void> HttpsGet(String url, Writer writer) {
     return k_success;
 }
 
-ErrorCodeOr<void> HttpsPost(String url, String body, Span<String> headers, Optional<Writer> response_writer) {
+ErrorCodeOr<void> HttpsPost(String url,
+                            String body,
+                            Span<String> headers,
+                            Optional<Writer> response_writer,
+                            RequestOptions options) {
     ArenaAllocatorWithInlineStorage<1000> temp_arena {Malloc::Instance()};
     URL_COMPONENTS url_comps {};
     url_comps.dwStructSize = sizeof(URL_COMPONENTS);
@@ -95,6 +102,9 @@ ErrorCodeOr<void> HttpsPost(String url, String body, Span<String> headers, Optio
         WinHttpOpen(L"Floe", WINHTTP_ACCESS_TYPE_NO_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
     if (session == nullptr) return ErrorCode {WebError::NetworkError};
     DEFER { WinHttpCloseHandle(session); };
+
+    auto const timeout_ms = int(options.timeout_seconds * 1000);
+    WinHttpSetTimeouts(session, timeout_ms, timeout_ms, timeout_ms, timeout_ms);
 
     unsigned long protocols = WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_2 | WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_3;
     WinHttpSetOption(session, WINHTTP_OPTION_SECURE_PROTOCOLS, &protocols, sizeof(protocols));

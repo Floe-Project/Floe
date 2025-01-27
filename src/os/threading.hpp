@@ -369,7 +369,7 @@ PUBLIC void CallOnce(Atomic<u32>& flag, FunctionRef<void()> function) {
             flag.Store(k_once_flag_called, StoreMemoryOrder::Release);
             WakeWaitingThreads(flag, NumWaitingThreads::All);
         } else {
-            while (flag.Load(LoadMemoryOrder::Relaxed) != k_once_flag_called)
+            while (flag.Load(LoadMemoryOrder::Acquire) != k_once_flag_called)
                 WaitIfValueIsExpected(flag, k_once_flag_called, 100u);
         }
     }

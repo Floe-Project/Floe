@@ -12,6 +12,8 @@
 
 #include "common_infrastructure/final_binary_type.hpp"
 
+#include "sentry_config.hpp"
+
 namespace sentry {
 
 constexpr auto k_log_module = "sentry"_log_module;
@@ -54,19 +56,16 @@ struct ErrorEvent {
     Span<Tag const> tags;
 };
 
+struct Error : ErrorEvent {
+    ArenaAllocator arena {Malloc::Instance()};
+};
+
 struct DsnInfo {
     String dsn;
     String host;
     String project_id;
     String public_key;
 };
-
-// NOTE: in Sentry, releases are created when an event payload (error) is sent with a release tag for the
-// first time. We use an unchanging release tag for dev builds.
-static constexpr String k_release = PRODUCTION_BUILD ? String {"floe@" FLOE_VERSION_STRING} : "floe@dev";
-static constexpr usize k_max_message_length = 8192;
-static constexpr String k_environment = PRODUCTION_BUILD ? "production"_s : "development"_s;
-static constexpr String k_user_agent = PRODUCTION_BUILD ? String {"floe/" FLOE_VERSION_STRING} : "floe/dev";
 
 struct Sentry {
     Optional<fmt::UuidArray> device_id {};
@@ -84,11 +83,29 @@ struct Sentry {
 
 namespace detail {
 
+// NOTE: in Sentry, releases are created when an Event payload (error) is sent with a release tag for the
+// first time. We use an unchanging release tag for dev builds.
+static constexpr String k_release = PRODUCTION_BUILD ? String {"floe@" FLOE_VERSION_STRING} : "floe@dev";
+static constexpr usize k_max_message_length = 8192;
+static constexpr String k_environment = PRODUCTION_BUILD ? "production"_s : "development"_s;
+static constexpr String k_user_agent = PRODUCTION_BUILD ? String {"floe/" FLOE_VERSION_STRING} : "floe/dev";
+
+constexpr auto k_error_file_extension = "floe-error"_ca;
+
 static fmt::UuidArray Uuid(Atomic<u64>& seed) {
     u64 s = seed.FetchAdd(1, RmwMemoryOrder::Relaxed);
     auto result = fmt::Uuid(s);
     seed.Store(s, StoreMemoryOrder::Relaxed);
     return result;
+}
+
+static String UniqueErrorFilepath(String folder, Atomic<u64>& seed, ArenaAllocator& arena) {
+    auto s = seed.FetchAdd(1, RmwMemoryOrder::Relaxed);
+    auto const random = RandomU64(s);
+    seed.Store(s, StoreMemoryOrder::Relaxed);
+    auto const id = fmt::IntToString(random, {.base = fmt::IntToStringOptions::Base::Base32});
+    auto const filename = fmt::Format(arena, "{}.{}", id, k_error_file_extension);
+    return path::Join(arena, Array {folder, filename});
 }
 
 } // namespace detail
@@ -138,13 +155,30 @@ consteval DsnInfo ParseDsnOrThrow(String dsn) {
 // not thread-safe, not signal-safe, inits g_instance
 // adds device_id, OS info, CPU info
 // dsn must be valid and static
-Sentry* InitGlobalSentry(DsnInfo dsn, Span<Tag const> tag);
+Sentry& InitGlobalSentry(DsnInfo dsn, Span<Tag const> tag);
 
 // thread-safe, signal-safe, guaranteed to be valid if InitGlobalSentry has been called
 Sentry* GlobalSentry();
 
-// threadsafe, signal-safe, doesn't include useful context info
+// threadsafe, signal-safe, works just as well but doesn't include useful context info
 void InitBarebonesSentry(Sentry& sentry);
+
+// threadsafe, signal-safe
+struct SentryOrFallback {
+    SentryOrFallback() {
+        sentry = GlobalSentry();
+        if (!sentry) {
+            // If the global version hasn't been initialized, we can still use a local version but it won't
+            // have as much rich context associated with it.
+            InitBarebonesSentry(fallback);
+            sentry = &fallback;
+        }
+    }
+    operator Sentry*() { return sentry; }
+    Sentry* operator->() { return sentry; }
+    Sentry* sentry;
+    Sentry fallback;
+};
 
 // thread-safe (for Sentry), signal-safe
 PUBLIC ErrorCodeOr<void> EnvelopeAddHeader(Sentry& sentry, Writer writer, bool include_sent_at) {
@@ -253,9 +287,9 @@ enum class SessionStatus {
     TRY(json::WriteKeyValue(json_writer, "errors", num_errors));
     {
         TRY(json::WriteKeyObjectBegin(json_writer, "attrs"));
-        TRY(json::WriteKeyValue(json_writer, "release", k_release));
-        TRY(json::WriteKeyValue(json_writer, "environment", k_environment));
-        TRY(json::WriteKeyValue(json_writer, "user_agent", k_user_agent));
+        TRY(json::WriteKeyValue(json_writer, "release", detail::k_release));
+        TRY(json::WriteKeyValue(json_writer, "environment", detail::k_environment));
+        TRY(json::WriteKeyValue(json_writer, "user_agent", detail::k_user_agent));
         TRY(json::WriteObjectEnd(json_writer));
     }
     TRY(json::WriteObjectEnd(json_writer));
@@ -268,7 +302,7 @@ enum class SessionStatus {
 // NOTE (Jan 2025): all events are 'errors' in Sentry, there's no plain logging concept
 [[maybe_unused]] PUBLIC ErrorCodeOr<void>
 EnvelopeAddEvent(Sentry& sentry, Writer writer, ErrorEvent event, bool signal_safe) {
-    ASSERT(event.message.size <= k_max_message_length, "message too long");
+    ASSERT(event.message.size <= detail::k_max_message_length, "message too long");
     ASSERT(event.tags.size < 100, "too many tags");
 
     switch (event.level) {
@@ -303,8 +337,8 @@ EnvelopeAddEvent(Sentry& sentry, Writer writer, ErrorEvent event, bool signal_sa
     TRY(json::WriteKeyValue(json_writer, "timestamp", timestamp));
     TRY(json::WriteKeyValue(json_writer, "platform", "native"));
     TRY(json::WriteKeyValue(json_writer, "level", event.LevelString()));
-    TRY(json::WriteKeyValue(json_writer, "release", k_release));
-    TRY(json::WriteKeyValue(json_writer, "environment", k_environment));
+    TRY(json::WriteKeyValue(json_writer, "release", detail::k_release));
+    TRY(json::WriteKeyValue(json_writer, "environment", detail::k_environment));
 
     // tags
     if (event.tags.size || sentry.tags.size) {
@@ -325,7 +359,9 @@ EnvelopeAddEvent(Sentry& sentry, Writer writer, ErrorEvent event, bool signal_sa
     // message
     {
         TRY(json::WriteKeyObjectBegin(json_writer, "message"));
-        TRY(json::WriteKeyValue(json_writer, "formatted", event.message.SubSpan(0, k_max_message_length)));
+        TRY(json::WriteKeyValue(json_writer,
+                                "formatted",
+                                event.message.SubSpan(0, detail::k_max_message_length)));
         TRY(json::WriteObjectEnd(json_writer));
     }
 
@@ -376,79 +412,78 @@ EnvelopeAddEvent(Sentry& sentry, Writer writer, ErrorEvent event, bool signal_sa
     return k_success;
 }
 
-constexpr auto k_error_file_extension = "floe-error"_ca;
-
-PUBLIC String UniqueErrorFilepath(String folder, Atomic<u64>& seed, ArenaAllocator& arena) {
-    auto s = seed.FetchAdd(1, RmwMemoryOrder::Relaxed);
-    auto const random = RandomU64(s);
-    seed.Store(s, StoreMemoryOrder::Relaxed);
-    auto const id = fmt::IntToString(random, {.base = fmt::IntToStringOptions::Base::Base32});
-    auto const filename = fmt::Format(arena, "{}.{}", id, k_error_file_extension);
-    return path::Join(arena, Array {folder, filename});
-}
-
 // threadsafe (for Sentry), not signal-safe
-PUBLIC ErrorCodeOr<void> SendSentryEnvelope(Sentry& sentry,
-                                            String envelope_without_header,
-                                            Optional<Writer> response,
-                                            bool fallback_write_to_file,
-                                            ArenaAllocator& scratch_arena) {
+PUBLIC ErrorCodeOr<void> SubmitEnvelope(Sentry& sentry,
+                                        String envelope_without_header,
+                                        Optional<Writer> response,
+                                        bool write_to_file_if_needed,
+                                        ArenaAllocator& scratch_arena) {
     if (envelope_without_header.size == 0) return k_success;
-
-    auto const envelope_url =
-        fmt::Format(scratch_arena, "https://{}:443/api/{}/envelope/", sentry.dsn.host, sentry.dsn.project_id);
 
     DynamicArray<char> envelope {scratch_arena};
     envelope.Reserve(envelope_without_header.size + 200);
     auto envelope_writer = dyn::WriterFor(envelope);
 
     auto _ = EnvelopeAddHeader(sentry, envelope_writer, true);
-    auto const envelop_header_size = envelope.size;
+    auto const online_envelope_header_size = envelope.size;
     dyn::AppendSpan(envelope, envelope_without_header);
 
-    g_log.Debug(k_main_log_module, "Posting to Sentry: {}", envelope);
+    bool sent_online_successfully = false;
+    ErrorCodeOr<void> result = k_success;
 
-    auto const result =
-        HttpsPost(envelope_url,
-                  envelope,
-                  Array {
-                      "Content-Type: application/x-sentry-envelope"_s,
-                      fmt::Format(scratch_arena,
-                                  "X-Sentry-Auth: Sentry sentry_version=7, sentry_client={}, sentry_key={}",
-                                  k_user_agent,
-                                  sentry.dsn.public_key),
-                      fmt::Format(scratch_arena, "Content-Length: {}", envelope.size),
-                      fmt::Format(scratch_arena,
-                                  "User-Agent: {} ({})"_s,
-                                  k_user_agent,
-                                  IS_WINDOWS ? "Windows"
-                                  : IS_LINUX ? "Linux"
-                                             : "macOS"),
-                  },
-                  response);
+    if constexpr (k_online_reporting) {
+        g_log.Debug(k_main_log_module, "Posting to Sentry: {}", envelope);
 
-    if (result.HasError() && fallback_write_to_file) {
-        // We've failed to send it to the server. We don't want to loose the information, so write it to a
-        // file.
+        auto const envelope_url = fmt::Format(scratch_arena,
+                                              "https://{}:443/api/{}/envelope/",
+                                              sentry.dsn.host,
+                                              sentry.dsn.project_id);
+
+        auto const o = HttpsPost(
+            envelope_url,
+            envelope,
+            Array {
+                "Content-Type: application/x-sentry-envelope"_s,
+                fmt::Format(scratch_arena,
+                            "X-Sentry-Auth: Sentry sentry_version=7, sentry_client={}, sentry_key={}",
+                            detail::k_user_agent,
+                            sentry.dsn.public_key),
+                fmt::Format(scratch_arena, "Content-Length: {}", envelope.size),
+                fmt::Format(scratch_arena,
+                            "User-Agent: {} ({})"_s,
+                            detail::k_user_agent,
+                            IS_WINDOWS ? "Windows"
+                            : IS_LINUX ? "Linux"
+                                       : "macOS"),
+            },
+            response);
 
         // If there's an error other than just the internet being down, we want to capture that too.
-        if (result.Error() != WebError::NetworkError) {
+        if (write_to_file_if_needed && o.HasError() && o.Error() != WebError::NetworkError) {
             auto _ = EnvelopeAddEvent(
                 sentry,
                 envelope_writer,
                 {
                     .level = ErrorEvent::Level::Error,
-                    .message = fmt::Format(scratch_arena, "Failed to send to Sentry: {}", result.Error()),
+                    .message = fmt::Format(scratch_arena, "Failed to send to Sentry: {}", o.Error()),
                 },
                 false);
         }
 
-        InitLogFolderIfNeeded();
-        auto file = TRY(OpenFile(UniqueErrorFilepath(*LogFolder(), sentry.seed, scratch_arena),
-                                 FileMode::WriteNoOverwrite));
+        if (o.Succeeded()) sent_online_successfully = true;
 
+        result = o;
+    }
+
+    if (!sent_online_successfully && write_to_file_if_needed) {
+        InitLogFolderIfNeeded();
+        auto file = TRY(OpenFile(detail::UniqueErrorFilepath(*LogFolder(), sentry.seed, scratch_arena),
+                                 FileMode::WriteNoOverwrite));
         TRY(EnvelopeAddHeader(sentry, file.Writer(), false));
-        TRY(file.Write(envelope.Items().SubSpan(envelop_header_size)));
+
+        // We have just written a header appropriate for the file, so we make sure don't write the header
+        // appropriate for online submission by using SubSpan.
+        TRY(file.Write(envelope.Items().SubSpan(online_envelope_header_size)));
 
         return k_success;
     }
@@ -462,8 +497,8 @@ PUBLIC ErrorCodeOr<void> WriteCrashToFile(Sentry& sentry,
                                           String folder,
                                           String message,
                                           ArenaAllocator& scratch_arena) {
-    auto file =
-        TRY(OpenFile(UniqueErrorFilepath(folder, sentry.seed, scratch_arena), FileMode::WriteNoOverwrite));
+    auto file = TRY(OpenFile(detail::UniqueErrorFilepath(folder, sentry.seed, scratch_arena),
+                             FileMode::WriteNoOverwrite));
 
     TRY(EnvelopeAddHeader(sentry, file.Writer(), false));
     TRY(EnvelopeAddEvent(sentry,
@@ -480,11 +515,34 @@ PUBLIC ErrorCodeOr<void> WriteCrashToFile(Sentry& sentry,
 }
 
 // thread-safe, not signal-safe
+PUBLIC ErrorCodeOr<void> SubmitCrash(Sentry& sentry,
+                                     Optional<StacktraceStack> const& stacktrace,
+                                     String message,
+                                     Optional<Writer> response,
+                                     ArenaAllocator& scratch_arena) {
+    DynamicArray<char> envelope_without_header {scratch_arena};
+    auto writer = dyn::WriterFor(envelope_without_header);
+
+    TRY(EnvelopeAddEvent(sentry,
+                         writer,
+                         {
+                             .level = ErrorEvent::Level::Fatal,
+                             .message = message,
+                             .stacktrace = stacktrace,
+                         },
+                         true));
+    TRY(EnvelopeAddSessionUpdate(sentry, writer, SessionStatus::Crashed));
+    TRY(SubmitEnvelope(sentry, envelope_without_header, response, true, scratch_arena));
+
+    return k_success;
+}
+
+// thread-safe, not signal-safe
 PUBLIC ErrorCodeOr<void> WriteErrorToFile(Sentry& sentry, ErrorEvent const& event) {
     PathArena path_arena {PageAllocator::Instance()};
     InitLogFolderIfNeeded();
-    auto file =
-        TRY(OpenFile(UniqueErrorFilepath(*LogFolder(), sentry.seed, path_arena), FileMode::WriteNoOverwrite));
+    auto file = TRY(OpenFile(detail::UniqueErrorFilepath(*LogFolder(), sentry.seed, path_arena),
+                             FileMode::WriteNoOverwrite));
 
     TRY(EnvelopeAddHeader(sentry, file.Writer(), false));
     TRY(EnvelopeAddEvent(sentry, file.Writer(), event, false));
@@ -492,8 +550,10 @@ PUBLIC ErrorCodeOr<void> WriteErrorToFile(Sentry& sentry, ErrorEvent const& even
 }
 
 PUBLIC ErrorCodeOr<void>
-ConsumeAndSendErrorFiles(Sentry& sentry, String folder, ArenaAllocator& scratch_arena) {
-    constexpr auto k_wildcard = ConcatArrays("*."_ca, k_error_file_extension);
+ConsumeAndSubmitErrorFiles(Sentry& sentry, String folder, ArenaAllocator& scratch_arena) {
+    if constexpr (!k_online_reporting) return k_success;
+
+    constexpr auto k_wildcard = ConcatArrays("*."_ca, detail::k_error_file_extension);
     auto const entries = TRY(FindEntriesInFolder(scratch_arena,
                                                  folder,
                                                  {
@@ -560,11 +620,11 @@ ConsumeAndSendErrorFiles(Sentry& sentry, String folder, ArenaAllocator& scratch_
 
             DynamicArray<char> response {scratch_arena};
 
-            TRY_OR(SendSentryEnvelope(sentry,
-                                      envelope_without_header,
-                                      dyn::WriterFor(response),
-                                      false,
-                                      scratch_arena),
+            TRY_OR(SubmitEnvelope(sentry,
+                                  envelope_without_header,
+                                  dyn::WriterFor(response),
+                                  false,
+                                  scratch_arena),
                    {
                        g_log.Error(k_main_log_module,
                                    "Couldn't send error report to Sentry: {}. {}",

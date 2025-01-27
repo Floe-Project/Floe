@@ -12,9 +12,9 @@
 
 #include "common_infrastructure/common_errors.hpp"
 #include "common_infrastructure/crash_hooks.hpp"
+#include "common_infrastructure/error_reporting.hpp"
 #include "common_infrastructure/package_format.hpp"
 #include "common_infrastructure/sample_library/sample_library.hpp"
-#include "common_infrastructure/sentry/sentry_worker.hpp"
 
 #include "build_resources/embedded_files.h"
 

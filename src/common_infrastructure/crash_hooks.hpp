@@ -25,18 +25,6 @@ WriteErrorToStderr(String crash_message, Optional<StacktraceStack> const& stackt
     auto _ = writer.WriteChar('\n');
 }
 
-// signal-safe
-static sentry::Sentry* GetSentry(sentry::Sentry& fallback) {
-    auto sentry = sentry::GlobalSentry();
-    if (!sentry) {
-        // we've crashed without there being rich context available, but we can still generate a barebones
-        // crash report
-        sentry::InitBarebonesSentry(fallback);
-        sentry = &fallback;
-    }
-    return sentry;
-}
-
 static ErrorCodeOr<void> WriteCrashToFile(String crash_message, Optional<StacktraceStack> const& stacktrace) {
     auto const log_folder = LogFolder();
     if (!log_folder) {
@@ -46,8 +34,7 @@ static ErrorCodeOr<void> WriteCrashToFile(String crash_message, Optional<Stacktr
 
     ArenaAllocatorWithInlineStorage<1000> arena {PageAllocator::Instance()};
 
-    sentry::Sentry fallback_sentry_instance {};
-    auto sentry = GetSentry(fallback_sentry_instance);
+    sentry::SentryOrFallback sentry {};
     return sentry::WriteCrashToFile(*sentry, stacktrace, *log_folder, crash_message, arena);
 }
 
@@ -75,23 +62,10 @@ PUBLIC void PanicHook(char const* message_c_str, SourceLocation loc) {
 
     // sentry
     {
-        sentry::Sentry fallback_sentry_instance {};
-        auto sentry = detail::GetSentry(fallback_sentry_instance);
-
-        DynamicArray<char> envelope {arena};
-        auto envelope_writer = dyn::WriterFor(envelope);
-
-        auto _ = sentry::EnvelopeAddEvent(*sentry,
-                                          envelope_writer,
-                                          {
-                                              .level = sentry::ErrorEvent::Level::Fatal,
-                                              .message = message,
-                                              .stacktrace = stacktrace,
-                                          },
-                                          false);
-        auto _ = sentry::EnvelopeAddSessionUpdate(*sentry, envelope_writer, sentry::SessionStatus::Crashed);
-
+        sentry::SentryOrFallback sentry {};
         DynamicArray<char> response {arena};
-        auto const _ = sentry::SendSentryEnvelope(*sentry, envelope, dyn::WriterFor(response), true, arena);
+        TRY_OR(sentry::SubmitCrash(*sentry, stacktrace, message, {}, arena), {
+            g_log.Error(sentry::k_log_module, "Failed to submit panic to Sentry: {}, {}", error, response);
+        });
     }
 }

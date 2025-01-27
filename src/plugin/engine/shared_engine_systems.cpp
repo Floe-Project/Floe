@@ -6,7 +6,7 @@
 #include "foundation/foundation.hpp"
 #include "os/misc.hpp"
 
-#include "common_infrastructure/sentry/sentry_worker.hpp"
+#include "common_infrastructure/error_reporting.hpp"
 
 #include "plugin/plugin.hpp"
 #include "settings/settings_file.hpp"
@@ -39,7 +39,7 @@ SharedEngineSystems::SharedEngineSystems(Span<sentry::Tag const> tags)
     , sample_library_server(thread_pool,
                             paths.always_scanned_folder[ToInt(ScanFolderType::Libraries)],
                             error_notifications) {
-    sentry::InitGlobalWorker(tags);
+    InitErrorReporting(tags);
 
     settings.tracking.on_filesystem_change = [this](ScanFolderType type) {
         ASSERT(CheckThreadName("main"));
@@ -91,10 +91,8 @@ SharedEngineSystems::~SharedEngineSystems() {
             g_log.Error("global"_log_module, "Failed to write settings file: {}", outcome.Error());
     }
 
-    auto sentry_worker = sentry::GlobalWorker();
-    ASSERT(sentry_worker);
-    sentry::RequestThreadEnd(*sentry_worker);
-    sentry::WaitForThreadEnd(*sentry_worker);
+    RequestErrorReportingEnd();
+    RequestErrorReportingEnd();
 }
 
 void SharedEngineSystems::RegisterFloeInstance(clap_plugin const* plugin, FloeInstanceIndex index) {

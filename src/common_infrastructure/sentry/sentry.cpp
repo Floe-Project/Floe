@@ -172,15 +172,15 @@ static Atomic<Sentry*> g_instance {nullptr};
 
 Sentry* GlobalSentry() { return g_instance.Load(LoadMemoryOrder::Acquire); }
 
-Sentry* InitGlobalSentry(DsnInfo dsn, Span<Tag const> tags) {
+Sentry& InitGlobalSentry(DsnInfo dsn, Span<Tag const> tags) {
     auto existing = g_instance.Load(LoadMemoryOrder::Acquire);
-    if (existing) return existing;
+    if (existing) return *existing;
 
     auto sentry = PLACEMENT_NEW(g_sentry_storage) Sentry {};
     InitSentry(*sentry, dsn, tags);
 
     g_instance.Store(sentry, StoreMemoryOrder::Release);
-    return sentry;
+    return *sentry;
 }
 
 // signal-safe
@@ -261,16 +261,15 @@ TEST_CASE(TestSentry) {
     }
 
     SUBCASE("Basics") {
-        auto sentry = InitGlobalSentry(ParseDsnOrThrow("https://publickey@host.com/123"), {});
-        REQUIRE(sentry);
-        CHECK(sentry->device_id);
+        auto& sentry = InitGlobalSentry(ParseDsnOrThrow("https://publickey@host.com/123"), {});
+        CHECK(sentry.device_id);
 
         // build an envelope
         DynamicArray<char> envelope {tester.scratch_arena};
         auto writer = dyn::WriterFor(envelope);
-        TRY(EnvelopeAddHeader(*sentry, writer, true));
-        TRY(EnvelopeAddSessionUpdate(*sentry, writer, SessionStatus::Ok));
-        TRY(EnvelopeAddEvent(*sentry,
+        TRY(EnvelopeAddHeader(sentry, writer, true));
+        TRY(EnvelopeAddSessionUpdate(sentry, writer, SessionStatus::Ok));
+        TRY(EnvelopeAddEvent(sentry,
                              writer,
                              {
                                  .level = ErrorEvent::Level::Info,
@@ -282,7 +281,7 @@ TEST_CASE(TestSentry) {
                                  }),
                              },
                              false));
-        TRY(EnvelopeAddSessionUpdate(*sentry, writer, SessionStatus::EndedNormally));
+        TRY(EnvelopeAddSessionUpdate(sentry, writer, SessionStatus::EndedNormally));
 
         CHECK(envelope.size > 0);
     }

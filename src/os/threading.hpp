@@ -357,8 +357,8 @@ PUBLIC bool OnceFlagCalled(CallOnceFlag& flag) {
 PUBLIC void CallOnce(Atomic<u32>& flag, FunctionRef<void()> function) {
     if (flag.Load(LoadMemoryOrder::Acquire) == k_once_flag_not_called) {
         // IMPROVE: probably faster to use a mutex here but we want to avoid initialising a global mutex at
-        // the moment (pthread_mutex_init, InitializeCriticalSection); the order of initialisation of global
-        // objects with constructors can be bug-prone.
+        // the moment (pthread_mutex_init, InitializeCriticalSection) because the order of initialisation of
+        // global objects with constructors can be bug-prone.
 
         u32 expected = k_once_flag_not_called;
         if (flag.CompareExchangeStrong(expected,

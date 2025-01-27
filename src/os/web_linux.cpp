@@ -31,8 +31,8 @@ ErrorCodeOr<void> HttpsGet(String url, Writer writer) {
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteFunction);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &writer);
 
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L); 
-    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10L); 
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
@@ -74,8 +74,8 @@ ErrorCodeOr<void> HttpsPost(String url, String body, Span<String> headers, Optio
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteFunction);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, response_writer ? &*response_writer : nullptr);
 
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L); 
-    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10L); 
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);

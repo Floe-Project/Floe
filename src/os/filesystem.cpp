@@ -134,19 +134,23 @@ MutableString FloeKnownDirectory(Allocator& a,
     return KnownDirectoryWithSubdirectories(a, known_dir_type, subdirectories, filename, options);
 }
 
-static FixedSizeAllocator<256> g_crash_folder_allocator {&PageAllocator::Instance()};
-static Span<char> g_crash_folder_path = {};
+static String g_log_folder_path;
+static CallOnceFlag g_log_folder_flag = 0;
 
-void InitCrashFolder() {
-    g_crash_folder_path = FloeKnownDirectory(g_crash_folder_allocator,
-                                             FloeKnownDirectoryType::Logs,
-                                             k_nullopt,
-                                             {.create = true});
+void InitLogFolderIfNeeded() {
+    static FixedSizeAllocator<256> g_log_folder_allocator {&PageAllocator::Instance()};
+    CallOnce(g_log_folder_flag, [] {
+        auto writer = StdWriter(StdStream::Err);
+        g_log_folder_path = FloeKnownDirectory(g_log_folder_allocator,
+                                               FloeKnownDirectoryType::Logs,
+                                               k_nullopt,
+                                               {.create = true, .error_log = &writer});
+    });
 }
 
-Optional<String> CrashFolder() {
-    if (g_crash_folder_path.size) return g_crash_folder_path;
-    return k_nullopt;
+Optional<String> LogFolder() {
+    if (!OnceFlagCalled(g_log_folder_flag)) return k_nullopt;
+    return g_log_folder_path;
 }
 
 ErrorCodeOr<MutableString>

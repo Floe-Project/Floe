@@ -68,7 +68,7 @@ extern "C" CLAP_EXPORT const clap_plugin_entry clap_entry = {
             if (Exchange(g_init, true)) return true; // already initialised
 
             g_panic_hook = PanicHook;
-            InitCrashFolder();
+            InitLogFolderIfNeeded();
 
             StartupTracy();
             BeginCrashDetection(CrashHookWriteCrashReport); // after tracy

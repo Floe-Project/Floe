@@ -21,7 +21,7 @@ static Optional<fmt::UuidArray> DeviceId(Atomic<u64>& seed) {
         return k_nullopt;
     });
 
-    TRY_OR(file.Lock(FileLockType::Exclusive), {
+    TRY_OR(file.Lock({.type = FileLockOptions::Type::Exclusive}), {
         g_log.Error(k_log_module, "Failed to lock device_id file: {}, {}", path, error);
         return k_nullopt;
     });
@@ -167,8 +167,10 @@ static void InitSentry(Sentry& sentry, DsnInfo dsn, Span<Tag const> tags) {
     }
 }
 
-alignas(Sentry) u8 g_sentry_storage[sizeof(Sentry)];
-Atomic<Sentry*> g_instance {nullptr};
+alignas(Sentry) static u8 g_sentry_storage[sizeof(Sentry)];
+static Atomic<Sentry*> g_instance {nullptr};
+
+Sentry* GlobalSentry() { return g_instance.Load(LoadMemoryOrder::Acquire); }
 
 Sentry* InitGlobalSentry(DsnInfo dsn, Span<Tag const> tags) {
     auto existing = g_instance.Load(LoadMemoryOrder::Acquire);
@@ -266,13 +268,14 @@ TEST_CASE(TestSentry) {
         // build an envelope
         DynamicArray<char> envelope {tester.scratch_arena};
         auto writer = dyn::WriterFor(envelope);
-        TRY(EnvelopeAddHeader(*sentry, writer));
+        TRY(EnvelopeAddHeader(*sentry, writer, true));
         TRY(EnvelopeAddSessionUpdate(*sentry, writer, SessionStatus::Ok));
         TRY(EnvelopeAddEvent(*sentry,
                              writer,
                              {
                                  .level = ErrorEvent::Level::Info,
                                  .message = "Test event message"_s,
+                                 .stacktrace = CurrentStacktrace(),
                                  .tags = ArrayT<Tag>({
                                      {"tag1", "value1"},
                                      {"tag2", "value2"},

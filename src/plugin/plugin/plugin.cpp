@@ -7,6 +7,8 @@
 #include "utils/debug/debug.hpp"
 #include "utils/debug/tracy_wrapped.hpp"
 
+#include "common_infrastructure/sentry/sentry_worker.hpp"
+
 #include "clap/ext/audio-ports.h"
 #include "clap/ext/note-ports.h"
 #include "clap/ext/params.h"
@@ -854,11 +856,11 @@ clap_plugin const floe_plugin {
                            floe.host.name,
                            floe.host.version);
 
-                // sentry::Worker::ErrorMessage message {{
-                //     .level = sentry::ErrorEvent::Level::Info,
-                //     .message = "Host start 2"_s,
-                // }};
-                // sentry::SendErrorMessage(g_shared_engine_systems->sentry_worker, Move(message));
+                sentry::Worker::ErrorMessage message {{
+                    .level = sentry::ErrorEvent::Level::Info,
+                    .message = "Host start 2"_s,
+                }};
+                sentry::SendErrorMessage(Move(message));
             }
 
             g_log.Debug(k_clap_log_module, "#{} init", floe.index);

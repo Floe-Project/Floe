@@ -82,13 +82,10 @@ struct Sentry {
     Span<Tag> tags {};
 };
 
-// never destroyed, once set (InitGlobalSentry) it's good for the entire program
-extern Atomic<Sentry*> g_instance;
-
 namespace detail {
 
 static fmt::UuidArray Uuid(Atomic<u64>& seed) {
-    u64 s = seed.Load(LoadMemoryOrder::Relaxed);
+    u64 s = seed.FetchAdd(1, RmwMemoryOrder::Relaxed);
     auto result = fmt::Uuid(s);
     seed.Store(s, StoreMemoryOrder::Relaxed);
     return result;
@@ -143,12 +140,14 @@ consteval DsnInfo ParseDsnOrThrow(String dsn) {
 // dsn must be valid and static
 Sentry* InitGlobalSentry(DsnInfo dsn, Span<Tag const> tag);
 
+// thread-safe, signal-safe, guaranteed to be valid if InitGlobalSentry has been called
+Sentry* GlobalSentry();
+
 // threadsafe, signal-safe, doesn't include useful context info
-// dsn must be valid and static
 void InitBarebonesSentry(Sentry& sentry);
 
 // thread-safe (for Sentry), signal-safe
-PUBLIC ErrorCodeOr<void> EnvelopeAddHeader(Sentry& sentry, Writer writer) {
+PUBLIC ErrorCodeOr<void> EnvelopeAddHeader(Sentry& sentry, Writer writer, bool include_sent_at) {
     ASSERT(sentry.dsn.dsn.size);
 
     json::WriteContext json_writer {
@@ -160,17 +159,13 @@ PUBLIC ErrorCodeOr<void> EnvelopeAddHeader(Sentry& sentry, Writer writer) {
 
     TRY(json::WriteObjectBegin(json_writer));
     TRY(json::WriteKeyValue(json_writer, "dsn", sentry.dsn.dsn));
-    TRY(json::WriteKeyValue(json_writer, "sent_at", TimestampRfc3339UtcNow()));
+    if (include_sent_at) TRY(json::WriteKeyValue(json_writer, "sent_at", TimestampRfc3339UtcNow()));
     TRY(json::WriteKeyValue(json_writer, "event_id", event_id));
     TRY(json::WriteObjectEnd(json_writer));
     TRY(writer.WriteChar('\n'));
 
     return k_success;
 }
-
-// An empty envelope header makes an envelope valid for `sentry-cli send-evelope --raw <file>`
-// If Floe is sending it, it will replace this empty one with better one.
-constexpr String k_empty_header = "{}\n"_s;
 
 enum class SessionStatus {
     Ok,
@@ -276,7 +271,15 @@ EnvelopeAddEvent(Sentry& sentry, Writer writer, ErrorEvent event, bool signal_sa
     ASSERT(event.message.size <= k_max_message_length, "message too long");
     ASSERT(event.tags.size < 100, "too many tags");
 
-    sentry.session_num_errors.FetchAdd(1, RmwMemoryOrder::AcquireRelease);
+    switch (event.level) {
+        case ErrorEvent::Level::Fatal:
+        case ErrorEvent::Level::Error:
+            sentry.session_num_errors.FetchAdd(1, RmwMemoryOrder::AcquireRelease);
+            break;
+        case ErrorEvent::Level::Warning:
+        case ErrorEvent::Level::Info:
+        case ErrorEvent::Level::Debug: break;
+    }
 
     json::WriteContext json_writer {
         .out = writer,
@@ -373,11 +376,14 @@ EnvelopeAddEvent(Sentry& sentry, Writer writer, ErrorEvent event, bool signal_sa
     return k_success;
 }
 
-constexpr auto k_crash_file_extension = "floe-error"_ca;
+constexpr auto k_error_file_extension = "floe-error"_ca;
 
-PUBLIC String UniqueErrorFilepath(String folder, ArenaAllocator& arena) {
-    auto const timestamp = TimestampUtc();
-    auto const filename = fmt::Format(arena, "{}.{}", timestamp, k_crash_file_extension);
+PUBLIC String UniqueErrorFilepath(String folder, Atomic<u64>& seed, ArenaAllocator& arena) {
+    auto s = seed.FetchAdd(1, RmwMemoryOrder::Relaxed);
+    auto const random = RandomU64(s);
+    seed.Store(s, StoreMemoryOrder::Relaxed);
+    auto const id = fmt::IntToString(random, {.base = fmt::IntToStringOptions::Base::Base32});
+    auto const filename = fmt::Format(arena, "{}.{}", id, k_error_file_extension);
     return path::Join(arena, Array {folder, filename});
 }
 
@@ -387,6 +393,8 @@ PUBLIC ErrorCodeOr<void> SendSentryEnvelope(Sentry& sentry,
                                             Optional<Writer> response,
                                             bool fallback_write_to_file,
                                             ArenaAllocator& scratch_arena) {
+    if (envelope_without_header.size == 0) return k_success;
+
     auto const envelope_url =
         fmt::Format(scratch_arena, "https://{}:443/api/{}/envelope/", sentry.dsn.host, sentry.dsn.project_id);
 
@@ -394,7 +402,7 @@ PUBLIC ErrorCodeOr<void> SendSentryEnvelope(Sentry& sentry,
     envelope.Reserve(envelope_without_header.size + 200);
     auto envelope_writer = dyn::WriterFor(envelope);
 
-    auto _ = EnvelopeAddHeader(sentry, envelope_writer);
+    auto _ = EnvelopeAddHeader(sentry, envelope_writer, true);
     auto const envelop_header_size = envelope.size;
     dyn::AppendSpan(envelope, envelope_without_header);
 
@@ -419,9 +427,7 @@ PUBLIC ErrorCodeOr<void> SendSentryEnvelope(Sentry& sentry,
                   },
                   response);
 
-    auto const crash_folder = CrashFolder();
-
-    if (result.HasError() && fallback_write_to_file && crash_folder) {
+    if (result.HasError() && fallback_write_to_file) {
         // We've failed to send it to the server. We don't want to loose the information, so write it to a
         // file.
 
@@ -437,10 +443,11 @@ PUBLIC ErrorCodeOr<void> SendSentryEnvelope(Sentry& sentry,
                 false);
         }
 
-        auto file =
-            TRY(OpenFile(UniqueErrorFilepath(*crash_folder, scratch_arena), FileMode::WriteNoOverwrite));
+        InitLogFolderIfNeeded();
+        auto file = TRY(OpenFile(UniqueErrorFilepath(*LogFolder(), sentry.seed, scratch_arena),
+                                 FileMode::WriteNoOverwrite));
 
-        TRY(file.Write(k_empty_header));
+        TRY(EnvelopeAddHeader(sentry, file.Writer(), false));
         TRY(file.Write(envelope.Items().SubSpan(envelop_header_size)));
 
         return k_success;
@@ -450,15 +457,15 @@ PUBLIC ErrorCodeOr<void> SendSentryEnvelope(Sentry& sentry,
 }
 
 // thread-safe, signal-safe
-PUBLIC ErrorCodeOr<void> WriteErrorToFile(Sentry& sentry,
+PUBLIC ErrorCodeOr<void> WriteCrashToFile(Sentry& sentry,
                                           Optional<StacktraceStack> const& stacktrace,
                                           String folder,
                                           String message,
                                           ArenaAllocator& scratch_arena) {
-    auto file = TRY(OpenFile(UniqueErrorFilepath(folder, scratch_arena), FileMode::WriteNoOverwrite));
+    auto file =
+        TRY(OpenFile(UniqueErrorFilepath(folder, sentry.seed, scratch_arena), FileMode::WriteNoOverwrite));
 
-    TRY(file.Write(k_empty_header));
-
+    TRY(EnvelopeAddHeader(sentry, file.Writer(), false));
     TRY(EnvelopeAddEvent(sentry,
                          file.Writer(),
                          {
@@ -472,9 +479,21 @@ PUBLIC ErrorCodeOr<void> WriteErrorToFile(Sentry& sentry,
     return k_success;
 }
 
+// thread-safe, not signal-safe
+PUBLIC ErrorCodeOr<void> WriteErrorToFile(Sentry& sentry, ErrorEvent const& event) {
+    PathArena path_arena {PageAllocator::Instance()};
+    InitLogFolderIfNeeded();
+    auto file =
+        TRY(OpenFile(UniqueErrorFilepath(*LogFolder(), sentry.seed, path_arena), FileMode::WriteNoOverwrite));
+
+    TRY(EnvelopeAddHeader(sentry, file.Writer(), false));
+    TRY(EnvelopeAddEvent(sentry, file.Writer(), event, false));
+    return k_success;
+}
+
 PUBLIC ErrorCodeOr<void>
 ConsumeAndSendErrorFiles(Sentry& sentry, String folder, ArenaAllocator& scratch_arena) {
-    constexpr auto k_wildcard = ConcatArrays("*."_ca, k_crash_file_extension);
+    constexpr auto k_wildcard = ConcatArrays("*."_ca, k_error_file_extension);
     auto const entries = TRY(FindEntriesInFolder(scratch_arena,
                                                  folder,
                                                  {
@@ -510,11 +529,11 @@ ConsumeAndSendErrorFiles(Sentry& sentry, String folder, ArenaAllocator& scratch_
             dyn::Resize(temp_full_path, temp_full_path_len);
             dyn::AppendSpan(temp_full_path, entry.subpath);
 
-            // Move the file into the temporary directory, this should be atomic so that other processes don't
-            // try and submit the same crash report.
+            // Move the file into the temporary directory, this will be atomic so that other processes don't
+            // try and submit the same error report.
             if (auto const o = Rename(full_path, temp_full_path); o.HasError()) {
                 if (o.Error() == FilesystemError::PathDoesNotExist) continue;
-                g_log.Error(k_main_log_module, "Couldn't move crash file: {}", o.Error());
+                g_log.Error(k_main_log_module, "Couldn't move error file: {}", o.Error());
                 continue;
             }
 
@@ -526,12 +545,18 @@ ConsumeAndSendErrorFiles(Sentry& sentry, String folder, ArenaAllocator& scratch_
             };
 
             auto envelope_without_header = TRY_OR(ReadEntireFile(temp_full_path, scratch_arena), {
-                g_log.Error(k_main_log_module, "Couldn't read crash file: {}", error);
+                g_log.Error(k_main_log_module, "Couldn't read error file: {}", error);
                 continue;
             });
 
-            // Remove the empty envelope header, SendSentryEnvelope will add a correct one.
-            envelope_without_header = TrimStartIfMatches(envelope_without_header, "{}\n"_s);
+            // Remove the envelope header, SendSentryEnvelope will add another one with correct sent_at.
+            // This is done by removing everything up to and including the first newline.
+            auto const newline = Find(envelope_without_header, '\n');
+            if (!newline) {
+                success = true; // file is invalid, ignore it
+                continue;
+            }
+            envelope_without_header.RemovePrefix(*newline + 1);
 
             DynamicArray<char> response {scratch_arena};
 
@@ -542,7 +567,7 @@ ConsumeAndSendErrorFiles(Sentry& sentry, String folder, ArenaAllocator& scratch_
                                       scratch_arena),
                    {
                        g_log.Error(k_main_log_module,
-                                   "Couldn't send crash report to Sentry: {}. {}",
+                                   "Couldn't send error report to Sentry: {}. {}",
                                    error,
                                    response);
                        continue;

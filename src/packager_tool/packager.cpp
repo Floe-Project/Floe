@@ -240,7 +240,7 @@ static ErrorCodeOr<int> Main(ArgsCstr args) {
 
 int main(int argc, char** argv) {
     g_panic_hook = PanicHook;
-    InitCrashFolder();
+    InitLogFolderIfNeeded();
 
     SetThreadName("main");
 

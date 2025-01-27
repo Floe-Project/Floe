@@ -6,12 +6,14 @@
 #include "foundation/foundation.hpp"
 #include "os/misc.hpp"
 
+#include "common_infrastructure/sentry/sentry_worker.hpp"
+
 #include "plugin/plugin.hpp"
 #include "settings/settings_file.hpp"
 
 void SharedEngineSystems::StartPollingThreadIfNeeded() {
-    if (polling_running.Load(LoadMemoryOrder::Relaxed)) return;
-    polling_running.Store(1, StoreMemoryOrder::Relaxed);
+    if (polling_running.Load(LoadMemoryOrder::Acquire)) return;
+    polling_running.Store(1, StoreMemoryOrder::Release);
     polling_thread.Start(
         [this]() {
             try {
@@ -37,7 +39,7 @@ SharedEngineSystems::SharedEngineSystems(Span<sentry::Tag const> tags)
     , sample_library_server(thread_pool,
                             paths.always_scanned_folder[ToInt(ScanFolderType::Libraries)],
                             error_notifications) {
-    sentry::StartThread(sentry_worker, tags);
+    sentry::InitGlobalWorker(tags);
 
     settings.tracking.on_filesystem_change = [this](ScanFolderType type) {
         ASSERT(CheckThreadName("main"));
@@ -73,8 +75,8 @@ SharedEngineSystems::SharedEngineSystems(Span<sentry::Tag const> tags)
 }
 
 SharedEngineSystems::~SharedEngineSystems() {
-    if (polling_running.Load(LoadMemoryOrder::Relaxed)) {
-        polling_running.Store(0, StoreMemoryOrder::Relaxed);
+    if (polling_running.Load(LoadMemoryOrder::Acquire)) {
+        polling_running.Store(0, StoreMemoryOrder::Release);
         WakeWaitingThreads(polling_running, NumWaitingThreads::All);
         polling_thread.Join();
     }
@@ -89,8 +91,10 @@ SharedEngineSystems::~SharedEngineSystems() {
             g_log.Error("global"_log_module, "Failed to write settings file: {}", outcome.Error());
     }
 
-    sentry::RequestThreadEnd(sentry_worker);
-    sentry::WaitForThreadEnd(sentry_worker);
+    auto sentry_worker = sentry::GlobalWorker();
+    ASSERT(sentry_worker);
+    sentry::RequestThreadEnd(*sentry_worker);
+    sentry::WaitForThreadEnd(*sentry_worker);
 }
 
 void SharedEngineSystems::RegisterFloeInstance(clap_plugin const* plugin, FloeInstanceIndex index) {

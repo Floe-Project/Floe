@@ -1589,6 +1589,7 @@ pub fn build(b: *std.Build) void {
                     path ++ "/checksum_crc32_file.cpp",
                     path ++ "/package_format.cpp",
                     path ++ "/sentry/sentry.cpp",
+                    path ++ "/sentry/sentry_worker.cpp",
                     path ++ "/sample_library/audio_file.cpp",
                     path ++ "/sample_library/sample_library_lua.cpp",
                     path ++ "/sample_library/sample_library_mdata.cpp",

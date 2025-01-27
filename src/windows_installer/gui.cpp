@@ -1060,7 +1060,7 @@ static LRESULT CALLBACK PageWindowProc(HWND window, UINT msg, WPARAM w_param, LP
 
 static ErrorCodeOr<void> Main(HINSTANCE h_instance, int cmd_show) {
     g_panic_hook = PanicHook;
-    InitCrashFolder();
+    InitCrashFolderIfNeeded();
 
     SetThreadName("main");
 

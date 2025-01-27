@@ -1074,6 +1074,18 @@ TEST_CASE(TestThread) {
     return k_success;
 }
 
+TEST_CASE(TestCallOnce) {
+    CallOnceFlag flag;
+    int i = 0;
+    CHECK(!OnceFlagCalled(flag));
+    CallOnce(flag, [&]() { i = 1; });
+    CHECK(OnceFlagCalled(flag));
+    CHECK_EQ(i, 1);
+    CallOnce(flag, [&]() { i = 2; });
+    CHECK_EQ(i, 1);
+    return k_success;
+}
+
 TEST_CASE(TestLockableSharedMemory) {
     SUBCASE("Basic creation and initialization") {
         constexpr usize k_size = 1024;
@@ -1179,18 +1191,19 @@ TEST_CASE(TestWeb) {
 }
 
 TEST_REGISTRATION(RegisterOsTests) {
-    REGISTER_TEST(TestEpochTime);
-    REGISTER_TEST(TestThread);
-    REGISTER_TEST(TestFutex);
-    REGISTER_TEST(TestMutex);
-    REGISTER_TEST(TestFilesystem);
-    REGISTER_TEST(TestFileApi);
+    REGISTER_TEST(TestCallOnce);
     REGISTER_TEST(TestDirectoryWatcher);
     REGISTER_TEST(TestDirectoryWatcherErrors);
+    REGISTER_TEST(TestEpochTime);
     REGISTER_TEST(TestFileApi);
-    REGISTER_TEST(TestTimePoint);
-    REGISTER_TEST(TestLockableSharedMemory);
-    REGISTER_TEST(TestOsRandom);
+    REGISTER_TEST(TestFileApi);
+    REGISTER_TEST(TestFilesystem);
+    REGISTER_TEST(TestFutex);
     REGISTER_TEST(TestGetInfo);
+    REGISTER_TEST(TestLockableSharedMemory);
+    REGISTER_TEST(TestMutex);
+    REGISTER_TEST(TestOsRandom);
+    REGISTER_TEST(TestThread);
+    REGISTER_TEST(TestTimePoint);
     REGISTER_TEST(TestWeb);
 }

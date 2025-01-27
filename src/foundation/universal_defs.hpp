@@ -336,6 +336,8 @@ void ResetPanic(); // thread-safe
 // Set the hook at the very start of your program and never change it.
 extern void (*g_panic_hook)(char const* message, SourceLocation loc);
 
+extern thread_local bool g_in_signal_handler;
+
 // NOTE: The expression may be discarded so it mustn't have side effects.
 // NOTE: We don't panic if PanicOccurred() is true because if a panic has happened the state of the program
 // can't be trusted to assert anything about it. Instead, we are just in a 'damage control' mode.

@@ -107,33 +107,13 @@ StdStreamLogger g_cli_out {
 };
 
 void FileLogger::Log(LogModuleName module_name, LogLevel level, String str) {
-    // Could just use a mutex here but this atomic method avoids the class having to have any sort of
-    // destructor which is particularly beneficial at the moment trying to debug a crash at shutdown.
-    //
-    // NOTE: this is not perfect - this method for thread-safety means that logs could be printed out of
-    // order.
-
-    FileLogger::State ex = FileLogger::State::Uninitialised;
-    if (state.CompareExchangeStrong(ex,
-                                    FileLogger::State::Initialising,
-                                    RmwMemoryOrder::Acquire,
-                                    LoadMemoryOrder::Relaxed)) {
-        ArenaAllocatorWithInlineStorage<1000> arena {Malloc::Instance()};
-
-        auto error_log = StdWriter(StdStream::Out);
-        auto const path = FloeKnownDirectory(arena,
-                                             FloeKnownDirectoryType::Logs,
-                                             "floe.log"_s,
-                                             {.create = true, .error_log = &error_log});
-        dyn::Assign(filepath, path);
-        state.Store(FileLogger::State::Initialised, StoreMemoryOrder::Release);
-    } else if (ex == FileLogger::State::Initialising) {
-        do {
-            SpinLoopPause();
-        } while (state.Load(LoadMemoryOrder::Acquire) == FileLogger::State::Initialising);
-    }
-
-    ASSERT(state.Load(LoadMemoryOrder::Relaxed) == FileLogger::State::Initialised);
+    CallOnce(init_flag, [this] {
+        auto error_log = StdWriter(StdStream::Err);
+        filepath = FloeKnownDirectory(path_allocator,
+                                      FloeKnownDirectoryType::Logs,
+                                      "floe.log"_s,
+                                      {.create = true, .error_log = &error_log});
+    });
 
     auto file = ({
         auto outcome = OpenFile(filepath, FileMode::Append);

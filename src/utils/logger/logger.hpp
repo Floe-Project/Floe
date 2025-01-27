@@ -139,9 +139,9 @@ struct FileLogger final : Logger {
     void Log(LogModuleName module_name, LogLevel level, String str) override;
     using Logger::Log;
 
-    enum class State : u32 { Uninitialised, Initialising, Initialised };
-    Atomic<State> state {State::Uninitialised};
-    DynamicArrayBounded<char, 256> filepath;
+    CallOnceFlag init_flag {};
+    FixedSizeAllocator<200> path_allocator {&PageAllocator::Instance()};
+    String filepath {};
 };
 extern FileLogger g_log_file;
 

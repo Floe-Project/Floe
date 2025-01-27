@@ -92,7 +92,7 @@ SharedEngineSystems::~SharedEngineSystems() {
     }
 
     RequestErrorReportingEnd();
-    RequestErrorReportingEnd();
+    WaitForErrorReportingEnd();
 }
 
 void SharedEngineSystems::RegisterFloeInstance(clap_plugin const* plugin, FloeInstanceIndex index) {

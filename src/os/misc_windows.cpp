@@ -419,11 +419,16 @@ SystemStats GetSystemStats() {
                       KEY_READ,
                       &hkey) == ERROR_SUCCESS) {
         // Get CPU Name
-        DWORD size = result.cpu_name.Capacity();
         Array<WCHAR, result.cpu_name.Capacity()> wide_name;
-        if (RegQueryValueExW(hkey, L"ProcessorNameString", nullptr, nullptr, (u8*)wide_name.data, &size) ==
-            ERROR_SUCCESS) {
-            if (size && size <= wide_name.size) {
+        DWORD size_bytes = sizeof(wide_name);
+        if (RegQueryValueExW(hkey,
+                             L"ProcessorNameString",
+                             nullptr,
+                             nullptr,
+                             (u8*)wide_name.data,
+                             &size_bytes) == ERROR_SUCCESS) {
+            auto const size = size_bytes / sizeof(WCHAR);
+            if (((size_bytes % sizeof(WCHAR)) == 0) && size && size <= wide_name.size) {
                 Array<char, MaxNarrowedStringSize(wide_name.size)> narrow_name;
                 if (auto const narrow_size =
                         NarrowToBuffer(narrow_name.data, {(const WCHAR*)wide_name.data, size})) {
@@ -434,9 +439,9 @@ SystemStats GetSystemStats() {
         }
 
         // Get CPU Frequency
-        size = sizeof(DWORD);
+        size_bytes = sizeof(DWORD);
         DWORD mhz;
-        if (RegQueryValueExW(hkey, L"~MHz", nullptr, nullptr, (LPBYTE)&mhz, &size) == ERROR_SUCCESS)
+        if (RegQueryValueExW(hkey, L"~MHz", nullptr, nullptr, (LPBYTE)&mhz, &size_bytes) == ERROR_SUCCESS)
             result.frequency_mhz = mhz;
 
         RegCloseKey(hkey);

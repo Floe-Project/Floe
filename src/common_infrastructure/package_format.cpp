@@ -59,34 +59,36 @@ static ErrorCodeOr<Span<u8 const>> CreateEmptyTestPackage(tests::Tester& tester)
 
 static ErrorCodeOr<void> ReadTestPackage(tests::Tester& tester, Span<u8 const> zip_data) {
     auto reader = Reader::FromMemory(zip_data);
-    BufferLogger error_log {tester.scratch_arena};
+    DynamicArray<char> error_buffer {tester.scratch_arena};
 
     package::PackageReader package {reader};
-    auto outcome = package::ReaderInit(package, error_log);
+    auto outcome = package::ReaderInit(package, dyn::WriterFor(error_buffer));
     if (outcome.HasError()) {
         TEST_FAILED("Failed to create package reader: {}. error_log: {}",
                     ErrorCode {outcome.Error()},
-                    error_log.buffer);
+                    error_buffer);
     }
     DEFER { package::ReaderDeinit(package); };
-    CHECK(error_log.buffer.size == 0);
+    CHECK(error_buffer.size == 0);
 
     package::PackageComponentIndex iterator = 0;
 
     usize components_found = 0;
     while (true) {
         auto const component = ({
-            auto const o =
-                package::IteratePackageComponents(package, iterator, tester.scratch_arena, error_log);
+            auto const o = package::IteratePackageComponents(package,
+                                                             iterator,
+                                                             tester.scratch_arena,
+                                                             dyn::WriterFor(error_buffer));
             if (o.HasError()) {
                 TEST_FAILED("Failed to read package component: {}, error_log: {}",
                             ErrorCode {o.Error()},
-                            error_log.buffer);
+                            error_buffer);
             }
             o.ReleaseValue();
         });
         if (!component) break;
-        CHECK(error_log.buffer.size == 0);
+        CHECK(error_buffer.size == 0);
 
         ++components_found;
         switch (component->type) {
@@ -132,10 +134,10 @@ TEST_CASE(TestPackageFormat) {
         CHECK_NEQ(zip_data.size, 0uz);
 
         auto reader = Reader::FromMemory(zip_data);
-        BufferLogger error_log {tester.scratch_arena};
+        DynamicArray<char> error_buffer {tester.scratch_arena};
 
         package::PackageReader package {reader};
-        auto outcome = package::ReaderInit(package, error_log);
+        auto outcome = package::ReaderInit(package, dyn::WriterFor(error_buffer));
         CHECK(outcome.HasError());
     }
 

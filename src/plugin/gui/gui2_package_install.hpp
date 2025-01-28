@@ -160,7 +160,7 @@ PUBLIC void DoPackageInstallNotifications(GuiBoxSystem& box_system,
                 case package::InstallJob::State::DoneError: {
                     auto err = error_notifs.NewError();
                     err->value = {
-                        .message = String(job.job->error_log.buffer),
+                        .message = String(job.job->error_buffer),
                         .id = HashComptime("package install error"),
                     };
                     fmt::Assign(err->value.title,

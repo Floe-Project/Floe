@@ -69,7 +69,7 @@ struct InstallJob {
 
     Optional<Reader> file_reader {};
     Optional<PackageReader> reader {}; // NOTE: needs uninit
-    BufferLogger error_log;
+    DynamicArray<char> error_buffer {arena};
 
     struct Component {
         package::Component component;
@@ -97,7 +97,7 @@ static ValueOrError<ExistingInstalledComponent, PackageError>
 LibraryCheckExistingInstallation(Component const& component,
                                  sample_lib::Library const* existing_matching_library,
                                  ArenaAllocator& scratch_arena,
-                                 Logger& error_log) {
+                                 Writer error_log) {
     ASSERT(component.type == ComponentType::Library);
     ASSERT(component.library);
 
@@ -161,7 +161,7 @@ static ValueOrError<ExistingInstalledComponent, PackageError>
 PresetsCheckExistingInstallation(Component const& component,
                                  Span<String const> presets_folders,
                                  ArenaAllocator& scratch_arena,
-                                 Logger& error_log) {
+                                 Writer error_log) {
     for (auto const folder : presets_folders) {
         auto const entries = ({
             auto const o = FindEntriesInFolder(scratch_arena,
@@ -356,7 +356,7 @@ static ErrorCodeOr<void> ExtractFolder(PackageReader& package,
 static VoidOrError<PackageError> ReaderInstallComponent(PackageReader& package,
                                                         Component const& component,
                                                         ArenaAllocator& scratch_arena,
-                                                        Logger& error_log,
+                                                        Writer error_log,
                                                         String destination_path,
                                                         InstallJob::DestinationWriteMode write_mode) {
     ASSERT(path::IsAbsolute(destination_path));
@@ -519,7 +519,7 @@ static InstallJob::State DoJobPhase1(InstallJob& job) {
     job.file_reader = ({
         auto o = Reader::FromFile(job.path);
         if (o.HasError()) {
-            job.error_log.Error({}, "couldn't read file {}: {}", path::Filename(job.path), o.Error());
+            fmt::Append(job.error_buffer, "Couldn't read file {}: {}\n", path::Filename(job.path), o.Error());
             return InstallJob::State::DoneError;
         }
         o.ReleaseValue();
@@ -527,7 +527,7 @@ static InstallJob::State DoJobPhase1(InstallJob& job) {
 
     job.reader = PackageReader {.zip_file_reader = *job.file_reader};
 
-    TRY_H(ReaderInit(*job.reader, job.error_log));
+    TRY_H(ReaderInit(*job.reader, dyn::WriterFor(job.error_buffer)));
 
     PackageComponentIndex it {};
     bool user_input_needed = false;
@@ -535,11 +535,12 @@ static InstallJob::State DoJobPhase1(InstallJob& job) {
     constexpr u32 k_max_components = 4000;
     for (; num_components < k_max_components; ++num_components) {
         if (job.abort.Load(LoadMemoryOrder::Acquire)) {
-            job.error_log.Error({}, "aborted");
+            dyn::AppendSpan(job.error_buffer, "aborted\n");
             return InstallJob::State::DoneError;
         }
 
-        auto const component = TRY_H(IteratePackageComponents(*job.reader, it, job.arena, job.error_log));
+        auto const component =
+            TRY_H(IteratePackageComponents(*job.reader, it, job.arena, dyn::WriterFor(job.error_buffer)));
         if (!component) {
             // end of folders
             break;
@@ -563,7 +564,8 @@ static InstallJob::State DoJobPhase1(InstallJob& job) {
 
                         constexpr u32 k_timeout_ms = 120 * 1000;
                         if (wait_ms >= k_timeout_ms) {
-                            job.error_log.Error({}, "timed out waiting for sample libraries to be scanned");
+                            dyn::AppendSpan(job.error_buffer,
+                                            "timed out waiting for sample libraries to be scanned\n");
                             return InstallJob::State::DoneError;
                         }
                     }
@@ -576,7 +578,7 @@ static InstallJob::State DoJobPhase1(InstallJob& job) {
                         detail::LibraryCheckExistingInstallation(*component,
                                                                  existing_lib ? &*existing_lib : nullptr,
                                                                  job.arena,
-                                                                 job.error_log));
+                                                                 dyn::WriterFor(job.error_buffer)));
                     if (existing_lib) {
                         destination_path = job.arena.Clone(*path::Directory(existing_lib->path));
                         write_mode = InstallJob::DestinationWriteMode::OverwriteDirectly;
@@ -591,7 +593,7 @@ static InstallJob::State DoJobPhase1(InstallJob& job) {
                     r = TRY_H(detail::PresetsCheckExistingInstallation(*component,
                                                                        job.preset_folders,
                                                                        job.arena,
-                                                                       job.error_log));
+                                                                       dyn::WriterFor(job.error_buffer)));
                     destination_path = job.presets_install_folder;
                     write_mode = InstallJob::DestinationWriteMode::CreateUniqueSubpath;
                     break;
@@ -614,7 +616,7 @@ static InstallJob::State DoJobPhase1(InstallJob& job) {
     }
 
     if (num_components == k_max_components) {
-        job.error_log.Error({}, "too many components in package");
+        dyn::AppendSpan(job.error_buffer, "too many components in package\n");
         return InstallJob::State::DoneError;
     }
 
@@ -628,7 +630,7 @@ static InstallJob::State DoJobPhase2(InstallJob& job) {
 
     for (auto& component : job.components) {
         if (job.abort.Load(LoadMemoryOrder::Acquire)) {
-            job.error_log.Error({}, "aborted");
+            dyn::AppendSpan(job.error_buffer, "aborted\n");
             return InstallJob::State::DoneError;
         }
 
@@ -642,7 +644,7 @@ static InstallJob::State DoJobPhase2(InstallJob& job) {
         TRY_H(ReaderInstallComponent(*job.reader,
                                      component.component,
                                      job.arena,
-                                     job.error_log,
+                                     dyn::WriterFor(job.error_buffer),
                                      component.destination_path,
                                      component.destination_write_mode));
 
@@ -694,7 +696,7 @@ PUBLIC InstallJob* CreateInstallJob(ArenaAllocator& arena, CreateJobOptions opts
         .presets_install_folder = arena.Clone(opts.presets_install_folder),
         .sample_lib_server = opts.server,
         .preset_folders = arena.Clone(opts.preset_folders, CloneType::Deep),
-        .error_log = {arena},
+        .error_buffer = {arena},
         .components = {arena},
     };
     return j;
@@ -744,7 +746,7 @@ PUBLIC void OnAllUserInputReceived(InstallJob& job, ThreadPool& thread_pool) {
         try {
             package::DoJobPhase2(job);
         } catch (PanicException) {
-            job.error_log.Error({}, "fatal error");
+            dyn::AppendSpan(job.error_buffer, "fatal error\n");
             job.state.Store(InstallJob::State::DoneError, StoreMemoryOrder::Release);
         }
     });
@@ -842,7 +844,7 @@ PUBLIC void AddJob(InstallJobs& jobs,
         try {
             package::DoJobPhase1(*job->job);
         } catch (PanicException) {
-            job->job->error_log.Error({}, "fatal error");
+            dyn::AppendSpan(job->job->error_buffer, "fatal error\n");
             job->job->state.Store(InstallJob::State::DoneError, StoreMemoryOrder::Release);
         }
     });

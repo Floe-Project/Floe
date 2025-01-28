@@ -33,7 +33,7 @@ struct Tag {
 static_assert(Cloneable<Tag>);
 
 struct ErrorEvent {
-    // NOTE: in Sentry, all events are 'errors' regardless of their level
+    // NOTE: in Sentry, all events are 'issues' regardless of their level
     enum class Level {
         Fatal,
         Error,
@@ -85,7 +85,7 @@ struct Sentry {
 
 namespace detail {
 
-// NOTE: in Sentry, releases are created when an Event payload (error) is sent with a release tag for the
+// NOTE: in Sentry, releases are created when an Event payload is sent with a release tag for the
 // first time. We use an unchanging release tag for dev builds.
 static constexpr String k_release = PRODUCTION_BUILD ? String {"floe@" FLOE_VERSION_STRING} : "floe@dev";
 static constexpr usize k_max_message_length = 8192;
@@ -299,7 +299,7 @@ enum class SessionStatus {
 }
 
 // thread-safe (for Sentry), signal-safe if signal_safe is true
-// NOTE (Jan 2025): all events are 'errors' in Sentry, there's no plain logging concept
+// NOTE (Jan 2025): all events are 'issues' in Sentry, there's no pure informational concept
 [[maybe_unused]] PUBLIC ErrorCodeOr<void>
 EnvelopeAddEvent(Sentry& sentry, Writer writer, ErrorEvent event, bool signal_safe) {
     ASSERT(event.message.size <= detail::k_max_message_length, "message too long");

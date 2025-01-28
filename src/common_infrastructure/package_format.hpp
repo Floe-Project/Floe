@@ -426,7 +426,7 @@ ReaderChecksumValuesForDir(PackageReader& package, String dir_in_zip, ArenaAlloc
 }
 
 template <typename... Args>
-static PackageError CreatePackageError(Logger& error_log, ErrorCode error, Args const&... args) {
+static PackageError CreatePackageError(Writer error_log, ErrorCode error, Args const&... args) {
     auto const package_error = ({
         PackageError e;
         if (error.category == &PackageErrorCodeType())
@@ -463,7 +463,8 @@ static PackageError CreatePackageError(Logger& error_log, ErrorCode error, Args 
     }
     if (possible_fix.size) fmt::Append(error_buffer, " {}.", possible_fix);
 
-    error_log.Error({}, error_buffer);
+    auto _ = error_log.WriteChars(error_buffer);
+    auto _ = error_log.WriteChar('\n');
     g_log.Info(k_log_mod, "Package error: {}. {}", error_buffer, error);
 
     return package_error;
@@ -471,7 +472,7 @@ static PackageError CreatePackageError(Logger& error_log, ErrorCode error, Args 
 
 } // namespace detail
 
-PUBLIC VoidOrError<PackageError> ReaderInit(PackageReader& package, Logger& error_log) {
+PUBLIC VoidOrError<PackageError> ReaderInit(PackageReader& package, Writer error_log) {
     mz_zip_zero_struct(&package.zip);
     package.zip.m_pRead =
         [](void* io_opaque_ptr, mz_uint64 file_offset, void* buffer, usize buffer_size) -> usize {
@@ -536,7 +537,7 @@ PUBLIC ValueOrError<Optional<Component>, PackageError>
 IteratePackageComponents(PackageReader& package,
                          PackageComponentIndex& file_index,
                          ArenaAllocator& arena,
-                         Logger& error_log) {
+                         Writer error_log) {
     DEFER { ++file_index; };
     for (; file_index < mz_zip_reader_get_num_files(&package.zip); ++file_index) {
         auto const file_stat = ({

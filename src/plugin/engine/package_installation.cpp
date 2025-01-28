@@ -152,8 +152,8 @@ static ErrorCodeOr<void> Test(tests::Tester& tester, TestOptions options) {
     }
 
     if (options.expected_state != InstallJob::State::DoneError) {
-        CHECK(job->error_log.buffer.size == 0);
-        if (job->error_log.buffer.size > 0) tester.log.Error("Unexpected errors: {}", job->error_log.buffer);
+        CHECK(job->error_buffer.size == 0);
+        if (job->error_buffer.size > 0) tester.log.Error("Unexpected errors: {}", job->error_buffer);
     }
 
     TRY(PrintDirectory(tester,

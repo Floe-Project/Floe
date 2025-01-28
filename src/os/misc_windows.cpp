@@ -407,7 +407,7 @@ String GetFileBrowserAppName() { return "File Explorer"; }
 
 SystemStats GetSystemStats() {
     SystemStats result {};
-    SYSTEM_INFO system_info;
+    SYSTEM_INFO system_info {};
     GetNativeSystemInfo(&system_info);
     result.num_logical_cpus = (u32)system_info.dwNumberOfProcessors;
     result.page_size = (u32)system_info.dwPageSize;
@@ -420,13 +420,17 @@ SystemStats GetSystemStats() {
                       &hkey) == ERROR_SUCCESS) {
         // Get CPU Name
         DWORD size = result.cpu_name.Capacity();
-        if (RegQueryValueExW(hkey,
-                             L"ProcessorNameString",
-                             nullptr,
-                             nullptr,
-                             (u8*)(char*)result.cpu_name.data,
-                             &size) == ERROR_SUCCESS) {
-            if (size <= result.cpu_name.Capacity()) result.cpu_name.size = size;
+        Array<WCHAR, result.cpu_name.Capacity()> wide_name;
+        if (RegQueryValueExW(hkey, L"ProcessorNameString", nullptr, nullptr, (u8*)wide_name.data, &size) ==
+            ERROR_SUCCESS) {
+            if (size && size <= wide_name.size) {
+                Array<char, MaxNarrowedStringSize(wide_name.size)> narrow_name;
+                if (auto const narrow_size =
+                        NarrowToBuffer(narrow_name.data, {(const WCHAR*)wide_name.data, size})) {
+                    dyn::Assign(result.cpu_name, String {narrow_name.data, *narrow_size});
+                    if (result.cpu_name.size && Last(result.cpu_name) == '\0') result.cpu_name.size--;
+                }
+            }
         }
 
         // Get CPU Frequency

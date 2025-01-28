@@ -25,7 +25,7 @@ static ErrorCodeOr<sample_lib::Library*> LoadTestLibrary(tests::Tester& tester) 
     auto lib_outcome =
         sample_lib::ReadLua(reader, test_floe_lua_path, tester.scratch_arena, tester.scratch_arena);
     if (lib_outcome.HasError()) {
-        tester.log.Error({}, "Failed to read library from test lua file: {}", lib_outcome.Error().message);
+        tester.log.Error("Failed to read library from test lua file: {}", lib_outcome.Error().message);
         return lib_outcome.Error().code;
     }
     auto lib = lib_outcome.ReleaseValue();

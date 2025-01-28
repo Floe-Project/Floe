@@ -22,31 +22,24 @@ TEST_CASE(TestTaggedUnion) {
 
     SUBCASE("visit") {
         u = 999;
-        u.Visit([&](auto const& arg) {
-            tester.log.Debug(k_foundation_mod_cat, "Tagged union value is: {}", arg);
-        });
+        u.Visit([&](auto const& arg) { tester.log.Debug("Tagged union value is: {}", arg); });
 
         u = 3.14f;
-        u.Visit([&](auto const& arg) {
-            tester.log.Debug(k_foundation_mod_cat, "Tagged union value is: {}", arg);
-        });
+        u.Visit([&](auto const& arg) { tester.log.Debug("Tagged union value is: {}", arg); });
 
         u = E::D;
-        u.Visit([&](auto const&) {
-            tester.log.Debug(k_foundation_mod_cat, "ERROR not expected a tag without a type to be called");
-        });
+        u.Visit(
+            [&](auto const&) { tester.log.Debug("ERROR not expected a tag without a type to be called"); });
 
         u = "hello"_s;
-        u.Visit([&](auto const& arg) {
-            tester.log.Debug(k_foundation_mod_cat, "Tagged union value is: {}", arg);
-        });
+        u.Visit([&](auto const& arg) { tester.log.Debug("Tagged union value is: {}", arg); });
 
-        tester.log.Debug({}, "Formatting a tagged union: {}", u);
+        tester.log.Debug("Formatting a tagged union: {}", u);
     }
 
     SUBCASE("format") {
         u = "hello"_s;
-        tester.log.Debug({}, "Formatting a tagged union: {}", u);
+        tester.log.Debug("Formatting a tagged union: {}", u);
     }
 
     SUBCASE("comparison") {
@@ -1185,7 +1178,7 @@ TEST_CASE(TestHashTable) {
         {
             auto v = tab.Find("bar");
             REQUIRE(v);
-            tester.log.Debug({}, "{}", *v);
+            tester.log.Debug("{}", *v);
         }
 
         {
@@ -1193,7 +1186,7 @@ TEST_CASE(TestHashTable) {
             for (auto item : tab) {
                 CHECK(item.value_ptr);
                 CHECK(item.key.size);
-                tester.log.Debug(k_foundation_mod_cat, "{} -> {}", item.key, *item.value_ptr);
+                tester.log.Debug("{} -> {}", item.key, *item.value_ptr);
                 if (item.key == "112") (*item.value_ptr)++;
                 ++count;
             }
@@ -1725,13 +1718,13 @@ TEST_CASE(TestFormat) {
             char const* c;
         };
         TestStruct const test {1, 2, "three"};
-        tester.log.Debug(k_foundation_mod_cat, "struct1 is: {}", fmt::DumpStruct(test));
+        tester.log.Debug("struct1 is: {}", fmt::DumpStruct(test));
 
         auto const arr = Array {
             TestStruct {1, 2, "three"},
             TestStruct {4, 5, "six"},
         };
-        tester.log.Debug(k_foundation_mod_cat, "struct2 is: {}", fmt::DumpStruct(arr));
+        tester.log.Debug("struct2 is: {}", fmt::DumpStruct(arr));
 
         struct OtherStruct {
             int a;
@@ -1741,9 +1734,9 @@ TEST_CASE(TestFormat) {
             TestStruct e;
         };
         OtherStruct const other {1, 2, "three", {4, 5, "six"}, {7, 8, "nine"}};
-        tester.log.Debug(k_foundation_mod_cat, "struct3 is: {}", fmt::DumpStruct(other));
+        tester.log.Debug("struct3 is: {}", fmt::DumpStruct(other));
 
-        tester.log.Debug(k_foundation_mod_cat, "struct4 is: {}", fmt::DumpStruct(tester));
+        tester.log.Debug("struct4 is: {}", fmt::DumpStruct(tester));
     }
 
     SUBCASE("DateAndTime") {
@@ -2775,7 +2768,7 @@ TEST_CASE(TestAllocatorTypes) {
         else
             PanicIfReached();
 
-        tester.log.Debug(k_foundation_mod_cat, "Speed benchmark: {} for {}", stopwatch, type_name);
+        tester.log.Debug("Speed benchmark: {} for {}", stopwatch, type_name);
     }
     return k_success;
 }

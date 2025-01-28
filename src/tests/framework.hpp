@@ -128,14 +128,46 @@ class PassedSubcaseStacks {
     DynamicArray<u64> m_hashes;
 };
 
-struct TestLogger : Logger {
-    TestLogger(Tester& tester) : tester(tester) {}
-    void Log(LogModuleName module_name, LogLevel level, String str) override;
-    Tester& tester;
-    LogLevel max_level_allowed = LogLevel::Info;
-};
-
 struct Tester {
+    struct TestLogger {
+        TestLogger(Tester& tester) : tester(tester) {}
+
+        template <typename... Args>
+        void Debug(String format, Args const&... args) {
+            Log(LogLevel::Debug, format, args...);
+        }
+        template <typename... Args>
+        void Info(String format, Args const&... args) {
+            Log(LogLevel::Info, format, args...);
+        }
+        template <typename... Args>
+        void Warning(String format, Args const&... args) {
+            Log(LogLevel::Warning, format, args...);
+        }
+        template <typename... Args>
+        void Error(String format, Args const&... args) {
+            Log(LogLevel::Error, format, args...);
+        }
+
+        template <typename... Args>
+        void Log(LogLevel level, String format, Args const&... args) {
+            if (level < max_level_allowed) return;
+            auto writer = StdWriter(StdStream::Err);
+            if (tester.current_test_case)
+                auto _ = fmt::FormatToWriter(writer, "[ {} ] ", tester.current_test_case->title);
+            if (level == LogLevel::Error) auto _ = writer.WriteChars(ANSI_COLOUR_SET_FOREGROUND_RED);
+            if constexpr (sizeof...(args) == 0)
+                auto _ = writer.WriteChars(format);
+            else
+                auto _ = fmt::FormatToWriter(writer, format, args...);
+            if (level == LogLevel::Error) auto _ = writer.WriteChars(ANSI_COLOUR_RESET);
+            auto _ = writer.WriteChar('\n');
+        }
+
+        Tester& tester;
+        LogLevel max_level_allowed = LogLevel::Info;
+    };
+
     // public
     TestLogger log {*this};
     ArenaAllocator scratch_arena {PageAllocator::Instance()};

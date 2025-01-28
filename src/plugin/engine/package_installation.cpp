@@ -42,7 +42,7 @@ static String TestPresetsFolder(tests::Tester& tester) {
 static ErrorCodeOr<sample_lib::Library*> LoadTestLibrary(tests::Tester& tester, String lib_subpath) {
     auto const format = sample_lib::DetermineFileFormat(lib_subpath);
     if (!format.HasValue()) {
-        tester.log.Error({}, "Unknown file format for '{}'", lib_subpath);
+        tester.log.Error("Unknown file format for '{}'", lib_subpath);
         return ErrorCode {PackageError::InvalidLibrary};
     }
 
@@ -52,7 +52,7 @@ static ErrorCodeOr<sample_lib::Library*> LoadTestLibrary(tests::Tester& tester, 
         sample_lib::Read(reader, format.Value(), path, tester.scratch_arena, tester.scratch_arena);
 
     if (lib_outcome.HasError()) {
-        tester.log.Error({}, "Failed to read library from test lua file: {}", lib_outcome.Error().message);
+        tester.log.Error("Failed to read library from test lua file: {}", lib_outcome.Error().message);
         return lib_outcome.Error().code;
     }
     auto lib = lib_outcome.ReleaseValue();
@@ -80,9 +80,9 @@ static ErrorCodeOr<void> PrintDirectory(tests::Tester& tester, String dir, Strin
     auto it = TRY(dir_iterator::RecursiveCreate(tester.scratch_arena, dir, {}));
     DEFER { dir_iterator::Destroy(it); };
 
-    tester.log.Debug({}, "{} Contents of '{}':", heading, dir);
+    tester.log.Debug("{} Contents of '{}':", heading, dir);
     while (auto const entry = TRY(dir_iterator::Next(it, tester.scratch_arena)))
-        tester.log.Debug({}, "  {}", entry->subpath);
+        tester.log.Debug("  {}", entry->subpath);
 
     return k_success;
 }
@@ -153,8 +153,7 @@ static ErrorCodeOr<void> Test(tests::Tester& tester, TestOptions options) {
 
     if (options.expected_state != InstallJob::State::DoneError) {
         CHECK(job->error_log.buffer.size == 0);
-        if (job->error_log.buffer.size > 0)
-            tester.log.Error({}, "Unexpected errors: {}", job->error_log.buffer);
+        if (job->error_log.buffer.size > 0) tester.log.Error("Unexpected errors: {}", job->error_log.buffer);
     }
 
     TRY(PrintDirectory(tester,

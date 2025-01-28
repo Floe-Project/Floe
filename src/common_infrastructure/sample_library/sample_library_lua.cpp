@@ -1733,7 +1733,7 @@ TEST_CASE(TestWordWrap) {
         "This is a very long sentence that will be split into multiple lines, with any luck at least.",
         dyn::WriterFor(buffer),
         30));
-    tester.log.Debug(k_log_module, "{}", buffer);
+    tester.log.Debug("{}", buffer);
     return k_success;
 }
 
@@ -1745,10 +1745,9 @@ TEST_CASE(TestDocumentedExampleIsValid) {
     LuaCodePrinter printer;
     TRY(printer.PrintWholeLua(dyn::WriterFor(buf),
                               {.mode_flags = LuaCodePrinter::PrintModeFlagsDocumentedExample}));
-    tester.log.Debug(k_log_module, "{}", buf);
+    tester.log.Debug("{}", buf);
     auto o = ReadLua(buf, FAKE_ABSOLUTE_PATH_PREFIX "doc.lua", result_arena, scratch_arena);
-    if (auto err = o.TryGet<Error>())
-        tester.log.Error(k_log_module, "Error: {}, {}", err->code, err->message);
+    if (auto err = o.TryGet<Error>()) tester.log.Error("Error: {}, {}", err->code, err->message);
     CHECK(o.Is<Library*>());
 
     return k_success;
@@ -1764,10 +1763,10 @@ TEST_CASE(TestIncorrectParameters) {
         CHECK(o.Is<Error>());
         if (o.Is<Error>()) {
             auto const err = o.Get<Error>();
-            tester.log.Debug(k_log_module, "Success: this error was expected: {}, {}", err.code, err.message);
+            tester.log.Debug("Success: this error was expected: {}, {}", err.code, err.message);
             CHECK(o.Get<Error>().code == LuaErrorCode::Runtime);
         } else
-            tester.log.Error(k_log_module, "Error: not expecting this code to succeed: {}", lua);
+            tester.log.Error("Error: not expecting this code to succeed: {}", lua);
     };
 
     SUBCASE("all arguments are functions") {
@@ -1870,8 +1869,7 @@ TEST_CASE(TestAutoMapKeyRange) {
     SUBCASE("2 files") {
         auto r =
             ReadLua(create_lua(Array {10, 30}), FAKE_ABSOLUTE_PATH_PREFIX "test.lua", result_arena, arena);
-        if (auto err = r.TryGet<Error>())
-            tester.log.Error(k_log_module, "Error: {}, {}", err->code, err->message);
+        if (auto err = r.TryGet<Error>()) tester.log.Error("Error: {}, {}", err->code, err->message);
         REQUIRE(!r.Is<Error>());
 
         auto library = r.Get<Library*>();
@@ -1890,8 +1888,7 @@ TEST_CASE(TestAutoMapKeyRange) {
 
     SUBCASE("1 file") {
         auto r = ReadLua(create_lua(Array {60}), FAKE_ABSOLUTE_PATH_PREFIX "test.lua", result_arena, arena);
-        if (auto err = r.TryGet<Error>())
-            tester.log.Error(k_log_module, "Error: {}, {}", err->code, err->message);
+        if (auto err = r.TryGet<Error>()) tester.log.Error("Error: {}, {}", err->code, err->message);
         REQUIRE(!r.Is<Error>());
 
         auto library = r.Get<Library*>();
@@ -1949,8 +1946,7 @@ TEST_CASE(TestBasicFile) {
                      FAKE_ABSOLUTE_PATH_PREFIX "test.lua",
                      result_arena,
                      arena);
-    if (auto err = r.TryGet<Error>())
-        tester.log.Error(k_log_module, "Error: {}, {}", err->code, err->message);
+    if (auto err = r.TryGet<Error>()) tester.log.Error("Error: {}, {}", err->code, err->message);
     REQUIRE(!r.Is<Error>());
 
     auto& lib = *r.Get<Library*>();
@@ -2015,13 +2011,12 @@ TEST_CASE(TestErrorHandling) {
         if (auto err = outcome.TryGetFromTag<ResultType::Error>()) {
             if (expected.Succeeded()) {
                 tester.log.Error(
-                    k_log_module,
                     "Error: we expected the lua code to succeed interpretation but it failed. Lua code:\n{}\nError:\n{d}, {}",
                     lua_code,
                     err->code,
                     err->message);
             } else {
-                tester.log.Debug(k_log_module, "Success: failure expected: {}", err->code);
+                tester.log.Debug("Success: failure expected: {}", err->code);
             }
 
             REQUIRE(expected.HasError());
@@ -2029,7 +2024,6 @@ TEST_CASE(TestErrorHandling) {
         } else {
             if (expected.HasError()) {
                 tester.log.Error(
-                    k_log_module,
                     "Error: we expected the lua code to fail interpretation but it succeeded. Lua code:\n{}",
                     lua_code);
             }

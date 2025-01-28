@@ -8,24 +8,10 @@
 #include "os/filesystem.hpp"
 #include "os/misc.hpp"
 #include "utils/debug/debug.hpp"
-#include "utils/logger/logger.hpp"
 
 namespace tests {
 
 struct TestFailed {};
-
-void TestLogger::Log(LogModuleName module_name, LogLevel level, String str) {
-    if (level < max_level_allowed) return;
-    ArenaAllocatorWithInlineStorage<1000> arena {Malloc::Instance()};
-    DynamicArray<char> buf {arena};
-    if (tester.current_test_case) fmt::Append(buf, "[ {} ] ", tester.current_test_case->title);
-    if (level == LogLevel::Error) dyn::AppendSpan(buf, ANSI_COLOUR_SET_FOREGROUND_RED);
-    if (module_name.str.size) fmt::Append(buf, "[{}] ", module_name.str);
-    fmt::Append(buf, "{}", str);
-    if (level == LogLevel::Error) dyn::AppendSpan(buf, ANSI_COLOUR_RESET);
-    dyn::Append(buf, '\n');
-    auto _ = StdPrint(StdStream::Err, buf);
-}
 
 void RegisterTest(Tester& tester, TestFunction f, String title) {
     dyn::Append(tester.test_cases, TestCase {f, title});
@@ -58,13 +44,13 @@ String TempFilename(Tester& tester) {
 static Optional<String> SearchUpwardsFromExeForFolder(Tester& tester, String folder_name) {
     auto const path_outcome = CurrentExecutablePath(tester.scratch_arena);
     if (path_outcome.HasError()) {
-        tester.log.Error({}, "failed to get the current exe path: {}", path_outcome.Error());
+        tester.log.Error("failed to get the current exe path: {}", path_outcome.Error());
         return k_nullopt;
     }
 
     auto result = SearchForExistingFolderUpwards(path_outcome.Value(), folder_name, tester.arena);
     if (!result) {
-        tester.log.Error({}, "failed to find {} folder", folder_name);
+        tester.log.Error("failed to find {} folder", folder_name);
         return k_nullopt;
     }
     return result;
@@ -97,8 +83,7 @@ String HumanCheckableOutputFilesFolder(Tester& tester) {
         } else {
             tester.human_checkable_output_files_folder = output_dir;
         }
-        tester.log.Info({},
-                        "Human checkable output files folder: {}",
+        tester.log.Info("Human checkable output files folder: {}",
                         *tester.human_checkable_output_files_folder);
     }
     return *tester.human_checkable_output_files_folder;
@@ -128,7 +113,7 @@ int RunAllTests(Tester& tester, Span<String> filter_patterns) {
             auto _ = Delete(*tester.temp_folder, {.type = DeleteOptions::Type::DirectoryRecursively});
     };
 
-    g_cli_out.Info({}, "Running tests ...");
+    tester.log.Info("Running tests ...");
     Stopwatch const overall_stopwatch;
 
     for (auto& test_case : tester.test_cases) {
@@ -144,7 +129,7 @@ int RunAllTests(Tester& tester, Span<String> filter_patterns) {
         }
 
         tester.current_test_case = &test_case;
-        tester.log.Debug({}, "Running ...");
+        tester.log.Debug("Running ...");
 
         tester.subcases_passed.Clear();
         tester.fixture_pointer = nullptr;
@@ -165,22 +150,22 @@ int RunAllTests(Tester& tester, Span<String> filter_patterns) {
                 if (result.outcome.HasError()) {
                     tester.should_reenter = false;
                     tester.current_test_case->failed = true;
-                    tester.log.Error({}, "Failed: test returned an error:\n{}", result.outcome.Error());
+                    tester.log.Error("Failed: test returned an error:\n{}", result.outcome.Error());
                     if (result.stacktrace.HasValue()) {
                         ASSERT(result.stacktrace.Value().size);
                         auto const str = StacktraceString(result.stacktrace.Value(), tester.scratch_arena);
-                        tester.log.Info({}, "Stacktrace:\n{}", str);
+                        tester.log.Info("Stacktrace:\n{}", str);
                     }
                 }
             } catch (TestFailed const& _) {
             } catch (PanicException) {
                 tester.should_reenter = false;
                 tester.current_test_case->failed = true;
-                tester.log.Error({}, "Failed: test panicked");
+                tester.log.Error("Failed: test panicked");
             } catch (...) {
                 tester.should_reenter = false;
                 tester.current_test_case->failed = true;
-                tester.log.Error({}, "Failed: an exception was thrown");
+                tester.log.Error("Failed: an exception was thrown");
             }
 
             if (!tester.should_reenter) run_test = false;
@@ -189,29 +174,28 @@ int RunAllTests(Tester& tester, Span<String> filter_patterns) {
         if (tester.delete_fixture) tester.delete_fixture(tester.fixture_pointer, tester.fixture_arena);
 
         if (!test_case.failed)
-            tester.log.Debug({}, ANSI_COLOUR_FOREGROUND_GREEN("Passed") " ({})\n", stopwatch);
+            tester.log.Debug(ANSI_COLOUR_FOREGROUND_GREEN("Passed") " ({})\n", stopwatch);
         else
-            tester.log.Error({}, "Failed\n");
+            tester.log.Error("Failed\n");
     }
     tester.current_test_case = nullptr;
 
-    g_cli_out.Info({}, "Summary");
-    g_cli_out.Info({}, "--------");
-    g_cli_out.Info({}, "Assertions: {}", tester.num_assertions);
-    g_cli_out.Info({}, "Tests: {}", tester.test_cases.size);
-    g_cli_out.Info({}, "Time taken: {.2}s", overall_stopwatch.SecondsElapsed());
+    tester.log.Info("Summary");
+    tester.log.Info("--------");
+    tester.log.Info("Assertions: {}", tester.num_assertions);
+    tester.log.Info("Tests: {}", tester.test_cases.size);
+    tester.log.Info("Time taken: {.2}s", overall_stopwatch.SecondsElapsed());
 
     if (tester.num_warnings == 0)
-        g_cli_out.Info({}, "Warnings: " ANSI_COLOUR_FOREGROUND_GREEN("0"));
+        tester.log.Info("Warnings: " ANSI_COLOUR_FOREGROUND_GREEN("0"));
     else
-        g_cli_out.Info({},
-                       "Warnings: " ANSI_COLOUR_SET_FOREGROUND_RED "{}" ANSI_COLOUR_RESET,
-                       tester.num_warnings);
+        tester.log.Info("Warnings: " ANSI_COLOUR_SET_FOREGROUND_RED "{}" ANSI_COLOUR_RESET,
+                        tester.num_warnings);
 
     auto const num_failed = CountIf(tester.test_cases, [](TestCase const& t) { return t.failed; });
     if (num_failed == 0) {
-        g_cli_out.Info({}, "Failed: " ANSI_COLOUR_FOREGROUND_GREEN("0"));
-        g_cli_out.Info({}, "Result: " ANSI_COLOUR_FOREGROUND_GREEN("Success"));
+        tester.log.Info("Failed: " ANSI_COLOUR_FOREGROUND_GREEN("0"));
+        tester.log.Info("Result: " ANSI_COLOUR_FOREGROUND_GREEN("Success"));
     } else {
         DynamicArray<char> failed_test_names {tester.scratch_arena};
         for (auto& test_case : tester.test_cases) {
@@ -224,11 +208,10 @@ int RunAllTests(Tester& tester, Span<String> filter_patterns) {
             }
         }
 
-        g_cli_out.Info({},
-                       "Failed: " ANSI_COLOUR_SET_FOREGROUND_RED "{}" ANSI_COLOUR_RESET "{}",
-                       num_failed,
-                       failed_test_names);
-        g_cli_out.Info({}, "Result: " ANSI_COLOUR_SET_FOREGROUND_RED "Failure");
+        tester.log.Info("Failed: " ANSI_COLOUR_SET_FOREGROUND_RED "{}" ANSI_COLOUR_RESET "{}",
+                        num_failed,
+                        failed_test_names);
+        tester.log.Info("Result: " ANSI_COLOUR_SET_FOREGROUND_RED "Failure");
     }
 
     return num_failed ? 1 : 0;
@@ -248,10 +231,10 @@ void Check(Tester& tester,
         else if (failure_aciton == FailureAction::LogWarningAndContinue)
             pretext = "WARNING issued";
 
-        tester.log.Error({}, "{}: {}", pretext, message);
-        tester.log.Error({}, "  File      {}:{}", file, line);
+        tester.log.Error("{}: {}", pretext, message);
+        tester.log.Error("  File      {}:{}", file, line);
         for (auto const& s : tester.subcases_stack)
-            tester.log.Error({}, "  SUBCASE   {}", s.name);
+            tester.log.Error("  SUBCASE   {}", s.name);
 
         auto capture = tester.capture_buffer.UsedStackData();
         if (capture.size) {
@@ -259,11 +242,11 @@ void Check(Tester& tester,
 
             while (auto pos = Find(capture_str, '\n')) {
                 String const part {capture_str.data, *pos};
-                tester.log.Error({}, part);
+                tester.log.Error(part);
 
                 capture_str.RemovePrefix(*pos + 1);
             }
-            if (capture_str.size) tester.log.Error({}, capture_str);
+            if (capture_str.size) tester.log.Error(capture_str);
         }
 
         auto _ = PrintCurrentStacktrace(StdStream::Err, {}, 3);
@@ -303,7 +286,7 @@ Subcase::Subcase(Tester& tester, String name, String file, int line) : tester(te
         fmt::Append(buf, "\"{}\"", subcase.name);
         if (&subcase != &Last(tester.subcases_stack)) dyn::AppendSpan(buf, " -> ");
     }
-    tester.log.Debug({}, buf);
+    tester.log.Debug(buf);
 }
 
 Subcase::~Subcase() {

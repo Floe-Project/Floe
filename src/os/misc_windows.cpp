@@ -510,14 +510,14 @@ TEST_CASE(TestWindowsErrors) {
         auto e = Win32ErrorCode(ERROR_TOO_MANY_OPEN_FILES, "ERROR_TOO_MANY_OPEN_FILES");
         auto message = fmt::Format(a, "{}", e);
         REQUIRE(message.size);
-        tester.log.Debug({}, "{}", e);
+        tester.log.Debug("{}", e);
     }
 
     SUBCASE("Win32 HRESULT") {
         auto e = HresultErrorCode(E_OUTOFMEMORY, "E_OUTOFMEMORY");
         auto message = fmt::Format(a, "{}", e);
         REQUIRE(message.size);
-        tester.log.Debug({}, "{}", e);
+        tester.log.Debug("{}", e);
     }
 
     return k_success;

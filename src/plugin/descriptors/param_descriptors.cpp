@@ -473,24 +473,24 @@ TEST_CASE(TestParamStringConversion) {
     {
         auto const& attack_param =
             k_param_descriptors[ToInt(ParamIndexFromLayerParamIndex(0, LayerParamIndex::VolumeAttack))];
-        tester.log.Debug({}, "Attack param id: {}", attack_param.id);
+        tester.log.Debug("Attack param id: {}", attack_param.id);
         auto const str = attack_param.LinearValueToString(0.4708353049341293f);
         REQUIRE(str);
         auto const val = attack_param.StringToLinearValue(*str);
         REQUIRE(val);
         auto const str2 = attack_param.LinearValueToString(*val);
-        tester.log.Debug({}, "Attack param str: {}, value: {}, str2: {}", *str, *val, *str2);
+        tester.log.Debug("Attack param str: {}, value: {}, str2: {}", *str, *val, *str2);
     }
     {
         auto const& detune_param =
             k_param_descriptors[ToInt(ParamIndexFromLayerParamIndex(0, LayerParamIndex::TuneCents))];
-        tester.log.Debug({}, "Detune param id: {}", detune_param.id);
+        tester.log.Debug("Detune param id: {}", detune_param.id);
         auto const str = detune_param.LinearValueToString(-0.010595884688319623f);
         REQUIRE(str);
         auto const val = detune_param.StringToLinearValue(*str);
         REQUIRE(val);
         auto const str2 = detune_param.LinearValueToString(*val);
-        tester.log.Debug({}, "Detune param str: {}, value: {}, str2: {}", *str, *val, *str2);
+        tester.log.Debug("Detune param str: {}, value: {}, str2: {}", *str, *val, *str2);
     }
     return k_success;
 }

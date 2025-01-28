@@ -411,7 +411,7 @@ TEST_CASE(TestFilesystem) {
                 return;
             }
             REQUIRE(o.HasValue());
-            tester.log.Debug(k_os_log_module, o.Value());
+            tester.log.Debug(o.Value());
             REQUIRE(path::IsAbsolute(o.Value()));
         };
 
@@ -421,12 +421,12 @@ TEST_CASE(TestFilesystem) {
     }
 
     SUBCASE("KnownDirectory") {
-        auto error_writer = ErrorWriter(tester.log);
+        auto error_writer = StdWriter(StdStream::Err);
         for (auto const i : Range(ToInt(KnownDirectoryType::Count))) {
             auto type = (KnownDirectoryType)i;
-            auto known_folder = KnownDirectory(a, type, {.create = false, .error_log = &error_writer.writer});
+            auto known_folder = KnownDirectory(a, type, {.create = false, .error_log = &error_writer});
             String type_name = EnumToString(type);
-            tester.log.Debug(k_os_log_module, "Found {} dir: {} ", type_name, known_folder);
+            tester.log.Debug("Found {} dir: {} ", type_name, known_folder);
             CHECK(path::IsAbsolute(known_folder));
         }
     }
@@ -434,7 +434,7 @@ TEST_CASE(TestFilesystem) {
     SUBCASE("TemporaryDirectoryOnSameFilesystemAs") {
         auto const abs_path = KnownDirectory(tester.arena, KnownDirectoryType::GlobalData, {.create = true});
         auto temp_dir = TRY(TemporaryDirectoryOnSameFilesystemAs(abs_path, a));
-        tester.log.Debug(k_os_log_module, "Temporary directory on same filesystem: {}", temp_dir);
+        tester.log.Debug("Temporary directory on same filesystem: {}", temp_dir);
         CHECK(path::IsAbsolute(temp_dir));
         CHECK(GetFileType(temp_dir).HasValue());
     }
@@ -555,7 +555,7 @@ TEST_CASE(TestFilesystem) {
             auto const filename = tests::TempFilename(tester);
             TRY(WriteFile(filename, "data"_s));
             auto trashed_file = TRY(TrashFileOrDirectory(filename, tester.scratch_arena));
-            tester.log.Debug(k_os_log_module, "File in trash: {}", trashed_file);
+            tester.log.Debug("File in trash: {}", trashed_file);
             CHECK(GetFileType(filename).HasError());
         }
 
@@ -565,7 +565,7 @@ TEST_CASE(TestFilesystem) {
             auto const subfile = path::Join(tester.scratch_arena, Array {folder, "subfile.txt"});
             TRY(WriteFile(subfile, "data"_s));
             auto trashed_folder = TRY(TrashFileOrDirectory(folder, tester.scratch_arena));
-            tester.log.Debug(k_os_log_module, "Folder in trash: {}", trashed_folder);
+            tester.log.Debug("Folder in trash: {}", trashed_folder);
         }
     }
 
@@ -620,13 +620,12 @@ TEST_CASE(TestDirectoryWatcher) {
         };
 
         if (auto const dir_changes_span = TRY(PollDirectoryChanges(watcher, args)); dir_changes_span.size) {
-            tester.log.Debug(k_os_log_module, "Unexpected result");
+            tester.log.Debug("Unexpected result");
             for (auto const& dir_changes : dir_changes_span) {
-                tester.log.Debug(k_os_log_module, "  {}", dir_changes.linked_dir_to_watch->path);
-                tester.log.Debug(k_os_log_module, "  {}", dir_changes.error);
+                tester.log.Debug("  {}", dir_changes.linked_dir_to_watch->path);
+                tester.log.Debug("  {}", dir_changes.error);
                 for (auto const& subpath_changeset : dir_changes.subpath_changesets)
-                    tester.log.Debug(k_os_log_module,
-                                     "    {} {}",
+                    tester.log.Debug("    {} {}",
                                      subpath_changeset.subpath,
                                      DirectoryWatcher::ChangeType::ToString(subpath_changeset.changes));
             }
@@ -647,14 +646,14 @@ TEST_CASE(TestDirectoryWatcher) {
 
                     CHECK(path::Equal(path, dir));
                     if (directory_changes.error) {
-                        tester.log.Debug(k_os_log_module, "Error in {}: {}", path, *directory_changes.error);
+                        tester.log.Debug("Error in {}: {}", path, *directory_changes.error);
                         continue;
                     }
                     CHECK(!directory_changes.error.HasValue());
 
                     for (auto const& subpath_changeset : directory_changes.subpath_changesets) {
                         if (subpath_changeset.changes & DirectoryWatcher::ChangeType::ManualRescanNeeded) {
-                            tester.log.Error(k_os_log_module, "Manual rescan needed for {}", path);
+                            tester.log.Error("Manual rescan needed for {}", path);
                             continue;
                         }
 
@@ -671,8 +670,7 @@ TEST_CASE(TestDirectoryWatcher) {
                             }
                         }
 
-                        tester.log.Debug(k_os_log_module,
-                                         "{} change: \"{}\" {{ {} }} in \"{}\"",
+                        tester.log.Debug("{} change: \"{}\" {{ {} }} in \"{}\"",
                                          was_expected ? "Expected" : "Unexpected",
                                          subpath_changeset.subpath,
                                          DirectoryWatcher::ChangeType::ToString(subpath_changeset.changes),
@@ -687,8 +685,7 @@ TEST_CASE(TestDirectoryWatcher) {
                 CAPTURE(expected.subpath);
                 CAPTURE(DirectoryWatcher::ChangeType::ToString(expected.changes));
                 if (!found_expected[index]) {
-                    tester.log.Debug(k_os_log_module,
-                                     "Expected change not found: {} {}",
+                    tester.log.Debug("Expected change not found: {} {}",
                                      expected.subpath,
                                      DirectoryWatcher::ChangeType::ToString(expected.changes));
                 }
@@ -763,7 +760,6 @@ TEST_CASE(TestDirectoryWatcher) {
                         CHECK(found_delete_self);
                     } else {
                         tester.log.Debug(
-                            k_os_log_module,
                             "Failed to delete root watched dir: {}. This is probably normal behaviour",
                             delete_outcome.Error());
                     }
@@ -779,8 +775,7 @@ TEST_CASE(TestDirectoryWatcher) {
                     // file object really moves and perhaps a rename like this doesn't do that. Either way I
                     // think we just need to check nothing bad happens in this case and that will do.
                 } else {
-                    tester.log.Debug(k_os_log_module,
-                                     "Failed to move root watched dir: {}. This is probably normal behaviour",
+                    tester.log.Debug("Failed to move root watched dir: {}. This is probably normal behaviour",
                                      move_outcome.Error());
                 }
             }
@@ -1016,7 +1011,7 @@ TEST_CASE(TestTimePoint) {
     REQUIRE(ApproxEqual(SecondsToMilliseconds(t2 - t1), us / 1000.0, 0.1));
     REQUIRE(ApproxEqual(t2 - t1, us / (1000.0 * 1000.0), 0.1));
 
-    tester.log.Debug(k_os_log_module, "Time has passed: {}", sw);
+    tester.log.Debug("Time has passed: {}", sw);
     return k_success;
 }
 
@@ -1140,7 +1135,7 @@ TEST_CASE(TestWeb) {
         if (o.HasError()) {
             LOG_WARNING("Failed to HttpsGet: {}", o.Error());
         } else {
-            tester.log.Debug(k_os_log_module, "GET response: {}", buffer);
+            tester.log.Debug("GET response: {}", buffer);
 
             using namespace json;
             auto parse_o = json::Parse(buffer,
@@ -1168,7 +1163,7 @@ TEST_CASE(TestWeb) {
         if (o.HasError()) {
             LOG_WARNING("Failed to HttpsPost: {}", o.Error());
         } else {
-            tester.log.Debug(k_os_log_module, "POST response: {}", buffer);
+            tester.log.Debug("POST response: {}", buffer);
 
             using namespace json;
             auto parse_o = json::Parse(buffer,

@@ -1726,12 +1726,12 @@ static Type& ExtractSuccess(tests::Tester& tester, LoadResult const& result, Loa
     switch (request.tag) {
         case LoadRequestType::Instrument: {
             auto inst = request.Get<LoadRequestInstrumentIdWithLayer>();
-            tester.log.Debug(k_log_module, "Instrument: {} - {}", inst.id.library, inst.id.inst_name);
+            tester.log.Debug("Instrument: {} - {}", inst.id.library, inst.id.inst_name);
             break;
         }
         case LoadRequestType::Ir: {
             auto ir = request.Get<sample_lib::IrId>();
-            tester.log.Debug(k_log_module, "Ir: {} - {}", ir.library, ir.ir_name);
+            tester.log.Debug("Ir: {} - {}", ir.library, ir.ir_name);
             break;
         }
     }
@@ -2120,7 +2120,7 @@ TEST_CASE(TestSampleLibraryLoader) {
             auto const countdown_result = countdown.WaitUntilZero(timeout_secs * 1000);
 
             if (countdown_result == WaitResult::TimedOut) {
-                tester.log.Error(k_log_module, "Timed out waiting for library resource loading to complete");
+                tester.log.Error("Timed out waiting for library resource loading to complete");
                 server.request_debug_dump_current_state.Store(true, StoreMemoryOrder::Release);
                 server.work_signaller.Signal();
                 SleepThisThread(1000);
@@ -2135,8 +2135,7 @@ TEST_CASE(TestSampleLibraryLoader) {
                     if (r->id == request.request_id) {
                         for (auto& n : fixture.error_notif.items) {
                             if (auto e = n.TryScoped()) {
-                                tester.log.Debug(k_log_module,
-                                                 "Error Notification  {}: {}: {}",
+                                tester.log.Debug("Error Notification  {}: {}: {}",
                                                  e->title,
                                                  e->message,
                                                  e->error_code);
@@ -2224,7 +2223,7 @@ TEST_CASE(TestSampleLibraryLoader) {
         auto const countdown_result = countdown.WaitUntilZero(k_timeout_secs * 1000);
 
         if (countdown_result == WaitResult::TimedOut) {
-            tester.log.Error(k_log_module, "Timed out waiting for library resource loading to complete");
+            tester.log.Error("Timed out waiting for library resource loading to complete");
             server.request_debug_dump_current_state.Store(true, StoreMemoryOrder::Release);
             SleepThisThread(1000);
             // We need to hard-exit without cleaning up because the loading thread is probably deadlocked

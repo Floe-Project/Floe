@@ -279,7 +279,7 @@ Process(tests::Tester& tester, clap_plugin const* plugin, ArenaAllocator& arena,
             .out_events = &out_events,
         };
 
-        tester.log.Debug({}, "processing {} frames with {} events", block_size, events.size);
+        tester.log.Debug("processing {} frames with {} events", block_size, events.size);
 
         auto const status = plugin->process(plugin, &process);
         CHECK(status != CLAP_PROCESS_ERROR);

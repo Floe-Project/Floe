@@ -19,7 +19,7 @@ namespace sentry {
 constexpr auto k_log_module = "sentry"_log_module;
 
 struct Tag {
-    Tag Clone(Allocator& arena) const {
+    Tag Clone(Allocator& arena, CloneType) const {
         return Tag {
             .key = key.Clone(arena),
             .value = value.Clone(arena),
@@ -29,6 +29,8 @@ struct Tag {
     String key;
     String value;
 };
+
+static_assert(Cloneable<Tag>);
 
 struct ErrorEvent {
     // NOTE: in Sentry, all events are 'errors' regardless of their level

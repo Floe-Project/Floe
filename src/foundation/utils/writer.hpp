@@ -54,3 +54,43 @@ struct Writer {
     void* object = {};
     usize bytes_written = {};
 };
+
+// This is based on Zig's BufferedWriter
+// https://github.com/ziglang/zig
+// Copyright (c) Zig contributors
+// SPDX-License-Identifier: MIT
+template <usize k_size>
+struct BufferedWriter {
+    ErrorCodeOr<void> Flush() {
+        if (end) {
+            TRY(unbuffered_writer.WriteBytes({buf.data, end}));
+            end = 0;
+        }
+        return k_success;
+    }
+
+    ::Writer Writer() {
+        ::Writer result;
+        result.Set<BufferedWriter>(*this,
+                                   [](BufferedWriter& self, Span<u8 const> bytes) -> ErrorCodeOr<void> {
+                                       return self.Write(bytes);
+                                   });
+        return result;
+    }
+
+    ErrorCodeOr<void> Write(Span<u8 const> bytes) {
+        if (end + bytes.size > buf.size) {
+            TRY(Flush());
+            if (bytes.size > buf.size) return unbuffered_writer.WriteBytes(bytes);
+        }
+
+        ASSERT(end + bytes.size <= buf.size);
+        __builtin_memcpy(buf.data + end, bytes.data, bytes.size);
+        end += bytes.size;
+        return k_success;
+    }
+
+    ::Writer unbuffered_writer;
+    Array<u8, k_size> buf = {};
+    usize end {};
+};

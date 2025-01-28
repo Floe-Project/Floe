@@ -10,7 +10,7 @@
 ErrorCodeOr<void> WriteFormattedLog(Writer writer,
                                     String module_name,
                                     LogLevel level,
-                                    String message,
+                                    MessageWriteFunction write_message,
                                     WriteFormattedLogOptions options) {
     bool needs_space = false;
     bool needs_open_bracket = true;
@@ -67,80 +67,104 @@ ErrorCodeOr<void> WriteFormattedLog(Writer writer,
     auto const prefix_was_written = !needs_open_bracket;
 
     if (prefix_was_written) TRY(writer.WriteChars("] "));
-    TRY(writer.WriteChars(message));
-    if (prefix_was_written || message.size) {
-        if (!message.size || (message.size && message[message.size - 1] != '\n')) TRY(writer.WriteChar('\n'));
-    }
+    TRY(write_message(writer));
+    TRY(writer.WriteChar('\n'));
     return k_success;
 }
 
 void Logger::Trace(LogModuleName module_name, String message, SourceLocation loc) {
-    DynamicArrayBounded<char, 1000> buf;
-    fmt::Append(buf, "trace: {}({}): {}", FromNullTerminated(loc.file), loc.line, loc.function);
-    if (message.size) fmt::Append(buf, ": {}", message);
-
-    Log(module_name, LogLevel::Debug, buf);
-}
-
-void StdStreamLogger::Log(LogModuleName module_name, LogLevel level, String str) {
-    auto& mutex = StdStreamMutex(stream);
-    mutex.Lock();
-    DEFER { mutex.Unlock(); };
-
-    auto _ = WriteFormattedLog(StdWriter(stream), module_name.str, level, str, config);
-}
-
-StdStreamLogger g_debug_log {
-    StdStream::Out,
-    WriteFormattedLogOptions {.ansi_colors = true,
-                              .no_info_prefix = false,
-                              .timestamp = true,
-                              .thread = true},
-};
-
-StdStreamLogger g_cli_out {
-    StdStream::Out,
-    WriteFormattedLogOptions {.ansi_colors = true,
-                              .no_info_prefix = true,
-                              .timestamp = false,
-                              .thread = false},
-};
-
-void FileLogger::Log(LogModuleName module_name, LogLevel level, String str) {
-    CallOnce(init_flag, [this] {
-        auto error_log = StdWriter(StdStream::Err);
-        filepath = FloeKnownDirectory(path_allocator,
-                                      FloeKnownDirectoryType::Logs,
-                                      "floe.log"_s,
-                                      {.create = true, .error_log = &error_log});
+    Log(module_name, LogLevel::Debug, [&](Writer writer) -> ErrorCodeOr<void> {
+        TRY(fmt::FormatToWriter(writer,
+                                "trace: {}({}): {}",
+                                FromNullTerminated(loc.file),
+                                loc.line,
+                                loc.function));
+        if (message.size) TRY(fmt::FormatToWriter(writer, ": {}", message));
+        return k_success;
     });
+}
 
-    auto file = ({
-        auto outcome = OpenFile(filepath, FileMode::Append);
-        if (outcome.HasError()) {
-            g_debug_log.Debug(k_global_log_module,
-                              "failed to open log file {}: {}",
-                              filepath,
-                              outcome.Error());
-            return;
+LogConfig g_log_config {};
+
+void Logger::Log(LogModuleName module_name,
+                 LogLevel level,
+                 FunctionRef<ErrorCodeOr<void>(Writer)> write_message) {
+    if (level < g_log_config.min_level_allowed.Load(LoadMemoryOrder::Relaxed)) return;
+
+    static auto log_to_stderr = [](LogModuleName module_name,
+                                   LogLevel level,
+                                   FunctionRef<ErrorCodeOr<void>(Writer)> write_message) {
+        constexpr WriteFormattedLogOptions k_config {
+            .ansi_colors = true,
+            .no_info_prefix = false,
+            .timestamp = true,
+            .thread = true,
+        };
+        auto& mutex = StdStreamMutex(StdStream::Err);
+        mutex.Lock();
+        DEFER { mutex.Unlock(); };
+
+        BufferedWriter<Kb(4)> buffered_writer {StdWriter(StdStream::Err)};
+        DEFER { auto _ = buffered_writer.Flush(); };
+
+        auto _ = WriteFormattedLog(buffered_writer.Writer(), module_name.str, level, write_message, k_config);
+    };
+
+    switch (g_log_config.destination.Load(LoadMemoryOrder::Relaxed)) {
+        case LogConfig::Destination::Stderr: {
+            log_to_stderr(module_name, level, write_message);
+            break;
         }
-        outcome.ReleaseValue();
-    });
+        case LogConfig::Destination::File: {
+            InitLogFolderIfNeeded();
 
-    auto writer = file.Writer();
-    auto o = WriteFormattedLog(writer,
-                               module_name.str,
-                               level,
-                               str,
-                               {
-                                   .ansi_colors = false,
-                                   .no_info_prefix = false,
-                                   .timestamp = true,
-                               });
-    if (o.HasError())
-        g_debug_log.Debug(k_global_log_module, "failed to write log file: {}, {}", filepath, o.Error());
+            auto file = ({
+                constexpr String k_filename = "floe.log";
+                constexpr usize k_buffer_size = 256;
+                auto const log_folder = *LogFolder();
+                if (log_folder.size + 1 + k_filename.size > k_buffer_size) {
+                    log_to_stderr(k_global_log_module, LogLevel::Error, [](Writer writer) {
+                        return writer.WriteChars("log file path too long"_s);
+                    });
+                    return;
+                }
+
+                auto outcome = OpenFile(path::JoinInline<k_buffer_size>(Array {*LogFolder(), k_filename}),
+                                        FileMode::Append);
+                if (outcome.HasError()) {
+                    log_to_stderr(k_global_log_module,
+                                  LogLevel::Error,
+                                  [&outcome](Writer writer) -> ErrorCodeOr<void> {
+                                      return fmt::FormatToWriter(writer,
+                                                                 "failed to open log file: {}"_s,
+                                                                 outcome.Error());
+                                  });
+                    return;
+                }
+                outcome.ReleaseValue();
+            });
+
+            BufferedWriter<Kb(4)> buffered_writer {file.Writer()};
+            DEFER { auto _ = buffered_writer.Flush(); };
+
+            auto o = WriteFormattedLog(buffered_writer.Writer(),
+                                       module_name.str,
+                                       level,
+                                       write_message,
+                                       {
+                                           .ansi_colors = false,
+                                           .no_info_prefix = false,
+                                           .timestamp = true,
+                                       });
+            if (o.HasError()) {
+                log_to_stderr(k_global_log_module, LogLevel::Error, [o](Writer writer) {
+                    return fmt::FormatToWriter(writer, "failed to write log file: {}"_s, o.Error());
+                });
+            }
+
+            break;
+        }
+    }
 }
 
-FileLogger g_log_file {};
-
-DefaultLogger g_log {};
+Logger g_log {};

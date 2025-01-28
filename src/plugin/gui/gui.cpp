@@ -456,7 +456,7 @@ Gui::Gui(GuiFrameInput& frame_input, Engine& engine)
                       gui->frame_input.request_update.Store(true, StoreMemoryOrder::Relaxed);
                   },
           })) {
-    g_log_file.Trace(k_gui_log_module);
+    g_log.Trace(k_gui_log_module);
 
     editor.imgui = &imgui;
     imgui.user_callback_data = this;
@@ -468,7 +468,7 @@ Gui::~Gui() {
     layout::DestroyContext(layout);
     sample_lib_server::CloseAsyncCommsChannel(engine.shared_engine_systems.sample_library_server,
                                               sample_lib_server_async_channel);
-    g_log_file.Trace(k_gui_log_module);
+    g_log.Trace(k_gui_log_module);
     if (midi_keyboard_note_held_with_mouse) {
         engine.processor.events_for_audio_thread.Push(
             GuiNoteClickReleased {.key = midi_keyboard_note_held_with_mouse.Value()});

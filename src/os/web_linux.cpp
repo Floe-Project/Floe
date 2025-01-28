@@ -45,10 +45,7 @@ ErrorCodeOr<void> HttpsGet(String url, Writer writer, RequestOptions options) {
     long http_code = 0;
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
     if (http_code != 200) {
-        g_debug_log.Debug({},
-                          "Reponse is non-200: {}, error: {}",
-                          http_code,
-                          FromNullTerminated(error_buffer));
+        g_log.Debug({}, "Reponse is non-200: {}, error: {}", http_code, FromNullTerminated(error_buffer));
         return ErrorCode {WebError::Non200Response};
     }
     if (return_code != CURLE_OK) {
@@ -56,7 +53,7 @@ ErrorCodeOr<void> HttpsGet(String url, Writer writer, RequestOptions options) {
             return_code == CURLE_COULDNT_RESOLVE_HOST) {
             return ErrorCode {WebError::NetworkError};
         }
-        g_debug_log.Debug({}, "CURL ERROR: {}, {}", (int)return_code, FromNullTerminated(error_buffer));
+        g_log.Debug({}, "CURL ERROR: {}, {}", (int)return_code, FromNullTerminated(error_buffer));
         return ErrorCode {WebError::ApiError};
     }
 
@@ -104,14 +101,11 @@ ErrorCodeOr<void> HttpsPost(String url,
     long http_code = 0;
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
     if (http_code != 200) {
-        g_debug_log.Debug({},
-                          "Reponse is non-200: {}, error: {}",
-                          http_code,
-                          FromNullTerminated(error_buffer));
+        g_log.Debug({}, "Reponse is non-200: {}, error: {}", http_code, FromNullTerminated(error_buffer));
         return ErrorCode {WebError::Non200Response};
     }
     if (return_code != CURLE_OK) {
-        g_debug_log.Debug({}, "CURL ERROR: {}, {}", (int)return_code, FromNullTerminated(error_buffer));
+        g_log.Debug({}, "CURL ERROR: {}, {}", (int)return_code, FromNullTerminated(error_buffer));
         return ErrorCode {WebError::ApiError};
     }
 

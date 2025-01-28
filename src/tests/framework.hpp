@@ -152,7 +152,9 @@ struct Tester {
         template <typename... Args>
         void Log(LogLevel level, String format, Args const&... args) {
             if (level < max_level_allowed) return;
-            auto writer = StdWriter(StdStream::Err);
+            BufferedWriter<Kb(4)> buffered_writer {StdWriter(StdStream::Err)};
+            auto writer = buffered_writer.Writer();
+            DEFER { auto _ = buffered_writer.Flush(); };
             if (tester.current_test_case)
                 auto _ = fmt::FormatToWriter(writer, "[ {} ] ", tester.current_test_case->title);
             if (level == LogLevel::Error) auto _ = writer.WriteChars(ANSI_COLOUR_SET_FOREGROUND_RED);

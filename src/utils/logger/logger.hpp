@@ -5,7 +5,6 @@
 #include "foundation/foundation.hpp"
 #include "os/misc.hpp"
 #include "os/threading.hpp"
-#include "utils/debug/tracy_wrapped.hpp"
 
 enum class LogLevel { Debug, Info, Warning, Error };
 
@@ -16,10 +15,12 @@ struct WriteFormattedLogOptions {
     bool thread = false;
 };
 
+using MessageWriteFunction = FunctionRef<ErrorCodeOr<void>(Writer)>;
+
 ErrorCodeOr<void> WriteFormattedLog(Writer writer,
                                     String module_name,
                                     LogLevel level,
-                                    String message,
+                                    MessageWriteFunction write_message,
                                     WriteFormattedLogOptions options);
 
 // Strongly-typed string so that it's not confused with strings and string formatting
@@ -44,21 +45,24 @@ constexpr auto k_global_log_module = "🌍global"_log_module;
 // main infrastructure related to the core of the application, the 'app' or 'instance' object
 constexpr auto k_main_log_module = "🚀main"_log_module;
 
+struct LogConfig {
+    enum class Destination { Stderr, File };
+    Atomic<Destination> destination = Destination::Stderr;
+    Atomic<LogLevel> min_level_allowed = PRODUCTION_BUILD ? LogLevel::Info : LogLevel::Debug;
+};
+
+extern LogConfig g_log_config;
+
 struct Logger {
-    virtual ~Logger() = default;
-    virtual void Log(LogModuleName module_name, LogLevel level, String str) = 0;
+    static void
+    Log(LogModuleName module_name, LogLevel level, FunctionRef<ErrorCodeOr<void>(Writer)> write_message);
 
-    using LogAllocator = ArenaAllocatorWithInlineStorage<2000>;
-
-    // NOTE: you will have to use `using Logger::Log` in the derived class to bring this in
     template <typename... Args>
     void Log(LogModuleName module_name, LogLevel level, String format, Args const&... args) {
-        static_assert(sizeof...(args) != 0);
-        LogAllocator log_allocator {Malloc::Instance()};
-        Log(module_name, level, fmt::Format(log_allocator, format, args...));
+        Log(module_name, level, [&](Writer writer) { return fmt::FormatToWriter(writer, format, args...); });
     }
 
-    void
+    static void
     Trace(LogModuleName module_name, String message = {}, SourceLocation loc = SourceLocation::Current());
 
     // A macro unfortunatly seems the best way to avoid repeating the same code while keep template
@@ -66,12 +70,12 @@ struct Logger {
 #define DECLARE_LOG_FUNCTION(level)                                                                          \
     template <typename... Args>                                                                              \
     void level(LogModuleName module_name, String format, Args const&... args) {                              \
-        if constexpr (LogLevel::level == LogLevel::Debug && PRODUCTION_BUILD) return;                        \
         if constexpr (sizeof...(args) == 0) {                                                                \
             Log(module_name, LogLevel::level, format);                                                       \
         } else {                                                                                             \
-            LogAllocator log_allocator {Malloc::Instance()};                                                 \
-            Log(module_name, LogLevel::level, fmt::Format(log_allocator, format, args...));                  \
+            Log(module_name, LogLevel::level, [&](Writer writer) {                                           \
+                return fmt::FormatToWriter(writer, format, args...);                                         \
+            });                                                                                              \
         }                                                                                                    \
     }
 
@@ -81,37 +85,7 @@ struct Logger {
     DECLARE_LOG_FUNCTION(Warning)
 };
 
-struct StdStreamLogger final : Logger {
-    StdStreamLogger(StdStream stream, WriteFormattedLogOptions config) : stream(stream), config(config) {}
-    void Log(LogModuleName module_name, LogLevel level, String str) override;
-    using Logger::Log; // Bring in the templated Log function
-    StdStream const stream;
-    WriteFormattedLogOptions const config;
-};
-
-// Debug log to STDOUT. The purpose of the log is to diagnose issues. Some tools like valgrind make it
-// difficult to capture STDERR easily. Let's just keep things simple and use STDOUT for everything.
-extern StdStreamLogger g_debug_log;
-
-// Timestamped log file
-struct FileLogger final : Logger {
-    void Log(LogModuleName module_name, LogLevel level, String str) override;
-    using Logger::Log;
-
-    CallOnceFlag init_flag {};
-    FixedSizeAllocator<200> path_allocator {&PageAllocator::Instance()};
-    String filepath {};
-};
-extern FileLogger g_log_file;
-
-struct DefaultLogger final : Logger {
-    void Log(LogModuleName module_name, LogLevel level, String str) override {
-        if constexpr (!PRODUCTION_BUILD) g_debug_log.Log(module_name, level, str);
-        g_log_file.Log(module_name, level, str);
-    }
-    using Logger::Log;
-};
-extern DefaultLogger g_log;
+extern Logger g_log;
 
 #define DBG_PRINT_EXPR(x)     g_log.Debug({}, "{}: {} = {}", __FUNCTION__, #x, x)
 #define DBG_PRINT_EXPR2(x, y) g_log.Debug({}, "{}: {} = {}, {} = {}", __FUNCTION__, #x, x, #y, y)

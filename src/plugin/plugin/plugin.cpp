@@ -1150,7 +1150,7 @@ clap_plugin const floe_plugin {
 FloePluginInstance::FloePluginInstance(clap_host const* host, FloeInstanceIndex index)
     : host(*host)
     , index(index) {
-    g_log_file.Trace(k_main_log_module);
+    g_log.Trace(k_main_log_module);
     clap_plugin = floe_plugin;
     clap_plugin.plugin_data = this;
 }

@@ -29,6 +29,25 @@ static void ShutdownTracy() {
 PUBLIC void GlobalInit(GlobalInitOptions options) {
     if (options.set_main_thread) SetThreadName("main");
 
+    g_log_config.destination.Store(({
+                                       LogConfig::Destination d;
+                                       switch (g_final_binary_type) {
+                                           case FinalBinaryType::Clap:
+                                           case FinalBinaryType::AuV2:
+                                           case FinalBinaryType::Vst3:
+                                               d = LogConfig::Destination::File;
+                                               break;
+                                           case FinalBinaryType::Standalone:
+                                           case FinalBinaryType::Packager:
+                                           case FinalBinaryType::WindowsInstaller:
+                                           case FinalBinaryType::Tests:
+                                               d = LogConfig::Destination::Stderr;
+                                               break;
+                                       }
+                                       d;
+                                   }),
+                                   StoreMemoryOrder::Relaxed);
+
     SetPanicHook([](char const* message_c_str, SourceLocation loc) {
         // We don't have to be signal-safe here.
 

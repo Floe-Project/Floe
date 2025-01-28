@@ -166,6 +166,7 @@
               pkgs.lychee # link checker
               pkgs.zig
               pkgs.zls
+              pkgs.sentry-cli
 
               # dsymutil internally calls "lipo", so we have to make sure it's available under that name
               (pkgs.writeShellScriptBin "lipo" "llvm-lipo $@")

@@ -1300,7 +1300,7 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
 
                 while (true) {
                     if (base >= end || ((usize)(end - base) < min_chunk_size)) {
-                        g_log.Error(k_log_module, "ERROR: invalid data received");
+                        LogError(k_log_module, "ERROR: invalid data received");
                         error = true;
                         break;
                     }
@@ -1326,7 +1326,7 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                         __builtin_memcpy_inline(&event, base, sizeof(event));
 
                         if ((base + event.NextEntryOffset) > end) {
-                            g_log.Debug(
+                            LogDebug(
                                 k_log_module,
                                 "ERROR: invalid data received: NextEntryOffset points outside of buffer: FileNameLength: {}, NextEntryOffset: {}",
                                 event.FileNameLength,
@@ -1337,7 +1337,7 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
 
                         auto const num_wchars = event.FileNameLength / sizeof(wchar_t);
                         if (num_wchars > filename_buf.size) {
-                            g_log.Debug(
+                            LogDebug(
                                 k_log_module,
                                 "ERROR: filename too long for buffer ({} chars): FileNameLength: {}, NextEntryOffset: {}, bytes_transferred: {}, min_chunk_size: {}",
                                 num_wchars,
@@ -1371,10 +1371,10 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                     if (changes) {
                         auto const narrowed = Narrow(args.result_arena, filename);
                         if (narrowed.HasValue()) {
-                            g_log.Debug(k_log_module,
-                                        "Change: {} {}",
-                                        DirectoryWatcher::ChangeType::ToString(changes),
-                                        narrowed.Value());
+                            LogDebug(k_log_module,
+                                     "Change: {} {}",
+                                     DirectoryWatcher::ChangeType::ToString(changes),
+                                     narrowed.Value());
                             dir.directory_changes.Add(
                                 {
                                     .subpath = narrowed.Value(),

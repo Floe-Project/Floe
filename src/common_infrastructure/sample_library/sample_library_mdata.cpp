@@ -539,7 +539,7 @@ ReadMdata(Reader& reader, String filepath, ArenaAllocator& result_arena, ArenaAl
     auto library = ({
         auto o = ReadMdataFile(result_arena, scratch_arena, reader);
         if (o.HasError()) {
-            g_log.Debug(k_log_mod, "Failed to read mdata file: {}", o.Error());
+            LogDebug(k_log_mod, "Failed to read mdata file: {}", o.Error());
             return Error {o.Error(), {}};
         }
         o.Value();

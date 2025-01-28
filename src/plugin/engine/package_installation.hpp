@@ -302,7 +302,7 @@ static ErrorCodeOr<void> ExtractFile(PackageReader& package, String file_path, S
     };
 
     auto const file_stat = find_file(file_path).Value();
-    g_log.Debug(k_log_mod, "Extracting file: {} to {}", file_path, destination_path);
+    LogDebug(k_log_mod, "Extracting file: {} to {}", file_path, destination_path);
     auto out_file = TRY(OpenFile(destination_path, FileMode::WriteNoOverwrite));
     return detail::ExtractFileToFile(package, file_stat, out_file);
 }
@@ -312,7 +312,7 @@ static ErrorCodeOr<void> ExtractFolder(PackageReader& package,
                                        String destination_folder,
                                        ArenaAllocator& scratch_arena,
                                        HashTable<String, ChecksumValues> destination_checksums) {
-    g_log.Info(k_log_mod, "Extracting folder: {} to {}", dir_in_zip, destination_folder);
+    LogInfo(k_log_mod, "Extracting folder: {} to {}", dir_in_zip, destination_folder);
     for (auto const file_index : Range(mz_zip_reader_get_num_files(&package.zip))) {
         auto const file_stat = TRY(detail::FileStat(package, file_index));
         if (file_stat.m_is_directory) continue;
@@ -373,8 +373,7 @@ static VoidOrError<PackageError> ReaderInstallComponent(PackageReader& package,
                                                   o.Error(),
                                                   "Couldn't access destination folder \"{}\"",
                                                   f);
-            if (o.Value() != f)
-                g_log.Info(k_log_mod, "Resolved folder name conflict: {} -> {}", f, o.Value());
+            if (o.Value() != f) LogInfo(k_log_mod, "Resolved folder name conflict: {} -> {}", f, o.Value());
             f = o.Value();
         }
 

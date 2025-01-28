@@ -3,7 +3,6 @@
 
 #pragma once
 #include "foundation/foundation.hpp"
-#include "os/misc.hpp"
 #include "os/threading.hpp"
 
 enum class LogLevel { Debug, Info, Warning, Error };
@@ -53,23 +52,20 @@ struct LogConfig {
 
 extern LogConfig g_log_config;
 
-struct Logger {
-    static void
-    Log(LogModuleName module_name, LogLevel level, FunctionRef<ErrorCodeOr<void>(Writer)> write_message);
+void Log(LogModuleName module_name, LogLevel level, FunctionRef<ErrorCodeOr<void>(Writer)> write_message);
 
-    template <typename... Args>
-    void Log(LogModuleName module_name, LogLevel level, String format, Args const&... args) {
-        Log(module_name, level, [&](Writer writer) { return fmt::FormatToWriter(writer, format, args...); });
-    }
+template <typename... Args>
+void Log(LogModuleName module_name, LogLevel level, String format, Args const&... args) {
+    Log(module_name, level, [&](Writer writer) { return fmt::FormatToWriter(writer, format, args...); });
+}
 
-    static void
-    Trace(LogModuleName module_name, String message = {}, SourceLocation loc = SourceLocation::Current());
+void Trace(LogModuleName module_name, String message = {}, SourceLocation loc = SourceLocation::Current());
 
-    // A macro unfortunatly seems the best way to avoid repeating the same code while keep template
-    // instantiations low (needed for fast compile times)
+// A macro unfortunatly seems the best way to avoid repeating the same code while keep template
+// instantiations low (needed for fast compile times)
 #define DECLARE_LOG_FUNCTION(level)                                                                          \
     template <typename... Args>                                                                              \
-    void level(LogModuleName module_name, String format, Args const&... args) {                              \
+    void Log##level(LogModuleName module_name, String format, Args const&... args) {                         \
         if constexpr (sizeof...(args) == 0) {                                                                \
             Log(module_name, LogLevel::level, format);                                                       \
         } else {                                                                                             \
@@ -79,16 +75,13 @@ struct Logger {
         }                                                                                                    \
     }
 
-    DECLARE_LOG_FUNCTION(Debug)
-    DECLARE_LOG_FUNCTION(Info)
-    DECLARE_LOG_FUNCTION(Error)
-    DECLARE_LOG_FUNCTION(Warning)
-};
+DECLARE_LOG_FUNCTION(Debug)
+DECLARE_LOG_FUNCTION(Info)
+DECLARE_LOG_FUNCTION(Error)
+DECLARE_LOG_FUNCTION(Warning)
 
-extern Logger g_log;
-
-#define DBG_PRINT_EXPR(x)     g_log.Debug({}, "{}: {} = {}", __FUNCTION__, #x, x)
-#define DBG_PRINT_EXPR2(x, y) g_log.Debug({}, "{}: {} = {}, {} = {}", __FUNCTION__, #x, x, #y, y)
+#define DBG_PRINT_EXPR(x)     LogDebug({}, "{}: {} = {}", __FUNCTION__, #x, x)
+#define DBG_PRINT_EXPR2(x, y) LogDebug({}, "{}: {} = {}, {} = {}", __FUNCTION__, #x, x, #y, y)
 #define DBG_PRINT_EXPR3(x, y, z)                                                                             \
-    g_log.Debug({}, "{}: {} = {}, {} = {}, {} = {}", __FUNCTION__, #x, x, #y, y, #z, z)
-#define DBG_PRINT_STRUCT(x) g_log.Debug({}, "{}: {} = {}", __FUNCTION__, #x, fmt::DumpStruct(x))
+    LogDebug({}, "{}: {} = {}, {} = {}, {} = {}", __FUNCTION__, #x, x, #y, y, #z, z)
+#define DBG_PRINT_STRUCT(x) LogDebug({}, "{}: {} = {}", __FUNCTION__, #x, fmt::DumpStruct(x))

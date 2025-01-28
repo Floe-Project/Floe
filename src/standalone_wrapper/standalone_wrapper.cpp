@@ -294,7 +294,7 @@ static bool OpenMidi(Standalone& standalone) {
     ASSERT(standalone.midi_stream == nullptr);
 
     if (auto result = Pm_Initialize(); result != pmNoError) {
-        g_log.Error(k_main_log_module, "Pm_Initialize: {}", FromNullTerminated(Pm_GetErrorText(result)));
+        LogError(k_main_log_module, "Pm_Initialize: {}", FromNullTerminated(Pm_GetErrorText(result)));
         return false;
     }
 
@@ -318,7 +318,7 @@ static bool OpenMidi(Standalone& standalone) {
     if (auto result = Pm_OpenInput(&standalone.midi_stream, *id_to_use, nullptr, 200, nullptr, nullptr);
         result != pmNoError) {
         standalone.floe_host_ext.standalone_midi_device_error = true;
-        g_log.Error(k_main_log_module, "Pm_OpenInput: {}", FromNullTerminated(Pm_GetErrorText(result)));
+        LogError(k_main_log_module, "Pm_OpenInput: {}", FromNullTerminated(Pm_GetErrorText(result)));
         return false;
     }
 
@@ -480,12 +480,12 @@ static ErrorCodeOr<void> Main() {
     DEFER { standalone.plugin.destroy(&standalone.plugin); };
 
     if (!OpenMidi(standalone)) {
-        g_log.Error(k_main_log_module, "Could not open Midi");
+        LogError(k_main_log_module, "Could not open Midi");
         return ErrorCode {StandaloneError::DeviceError};
     }
     DEFER { CloseMidi(standalone); };
     if (!OpenAudio(standalone)) {
-        g_log.Error(k_main_log_module, "Could not open Audio");
+        LogError(k_main_log_module, "Could not open Audio");
         return ErrorCode {StandaloneError::DeviceError};
     }
     DEFER { CloseAudio(standalone); };
@@ -576,7 +576,7 @@ int main() {
 
     auto const o = Main();
     if (o.HasError()) {
-        g_log.Error(k_main_log_module, "Standalone error: {}", o.Error());
+        LogError(k_main_log_module, "Standalone error: {}", o.Error());
         return 1;
     }
     return 0;

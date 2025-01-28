@@ -751,10 +751,10 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                     // FSEvents ONLY supports recursive watching so we just have to ignore subdirectory
                     // events
                     if (!dir.recursive && Contains(subpath, '/')) {
-                        g_log.Debug(k_log_module,
-                                    "Ignoring subdirectory event: {} because {} is watched non-recursively",
-                                    subpath,
-                                    dir.path);
+                        LogDebug(k_log_module,
+                                 "Ignoring subdirectory event: {} because {} is watched non-recursively",
+                                 subpath,
+                                 dir.path);
                         continue;
                     }
 

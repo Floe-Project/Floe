@@ -3,8 +3,7 @@
 
 #pragma once
 #include "foundation/foundation.hpp"
-
-#include "logger/logger.hpp"
+#include "os/misc.hpp"
 
 struct CommandLineArgDefinition {
     u32 id; // normally an enum, used for lookup

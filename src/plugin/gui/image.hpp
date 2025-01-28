@@ -98,13 +98,13 @@ PUBLIC ImageBytes ShrinkImageIfNeeded(ImageBytes image,
 
     Stopwatch stopwatch;
     DEFER {
-        g_log.Debug(k_image_log_module,
-                    "Shrinking image {}x{} to {}x{} took {} ms",
-                    image.size.width,
-                    image.size.height,
-                    shrunk_width,
-                    shrunk_height,
-                    stopwatch.MillisecondsElapsed());
+        LogDebug(k_image_log_module,
+                 "Shrinking image {}x{} to {}x{} took {} ms",
+                 image.size.width,
+                 image.size.height,
+                 shrunk_width,
+                 shrunk_height,
+                 stopwatch.MillisecondsElapsed());
     };
 
     ImageBytes result {
@@ -206,12 +206,12 @@ static bool BoxBlur(ImageF32 in, f32x4* out, u16 radius) {
 
     Stopwatch stopwatch;
     DEFER {
-        g_log.Debug(k_image_log_module,
-                    "Box blur {}x{}, radius {} took {} ms",
-                    in.size.width,
-                    in.size.height,
-                    radius,
-                    stopwatch.MillisecondsElapsed());
+        LogDebug(k_image_log_module,
+                 "Box blur {}x{}, radius {} took {} ms",
+                 in.size.width,
+                 in.size.height,
+                 radius,
+                 stopwatch.MillisecondsElapsed());
     };
 
     // You can do a box blur by first blurring in one direction, and then in the other. This is quicker
@@ -311,9 +311,7 @@ PUBLIC ImageBytes CreateBlurredLibraryBackground(ImageBytes original,
 
     Stopwatch stopwatch;
     DEFER {
-        g_log.Debug(k_image_log_module,
-                    "Blurred image generation took {} ms",
-                    stopwatch.MillisecondsElapsed());
+        LogDebug(k_image_log_module, "Blurred image generation took {} ms", stopwatch.MillisecondsElapsed());
     };
 
     // Shrink the image down for better speed. We are about to blur it, we don't need detail.

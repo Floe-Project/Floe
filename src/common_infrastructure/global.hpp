@@ -57,7 +57,7 @@ PUBLIC void GlobalInit(GlobalInitOptions options) {
         auto const message = fmt::Format(arena, "[panic] {}\nAt {}", FromNullTerminated(message_c_str), loc);
 
         // Step 1: log the error for easier local debugging.
-        g_log.Error(k_global_log_module, "{}", message);
+        LogError(k_global_log_module, "{}", message);
         if (stacktrace) {
             auto stacktrace_str = StacktraceString(*stacktrace,
                                                    arena,
@@ -65,7 +65,7 @@ PUBLIC void GlobalInit(GlobalInitOptions options) {
                                                        .ansi_colours = false,
                                                        .demangle = true,
                                                    });
-            g_log.Error(k_global_log_module, "\n{}", stacktrace_str);
+            LogError(k_global_log_module, "\n{}", stacktrace_str);
         }
 
         // Step 2: send an error report to Sentry.
@@ -85,10 +85,10 @@ PUBLIC void GlobalInit(GlobalInitOptions options) {
                                                },
                                        }),
                    {
-                       g_log.Error(sentry::k_log_module,
-                                   "Failed to submit panic to Sentry: {}, {}",
-                                   error,
-                                   response);
+                       LogError(sentry::k_log_module,
+                                "Failed to submit panic to Sentry: {}, {}",
+                                error,
+                                response);
                    });
         }
     });

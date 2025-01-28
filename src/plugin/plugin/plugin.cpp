@@ -34,7 +34,7 @@
 
 struct FloePluginInstance : PluginInstanceMessages {
     FloePluginInstance(clap_host const* clap_host, FloeInstanceIndex id);
-    ~FloePluginInstance() { g_log.Trace(k_main_log_module); }
+    ~FloePluginInstance() { Trace(k_main_log_module); }
 
     clap_host const& host;
     clap_plugin clap_plugin;
@@ -81,7 +81,7 @@ clap_plugin_state const floe_plugin_state {
             ZoneScopedMessage(floe.trace_config, "state save");
 
             if (!IsMainThread(floe.host)) {
-                g_log.Warning(k_clap_log_module, "host misbehaving: save() not on main thread");
+                LogWarning(k_clap_log_module, "host misbehaving: save() not on main thread");
                 ASSERT(!RunningInStandalone(floe.host));
                 return false;
             }
@@ -100,7 +100,7 @@ clap_plugin_state const floe_plugin_state {
             ZoneScopedMessage(floe.trace_config, "state load");
 
             if (!IsMainThread(floe.host)) {
-                g_log.Warning(k_clap_log_module, "host misbehaving: load() not on main thread");
+                LogWarning(k_clap_log_module, "host misbehaving: load() not on main thread");
                 ASSERT(!RunningInStandalone(floe.host));
                 return false;
             }
@@ -114,7 +114,7 @@ clap_plugin_state const floe_plugin_state {
 
 static bool LogIfError(ErrorCodeOr<void> const& ec, String name) {
     if (ec.HasError()) {
-        g_log.Error(k_main_log_module, "{}: {}", name, ec.Error());
+        LogError(k_main_log_module, "{}: {}", name, ec.Error());
         return false;
     }
     return true;
@@ -145,30 +145,30 @@ clap_plugin_gui const floe_gui {
             auto& floe = *(FloePluginInstance*)plugin->plugin_data;
 
             if (!IsMainThread(floe.host)) {
-                g_log.Warning(k_clap_log_module, "host misbehaving: gui.create() not on main thread");
+                LogWarning(k_clap_log_module, "host misbehaving: gui.create() not on main thread");
                 ASSERT(!RunningInStandalone(floe.host));
                 return false;
             }
 
             if (!NullTermStringsEqual(k_supported_gui_api, api)) {
-                g_log.Warning(k_clap_log_module, "host misbehaving: gui.create() with unsupported api");
+                LogWarning(k_clap_log_module, "host misbehaving: gui.create() with unsupported api");
                 ASSERT(!RunningInStandalone(floe.host));
                 return false;
             }
 
             if (is_floating) {
-                g_log.Warning(k_clap_log_module, "host misbehaving: gui.create() with floating window");
+                LogWarning(k_clap_log_module, "host misbehaving: gui.create() with floating window");
                 ASSERT(!RunningInStandalone(floe.host));
                 return false;
             }
 
             if (floe.gui_platform) {
-                g_log.Warning(k_clap_log_module, "host misbehaving: gui.create() called twice");
+                LogWarning(k_clap_log_module, "host misbehaving: gui.create() called twice");
                 ASSERT(!RunningInStandalone(floe.host));
                 return false;
             }
 
-            g_log.Debug(k_clap_log_module, "#{} gui.create()", floe.index);
+            LogDebug(k_clap_log_module, "#{} gui.create()", floe.index);
 
             ZoneScopedMessage(floe.trace_config, "gui create");
             floe.gui_platform.Emplace(floe.host, g_shared_engine_systems->settings);
@@ -186,18 +186,18 @@ clap_plugin_gui const floe_gui {
                 auto& floe = *(FloePluginInstance*)plugin->plugin_data;
 
                 if (!IsMainThread(floe.host)) {
-                    g_log.Warning(k_clap_log_module, "host misbehaving: gui.destroy() not on main thread");
+                    LogWarning(k_clap_log_module, "host misbehaving: gui.destroy() not on main thread");
                     ASSERT(!RunningInStandalone(floe.host));
                     return;
                 }
 
                 if (!floe.gui_platform) {
-                    g_log.Warning(k_clap_log_module, "host misbehaving: gui.destroy() called twice");
+                    LogWarning(k_clap_log_module, "host misbehaving: gui.destroy() called twice");
                     ASSERT(!RunningInStandalone(floe.host));
                     return;
                 }
 
-                g_log.Debug(k_clap_log_module, "#{} gui.destroy()", floe.index);
+                LogDebug(k_clap_log_module, "#{} gui.destroy()", floe.index);
 
                 ZoneScopedMessage(floe.trace_config, "gui destroy");
                 DestroyView(*floe.gui_platform);
@@ -218,14 +218,13 @@ clap_plugin_gui const floe_gui {
             auto& floe = *(FloePluginInstance*)plugin->plugin_data;
 
             if (!IsMainThread(floe.host)) {
-                g_log.Warning(k_clap_log_module, "host misbehaving: gui.get_size() not on main thread");
+                LogWarning(k_clap_log_module, "host misbehaving: gui.get_size() not on main thread");
                 ASSERT(!RunningInStandalone(floe.host));
                 return false;
             }
 
             if (!floe.gui_platform) {
-                g_log.Warning(k_clap_log_module,
-                              "host misbehaving: gui.get_size() called before gui.create()");
+                LogWarning(k_clap_log_module, "host misbehaving: gui.get_size() called before gui.create()");
                 ASSERT(!RunningInStandalone(floe.host));
                 return false;
             }
@@ -234,7 +233,7 @@ clap_plugin_gui const floe_gui {
                 PhysicalPixelsToClapPixels(floe.gui_platform->view, WindowSize(*floe.gui_platform));
             *width = size.width;
             *height = size.height;
-            g_log.Debug(k_clap_log_module, "get_size result {}x{}", *width, *height);
+            LogDebug(k_clap_log_module, "get_size result {}x{}", *width, *height);
             return true;
         } catch (PanicException) {
             return false;
@@ -250,8 +249,7 @@ clap_plugin_gui const floe_gui {
             auto& floe = *(FloePluginInstance*)plugin->plugin_data;
 
             if (!IsMainThread(floe.host)) {
-                g_log.Warning(k_clap_log_module,
-                              "host misbehaving: gui.get_resize_hints() not on main thread");
+                LogWarning(k_clap_log_module, "host misbehaving: gui.get_resize_hints() not on main thread");
                 ASSERT(!RunningInStandalone(floe.host));
                 return false;
             }
@@ -263,10 +261,10 @@ clap_plugin_gui const floe_gui {
                 gui_settings::CurrentAspectRatio(g_shared_engine_systems->settings.settings.gui);
             hints->aspect_ratio_width = ratio.width;
             hints->aspect_ratio_height = ratio.height;
-            g_log.Debug(k_clap_log_module,
-                        "get_resize_hints {}x{}",
-                        hints->aspect_ratio_width,
-                        hints->aspect_ratio_height);
+            LogDebug(k_clap_log_module,
+                     "get_resize_hints {}x{}",
+                     hints->aspect_ratio_width,
+                     hints->aspect_ratio_height);
             return true;
         } catch (PanicException) {
             return false;
@@ -280,7 +278,7 @@ clap_plugin_gui const floe_gui {
             auto& floe = *(FloePluginInstance*)plugin->plugin_data;
 
             if (!IsMainThread(floe.host)) {
-                g_log.Warning(k_clap_log_module, "host misbehaving: gui.adjust_size() not on main thread");
+                LogWarning(k_clap_log_module, "host misbehaving: gui.adjust_size() not on main thread");
                 ASSERT(!RunningInStandalone(floe.host));
                 return false;
             }
@@ -298,12 +296,12 @@ clap_plugin_gui const floe_gui {
             auto const clap_size =
                 PhysicalPixelsToClapPixels(floe.gui_platform->view, aspect_ratio_conformed_size);
 
-            g_log.Debug(k_clap_log_module,
-                        "adjust_size in: {}x{}, out: {}x{}",
-                        *clap_width,
-                        *clap_height,
-                        clap_size.width,
-                        clap_size.height);
+            LogDebug(k_clap_log_module,
+                     "adjust_size in: {}x{}, out: {}x{}",
+                     *clap_width,
+                     *clap_height,
+                     clap_size.width,
+                     clap_size.height);
 
             *clap_width = clap_size.width;
             *clap_height = clap_size.height;
@@ -321,14 +319,13 @@ clap_plugin_gui const floe_gui {
             auto& floe = *(FloePluginInstance*)plugin->plugin_data;
 
             if (!IsMainThread(floe.host)) {
-                g_log.Warning(k_clap_log_module, "host misbehaving: gui.set_size() not on main thread");
+                LogWarning(k_clap_log_module, "host misbehaving: gui.set_size() not on main thread");
                 ASSERT(!RunningInStandalone(floe.host));
                 return false;
             }
 
             if (!floe.gui_platform) {
-                g_log.Warning(k_clap_log_module,
-                              "host misbehaving: gui.set_size() called before gui.create()");
+                LogWarning(k_clap_log_module, "host misbehaving: gui.set_size() called before gui.create()");
                 ASSERT(!RunningInStandalone(floe.host));
                 return false;
             }
@@ -337,7 +334,7 @@ clap_plugin_gui const floe_gui {
                 auto w = clap_width;
                 auto h = clap_height;
                 if (floe_gui.adjust_size(plugin, &w, &h) && (w != clap_width && h != clap_height)) {
-                    g_log.Warning(
+                    LogWarning(
                         k_clap_log_module,
                         "host misbehaving: gui.set_size() called with unadjusted size, given: {}x{}, adjusted {}x{}",
                         clap_width,
@@ -357,15 +354,15 @@ clap_plugin_gui const floe_gui {
             auto const aspect_ratio_conformed_size = gui_settings::GetNearestAspectRatioSizeInsideSize(
                 size,
                 gui_settings::CurrentAspectRatio(g_shared_engine_systems->settings.settings.gui));
-            g_log.Debug(k_clap_log_module,
-                        "#{} set_size in: {}x{}, constrained {}x{}, result: {}",
-                        floe.index,
-                        size.width,
-                        size.height,
-                        aspect_ratio_conformed_size.width,
-                        aspect_ratio_conformed_size.height,
-                        aspect_ratio_conformed_size.width == size.width &&
-                            aspect_ratio_conformed_size.height == size.height);
+            LogDebug(k_clap_log_module,
+                     "#{} set_size in: {}x{}, constrained {}x{}, result: {}",
+                     floe.index,
+                     size.width,
+                     size.height,
+                     aspect_ratio_conformed_size.width,
+                     aspect_ratio_conformed_size.height,
+                     aspect_ratio_conformed_size.width == size.width &&
+                         aspect_ratio_conformed_size.height == size.height);
             if (aspect_ratio_conformed_size.width != size.width ||
                 aspect_ratio_conformed_size.height != size.height)
                 return false;
@@ -382,26 +379,26 @@ clap_plugin_gui const floe_gui {
             auto& floe = *(FloePluginInstance*)plugin->plugin_data;
 
             if (!IsMainThread(floe.host)) {
-                g_log.Warning(k_clap_log_module, "host misbehaving: gui.set_parent() not on main thread");
+                LogWarning(k_clap_log_module, "host misbehaving: gui.set_parent() not on main thread");
                 ASSERT(!RunningInStandalone(floe.host));
                 return false;
             }
 
             if (!floe.gui_platform) {
-                g_log.Warning(k_clap_log_module,
-                              "host misbehaving: gui.set_parent() called before gui.create()");
+                LogWarning(k_clap_log_module,
+                           "host misbehaving: gui.set_parent() called before gui.create()");
                 ASSERT(!RunningInStandalone(floe.host));
                 return false;
             }
 
             if (!window || !window->ptr) {
-                g_log.Warning(k_clap_log_module,
-                              "host misbehaving: gui.set_parent() called with invalid window");
+                LogWarning(k_clap_log_module,
+                           "host misbehaving: gui.set_parent() called with invalid window");
                 ASSERT(!RunningInStandalone(floe.host));
                 return false;
             }
 
-            g_log.Debug(k_clap_log_module, "#{} gui.set_parent()", floe.index);
+            LogDebug(k_clap_log_module, "#{} gui.set_parent()", floe.index);
 
             ZoneScopedMessage(floe.trace_config, "gui set_parent");
             auto const result = LogIfError(SetParent(*floe.gui_platform, *window), "SetParent");
@@ -431,27 +428,27 @@ clap_plugin_gui const floe_gui {
             auto& floe = *(FloePluginInstance*)plugin->plugin_data;
 
             if (!IsMainThread(floe.host)) {
-                g_log.Warning(k_clap_log_module, "host misbehaving: gui.show() not on main thread");
+                LogWarning(k_clap_log_module, "host misbehaving: gui.show() not on main thread");
                 ASSERT(!RunningInStandalone(floe.host));
                 return false;
             }
 
             if (!floe.gui_platform) {
-                g_log.Warning(k_clap_log_module, "host misbehaving: gui.show() called before gui.create()");
+                LogWarning(k_clap_log_module, "host misbehaving: gui.show() called before gui.create()");
                 ASSERT(!RunningInStandalone(floe.host));
                 return false;
             }
 
-            g_log.Debug(k_clap_log_module, "#{} gui.show()", floe.index);
+            LogDebug(k_clap_log_module, "#{} gui.show()", floe.index);
             ZoneScopedMessage(floe.trace_config, "gui show");
             bool const result = LogIfError(SetVisible(*floe.gui_platform, true), "SetVisible");
             if (result) {
                 static bool shown_graphics_info = false;
                 if (!shown_graphics_info) {
                     shown_graphics_info = true;
-                    g_log.Info(k_main_log_module,
-                               "\n{}",
-                               floe.gui_platform->graphics_ctx->graphics_device_info.Items());
+                    LogInfo(k_main_log_module,
+                            "\n{}",
+                            floe.gui_platform->graphics_ctx->graphics_device_info.Items());
                 }
             }
             return result;
@@ -467,18 +464,18 @@ clap_plugin_gui const floe_gui {
             auto& floe = *(FloePluginInstance*)plugin->plugin_data;
 
             if (!IsMainThread(floe.host)) {
-                g_log.Warning(k_clap_log_module, "host misbehaving: gui.hide() not on main thread");
+                LogWarning(k_clap_log_module, "host misbehaving: gui.hide() not on main thread");
                 ASSERT(!RunningInStandalone(floe.host));
                 return false;
             }
 
             if (!floe.gui_platform) {
-                g_log.Warning(k_clap_log_module, "host misbehaving: gui.hide() called before gui.create()");
+                LogWarning(k_clap_log_module, "host misbehaving: gui.hide() called before gui.create()");
                 ASSERT(!RunningInStandalone(floe.host));
                 return false;
             }
 
-            g_log.Debug(k_clap_log_module, "gui.show()");
+            LogDebug(k_clap_log_module, "gui.show()");
             ZoneScopedMessage(floe.trace_config, "gui hide");
             return LogIfError(SetVisible(*floe.gui_platform, false), "SetVisible");
         } catch (PanicException) {
@@ -535,13 +532,13 @@ clap_plugin_params const floe_params {
             auto& floe = *(FloePluginInstance*)plugin->plugin_data;
 
             if (!IsMainThread(floe.host)) {
-                g_log.Warning(k_clap_log_module, "host misbehaving: params.get_value() not on main thread");
+                LogWarning(k_clap_log_module, "host misbehaving: params.get_value() not on main thread");
                 ASSERT(!RunningInStandalone(floe.host));
                 return false;
             }
 
             if (!floe.engine) {
-                g_log.Warning(k_clap_log_module, "host misbehaving: params.get_value() called before init()");
+                LogWarning(k_clap_log_module, "host misbehaving: params.get_value() called before init()");
                 ASSERT(!RunningInStandalone(floe.host));
                 return false;
             }
@@ -617,21 +614,21 @@ clap_plugin_params const floe_params {
                 auto& floe = *(FloePluginInstance*)plugin->plugin_data;
 
                 if (!floe.engine) {
-                    g_log.Warning(k_clap_log_module, "host misbehaving: params.flush() called before init()");
+                    LogWarning(k_clap_log_module, "host misbehaving: params.flush() called before init()");
                     ASSERT(!RunningInStandalone(floe.host));
                     return;
                 }
 
                 if (!floe.active) {
                     if (!IsMainThread(floe.host)) {
-                        g_log.Warning(k_clap_log_module,
-                                      "host misbehaving: params.flush() not on main thread when inactive");
+                        LogWarning(k_clap_log_module,
+                                   "host misbehaving: params.flush() not on main thread when inactive");
                         ASSERT(!RunningInStandalone(floe.host));
                         return;
                     }
                 } else if (IsAudioThread(floe.host) == IsAudioThreadResult::No) {
-                    g_log.Warning(k_clap_log_module,
-                                  "host misbehaving: params.flush() not on audio thread when active");
+                    LogWarning(k_clap_log_module,
+                               "host misbehaving: params.flush() not on audio thread when active");
                     ASSERT(!RunningInStandalone(floe.host));
                     return;
                 }
@@ -656,7 +653,7 @@ clap_plugin_audio_ports const floe_audio_ports {
 
     .get = [](clap_plugin_t const*, u32 index, bool is_input, clap_audio_port_info_t* info) -> bool {
         if (index != 0) {
-            g_log.Warning(k_clap_log_module, "host misbehaving: audio_ports.get() called with invalid index");
+            LogWarning(k_clap_log_module, "host misbehaving: audio_ports.get() called with invalid index");
             return false;
         }
         if (!info) return false;
@@ -689,13 +686,12 @@ clap_plugin_note_ports const floe_note_ports {
 
     .get = [](clap_plugin_t const*, u32 index, bool is_input, clap_note_port_info_t* info) -> bool {
         if (!is_input) {
-            g_log.Warning(k_clap_log_module,
-                          "host misbehaving: note_ports.get() thinks we have output ports");
+            LogWarning(k_clap_log_module, "host misbehaving: note_ports.get() thinks we have output ports");
             return false;
         }
 
         if (index != 0) {
-            g_log.Warning(k_clap_log_module, "host misbehaving: note_ports.get() called with invalid index");
+            LogWarning(k_clap_log_module, "host misbehaving: note_ports.get() called with invalid index");
             return false;
         }
 
@@ -736,13 +732,13 @@ clap_plugin_timer_support const floe_timer {
                 auto& floe = *(FloePluginInstance*)plugin->plugin_data;
 
                 if (!IsMainThread(floe.host)) {
-                    g_log.Warning(k_clap_log_module, "host misbehaving: on_timer() not on main thread");
+                    LogWarning(k_clap_log_module, "host misbehaving: on_timer() not on main thread");
                     ASSERT(!RunningInStandalone(floe.host));
                     return;
                 }
 
                 if (!floe.engine) {
-                    g_log.Warning(k_clap_log_module, "host misbehaving: on_timer() called before init()");
+                    LogWarning(k_clap_log_module, "host misbehaving: on_timer() called before init()");
                     ASSERT(!RunningInStandalone(floe.host));
                     return;
                 }
@@ -769,13 +765,13 @@ clap_plugin_posix_fd_support const floe_posix_fd {
                 auto& floe = *(FloePluginInstance*)plugin->plugin_data;
 
                 if (!IsMainThread(floe.host)) {
-                    g_log.Warning(k_clap_log_module, "host misbehaving: on_fd() not on main thread");
+                    LogWarning(k_clap_log_module, "host misbehaving: on_fd() not on main thread");
                     ASSERT(!RunningInStandalone(floe.host));
                     return;
                 }
 
                 if (!floe.engine) {
-                    g_log.Warning(k_clap_log_module, "host misbehaving: on_fd() called before init()");
+                    LogWarning(k_clap_log_module, "host misbehaving: on_fd() called before init()");
                     ASSERT(!RunningInStandalone(floe.host));
                     return;
                 }
@@ -814,7 +810,7 @@ clap_plugin const floe_plugin {
             auto& floe = *(FloePluginInstance*)plugin->plugin_data;
 
             if (floe.initialised) {
-                g_log.Warning(k_clap_log_module, "host misbehaving: init() called twice");
+                LogWarning(k_clap_log_module, "host misbehaving: init() called twice");
                 ASSERT(!RunningInStandalone(floe.host));
                 return false;
             }
@@ -822,7 +818,7 @@ clap_plugin const floe_plugin {
             if (auto const thread_check =
                     (clap_host_thread_check const*)floe.host.get_extension(&floe.host, CLAP_EXT_THREAD_CHECK);
                 thread_check && !thread_check->is_main_thread(&floe.host)) {
-                g_log.Warning(k_clap_log_module, "host misbehaving: init() not on main thread");
+                LogWarning(k_clap_log_module, "host misbehaving: init() not on main thread");
                 ASSERT(!RunningInStandalone(floe.host));
                 return false;
             }
@@ -850,11 +846,11 @@ clap_plugin const floe_plugin {
 
                 g_shared_engine_systems.Emplace(tags);
 
-                g_log.Info(k_main_log_module,
-                           "host: {} {} {}",
-                           floe.host.vendor,
-                           floe.host.name,
-                           floe.host.version);
+                LogInfo(k_main_log_module,
+                        "host: {} {} {}",
+                        floe.host.vendor,
+                        floe.host.name,
+                        floe.host.version);
 
                 sentry::Error message {{
                     .level = sentry::ErrorEvent::Level::Info,
@@ -863,7 +859,7 @@ clap_plugin const floe_plugin {
                 ReportError(Move(message));
             }
 
-            g_log.Debug(k_clap_log_module, "#{} init", floe.index);
+            LogDebug(k_clap_log_module, "#{} init", floe.index);
 
             floe.engine.Emplace(floe.host, *g_shared_engine_systems, floe);
 
@@ -887,20 +883,20 @@ clap_plugin const floe_plugin {
 
                 if (floe.initialised) {
                     if (!IsMainThread(floe.host)) {
-                        g_log.Warning(k_clap_log_module, "host misbehaving: destroy() not on main thread");
+                        LogWarning(k_clap_log_module, "host misbehaving: destroy() not on main thread");
                         ASSERT(!RunningInStandalone(floe.host));
                         return;
                     }
 
                     if (floe.gui_platform) {
-                        g_log.Warning(k_clap_log_module,
-                                      "host misbehaving: destroy() called while gui is active");
+                        LogWarning(k_clap_log_module,
+                                   "host misbehaving: destroy() called while gui is active");
                         ASSERT(!RunningInStandalone(floe.host));
                         floe_gui.destroy(plugin);
                     }
 
                     if (floe.active) {
-                        g_log.Warning(k_clap_log_module, "host misbehaving: destroy() called while active");
+                        LogWarning(k_clap_log_module, "host misbehaving: destroy() called while active");
                         ASSERT(!RunningInStandalone(floe.host));
                         floe_plugin.deactivate(plugin);
                     }
@@ -914,7 +910,7 @@ clap_plugin const floe_plugin {
                     if (--g_num_initialised_plugins == 0) g_shared_engine_systems.Clear();
                 }
 
-                g_log.Debug(k_clap_log_module, "#{} destroy", floe.index);
+                LogDebug(k_clap_log_module, "#{} destroy", floe.index);
 
                 --g_num_floe_instances;
                 FloeInstanceAllocator().Delete(&floe);
@@ -931,13 +927,13 @@ clap_plugin const floe_plugin {
             ZoneScopedMessage(floe.trace_config, "plugin activate");
 
             if (!IsMainThread(floe.host)) {
-                g_log.Warning(k_clap_log_module, "host misbehaving: activate() not on main thread");
+                LogWarning(k_clap_log_module, "host misbehaving: activate() not on main thread");
                 ASSERT(!RunningInStandalone(floe.host));
                 return false;
             }
 
             if (floe.active) {
-                g_log.Warning(k_clap_log_module, "host misbehaving: activate() when already active");
+                LogWarning(k_clap_log_module, "host misbehaving: activate() when already active");
                 ASSERT(!RunningInStandalone(floe.host));
                 return false;
             }
@@ -966,13 +962,13 @@ clap_plugin const floe_plugin {
                 ZoneScopedMessage(floe.trace_config, "plugin activate");
 
                 if (!IsMainThread(floe.host)) {
-                    g_log.Warning(k_clap_log_module, "host misbehaving: deactivate() not on main thread");
+                    LogWarning(k_clap_log_module, "host misbehaving: deactivate() not on main thread");
                     ASSERT(!RunningInStandalone(floe.host));
                     return;
                 }
 
                 if (!floe.active) {
-                    g_log.Warning(k_clap_log_module, "host misbehaving: deactivate() when not active");
+                    LogWarning(k_clap_log_module, "host misbehaving: deactivate() when not active");
                     ASSERT(!RunningInStandalone(floe.host));
                     return;
                 }
@@ -992,20 +988,19 @@ clap_plugin const floe_plugin {
             ZoneScopedMessage(floe.trace_config, "plugin start_processing");
 
             if (IsAudioThread(floe.host) == IsAudioThreadResult::No) {
-                g_log.Warning(k_clap_log_module, "host misbehaving: start_processing() not on audio thread");
+                LogWarning(k_clap_log_module, "host misbehaving: start_processing() not on audio thread");
                 ASSERT(!RunningInStandalone(floe.host));
                 return false;
             }
 
             if (!floe.active) {
-                g_log.Warning(k_clap_log_module, "host misbehaving: start_processing() when not active");
+                LogWarning(k_clap_log_module, "host misbehaving: start_processing() when not active");
                 ASSERT(!RunningInStandalone(floe.host));
                 return false;
             }
 
             if (floe.processing) {
-                g_log.Warning(k_clap_log_module,
-                              "host misbehaving: start_processing() when already processing");
+                LogWarning(k_clap_log_module, "host misbehaving: start_processing() when already processing");
                 ASSERT(!RunningInStandalone(floe.host));
                 return false;
             }
@@ -1028,21 +1023,19 @@ clap_plugin const floe_plugin {
                 ZoneScopedMessage(floe.trace_config, "plugin stop_processing");
 
                 if (IsAudioThread(floe.host) == IsAudioThreadResult::No) {
-                    g_log.Warning(k_clap_log_module,
-                                  "host misbehaving: stop_processing() not on audio thread");
+                    LogWarning(k_clap_log_module, "host misbehaving: stop_processing() not on audio thread");
                     ASSERT(!RunningInStandalone(floe.host));
                     return;
                 }
 
                 if (!floe.active) {
-                    g_log.Warning(k_clap_log_module, "host misbehaving: stop_processing() when not active");
+                    LogWarning(k_clap_log_module, "host misbehaving: stop_processing() when not active");
                     ASSERT(!RunningInStandalone(floe.host));
                     return;
                 }
 
                 if (!floe.processing) {
-                    g_log.Warning(k_clap_log_module,
-                                  "host misbehaving: stop_processing() when not processing");
+                    LogWarning(k_clap_log_module, "host misbehaving: stop_processing() when not processing");
                     ASSERT(!RunningInStandalone(floe.host));
                     return;
                 }
@@ -1063,13 +1056,13 @@ clap_plugin const floe_plugin {
                 ZoneScopedMessage(floe.trace_config, "plugin reset");
 
                 if (IsAudioThread(floe.host) == IsAudioThreadResult::No) {
-                    g_log.Warning(k_clap_log_module, "host misbehaving: reset() not on audio thread");
+                    LogWarning(k_clap_log_module, "host misbehaving: reset() not on audio thread");
                     ASSERT(!RunningInStandalone(floe.host));
                     return;
                 }
 
                 if (!floe.active) {
-                    g_log.Warning(k_clap_log_module, "host misbehaving: reset() when not active");
+                    LogWarning(k_clap_log_module, "host misbehaving: reset() when not active");
                     ASSERT(!RunningInStandalone(floe.host));
                     return;
                 }
@@ -1130,7 +1123,7 @@ clap_plugin const floe_plugin {
                 ZoneScopedMessage(floe.trace_config, "plugin on_main_thread");
 
                 if (!IsMainThread(floe.host)) {
-                    g_log.Warning(k_clap_log_module, "host misbehaving: on_main_thread() not on main thread");
+                    LogWarning(k_clap_log_module, "host misbehaving: on_main_thread() not on main thread");
                     ASSERT(!RunningInStandalone(floe.host));
                     return;
                 }
@@ -1150,7 +1143,7 @@ clap_plugin const floe_plugin {
 FloePluginInstance::FloePluginInstance(clap_host const* host, FloeInstanceIndex index)
     : host(*host)
     , index(index) {
-    g_log.Trace(k_main_log_module);
+    Trace(k_main_log_module);
     clap_plugin = floe_plugin;
     clap_plugin.plugin_data = this;
 }

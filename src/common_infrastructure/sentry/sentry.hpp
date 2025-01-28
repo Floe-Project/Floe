@@ -439,7 +439,7 @@ PUBLIC ErrorCodeOr<void> SubmitEnvelope(Sentry& sentry,
     ErrorCodeOr<void> result = k_success;
 
     if constexpr (k_online_reporting) {
-        g_log.Debug(k_main_log_module, "Posting to Sentry: {}", envelope);
+        LogDebug(k_main_log_module, "Posting to Sentry: {}", envelope);
 
         auto const envelope_url = fmt::Format(scratch_arena,
                                               "https://{}:443/api/{}/envelope/",
@@ -602,7 +602,7 @@ ConsumeAndSubmitErrorFiles(Sentry& sentry, String folder, ArenaAllocator& scratc
             // try and submit the same error report.
             if (auto const o = Rename(full_path, temp_full_path); o.HasError()) {
                 if (o.Error() == FilesystemError::PathDoesNotExist) continue;
-                g_log.Error(k_main_log_module, "Couldn't move error file: {}", o.Error());
+                LogError(k_main_log_module, "Couldn't move error file: {}", o.Error());
                 continue;
             }
 
@@ -614,7 +614,7 @@ ConsumeAndSubmitErrorFiles(Sentry& sentry, String folder, ArenaAllocator& scratc
             };
 
             auto envelope_without_header = TRY_OR(ReadEntireFile(temp_full_path, scratch_arena), {
-                g_log.Error(k_main_log_module, "Couldn't read error file: {}", error);
+                LogError(k_main_log_module, "Couldn't read error file: {}", error);
                 continue;
             });
 
@@ -641,10 +641,10 @@ ConsumeAndSubmitErrorFiles(Sentry& sentry, String folder, ArenaAllocator& scratc
                                           },
                                   }),
                    {
-                       g_log.Error(k_main_log_module,
-                                   "Couldn't send error report to Sentry: {}. {}",
-                                   error,
-                                   response);
+                       LogError(k_main_log_module,
+                                "Couldn't send error report to Sentry: {}. {}",
+                                error,
+                                response);
                        continue;
                    });
 

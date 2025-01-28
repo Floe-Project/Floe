@@ -88,7 +88,7 @@ SharedEngineSystems::~SharedEngineSystems() {
     {
         auto outcome = WriteSettingsFileIfChanged(settings);
         if (outcome.HasError())
-            g_log.Error("global"_log_module, "Failed to write settings file: {}", outcome.Error());
+            LogError("global"_log_module, "Failed to write settings file: {}", outcome.Error());
     }
 
     RequestBackgroundErrorReportingEnd();

@@ -131,7 +131,7 @@ static void BackgroundInstallingThread(Application& app) {
     for (auto const i : Range(ToInt(ComponentTypes::Count))) {
         if (!app.components_selected[i]) continue;
         auto const& comp = app.components[i];
-        g_log.Debug(k_log_module, "Installing {} to {}", comp.info.name, comp.install_dir);
+        LogDebug(k_log_module, "Installing {} to {}", comp.info.name, comp.install_dir);
         InstallResult outcome = k_success;
         if (comp.data.size != 0) outcome = TryInstall(comp);
         app.installation_results.Use([i, outcome](InstallationResults& r) { r[i] = outcome; });
@@ -252,7 +252,7 @@ Application* CreateApplication(GuiFramework& framework, u32 root_layout_id) {
                 ErrorDialog(framework, "Bug: missing data resource");
                 ExitProgram(framework);
             } else {
-                g_log.Debug(k_log_module, "Failed to load component data: {}", data.Error());
+                LogDebug(k_log_module, "Failed to load component data: {}", data.Error());
                 data = Span<u8 const> {};
             }
         }
@@ -536,7 +536,7 @@ void HandleUserInteraction(Application& app, GuiFramework& framework, UserIntera
         }
         case UserInteraction::Type::CheckboxTableItemToggled: {
             if (info.widget_id == app.plugin_checkboxes) {
-                g_log.Debug(k_log_module, "Checkbox {} toggled to {}", info.button_index, info.button_state);
+                LogDebug(k_log_module, "Checkbox {} toggled to {}", info.button_index, info.button_state);
                 app.components_selected[info.button_index] = info.button_state;
             }
             if (Find(app.components_selected, true))

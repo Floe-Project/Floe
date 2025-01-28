@@ -53,7 +53,7 @@ ErrorCodeOr<void> CheckGLError(String function) {
     GLenum gl_err;
     while ((gl_err = glGetError()) != GL_NO_ERROR) {
         err = ErrorCode(k_gl_error_category, gl_err);
-        g_log.Debug(k_renderer_log_module, "GL Error: {}: {}", function, err.Error());
+        LogDebug(k_renderer_log_module, "GL Error: {}: {}", function, err.Error());
     }
     if (err.HasError()) return err;
     return k_success;
@@ -61,7 +61,7 @@ ErrorCodeOr<void> CheckGLError(String function) {
 
 struct OpenGLDrawContext : public DrawContext {
     ErrorCodeOr<void> CreateDeviceObjects(void* _window) override {
-        g_log.Trace(k_renderer_log_module);
+        Trace(k_renderer_log_module);
         ASSERT(_window != nullptr);
 
         {
@@ -80,14 +80,14 @@ struct OpenGLDrawContext : public DrawContext {
 
     void DestroyDeviceObjects() override {
         ZoneScoped;
-        g_log.Trace(k_renderer_log_module);
+        Trace(k_renderer_log_module);
         DestroyAllTextures();
         DestroyFontTexture();
     }
 
     ErrorCodeOr<void> CreateFontTexture() override {
         ZoneScoped;
-        g_log.Trace(k_renderer_log_module);
+        Trace(k_renderer_log_module);
         unsigned char* pixels;
         int width;
         int height;
@@ -116,7 +116,7 @@ struct OpenGLDrawContext : public DrawContext {
 
     void DestroyFontTexture() override {
         ZoneScoped;
-        g_log.Trace(k_renderer_log_module);
+        Trace(k_renderer_log_module);
         if (font_texture) {
             glDeleteTextures(1, &font_texture);
             fonts.tex_id = nullptr;
@@ -227,7 +227,7 @@ struct OpenGLDrawContext : public DrawContext {
 
     ErrorCodeOr<TextureHandle> CreateTexture(u8 const* data, UiSize size, u16 bytes_per_pixel) override {
         ZoneScoped;
-        g_log.Trace(k_renderer_log_module);
+        Trace(k_renderer_log_module);
         // Upload texture to graphics system
         GLint last_texture;
         glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture);

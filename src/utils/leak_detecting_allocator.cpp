@@ -11,12 +11,12 @@ LeakDetectingAllocator::~LeakDetectingAllocator() {
     ArenaAllocatorWithInlineStorage<1000> scratch_arena {Malloc::Instance()};
     for (auto& i : m_allocations) {
         if (!i.stack_trace)
-            g_log.Debug({}, "ERROR: memory leak detected of {} bytes, no stacktrace available", i.data.size);
+            LogDebug({}, "ERROR: memory leak detected of {} bytes, no stacktrace available", i.data.size);
         else {
-            g_log.Debug({},
-                        "ERROR: memory leak detected of {} bytes, allocated at location:\n{}",
-                        i.data.size,
-                        StacktraceString(*i.stack_trace, scratch_arena, {.ansi_colours = true}));
+            LogDebug({},
+                     "ERROR: memory leak detected of {} bytes, allocated at location:\n{}",
+                     i.data.size,
+                     StacktraceString(*i.stack_trace, scratch_arena, {.ansi_colours = true}));
         }
     }
 

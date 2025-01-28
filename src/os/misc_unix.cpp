@@ -579,11 +579,11 @@ bool TrySigFunction(int return_code, String message) {
     auto _ = strerror_r(errno, buffer, sizeof(buffer));
     auto const err_str = buffer;
 #endif
-    g_log.Error(k_global_log_module,
-                "failed {}, errno({}) {}",
-                message,
-                errno,
-                FromNullTerminated(err_str ? err_str : buffer));
+    LogError(k_global_log_module,
+             "failed {}, errno({}) {}",
+             message,
+             errno,
+             FromNullTerminated(err_str ? err_str : buffer));
 
     return false;
 }

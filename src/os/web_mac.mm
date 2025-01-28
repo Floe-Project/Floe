@@ -32,7 +32,7 @@ ErrorCodeOr<void> HttpsGet(String url, Writer writer, RequestOptions options) {
             [session dataTaskWithRequest:request
                        completionHandler:^(NSData* data, NSURLResponse*, NSError* error) {
                          if (error) {
-                             g_debug_log.Debug({}, "Error: {}", error.localizedDescription.UTF8String);
+                             LogDebug({}, "Error: {}", error.localizedDescription.UTF8String);
                              result = ErrorCode {WebError::NetworkError};
                          } else {
                              auto const o = writer.WriteBytes({(u8 const*)data.bytes, data.length});
@@ -83,7 +83,7 @@ ErrorCodeOr<void> HttpsPost(String url,
             [session dataTaskWithRequest:request
                        completionHandler:^(NSData* data, NSURLResponse*, NSError* error) {
                          if (error) {
-                             g_debug_log.Debug({}, "Error: {}", error.localizedDescription.UTF8String);
+                             LogDebug({}, "Error: {}", error.localizedDescription.UTF8String);
                              result = ErrorCode {WebError::NetworkError};
                          } else if (response_writer.HasValue() && data) {
                              auto const o = response_writer->WriteBytes({(u8 const*)data.bytes, data.length});

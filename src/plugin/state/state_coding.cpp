@@ -867,14 +867,14 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
             auto const& info = k_param_descriptors[i];
             auto const v = state.param_values[i];
             if (v < info.linear_range.min || v > info.linear_range.max) {
-                g_log.Debug({},
-                            "Param \"{} {}\" value ({}) is outside of the expected "
-                            "range: ({}, {})",
-                            info.ModuleString(),
-                            info.name,
-                            v,
-                            info.linear_range.min,
-                            info.linear_range.max);
+                LogDebug({},
+                         "Param \"{} {}\" value ({}) is outside of the expected "
+                         "range: ({}, {})",
+                         info.ModuleString(),
+                         info.name,
+                         v,
+                         info.linear_range.min,
+                         info.linear_range.max);
                 PanicIfReached();
             }
         }

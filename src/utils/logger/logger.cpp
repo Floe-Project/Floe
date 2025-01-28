@@ -72,7 +72,7 @@ ErrorCodeOr<void> WriteFormattedLog(Writer writer,
     return k_success;
 }
 
-void Logger::Trace(LogModuleName module_name, String message, SourceLocation loc) {
+void Trace(LogModuleName module_name, String message, SourceLocation loc) {
     Log(module_name, LogLevel::Debug, [&](Writer writer) -> ErrorCodeOr<void> {
         TRY(fmt::FormatToWriter(writer,
                                 "trace: {}({}): {}",
@@ -86,9 +86,7 @@ void Logger::Trace(LogModuleName module_name, String message, SourceLocation loc
 
 LogConfig g_log_config {};
 
-void Logger::Log(LogModuleName module_name,
-                 LogLevel level,
-                 FunctionRef<ErrorCodeOr<void>(Writer)> write_message) {
+void Log(LogModuleName module_name, LogLevel level, FunctionRef<ErrorCodeOr<void>(Writer)> write_message) {
     if (level < g_log_config.min_level_allowed.Load(LoadMemoryOrder::Relaxed)) return;
 
     static auto log_to_stderr = [](LogModuleName module_name,
@@ -166,5 +164,3 @@ void Logger::Log(LogModuleName module_name,
         }
     }
 }
-
-Logger g_log {};

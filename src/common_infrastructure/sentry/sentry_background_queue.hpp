@@ -29,7 +29,7 @@ static void BackgroundThread(BackgroundQueue& queue, Span<Tag const> tags) {
         g_log.Error(k_log_module, "Failed to consume error files: {}", o.Error());
 
     // start session
-    {
+    if constexpr (k_online_reporting) {
         DynamicArray<char> envelope {scratch_arena};
         auto writer = dyn::WriterFor(envelope);
         auto _ = EnvelopeAddSessionUpdate(sentry, writer, SessionStatus::Ok);
@@ -68,7 +68,8 @@ static void BackgroundThread(BackgroundQueue& queue, Span<Tag const> tags) {
         if (repeat) queue.signaller.Signal();
 
         auto const end = queue.end_thread.Load(LoadMemoryOrder::Acquire);
-        if (end) auto _ = EnvelopeAddSessionUpdate(sentry, writer, SessionStatus::EndedNormally);
+        if (end && k_online_reporting)
+            auto _ = EnvelopeAddSessionUpdate(sentry, writer, SessionStatus::EndedNormally);
 
         if (envelope.size) {
             DynamicArray<char> response {scratch_arena};

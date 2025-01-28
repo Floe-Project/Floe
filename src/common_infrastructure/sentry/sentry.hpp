@@ -515,7 +515,8 @@ PUBLIC ErrorCodeOr<void> WriteCrashToFile(Sentry& sentry,
                              .stacktrace = stacktrace,
                          },
                          true));
-    TRY(EnvelopeAddSessionUpdate(sentry, file.Writer(), SessionStatus::Crashed));
+    if constexpr (k_online_reporting)
+        TRY(EnvelopeAddSessionUpdate(sentry, file.Writer(), SessionStatus::Crashed));
 
     return k_success;
 }
@@ -537,7 +538,7 @@ PUBLIC ErrorCodeOr<void> SubmitCrash(Sentry& sentry,
                              .stacktrace = stacktrace,
                          },
                          true));
-    TRY(EnvelopeAddSessionUpdate(sentry, writer, SessionStatus::Crashed));
+    if constexpr (k_online_reporting) TRY(EnvelopeAddSessionUpdate(sentry, writer, SessionStatus::Crashed));
     TRY(SubmitEnvelope(sentry, envelope_without_header, scratch_arena, options));
 
     return k_success;

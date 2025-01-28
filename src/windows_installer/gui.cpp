@@ -23,8 +23,8 @@
 #include "utils/debug/debug.hpp"
 #include "utils/logger/logger.hpp"
 
-#include "common_infrastructure/crash_hooks.hpp"
 #include "common_infrastructure/error_reporting.hpp"
+#include "common_infrastructure/global.hpp"
 
 #include "gui.hpp"
 
@@ -1059,14 +1059,6 @@ static LRESULT CALLBACK PageWindowProc(HWND window, UINT msg, WPARAM w_param, LP
 }
 
 static ErrorCodeOr<void> Main(HINSTANCE h_instance, int cmd_show) {
-    g_panic_hook = PanicHook;
-    InitLogFolderIfNeeded();
-
-    SetThreadName("main");
-
-    BeginCrashDetection(CrashHookWriteCrashReport);
-    DEFER { EndCrashDetection(); };
-
     constexpr INITCOMMONCONTROLSEX k_init_cc {.dwSize = sizeof(INITCOMMONCONTROLSEX),
                                               .dwICC = ICC_LINK_CLASS};
     InitCommonControlsEx(&k_init_cc);
@@ -1212,6 +1204,9 @@ static ErrorCodeOr<void> Main(HINSTANCE h_instance, int cmd_show) {
 }
 
 int WINAPI WinMain(HINSTANCE h_instance, HINSTANCE, LPSTR, int cmd_show) {
+    GlobalInit({.init_error_reporting = true, .set_main_thread = true});
+    DEFER { GlobalDeinit({.shutdown_error_reporting = true}); };
+
     if (auto o = Main(h_instance, cmd_show); o.HasError()) {
         AbortWithError(o.Error());
         return 1;

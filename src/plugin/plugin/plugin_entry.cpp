@@ -7,7 +7,7 @@
 #include "utils/debug/tracy_wrapped.hpp"
 #include "utils/logger/logger.hpp"
 
-#include "common_infrastructure/crash_hooks.hpp"
+#include "common_infrastructure/global.hpp"
 
 #include "clap/factory/plugin-factory.h"
 #include "plugin.hpp"
@@ -41,18 +41,6 @@ __attribute__((destructor)) void ZigBugWorkaround() {
 // NOLINTEND
 #endif
 
-static void StartupTracy() {
-#ifdef TRACY_ENABLE
-    ___tracy_startup_profiler();
-#endif
-}
-
-static void ShutdownTracy() {
-#ifdef TRACY_ENABLE
-    ___tracy_shutdown_profiler();
-#endif
-}
-
 static bool g_init = false;
 
 // NOLINTNEXTLINE(cppcoreguidelines-interfaces-global-init): clang-tidy thinks g_panicking is initialised
@@ -67,11 +55,10 @@ extern "C" CLAP_EXPORT const clap_plugin_entry clap_entry = {
         try {
             if (Exchange(g_init, true)) return true; // already initialised
 
-            g_panic_hook = PanicHook;
-            InitLogFolderIfNeeded();
-
-            StartupTracy();
-            BeginCrashDetection(CrashHookWriteCrashReport); // after tracy
+            GlobalInit({
+                .init_error_reporting = false,
+                .set_main_thread = false,
+            });
 
             g_log.Debug(k_clap_log_module, "init DSO");
             g_log.Info(k_global_log_module, "Floe version: " FLOE_VERSION_STRING);
@@ -91,8 +78,9 @@ extern "C" CLAP_EXPORT const clap_plugin_entry clap_entry = {
 
                 g_log.Debug(k_clap_log_module, "deinit");
 
-                EndCrashDetection(); // before tracy
-                ShutdownTracy();
+                GlobalDeinit({
+                    .shutdown_error_reporting = false,
+                });
             } catch (PanicException) {
             }
         },

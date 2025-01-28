@@ -6,11 +6,11 @@
 #include "sentry/sentry.hpp"
 
 // not thread-safe, call once near the start of the program
-void InitErrorReporting(Span<sentry::Tag const> tags);
+void InitBackgroundErrorReporting(Span<sentry::Tag const> tags);
 
 // not thread-safe, call near the end of the program
-void RequestErrorReportingEnd(); // begins ending the thread
-void WaitForErrorReportingEnd(); // waits for thread to end
+void RequestBackgroundErrorReportingEnd(); // begins ending the thread
+void WaitForBackgroundErrorReportingEnd(); // waits for thread to end
 
 // thread-safe, not signal-safe, works even if InitErrorReporting() was not called
 void ReportError(sentry::Error&& error);

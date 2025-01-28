@@ -8,21 +8,21 @@
 static Atomic<sentry::BackgroundQueue*> g_queue = nullptr;
 alignas(sentry::BackgroundQueue) static u8 g_worker_storage[sizeof(sentry::BackgroundQueue)];
 
-void InitErrorReporting(Span<sentry::Tag const> tags) {
+void InitBackgroundErrorReporting(Span<sentry::Tag const> tags) {
     auto existing = g_queue.Load(LoadMemoryOrder::Acquire);
     if (existing) return;
 
     WebGlobalInit();
 
     auto worker = PLACEMENT_NEW(g_worker_storage) sentry::BackgroundQueue {};
-    StartThread(*worker, tags);
+    sentry::StartThread(*worker, tags);
     g_queue.Store(worker, StoreMemoryOrder::Release);
 }
 
 void ReportError(sentry::Error&& error) {
-    // Option 1: send the error to the background thread
+    // Option 1: enqueue the error for the background thread
     if (auto q = g_queue.Load(LoadMemoryOrder::Acquire); q && !PanicOccurred()) {
-        ReportError(*q, Move(error));
+        sentry::ReportError(*q, Move(error));
         return;
     }
 
@@ -45,16 +45,16 @@ void ReportError(sentry::Error&& error) {
     auto _ = writer.WriteChar('\n');
 }
 
-void RequestErrorReportingEnd() {
+void RequestBackgroundErrorReportingEnd() {
     auto q = g_queue.Load(LoadMemoryOrder::Acquire);
     ASSERT(q);
     sentry::RequestThreadEnd(*q);
 }
 
-void WaitForErrorReportingEnd() {
+void WaitForBackgroundErrorReportingEnd() {
     auto q = g_queue.Load(LoadMemoryOrder::Acquire);
     ASSERT(q);
-    WaitForThreadEnd(*q);
+    sentry::WaitForThreadEnd(*q);
 
     WebGlobalCleanup();
 }

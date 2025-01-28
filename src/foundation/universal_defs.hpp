@@ -333,8 +333,9 @@ bool PanicOccurred(); // thread-safe
 void ResetPanic(); // thread-safe
 
 // Before throwing the PanicException, the panic hook is called. This is useful for logging the panic.
-// Set the hook at the very start of your program and never change it.
-extern void (*g_panic_hook)(char const* message, SourceLocation loc);
+using PanicHook = void (*)(char const* message, SourceLocation loc);
+void SetPanicHook(PanicHook hook); // thread-safe
+PanicHook GetPanicHook(); // thread-safe
 
 extern thread_local bool g_in_signal_handler;
 

@@ -173,6 +173,10 @@ int RunAllTests(Tester& tester, Span<String> filter_patterns) {
                     }
                 }
             } catch (TestFailed const& _) {
+            } catch (PanicException) {
+                tester.should_reenter = false;
+                tester.current_test_case->failed = true;
+                tester.log.Error({}, "Failed: test panicked");
             } catch (...) {
                 tester.should_reenter = false;
                 tester.current_test_case->failed = true;

@@ -39,7 +39,7 @@ SharedEngineSystems::SharedEngineSystems(Span<sentry::Tag const> tags)
     , sample_library_server(thread_pool,
                             paths.always_scanned_folder[ToInt(ScanFolderType::Libraries)],
                             error_notifications) {
-    InitErrorReporting(tags);
+    InitBackgroundErrorReporting(tags);
 
     settings.tracking.on_filesystem_change = [this](ScanFolderType type) {
         ASSERT(CheckThreadName("main"));
@@ -91,8 +91,8 @@ SharedEngineSystems::~SharedEngineSystems() {
             g_log.Error("global"_log_module, "Failed to write settings file: {}", outcome.Error());
     }
 
-    RequestErrorReportingEnd();
-    WaitForErrorReportingEnd();
+    RequestBackgroundErrorReportingEnd();
+    WaitForBackgroundErrorReportingEnd();
 }
 
 void SharedEngineSystems::RegisterFloeInstance(clap_plugin const* plugin, FloeInstanceIndex index) {

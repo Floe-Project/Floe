@@ -20,6 +20,8 @@
 #include "os/misc.hpp"
 #include "utils/logger/logger.hpp"
 
+#include "common_infrastructure/global.hpp"
+
 #include "plugin/plugin/plugin.hpp"
 #include "plugin/processing_utils/audio_utils.hpp"
 
@@ -569,7 +571,9 @@ static ErrorCodeOr<void> Main() {
 }
 
 int main() {
-    SetThreadName("main");
+    GlobalInit({.init_error_reporting = true, .set_main_thread = true});
+    DEFER { GlobalDeinit({.shutdown_error_reporting = true}); };
+
     auto const o = Main();
     if (o.HasError()) {
         g_log.Error(k_main_log_module, "Standalone error: {}", o.Error());

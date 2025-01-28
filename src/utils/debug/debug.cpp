@@ -14,24 +14,25 @@
 #include "os/misc.hpp"
 
 static void DefaultPanicHook(char const* message, SourceLocation loc) {
-    if (!PRODUCTION_BUILD) {
-        constexpr StdStream k_panic_stream = StdStream::Out;
-        InlineSprintfBuffer buffer;
-        // we style the source location to look like the first item of a call stack and then print the stack
-        // skipping one extra frame
-        buffer.Append("\nPanic: " ANSI_COLOUR_SET_FOREGROUND_RED "%s" ANSI_COLOUR_RESET
-                      "\n[0] " ANSI_COLOUR_SET_FOREGROUND_BLUE "%s" ANSI_COLOUR_RESET ":%d: %s\n",
-                      message,
-                      loc.file,
-                      loc.line,
-                      loc.function);
-        auto _ = StdPrint(k_panic_stream, buffer.AsString());
-        auto _ = PrintCurrentStacktrace(k_panic_stream, {.ansi_colours = true}, 4);
-        auto _ = StdPrint(k_panic_stream, "\n");
-    }
+    constexpr StdStream k_panic_stream = StdStream::Err;
+    InlineSprintfBuffer buffer;
+    // we style the source location to look like the first item of a call stack and then print the stack
+    // skipping one extra frame
+    buffer.Append("\nPanic: " ANSI_COLOUR_SET_FOREGROUND_RED "%s" ANSI_COLOUR_RESET
+                  "\n[0] " ANSI_COLOUR_SET_FOREGROUND_BLUE "%s" ANSI_COLOUR_RESET ":%d: %s\n",
+                  message,
+                  loc.file,
+                  loc.line,
+                  loc.function);
+    auto _ = StdPrint(k_panic_stream, buffer.AsString());
+    auto _ = PrintCurrentStacktrace(k_panic_stream, {.ansi_colours = true}, 4);
+    auto _ = StdPrint(k_panic_stream, "\n");
 }
 
-void (*g_panic_hook)(char const* message, SourceLocation loc) = DefaultPanicHook;
+Atomic<void (*)(char const* message, SourceLocation loc)> g_panic_hook = DefaultPanicHook;
+
+void SetPanicHook(PanicHook hook) { g_panic_hook.Store(hook, StoreMemoryOrder::Release); }
+PanicHook GetPanicHook() { return g_panic_hook.Load(LoadMemoryOrder::Acquire); }
 
 thread_local bool g_in_signal_handler {};
 
@@ -49,7 +50,7 @@ void ResetPanic() { g_panic_occurred.Store(false, StoreMemoryOrder::Release); }
         case 0: {
             // First time we've panicked.
             ++in_panic_hook;
-            g_panic_hook(message, loc);
+            g_panic_hook.Load(LoadMemoryOrder::Acquire)(message, loc);
             --in_panic_hook;
 
             g_panic_occurred.Store(true, StoreMemoryOrder::Release);

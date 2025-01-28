@@ -13,6 +13,7 @@
 #include "common_infrastructure/common_errors.hpp"
 #include "common_infrastructure/crash_hooks.hpp"
 #include "common_infrastructure/error_reporting.hpp"
+#include "common_infrastructure/global.hpp"
 #include "common_infrastructure/package_format.hpp"
 #include "common_infrastructure/sample_library/sample_library.hpp"
 
@@ -239,13 +240,8 @@ static ErrorCodeOr<int> Main(ArgsCstr args) {
 }
 
 int main(int argc, char** argv) {
-    g_panic_hook = PanicHook;
-    InitLogFolderIfNeeded();
-
-    SetThreadName("main");
-
-    BeginCrashDetection(CrashHookWriteCrashReport);
-    DEFER { EndCrashDetection(); };
+    GlobalInit({.init_error_reporting = true, .set_main_thread = true});
+    DEFER { GlobalDeinit({.shutdown_error_reporting = true}); };
 
     auto const result = Main({argc, argv});
     if (result.HasError()) {

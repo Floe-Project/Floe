@@ -7,7 +7,7 @@
 #include "utils/cli_arg_parse.hpp"
 #include "utils/debug/tracy_wrapped.hpp"
 
-#include "common_infrastructure/crash_hooks.hpp"
+#include "common_infrastructure/global.hpp"
 
 #include "foundation_tests.hpp"
 #include "os_tests.hpp"
@@ -65,14 +65,8 @@ static ErrorCodeOr<void> SetLogLevel(tests::Tester& tester, Optional<String> log
 }
 
 ErrorCodeOr<int> Main(ArgsCstr args) {
-    SetThreadName("main");
-#ifdef TRACY_ENABLE
-    ___tracy_startup_profiler();
-    DEFER { ___tracy_shutdown_profiler(); };
-#endif
-
-    BeginCrashDetection(CrashHookWriteToStdout);
-    DEFER { EndCrashDetection(); };
+    GlobalInit({.init_error_reporting = false, .set_main_thread = true});
+    DEFER { GlobalDeinit({.shutdown_error_reporting = false}); };
 
     ZoneScoped;
 

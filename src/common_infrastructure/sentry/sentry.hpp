@@ -99,13 +99,13 @@ static fmt::UuidArray Uuid(Atomic<u64>& seed) {
     return result;
 }
 
-static String UniqueErrorFilepath(String folder, Atomic<u64>& seed, ArenaAllocator& arena) {
+static String UniqueErrorFilepath(String folder, Atomic<u64>& seed, Allocator& allocator) {
     auto s = seed.FetchAdd(1, RmwMemoryOrder::Relaxed);
     auto const random = RandomU64(s);
     seed.Store(s, StoreMemoryOrder::Relaxed);
     auto const id = fmt::IntToString(random, {.base = fmt::IntToStringOptions::Base::Base32});
-    auto const filename = fmt::Format(arena, "{}.{}", id, k_error_file_extension);
-    return path::Join(arena, Array {folder, filename});
+    auto const filename = fmt::Format(allocator, "{}.{}", id, k_error_file_extension);
+    return path::Join(allocator, Array {folder, filename});
 }
 
 } // namespace detail
@@ -419,6 +419,8 @@ struct SubmissionOptions {
 };
 
 // threadsafe (for Sentry), not signal-safe
+// Blocks until the submission is complete. If the submission fails, it will write the envelope to a file if
+// write_to_file_if_needed is true.
 PUBLIC ErrorCodeOr<void> SubmitEnvelope(Sentry& sentry,
                                         String envelope_without_header,
                                         ArenaAllocator& scratch_arena,
@@ -502,8 +504,8 @@ PUBLIC ErrorCodeOr<void> WriteCrashToFile(Sentry& sentry,
                                           Optional<StacktraceStack> const& stacktrace,
                                           String folder,
                                           String message,
-                                          ArenaAllocator& scratch_arena) {
-    auto file = TRY(OpenFile(detail::UniqueErrorFilepath(folder, sentry.seed, scratch_arena),
+                                          Allocator& scratch_allocator) {
+    auto file = TRY(OpenFile(detail::UniqueErrorFilepath(folder, sentry.seed, scratch_allocator),
                              FileMode::WriteNoOverwrite));
 
     TRY(EnvelopeAddHeader(sentry, file.Writer(), false));

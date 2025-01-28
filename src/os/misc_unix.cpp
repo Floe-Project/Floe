@@ -384,10 +384,10 @@ static constexpr auto k_signals = Array {
     SIGTRAP, // Trace/breakpoint trap
 };
 
-bool g_signals_installed = false;
+u32 g_signals_installed = 0;
 static struct sigaction g_previous_signal_actions[k_signals.size] {};
 
-CrashHookFunction g_crash_hook {};
+Atomic<CrashHookFunction> g_crash_hook {};
 
 static String SignalString(int signal_num, siginfo_t* info) {
     String message = "unknown signal";
@@ -469,7 +469,7 @@ static void SignalHandler(int signal_num, siginfo_t* info, void* context) {
 #endif
         }
 
-        if (g_crash_hook) g_crash_hook(signal_description);
+        if (auto hook = g_crash_hook.Load(LoadMemoryOrder::Acquire)) hook(signal_description);
 
         for (auto [index, s] : Enumerate(k_signals)) {
             if (s == signal_num) {
@@ -589,9 +589,10 @@ bool TrySigFunction(int return_code, String message) {
 }
 
 void BeginCrashDetection(CrashHookFunction hook) {
-    g_crash_hook = hook;
-    if (g_signals_installed) return;
-    g_signals_installed = true;
+    g_crash_hook.Store(hook, StoreMemoryOrder::Release);
+
+    ++g_signals_installed;
+    if (g_signals_installed > 1) return;
 
     InitStacktraceState();
 
@@ -608,8 +609,9 @@ void BeginCrashDetection(CrashHookFunction hook) {
 }
 
 void EndCrashDetection() {
-    if (!g_signals_installed) return;
-    g_signals_installed = false;
+    ASSERT(g_signals_installed > 0);
+    --g_signals_installed;
+    if (g_signals_installed != 0) return;
 
     for (auto [index, signal] : Enumerate(k_signals)) {
         sigaction(signal, &g_previous_signal_actions[index], nullptr);

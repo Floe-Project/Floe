@@ -910,15 +910,6 @@ clap_plugin const floe_plugin {
 
                     floe.engine.Clear();
 
-                    // // TODO: consolidate panic handling
-                    // g_panic_hook = [](char const* message, SourceLocation loc) {
-                    //     g_log.Error(k_global_log_module, "Panic: {}: {}", loc, message);
-                    //     DynamicArrayBounded<char, 2000> buffer {};
-                    //     auto _ = WriteCurrentStacktrace(dyn::WriterFor(buffer), {}, 1);
-                    //     g_log.Error(k_global_log_module, "Stacktrace:\n{}", buffer);
-                    //     DefaultPanicHandler(message, loc);
-                    // };
-
                     ASSERT(g_num_initialised_plugins);
                     if (--g_num_initialised_plugins == 0) g_shared_engine_systems.Clear();
                 }

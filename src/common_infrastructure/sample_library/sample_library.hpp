@@ -299,7 +299,7 @@ inline LibraryPtrOrError Read(Reader& reader,
 ErrorCodeOr<void> WriteDocumentedLuaExample(Writer writer, bool include_comments = true);
 
 // Lua only
-bool CheckAllReferencedFilesExist(Library const& lib, Logger& logger);
+bool CheckAllReferencedFilesExist(Library const& lib, Writer error_writer);
 
 } // namespace sample_lib
 

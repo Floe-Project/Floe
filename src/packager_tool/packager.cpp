@@ -8,10 +8,8 @@
 #include "foundation/foundation.hpp"
 #include "os/misc.hpp"
 #include "utils/cli_arg_parse.hpp"
-#include "utils/logger/logger.hpp"
 
 #include "common_infrastructure/common_errors.hpp"
-#include "common_infrastructure/crash_hooks.hpp"
 #include "common_infrastructure/error_reporting.hpp"
 #include "common_infrastructure/global.hpp"
 #include "common_infrastructure/package_format.hpp"
@@ -46,15 +44,15 @@ ErrorCodeOr<Paths> ScanLibraryFolder(ArenaAllocator& arena, String library_folde
             result.license = dir_iterator::FullPath(it, *entry, arena);
 
     if (!result.lua.size) {
-        g_cli_out.Error({}, "No Floe Lua file found in {}", library_folder);
+        StdPrintF(StdStream::Err, "Error: no Floe Lua file found in {}\n", library_folder);
         return ErrorCode {CommonError::NotFound};
     }
 
     if (!result.license.size) {
-        g_cli_out.Error({}, "No license file found in {}", library_folder);
-        g_cli_out.Info(
-            {},
-            "Expected a file called licence (or license) to be present. Any file extension is allowed.");
+        StdPrintF(StdStream::Err, "Error: no license file found in {}\n", library_folder);
+        StdPrintF(
+            StdStream::Err,
+            "Expected a file called licence (or license) to be present. Any file extension is allowed.\n");
         return ErrorCode {CommonError::NotFound};
     }
 
@@ -67,11 +65,11 @@ static ErrorCodeOr<sample_lib::Library*> ReadLua(String lua_path, ArenaAllocator
     ArenaAllocator scratch_arena {PageAllocator::Instance()};
     auto const outcome = sample_lib::ReadLua(reader, lua_path, arena, scratch_arena, {});
     if (outcome.HasError()) {
-        g_cli_out.Error({},
-                        "Error reading {}: {}, {}",
-                        lua_path,
-                        outcome.Error().message,
-                        outcome.Error().code);
+        StdPrintF(StdStream::Err,
+                  "Error: failed to read {}: {}, {}\n",
+                  lua_path,
+                  outcome.Error().message,
+                  outcome.Error().code);
         return outcome.Error().code;
     }
 
@@ -107,7 +105,6 @@ static ErrorCodeOr<void> WriteAboutLibraryHtml(sample_lib::Library const& lib,
         path::Join(arena, Array {library_folder, fmt::Format(arena, "About {}.rtf"_s, lib.name)});
     TRY(WriteFile(output_path, result_data));
 
-    g_cli_out.Info({}, "Successfully wrote '{}'", output_path);
     return k_success;
 }
 
@@ -118,26 +115,26 @@ static ErrorCodeOr<void> CheckNeededPackageCliArgs(Span<CommandLineArg const> ar
     auto const presets_folders_arg = args[ToInt(PackagerCliArgId::PresetFolder)];
 
     if (!library_folders_arg.values.size && !presets_folders_arg.values.size) {
-        g_cli_out.Error({},
-                        "Either --{} or --{} must be provided",
-                        library_folders_arg.info.key,
-                        presets_folders_arg.info.key);
+        StdPrintF(StdStream::Err,
+                  "Error: either --{} or --{} must be provided\n",
+                  library_folders_arg.info.key,
+                  presets_folders_arg.info.key);
         return ErrorCode {CliError::InvalidArguments};
     }
 
     auto const package_name_arg = args[ToInt(PackagerCliArgId::PackageName)];
     if (library_folders_arg.values.size != 1 && !package_name_arg.was_provided) {
-        g_cli_out.Error({},
-                        "If --{} is not set to 1 folder, --{} must be",
-                        library_folders_arg.info.key,
-                        package_name_arg.info.key);
+        StdPrintF(StdStream::Err,
+                  "Error: if --{} is not set to 1 folder, --{} must be\n",
+                  library_folders_arg.info.key,
+                  package_name_arg.info.key);
         return ErrorCode {CliError::InvalidArguments};
     }
 
     if (package_name_arg.was_provided) {
         if (EndsWithSpan(package_name_arg.values[0], package::k_file_extension) ||
             EndsWithSpan(package_name_arg.values[0], ".zip"_s)) {
-            g_cli_out.Error({}, "Don't include the file extension in the package name");
+            StdPrintF(StdStream::Err, "Error: don't include the file extension in the package name\n");
             return ErrorCode {CliError::InvalidArguments};
         }
     }
@@ -186,11 +183,11 @@ static ErrorCodeOr<int> Main(ArgsCstr args) {
             ArenaAllocator scratch_arena {PageAllocator::Instance()};
             auto outcome = sample_lib::ReadMdata(reader, library_path, arena, scratch_arena);
             if (outcome.HasError()) {
-                g_cli_out.Error({},
-                                "Error reading {}: {}, {}",
-                                library_path,
-                                outcome.Error().message,
-                                outcome.Error().code);
+                StdPrintF(StdStream::Err,
+                          "Error: failed to read {}: {}, {}\n",
+                          library_path,
+                          outcome.Error().message,
+                          outcome.Error().code);
                 return outcome.Error().code;
             }
             auto lib = outcome.Get<sample_lib::Library*>();
@@ -204,7 +201,7 @@ static ErrorCodeOr<int> Main(ArgsCstr args) {
 
         auto lib = TRY(ReadLua(paths.lua, arena));
         lib_for_package_name = lib;
-        if (!sample_lib::CheckAllReferencedFilesExist(*lib, g_cli_out))
+        if (!sample_lib::CheckAllReferencedFilesExist(*lib, StdWriter(StdStream::Err)))
             return ErrorCode {CommonError::NotFound};
 
         TRY(WriteAboutLibraryHtml(*lib, arena, paths, library_path));
@@ -229,11 +226,11 @@ static ErrorCodeOr<int> Main(ArgsCstr args) {
                    PackageName(arena, lib_for_package_name, cli_args[ToInt(PackagerCliArgId::PackageName)])});
         package::WriterFinalise(package);
         TRY(WriteFile(package_path, zip_data));
-        g_cli_out.Info({}, "Created package file: {}", package_path);
+        StdPrintF(StdStream::Out, "Successfully created package: {}\n", package_path);
     } else {
-        g_cli_out.Info(
-            {},
-            "No output packge folder provided, not creating a package file\nRun with --help for usage info");
+        StdPrintF(
+            StdStream::Err,
+            "No output packge folder provided, not creating a package file\nRun with --help for usage info\n");
     }
 
     return 0;
@@ -245,7 +242,7 @@ int main(int argc, char** argv) {
 
     auto const result = Main({argc, argv});
     if (result.HasError()) {
-        g_cli_out.Error({}, "Error: {}", result.Error());
+        StdPrintF(StdStream::Err, "Error: {}\n", result.Error());
         return 1;
     }
     return result.Value();

@@ -1699,15 +1699,13 @@ ErrorCodeOr<void> WriteDocumentedLuaExample(Writer writer, bool include_comments
     return k_success;
 }
 
-bool CheckAllReferencedFilesExist(Library const& lib, Logger& logger) {
+bool CheckAllReferencedFilesExist(Library const& lib, Writer error_writer) {
     bool success = true;
     auto check_file = [&](LibraryPath path) {
         auto outcome = lib.create_file_reader(lib, path);
         if (outcome.HasError()) {
-            logger.Error(k_log_module,
-                         "Error with file \"{}\" referenced in Lua. {}.",
-                         path,
-                         outcome.Error());
+            auto _ =
+                fmt::FormatToWriter(error_writer, "Error: file in Lua \"{}\": {}.\n", path, outcome.Error());
             success = false;
         }
     };

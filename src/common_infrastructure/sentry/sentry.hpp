@@ -184,8 +184,6 @@ struct SentryOrFallback {
 
 // thread-safe (for Sentry), signal-safe
 PUBLIC ErrorCodeOr<void> EnvelopeAddHeader(Sentry& sentry, Writer writer, bool include_sent_at) {
-    ASSERT(sentry.dsn.dsn.size);
-
     json::WriteContext json_writer {
         .out = writer,
         .add_whitespace = false,

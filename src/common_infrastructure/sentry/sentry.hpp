@@ -194,7 +194,7 @@ PUBLIC ErrorCodeOr<void> EnvelopeAddHeader(Sentry& sentry, Writer writer, bool i
     auto const event_id = detail::Uuid(sentry.seed);
 
     TRY(json::WriteObjectBegin(json_writer));
-    TRY(json::WriteKeyValue(json_writer, "dsn", sentry.dsn.dsn));
+    if constexpr (k_online_reporting) TRY(json::WriteKeyValue(json_writer, "dsn", sentry.dsn.dsn));
     if (include_sent_at) TRY(json::WriteKeyValue(json_writer, "sent_at", TimestampRfc3339UtcNow()));
     TRY(json::WriteKeyValue(json_writer, "event_id", event_id));
     TRY(json::WriteObjectEnd(json_writer));

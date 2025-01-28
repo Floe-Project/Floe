@@ -123,7 +123,7 @@ clang-tidy arch_os_pair=native_arch_os_pair: (install-cbd arch_os_pair)
 
 clang-tidy-all: (clang-tidy "x86_64-linux") (clang-tidy "x86_64-windows") (clang-tidy "aarch64-macos")
 
-upload-crashes:
+upload-errors:
   #!/usr/bin/env bash
   set -euxo pipefail
   
@@ -142,6 +142,7 @@ upload-crashes:
   for crash in *.floe-error; do
     if [ -f "$crash" ]; then
       sentry-cli send-envelope --raw "$crash"
+      rm "$crash"
     fi
   done
 

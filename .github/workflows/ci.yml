@@ -34,11 +34,11 @@ jobs:
       - run: just build mac_ub
       - run: just test-ci
 
-      - name: Upload crashes
+      - name: Upload errors
         if: '!cancelled()'
         env:
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
-        run: just upload-crashes
+        run: just upload-errors
 
       - name: Upload logs
         if: '!cancelled()'
@@ -103,11 +103,11 @@ jobs:
             zig-out/x86_64-windows/tests.exe
             zig-out/x86_64-windows/VST3-Validator.exe
 
-      - name: Upload crashes
+      - name: Upload errors
         if: '!cancelled()'
         env:
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
-        run: just upload-crashes
+        run: just upload-errors
 
       - name: Upload logs
         if: '!cancelled()'
@@ -143,11 +143,11 @@ jobs:
           choco install sentry-cli -y --no-progress
           sentry-cli --version
 
-      - name: Upload crashes
+      - name: Upload errors
         if: '!cancelled()'
         env:
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
-        run: just upload-crashes
+        run: just upload-errors
 
       - name: Upload logs
         if: '!cancelled()'

@@ -156,16 +156,16 @@ ChecksumsForFolder(String folder, ArenaAllocator& arena, ArenaAllocator& scratch
 
 // All values in the authority table must be present in the test_table and have the same checksums.
 // test_table is allowed to have extra files.
-PUBLIC bool ChecksumsDiffer(ChecksumTable authority, ChecksumTable test_table, Logger* diff_log) {
+PUBLIC bool ChecksumsDiffer(ChecksumTable authority, ChecksumTable test_table, Optional<Writer> diff_log) {
     for (auto const [key, val_ptr] : authority) {
         auto const a_val = *val_ptr;
         if (auto const b_val = test_table.FindElement(key)) {
             if (a_val.crc32 != b_val->data.crc32 || a_val.file_size != b_val->data.file_size) {
-                if (diff_log) diff_log->Info({}, "File has changed: {}", key);
+                if (diff_log) auto _ = fmt::FormatToWriter(*diff_log, "File has changed: {}\n", key);
                 return true;
             }
         } else {
-            if (diff_log) diff_log->Info({}, "File is missing: {}", key);
+            if (diff_log) auto _ = fmt::FormatToWriter(*diff_log, "File is missing: {}\n", key);
             return true;
         }
     }

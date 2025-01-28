@@ -116,7 +116,7 @@ LibraryCheckExistingInstallation(Component const& component,
         o.Value();
     });
 
-    if (!ChecksumsDiffer(component.checksum_values, actual_checksums, nullptr))
+    if (!ChecksumsDiffer(component.checksum_values, actual_checksums, k_nullopt))
         return ExistingInstalledComponent {
             .installed = true,
             .version_difference = ExistingInstalledComponent::Equal,
@@ -129,7 +129,7 @@ LibraryCheckExistingInstallation(Component const& component,
     if (auto const o = ReadEntireFile(checksum_file_path, scratch_arena); !o.HasError()) {
         auto const stored_checksums = ParseChecksumFile(o.Value(), scratch_arena);
         if (stored_checksums.HasValue() &&
-            !ChecksumsDiffer(stored_checksums.Value(), actual_checksums, nullptr)) {
+            !ChecksumsDiffer(stored_checksums.Value(), actual_checksums, k_nullopt)) {
             result.modified_since_installed = ExistingInstalledComponent::Unmodified;
         } else {
             // The library has been modified since it was installed. OR the checksum file is badly formatted,

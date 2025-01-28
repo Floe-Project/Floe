@@ -24,7 +24,7 @@
 #include "utils/logger/logger.hpp"
 
 #include "common_infrastructure/crash_hooks.hpp"
-#include "common_infrastructure/sentry/sentry_worker.hpp"
+#include "common_infrastructure/error_reporting.hpp"
 
 #include "gui.hpp"
 
@@ -1060,7 +1060,7 @@ static LRESULT CALLBACK PageWindowProc(HWND window, UINT msg, WPARAM w_param, LP
 
 static ErrorCodeOr<void> Main(HINSTANCE h_instance, int cmd_show) {
     g_panic_hook = PanicHook;
-    InitCrashFolderIfNeeded();
+    InitLogFolderIfNeeded();
 
     SetThreadName("main");
 

@@ -88,17 +88,14 @@ OsInfo GetOsInfo() {
     // SPDX-License-Identifier: MIT
     usize size = result.version.Capacity();
     if (sysctlbyname("kern.osproductversion", result.version.data, &size, nullptr, 0) == 0) {
-        if (size <= result.version.Capacity()) {
-            result.version.size = size;
-            auto const num_dots = Count(result.version, '.');
-            if (num_dots < 2) dyn::AppendSpan(result.version, ".0");
-        }
+        result.version.size = NullTerminatedSize(result.version.data);
+        auto const num_dots = Count(result.version, '.');
+        if (num_dots < 2) dyn::AppendSpan(result.version, ".0");
     }
 
     size = result.build.Capacity();
-    if (sysctlbyname("kern.osversion", result.build.data, &size, nullptr, 0) == 0) {
-        if (size <= result.build.Capacity()) result.build.size = size;
-    }
+    if (sysctlbyname("kern.osversion", result.build.data, &size, nullptr, 0) == 0)
+        result.build.size = NullTerminatedSize(result.build.data);
 
     struct utsname uts {};
     if (uname(&uts) == 0) result.kernel_version = FromNullTerminated((char const*)uts.release);
@@ -115,15 +112,13 @@ SystemStats GetSystemStats() {
     result.page_size = (u32)NSPageSize();
 
     auto size = result.cpu_name.Capacity();
-    if (sysctlbyname("machdep.cpu.brand_string", result.cpu_name.data, &size, nullptr, 0) == 0) {
-        if (size <= result.cpu_name.Capacity()) result.cpu_name.size = size;
-    }
+    if (sysctlbyname("machdep.cpu.brand_string", result.cpu_name.data, &size, nullptr, 0) == 0)
+        result.cpu_name.size = NullTerminatedSize(result.cpu_name.data);
 
     u64 freq = 0;
     size = sizeof(freq);
-    if (sysctlbyname("hw.cpufrequency", &freq, &size, nullptr, 0) == 0) {
+    if (sysctlbyname("hw.cpufrequency", &freq, &size, nullptr, 0) == 0)
         result.frequency_mhz = (double)freq / 1000000.0;
-    }
 
     return result;
 }

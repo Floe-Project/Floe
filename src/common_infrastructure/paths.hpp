@@ -6,6 +6,8 @@
 #include "os/filesystem.hpp"
 #include "utils/logger/logger.hpp"
 
+#include "common_infrastructure/error_reporting.hpp"
+
 enum class ScanFolderType : u8 { Presets, Libraries, Count };
 
 struct FloePaths {
@@ -19,15 +21,29 @@ static Span<String> PossibleSettingsPaths(ArenaAllocator& arena) {
     result.Reserve(5);
 
     // Best path
-    LineWriter writer {k_main_log_module, LogLevel::Error, g_log};
-    dyn::Append(result,
-                FloeKnownDirectory(arena,
-                                   FloeKnownDirectoryType::Settings,
-                                   "settings.ini"_s,
-                                   {
-                                       .create = true,
-                                       .error_log = &writer.writer,
-                                   }));
+    {
+        ArenaAllocatorWithInlineStorage<500> scratch_arena {PageAllocator::Instance()};
+        DynamicArray<char> error_log {scratch_arena};
+        auto error_writer = dyn::WriterFor(error_log);
+        dyn::Append(result,
+                    FloeKnownDirectory(arena,
+                                       FloeKnownDirectoryType::Settings,
+                                       "settings.ini"_s,
+                                       {
+                                           .create = true,
+                                           .error_log = &error_writer,
+                                       }));
+        if (error_log.size) {
+            sentry::Error error {{
+                .level = sentry::ErrorEvent::Level::Warning,
+            }};
+            error.message = fmt::Format(error.arena,
+                                        "Failed to get known settings directory {}\n{}",
+                                        Last(result),
+                                        error_log);
+            ReportError(Move(error));
+        }
+    }
 
     // Legacy paths
     // In the past some of these were poorly chosen as locations for saving settings due to file permissions.
@@ -76,11 +92,20 @@ static String AlwaysScannedFolder(ScanFolderType type, ArenaAllocator& allocator
         case ScanFolderType::Presets: dir_type = FloeKnownDirectoryType::Presets; break;
         case ScanFolderType::Count: PanicIfReached();
     }
-    auto error_writer = ErrorWriter(g_log);
-    return FloeKnownDirectory(allocator,
-                              dir_type,
-                              k_nullopt,
-                              {.create = true, .error_log = &error_writer.writer});
+    ArenaAllocatorWithInlineStorage<500> scratch_arena {PageAllocator::Instance()};
+    DynamicArray<char> error_log {scratch_arena};
+    auto error_writer = dyn::WriterFor(error_log);
+    auto const result =
+        FloeKnownDirectory(allocator, dir_type, k_nullopt, {.create = true, .error_log = &error_writer});
+    if (error_log.size) {
+        sentry::Error error {{
+            .level = sentry::ErrorEvent::Level::Warning,
+        }};
+        error.message =
+            fmt::Format(error.arena, "Failed to get always scanned folder {}\n{}", result, error_log);
+        ReportError(Move(error));
+    }
+    return result;
 }
 
 PUBLIC FloePaths CreateFloePaths(ArenaAllocator& arena) {

@@ -60,7 +60,6 @@ TEST_CASE(TestFileApi) {
 
     SUBCASE("Write and read") {
         TRY(CreateDirectory(tests::TempFolder(tester), {.create_intermediate_directories = true}));
-        g_debug_log.Debug(k_os_log_module, "filename1: {}", filename1);
 
         SUBCASE("Open API") {
             {

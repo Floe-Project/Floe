@@ -81,43 +81,6 @@ struct Logger {
     DECLARE_LOG_FUNCTION(Warning)
 };
 
-struct LineWriter {
-    LineWriter(LogModuleName module_name, LogLevel level, Logger& sink)
-        : module_name(module_name)
-        , level(level)
-        , sink(sink) {
-        writer.Set<LineWriter>(*this, [](LineWriter& w, Span<u8 const> bytes) -> ErrorCodeOr<void> {
-            w.Append(String {(char const*)bytes.data, bytes.size});
-            return k_success;
-        });
-    }
-    ~LineWriter() { Flush(); }
-
-    void Flush() {
-        if (buffer.size) {
-            sink.Log(module_name, level, buffer);
-            dyn::Clear(buffer);
-        }
-    }
-    void Append(String data) {
-        for (auto c : data)
-            if (c == '\n')
-                Flush();
-            else
-                dyn::Append(buffer, c);
-    }
-
-    LogModuleName module_name;
-    LogLevel level;
-    Logger& sink;
-    DynamicArrayBounded<char, 250> buffer {};
-    Writer writer {};
-};
-
-inline LineWriter ErrorWriter(Logger& logger) {
-    return LineWriter {k_main_log_module, LogLevel::Error, logger};
-}
-
 struct StdStreamLogger final : Logger {
     StdStreamLogger(StdStream stream, WriteFormattedLogOptions config) : stream(stream), config(config) {}
     void Log(LogModuleName module_name, LogLevel level, String str) override;
@@ -130,10 +93,6 @@ struct StdStreamLogger final : Logger {
 // difficult to capture STDERR easily. Let's just keep things simple and use STDOUT for everything.
 extern StdStreamLogger g_debug_log;
 
-// STDOUT log for a CLI program. Info messages are printed verbatim, whereas warnings and erros have prefixes
-// and colours
-extern StdStreamLogger g_cli_out;
-
 // Timestamped log file
 struct FileLogger final : Logger {
     void Log(LogModuleName module_name, LogLevel level, String str) override;
@@ -144,31 +103,6 @@ struct FileLogger final : Logger {
     String filepath {};
 };
 extern FileLogger g_log_file;
-
-struct TracyLogger final : Logger {
-    void Log([[maybe_unused]] LogModuleName module_name, LogLevel, [[maybe_unused]] String str) override {
-        if constexpr (k_tracy_enable) TracyMessageC(str.data, str.size, config.colour);
-    }
-    using Logger::Log;
-};
-
-struct BufferLogger final : Logger {
-    BufferLogger(Allocator& a) : buffer(a) {}
-    void Log(LogModuleName module_name, LogLevel level, String str) override {
-        auto _ = WriteFormattedLog(dyn::WriterFor(buffer),
-                                   module_name.str,
-                                   level,
-                                   str,
-                                   {
-                                       .ansi_colors = false,
-                                       .no_info_prefix = true,
-                                       .timestamp = false,
-                                       .thread = false,
-                                   });
-    }
-
-    DynamicArray<char> buffer;
-};
 
 struct DefaultLogger final : Logger {
     void Log(LogModuleName module_name, LogLevel level, String str) override {

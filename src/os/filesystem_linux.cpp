@@ -279,7 +279,7 @@ MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirecto
                     o.HasError()) {
                     if (options.error_log)
                         auto _ = fmt::FormatToWriter(*options.error_log,
-                                                     "Failed to create directory '{}': {}",
+                                                     "Failed to create directory '{}': {}\n",
                                                      result,
                                                      o.Error());
                 }
@@ -310,7 +310,7 @@ MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirecto
         char const* home = secure_getenv("HOME");
         if (home == nullptr) {
             if (options.error_log)
-                auto _ = fmt::FormatToWriter(*options.error_log, "HOME environment variable not set");
+                auto _ = fmt::FormatToWriter(*options.error_log, "HOME environment variable not set\n");
             home = "unknown";
         }
         result = path::Join(a, Array {FromNullTerminated(home), *home_path});
@@ -326,7 +326,7 @@ MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirecto
                                        });
         if (o.HasError() && options.error_log)
             auto _ = fmt::FormatToWriter(*options.error_log,
-                                         "Failed to create directory '{}': {}",
+                                         "Failed to create directory '{}': {}\n",
                                          result,
                                          o.Error());
     }

@@ -9,7 +9,6 @@
 #include "utils/cli_arg_parse.hpp"
 #include "utils/json/json_reader.hpp"
 #include "utils/json/json_writer.hpp"
-#include "utils/logger/logger.hpp"
 
 #include "common_infrastructure/common_errors.hpp"
 #include "common_infrastructure/sample_library/sample_library.hpp"
@@ -318,7 +317,7 @@ int main(int argc, char** argv) {
     SetThreadName("main");
     auto result = Main({argc, argv});
     if (result.HasError()) {
-        g_cli_out.Error({}, "Error: {}", result.Error());
+        StdPrintF(StdStream::Err, "Error: {}", result.Error());
         return 1;
     }
     return result.Value();

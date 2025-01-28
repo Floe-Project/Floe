@@ -205,7 +205,7 @@ MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirecto
                                         {.create_intermediate_directories = true, .fail_if_exists = false});
                     o.HasError() && options.error_log) {
                     auto _ = fmt::FormatToWriter(*options.error_log,
-                                                 "Failed creating directory {}: {}",
+                                                 "Failed creating directory {}: {}\n",
                                                  result,
                                                  o.Error());
                 }

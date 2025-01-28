@@ -60,7 +60,7 @@ static ErrorCodeOr<void> SetLogLevel(tests::Tester& tester, Optional<String> log
         }
     }
 
-    g_cli_out.Error({}, "Unknown log level: {}", *log_level);
+    StdPrintF(StdStream::Err, "Unknown log level: {}", *log_level);
     return ErrorCode {CliError::InvalidArguments};
 }
 
@@ -122,7 +122,7 @@ ErrorCodeOr<int> Main(ArgsCstr args) {
 int main(int argc, char** argv) {
     auto const result = Main({argc, argv});
     if (result.HasError()) {
-        g_cli_out.Error({}, "Error: {}", result.Error());
+        StdPrintF(StdStream::Err, "Error: {}", result.Error());
         return 1;
     }
     return result.Value();

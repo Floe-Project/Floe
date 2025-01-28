@@ -297,7 +297,7 @@ ParseCommandLineArgsStandard(ArenaAllocator& arena,
                                  .handle_help_option = true,
                                  .print_usage_on_error = true,
                              }) {
-    auto writer = StdWriter(g_cli_out.stream);
+    auto writer = StdWriter(StdStream::Err);
     auto result = ParseCommandLineArgs(writer, arena, args, arg_defs, options);
     if (result.HasError()) {
         if (result.Error() == CliError::HelpRequested)

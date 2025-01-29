@@ -20,6 +20,26 @@ void InitBackgroundErrorReporting(Span<sentry::Tag const> tags) {
 }
 
 void ReportError(sentry::Error&& error) {
+    // Always log the error
+    Log({},
+        ({
+            LogLevel l;
+            switch (error.level) {
+                case sentry::ErrorEvent::Level::Fatal: l = LogLevel::Error; break;
+                case sentry::ErrorEvent::Level::Error: l = LogLevel::Error; break;
+                case sentry::ErrorEvent::Level::Warning: l = LogLevel::Warning; break;
+                case sentry::ErrorEvent::Level::Info: l = LogLevel::Info; break;
+                case sentry::ErrorEvent::Level::Debug: l = LogLevel::Debug; break;
+            }
+            l;
+        }),
+        error.message);
+    if (error.stacktrace) {
+        StacktraceToCallback(*error.stacktrace, [](FrameInfo const& frame) {
+            LogInfo({}, "  {}:{}: {}", frame.filename, frame.line, frame.function_name);
+        });
+    }
+
     // Option 1: enqueue the error for the background thread
     if (auto q = g_queue.Load(LoadMemoryOrder::Acquire); q && !PanicOccurred()) {
         sentry::ReportError(*q, Move(error));
@@ -28,21 +48,6 @@ void ReportError(sentry::Error&& error) {
 
     // Option 2: write the message to file directly
     if (WriteErrorToFile(*sentry::SentryOrFallback {}, error).Succeeded()) return;
-
-    // Option 3: write the message to stderr
-    auto writer = StdWriter(StdStream::Err);
-    auto _ = fmt::FormatToWriter(writer,
-                                 "\n" ANSI_COLOUR_SET_FOREGROUND_RED "{}" ANSI_COLOUR_RESET "\n",
-                                 error.message);
-    if (error.stacktrace) {
-        auto _ = WriteStacktrace(*error.stacktrace,
-                                 writer,
-                                 {
-                                     .ansi_colours = true,
-                                     .demangle = true,
-                                 });
-    }
-    auto _ = writer.WriteChar('\n');
 }
 
 void RequestBackgroundErrorReportingEnd() {

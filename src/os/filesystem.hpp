@@ -104,12 +104,12 @@ struct FileMode {
     }
 
     // Windows only. On Unix, you're always allowed to open a file, but on Windows you must specify what
-    // sharing you will allow.
+    // sharing you accept.
     enum class Share : u8 {
         None = 0,
         Read = 1 << 0, // allow others to read the file while you have it open
         Write = 1 << 1, // allow others to write to the file while you have it open
-        Delete = 1 << 2, // allow others to delete the file while you have it open
+        DeleteRename = 1 << 2, // allows other to delete or rename the file while you have it open
         ReadWrite = Read | Write,
     };
     friend constexpr Share operator|(Share a, Share b) { return (Share)(ToInt(a) | ToInt(b)); }

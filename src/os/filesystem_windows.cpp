@@ -195,7 +195,7 @@ ErrorCodeOr<File> OpenFile(String filename, FileMode mode) {
         auto const share_flags = ToInt(mode.share);
         if (share_flags & ToInt(FileMode::Share::Read)) s |= FILE_SHARE_READ;
         if (share_flags & ToInt(FileMode::Share::Write)) s |= FILE_SHARE_WRITE;
-        if (share_flags & ToInt(FileMode::Share::Delete)) s |= FILE_SHARE_DELETE;
+        if (share_flags & ToInt(FileMode::Share::DeleteRename)) s |= FILE_SHARE_DELETE;
         s;
     });
 

@@ -156,7 +156,7 @@ Optional<String> LogFolder() {
 ErrorCodeOr<MutableString>
 TemporaryDirectoryWithinFolder(String existing_abs_folder, Allocator& a, u64& seed) {
     auto result =
-        path::Join(a, Array {existing_abs_folder, UniqueFilename(k_temporary_directory_prefix, seed)});
+        path::Join(a, Array {existing_abs_folder, UniqueFilename(k_temporary_directory_prefix, "", seed)});
     TRY(CreateDirectory(result,
                         {
                             .create_intermediate_directories = false,

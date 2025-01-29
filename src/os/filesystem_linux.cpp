@@ -254,7 +254,8 @@ ErrorCodeOr<MutableString> TemporaryDirectoryOnSameFilesystemAs(String path, All
         base_path = TRY(FindMountPoint(path_nt, temp_path_allocator));
 
     auto seed = (u64)NanosecondsSinceEpoch();
-    auto const result = path::Join(a, Array {base_path, UniqueFilename(k_temporary_directory_prefix, seed)});
+    auto const result =
+        path::Join(a, Array {base_path, UniqueFilename(k_temporary_directory_prefix, "", seed)});
     TRY(CreateDirectory(result, {.create_intermediate_directories = true, .fail_if_exists = false}));
 
     return result;

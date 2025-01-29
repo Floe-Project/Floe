@@ -103,10 +103,8 @@ static fmt::UuidArray Uuid(Atomic<u64>& seed) {
 
 static String UniqueErrorFilepath(String folder, Atomic<u64>& seed, Allocator& allocator) {
     auto s = seed.FetchAdd(1, RmwMemoryOrder::Relaxed);
-    auto const random = RandomU64(s);
+    auto const filename = UniqueFilename("", ConcatArrays("."_ca, k_error_file_extension), s);
     seed.Store(s, StoreMemoryOrder::Relaxed);
-    auto const id = fmt::IntToString(random, {.base = fmt::IntToStringOptions::Base::Base32});
-    auto const filename = fmt::Format(allocator, "{}.{}", id, k_error_file_extension);
     return path::Join(allocator, Array {folder, filename});
 }
 

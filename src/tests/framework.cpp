@@ -20,15 +20,15 @@ void RegisterTest(Tester& tester, TestFunction f, String title) {
 String TempFolder(Tester& tester) {
     if (!tester.temp_folder) {
         auto error_log = StdWriter(StdStream::Out);
-        tester.temp_folder =
-            path::JoinAppendResizeAllocation(tester.arena,
-                                             KnownDirectory(tester.arena,
-                                                            KnownDirectoryType::Temporary,
-                                                            {
-                                                                .create = true,
-                                                                .error_log = &error_log,
-                                                            }),
-                                             ArrayT<String>({UniqueFilename("Floe-", tester.random_seed)}));
+        tester.temp_folder = path::JoinAppendResizeAllocation(
+            tester.arena,
+            KnownDirectory(tester.arena,
+                           KnownDirectoryType::Temporary,
+                           {
+                               .create = true,
+                               .error_log = &error_log,
+                           }),
+            ArrayT<String>({UniqueFilename("Floe-", "", tester.random_seed)}));
         auto _ = StdPrint(StdStream::Err,
                           fmt::Format(tester.scratch_arena, "Test output folder: {}\n", *tester.temp_folder));
     }
@@ -37,7 +37,7 @@ String TempFolder(Tester& tester) {
 
 String TempFilename(Tester& tester) {
     auto folder = TempFolder(tester);
-    auto filename = UniqueFilename("tmp-", tester.random_seed);
+    auto filename = UniqueFilename("tmp-", "", tester.random_seed);
     return path::Join(tester.scratch_arena, Array {folder, filename});
 }
 

@@ -317,14 +317,16 @@ MutableString FloeKnownDirectory(Allocator& a,
 void InitLogFolderIfNeeded(); // thread-safe
 Optional<String> LogFolder(); // thread-safe, signal-safe, guaranteed valid after InitLogFolder()
 
-inline DynamicArrayBounded<char, 32> UniqueFilename(String prefix, u64& seed) {
+inline DynamicArrayBounded<char, 48> UniqueFilename(String prefix, String suffix, u64& seed) {
     ASSERT(prefix.size <= 16);
-    DynamicArrayBounded<char, 32> name {prefix};
+    ASSERT(suffix.size <= 16);
+    DynamicArrayBounded<char, 48> name {prefix};
     auto const chars_added = fmt::IntToString(RandomU64(seed),
                                               name.data + name.size,
                                               {.base = fmt::IntToStringOptions::Base::Base32});
     ASSERT(chars_added <= 16);
     name.size += chars_added;
+    dyn::AppendSpan(name, suffix);
     return name;
 }
 

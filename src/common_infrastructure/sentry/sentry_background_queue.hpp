@@ -123,8 +123,10 @@ PUBLIC void WaitForThreadEnd(BackgroundQueue& queue) {
 
     // it's possible there's still messages in the queue, let's write them to file
     SentryOrFallback sentry;
-    while (auto const error = queue.queue.TryPop())
+    while (auto const error = queue.queue.TryPop()) {
+        LogDebug(k_log_module, "Errors still in queue, writing to file");
         auto _ = WriteErrorToFile(*sentry, *error);
+    }
 }
 
 // thread-safe, not signal-safe
@@ -138,6 +140,7 @@ PUBLIC void ReportError(BackgroundQueue& queue, Error&& error) {
         // we're shutting down, write the message to file
         SentryOrFallback sentry;
         auto _ = WriteErrorToFile(*sentry, error);
+        LogDebug(k_log_module, "Error background thread is shutting down, writing error to file");
     }
 }
 

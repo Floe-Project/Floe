@@ -17,6 +17,13 @@ void SharedEngineSystems::StartPollingThreadIfNeeded() {
     polling_thread.Start(
         [this]() {
             try {
+                {
+                    ArenaAllocatorWithInlineStorage<2000> scratch_arena {PageAllocator::Instance()};
+                    auto const o = CleanupOldLogFilesIfNeeded(scratch_arena);
+                    if (o.HasError())
+                        LogError("global"_log_module, "Failed to cleanup old log files: {}", o.Error());
+                }
+
                 while (polling_running.Load(LoadMemoryOrder::Relaxed)) {
                     WaitIfValueIsExpected(polling_running, 1, 1000u);
                     {

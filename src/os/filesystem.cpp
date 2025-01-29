@@ -135,10 +135,10 @@ MutableString FloeKnownDirectory(Allocator& a,
 }
 
 static String g_log_folder_path;
-static CallOnceFlag g_log_folder_flag = 0;
+static CallOnceFlag g_log_folder_flag {};
 
 void InitLogFolderIfNeeded() {
-    static FixedSizeAllocator<256> g_log_folder_allocator {&PageAllocator::Instance()};
+    static FixedSizeAllocator<500> g_log_folder_allocator {&PageAllocator::Instance()};
     CallOnce(g_log_folder_flag, [] {
         auto writer = StdWriter(StdStream::Err);
         g_log_folder_path = FloeKnownDirectory(g_log_folder_allocator,
@@ -150,6 +150,7 @@ void InitLogFolderIfNeeded() {
 
 Optional<String> LogFolder() {
     if (!g_log_folder_flag.Called()) return k_nullopt;
+    ASSERT(g_log_folder_path.size);
     return g_log_folder_path;
 }
 

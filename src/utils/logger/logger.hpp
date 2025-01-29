@@ -52,6 +52,8 @@ struct LogConfig {
 
 extern LogConfig g_log_config;
 
+ErrorCodeOr<void> CleanupOldLogFilesIfNeeded(ArenaAllocator& scratch_arena);
+
 void Log(LogModuleName module_name, LogLevel level, FunctionRef<ErrorCodeOr<void>(Writer)> write_message);
 
 template <typename... Args>

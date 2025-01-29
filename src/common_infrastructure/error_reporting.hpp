@@ -14,3 +14,11 @@ void WaitForBackgroundErrorReportingEnd(); // waits for thread to end
 
 // thread-safe, not signal-safe, works even if InitErrorReporting() was not called
 void ReportError(sentry::Error&& error);
+
+template <typename... Args>
+void ReportError(sentry::Error::Level level, String format, Args const&... args) {
+    sentry::Error error {};
+    error.level = level;
+    error.message = fmt::Format(error.arena, format, args...);
+    ReportError(Move(error));
+}

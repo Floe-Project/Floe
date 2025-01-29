@@ -622,7 +622,7 @@ fn genericFlags(context: *BuildContext, target: std.Build.ResolvedTarget, extra_
     // outputs a .dSYM folder which contains the aggregated DWARF info. libbacktrace looks for this dSYM folder
     // adjacent to the executable.
 
-    // Include dwark debug info, even on windows. This means we can use the libbacktrace library everywhere to get really
+    // Include dwarf debug info, even on windows. This means we can use the libbacktrace library everywhere to get really
     // good stack traces.
     try flags.append("-gdwarf");
 

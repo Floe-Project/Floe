@@ -208,7 +208,7 @@ void Log(LogModuleName module_name, LogLevel level, FunctionRef<ErrorCodeOr<void
                             standard_path,
                             {
                                 .capability = FileMode::Capability::Write | FileMode::Capability::Append,
-                                .share = FileMode::Share::DeleteRename,
+                                .share = FileMode::Share::DeleteRename | FileMode::Share::ReadWrite,
                                 .creation = FileMode::Creation::CreateNew, // Exclusive access
                             });
 

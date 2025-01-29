@@ -20,5 +20,6 @@ void ReportError(sentry::Error::Level level, String format, Args const&... args)
     sentry::Error error {};
     error.level = level;
     error.message = fmt::Format(error.arena, format, args...);
+    error.stacktrace = CurrentStacktrace(2);
     ReportError(Move(error));
 }

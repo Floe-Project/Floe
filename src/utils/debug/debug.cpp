@@ -66,7 +66,7 @@ void ResetPanic() { g_panic_occurred.Store(false, StoreMemoryOrder::Release); }
 
 static void HandleUbsanError(String msg) {
     InlineSprintfBuffer buffer;
-    buffer.Append("undefined behaviour detected: %.*s", (int)msg.size, msg.data);
+    buffer.Append("undefined behaviour: %.*s", (int)msg.size, msg.data);
     Panic(buffer.CString(), SourceLocation::Current());
 }
 

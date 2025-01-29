@@ -345,7 +345,11 @@ struct BacktraceState {
     backtrace_state* state = nullptr;
 };
 
-void InitStacktraceState() { auto& _ = BacktraceState::Instance(); }
+Optional<String> InitStacktraceState() {
+    auto const opt_err = BacktraceState::Instance().failed_init_error;
+    if (opt_err) return *opt_err;
+    return k_nullopt;
+}
 
 Optional<StacktraceStack> CurrentStacktrace(int skip_frames) {
     auto& state = BacktraceState::Instance();

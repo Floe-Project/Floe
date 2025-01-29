@@ -137,6 +137,9 @@ PUBLIC void GlobalInit(GlobalInitOptions options) {
     });
 
     if (options.init_error_reporting) InitBackgroundErrorReporting({});
+
+    if (auto const err = InitStacktraceState())
+        ReportError(sentry::Error::Level::Warning, "Failed to initialize stacktrace state: {}", *err);
 }
 
 struct GlobalShutdownOptions {

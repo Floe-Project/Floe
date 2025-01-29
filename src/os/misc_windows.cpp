@@ -268,6 +268,8 @@ void* g_exception_handler = nullptr;
 CrashHookFunction g_crash_hook {};
 
 void BeginCrashDetection(CrashHookFunction hook) {
+    auto _ = InitStacktraceState();
+
     g_crash_hook = hook;
     g_exception_handler = AddVectoredExceptionHandler(1, [](PEXCEPTION_POINTERS exception_info) -> LONG {
         // Some exceptions are expected and should be ignored; for example Lua will trigger exceptions.

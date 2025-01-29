@@ -49,7 +49,7 @@ struct StacktraceOptions {
 
 using StacktraceStack = DynamicArrayBounded<uintptr, 32>;
 Optional<StacktraceStack> CurrentStacktrace(int skip_frames = 1);
-void InitStacktraceState();
+Optional<String> InitStacktraceState(); // returns error message if failed
 
 struct FrameInfo {
     String function_name;

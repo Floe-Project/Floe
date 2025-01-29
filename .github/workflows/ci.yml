@@ -99,13 +99,9 @@ jobs:
           retention-days: 2
           path: |
             zig-out/x86_64-windows/Floe.vst3
-            zig-out/x86_64-windows/Floe.vst3.pdb
             zig-out/x86_64-windows/Floe.clap
-            zig-out/x86_64-windows/Floe.clap.pdb
             zig-out/x86_64-windows/tests.exe
-            zig-out/x86_64-windows/tests.pdb
             zig-out/x86_64-windows/VST3-Validator.exe
-            zig-out/x86_64-windows/VST3-Validator.pdb
 
       - name: Upload errors
         if: '!cancelled()'

@@ -207,6 +207,86 @@ PUBLIC usize Utf8CharacterToUtf32(u32* out_char,
     return wanted;
 }
 
+// From public domain https://github.com/sheredom/utf8.h/tree/master
+// Returns the positions of any invalid utf8 characters in the string, else returns null.
+PUBLIC constexpr char* InvalidUtf8Position(String string) {
+    auto str = string.data;
+    auto const n = string.size;
+    char const* t = str;
+    usize consumed = 0;
+
+    while ((void)(consumed = (usize)(str - t)), consumed < n && '\0' != *str) {
+        usize const remaining = n - consumed;
+
+        if (0xf0 == (0xf8 & *str)) {
+            /* ensure that there's 4 bytes or more remaining */
+            if (remaining < 4) return (char*)str;
+
+            /* ensure each of the 3 following bytes in this 4-byte
+             * utf8 codepoint began with 0b10xxxxxx */
+            if ((0x80 != (0xc0 & str[1])) || (0x80 != (0xc0 & str[2])) || (0x80 != (0xc0 & str[3])))
+                return (char*)str;
+
+            /* ensure that our utf8 codepoint ended after 4 bytes */
+            if ((remaining != 4) && (0x80 == (0xc0 & str[4]))) return (char*)str;
+
+            /* ensure that the top 5 bits of this 4-byte utf8
+             * codepoint were not 0, as then we could have used
+             * one of the smaller encodings */
+            if ((0 == (0x07 & str[0])) && (0 == (0x30 & str[1]))) return (char*)str;
+
+            /* 4-byte utf8 code point (began with 0b11110xxx) */
+            str += 4;
+        } else if (0xe0 == (0xf0 & *str)) {
+            /* ensure that there's 3 bytes or more remaining */
+            if (remaining < 3) return (char*)str;
+
+            /* ensure each of the 2 following bytes in this 3-byte
+             * utf8 codepoint began with 0b10xxxxxx */
+            if ((0x80 != (0xc0 & str[1])) || (0x80 != (0xc0 & str[2]))) return (char*)str;
+
+            /* ensure that our utf8 codepoint ended after 3 bytes */
+            if ((remaining != 3) && (0x80 == (0xc0 & str[3]))) return (char*)str;
+
+            /* ensure that the top 5 bits of this 3-byte utf8
+             * codepoint were not 0, as then we could have used
+             * one of the smaller encodings */
+            if ((0 == (0x0f & str[0])) && (0 == (0x20 & str[1]))) return (char*)str;
+
+            /* 3-byte utf8 code point (began with 0b1110xxxx) */
+            str += 3;
+        } else if (0xc0 == (0xe0 & *str)) {
+            /* ensure that there's 2 bytes or more remaining */
+            if (remaining < 2) return (char*)str;
+
+            /* ensure the 1 following byte in this 2-byte
+             * utf8 codepoint began with 0b10xxxxxx */
+            if (0x80 != (0xc0 & str[1])) return (char*)str;
+
+            /* ensure that our utf8 codepoint ended after 2 bytes */
+            if ((remaining != 2) && (0x80 == (0xc0 & str[2]))) return (char*)str;
+
+            /* ensure that the top 4 bits of this 2-byte utf8
+             * codepoint were not 0, as then we could have used
+             * one of the smaller encodings */
+            if (0 == (0x1e & str[0])) return (char*)str;
+
+            /* 2-byte utf8 code point (began with 0b110xxxxx) */
+            str += 2;
+        } else if (0x00 == (0x80 & *str)) {
+            /* 1-byte ascii (began with 0b0xxxxxxx) */
+            str += 1;
+        } else {
+            /* we have an invalid 0b1xxxxxxx utf8 code point entry */
+            return (char*)str;
+        }
+    }
+
+    return nullptr;
+}
+
+PUBLIC constexpr bool IsValidUtf8(String string) { return InvalidUtf8Position(string) == nullptr; }
+
 PUBLIC constexpr String SplitWithIterator(String whole, Optional<usize>& cursor, char token) {
     if (!cursor) return {};
     auto const cursor_val = *cursor;

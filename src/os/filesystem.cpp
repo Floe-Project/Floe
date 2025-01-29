@@ -149,7 +149,7 @@ void InitLogFolderIfNeeded() {
 }
 
 Optional<String> LogFolder() {
-    if (!OnceFlagCalled(g_log_folder_flag)) return k_nullopt;
+    if (!g_log_folder_flag.Called()) return k_nullopt;
     return g_log_folder_path;
 }
 

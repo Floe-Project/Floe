@@ -1069,11 +1069,11 @@ TEST_CASE(TestThread) {
 }
 
 TEST_CASE(TestCallOnce) {
-    CallOnceFlag flag;
+    CallOnceFlag flag {};
     int i = 0;
-    CHECK(!OnceFlagCalled(flag));
+    CHECK(!flag.Called());
     CallOnce(flag, [&]() { i = 1; });
-    CHECK(OnceFlagCalled(flag));
+    CHECK(flag.Called());
     CHECK_EQ(i, 1);
     CallOnce(flag, [&]() { i = 2; });
     CHECK_EQ(i, 1);

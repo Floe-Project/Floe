@@ -344,36 +344,39 @@ struct AtomicCountdown {
 inline void AtomicThreadFence(RmwMemoryOrder memory_order) { __atomic_thread_fence(int(memory_order)); }
 inline void AtomicSignalFence(RmwMemoryOrder memory_order) { __atomic_signal_fence(int(memory_order)); }
 
-using CallOnceFlag = Atomic<u32>; // you must init to 0
-constexpr u32 k_once_flag_not_called = 0;
-constexpr u32 k_once_flag_calling = 1;
-constexpr u32 k_once_flag_called = 2;
-PUBLIC bool OnceFlagCalled(CallOnceFlag& flag) {
-    return flag.Load(LoadMemoryOrder::Acquire) == k_once_flag_called;
-}
+struct CallOnceFlag {
+    bool Called() const { return v.Load(LoadMemoryOrder::Acquire) == k_called; }
+    bool Calling() const { return v.Load(LoadMemoryOrder::Acquire) == k_calling; }
+
+    static constexpr u32 k_not_called = 0;
+    static constexpr u32 k_calling = 1;
+    static constexpr u32 k_called = 2;
+    Atomic<u32> v = k_not_called;
+};
+
 // If the function hasn't been called before, it will call it once, even if multiple threads run this function
 // at the same time. In any case, after this function returns, the function has been called.
 // Same as pthread_once.
-PUBLIC void CallOnce(Atomic<u32>& flag, FunctionRef<void()> function) {
-    if (flag.Load(LoadMemoryOrder::Acquire) == k_once_flag_not_called) {
+PUBLIC void CallOnce(CallOnceFlag& flag, FunctionRef<void()> function) {
+    if (flag.v.Load(LoadMemoryOrder::Acquire) != CallOnceFlag::k_called) {
         // IMPROVE: probably faster to use a mutex here but we want to avoid initialising a global mutex at
         // the moment (pthread_mutex_init, InitializeCriticalSection) because the order of initialisation of
         // global objects with constructors can be bug-prone.
 
-        u32 expected = k_once_flag_not_called;
-        if (flag.CompareExchangeStrong(expected,
-                                       k_once_flag_calling,
-                                       RmwMemoryOrder::AcquireRelease,
-                                       LoadMemoryOrder::Acquire)) {
+        u32 expected = CallOnceFlag::k_not_called;
+        if (flag.v.CompareExchangeStrong(expected,
+                                         CallOnceFlag::k_calling,
+                                         RmwMemoryOrder::AcquireRelease,
+                                         LoadMemoryOrder::Acquire)) {
             function();
-            flag.Store(k_once_flag_called, StoreMemoryOrder::Release);
-            WakeWaitingThreads(flag, NumWaitingThreads::All);
+            flag.v.Store(CallOnceFlag::k_called, StoreMemoryOrder::Release);
+            WakeWaitingThreads(flag.v, NumWaitingThreads::All);
         } else {
-            while (flag.Load(LoadMemoryOrder::Acquire) != k_once_flag_called)
-                WaitIfValueIsExpected(flag, k_once_flag_called, 100u);
+            while (flag.v.Load(LoadMemoryOrder::Acquire) != CallOnceFlag::k_called)
+                WaitIfValueIsExpected(flag.v, CallOnceFlag::k_calling, 100u);
         }
     }
-    ASSERT(flag.Load(LoadMemoryOrder::Relaxed) == k_once_flag_called);
+    ASSERT(flag.v.Load(LoadMemoryOrder::Relaxed) == CallOnceFlag::k_called);
 }
 
 struct WorkSignaller {

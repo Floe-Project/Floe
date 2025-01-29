@@ -10,7 +10,7 @@
 #include "misc.hpp"
 #include "web.hpp"
 
-ErrorCodeOr<void> HttpsGet(String url, Writer writer, RequestOptions options) {
+ErrorCodeOr<void> HttpsGet(String url, Writer response_writer, RequestOptions options) {
     ArenaAllocatorWithInlineStorage<1000> temp_arena {Malloc::Instance()};
 
     URL_COMPONENTS url_comps {};
@@ -57,6 +57,8 @@ ErrorCodeOr<void> HttpsGet(String url, Writer writer, RequestOptions options) {
     if (!WinHttpSendRequest(request, WINHTTP_NO_ADDITIONAL_HEADERS, 0, WINHTTP_NO_REQUEST_DATA, 0, 0, 0))
         return ErrorCode {WebError::NetworkError};
 
+    if (!WinHttpReceiveResponse(request, nullptr)) return ErrorCode {WebError::NetworkError};
+
     DWORD bytes_available = 0;
     DynamicArray<u8> out_buffer {PageAllocator::Instance()};
     do {
@@ -66,7 +68,7 @@ ErrorCodeOr<void> HttpsGet(String url, Writer writer, RequestOptions options) {
             DWORD bytes_read = 0;
             if (!WinHttpReadData(request, (LPVOID)(out_buffer.data), bytes_available, &bytes_read))
                 return ErrorCode {WebError::NetworkError};
-            TRY(writer.WriteBytes({out_buffer.data, bytes_read}));
+            TRY(response_writer.WriteBytes({out_buffer.data, bytes_read}));
         } else {
             return ErrorCode {WebError::NetworkError};
         }

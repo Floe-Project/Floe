@@ -116,6 +116,8 @@ void Log(LogModuleName module_name, LogLevel level, FunctionRef<ErrorCodeOr<void
         case LogConfig::Destination::File: {
             InitLogFolderIfNeeded();
 
+            // TODO: Multiple processes might be trying to open and write to this file at the same time we
+            // need to handle this case.
             auto file = ({
                 constexpr String k_filename = "floe.log";
                 constexpr usize k_buffer_size = 256;
@@ -128,7 +130,7 @@ void Log(LogModuleName module_name, LogLevel level, FunctionRef<ErrorCodeOr<void
                 }
 
                 auto outcome = OpenFile(path::JoinInline<k_buffer_size>(Array {*LogFolder(), k_filename}),
-                                        FileMode::Append);
+                                        FileMode::Append());
                 if (outcome.HasError()) {
                     log_to_stderr(k_global_log_module,
                                   LogLevel::Error,

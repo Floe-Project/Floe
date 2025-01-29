@@ -174,7 +174,7 @@ PUBLIC bool ChecksumsDiffer(ChecksumTable authority, ChecksumTable test_table, O
 
 PUBLIC ErrorCodeOr<bool>
 FileMatchesChecksum(String filepath, ChecksumValues const& checksum, ArenaAllocator& scratch_arena) {
-    auto f = TRY(OpenFile(filepath, FileMode::Read));
+    auto f = TRY(OpenFile(filepath, FileMode::Read()));
     auto const file_size = TRY(f.FileSize());
     return file_size == checksum.file_size &&
            Crc32(TRY(f.ReadWholeFile(scratch_arena)).ToByteSpan()) == checksum.crc32;

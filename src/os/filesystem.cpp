@@ -305,19 +305,19 @@ File::~File() {
 }
 
 ErrorCodeOr<usize> WriteFile(String filename, Span<u8 const> data) {
-    auto file = OpenFile(filename, FileMode::Write);
+    auto file = OpenFile(filename, FileMode::Write());
     if (file.HasError()) return file.Error();
     return file.Value().Write(data);
 }
 
 ErrorCodeOr<usize> AppendFile(String filename, Span<u8 const> data) {
-    auto file = OpenFile(filename, FileMode::Append);
+    auto file = OpenFile(filename, FileMode::Append());
     if (file.HasError()) return file.Error();
     return file.Value().Write(data);
 }
 
 ErrorCodeOr<MutableString> ReadEntireFile(String filename, Allocator& a) {
-    auto file = TRY(OpenFile(filename, FileMode::Read));
+    auto file = TRY(OpenFile(filename, FileMode::Read()));
     return file.ReadWholeFile(a);
 }
 
@@ -325,14 +325,14 @@ ErrorCodeOr<MutableString> ReadSectionOfFile(String filename,
                                              usize const bytes_offset_from_file_start,
                                              usize const size_in_bytes,
                                              Allocator& a) {
-    auto file = TRY(OpenFile(filename, FileMode::Read));
+    auto file = TRY(OpenFile(filename, FileMode::Read()));
     return file.ReadSectionOfFile(bytes_offset_from_file_start, size_in_bytes, a);
 }
 
-ErrorCodeOr<u64> FileSize(String filename) { return TRY(OpenFile(filename, FileMode::Read)).FileSize(); }
+ErrorCodeOr<u64> FileSize(String filename) { return TRY(OpenFile(filename, FileMode::Read())).FileSize(); }
 
 ErrorCodeOr<s128> LastModifiedTimeNsSinceEpoch(String filename) {
-    return TRY(OpenFile(filename, FileMode::Read)).LastModifiedTimeNsSinceEpoch();
+    return TRY(OpenFile(filename, FileMode::Read())).LastModifiedTimeNsSinceEpoch();
 }
 
 ErrorCodeOr<MutableString>
@@ -356,7 +356,7 @@ ErrorCodeOr<void> ReadSectionOfFileAndWriteToOtherFile(File& file_to_read_from,
                                                        String const filename_to_write_to) {
     ASSERT(section_size);
 
-    auto out_file = TRY(OpenFile(filename_to_write_to, FileMode::Write));
+    auto out_file = TRY(OpenFile(filename_to_write_to, FileMode::Write()));
     TRY(file_to_read_from.Seek((s64)section_start, File::SeekOrigin::Start));
 
     constexpr usize k_four_mb = Mb(4);

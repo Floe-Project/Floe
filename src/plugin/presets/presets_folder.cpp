@@ -161,7 +161,7 @@ PresetsFolderScanResult FetchOrRescanPresetsFolder(PresetsListing& listing,
                 Array {"*.mirage*"_s, "*" FLOE_PRESET_FILE_EXTENSION},
                 [](String path, ArenaAllocator& arena) -> ErrorCodeOr<void*> {
                     if (path::Extension(path) == FLOE_PRESET_FILE_EXTENSION) {
-                        auto file = TRY_I(OpenFile(path, FileMode::Read));
+                        auto file = TRY_I(OpenFile(path, FileMode::Read()));
 
                         StateSnapshot state {};
                         TRY(CodeState(

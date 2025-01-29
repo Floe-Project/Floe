@@ -12,7 +12,7 @@ using PathOrMemory = TaggedUnion<PathOrMemoryType,
 
 struct Reader {
     static ErrorCodeOr<Reader> FromFile(String path) {
-        auto f = TRY(OpenFile(path, FileMode::Read));
+        auto f = TRY(OpenFile(path, FileMode::Read()));
         auto const size = TRY(f.FileSize());
         return Reader {
             .size = size,
@@ -23,7 +23,7 @@ struct Reader {
     }
 
     static ErrorCodeOr<Reader> FromFileSection(String path, usize start_offset, usize size) {
-        auto f = TRY(OpenFile(path, FileMode::Read));
+        auto f = TRY(OpenFile(path, FileMode::Read()));
         return Reader {
             .size = size,
             .pos = 0,

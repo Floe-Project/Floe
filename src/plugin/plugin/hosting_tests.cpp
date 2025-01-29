@@ -319,7 +319,7 @@ ErrorCodeOr<void> WriteWaveFile(String filename, ArenaAllocator& scratch_arena, 
 
     auto const sample_rate = (u32)args.sample_rate;
 
-    auto file = TRY(OpenFile(filename, FileMode::Write));
+    auto file = TRY(OpenFile(filename, FileMode::Write()));
 
     auto data_pcm_16_interleaved =
         scratch_arena.AllocateExactSizeUninitialised<s16>(args.num_frames * args.num_channels);

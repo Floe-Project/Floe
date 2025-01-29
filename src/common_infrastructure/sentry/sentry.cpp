@@ -16,7 +16,7 @@ static Optional<fmt::UuidArray> DeviceId(Atomic<u64>& seed) {
                                                        "device_id",
                                                        {.create = true});
 
-    auto file = TRY_OR(OpenFile(path, FileMode::ReadWrite), {
+    auto file = TRY_OR(OpenFile(path, FileMode::ReadWrite()), {
         LogError(k_log_module, "Failed to create device_id file: {}, {}", path, error);
         return k_nullopt;
     });

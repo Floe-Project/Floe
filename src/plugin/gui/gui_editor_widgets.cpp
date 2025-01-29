@@ -215,7 +215,7 @@ static void WriteHeader(Writer writer) {
 static void WriteColoursFile(LiveEditGui const& gui) {
     PageAllocator page_allocator;
     ArenaAllocator scratch_arena {page_allocator};
-    auto outcome = OpenFile(UiStyleFilepath(scratch_arena, COLOURS_DEF_FILENAME), FileMode::Write);
+    auto outcome = OpenFile(UiStyleFilepath(scratch_arena, COLOURS_DEF_FILENAME), FileMode::Write());
     if (outcome.HasError()) {
         LogError(k_editor_log_module, "{} failed: {}", __FUNCTION__, outcome.Error());
         return;
@@ -242,7 +242,7 @@ static void WriteColoursFile(LiveEditGui const& gui) {
 static void WriteSizesFile(LiveEditGui const& gui) {
     PageAllocator page_allocator;
     ArenaAllocator scratch_arena {page_allocator};
-    auto outcome = OpenFile(UiStyleFilepath(scratch_arena, SIZES_DEF_FILENAME), FileMode::Write);
+    auto outcome = OpenFile(UiStyleFilepath(scratch_arena, SIZES_DEF_FILENAME), FileMode::Write());
     if (outcome.HasError()) {
         LogError(k_editor_log_module, "{} failed: {}", __FUNCTION__, outcome.Error());
         return;
@@ -272,7 +272,7 @@ static void WriteSizesFile(LiveEditGui const& gui) {
 static void WriteColourMapFile(LiveEditGui const& gui) {
     PageAllocator page_allocator;
     ArenaAllocator scratch_arena {page_allocator};
-    auto outcome = OpenFile(UiStyleFilepath(scratch_arena, COLOUR_MAP_DEF_FILENAME), FileMode::Write);
+    auto outcome = OpenFile(UiStyleFilepath(scratch_arena, COLOUR_MAP_DEF_FILENAME), FileMode::Write());
     if (outcome.HasError()) {
         LogError(k_editor_log_module, "{} failed: {}", __FUNCTION__, outcome.Error());
         return;

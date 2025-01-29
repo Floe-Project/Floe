@@ -29,19 +29,106 @@ ErrorCode FilesystemErrnoErrorCode(s64 error_code,
                                    char const* extra_debug_info = nullptr,
                                    SourceLocation loc = SourceLocation::Current());
 
-// fopen()-like File API
+// File API
 // =======================================================================================================
-enum class FileMode : u32 {
-    Read,
-    Write, // overwrites if it already exists
-    WriteNoOverwrite,
-    ReadWrite, // create if it doesn't exist
+struct FileMode {
+    // Open for reading if it exists.
+    static constexpr FileMode Read() {
+        return {
+            .capability = Capability::Read,
+            .share = Share::Read,
+            .creation = Creation::OpenExisting,
+            .everyone_read_write = false,
+        };
+    }
 
-    // Overwrites if it already exists (but doesn't change file permissions). If it doesn't exist, it will be
-    // created with read/write permissions for everyone.
-    WriteEveryoneReadWrite,
+    // Open for writing, overwriting if it already exists.
+    static constexpr FileMode Write() {
+        return {
+            .capability = Capability::Write,
+            .share = Share::None,
+            .creation = Creation::CreateAlways,
+            .everyone_read_write = false,
+        };
+    }
 
-    Append,
+    // Open for writing, fail if it already exists.
+    static constexpr FileMode WriteNoOverwrite() {
+        return {
+            .capability = Capability::Write,
+            .share = Share::None,
+            .creation = Creation::CreateNew,
+            .everyone_read_write = false,
+        };
+    }
+
+    // Open for reading and writing, create if it doesn't exist.
+    static constexpr FileMode ReadWrite() {
+        return {
+            .capability = Capability::ReadWrite,
+            .share = Share::ReadWrite,
+            .creation = Creation::OpenAlways,
+            .everyone_read_write = false,
+        };
+    }
+
+    // Overwrites if it already exists (but doesn't change file permissions). If it doesn't exist, it will
+    // be created with read/write permissions for everyone.
+    static constexpr FileMode WriteEveryoneReadWrite() {
+        return {
+            .capability = Capability::Write,
+            .share = Share::None,
+            .creation = Creation::CreateAlways,
+            .everyone_read_write = true,
+        };
+    }
+
+    // Open for appending.
+    static constexpr FileMode Append() {
+        return {
+            .capability = Capability::Write | Capability::Append,
+            .share = Share::None,
+            .creation = Creation::OpenAlways,
+            .everyone_read_write = false,
+        };
+    }
+
+    enum class Capability : u8 {
+        Read = 1 << 0, // open the file for reading
+        Write = 1 << 1, // open the file for writing
+        ReadWrite = Read | Write,
+        Append = 1 << 2, // open the file for appending
+    };
+    friend constexpr Capability operator|(Capability a, Capability b) {
+        return (Capability)(ToInt(a) | ToInt(b));
+    }
+
+    // Windows only. On Unix, you're always allowed to open a file, but on Windows you must specify what
+    // sharing you will allow.
+    enum class Share : u8 {
+        None = 0,
+        Read = 1 << 0, // allow others to read the file while you have it open
+        Write = 1 << 1, // allow others to write to the file while you have it open
+        Delete = 1 << 2, // allow others to delete the file while you have it open
+        ReadWrite = Read | Write,
+    };
+    friend constexpr Share operator|(Share a, Share b) { return (Share)(ToInt(a) | ToInt(b)); }
+
+    enum class Creation : u8 {
+        OpenExisting, // fail if it doesn't exist
+        OpenAlways, // open if it exists, create if it doesn't
+        CreateNew, // create new, fail if it already exists
+        CreateAlways, // create new, overwrite if it already exists
+        TruncateExisting, // open if it exists, truncate it to 0 bytes
+    };
+
+    Capability capability = Capability::Read;
+    Share share = Share::Read;
+    Creation creation = Creation::OpenExisting;
+
+    // Add extra permissions to the file so that any user on the system can read and write to it.
+    bool everyone_read_write = false;
+    int default_permissions = 0644; // Unix only
 };
 
 struct FileLockOptions {

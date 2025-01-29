@@ -63,11 +63,11 @@ TEST_CASE(TestFileApi) {
 
         SUBCASE("Open API") {
             {
-                auto f = TRY(OpenFile(filename1, FileMode::Write));
+                auto f = TRY(OpenFile(filename1, FileMode::Write()));
                 CHECK(f.Write(k_data.ToByteSpan()).HasValue());
             }
             {
-                auto f = TRY(OpenFile(filename1, FileMode::Read));
+                auto f = TRY(OpenFile(filename1, FileMode::Read()));
                 CHECK_EQ(TRY(f.FileSize()), k_data.size);
                 CHECK_EQ(TRY(f.ReadWholeFile(scratch_arena)), k_data);
             }
@@ -80,7 +80,7 @@ TEST_CASE(TestFileApi) {
 
     SUBCASE("Seek") {
         TRY(WriteFile(filename1, k_data.ToByteSpan()));
-        auto f = TRY(OpenFile(filename1, FileMode::Read));
+        auto f = TRY(OpenFile(filename1, FileMode::Read()));
         TRY(f.Seek(2, File::SeekOrigin::Start));
         char buffer[2];
         CHECK_EQ(TRY(f.Read(buffer, 2)), 2u);
@@ -90,7 +90,7 @@ TEST_CASE(TestFileApi) {
     SUBCASE("Lock a file") {
         for (auto const type : Array {FileLockOptions::Type::Exclusive, FileLockOptions::Type::Shared}) {
             for (auto const non_blocking : Array {true, false}) {
-                auto f = TRY(OpenFile(filename1, FileMode::Write));
+                auto f = TRY(OpenFile(filename1, FileMode::Write()));
                 auto locked = TRY(f.Lock({.type = type, .non_blocking = non_blocking}));
                 CHECK(locked);
                 if (locked) TRY(f.Unlock());
@@ -99,14 +99,14 @@ TEST_CASE(TestFileApi) {
     }
 
     SUBCASE("Move a File object") {
-        auto f = OpenFile(filename1, FileMode::Read);
+        auto f = OpenFile(filename1, FileMode::Read());
         auto f2 = Move(f);
     }
 
     SUBCASE("Read from one large file and write to another") {
         auto buffer = tester.scratch_arena.AllocateExactSizeUninitialised<u8>(Mb(8));
         {
-            auto f = TRY(OpenFile(filename1, FileMode::Write));
+            auto f = TRY(OpenFile(filename1, FileMode::Write()));
             FillMemory(buffer, 'a');
             TRY(f.Write(buffer));
             FillMemory(buffer, 'b');
@@ -114,7 +114,7 @@ TEST_CASE(TestFileApi) {
         }
 
         {
-            auto f = TRY(OpenFile(filename1, FileMode::Read));
+            auto f = TRY(OpenFile(filename1, FileMode::Read()));
 
             {
                 TRY(ReadSectionOfFileAndWriteToOtherFile(f, 0, buffer.size, filename2));
@@ -135,20 +135,20 @@ TEST_CASE(TestFileApi) {
     SUBCASE("Last modified time") {
         auto time = NanosecondsSinceEpoch();
         {
-            auto f = TRY(OpenFile(filename1, FileMode::Write));
+            auto f = TRY(OpenFile(filename1, FileMode::Write()));
             TRY(f.Write(k_data.ToByteSpan()));
             TRY(f.Flush());
             TRY(f.SetLastModifiedTimeNsSinceEpoch(time));
         }
         {
-            auto f = TRY(OpenFile(filename1, FileMode::Read));
+            auto f = TRY(OpenFile(filename1, FileMode::Read()));
             auto last_modified = TRY(f.LastModifiedTimeNsSinceEpoch());
             CHECK_EQ(last_modified, time);
         }
     }
 
     SUBCASE("Try opening a file that does not exist") {
-        auto const f = OpenFile("foo", FileMode::Read);
+        auto const f = OpenFile("foo", FileMode::Read());
         REQUIRE(f.HasError());
     }
 

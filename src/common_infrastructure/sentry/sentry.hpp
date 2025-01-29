@@ -486,7 +486,7 @@ PUBLIC ErrorCodeOr<void> SubmitEnvelope(Sentry& sentry,
     if (!sent_online_successfully && options.write_to_file_if_needed) {
         InitLogFolderIfNeeded();
         auto file = TRY(OpenFile(detail::UniqueErrorFilepath(*LogFolder(), sentry.seed, scratch_arena),
-                                 FileMode::WriteNoOverwrite));
+                                 FileMode::WriteNoOverwrite()));
         TRY(EnvelopeAddHeader(sentry, file.Writer(), false));
 
         // We have just written a header appropriate for the file, so we make sure don't write the header
@@ -506,7 +506,7 @@ PUBLIC ErrorCodeOr<void> WriteCrashToFile(Sentry& sentry,
                                           String message,
                                           Allocator& scratch_allocator) {
     auto file = TRY(OpenFile(detail::UniqueErrorFilepath(folder, sentry.seed, scratch_allocator),
-                             FileMode::WriteNoOverwrite));
+                             FileMode::WriteNoOverwrite()));
 
     TRY(EnvelopeAddHeader(sentry, file.Writer(), false));
     TRY(EnvelopeAddEvent(sentry,
@@ -551,7 +551,7 @@ PUBLIC ErrorCodeOr<void> WriteErrorToFile(Sentry& sentry, ErrorEvent const& even
     PathArena path_arena {PageAllocator::Instance()};
     InitLogFolderIfNeeded();
     auto file = TRY(OpenFile(detail::UniqueErrorFilepath(*LogFolder(), sentry.seed, path_arena),
-                             FileMode::WriteNoOverwrite));
+                             FileMode::WriteNoOverwrite()));
 
     TRY(EnvelopeAddHeader(sentry, file.Writer(), false));
     TRY(EnvelopeAddEvent(sentry, file.Writer(), event, false));

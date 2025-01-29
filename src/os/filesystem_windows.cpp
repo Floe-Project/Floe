@@ -173,43 +173,42 @@ ErrorCodeOr<File> OpenFile(String filename, FileMode mode) {
     auto const w_path =
         TRY(path::MakePathForWin32(filename, temp_allocator, path::IsAbsolute(filename))).path;
 
-    const DWORD desired_access = ({
-        DWORD d;
-        switch (mode) {
-            case FileMode::Read: d = GENERIC_READ; break;
-            case FileMode::Write: d = GENERIC_WRITE; break;
-            case FileMode::ReadWrite: d = GENERIC_READ | GENERIC_WRITE; break;
-            case FileMode::Append: d = FILE_APPEND_DATA; break;
-            case FileMode::WriteNoOverwrite: d = GENERIC_WRITE; break;
-            case FileMode::WriteEveryoneReadWrite: d = GENERIC_WRITE; break;
+    auto const access = ({
+        DWORD a {};
+        auto const cap = ToInt(mode.capability);
+        if ((cap & ToInt(FileMode::Capability::ReadWrite)) == ToInt(FileMode::Capability::ReadWrite))
+            a = GENERIC_READ | GENERIC_WRITE;
+        else if (cap & ToInt(FileMode::Capability::Write))
+            a = GENERIC_WRITE;
+        else if (cap & ToInt(FileMode::Capability::Read))
+            a = GENERIC_READ;
+
+        if (cap & ToInt(FileMode::Capability::Append)) {
+            a |= FILE_APPEND_DATA;
+            a &= ~(DWORD)GENERIC_WRITE;
         }
-        d;
+        a;
     });
 
-    const DWORD creation_disposition = ({
-        DWORD c;
-        switch (mode) {
-            case FileMode::Read: c = OPEN_EXISTING; break;
-            case FileMode::Write: c = CREATE_ALWAYS; break;
-            case FileMode::ReadWrite: c = OPEN_ALWAYS; break;
-            case FileMode::Append: c = OPEN_ALWAYS; break;
-            case FileMode::WriteNoOverwrite: c = CREATE_NEW; break;
-            case FileMode::WriteEveryoneReadWrite: c = CREATE_ALWAYS; break;
+    auto const share = ({
+        DWORD s {};
+        auto const share_flags = ToInt(mode.share);
+        if (share_flags & ToInt(FileMode::Share::Read)) s |= FILE_SHARE_READ;
+        if (share_flags & ToInt(FileMode::Share::Write)) s |= FILE_SHARE_WRITE;
+        if (share_flags & ToInt(FileMode::Share::Delete)) s |= FILE_SHARE_DELETE;
+        s;
+    });
+
+    auto const creation = ({
+        DWORD c {};
+        switch (mode.creation) {
+            case FileMode::Creation::OpenExisting: c = OPEN_EXISTING; break;
+            case FileMode::Creation::OpenAlways: c = OPEN_ALWAYS; break;
+            case FileMode::Creation::CreateNew: c = CREATE_NEW; break;
+            case FileMode::Creation::CreateAlways: c = CREATE_ALWAYS; break;
+            case FileMode::Creation::TruncateExisting: c = TRUNCATE_EXISTING; break;
         }
         c;
-    });
-
-    const DWORD share_mode = ({
-        DWORD s;
-        switch (mode) {
-            case FileMode::Read: s = FILE_SHARE_READ; break;
-            case FileMode::Write: s = 0; break;
-            case FileMode::ReadWrite: s = FILE_SHARE_READ | FILE_SHARE_WRITE; break;
-            case FileMode::Append: s = 0; break;
-            case FileMode::WriteNoOverwrite: s = 0; break;
-            case FileMode::WriteEveryoneReadWrite: s = 0; break;
-        }
-        s;
     });
 
     PSID everyone_sid = nullptr;
@@ -222,7 +221,7 @@ ErrorCodeOr<File> OpenFile(String filename, FileMode mode) {
     };
     SECURITY_ATTRIBUTES sa {};
 
-    if (mode == FileMode::WriteEveryoneReadWrite) {
+    if (mode.everyone_read_write) {
         SID_IDENTIFIER_AUTHORITY sid_auth_world = SECURITY_WORLD_SID_AUTHORITY;
         if (AllocateAndInitializeSid(&sid_auth_world,
                                      1,
@@ -264,10 +263,10 @@ ErrorCodeOr<File> OpenFile(String filename, FileMode mode) {
     }
 
     auto handle = CreateFileW(w_path.data,
-                              desired_access,
-                              share_mode,
+                              access,
+                              share,
                               sa.nLength ? &sa : nullptr,
-                              creation_disposition,
+                              creation,
                               FILE_ATTRIBUTE_NORMAL,
                               nullptr);
     if (handle == INVALID_HANDLE_VALUE) return FilesystemWin32ErrorCode(GetLastError(), "CreateFileW");

@@ -303,7 +303,7 @@ static ErrorCodeOr<void> ExtractFile(PackageReader& package, String file_path, S
 
     auto const file_stat = find_file(file_path).Value();
     LogDebug(k_log_mod, "Extracting file: {} to {}", file_path, destination_path);
-    auto out_file = TRY(OpenFile(destination_path, FileMode::WriteNoOverwrite));
+    auto out_file = TRY(OpenFile(destination_path, FileMode::WriteNoOverwrite()));
     return detail::ExtractFileToFile(package, file_stat, out_file);
 }
 
@@ -327,7 +327,7 @@ static ErrorCodeOr<void> ExtractFolder(PackageReader& package,
                                 .create_intermediate_directories = true,
                                 .fail_if_exists = false,
                             }));
-        auto out_file = TRY(OpenFile(out_path, FileMode::WriteNoOverwrite));
+        auto out_file = TRY(OpenFile(out_path, FileMode::WriteNoOverwrite()));
         TRY(detail::ExtractFileToFile(package, file_stat, out_file));
     }
 

@@ -223,27 +223,32 @@ ErrorCodeOr<File> OpenFile(String filename, FileMode mode) {
     PathArena temp_allocator {Malloc::Instance()};
 
     int flags = 0;
-    mode_t perms = 0644; // Default permissions
 
-    switch (mode) {
-        case FileMode::Read: flags = O_RDONLY; break;
-        case FileMode::Write: flags = O_WRONLY | O_CREAT | O_TRUNC; break;
-        case FileMode::WriteNoOverwrite:
-            flags = O_WRONLY | O_CREAT | O_EXCL; // O_EXCL ensures file doesn't exist
-            break;
-        case FileMode::ReadWrite:
-            flags = O_RDWR | O_CREAT; // Create if doesn't exist, open for read/write
-            break;
-        case FileMode::WriteEveryoneReadWrite:
-            flags = O_WRONLY | O_CREAT | O_TRUNC; // Will set permissions with fchmod later
-            break;
-        case FileMode::Append: flags = O_WRONLY | O_CREAT | O_APPEND; break;
+    {
+        auto const capability = ToInt(mode.capability);
+
+        if (capability & ToInt(FileMode::Capability::Append)) flags |= O_APPEND;
+
+        if ((capability & ToInt(FileMode::Capability::ReadWrite)) == ToInt(FileMode::Capability::ReadWrite))
+            flags |= O_RDWR;
+        else if (capability & ToInt(FileMode::Capability::Write))
+            flags |= O_WRONLY;
+        else if (capability & ToInt(FileMode::Capability::Read))
+            flags |= O_RDONLY;
     }
 
-    int fd = open(NullTerminated(filename, temp_allocator), flags, perms);
+    switch (mode.creation) {
+        case FileMode::Creation::OpenExisting: break;
+        case FileMode::Creation::OpenAlways: flags |= O_CREAT; break;
+        case FileMode::Creation::CreateNew: flags |= O_CREAT | O_EXCL; break;
+        case FileMode::Creation::CreateAlways: flags |= O_CREAT | O_TRUNC; break;
+        case FileMode::Creation::TruncateExisting: flags |= O_TRUNC; break;
+    }
+
+    int fd = open(NullTerminated(filename, temp_allocator), flags, mode.default_permissions);
     if (fd == -1) return FilesystemErrnoErrorCode(errno, "open");
 
-    if (mode == FileMode::WriteEveryoneReadWrite) {
+    if (mode.everyone_read_write) {
         // It's necessary to use fchmod() to set the permissions instead of open(mode = 0666) because open()
         // uses umask and so will likely not actually set the permissions we want. fchmod() doesn't have that
         // problem.

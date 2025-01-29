@@ -101,6 +101,10 @@ ErrorCodeOr<Span<u8 const>> GetResource(int resource_id) {
 }
 
 static InstallResult TryInstall(Component const& comp) {
+    ASSERT(comp.data.size != 0);
+    ASSERT(comp.info.filename.size != 0);
+    ASSERT(IsValidUtf8(comp.info.filename));
+
     // IMPROVE: error messages could be more helpful here for the end-user. Explain what they could try to fix
     // the issue.
     InstallError error {};
@@ -249,8 +253,7 @@ Application* CreateApplication(GuiFramework& framework, u32 root_layout_id) {
         auto data = GetResource(info.resource_id);
         if (data.HasError()) {
             if constexpr (PRODUCTION_BUILD) {
-                ErrorDialog(framework, "Bug: missing data resource");
-                ExitProgram(framework);
+                Panic("installer is missing resource");
             } else {
                 LogDebug(k_log_module, "Failed to load component data: {}", data.Error());
                 data = Span<u8 const> {};
@@ -509,7 +512,7 @@ void DestroyApplication(Application& app, GuiFramework&) {
 
 void OnTimer(Application& app, GuiFramework& framework) {
     if (app.current_page == Pages::Installing) {
-        if (app.installing_completed.Load(LoadMemoryOrder::Relaxed))
+        if (app.installing_completed.Load(LoadMemoryOrder::Acquire))
             SwitchPage(app, framework, Pages::Summary);
         else
             EditWidget(framework, app.installing_bar, {.progress_bar_pulse = true});

@@ -87,17 +87,13 @@ struct WindowRect {
 
 #undef CreateWindow
 
-static void ErrorDialog(HWND parent, String title) {
-    ArenaAllocatorWithInlineStorage<4000> allocator {Malloc::Instance()};
-    wchar_t null {};
-    auto wstr = Widen(allocator, title).ValueOr({&null, 1});
-    MessageBoxW(parent, wstr.data, L"Error", MB_OK | MB_ICONEXCLAMATION);
+static void CheckLastError(String message, SourceLocation loc = SourceLocation::Current()) {
+    auto const error = GetLastError();
+    if (error) PanicF(loc, "{}, {}", message, Win32ErrorCode(error));
 }
 
-static void AbortWithError(ErrorCode error) {
-    ArenaAllocatorWithInlineStorage<2000> allocator {Malloc::Instance()};
-    ErrorDialog(nullptr, fmt::Format(allocator, "Fatal error: {d}", error));
-    Panic("error");
+static void Require(bool condition, String message, SourceLocation loc = SourceLocation::Current()) {
+    if (!condition) CheckLastError(message, loc);
 }
 
 // for 'static' controls, the notifications regarding interaction are passed to the _parent_ window, and
@@ -122,24 +118,25 @@ static HWND CreateWindow(Widget& widget,
                                   (HMENU)(uintptr_t)button_id,
                                   GetModuleHandleW(nullptr),
                                   nullptr);
-    if (!window) AbortWithError(Win32ErrorCode(GetLastError(), "CreateWindow"));
+    ASSERT(window, "failed to create window");
 
     SetLastError(0);
     SetWindowLongPtrW(window, GWLP_USERDATA, (LONG_PTR)&widget);
-    if (GetLastError() != 0) AbortWithError(Win32ErrorCode(GetLastError(), "SetWindowLongPtrW"));
+    CheckLastError("SetWindowLongPtrW");
 
     return window;
 }
 
 static UiSize WindowContentsSize(HWND window) {
     RECT r;
-    if (!GetClientRect(window, &r)) AbortWithError(Win32ErrorCode(GetLastError(), "GetClientRect"));
+    Require(GetClientRect(window, &r), "GetClientRect");
     return {CheckedCast<u16>(r.right), CheckedCast<u16>(r.bottom)};
 }
 
 static WCHAR* NullTermWideString(GuiFramework& framework, String str) {
+    ASSERT(IsValidUtf8(str));
     auto result = WidenAllocNullTerm(framework.scratch_arena, str);
-    if (!result.HasValue()) AbortWithError(Win32ErrorCode(ERROR_NO_UNICODE_TRANSLATION));
+    if (!result.HasValue()) Panic("Failed to widen string");
     return result.Value().data;
 }
 
@@ -320,14 +317,14 @@ static UiSize GetSizeAndLayoutChildren(Widget& widget, UiSize max_size_allowed) 
                 coord[dim] = pos;
                 auto const total_margin_x = c.w->options.margins.l + c.w->options.margins.r;
                 auto const total_margin_y = c.w->options.margins.t + c.w->options.margins.b;
-                if (!SetWindowPos(c.w->window,
-                                  nullptr,
-                                  coord[0] + c.w->options.margins.l,
-                                  coord[1] + c.w->options.margins.t,
-                                  c.size.width - total_margin_x,
-                                  c.size.height - total_margin_y,
-                                  SWP_NOZORDER | SWP_NOCOPYBITS))
-                    AbortWithError(Win32ErrorCode(GetLastError(), "SetWindowPos"));
+                Require(SetWindowPos(c.w->window,
+                                     nullptr,
+                                     coord[0] + c.w->options.margins.l,
+                                     coord[1] + c.w->options.margins.t,
+                                     c.size.width - total_margin_x,
+                                     c.size.height - total_margin_y,
+                                     SWP_NOZORDER | SWP_NOCOPYBITS),
+                        "SetWindowPos");
                 pos += c.size.e[dim] + container_options.spacing;
             }
 
@@ -419,13 +416,8 @@ void ExitProgram(GuiFramework& framework) {
     PostQuitMessage(0);
 }
 
-void ErrorDialog(GuiFramework& framework, String title) {
-    if (!KillTimer(framework.root, k_timer_id)) PanicIfReached();
-    ErrorDialog(framework.root, title);
-    if (!SetTimer(framework.root, k_timer_id, k_timer_ms, nullptr)) PanicIfReached();
-}
-
 void EditWidget(GuiFramework& framework, u32 id, EditWidgetOptions const& options) {
+    framework.scratch_arena.ResetCursorAndConsolidateRegions();
     auto& widget = framework.widgets[id];
 
     if (options.visible) {
@@ -526,6 +518,7 @@ u32 CreateStackLayoutWidget(GuiFramework& framework, Optional<u32> parent_id, Wi
 }
 
 u32 CreateWidget(GuiFramework& framework, u32 page, WidgetOptions options) {
+    framework.scratch_arena.ResetCursorAndConsolidateRegions();
     // IMPROVE: review usage of WS_TABSTOP
     // https://devblogs.microsoft.com/oldnewthing/20031021-00/?p=42083
 
@@ -568,7 +561,7 @@ u32 CreateWidget(GuiFramework& framework, u32 page, WidgetOptions options) {
         }
         case WidgetType::ReadOnlyTextbox: {
             auto library = LoadLibraryW(L"Msftedit.dll");
-            if (library == nullptr) AbortWithError(Win32ErrorCode(GetLastError(), "LoadLibrary"));
+            Require(library, "LoadLibrary");
 
             widget.window =
                 CreateWindow(widget,
@@ -1146,7 +1139,7 @@ static ErrorCodeOr<void> Main(HINSTANCE h_instance, int cmd_show) {
 
     if (framework.regular_font == nullptr || framework.heading_font == nullptr ||
         framework.bold_font == nullptr)
-        AbortWithError(Win32ErrorCode(GetLastError(), "Failed to get font"));
+        CheckLastError("Failed to get font");
 
     framework.root = CreateWindowExW(WS_EX_CLIENTEDGE,
                                      k_root_window_class_name,
@@ -1165,7 +1158,7 @@ static ErrorCodeOr<void> Main(HINSTANCE h_instance, int cmd_show) {
     {
         SetLastError(0);
         SetWindowLongPtrW(framework.root, GWLP_USERDATA, (LONG_PTR)&framework);
-        if (GetLastError() != 0) AbortWithError(Win32ErrorCode(GetLastError(), "SetWindowLongPtrW"));
+        CheckLastError("SetWindowLongPtrW");
     }
 
     auto [root_layout, root_layout_id] = framework.AllocWidget();
@@ -1194,10 +1187,9 @@ static ErrorCodeOr<void> Main(HINSTANCE h_instance, int cmd_show) {
     SetTimer(framework.root, k_timer_id, k_timer_ms, nullptr);
 
     MSG msg = {};
-    while (GetMessage(&msg, nullptr, 0, 0) > 0) {
-        framework.scratch_arena.ResetCursorAndConsolidateRegions();
+    while (GetMessageW(&msg, nullptr, 0, 0) > 0) {
         TranslateMessage(&msg);
-        DispatchMessage(&msg);
+        DispatchMessageW(&msg);
     }
 
     return k_success;
@@ -1208,7 +1200,7 @@ int WINAPI WinMain(HINSTANCE h_instance, HINSTANCE, LPSTR, int cmd_show) {
     DEFER { GlobalDeinit({.shutdown_error_reporting = true}); };
 
     if (auto o = Main(h_instance, cmd_show); o.HasError()) {
-        AbortWithError(o.Error());
+        PanicF(SourceLocation::Current(), "{}", o.Error());
         return 1;
     }
     return 0;

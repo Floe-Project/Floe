@@ -168,6 +168,7 @@ ErrorCodeOr<u64> File::FileSize() {
 }
 
 ErrorCodeOr<File> OpenFile(String filename, FileMode mode) {
+    ASSERT(IsValidUtf8(filename));
     PathArena temp_allocator {Malloc::Instance()};
 
     auto const w_path =
@@ -318,7 +319,9 @@ static DWORD AttributesForDir(WCHAR* path, usize path_size, CreateDirectoryOptio
 }
 
 ErrorCodeOr<void> CreateDirectory(String path, CreateDirectoryOptions options) {
+    ASSERT(IsValidUtf8(path));
     ASSERT(path::IsAbsolute(path));
+
     PathArena temp_path_arena {Malloc::Instance()};
     auto const wide_path = TRY(path::MakePathForWin32(path, temp_path_arena, true));
 
@@ -400,13 +403,16 @@ static ErrorCodeOr<DynamicArray<wchar_t>> Win32GetRunningProgramName(Allocator& 
 ErrorCodeOr<MutableString> CurrentExecutablePath(Allocator& a) {
     PathArena temp_path_arena {Malloc::Instance()};
     auto const full_wide_path = TRY(Win32GetRunningProgramName(temp_path_arena));
-    return Narrow(a, full_wide_path).Value();
+    auto const result = Narrow(a, full_wide_path).Value();
+    ASSERT(IsValidUtf8(result));
+    return result;
 }
 
 ErrorCodeOr<DynamicArrayBounded<char, 200>> NameOfRunningExecutableOrLibrary() {
     PathArena temp_path_arena {Malloc::Instance()};
     auto const full_wide_path = TRY(Win32GetRunningProgramName(temp_path_arena));
     auto full_path = Narrow(temp_path_arena, full_wide_path).Value();
+    ASSERT(IsValidUtf8(full_path));
     return String {path::Filename(full_path)};
 }
 
@@ -464,7 +470,10 @@ ErrorCodeOr<MutableString> TemporaryDirectoryOnSameFilesystemAs(String path, All
         wide_result = {wide_result_buffer.data, pos};
     }
 
-    return Narrow(a, wide_result).Value();
+    auto const result = Narrow(a, wide_result).Value();
+    ASSERT(path::IsAbsolute(result));
+    ASSERT(IsValidUtf8(result));
+    return result;
 }
 
 MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirectoryOptions options) {
@@ -502,6 +511,7 @@ MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirecto
         auto result = Narrow(a, wide_path).Value();
         ASSERT(!path::IsDirectorySeparator(Last(result)));
         ASSERT(path::IsAbsolute(result));
+        ASSERT(IsValidUtf8(result));
         return result;
     }
 
@@ -607,9 +617,11 @@ MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirecto
         }
         auto const fallback = ({
             MutableString f {};
-            if (config.fallback_absolute.size)
+            if (config.fallback_absolute.size) {
                 f = a.Clone(config.fallback_absolute);
-            else {
+                ASSERT(path::IsAbsolute(f));
+                ASSERT(IsValidUtf8(f));
+            } else {
                 ASSERT(config.fallback_user.size);
                 Array<WCHAR, UNLEN + 1> wbuffer {};
                 Array<char, MaxNarrowedStringSize(wbuffer.size)> buffer {};
@@ -633,6 +645,8 @@ MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirecto
                                   "\\"_s,
                                   config.fallback_user,
                               });
+                ASSERT(path::IsAbsolute(f));
+                ASSERT(IsValidUtf8(f));
             }
             f;
         });
@@ -677,11 +691,15 @@ MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirecto
 
     ASSERT(!path::IsDirectorySeparator(Last(result)));
     ASSERT(path::IsAbsolute(result));
+    ASSERT(IsValidUtf8(result));
 
     return result;
 }
 
 ErrorCodeOr<FileType> GetFileType(String absolute_path) {
+    ASSERT(path::IsAbsolute(absolute_path));
+    ASSERT(IsValidUtf8(absolute_path));
+
     PathArena temp_path_arena {Malloc::Instance()};
 
     auto const attributes =
@@ -695,6 +713,7 @@ ErrorCodeOr<FileType> GetFileType(String absolute_path) {
 
 ErrorCodeOr<MutableString> AbsolutePath(Allocator& a, String path) {
     ASSERT(path.size);
+    ASSERT(IsValidUtf8(path));
 
     PathArena temp_path_arena {Malloc::Instance()};
     // relative paths cannot start with the long-path prefix: //?/
@@ -722,6 +741,7 @@ ErrorCodeOr<MutableString> AbsolutePath(Allocator& a, String path) {
 }
 
 ErrorCodeOr<MutableString> CanonicalizePath(Allocator& a, String path) {
+    ASSERT(IsValidUtf8(path));
     auto result = TRY(AbsolutePath(a, path));
     for (auto& c : result)
         if (c == '/') c = '\\';
@@ -772,7 +792,9 @@ static ErrorCodeOr<void> Win32DeleteDirectory(WString windows_path, ArenaAllocat
 }
 
 ErrorCodeOr<String> TrashFileOrDirectory(String path, Allocator&) {
+    ASSERT(IsValidUtf8(path));
     ASSERT(path::IsAbsolute(path));
+
     auto const com_library_usage = TRY(ScopedWin32ComUsage::Create());
 
     PathArena temp_path_arena {Malloc::Instance()};
@@ -796,6 +818,9 @@ ErrorCodeOr<String> TrashFileOrDirectory(String path, Allocator&) {
 }
 
 ErrorCodeOr<void> Delete(String path, DeleteOptions options) {
+    ASSERT(IsValidUtf8(path));
+    ASSERT(path::IsAbsolute(path));
+
     PathArena temp_path_arena {Malloc::Instance()};
     auto const wide_path = TRY(path::MakePathForWin32(path, temp_path_arena, true));
 
@@ -848,6 +873,8 @@ ErrorCodeOr<void> Delete(String path, DeleteOptions options) {
 }
 
 ErrorCodeOr<void> CopyFile(String from, String to, ExistingDestinationHandling existing) {
+    ASSERT(IsValidUtf8(from));
+    ASSERT(IsValidUtf8(to));
     ASSERT(path::IsAbsolute(from));
     ASSERT(path::IsAbsolute(to));
     PathArena temp_path_arena {Malloc::Instance()};
@@ -914,6 +941,8 @@ static bool PathIsANonEmptyDirectory(WString path) {
 }
 
 ErrorCodeOr<void> Rename(String from, String to) {
+    ASSERT(IsValidUtf8(from));
+    ASSERT(IsValidUtf8(to));
     ASSERT(path::IsAbsolute(from));
     ASSERT(path::IsAbsolute(to));
     PathArena temp_path_arena {Malloc::Instance()};
@@ -968,6 +997,9 @@ static bool ShouldSkipFile(ContiguousContainer auto const& filename, bool skip_d
 }
 
 ErrorCodeOr<Iterator> Create(ArenaAllocator& a, String path, Options options) {
+    ASSERT(IsValidUtf8(path));
+    ASSERT(path::IsAbsolute(path));
+
     auto result = TRY(Iterator::InternalCreate(a, path, options));
 
     PathArena temp_path_arena {Malloc::Instance()};
@@ -1066,6 +1098,10 @@ ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments args) {
     DEFER { f->Release(); };
 
     if (args.default_path) {
+        ASSERT(args.default_path->size);
+        ASSERT(IsValidUtf8(*args.default_path));
+        ASSERT(path::IsAbsolute(*args.default_path));
+
         PathArena temp_path_arena {Malloc::Instance()};
 
         if (auto const narrow_dir = path::Directory(*args.default_path)) {
@@ -1209,6 +1245,7 @@ void DestoryDirectoryWatcher(DirectoryWatcher& watcher) {
 
 static ErrorCodeOr<WindowsWatchedDirectory*> WatchDirectory(DirectoryWatcher::WatchedDirectory const& dir,
                                                             ArenaAllocator& scratch_arena) {
+    ASSERT(IsValidUtf8(dir.path));
     auto wide_path = TRY(path::MakePathForWin32(dir.path, scratch_arena, true));
     auto handle = CreateFileW(wide_path.path.data,
                               FILE_LIST_DIRECTORY,
@@ -1370,6 +1407,7 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                     if (changes) {
                         auto const narrowed = Narrow(args.result_arena, filename);
                         if (narrowed.HasValue()) {
+                            ASSERT(IsValidUtf8(narrowed.Value()));
                             LogDebug(k_log_module,
                                      "Change: {} {}",
                                      DirectoryWatcher::ChangeType::ToString(changes),

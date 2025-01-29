@@ -25,11 +25,11 @@ bool FillDistributionInfo(OsInfo& info, String filename) {
         value = TrimStartIfMatches(value, '"');
 
         if (key == "PRETTY_NAME")
-            info.distribution_pretty_name = value;
+            dyn::AssignFitInCapacity(info.distribution_pretty_name, value);
         else if (key == "ID")
-            info.distribution_name = value;
+            dyn::AssignFitInCapacity(info.distribution_name, value);
         else if (key == "VERSION_ID")
-            info.distribution_version = value;
+            dyn::AssignFitInCapacity(info.distribution_version, value);
     }
 
     return true;
@@ -55,10 +55,11 @@ OsInfo GetOsInfo() {
         auto release_start = release;
         if (release[0] == '-' || release[0] == '.') release_start++;
 
-        if (release_start[0] != '\0') result.build = FromNullTerminated(release_start);
+        if (release_start[0] != '\0')
+            dyn::AssignFitInCapacity(result.build, FromNullTerminated(release_start));
 
-        result.name = FromNullTerminated((char const*)uts.sysname);
-        result.version = FromNullTerminated((char const*)uts.release);
+        dyn::AssignFitInCapacity(result.name, FromNullTerminated((char const*)uts.sysname));
+        dyn::AssignFitInCapacity(result.version, FromNullTerminated((char const*)uts.release));
     }
 
     if (!result.name.size) result.name = "Linux"_s;

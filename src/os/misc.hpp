@@ -13,7 +13,7 @@ ErrorCode ErrnoErrorCode(s64 error_code,
 // Strings can be empty
 struct OsInfo {
     DynamicArrayBounded<char, 48> name; // never empty
-    DynamicArrayBounded<char, 32> version;
+    DynamicArrayBounded<char, 48> version;
     DynamicArrayBounded<char, 96> pretty_name;
     DynamicArrayBounded<char, 32> build;
     DynamicArrayBounded<char, 32> kernel_version;

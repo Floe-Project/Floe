@@ -98,7 +98,8 @@ OsInfo GetOsInfo() {
         result.build.size = NullTerminatedSize(result.build.data);
 
     struct utsname uts {};
-    if (uname(&uts) == 0) result.kernel_version = FromNullTerminated((char const*)uts.release);
+    if (uname(&uts) == 0)
+        dyn::AssignFitInCapacity(result.kernel_version, FromNullTerminated((char const*)uts.release));
 
     return result;
 }

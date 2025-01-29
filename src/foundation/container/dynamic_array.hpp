@@ -111,6 +111,11 @@ PUBLIC constexpr bool Assign(DynType& array, SpanFor<DynType> new_items) {
     return dyn::AssignAssumingAlreadyEmpty(array, new_items);
 }
 
+template <DynArray DynType>
+PUBLIC constexpr void AssignFitInCapacity(DynType& array, SpanFor<DynType> new_items) {
+    Assign(array, new_items.SubSpan(0, array.Capacity()));
+}
+
 template <class... Args>
 PUBLIC constexpr bool AssignRepeated(DynArray auto& array, usize count, Args&&... args) {
     using ValueType = typename RemoveReference<decltype(array)>::ValueType;

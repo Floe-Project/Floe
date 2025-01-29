@@ -981,7 +981,6 @@ pub fn build(b: *std.Build) void {
             "-DNOHELP",
             "-DNOMCX",
             "-DNOCLIPBOARD",
-            "-DNONLS",
             "-DNOMEMMGR",
             "-DNOMETAFILE",
             "-DNOMINMAX",

@@ -4,6 +4,8 @@
 //
 #include <dbghelp.h>
 #include <errhandlingapi.h>
+#include <fcntl.h>
+#include <io.h>
 #include <process.h>
 #include <shellapi.h>
 #include <versionhelpers.h>
@@ -284,6 +286,9 @@ void EndCrashDetection() {
 }
 
 ErrorCodeOr<void> StdPrint(StdStream stream, String str) {
+    static CallOnceFlag flag;
+    CallOnce(flag, []() { SetConsoleOutputCP(CP_UTF8); });
+
     DWORD bytes_written;
     auto const result = WriteFile(GetStdHandle(({
                                       DWORD h = STD_OUTPUT_HANDLE;

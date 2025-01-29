@@ -38,7 +38,7 @@ default:
   if [[ -z "${DEFAULT_CMD:-}" ]]; then
     just build native
   else
-    just $DEFAULT_CMD
+    $DEFAULT_CMD
   fi
 
 alias pre-debug := build

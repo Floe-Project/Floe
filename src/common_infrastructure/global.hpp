@@ -53,7 +53,7 @@ PUBLIC void GlobalInit(GlobalInitOptions options) {
 
         ArenaAllocatorWithInlineStorage<2000> arena {PageAllocator::Instance()};
 
-        auto const stacktrace = CurrentStacktrace(2);
+        auto const stacktrace = CurrentStacktrace(4);
         auto const message = fmt::Format(arena, "[panic] {}\nAt {}", FromNullTerminated(message_c_str), loc);
 
         // Step 1: log the error for easier local debugging.

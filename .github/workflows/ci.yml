@@ -144,6 +144,7 @@ jobs:
       - run: just test-ci-windows
 
       - name: Install sentry-cli
+        if: '!cancelled()'
         run: |
           choco install sentry-cli -y --no-progress
           sentry-cli --version

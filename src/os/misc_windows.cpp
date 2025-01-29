@@ -438,7 +438,10 @@ SystemStats GetSystemStats() {
                 if (auto const narrow_size =
                         NarrowToBuffer(narrow_name.data, {(const WCHAR*)wide_name.data, size})) {
                     dyn::Assign(result.cpu_name, String {narrow_name.data, *narrow_size});
-                    if (result.cpu_name.size && Last(result.cpu_name) == '\0') result.cpu_name.size--;
+                    while (result.cpu_name.size &&
+                           (Last(result.cpu_name) == '\0' || IsSpacing(Last(result.cpu_name))))
+                        result.cpu_name.size--;
+                    ASSERT(IsValidUtf8(result.cpu_name));
                 }
             }
         }

@@ -220,15 +220,15 @@ int RunAllTests(Tester& tester, Span<String> filter_patterns) {
 void Check(Tester& tester,
            bool expression,
            String message,
-           FailureAction failure_aciton,
+           FailureAction failure_action,
            String file,
            int line) {
     ++tester.num_assertions;
     if (!expression) {
         String pretext = "REQUIRE failed";
-        if (failure_aciton == FailureAction::FailAndContinue)
+        if (failure_action == FailureAction::FailAndContinue)
             pretext = "CHECK failed";
-        else if (failure_aciton == FailureAction::LogWarningAndContinue)
+        else if (failure_action == FailureAction::LogWarningAndContinue)
             pretext = "WARNING issued";
 
         tester.log.Error("{}: {}", pretext, message);
@@ -251,13 +251,13 @@ void Check(Tester& tester,
 
         auto _ = PrintCurrentStacktrace(StdStream::Err, {}, 3);
 
-        if (failure_aciton != FailureAction::LogWarningAndContinue) {
+        if (failure_action != FailureAction::LogWarningAndContinue) {
             tester.should_reenter = false;
             tester.current_test_case->failed = true;
         } else {
             ++tester.num_warnings;
         }
-        if (failure_aciton == FailureAction::FailAndExitTest) throw TestFailed();
+        if (failure_action == FailureAction::FailAndExitTest) throw TestFailed();
     }
 }
 

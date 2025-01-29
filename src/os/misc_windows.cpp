@@ -144,52 +144,50 @@ ErrorCodeOr<LockableSharedMemory> CreateLockableSharedMemory(String name, usize 
     LockableSharedMemory result {};
     auto& native = result.native.As<LockableSharedMemoryNative>();
 
-    // Create mutex name and mapping name
-    auto mutex_name = fmt::FormatInline<40>("Global\\{}_mutex", name);
-    auto mapping_name = fmt::FormatInline<40>("Global\\{}_mapping", name);
+    bool success = false;
 
-    // Create or open mutex
+    auto const mutex_name = fmt::FormatInline<40>("Global\\{}_mutex", name);
+
+    // Global mapping requires SeCreateGlobalPrivilege, which doesn't seems available sometimes. Using Local
+    // instead should be fine since I don't think we need to share memory between different terminal server
+    // sessions.
+    auto const mapping_name = fmt::FormatInline<40>("Local\\{}_mapping", name);
+
     native.mutex = CreateMutexA(nullptr, FALSE, mutex_name.data);
     if (!native.mutex) return Win32ErrorCode(GetLastError(), "CreateMutexA");
+    DEFER {
+        if (!success) CloseHandle(native.mutex);
+    };
 
-    // Wait for mutex to ensure atomic initialization
-    if (WaitForSingleObject(native.mutex, INFINITE) != WAIT_OBJECT_0) {
-        CloseHandle(native.mutex);
+    // Lock
+    if (WaitForSingleObject(native.mutex, INFINITE) != WAIT_OBJECT_0)
         return Win32ErrorCode(GetLastError(), "WaitForSingleObject");
-    }
 
     DEFER { ReleaseMutex(native.mutex); };
 
-    // Create or open file mapping
-    // Create file mapping and immediately check if it was newly created
-    native.mapping = CreateFileMappingA(INVALID_HANDLE_VALUE, // Use paging file
-                                        nullptr, // Default security attributes
-                                        PAGE_READWRITE, // Read/write access
-                                        (DWORD)((size >> 32) & 0xFFFFFFFF), // High-order DWORD of size
-                                        (DWORD)(size & 0xFFFFFFFF), // Low-order DWORD of size
+    native.mapping = CreateFileMappingA(INVALID_HANDLE_VALUE,
+                                        nullptr,
+                                        PAGE_READWRITE,
+                                        (DWORD)((size >> 32) & 0xFFFFFFFF),
+                                        (DWORD)(size & 0xFFFFFFFF),
                                         mapping_name.data);
-    DWORD last_error = GetLastError(); // Must check immediately after create
+    if (!native.mapping) return Win32ErrorCode(GetLastError(), "CreateFileMappingA");
+    DEFER {
+        if (!success) CloseHandle(native.mapping);
+    };
 
-    if (!native.mapping) {
-        CloseHandle(native.mutex);
-        return Win32ErrorCode(last_error, "CreateFileMappingA");
-    }
-
-    bool created = (last_error != ERROR_ALREADY_EXISTS);
+    bool const created = GetLastError() != ERROR_ALREADY_EXISTS;
 
     // Map view of the file
     void* data = MapViewOfFile(native.mapping, FILE_MAP_ALL_ACCESS, 0, 0, size);
 
-    if (!data) {
-        CloseHandle(native.mapping);
-        CloseHandle(native.mutex);
-        return Win32ErrorCode(GetLastError(), "MapViewOfFile");
-    }
+    if (!data) return Win32ErrorCode(GetLastError(), "MapViewOfFile");
 
     // Initialize memory if we created it
     if (created) FillMemory(data, 0, size);
 
     result.data = {(u8*)data, size};
+    success = true;
     return result;
 }
 

@@ -514,7 +514,7 @@ macos-prepare-packager:
   zip $final_packager_zip_name floe-packager
 
   just macos-notarize "$final_packager_zip_name"
-  # NOTE: we can't staple the packager because it's a unix binary 
+  # NOTE: we can't staple the packager because it's a Unix binary 
 
   mv $final_packager_zip_name {{release_files_dir}}
 

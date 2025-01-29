@@ -25,7 +25,7 @@ struct ChecksumLine {
 using ChecksumTable = HashTable<String, ChecksumValues>;
 using DynamicChecksumTable = DynamicHashTable<String, ChecksumValues>;
 
-// similar format to unix cksum - except cksum uses a different crc algorithm
+// similar format to Unix cksum - except cksum uses a different crc algorithm
 PUBLIC void AppendChecksumLine(DynamicArray<char>& buffer, ChecksumLine line) {
     if constexpr (IS_WINDOWS)
         for (auto c : line.path)

@@ -263,7 +263,7 @@ enum class KnownDirectoryType : u8 {
     //
     // We still need to be mindful of permissions. If one user creates a file, it should be readable by
     // everyone, but it might not be writable by everyone. If we wan't to share write-access then we can use
-    // things like open()'s mode argument, chmod() or umask() on UNIX, or CreateFile()'s security attributes
+    // things like open()'s mode argument, chmod() or umask() on Unix, or CreateFile()'s security attributes
     // or SetFileSecurity() on Windows.
     //
     // We tend to prefer global locations because as an audio plugin, we're almost always going to be

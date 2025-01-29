@@ -95,7 +95,7 @@ ErrorCodeOr<s128> File::LastModifiedTimeNsSinceEpoch() {
     file_time_int.LowPart = file_time.dwLowDateTime;
     file_time_int.HighPart = file_time.dwHighDateTime;
 
-    // The windows epoch starts 1601-01-01T00:00:00Z. It's 11644473600 seconds before the UNIX/Linux epoch
+    // The windows epoch starts 1601-01-01T00:00:00Z. It's 11644473600 seconds before the Unix/Linux epoch
     // (1970-01-01T00:00:00Z). Windows ticks are in 100 nanoseconds.
     return (s128)file_time_int.QuadPart * (s128)100 - (s128)11644473600ull * (s128)1'000'000'000ull;
 }
@@ -103,7 +103,7 @@ ErrorCodeOr<s128> File::LastModifiedTimeNsSinceEpoch() {
 ErrorCodeOr<void> File::SetLastModifiedTimeNsSinceEpoch(s128 time) {
     ULARGE_INTEGER file_time_int;
 
-    // The windows epoch starts 1601-01-01T00:00:00Z. It's 11644473600 seconds before the UNIX/Linux epoch
+    // The windows epoch starts 1601-01-01T00:00:00Z. It's 11644473600 seconds before the Unix/Linux epoch
     // (1970-01-01T00:00:00Z). Windows ticks are in 100 nanoseconds.
     file_time_int.QuadPart = (ULONGLONG)((time + (s128)11644473600ull * (s128)1'000'000'000ull) / (s128)100);
 

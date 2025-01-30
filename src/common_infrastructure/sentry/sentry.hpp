@@ -497,7 +497,7 @@ PUBLIC ErrorCodeOr<void> SubmitEnvelope(Sentry& sentry,
     return result;
 }
 
-// thread-safe, signal-safe
+// thread-safe, signal-safe on Unix
 PUBLIC ErrorCodeOr<void> WriteCrashToFile(Sentry& sentry,
                                           Optional<StacktraceStack> const& stacktrace,
                                           String folder,
@@ -537,7 +537,7 @@ PUBLIC ErrorCodeOr<void> SubmitCrash(Sentry& sentry,
                              .message = message,
                              .stacktrace = stacktrace,
                          },
-                         true));
+                         !IS_WINDOWS));
     if constexpr (k_online_reporting) TRY(EnvelopeAddSessionUpdate(sentry, writer, SessionStatus::Crashed));
     TRY(SubmitEnvelope(sentry, envelope_without_header, scratch_arena, options));
 

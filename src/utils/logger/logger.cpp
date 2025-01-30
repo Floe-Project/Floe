@@ -143,10 +143,12 @@ ErrorCodeOr<void> CleanupOldLogFilesIfNeeded(ArenaAllocator& scratch_arena) {
 __attribute__((visibility("hidden"))) static CountedInitFlag g_logger_init_flag {};
 __attribute__((visibility("hidden"))) alignas(File) static u8 g_file_storage[sizeof(File)];
 __attribute__((visibility("hidden"))) static Atomic<File*> g_file = nullptr;
-__attribute__((visibility("hidden"))) LogConfig g_log_config {};
+__attribute__((visibility("hidden"))) static LogConfig g_log_config {};
 
-void InitLogger() {
-    CountedInit(g_logger_init_flag, []() {
+void InitLogger(LogConfig config) {
+    CountedInit(g_logger_init_flag, [&]() {
+        g_log_config = config;
+
         ASSERT(g_file.Load(LoadMemoryOrder::Relaxed) == nullptr);
         InitLogFolderIfNeeded();
 
@@ -186,32 +188,39 @@ void InitLogger() {
                         // have created it between our Rename and OpenFile calls. Let's try again.
                         continue;
                     }
-                    StdPrintF(StdStream::Err, "failed to open log file: {}\n", file_outcome.Error());
+                    StdPrintF(StdStream::Err,
+                              "{} failed to open log file: {}\n",
+                              CurrentThreadId(),
+                              file_outcome.Error());
                     return;
                 }
 
+                StdPrintF(StdStream::Err, "{} opened log file\n", CurrentThreadId());
                 auto file = PLACEMENT_NEW(g_file_storage) File {file_outcome.ReleaseValue()};
                 g_file.Store(file, StoreMemoryOrder::Release);
                 return;
             } else {
-                StdPrintF(StdStream::Err, "failed to rename log file: {}\n", o.Error());
+                StdPrintF(StdStream::Err, "{} failed to rename log file: {}\n", CurrentThreadId(), o.Error());
                 return;
             }
         }
 
-        StdPrintF(StdStream::Err, "failed to open log file: too many attempts\n");
+        StdPrintF(StdStream::Err, "{} failed to open log file: too many attempts\n", CurrentThreadId());
         return;
     });
 }
 
 void ShutdownLogger() {
     CountedDeinit(g_logger_init_flag, []() {
-        if (auto file = g_file.Exchange(nullptr, RmwMemoryOrder::Release)) file->~File();
+        if (auto file = g_file.Exchange(nullptr, RmwMemoryOrder::Release)) {
+            StdPrintF(StdStream::Err, "{} closed log file\n", CurrentThreadId());
+            file->~File();
+        }
     });
 }
 
 void Log(LogModuleName module_name, LogLevel level, FunctionRef<ErrorCodeOr<void>(Writer)> write_message) {
-    if (level < g_log_config.min_level_allowed.Load(LoadMemoryOrder::Relaxed)) return;
+    if (level < g_log_config.min_level_allowed) return;
 
     static auto log_to_stderr = [](LogModuleName module_name,
                                    LogLevel level,
@@ -232,7 +241,7 @@ void Log(LogModuleName module_name, LogLevel level, FunctionRef<ErrorCodeOr<void
         auto _ = WriteFormattedLog(buffered_writer.Writer(), module_name.str, level, write_message, k_config);
     };
 
-    switch (g_log_config.destination.Load(LoadMemoryOrder::Relaxed)) {
+    switch (g_log_config.destination) {
         case LogConfig::Destination::Stderr: {
             log_to_stderr(module_name, level, write_message);
             break;

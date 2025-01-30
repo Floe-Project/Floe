@@ -46,11 +46,9 @@ constexpr auto k_main_log_module = "🚀main"_log_module;
 
 struct LogConfig {
     enum class Destination { Stderr, File };
-    Atomic<Destination> destination = Destination::Stderr;
-    Atomic<LogLevel> min_level_allowed = PRODUCTION_BUILD ? LogLevel::Info : LogLevel::Debug;
+    Destination destination = Destination::Stderr;
+    LogLevel min_level_allowed = PRODUCTION_BUILD ? LogLevel::Info : LogLevel::Debug;
 };
-
-__attribute__((visibility("hidden"))) extern LogConfig g_log_config;
 
 ErrorCodeOr<void> CleanupOldLogFilesIfNeeded(ArenaAllocator& scratch_arena);
 
@@ -61,7 +59,7 @@ void Log(LogModuleName module_name, LogLevel level, String format, Args const&..
     Log(module_name, level, [&](Writer writer) { return fmt::FormatToWriter(writer, format, args...); });
 }
 
-void InitLogger();
+void InitLogger(LogConfig);
 void ShutdownLogger();
 
 void Trace(LogModuleName module_name, String message = {}, SourceLocation loc = SourceLocation::Current());

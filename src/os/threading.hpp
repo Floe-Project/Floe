@@ -379,6 +379,66 @@ PUBLIC void CallOnce(CallOnceFlag& flag, FunctionRef<void()> function) {
     ASSERT(flag.v.Load(LoadMemoryOrder::Relaxed) == CallOnceFlag::k_called);
 }
 
+// Futex-based mutex, possibly slower than the pthread/CriticalSection based mutexes, but doesn't require
+// any initialisation.
+// This based on Zig's Mutex
+// https://github.com/ziglang/zig/blob/master/lib/std/Thread/Mutex.zig
+// Copyright (c) Zig contributors
+// SPDX-License-Identifier: MIT
+struct MutexThin {
+    static constexpr u32 k_unlocked = 0;
+    static constexpr u32 k_locked = 1;
+    static constexpr u32 k_contended = 2;
+
+    Atomic<u32> state = k_unlocked;
+
+    void Lock() {
+        if (!TryLock()) LockSlow();
+    }
+
+    bool TryLock() {
+        u32 expected = k_unlocked;
+        return state.CompareExchangeWeak(expected,
+                                         k_locked,
+                                         RmwMemoryOrder::Acquire,
+                                         LoadMemoryOrder::Relaxed);
+    }
+
+    void LockSlow() {
+        if (state.Load(LoadMemoryOrder::Relaxed) == k_contended) WaitIfValueIsExpected(state, k_contended);
+
+        while (state.Exchange(k_contended, RmwMemoryOrder::Acquire) != k_unlocked)
+            WaitIfValueIsExpected(state, k_contended);
+    }
+
+    void Unlock() {
+        auto const s = state.Exchange(k_unlocked, RmwMemoryOrder::Release);
+        ASSERT(s != k_unlocked);
+
+        if (s == k_contended) WakeWaitingThreads(state, NumWaitingThreads::One);
+    }
+};
+
+struct CountedInitFlag {
+    u32 counter = 0;
+    MutexThin mutex {};
+};
+
+PUBLIC void CountedInit(CountedInitFlag& flag, FunctionRef<void()> function) {
+    flag.mutex.Lock();
+    DEFER { flag.mutex.Unlock(); };
+    if (flag.counter == 0) function();
+    flag.counter += 1;
+}
+
+PUBLIC void CountedDeinit(CountedInitFlag& flag, FunctionRef<void()> function) {
+    flag.mutex.Lock();
+    DEFER { flag.mutex.Unlock(); };
+    ASSERT(flag.counter > 0, "mismatched CountedInit/CountedDeinit");
+    flag.counter -= 1;
+    if (flag.counter == 0) function();
+}
+
 struct WorkSignaller {
     void Signal() {
         if (flag.Exchange(k_signalled, RmwMemoryOrder::AcquireRelease) == k_not_signalled)

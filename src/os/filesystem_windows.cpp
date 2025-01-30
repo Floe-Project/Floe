@@ -953,11 +953,9 @@ ErrorCodeOr<void> Rename(String from, String to) {
     // Windows and POSIX rename().
     RemoveDirectoryW(to_wide.data);
 
-    if (!MoveFileWithProgressW(TRY(path::MakePathForWin32(from, temp_path_arena, true)).path.data,
-                               to_wide.data,
-                               nullptr,
-                               nullptr,
-                               MOVEFILE_REPLACE_EXISTING)) {
+    if (!MoveFileExW(TRY(path::MakePathForWin32(from, temp_path_arena, true)).path.data,
+                     to_wide.data,
+                     MOVEFILE_REPLACE_EXISTING)) {
         auto err = GetLastError();
         if (err == ERROR_ACCESS_DENIED) {
             // When the destination is a non-empty directory we don't get ERROR_DIR_NOT_EMPTY as we might

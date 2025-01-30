@@ -278,7 +278,6 @@ ErrorCodeOr<MutableString> CurrentBinaryPath(Allocator& a) {
         if (path::IsAbsolute(fname)) {
             result = a.Clone(fname);
         } else {
-            // read /proc/self/maps to find the full path
             Array<char, Kb(32)> buffer {};
             auto size = readlink("/proc/self/maps", buffer.data, buffer.size);
             if (size != -1) {

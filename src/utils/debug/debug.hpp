@@ -42,6 +42,13 @@ template <typename... Args>
 
 #define PANICF(format, ...) PanicF(SourceLocation::Current(), format, ##__VA_ARGS__)
 
+enum class StacktraceError {
+    NotInitialised,
+};
+
+ErrorCodeCategory const& StacktraceErrorCodeType();
+inline ErrorCodeCategory const& ErrorCategoryForEnum(StacktraceError) { return StacktraceErrorCodeType(); }
+
 struct StacktraceOptions {
     bool ansi_colours = false;
     bool demangle = true; // demangling is not signal-safe
@@ -50,6 +57,7 @@ struct StacktraceOptions {
 using StacktraceStack = DynamicArrayBounded<uintptr, 32>;
 Optional<StacktraceStack> CurrentStacktrace(int skip_frames = 1);
 Optional<String> InitStacktraceState(); // returns error message if failed
+void ShutdownStacktraceState();
 
 struct FrameInfo {
     String function_name;

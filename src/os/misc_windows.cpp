@@ -266,23 +266,27 @@ static String ExceptionCodeString(DWORD code) {
     return {};
 }
 
-void* g_exception_handler = nullptr;
-CrashHookFunction g_crash_hook {};
+__attribute__((visibility("hidden"))) static void* g_exception_handler = nullptr;
+__attribute__((visibility("hidden"))) static CrashHookFunction g_crash_hook {};
+__attribute__((visibility("hidden"))) static CountedInitFlag g_crash_hook_init_flag {};
 
 void BeginCrashDetection(CrashHookFunction hook) {
-    auto _ = InitStacktraceState();
-
-    g_crash_hook = hook;
-    g_exception_handler = AddVectoredExceptionHandler(1, [](PEXCEPTION_POINTERS exception_info) -> LONG {
-        // Some exceptions are expected and should be ignored; for example Lua will trigger exceptions.
-        if (auto const msg = ExceptionCodeString(exception_info->ExceptionRecord->ExceptionCode); msg.size) {
-            if (g_crash_hook) g_crash_hook(msg);
-        }
-        return EXCEPTION_CONTINUE_SEARCH;
+    CountedInit(g_crash_hook_init_flag, [hook]() {
+        g_crash_hook = hook;
+        g_exception_handler = AddVectoredExceptionHandler(1, [](PEXCEPTION_POINTERS exception_info) -> LONG {
+            // Some exceptions are expected and should be ignored; for example Lua will trigger exceptions.
+            if (auto const msg = ExceptionCodeString(exception_info->ExceptionRecord->ExceptionCode);
+                msg.size) {
+                if (g_crash_hook) g_crash_hook(msg);
+            }
+            return EXCEPTION_CONTINUE_SEARCH;
+        });
     });
 }
 void EndCrashDetection() {
-    if (g_exception_handler) RemoveVectoredContinueHandler(g_exception_handler);
+    CountedDeinit(g_crash_hook_init_flag, [] {
+        if (g_exception_handler) RemoveVectoredExceptionHandler(g_exception_handler);
+    });
 }
 
 ErrorCodeOr<void> StdPrint(StdStream stream, String str) {

@@ -594,8 +594,6 @@ void BeginCrashDetection(CrashHookFunction hook) {
     ++g_signals_installed;
     if (g_signals_installed > 1) return;
 
-    auto _ = InitStacktraceState();
-
     for (auto [index, signal] : Enumerate(k_signals)) {
         struct sigaction action {};
         action.sa_flags =

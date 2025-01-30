@@ -50,7 +50,7 @@ struct LogConfig {
     Atomic<LogLevel> min_level_allowed = PRODUCTION_BUILD ? LogLevel::Info : LogLevel::Debug;
 };
 
-extern LogConfig g_log_config;
+__attribute__((visibility("hidden"))) extern LogConfig g_log_config;
 
 ErrorCodeOr<void> CleanupOldLogFilesIfNeeded(ArenaAllocator& scratch_arena);
 
@@ -60,6 +60,9 @@ template <typename... Args>
 void Log(LogModuleName module_name, LogLevel level, String format, Args const&... args) {
     Log(module_name, level, [&](Writer writer) { return fmt::FormatToWriter(writer, format, args...); });
 }
+
+void InitLogger();
+void ShutdownLogger();
 
 void Trace(LogModuleName module_name, String message = {}, SourceLocation loc = SourceLocation::Current());
 

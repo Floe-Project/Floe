@@ -12,6 +12,7 @@
 #include "foundation/foundation.hpp"
 #include "os/filesystem.hpp"
 #include "os/misc.hpp"
+#include "utils/logger/logger.hpp"
 
 static void DefaultPanicHook(char const* message, SourceLocation loc) {
     constexpr StdStream k_panic_stream = StdStream::Err;
@@ -306,12 +307,40 @@ void DumpInfoAboutUBSan(StdStream stream) {
         auto _ = StdPrint(stream, check);
 }
 
+ErrorCodeCategory const& StacktraceErrorCodeType() {
+    static constexpr ErrorCodeCategory k_cat = {
+        .category_id = "ST",
+        .message = [](Writer const& writer, ErrorCode code) -> ErrorCodeOr<void> {
+            String str {};
+            switch ((StacktraceError)code.code) {
+                case StacktraceError::NotInitialised: str = "Not initialised"; break;
+            }
+            return writer.WriteChars(str);
+        }};
+    return k_cat;
+}
+
 struct BacktraceState {
-    BacktraceState() {
+    Optional<DynamicArrayBounded<char, 256>> failed_init_error {};
+    backtrace_state* state = nullptr;
+};
+
+__attribute__((visibility("hidden"))) alignas(BacktraceState) static u8
+    g_backtrace_state_storage[sizeof(BacktraceState)] {};
+__attribute__((visibility("hidden"))) static Atomic<BacktraceState*> g_backtrace_state {};
+__attribute__((visibility("hidden"))) static CountedInitFlag g_init {};
+
+Optional<String> InitStacktraceState() {
+    LogDebug(k_global_log_module, "Initialising backtrace state");
+    CountedInit(g_init, [] {
         auto const o = CurrentExecutablePath(PageAllocator::Instance());
         if (o.HasError()) {
-            failed_init_error.Emplace();
-            fmt::Assign(*failed_init_error, "Stacktrace error: failed to get executable path: {}", o.Error());
+            auto state = PLACEMENT_NEW(g_backtrace_state_storage) BacktraceState;
+            state->failed_init_error.Emplace();
+            fmt::Assign(*state->failed_init_error,
+                        "Stacktrace error: failed to get executable path: {}",
+                        o.Error());
+            g_backtrace_state.Store(state, StoreMemoryOrder::Release);
             return;
         }
 
@@ -319,7 +348,10 @@ struct BacktraceState {
         dyn::Append(p, '\0');
         auto executable_path = p.ToOwnedSpan();
 
-        state = backtrace_create_state(
+        LogDebug(k_global_log_module, "Initialising backtrace state for executable: {}", executable_path);
+
+        auto state = PLACEMENT_NEW(g_backtrace_state_storage) BacktraceState;
+        state->state = backtrace_create_state(
             executable_path.data, // filename must be a permanent, null-terminated buffer
             1,
             [](void* user_data, char const* msg, int errnum) {
@@ -329,36 +361,37 @@ struct BacktraceState {
                     fmt::Assign(*self.failed_init_error, "Stacktrace error ({}): {}", errnum, msg);
                 else
                     fmt::Assign(*self.failed_init_error,
-                                "Stacktrace error: no debug info is available({}): {}",
+                                "Stacktrace error: no debug info is available ({}): {}",
                                 errnum,
                                 msg);
             },
-            this);
+            state);
+        g_backtrace_state.Store(state, StoreMemoryOrder::Release);
+    });
+
+    auto state = g_backtrace_state.Load(LoadMemoryOrder::Acquire);
+    if (state->failed_init_error) {
+        LogDebug(k_global_log_module, "Failed to initialise backtrace state: {}", *state->failed_init_error);
+        return *state->failed_init_error;
     }
-
-    static BacktraceState& Instance() {
-        static BacktraceState instance;
-        return instance;
-    }
-
-    Optional<DynamicArrayBounded<char, 256>> failed_init_error;
-    backtrace_state* state = nullptr;
-};
-
-Optional<String> InitStacktraceState() {
-    auto const opt_err = BacktraceState::Instance().failed_init_error;
-    if (opt_err) return *opt_err;
     return k_nullopt;
 }
 
-Optional<StacktraceStack> CurrentStacktrace(int skip_frames) {
-    auto& state = BacktraceState::Instance();
+void ShutdownStacktraceState() {
+    CountedDeinit(g_init, [] {
+        auto state = g_backtrace_state.Exchange(nullptr, RmwMemoryOrder::AcquireRelease);
+        state->~BacktraceState();
+    });
+}
 
-    if (state.failed_init_error) return k_nullopt;
+Optional<StacktraceStack> CurrentStacktrace(int skip_frames) {
+    auto state = g_backtrace_state.Load(LoadMemoryOrder::Acquire);
+
+    if (!state || state->failed_init_error) return k_nullopt;
 
     StacktraceStack result;
     backtrace_simple(
-        state.state,
+        state->state,
         skip_frames,
         [](void* data, uintptr_t pc) -> int {
             auto& result = *(StacktraceStack*)data;
@@ -419,12 +452,14 @@ static void HandleStacktraceError(void* data, char const* message, [[maybe_unuse
 }
 
 ErrorCodeOr<void> WriteStacktrace(StacktraceStack const& stack, Writer writer, StacktraceOptions options) {
-    auto& state = BacktraceState::Instance();
-    if (state.failed_init_error) return fmt::FormatToWriter(writer, "{}", *state.failed_init_error);
+    auto state = g_backtrace_state.Load(LoadMemoryOrder::Acquire);
+    if (!state) return ErrorCode {StacktraceError::NotInitialised};
+
+    if (state->failed_init_error) return fmt::FormatToWriter(writer, "{}", *state->failed_init_error);
 
     StacktraceContext ctx {.options = options, .writer = writer};
     for (auto const pc : stack) {
-        backtrace_pcinfo(state.state, pc, HandleStacktraceLine, HandleStacktraceError, &ctx);
+        backtrace_pcinfo(state->state, pc, HandleStacktraceLine, HandleStacktraceError, &ctx);
         if (ctx.return_value.HasError()) return ctx.return_value;
     }
 
@@ -432,22 +467,24 @@ ErrorCodeOr<void> WriteStacktrace(StacktraceStack const& stack, Writer writer, S
 }
 
 ErrorCodeOr<void> WriteCurrentStacktrace(Writer writer, StacktraceOptions options, int skip_frames) {
-    auto& state = BacktraceState::Instance();
-    if (state.failed_init_error) return fmt::FormatToWriter(writer, "{}", *state.failed_init_error);
+    auto state = g_backtrace_state.Load(LoadMemoryOrder::Acquire);
+    if (!state) return ErrorCode {StacktraceError::NotInitialised};
+    if (state->failed_init_error) return fmt::FormatToWriter(writer, "{}", *state->failed_init_error);
 
     StacktraceContext ctx {.options = options, .writer = writer};
-    backtrace_full(state.state, skip_frames, HandleStacktraceLine, HandleStacktraceError, &ctx);
+    backtrace_full(state->state, skip_frames, HandleStacktraceLine, HandleStacktraceError, &ctx);
     return ctx.return_value;
 }
 
 MutableString StacktraceString(StacktraceStack const& stack, Allocator& a, StacktraceOptions options) {
-    auto& state = BacktraceState::Instance();
-    if (state.failed_init_error) return a.Clone(*state.failed_init_error);
+    auto state = g_backtrace_state.Load(LoadMemoryOrder::Acquire);
+    if (!state) return a.Clone("Stacktrace error: not initialised"_s);
+    if (state->failed_init_error) return a.Clone(*state->failed_init_error);
 
     DynamicArray<char> result {a};
     StacktraceContext ctx {.options = options, .writer = dyn::WriterFor(result)};
     for (auto const pc : stack)
-        backtrace_pcinfo(state.state, pc, HandleStacktraceLine, HandleStacktraceError, &ctx);
+        backtrace_pcinfo(state->state, pc, HandleStacktraceLine, HandleStacktraceError, &ctx);
 
     return result.ToOwnedSpan();
 }
@@ -461,8 +498,8 @@ MutableString CurrentStacktraceString(Allocator& a, StacktraceOptions options, i
 void StacktraceToCallback(StacktraceStack const& stack,
                           FunctionRef<void(FrameInfo const&)> callback,
                           StacktraceOptions options) {
-    auto& state = BacktraceState::Instance();
-    if (state.failed_init_error) return;
+    auto state = g_backtrace_state.Load(LoadMemoryOrder::Acquire);
+    if (!state || state->failed_init_error) return;
 
     using CallbackType = decltype(callback);
 
@@ -474,7 +511,7 @@ void StacktraceToCallback(StacktraceStack const& stack,
 
     for (auto const pc : stack)
         backtrace_pcinfo(
-            state.state,
+            state->state,
             pc,
             [](void* data,
                [[maybe_unused]] uintptr_t program_counter,

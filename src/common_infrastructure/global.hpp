@@ -93,6 +93,11 @@ PUBLIC void GlobalInit(GlobalInitOptions options) {
         }
     });
 
+    if (auto const err = InitStacktraceState())
+        ReportError(sentry::Error::Level::Warning, "Failed to initialize stacktrace state: {}", *err);
+
+    InitLogger();
+
     InitLogFolderIfNeeded();
 
     detail::StartupTracy();
@@ -137,9 +142,6 @@ PUBLIC void GlobalInit(GlobalInitOptions options) {
     });
 
     if (options.init_error_reporting) InitBackgroundErrorReporting({});
-
-    if (auto const err = InitStacktraceState())
-        ReportError(sentry::Error::Level::Warning, "Failed to initialize stacktrace state: {}", *err);
 }
 
 struct GlobalShutdownOptions {
@@ -155,4 +157,8 @@ PUBLIC void GlobalDeinit(GlobalShutdownOptions options) {
     EndCrashDetection(); // before tracy
 
     detail::ShutdownTracy();
+
+    ShutdownLogger();
+
+    ShutdownStacktraceState();
 }

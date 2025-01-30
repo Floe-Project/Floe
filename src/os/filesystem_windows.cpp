@@ -400,20 +400,12 @@ static ErrorCodeOr<DynamicArray<wchar_t>> Win32GetRunningProgramName(Allocator& 
     return result;
 }
 
-ErrorCodeOr<MutableString> CurrentExecutablePath(Allocator& a) {
+ErrorCodeOr<MutableString> CurrentBinaryPath(Allocator& a) {
     PathArena temp_path_arena {Malloc::Instance()};
     auto const full_wide_path = TRY(Win32GetRunningProgramName(temp_path_arena));
     auto const result = Narrow(a, full_wide_path).Value();
     ASSERT(IsValidUtf8(result));
     return result;
-}
-
-ErrorCodeOr<DynamicArrayBounded<char, 200>> NameOfRunningExecutableOrLibrary() {
-    PathArena temp_path_arena {Malloc::Instance()};
-    auto const full_wide_path = TRY(Win32GetRunningProgramName(temp_path_arena));
-    auto full_path = Narrow(temp_path_arena, full_wide_path).Value();
-    ASSERT(IsValidUtf8(full_path));
-    return String {path::Filename(full_path)};
 }
 
 static ErrorCodeOr<WString> VolumeName(const WCHAR* path, ArenaAllocator& arena) {

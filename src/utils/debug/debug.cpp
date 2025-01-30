@@ -329,30 +329,47 @@ __attribute__((visibility("hidden"))) alignas(BacktraceState) static u8
     g_backtrace_state_storage[sizeof(BacktraceState)] {};
 __attribute__((visibility("hidden"))) static Atomic<BacktraceState*> g_backtrace_state {};
 __attribute__((visibility("hidden"))) static CountedInitFlag g_init {};
+__attribute__((
+    visibility("hidden"))) static MutableString g_current_binary_path {}; // includes null terminator
 
-Optional<String> InitStacktraceState() {
+static Allocator& StateAllocator() { return PageAllocator::Instance(); }
+
+Optional<String> InitStacktraceState(Optional<String> current_binary_path) {
     LogDebug(k_global_log_module, "Initialising backtrace state");
-    CountedInit(g_init, [] {
-        auto const o = CurrentExecutablePath(PageAllocator::Instance());
-        if (o.HasError()) {
-            auto state = PLACEMENT_NEW(g_backtrace_state_storage) BacktraceState;
-            state->failed_init_error.Emplace();
-            fmt::Assign(*state->failed_init_error,
-                        "Stacktrace error: failed to get executable path: {}",
-                        o.Error());
-            g_backtrace_state.Store(state, StoreMemoryOrder::Release);
-            return;
+    CountedInit(g_init, [current_binary_path] {
+        if (current_binary_path) {
+            ASSERT(current_binary_path->size);
+            ASSERT(path::IsAbsolute(*current_binary_path));
+            ASSERT(IsValidUtf8(*current_binary_path));
+            g_current_binary_path =
+                StateAllocator().AllocateExactSizeUninitialised<char>(current_binary_path->size + 1);
+            usize pos = 0;
+            WriteAndIncrement(pos, g_current_binary_path, *current_binary_path);
+            WriteAndIncrement(pos, g_current_binary_path, '\0');
+        } else {
+            auto const o = CurrentBinaryPath(StateAllocator());
+            if (o.HasError()) {
+                auto state = PLACEMENT_NEW(g_backtrace_state_storage) BacktraceState;
+                state->failed_init_error.Emplace();
+                fmt::Assign(*state->failed_init_error,
+                            "Stacktrace error: failed to get executable path: {}",
+                            o.Error());
+                g_backtrace_state.Store(state, StoreMemoryOrder::Release);
+                return;
+            }
+            g_current_binary_path = o.Value();
+            auto p = DynamicArray<char>::FromOwnedSpan(g_current_binary_path, StateAllocator());
+            dyn::Append(p, '\0');
+            g_current_binary_path = p.ToOwnedSpan();
         }
 
-        auto p = DynamicArray<char>::FromOwnedSpan(o.Value(), PageAllocator::Instance());
-        dyn::Append(p, '\0');
-        auto executable_path = p.ToOwnedSpan();
-
-        LogDebug(k_global_log_module, "Initialising backtrace state for executable: {}", executable_path);
+        LogDebug(k_global_log_module,
+                 "Initialising backtrace state for executable: {}",
+                 g_current_binary_path);
 
         auto state = PLACEMENT_NEW(g_backtrace_state_storage) BacktraceState;
         state->state = backtrace_create_state(
-            executable_path.data, // filename must be a permanent, null-terminated buffer
+            g_current_binary_path.data, // filename must be a permanent, null-terminated buffer
             1,
             [](void* user_data, char const* msg, int errnum) {
                 auto& self = *(BacktraceState*)user_data;
@@ -379,8 +396,10 @@ Optional<String> InitStacktraceState() {
 
 void ShutdownStacktraceState() {
     CountedDeinit(g_init, [] {
-        auto state = g_backtrace_state.Exchange(nullptr, RmwMemoryOrder::AcquireRelease);
-        state->~BacktraceState();
+        if (auto state = g_backtrace_state.Exchange(nullptr, RmwMemoryOrder::AcquireRelease)) {
+            StateAllocator().Free(g_current_binary_path.ToByteSpan());
+            state->~BacktraceState();
+        }
     });
 }
 

@@ -42,7 +42,7 @@ String TempFilename(Tester& tester) {
 }
 
 static Optional<String> SearchUpwardsFromExeForFolder(Tester& tester, String folder_name) {
-    auto const path_outcome = CurrentExecutablePath(tester.scratch_arena);
+    auto const path_outcome = CurrentBinaryPath(tester.scratch_arena);
     if (path_outcome.HasError()) {
         tester.log.Error("failed to get the current exe path: {}", path_outcome.Error());
         return k_nullopt;

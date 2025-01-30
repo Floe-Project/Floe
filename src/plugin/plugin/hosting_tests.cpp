@@ -531,7 +531,8 @@ TEST_CASE(TestHostingClap) {
     struct Fixture {
         [[maybe_unused]] Fixture(tests::Tester&) {}
         [[maybe_unused]] ~Fixture() {}
-        DynamicArrayBounded<char, path::k_max> clap_path {};
+        DynamicArrayBounded<char, path::k_max> clap_binary_path {};
+        DynamicArrayBounded<char, path::k_max> clap_dso_or_bundle_path {}; // null terminated
         bool initialised = false;
         Optional<LibraryHandle> handle = {}; // there is no need to unload the library
     };
@@ -540,35 +541,37 @@ TEST_CASE(TestHostingClap) {
 
     if (!fixture.initialised) {
         fixture.initialised = true;
-        auto const exe_path = TRY(CurrentExecutablePath(tester.scratch_arena));
-        String dir = exe_path;
+        auto const exe_path = TRY(CurrentBinaryPath(tester.scratch_arena));
 
+        String dir = exe_path;
         for (auto _ : Range(6)) {
             auto p = path::Directory(dir);
             if (!p) break;
             dir = *p;
 
-            dyn::Assign(fixture.clap_path, dir);
-            path::JoinAppend(fixture.clap_path, "Floe.clap"_s);
-            if (auto const o = GetFileType(fixture.clap_path); o.HasValue()) {
-                if constexpr (IS_MACOS) path::JoinAppend(fixture.clap_path, "Contents/MacOS/Floe"_s);
+            dyn::Assign(fixture.clap_binary_path, dir);
+            path::JoinAppend(fixture.clap_binary_path, "Floe.clap"_s);
+            if (auto const o = GetFileType(fixture.clap_binary_path); o.HasValue()) {
+                fixture.clap_dso_or_bundle_path = fixture.clap_binary_path;
+                dyn::Append(fixture.clap_dso_or_bundle_path, '\0');
+                if constexpr (IS_MACOS) path::JoinAppend(fixture.clap_binary_path, "Contents/MacOS/Floe"_s);
                 break;
             } else
-                dyn::Clear(fixture.clap_path);
+                dyn::Clear(fixture.clap_binary_path);
         }
 
-        if (!fixture.clap_path.size) {
+        if (!fixture.clap_binary_path.size) {
             LOG_WARNING("Failed to find Floe.clap");
             return k_success;
         }
 
-        fixture.handle = TRY(LoadLibrary(fixture.clap_path));
+        fixture.handle = TRY(LoadLibrary(fixture.clap_binary_path));
     }
 
     auto const entry = (clap_plugin_entry const*)TRY(SymbolFromLibrary(*fixture.handle, "clap_entry"));
     REQUIRE(entry != nullptr);
 
-    CHECK(entry->init("plugin-path"));
+    CHECK(entry->init(fixture.clap_dso_or_bundle_path.data));
     DEFER { entry->deinit(); };
 
     SUBCASE("double init") { CHECK(entry->init("plugin-path")); }

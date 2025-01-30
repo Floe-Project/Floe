@@ -26,12 +26,6 @@
 
 #include "filesystem.hpp"
 
-__attribute__((visibility("default")))
-@interface MAKE_UNIQUE_OBJC_NAME(ClassForGettingBundle) : NSObject {}
-@end
-@implementation MAKE_UNIQUE_OBJC_NAME (ClassForGettingBundle)
-@end
-
 static ErrorCode FilesystemErrorFromNSError(NSError* error,
                                             char const* extra_debug_info = nullptr,
                                             SourceLocation loc = SourceLocation::Current()) {
@@ -374,43 +368,6 @@ MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirecto
     }
 
     return path;
-}
-
-ErrorCodeOr<MutableString> CurrentExecutablePath(Allocator& a) {
-    u32 size = 0;
-    constexpr int k_buffer_not_large_enough = -1;
-    char unused_buffer[1];
-    errno = 0;
-    if (_NSGetExecutablePath(unused_buffer, &size) == k_buffer_not_large_enough) {
-        auto result = a.AllocateExactSizeUninitialised<char>(size);
-        errno = 0;
-        if (_NSGetExecutablePath(result.data, &size) == 0)
-            return result;
-        else
-            a.Free(result.ToByteSpan());
-    }
-    if (errno != 0) return FilesystemErrnoErrorCode(errno);
-    PanicIfReached();
-    return MutableString {};
-}
-
-ErrorCodeOr<DynamicArrayBounded<char, 200>> NameOfRunningExecutableOrLibrary() {
-    if (NSBundle* bundle = [NSBundle bundleForClass:[MAKE_UNIQUE_OBJC_NAME(ClassForGettingBundle) class]])
-        return path::Filename(NSStringToString(bundle.bundlePath));
-
-    u32 size = 0;
-    constexpr int k_buffer_not_large_enough = -1;
-    char unused_buffer[1];
-    errno = 0;
-    if (_NSGetExecutablePath(unused_buffer, &size) == k_buffer_not_large_enough) {
-        DynamicArrayBounded<char, 200> result;
-        dyn::Resize(result, size);
-        errno = 0;
-        if (_NSGetExecutablePath(result.data, &size) == 0) return result;
-    }
-    if (errno != 0) return FilesystemErrnoErrorCode(errno);
-    PanicIfReached();
-    return ""_s;
 }
 
 Optional<Version> MacosBundleVersion(String path) {

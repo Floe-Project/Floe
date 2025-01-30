@@ -6,6 +6,7 @@
 #include "error_reporting.hpp"
 
 struct GlobalInitOptions {
+    Optional<String> current_binary_path {};
     bool init_error_reporting = false;
     bool set_main_thread = false;
 };
@@ -93,7 +94,7 @@ PUBLIC void GlobalInit(GlobalInitOptions options) {
         }
     });
 
-    if (auto const err = InitStacktraceState())
+    if (auto const err = InitStacktraceState(options.current_binary_path))
         ReportError(sentry::Error::Level::Warning, "Failed to initialize stacktrace state: {}", *err);
 
     InitLogger();

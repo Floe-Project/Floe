@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <dirent.h>
+#include <dlfcn.h>
 #include <errno.h>
 #include <limits.h>
 #include <stdio.h>
@@ -259,4 +260,12 @@ ErrorCodeOr<File> OpenFile(String filename, FileMode mode) {
     }
 
     return File(fd);
+}
+
+static void volatile* __attribute__((visibility("hidden"))) g_this_binary_symbol = nullptr;
+
+ErrorCodeOr<MutableString> CurrentBinaryPath(Allocator& a) {
+    Dl_info info;
+    if (dladdr(&g_this_binary_symbol, &info) == 0) return FilesystemErrnoErrorCode(errno, "dladdr");
+    return a.Clone(FromNullTerminated(info.dli_fname));
 }

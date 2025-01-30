@@ -334,15 +334,6 @@ MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirecto
     return result;
 }
 
-ErrorCodeOr<DynamicArrayBounded<char, 200>> NameOfRunningExecutableOrLibrary() { return "unknown"_s; }
-
-ErrorCodeOr<MutableString> CurrentExecutablePath(Allocator& a) {
-    char buffer[8000];
-    auto const size = readlink("/proc/self/exe", buffer, ArraySize(buffer));
-    if (size == -1) return FilesystemErrnoErrorCode(errno, "readlink");
-    return a.Clone(MutableString {buffer, (usize)size});
-}
-
 struct LinuxWatchedDirectory {
     struct SubDir {
         int watch_id;

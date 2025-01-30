@@ -360,8 +360,8 @@ ErrorCodeOr<MutableString> CanonicalizePath(Allocator& a, String path);
 
 Optional<Version> MacosBundleVersion(String path);
 
-ErrorCodeOr<DynamicArrayBounded<char, 200>> NameOfRunningExecutableOrLibrary();
-ErrorCodeOr<MutableString> CurrentExecutablePath(Allocator& a);
+// Path to the currently running executable or shared library
+ErrorCodeOr<MutableString> CurrentBinaryPath(Allocator& a);
 
 Optional<String> SearchForExistingFolderUpwards(String dir, String folder_name_to_find, Allocator& allocator);
 

@@ -279,41 +279,43 @@ ErrorCodeOr<MutableString> CurrentBinaryPath(Allocator& a) {
             result = a.Clone(fname);
         } else {
             // read /proc/self/maps to find the full path
-            auto const fd = open("/proc/self/maps", O_RDONLY);
-            if (fd == -1) return FilesystemErrnoErrorCode(errno, "open");
-            DEFER { close(fd); };
-
-            DynamicArray<char> file_data {PageAllocator::Instance()};
-            Array<char, Kb(4)> buffer {};
-            while (true) {
-                auto const num_read = read(fd, buffer.data, buffer.size);
-                if (num_read == -1) return FilesystemErrnoErrorCode(errno, "read");
-                if (num_read == 0) break;
-                dyn::AppendSpan(file_data, buffer.Items().SubSpan(0, (usize)num_read));
-
-                ASSERT(file_data.size < Mb(100));
-            }
-
-            usize line_index = 0;
-            for (auto const line : SplitIterator {file_data, '\n'}) {
-                // lines look like this:
-                // 7f6bbc12e000-7f6bbc2bf000 r-xp 00000000 08:02 135522  /usr/lib64/libglib-2.0.so.0.4400.1
-                usize word_index = 0;
-                for (auto const word : SplitIterator {line, ' ', true}) {
-                    if (word_index++ == 5) {
-                        auto const path = word;
-                        if (path::IsAbsolute(path)) {
-                            if (path::Equal(path::Filename(path), fname)) {
-                                result = a.Clone(path);
-                                break;
-                            }
-                        }
-                    }
-                    ASSERT(word_index < 100);
+            Array<char, Kb(32)> buffer {};
+            auto size = readlink("/proc/self/maps", buffer.data, buffer.size);
+            if (size != -1) {
+                if (size == buffer.size) {
+                    // truncated, we can't know if the path will be correct
+                    return ErrorCode {FilesystemError::PathDoesNotExist};
                 }
 
-                ++line_index;
-                ASSERT(line_index < 20000);
+                usize line_index = 0;
+                for (auto const line : SplitIterator {String {buffer.data, (usize)size}, '\n'}) {
+                    // lines look like this:
+                    // 7f6bbc12e000-7f6bbc2bf000 r-xp 00000000 08:02 135522 /usr/lib64/libglib-2.0.so.0.4400.1
+                    usize word_index = 0;
+                    for (auto const word : SplitIterator {line, ' ', true}) {
+                        if (word_index++ == 5) {
+                            auto const path = word;
+                            if (path::IsAbsolute(path)) {
+                                if (path::Equal(path::Filename(path), fname)) {
+                                    result = a.Clone(path);
+                                    break;
+                                }
+                            }
+                        }
+                        ASSERT(word_index < 100);
+                    }
+
+                    ++line_index;
+                    ASSERT(line_index < 20000);
+                }
+            } else {
+                size = readlink("/proc/self/exe", buffer.data, buffer.size);
+                if (size == -1) return FilesystemErrnoErrorCode(errno, "readlink");
+                if (size == buffer.size) {
+                    // truncated, we can't know if the path will be correct
+                    return ErrorCode {FilesystemError::PathDoesNotExist};
+                }
+                result = a.Clone(String {buffer.data, (usize)size});
             }
 
             if (result.size == 0) return ErrorCode {FilesystemError::PathDoesNotExist};

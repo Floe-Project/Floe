@@ -397,7 +397,7 @@ Optional<String> InitStacktraceState(Optional<String> current_binary_path) {
 void ShutdownStacktraceState() {
     CountedDeinit(g_init, [] {
         if (auto state = g_backtrace_state.Exchange(nullptr, RmwMemoryOrder::AcquireRelease)) {
-            StateAllocator().Free(g_current_binary_path.ToByteSpan());
+            if (g_current_binary_path.size) StateAllocator().Free(g_current_binary_path.ToByteSpan());
             state->~BacktraceState();
         }
     });

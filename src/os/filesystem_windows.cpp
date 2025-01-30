@@ -941,8 +941,8 @@ ErrorCodeOr<void> Rename(String from, String to) {
 
     auto to_wide = TRY(path::MakePathForWin32(to, temp_path_arena, true)).path;
 
-    // Only succeeds if the destination is an empty directory. We do this to make Rename consistent across
-    // Windows and POSIX rename().
+    // MoveFileExW for directories only succeeds if the destination is an empty directory. Do to make
+    // Rename consistent across Windows and POSIX rename() we try to delete the empty dir first.
     RemoveDirectoryW(to_wide.data);
 
     if (!MoveFileExW(TRY(path::MakePathForWin32(from, temp_path_arena, true)).path.data,

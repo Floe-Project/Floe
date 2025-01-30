@@ -267,5 +267,60 @@ static void volatile* __attribute__((visibility("hidden"))) g_this_binary_symbol
 ErrorCodeOr<MutableString> CurrentBinaryPath(Allocator& a) {
     Dl_info info;
     if (dladdr(&g_this_binary_symbol, &info) == 0) return FilesystemErrnoErrorCode(errno, "dladdr");
-    return a.Clone(FromNullTerminated(info.dli_fname));
+    auto const fname = FromNullTerminated(info.dli_fname);
+
+    MutableString result {};
+    if constexpr (IS_MACOS) {
+        // macOS seems to always return full paths
+        result = a.Clone(fname);
+    } else {
+        // on Linux, we might not have full paths
+        if (path::IsAbsolute(fname)) {
+            result = a.Clone(fname);
+        } else {
+            // read /proc/self/maps to find the full path
+            auto const fd = open("/proc/self/maps", O_RDONLY);
+            if (fd == -1) return FilesystemErrnoErrorCode(errno, "open");
+            DEFER { close(fd); };
+
+            DynamicArray<char> file_data {PageAllocator::Instance()};
+            Array<char, Kb(4)> buffer {};
+            while (true) {
+                auto const num_read = read(fd, buffer.data, buffer.size);
+                if (num_read == -1) return FilesystemErrnoErrorCode(errno, "read");
+                if (num_read == 0) break;
+                dyn::AppendSpan(file_data, buffer.Items().SubSpan(0, (usize)num_read));
+
+                ASSERT(file_data.size < Mb(100));
+            }
+
+            usize line_index = 0;
+            for (auto const line : SplitIterator {file_data, '\n'}) {
+                // lines look like this:
+                // 7f6bbc12e000-7f6bbc2bf000 r-xp 00000000 08:02 135522  /usr/lib64/libglib-2.0.so.0.4400.1
+                usize word_index = 0;
+                for (auto const word : SplitIterator {line, ' ', true}) {
+                    if (word_index++ == 5) {
+                        auto const path = word;
+                        if (path::IsAbsolute(path)) {
+                            if (path::Equal(path::Filename(path), fname)) {
+                                result = a.Clone(path);
+                                break;
+                            }
+                        }
+                    }
+                    ASSERT(word_index < 100);
+                }
+
+                ++line_index;
+                ASSERT(line_index < 20000);
+            }
+
+            if (result.size == 0) return ErrorCode {FilesystemError::PathDoesNotExist};
+        }
+    }
+
+    ASSERT(path::IsAbsolute(result));
+    ASSERT(IsValidUtf8(result));
+    return result;
 }

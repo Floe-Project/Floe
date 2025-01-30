@@ -310,6 +310,7 @@ _print-ci-summary num_tasks num_failed:
 [windows, linux]
 test-ci-windows:
   #!/usr/bin/env bash
+  set -x
 
   num_tasks=0
   num_failed=0
@@ -340,7 +341,7 @@ test-ci-windows:
   # test test-windows-vst3-val # TODO: re-enable when wrappers are supported
   test test-windows-clap-val
 
-  if [[ ! -v GITHUB_ACTIONS ]]; then
+  if [[ ! -v $GITHUB_ACTIONS ]]; then
     cat {{cache_dir}}/test_ci_windows_summary.md
   fi
 

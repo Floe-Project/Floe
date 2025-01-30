@@ -17,7 +17,8 @@
             "runInTerminal": true,
             "program": "tests",
             "args": [
-                "--log-level=debug"
+                "--log-level=debug",
+                "--filter=*"
             ]
         },
         {

@@ -175,6 +175,7 @@ test-vst3-val build="": (_build_if_requested build "native")
 
 _download-and-unzip-to-cache-dir url:
   #!/usr/bin/env bash
+  set -euxo pipefail
   mkdir -p {{cache_dir}}
   pushd {{cache_dir}}
   curl -O -L {{url}} 
@@ -185,15 +186,18 @@ _download-and-unzip-to-cache-dir url:
 
 [linux, windows]
 test-windows-units:
+  set -x
   {{run_windows_program}} zig-out/x86_64-windows/tests.exe --log-level=debug
 
 [linux, windows]
 test-windows-vst3-val:
+  set -x
   {{run_windows_program}} zig-out/x86_64-windows/VST3-Validator.exe zig-out/x86_64-windows/Floe.vst3
 
 [linux, windows]
 test-windows-pluginval:
   #!/usr/bin/env bash
+  set -x
   exe="{{cache_dir}}/pluginval.exe"
   if [[ ! -f "$exe" ]]; then
     just _download-and-unzip-to-cache-dir "https://github.com/Tracktion/pluginval/releases/download/v1.0.3/pluginval_Windows.zip"
@@ -204,6 +208,7 @@ test-windows-pluginval:
 [linux, windows]
 test-windows-clap-val:
   #!/usr/bin/env bash
+  set -x
   exe="{{cache_dir}}/clap-validator.exe"
   if [[ ! -f "$exe" ]]; then
     just _download-and-unzip-to-cache-dir  "https://github.com/free-audio/clap-validator/releases/download/0.3.2/clap-validator-0.3.2-windows.zip"
@@ -213,6 +218,7 @@ test-windows-clap-val:
 
 [linux]
 coverage build="": (_build_if_requested build "native")
+  set -x
   mkdir -p {{cache_dir}}
   # IMPROVE: run other tests with coverage and --merge the results
   kcov --include-pattern={{justfile_directory()}}/src {{cache_dir}}/coverage-out {{native_binary_dir}}/tests

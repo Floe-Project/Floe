@@ -28,8 +28,8 @@
             .hash = "1220daa13e5e160cc3e8d286843749f292dbe31ae7700df3584a7b1ce32da7dcb296",
         },
         .clap = .{
-            .url = "https://github.com/free-audio/clap/archive/refs/tags/1.2.1.tar.gz",
-            .hash = "1220acf6dc2f181a8aa57099dfe0ed8cbc9d726fb38e61db6b1e9d9d945f6fffb689",
+            .url = "https://github.com/free-audio/clap/archive/refs/tags/1.2.3.tar.gz",
+            .hash = "1220c6534f5ec8d81d53df7f4e2c6e4274ba13b74bab56d296f34085e23fd7d243ba",
         },
         .clap_wrapper = .{
             .url = "git+https://github.com/free-audio/clap-wrapper#705df2703fbb991b3609e1a5c91d92a5c2213925",

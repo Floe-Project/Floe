@@ -214,7 +214,7 @@ test-windows-clap-val:
     just _download-and-unzip-to-cache-dir  "https://github.com/free-audio/clap-validator/releases/download/0.3.2/clap-validator-0.3.2-windows.zip"
     chmod +x "$exe"
   fi
-  {{run_windows_program}} "$exe" validate zig-out/x86_64-windows/Floe.clap
+  timeout 5 {{run_windows_program}} "$exe" validate zig-out/x86_64-windows/Floe.clap
 
 [linux]
 coverage build="": (_build_if_requested build "native")

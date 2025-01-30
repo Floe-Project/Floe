@@ -66,8 +66,8 @@ struct ChecksumFileParser {
     }
 
     ErrorCodeOr<Optional<ChecksumLine>> ReadLine() {
-        while (cursor) {
-            auto line = SplitWithIterator(file_data, cursor, '\n');
+        while (auto opt_line = SplitWithIterator(file_data, cursor, '\n')) {
+            auto line = *opt_line;
 
             if (line.size == 0) continue;
             if (StartsWith(line, ';')) continue;
@@ -96,7 +96,7 @@ struct ChecksumFileParser {
     }
 
     String const file_data;
-    Optional<usize> cursor = 0uz;
+    usize cursor = 0uz;
 };
 
 PUBLIC u32 Crc32(Span<u8 const> data) {

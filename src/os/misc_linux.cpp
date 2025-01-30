@@ -15,7 +15,7 @@ bool FillDistributionInfo(OsInfo& info, String filename) {
     auto const file_data = TRY_OR(ReadEntireFile(filename, PageAllocator::Instance()), return false);
     DEFER { PageAllocator::Instance().Free(file_data.ToByteSpan()); };
 
-    for (auto const line : StringSplitIterator {file_data, '\n'}) {
+    for (auto const line : SplitIterator {file_data, '\n'}) {
         auto const equals_pos = Find(line, '=');
         if (!equals_pos) continue;
 
@@ -81,7 +81,7 @@ bool FillCpuInfo(SystemStats& stats, char const* filename) {
     if (num_read == -1) return false;
     file_data.size = (usize)num_read;
 
-    for (auto const line : StringSplitIterator {file_data, '\n'}) {
+    for (auto const line : SplitIterator {file_data, '\n'}) {
         auto const colon_pos = Find(line, ':');
         if (!colon_pos) continue;
 

@@ -284,10 +284,7 @@ static void
 Parse(Settings& content, ArenaAllocator& content_allocator, ArenaAllocator& scratch_arena, String file_data) {
     DynamicArray<String> unknown_lines {scratch_arena};
 
-    Optional<usize> cursor = 0uz;
-    while (cursor) {
-        auto const line = SplitWithIterator(file_data, cursor, '\n');
-        if (line.size == 0) continue;
+    for (auto const line : SplitIterator {.whole = file_data, .token = '\n', .skip_consecutive = true}) {
         if (StartsWith(line, ';')) continue;
 
         {
@@ -301,9 +298,7 @@ Parse(Settings& content, ArenaAllocator& content_allocator, ArenaAllocator& scra
                             auto const id_strs = value.SubSpan(equal_pos.Value() + 1);
                             if (id_strs.size) {
                                 DynamicArray<u32> const ids {scratch_arena};
-                                Optional<usize> ids_str_cursor = 0uz;
-                                while (ids_str_cursor) {
-                                    auto const item = SplitWithIterator(id_strs, ids_str_cursor, ',');
+                                for (auto const item : SplitIterator {.whole = id_strs, .token = ','}) {
                                     if (auto id_result = ParseInt(item, ParseIntBase::Decimal);
                                         id_result.HasValue()) {
                                         midi_settings::AddPersistentCcToParamMapping(content.midi,

@@ -44,7 +44,7 @@ static void ExpandIdentifiersBasedOnLuaSections(DynamicArray<char>& markdown_blo
     char const* section_end {};
     constexpr String k_anchor_prefix = "-- SECTION: ";
     constexpr String k_anchor_end_prefix = "-- SECTION_END: ";
-    for (auto const line : StringSplitIterator {lua, '\n'}) {
+    for (auto const line : SplitIterator {lua, '\n'}) {
         if (StartsWithSpan(WhitespaceStrippedStart(line), k_anchor_prefix)) {
             current_section_name = line.SubSpan(k_anchor_prefix.size);
             section_start = End(line) + 1;

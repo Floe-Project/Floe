@@ -60,7 +60,7 @@ ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments args) {
             output.RemoveSuffix(1);
 
         DynamicArray<MutableString> result {args.allocator};
-        for (auto part : StringSplitIterator {output, '|'})
+        for (auto part : SplitIterator {output, '|'})
             if (path::IsAbsolute(part)) dyn::Append(result, result.allocator.Clone(part));
         return result.ToOwnedSpan();
     } else {
@@ -179,18 +179,14 @@ ErrorCodeOr<void> CreateDirectory(String path, CreateDirectoryOptions options) {
         if (errno == EEXIST && !options.fail_if_exists) return k_success;
         if (errno == ENOENT && options.create_intermediate_directories) {
             dyn::Clear(buffer);
-            Optional<usize> cursor = 0u;
-            while (cursor) {
-                auto part = SplitWithIterator(path, cursor, '/');
-                if (part.size) {
-                    dyn::Append(buffer, '/');
-                    dyn::AppendSpan(buffer, part);
-                    if (mkdir(dyn::NullTerminated(buffer), 0700) != 0) {
-                        if (errno == EEXIST)
-                            continue;
-                        else
-                            return FilesystemErrnoErrorCode(errno);
-                    }
+            for (auto const part : SplitIterator {path, '/'}) {
+                dyn::Append(buffer, '/');
+                dyn::AppendSpan(buffer, part);
+                if (mkdir(dyn::NullTerminated(buffer), 0700) != 0) {
+                    if (errno == EEXIST)
+                        continue;
+                    else
+                        return FilesystemErrnoErrorCode(errno);
                 }
             }
             return k_success;

@@ -149,11 +149,12 @@ static DynamicArray<char> TrimPath(Allocator& a, String path) {
         auto const num_sections_to_remove = num_sections - 2;
         usize section = 0;
 
-        Optional<usize> cursor = 0uz;
+        usize cursor = 0uz;
         auto whole = path;
-        while (cursor && section < num_sections_to_remove) {
+        while (section < num_sections_to_remove) {
             auto item = SplitWithIterator(whole, cursor, '/');
-            path.RemovePrefix(item.size + 1);
+            if (!item) break;
+            path.RemovePrefix(item->size + 1);
             ++section;
         }
 

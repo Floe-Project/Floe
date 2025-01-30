@@ -2330,31 +2330,42 @@ TEST_CASE(TestNullTermStringsEqual) {
 }
 
 TEST_CASE(TestSplitWithIterator) {
-    auto check = [&](String whole, char token, Span<String> expected_parts) {
+    auto check = [&](String whole, char token, Span<String> expected_parts, bool skip_consecutive) {
         CAPTURE(whole);
         CAPTURE(expected_parts);
+        CAPTURE(skip_consecutive);
 
-        Optional<usize> cursor {0uz};
-        usize index = 0;
-        while (cursor) {
-            auto part = SplitWithIterator(whole, cursor, token);
-            REQUIRE(part == expected_parts[index++]);
+        {
+            usize cursor {0uz};
+            usize index = 0;
+            while (auto part = SplitWithIterator(whole, cursor, token, skip_consecutive))
+                CHECK_EQ(*part, expected_parts[index++]);
+            CHECK_EQ(index, expected_parts.size);
         }
 
-        index = 0;
-        for (auto const& part : StringSplitIterator {whole, token}) {
-            CHECK_LT(index, expected_parts.size);
-            CHECK_EQ(part, expected_parts[index]);
-            ++index;
+        {
+            usize index = 0;
+            for (auto const part :
+                 SplitIterator {.whole = whole, .token = token, .skip_consecutive = skip_consecutive}) {
+                CHECK_EQ(part, expected_parts[index++]);
+            }
+            CHECK_EQ(index, expected_parts.size);
         }
-
-        REQUIRE(index == expected_parts.size);
     };
 
-    check("aa\nbb", '\n', ArrayT<String>({"aa", "bb"}));
-    check("aa", '\n', Array {"aa"_s});
-    check("aa\n\nbb", '\n', ArrayT<String>({"aa", "", "bb"}));
-    check("\n\nbb", '\n', ArrayT<String>({"", "", "bb"}));
+    check("aa\nbb", '\n', Array {"aa"_s, "bb"}, false);
+    check("aa", '\n', Array {"aa"_s}, false);
+    check("aa\n\nbb", '\n', Array {"aa"_s, "", "bb"}, false);
+    check("\n\nbb", '\n', Array {""_s, "", "bb"}, false);
+    check("aa\n\n", '\n', Array {"aa"_s, ""}, false);
+    check("\n\n", '\n', Array {""_s, ""}, false);
+
+    check("aa\nbb", '\n', Array {"aa"_s, "bb"}, true);
+    check("aa", '\n', Array {"aa"_s}, true);
+    check("aa\n\nbb", '\n', Array {"aa"_s, "bb"}, true);
+    check("\n\nbb", '\n', Array {"bb"_s}, true);
+    check("aa\n\n", '\n', Array {"aa"_s}, true);
+    check("\n\n", '\n', {}, true);
 
     return k_success;
 }
@@ -2367,7 +2378,7 @@ TEST_CASE(TestSplit) {
         auto split = Split(whole, token, tester.scratch_arena);
         REQUIRE(split.size == expected_parts.size);
         for (auto const i : Range(expected_parts.size))
-            REQUIRE(split[i] == expected_parts[i]);
+            CHECK(split[i] == expected_parts[i]);
     };
     check("aa\nbb", '\n', Array<String, 2> {"aa", "bb"});
     check("aa", '\n', Array<String, 1> {"aa"});

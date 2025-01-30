@@ -287,50 +287,68 @@ PUBLIC constexpr char* InvalidUtf8Position(String string) {
 
 PUBLIC constexpr bool IsValidUtf8(String string) { return InvalidUtf8Position(string) == nullptr; }
 
-PUBLIC constexpr String SplitWithIterator(String whole, Optional<usize>& cursor, char token) {
-    if (!cursor) return {};
-    auto const cursor_val = *cursor;
+PUBLIC constexpr Optional<String>
+SplitWithIterator(String whole, usize& cursor, char token, bool skip_consecutive = false) {
+    if (cursor >= whole.size) return k_nullopt;
 
-    auto pos = Find(whole, token, cursor_val);
-    String result;
-    if (!pos) {
-        result = whole.SubSpan(cursor_val);
-        cursor = {};
-    } else {
-        result = whole.SubSpan(cursor_val, *pos - cursor_val);
-        cursor = *pos + 1;
+    if (skip_consecutive && cursor == 0) {
+        while (cursor < whole.size && whole[cursor] == token)
+            ++cursor;
+        if (cursor == whole.size) return k_nullopt;
     }
+
+    auto const pos = Find(whole, token, cursor);
+    String result;
+
+    if (!pos) {
+        result = whole.SubSpan(cursor);
+        cursor = whole.size;
+    } else {
+        result = whole.SubSpan(cursor, *pos - cursor);
+        cursor = *pos + 1;
+
+        if (skip_consecutive)
+            while (cursor < whole.size && whole[cursor] == token)
+                ++cursor;
+    }
+
     return result;
 }
+
+struct SplitIterator {
+    String whole;
+    char token;
+    bool skip_consecutive;
+    usize cursor {};
+
+    struct Iterator {
+        SplitIterator* self;
+        Optional<String> value;
+
+        String operator*() const {
+            ASSERT(value);
+            return *value;
+        }
+
+        Iterator& operator++() {
+            value = SplitWithIterator(self->whole, self->cursor, self->token, self->skip_consecutive);
+            return *this;
+        }
+
+        bool operator!=(Iterator const& other) const { return value != other.value; }
+    };
+
+    Iterator begin() { return {this, SplitWithIterator(whole, cursor, token, skip_consecutive)}; }
+    Iterator end() { return {this, k_nullopt}; }
+};
 
 PUBLIC DynamicArray<String> Split(String str, char token, Allocator& allocator) {
     DynamicArray<String> result {allocator};
-    Optional<usize> cursor {0uz};
-    while (cursor)
-        dyn::Append(result, SplitWithIterator(str, cursor, token));
+    usize cursor {};
+    while (auto part = SplitWithIterator(str, cursor, token))
+        dyn::Append(result, *part);
     return result;
 }
-
-// for (const auto& part : StringSplitIterator{whole_string, ','}) {
-//     // Use part
-// }
-struct StringSplitIterator {
-    String whole;
-    char token;
-    Optional<usize> cursor {0uz};
-
-    struct Iterator {
-        StringSplitIterator* parent;
-
-        String operator*() const { return SplitWithIterator(parent->whole, parent->cursor, parent->token); }
-
-        Iterator& operator++() { return *this; }
-        bool operator!=(Iterator const&) const { return parent->cursor.HasValue(); }
-    };
-
-    Iterator begin() { return Iterator {this}; }
-    Iterator end() { return Iterator {this}; }
-};
 
 // Supports * and ? wildcards
 // https://research.swtch.com/glob

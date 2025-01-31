@@ -52,8 +52,8 @@
             .hash = "1220967b3455d5b2e950a346dac71225b25dc1e17521dff724a73bff9a819846a056",
         },
         .libbacktrace = .{
-            .url = "git+https://github.com/ianlancetaylor/libbacktrace#7e2b7da3d6568d2e4e78658f22e701746a48d7e1",
-            .hash = "12204b61a699b9cd95aec47d75cb37c363f7cd2a2618eb27c418f72c19766b2ae70c",
+            .url = "git+https://github.com/ianlancetaylor/libbacktrace#78af4ffa26e15532847c1ba854ece7b3bacc6b1a",
+            .hash = "1220d8db736ca961d73f4527d492222668bc6fcc103240fc6999ffc2ce6af2c25fa7",
         },
         .lua = .{
             .url = "https://github.com/lua/lua/archive/refs/tags/v5.4.7.tar.gz",

@@ -200,7 +200,7 @@ class PageAllocator final : public Allocator {
 // If there's a crash something has gone very wrong. We can't do much really other than write to a file
 // since we need to be async-signal-safe. Crashes are different to Panics, panics are controlled failure - we
 // have an opportunity to try and clean up and exit with a bit more grace.
-using CrashHookFunction = void (*)(String message);
+using CrashHookFunction = void (*)(String message, Optional<uintptr> program_counter);
 void BeginCrashDetection(CrashHookFunction);
 void EndCrashDetection();
 

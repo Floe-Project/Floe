@@ -76,8 +76,7 @@ void StacktraceToCallback(StacktraceStack const&,
 ErrorCodeOr<void> PrintCurrentStacktrace(StdStream stream, StacktraceOptions options, int skip_frames);
 ErrorCodeOr<void> WriteStacktrace(StacktraceStack const&, Writer writer, StacktraceOptions options);
 ErrorCodeOr<void> WriteCurrentStacktrace(Writer writer, StacktraceOptions options, int skip_frames);
-
-void DumpInfoAboutUBSan(StdStream stream);
+ErrorCodeOr<void> WriteInfoForProgramCounter(uintptr_t pc, Writer writer, StacktraceOptions options);
 
 struct TracyMessageConfig {
     String category;

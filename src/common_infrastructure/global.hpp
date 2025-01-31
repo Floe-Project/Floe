@@ -97,7 +97,7 @@ PUBLIC void GlobalInit(GlobalInitOptions options) {
     detail::StartupTracy();
 
     // after tracy
-    BeginCrashDetection([](String crash_message) {
+    BeginCrashDetection([](String crash_message, Optional<uintptr> program_counter) {
         // This function is async-signal-safe.
 
         FixedSizeAllocator<4000> allocator {nullptr};
@@ -111,6 +111,14 @@ PUBLIC void GlobalInit(GlobalInitOptions options) {
             auto _ = fmt::FormatToWriter(writer,
                                          "\n" ANSI_COLOUR_SET_FOREGROUND_RED "{}" ANSI_COLOUR_RESET "\n",
                                          message);
+            if (program_counter) {
+                auto _ = WriteInfoForProgramCounter(*program_counter,
+                                                    writer,
+                                                    {
+                                                        .ansi_colours = true,
+                                                        .demangle = false,
+                                                    });
+            }
             if (stacktrace) {
                 auto _ = WriteStacktrace(*stacktrace,
                                          writer,
@@ -132,6 +140,12 @@ PUBLIC void GlobalInit(GlobalInitOptions options) {
 
             sentry::SentryOrFallback sentry {};
             auto _ = sentry::WriteCrashToFile(*sentry, stacktrace, *log_folder, message, allocator);
+            if (program_counter)
+                auto _ = sentry::WriteCrashToFile(*sentry,
+                                                  Array {*program_counter},
+                                                  *log_folder,
+                                                  "At program counter",
+                                                  allocator);
         }
     });
 

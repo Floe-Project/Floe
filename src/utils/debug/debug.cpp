@@ -495,6 +495,16 @@ ErrorCodeOr<void> WriteCurrentStacktrace(Writer writer, StacktraceOptions option
     return ctx.return_value;
 }
 
+ErrorCodeOr<void> WriteInfoForProgramCounter(uintptr_t pc, Writer writer, StacktraceOptions options) {
+    auto state = g_backtrace_state.Load(LoadMemoryOrder::Acquire);
+    if (!state) return ErrorCode {StacktraceError::NotInitialised};
+    if (state->failed_init_error) return fmt::FormatToWriter(writer, "{}", *state->failed_init_error);
+
+    StacktraceContext ctx {.options = options, .writer = writer};
+    backtrace_pcinfo(state->state, pc, HandleStacktraceLine, HandleStacktraceError, &ctx);
+    return ctx.return_value;
+}
+
 MutableString StacktraceString(StacktraceStack const& stack, Allocator& a, StacktraceOptions options) {
     auto state = g_backtrace_state.Load(LoadMemoryOrder::Acquire);
     if (!state) return a.Clone("Stacktrace error: not initialised"_s);

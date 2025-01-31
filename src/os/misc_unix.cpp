@@ -469,7 +469,7 @@ static void SignalHandler(int signal_num, siginfo_t* info, void* context) {
 #endif
         }
 
-        if (auto hook = g_crash_hook.Load(LoadMemoryOrder::Acquire)) hook(signal_description);
+        if (auto hook = g_crash_hook.Load(LoadMemoryOrder::Acquire)) hook(signal_description, k_nullopt);
 
         for (auto [index, s] : Enumerate(k_signals)) {
             if (s == signal_num) {

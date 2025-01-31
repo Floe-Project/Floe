@@ -277,7 +277,12 @@ void BeginCrashDetection(CrashHookFunction hook) {
             // Some exceptions are expected and should be ignored; for example Lua will trigger exceptions.
             if (auto const msg = ExceptionCodeString(exception_info->ExceptionRecord->ExceptionCode);
                 msg.size) {
-                if (g_crash_hook) g_crash_hook(msg);
+
+                auto _ = WriteInfoForProgramCounter(exception_info->ContextRecord->Rip,
+                                                    StdWriter(StdStream::Err),
+                                                    {.demangle = true});
+
+                if (g_crash_hook) g_crash_hook(msg, exception_info->ContextRecord->Rip);
             }
             return EXCEPTION_CONTINUE_SEARCH;
         });

@@ -87,10 +87,11 @@ namespace detail {
 
 // NOTE: in Sentry, releases are created when an Event payload is sent with a release tag for the
 // first time. We use an unchanging release tag for dev builds.
-static constexpr String k_release = PRODUCTION_BUILD ? String {"floe@" FLOE_VERSION_STRING} : "floe@dev";
+static constexpr String k_release = PRODUCTION_BUILD ? String {"floe@" FLOE_VERSION_STRING} : GIT_COMMIT_HASH;
 static constexpr usize k_max_message_length = 8192;
 static constexpr String k_environment = PRODUCTION_BUILD ? "production"_s : "development"_s;
-static constexpr String k_user_agent = PRODUCTION_BUILD ? String {"floe/" FLOE_VERSION_STRING} : "floe/dev";
+static constexpr String k_user_agent =
+    PRODUCTION_BUILD ? String {"floe/" FLOE_VERSION_STRING} : "floe/" GIT_COMMIT_HASH;
 
 constexpr auto k_report_file_extension = "floe-report"_ca;
 

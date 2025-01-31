@@ -8,6 +8,7 @@
 
 namespace sentry {
 
+// A random string that we save to disk to identify if errors occur for multple 'users'.
 static Optional<fmt::UuidArray> DeviceId(Atomic<u64>& seed) {
     PathArena path_arena {PageAllocator::Instance()};
     auto const path = KnownDirectoryWithSubdirectories(path_arena,

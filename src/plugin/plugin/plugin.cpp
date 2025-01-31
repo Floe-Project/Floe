@@ -77,6 +77,9 @@ clap_plugin_state const floe_plugin_state {
         if (PanicOccurred()) return false;
 
         try {
+            ASSERT(plugin);
+            ASSERT(stream);
+
             auto& floe = *(FloePluginInstance*)plugin->plugin_data;
             ZoneScopedMessage(floe.trace_config, "state save");
 
@@ -96,6 +99,9 @@ clap_plugin_state const floe_plugin_state {
         if (PanicOccurred()) return false;
 
         try {
+            ASSERT(plugin);
+            ASSERT(stream);
+
             auto& floe = *(FloePluginInstance*)plugin->plugin_data;
             ZoneScopedMessage(floe.trace_config, "state load");
 
@@ -142,6 +148,8 @@ clap_plugin_gui const floe_gui {
         if (PanicOccurred()) return false;
 
         try {
+            ASSERT(plugin);
+            ASSERT(api);
             auto& floe = *(FloePluginInstance*)plugin->plugin_data;
 
             if (!IsMainThread(floe.host)) {
@@ -183,6 +191,7 @@ clap_plugin_gui const floe_gui {
             if (PanicOccurred()) return;
 
             try {
+                ASSERT(plugin);
                 auto& floe = *(FloePluginInstance*)plugin->plugin_data;
 
                 if (!IsMainThread(floe.host)) {
@@ -215,6 +224,9 @@ clap_plugin_gui const floe_gui {
         if (PanicOccurred()) return false;
 
         try {
+            ASSERT(plugin);
+            ASSERT(width);
+            ASSERT(height);
             auto& floe = *(FloePluginInstance*)plugin->plugin_data;
 
             if (!IsMainThread(floe.host)) {
@@ -246,6 +258,8 @@ clap_plugin_gui const floe_gui {
         if (PanicOccurred()) return false;
 
         try {
+            ASSERT(plugin);
+            ASSERT(hints);
             auto& floe = *(FloePluginInstance*)plugin->plugin_data;
 
             if (!IsMainThread(floe.host)) {
@@ -275,6 +289,9 @@ clap_plugin_gui const floe_gui {
         if (PanicOccurred()) return false;
 
         try {
+            ASSERT(plugin);
+            ASSERT(clap_width);
+            ASSERT(clap_height);
             auto& floe = *(FloePluginInstance*)plugin->plugin_data;
 
             if (!IsMainThread(floe.host)) {
@@ -316,6 +333,7 @@ clap_plugin_gui const floe_gui {
         if (PanicOccurred()) return false;
 
         try {
+            ASSERT(plugin);
             auto& floe = *(FloePluginInstance*)plugin->plugin_data;
 
             if (!IsMainThread(floe.host)) {
@@ -376,6 +394,8 @@ clap_plugin_gui const floe_gui {
         if (PanicOccurred()) return false;
 
         try {
+            ASSERT(plugin);
+            ASSERT(window);
             auto& floe = *(FloePluginInstance*)plugin->plugin_data;
 
             if (!IsMainThread(floe.host)) {
@@ -425,6 +445,7 @@ clap_plugin_gui const floe_gui {
         if (PanicOccurred()) return false;
 
         try {
+            ASSERT(plugin);
             auto& floe = *(FloePluginInstance*)plugin->plugin_data;
 
             if (!IsMainThread(floe.host)) {
@@ -461,6 +482,7 @@ clap_plugin_gui const floe_gui {
         if (PanicOccurred()) return false;
 
         try {
+            ASSERT(plugin);
             auto& floe = *(FloePluginInstance*)plugin->plugin_data;
 
             if (!IsMainThread(floe.host)) {
@@ -506,29 +528,40 @@ clap_plugin_params const floe_params {
     .count = [](clap_plugin_t const*) -> u32 { return (u32)k_num_parameters; },
 
     .get_info = [](clap_plugin_t const*, u32 param_index, clap_param_info_t* param_info) -> bool {
-        // This callback should be main-thread only, but we don't care if that's not true since we don't use
-        // any shared state.
-        auto const& desc = k_param_descriptors[param_index];
-        param_info->id = ParamIndexToId((ParamIndex)param_index);
-        param_info->default_value = (f64)desc.default_linear_value;
-        param_info->max_value = (f64)desc.linear_range.max;
-        param_info->min_value = (f64)desc.linear_range.min;
-        CopyStringIntoBufferWithNullTerm(param_info->name, desc.name);
-        CopyStringIntoBufferWithNullTerm(param_info->module, desc.ModuleString());
-        param_info->cookie = nullptr;
-        param_info->flags = 0;
-        if (!desc.flags.not_automatable) param_info->flags |= CLAP_PARAM_IS_AUTOMATABLE;
-        if (desc.value_type == ParamValueType::Menu || desc.value_type == ParamValueType::Bool ||
-            desc.value_type == ParamValueType::Int)
-            param_info->flags |= CLAP_PARAM_IS_STEPPED;
+        if (PanicOccurred()) return false;
 
-        return true;
+        try {
+            ASSERT(param_info);
+            ASSERT(param_index < k_num_parameters);
+
+            // This callback should be main-thread only, but we don't care if that's not true since we don't
+            // use any shared state.
+            auto const& desc = k_param_descriptors[param_index];
+            param_info->id = ParamIndexToId((ParamIndex)param_index);
+            param_info->default_value = (f64)desc.default_linear_value;
+            param_info->max_value = (f64)desc.linear_range.max;
+            param_info->min_value = (f64)desc.linear_range.min;
+            CopyStringIntoBufferWithNullTerm(param_info->name, desc.name);
+            CopyStringIntoBufferWithNullTerm(param_info->module, desc.ModuleString());
+            param_info->cookie = nullptr;
+            param_info->flags = 0;
+            if (!desc.flags.not_automatable) param_info->flags |= CLAP_PARAM_IS_AUTOMATABLE;
+            if (desc.value_type == ParamValueType::Menu || desc.value_type == ParamValueType::Bool ||
+                desc.value_type == ParamValueType::Int)
+                param_info->flags |= CLAP_PARAM_IS_STEPPED;
+
+            return true;
+        } catch (PanicException) {
+            return false;
+        }
     },
 
     .get_value = [](clap_plugin_t const* plugin, clap_id param_id, f64* out_value) -> bool {
         if (PanicOccurred()) return false;
 
         try {
+            ASSERT(plugin);
+            ASSERT(out_value);
             auto& floe = *(FloePluginInstance*)plugin->plugin_data;
 
             if (!IsMainThread(floe.host)) {
@@ -569,6 +602,8 @@ clap_plugin_params const floe_params {
         if (PanicOccurred()) return false;
 
         try {
+            ASSERT(out_buffer);
+            if (out_buffer_capacity == 0) return false;
             auto const opt_index = ParamIdToIndex(param_id);
             if (!opt_index) return false;
             auto const index = (usize)*opt_index;
@@ -588,6 +623,8 @@ clap_plugin_params const floe_params {
         if (PanicOccurred()) return false;
 
         try {
+            ASSERT(param_value_text);
+            ASSERT(out_value);
             auto const opt_index = ParamIdToIndex(param_id);
             if (!opt_index) return false;
             auto const index = (usize)*opt_index;
@@ -610,6 +647,10 @@ clap_plugin_params const floe_params {
             if (PanicOccurred()) return;
 
             try {
+                ASSERT(plugin);
+                ASSERT(in);
+                ASSERT(out);
+
                 ZoneScopedN("clap_plugin_params flush");
                 auto& floe = *(FloePluginInstance*)plugin->plugin_data;
 
@@ -713,6 +754,7 @@ clap_plugin_thread_pool const floe_thread_pool {
             if (PanicOccurred()) return;
 
             try {
+                ASSERT(plugin);
                 ZoneScopedN("clap_plugin_thread_pool exec");
                 auto& floe = *(FloePluginInstance*)plugin->plugin_data;
                 floe.engine->processor.processor_callbacks.on_thread_pool_exec(floe.engine->processor,
@@ -729,6 +771,7 @@ clap_plugin_timer_support const floe_timer {
             if (PanicOccurred()) return;
 
             try {
+                ASSERT(plugin);
                 auto& floe = *(FloePluginInstance*)plugin->plugin_data;
 
                 if (!IsMainThread(floe.host)) {
@@ -762,6 +805,7 @@ clap_plugin_posix_fd_support const floe_posix_fd {
             if (PanicOccurred()) return;
 
             try {
+                ASSERT(plugin);
                 auto& floe = *(FloePluginInstance*)plugin->plugin_data;
 
                 if (!IsMainThread(floe.host)) {
@@ -789,6 +833,7 @@ FloeClapExtensionPlugin const floe_custom_ext {
         if (PanicOccurred()) return false;
 
         try {
+            ASSERT(plugin);
             auto& floe = *(FloePluginInstance*)plugin->plugin_data;
             return floe.engine->pending_state_change.HasValue();
         } catch (PanicException) {
@@ -806,6 +851,7 @@ clap_plugin const floe_plugin {
         if (PanicOccurred()) return false;
 
         try {
+            ASSERT(plugin);
 
             auto& floe = *(FloePluginInstance*)plugin->plugin_data;
 
@@ -874,6 +920,8 @@ clap_plugin const floe_plugin {
             if (PanicOccurred()) return;
 
             try {
+                ASSERT(plugin);
+
                 auto& floe = *(FloePluginInstance*)plugin->plugin_data;
                 ZoneScopedMessage(floe.trace_config, "plugin destroy (init:{})", floe.initialised);
 
@@ -919,6 +967,7 @@ clap_plugin const floe_plugin {
         if (PanicOccurred()) return false;
 
         try {
+            ASSERT(plugin);
             auto& floe = *(FloePluginInstance*)plugin->plugin_data;
             ZoneScopedMessage(floe.trace_config, "plugin activate");
 
@@ -954,6 +1003,7 @@ clap_plugin const floe_plugin {
             if (PanicOccurred()) return;
 
             try {
+                ASSERT(plugin);
                 auto& floe = *(FloePluginInstance*)plugin->plugin_data;
                 ZoneScopedMessage(floe.trace_config, "plugin activate");
 

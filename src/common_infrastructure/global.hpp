@@ -143,10 +143,7 @@ struct GlobalShutdownOptions {
 };
 
 PUBLIC void GlobalDeinit(GlobalShutdownOptions options) {
-    if (options.shutdown_error_reporting) {
-        RequestBackgroundErrorReportingEnd();
-        WaitForBackgroundErrorReportingEnd();
-    }
+    if (options.shutdown_error_reporting) ShutdownBackgroundErrorReporting();
 
     EndCrashDetection(); // before tracy
 

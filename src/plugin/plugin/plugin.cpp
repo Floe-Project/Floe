@@ -852,11 +852,7 @@ clap_plugin const floe_plugin {
                         floe.host.name,
                         floe.host.version);
 
-                sentry::Error message {{
-                    .level = sentry::ErrorEvent::Level::Info,
-                    .message = "Host start 2"_s,
-                }};
-                ReportError(Move(message));
+                ReportError(sentry::Error::Level::Info, "Floe plugin loaded"_s);
             }
 
             LogDebug(k_clap_log_module, "#{} init", floe.index);

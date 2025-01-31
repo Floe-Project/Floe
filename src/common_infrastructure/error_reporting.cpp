@@ -5,18 +5,22 @@
 
 #include "sentry/sentry_background_queue.hpp"
 
-static Atomic<sentry::BackgroundQueue*> g_queue = nullptr;
-alignas(sentry::BackgroundQueue) static u8 g_worker_storage[sizeof(sentry::BackgroundQueue)];
+__attribute__((visibility("hidden"))) static CountedInitFlag g_init_flag {};
+__attribute__((visibility("hidden"))) static Atomic<sentry::BackgroundQueue*> g_queue = nullptr;
+__attribute__((visibility("hidden"))) alignas(sentry::BackgroundQueue) static u8
+    g_worker_storage[sizeof(sentry::BackgroundQueue)];
 
 void InitBackgroundErrorReporting(Span<sentry::Tag const> tags) {
-    auto existing = g_queue.Load(LoadMemoryOrder::Acquire);
-    if (existing) return;
+    CountedInit(g_init_flag, [&]() {
+        auto existing = g_queue.Load(LoadMemoryOrder::Acquire);
+        if (existing) return;
 
-    WebGlobalInit();
+        WebGlobalInit();
 
-    auto worker = PLACEMENT_NEW(g_worker_storage) sentry::BackgroundQueue {};
-    sentry::StartThread(*worker, tags);
-    g_queue.Store(worker, StoreMemoryOrder::Release);
+        auto worker = PLACEMENT_NEW(g_worker_storage) sentry::BackgroundQueue {};
+        sentry::StartThread(*worker, tags);
+        g_queue.Store(worker, StoreMemoryOrder::Release);
+    });
 }
 
 void ReportError(sentry::Error&& error) {
@@ -50,16 +54,13 @@ void ReportError(sentry::Error&& error) {
     if (WriteErrorToFile(*sentry::SentryOrFallback {}, error).Succeeded()) return;
 }
 
-void RequestBackgroundErrorReportingEnd() {
-    auto q = g_queue.Load(LoadMemoryOrder::Acquire);
-    ASSERT(q);
-    sentry::RequestThreadEnd(*q);
-}
+void ShutdownBackgroundErrorReporting() {
+    CountedDeinit(g_init_flag, [&]() {
+        auto q = g_queue.Load(LoadMemoryOrder::Acquire);
+        ASSERT(q);
+        sentry::RequestThreadEnd(*q);
+        sentry::WaitForThreadEnd(*q);
 
-void WaitForBackgroundErrorReportingEnd() {
-    auto q = g_queue.Load(LoadMemoryOrder::Acquire);
-    ASSERT(q);
-    sentry::WaitForThreadEnd(*q);
-
-    WebGlobalCleanup();
+        WebGlobalCleanup();
+    });
 }

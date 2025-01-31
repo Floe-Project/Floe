@@ -9,8 +9,7 @@
 void InitBackgroundErrorReporting(Span<sentry::Tag const> tags);
 
 // not thread-safe, call near the end of the program
-void RequestBackgroundErrorReportingEnd(); // begins ending the thread
-void WaitForBackgroundErrorReportingEnd(); // waits for thread to end
+void ShutdownBackgroundErrorReporting();
 
 // thread-safe, not signal-safe, works even if InitErrorReporting() was not called
 void ReportError(sentry::Error&& error);

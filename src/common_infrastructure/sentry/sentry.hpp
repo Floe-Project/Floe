@@ -155,7 +155,7 @@ consteval DsnInfo ParseDsnOrThrow(String dsn) {
 // not thread-safe, not signal-safe, inits g_instance
 // adds device_id, OS info, CPU info
 // dsn must be valid and static
-Sentry& InitGlobalSentry(DsnInfo dsn, Span<Tag const> tag);
+Sentry& InitGlobalSentry(DsnInfo dsn, Span<Tag const> tags);
 
 // thread-safe, signal-safe, guaranteed to be valid if InitGlobalSentry has been called
 Sentry* GlobalSentry();
@@ -339,20 +339,18 @@ EnvelopeAddEvent(Sentry& sentry, Writer writer, ErrorEvent event, bool signal_sa
     TRY(json::WriteKeyValue(json_writer, "environment", detail::k_environment));
 
     // tags
-    if (event.tags.size || sentry.tags.size) {
-        TRY(json::WriteKeyObjectBegin(json_writer, "tags"));
-        for (auto tags :
-             Array {event.tags, sentry.tags, Array {Tag {"app_type", ToString(g_final_binary_type)}}}) {
-            for (auto const& tag : tags) {
-                if (!tag.key.size) continue;
-                if (!tag.value.size) continue;
-                if (tag.key.size >= 200) continue;
-                if (tag.value.size >= 200) continue;
-                TRY(json::WriteKeyValue(json_writer, tag.key, tag.value));
-            }
+    TRY(json::WriteKeyObjectBegin(json_writer, "tags"));
+    for (auto const tags :
+         Array {event.tags, sentry.tags, Array {Tag {"app_type", ToString(g_final_binary_type)}}}) {
+        for (auto const& tag : tags) {
+            if (!tag.key.size) continue;
+            if (!tag.value.size) continue;
+            if (tag.key.size >= 200) continue;
+            if (tag.value.size >= 200) continue;
+            TRY(json::WriteKeyValue(json_writer, tag.key, tag.value));
         }
-        TRY(json::WriteObjectEnd(json_writer));
     }
+    TRY(json::WriteObjectEnd(json_writer));
 
     // message
     {
@@ -372,9 +370,11 @@ EnvelopeAddEvent(Sentry& sentry, Writer writer, ErrorEvent event, bool signal_sa
             *event.stacktrace,
             [&](FrameInfo const& frame) {
                 auto try_write = [&]() -> ErrorCodeOr<void> {
+                    auto const filename = TrimStartIfMatches(frame.filename, String {FLOE_PROJECT_ROOT_PATH});
+                    if (!filename.size && !frame.function_name.size) return k_success;
+
                     TRY(json::WriteObjectBegin(json_writer));
 
-                    auto filename = TrimStartIfMatches(frame.filename, String {FLOE_PROJECT_ROOT_PATH});
                     if (filename.size) {
                         TRY(json::WriteKeyValue(json_writer, "filename", filename));
                         TRY(json::WriteKeyValue(json_writer, "in_app", true));

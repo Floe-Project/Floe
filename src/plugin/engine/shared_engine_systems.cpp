@@ -98,8 +98,7 @@ SharedEngineSystems::~SharedEngineSystems() {
             LogError("global"_log_module, "Failed to write settings file: {}", outcome.Error());
     }
 
-    RequestBackgroundErrorReportingEnd();
-    WaitForBackgroundErrorReportingEnd();
+    ShutdownBackgroundErrorReporting();
 }
 
 void SharedEngineSystems::RegisterFloeInstance(clap_plugin const* plugin, FloeInstanceIndex index) {

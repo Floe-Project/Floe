@@ -371,12 +371,11 @@ EnvelopeAddEvent(Sentry& sentry, Writer writer, ErrorEvent event, bool signal_sa
             *event.stacktrace,
             [&](FrameInfo const& frame) {
                 auto try_write = [&]() -> ErrorCodeOr<void> {
-                    auto const filename = TrimStartIfMatches(frame.filename, String {FLOE_PROJECT_ROOT_PATH});
-                    if (!filename.size && !frame.function_name.size) return k_success;
-
                     TRY(json::WriteObjectBegin(json_writer));
 
-                    if (filename.size) {
+                    if (auto const filename =
+                            TrimStartIfMatches(frame.filename, String {FLOE_PROJECT_ROOT_PATH});
+                        filename.size) {
                         TRY(json::WriteKeyValue(json_writer, "filename", filename));
                         TRY(json::WriteKeyValue(json_writer, "in_app", true));
                         TRY(json::WriteKeyValue(json_writer, "lineno", frame.line));

@@ -3,7 +3,6 @@
 
 #pragma once
 #include "foundation/foundation.hpp"
-#include "os/threading.hpp"
 
 enum class LogLevel { Debug, Info, Warning, Error };
 
@@ -25,16 +24,14 @@ ErrorCodeOr<void> WriteFormattedLog(Writer writer,
 // Strongly-typed string so that it's not confused with strings and string formatting
 struct LogModuleName {
     constexpr LogModuleName() = default;
-    constexpr explicit LogModuleName(String str) : str(str) {
-        if constexpr (!PRODUCTION_BUILD) {
-            for (auto c : str)
-                if (c == ' ' || c == '_' || IsUppercaseAscii(c))
-                    throw "Log module names must be lowercase, use - instead of _ and not contain spaces";
-        }
+    consteval explicit LogModuleName(String str) : str(str) {
+        for (auto c : str)
+            if (c == ' ' || c == '_' || IsUppercaseAscii(c))
+                throw "Log module names must be lowercase, use - instead of _ and not contain spaces";
     }
     String str {};
 };
-constexpr LogModuleName operator""_log_module(char const* str, usize size) {
+consteval LogModuleName operator""_log_module(char const* str, usize size) {
     return LogModuleName {String {str, size}};
 }
 

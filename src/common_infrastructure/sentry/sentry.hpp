@@ -92,7 +92,7 @@ static constexpr usize k_max_message_length = 8192;
 static constexpr String k_environment = PRODUCTION_BUILD ? "production"_s : "development"_s;
 static constexpr String k_user_agent = PRODUCTION_BUILD ? String {"floe/" FLOE_VERSION_STRING} : "floe/dev";
 
-constexpr auto k_error_file_extension = "floe-error"_ca;
+constexpr auto k_report_file_extension = "floe-report"_ca;
 
 static fmt::UuidArray Uuid(Atomic<u64>& seed) {
     u64 s = seed.FetchAdd(1, RmwMemoryOrder::Relaxed);
@@ -103,7 +103,7 @@ static fmt::UuidArray Uuid(Atomic<u64>& seed) {
 
 static String UniqueErrorFilepath(String folder, Atomic<u64>& seed, Allocator& allocator) {
     auto s = seed.FetchAdd(1, RmwMemoryOrder::Relaxed);
-    auto const filename = UniqueFilename("", ConcatArrays("."_ca, k_error_file_extension), s);
+    auto const filename = UniqueFilename("", ConcatArrays("."_ca, k_report_file_extension), s);
     seed.Store(s, StoreMemoryOrder::Relaxed);
     return path::Join(allocator, Array {folder, filename});
 }
@@ -560,7 +560,7 @@ PUBLIC ErrorCodeOr<void>
 ConsumeAndSubmitErrorFiles(Sentry& sentry, String folder, ArenaAllocator& scratch_arena) {
     if constexpr (!k_online_reporting) return k_success;
 
-    constexpr auto k_wildcard = ConcatArrays("*."_ca, detail::k_error_file_extension);
+    constexpr auto k_wildcard = ConcatArrays("*."_ca, detail::k_report_file_extension);
     auto const entries = TRY(FindEntriesInFolder(scratch_arena,
                                                  folder,
                                                  {
@@ -597,10 +597,10 @@ ConsumeAndSubmitErrorFiles(Sentry& sentry, String folder, ArenaAllocator& scratc
             dyn::AppendSpan(temp_full_path, entry.subpath);
 
             // Move the file into the temporary directory, this will be atomic so that other processes don't
-            // try and submit the same error report.
+            // try and submit the same report file.
             if (auto const o = Rename(full_path, temp_full_path); o.HasError()) {
                 if (o.Error() == FilesystemError::PathDoesNotExist) continue;
-                LogError(k_main_log_module, "Couldn't move error file: {}", o.Error());
+                LogError(k_main_log_module, "Couldn't move report file: {}", o.Error());
                 continue;
             }
 
@@ -612,7 +612,7 @@ ConsumeAndSubmitErrorFiles(Sentry& sentry, String folder, ArenaAllocator& scratc
             };
 
             auto envelope_without_header = TRY_OR(ReadEntireFile(temp_full_path, scratch_arena), {
-                LogError(k_main_log_module, "Couldn't read error file: {}", error);
+                LogError(k_main_log_module, "Couldn't read report file: {}", error);
                 continue;
             });
 
@@ -639,10 +639,7 @@ ConsumeAndSubmitErrorFiles(Sentry& sentry, String folder, ArenaAllocator& scratc
                                           },
                                   }),
                    {
-                       LogError(k_main_log_module,
-                                "Couldn't send error report to Sentry: {}. {}",
-                                error,
-                                response);
+                       LogError(k_main_log_module, "Couldn't send report to Sentry: {}. {}", error, response);
                        continue;
                    });
 

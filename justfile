@@ -139,10 +139,10 @@ upload-errors:
   fi
   
   cd "$dir" || exit 1
-  for crash in *.floe-error; do
-    if [ -f "$crash" ]; then
-      sentry-cli send-envelope --raw "$crash"
-      rm "$crash"
+  for report in *.floe-report; do
+    if [ -f "$report" ]; then
+      sentry-cli send-envelope --raw "$report"
+      rm "$report"
     fi
   done
 

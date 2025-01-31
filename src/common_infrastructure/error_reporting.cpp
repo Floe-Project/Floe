@@ -24,24 +24,31 @@ void InitBackgroundErrorReporting(Span<sentry::Tag const> tags) {
 }
 
 void ReportError(sentry::Error&& error) {
-    // Always log the error
-    Log({},
-        ({
-            LogLevel l;
-            switch (error.level) {
-                case sentry::ErrorEvent::Level::Fatal: l = LogLevel::Error; break;
-                case sentry::ErrorEvent::Level::Error: l = LogLevel::Error; break;
-                case sentry::ErrorEvent::Level::Warning: l = LogLevel::Warning; break;
-                case sentry::ErrorEvent::Level::Info: l = LogLevel::Info; break;
-                case sentry::ErrorEvent::Level::Debug: l = LogLevel::Debug; break;
-            }
-            l;
-        }),
-        error.message);
-    if (error.stacktrace) {
-        StacktraceToCallback(*error.stacktrace, [](FrameInfo const& frame) {
-            LogInfo({}, "  {}:{}: {}", frame.filename, frame.line, frame.function_name);
-        });
+    // For debug purposes, log the error.
+    if constexpr (!PRODUCTION_BUILD) {
+        Log({},
+            ({
+                LogLevel l;
+                switch (error.level) {
+                    case sentry::ErrorEvent::Level::Fatal: l = LogLevel::Error; break;
+                    case sentry::ErrorEvent::Level::Error: l = LogLevel::Error; break;
+                    case sentry::ErrorEvent::Level::Warning: l = LogLevel::Warning; break;
+                    case sentry::ErrorEvent::Level::Info: l = LogLevel::Info; break;
+                    case sentry::ErrorEvent::Level::Debug: l = LogLevel::Debug; break;
+                }
+                l;
+            }),
+            [&error](Writer writer) -> ErrorCodeOr<void> {
+                TRY(fmt::FormatToWriter(writer, "Error reported: {}\n", error.message));
+                if (error.stacktrace)
+                    TRY(WriteStacktrace(*error.stacktrace,
+                                        writer,
+                                        {
+                                            .ansi_colours = false,
+                                            .demangle = true,
+                                        }));
+                return k_success;
+            });
     }
 
     // Option 1: enqueue the error for the background thread

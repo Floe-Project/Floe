@@ -1507,6 +1507,9 @@ void Context::BeginWindow(WindowSettings settings, Window* window, Rect r, Strin
     auto const no_scroll_y = (flags & WindowFlags_NoScrollbarY);
     auto const draw_on_top = (flags & WindowFlags_DrawOnTop);
 
+    ASSERT(r.x >= 0);
+    ASSERT(r.y >= 0);
+
     dyn::Append(active_windows, window);
     dyn::Assign(window->name, str);
     window->user_flags = next_window_user_flags;

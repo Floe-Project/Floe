@@ -6,6 +6,9 @@ name: Release
 on:
   workflow_dispatch:
 
+env:
+  SENTRY_DSN: ${{ secrets.SENTRY_DSN_PRODUCTION }}
+
 jobs:
   build-windows:
     runs-on: ubuntu-latest # NOTE: we don't actually use Windows
@@ -121,6 +124,16 @@ jobs:
           tag: v${{ env.VERSION }}
           draft: true
           bodyFile: latest_changes.md
+
+      - name: Create Sentry release
+        uses: getsentry/action-release@v1
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+        with:
+          environment: production
+          version: v${{ env.VERSION }}
 
       - if: '!cancelled()'
         run: |

@@ -14,6 +14,9 @@ on:
   release:
     types: [published] # our website needs to update its download links
 
+env:
+  SENTRY_DSN: ${{ secrets.SENTRY_DSN_DEVELOPMENT }}
+
 jobs:
   mac-compile-and-test:
     permissions:
@@ -39,8 +42,6 @@ jobs:
 
       - name: Upload errors
         if: '!cancelled()'
-        env:
-          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         run: just upload-errors
 
       - name: Upload logs
@@ -111,8 +112,6 @@ jobs:
 
       - name: Upload errors
         if: '!cancelled()'
-        env:
-          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         run: just upload-errors
 
       - name: Upload logs
@@ -153,8 +152,6 @@ jobs:
 
       - name: Upload errors
         if: '!cancelled()'
-        env:
-          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         run: just upload-errors
 
       - name: Upload logs

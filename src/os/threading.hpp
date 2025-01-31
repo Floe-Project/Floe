@@ -347,6 +347,7 @@ inline void AtomicSignalFence(RmwMemoryOrder memory_order) { __atomic_signal_fen
 struct CallOnceFlag {
     bool Called() const { return v.Load(LoadMemoryOrder::Acquire) == k_called; }
     bool Calling() const { return v.Load(LoadMemoryOrder::Acquire) == k_calling; }
+    void Reset() { v.Store(k_not_called, StoreMemoryOrder::Release); }
 
     static constexpr u32 k_not_called = 0;
     static constexpr u32 k_calling = 1;

@@ -140,87 +140,28 @@ ErrorCodeOr<void> CleanupOldLogFilesIfNeeded(ArenaAllocator& scratch_arena) {
     return k_success;
 }
 
-__attribute__((visibility("hidden"))) static CountedInitFlag g_logger_init_flag {};
+__attribute__((visibility("hidden"))) static CountedInitFlag g_counted_init_flag {};
+__attribute__((visibility("hidden"))) static CallOnceFlag g_call_once_flag {};
 __attribute__((visibility("hidden"))) alignas(File) static u8 g_file_storage[sizeof(File)];
-__attribute__((visibility("hidden"))) static Atomic<File*> g_file = nullptr;
-__attribute__((visibility("hidden"))) static LogConfig g_log_config {};
+__attribute__((visibility("hidden"))) static File* g_file = nullptr;
+__attribute__((visibility("hidden"))) static LogConfig g_config {};
 
 void InitLogger(LogConfig config) {
-    CountedInit(g_logger_init_flag, [&]() {
-        g_log_config = config;
-
-        ASSERT(g_file.Load(LoadMemoryOrder::Relaxed) == nullptr);
-        InitLogFolderIfNeeded();
-
-        auto seed = RandomSeed();
-        ArenaAllocatorWithInlineStorage<500> arena {PageAllocator::Instance()};
-
-        auto const log_folder = *LogFolder();
-
-        auto const standard_path = path::Join(arena, Array {log_folder, k_latest_log_filename});
-        auto const unique_path =
-            path::Join(arena, Array {log_folder, UniqueFilename("", k_log_extension, seed)});
-
-        // We have a few requirements here:
-        // - If possible, we want to use a standard path that doesn't change because it makes tailing
-        //   the log easier.
-        // - We don't want to overwrite any log files.
-        // - We need to correctly handle the case where other processes are running this same code.
-        for (auto _ : Range(50)) {
-            // We try to oust the standard log file by renaming it to a unique name. Rename is atomic.
-            // If another process is already using the log file, they will continue to do so safely,
-            // but it will be under the new name.
-            auto const o = Rename(standard_path, unique_path);
-
-            // If that succeeded, we can attempt to gain exclusive access to the file.
-            if (o.Succeeded() || (o.HasError() && o.Error() == FilesystemError::PathDoesNotExist)) {
-                auto file_outcome =
-                    OpenFile(standard_path,
-                             {
-                                 .capability = FileMode::Capability::Write | FileMode::Capability::Append,
-                                 .share = FileMode::Share::DeleteRename | FileMode::Share::ReadWrite,
-                                 .creation = FileMode::Creation::CreateNew, // Exclusive access
-                             });
-
-                if (file_outcome.HasError()) {
-                    if (file_outcome.Error() == FilesystemError::PathAlreadyExists) {
-                        // We tried creating a new file but it already exists, another process must
-                        // have created it between our Rename and OpenFile calls. Let's try again.
-                        continue;
-                    }
-                    StdPrintF(StdStream::Err,
-                              "{} failed to open log file: {}\n",
-                              CurrentThreadId(),
-                              file_outcome.Error());
-                    return;
-                }
-
-                StdPrintF(StdStream::Err, "{} opened log file\n", CurrentThreadId());
-                auto file = PLACEMENT_NEW(g_file_storage) File {file_outcome.ReleaseValue()};
-                g_file.Store(file, StoreMemoryOrder::Release);
-                return;
-            } else {
-                StdPrintF(StdStream::Err, "{} failed to rename log file: {}\n", CurrentThreadId(), o.Error());
-                return;
-            }
-        }
-
-        StdPrintF(StdStream::Err, "{} failed to open log file: too many attempts\n", CurrentThreadId());
-        return;
-    });
+    CountedInit(g_counted_init_flag, [&]() { g_config = config; });
 }
 
 void ShutdownLogger() {
-    CountedDeinit(g_logger_init_flag, []() {
-        if (auto file = g_file.Exchange(nullptr, RmwMemoryOrder::Release)) {
+    CountedDeinit(g_counted_init_flag, []() {
+        if (auto file = Exchange(g_file, nullptr)) {
             StdPrintF(StdStream::Err, "{} closed log file\n", CurrentThreadId());
             file->~File();
         }
+        g_call_once_flag.Reset();
     });
 }
 
 void Log(LogModuleName module_name, LogLevel level, FunctionRef<ErrorCodeOr<void>(Writer)> write_message) {
-    if (level < g_log_config.min_level_allowed) return;
+    if (level < g_config.min_level_allowed) return;
 
     static auto log_to_stderr = [](LogModuleName module_name,
                                    LogLevel level,
@@ -241,13 +182,79 @@ void Log(LogModuleName module_name, LogLevel level, FunctionRef<ErrorCodeOr<void
         auto _ = WriteFormattedLog(buffered_writer.Writer(), module_name.str, level, write_message, k_config);
     };
 
-    switch (g_log_config.destination) {
+    switch (g_config.destination) {
         case LogConfig::Destination::Stderr: {
             log_to_stderr(module_name, level, write_message);
             break;
         }
         case LogConfig::Destination::File: {
-            auto file = g_file.Load(LoadMemoryOrder::Acquire);
+            CallOnce(g_call_once_flag, []() {
+                ASSERT(g_file == nullptr);
+                InitLogFolderIfNeeded();
+
+                auto seed = RandomSeed();
+                ArenaAllocatorWithInlineStorage<500> arena {PageAllocator::Instance()};
+
+                auto const log_folder = *LogFolder();
+
+                auto const standard_path = path::Join(arena, Array {log_folder, k_latest_log_filename});
+                auto const unique_path =
+                    path::Join(arena, Array {log_folder, UniqueFilename("", k_log_extension, seed)});
+
+                // We have a few requirements here:
+                // - If possible, we want to use a standard path that doesn't change because it makes tailing
+                //   the log easier.
+                // - We don't want to overwrite any log files.
+                // - We need to correctly handle the case where other processes are running this same code.
+                for (auto _ : Range(50)) {
+                    // We try to oust the standard log file by renaming it to a unique name. Rename is atomic.
+                    // If another process is already using the log file, they will continue to do so safely,
+                    // but it will be under the new name.
+                    auto const o = Rename(standard_path, unique_path);
+
+                    // If that succeeded, we can attempt to gain exclusive access to the file.
+                    if (o.Succeeded() || (o.HasError() && o.Error() == FilesystemError::PathDoesNotExist)) {
+                        auto file_outcome = OpenFile(
+                            standard_path,
+                            {
+                                .capability = FileMode::Capability::Write | FileMode::Capability::Append,
+                                .share = FileMode::Share::DeleteRename | FileMode::Share::ReadWrite,
+                                .creation = FileMode::Creation::CreateNew, // Exclusive access
+                            });
+
+                        if (file_outcome.HasError()) {
+                            if (file_outcome.Error() == FilesystemError::PathAlreadyExists) {
+                                // We tried creating a new file but it already exists, another process must
+                                // have created it between our Rename and OpenFile calls. Let's try again.
+                                continue;
+                            }
+                            StdPrintF(StdStream::Err,
+                                      "{} failed to open log file: {}\n",
+                                      CurrentThreadId(),
+                                      file_outcome.Error());
+                            return;
+                        }
+
+                        StdPrintF(StdStream::Err, "{} opened log file\n", CurrentThreadId());
+                        auto file = PLACEMENT_NEW(g_file_storage) File {file_outcome.ReleaseValue()};
+                        g_file = file;
+                        return;
+                    } else {
+                        StdPrintF(StdStream::Err,
+                                  "{} failed to rename log file: {}\n",
+                                  CurrentThreadId(),
+                                  o.Error());
+                        return;
+                    }
+                }
+
+                StdPrintF(StdStream::Err,
+                          "{} failed to open log file: too many attempts\n",
+                          CurrentThreadId());
+                return;
+            });
+
+            auto file = g_file;
 
             if (!file) {
                 log_to_stderr(k_global_log_module, level, write_message);

@@ -8,7 +8,6 @@
 #include "foundation/container/span.hpp"
 #include "foundation/container/tagged_union.hpp"
 #include "foundation/error/error_code.hpp"
-#include "foundation/error/error_trace.hpp"
 #include "foundation/universal_defs.hpp"
 #include "foundation/utils/random.hpp"
 #include "foundation/utils/string.hpp"
@@ -339,7 +338,6 @@ PUBLIC ErrorCodeOr<void> ValueToString(Writer writer, T const& value, FormatOpti
         if (options.error_debug_info) {
             TRY(writer.WriteChar('\n'));
 
-            if (g_error_trace.count != 0) TRY(writer.WriteChars("├ "));
             TRY(writer.WriteChars(FromNullTerminated(value.source_location.file)));
             TRY(writer.WriteChar(':'));
             TRY(writer.WriteChars(IntToString(value.source_location.line)));
@@ -349,18 +347,6 @@ PUBLIC ErrorCodeOr<void> ValueToString(Writer writer, T const& value, FormatOpti
             if (value.extra_debug_info) {
                 TRY(writer.WriteChars(", "));
                 TRY(writer.WriteChars(FromNullTerminated(value.extra_debug_info)));
-            }
-
-            for (auto const [index, trace_loc] :
-                 Enumerate(Span {g_error_trace.error_trace, g_error_trace.count})) {
-                TRY(writer.WriteChar('\n'));
-                TRY(writer.WriteChars(index == g_error_trace.count - 1 ? "└" : "├"));
-                TRY(writer.WriteChar(' '));
-                TRY(writer.WriteChars(FromNullTerminated(trace_loc.file)));
-                TRY(writer.WriteChar(':'));
-                TRY(writer.WriteChars(IntToString(trace_loc.line)));
-                TRY(writer.WriteChars(": "));
-                TRY(writer.WriteChars(FromNullTerminated(trace_loc.function)));
             }
         }
         return k_success;

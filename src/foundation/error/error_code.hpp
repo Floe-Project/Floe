@@ -23,7 +23,6 @@
 #include "foundation/memory/cloneable.hpp"
 #include "foundation/universal_defs.hpp"
 
-#include "error_trace.hpp"
 #include "try.hpp"
 
 struct ErrorCodeCategory;
@@ -44,9 +43,7 @@ struct [[nodiscard]] ErrorCode {
         : code((s64)e)
         , category(&ErrorCategoryForEnum(e))
         , extra_debug_info(extra_debug_info)
-        , source_location(source_loc) {
-        g_error_trace.Begin();
-    }
+        , source_location(source_loc) {}
 
     constexpr ErrorCode(ErrorCodeCategory const& type,
                         s64 c,
@@ -55,9 +52,7 @@ struct [[nodiscard]] ErrorCode {
         : code(c)
         , category(&type)
         , extra_debug_info(extra_debug_info)
-        , source_location(source_loc) {
-        g_error_trace.Begin();
-    }
+        , source_location(source_loc) {}
 
     constexpr bool operator==(ErrorEnumWithCategory auto e) const {
         return category == &ErrorCategoryForEnum(e) && code == (s64)e;

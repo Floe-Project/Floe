@@ -279,8 +279,8 @@ ErrorCodeOr<MutableString> CurrentBinaryPath(Allocator& a) {
             result = a.Clone(fname);
         } else {
             Array<char, Kb(32)> buffer {};
-
-            if (auto const size = readlink("/proc/self/maps", buffer.data, buffer.size); size != -1) {
+            auto size = readlink("/proc/self/maps", buffer.data, buffer.size);
+            if (size != -1) {
                 if (size == buffer.size) {
                     // truncated, we can't know if the path will be correct
                     return ErrorCode {FilesystemError::PathDoesNotExist};
@@ -294,9 +294,11 @@ ErrorCodeOr<MutableString> CurrentBinaryPath(Allocator& a) {
                     for (auto const word : SplitIterator {line, ' ', true}) {
                         if (word_index++ == 5) {
                             auto const path = word;
-                            if (path::IsAbsolute(path) && path::Equal(path::Filename(path), fname)) {
-                                result = a.Clone(path);
-                                break;
+                            if (path::IsAbsolute(path)) {
+                                if (path::Equal(path::Filename(path), fname)) {
+                                    result = a.Clone(path);
+                                    break;
+                                }
                             }
                         }
                         ASSERT(word_index < 100);
@@ -305,18 +307,14 @@ ErrorCodeOr<MutableString> CurrentBinaryPath(Allocator& a) {
                     ++line_index;
                     ASSERT(line_index < 20000);
                 }
-            }
-
-            if (result.size == 0) {
-                auto const size = readlink("/proc/self/exe", buffer.data, buffer.size);
+            } else {
+                size = readlink("/proc/self/exe", buffer.data, buffer.size);
                 if (size == -1) return FilesystemErrnoErrorCode(errno, "readlink");
                 if (size == buffer.size) {
                     // truncated, we can't know if the path will be correct
                     return ErrorCode {FilesystemError::PathDoesNotExist};
                 }
-                auto const path = String {buffer.data, (usize)size};
-                if (path::IsAbsolute(path) && path::Equal(path::Filename(path), fname))
-                    result = a.Clone(path);
+                result = a.Clone(String {buffer.data, (usize)size});
             }
 
             if (result.size == 0) return ErrorCode {FilesystemError::PathDoesNotExist};

@@ -694,7 +694,7 @@ fn applyUniversalSettings(context: *BuildContext, step: *std.Build.Step.Compile)
         // LTO doesn't seem like it's supported on mac
         step.want_lto = context.build_mode == .production;
     }
-    step.rdynamic = context.build_mode != .production;
+    step.rdynamic = true;
     step.linkLibC();
 
     step.addIncludePath(context.dep_xxhash.path(""));

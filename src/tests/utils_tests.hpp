@@ -1114,6 +1114,15 @@ TEST_CASE(TestStacktraceString) {
         f();
     }
 
+    SUBCASE("stacktrace 4") {
+        bool stacktrace_has_this_function = false;
+        constexpr String k_this_function = __FUNCTION__;
+        CurrentStacktraceToCallback([&](FrameInfo const& frame) {
+            if (ContainsSpan(frame.function_name, k_this_function)) stacktrace_has_this_function = true;
+        });
+        CHECK(stacktrace_has_this_function);
+    }
+
     return k_success;
 }
 

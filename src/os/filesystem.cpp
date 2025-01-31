@@ -80,6 +80,9 @@ MutableString KnownDirectoryWithSubdirectories(Allocator& a,
                                             (filename ? filename->size + 1 : 0));
     usize pos = path.size;
     for (auto const& sub : subdirectories) {
+        ASSERT(sub.size);
+        ASSERT(IsValidUtf8(sub));
+
         WriteAndIncrement(pos, full_path, path::k_dir_separator);
         WriteAndIncrement(pos, full_path, sub);
 
@@ -104,6 +107,8 @@ MutableString KnownDirectoryWithSubdirectories(Allocator& a,
         WriteAndIncrement(pos, full_path, *filename);
     }
 
+    ASSERT(path::IsAbsolute(full_path));
+    ASSERT(IsValidUtf8(full_path));
     return full_path;
 }
 

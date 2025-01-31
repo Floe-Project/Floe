@@ -63,6 +63,7 @@ void ReportError(sentry::Error&& error) {
 
 void ShutdownBackgroundErrorReporting() {
     CountedDeinit(g_init_flag, [&]() {
+        LogDebug({}, "Shutting down background error reporting");
         auto q = g_queue.Load(LoadMemoryOrder::Acquire);
         ASSERT(q);
         sentry::RequestThreadEnd(*q);

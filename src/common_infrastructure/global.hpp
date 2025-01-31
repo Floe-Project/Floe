@@ -149,7 +149,7 @@ PUBLIC void GlobalDeinit(GlobalShutdownOptions options) {
 
     detail::ShutdownTracy();
 
-    ShutdownLogger();
-
     ShutdownStacktraceState();
+
+    ShutdownLogger();
 }

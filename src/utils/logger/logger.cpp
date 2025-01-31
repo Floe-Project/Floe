@@ -196,10 +196,13 @@ void Log(LogModuleName module_name, LogLevel level, FunctionRef<ErrorCodeOr<void
                 ArenaAllocatorWithInlineStorage<500> arena {PageAllocator::Instance()};
 
                 auto const log_folder = *LogFolder();
+                ASSERT(IsValidUtf8(log_folder));
 
                 auto const standard_path = path::Join(arena, Array {log_folder, k_latest_log_filename});
                 auto const unique_path =
                     path::Join(arena, Array {log_folder, UniqueFilename("", k_log_extension, seed)});
+                ASSERT(IsValidUtf8(standard_path));
+                ASSERT(IsValidUtf8(unique_path));
 
                 // We have a few requirements here:
                 // - If possible, we want to use a standard path that doesn't change because it makes tailing
@@ -272,6 +275,7 @@ void Log(LogModuleName module_name, LogLevel level, FunctionRef<ErrorCodeOr<void
                                            .ansi_colors = false,
                                            .no_info_prefix = false,
                                            .timestamp = true,
+                                           .thread = true,
                                        });
             if (o.HasError()) {
                 log_to_stderr(k_global_log_module, LogLevel::Error, [o](Writer writer) {

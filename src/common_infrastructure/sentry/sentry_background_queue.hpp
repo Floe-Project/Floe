@@ -25,6 +25,8 @@ static void BackgroundThread(BackgroundQueue& queue, Span<Tag const> tags) {
 
     ArenaAllocatorWithInlineStorage<4000> scratch_arena {PageAllocator::Instance()};
 
+    InitLogFolderIfNeeded();
+
     if (auto const o = ConsumeAndSubmitErrorFiles(sentry, *LogFolder(), scratch_arena); o.HasError())
         LogError(k_log_module, "Failed to consume error files: {}", o.Error());
 

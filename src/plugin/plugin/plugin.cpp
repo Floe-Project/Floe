@@ -851,6 +851,7 @@ clap_plugin const floe_plugin {
         if (PanicOccurred()) return false;
 
         try {
+            LogDebug(k_clap_log_module, "init plugin");
             ASSERT(plugin);
 
             auto& floe = *(FloePluginInstance*)plugin->plugin_data;

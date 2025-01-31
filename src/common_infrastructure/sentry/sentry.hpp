@@ -560,6 +560,8 @@ PUBLIC ErrorCodeOr<void> WriteErrorToFile(Sentry& sentry, ErrorEvent const& even
 PUBLIC ErrorCodeOr<void>
 ConsumeAndSubmitErrorFiles(Sentry& sentry, String folder, ArenaAllocator& scratch_arena) {
     if constexpr (!k_online_reporting) return k_success;
+    ASSERT(path::IsAbsolute(folder));
+    ASSERT(IsValidUtf8(folder));
 
     constexpr auto k_wildcard = ConcatArrays("*."_ca, detail::k_report_file_extension);
     auto const entries = TRY(FindEntriesInFolder(scratch_arena,

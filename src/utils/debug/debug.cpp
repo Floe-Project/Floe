@@ -383,6 +383,16 @@ Optional<String> InitStacktraceState(Optional<String> current_binary_path) {
                                 msg);
             },
             state);
+
+        // TODO: libbacktrace initialises the state in the first call to one of its functions, so this might
+        // be necessary to ensure we don't incorrectly load state in a multi-threaded environment
+        // backtrace_pcinfo(
+        //     state->state,
+        //     (uintptr)__builtin_return_address(0),
+        //     [](void*, uintptr_t, char const*, int, char const*) -> int { return 0; },
+        //     [](void*, char const*, int) -> void {},
+        //     nullptr);
+
         g_backtrace_state.Store(state, StoreMemoryOrder::Release);
     });
 

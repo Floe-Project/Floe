@@ -156,6 +156,7 @@ void InitLogFolderIfNeeded() {
 Optional<String> LogFolder() {
     if (!g_log_folder_flag.Called()) return k_nullopt;
     ASSERT(g_log_folder_path.size);
+    ASSERT(IsValidUtf8(g_log_folder_path));
     return g_log_folder_path;
 }
 

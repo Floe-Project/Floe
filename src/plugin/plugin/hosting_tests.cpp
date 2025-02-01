@@ -571,10 +571,10 @@ TEST_CASE(TestHostingClap) {
     auto const entry = (clap_plugin_entry const*)TRY(SymbolFromLibrary(*fixture.handle, "clap_entry"));
     REQUIRE(entry != nullptr);
 
-    CHECK(entry->init(fixture.clap_dso_or_bundle_path.data));
+    REQUIRE(entry->init(fixture.clap_dso_or_bundle_path.data));
     DEFER { entry->deinit(); };
 
-    SUBCASE("double init") { CHECK(entry->init("plugin-path")); }
+    SUBCASE("double init") { REQUIRE(entry->init("plugin-path")); }
 
     SUBCASE("double deinit") { entry->deinit(); }
 
@@ -582,6 +582,7 @@ TEST_CASE(TestHostingClap) {
         TestHost test_host {};
 
         auto factory = (clap_plugin_factory const*)entry->get_factory(CLAP_PLUGIN_FACTORY_ID);
+        REQUIRE(factory);
         CHECK_EQ(factory->get_plugin_count(factory), 1u);
         auto const plugin_id = factory->get_plugin_descriptor(factory, 0)->id;
 

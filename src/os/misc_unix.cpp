@@ -448,6 +448,28 @@ static String SignalString(int signal_num, siginfo_t* info) {
 
 constexpr StdStream k_signal_output_stream = StdStream::Err;
 
+static uintptr ErrorAddress(void* _ctx) {
+    if (!_ctx) return 0;
+
+    auto* uctx = (ucontext_t*)(_ctx);
+
+#if defined(__x86_64__)
+#if defined(__APPLE__)
+    return CheckedCast<uintptr>(uctx->uc_mcontext->__ss.__rip);
+#else
+    return CheckedCast<uintptr>(uctx->uc_mcontext.gregs[REG_RIP]);
+#endif
+#elif defined(__aarch64__)
+#if defined(__APPLE__)
+    return CheckedCast<uintptr>(uctx->uc_mcontext->__ss.__pc);
+#else
+    return CheckedCast<uintptr>(uctx->uc_mcontext.pc);
+#endif
+#else
+#error "Only x86_64 and aarch64 architectures are supported"
+#endif
+}
+
 // remember we can only use async-signal-safe functions here:
 // https://man7.org/linux/man-pages/man7/signal-safety.7.html
 static void SignalHandler(int signal_num, siginfo_t* info, void* context) {
@@ -469,7 +491,22 @@ static void SignalHandler(int signal_num, siginfo_t* info, void* context) {
 #endif
         }
 
-        if (auto hook = g_crash_hook.Load(LoadMemoryOrder::Acquire)) hook(signal_description, k_nullopt);
+        if (auto hook = g_crash_hook.Load(LoadMemoryOrder::Acquire)) {
+            auto trace = CurrentStacktrace();
+            if (trace) {
+                auto const error_ip = ErrorAddress(context) - 1;
+                if (error_ip) {
+                    // Find and remove signal handler frames
+                    for (auto i : Range(1uz, trace->size)) {
+                        if (trace->data[i] == error_ip) {
+                            dyn::Remove(*trace, 0, i);
+                            break;
+                        }
+                    }
+                }
+            }
+            hook(signal_description, trace);
+        }
 
         for (auto [index, s] : Enumerate(k_signals)) {
             if (s == signal_num) {

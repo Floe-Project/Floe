@@ -24,6 +24,7 @@ static constexpr ErrorCodeCategory k_fp_error_category {
                 case FilesystemError::FileWatcherCreationFailed: return "File watcher creation failed";
                 case FilesystemError::FilesystemBusy: return "Filesystem is busy";
                 case FilesystemError::DiskFull: return "Disk is full";
+                case FilesystemError::NotSupported: return "Not supported";
                 case FilesystemError::DifferentFilesystems: return "Paths are on different filesystems";
                 case FilesystemError::NotEmpty: return "Folder is not empty";
                 case FilesystemError::Count: break;

@@ -1199,9 +1199,9 @@ constexpr DWORD k_directory_changes_filter = FILE_NOTIFY_CHANGE_FILE_NAME | FILE
                                              FILE_NOTIFY_CHANGE_SIZE | FILE_NOTIFY_CHANGE_LAST_WRITE;
 
 struct WindowsWatchedDirectory {
-    alignas(16) Array<u8, Kb(35)> buffer;
-    HANDLE handle;
-    OVERLAPPED overlapped;
+    alignas(16) Array<u8, Kb(32)> buffer;
+    HANDLE handle {};
+    OVERLAPPED overlapped {};
 };
 
 static void UnwatchDirectory(WindowsWatchedDirectory* windows_dir) {
@@ -1264,13 +1264,26 @@ static ErrorCodeOr<WindowsWatchedDirectory*> WatchDirectory(DirectoryWatcher::Wa
     if (!succeeded) {
         UnwatchDirectory(windows_dir);
         auto const error = GetLastError();
+        switch (error) {
+            case ERROR_INVALID_FUNCTION: {
+                // If the network redirector or the target file system does not support this operation, the
+                // function fails with ERROR_INVALID_FUNCTION.
+                return ErrorCode {FilesystemError::NotSupported};
+            }
+            case ERROR_NOACCESS: {
+                Panic(
+                    "ReadDirectoryChangesW fails with ERROR_NOACCESS when the buffer is not aligned on a DWORD boundary.");
+                case ERROR_INVALID_PARAMETER: {
+                    Panic(
+                        "ReadDirectoryChangesW fails with ERROR_INVALID_PARAMETER when the buffer length is greater than 64 KB and the application is monitoring a directory over the network. This is due to a packet size limitation with the underlying file sharing protocols.");
+                }
+            }
+        }
         return FilesystemWin32ErrorCode(error);
     }
 
     return windows_dir;
 }
-
-constexpr auto k_log_module = "dirwatch"_log_module;
 
 ErrorCodeOr<Span<DirectoryWatcher::DirectoryChanges const>>
 PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
@@ -1325,11 +1338,8 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                 bool error = false;
 
                 while (true) {
-                    if (base >= end || ((usize)(end - base) < min_chunk_size)) {
-                        LogError(k_log_module, "ERROR: invalid data received");
-                        error = true;
-                        break;
-                    }
+                    ASSERT(base < end, "invalid data from ReadDirectoryChangesW");
+                    ASSERT((usize)(end - base) >= min_chunk_size, "invalid data from ReadDirectoryChangesW");
 
                     ASSERT(bytes_transferred >= min_chunk_size);
 
@@ -1342,7 +1352,7 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                         // I've found that it's possible to receive
                         // FILE_NOTIFY_INFORMATION.NextEntryOffset values that result in the next event
                         // being misaligned. Reading unaligned memory is not normally a great idea for
-                        // performance. And if you have UBSan enabled it will crash. To work around this,
+                        // performance. And if you have UBSan enabled, it will crash. To work around this,
                         // we copy the given memory into correctly aligned structures. Another option
                         // would be to disable UBSan for this function but I'm not sure of the
                         // consequences of misaligned reads so let's play it safe.
@@ -1351,29 +1361,19 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                         FILE_NOTIFY_INFORMATION event;
                         __builtin_memcpy_inline(&event, base, sizeof(event));
 
-                        if ((base + event.NextEntryOffset) > end) {
-                            LogDebug(
-                                k_log_module,
-                                "ERROR: invalid data received: NextEntryOffset points outside of buffer: FileNameLength: {}, NextEntryOffset: {}",
-                                event.FileNameLength,
-                                event.NextEntryOffset);
-                            error = true;
-                            break;
-                        }
+                        ASSERT((base + event.FileNameLength) <= end,
+                               "invalid data from ReadDirectoryChangesW");
+                        constexpr DWORD k_valid_actions =
+                            FILE_ACTION_ADDED | FILE_ACTION_REMOVED | FILE_ACTION_MODIFIED |
+                            FILE_ACTION_RENAMED_OLD_NAME | FILE_ACTION_RENAMED_NEW_NAME;
+                        ASSERT((event.Action & ~k_valid_actions) == 0,
+                               "invalid data from ReadDirectoryChangesW");
+                        ASSERT(event.FileNameLength % sizeof(wchar_t) == 0,
+                               "invalid data from ReadDirectoryChangesW");
 
                         auto const num_wchars = event.FileNameLength / sizeof(wchar_t);
-                        if (num_wchars > filename_buf.size) {
-                            LogDebug(
-                                k_log_module,
-                                "ERROR: filename too long for buffer ({} chars): FileNameLength: {}, NextEntryOffset: {}, bytes_transferred: {}, min_chunk_size: {}",
-                                num_wchars,
-                                event.FileNameLength,
-                                event.NextEntryOffset,
-                                bytes_transferred,
-                                min_chunk_size);
-                            error = true;
-                            break;
-                        }
+                        ASSERT(num_wchars <= filename_buf.size);
+
                         CopyMemory(filename_buf.data,
                                    base + offsetof(FILE_NOTIFY_INFORMATION, FileName),
                                    event.FileNameLength);
@@ -1398,10 +1398,6 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                         auto const narrowed = Narrow(args.result_arena, filename);
                         if (narrowed.HasValue()) {
                             ASSERT(IsValidUtf8(narrowed.Value()));
-                            LogDebug(k_log_module,
-                                     "Change: {} {}",
-                                     DirectoryWatcher::ChangeType::ToString(changes),
-                                     narrowed.Value());
                             dir.directory_changes.Add(
                                 {
                                     .subpath = narrowed.Value(),
@@ -1429,8 +1425,8 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
             } else {
                 dir.directory_changes.error = FilesystemWin32ErrorCode(GetLastError());
             }
-        } else if (wait_result != WAIT_TIMEOUT) {
-            if constexpr (!PRODUCTION_BUILD) Panic("unexpected result from WaitForSingleObjectEx");
+        } else {
+            ASSERT(wait_result == WAIT_TIMEOUT);
         }
 
         auto const succeeded = ReadDirectoryChangesW(windows_dir.handle,
@@ -1452,8 +1448,11 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                         .changes = DirectoryWatcher::ChangeType::ManualRescanNeeded,
                     },
                     args.result_arena);
-            else
+            else {
+                ASSERT(error != ERROR_INVALID_PARAMETER);
+                ASSERT(error != ERROR_INVALID_FUNCTION);
                 dir.directory_changes.error = FilesystemWin32ErrorCode(error);
+            }
             continue;
         }
     }

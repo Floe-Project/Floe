@@ -300,7 +300,7 @@ TEST_CASE(TestFilesystem) {
 
                 SUBCASE("non existent dir") {
                     auto it = dir_iterator::Create(a,
-                                                   "C:/seflskflks"_s,
+                                                   IS_WINDOWS ? "C:/seflskflks"_s : "/aoidlkdsf"_s,
                                                    {
                                                        .wildcard = "*",
                                                        .get_file_size = false,

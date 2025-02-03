@@ -705,7 +705,6 @@ fn applyUniversalSettings(context: *BuildContext, step: *std.Build.Step.Compile)
     step.addIncludePath(context.dep_libbacktrace.path(""));
     step.addIncludePath(context.dep_lua.path(""));
     step.addIncludePath(context.dep_pugl.path("include"));
-    step.addIncludePath(context.dep_pugl.path("test")); // bit of a hack but there's handy debug headers here
     step.addIncludePath(context.dep_tracy.path("public"));
     step.addIncludePath(context.dep_valgrind_h.path(""));
     step.addIncludePath(context.dep_portmidi.path("pm_common"));

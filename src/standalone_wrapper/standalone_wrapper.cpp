@@ -15,7 +15,6 @@
 #include <portmidi.h>
 #include <pugl/pugl.h>
 #include <pugl/stub.h>
-#include <test_utils.h>
 
 #include "os/misc.hpp"
 #include "utils/logger/logger.hpp"

@@ -7,7 +7,6 @@
 #include <clap/host.h>
 #include <pugl/gl.h> // on windows this includes windows.h
 #include <pugl/pugl.h>
-#include <test_utils.h> // pugl - bit of a hack including it this way
 //
 #include "os/undef_windows_macros.h"
 //
@@ -686,9 +685,6 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
     if (PanicOccurred()) return PUGL_FAILURE;
 
     try {
-        if constexpr (k_debug_gui_platform)
-            if (event->type != PUGL_UPDATE && event->type != PUGL_TIMER && event->type != PUGL_MOTION)
-                printEvent(event, "PUGL: ", true);
         auto& platform = *(GuiPlatform*)puglGetHandle(view);
 
         bool post_redisplay = false;

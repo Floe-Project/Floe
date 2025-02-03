@@ -15,11 +15,11 @@
 #include "os/misc.hpp"
 #include "os/misc_windows.hpp"
 #include "os/threading.hpp"
-#include "utils/logger/logger.hpp"
+#include "utils/debug/debug.hpp"
+
+#include "common_infrastructure/error_reporting.hpp"
 
 #include "gui.hpp"
-
-constexpr auto k_log_module = "installer"_log_module;
 
 enum class Pages : u32 {
     Configuration,
@@ -38,7 +38,7 @@ constexpr auto k_page_infos = Array {
         .title = "Configuration",
         .label =
             "Welcome to the installer for Floe"
-            ".\n\nPlease close your DAW before clicking install. Plugins are installed to standard locations so that any DAW can find them.",
+            ".\n\nPlease close your DAW before clicking install. Plugins are installed to standard locations so that any DAW can find them. Existing installations of Floe will be safely overwritten.",
     },
     PageInfo {
         .title = "Installing",
@@ -58,12 +58,7 @@ struct Component {
     Span<u8 const> data {};
 };
 
-struct InstallError {
-    DynamicArrayBounded<char, 500> message;
-    ErrorCode error;
-};
-
-using InstallResult = VoidOrError<InstallError>;
+using InstallResult = ErrorCodeOr<void>;
 
 using InstallationResults = Array<InstallResult, ToInt(ComponentTypes::Count)>;
 
@@ -100,47 +95,37 @@ ErrorCodeOr<Span<u8 const>> GetResource(int resource_id) {
     return Span<u8 const> {res_data, (size_t)res_size};
 }
 
-static InstallResult TryInstall(Component const& comp) {
+static ErrorCodeOr<void> TryInstall(Component const& comp) {
     ASSERT(comp.data.size != 0);
     ASSERT(comp.info.filename.size != 0);
     ASSERT(IsValidUtf8(comp.info.filename));
 
-    // IMPROVE: error messages could be more helpful here for the end-user. Explain what they could try to fix
-    // the issue.
-    InstallError error {};
-    if (auto const o = CreateDirectory(comp.install_dir,
-                                       {
-                                           .create_intermediate_directories = true,
-                                           .fail_if_exists = false,
-                                       });
-        o.HasError()) {
-        fmt::Assign(error.message, "Failed to create directory: {}", o.Error());
-        error.error = o.Error();
+    PathArena arena {Malloc::Instance()};
+    auto const path = path::Join(arena, Array {comp.install_dir, comp.info.filename});
+    TRY_OR(WriteFile(path, comp.data), {
+        ReportError(sentry::Error::Level::Warning, "Failed to install file {}: {}", path, error);
         return error;
-    }
-
-    ArenaAllocatorWithInlineStorage<1000> arena {Malloc::Instance()};
-    if (auto const o = WriteFile(path::Join(arena, Array {comp.install_dir, comp.info.filename}), comp.data);
-        o.HasError()) {
-        fmt::Assign(error.message, "Failed to write file: {}", o.Error());
-        error.error = o.Error();
-        return error;
-    }
+    });
 
     return k_success;
 }
 
 static void BackgroundInstallingThread(Application& app) {
     ArenaAllocatorWithInlineStorage<1000> arena {Malloc::Instance()};
+    auto const start_time = TimePoint::Now();
     for (auto const i : Range(ToInt(ComponentTypes::Count))) {
         if (!app.components_selected[i]) continue;
         auto const& comp = app.components[i];
-        LogDebug(k_log_module, "Installing {} to {}", comp.info.name, comp.install_dir);
         InstallResult outcome = k_success;
         if (comp.data.size != 0) outcome = TryInstall(comp);
         app.installation_results.Use([i, outcome](InstallationResults& r) { r[i] = outcome; });
     }
-    SleepThisThread(1500); // Intentional delay because it feels good
+
+    // Intentional delay because it feels good
+    constexpr auto k_min_seconds = 1.5;
+    if (auto const time_taken = start_time.SecondsFromNow(); time_taken < k_min_seconds)
+        SleepThisThread((int)((k_min_seconds - time_taken) * 1000));
+
     app.installing_completed.Store(true, StoreMemoryOrder::Release);
 }
 
@@ -172,9 +157,9 @@ static void SwitchPage(Application& app, GuiFramework& framework, Pages page) {
                 if (result.HasError()) failure = true;
 
             if (failure)
-                label_text_override = "Installation failed"_s;
+                label_text_override = "❌ Installation failed"_s;
             else
-                label_text_override = "Done. Installation succeeded."_s;
+                label_text_override = "✅ Done. Installation succeeded."_s;
 
             DynamicArray<char> summary_text {PageAllocator::Instance()};
             for (auto const comp_index : Range(ToInt(ComponentTypes::Count))) {
@@ -182,18 +167,17 @@ static void SwitchPage(Application& app, GuiFramework& framework, Pages page) {
                 auto const result = installation_results[comp_index];
                 if (!result.HasError())
                     fmt::Append(summary_text,
-                                "Installed {} ({}) to {}"_s,
+                                "Installed {} ({}) to:\n{}"_s,
                                 app.components[comp_index].info.name,
                                 app.components[comp_index].info.filename,
                                 app.components[comp_index].install_dir);
                 else
                     fmt::Append(summary_text,
-                                "Failed to install {} ({}) to {}: {}, {}"_s,
+                                "Failed to install {} ({}) to {}: {u}."_s,
                                 app.components[comp_index].info.name,
                                 app.components[comp_index].info.filename,
                                 app.components[comp_index].install_dir,
-                                result.Error().message,
-                                result.Error().error);
+                                result.Error());
                 dyn::AppendSpan(summary_text, "\n\n");
             }
 
@@ -251,24 +235,28 @@ Application* CreateApplication(GuiFramework& framework, u32 root_layout_id) {
     for (auto const i : Range(k_plugin_infos.size)) {
         auto const& info = k_plugin_infos[i];
         auto data = GetResource(info.resource_id);
-        if (data.HasError()) {
-            if constexpr (PRODUCTION_BUILD) {
-                Panic("installer is missing resource");
-            } else {
-                LogDebug(k_log_module, "Failed to load component data: {}", data.Error());
-                data = Span<u8 const> {};
-            }
-        }
+        if (data.HasError())
+            PanicF(SourceLocation::Current(), "Windows resource failed to load: {}", data.Error());
+
+        DynamicArray<char> error_buffer {PageAllocator::Instance()};
+        auto error_writer = dyn::WriterFor(error_buffer);
 
         app->components[i] = {
             .info = info,
-            .install_dir = ({
-                String p {};
-                if (info.install_dir) p = KnownDirectory(app->arena, *info.install_dir, {.create = true});
-                p;
-            }),
+            .install_dir = KnownDirectory(app->arena,
+                                          info.install_dir,
+                                          {
+                                              .create = true,
+                                              .error_log = &error_writer,
+                                          }),
             .data = data.Value(),
         };
+
+        if (error_buffer.size)
+            ReportError(sentry::Error::Level::Error,
+                        "Failed to get install directory {}: {}",
+                        app->components[i].install_dir,
+                        error_buffer);
     }
 
     constexpr u16 k_margin = 10;
@@ -538,10 +526,8 @@ void HandleUserInteraction(Application& app, GuiFramework& framework, UserIntera
             break;
         }
         case UserInteraction::Type::CheckboxTableItemToggled: {
-            if (info.widget_id == app.plugin_checkboxes) {
-                LogDebug(k_log_module, "Checkbox {} toggled to {}", info.button_index, info.button_state);
+            if (info.widget_id == app.plugin_checkboxes)
                 app.components_selected[info.button_index] = info.button_state;
-            }
             if (Find(app.components_selected, true))
                 EditWidget(framework, app.next_button, {.enabled = true});
             else

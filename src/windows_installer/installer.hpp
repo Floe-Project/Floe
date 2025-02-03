@@ -17,7 +17,7 @@ enum class ComponentTypes : u32 {
 
 struct ComponentInfo {
     String name;
-    Optional<KnownDirectoryType> install_dir;
+    KnownDirectoryType install_dir;
     String filename;
     int resource_id;
 };

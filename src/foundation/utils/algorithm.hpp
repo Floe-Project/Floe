@@ -58,6 +58,9 @@ inline void HashUpdate(u64& hash, Span<T const> data) {
         hash *= 0x100000001b3;
     }
 }
+inline void HashUpdate(u64& hash, Integral auto data) {
+    HashUpdate(hash, Span {(u8 const*)&data, sizeof(data)});
+}
 
 template <Fundamental T>
 PUBLIC constexpr u32 HashDbj(Span<T const> data) {

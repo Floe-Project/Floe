@@ -298,7 +298,8 @@ enum class SessionStatus {
 }
 
 // thread-safe (for Sentry), signal-safe if signal_safe is true
-// NOTE (Jan 2025): all events are 'issues' in Sentry, there's no pure informational concept
+// NOTE (Jan 2025): There's no pure informational concept in Sentry. All events are 'issues' regardless of
+// their level.
 [[maybe_unused]] PUBLIC ErrorCodeOr<void>
 EnvelopeAddEvent(Sentry& sentry, Writer writer, ErrorEvent event, bool signal_safe) {
     ASSERT(event.message.size <= detail::k_max_message_length, "message too long");
@@ -362,6 +363,8 @@ EnvelopeAddEvent(Sentry& sentry, Writer writer, ErrorEvent event, bool signal_sa
         TRY(json::WriteObjectEnd(json_writer));
     }
 
+    auto fingerprint = HashInit();
+
     // stacktrace
     if (event.stacktrace && event.stacktrace->size) {
         TRY(json::WriteKeyObjectBegin(json_writer, "stacktrace"));
@@ -379,6 +382,9 @@ EnvelopeAddEvent(Sentry& sentry, Writer writer, ErrorEvent event, bool signal_sa
                         TRY(json::WriteKeyValue(json_writer, "filename", filename));
                         TRY(json::WriteKeyValue(json_writer, "in_app", true));
                         TRY(json::WriteKeyValue(json_writer, "lineno", frame.line));
+
+                        HashUpdate(fingerprint, filename);
+                        HashUpdate(fingerprint, frame.line);
                     }
 
                     if (frame.function_name.size)
@@ -396,6 +402,15 @@ EnvelopeAddEvent(Sentry& sentry, Writer writer, ErrorEvent event, bool signal_sa
         TRY(stacktrace_error);
         TRY(json::WriteArrayEnd(json_writer));
         TRY(json::WriteObjectEnd(json_writer));
+    }
+
+    // The default fingerprinting algorithm doesn't produce great results for us, so we manually set it here.
+    // Sentry uses the fingerprint to group events into 'issues'.
+    {
+        if (fingerprint == HashInit()) HashUpdate(fingerprint, event.message);
+        TRY(json::WriteKeyArrayBegin(json_writer, "fingerprint"));
+        TRY(json::WriteValue(json_writer, fmt::IntToString(fingerprint)));
+        TRY(json::WriteArrayEnd(json_writer));
     }
 
     // insert the common context

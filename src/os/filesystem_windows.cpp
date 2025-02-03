@@ -184,10 +184,7 @@ ErrorCodeOr<File> OpenFile(String filename, FileMode mode) {
         else if (cap & ToInt(FileMode::Capability::Read))
             a = GENERIC_READ;
 
-        if (cap & ToInt(FileMode::Capability::Append)) {
-            a |= FILE_APPEND_DATA;
-            a &= ~(DWORD)GENERIC_WRITE;
-        }
+        if (cap & ToInt(FileMode::Capability::Append)) a |= FILE_APPEND_DATA;
         a;
     });
 

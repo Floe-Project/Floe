@@ -299,13 +299,19 @@ TEST_CASE(TestFilesystem) {
                 }
 
                 SUBCASE("non existent dir") {
-                    REQUIRE(dir_iterator::Create(a,
-                                                 "C:/seflskflks"_s,
-                                                 {
-                                                     .wildcard = "*",
-                                                     .get_file_size = false,
-                                                 })
-                                .HasError());
+                    auto it = dir_iterator::Create(a,
+                                                   "C:/seflskflks"_s,
+                                                   {
+                                                       .wildcard = "*",
+                                                       .get_file_size = false,
+                                                   });
+                    // Create is allow to succeed even if the path does not exist.
+                    if (it.HasValue()) {
+                        auto const next = dir_iterator::Next(it.Value(), a);
+                        CHECK(next.HasError() && next.Error() == FilesystemError::PathDoesNotExist);
+                    } else {
+                        CHECK(it.Error() == FilesystemError::PathDoesNotExist);
+                    }
                 }
             }
 

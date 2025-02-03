@@ -966,6 +966,7 @@ namespace dir_iterator {
 
 static Entry MakeEntry(WIN32_FIND_DATAW const& data, ArenaAllocator& arena) {
     auto filename = Narrow(arena, FromNullTerminated(data.cFileName)).Value();
+    ASSERT(IsValidUtf8(filename));
     return {
         .subpath = filename,
         .type = (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ? FileType::Directory : FileType::File,
@@ -973,49 +974,18 @@ static Entry MakeEntry(WIN32_FIND_DATAW const& data, ArenaAllocator& arena) {
     };
 }
 
-static bool StringIsDot(String filename) { return filename == "."_s || filename == ".."_s; }
 static bool StringIsDot(WString filename) { return filename == L"."_s || filename == L".."_s; }
-static bool CharIsDot(char c) { return c == '.'; }
 static bool CharIsDot(WCHAR c) { return c == L'.'; }
-static bool CharIsSlash(char c) { return c == '\\'; }
 static bool CharIsSlash(WCHAR c) { return c == L'\\'; }
 
-static bool ShouldSkipFile(ContiguousContainer auto const& filename, bool skip_dot_files) {
+static bool ShouldSkipFile(WString filename, bool skip_dot_files) {
     for (auto c : filename)
         ASSERT(!CharIsSlash(c));
     return StringIsDot(filename) || (skip_dot_files && filename.size && CharIsDot(filename[0]));
 }
 
 ErrorCodeOr<Iterator> Create(ArenaAllocator& a, String path, Options options) {
-    ASSERT(IsValidUtf8(path));
-    ASSERT(path::IsAbsolute(path));
-
     auto result = TRY(Iterator::InternalCreate(a, path, options));
-
-    PathArena temp_path_arena {Malloc::Instance()};
-    auto wpath = path::MakePathForWin32(ArrayT<WString>({Widen(temp_path_arena, result.base_path).Value(),
-                                                         Widen(temp_path_arena, options.wildcard).Value()}),
-                                        temp_path_arena,
-                                        true)
-                     .path;
-
-    WIN32_FIND_DATAW data {};
-    auto handle = FindFirstFileExW(wpath.data,
-                                   FindExInfoBasic,
-                                   &data,
-                                   FindExSearchNameMatch,
-                                   nullptr,
-                                   FIND_FIRST_EX_LARGE_FETCH);
-    if (handle == INVALID_HANDLE_VALUE) {
-        if (GetLastError() == ERROR_FILE_NOT_FOUND) {
-            // The search could not find any files.
-            result.reached_end = true;
-            return result;
-        }
-        return FilesystemWin32ErrorCode(GetLastError(), "FindFirstFileW");
-    }
-    result.handle = handle;
-    result.first_entry = MakeEntry(data, a);
     return result;
 }
 
@@ -1026,12 +996,37 @@ void Destroy(Iterator& it) {
 ErrorCodeOr<Optional<Entry>> Next(Iterator& it, ArenaAllocator& result_arena) {
     if (it.reached_end) return Optional<Entry> {};
 
-    if (it.first_entry.subpath.size) {
-        DEFER { it.first_entry = {}; };
-        if (!ShouldSkipFile(path::Filename(it.first_entry.subpath), it.options.skip_dot_files)) {
-            auto result = it.first_entry;
-            return result;
+    if (!it.handle) {
+        PathArena temp_path_arena {Malloc::Instance()};
+        auto const wpath =
+            path::MakePathForWin32(ArrayT<WString>({Widen(temp_path_arena, it.base_path).Value(),
+                                                    Widen(temp_path_arena, it.options.wildcard).Value()}),
+                                   temp_path_arena,
+                                   true)
+                .path;
+
+        WIN32_FIND_DATAW data {};
+        auto handle = FindFirstFileExW(wpath.data,
+                                       FindExInfoBasic,
+                                       &data,
+                                       FindExSearchNameMatch,
+                                       nullptr,
+                                       FIND_FIRST_EX_LARGE_FETCH);
+        if (handle == INVALID_HANDLE_VALUE) {
+            if (GetLastError() == ERROR_FILE_NOT_FOUND) {
+                // The search could not find any files.
+                it.reached_end = true;
+                return Optional<Entry> {};
+            }
+            return FilesystemWin32ErrorCode(GetLastError(), "FindFirstFileW");
         }
+        it.handle = handle;
+        ASSERT(it.handle != nullptr);
+
+        if (ShouldSkipFile(FromNullTerminated(data.cFileName), it.options.skip_dot_files))
+            return Next(it, result_arena);
+
+        return MakeEntry(data, result_arena);
     }
 
     while (true) {

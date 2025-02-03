@@ -446,6 +446,13 @@ ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments args);
 namespace dir_iterator {
 
 struct Options {
+    Options Clone(Allocator& a, CloneType) const {
+        return {
+            .wildcard = a.Clone(wildcard),
+            .get_file_size = get_file_size,
+            .skip_dot_files = skip_dot_files,
+        };
+    }
     String wildcard = "*";
     bool get_file_size = false;
     bool skip_dot_files = true;
@@ -460,14 +467,15 @@ struct Entry {
 struct Iterator {
     // private
     static ErrorCodeOr<Iterator> InternalCreate(ArenaAllocator& arena, String path, Options options) {
-        ASSERT(path.size);
+        ASSERT(IsValidUtf8(path));
+        ASSERT(path::IsAbsolute(path));
         ASSERT(options.wildcard.size);
+        ASSERT(IsValidUtf8(options.wildcard));
         ASSERT(!path::EndsWithDirectorySeparator(path));
         Iterator result {
-            .options = options,
+            .options = options.Clone(arena, CloneType::Deep),
             .base_path = arena.Clone(path),
         };
-        result.options.wildcard = arena.Clone(options.wildcard);
         return result;
     }
 
@@ -475,7 +483,6 @@ struct Iterator {
     void* handle;
     String base_path;
     bool reached_end;
-    Entry first_entry; // Windows only
 };
 
 struct RecursiveIterator {
@@ -485,6 +492,7 @@ struct RecursiveIterator {
     Options options;
 };
 
+// NOTE: these may succeed even if the folder doesn't exist. In which case, Next() will return an error.
 ErrorCodeOr<Iterator> Create(ArenaAllocator& a, String path, Options options);
 ErrorCodeOr<RecursiveIterator> RecursiveCreate(ArenaAllocator& a, String path, Options options);
 

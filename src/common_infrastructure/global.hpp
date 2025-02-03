@@ -36,7 +36,11 @@ PUBLIC void GlobalInit(GlobalInitOptions options) {
         ArenaAllocatorWithInlineStorage<2000> arena {PageAllocator::Instance()};
 
         auto const stacktrace = CurrentStacktrace(4);
-        auto const message = fmt::Format(arena, "[panic] {}\nAt {}", FromNullTerminated(message_c_str), loc);
+        auto const message = fmt::Format(arena,
+                                         "[panic] ({}) {}\nAt {}",
+                                         ToString(g_final_binary_type),
+                                         FromNullTerminated(message_c_str),
+                                         loc);
 
         // Step 1: log the error for easier local debugging.
         LogError(k_global_log_module, "{}", message);
@@ -102,7 +106,8 @@ PUBLIC void GlobalInit(GlobalInitOptions options) {
 
         FixedSizeAllocator<4000> allocator {nullptr};
 
-        auto const message = fmt::Format(allocator, "[crash] {}", crash_message);
+        auto const message =
+            fmt::Format(allocator, "[crash] ({}) {}", ToString(g_final_binary_type), crash_message);
 
         // Step 1: dump info to stderr.
         {

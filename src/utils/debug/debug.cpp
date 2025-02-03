@@ -335,7 +335,6 @@ __attribute__((
 static Allocator& StateAllocator() { return PageAllocator::Instance(); }
 
 Optional<String> InitStacktraceState(Optional<String> current_binary_path) {
-    LogDebug(k_global_log_module, "Initialising backtrace state");
     CountedInit(g_init, [current_binary_path] {
         if (current_binary_path) {
             ASSERT(current_binary_path->size);
@@ -363,14 +362,10 @@ Optional<String> InitStacktraceState(Optional<String> current_binary_path) {
             g_current_binary_path = p.ToOwnedSpan();
         }
 
-        LogDebug(k_global_log_module,
-                 "Initialising backtrace state for executable: {}",
-                 g_current_binary_path);
-
         auto state = PLACEMENT_NEW(g_backtrace_state_storage) BacktraceState;
         state->state = backtrace_create_state(
             g_current_binary_path.data, // filename must be a permanent, null-terminated buffer
-            1,
+            true,
             [](void* user_data, char const* msg, int errnum) {
                 auto& self = *(BacktraceState*)user_data;
                 self.failed_init_error.Emplace();

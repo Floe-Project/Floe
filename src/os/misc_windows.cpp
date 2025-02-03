@@ -81,9 +81,11 @@ OsInfo GetOsInfo() {
 }
 
 u64 RandomSeed() {
-    auto ticks = GetTickCount64();
-    auto pid = GetCurrentProcessId();
-    return (ticks << 32) | pid;
+    auto const pid = GetCurrentProcessId();
+    auto const tid = GetCurrentThreadId();
+    LARGE_INTEGER ticks;
+    QueryPerformanceCounter(&ticks);
+    return (u64)pid + (u64)tid + (u64)ticks.QuadPart;
 }
 
 bool IsRunningUnderWine() {

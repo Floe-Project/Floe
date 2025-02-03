@@ -205,6 +205,13 @@ template <typename... Args>
 void StdPrintF(StdStream stream, String format, Args const&... args) {
     auto _ = fmt::FormatToWriter(StdWriter(stream), format, args...);
 }
+template <typename... Args>
+void StdPrintFLocked(StdStream stream, String format, Args const&... args) {
+    auto& mutex = StdStreamMutex(stream);
+    mutex.Lock();
+    auto _ = fmt::FormatToWriter(StdWriter(stream), format, args...);
+    mutex.Unlock();
+}
 
 ErrorCodeOr<String> ReadAllStdin(Allocator& allocator);
 

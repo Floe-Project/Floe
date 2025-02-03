@@ -152,10 +152,7 @@ void InitLogger(LogConfig config) {
 
 void ShutdownLogger() {
     CountedDeinit(g_counted_init_flag, []() {
-        if (auto file = Exchange(g_file, nullptr)) {
-            StdPrintF(StdStream::Err, "{} closed log file\n", CurrentThreadId());
-            file->~File();
-        }
+        if (auto file = Exchange(g_file, nullptr)) file->~File();
         g_call_once_flag.Reset();
     });
 }

@@ -22,10 +22,14 @@ int FdFromPuglWorld(PuglWorld* world) {
 }
 
 // The CLAP API says that we need to use XEMBED protocol. Pugl doesn't do that so we need to do it ourselves.
-void X11SetEmbedInformation(PuglView* view) {
+void X11SetParent(PuglView* view, uintptr parent) {
 #ifdef __linux__
     auto display = (Display*)puglGetNativeWorld(puglGetWorld(view));
     auto window = (Window)puglGetNativeView(view);
+    ASSERT(window);
+
+    XReparentWindow(display, window, (Window)parent, 0, 0);
+    XFlush(display);
 
     Atom embed_info_atom = XInternAtom(display, "_XEMBED_INFO", 0);
     constexpr u32 k_xembed_protocol_version = 0;
@@ -41,20 +45,6 @@ void X11SetEmbedInformation(PuglView* view) {
                     ArraySize(embed_info_data));
 #else
     (void)view;
-#endif
-}
-
-// The CLAP API says that we need to use XEMBED protocol. Pugl doesn't do that so we need to do it ourselves.
-void X11SetParent(PuglView* view, uintptr parent) {
-#ifdef __linux__
-    auto display = (Display*)puglGetNativeWorld(puglGetWorld(view));
-    auto window = (Window)puglGetNativeView(view);
-
-    XReparentWindow(display, window, (Window)parent, 0, 0);
-    XFlush(display);
-#else
-    (void)view;
-    (void)parent;
 #endif
 }
 

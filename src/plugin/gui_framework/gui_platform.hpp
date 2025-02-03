@@ -98,7 +98,6 @@ inline FloeClapExtensionHost const* CustomFloeHost(clap_host const& host);
 // Linux only, we need a way get the file descriptor from the X11 Display, but there's all kinds of macro
 // problems if we directly include X11 headers here, so we'll do it in a separate translation unit
 int FdFromPuglWorld(PuglWorld* world);
-void X11SetEmbedInformation(PuglView* view);
 void X11SetParent(PuglView* view, uintptr parent);
 } // namespace detail
 
@@ -190,8 +189,6 @@ PUBLIC ErrorCodeOr<void> SetParent(GuiPlatform& platform, clap_window_t const& w
     ASSERT(!puglGetNativeView(platform.view), "SetParent called after window realised");
     // NOTE: "This must be called before puglRealize(), reparenting is not supported"
     TRY(Required(puglSetParentWindow(platform.view, (uintptr)window.ptr)));
-    detail::X11SetParent(platform.view, window.x11);
-    puglSetPosition(platform.view, 0, 0);
     return k_success;
 }
 
@@ -222,7 +219,9 @@ PUBLIC ErrorCodeOr<void> SetVisible(GuiPlatform& platform, bool visible, Engine&
                     "realised, native handle {}, world {}",
                     (void*)puglGetNativeView(platform.view),
                     (void*)puglGetWorld(platform.view));
-            detail::X11SetEmbedInformation(platform.view);
+
+            detail::X11SetParent(platform.view, puglGetParentWindow(platform.view));
+            puglSetPosition(platform.view, 0, 0);
 
             platform.gui.Emplace(platform.frame_state, plugin);
 
@@ -258,7 +257,6 @@ PUBLIC ErrorCodeOr<void> SetVisible(GuiPlatform& platform, bool visible, Engine&
         }
 
         TRY(Required(puglShow(platform.view, PUGL_SHOW_PASSIVE)));
-
     } else {
         // IMRPOVE: stop update timers, make things more efficient
         TRY(Required(puglHide(platform.view)));

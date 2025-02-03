@@ -4,7 +4,7 @@
 #pragma once
 #include "foundation/foundation.hpp"
 
-#include "settings/settings_file.hpp"
+#include "settings_file.hpp"
 
 namespace gui_settings {
 
@@ -15,6 +15,7 @@ constexpr UiSize k_aspect_ratio_without_keyboard = {100, 61};
 constexpr UiSize k_aspect_ratio_with_keyboard = {100, 68};
 
 constexpr u16 k_min_gui_width = k_aspect_ratio_with_keyboard.width * 2;
+constexpr u32 k_largest_gui_size = LargestRepresentableValue<u16>();
 
 static_assert(k_aspect_ratio_with_keyboard.width == k_aspect_ratio_without_keyboard.width,
               "We assume this to be the case in a couple of places.");

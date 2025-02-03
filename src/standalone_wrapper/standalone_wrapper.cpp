@@ -23,6 +23,7 @@
 
 #include "plugin/plugin/plugin.hpp"
 #include "plugin/processing_utils/audio_utils.hpp"
+#include "plugin/settings/settings_gui.hpp"
 
 // A very simple 'standalone' host for development purposes.
 
@@ -198,8 +199,8 @@ AudioCallback(ma_device* device, void* output_buffer, void const* input, ma_uint
     channels[0] = standalone->audio_buffers[0].data;
     channels[1] = standalone->audio_buffers[1].data;
 
-    memset(channels[0], 0, sizeof(f32) * num_buffer_frames);
-    memset(channels[1], 0, sizeof(f32) * num_buffer_frames);
+    ZeroMemory(channels[0], sizeof(f32) * num_buffer_frames);
+    ZeroMemory(channels[1], sizeof(f32) * num_buffer_frames);
 
     clap_process_t process {};
     process.frames_count = num_buffer_frames;
@@ -390,7 +391,19 @@ static PuglStatus OnEvent(PuglView* view, PuglEvent const* event) {
         case PUGL_NOTHING:
         case PUGL_REALIZE:
         case PUGL_UNREALIZE:
-        case PUGL_CONFIGURE:
+        case PUGL_CONFIGURE: {
+            if (event->configure.style & PUGL_VIEW_STYLE_MAPPED) {
+                LogDebug(k_main_log_module, "PUGL: {}", fmt::DumpStruct(event->configure));
+                auto gui = (clap_plugin_gui const*)p.plugin.get_extension(&p.plugin, CLAP_EXT_GUI);
+                ASSERT(gui);
+                if (gui->can_resize(&p.plugin)) {
+                    u32 width = event->configure.width;
+                    u32 height = event->configure.height;
+                    if (gui->adjust_size(&p.plugin, &width, &height)) gui->set_size(&p.plugin, width, height);
+                }
+            }
+            break;
+        }
         case PUGL_UPDATE:
         case PUGL_EXPOSE:
         case PUGL_FOCUS_IN:
@@ -469,8 +482,18 @@ inline ErrorCodeCategory const& ErrorCategoryForEnum(StandaloneError) { return s
 
 extern clap_plugin_entry const clap_entry;
 
-static ErrorCodeOr<void> Main() {
-    clap_entry.init("plugin-path");
+static ErrorCodeOr<void> Main(String exe_path_rel) {
+    ArenaAllocator arena {PageAllocator::Instance()};
+    auto exe_path = DynamicArray<char>::FromOwnedSpan(TRY(AbsolutePath(arena, exe_path_rel)), arena);
+
+    GlobalInit({
+        .current_binary_path = exe_path,
+        .init_error_reporting = true,
+        .set_main_thread = true,
+    });
+    DEFER { GlobalDeinit({.shutdown_error_reporting = true}); };
+
+    clap_entry.init(dyn::NullTerminated(exe_path));
     DEFER { clap_entry.deinit(); };
 
     Standalone standalone {};
@@ -495,17 +518,24 @@ static ErrorCodeOr<void> Main() {
 
     standalone.floe_host_ext.pugl_world = standalone.gui_world;
 
+    standalone.gui_view = puglNewView(standalone.gui_world);
+    DEFER { puglFreeView(standalone.gui_view); };
+    TRY_PUGL(puglSetViewHint(standalone.gui_view, PUGL_CONTEXT_DEBUG, RUNTIME_SAFETY_CHECKS_ON));
+    TRY_PUGL(puglSetBackend(standalone.gui_view, puglStubBackend()));
+    puglSetHandle(standalone.gui_view, &standalone);
+    TRY_PUGL(puglSetEventFunc(standalone.gui_view, OnEvent));
+    TRY_PUGL(puglSetViewString(standalone.gui_view, PUGL_WINDOW_TITLE, "Floe"));
+
     auto gui = (clap_plugin_gui const*)standalone.plugin.get_extension(&standalone.plugin, CLAP_EXT_GUI);
     TRY_CLAP(gui);
 
     TRY_CLAP(gui->create(&standalone.plugin, k_supported_gui_api, false));
 
-    standalone.gui_view = puglNewView(standalone.gui_world);
-    DEFER { puglFreeView(standalone.gui_view); };
-
     u32 clap_width;
     u32 clap_height;
     TRY_CLAP(gui->get_size(&standalone.plugin, &clap_width, &clap_height));
+    ASSERT(clap_width >= gui_settings::k_min_gui_width);
+    ASSERT(clap_width <= gui_settings::k_largest_gui_size);
 
     {
         auto const original_width = clap_width;
@@ -531,19 +561,17 @@ static ErrorCodeOr<void> Main() {
                                      (PuglSpan)resize_hints.aspect_ratio_width,
                                      (PuglSpan)resize_hints.aspect_ratio_height));
     }
+    TRY_PUGL(puglSetSize(standalone.gui_view, size.width, size.height));
 
-    TRY_PUGL(puglSetViewHint(standalone.gui_view, PUGL_CONTEXT_DEBUG, RUNTIME_SAFETY_CHECKS_ON));
-    TRY_PUGL(puglSetBackend(standalone.gui_view, puglStubBackend()));
-    puglSetHandle(standalone.gui_view, &standalone);
-    TRY_PUGL(puglSetEventFunc(standalone.gui_view, OnEvent));
-    TRY_PUGL(puglSetViewString(standalone.gui_view, PUGL_WINDOW_TITLE, "Floe"));
     TRY_PUGL(puglRealize(standalone.gui_view));
     DEFER { puglUnrealize(standalone.gui_view); };
 
-    clap_window const clap_window = {.ptr = (void*)puglGetNativeView(standalone.gui_view)};
+    clap_window const clap_window = {
+        .api = k_supported_gui_api,
+        .ptr = (void*)puglGetNativeView(standalone.gui_view),
+    };
     TRY_CLAP(gui->set_parent(&standalone.plugin, &clap_window));
 
-    TRY_PUGL(puglSetSize(standalone.gui_view, size.width, size.height));
     TRY_PUGL(puglShow(standalone.gui_view, PUGL_SHOW_RAISE));
     TRY_CLAP(gui->show(&standalone.plugin));
 
@@ -569,11 +597,8 @@ static ErrorCodeOr<void> Main() {
     return k_success;
 }
 
-int main() {
-    GlobalInit({.init_error_reporting = true, .set_main_thread = true});
-    DEFER { GlobalDeinit({.shutdown_error_reporting = true}); };
-
-    auto const o = Main();
+int main(int, char** argv) {
+    auto const o = Main(FromNullTerminated(argv[0]));
     if (o.HasError()) {
         LogError(k_main_log_module, "Standalone error: {}", o.Error());
         return 1;

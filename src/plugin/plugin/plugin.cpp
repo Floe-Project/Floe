@@ -120,13 +120,11 @@ clap_plugin_state const floe_plugin_state {
 
 static bool LogIfError(ErrorCodeOr<void> const& ec, String name) {
     if (ec.HasError()) {
-        LogError(k_main_log_module, "{}: {}", name, ec.Error());
+        ReportError(sentry::Error::Level::Warning, name);
         return false;
     }
     return true;
 }
-
-constexpr u32 k_largest_gui_size = LargestRepresentableValue<u16>();
 
 // Size (width, height) is in pixels; the corresponding windowing system extension is
 // responsible for defining if it is physical pixels or logical pixels.
@@ -180,7 +178,7 @@ clap_plugin_gui const floe_gui {
 
             ZoneScopedMessage(floe.trace_config, "gui create");
             floe.gui_platform.Emplace(floe.host, g_shared_engine_systems->settings);
-            return LogIfError(CreateView(*floe.gui_platform, *floe.engine), "CreateView");
+            return LogIfError(CreateView(*floe.gui_platform), "CreateView");
         } catch (PanicException) {
             return false;
         }
@@ -300,8 +298,8 @@ clap_plugin_gui const floe_gui {
                 return false;
             }
 
-            *clap_width = Clamp<u32>(*clap_width, 1, k_largest_gui_size);
-            *clap_height = Clamp<u32>(*clap_height, 1, k_largest_gui_size);
+            *clap_width = Clamp<u32>(*clap_width, 1, gui_settings::k_largest_gui_size);
+            *clap_height = Clamp<u32>(*clap_height, 1, gui_settings::k_largest_gui_size);
             auto const size = ClapPixelsToPhysicalPixels(floe.gui_platform->view, *clap_width, *clap_height);
 
             auto const aspect_ratio_conformed_size = gui_settings::GetNearestAspectRatioSizeInsideSize(
@@ -365,7 +363,9 @@ clap_plugin_gui const floe_gui {
             ZoneScopedMessage(floe.trace_config, "gui set_size {} {}", clap_width, clap_height);
 
             if (clap_width == 0 || clap_height == 0) return false;
-            if (clap_width > k_largest_gui_size || clap_height > k_largest_gui_size) return false;
+            if (clap_width > gui_settings::k_largest_gui_size ||
+                clap_height > gui_settings::k_largest_gui_size)
+                return false;
 
             auto const size = ClapPixelsToPhysicalPixels(floe.gui_platform->view, clap_width, clap_height);
 
@@ -424,7 +424,7 @@ clap_plugin_gui const floe_gui {
             auto const result = LogIfError(SetParent(*floe.gui_platform, *window), "SetParent");
 
             // Bitwig never calls show() so we do it here
-            auto _ = SetVisible(*floe.gui_platform, true);
+            auto _ = SetVisible(*floe.gui_platform, true, *floe.engine);
 
             return result;
         } catch (PanicException) {
@@ -462,7 +462,7 @@ clap_plugin_gui const floe_gui {
 
             LogDebug(k_clap_log_module, "#{} gui.show()", floe.index);
             ZoneScopedMessage(floe.trace_config, "gui show");
-            bool const result = LogIfError(SetVisible(*floe.gui_platform, true), "SetVisible");
+            bool const result = LogIfError(SetVisible(*floe.gui_platform, true, *floe.engine), "SetVisible");
             if (result) {
                 static bool shown_graphics_info = false;
                 if (!shown_graphics_info) {
@@ -499,7 +499,7 @@ clap_plugin_gui const floe_gui {
 
             LogDebug(k_clap_log_module, "gui.show()");
             ZoneScopedMessage(floe.trace_config, "gui hide");
-            return LogIfError(SetVisible(*floe.gui_platform, false), "SetVisible");
+            return LogIfError(SetVisible(*floe.gui_platform, false, *floe.engine), "SetVisible");
         } catch (PanicException) {
             return false;
         }

@@ -951,7 +951,7 @@ ErrorCodeOr<void> Rename(String from, String to) {
             // expect, but instead ERROR_ACCESS_DENIED. Let's try and fix that.
             if (PathIsANonEmptyDirectory(to_wide)) err = ERROR_DIR_NOT_EMPTY;
         }
-        return FilesystemWin32ErrorCode(err, "MoveFileW");
+        return FilesystemWin32ErrorCode(err, "MoveFileExW");
     }
     return k_success;
 }

@@ -40,6 +40,7 @@ ErrorCodeCategory const& ErrorCategoryForEnum(FilesystemError) { return k_fp_err
 static constexpr Optional<FilesystemError> TranslateErrnoCode(s64 ec) {
     switch (ec) {
         case ENOENT: return FilesystemError::PathDoesNotExist;
+        case EEXIST: return FilesystemError::PathAlreadyExists;
         case ENFILE: return FilesystemError::TooManyFilesOpen;
         case EROFS: // read-only
         case EACCES:

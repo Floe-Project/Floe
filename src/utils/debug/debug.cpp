@@ -313,7 +313,7 @@ ErrorCodeCategory const& StacktraceErrorCodeType() {
         .message = [](Writer const& writer, ErrorCode code) -> ErrorCodeOr<void> {
             String str {};
             switch ((StacktraceError)code.code) {
-                case StacktraceError::NotInitialised: str = "Not initialised"; break;
+                case StacktraceError::NotInitialised: str = "not initialised"; break;
             }
             return writer.WriteChars(str);
         }};

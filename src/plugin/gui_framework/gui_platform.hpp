@@ -56,13 +56,13 @@ static ErrorCodeCategory const gui_platform_error_code {
     .message = [](Writer const& writer, ErrorCode code) -> ErrorCodeOr<void> {
         String str {};
         switch ((GuiPlatformErrorCode)code.code) {
-            case GuiPlatformErrorCode::UnknownError: str = "Unknown error"; break;
-            case GuiPlatformErrorCode::Unsupported: str = "Unsupported"; break;
-            case GuiPlatformErrorCode::BackendFailed: str = "Backend init failed"; break;
-            case GuiPlatformErrorCode::RegistrationFailed: str = "Registration failed"; break;
-            case GuiPlatformErrorCode::RealizeFailed: str = "Realize failed"; break;
-            case GuiPlatformErrorCode::SetFormatFailed: str = "Set format failed"; break;
-            case GuiPlatformErrorCode::CreateContextFailed: str = "Create context failed"; break;
+            case GuiPlatformErrorCode::UnknownError: str = "unknown error"; break;
+            case GuiPlatformErrorCode::Unsupported: str = "unsupported"; break;
+            case GuiPlatformErrorCode::BackendFailed: str = "backend init failed"; break;
+            case GuiPlatformErrorCode::RegistrationFailed: str = "registration failed"; break;
+            case GuiPlatformErrorCode::RealizeFailed: str = "realize failed"; break;
+            case GuiPlatformErrorCode::SetFormatFailed: str = "set format failed"; break;
+            case GuiPlatformErrorCode::CreateContextFailed: str = "create context failed"; break;
         }
         return writer.WriteChars(str);
     },

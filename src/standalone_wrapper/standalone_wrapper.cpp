@@ -420,19 +420,19 @@ ErrorCodeCategory const pugl_error_category {
     .message = [](Writer const& writer, ErrorCode code) -> ErrorCodeOr<void> {
         String str {};
         switch ((PuglStatus)code.code) {
-            case PUGL_SUCCESS: str = "Success"; break;
-            case PUGL_FAILURE: str = "Failure"; break;
-            case PUGL_UNKNOWN_ERROR: str = "Unknown error"; break;
-            case PUGL_BAD_BACKEND: str = "Bad backend"; break;
-            case PUGL_BAD_CONFIGURATION: str = "Bad configuration"; break;
-            case PUGL_BAD_PARAMETER: str = "Bad parameter"; break;
-            case PUGL_BACKEND_FAILED: str = "Backend failed"; break;
-            case PUGL_REGISTRATION_FAILED: str = "Registration failed"; break;
-            case PUGL_REALIZE_FAILED: str = "Realize failed"; break;
-            case PUGL_SET_FORMAT_FAILED: str = "Set format failed"; break;
-            case PUGL_CREATE_CONTEXT_FAILED: str = "Create context failed"; break;
-            case PUGL_UNSUPPORTED: str = "Unsupported"; break;
-            case PUGL_NO_MEMORY: str = "No memory"; break;
+            case PUGL_SUCCESS: str = "success"; break;
+            case PUGL_FAILURE: str = "failure"; break;
+            case PUGL_UNKNOWN_ERROR: str = "unknown error"; break;
+            case PUGL_BAD_BACKEND: str = "bad backend"; break;
+            case PUGL_BAD_CONFIGURATION: str = "bad configuration"; break;
+            case PUGL_BAD_PARAMETER: str = "bad parameter"; break;
+            case PUGL_BACKEND_FAILED: str = "backend failed"; break;
+            case PUGL_REGISTRATION_FAILED: str = "registration failed"; break;
+            case PUGL_REALIZE_FAILED: str = "realize failed"; break;
+            case PUGL_SET_FORMAT_FAILED: str = "set format failed"; break;
+            case PUGL_CREATE_CONTEXT_FAILED: str = "create context failed"; break;
+            case PUGL_UNSUPPORTED: str = "unsupported"; break;
+            case PUGL_NO_MEMORY: str = "no memory"; break;
         }
         return writer.WriteChars(str);
     },
@@ -448,8 +448,8 @@ ErrorCodeCategory const standalone_error_category {
     .message = [](Writer const& writer, ErrorCode code) -> ErrorCodeOr<void> {
         String str {};
         switch ((StandaloneError)code.code) {
-            case StandaloneError::DeviceError: str = "Device error"; break;
-            case StandaloneError::PluginInterfaceError: str = "Plugin interface error"; break;
+            case StandaloneError::DeviceError: str = "device error"; break;
+            case StandaloneError::PluginInterfaceError: str = "plugin interface error"; break;
         }
         return writer.WriteChars(str);
     },

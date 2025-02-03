@@ -14,19 +14,19 @@ static constexpr ErrorCodeCategory k_fp_error_category {
     .message = [](Writer const& writer, ErrorCode e) -> ErrorCodeOr<void> {
         auto const get_str = [code = e.code]() -> String {
             switch ((FilesystemError)code) {
-                case FilesystemError::PathDoesNotExist: return "File or folder does not exist";
-                case FilesystemError::TooManyFilesOpen: return "Too many files open";
-                case FilesystemError::FolderContainsTooManyFiles: return "Folder is too large";
-                case FilesystemError::AccessDenied: return "Access is denied to this file or folder";
-                case FilesystemError::PathIsAFile: return "Path is a file";
-                case FilesystemError::PathIsAsDirectory: return "Path is a folder";
-                case FilesystemError::PathAlreadyExists: return "Path already exists";
-                case FilesystemError::FileWatcherCreationFailed: return "File watcher creation failed";
-                case FilesystemError::FilesystemBusy: return "Filesystem is busy";
-                case FilesystemError::DiskFull: return "Disk is full";
-                case FilesystemError::NotSupported: return "Not supported";
-                case FilesystemError::DifferentFilesystems: return "Paths are on different filesystems";
-                case FilesystemError::NotEmpty: return "Folder is not empty";
+                case FilesystemError::PathDoesNotExist: return "file or folder does not exist";
+                case FilesystemError::TooManyFilesOpen: return "too many files open";
+                case FilesystemError::FolderContainsTooManyFiles: return "folder is too large";
+                case FilesystemError::AccessDenied: return "access is denied to this file or folder";
+                case FilesystemError::PathIsAFile: return "path is a file";
+                case FilesystemError::PathIsAsDirectory: return "path is a folder";
+                case FilesystemError::PathAlreadyExists: return "path already exists";
+                case FilesystemError::FileWatcherCreationFailed: return "file watcher creation failed";
+                case FilesystemError::FilesystemBusy: return "filesystem is busy";
+                case FilesystemError::DiskFull: return "disk is full";
+                case FilesystemError::NotSupported: return "not supported";
+                case FilesystemError::DifferentFilesystems: return "paths are on different filesystems";
+                case FilesystemError::NotEmpty: return "folder is not empty";
                 case FilesystemError::Count: break;
             }
             return "";

@@ -190,9 +190,9 @@ PUBLIC ErrorCodeCategory const& CliErrorCodeType() {
                 return writer.WriteChars(({
                     String s {};
                     switch ((CliError)e.code) {
-                        case CliError::InvalidArguments: s = "Invalid arguments"; break;
-                        case CliError::HelpRequested: s = "Help requested"; break;
-                        case CliError::VersionRequested: s = "Version requested"; break;
+                        case CliError::InvalidArguments: s = "invalid arguments"; break;
+                        case CliError::HelpRequested: s = "help requested"; break;
+                        case CliError::VersionRequested: s = "version requested"; break;
                     }
                     s;
                 }));

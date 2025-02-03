@@ -30,7 +30,7 @@ ErrorCodeCategory const lua_error_category {
             case LuaErrorCode::Syntax: str = "Lua syntax error"; break;
             case LuaErrorCode::Runtime: str = "Lua runtime error"; break;
             case LuaErrorCode::Timeout: str = "Lua script took too long"; break;
-            case LuaErrorCode::Unexpected: str = "Something unexpected happened"; break;
+            case LuaErrorCode::Unexpected: str = "something unexpected happened"; break;
         }
         return writer.WriteChars(str);
     },

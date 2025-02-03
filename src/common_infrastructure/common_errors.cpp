@@ -11,10 +11,10 @@ ErrorCodeCategory const& CommonErrorCodeType() {
         .message = [](Writer const& writer, ErrorCode code) -> ErrorCodeOr<void> {
             String str {};
             switch ((CommonError)code.code) {
-                case CommonError::InvalidFileFormat: str = "Invalid file format"; break;
-                case CommonError::CurrentFloeVersionTooOld: str = "Current Floe version too old"; break;
-                case CommonError::PluginHostError: str = "Plugin host error"; break;
-                case CommonError::NotFound: str = "Item not found"; break;
+                case CommonError::InvalidFileFormat: str = "invalid file format"; break;
+                case CommonError::CurrentFloeVersionTooOld: str = "current Floe version too old"; break;
+                case CommonError::PluginHostError: str = "plugin host error"; break;
+                case CommonError::NotFound: str = "item not found"; break;
             }
             return writer.WriteChars(str);
         }};

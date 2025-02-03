@@ -32,14 +32,14 @@ static constexpr ErrorCodeCategory k_gl_error_category {
         String str {"unknown"};
         switch (code.code) {
             case GL_NO_ERROR: PanicIfReached(); break;
-            case GL_INVALID_ENUM: str = "Invalid enum"; break;
-            case GL_INVALID_VALUE: str = "Invalid value"; break;
-            case GL_INVALID_OPERATION: str = "Invalid operation"; break;
-            case GL_STACK_OVERFLOW: str = "Stack overflow"; break;
-            case GL_STACK_UNDERFLOW: str = "Stack underflow"; break;
-            case GL_OUT_OF_MEMORY: str = "Out of memory"; break;
-            case GL_TABLE_TOO_LARGE: str = "Table too large"; break;
-            case GL_INVALID_FRAMEBUFFER_OPERATION: str = "Invalid framebuffer operation"; break;
+            case GL_INVALID_ENUM: str = "invalid enum"; break;
+            case GL_INVALID_VALUE: str = "invalid value"; break;
+            case GL_INVALID_OPERATION: str = "invalid operation"; break;
+            case GL_STACK_OVERFLOW: str = "stack overflow"; break;
+            case GL_STACK_UNDERFLOW: str = "stack underflow"; break;
+            case GL_OUT_OF_MEMORY: str = "out of memory"; break;
+            case GL_TABLE_TOO_LARGE: str = "table too large"; break;
+            case GL_INVALID_FRAMEBUFFER_OPERATION: str = "invalid framebuffer operation"; break;
             default: {
                 PanicIfReached();
             }

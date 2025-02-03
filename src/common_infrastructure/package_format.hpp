@@ -58,12 +58,12 @@ PUBLIC ErrorCodeCategory const& PackageErrorCodeType() {
                 return writer.WriteChars(({
                     String s {};
                     switch ((PackageError)e.code) {
-                        case PackageError::FileCorrupted: s = "Package file is corrupted"_s; break;
-                        case PackageError::NotFloePackage: s = "Not a valid Floe package"_s; break;
-                        case PackageError::InvalidLibrary: s = "Library is invalid"_s; break;
-                        case PackageError::AccessDenied: s = "Access denied"_s; break;
-                        case PackageError::FilesystemError: s = "Filesystem error"_s; break;
-                        case PackageError::NotEmpty: s = "Directory not empty"_s; break;
+                        case PackageError::FileCorrupted: s = "package file is corrupted"_s; break;
+                        case PackageError::NotFloePackage: s = "not a valid Floe package"_s; break;
+                        case PackageError::InvalidLibrary: s = "library is invalid"_s; break;
+                        case PackageError::AccessDenied: s = "access denied"_s; break;
+                        case PackageError::FilesystemError: s = "filesystem error"_s; break;
+                        case PackageError::NotEmpty: s = "directory not empty"_s; break;
                     }
                     s;
                 }));

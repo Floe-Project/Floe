@@ -7,7 +7,6 @@
 #include "foundation/container/hash_table.hpp"
 #include "foundation/foundation.hpp"
 #include "os/filesystem.hpp"
-#include "utils/logger/logger.hpp"
 
 #include "common_errors.hpp"
 

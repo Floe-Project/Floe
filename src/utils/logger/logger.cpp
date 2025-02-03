@@ -196,61 +196,65 @@ void Log(LogModuleName module_name, LogLevel level, FunctionRef<ErrorCodeOr<void
                 ASSERT(IsValidUtf8(log_folder));
 
                 auto const standard_path = path::Join(arena, Array {log_folder, k_latest_log_filename});
-                auto const unique_path =
-                    path::Join(arena, Array {log_folder, UniqueFilename("", k_log_extension, seed)});
                 ASSERT(IsValidUtf8(standard_path));
-                ASSERT(IsValidUtf8(unique_path));
 
                 // We have a few requirements here:
-                // - If possible, we want to use a standard path that doesn't change because it makes tailing
-                //   the log easier.
+                // - If possible, we want a log file with a fix name so that it's easier to find and debug.
                 // - We don't want to overwrite any log files.
                 // - We need to correctly handle the case where other processes are running this same code.
                 for (auto _ : Range(50)) {
-                    // We try to oust the standard log file by renaming it to a unique name. Rename is atomic.
-                    // If another process is already using the log file, they will continue to do so safely,
-                    // but it will be under the new name.
-                    auto const o = Rename(standard_path, unique_path);
-
-                    // If that succeeded, we can attempt to gain exclusive access to the file.
-                    if (o.Succeeded() || (o.HasError() && o.Error() == FilesystemError::PathDoesNotExist)) {
-                        auto file_outcome = OpenFile(
-                            standard_path,
-                            {
-                                .capability = FileMode::Capability::Write | FileMode::Capability::Append,
-                                .share = FileMode::Share::DeleteRename | FileMode::Share::ReadWrite,
-                                .creation = FileMode::Creation::CreateNew, // Exclusive access
-                            });
-
-                        if (file_outcome.HasError()) {
-                            if (file_outcome.Error() == FilesystemError::PathAlreadyExists) {
-                                // We tried creating a new file but it already exists, another process must
-                                // have created it between our Rename and OpenFile calls. Let's try again.
+                    // Try opening the file with exclusive access.
+                    auto file_outcome =
+                        OpenFile(standard_path,
+                                 {
+                                     .capability = FileMode::Capability::Append,
+                                     .share = FileMode::Share::DeleteRename | FileMode::Share::ReadWrite,
+                                     .creation = FileMode::Creation::CreateNew, // Exclusive access
+                                 });
+                    if (file_outcome.HasError()) {
+                        if (file_outcome.Error() == FilesystemError::PathAlreadyExists) {
+                            // We try to oust the standard log file by renaming it to a unique name. Rename is
+                            // atomic. If another process is already using the log file, they will continue to
+                            // do so safely, but it will be under the new name.
+                            auto const unique_path =
+                                path::Join(arena,
+                                           Array {log_folder, UniqueFilename("", k_log_extension, seed)});
+                            ASSERT(IsValidUtf8(unique_path));
+                            auto const rename_o = Rename(standard_path, unique_path);
+                            if (rename_o.Succeeded()) {
+                                // We successfully renamed the file. Now let's try opening it again.
                                 continue;
+                            } else {
+                                if (rename_o.Error() == FilesystemError::PathDoesNotExist) {
+                                    // The file was deleted between our OpenFile and Rename calls. Let's try
+                                    // again.
+                                    continue;
+                                }
+
+                                StdPrintFLocked(StdStream::Err,
+                                                "{} failed to rename log file: {}\n",
+                                                CurrentThreadId(),
+                                                rename_o.Error());
+                                return;
                             }
-                            StdPrintF(StdStream::Err,
-                                      "{} failed to open log file: {}\n",
-                                      CurrentThreadId(),
-                                      file_outcome.Error());
-                            return;
                         }
 
-                        StdPrintF(StdStream::Err, "{} opened log file\n", CurrentThreadId());
-                        auto file = PLACEMENT_NEW(g_file_storage) File {file_outcome.ReleaseValue()};
-                        g_file = file;
-                        return;
-                    } else {
-                        StdPrintF(StdStream::Err,
-                                  "{} failed to rename log file: {}\n",
-                                  CurrentThreadId(),
-                                  o.Error());
+                        // Some other error occurred, not much we can do.
+                        StdPrintFLocked(StdStream::Err,
+                                        "{} failed to open log file: {}\n",
+                                        CurrentThreadId(),
+                                        file_outcome.Error());
                         return;
                     }
+
+                    auto file = PLACEMENT_NEW(g_file_storage) File {file_outcome.ReleaseValue()};
+                    g_file = file;
+                    return;
                 }
 
-                StdPrintF(StdStream::Err,
-                          "{} failed to open log file: too many attempts\n",
-                          CurrentThreadId());
+                StdPrintFLocked(StdStream::Err,
+                                "{} failed to open log file: too many attempts\n",
+                                CurrentThreadId());
                 return;
             });
 

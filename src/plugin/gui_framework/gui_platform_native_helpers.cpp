@@ -45,6 +45,7 @@ void X11SetParent(PuglView* view, uintptr parent) {
                     ArraySize(embed_info_data));
 #else
     (void)view;
+    (void)parent;
 #endif
 }
 

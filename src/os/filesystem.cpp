@@ -121,22 +121,30 @@ MutableString FloeKnownDirectory(Allocator& a,
     KnownDirectoryType known_dir_type {};
     Span<String const> subdirectories {};
     switch (type) {
-        case FloeKnownDirectoryType::Logs:
+        case FloeKnownDirectoryType::Logs: {
             known_dir_type = KnownDirectoryType::Logs;
-            subdirectories = Array {"Floe"_s};
+            static constexpr auto k_dirs = Array {"Floe"_s};
+            subdirectories = k_dirs;
             break;
-        case FloeKnownDirectoryType::Settings:
+        }
+        case FloeKnownDirectoryType::Settings: {
             known_dir_type = KnownDirectoryType::GlobalData;
-            subdirectories = Array {"Floe"_s, "Settings"};
+            static constexpr auto k_dirs = Array {"Floe"_s, "Settings"};
+            subdirectories = k_dirs;
             break;
-        case FloeKnownDirectoryType::Presets:
+        }
+        case FloeKnownDirectoryType::Presets: {
             known_dir_type = KnownDirectoryType::GlobalData;
-            subdirectories = Array {"Floe"_s, "Presets"};
+            static constexpr auto k_dirs = Array {"Floe"_s, "Presets"};
+            subdirectories = k_dirs;
             break;
-        case FloeKnownDirectoryType::Libraries:
+        }
+        case FloeKnownDirectoryType::Libraries: {
             known_dir_type = KnownDirectoryType::GlobalData;
-            subdirectories = Array {"Floe"_s, "Libraries"};
+            static constexpr auto k_dirs = Array {"Floe"_s, "Libraries"};
+            subdirectories = k_dirs;
             break;
+        }
     }
     return KnownDirectoryWithSubdirectories(a, known_dir_type, subdirectories, filename, options);
 }

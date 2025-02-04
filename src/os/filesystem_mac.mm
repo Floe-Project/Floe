@@ -206,12 +206,14 @@ MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirecto
             }
             return result;
         }
-        case KnownDirectoryType::Logs:
+        case KnownDirectoryType::Logs: {
             dir_type = NSLibraryDirectory;
             domain = NSUserDomainMask;
-            extra_subdirs = Array {"Logs"_s};
+            static constexpr auto k_dirs = Array {"Logs"_s};
+            extra_subdirs = k_dirs;
             fallback = "Library";
             break;
+        }
         case KnownDirectoryType::Documents:
             dir_type = NSDocumentDirectory;
             domain = NSUserDomainMask;
@@ -269,37 +271,47 @@ MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirecto
             fallback = "Application Support";
             break;
 
-        case KnownDirectoryType::GlobalVst3Plugins:
+        case KnownDirectoryType::GlobalVst3Plugins: {
             dir_type = NSLibraryDirectory;
             domain = NSLocalDomainMask;
-            extra_subdirs = Array {"Audio"_s, "Plug-Ins", "VST3"};
+            static constexpr auto k_dirs = Array {"Audio"_s, "Plug-Ins", "VST3"};
+            extra_subdirs = k_dirs;
             fallback = "/Library";
             break;
-        case KnownDirectoryType::UserVst3Plugins:
+        }
+        case KnownDirectoryType::UserVst3Plugins: {
             dir_type = NSLibraryDirectory;
             domain = NSUserDomainMask;
-            extra_subdirs = Array {"Audio"_s, "Plug-Ins", "VST3"};
+            static constexpr auto k_dirs = Array {"Audio"_s, "Plug-Ins", "VST3"};
+            extra_subdirs = k_dirs;
             fallback = "Library";
             break;
-        case KnownDirectoryType::GlobalClapPlugins:
+        }
+        case KnownDirectoryType::GlobalClapPlugins: {
             dir_type = NSLibraryDirectory;
             domain = NSLocalDomainMask;
-            extra_subdirs = Array {"Audio"_s, "Plug-Ins", "CLAP"};
+            static constexpr auto k_dirs = Array {"Audio"_s, "Plug-Ins", "CLAP"};
+            extra_subdirs = k_dirs;
             fallback = "/Library";
             break;
-        case KnownDirectoryType::UserClapPlugins:
+        }
+        case KnownDirectoryType::UserClapPlugins: {
             dir_type = NSLibraryDirectory;
             domain = NSUserDomainMask;
-            extra_subdirs = Array {"Audio"_s, "Plug-Ins", "CLAP"};
+            static constexpr auto k_dirs = Array {"Audio"_s, "Plug-Ins", "CLAP"};
+            extra_subdirs = k_dirs;
             fallback = "Library";
             break;
+        }
 
-        case KnownDirectoryType::LegacyPluginSettings:
+        case KnownDirectoryType::LegacyPluginSettings: {
             dir_type = NSMusicDirectory;
             domain = NSUserDomainMask;
-            extra_subdirs = Array {"Audio Music Apps"_s, "Plug-In Settings"};
+            static constexpr auto k_dirs = Array {"Audio Music Apps"_s, "Plug-In Settings"};
+            extra_subdirs = k_dirs;
             fallback = "Music";
             break;
+        }
         case KnownDirectoryType::LegacyData:
             dir_type = NSApplicationSupportDirectory;
             domain = NSUserDomainMask;

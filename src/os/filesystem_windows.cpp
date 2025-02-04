@@ -537,26 +537,34 @@ MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirecto
             config.fallback_user = "AppData\\Roaming";
             break;
 
-        case KnownDirectoryType::GlobalClapPlugins:
+        case KnownDirectoryType::GlobalClapPlugins: {
             config.folder_id = FOLDERID_ProgramFilesCommon;
-            config.subfolders = Array {L"CLAP"_s};
+            static constexpr auto k_dirs = Array {L"CLAP"_s};
+            config.subfolders = k_dirs;
             config.fallback_absolute = "C:\\Program Files\\Common Files\\CLAP";
             break;
-        case KnownDirectoryType::UserClapPlugins:
+        }
+        case KnownDirectoryType::UserClapPlugins: {
             config.folder_id = FOLDERID_LocalAppData;
-            config.subfolders = Array {L"CLAP"_s};
+            static constexpr auto k_dirs = Array {L"CLAP"_s};
+            config.subfolders = k_dirs;
             config.fallback_user = "AppData\\Local\\CLAP";
             break;
-        case KnownDirectoryType::GlobalVst3Plugins:
+        }
+        case KnownDirectoryType::GlobalVst3Plugins: {
             config.folder_id = FOLDERID_ProgramFilesCommon;
-            config.subfolders = Array {L"VST3"_s};
+            static constexpr auto k_dirs = Array {L"VST3"_s};
+            config.subfolders = k_dirs;
             config.fallback_absolute = "C:\\Program Files\\Common Files\\VST3";
             break;
-        case KnownDirectoryType::UserVst3Plugins:
+        }
+        case KnownDirectoryType::UserVst3Plugins: {
             config.folder_id = FOLDERID_UserProgramFilesCommon;
             config.fallback_user = "AppData\\Local\\Programs\\Common";
-            config.subfolders = Array {L"VST3"_s};
+            static constexpr auto k_dirs = Array {L"VST3"_s};
+            config.subfolders = k_dirs;
             break;
+        }
 
         case KnownDirectoryType::LegacyAllUsersData:
             config.folder_id = FOLDERID_Public;

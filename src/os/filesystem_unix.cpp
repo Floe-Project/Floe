@@ -246,7 +246,8 @@ ErrorCodeOr<File> OpenFile(String filename, FileMode mode) {
         case FileMode::Creation::TruncateExisting: flags |= O_TRUNC; break;
     }
 
-    int fd = open(NullTerminated(filename, temp_allocator), flags, mode.default_permissions);
+    int fd =
+        open(NullTerminated(filename, temp_allocator), flags, CheckedCast<mode_t>(mode.default_permissions));
     if (fd == -1) return FilesystemErrnoErrorCode(errno, "open");
 
     if (mode.everyone_read_write) {

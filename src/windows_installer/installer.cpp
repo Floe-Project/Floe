@@ -224,6 +224,21 @@ static void SwitchPage(Application& app, GuiFramework& framework, Pages page) {
         case Pages::Summary: break;
         case Pages::Count: PanicIfReached(); break;
     }
+
+    if (AutorunMode(framework)) {
+        switch (page) {
+            case Pages::Configuration: {
+                EditWidget(framework, app.next_button, {.simulate_button_press = true});
+                break;
+            }
+            case Pages::Installing: break;
+            case Pages::Summary: {
+                EditWidget(framework, app.next_button, {.simulate_button_press = true});
+                break;
+            }
+            case Pages::Count: PanicIfReached(); break;
+        }
+    }
 }
 
 Application* CreateApplication(GuiFramework& framework, u32 root_layout_id) {
@@ -257,6 +272,21 @@ Application* CreateApplication(GuiFramework& framework, u32 root_layout_id) {
                         "Failed to get install directory {}: {}",
                         app->components[i].install_dir,
                         error_buffer);
+
+        switch ((ComponentTypes)i) {
+            case ComponentTypes::Clap:
+                ASSERT(
+                    IsEqualToCaseInsensitiveAscii(path::Filename(app->components[i].install_dir), "CLAP"_s));
+                break;
+#ifdef VST3_PLUGIN_PATH
+            case ComponentTypes::VST3:
+                ASSERT(
+                    IsEqualToCaseInsensitiveAscii(path::Filename(app->components[i].install_dir), "VST3"_s));
+                break;
+#endif
+
+            case ComponentTypes::Count: break;
+        }
     }
 
     constexpr u16 k_margin = 10;
@@ -493,9 +523,17 @@ Application* CreateApplication(GuiFramework& framework, u32 root_layout_id) {
     return app;
 }
 
-void DestroyApplication(Application& app, GuiFramework&) {
+int DestroyApplication(Application& app, GuiFramework&) {
+    int result = 0;
+    for (auto const& r : app.installation_results.Use([](InstallationResults const& r) { return r; }))
+        if (r.HasError()) {
+            result = 1;
+            break;
+        }
+
     if (app.installing_thread.Joinable()) app.installing_thread.Join();
     delete &app;
+    return result;
 }
 
 void OnTimer(Application& app, GuiFramework& framework) {

@@ -139,6 +139,7 @@ struct EditWidgetOptions {
         Span<String> items {};
     };
 
+    Optional<bool> simulate_button_press;
     Optional<bool> visible;
     Optional<bool> enabled;
     Optional<String> text;
@@ -151,17 +152,12 @@ struct EditWidgetOptions {
 void EditWidget(GuiFramework&, u32 id, EditWidgetOptions const& options);
 
 String GetText(GuiFramework& framework, u32 id);
+bool AutorunMode(GuiFramework& framework);
 
 // Defined in installer code
 Application* CreateApplication(GuiFramework& framework, u32 root_layout);
 void OnTimer(Application& app, GuiFramework& framework);
-void DestroyApplication(Application& app, GuiFramework& framework);
+[[nodiscard]] int DestroyApplication(Application& app, GuiFramework& framework); // returns main return code
 
 void ExitProgram(GuiFramework& framework);
 void ErrorDialog(GuiFramework& framework, String title);
-
-// Internal
-inline bool ExpandsInDimension(WidgetOptions const& options, int dim) {
-    bool const expand[2] = {options.expand_x, options.expand_y};
-    return expand[dim];
-}

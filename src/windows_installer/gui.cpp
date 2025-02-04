@@ -20,6 +20,7 @@
 #include "os/misc.hpp"
 #include "os/misc_windows.hpp"
 #include "os/threading.hpp"
+#include "utils/cli_arg_parse.hpp"
 #include "utils/debug/debug.hpp"
 #include "utils/logger/logger.hpp"
 
@@ -30,6 +31,8 @@
 
 constexpr auto k_page_class_name = L"floe-page";
 constexpr auto k_divider_class_name = L"floe-divider";
+
+constexpr auto k_log_module = "🖥️gui"_log_module;
 
 enum class ProgressBarMode { None, Marquee, Normal };
 
@@ -78,6 +81,7 @@ struct GuiFramework {
     ArenaAllocator arena {PageAllocator::Instance()};
     DynamicArray<char> buffer {arena};
     bool in_timer = false;
+    bool autorun_mode = false;
 };
 
 struct WindowRect {
@@ -167,6 +171,11 @@ static UiSize LabelSize(HWND label, Optional<UiSize> container) {
 }
 
 static UiSize ButtonSize(HWND button) { return ExpandChecked(LabelSize(button, k_nullopt), {20, 10}); }
+
+inline bool ExpandsInDimension(WidgetOptions const& options, int dim) {
+    bool const expand[2] = {options.expand_x, options.expand_y};
+    return expand[dim];
+}
 
 // This function returns the minimum acceptable size of the widget. The caller may decide to use a larger size
 // than this.
@@ -416,6 +425,8 @@ void ExitProgram(GuiFramework& framework) {
     PostQuitMessage(0);
 }
 
+bool AutorunMode(GuiFramework& framework) { return framework.autorun_mode; }
+
 void EditWidget(GuiFramework& framework, u32 id, EditWidgetOptions const& options) {
     framework.scratch_arena.ResetCursorAndConsolidateRegions();
     auto& widget = framework.widgets[id];
@@ -480,6 +491,11 @@ void EditWidget(GuiFramework& framework, u32 id, EditWidgetOptions const& option
                 SendMessageW(widget.window, WM_SETFONT, (WPARAM)framework.heading_font, TRUE);
                 break;
         }
+    }
+    if (options.simulate_button_press) {
+        HWND parent_window = GetParent(widget.window);
+        ASSERT(parent_window);
+        PostMessageW(parent_window, WM_COMMAND, MAKEWPARAM(id, BN_CLICKED), (LPARAM)widget.window);
     }
 }
 
@@ -910,10 +926,13 @@ static LRESULT CALLBACK PageWindowProc(HWND window, UINT msg, WPARAM w_param, LP
             break;
         }
         case WM_COMMAND: {
+            LogDebug(k_log_module, "WM_COMMAND");
             auto& widget = *(Widget*)GetWindowLongPtrW(window, GWLP_USERDATA);
             if (!widget.framework->app) break;
             auto const event = HIWORD(w_param);
+            LogDebug(k_log_module, "event: {}", event);
             if (event == BN_CLICKED) {
+                LogDebug(k_log_module, "BN_CLICKED");
                 // l_param is a HWND to the button, but for some reason getting the window style using
                 // GetWindowLongPtrW(button, GLW_STYLE) does not return a value that contains the button
                 // styles BS_PUSHBUTTON, etc. So instead we're just doing a search through the list of
@@ -1051,12 +1070,41 @@ static LRESULT CALLBACK PageWindowProc(HWND window, UINT msg, WPARAM w_param, LP
     return DefWindowProcW(window, msg, w_param, l_param);
 }
 
-static ErrorCodeOr<void> Main(HINSTANCE h_instance, int cmd_show) {
+enum class InstallerCliArgs { Autorun, Count };
+
+auto constexpr k_cli_arg_defs = MakeCommandLineArgDefs<InstallerCliArgs>({
+    {
+        .id = (u32)InstallerCliArgs::Autorun,
+        .key = "autorun",
+        .description = "Automatically run with default options",
+        .value_type = "flag",
+        .required = false,
+        .num_values = 0,
+    },
+});
+
+static ErrorCodeOr<int> Main(HINSTANCE h_instance, int cmd_show, ArgsCstr args) {
+    GlobalInit({.init_error_reporting = true, .set_main_thread = true});
+    DEFER { GlobalDeinit({.shutdown_error_reporting = true}); };
+
+    ArenaAllocatorWithInlineStorage<1024> arena {PageAllocator::Instance()};
+
+    auto const cli_args = TRY(ParseCommandLineArgsStandard(arena,
+                                                           args,
+                                                           k_cli_arg_defs,
+                                                           {
+                                                               .handle_help_option = true,
+                                                               .print_usage_on_error = true,
+                                                               .description = "Install Floe plugins",
+                                                               .version = FLOE_VERSION_STRING,
+                                                           }));
+
     constexpr INITCOMMONCONTROLSEX k_init_cc {.dwSize = sizeof(INITCOMMONCONTROLSEX),
                                               .dwICC = ICC_LINK_CLASS};
     InitCommonControlsEx(&k_init_cc);
 
     GuiFramework framework {};
+    framework.autorun_mode = cli_args[(u32)InstallerCliArgs::Autorun].was_provided;
 
     if (auto hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE); hr != S_OK)
         return HresultErrorCode(hr, "CoInitialiseEx");
@@ -1182,7 +1230,6 @@ static ErrorCodeOr<void> Main(HINSTANCE h_instance, int cmd_show) {
     UpdateWindow(framework.root);
 
     framework.app = CreateApplication(framework, root_layout_id);
-    DEFER { DestroyApplication(*framework.app, framework); };
 
     SetTimer(framework.root, k_timer_id, k_timer_ms, nullptr);
 
@@ -1192,16 +1239,45 @@ static ErrorCodeOr<void> Main(HINSTANCE h_instance, int cmd_show) {
         DispatchMessageW(&msg);
     }
 
-    return k_success;
+    return DestroyApplication(*framework.app, framework);
 }
 
 int WINAPI WinMain(HINSTANCE h_instance, HINSTANCE, LPSTR, int cmd_show) {
-    GlobalInit({.init_error_reporting = true, .set_main_thread = true});
-    DEFER { GlobalDeinit({.shutdown_error_reporting = true}); };
+    bool attached = false;
+    struct ConsoleMode {
+        DWORD output_handle;
+        Optional<DWORD> original_mode;
+    };
+    auto console_modes = ArrayT<ConsoleMode>({
+        {.output_handle = STD_OUTPUT_HANDLE},
+        {.output_handle = STD_ERROR_HANDLE},
+    });
+    if (AttachConsole(ATTACH_PARENT_PROCESS)) {
+        attached = true;
+        for (auto& cm : console_modes) {
+            DWORD starting_mode {};
+            auto handle = GetStdHandle(cm.output_handle);
+            if (GetConsoleMode(handle, &starting_mode)) {
+                // enable converting \n to \r\n
+                auto new_mode = starting_mode;
+                new_mode &= ~(DWORD)DISABLE_NEWLINE_AUTO_RETURN;
+                if (SetConsoleMode(handle, new_mode)) cm.original_mode = starting_mode;
+            }
+        }
+    }
+    DEFER {
+        for (auto& cm : console_modes)
+            if (cm.original_mode.HasValue()) {
+                auto handle = GetStdHandle(cm.output_handle);
+                SetConsoleMode(handle, cm.original_mode.Value());
+            }
+        if (attached) FreeConsole();
+    };
 
-    if (auto o = Main(h_instance, cmd_show); o.HasError()) {
+    if (auto const o = Main(h_instance, cmd_show, ArgsCstr {__argc, __argv}); o.HasValue()) {
+        return o.Value();
+    } else {
         PanicF(SourceLocation::Current(), "{}", o.Error());
         return 1;
     }
-    return 0;
 }

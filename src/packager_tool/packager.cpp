@@ -151,6 +151,9 @@ PackageName(ArenaAllocator& arena, sample_lib::Library const* lib, CommandLineAr
 }
 
 static ErrorCodeOr<int> Main(ArgsCstr args) {
+    GlobalInit({.init_error_reporting = true, .set_main_thread = true});
+    DEFER { GlobalDeinit({.shutdown_error_reporting = true}); };
+
     ArenaAllocator arena {PageAllocator::Instance()};
     auto const program_name = path::Filename(FromNullTerminated(args.args[0]));
 
@@ -237,9 +240,6 @@ static ErrorCodeOr<int> Main(ArgsCstr args) {
 }
 
 int main(int argc, char** argv) {
-    GlobalInit({.init_error_reporting = true, .set_main_thread = true});
-    DEFER { GlobalDeinit({.shutdown_error_reporting = true}); };
-
     auto const result = Main({argc, argv});
     if (result.HasError()) {
         StdPrintF(StdStream::Err, "Error: {}\n", result.Error());

@@ -46,6 +46,9 @@ struct Settings {
         u16 window_width {0};
     } gui;
 
+    // general
+    bool online_reporting_disabled {};
+
     // We keep hold of entries in the file that we don't use. Other versions of Floe might still want these
     // so lets keep hold of them, and write them back to the file.
     Span<String> unknown_lines_from_file {};
@@ -54,8 +57,10 @@ struct Settings {
 };
 
 struct SettingsTracking {
-    TrivialFixedSizeFunction<8, void()> on_window_size_change {};
-    TrivialFixedSizeFunction<8, void(ScanFolderType)> on_filesystem_change {}; // single function
+    enum class ChangeType { WindowSize, ScanFolder, OnlineReportingDisabled };
+    using Change = TaggedUnion<ChangeType, TypeAndTag<ScanFolderType, ChangeType::ScanFolder>>;
+
+    TrivialFixedSizeFunction<8, void(Change)> on_change {};
     bool changed {};
 };
 

@@ -170,6 +170,20 @@ Optional<String> LogFolder() {
     return g_log_folder_path;
 }
 
+String SettingsFilepath(String* error_log) {
+    static DynamicArrayBounded<char, 200> error_log_buffer;
+    static String path = []() {
+        static FixedSizeAllocator<500> allocator {&PageAllocator::Instance()};
+        auto writer = dyn::WriterFor(error_log_buffer);
+        return FloeKnownDirectory(allocator,
+                                  FloeKnownDirectoryType::Settings,
+                                  "settings.ini"_s,
+                                  {.create = true, .error_log = &writer});
+    }();
+    if (error_log) *error_log = error_log_buffer;
+    return path;
+}
+
 ErrorCodeOr<MutableString>
 TemporaryDirectoryWithinFolder(String existing_abs_folder, Allocator& a, u64& seed) {
     auto result =

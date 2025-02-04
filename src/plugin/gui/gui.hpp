@@ -17,7 +17,7 @@
 #include "gui_framework/layout.hpp"
 #include "gui_layer.hpp"
 #include "gui_preset_browser.hpp"
-#include "settings/settings_file.hpp"
+#include "settings/settings.hpp"
 
 struct GuiFrameInput;
 

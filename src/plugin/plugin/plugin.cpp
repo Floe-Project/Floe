@@ -25,7 +25,7 @@
 #include "plugin.hpp"
 #include "processing_utils/scoped_denormals.hpp"
 #include "processor/processor.hpp"
-#include "settings/settings_file.hpp"
+#include "settings/settings.hpp"
 
 //
 #include "os/undef_windows_macros.h"

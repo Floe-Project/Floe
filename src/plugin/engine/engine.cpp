@@ -17,7 +17,7 @@
 #include "plugin/plugin.hpp"
 #include "processor/layer_processor.hpp"
 #include "sample_lib_server/sample_library_server.hpp"
-#include "settings/settings_file.hpp"
+#include "settings/settings.hpp"
 #include "shared_engine_systems.hpp"
 #include "state/instrument.hpp"
 #include "state/state_coding.hpp"

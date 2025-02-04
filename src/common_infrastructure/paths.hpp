@@ -4,7 +4,6 @@
 #pragma once
 #include "foundation/foundation.hpp"
 #include "os/filesystem.hpp"
-#include "utils/logger/logger.hpp"
 
 #include "common_infrastructure/error_reporting.hpp"
 
@@ -22,26 +21,13 @@ static Span<String> PossibleSettingsPaths(ArenaAllocator& arena) {
 
     // Best path
     {
-        ArenaAllocatorWithInlineStorage<500> scratch_arena {PageAllocator::Instance()};
-        DynamicArray<char> error_log {scratch_arena};
-        auto error_writer = dyn::WriterFor(error_log);
-        dyn::Append(result,
-                    FloeKnownDirectory(arena,
-                                       FloeKnownDirectoryType::Settings,
-                                       "settings.ini"_s,
-                                       {
-                                           .create = true,
-                                           .error_log = &error_writer,
-                                       }));
+        String error_log {};
+        dyn::Append(result, SettingsFilepath(&error_log));
         if (error_log.size) {
-            sentry::Error error {{
-                .level = sentry::ErrorEvent::Level::Warning,
-            }};
-            error.message = fmt::Format(error.arena,
-                                        "Failed to get known settings directory {}\n{}",
-                                        Last(result),
-                                        error_log);
-            ReportError(Move(error));
+            ReportError(sentry::ErrorEvent::Level::Warning,
+                        "Failed to get known settings directory {}\n{}",
+                        Last(result),
+                        error_log);
         }
     }
 

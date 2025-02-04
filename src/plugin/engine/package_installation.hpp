@@ -5,7 +5,7 @@
 #include "common_infrastructure/package_format.hpp"
 
 #include "sample_lib_server/sample_library_server.hpp"
-#include "settings/settings_file.hpp"
+#include "settings/settings.hpp"
 
 // This is a higher-level API on top of package_format.hpp.
 //

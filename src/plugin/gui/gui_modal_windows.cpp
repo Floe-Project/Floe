@@ -21,7 +21,7 @@
 #include "gui_widget_helpers.hpp"
 #include "gui_window.hpp"
 #include "presets/presets_folder.hpp"
-#include "settings/settings_file.hpp"
+#include "settings/settings.hpp"
 
 PUBLIC Rect ModalRect(imgui::Context const& imgui, f32 width, f32 height) {
     auto const size = f32x2 {width, height};

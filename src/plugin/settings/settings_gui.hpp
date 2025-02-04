@@ -4,7 +4,7 @@
 #pragma once
 #include "foundation/foundation.hpp"
 
-#include "settings_file.hpp"
+#include "settings.hpp"
 
 namespace gui_settings {
 
@@ -89,7 +89,7 @@ PUBLIC void SetWindowSize(Settings::Gui& gui, SettingsTracking& tracking, u16 wi
     if (gui.window_width == new_width) return;
     gui.window_width = new_width;
     tracking.changed = true;
-    if (tracking.on_window_size_change) tracking.on_window_size_change();
+    if (tracking.on_change) tracking.on_change(SettingsTracking::ChangeType::WindowSize);
 }
 
 PUBLIC f32 KeyboardHeight(Settings::Gui const& gui) {
@@ -103,7 +103,16 @@ PUBLIC void SetShowKeyboard(Settings::Gui& gui, SettingsTracking& tracking, bool
     ASSERT(CheckThreadName("main"));
     gui.show_keyboard = show;
     tracking.changed = true;
-    if (tracking.on_window_size_change) tracking.on_window_size_change();
+    if (tracking.on_change) tracking.on_change(SettingsTracking::ChangeType::WindowSize);
+}
+
+// TODO: this should go somewhere else, it's not really a gui setting
+PUBLIC void SetDisableOnlineReporting(SettingsFile& settings, bool disable) {
+    ASSERT(CheckThreadName("main"));
+    settings.settings.online_reporting_disabled = disable;
+    settings.tracking.changed = true;
+    if (settings.tracking.on_change)
+        settings.tracking.on_change(SettingsTracking::ChangeType::OnlineReportingDisabled);
 }
 
 } // namespace gui_settings

@@ -4,7 +4,7 @@
 #pragma once
 #include "os/threading.hpp"
 
-#include "settings/settings_file.hpp"
+#include "settings/settings.hpp"
 
 namespace filesystem_settings {
 
@@ -33,7 +33,7 @@ PUBLIC void AddScanFolder(SettingsFile& settings, ScanFolderType type, String pa
     if (dyn::AppendIfNotAlreadyThere(settings.settings.filesystem.extra_scan_folders[ToInt(type)],
                                      settings.settings.path_pool.Clone(path, settings.arena))) {
         settings.tracking.changed = true;
-        if (settings.tracking.on_filesystem_change) settings.tracking.on_filesystem_change(type);
+        if (settings.tracking.on_change) settings.tracking.on_change(type);
     }
 }
 
@@ -49,7 +49,7 @@ PUBLIC void RemoveScanFolder(SettingsFile& settings, ScanFolderType type, String
         dyn::RemoveSwapLast(paths, *opt_index);
 
         settings.tracking.changed = true;
-        if (settings.tracking.on_filesystem_change) settings.tracking.on_filesystem_change(type);
+        if (settings.tracking.on_change) settings.tracking.on_change(type);
     }
 }
 

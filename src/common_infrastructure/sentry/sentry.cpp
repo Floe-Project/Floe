@@ -6,6 +6,8 @@
 #include "os/filesystem.hpp"
 #include "tests/framework.hpp"
 
+#include "common_infrastructure/settings/settings_file.hpp"
+
 namespace sentry {
 
 // A random string that we save to disk to identify if errors occur for multple 'users'.
@@ -93,6 +95,7 @@ static void InitSentry(Sentry& sentry, DsnInfo dsn, Span<Tag const> tags) {
     sentry.seed.Store(RandomSeed(), StoreMemoryOrder::Relaxed);
     sentry.session_id = detail::Uuid(sentry.seed);
     sentry.device_id = DeviceId(sentry.seed);
+    sentry.online_reporting_disabled.Store(IsOnlineReportingDisabled(), StoreMemoryOrder::Relaxed);
 
     // clone the tags
     ASSERT(sentry.tags.size == 0);

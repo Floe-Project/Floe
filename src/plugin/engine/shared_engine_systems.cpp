@@ -9,7 +9,7 @@
 #include "common_infrastructure/error_reporting.hpp"
 
 #include "plugin/plugin.hpp"
-#include "settings/settings_file.hpp"
+#include "settings/settings.hpp"
 
 void SharedEngineSystems::StartPollingThreadIfNeeded() {
     if (polling_running.Load(LoadMemoryOrder::Acquire)) return;
@@ -48,26 +48,41 @@ SharedEngineSystems::SharedEngineSystems(Span<sentry::Tag const> tags)
                             error_notifications) {
     InitBackgroundErrorReporting(tags);
 
-    settings.tracking.on_filesystem_change = [this](ScanFolderType type) {
+    settings.tracking.on_change = [this](SettingsTracking::Change change) {
         ASSERT(CheckThreadName("main"));
-        switch (type) {
-            case ScanFolderType::Presets:
-                preset_listing.scanned_folder.needs_rescan.Store(true, StoreMemoryOrder::Relaxed);
-                break;
-            case ScanFolderType::Libraries: {
-                sample_lib_server::SetExtraScanFolders(
-                    sample_library_server,
-                    settings.settings.filesystem.extra_scan_folders[ToInt(ScanFolderType::Libraries)]);
+
+        switch (change.tag) {
+            case SettingsTracking::ChangeType::ScanFolder: {
+                auto type = change.Get<ScanFolderType>();
+                switch (type) {
+                    case ScanFolderType::Presets:
+                        preset_listing.scanned_folder.needs_rescan.Store(true, StoreMemoryOrder::Relaxed);
+                        break;
+                    case ScanFolderType::Libraries: {
+                        sample_lib_server::SetExtraScanFolders(
+                            sample_library_server,
+                            settings.settings.filesystem
+                                .extra_scan_folders[ToInt(ScanFolderType::Libraries)]);
+                        break;
+                    }
+                    case ScanFolderType::Count: PanicIfReached();
+                }
                 break;
             }
-            case ScanFolderType::Count: PanicIfReached();
-        }
-    };
+            case SettingsTracking::ChangeType::WindowSize: {
+                for (auto plugin : floe_instances)
+                    if (plugin) RequestGuiResize(*plugin);
+                break;
+            }
+            case SettingsTracking::ChangeType::OnlineReportingDisabled: {
+                if (auto sentry = sentry::GlobalSentry()) {
+                    sentry->online_reporting_disabled.Store(settings.settings.online_reporting_disabled,
+                                                            StoreMemoryOrder::Relaxed);
+                }
 
-    settings.tracking.on_window_size_change = [this]() {
-        ASSERT(CheckThreadName("main"));
-        for (auto plugin : floe_instances)
-            if (plugin) RequestGuiResize(*plugin);
+                break;
+            }
+        }
     };
 
     thread_pool.Init("global", {});
@@ -88,7 +103,7 @@ SharedEngineSystems::~SharedEngineSystems() {
         polling_thread.Join();
     }
 
-    settings.tracking.on_filesystem_change = {};
+    settings.tracking.on_change = {};
 
     DeinitSettingsFile(settings);
 

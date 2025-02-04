@@ -10,7 +10,7 @@
 #include "gui2_settings_panel_state.hpp"
 #include "gui_framework/gui_box_system.hpp"
 #include "sample_lib_server/sample_library_server.hpp"
-#include "settings/settings_file.hpp"
+#include "settings/settings.hpp"
 #include "settings/settings_filesystem.hpp"
 #include "settings/settings_gui.hpp"
 
@@ -736,6 +736,15 @@ static void AppearanceSettingsPanel(GuiBoxSystem& box_system, SettingsPanelConte
             context.settings.settings.gui.high_contrast_gui =
                 !context.settings.settings.gui.high_contrast_gui;
             context.settings.tracking.changed = true;
+        }
+
+        // TODO: move this, it's not really a 'Appearance' setting
+        if (SettingsCheckboxButton(box_system,
+                                   options_rhs_column,
+                                   "Disable anonymous online reporting",
+                                   context.settings.settings.online_reporting_disabled)) {
+            gui_settings::SetDisableOnlineReporting(context.settings,
+                                                    !context.settings.settings.online_reporting_disabled);
         }
     }
 }

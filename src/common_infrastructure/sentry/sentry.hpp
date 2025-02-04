@@ -81,6 +81,7 @@ struct Sentry {
     FixedSizeAllocator<Kb(4)> arena {nullptr};
     Span<char> event_context_json {};
     Span<Tag> tags {};
+    Atomic<bool> online_reporting_disabled = true;
 };
 
 namespace detail {
@@ -154,14 +155,15 @@ consteval DsnInfo ParseDsnOrThrow(String dsn) {
 }
 
 // not thread-safe, not signal-safe, inits g_instance
-// adds device_id, OS info, CPU info
+// adds device_id, OS info, CPU info, checks if online reporting is enabled
 // dsn must be valid and static
 Sentry& InitGlobalSentry(DsnInfo dsn, Span<Tag const> tags);
 
 // thread-safe, signal-safe, guaranteed to be valid if InitGlobalSentry has been called
 Sentry* GlobalSentry();
 
-// threadsafe, signal-safe, works just as well but doesn't include useful context info
+// threadsafe, signal-safe, works just as well but doesn't include useful context info. Doesn't allow online
+// reporting, only writing to file.
 void InitBarebonesSentry(Sentry& sentry);
 
 // threadsafe, signal-safe
@@ -451,7 +453,7 @@ PUBLIC ErrorCodeOr<void> SubmitEnvelope(Sentry& sentry,
     bool sent_online_successfully = false;
     ErrorCodeOr<void> result = k_success;
 
-    if constexpr (k_online_reporting) {
+    if (!sentry.online_reporting_disabled.Load(LoadMemoryOrder::Relaxed) && k_online_reporting) {
         LogDebug(k_main_log_module, "Posting to Sentry: {}", envelope);
 
         auto const envelope_url = fmt::Format(scratch_arena,
@@ -574,6 +576,7 @@ PUBLIC ErrorCodeOr<void> WriteErrorToFile(Sentry& sentry, ErrorEvent const& even
 PUBLIC ErrorCodeOr<void>
 ConsumeAndSubmitErrorFiles(Sentry& sentry, String folder, ArenaAllocator& scratch_arena) {
     if constexpr (!k_online_reporting) return k_success;
+    if (sentry.online_reporting_disabled.Load(LoadMemoryOrder::Relaxed)) return k_success;
     ASSERT(path::IsAbsolute(folder));
     ASSERT(IsValidUtf8(folder));
 
@@ -657,6 +660,14 @@ ConsumeAndSubmitErrorFiles(Sentry& sentry, String folder, ArenaAllocator& scratc
                                   }),
                    {
                        LogError(k_main_log_module, "Couldn't send report to Sentry: {}. {}", error, response);
+                       if (error == WebError::Non200Response) {
+                           // There's something wrong with the envelope, we shall keep it but with a new name
+                           // so we don't try to send it again.
+                           auto destination = full_path.Items();
+                           destination.RemoveSuffix(path::Extension(full_path).size);
+                           auto _ = Rename(temp_full_path, destination);
+                           success = true;
+                       }
                        continue;
                    });
 

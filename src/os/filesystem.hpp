@@ -313,6 +313,10 @@ MutableString FloeKnownDirectory(Allocator& a,
                                  Optional<String> filename,
                                  KnownDirectoryOptions options);
 
+// Path of Floe's settings file. This is static and doesn't change during the lifetime of the program.
+// thread-safe
+String SettingsFilepath(String* error_log = nullptr);
+
 // The path where logs and error reports are written to. This is static and doesn't change during the lifetime
 // of the program.
 void InitLogFolderIfNeeded(); // thread-safe

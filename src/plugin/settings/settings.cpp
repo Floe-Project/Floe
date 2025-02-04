@@ -1,7 +1,7 @@
 // Copyright 2018-2024 Sam Windell
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "settings_file.hpp"
+#include "settings.hpp"
 
 #include "foundation/foundation.hpp"
 #include "os/filesystem.hpp"
@@ -9,6 +9,7 @@
 #include "utils/json/json_reader.hpp"
 
 #include "common_infrastructure/common_errors.hpp"
+#include "common_infrastructure/settings/settings_file.hpp"
 
 #include "config.h"
 #include "descriptors/param_descriptors.hpp"
@@ -190,78 +191,6 @@ static bool ParseLegacyJsonFile(Settings& content,
 
 namespace ini {
 
-static Optional<String> ValueIfKeyMatches(String line, String key) {
-    if (StartsWithSpan(line, key)) {
-        auto l = line;
-        l.RemovePrefix(key.size);
-        l = WhitespaceStrippedStart(l);
-        if (l.size && l[0] == '=') {
-            l.RemovePrefix(1);
-            l = WhitespaceStripped(l);
-            if (l.size) return l;
-        }
-    }
-    return k_nullopt;
-}
-
-static bool SetIfMatching(String line, String key, bool& value) {
-    if (auto value_string = ValueIfKeyMatches(line, key)) {
-        value = IsEqualToCaseInsensitiveAscii(value_string.Value(), "true"_s);
-        return true;
-    }
-    return false;
-}
-
-static bool SetIfMatching(String line, String key, String& value) {
-    if (auto value_string = ValueIfKeyMatches(line, key)) {
-        value = *value_string;
-        return true;
-    }
-    return false;
-}
-
-template <Integral Type>
-requires(!Same<Type, bool>)
-static bool SetIfMatching(String line, String key, Type& value) {
-    if (auto value_string = ValueIfKeyMatches(line, key)) {
-        if (auto o = ParseInt(*value_string, ParseIntBase::Decimal); o.HasValue()) value = (Type)o.Value();
-        return true;
-    }
-    return false;
-}
-
-enum class KeyType : u32 {
-    CcToParamIdMap,
-    ExtraLibrariesFolder,
-    ExtraPresetsFolder,
-    LibrariesInstallLocation,
-    PresetsInstallLocation,
-    GuiKeyboardOctave,
-    HighContrastGui,
-    PresetsRandomMode,
-    ShowKeyboard,
-    ShowTooltips,
-    WindowWidth,
-    Count,
-};
-
-constexpr String Key(KeyType k) {
-    switch (k) {
-        case KeyType::CcToParamIdMap: return "cc_to_param_id_map"_s;
-        case KeyType::ExtraLibrariesFolder: return "extra_libraries_folder"_s;
-        case KeyType::ExtraPresetsFolder: return "extra_presets_folder"_s;
-        case KeyType::LibrariesInstallLocation: return "libraries_install_location"_s;
-        case KeyType::PresetsInstallLocation: return "presets_install_location"_s;
-        case KeyType::GuiKeyboardOctave: return "gui_keyboard_octave"_s;
-        case KeyType::HighContrastGui: return "high_contrast_gui"_s;
-        case KeyType::PresetsRandomMode: return "presets_random_mode"_s;
-        case KeyType::ShowKeyboard: return "show_keyboard"_s;
-        case KeyType::ShowTooltips: return "show_tooltips"_s;
-        case KeyType::WindowWidth: return "window_width"_s;
-        case KeyType::Count: PanicIfReached();
-    }
-}
-
 constexpr KeyType ScanFolderKeyType(ScanFolderType scan_folder) {
     switch (scan_folder) {
         case ScanFolderType::Presets: return KeyType::ExtraPresetsFolder;
@@ -350,6 +279,8 @@ Parse(Settings& content, ArenaAllocator& content_allocator, ArenaAllocator& scra
         if (SetIfMatching(line, Key(KeyType::ShowKeyboard), content.gui.show_keyboard)) continue;
         if (SetIfMatching(line, Key(KeyType::ShowTooltips), content.gui.show_tooltips)) continue;
         if (SetIfMatching(line, Key(KeyType::WindowWidth), content.gui.window_width)) continue;
+        if (SetIfMatching(line, Key(KeyType::OnlineReportingDisabled), content.online_reporting_disabled))
+            continue;
 
         dyn::Append(unknown_lines, line);
     }
@@ -402,6 +333,10 @@ ErrorCodeOr<void> WriteFile(Settings const& data, FloePaths const& paths, String
         TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::ShowKeyboard), data.gui.show_keyboard));
         TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::ShowTooltips), data.gui.show_tooltips));
         TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::WindowWidth), data.gui.window_width));
+        TRY(fmt::AppendLine(writer,
+                            "{} = {}",
+                            Key(KeyType::OnlineReportingDisabled),
+                            data.online_reporting_disabled));
 
         for (auto line : data.unknown_lines_from_file)
             TRY(fmt::AppendLineRaw(writer, line));
@@ -457,8 +392,7 @@ void DeinitSettingsFile(SettingsFile& settings) {
 }
 
 // This is a simple implementation that should reduce the chances of the settings file being overwritten if
-// there are multiple processes of Floe running. I don't think this is a common scenario though, plugins tend
-// to be in the same process and therefore if we are using global memory, they share the same memory.
+// there are multiple processes of Floe running.
 void PollForSettingsFileChanges(SettingsFile& settings) {
     ASSERT(CheckThreadName("main"));
 
@@ -470,7 +404,7 @@ void PollForSettingsFileChanges(SettingsFile& settings) {
     auto const dir = path::Directory(settings.paths.settings_write_path);
     if (!dir) return;
 
-    DirectoryToWatch watch_dir {
+    DirectoryToWatch const watch_dir {
         .path = *dir,
         .recursive = false,
     };
@@ -503,6 +437,7 @@ void PollForSettingsFileChanges(SettingsFile& settings) {
                     settings.arena.ResetCursorAndConsolidateRegions();
                     auto data = ReadSettingsFile(settings.arena, settings.paths.settings_write_path);
                     if (data.HasValue()) {
+                        // TODO: detect changes and call tracking.on_change
                         settings.settings = data.Value().settings;
                         settings.last_modified_time = data.Value().last_modified_time;
                     } else {

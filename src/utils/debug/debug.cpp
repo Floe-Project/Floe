@@ -14,11 +14,10 @@
 #include "os/misc.hpp"
 #include "utils/logger/logger.hpp"
 
-static void DefaultPanicHook(char const* message, SourceLocation loc) {
+static void DefaultPanicHook(char const* message, SourceLocation loc, uintptr pc) {
     constexpr StdStream k_panic_stream = StdStream::Err;
     InlineSprintfBuffer buffer;
     // we style the source location to look like the first item of a call stack and then print the stack
-    // skipping one extra frame
     buffer.Append("\nPanic: " ANSI_COLOUR_SET_FOREGROUND_RED "%s" ANSI_COLOUR_RESET
                   "\n[0] " ANSI_COLOUR_SET_FOREGROUND_BLUE "%s" ANSI_COLOUR_RESET ":%d: %s\n",
                   message,
@@ -26,11 +25,11 @@ static void DefaultPanicHook(char const* message, SourceLocation loc) {
                   loc.line,
                   loc.function);
     auto _ = StdPrint(k_panic_stream, buffer.AsString());
-    auto _ = PrintCurrentStacktrace(k_panic_stream, {.ansi_colours = true}, 4);
+    auto _ = PrintCurrentStacktrace(k_panic_stream, {.ansi_colours = true}, ProgramCounter {pc});
     auto _ = StdPrint(k_panic_stream, "\n");
 }
 
-Atomic<void (*)(char const* message, SourceLocation loc)> g_panic_hook = DefaultPanicHook;
+Atomic<PanicHook> g_panic_hook = DefaultPanicHook;
 
 void SetPanicHook(PanicHook hook) { g_panic_hook.Store(hook, StoreMemoryOrder::Release); }
 PanicHook GetPanicHook() { return g_panic_hook.Load(LoadMemoryOrder::Acquire); }
@@ -42,8 +41,12 @@ static Atomic<bool> g_panic_occurred {};
 bool PanicOccurred() { return g_panic_occurred.Load(LoadMemoryOrder::Acquire); }
 void ResetPanic() { g_panic_occurred.Store(false, StoreMemoryOrder::Release); }
 
-[[noreturn]] void Panic(char const* message, SourceLocation loc) {
-    if (g_in_signal_handler) __builtin_abort();
+// noinline because we want __builtin_return_address(0) to return the address of the call site
+[[noreturn]] __attribute__((noinline)) void Panic(char const* message, SourceLocation loc) {
+    if (g_in_signal_handler) {
+        auto _ = StdPrint(StdStream::Err, "Panic occurred while in a signal handler, aborting\n");
+        __builtin_abort();
+    }
 
     static thread_local u8 in_panic_hook {};
 
@@ -51,14 +54,14 @@ void ResetPanic() { g_panic_occurred.Store(false, StoreMemoryOrder::Release); }
         case 0: {
             // First time we've panicked.
             ++in_panic_hook;
-            g_panic_hook.Load(LoadMemoryOrder::Acquire)(message, loc);
+            g_panic_hook.Load(LoadMemoryOrder::Acquire)(message, loc, CALL_SITE_PROGRAM_COUNTER);
             --in_panic_hook;
 
             g_panic_occurred.Store(true, StoreMemoryOrder::Release);
             throw PanicException();
         }
         default: {
-            // We've panicked while in a panic hook. Hopefully we have a crash handler installed.
+            auto _ = StdPrint(StdStream::Err, "Panic occurred while handling a panic, aborting\n");
             __builtin_abort();
             break;
         }
@@ -413,7 +416,20 @@ void ShutdownStacktraceState() {
     });
 }
 
-Optional<StacktraceStack> CurrentStacktrace(int skip_frames) {
+static void SkipUntil(StacktraceStack& stack, uintptr pc) {
+    ASSERT(pc);
+    for (auto const i : Range(stack.size))
+        if (stack[i] == pc) {
+            dyn::Remove(stack, 0, i);
+            return;
+        }
+}
+
+static int NumSkipFrames(StacktraceSkipOptions skip) {
+    return CheckedCast<int>(skip.TryGetOpt<StacktraceFrames>().ValueOr(StacktraceFrames {1}));
+}
+
+Optional<StacktraceStack> CurrentStacktrace(StacktraceSkipOptions skip) {
     auto state = g_backtrace_state.Load(LoadMemoryOrder::Acquire);
 
     if (!state || state->failed_init_error) return k_nullopt;
@@ -421,7 +437,7 @@ Optional<StacktraceStack> CurrentStacktrace(int skip_frames) {
     StacktraceStack result;
     backtrace_simple(
         state->state,
-        skip_frames,
+        NumSkipFrames(skip),
         [](void* data, uintptr_t pc) -> int {
             auto& result = *(StacktraceStack*)data;
             dyn::Append(result, pc);
@@ -433,11 +449,13 @@ Optional<StacktraceStack> CurrentStacktrace(int skip_frames) {
         },
         &result);
 
+    if (auto const pc = skip.TryGet<ProgramCounter>()) SkipUntil(result, (uintptr)*pc);
+
     return result;
 }
 
 struct StacktraceContext {
-    StacktraceOptions options;
+    StacktracePrintOptions options;
     Writer writer;
     u32 line_num = 1;
     ErrorCodeOr<void> return_value;
@@ -460,14 +478,13 @@ static int HandleStacktraceLine(void* data,
     }
     if (!function_name.size) function_name = function ? FromNullTerminated(function) : ""_s;
 
-    ctx.return_value = fmt::FormatToWriter(ctx.writer,
-                                           "[{}] {}{}{}:{}: {}\n",
-                                           ctx.line_num++,
-                                           ctx.options.ansi_colours ? ANSI_COLOUR_SET_FOREGROUND_BLUE : ""_s,
-                                           filename ? FromNullTerminated(filename) : "unknown-file"_s,
-                                           ctx.options.ansi_colours ? ANSI_COLOUR_RESET : ""_s,
-                                           lineno,
-                                           function_name);
+    FrameInfo const frame {
+        .function_name = function_name,
+        .filename = filename ? FromNullTerminated(filename) : "unknown-file"_s,
+        .line = lineno,
+    };
+    ctx.return_value = frame.Write(ctx.line_num++, ctx.writer, ctx.options);
+
     return 0;
 }
 
@@ -480,7 +497,7 @@ static void HandleStacktraceError(void* data, char const* message, [[maybe_unuse
                                  FromNullTerminated(message));
 }
 
-ErrorCodeOr<void> WriteStacktrace(StacktraceStack const& stack, Writer writer, StacktraceOptions options) {
+ErrorCodeOr<void> WriteStacktrace(Span<uintptr const> stack, Writer writer, StacktracePrintOptions options) {
     auto state = g_backtrace_state.Load(LoadMemoryOrder::Acquire);
     if (!state) return ErrorCode {StacktraceError::NotInitialised};
 
@@ -495,27 +512,18 @@ ErrorCodeOr<void> WriteStacktrace(StacktraceStack const& stack, Writer writer, S
     return k_success;
 }
 
-ErrorCodeOr<void> WriteCurrentStacktrace(Writer writer, StacktraceOptions options, int skip_frames) {
+ErrorCodeOr<void>
+WriteCurrentStacktrace(Writer writer, StacktracePrintOptions options, StacktraceSkipOptions skip) {
     auto state = g_backtrace_state.Load(LoadMemoryOrder::Acquire);
     if (!state) return ErrorCode {StacktraceError::NotInitialised};
     if (state->failed_init_error) return fmt::FormatToWriter(writer, "{}", *state->failed_init_error);
 
     StacktraceContext ctx {.options = options, .writer = writer};
-    backtrace_full(state->state, skip_frames, HandleStacktraceLine, HandleStacktraceError, &ctx);
+    backtrace_full(state->state, NumSkipFrames(skip), HandleStacktraceLine, HandleStacktraceError, &ctx);
     return ctx.return_value;
 }
 
-ErrorCodeOr<void> WriteInfoForProgramCounter(uintptr_t pc, Writer writer, StacktraceOptions options) {
-    auto state = g_backtrace_state.Load(LoadMemoryOrder::Acquire);
-    if (!state) return ErrorCode {StacktraceError::NotInitialised};
-    if (state->failed_init_error) return fmt::FormatToWriter(writer, "{}", *state->failed_init_error);
-
-    StacktraceContext ctx {.options = options, .writer = writer};
-    backtrace_pcinfo(state->state, pc, HandleStacktraceLine, HandleStacktraceError, &ctx);
-    return ctx.return_value;
-}
-
-MutableString StacktraceString(StacktraceStack const& stack, Allocator& a, StacktraceOptions options) {
+MutableString StacktraceString(Span<uintptr const> stack, Allocator& a, StacktracePrintOptions options) {
     auto state = g_backtrace_state.Load(LoadMemoryOrder::Acquire);
     if (!state) return a.Clone("Stacktrace error: not initialised"_s);
     if (state->failed_init_error) return a.Clone(*state->failed_init_error);
@@ -528,15 +536,16 @@ MutableString StacktraceString(StacktraceStack const& stack, Allocator& a, Stack
     return result.ToOwnedSpan();
 }
 
-MutableString CurrentStacktraceString(Allocator& a, StacktraceOptions options, int skip_frames) {
+MutableString
+CurrentStacktraceString(Allocator& a, StacktracePrintOptions options, StacktraceSkipOptions skip) {
     DynamicArray<char> result {a};
-    auto _ = WriteCurrentStacktrace(dyn::WriterFor(result), options, skip_frames);
+    auto _ = WriteCurrentStacktrace(dyn::WriterFor(result), options, skip);
     return result.ToOwnedSpan();
 }
 
-void StacktraceToCallback(StacktraceStack const& stack,
+void StacktraceToCallback(Span<uintptr const> stack,
                           FunctionRef<void(FrameInfo const&)> callback,
-                          StacktraceOptions options) {
+                          StacktracePrintOptions options) {
     auto state = g_backtrace_state.Load(LoadMemoryOrder::Acquire);
     if (!state || state->failed_init_error) return;
 
@@ -544,7 +553,7 @@ void StacktraceToCallback(StacktraceStack const& stack,
 
     struct Context {
         CallbackType& callback;
-        StacktraceOptions const& options;
+        StacktracePrintOptions const& options;
     };
     Context context {callback, options};
 
@@ -578,12 +587,13 @@ void StacktraceToCallback(StacktraceStack const& stack,
 }
 
 void CurrentStacktraceToCallback(FunctionRef<void(FrameInfo const&)> callback,
-                                 StacktraceOptions options,
-                                 int skip_frames) {
-    auto stack = CurrentStacktrace(skip_frames);
+                                 StacktracePrintOptions options,
+                                 StacktraceSkipOptions skip) {
+    auto stack = CurrentStacktrace(skip);
     if (stack) StacktraceToCallback(*stack, callback, options);
 }
 
-ErrorCodeOr<void> PrintCurrentStacktrace(StdStream stream, StacktraceOptions options, int skip_frames) {
-    return WriteCurrentStacktrace(StdWriter(stream), options, skip_frames);
+ErrorCodeOr<void>
+PrintCurrentStacktrace(StdStream stream, StacktracePrintOptions options, StacktraceSkipOptions skip) {
+    return WriteCurrentStacktrace(StdWriter(stream), options, skip);
 }

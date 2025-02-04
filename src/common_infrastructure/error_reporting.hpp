@@ -13,11 +13,12 @@ void ShutdownBackgroundErrorReporting();
 
 // thread-safe, not signal-safe, works even if InitErrorReporting() was not called
 void ReportError(sentry::Error&& error);
+
 template <typename... Args>
-void ReportError(sentry::Error::Level level, String format, Args const&... args) {
+__attribute__((noinline)) void ReportError(sentry::Error::Level level, String format, Args const&... args) {
     sentry::Error error {};
     error.level = level;
     error.message = fmt::Format(error.arena, format, args...);
-    error.stacktrace = CurrentStacktrace(2);
+    error.stacktrace = CurrentStacktrace(ProgramCounter {CALL_SITE_PROGRAM_COUNTER});
     ReportError(Move(error));
 }

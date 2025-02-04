@@ -30,29 +30,35 @@ static void ShutdownTracy() {
 PUBLIC void GlobalInit(GlobalInitOptions options) {
     if (options.set_main_thread) SetThreadName("main");
 
-    SetPanicHook([](char const* message_c_str, SourceLocation loc) {
+    SetPanicHook([](char const* message_c_str, SourceLocation loc, uintptr loc_pc) {
         // We don't have to be signal-safe here.
 
         ArenaAllocatorWithInlineStorage<2000> arena {PageAllocator::Instance()};
 
-        auto const stacktrace = CurrentStacktrace(4);
-        auto const message = fmt::Format(arena,
-                                         "[panic] ({}) {}\nAt {}",
-                                         ToString(g_final_binary_type),
-                                         FromNullTerminated(message_c_str),
-                                         loc);
+        auto const stacktrace = CurrentStacktrace(ProgramCounter {loc_pc});
+        DynamicArray<char> message {arena};
+        fmt::Assign(message,
+                    "[panic] ({}) {}\n",
+                    ToString(g_final_binary_type),
+                    FromNullTerminated(message_c_str));
+        auto _ = FrameInfo::FromSourceLocation(loc).Write(0, dyn::WriterFor(message), {});
 
         // Step 1: log the error for easier local debugging.
-        LogError(k_global_log_module, "{}", message);
-        if (stacktrace) {
-            auto stacktrace_str = StacktraceString(*stacktrace,
-                                                   arena,
-                                                   {
-                                                       .ansi_colours = false,
-                                                       .demangle = true,
-                                                   });
-            LogError(k_global_log_module, "\n{}", stacktrace_str);
-        }
+        Log(k_global_log_module, LogLevel::Error, [&](Writer writer) -> ErrorCodeOr<void> {
+            TRY(writer.WriteChars(message));
+            TRY(writer.WriteChar('\n'));
+            if (stacktrace) {
+                auto stack = stacktrace->Items();
+                if (stack[0] == loc_pc) stack.RemovePrefix(1);
+                TRY(WriteStacktrace(stack,
+                                    writer,
+                                    {
+                                        .ansi_colours = false,
+                                        .demangle = true,
+                                    }));
+            }
+            return k_success;
+        });
 
         // Step 2: send an error report to Sentry.
         {

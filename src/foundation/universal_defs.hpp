@@ -100,7 +100,7 @@ constexpr auto k_endianness = Endianness::Big;
 
 // ==========================================================================================================
 struct SourceLocation {
-    static SourceLocation Current(char const* file = __builtin_FILE_NAME(),
+    static SourceLocation Current(char const* file = __builtin_FILE(),
                                   int line = __builtin_LINE(),
                                   char const* function = __builtin_FUNCTION()) {
         return {function, file, line};
@@ -333,7 +333,9 @@ bool PanicOccurred(); // thread-safe
 void ResetPanic(); // thread-safe
 
 // Before throwing the PanicException, the panic hook is called. This is useful for logging the panic.
-using PanicHook = void (*)(char const* message, SourceLocation loc);
+// We get the source location so that we can we always have a correct location. The program counter should be
+// correct to, but we might not have debug info available to get the file/line from it.
+using PanicHook = void (*)(char const* message, SourceLocation loc, uintptr loc_pc);
 void SetPanicHook(PanicHook hook); // thread-safe
 PanicHook GetPanicHook(); // thread-safe
 

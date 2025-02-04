@@ -49,34 +49,68 @@ enum class StacktraceError {
 ErrorCodeCategory const& StacktraceErrorCodeType();
 inline ErrorCodeCategory const& ErrorCategoryForEnum(StacktraceError) { return StacktraceErrorCodeType(); }
 
-struct StacktraceOptions {
+struct StacktracePrintOptions {
     bool ansi_colours = false;
     bool demangle = true; // demangling is not signal-safe
 };
 
+// make sure to only use this in a noinline function
+#define CALL_SITE_PROGRAM_COUNTER ((uintptr)__builtin_extract_return_addr(__builtin_return_address(0)) - 1)
+
+enum class ProgramCounter : uintptr {};
+enum class StacktraceFrames : u32 {};
+enum class StacktraceSkipType { Frames, UntilProgramCounter };
+using StacktraceSkipOptions = TaggedUnion<StacktraceSkipType,
+                                          TypeAndTag<ProgramCounter, StacktraceSkipType::UntilProgramCounter>,
+                                          TypeAndTag<StacktraceFrames, StacktraceSkipType::Frames>>;
+
 using StacktraceStack = DynamicArrayBounded<uintptr, 32>;
-Optional<StacktraceStack> CurrentStacktrace(int skip_frames = 1);
+Optional<StacktraceStack> CurrentStacktrace(StacktraceSkipOptions skip = StacktraceFrames {1});
 Optional<String> InitStacktraceState(Optional<String> current_binary_path); // returns error message if failed
 void ShutdownStacktraceState();
 
 struct FrameInfo {
+    ErrorCodeOr<void> Write(u32 frame_index, Writer writer, StacktracePrintOptions options) const {
+        return fmt::FormatToWriter(writer,
+                                   "[{}] {}{}{}:{}: {}\n",
+                                   frame_index,
+                                   options.ansi_colours ? ANSI_COLOUR_SET_FOREGROUND_BLUE : ""_s,
+                                   filename,
+                                   options.ansi_colours ? ANSI_COLOUR_RESET : ""_s,
+                                   line,
+                                   function_name);
+    }
+
+    static FrameInfo FromSourceLocation(SourceLocation loc) {
+        return {
+            .function_name = FromNullTerminated(loc.function),
+            .filename = FromNullTerminated(loc.file),
+            .line = loc.line,
+        };
+    }
+
     String function_name;
     String filename;
     int line;
 };
 
-MutableString CurrentStacktraceString(Allocator& a, StacktraceOptions options = {}, int skip_frames = 1);
-MutableString StacktraceString(StacktraceStack const&, Allocator& a, StacktraceOptions options = {});
+MutableString CurrentStacktraceString(Allocator& a,
+                                      StacktracePrintOptions options = {},
+                                      StacktraceSkipOptions skip = StacktraceFrames {1});
+MutableString StacktraceString(Span<uintptr const> stack, Allocator& a, StacktracePrintOptions options = {});
 void CurrentStacktraceToCallback(FunctionRef<void(FrameInfo const&)> callback,
-                                 StacktraceOptions options = {},
-                                 int skip_frames = 1);
-void StacktraceToCallback(StacktraceStack const&,
+                                 StacktracePrintOptions options = {},
+                                 StacktraceSkipOptions skip = StacktraceFrames {1});
+void StacktraceToCallback(Span<uintptr const> stack,
                           FunctionRef<void(FrameInfo const&)> callback,
-                          StacktraceOptions options = {});
-ErrorCodeOr<void> PrintCurrentStacktrace(StdStream stream, StacktraceOptions options, int skip_frames);
-ErrorCodeOr<void> WriteStacktrace(StacktraceStack const&, Writer writer, StacktraceOptions options);
-ErrorCodeOr<void> WriteCurrentStacktrace(Writer writer, StacktraceOptions options, int skip_frames);
-ErrorCodeOr<void> WriteInfoForProgramCounter(uintptr_t pc, Writer writer, StacktraceOptions options);
+                          StacktracePrintOptions options = {});
+ErrorCodeOr<void> PrintCurrentStacktrace(StdStream stream,
+                                         StacktracePrintOptions options,
+                                         StacktraceSkipOptions skip = StacktraceFrames {1});
+ErrorCodeOr<void> WriteStacktrace(Span<uintptr const> stack, Writer writer, StacktracePrintOptions options);
+ErrorCodeOr<void> WriteCurrentStacktrace(Writer writer,
+                                         StacktracePrintOptions options,
+                                         StacktraceSkipOptions skip = StacktraceFrames {1});
 
 // Call once at the start/end of your progam. When a crash occurs g_crash_handler will be called. It must be
 // async-signal-safe on Unix. It should return normally, not throw exceptions or call abort().

@@ -217,12 +217,8 @@ int RunAllTests(Tester& tester, Span<String> filter_patterns) {
     return num_failed ? 1 : 0;
 }
 
-void Check(Tester& tester,
-           bool expression,
-           String message,
-           FailureAction failure_action,
-           String file,
-           int line) {
+__attribute__((noinline)) void
+Check(Tester& tester, bool expression, String message, FailureAction failure_action, String file, int line) {
     ++tester.num_assertions;
     if (!expression) {
         String pretext = "REQUIRE failed";
@@ -249,7 +245,7 @@ void Check(Tester& tester,
             if (capture_str.size) tester.log.Error(capture_str);
         }
 
-        auto _ = PrintCurrentStacktrace(StdStream::Err, {}, 3);
+        auto _ = PrintCurrentStacktrace(StdStream::Err, {}, ProgramCounter {CALL_SITE_PROGRAM_COUNTER});
 
         if (failure_action != FailureAction::LogWarningAndContinue) {
             tester.should_reenter = false;

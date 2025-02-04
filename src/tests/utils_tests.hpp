@@ -1088,7 +1088,7 @@ TEST_CASE(TestStacktraceString) {
                                                {
                                                    .ansi_colours = true,
                                                });
-            tester.log.Debug("{}", str);
+            tester.log.Debug("\n{}", str);
         };
         f();
     }
@@ -1096,25 +1096,38 @@ TEST_CASE(TestStacktraceString) {
     SUBCASE("stacktrace 2") {
         auto f = [&]() {
             auto str = CurrentStacktraceString(tester.scratch_arena);
-            tester.log.Debug("{}", str);
+            tester.log.Debug("\n{}", str);
         };
         f();
     }
 
     SUBCASE("stacktrace 3") {
         auto f = [&]() {
-            auto o = CurrentStacktrace(1);
+            auto o = CurrentStacktrace(StacktraceFrames {1});
             if (!o.HasValue())
                 LOG_WARNING("Failed to get stacktrace");
             else {
                 auto str = StacktraceString(o.Value(), tester.scratch_arena);
-                tester.log.Debug("{}", str);
+                tester.log.Debug("\n{}", str);
             }
         };
         f();
     }
 
     SUBCASE("stacktrace 4") {
+        auto f = [&]() {
+            auto o = CurrentStacktrace(ProgramCounter {CALL_SITE_PROGRAM_COUNTER});
+            if (!o.HasValue())
+                LOG_WARNING("Failed to get stacktrace");
+            else {
+                auto str = StacktraceString(o.Value(), tester.scratch_arena);
+                tester.log.Debug("\n{}", str);
+            }
+        };
+        f();
+    }
+
+    SUBCASE("stacktrace 5") {
         bool stacktrace_has_this_function = false;
         constexpr String k_this_function = __FUNCTION__;
         CurrentStacktraceToCallback([&](FrameInfo const& frame) {

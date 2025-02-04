@@ -313,7 +313,7 @@ Type& CreateOrFetchFixtureObject(Tester& tester) {
 #define CHECK_PANICS(...)                                                                                    \
     {                                                                                                        \
         auto initial_panic_hook = GetPanicHook();                                                            \
-        SetPanicHook([](const char*, SourceLocation) {});                                                    \
+        SetPanicHook([](const char*, SourceLocation, uintptr) {});                                           \
         bool panicked = false;                                                                               \
         try {                                                                                                \
             __VA_ARGS__;                                                                                     \

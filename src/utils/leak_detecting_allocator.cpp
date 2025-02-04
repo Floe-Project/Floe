@@ -30,7 +30,7 @@ Span<u8> LeakDetectingAllocator::DoCommand(AllocatorCommandUnion const& command_
             auto result = Malloc::Instance().DoCommand(cmd);
             {
                 ScopedMutexLock const lock(m_lock);
-                dyn::Append(m_allocations, {result, CurrentStacktrace(1).ReleaseValueOr({})});
+                dyn::Append(m_allocations, {result, CurrentStacktrace().ReleaseValueOr({})});
             }
             FillMemory(result.ToByteSpan(), 0xcd); // fill it with unusual data
             return result;
@@ -59,7 +59,7 @@ Span<u8> LeakDetectingAllocator::DoCommand(AllocatorCommandUnion const& command_
 
             {
                 ScopedMutexLock const lock(m_lock);
-                dyn::Append(m_allocations, {result, CurrentStacktrace(1)});
+                dyn::Append(m_allocations, {result, CurrentStacktrace()});
             }
 
             return result;

@@ -280,7 +280,7 @@ void BeginCrashDetection(CrashHookFunction hook) {
             if (auto const msg = ExceptionCodeString(exception_info->ExceptionRecord->ExceptionCode);
                 msg.size) {
                 if (g_crash_hook) {
-                    auto stacktrace = CurrentStacktrace();
+                    auto stacktrace = CurrentStacktrace(StacktraceFrames {0});
                     if (stacktrace) {
                         // Remove frames related to the exception handling code
                         auto const error_ip = (uintptr)exception_info->ExceptionRecord->ExceptionAddress - 1;

@@ -587,8 +587,11 @@ fn genericFlags(context: *BuildContext, target: std.Build.ResolvedTarget, extra_
         try flags.append("-fno-use-cxa-atexit");
     }
 
+    // make the __FILE__ macro non-absolute
+    try flags.append("-fmacro-prefix-map=" ++ rootdir ++ "/=");
+    try flags.append("-ffile-prefix-map=" ++ rootdir ++ "/=");
+
     if (context.build_mode == .production) {
-        try flags.append("-fmacro-prefix-map=" ++ "=/"); // make the __FILE__ macro non-absolute
         try flags.append("-fvisibility=hidden");
     } else if (target.query.isNativeOs() and context.enable_tracy) {
         try flags.append("-DTRACY_ENABLE");

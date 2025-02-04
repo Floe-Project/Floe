@@ -374,7 +374,8 @@ PUBLIC void CallOnce(CallOnceFlag& flag, FunctionRef<void()> function) {
             WakeWaitingThreads(flag.v, NumWaitingThreads::All);
         } else {
             while (flag.v.Load(LoadMemoryOrder::Acquire) != CallOnceFlag::k_called)
-                WaitIfValueIsExpected(flag.v, CallOnceFlag::k_calling, 100u);
+                if (WaitIfValueIsExpected(flag.v, CallOnceFlag::k_calling, 4000u) == WaitResult::TimedOut)
+                    Panic("Possible recursive call to CallOnce");
         }
     }
     ASSERT(flag.v.Load(LoadMemoryOrder::Relaxed) == CallOnceFlag::k_called);

@@ -191,7 +191,7 @@ test-windows-installer:
   cd zig-out/x86_64-windows
   installer_file=$(find . -type f -name "*Installer*.exe")
   if [[ "{{os()}}" == "windows" ]]; then
-    powershell.exe -Command "Start-Process '$installer_file' -Args '--autorun' -Verb RunAs -Wait"
+    powershell.exe -Command "\$p = Start-Process '$installer_file' -Args '--autorun' -Verb RunAs -Wait -PassThru; exit \$p.ExitCode"
   else
     {{run_windows_program}} $installer_file --autorun
   fi

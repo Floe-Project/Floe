@@ -84,12 +84,10 @@ static String AlwaysScannedFolder(ScanFolderType type, ArenaAllocator& allocator
     auto const result =
         FloeKnownDirectory(allocator, dir_type, k_nullopt, {.create = true, .error_log = &error_writer});
     if (error_log.size) {
-        sentry::Error error {{
-            .level = sentry::ErrorEvent::Level::Warning,
-        }};
-        error.message =
-            fmt::Format(error.arena, "Failed to get always scanned folder {}\n{}", result, error_log);
-        ReportError(Move(error));
+        ReportError(sentry::ErrorEvent::Level::Warning,
+                    "Failed to get always scanned folder {}\n{}",
+                    result,
+                    error_log);
     }
     return result;
 }

@@ -397,8 +397,9 @@ static PuglStatus OnEvent(PuglView* view, PuglEvent const* event) {
                 auto gui = (clap_plugin_gui const*)p.plugin.get_extension(&p.plugin, CLAP_EXT_GUI);
                 ASSERT(gui);
                 if (gui->can_resize(&p.plugin)) {
-                    u32 width = event->configure.width;
-                    u32 height = event->configure.height;
+                    auto const scale_factor = puglGetScaleFactor(view);
+                    auto width = (u32)(event->configure.width / scale_factor);
+                    auto height = (u32)(event->configure.height / scale_factor);
                     if (gui->adjust_size(&p.plugin, &width, &height)) gui->set_size(&p.plugin, width, height);
                 }
             }

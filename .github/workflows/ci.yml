@@ -109,6 +109,7 @@ jobs:
             zig-out/x86_64-windows/Floe.clap
             zig-out/x86_64-windows/tests.exe
             zig-out/x86_64-windows/VST3-Validator.exe
+            zig-out/x86_64-windows/Floe-Installer*.exe
 
       - name: Upload errors
         if: '!cancelled()'
@@ -143,6 +144,22 @@ jobs:
           path: zig-out/x86_64-windows
 
       - run: just test-ci-windows
+
+      - name: Run installer in auto mode
+        if: '!cancelled()'
+        shell: powershell
+        run: |
+          $installerPath = Get-ChildItem -Path "zig-out/x86-windows/Floe-Installer*" | Select-Object -ExpandProperty FullName
+          if (-not $installerPath) {
+            Write-Error "Could not find installer file"
+            exit 1
+          }
+          Write-Host "Found installer at: $installerPath"
+          $process = Start-Process -FilePath $installerPath -ArgumentList "--autorun" -Verb RunAs -Wait -NoNewWindow -PassThru
+          if ($process.ExitCode -ne 0) {
+            Write-Error "Installer failed with exit code $($process.ExitCode)"
+            exit $process.ExitCode
+          }
 
       - name: Install sentry-cli
         if: '!cancelled()'

@@ -123,7 +123,11 @@ MutableString FloeKnownDirectory(Allocator& a,
     switch (type) {
         case FloeKnownDirectoryType::Logs: {
             known_dir_type = KnownDirectoryType::Logs;
+#if IS_MACOS
             static constexpr auto k_dirs = Array {"Floe"_s};
+#else
+            static constexpr auto k_dirs = Array {"Floe"_s, "Logs"};
+#endif
             subdirectories = k_dirs;
             break;
         }

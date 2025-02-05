@@ -155,7 +155,7 @@ jobs:
             exit 1
           }
           Write-Host "Found installer at: $installerPath"
-          $process = Start-Process -FilePath $installerPath -ArgumentList "--autorun" -Verb RunAs -Wait -NoNewWindow -PassThru
+          $process = Start-Process -FilePath "$installerPath" -Args "--autorun" -Verb RunAs -Wait -PassThru
           if ($process.ExitCode -ne 0) {
             Write-Error "Installer failed with exit code $($process.ExitCode)"
             exit $process.ExitCode

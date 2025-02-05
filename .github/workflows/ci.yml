@@ -149,7 +149,7 @@ jobs:
         if: '!cancelled()'
         shell: powershell
         run: |
-          $installerPath = Get-ChildItem -Path "zig-out/x86-windows/Floe-Installer*" | Select-Object -ExpandProperty FullName
+          $installerPath = Get-ChildItem -Path "zig-out/x86_64-windows/Floe-Installer*" | Select-Object -ExpandProperty FullName
           if (-not $installerPath) {
             Write-Error "Could not find installer file"
             exit 1

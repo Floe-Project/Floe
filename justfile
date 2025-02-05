@@ -185,6 +185,18 @@ _download-and-unzip-to-cache-dir url:
   popd
 
 [linux, windows]
+test-windows-installer:
+  #!/usr/bin/env bash
+  set -euxo pipefail
+  cd zig-out/x86_64-windows
+  installer_file=$(find . -type f -name "*Installer*.exe")
+  if [[ "{{os()}}" == "windows" ]]; then
+    powershell.exe -Command "Start-Process '$installer_file' -Args '--autorun' -Verb RunAs -Wait"
+  else
+    {{run_windows_program}} $installer_file --autorun
+  fi
+
+[linux, windows]
 test-windows-units:
   set -x
   {{run_windows_program}} zig-out/x86_64-windows/tests.exe --log-level=debug

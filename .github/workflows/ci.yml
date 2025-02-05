@@ -147,19 +147,7 @@ jobs:
 
       - name: Run installer in auto mode
         if: '!cancelled()'
-        shell: powershell
-        run: |
-          $installerPath = Get-ChildItem -Path "zig-out/x86_64-windows/Floe-Installer*" | Select-Object -ExpandProperty FullName
-          if (-not $installerPath) {
-            Write-Error "Could not find installer file"
-            exit 1
-          }
-          Write-Host "Found installer at: $installerPath"
-          $process = Start-Process -FilePath "$installerPath" -Args "--autorun" -Verb RunAs -Wait -PassThru
-          if ($process.ExitCode -ne 0) {
-            Write-Error "Installer failed with exit code $($process.ExitCode)"
-            exit $process.ExitCode
-          }
+        run: just test-windows-installer
 
       - name: Install sentry-cli
         if: '!cancelled()'

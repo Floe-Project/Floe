@@ -76,7 +76,7 @@ extern "C" CLAP_EXPORT const clap_plugin_entry clap_entry = {
                     String p = plugin_path;
                     // the CLAP spec says that the path is to the bundle on macOS, so we need to append
                     // the subpaths to get the binary path
-                    if constexpr (IS_MACOS) {
+                    if (IS_MACOS && g_final_binary_type != FinalBinaryType::Standalone) {
                         constexpr String k_subpath = "/Contents/MacOS/Floe"_s;
                         auto binary_path =
                             arena.AllocateExactSizeUninitialised<char>(p.size + k_subpath.size);

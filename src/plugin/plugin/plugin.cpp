@@ -71,51 +71,57 @@ inline Allocator& FloeInstanceAllocator() { return PageAllocator::Instance(); }
 static u16 g_num_initialised_plugins = 0;
 static u16 g_num_floe_instances = 0;
 
-// NOLINTNEXTLINE(cppcoreguidelines-interfaces-global-init): clang-tidy thinks g_log is initialised
+#define LOG_CLAP_CALL(name)                                                                                  \
+    ZoneScopedMessage(floe.trace_config, name);                                                              \
+    LogInfo(k_clap_log_module, "{} #{}", name, floe.index);
+
+bool ClapStateSave(clap_plugin const* plugin, clap_ostream const* stream) {
+    if (PanicOccurred()) return false;
+
+    try {
+        ASSERT(plugin);
+        ASSERT(stream);
+
+        auto& floe = *(FloePluginInstance*)plugin->plugin_data;
+        LOG_CLAP_CALL("state.save");
+
+        if (!IsMainThread(floe.host)) {
+            LogWarning(k_clap_log_module, "state.save not on main thread");
+            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
+            return false;
+        }
+
+        return EngineCallbacks().save_state(*floe.engine, *stream);
+    } catch (PanicException) {
+        return false;
+    }
+}
+
+static bool ClapStateLoad(clap_plugin const* plugin, clap_istream const* stream) {
+    if (PanicOccurred()) return false;
+
+    try {
+        ASSERT(plugin);
+        ASSERT(stream);
+
+        auto& floe = *(FloePluginInstance*)plugin->plugin_data;
+        LOG_CLAP_CALL("state.load");
+
+        if (!IsMainThread(floe.host)) {
+            LogWarning(k_clap_log_module, "state.load not on main thread");
+            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
+            return false;
+        }
+
+        return EngineCallbacks().load_state(*floe.engine, *stream);
+    } catch (PanicException) {
+        return false;
+    }
+}
+
 clap_plugin_state const floe_plugin_state {
-    .save = [](clap_plugin const* plugin, clap_ostream const* stream) -> bool {
-        if (PanicOccurred()) return false;
-
-        try {
-            ASSERT(plugin);
-            ASSERT(stream);
-
-            auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-            ZoneScopedMessage(floe.trace_config, "state save");
-
-            if (!IsMainThread(floe.host)) {
-                LogWarning(k_clap_log_module, "host misbehaving: save() not on main thread");
-                ASSERT(!RunningInStandalone(floe.host));
-                return false;
-            }
-
-            return EngineCallbacks().save_state(*floe.engine, *stream);
-        } catch (PanicException) {
-            return false;
-        }
-    },
-
-    .load = [](clap_plugin const* plugin, clap_istream const* stream) -> bool {
-        if (PanicOccurred()) return false;
-
-        try {
-            ASSERT(plugin);
-            ASSERT(stream);
-
-            auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-            ZoneScopedMessage(floe.trace_config, "state load");
-
-            if (!IsMainThread(floe.host)) {
-                LogWarning(k_clap_log_module, "host misbehaving: load() not on main thread");
-                ASSERT(!RunningInStandalone(floe.host));
-                return false;
-            }
-
-            return EngineCallbacks().load_state(*floe.engine, *stream);
-        } catch (PanicException) {
-            return false;
-        }
-    },
+    .save = ClapStateSave,
+    .load = ClapStateLoad,
 };
 
 static bool LogIfError(ErrorCodeOr<void> const& ec, String name) {
@@ -126,384 +132,364 @@ static bool LogIfError(ErrorCodeOr<void> const& ec, String name) {
     return true;
 }
 
+static bool ClapGuiIsApiSupported(clap_plugin_t const*, char const* api, bool is_floating) {
+    if (!api) return false;
+    if (is_floating) return false;
+    return NullTermStringsEqual(k_supported_gui_api, api);
+}
+
+static bool ClapGuiGetPrefferedApi(clap_plugin_t const*, char const** api, bool* is_floating) {
+    if (is_floating) *is_floating = false;
+    if (api) *api = k_supported_gui_api;
+    return true;
+}
+
+static bool ClapGuiCreate(clap_plugin_t const* plugin, char const* api, bool is_floating) {
+    if (PanicOccurred()) return false;
+
+    try {
+        ASSERT(plugin);
+        ASSERT(api);
+
+        auto& floe = *(FloePluginInstance*)plugin->plugin_data;
+        LOG_CLAP_CALL("gui.create");
+
+        if (!IsMainThread(floe.host)) {
+            LogWarning(k_clap_log_module, "gui.create not on main thread");
+            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
+            return false;
+        }
+
+        if (!NullTermStringsEqual(k_supported_gui_api, api)) {
+            LogWarning(k_clap_log_module, "gui.create with unsupported api");
+            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
+            return false;
+        }
+
+        if (is_floating) {
+            LogWarning(k_clap_log_module, "gui.create with floating window");
+            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
+            return false;
+        }
+
+        if (floe.gui_platform) {
+            LogWarning(k_clap_log_module, "gui.create called twice");
+            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
+            return false;
+        }
+
+        floe.gui_platform.Emplace(floe.host, g_shared_engine_systems->settings);
+        return LogIfError(CreateView(*floe.gui_platform), "CreateView");
+    } catch (PanicException) {
+        return false;
+    }
+}
+
+static void ClapGuiDestroy(clap_plugin const* plugin) {
+    if (PanicOccurred()) return;
+
+    try {
+        ASSERT(plugin);
+
+        auto& floe = *(FloePluginInstance*)plugin->plugin_data;
+        LOG_CLAP_CALL("gui.destroy");
+
+        if (!IsMainThread(floe.host)) {
+            LogWarning(k_clap_log_module, "host misbehaving: gui.destroy() not on main thread");
+            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
+            return;
+        }
+
+        if (!floe.gui_platform) {
+            LogWarning(k_clap_log_module, "host misbehaving: gui.destroy() called twice");
+            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
+            return;
+        }
+
+        DestroyView(*floe.gui_platform);
+        floe.gui_platform.Clear();
+    } catch (PanicException) {
+        return;
+    }
+}
+
+static bool ClapGuiSetScale(clap_plugin_t const*, f64) {
+    return false; // we (pugl) negotiate this with the OS ourselves
+}
+
+static bool ClapGuiGetSize(clap_plugin_t const* plugin, u32* width, u32* height) {
+    if (PanicOccurred()) return false;
+
+    try {
+        ASSERT(plugin);
+        ASSERT(width);
+        ASSERT(height);
+
+        auto& floe = *(FloePluginInstance*)plugin->plugin_data;
+        LOG_CLAP_CALL("gui.get_size");
+
+        if (!IsMainThread(floe.host)) {
+            LogWarning(k_clap_log_module, "host misbehaving: gui.get_size() not on main thread");
+            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
+            return false;
+        }
+
+        if (!floe.gui_platform) {
+            LogWarning(k_clap_log_module, "host misbehaving: gui.get_size() called before gui.create()");
+            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
+            return false;
+        }
+
+        auto const size = PhysicalPixelsToClapPixels(floe.gui_platform->view, WindowSize(*floe.gui_platform));
+        *width = size.width;
+        *height = size.height;
+        return true;
+    } catch (PanicException) {
+        return false;
+    }
+}
+
+static bool ClapGuiCanResize(clap_plugin_t const*) { return true; }
+
+static bool ClapGuiGetResizeHints(clap_plugin_t const* plugin, clap_gui_resize_hints_t* hints) {
+    if (PanicOccurred()) return false;
+
+    try {
+        ASSERT(plugin);
+        ASSERT(hints);
+
+        auto& floe = *(FloePluginInstance*)plugin->plugin_data;
+        LOG_CLAP_CALL("gui.get_resize_hints");
+
+        if (!IsMainThread(floe.host)) {
+            LogWarning(k_clap_log_module, "gui.get_resize_hints not on main thread");
+            return false;
+        }
+
+        hints->can_resize_vertically = true;
+        hints->can_resize_horizontally = true;
+        hints->preserve_aspect_ratio = true;
+        auto const ratio = gui_settings::CurrentAspectRatio(g_shared_engine_systems->settings.settings.gui);
+        hints->aspect_ratio_width = ratio.width;
+        hints->aspect_ratio_height = ratio.height;
+        return true;
+    } catch (PanicException) {
+        return false;
+    }
+}
+
+static Optional<UiSize>
+GetUsableSizeWithinDimensions(GuiPlatform& gui_platform, u32 clap_width, u32 clap_height) {
+    clap_width = Clamp<u32>(clap_width, 1, gui_settings::k_largest_gui_size);
+    clap_height = Clamp<u32>(clap_height, 1, gui_settings::k_largest_gui_size);
+
+    auto const size = ClapPixelsToPhysicalPixels(gui_platform.view, clap_width, clap_height);
+    if (!size) return k_nullopt;
+
+    auto const aspect_ratio_conformed_size = gui_settings::GetNearestAspectRatioSizeInsideSize(
+        *size,
+        gui_settings::CurrentAspectRatio(g_shared_engine_systems->settings.settings.gui));
+
+    if (aspect_ratio_conformed_size.width < gui_settings::k_min_gui_width) return k_nullopt;
+
+    return PhysicalPixelsToClapPixels(gui_platform.view, aspect_ratio_conformed_size);
+}
+
+static bool ClapGuiAdjustSize(clap_plugin_t const* plugin, u32* clap_width, u32* clap_height) {
+    if (PanicOccurred()) return false;
+
+    try {
+        ASSERT(plugin);
+        ASSERT(clap_width);
+        ASSERT(clap_height);
+
+        auto& floe = *(FloePluginInstance*)plugin->plugin_data;
+        LOG_CLAP_CALL("gui.adjust_size");
+
+        if (!IsMainThread(floe.host)) {
+            LogWarning(k_clap_log_module, "gui.adjust_size not on main thread");
+            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
+            return false;
+        }
+
+        if (auto const size = GetUsableSizeWithinDimensions(*floe.gui_platform, *clap_width, *clap_height)) {
+            *clap_width = size->width;
+            *clap_height = size->height;
+            return true;
+        } else {
+            return false;
+        }
+    } catch (PanicException) {
+        return false;
+    }
+}
+
+static bool ClapGuiSetSize(clap_plugin_t const* plugin, u32 clap_width, u32 clap_height) {
+    if (PanicOccurred()) return false;
+
+    try {
+        ASSERT(plugin);
+
+        auto& floe = *(FloePluginInstance*)plugin->plugin_data;
+        LOG_CLAP_CALL("gui.set_size");
+
+        if (!IsMainThread(floe.host)) {
+            LogWarning(k_clap_log_module, "gui.set_size not on main thread");
+            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
+            return false;
+        }
+
+        if (!floe.gui_platform) {
+            LogWarning(k_clap_log_module, "gui.set_size called before gui.create()");
+            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
+            return false;
+        }
+
+        auto const size = ClapPixelsToPhysicalPixels(floe.gui_platform->view, clap_width, clap_height);
+
+        if (!size || size->width < gui_settings::k_min_gui_width ||
+            !gui_settings::IsAspectRatio(
+                *size,
+                gui_settings::CurrentAspectRatio(g_shared_engine_systems->settings.settings.gui))) {
+            LogWarning(k_clap_log_module, "gui.set_size called with invalid size");
+            return false;
+        }
+
+        return SetSize(*floe.gui_platform, *size);
+    } catch (PanicException) {
+        return false;
+    }
+}
+
+static bool ClapGuiSetParent(clap_plugin_t const* plugin, clap_window_t const* window) {
+    if (PanicOccurred()) return false;
+
+    try {
+        ASSERT(plugin);
+        ASSERT(window);
+
+        auto& floe = *(FloePluginInstance*)plugin->plugin_data;
+        LOG_CLAP_CALL("gui.set_parent");
+
+        if (!IsMainThread(floe.host)) {
+            LogWarning(k_clap_log_module, "host misbehaving: gui.set_parent() not on main thread");
+            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
+            return false;
+        }
+
+        if (!floe.gui_platform) {
+            LogWarning(k_clap_log_module, "host misbehaving: gui.set_parent() called before gui.create()");
+            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
+            return false;
+        }
+
+        if (!window || !window->ptr) {
+            LogWarning(k_clap_log_module, "host misbehaving: gui.set_parent() called with invalid window");
+            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
+            return false;
+        }
+
+        auto const result = LogIfError(SetParent(*floe.gui_platform, *window), "SetParent");
+
+        // Bitwig never calls show() so we do it here
+        auto _ = SetVisible(*floe.gui_platform, true, *floe.engine);
+
+        return result;
+    } catch (PanicException) {
+        return false;
+    }
+}
+
+static bool ClapGuiSetTransient(clap_plugin_t const*, clap_window_t const*) {
+    return false; // we don't support floating windows
+}
+
+static void ClapGuiSuggestTitle(clap_plugin_t const*, char const*) {
+    // we don't support floating windows
+}
+
+static bool ClapGuiShow(clap_plugin_t const* plugin) {
+    if (PanicOccurred()) return false;
+
+    try {
+        ASSERT(plugin);
+
+        auto& floe = *(FloePluginInstance*)plugin->plugin_data;
+        LOG_CLAP_CALL("gui.show");
+
+        if (!IsMainThread(floe.host)) {
+            LogWarning(k_clap_log_module, "host misbehaving: gui.show() not on main thread");
+            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
+            return false;
+        }
+
+        if (!floe.gui_platform) {
+            LogWarning(k_clap_log_module, "host misbehaving: gui.show() called before gui.create()");
+            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
+            return false;
+        }
+
+        bool const result = LogIfError(SetVisible(*floe.gui_platform, true, *floe.engine), "SetVisible");
+        if (result) {
+            static bool shown_graphics_info = false;
+            if (!shown_graphics_info) {
+                shown_graphics_info = true;
+                LogInfo(k_main_log_module,
+                        "\n{}",
+                        floe.gui_platform->graphics_ctx->graphics_device_info.Items());
+            }
+        }
+        return result;
+    } catch (PanicException) {
+        return false;
+    }
+}
+
+static bool ClapGuiHide(clap_plugin_t const* plugin) {
+    if (PanicOccurred()) return false;
+
+    try {
+        ASSERT(plugin);
+
+        auto& floe = *(FloePluginInstance*)plugin->plugin_data;
+        LOG_CLAP_CALL("gui.hide");
+
+        if (!IsMainThread(floe.host)) {
+            LogWarning(k_clap_log_module, "host misbehaving: gui.hide() not on main thread");
+            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
+            return false;
+        }
+
+        if (!floe.gui_platform) {
+            LogWarning(k_clap_log_module, "host misbehaving: gui.hide() called before gui.create()");
+            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
+            return false;
+        }
+
+        return LogIfError(SetVisible(*floe.gui_platform, false, *floe.engine), "SetVisible");
+    } catch (PanicException) {
+        return false;
+    }
+}
+
 // Size (width, height) is in pixels; the corresponding windowing system extension is
 // responsible for defining if it is physical pixels or logical pixels.
-// NOLINTNEXTLINE(cppcoreguidelines-interfaces-global-init): clang-tidy thinks g_log is initialised
 clap_plugin_gui const floe_gui {
-    .is_api_supported = [](clap_plugin_t const*, char const* api, bool is_floating) -> bool {
-        if (!api) return false;
-        if (is_floating) return false;
-        return NullTermStringsEqual(k_supported_gui_api, api);
-    },
-
-    .get_preferred_api = [](clap_plugin_t const*, char const** api, bool* is_floating) -> bool {
-        if (is_floating) *is_floating = false;
-        if (api) *api = k_supported_gui_api;
-        return true;
-    },
-
-    .create = [](clap_plugin_t const* plugin, char const* api, bool is_floating) -> bool {
-        if (PanicOccurred()) return false;
-
-        try {
-            ASSERT(plugin);
-            ASSERT(api);
-            auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-
-            if (!IsMainThread(floe.host)) {
-                LogWarning(k_clap_log_module, "host misbehaving: gui.create() not on main thread");
-                ASSERT(!RunningInStandalone(floe.host));
-                return false;
-            }
-
-            if (!NullTermStringsEqual(k_supported_gui_api, api)) {
-                LogWarning(k_clap_log_module, "host misbehaving: gui.create() with unsupported api");
-                ASSERT(!RunningInStandalone(floe.host));
-                return false;
-            }
-
-            if (is_floating) {
-                LogWarning(k_clap_log_module, "host misbehaving: gui.create() with floating window");
-                ASSERT(!RunningInStandalone(floe.host));
-                return false;
-            }
-
-            if (floe.gui_platform) {
-                LogWarning(k_clap_log_module, "host misbehaving: gui.create() called twice");
-                ASSERT(!RunningInStandalone(floe.host));
-                return false;
-            }
-
-            LogDebug(k_clap_log_module, "#{} gui.create()", floe.index);
-
-            ZoneScopedMessage(floe.trace_config, "gui create");
-            floe.gui_platform.Emplace(floe.host, g_shared_engine_systems->settings);
-            return LogIfError(CreateView(*floe.gui_platform), "CreateView");
-        } catch (PanicException) {
-            return false;
-        }
-    },
-
-    .destroy =
-        [](clap_plugin_t const* plugin) {
-            if (PanicOccurred()) return;
-
-            try {
-                ASSERT(plugin);
-                auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-
-                if (!IsMainThread(floe.host)) {
-                    LogWarning(k_clap_log_module, "host misbehaving: gui.destroy() not on main thread");
-                    ASSERT(!RunningInStandalone(floe.host));
-                    return;
-                }
-
-                if (!floe.gui_platform) {
-                    LogWarning(k_clap_log_module, "host misbehaving: gui.destroy() called twice");
-                    ASSERT(!RunningInStandalone(floe.host));
-                    return;
-                }
-
-                LogDebug(k_clap_log_module, "#{} gui.destroy()", floe.index);
-
-                ZoneScopedMessage(floe.trace_config, "gui destroy");
-                DestroyView(*floe.gui_platform);
-                floe.gui_platform.Clear();
-            } catch (PanicException) {
-                return;
-            }
-        },
-
-    .set_scale = [](clap_plugin_t const*, f64) -> bool {
-        return false; // we (pugl) negotiate this with the OS ourselves
-    },
-
-    .get_size = [](clap_plugin_t const* plugin, u32* width, u32* height) -> bool {
-        if (PanicOccurred()) return false;
-
-        try {
-            ASSERT(plugin);
-            ASSERT(width);
-            ASSERT(height);
-            auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-
-            if (!IsMainThread(floe.host)) {
-                LogWarning(k_clap_log_module, "host misbehaving: gui.get_size() not on main thread");
-                ASSERT(!RunningInStandalone(floe.host));
-                return false;
-            }
-
-            if (!floe.gui_platform) {
-                LogWarning(k_clap_log_module, "host misbehaving: gui.get_size() called before gui.create()");
-                ASSERT(!RunningInStandalone(floe.host));
-                return false;
-            }
-
-            auto const size =
-                PhysicalPixelsToClapPixels(floe.gui_platform->view, WindowSize(*floe.gui_platform));
-            *width = size.width;
-            *height = size.height;
-            LogDebug(k_clap_log_module, "get_size result {}x{}", *width, *height);
-            return true;
-        } catch (PanicException) {
-            return false;
-        }
-    },
-
-    .can_resize = [](clap_plugin_t const*) -> bool { return true; },
-
-    .get_resize_hints = [](clap_plugin_t const* plugin, clap_gui_resize_hints_t* hints) -> bool {
-        if (PanicOccurred()) return false;
-
-        try {
-            ASSERT(plugin);
-            ASSERT(hints);
-            auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-
-            if (!IsMainThread(floe.host)) {
-                LogWarning(k_clap_log_module, "host misbehaving: gui.get_resize_hints() not on main thread");
-                ASSERT(!RunningInStandalone(floe.host));
-                return false;
-            }
-
-            hints->can_resize_vertically = true;
-            hints->can_resize_horizontally = true;
-            hints->preserve_aspect_ratio = true;
-            auto const ratio =
-                gui_settings::CurrentAspectRatio(g_shared_engine_systems->settings.settings.gui);
-            hints->aspect_ratio_width = ratio.width;
-            hints->aspect_ratio_height = ratio.height;
-            LogDebug(k_clap_log_module,
-                     "get_resize_hints {}x{}",
-                     hints->aspect_ratio_width,
-                     hints->aspect_ratio_height);
-            return true;
-        } catch (PanicException) {
-            return false;
-        }
-    },
-
-    .adjust_size = [](clap_plugin_t const* plugin, u32* clap_width, u32* clap_height) -> bool {
-        if (PanicOccurred()) return false;
-
-        try {
-            ASSERT(plugin);
-            ASSERT(clap_width);
-            ASSERT(clap_height);
-            auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-
-            if (!IsMainThread(floe.host)) {
-                LogWarning(k_clap_log_module, "host misbehaving: gui.adjust_size() not on main thread");
-                ASSERT(!RunningInStandalone(floe.host));
-                return false;
-            }
-
-            *clap_width = Clamp<u32>(*clap_width, 1, gui_settings::k_largest_gui_size);
-            *clap_height = Clamp<u32>(*clap_height, 1, gui_settings::k_largest_gui_size);
-            auto const size = ClapPixelsToPhysicalPixels(floe.gui_platform->view, *clap_width, *clap_height);
-
-            auto const aspect_ratio_conformed_size = gui_settings::GetNearestAspectRatioSizeInsideSize(
-                size,
-                gui_settings::CurrentAspectRatio(g_shared_engine_systems->settings.settings.gui));
-
-            if (aspect_ratio_conformed_size.width < gui_settings::k_min_gui_width) return false;
-
-            auto const clap_size =
-                PhysicalPixelsToClapPixels(floe.gui_platform->view, aspect_ratio_conformed_size);
-
-            LogDebug(k_clap_log_module,
-                     "adjust_size in: {}x{}, out: {}x{}",
-                     *clap_width,
-                     *clap_height,
-                     clap_size.width,
-                     clap_size.height);
-
-            *clap_width = clap_size.width;
-            *clap_height = clap_size.height;
-
-            return true;
-        } catch (PanicException) {
-            return false;
-        }
-    },
-
-    .set_size = [](clap_plugin_t const* plugin, u32 clap_width, u32 clap_height) -> bool {
-        if (PanicOccurred()) return false;
-
-        try {
-            ASSERT(plugin);
-            auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-
-            if (!IsMainThread(floe.host)) {
-                LogWarning(k_clap_log_module, "host misbehaving: gui.set_size() not on main thread");
-                ASSERT(!RunningInStandalone(floe.host));
-                return false;
-            }
-
-            if (!floe.gui_platform) {
-                LogWarning(k_clap_log_module, "host misbehaving: gui.set_size() called before gui.create()");
-                ASSERT(!RunningInStandalone(floe.host));
-                return false;
-            }
-
-            {
-                auto w = clap_width;
-                auto h = clap_height;
-                if (floe_gui.adjust_size(plugin, &w, &h) && (w != clap_width && h != clap_height)) {
-                    LogWarning(
-                        k_clap_log_module,
-                        "host misbehaving: gui.set_size() called with unadjusted size, given: {}x{}, adjusted {}x{}",
-                        clap_width,
-                        clap_height,
-                        w,
-                        h);
-                }
-            }
-
-            ZoneScopedMessage(floe.trace_config, "gui set_size {} {}", clap_width, clap_height);
-
-            if (clap_width == 0 || clap_height == 0) return false;
-            if (clap_width > gui_settings::k_largest_gui_size ||
-                clap_height > gui_settings::k_largest_gui_size)
-                return false;
-
-            auto const size = ClapPixelsToPhysicalPixels(floe.gui_platform->view, clap_width, clap_height);
-
-            auto const aspect_ratio_conformed_size = gui_settings::GetNearestAspectRatioSizeInsideSize(
-                size,
-                gui_settings::CurrentAspectRatio(g_shared_engine_systems->settings.settings.gui));
-            LogDebug(k_clap_log_module,
-                     "#{} set_size in: {}x{}, constrained {}x{}, result: {}",
-                     floe.index,
-                     size.width,
-                     size.height,
-                     aspect_ratio_conformed_size.width,
-                     aspect_ratio_conformed_size.height,
-                     aspect_ratio_conformed_size.width == size.width &&
-                         aspect_ratio_conformed_size.height == size.height);
-            if (aspect_ratio_conformed_size.width != size.width ||
-                aspect_ratio_conformed_size.height != size.height)
-                return false;
-            return SetSize(*floe.gui_platform, size);
-        } catch (PanicException) {
-            return false;
-        }
-    },
-
-    .set_parent = [](clap_plugin_t const* plugin, clap_window_t const* window) -> bool {
-        if (PanicOccurred()) return false;
-
-        try {
-            ASSERT(plugin);
-            ASSERT(window);
-            auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-
-            if (!IsMainThread(floe.host)) {
-                LogWarning(k_clap_log_module, "host misbehaving: gui.set_parent() not on main thread");
-                ASSERT(!RunningInStandalone(floe.host));
-                return false;
-            }
-
-            if (!floe.gui_platform) {
-                LogWarning(k_clap_log_module,
-                           "host misbehaving: gui.set_parent() called before gui.create()");
-                ASSERT(!RunningInStandalone(floe.host));
-                return false;
-            }
-
-            if (!window || !window->ptr) {
-                LogWarning(k_clap_log_module,
-                           "host misbehaving: gui.set_parent() called with invalid window");
-                ASSERT(!RunningInStandalone(floe.host));
-                return false;
-            }
-
-            LogDebug(k_clap_log_module, "#{} gui.set_parent()", floe.index);
-
-            ZoneScopedMessage(floe.trace_config, "gui set_parent");
-            auto const result = LogIfError(SetParent(*floe.gui_platform, *window), "SetParent");
-
-            // Bitwig never calls show() so we do it here
-            auto _ = SetVisible(*floe.gui_platform, true, *floe.engine);
-
-            return result;
-        } catch (PanicException) {
-            return false;
-        }
-    },
-
-    .set_transient = [](clap_plugin_t const*, clap_window_t const*) -> bool {
-        return false; // we don't support floating windows
-    },
-
-    .suggest_title =
-        [](clap_plugin_t const*, char const*) {
-            // we don't support floating windows
-        },
-
-    .show = [](clap_plugin_t const* plugin) -> bool {
-        if (PanicOccurred()) return false;
-
-        try {
-            ASSERT(plugin);
-            auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-
-            if (!IsMainThread(floe.host)) {
-                LogWarning(k_clap_log_module, "host misbehaving: gui.show() not on main thread");
-                ASSERT(!RunningInStandalone(floe.host));
-                return false;
-            }
-
-            if (!floe.gui_platform) {
-                LogWarning(k_clap_log_module, "host misbehaving: gui.show() called before gui.create()");
-                ASSERT(!RunningInStandalone(floe.host));
-                return false;
-            }
-
-            LogDebug(k_clap_log_module, "#{} gui.show()", floe.index);
-            ZoneScopedMessage(floe.trace_config, "gui show");
-            bool const result = LogIfError(SetVisible(*floe.gui_platform, true, *floe.engine), "SetVisible");
-            if (result) {
-                static bool shown_graphics_info = false;
-                if (!shown_graphics_info) {
-                    shown_graphics_info = true;
-                    LogInfo(k_main_log_module,
-                            "\n{}",
-                            floe.gui_platform->graphics_ctx->graphics_device_info.Items());
-                }
-            }
-            return result;
-        } catch (PanicException) {
-            return false;
-        }
-    },
-
-    .hide = [](clap_plugin_t const* plugin) -> bool {
-        if (PanicOccurred()) return false;
-
-        try {
-            ASSERT(plugin);
-            auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-
-            if (!IsMainThread(floe.host)) {
-                LogWarning(k_clap_log_module, "host misbehaving: gui.hide() not on main thread");
-                ASSERT(!RunningInStandalone(floe.host));
-                return false;
-            }
-
-            if (!floe.gui_platform) {
-                LogWarning(k_clap_log_module, "host misbehaving: gui.hide() called before gui.create()");
-                ASSERT(!RunningInStandalone(floe.host));
-                return false;
-            }
-
-            LogDebug(k_clap_log_module, "gui.show()");
-            ZoneScopedMessage(floe.trace_config, "gui hide");
-            return LogIfError(SetVisible(*floe.gui_platform, false, *floe.engine), "SetVisible");
-        } catch (PanicException) {
-            return false;
-        }
-    },
+    .is_api_supported = ClapGuiIsApiSupported,
+    .get_preferred_api = ClapGuiGetPrefferedApi,
+    .create = ClapGuiCreate,
+    .destroy = ClapGuiDestroy,
+    .set_scale = ClapGuiSetScale,
+    .get_size = ClapGuiGetSize,
+    .can_resize = ClapGuiCanResize,
+    .get_resize_hints = ClapGuiGetResizeHints,
+    .adjust_size = ClapGuiAdjustSize,
+    .set_size = ClapGuiSetSize,
+    .set_parent = ClapGuiSetParent,
+    .set_transient = ClapGuiSetTransient,
+    .suggest_title = ClapGuiSuggestTitle,
+    .show = ClapGuiShow,
+    .hide = ClapGuiHide,
 };
 
 static void CheckInputEvents(clap_input_events const* in) {
@@ -523,78 +509,82 @@ static void CheckInputEvents(clap_input_events const* in) {
     }
 }
 
+static u32 ClapParamsCount(clap_plugin_t const*) { return (u32)k_num_parameters; }
+
+static bool ClapParamsGetInfo(clap_plugin_t const*, u32 param_index, clap_param_info_t* param_info) {
+    if (PanicOccurred()) return false;
+
+    try {
+        ASSERT(param_info);
+        ASSERT(param_index < k_num_parameters);
+
+        // This callback should be main-thread only, but we don't care if that's not true since we don't
+        // use any shared state.
+        auto const& desc = k_param_descriptors[param_index];
+        param_info->id = ParamIndexToId((ParamIndex)param_index);
+        param_info->default_value = (f64)desc.default_linear_value;
+        param_info->max_value = (f64)desc.linear_range.max;
+        param_info->min_value = (f64)desc.linear_range.min;
+        CopyStringIntoBufferWithNullTerm(param_info->name, desc.name);
+        CopyStringIntoBufferWithNullTerm(param_info->module, desc.ModuleString());
+        param_info->cookie = nullptr;
+        param_info->flags = 0;
+        if (!desc.flags.not_automatable) param_info->flags |= CLAP_PARAM_IS_AUTOMATABLE;
+        if (desc.value_type == ParamValueType::Menu || desc.value_type == ParamValueType::Bool ||
+            desc.value_type == ParamValueType::Int)
+            param_info->flags |= CLAP_PARAM_IS_STEPPED;
+
+        return true;
+    } catch (PanicException) {
+        return false;
+    }
+}
+
+static bool ClapParamsGetValue(clap_plugin_t const* plugin, clap_id param_id, f64* out_value) {
+    if (PanicOccurred()) return false;
+
+    try {
+        ASSERT(plugin);
+        ASSERT(out_value);
+        auto& floe = *(FloePluginInstance*)plugin->plugin_data;
+
+        if (!IsMainThread(floe.host)) {
+            LogWarning(k_clap_log_module, "host misbehaving: params.get_value() not on main thread");
+            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
+            return false;
+        }
+
+        if (!floe.engine) {
+            LogWarning(k_clap_log_module, "host misbehaving: params.get_value() called before init()");
+            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
+            return false;
+        }
+
+        auto const opt_index = ParamIdToIndex(param_id);
+        if (!opt_index) return false;
+
+        auto const index = (usize)*opt_index;
+
+        // IMPROVE: handle params without atomics (part of larger refactor)
+        if (floe.engine->pending_state_change)
+            *out_value = (f64)floe.engine->last_snapshot.state.param_values[index];
+        else
+            *out_value = (f64)floe.engine->processor.params[index].value.Load(LoadMemoryOrder::Relaxed);
+
+        ASSERT(*out_value >= (f64)k_param_descriptors[index].linear_range.min);
+        ASSERT(*out_value <= (f64)k_param_descriptors[index].linear_range.max);
+
+        return true;
+    } catch (PanicException) {
+        return false;
+    }
+}
+
 // NOLINTNEXTLINE(cppcoreguidelines-interfaces-global-init): clang-tidy thinks g_log is initialised
 clap_plugin_params const floe_params {
-    .count = [](clap_plugin_t const*) -> u32 { return (u32)k_num_parameters; },
-
-    .get_info = [](clap_plugin_t const*, u32 param_index, clap_param_info_t* param_info) -> bool {
-        if (PanicOccurred()) return false;
-
-        try {
-            ASSERT(param_info);
-            ASSERT(param_index < k_num_parameters);
-
-            // This callback should be main-thread only, but we don't care if that's not true since we don't
-            // use any shared state.
-            auto const& desc = k_param_descriptors[param_index];
-            param_info->id = ParamIndexToId((ParamIndex)param_index);
-            param_info->default_value = (f64)desc.default_linear_value;
-            param_info->max_value = (f64)desc.linear_range.max;
-            param_info->min_value = (f64)desc.linear_range.min;
-            CopyStringIntoBufferWithNullTerm(param_info->name, desc.name);
-            CopyStringIntoBufferWithNullTerm(param_info->module, desc.ModuleString());
-            param_info->cookie = nullptr;
-            param_info->flags = 0;
-            if (!desc.flags.not_automatable) param_info->flags |= CLAP_PARAM_IS_AUTOMATABLE;
-            if (desc.value_type == ParamValueType::Menu || desc.value_type == ParamValueType::Bool ||
-                desc.value_type == ParamValueType::Int)
-                param_info->flags |= CLAP_PARAM_IS_STEPPED;
-
-            return true;
-        } catch (PanicException) {
-            return false;
-        }
-    },
-
-    .get_value = [](clap_plugin_t const* plugin, clap_id param_id, f64* out_value) -> bool {
-        if (PanicOccurred()) return false;
-
-        try {
-            ASSERT(plugin);
-            ASSERT(out_value);
-            auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-
-            if (!IsMainThread(floe.host)) {
-                LogWarning(k_clap_log_module, "host misbehaving: params.get_value() not on main thread");
-                ASSERT(!RunningInStandalone(floe.host));
-                return false;
-            }
-
-            if (!floe.engine) {
-                LogWarning(k_clap_log_module, "host misbehaving: params.get_value() called before init()");
-                ASSERT(!RunningInStandalone(floe.host));
-                return false;
-            }
-
-            auto const opt_index = ParamIdToIndex(param_id);
-            if (!opt_index) return false;
-
-            auto const index = (usize)*opt_index;
-
-            // IMPROVE: handle params without atomics (part of larger refactor)
-            if (floe.engine->pending_state_change)
-                *out_value = (f64)floe.engine->last_snapshot.state.param_values[index];
-            else
-                *out_value = (f64)floe.engine->processor.params[index].value.Load(LoadMemoryOrder::Relaxed);
-
-            ASSERT(*out_value >= (f64)k_param_descriptors[index].linear_range.min);
-            ASSERT(*out_value <= (f64)k_param_descriptors[index].linear_range.max);
-
-            return true;
-        } catch (PanicException) {
-            return false;
-        }
-    },
+    .count = ClapParamsCount,
+    .get_info = ClapParamsGetInfo,
+    .get_value = ClapParamsGetValue,
 
     .value_to_text =
         [](clap_plugin_t const*, clap_id param_id, f64 value, char* out_buffer, u32 out_buffer_capacity)
@@ -656,7 +646,7 @@ clap_plugin_params const floe_params {
 
                 if (!floe.engine) {
                     LogWarning(k_clap_log_module, "host misbehaving: params.flush() called before init()");
-                    ASSERT(!RunningInStandalone(floe.host));
+                    ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
                     return;
                 }
 
@@ -664,13 +654,13 @@ clap_plugin_params const floe_params {
                     if (!IsMainThread(floe.host)) {
                         LogWarning(k_clap_log_module,
                                    "host misbehaving: params.flush() not on main thread when inactive");
-                        ASSERT(!RunningInStandalone(floe.host));
+                        ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
                         return;
                     }
                 } else if (IsAudioThread(floe.host) == IsAudioThreadResult::No) {
                     LogWarning(k_clap_log_module,
                                "host misbehaving: params.flush() not on audio thread when active");
-                    ASSERT(!RunningInStandalone(floe.host));
+                    ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
                     return;
                 }
 
@@ -776,13 +766,13 @@ clap_plugin_timer_support const floe_timer {
 
                 if (!IsMainThread(floe.host)) {
                     LogWarning(k_clap_log_module, "host misbehaving: on_timer() not on main thread");
-                    ASSERT(!RunningInStandalone(floe.host));
+                    ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
                     return;
                 }
 
                 if (!floe.engine) {
                     LogWarning(k_clap_log_module, "host misbehaving: on_timer() called before init()");
-                    ASSERT(!RunningInStandalone(floe.host));
+                    ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
                     return;
                 }
 
@@ -810,13 +800,13 @@ clap_plugin_posix_fd_support const floe_posix_fd {
 
                 if (!IsMainThread(floe.host)) {
                     LogWarning(k_clap_log_module, "host misbehaving: on_fd() not on main thread");
-                    ASSERT(!RunningInStandalone(floe.host));
+                    ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
                     return;
                 }
 
                 if (!floe.engine) {
                     LogWarning(k_clap_log_module, "host misbehaving: on_fd() called before init()");
-                    ASSERT(!RunningInStandalone(floe.host));
+                    ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
                     return;
                 }
 
@@ -858,7 +848,7 @@ clap_plugin const floe_plugin {
 
             if (floe.initialised) {
                 LogWarning(k_clap_log_module, "host misbehaving: init() called twice");
-                ASSERT(!RunningInStandalone(floe.host));
+                ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
                 return false;
             }
 
@@ -866,7 +856,7 @@ clap_plugin const floe_plugin {
                     (clap_host_thread_check const*)floe.host.get_extension(&floe.host, CLAP_EXT_THREAD_CHECK);
                 thread_check && !thread_check->is_main_thread(&floe.host)) {
                 LogWarning(k_clap_log_module, "host misbehaving: init() not on main thread");
-                ASSERT(!RunningInStandalone(floe.host));
+                ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
                 return false;
             }
 
@@ -929,20 +919,20 @@ clap_plugin const floe_plugin {
                 if (floe.initialised) {
                     if (!IsMainThread(floe.host)) {
                         LogWarning(k_clap_log_module, "host misbehaving: destroy() not on main thread");
-                        ASSERT(!RunningInStandalone(floe.host));
+                        ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
                         return;
                     }
 
                     if (floe.gui_platform) {
                         LogWarning(k_clap_log_module,
                                    "host misbehaving: destroy() called while gui is active");
-                        ASSERT(!RunningInStandalone(floe.host));
+                        ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
                         floe_gui.destroy(plugin);
                     }
 
                     if (floe.active) {
                         LogWarning(k_clap_log_module, "host misbehaving: destroy() called while active");
-                        ASSERT(!RunningInStandalone(floe.host));
+                        ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
                         floe_plugin.deactivate(plugin);
                     }
 
@@ -974,13 +964,13 @@ clap_plugin const floe_plugin {
 
             if (!IsMainThread(floe.host)) {
                 LogWarning(k_clap_log_module, "host misbehaving: activate() not on main thread");
-                ASSERT(!RunningInStandalone(floe.host));
+                ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
                 return false;
             }
 
             if (floe.active) {
                 LogWarning(k_clap_log_module, "host misbehaving: activate() when already active");
-                ASSERT(!RunningInStandalone(floe.host));
+                ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
                 return false;
             }
 
@@ -1010,13 +1000,13 @@ clap_plugin const floe_plugin {
 
                 if (!IsMainThread(floe.host)) {
                     LogWarning(k_clap_log_module, "host misbehaving: deactivate() not on main thread");
-                    ASSERT(!RunningInStandalone(floe.host));
+                    ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
                     return;
                 }
 
                 if (!floe.active) {
                     LogWarning(k_clap_log_module, "host misbehaving: deactivate() when not active");
-                    ASSERT(!RunningInStandalone(floe.host));
+                    ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
                     return;
                 }
 
@@ -1036,19 +1026,19 @@ clap_plugin const floe_plugin {
 
             if (IsAudioThread(floe.host) == IsAudioThreadResult::No) {
                 LogWarning(k_clap_log_module, "host misbehaving: start_processing() not on audio thread");
-                ASSERT(!RunningInStandalone(floe.host));
+                ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
                 return false;
             }
 
             if (!floe.active) {
                 LogWarning(k_clap_log_module, "host misbehaving: start_processing() when not active");
-                ASSERT(!RunningInStandalone(floe.host));
+                ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
                 return false;
             }
 
             if (floe.processing) {
                 LogWarning(k_clap_log_module, "host misbehaving: start_processing() when already processing");
-                ASSERT(!RunningInStandalone(floe.host));
+                ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
                 return false;
             }
 
@@ -1071,19 +1061,19 @@ clap_plugin const floe_plugin {
 
                 if (IsAudioThread(floe.host) == IsAudioThreadResult::No) {
                     LogWarning(k_clap_log_module, "host misbehaving: stop_processing() not on audio thread");
-                    ASSERT(!RunningInStandalone(floe.host));
+                    ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
                     return;
                 }
 
                 if (!floe.active) {
                     LogWarning(k_clap_log_module, "host misbehaving: stop_processing() when not active");
-                    ASSERT(!RunningInStandalone(floe.host));
+                    ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
                     return;
                 }
 
                 if (!floe.processing) {
                     LogWarning(k_clap_log_module, "host misbehaving: stop_processing() when not processing");
-                    ASSERT(!RunningInStandalone(floe.host));
+                    ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
                     return;
                 }
 
@@ -1104,13 +1094,13 @@ clap_plugin const floe_plugin {
 
                 if (IsAudioThread(floe.host) == IsAudioThreadResult::No) {
                     LogWarning(k_clap_log_module, "host misbehaving: reset() not on audio thread");
-                    ASSERT(!RunningInStandalone(floe.host));
+                    ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
                     return;
                 }
 
                 if (!floe.active) {
                     LogWarning(k_clap_log_module, "host misbehaving: reset() when not active");
-                    ASSERT(!RunningInStandalone(floe.host));
+                    ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
                     return;
                 }
 
@@ -1171,7 +1161,7 @@ clap_plugin const floe_plugin {
 
                 if (!IsMainThread(floe.host)) {
                     LogWarning(k_clap_log_module, "host misbehaving: on_main_thread() not on main thread");
-                    ASSERT(!RunningInStandalone(floe.host));
+                    ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
                     return;
                 }
 

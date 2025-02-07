@@ -548,7 +548,7 @@ static ErrorCodeOr<void> Main(String exe_path_rel) {
         ASSERT(original_height == clap_height);
     }
 
-    auto const size = ClapPixelsToPhysicalPixels(standalone.gui_view, clap_width, clap_height);
+    auto const size = *ClapPixelsToPhysicalPixels(standalone.gui_view, clap_width, clap_height);
     TRY_PUGL(
         puglSetSizeHint(standalone.gui_view, PUGL_DEFAULT_SIZE, (PuglSpan)size.width, (PuglSpan)size.height));
 
@@ -583,9 +583,9 @@ static ErrorCodeOr<void> Main(String exe_path_rel) {
                 standalone.requested_resize.Exchange(k_invalid_encoded_ui_size, RmwMemoryOrder::Relaxed);
             encoded_uisize != k_invalid_encoded_ui_size) {
             auto const requested_clap_size = DecodeUiSize(encoded_uisize);
-            auto const physical_pixels = ClapPixelsToPhysicalPixels(standalone.gui_view,
-                                                                    requested_clap_size.width,
-                                                                    requested_clap_size.height);
+            auto const physical_pixels = *ClapPixelsToPhysicalPixels(standalone.gui_view,
+                                                                     requested_clap_size.width,
+                                                                     requested_clap_size.height);
             puglSetSize(standalone.gui_view, physical_pixels.width, physical_pixels.height);
             gui->set_size(&standalone.plugin, requested_clap_size.width, requested_clap_size.height);
         }

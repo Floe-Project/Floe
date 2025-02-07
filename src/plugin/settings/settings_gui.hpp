@@ -68,6 +68,10 @@ constexpr UiSize GetNearestAspectRatioSizeInsideSize(UiSize size, UiSize aspect_
     }
 }
 
+constexpr bool IsAspectRatio(UiSize size, UiSize aspect_ratio) {
+    return GetNearestAspectRatioSizeInsideSize(size, aspect_ratio) == size;
+}
+
 PUBLIC UiSize CurrentAspectRatio(Settings::Gui const& gui) {
     ASSERT(CheckThreadName("main"));
     return gui.show_keyboard ? k_aspect_ratio_with_keyboard : k_aspect_ratio_without_keyboard;

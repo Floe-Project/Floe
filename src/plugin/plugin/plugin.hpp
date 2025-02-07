@@ -110,7 +110,7 @@ PUBLIC UiSize PhysicalPixelsToClapPixels(PuglView* view, UiSize size) {
     }
     return size;
 }
-PUBLIC UiSize ClapPixelsToPhysicalPixels(PuglView* view, u32 width, u32 height) {
+PUBLIC Optional<UiSize> ClapPixelsToPhysicalPixels(PuglView* view, u32 width, u32 height) {
     ASSERT(CheckThreadName("main"));
     ASSERT(view);
     if constexpr (IS_MACOS) {
@@ -120,7 +120,9 @@ PUBLIC UiSize ClapPixelsToPhysicalPixels(PuglView* view, u32 width, u32 height) 
             height = u32(height * scale_factor);
         }
     }
-    return {CheckedCast<u16>(width), CheckedCast<u16>(height)};
+    if (width > LargestRepresentableValue<u16>() || height > LargestRepresentableValue<u16>())
+        return k_nullopt;
+    return UiSize {(u16)width, (u16)height};
 }
 
 // We use the clap extension interface for our plugin and "host" (wrapper) to communicate to each other.
@@ -160,11 +162,6 @@ inline IsAudioThreadResult IsAudioThread(clap_host const& host) {
         // audio threads.
         return IsAudioThreadResult::Unknown;
     }
-}
-
-inline bool RunningInStandalone(clap_host const& host) {
-    if constexpr (PRODUCTION_BUILD) return false;
-    return host.get_extension(&host, k_floe_clap_extension_id) != nullptr;
 }
 
 static constexpr char const* k_features[] = {CLAP_PLUGIN_FEATURE_INSTRUMENT,

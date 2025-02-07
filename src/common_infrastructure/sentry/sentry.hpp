@@ -415,6 +415,21 @@ EnvelopeAddEvent(Sentry& sentry, Writer writer, ErrorEvent event, bool signal_sa
         TRY(json::WriteArrayEnd(json_writer));
     }
 
+    // breadcrumbs
+    if (!signal_safe) {
+        TRY(json::WriteKeyArrayBegin(json_writer, "breadcrumbs"));
+
+        DynamicArrayBounded<char, LogRingBuffer::k_buffer_size> buffer;
+        GetLatestLogMessages(buffer);
+        for (auto const message : SplitIterator {.whole = buffer, .token = '\0', .skip_consecutive = true}) {
+            TRY(json::WriteObjectBegin(json_writer));
+            TRY(json::WriteKeyValue(json_writer, "message", message));
+            TRY(json::WriteObjectEnd(json_writer));
+        }
+
+        TRY(json::WriteArrayEnd(json_writer));
+    }
+
     // insert the common context
     {
         TRY(writer.WriteChar(','));

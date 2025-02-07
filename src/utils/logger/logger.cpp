@@ -6,6 +6,7 @@
 #include "foundation/foundation.hpp"
 #include "os/filesystem.hpp"
 #include "os/misc.hpp"
+#include "tests/framework.hpp"
 
 ErrorCodeOr<void> WriteFormattedLog(Writer writer,
                                     String module_name,
@@ -145,6 +146,7 @@ __attribute__((visibility("hidden"))) static CallOnceFlag g_call_once_flag {};
 __attribute__((visibility("hidden"))) alignas(File) static u8 g_file_storage[sizeof(File)];
 __attribute__((visibility("hidden"))) static File* g_file = nullptr;
 __attribute__((visibility("hidden"))) static LogConfig g_config {};
+__attribute__((visibility("hidden"))) static LogRingBuffer g_message_ring_buffer {};
 
 void InitLogger(LogConfig config) {
     CountedInit(g_counted_init_flag, [&]() { g_config = config; });
@@ -157,134 +159,232 @@ void ShutdownLogger() {
     });
 }
 
+void GetLatestLogMessages(DynamicArrayBounded<char, LogRingBuffer::k_buffer_size>& out) {
+    g_message_ring_buffer.ReadToNullTerminatedStringList(out);
+}
+
 void Log(LogModuleName module_name, LogLevel level, FunctionRef<ErrorCodeOr<void>(Writer)> write_message) {
     if (level < g_config.min_level_allowed) return;
 
-    static auto log_to_stderr = [](LogModuleName module_name,
-                                   LogLevel level,
-                                   FunctionRef<ErrorCodeOr<void>(Writer)> write_message) {
-        constexpr WriteFormattedLogOptions k_config {
-            .ansi_colors = true,
-            .no_info_prefix = false,
-            .timestamp = true,
-            .thread = true,
+    // We always want to write to the log ring buffer. We can access these when we report errors online.
+    {
+        DynamicArrayBounded<char, LogRingBuffer::k_max_message_size> message;
+        auto _ = WriteFormattedLog(dyn::WriterFor(message),
+                                   module_name.str,
+                                   level,
+                                   write_message,
+                                   {
+                                       .ansi_colors = false,
+                                       .no_info_prefix = true,
+                                       .timestamp = false,
+                                       .thread = true,
+                                   });
+        g_message_ring_buffer.Write(message);
+    }
+
+    // For debugging purposes, we also log to a file or stderr.
+    if constexpr (!PRODUCTION_BUILD) {
+        static auto log_to_stderr = [](LogModuleName module_name,
+                                       LogLevel level,
+                                       FunctionRef<ErrorCodeOr<void>(Writer)> write_message) {
+            constexpr WriteFormattedLogOptions k_config {
+                .ansi_colors = true,
+                .no_info_prefix = false,
+                .timestamp = true,
+                .thread = true,
+            };
+            auto& mutex = StdStreamMutex(StdStream::Err);
+            mutex.Lock();
+            DEFER { mutex.Unlock(); };
+
+            BufferedWriter<Kb(4)> buffered_writer {StdWriter(StdStream::Err)};
+            DEFER { auto _ = buffered_writer.Flush(); };
+
+            auto _ =
+                WriteFormattedLog(buffered_writer.Writer(), module_name.str, level, write_message, k_config);
         };
-        auto& mutex = StdStreamMutex(StdStream::Err);
-        mutex.Lock();
-        DEFER { mutex.Unlock(); };
 
-        BufferedWriter<Kb(4)> buffered_writer {StdWriter(StdStream::Err)};
-        DEFER { auto _ = buffered_writer.Flush(); };
+        switch (g_config.destination) {
+            case LogConfig::Destination::Stderr: {
+                log_to_stderr(module_name, level, write_message);
+                break;
+            }
+            case LogConfig::Destination::File: {
+                CallOnce(g_call_once_flag, []() {
+                    ASSERT(g_file == nullptr);
+                    InitLogFolderIfNeeded();
 
-        auto _ = WriteFormattedLog(buffered_writer.Writer(), module_name.str, level, write_message, k_config);
-    };
+                    auto seed = RandomSeed();
+                    ArenaAllocatorWithInlineStorage<500> arena {PageAllocator::Instance()};
 
-    switch (g_config.destination) {
-        case LogConfig::Destination::Stderr: {
-            log_to_stderr(module_name, level, write_message);
-            break;
-        }
-        case LogConfig::Destination::File: {
-            CallOnce(g_call_once_flag, []() {
-                ASSERT(g_file == nullptr);
-                InitLogFolderIfNeeded();
+                    auto const log_folder = *LogFolder();
+                    ASSERT(IsValidUtf8(log_folder));
 
-                auto seed = RandomSeed();
-                ArenaAllocatorWithInlineStorage<500> arena {PageAllocator::Instance()};
+                    auto const standard_path = path::Join(arena, Array {log_folder, k_latest_log_filename});
+                    ASSERT(IsValidUtf8(standard_path));
 
-                auto const log_folder = *LogFolder();
-                ASSERT(IsValidUtf8(log_folder));
-
-                auto const standard_path = path::Join(arena, Array {log_folder, k_latest_log_filename});
-                ASSERT(IsValidUtf8(standard_path));
-
-                // We have a few requirements here:
-                // - If possible, we want a log file with a fix name so that it's easier to find and debug.
-                // - We don't want to overwrite any log files.
-                // - We need to correctly handle the case where other processes are running this same code.
-                for (auto _ : Range(50)) {
-                    // Try opening the file with exclusive access.
-                    auto file_outcome =
-                        OpenFile(standard_path,
-                                 {
-                                     .capability = FileMode::Capability::Append,
-                                     .share = FileMode::Share::DeleteRename | FileMode::Share::ReadWrite,
-                                     .creation = FileMode::Creation::CreateNew, // Exclusive access
-                                 });
-                    if (file_outcome.HasError()) {
-                        if (file_outcome.Error() == FilesystemError::PathAlreadyExists) {
-                            // We try to oust the standard log file by renaming it to a unique name. Rename is
-                            // atomic. If another process is already using the log file, they will continue to
-                            // do so safely, but it will be under the new name.
-                            auto const unique_path =
-                                path::Join(arena,
-                                           Array {log_folder, UniqueFilename("", k_log_extension, seed)});
-                            ASSERT(IsValidUtf8(unique_path));
-                            auto const rename_o = Rename(standard_path, unique_path);
-                            if (rename_o.Succeeded()) {
-                                // We successfully renamed the file. Now let's try opening it again.
-                                continue;
-                            } else {
-                                if (rename_o.Error() == FilesystemError::PathDoesNotExist) {
-                                    // The file was deleted between our OpenFile and Rename calls. Let's try
-                                    // again.
+                    // We have a few requirements here:
+                    // - If possible, we want a log file with a fixed name so that it's easier to find and
+                    // debug.
+                    // - We don't want to overwrite any log files.
+                    // - We need to correctly handle the case where other processes are running this same
+                    // code.
+                    for (auto _ : Range(50)) {
+                        // Try opening the file with exclusive access.
+                        auto file_outcome =
+                            OpenFile(standard_path,
+                                     {
+                                         .capability = FileMode::Capability::Append,
+                                         .share = FileMode::Share::DeleteRename | FileMode::Share::ReadWrite,
+                                         .creation = FileMode::Creation::CreateNew, // Exclusive access
+                                     });
+                        if (file_outcome.HasError()) {
+                            if (file_outcome.Error() == FilesystemError::PathAlreadyExists) {
+                                // We try to oust the standard log file by renaming it to a unique name.
+                                // Rename is atomic. If another process is already using the log file, they
+                                // will continue to do so safely, but it will be under the new name.
+                                auto const unique_path =
+                                    path::Join(arena,
+                                               Array {log_folder, UniqueFilename("", k_log_extension, seed)});
+                                ASSERT(IsValidUtf8(unique_path));
+                                auto const rename_o = Rename(standard_path, unique_path);
+                                if (rename_o.Succeeded()) {
+                                    // We successfully renamed the file. Now let's try opening it again.
                                     continue;
-                                }
+                                } else {
+                                    if (rename_o.Error() == FilesystemError::PathDoesNotExist) {
+                                        // The file was deleted between our OpenFile and Rename calls. Let's
+                                        // try again.
+                                        continue;
+                                    }
 
-                                StdPrintFLocked(StdStream::Err,
-                                                "{} failed to rename log file: {}\n",
-                                                CurrentThreadId(),
-                                                rename_o.Error());
-                                return;
+                                    StdPrintFLocked(StdStream::Err,
+                                                    "{} failed to rename log file: {}\n",
+                                                    CurrentThreadId(),
+                                                    rename_o.Error());
+                                    return;
+                                }
                             }
+
+                            // Some other error occurred, not much we can do.
+                            StdPrintFLocked(StdStream::Err,
+                                            "{} failed to open log file: {}\n",
+                                            CurrentThreadId(),
+                                            file_outcome.Error());
+                            return;
                         }
 
-                        // Some other error occurred, not much we can do.
-                        StdPrintFLocked(StdStream::Err,
-                                        "{} failed to open log file: {}\n",
-                                        CurrentThreadId(),
-                                        file_outcome.Error());
+                        auto file = PLACEMENT_NEW(g_file_storage) File {file_outcome.ReleaseValue()};
+                        g_file = file;
                         return;
                     }
 
-                    auto file = PLACEMENT_NEW(g_file_storage) File {file_outcome.ReleaseValue()};
-                    g_file = file;
+                    StdPrintFLocked(StdStream::Err,
+                                    "{} failed to open log file: too many attempts\n",
+                                    CurrentThreadId());
+                    return;
+                });
+
+                auto file = g_file;
+
+                if (!file) {
+                    log_to_stderr(k_global_log_module, level, write_message);
                     return;
                 }
 
-                StdPrintFLocked(StdStream::Err,
-                                "{} failed to open log file: too many attempts\n",
-                                CurrentThreadId());
-                return;
-            });
+                BufferedWriter<Kb(4)> buffered_writer {file->Writer()};
+                DEFER { auto _ = buffered_writer.Flush(); };
 
-            auto file = g_file;
+                auto o = WriteFormattedLog(buffered_writer.Writer(),
+                                           module_name.str,
+                                           level,
+                                           write_message,
+                                           {
+                                               .ansi_colors = false,
+                                               .no_info_prefix = false,
+                                               .timestamp = true,
+                                               .thread = true,
+                                           });
+                if (o.HasError()) {
+                    log_to_stderr(k_global_log_module, LogLevel::Error, [o](Writer writer) {
+                        return fmt::FormatToWriter(writer, "failed to write log file: {}"_s, o.Error());
+                    });
+                }
 
-            if (!file) {
-                log_to_stderr(k_global_log_module, level, write_message);
-                return;
+                break;
             }
-
-            BufferedWriter<Kb(4)> buffered_writer {file->Writer()};
-            DEFER { auto _ = buffered_writer.Flush(); };
-
-            auto o = WriteFormattedLog(buffered_writer.Writer(),
-                                       module_name.str,
-                                       level,
-                                       write_message,
-                                       {
-                                           .ansi_colors = false,
-                                           .no_info_prefix = false,
-                                           .timestamp = true,
-                                           .thread = true,
-                                       });
-            if (o.HasError()) {
-                log_to_stderr(k_global_log_module, LogLevel::Error, [o](Writer writer) {
-                    return fmt::FormatToWriter(writer, "failed to write log file: {}"_s, o.Error());
-                });
-            }
-
-            break;
         }
     }
 }
+
+TEST_CASE(TestLogRingBuffer) {
+    LogRingBuffer ring;
+    DynamicArrayBounded<char, LogRingBuffer::k_buffer_size> buffer;
+    usize count = 0;
+
+    SUBCASE("basics") {
+        ring.ReadToNullTerminatedStringList(buffer);
+        CHECK_EQ(buffer.size, 0u);
+
+        ring.Write("hello");
+        ring.ReadToNullTerminatedStringList(buffer);
+        count = 0;
+        for (auto const message : SplitIterator {.whole = buffer, .token = '\0', .skip_consecutive = true}) {
+            CHECK_EQ(message, "hello"_s);
+            ++count;
+        }
+        CHECK_EQ(count, 1u);
+
+        ring.Reset();
+        ring.ReadToNullTerminatedStringList(buffer);
+        CHECK_EQ(buffer.size, 0u);
+
+        ring.Write("world");
+        ring.ReadToNullTerminatedStringList(buffer);
+        count = 0;
+        for (auto const message : SplitIterator {.whole = buffer, .token = '\0', .skip_consecutive = true}) {
+            CHECK_EQ(message, "world"_s);
+            ++count;
+        }
+        CHECK_EQ(count, 1u);
+
+        ring.Write("hello");
+        count = 0;
+        ring.ReadToNullTerminatedStringList(buffer);
+        for (auto const message : SplitIterator {.whole = buffer, .token = '\0', .skip_consecutive = true}) {
+            switch (count) {
+                case 0: CHECK_EQ(message, "world"_s); break;
+                case 1: CHECK_EQ(message, "hello"_s); break;
+                default: CHECK(false);
+            }
+            ++count;
+        }
+        CHECK_EQ(count, 2u);
+    }
+
+    SUBCASE("wrap") {
+        for (auto _ : Range(1000))
+            ring.Write("abcdefghijklmnopqrstuvwxyz");
+        ring.ReadToNullTerminatedStringList(buffer);
+        for (auto const message : SplitIterator {.whole = buffer, .token = '\0', .skip_consecutive = true})
+            CHECK_EQ(message, "abcdefghijklmnopqrstuvwxyz"_s);
+    }
+
+    SUBCASE("randomly add strings") {
+        u64 seed = RandomSeed();
+        for (auto _ : Range(1000)) {
+            DynamicArrayBounded<char, 32> string;
+            auto const string_size = RandomIntInRange<u32>(seed, 1, string.Capacity() - 1);
+            for (auto _ : Range(string_size)) {
+                auto const c = RandomIntInRange<char>(seed, 'a', 'z');
+                dyn::AppendAssumeCapacity(string, c);
+            }
+            ring.Write(string);
+        }
+        ring.ReadToNullTerminatedStringList(buffer);
+    }
+
+    return k_success;
+}
+
+TEST_REGISTRATION(RegisterLogRingBufferTests) { REGISTER_TEST(TestLogRingBuffer); }

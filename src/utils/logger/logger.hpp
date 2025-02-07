@@ -3,6 +3,7 @@
 
 #pragma once
 #include "foundation/foundation.hpp"
+#include "os/threading.hpp"
 
 enum class LogLevel { Debug, Info, Warning, Error };
 
@@ -11,6 +12,73 @@ struct WriteFormattedLogOptions {
     bool no_info_prefix = false;
     bool timestamp = false;
     bool thread = false;
+};
+
+struct LogRingBuffer {
+    static constexpr usize k_buffer_size = 1 << 12; // must be a power of 2
+    static constexpr usize k_max_message_size = 256;
+
+    u32 Mask(u32 val) { return val & (buffer.size - 1); }
+
+    void Write(String message) {
+        // We allow indexes to grow continuously until they naturally wrap around. These are the requirements
+        // to make this work:
+        static_assert(IsPowerOfTwo(k_buffer_size));
+        static_assert(UnsignedInt<decltype(write)>);
+        static_assert(Same<decltype(write), decltype(read)>);
+        // The maximum capacity can only be half the range of the index data types. (So 2^31-1 when using 32
+        // bit unsigned integers)
+        static_assert(k_buffer_size <= ((1 << ((sizeof(write) * 8) - 1)) - 1));
+
+        message.size = Min(message.size, k_max_message_size);
+
+        mutex.Lock();
+        DEFER { mutex.Unlock(); };
+
+        // if there's no room for this message, we remove the oldest messages until there is room
+        while (true) {
+            auto const used = (u32)write - (u32)read;
+            ASSERT_HOT(used <= buffer.size);
+            auto const remaining = buffer.size - used;
+            // we need the extra byte for prefixing the message with its size
+            if (remaining >= (message.size + 1)) break;
+            auto const tail_message_size = buffer[Mask(read)];
+            read += 1; // message size byte
+            read += tail_message_size;
+        }
+
+        buffer[Mask(write++)] = (u8)message.size;
+        for (auto c : message)
+            buffer[Mask(write++)] = (u8)c;
+    }
+
+    void ReadToNullTerminatedStringList(DynamicArrayBounded<char, k_buffer_size>& out) {
+        mutex.Lock();
+        DEFER { mutex.Unlock(); };
+
+        dyn::Resize(out, write - read);
+
+        auto pos = read;
+        while (pos != write) {
+            auto const message_size = (u8)buffer[Mask(pos)];
+            pos += 1;
+            for (u8 i = 0; i < message_size; i++)
+                dyn::AppendAssumeCapacity(out, (char)buffer[Mask(pos++)]);
+            dyn::AppendAssumeCapacity(out, '\0');
+        }
+    }
+
+    void Reset() {
+        mutex.Lock();
+        DEFER { mutex.Unlock(); };
+        write = 0;
+        read = 0;
+    }
+
+    Array<u8, k_buffer_size> buffer;
+    MutexThin mutex {};
+    u16 write {};
+    u16 read {};
 };
 
 using MessageWriteFunction = FunctionRef<ErrorCodeOr<void>(Writer)>;
@@ -55,6 +123,9 @@ template <typename... Args>
 void Log(LogModuleName module_name, LogLevel level, String format, Args const&... args) {
     Log(module_name, level, [&](Writer writer) { return fmt::FormatToWriter(writer, format, args...); });
 }
+
+// thread-safe, not signal-safe
+void GetLatestLogMessages(DynamicArrayBounded<char, LogRingBuffer::k_buffer_size>& out);
 
 void InitLogger(LogConfig);
 void ShutdownLogger();

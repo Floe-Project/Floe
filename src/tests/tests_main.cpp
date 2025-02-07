@@ -23,16 +23,17 @@
     X(RegisterLayoutTests)                                                                                   \
     X(RegisterLibraryLuaTests)                                                                               \
     X(RegisterLibraryMdataTests)                                                                             \
+    X(RegisterLogRingBufferTests)                                                                            \
     X(RegisterOsTests)                                                                                       \
     X(RegisterPackageFormatTests)                                                                            \
     X(RegisterPackageInstallationTests)                                                                      \
     X(RegisterParamDescriptorTests)                                                                          \
     X(RegisterPresetTests)                                                                                   \
     X(RegisterSampleLibraryLoaderTests)                                                                      \
+    X(RegisterSentryTests)                                                                                   \
     X(RegisterSettingsFileTests)                                                                             \
     X(RegisterStateCodingTests)                                                                              \
     X(RegisterUtilsTests)                                                                                    \
-    X(RegisterSentryTests)                                                                                   \
     X(RegisterVolumeFadeTests)
 
 #define WINDOWS_FP_TEST_REGISTER_FUNCTIONS X(RegisterWindowsSpecificTests)

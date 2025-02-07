@@ -514,13 +514,8 @@ ErrorCodeOr<void> WriteStacktrace(Span<uintptr const> stack, Writer writer, Stac
 
 ErrorCodeOr<void>
 WriteCurrentStacktrace(Writer writer, StacktracePrintOptions options, StacktraceSkipOptions skip) {
-    auto state = g_backtrace_state.Load(LoadMemoryOrder::Acquire);
-    if (!state) return ErrorCode {StacktraceError::NotInitialised};
-    if (state->failed_init_error) return fmt::FormatToWriter(writer, "{}", *state->failed_init_error);
-
-    StacktraceContext ctx {.options = options, .writer = writer};
-    backtrace_full(state->state, NumSkipFrames(skip), HandleStacktraceLine, HandleStacktraceError, &ctx);
-    return ctx.return_value;
+    if (auto stack = CurrentStacktrace(skip)) return WriteStacktrace(*stack, writer, options);
+    return ErrorCode {StacktraceError::NotInitialised};
 }
 
 MutableString StacktraceString(Span<uintptr const> stack, Allocator& a, StacktracePrintOptions options) {
@@ -538,9 +533,8 @@ MutableString StacktraceString(Span<uintptr const> stack, Allocator& a, Stacktra
 
 MutableString
 CurrentStacktraceString(Allocator& a, StacktracePrintOptions options, StacktraceSkipOptions skip) {
-    DynamicArray<char> result {a};
-    auto _ = WriteCurrentStacktrace(dyn::WriterFor(result), options, skip);
-    return result.ToOwnedSpan();
+    if (auto stack = CurrentStacktrace(skip)) return StacktraceString(*stack, a, options);
+    return a.Clone("Stacktrace error: not initialised"_s);
 }
 
 void StacktraceToCallback(Span<uintptr const> stack,

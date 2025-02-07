@@ -70,7 +70,9 @@ constexpr auto k_preset_test_files_subdir = "presets"_s;
 constexpr auto k_libraries_test_files_subdir = "libraries"_s;
 
 struct Result {
-    Result(ErrorCode ec) : outcome(ec) { stacktrace = CurrentStacktrace(); }
+    __attribute__((noinline)) Result(ErrorCode ec) : outcome(ec) {
+        stacktrace = CurrentStacktrace(ProgramCounter {CALL_SITE_PROGRAM_COUNTER});
+    }
     Result(SuccessType s) : outcome(s) { stacktrace = StacktraceStack {}; }
     Optional<StacktraceStack> stacktrace;
     ErrorCodeOr<void> outcome;

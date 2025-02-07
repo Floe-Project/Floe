@@ -166,8 +166,9 @@ void GetLatestLogMessages(DynamicArrayBounded<char, LogRingBuffer::k_buffer_size
 void Log(LogModuleName module_name, LogLevel level, FunctionRef<ErrorCodeOr<void>(Writer)> write_message) {
     if (level < g_config.min_level_allowed) return;
 
-    // We always want to write to the log ring buffer. We can access these when we report errors online.
-    {
+    // Info, warnings and errors should be added to the ring buffer. We can access these when we report errors
+    // online.
+    if (level > LogLevel::Debug) {
         DynamicArrayBounded<char, LogRingBuffer::k_max_message_size> message;
         auto _ = WriteFormattedLog(dyn::WriterFor(message),
                                    module_name.str,

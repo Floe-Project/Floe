@@ -15,8 +15,8 @@ struct WriteFormattedLogOptions {
 };
 
 struct LogRingBuffer {
-    static constexpr usize k_buffer_size = 1 << 12; // must be a power of 2
-    static constexpr usize k_max_message_size = 256;
+    static constexpr usize k_buffer_size = 1 << 13; // must be a power of 2
+    static constexpr usize k_max_message_size = LargestRepresentableValue<u8>();
 
     u32 Mask(u32 val) { return val & (buffer.size - 1); }
 
@@ -57,14 +57,14 @@ struct LogRingBuffer {
         DEFER { mutex.Unlock(); };
 
         dyn::Resize(out, write - read);
+        usize out_index = 0;
 
         auto pos = read;
         while (pos != write) {
-            auto const message_size = (u8)buffer[Mask(pos)];
-            pos += 1;
+            auto const message_size = (u8)buffer[Mask(pos++)];
             for (u8 i = 0; i < message_size; i++)
-                dyn::AppendAssumeCapacity(out, (char)buffer[Mask(pos++)]);
-            dyn::AppendAssumeCapacity(out, '\0');
+                out[out_index++] = (char)buffer[Mask(pos++)];
+            out[out_index++] = '\0';
         }
     }
 
@@ -125,6 +125,7 @@ void Log(LogModuleName module_name, LogLevel level, String format, Args const&..
 }
 
 // thread-safe, not signal-safe
+// Returns log message strings in the order they were written, each message is separated by a null terminator.
 void GetLatestLogMessages(DynamicArrayBounded<char, LogRingBuffer::k_buffer_size>& out);
 
 void InitLogger(LogConfig);

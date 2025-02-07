@@ -269,7 +269,9 @@ PUBLIC bool SetSize(GuiPlatform& platform, UiSize new_size) {
 }
 
 PUBLIC UiSize WindowSize(GuiPlatform& platform) {
-    return gui_settings::WindowSize(platform.settings.settings.gui);
+    if (platform.view == nullptr) return gui_settings::WindowSize(platform.settings.settings.gui);
+    auto const size = puglGetFrame(platform.view);
+    return {size.width, size.height};
 }
 
 // Details

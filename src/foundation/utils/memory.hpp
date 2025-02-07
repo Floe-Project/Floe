@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #pragma once
+#include "foundation/container/contiguous.hpp"
 #include "foundation/container/span.hpp"
 #include "foundation/universal_defs.hpp"
 
@@ -109,7 +110,7 @@ PUBLIC constexpr Span<u8 const> AsBytes(Type const& obj) {
 }
 
 template <typename DestType, typename Type>
-PUBLIC constexpr void WriteAndIncrement(usize& pos, DestType* dest, Type const& src) {
+PUBLIC constexpr void WriteAndIncrement(UnsignedInt auto& pos, DestType* dest, Type const& src) {
     if constexpr (requires(Type t) {
                       typename Type::ValueType;
                       requires sizeof(typename Type::ValueType) == sizeof(DestType);
@@ -127,6 +128,11 @@ PUBLIC constexpr void WriteAndIncrement(usize& pos, DestType* dest, Type const& 
 }
 
 template <typename DestType, typename Type>
-PUBLIC constexpr void WriteAndIncrement(usize& pos, Span<DestType> dest, Type const& src) {
+PUBLIC constexpr void WriteAndIncrement(UnsignedInt auto& pos, Span<DestType> dest, Type const& src) {
+    WriteAndIncrement(pos, dest.data, src);
+}
+
+template <ContiguousContainer DestType, typename Type>
+PUBLIC constexpr void WriteAndIncrement(UnsignedInt auto& pos, DestType& dest, Type const& src) {
     WriteAndIncrement(pos, dest.data, src);
 }

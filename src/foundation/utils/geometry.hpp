@@ -17,6 +17,19 @@ union UiSize {
     u16 e[2];
 };
 
+union UiSize32 {
+    constexpr UiSize32() : width(0), height(0) {}
+    constexpr UiSize32(UiSize sz) : width(sz.width), height(sz.height) {}
+    constexpr UiSize32(u32 w, u32 h) : width(w), height(h) {}
+    f32x2 ToFloat2() const { return {(f32)width, (f32)height}; }
+
+    struct {
+        u32 width;
+        u32 height;
+    };
+    u32 e[2];
+};
+
 PUBLIC constexpr bool operator!=(UiSize a, UiSize b) { return a.width != b.width || a.height != b.height; }
 PUBLIC constexpr bool operator==(UiSize const& a, UiSize const& b) {
     return a.width == b.width && a.height == b.height;

@@ -32,6 +32,13 @@
 
 [[clang::no_destroy]] Optional<SharedEngineSystems> g_shared_engine_systems {};
 
+enum class ClapLoggingLevel {
+    Majority, // log only the majority of CLAP calls
+    AllNonRealtime, // log all CLAP calls except audio-thread ones
+};
+constexpr ClapLoggingLevel k_clap_logging_level =
+    PRODUCTION_BUILD ? ClapLoggingLevel::Majority : ClapLoggingLevel::AllNonRealtime;
+
 struct FloePluginInstance : PluginInstanceMessages {
     FloePluginInstance(clap_host const* clap_host, FloeInstanceIndex id);
     ~FloePluginInstance() { Trace(k_main_log_module); }
@@ -71,25 +78,50 @@ inline Allocator& FloeInstanceAllocator() { return PageAllocator::Instance(); }
 static u16 g_num_initialised_plugins = 0;
 static u16 g_num_floe_instances = 0;
 
-#define LOG_CLAP_CALL(name)                                                                                  \
-    ZoneScopedMessage(floe.trace_config, name);                                                              \
-    LogInfo(k_clap_log_module, "{} #{}", name, floe.index);
+// Macro because it declares a constructor/destructor object for timing start/end
+#define TRACE_CLAP_CALL(name) ZoneScopedMessage(floe.trace_config, name)
+
+inline void LogClapApi(FloePluginInstance& floe, ClapLoggingLevel level, String name) {
+    if (k_clap_logging_level >= level) LogInfo(k_clap_log_module, "{} #{}: {}", name, floe.index);
+}
+
+inline void
+LogClapFunction(FloePluginInstance& floe, ClapLoggingLevel level, String name, String format, auto... args) {
+    if (k_clap_logging_level >= level) {
+        ArenaAllocatorWithInlineStorage<400> arena {PageAllocator::Instance()};
+        LogInfo(k_clap_log_module, "{} #{}: {}", name, floe.index, fmt::Format(arena, format, args...));
+    }
+}
+
+inline bool Check(FloePluginInstance& floe, bool condition, String function_name, String message) {
+    if (!condition) LogWarning(k_clap_log_module, "{} #{}: {}", function_name, floe.index, message);
+    return condition;
+}
+
+inline bool Check(bool condition, String function_name, String message) {
+    if (!condition) LogWarning(k_clap_log_module, "{}: {}", function_name, message);
+    return condition;
+}
+
+static FloePluginInstance& GetFloe(clap_plugin const* plugin) {
+    ASSERT(plugin);
+    return *(FloePluginInstance*)plugin->plugin_data;
+}
 
 bool ClapStateSave(clap_plugin const* plugin, clap_ostream const* stream) {
     if (PanicOccurred()) return false;
 
     try {
-        ASSERT(plugin);
-        ASSERT(stream);
+        constexpr String k_func = "state.save";
+        if (!Check(plugin, k_func, "plugin is null")) return false;
 
-        auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-        LOG_CLAP_CALL("state.save");
+        auto& floe = GetFloe(plugin);
+        LogClapApi(floe, ClapLoggingLevel::Majority, k_func);
+        TRACE_CLAP_CALL(k_func);
 
-        if (!IsMainThread(floe.host)) {
-            LogWarning(k_clap_log_module, "state.save not on main thread");
-            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-            return false;
-        }
+        if (!Check(floe, stream, k_func, "stream is null")) return false;
+        if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return false;
+        if (!Check(floe, floe.initialised, k_func, "not initialised")) return false;
 
         return EngineCallbacks().save_state(*floe.engine, *stream);
     } catch (PanicException) {
@@ -101,17 +133,16 @@ static bool ClapStateLoad(clap_plugin const* plugin, clap_istream const* stream)
     if (PanicOccurred()) return false;
 
     try {
-        ASSERT(plugin);
-        ASSERT(stream);
+        constexpr String k_func = "state.load";
+        if (!Check(plugin, k_func, "plugin is null")) return false;
 
-        auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-        LOG_CLAP_CALL("state.load");
+        auto& floe = GetFloe(plugin);
+        LogClapApi(floe, ClapLoggingLevel::Majority, k_func);
+        TRACE_CLAP_CALL(k_func);
 
-        if (!IsMainThread(floe.host)) {
-            LogWarning(k_clap_log_module, "state.load not on main thread");
-            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-            return false;
-        }
+        if (!Check(floe, stream, k_func, "stream is null")) return false;
+        if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return false;
+        if (!Check(floe, floe.initialised, k_func, "not initialised")) return false;
 
         return EngineCallbacks().load_state(*floe.engine, *stream);
     } catch (PanicException) {
@@ -132,51 +163,70 @@ static bool LogIfError(ErrorCodeOr<void> const& ec, String name) {
     return true;
 }
 
-static bool ClapGuiIsApiSupported(clap_plugin_t const*, char const* api, bool is_floating) {
-    if (!api) return false;
-    if (is_floating) return false;
-    return NullTermStringsEqual(k_supported_gui_api, api);
+static bool ClapGuiIsApiSupported(clap_plugin_t const* plugin, char const* api, bool is_floating) {
+    if (PanicOccurred()) return false;
+
+    try {
+        constexpr String k_func = "gui.is_api_supported";
+        if (!Check(plugin, k_func, "plugin is null")) return false;
+        if (!Check(api, k_func, "api is null")) return false;
+
+        auto& floe = GetFloe(plugin);
+        LogClapFunction(floe,
+                        ClapLoggingLevel::AllNonRealtime,
+                        k_func,
+                        "api: {}, is_floating: {}",
+                        api,
+                        is_floating);
+
+        if (is_floating) return false;
+        return NullTermStringsEqual(k_supported_gui_api, api);
+    } catch (PanicException) {
+        return false;
+    }
 }
 
-static bool ClapGuiGetPrefferedApi(clap_plugin_t const*, char const** api, bool* is_floating) {
-    if (is_floating) *is_floating = false;
-    if (api) *api = k_supported_gui_api;
-    return true;
+static bool ClapGuiGetPrefferedApi(clap_plugin_t const* plugin, char const** api, bool* is_floating) {
+    if (PanicOccurred()) return false;
+
+    try {
+        constexpr String k_func = "gui.get_preferred_api";
+        if (!Check(plugin, k_func, "plugin is null")) return false;
+
+        auto& floe = GetFloe(plugin);
+        LogClapApi(floe, ClapLoggingLevel::AllNonRealtime, k_func);
+
+        if (is_floating) *is_floating = false;
+        if (api) *api = k_supported_gui_api;
+        return true;
+    } catch (PanicException) {
+        return false;
+    }
 }
 
 static bool ClapGuiCreate(clap_plugin_t const* plugin, char const* api, bool is_floating) {
     if (PanicOccurred()) return false;
 
     try {
-        ASSERT(plugin);
-        ASSERT(api);
+        constexpr String k_func = "gui.create";
+        if (!Check(plugin, k_func, "plugin is null")) return false;
+        if (!Check(api, k_func, "api is null")) return false;
 
-        auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-        LOG_CLAP_CALL("gui.create");
+        auto& floe = GetFloe(plugin);
+        LogClapFunction(floe,
+                        ClapLoggingLevel::Majority,
+                        k_func,
+                        "api: {}, is_floating: {}",
+                        api,
+                        is_floating);
+        TRACE_CLAP_CALL(k_func);
 
-        if (!IsMainThread(floe.host)) {
-            LogWarning(k_clap_log_module, "gui.create not on main thread");
-            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
+        if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return false;
+        if (!Check(floe, floe.initialised, k_func, "not initialised")) return false;
+        if (!Check(floe, NullTermStringsEqual(k_supported_gui_api, api), k_func, "unsupported api"))
             return false;
-        }
-
-        if (!NullTermStringsEqual(k_supported_gui_api, api)) {
-            LogWarning(k_clap_log_module, "gui.create with unsupported api");
-            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-            return false;
-        }
-
-        if (is_floating) {
-            LogWarning(k_clap_log_module, "gui.create with floating window");
-            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-            return false;
-        }
-
-        if (floe.gui_platform) {
-            LogWarning(k_clap_log_module, "gui.create called twice");
-            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-            return false;
-        }
+        if (!Check(floe, !is_floating, k_func, "floating windows are not supported")) return false;
+        if (!Check(floe, !floe.gui_platform, k_func, "already created gui")) return false;
 
         floe.gui_platform.Emplace(floe.host, g_shared_engine_systems->settings);
         return LogIfError(CreateView(*floe.gui_platform), "CreateView");
@@ -189,22 +239,15 @@ static void ClapGuiDestroy(clap_plugin const* plugin) {
     if (PanicOccurred()) return;
 
     try {
-        ASSERT(plugin);
+        constexpr String k_func = "gui.destroy";
+        if (!Check(plugin, k_func, "plugin is null")) return;
 
-        auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-        LOG_CLAP_CALL("gui.destroy");
+        auto& floe = GetFloe(plugin);
+        LogClapApi(floe, ClapLoggingLevel::Majority, k_func);
+        TRACE_CLAP_CALL(k_func);
 
-        if (!IsMainThread(floe.host)) {
-            LogWarning(k_clap_log_module, "host misbehaving: gui.destroy() not on main thread");
-            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-            return;
-        }
-
-        if (!floe.gui_platform) {
-            LogWarning(k_clap_log_module, "host misbehaving: gui.destroy() called twice");
-            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-            return;
-        }
+        if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return;
+        if (!Check(floe, floe.gui_platform.HasValue(), k_func, "no gui created")) return;
 
         DestroyView(*floe.gui_platform);
         floe.gui_platform.Clear();
@@ -213,7 +256,16 @@ static void ClapGuiDestroy(clap_plugin const* plugin) {
     }
 }
 
-static bool ClapGuiSetScale(clap_plugin_t const*, f64) {
+static bool ClapGuiSetScale(clap_plugin_t const* plugin, f64 scale) {
+    if (PanicOccurred()) return false;
+
+    try {
+        constexpr String k_func = "gui.set_scale";
+        if (!Check(plugin, k_func, "plugin is null")) return false;
+        LogClapFunction(GetFloe(plugin), ClapLoggingLevel::AllNonRealtime, k_func, "scale: {}", scale);
+    } catch (PanicException) {
+    }
+
     return false; // we (pugl) negotiate this with the OS ourselves
 }
 
@@ -221,50 +273,56 @@ static bool ClapGuiGetSize(clap_plugin_t const* plugin, u32* width, u32* height)
     if (PanicOccurred()) return false;
 
     try {
-        ASSERT(plugin);
-        ASSERT(width);
-        ASSERT(height);
+        constexpr String k_func = "gui.get_size";
+        if (!Check(plugin, k_func, "plugin is null")) return false;
 
-        auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-        LOG_CLAP_CALL("gui.get_size");
+        auto& floe = GetFloe(plugin);
+        LogClapApi(floe, ClapLoggingLevel::Majority, k_func);
+        TRACE_CLAP_CALL(k_func);
 
-        if (!IsMainThread(floe.host)) {
-            LogWarning(k_clap_log_module, "host misbehaving: gui.get_size() not on main thread");
-            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-            return false;
-        }
-
-        if (!floe.gui_platform) {
-            LogWarning(k_clap_log_module, "host misbehaving: gui.get_size() called before gui.create()");
-            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-            return false;
-        }
+        if (!Check(floe, width || height, k_func, "width and height both null")) return false;
+        if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return false;
+        if (!Check(floe, floe.gui_platform.HasValue(), k_func, "no gui created")) return false;
 
         auto const size = PhysicalPixelsToClapPixels(floe.gui_platform->view, WindowSize(*floe.gui_platform));
-        *width = size.width;
-        *height = size.height;
+        if (width) *width = size.width;
+        if (height) *height = size.height;
         return true;
     } catch (PanicException) {
         return false;
     }
 }
 
-static bool ClapGuiCanResize(clap_plugin_t const*) { return true; }
+static bool ClapGuiCanResize(clap_plugin_t const* plugin) {
+    if (PanicOccurred()) return false;
+
+    try {
+        constexpr String k_func = "gui.can_resize";
+        if (!Check(plugin, k_func, "plugin is null")) return false;
+        LogClapApi(GetFloe(plugin), ClapLoggingLevel::AllNonRealtime, k_func);
+
+        // Should be main-thread but we don't care if it's not.
+
+        return true;
+    } catch (PanicException) {
+    }
+
+    return false;
+}
 
 static bool ClapGuiGetResizeHints(clap_plugin_t const* plugin, clap_gui_resize_hints_t* hints) {
     if (PanicOccurred()) return false;
 
     try {
-        ASSERT(plugin);
-        ASSERT(hints);
+        constexpr String k_func = "gui.get_resize_hints";
+        if (!Check(plugin, k_func, "plugin is null")) return false;
 
-        auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-        LOG_CLAP_CALL("gui.get_resize_hints");
+        auto& floe = GetFloe(plugin);
+        LogClapApi(floe, ClapLoggingLevel::AllNonRealtime, k_func);
+        TRACE_CLAP_CALL(k_func);
 
-        if (!IsMainThread(floe.host)) {
-            LogWarning(k_clap_log_module, "gui.get_resize_hints not on main thread");
-            return false;
-        }
+        if (!Check(floe, hints, k_func, "hints is null")) return false;
+        if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return false;
 
         hints->can_resize_vertically = true;
         hints->can_resize_horizontally = true;
@@ -290,68 +348,75 @@ GetUsableSizeWithinDimensions(GuiPlatform& gui_platform, u32 clap_width, u32 cla
         *size,
         gui_settings::CurrentAspectRatio(g_shared_engine_systems->settings.settings.gui));
 
-    if (aspect_ratio_conformed_size.width < gui_settings::k_min_gui_width) return k_nullopt;
+    if (!aspect_ratio_conformed_size) return k_nullopt;
+    if (aspect_ratio_conformed_size->width < gui_settings::k_min_gui_width) return k_nullopt;
 
-    return PhysicalPixelsToClapPixels(gui_platform.view, aspect_ratio_conformed_size);
+    return PhysicalPixelsToClapPixels(gui_platform.view, *aspect_ratio_conformed_size);
 }
 
 static bool ClapGuiAdjustSize(clap_plugin_t const* plugin, u32* clap_width, u32* clap_height) {
     if (PanicOccurred()) return false;
 
     try {
-        ASSERT(plugin);
-        ASSERT(clap_width);
-        ASSERT(clap_height);
+        constexpr String k_func = "gui.adjust_size";
+        if (!Check(plugin, k_func, "plugin is null")) return false;
+        if (!Check(clap_width && clap_height, k_func, "width or height is null")) return false;
 
-        auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-        LOG_CLAP_CALL("gui.adjust_size");
+        auto& floe = GetFloe(plugin);
+        LogClapFunction(floe, ClapLoggingLevel::Majority, k_func, "{} x {}", *clap_width, *clap_height);
+        TRACE_CLAP_CALL(k_func);
 
-        if (!IsMainThread(floe.host)) {
-            LogWarning(k_clap_log_module, "gui.adjust_size not on main thread");
-            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-            return false;
-        }
+        if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return false;
 
-        if (auto const size = GetUsableSizeWithinDimensions(*floe.gui_platform, *clap_width, *clap_height)) {
+        if (!floe.gui_platform || !floe.gui_platform->view) {
+            // We've been called before we have the ability to check our scaling factor, we can still give a
+            // reasonable result by getting the nearest aspect ratio size.
+
+            auto const aspect_ratio_conformed_size = gui_settings::GetNearestAspectRatioSizeInsideSize32(
+                {*clap_width, *clap_height},
+                gui_settings::CurrentAspectRatio(g_shared_engine_systems->settings.settings.gui));
+
+            if (!aspect_ratio_conformed_size) return false;
+
+            *clap_width = aspect_ratio_conformed_size->width;
+            *clap_height = aspect_ratio_conformed_size->height;
+            return true;
+        } else if (auto const size =
+                       GetUsableSizeWithinDimensions(*floe.gui_platform, *clap_width, *clap_height)) {
             *clap_width = size->width;
             *clap_height = size->height;
             return true;
-        } else {
-            return false;
         }
     } catch (PanicException) {
-        return false;
     }
+
+    return false;
 }
 
 static bool ClapGuiSetSize(clap_plugin_t const* plugin, u32 clap_width, u32 clap_height) {
     if (PanicOccurred()) return false;
 
     try {
-        ASSERT(plugin);
+        constexpr String k_func = "gui.set_size";
+        if (!Check(plugin, k_func, "plugin is null")) return false;
 
-        auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-        LOG_CLAP_CALL("gui.set_size");
+        auto& floe = GetFloe(plugin);
+        LogClapFunction(floe, ClapLoggingLevel::Majority, k_func, "{} x {}", clap_width, clap_height);
+        TRACE_CLAP_CALL(k_func);
 
-        if (!IsMainThread(floe.host)) {
-            LogWarning(k_clap_log_module, "gui.set_size not on main thread");
-            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-            return false;
-        }
-
-        if (!floe.gui_platform) {
-            LogWarning(k_clap_log_module, "gui.set_size called before gui.create()");
-            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-            return false;
-        }
+        if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return false;
+        if (!Check(floe, floe.gui_platform.HasValue(), k_func, "no gui created")) return false;
 
         auto const size = ClapPixelsToPhysicalPixels(floe.gui_platform->view, clap_width, clap_height);
 
-        if (!size || size->width < gui_settings::k_min_gui_width ||
-            !gui_settings::IsAspectRatio(
-                *size,
-                gui_settings::CurrentAspectRatio(g_shared_engine_systems->settings.settings.gui))) {
-            LogWarning(k_clap_log_module, "gui.set_size called with invalid size");
+        if (!Check(floe, size && size->width >= gui_settings::k_min_gui_width, k_func, "invalid size"))
+            return false;
+        if (!Check(floe,
+                   gui_settings::IsAspectRatio(
+                       *size,
+                       gui_settings::CurrentAspectRatio(g_shared_engine_systems->settings.settings.gui)),
+                   k_func,
+                   "invalid aspect ratio")) {
             return false;
         }
 
@@ -365,29 +430,17 @@ static bool ClapGuiSetParent(clap_plugin_t const* plugin, clap_window_t const* w
     if (PanicOccurred()) return false;
 
     try {
-        ASSERT(plugin);
-        ASSERT(window);
+        constexpr String k_func = "gui.set_parent";
+        if (!Check(plugin, k_func, "plugin is null")) return false;
 
-        auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-        LOG_CLAP_CALL("gui.set_parent");
+        auto& floe = GetFloe(plugin);
+        LogClapApi(floe, ClapLoggingLevel::Majority, k_func);
+        TRACE_CLAP_CALL(k_func);
 
-        if (!IsMainThread(floe.host)) {
-            LogWarning(k_clap_log_module, "host misbehaving: gui.set_parent() not on main thread");
-            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-            return false;
-        }
-
-        if (!floe.gui_platform) {
-            LogWarning(k_clap_log_module, "host misbehaving: gui.set_parent() called before gui.create()");
-            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-            return false;
-        }
-
-        if (!window || !window->ptr) {
-            LogWarning(k_clap_log_module, "host misbehaving: gui.set_parent() called with invalid window");
-            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-            return false;
-        }
+        if (!Check(floe, window, k_func, "window is null")) return false;
+        if (!Check(floe, window->ptr, k_func, "window ptr is null")) return false;
+        if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return false;
+        if (!Check(floe, floe.gui_platform.HasValue(), k_func, "no gui created")) return false;
 
         auto const result = LogIfError(SetParent(*floe.gui_platform, *window), "SetParent");
 
@@ -400,34 +453,50 @@ static bool ClapGuiSetParent(clap_plugin_t const* plugin, clap_window_t const* w
     }
 }
 
-static bool ClapGuiSetTransient(clap_plugin_t const*, clap_window_t const*) {
-    return false; // we don't support floating windows
+static bool ClapGuiSetTransient(clap_plugin_t const* plugin, clap_window_t const*) {
+    if (PanicOccurred()) return false;
+
+    try {
+        constexpr String k_func = "gui.set_transient";
+        if (!Check(plugin, k_func, "plugin is null")) return false;
+
+        LogClapApi(GetFloe(plugin), ClapLoggingLevel::AllNonRealtime, k_func);
+
+        return false; // we don't support floating windows
+    } catch (PanicException) {
+    }
+
+    return false;
 }
 
-static void ClapGuiSuggestTitle(clap_plugin_t const*, char const*) {
-    // we don't support floating windows
+static void ClapGuiSuggestTitle(clap_plugin_t const* plugin, char const*) {
+    if (PanicOccurred()) return;
+
+    try {
+        constexpr String k_func = "gui.set_transient";
+        if (!Check(plugin, k_func, "plugin is null")) return;
+
+        LogClapApi(GetFloe(plugin), ClapLoggingLevel::AllNonRealtime, k_func);
+
+        // we don't support floating windows
+
+    } catch (PanicException) {
+    }
 }
 
 static bool ClapGuiShow(clap_plugin_t const* plugin) {
     if (PanicOccurred()) return false;
 
     try {
-        ASSERT(plugin);
+        constexpr String k_func = "gui.show";
+        if (!Check(plugin, k_func, "plugin is null")) return false;
 
-        auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-        LOG_CLAP_CALL("gui.show");
+        auto& floe = GetFloe(plugin);
+        LogClapApi(floe, ClapLoggingLevel::Majority, k_func);
+        TRACE_CLAP_CALL(k_func);
 
-        if (!IsMainThread(floe.host)) {
-            LogWarning(k_clap_log_module, "host misbehaving: gui.show() not on main thread");
-            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-            return false;
-        }
-
-        if (!floe.gui_platform) {
-            LogWarning(k_clap_log_module, "host misbehaving: gui.show() called before gui.create()");
-            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-            return false;
-        }
+        if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return false;
+        if (!Check(floe, floe.gui_platform.HasValue(), k_func, "no gui created")) return false;
 
         bool const result = LogIfError(SetVisible(*floe.gui_platform, true, *floe.engine), "SetVisible");
         if (result) {
@@ -449,22 +518,15 @@ static bool ClapGuiHide(clap_plugin_t const* plugin) {
     if (PanicOccurred()) return false;
 
     try {
-        ASSERT(plugin);
+        constexpr String k_func = "gui.hide";
+        if (!Check(plugin, k_func, "plugin is null")) return false;
 
-        auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-        LOG_CLAP_CALL("gui.hide");
+        auto& floe = GetFloe(plugin);
+        LogClapApi(floe, ClapLoggingLevel::Majority, k_func);
+        TRACE_CLAP_CALL(k_func);
 
-        if (!IsMainThread(floe.host)) {
-            LogWarning(k_clap_log_module, "host misbehaving: gui.hide() not on main thread");
-            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-            return false;
-        }
-
-        if (!floe.gui_platform) {
-            LogWarning(k_clap_log_module, "host misbehaving: gui.hide() called before gui.create()");
-            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-            return false;
-        }
+        if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return false;
+        if (!Check(floe, floe.gui_platform.HasValue(), k_func, "no gui created")) return false;
 
         return LogIfError(SetVisible(*floe.gui_platform, false, *floe.engine), "SetVisible");
     } catch (PanicException) {
@@ -492,34 +554,43 @@ clap_plugin_gui const floe_gui {
     .hide = ClapGuiHide,
 };
 
-static void CheckInputEvents(clap_input_events const* in) {
-    if constexpr (!RUNTIME_SAFETY_CHECKS_ON) return;
+[[nodiscard]] static bool CheckInputEvents(clap_input_events const* in) {
+    if constexpr (!RUNTIME_SAFETY_CHECKS_ON) return true;
 
     for (auto const event_index : Range(in->size(in))) {
         auto e = in->get(in, event_index);
+        if (!e) return false;
         if (e->space_id != CLAP_CORE_EVENT_SPACE_ID) continue;
         if (e->type == CLAP_EVENT_PARAM_VALUE) {
             auto& value = *CheckedPointerCast<clap_event_param_value const*>(e);
             auto const opt_index = ParamIdToIndex(value.param_id);
-            ASSERT(opt_index);
+            if (!opt_index) return false;
             auto const param_desc = k_param_descriptors[(usize)*opt_index];
-            ASSERT(value.value >= (f64)param_desc.linear_range.min);
-            ASSERT(value.value <= (f64)param_desc.linear_range.max);
+            if (value.value < (f64)param_desc.linear_range.min ||
+                value.value > (f64)param_desc.linear_range.max)
+                return false;
         }
     }
+    return true;
 }
 
 static u32 ClapParamsCount(clap_plugin_t const*) { return (u32)k_num_parameters; }
 
-static bool ClapParamsGetInfo(clap_plugin_t const*, u32 param_index, clap_param_info_t* param_info) {
+static bool ClapParamsGetInfo(clap_plugin_t const* plugin, u32 param_index, clap_param_info_t* param_info) {
     if (PanicOccurred()) return false;
 
     try {
-        ASSERT(param_info);
-        ASSERT(param_index < k_num_parameters);
+        constexpr String k_func = "params.get_info";
+        if (!Check(plugin, k_func, "plugin is null")) return false;
 
-        // This callback should be main-thread only, but we don't care if that's not true since we don't
-        // use any shared state.
+        auto& floe = GetFloe(plugin);
+        LogClapFunction(floe, ClapLoggingLevel::AllNonRealtime, k_func, "index: {}", param_index);
+
+        if (!Check(floe, param_info, k_func, "param_info is null")) return false;
+        if (!Check(floe, param_index < k_num_parameters, k_func, "param_index out of range")) return false;
+
+        // This callback should be main-thread only, but we don't care since we don't use any shared state.
+
         auto const& desc = k_param_descriptors[param_index];
         param_info->id = ParamIndexToId((ParamIndex)param_index);
         param_info->default_value = (f64)desc.default_linear_value;
@@ -544,24 +615,18 @@ static bool ClapParamsGetValue(clap_plugin_t const* plugin, clap_id param_id, f6
     if (PanicOccurred()) return false;
 
     try {
-        ASSERT(plugin);
-        ASSERT(out_value);
-        auto& floe = *(FloePluginInstance*)plugin->plugin_data;
+        constexpr String k_func = "params.get_value";
+        if (!Check(plugin, k_func, "plugin is null")) return false;
 
-        if (!IsMainThread(floe.host)) {
-            LogWarning(k_clap_log_module, "host misbehaving: params.get_value() not on main thread");
-            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-            return false;
-        }
-
-        if (!floe.engine) {
-            LogWarning(k_clap_log_module, "host misbehaving: params.get_value() called before init()");
-            ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-            return false;
-        }
+        auto& floe = GetFloe(plugin);
+        LogClapFunction(floe, ClapLoggingLevel::AllNonRealtime, k_func, "id: {}", param_id);
 
         auto const opt_index = ParamIdToIndex(param_id);
         if (!opt_index) return false;
+
+        if (!Check(floe, out_value, k_func, "out_value is null")) return false;
+        if (!Check(floe, floe.initialised, k_func, "not initialised")) return false;
+        if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return false;
 
         auto const index = (usize)*opt_index;
 
@@ -580,114 +645,144 @@ static bool ClapParamsGetValue(clap_plugin_t const* plugin, clap_id param_id, f6
     }
 }
 
-// NOLINTNEXTLINE(cppcoreguidelines-interfaces-global-init): clang-tidy thinks g_log is initialised
+static bool ClapParamsValueToText(clap_plugin_t const* plugin,
+                                  clap_id param_id,
+                                  f64 value,
+                                  char* out_buffer,
+                                  u32 out_buffer_capacity) {
+    if (PanicOccurred()) return false;
+
+    try {
+        constexpr String k_func = "params.value_to_text";
+        if (!Check(plugin, k_func, "plugin is null")) return false;
+
+        auto& floe = GetFloe(plugin);
+        LogClapFunction(floe, ClapLoggingLevel::AllNonRealtime, k_func, "id: {}, value: {}", param_id, value);
+
+        if (out_buffer_capacity == 0) return false;
+        auto const opt_index = ParamIdToIndex(param_id);
+        if (!opt_index) return false;
+        if (!Check(floe, out_buffer, k_func, "out_buffer is null")) return false;
+        auto const index = (usize)*opt_index;
+        auto const str = k_param_descriptors[index].LinearValueToString((f32)value);
+        if (!str) return false;
+        if (out_buffer_capacity < (str->size + 1)) return false;
+        CopyMemory(out_buffer, str->data, str->size);
+        out_buffer[str->size] = '\0';
+        return true;
+    } catch (PanicException) {
+        return false;
+    }
+}
+
+static bool ClapParamsTextToValue(clap_plugin_t const* plugin,
+                                  clap_id param_id,
+                                  char const* param_value_text,
+                                  f64* out_value) {
+    if (PanicOccurred()) return false;
+
+    try {
+        constexpr String k_func = "params.text_to_value";
+        if (!Check(plugin, k_func, "plugin is null")) return false;
+
+        auto& floe = GetFloe(plugin);
+        LogClapFunction(floe, ClapLoggingLevel::AllNonRealtime, k_func, "id: {}", param_id);
+        TRACE_CLAP_CALL(k_func);
+
+        auto const opt_index = ParamIdToIndex(param_id);
+        if (!opt_index) return false;
+        auto const index = (usize)*opt_index;
+
+        if (!Check(floe, param_value_text, k_func, "param_value_text is null")) return false;
+        if (auto v = k_param_descriptors[index].StringToLinearValue(FromNullTerminated(param_value_text))) {
+            if (!Check(floe, out_value, k_func, "out_value is null")) return false;
+            *out_value = (f64)*v;
+            ASSERT(*out_value >= (f64)k_param_descriptors[index].linear_range.min);
+            ASSERT(*out_value <= (f64)k_param_descriptors[index].linear_range.max);
+            return true;
+        }
+        return false;
+    } catch (PanicException) {
+        return false;
+    }
+}
+
+// [active ? audio-thread : main-thread]
+static void
+ClapParamsFlush(clap_plugin_t const* plugin, clap_input_events_t const* in, clap_output_events_t const* out) {
+    if (PanicOccurred()) return;
+
+    try {
+        constexpr String k_func = "params.flush";
+        if (!plugin) return;
+
+        auto& floe = GetFloe(plugin);
+        if (!floe.active)
+            LogClapFunction(floe, ClapLoggingLevel::AllNonRealtime, k_func, "num in: {}", in->size(in));
+        TRACE_CLAP_CALL(k_func);
+
+        if (!in) return;
+        if (!out) return;
+        if (!floe.initialised) return;
+
+        if (floe.active && IsAudioThread(floe.host) == IsAudioThreadResult::No)
+            return;
+        else if (!floe.active && !IsMainThread(floe.host))
+            return;
+
+        if (!CheckInputEvents(in)) return;
+
+        auto& processor = floe.engine->processor;
+        processor.processor_callbacks.flush_parameter_events(processor, *in, *out);
+    } catch (PanicException) {
+    }
+}
+
 clap_plugin_params const floe_params {
     .count = ClapParamsCount,
     .get_info = ClapParamsGetInfo,
     .get_value = ClapParamsGetValue,
-
-    .value_to_text =
-        [](clap_plugin_t const*, clap_id param_id, f64 value, char* out_buffer, u32 out_buffer_capacity)
-        -> bool {
-        if (PanicOccurred()) return false;
-
-        try {
-            ASSERT(out_buffer);
-            if (out_buffer_capacity == 0) return false;
-            auto const opt_index = ParamIdToIndex(param_id);
-            if (!opt_index) return false;
-            auto const index = (usize)*opt_index;
-            auto const str = k_param_descriptors[index].LinearValueToString((f32)value);
-            if (!str) return false;
-            if (out_buffer_capacity < (str->size + 1)) return false;
-            CopyMemory(out_buffer, str->data, str->size);
-            out_buffer[str->size] = '\0';
-            return true;
-        } catch (PanicException) {
-            return false;
-        }
-    },
-
-    .text_to_value =
-        [](clap_plugin_t const*, clap_id param_id, char const* param_value_text, f64* out_value) -> bool {
-        if (PanicOccurred()) return false;
-
-        try {
-            ASSERT(param_value_text);
-            ASSERT(out_value);
-            auto const opt_index = ParamIdToIndex(param_id);
-            if (!opt_index) return false;
-            auto const index = (usize)*opt_index;
-            if (auto v =
-                    k_param_descriptors[index].StringToLinearValue(FromNullTerminated(param_value_text))) {
-                *out_value = (f64)*v;
-                ASSERT(*out_value >= (f64)k_param_descriptors[index].linear_range.min);
-                ASSERT(*out_value <= (f64)k_param_descriptors[index].linear_range.max);
-                return true;
-            }
-            return false;
-        } catch (PanicException) {
-            return false;
-        }
-    },
-
-    // [active ? audio-thread : main-thread]
-    .flush =
-        [](clap_plugin_t const* plugin, clap_input_events_t const* in, clap_output_events_t const* out) {
-            if (PanicOccurred()) return;
-
-            try {
-                ASSERT(plugin);
-                ASSERT(in);
-                ASSERT(out);
-
-                ZoneScopedN("clap_plugin_params flush");
-                auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-
-                if (!floe.engine) {
-                    LogWarning(k_clap_log_module, "host misbehaving: params.flush() called before init()");
-                    ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-                    return;
-                }
-
-                if (!floe.active) {
-                    if (!IsMainThread(floe.host)) {
-                        LogWarning(k_clap_log_module,
-                                   "host misbehaving: params.flush() not on main thread when inactive");
-                        ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-                        return;
-                    }
-                } else if (IsAudioThread(floe.host) == IsAudioThreadResult::No) {
-                    LogWarning(k_clap_log_module,
-                               "host misbehaving: params.flush() not on audio thread when active");
-                    ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-                    return;
-                }
-
-                if (!in || !out) return;
-
-                CheckInputEvents(in);
-
-                auto& processor = floe.engine->processor;
-                processor.processor_callbacks.flush_parameter_events(processor, *in, *out);
-            } catch (PanicException) {
-            }
-        },
+    .value_to_text = ClapParamsValueToText,
+    .text_to_value = ClapParamsTextToValue,
+    .flush = ClapParamsFlush,
 };
 
 static constexpr clap_id k_input_port_id = 1;
 static constexpr clap_id k_output_port_id = 2;
 
-// NOLINTNEXTLINE(cppcoreguidelines-interfaces-global-init): clang-tidy thinks g_log is initialised
-clap_plugin_audio_ports const floe_audio_ports {
-    .count = [](clap_plugin_t const*, bool) -> u32 { return 1; },
+static u32 ClapAudioPortsCount(clap_plugin_t const* plugin, [[maybe_unused]] bool is_input) {
+    if (PanicOccurred()) return 0;
 
-    .get = [](clap_plugin_t const*, u32 index, bool is_input, clap_audio_port_info_t* info) -> bool {
-        if (index != 0) {
-            LogWarning(k_clap_log_module, "host misbehaving: audio_ports.get() called with invalid index");
-            return false;
-        }
-        if (!info) return false;
+    try {
+        constexpr String k_func = "audio_ports.count";
+        if (!Check(plugin, k_func, "plugin is null")) return 0;
+        LogClapFunction(GetFloe(plugin), ClapLoggingLevel::AllNonRealtime, k_func, "is_input: {}", is_input);
+
+        return 1;
+    } catch (PanicException) {
+        return 0;
+    }
+
+    return 1;
+}
+
+static bool
+ClapAudioPortsGet(clap_plugin_t const* plugin, u32 index, bool is_input, clap_audio_port_info_t* info) {
+    if (PanicOccurred()) return 0;
+
+    try {
+        constexpr String k_func = "audio_ports.get";
+        if (!Check(plugin, k_func, "plugin is null")) return false;
+        auto& floe = GetFloe(plugin);
+        LogClapFunction(floe,
+                        ClapLoggingLevel::AllNonRealtime,
+                        "audio_ports.get",
+                        "index: {}, is_input: {}",
+                        index,
+                        is_input);
+
+        if (!Check(floe, index == 0, k_func, "index out of range")) return false;
+        if (!Check(floe, info, k_func, "info is null")) return false;
 
         if (is_input) {
             info->id = k_input_port_id;
@@ -705,53 +800,80 @@ clap_plugin_audio_ports const floe_audio_ports {
             info->in_place_pair = CLAP_INVALID_ID;
         }
         return true;
-    },
+    } catch (PanicException) {
+        return false;
+    }
+}
+
+clap_plugin_audio_ports const floe_audio_ports {
+    .count = ClapAudioPortsCount,
+    .get = ClapAudioPortsGet,
 };
 
 static constexpr clap_id k_main_note_port_id = 1; // never change this
 
-// The note ports scan has to be done while the plugin is deactivated.
-// NOLINTNEXTLINE(cppcoreguidelines-interfaces-global-init): clang-tidy thinks g_log is initialised
-clap_plugin_note_ports const floe_note_ports {
-    .count = [](clap_plugin_t const*, bool is_input) -> u32 { return is_input ? 1 : 0; },
+static u32 ClapNotePortsCount(clap_plugin_t const* plugin, bool is_input) {
+    if (PanicOccurred()) return 0;
 
-    .get = [](clap_plugin_t const*, u32 index, bool is_input, clap_note_port_info_t* info) -> bool {
-        if (!is_input) {
-            LogWarning(k_clap_log_module, "host misbehaving: note_ports.get() thinks we have output ports");
-            return false;
-        }
+    try {
+        constexpr String k_func = "note_ports.count";
+        if (!Check(plugin, k_func, "plugin is null")) return 0;
+        LogClapFunction(GetFloe(plugin), ClapLoggingLevel::AllNonRealtime, k_func, "is_input: {}", is_input);
 
-        if (index != 0) {
-            LogWarning(k_clap_log_module, "host misbehaving: note_ports.get() called with invalid index");
-            return false;
-        }
+        return is_input ? 1 : 0;
+    } catch (PanicException) {
+        return 0;
+    }
 
-        if (!info) return false;
+    return 0;
+}
 
-        ZoneScopedN("clap_plugin_note_ports get");
+static bool
+ClapNotePortsGet(clap_plugin_t const* plugin, u32 index, bool is_input, clap_note_port_info_t* info) {
+    if (PanicOccurred()) return 0;
+
+    try {
+        constexpr String k_func = "note_ports.get";
+        if (!Check(plugin, k_func, "plugin is null")) return false;
+        auto& floe = GetFloe(plugin);
+        LogClapApi(floe, ClapLoggingLevel::AllNonRealtime, k_func);
+
+        if (!Check(floe, index == 0, k_func, "index out of range")) return false;
+        if (!Check(floe, info, k_func, "info is null")) return false;
+        if (!Check(floe, is_input, k_func, "output ports not supported")) return false;
+
         info->id = k_main_note_port_id;
         info->supported_dialects = CLAP_NOTE_DIALECT_CLAP | CLAP_NOTE_DIALECT_MIDI;
         info->preferred_dialect = CLAP_NOTE_DIALECT_MIDI;
-        CopyStringIntoBufferWithNullTerm(info->name, "Notes In"_s);
+        CopyStringIntoBufferWithNullTerm(info->name, "Notes In");
         return true;
-    },
+    } catch (PanicException) {
+        return false;
+    }
+}
+
+// The note ports scan has to be done while the plugin is deactivated.
+clap_plugin_note_ports const floe_note_ports {
+    .count = ClapNotePortsCount,
+    .get = ClapNotePortsGet,
 };
 
-// NOLINTNEXTLINE(cppcoreguidelines-interfaces-global-init): clang-tidy thinks g_panicking is initialised
-clap_plugin_thread_pool const floe_thread_pool {
-    .exec =
-        [](clap_plugin_t const* plugin, u32 task_index) {
-            if (PanicOccurred()) return;
+static void ClapThreadPoolExec(clap_plugin_t const* plugin, u32 task_index) {
+    if (PanicOccurred()) return;
 
-            try {
-                ASSERT(plugin);
-                ZoneScopedN("clap_plugin_thread_pool exec");
-                auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-                floe.engine->processor.processor_callbacks.on_thread_pool_exec(floe.engine->processor,
-                                                                               task_index);
-            } catch (PanicException) {
-            }
-        },
+    try {
+        if (!plugin) return;
+
+        auto& floe = *(FloePluginInstance*)plugin->plugin_data;
+        TRACE_CLAP_CALL("thread_pool.exec");
+
+        floe.engine->processor.processor_callbacks.on_thread_pool_exec(floe.engine->processor, task_index);
+    } catch (PanicException) {
+    }
+}
+
+clap_plugin_thread_pool const floe_thread_pool {
+    .exec = ClapThreadPoolExec,
 };
 
 // NOLINTNEXTLINE(cppcoreguidelines-interfaces-global-init): clang-tidy thinks g_log is initialised
@@ -1124,7 +1246,7 @@ clap_plugin const floe_plugin {
                 IsAudioThread(floe.host) == IsAudioThreadResult::No)
                 return CLAP_PROCESS_ERROR;
 
-            CheckInputEvents(process->in_events);
+            ASSERT(CheckInputEvents(process->in_events));
 
             ScopedNoDenormals const no_denormals;
             auto& processor = floe.engine->processor;

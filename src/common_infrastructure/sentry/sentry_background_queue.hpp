@@ -14,7 +14,7 @@ struct BackgroundQueue {
     Thread thread;
     Atomic<bool> end_thread = false;
     WorkSignaller signaller;
-    ThreadsafeQueue<Error> queue {Malloc::Instance()};
+    ThreadsafeBoundedQueue<Error, 32> queue {};
     ArenaAllocator tag_arena {Malloc::Instance()};
 };
 
@@ -134,15 +134,17 @@ PUBLIC void WaitForThreadEnd(BackgroundQueue& queue) {
 // Must not be called after WaitForThreadEnd()
 PUBLIC void ReportError(BackgroundQueue& queue, Error&& error) {
     if (!queue.end_thread.Load(LoadMemoryOrder::Acquire)) {
-        queue.queue.Push(Move(error));
-        queue.signaller.Signal();
-    } else {
-        // we're shutting down, write the message to file
-        if (error.level >= ErrorEvent::Level::Error) {
-            SentryOrFallback sentry;
-            auto _ = WriteErrorToFile(*sentry, error);
-            LogDebug(k_log_module, "Error background thread is shutting down, writing error to file");
+        if (queue.queue.TryPush(Move(error))) {
+            queue.signaller.Signal();
+            return;
         }
+    }
+
+    // We couldn't queue it, write the message to file instead
+    if (error.level >= ErrorEvent::Level::Error) {
+        SentryOrFallback sentry;
+        auto _ = WriteErrorToFile(*sentry, error);
+        LogDebug(ModuleName::ErrorReporting, "Error background thread is not enqueuable, writing to file");
     }
 }
 

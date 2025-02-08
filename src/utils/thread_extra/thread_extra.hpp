@@ -8,4 +8,7 @@
 template <typename Type>
 using ThreadsafeQueue = Queue<Type, Mutex>;
 
+template <typename Type, usize k_size>
+using ThreadsafeBoundedQueue = BoundedQueue<Type, k_size, Mutex>;
+
 using ThreadsafeFunctionQueue = FunctionQueue<Mutex>;

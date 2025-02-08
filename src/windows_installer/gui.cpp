@@ -32,8 +32,6 @@
 constexpr auto k_page_class_name = L"floe-page";
 constexpr auto k_divider_class_name = L"floe-divider";
 
-constexpr auto k_log_module = "🖥️gui"_log_module;
-
 enum class ProgressBarMode { None, Marquee, Normal };
 
 struct Widget {
@@ -926,13 +924,10 @@ static LRESULT CALLBACK PageWindowProc(HWND window, UINT msg, WPARAM w_param, LP
             break;
         }
         case WM_COMMAND: {
-            LogDebug(k_log_module, "WM_COMMAND");
             auto& widget = *(Widget*)GetWindowLongPtrW(window, GWLP_USERDATA);
             if (!widget.framework->app) break;
             auto const event = HIWORD(w_param);
-            LogDebug(k_log_module, "event: {}", event);
             if (event == BN_CLICKED) {
-                LogDebug(k_log_module, "BN_CLICKED");
                 // l_param is a HWND to the button, but for some reason getting the window style using
                 // GetWindowLongPtrW(button, GLW_STYLE) does not return a value that contains the button
                 // styles BS_PUSHBUTTON, etc. So instead we're just doing a search through the list of

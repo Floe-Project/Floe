@@ -490,7 +490,6 @@ ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments options) {
 // Atom file watcher: https://github.com/atom/watcher/blob/master/docs/macos.md
 
 constexpr bool k_debug_fsevents = false && !PRODUCTION_BUILD;
-constexpr auto k_log_module = "dirwatch"_log_module;
 
 struct MacWatcher {
     FSEventStreamRef stream {};
@@ -720,7 +719,7 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                     // FSEvents ONLY supports recursive watching so we just have to ignore subdirectory
                     // events
                     if (!dir.recursive && Contains(subpath, '/')) {
-                        LogDebug(k_log_module,
+                        LogDebug(ModuleName::Filesystem,
                                  "Ignoring subdirectory event: {} because {} is watched non-recursively",
                                  subpath,
                                  dir.path);

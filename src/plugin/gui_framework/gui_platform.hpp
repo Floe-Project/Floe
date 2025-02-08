@@ -214,10 +214,6 @@ PUBLIC ErrorCodeOr<void> SetVisible(GuiPlatform& platform, bool visible, Engine&
             TRY(Required(puglRealize(platform.view)));
             TRY(Required(
                 puglStartTimer(platform.view, platform.k_pugl_timer_id, 1.0 / (f64)k_gui_refresh_rate_hz)));
-            LogInfo(ModuleName::Gui,
-                    "realised, native handle {}, world {}",
-                    (void*)puglGetNativeView(platform.view),
-                    (void*)puglGetWorld(platform.view));
 
             detail::X11SetParent(platform.view, puglGetParentWindow(platform.view));
             puglSetPosition(platform.view, 0, 0);
@@ -232,10 +228,9 @@ PUBLIC ErrorCodeOr<void> SetVisible(GuiPlatform& platform, bool visible, Engine&
                 if (posix_fd && posix_fd->register_fd) {
                     auto const fd = detail::FdFromPuglWorld(platform.world);
                     ASSERT(fd != -1);
-                    if (posix_fd->register_fd(&platform.host, fd, CLAP_POSIX_FD_READ)) {
-                        LogInfo(ModuleName::Gui, "registered fd {}", fd);
+                    if (posix_fd->register_fd(&platform.host, fd, CLAP_POSIX_FD_READ))
                         platform.clap_posix_fd = fd;
-                    } else
+                    else
                         LogError(ModuleName::Gui, "failed to register fd {}", fd);
                 }
 
@@ -247,7 +242,6 @@ PUBLIC ErrorCodeOr<void> SetVisible(GuiPlatform& platform, bool visible, Engine&
                     if (timer_support->register_timer(&platform.host,
                                                       (u32)(1000.0 / k_gui_refresh_rate_hz),
                                                       &timer_id)) {
-                        LogInfo(ModuleName::Gui, "registered timer");
                         platform.clap_timer_id = timer_id;
                     } else
                         LogError(ModuleName::Gui, "failed to register timer");

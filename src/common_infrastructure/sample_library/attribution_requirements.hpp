@@ -5,7 +5,7 @@
 #include "sample_library.hpp"
 
 // Floe provides an up-to-date list of all sounds that require crediting the authors. It synchronises this
-// list with other instances of Floe using shared memory. This is necessary because often DAWs will load
+// list with other instances of Floe using shared memory. This is necessary because sometimes DAWs will load
 // plugins in separate processes. Providing the definitive list of attributions makes using CC-BY sounds very
 // easy for example.
 

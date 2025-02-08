@@ -114,9 +114,9 @@ static bool ClapEntryInit(char const* plugin_path_c_str) {
 #error "Unsupported architecture"
 #endif
 
-        LogInfo(ModuleName::Clap, "init: ver: " VERSION ", os: " OS_NAME ", arch: " ARCH_NAME);
+        LogInfo(ModuleName::Clap, "entry.init: ver: " VERSION ", os: " OS_NAME ", arch: " ARCH_NAME);
 
-        LogDebug(ModuleName::Global, "Path: {}", plugin_path);
+        LogDebug(ModuleName::Global, "given plugin path: {}", plugin_path);
 
         return true;
     } catch (PanicException) {
@@ -130,7 +130,7 @@ static void ClapEntryDeinit() {
     try {
         if (!Exchange(g_init, false)) return; // already deinitialised
 
-        LogInfo(ModuleName::Clap, "deinit");
+        LogInfo(ModuleName::Clap, "entry.deinit");
 
         GlobalDeinit({
             .shutdown_error_reporting = false,
@@ -142,12 +142,11 @@ static void ClapEntryDeinit() {
 static void const* ClapEntryGetFactory(char const* factory_id) {
     if (!factory_id) return nullptr;
     if (PanicOccurred()) return nullptr;
-    LogInfo(ModuleName::Clap, "get_factory");
+    LogInfo(ModuleName::Clap, "entry.get_factory");
     if (NullTermStringsEqual(factory_id, CLAP_PLUGIN_FACTORY_ID)) return &factory;
     return nullptr;
 }
 
-// NOLINTNEXTLINE(cppcoreguidelines-interfaces-global-init): clang-tidy thinks g_panicking is initialised
 extern "C" CLAP_EXPORT const clap_plugin_entry clap_entry = {
     .clap_version = CLAP_VERSION,
     .init = ClapEntryInit,

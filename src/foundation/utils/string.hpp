@@ -285,6 +285,22 @@ PUBLIC constexpr char* InvalidUtf8Position(String string) {
     return nullptr;
 }
 
+PUBLIC constexpr usize Utf8CodepointSize(char first_byte) {
+    if (0xf0 == (0xf8 & first_byte)) {
+        /* 4 byte utf8 codepoint */
+        return 4;
+    } else if (0xe0 == (0xf0 & first_byte)) {
+        /* 3 byte utf8 codepoint */
+        return 3;
+    } else if (0xc0 == (0xe0 & first_byte)) {
+        /* 2 byte utf8 codepoint */
+        return 2;
+    }
+
+    /* 1 byte utf8 codepoint otherwise */
+    return 1;
+}
+
 PUBLIC constexpr bool IsValidUtf8(String string) { return InvalidUtf8Position(string) == nullptr; }
 
 PUBLIC constexpr Optional<String>

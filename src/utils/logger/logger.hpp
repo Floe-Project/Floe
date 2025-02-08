@@ -31,7 +31,17 @@ struct LogRingBuffer {
         // bit unsigned integers)
         static_assert(k_buffer_size <= ((1 << ((sizeof(write) * 8) - 1)) - 1));
 
-        message.size = Min(message.size, k_max_message_size);
+        if (message.size > k_max_message_size) [[unlikely]] {
+            // we need to truncate the message, but not invalidate utf-8
+            for (usize i = 0; i < message.size;) {
+                auto const size = Utf8CodepointSize(message[i]);
+                if (i + size > k_max_message_size) {
+                    message = message.SubSpan(0, i);
+                    break;
+                }
+                i += size;
+            }
+        }
 
         mutex.Lock();
         DEFER { mutex.Unlock(); };

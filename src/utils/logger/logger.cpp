@@ -382,6 +382,16 @@ TEST_CASE(TestLogRingBuffer) {
         ring.ReadToNullTerminatedStringList(buffer);
     }
 
+    SUBCASE("add too long string") {
+        auto const str =
+            tester.arena.AllocateExactSizeUninitialised<char>(LogRingBuffer::k_max_message_size + 1);
+        FillMemory(str.data, 'a', str.size);
+        ring.Write({str.data, str.size});
+        ring.ReadToNullTerminatedStringList(buffer);
+        for (auto const message : SplitIterator {.whole = buffer, .token = '\0', .skip_consecutive = true})
+            CHECK_EQ(message.size, LogRingBuffer::k_max_message_size);
+    }
+
     return k_success;
 }
 

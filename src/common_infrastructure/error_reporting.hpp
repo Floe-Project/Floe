@@ -14,14 +14,19 @@ void InitBackgroundErrorReporting(Span<sentry::Tag const> tags);
 // not thread-safe, call near the end of the program
 void ShutdownBackgroundErrorReporting();
 
-// thread-safe, not signal-safe, works even if InitErrorReporting() was not called
+namespace detail {
 void ReportError(sentry::Error&& error);
+bool ErrorSentBefore(u64 error_id);
+} // namespace detail
 
+// thread-safe, not signal-safe, works even if InitErrorReporting() was not called
 template <typename... Args>
-__attribute__((noinline)) void ReportError(sentry::Error::Level level, String format, Args const&... args) {
+__attribute__((noinline)) void
+ReportError(sentry::Error::Level level, u64 error_id, String format, Args const&... args) {
+    if (detail::ErrorSentBefore(error_id)) return;
     sentry::Error error {};
     error.level = level;
     error.message = fmt::Format(error.arena, format, args...);
     error.stacktrace = CurrentStacktrace(ProgramCounter {CALL_SITE_PROGRAM_COUNTER});
-    ReportError(Move(error));
+    detail::ReportError(Move(error));
 }

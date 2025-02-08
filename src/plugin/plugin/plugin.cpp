@@ -122,39 +122,24 @@ LogClapFunction(FloePluginInstance& floe, ClapLoggingLevel level, String name, S
 }
 
 inline bool Check(FloePluginInstance& floe, bool condition, String function_name, String message) {
-    if (!condition) [[unlikely]]
-        LogWarning(ModuleName::Clap, "{} #{}: {}", function_name, floe.index, message);
-    return condition;
-}
-
-inline bool CheckOnce(FloePluginInstance& floe,
-                      u8& warned_before_bitset,
-                      u8 warn_bit,
-                      bool condition,
-                      String function_name,
-                      String message) {
-    if (!condition) {
-        if (!(warned_before_bitset & warn_bit)) {
-            LogWarning(ModuleName::Clap, "{} #{}: {}", function_name, floe.index, message);
-            warned_before_bitset |= warn_bit;
-        }
+    if (!condition) [[unlikely]] {
+        ReportError(sentry::Error::Level::Error,
+                    HashMultiple(Array {function_name, message}),
+                    "{} #{}: {}",
+                    function_name,
+                    floe.index,
+                    message);
     }
     return condition;
 }
 
 inline bool Check(bool condition, String function_name, String message) {
-    if (!condition) [[unlikely]]
-        LogWarning(ModuleName::Clap, "{}: {}", function_name, message);
-    return condition;
-}
-
-inline bool
-CheckOnce(u8& warned_before_bitset, u8 warn_bit, bool condition, String function_name, String message) {
-    if (!condition) {
-        if (!(warned_before_bitset & warn_bit)) {
-            LogWarning(ModuleName::Clap, "{}: {}", function_name, message);
-            warned_before_bitset |= warn_bit;
-        }
+    if (!condition) [[unlikely]] {
+        ReportError(sentry::Error::Level::Error,
+                    HashMultiple(Array {function_name, message}),
+                    "{}: {}",
+                    function_name,
+                    message);
     }
     return condition;
 }
@@ -223,7 +208,7 @@ clap_plugin_state const floe_plugin_state {
 
 static bool LogIfError(ErrorCodeOr<void> const& ec, String name) {
     if (ec.HasError()) {
-        ReportError(sentry::Error::Level::Warning, name);
+        ReportError(sentry::Error::Level::Warning, Hash(name), name);
         return false;
     }
     return true;
@@ -1137,7 +1122,8 @@ static bool ClapInit(const struct clap_plugin* plugin) {
             LogInfo(ModuleName::Clap, "host: {} {} {}", floe.host.vendor, floe.host.name, floe.host.version);
 
             // TODO: remove this before release
-            if constexpr (!PRODUCTION_BUILD) ReportError(sentry::Error::Level::Info, "Floe plugin loaded"_s);
+            if constexpr (!PRODUCTION_BUILD)
+                ReportError(sentry::Error::Level::Info, 0x12345678, "Floe plugin loaded"_s);
         }
 
         floe.engine.Emplace(floe.host, *g_shared_engine_systems, floe);
@@ -1253,25 +1239,18 @@ static bool ClapStartProcessing(const struct clap_plugin* plugin) {
     if (PanicOccurred()) return false;
 
     try {
-        static u8 warned_before_bits {};
-
         constexpr String k_func = "start_processing";
         auto& floe = *({
             auto f = ExtractFloe(plugin);
-            if (!CheckOnce(warned_before_bits, 0, f, k_func, "plugin ptr is invalid")) return false;
+            if (!Check(f, k_func, "plugin ptr is invalid")) return false;
             f;
         });
         TRACE_CLAP_CALL(k_func);
 
-        if (!CheckOnce(floe,
-                       warned_before_bits,
-                       1,
-                       IsAudioThread(floe.host) != IsAudioThreadResult::No,
-                       k_func,
-                       "not audio thread"))
+        if (!Check(floe, IsAudioThread(floe.host) != IsAudioThreadResult::No, k_func, "not audio thread"))
             return false;
 
-        if (!CheckOnce(floe, warned_before_bits, 2, floe.active, k_func, "not active")) return false;
+        if (!Check(floe, floe.active, k_func, "not active")) return false;
 
         if (floe.processing) return true;
 
@@ -1288,25 +1267,17 @@ static void ClapStopProcessing(const struct clap_plugin* plugin) {
     if (PanicOccurred()) return;
 
     try {
-        static u8 warned_before_bits {};
-
         constexpr String k_func = "stop_processing";
         auto& floe = *({
             auto f = ExtractFloe(plugin);
-            if (!CheckOnce(warned_before_bits, 0, f, k_func, "plugin ptr is invalid")) return;
+            if (!Check(f, k_func, "plugin ptr is invalid")) return;
             f;
         });
         TRACE_CLAP_CALL(k_func);
 
-        if (!CheckOnce(floe,
-                       warned_before_bits,
-                       1,
-                       IsAudioThread(floe.host) != IsAudioThreadResult::No,
-                       k_func,
-                       "not audio thread"))
+        if (!Check(floe, IsAudioThread(floe.host) != IsAudioThreadResult::No, k_func, "not audio thread"))
             return;
-
-        if (!CheckOnce(floe, warned_before_bits, 2, floe.active, k_func, "not active")) return;
+        if (!Check(floe, floe.active, k_func, "not active")) return;
 
         if (!floe.processing) return;
 
@@ -1321,25 +1292,17 @@ static void ClapReset(const struct clap_plugin* plugin) {
     if (PanicOccurred()) return;
 
     try {
-        static u8 warned_before_bits {};
-
         constexpr String k_func = "reset";
         auto& floe = *({
             auto f = ExtractFloe(plugin);
-            if (!CheckOnce(warned_before_bits, 0, f, k_func, "plugin ptr is invalid")) return;
+            if (!Check(f, k_func, "plugin ptr is invalid")) return;
             f;
         });
         TRACE_CLAP_CALL(k_func);
 
-        if (!CheckOnce(floe,
-                       warned_before_bits,
-                       1,
-                       IsAudioThread(floe.host) != IsAudioThreadResult::No,
-                       k_func,
-                       "not audio thread"))
+        if (!Check(floe, IsAudioThread(floe.host) != IsAudioThreadResult::No, k_func, "not audio thread"))
             return;
-
-        if (!CheckOnce(floe, warned_before_bits, 2, floe.active, k_func, "not active")) return;
+        if (!Check(floe, floe.active, k_func, "not active")) return;
 
         auto& processor = floe.engine->processor;
         processor.processor_callbacks.reset(processor);
@@ -1351,13 +1314,10 @@ static clap_process_status ClapProcess(const struct clap_plugin* plugin, clap_pr
     if (PanicOccurred()) return CLAP_PROCESS_ERROR;
 
     try {
-        static u8 warned_before_bits {};
-
         constexpr String k_func = "process";
         auto& floe = *({
             auto f = ExtractFloe(plugin);
-            if (!CheckOnce(warned_before_bits, 0, f, k_func, "plugin ptr is invalid"))
-                return CLAP_PROCESS_ERROR;
+            if (!Check(f, k_func, "plugin ptr is invalid")) return CLAP_PROCESS_ERROR;
             f;
         });
         TRACE_CLAP_CALL(k_func);
@@ -1366,25 +1326,12 @@ static clap_process_status ClapProcess(const struct clap_plugin* plugin, clap_pr
         ZoneKeyNum("events", process->in_events->size(process->in_events));
         ZoneKeyNum("num_frames", process->frames_count);
 
-        if (!CheckOnce(floe,
-                       warned_before_bits,
-                       1,
-                       IsAudioThread(floe.host) != IsAudioThreadResult::No,
-                       k_func,
-                       "not audio thread"))
+        if (!Check(floe, IsAudioThread(floe.host) != IsAudioThreadResult::No, k_func, "not audio thread"))
             return CLAP_PROCESS_ERROR;
-        if (!CheckOnce(floe, warned_before_bits, 2, floe.active, k_func, "not active"))
-            return CLAP_PROCESS_ERROR;
-        if (!CheckOnce(floe, warned_before_bits, 3, floe.processing, k_func, "not processing"))
-            return CLAP_PROCESS_ERROR;
-        if (!CheckOnce(floe, warned_before_bits, 4, process, k_func, "process is null"))
-            return CLAP_PROCESS_ERROR;
-        if (!CheckOnce(floe,
-                       warned_before_bits,
-                       5,
-                       CheckInputEvents(process->in_events),
-                       k_func,
-                       "invalid events"))
+        if (!Check(floe, floe.active, k_func, "not active")) return CLAP_PROCESS_ERROR;
+        if (!Check(floe, floe.processing, k_func, "not processing")) return CLAP_PROCESS_ERROR;
+        if (!Check(floe, process, k_func, "process is null")) return CLAP_PROCESS_ERROR;
+        if (!Check(floe, CheckInputEvents(process->in_events), k_func, "invalid events"))
             return CLAP_PROCESS_ERROR;
 
         ScopedNoDenormals const no_denormals;

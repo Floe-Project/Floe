@@ -9,6 +9,8 @@ __attribute__((visibility("hidden"))) static CountedInitFlag g_init_flag {};
 __attribute__((visibility("hidden"))) static Atomic<sentry::BackgroundQueue*> g_queue = nullptr;
 __attribute__((visibility("hidden"))) alignas(sentry::BackgroundQueue) static u8
     g_worker_storage[sizeof(sentry::BackgroundQueue)];
+__attribute__((visibility("hidden"))) static MutexThin g_reported_error_ids_mutex = {};
+__attribute__((visibility("hidden"))) static DynamicArrayBounded<u64, 48> g_reported_error_ids = {};
 
 void InitBackgroundErrorReporting(Span<sentry::Tag const> tags) {
     CountedInit(g_init_flag, [&]() {
@@ -23,7 +25,24 @@ void InitBackgroundErrorReporting(Span<sentry::Tag const> tags) {
     });
 }
 
-void ReportError(sentry::Error&& error) {
+namespace detail {
+
+bool ErrorSentBefore(u64 error_id) {
+    g_reported_error_ids_mutex.Lock();
+    DEFER { g_reported_error_ids_mutex.Unlock(); };
+    return Contains(g_reported_error_ids, error_id);
+}
+
+void SetErrorSent(u64 error_id) {
+    g_reported_error_ids_mutex.Lock();
+    DEFER { g_reported_error_ids_mutex.Unlock(); };
+    if (g_reported_error_ids.size != g_reported_error_ids.Capacity())
+        dyn::Append(g_reported_error_ids, error_id);
+}
+
+void ReportError(sentry::Error&& error, u64 error_id) {
+    SetErrorSent(error_id);
+
     // For debug purposes, log the error.
     Log(ModuleName::ErrorReporting, LogLevel::Debug, [&error](Writer writer) -> ErrorCodeOr<void> {
         TRY(fmt::FormatToWriter(writer, "Error reported: {}\n", error.message));
@@ -46,6 +65,8 @@ void ReportError(sentry::Error&& error) {
     // Option 2: write the message to file directly
     if (WriteErrorToFile(*sentry::SentryOrFallback {}, error).Succeeded()) return;
 }
+
+} // namespace detail
 
 void ShutdownBackgroundErrorReporting() {
     CountedDeinit(g_init_flag, [&]() {

@@ -3,7 +3,8 @@
 
 #pragma once
 #include "os/threading.hpp"
-#include "utils/logger/logger.hpp"
+
+#include "common_infrastructure/constants.hpp"
 
 #include "clap/ext/gui.h"
 #include "clap/ext/thread-check.h"
@@ -135,11 +136,9 @@ struct FloeClapExtensionHost {
     void* pugl_world;
 };
 
-struct FloeClapExtensionPlugin {
+struct FloeClapTestingExtension {
     bool (*state_change_is_pending)(clap_plugin const* plugin) = nullptr;
 };
-
-constexpr auto k_clap_log_module = "👏clap"_log_module;
 
 inline bool IsMainThread(clap_host const& host) {
     if (auto const thread_check =
@@ -187,6 +186,6 @@ clap_plugin const* CreateFloeInstance(clap_host const* clap_host);
 
 // Request that the host resize the available space for the plugin. The host will likely follow this up with a
 // call to set_size(). So we shouldn't do that ourselves.
-void RequestGuiResize(clap_plugin const& plugin);
+void RequestGuiResize(FloeInstanceIndex index);
 
-void OnPollThread(clap_plugin const& plugin);
+void OnPollThread(FloeInstanceIndex index);

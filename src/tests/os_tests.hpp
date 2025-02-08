@@ -8,8 +8,6 @@
 #include "tests/framework.hpp"
 #include "utils/json/json_reader.hpp"
 
-constexpr auto k_os_log_module = "os"_log_module;
-
 TEST_CASE(TestEpochTime) {
     auto check_approx = [&](s64 a, s64 b, Optional<s64> wrap_max) {
         auto b_below = b - 1;

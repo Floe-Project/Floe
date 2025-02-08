@@ -84,7 +84,7 @@ ImagePixelsFromLibrary(Gui* g, sample_lib::Library const& lib, LibraryImageType 
     auto const path_in_lib = PathInLibraryForImageType(lib, type);
 
     auto err = [&](String middle, LogLevel severity) {
-        Log(k_gui_log_module, severity, "{} {} {}", lib.name, middle, filename);
+        Log(ModuleName::Gui, severity, "{} {} {}", lib.name, middle, filename);
         return Optional<ImageBytesManaged> {};
     };
 
@@ -107,7 +107,7 @@ static graphics::ImageID CopyPixelsToGpuLoadedImage(Gui* g, ImageBytesManaged co
     ASSERT(px.rgba);
     auto const outcome = g->frame_input.graphics_ctx->CreateImageID(px.rgba, px.size, 4);
     if (outcome.HasError()) {
-        LogError(k_gui_log_module,
+        LogError(ModuleName::Gui,
                  "Failed to create a texture (size {}x{}): {}",
                  px.size.width,
                  px.size.height,
@@ -119,7 +119,7 @@ static graphics::ImageID CopyPixelsToGpuLoadedImage(Gui* g, ImageBytesManaged co
 
 static Optional<graphics::ImageID> TryCreateImageOnGpu(graphics::DrawContext& ctx, ImageBytes const image) {
     return ctx.CreateImageID(image.rgba, image.size, k_rgba_channels).OrElse([](ErrorCode error) {
-        LogError(k_gui_log_module, "Failed to create image texture: {}", error);
+        LogError(ModuleName::Gui, "Failed to create image texture: {}", error);
         return graphics::ImageID {};
     });
 }
@@ -339,7 +339,7 @@ static void CreateFontsIfNeeded(Gui* g) {
 
         auto const outcome = graphics_ctx->CreateFontTexture();
         if (outcome.HasError())
-            LogError(k_gui_log_module, "Failed to create font texture: {}", outcome.Error());
+            LogError(ModuleName::Gui, "Failed to create font texture: {}", outcome.Error());
     }
 }
 
@@ -435,7 +435,7 @@ static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
 
 void Gui::OpenDialog(DialogType type) {
     auto const outcome = ::OpenDialog(this, type);
-    if (outcome.HasError()) LogError(k_gui_log_module, "Failed to create dialog: {}", outcome.Error());
+    if (outcome.HasError()) LogError(ModuleName::Gui, "Failed to create dialog: {}", outcome.Error());
 }
 
 Gui::Gui(GuiFrameInput& frame_input, Engine& engine)
@@ -456,7 +456,7 @@ Gui::Gui(GuiFrameInput& frame_input, Engine& engine)
                       gui->frame_input.request_update.Store(true, StoreMemoryOrder::Relaxed);
                   },
           })) {
-    Trace(k_gui_log_module);
+    Trace(ModuleName::Gui);
 
     editor.imgui = &imgui;
     imgui.user_callback_data = this;
@@ -468,7 +468,7 @@ Gui::~Gui() {
     layout::DestroyContext(layout);
     sample_lib_server::CloseAsyncCommsChannel(engine.shared_engine_systems.sample_library_server,
                                               sample_lib_server_async_channel);
-    Trace(k_gui_log_module);
+    Trace(ModuleName::Gui);
     if (midi_keyboard_note_held_with_mouse) {
         engine.processor.events_for_audio_thread.Push(
             GuiNoteClickReleased {.key = midi_keyboard_note_held_with_mouse.Value()});

@@ -12,8 +12,6 @@
 #include "utils/thread_extra/atomic_queue.hpp"
 #include "utils/thread_extra/atomic_swap_buffer.hpp"
 
-constexpr auto k_utils_log_module = "utils"_log_module;
-
 TEST_CASE(TestParseCommandLineArgs) {
     auto& a = tester.scratch_arena;
 

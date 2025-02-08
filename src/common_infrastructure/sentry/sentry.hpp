@@ -16,8 +16,6 @@
 
 namespace sentry {
 
-constexpr auto k_log_module = "sentry"_log_module;
-
 struct Tag {
     Tag Clone(Allocator& arena, CloneType) const {
         return Tag {
@@ -469,7 +467,7 @@ PUBLIC ErrorCodeOr<void> SubmitEnvelope(Sentry& sentry,
     ErrorCodeOr<void> result = k_success;
 
     if (!sentry.online_reporting_disabled.Load(LoadMemoryOrder::Relaxed) && k_online_reporting) {
-        LogDebug(k_main_log_module, "Posting to Sentry: {}", envelope);
+        LogDebug(ModuleName::ErrorReporting, "Posting to Sentry: {}", envelope);
 
         auto const envelope_url = fmt::Format(scratch_arena,
                                               "https://{}:443/api/{}/envelope/",
@@ -635,7 +633,7 @@ ConsumeAndSubmitErrorFiles(Sentry& sentry, String folder, ArenaAllocator& scratc
             // try and submit the same report file.
             if (auto const o = Rename(full_path, temp_full_path); o.HasError()) {
                 if (o.Error() == FilesystemError::PathDoesNotExist) continue;
-                LogError(k_main_log_module, "Couldn't move report file: {}", o.Error());
+                LogError(ModuleName::ErrorReporting, "Couldn't move report file: {}", o.Error());
                 continue;
             }
 
@@ -647,7 +645,7 @@ ConsumeAndSubmitErrorFiles(Sentry& sentry, String folder, ArenaAllocator& scratc
             };
 
             auto envelope_without_header = TRY_OR(ReadEntireFile(temp_full_path, scratch_arena), {
-                LogError(k_main_log_module, "Couldn't read report file: {}", error);
+                LogError(ModuleName::ErrorReporting, "Couldn't read report file: {}", error);
                 continue;
             });
 
@@ -674,7 +672,10 @@ ConsumeAndSubmitErrorFiles(Sentry& sentry, String folder, ArenaAllocator& scratc
                                           },
                                   }),
                    {
-                       LogError(k_main_log_module, "Couldn't send report to Sentry: {}. {}", error, response);
+                       LogError(ModuleName::ErrorReporting,
+                                "Couldn't send report to Sentry: {}. {}",
+                                error,
+                                response);
                        if (error == WebError::Non200Response) {
                            // There's something wrong with the envelope, we shall keep it but with a new name
                            // so we don't try to send it again.

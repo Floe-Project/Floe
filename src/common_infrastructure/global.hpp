@@ -44,7 +44,7 @@ PUBLIC void GlobalInit(GlobalInitOptions options) {
         auto _ = FrameInfo::FromSourceLocation(loc).Write(0, dyn::WriterFor(message), {});
 
         // Step 1: log the error for easier local debugging.
-        Log(k_global_log_module, LogLevel::Error, [&](Writer writer) -> ErrorCodeOr<void> {
+        Log(ModuleName::ErrorReporting, LogLevel::Error, [&](Writer writer) -> ErrorCodeOr<void> {
             TRY(writer.WriteChars(message));
             TRY(writer.WriteChar('\n'));
             if (stacktrace) {
@@ -77,7 +77,7 @@ PUBLIC void GlobalInit(GlobalInitOptions options) {
                                                },
                                        }),
                    {
-                       LogError(sentry::k_log_module,
+                       LogError(ModuleName::ErrorReporting,
                                 "Failed to submit panic to Sentry: {}, {}",
                                 error,
                                 response);

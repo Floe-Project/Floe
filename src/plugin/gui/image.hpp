@@ -12,7 +12,6 @@
 #include "common_infrastructure/common_errors.hpp"
 
 constexpr u16 k_rgba_channels = 4;
-constexpr auto k_image_log_module = "🍱image"_log_module;
 
 struct ImageBytes {
     usize NumPixels() const { return (usize)(size.width * size.height); }
@@ -98,7 +97,7 @@ PUBLIC ImageBytes ShrinkImageIfNeeded(ImageBytes image,
 
     Stopwatch stopwatch;
     DEFER {
-        LogDebug(k_image_log_module,
+        LogDebug(ModuleName::Gui,
                  "Shrinking image {}x{} to {}x{} took {} ms",
                  image.size.width,
                  image.size.height,
@@ -206,7 +205,7 @@ static bool BoxBlur(ImageF32 in, f32x4* out, u16 radius) {
 
     Stopwatch stopwatch;
     DEFER {
-        LogDebug(k_image_log_module,
+        LogDebug(ModuleName::Gui,
                  "Box blur {}x{}, radius {} took {} ms",
                  in.size.width,
                  in.size.height,
@@ -311,7 +310,7 @@ PUBLIC ImageBytes CreateBlurredLibraryBackground(ImageBytes original,
 
     Stopwatch stopwatch;
     DEFER {
-        LogDebug(k_image_log_module, "Blurred image generation took {} ms", stopwatch.MillisecondsElapsed());
+        LogDebug(ModuleName::Gui, "Blurred image generation took {} ms", stopwatch.MillisecondsElapsed());
     };
 
     // Shrink the image down for better speed. We are about to blur it, we don't need detail.

@@ -446,7 +446,6 @@ static ErrorCodeOr<LinuxWatchedDirectory*> WatchDirectory(DirectoryWatcher::Watc
 }
 
 constexpr bool k_debug_inotify = false && !PRODUCTION_BUILD;
-constexpr auto k_log_module = "dirwatch"_log_module;
 
 ErrorCodeOr<Span<DirectoryWatcher::DirectoryChanges const>>
 PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
@@ -561,7 +560,7 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                 }
                 if (!d.HasValue()) {
                     if constexpr (k_debug_inotify) {
-                        LogDebug(k_log_module,
+                        LogDebug(ModuleName::Filesystem,
                                  "ERROR: inotify event for unknown watch id: {}, name_len: {}, name: {}",
                                  event.wd,
                                  event.len,
@@ -572,11 +571,17 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                             if (watch.state != DirectoryWatcher::WatchedDirectory::State::Watching) continue;
                             found_ids = true;
                             auto& native_data = *(LinuxWatchedDirectory*)watch.native_data.pointer;
-                            LogDebug(k_log_module, "  {}: {}", native_data.root_watch_id, watch.path);
+                            LogDebug(ModuleName::Filesystem,
+                                     "  {}: {}",
+                                     native_data.root_watch_id,
+                                     watch.path);
                             for (auto& subdir : native_data.subdirs)
-                                LogDebug(k_log_module, "    {}: {}", subdir.watch_id, subdir.subpath);
+                                LogDebug(ModuleName::Filesystem,
+                                         "    {}: {}",
+                                         subdir.watch_id,
+                                         subdir.subpath);
                         }
-                        if (!found_ids) LogDebug(k_log_module, "  none");
+                        if (!found_ids) LogDebug(ModuleName::Filesystem, "  none");
                     }
                     continue;
                 }
@@ -619,7 +624,7 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                     TRY(writer.WriteChars("}}"));
                     return k_success;
                 }();
-                LogDebug(k_log_module, printout);
+                LogDebug(ModuleName::Filesystem, printout);
             }
 
             // "Watch was removed explicitly (inotify_rm_watch()) or automatically (file was deleted, or

@@ -8,11 +8,11 @@
 #include "os/misc.hpp"
 #include "tests/framework.hpp"
 
-ErrorCodeOr<void> WriteFormattedLog(Writer writer,
-                                    String module_name,
-                                    LogLevel level,
-                                    MessageWriteFunction write_message,
-                                    WriteFormattedLogOptions options) {
+ErrorCodeOr<void> WriteLogLine(Writer writer,
+                               ModuleName module_name,
+                               LogLevel level,
+                               MessageWriteFunction write_message,
+                               WriteLogLineOptions options) {
     bool needs_space = false;
     bool needs_open_bracket = true;
 
@@ -30,10 +30,8 @@ ErrorCodeOr<void> WriteFormattedLog(Writer writer,
         TRY(writer.WriteChars(Timestamp()));
     }
 
-    if (module_name.size) {
-        TRY(begin_prefix_item());
-        TRY(writer.WriteChars(module_name));
-    }
+    TRY(begin_prefix_item());
+    TRY(writer.WriteChars(ModuleNameString(module_name)));
 
     if (!(options.no_info_prefix && level == LogLevel::Info)) {
         TRY(begin_prefix_item());
@@ -69,11 +67,11 @@ ErrorCodeOr<void> WriteFormattedLog(Writer writer,
 
     if (prefix_was_written) TRY(writer.WriteChars("] "));
     TRY(write_message(writer));
-    TRY(writer.WriteChar('\n'));
+    if (options.newline) TRY(writer.WriteChar('\n'));
     return k_success;
 }
 
-void Trace(LogModuleName module_name, String message, SourceLocation loc) {
+void Trace(ModuleName module_name, String message, SourceLocation loc) {
     Log(module_name, LogLevel::Debug, [&](Writer writer) -> ErrorCodeOr<void> {
         TRY(fmt::FormatToWriter(writer,
                                 "trace: {}({}): {}",
@@ -134,7 +132,7 @@ ErrorCodeOr<void> CleanupOldLogFilesIfNeeded(ArenaAllocator& scratch_arena) {
         auto const entry = entries_with_last_modified[i];
         auto const full_path = path::Join(scratch_arena, Array {*LogFolder(), entry.entry->subpath});
         DEFER { scratch_arena.Free(full_path.ToByteSpan()); };
-        LogDebug(k_global_log_module, "deleting old log file: {}"_s, full_path);
+        LogDebug(ModuleName::Global, "deleting old log file: {}"_s, full_path);
         auto _ = Delete(full_path, {.type = DeleteOptions::Type::File});
     }
 
@@ -163,47 +161,46 @@ void GetLatestLogMessages(DynamicArrayBounded<char, LogRingBuffer::k_buffer_size
     g_message_ring_buffer.ReadToNullTerminatedStringList(out);
 }
 
-void Log(LogModuleName module_name, LogLevel level, FunctionRef<ErrorCodeOr<void>(Writer)> write_message) {
+void Log(ModuleName module_name, LogLevel level, FunctionRef<ErrorCodeOr<void>(Writer)> write_message) {
     if (level < g_config.min_level_allowed) return;
 
     // Info, warnings and errors should be added to the ring buffer. We can access these when we report errors
     // online.
     if (level > LogLevel::Debug) {
         DynamicArrayBounded<char, LogRingBuffer::k_max_message_size> message;
-        auto _ = WriteFormattedLog(dyn::WriterFor(message),
-                                   module_name.str,
-                                   level,
-                                   write_message,
-                                   {
-                                       .ansi_colors = false,
-                                       .no_info_prefix = true,
-                                       .timestamp = false,
-                                       .thread = true,
-                                   });
+        auto _ = WriteLogLine(dyn::WriterFor(message),
+                              module_name,
+                              level,
+                              write_message,
+                              {
+                                  .ansi_colors = false,
+                                  .no_info_prefix = true,
+                                  .timestamp = false,
+                                  .thread = true,
+                                  .newline = false,
+                              });
         g_message_ring_buffer.Write(message);
     }
 
     // For debugging purposes, we also log to a file or stderr.
     if constexpr (!PRODUCTION_BUILD) {
-        static auto log_to_stderr = [](LogModuleName module_name,
-                                       LogLevel level,
-                                       FunctionRef<ErrorCodeOr<void>(Writer)> write_message) {
-            constexpr WriteFormattedLogOptions k_config {
-                .ansi_colors = true,
-                .no_info_prefix = false,
-                .timestamp = true,
-                .thread = true,
+        static auto log_to_stderr =
+            [](ModuleName module_name, LogLevel level, FunctionRef<ErrorCodeOr<void>(Writer)> write_message) {
+                constexpr WriteLogLineOptions k_config {
+                    .ansi_colors = true,
+                    .no_info_prefix = false,
+                    .timestamp = true,
+                    .thread = true,
+                };
+                auto& mutex = StdStreamMutex(StdStream::Err);
+                mutex.Lock();
+                DEFER { mutex.Unlock(); };
+
+                BufferedWriter<Kb(4)> buffered_writer {StdWriter(StdStream::Err)};
+                DEFER { auto _ = buffered_writer.Flush(); };
+
+                auto _ = WriteLogLine(buffered_writer.Writer(), module_name, level, write_message, k_config);
             };
-            auto& mutex = StdStreamMutex(StdStream::Err);
-            mutex.Lock();
-            DEFER { mutex.Unlock(); };
-
-            BufferedWriter<Kb(4)> buffered_writer {StdWriter(StdStream::Err)};
-            DEFER { auto _ = buffered_writer.Flush(); };
-
-            auto _ =
-                WriteFormattedLog(buffered_writer.Writer(), module_name.str, level, write_message, k_config);
-        };
 
         switch (g_config.destination) {
             case LogConfig::Destination::Stderr: {
@@ -289,25 +286,25 @@ void Log(LogModuleName module_name, LogLevel level, FunctionRef<ErrorCodeOr<void
                 auto file = g_file;
 
                 if (!file) {
-                    log_to_stderr(k_global_log_module, level, write_message);
+                    log_to_stderr(ModuleName::Global, level, write_message);
                     return;
                 }
 
                 BufferedWriter<Kb(4)> buffered_writer {file->Writer()};
                 DEFER { auto _ = buffered_writer.Flush(); };
 
-                auto o = WriteFormattedLog(buffered_writer.Writer(),
-                                           module_name.str,
-                                           level,
-                                           write_message,
-                                           {
-                                               .ansi_colors = false,
-                                               .no_info_prefix = false,
-                                               .timestamp = true,
-                                               .thread = true,
-                                           });
+                auto o = WriteLogLine(buffered_writer.Writer(),
+                                      module_name,
+                                      level,
+                                      write_message,
+                                      {
+                                          .ansi_colors = false,
+                                          .no_info_prefix = false,
+                                          .timestamp = true,
+                                          .thread = true,
+                                      });
                 if (o.HasError()) {
-                    log_to_stderr(k_global_log_module, LogLevel::Error, [o](Writer writer) {
+                    log_to_stderr(ModuleName::Global, LogLevel::Error, [o](Writer writer) {
                         return fmt::FormatToWriter(writer, "failed to write log file: {}"_s, o.Error());
                     });
                 }

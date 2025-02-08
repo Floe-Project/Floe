@@ -3,7 +3,6 @@
 
 #pragma once
 #include "foundation/foundation.hpp"
-#include "utils/logger/logger.hpp"
 
 #include "fonts.hpp"
 #include "gui/gui_drawing_helpers.hpp"
@@ -39,8 +38,6 @@
 //
 // The flexbox-like layout system is in layout.hpp.
 //
-
-constexpr auto k_gui_log_module = "gui"_log_module;
 
 struct GuiBoxSystem;
 

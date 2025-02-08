@@ -23,12 +23,11 @@ struct SharedEngineSystems {
 
     void StartPollingThreadIfNeeded();
 
-    void RegisterFloeInstance(clap_plugin const* plugin, FloeInstanceIndex index);
+    void RegisterFloeInstance(FloeInstanceIndex index);
     void UnregisterFloeInstance(FloeInstanceIndex index);
 
-    // indexable by FloeInstanceIndex
-    Mutex floe_instances_mutex {};
-    Array<clap_plugin const*, k_max_num_floe_instances> floe_instances {};
+    Mutex registered_floe_instances_mutex {};
+    DynamicArrayBounded<FloeInstanceIndex, k_max_num_floe_instances> registered_floe_instances {};
 
     ArenaAllocator arena;
     ThreadsafeErrorNotifications error_notifications {};

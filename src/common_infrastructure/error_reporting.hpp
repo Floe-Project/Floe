@@ -5,6 +5,9 @@
 
 #include "sentry/sentry.hpp"
 
+// Reporting an error means sending it the online service (if enabled), or writing it a file - ready to be
+// sent later (either automatically or when manually requested as part of a bug report).
+
 // not thread-safe, call once near the start of the program
 void InitBackgroundErrorReporting(Span<sentry::Tag const> tags);
 

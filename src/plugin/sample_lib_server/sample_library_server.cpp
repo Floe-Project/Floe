@@ -23,7 +23,6 @@ namespace sample_lib_server {
 using namespace detail;
 constexpr String k_trace_category = "SLS";
 constexpr u32 k_trace_colour = 0xfcba03;
-constexpr auto k_log_module = "sample-lib-server"_log_module;
 
 // ==========================================================================================================
 // Library loading
@@ -470,7 +469,9 @@ static bool UpdateLibraryJobs(Server& server,
                                                       });
             outcome.HasError()) {
             // IMPROVE: handle error
-            LogDebug(k_log_module, "Reading directory changes failed: {}", outcome.Error());
+            LogDebug(ModuleName::SampleLibraryServer,
+                     "Reading directory changes failed: {}",
+                     outcome.Error());
         } else {
             auto const dir_changes_span = outcome.Value();
             for (auto const& dir_changes : dir_changes_span) {
@@ -488,7 +489,7 @@ static bool UpdateLibraryJobs(Server& server,
 
                 if (dir_changes.error) {
                     // IMPROVE: handle this
-                    LogDebug(k_log_module,
+                    LogDebug(ModuleName::SampleLibraryServer,
                              "Reading directory changes failed for {}: {}",
                              scan_folder.path,
                              dir_changes.error);
@@ -631,7 +632,9 @@ static Optional<DirectoryWatcher> CreateDirectoryWatcher(ThreadsafeErrorNotifica
         error_notifications.RemoveError(error_id);
         watcher.Emplace(watcher_outcome.ReleaseValue());
     } else {
-        LogDebug(k_log_module, "Failed to create directory watcher: {}", watcher_outcome.Error());
+        LogDebug(ModuleName::SampleLibraryServer,
+                 "Failed to create directory watcher: {}",
+                 watcher_outcome.Error());
         auto const err = error_notifications.NewError();
         err->value = {
             .title = "Warning: unable to monitor library folders"_s,
@@ -947,26 +950,26 @@ struct PendingResources {
 
 static void DumpPendingResourcesDebugInfo(PendingResources& pending_resources) {
     ASSERT(CurrentThreadId() == pending_resources.server_thread_id);
-    LogDebug(k_log_module,
+    LogDebug(ModuleName::SampleLibraryServer,
              "Thread pool jobs: {}",
              pending_resources.thread_pool_jobs.counter.Load(LoadMemoryOrder::Relaxed));
-    LogDebug(k_log_module, "\nPending results:");
+    LogDebug(ModuleName::SampleLibraryServer, "\nPending results:");
     for (auto& pending_resource : pending_resources.list) {
-        LogDebug(k_log_module, "  Pending result: {}", pending_resource.debug_id);
+        LogDebug(ModuleName::SampleLibraryServer, "  Pending result: {}", pending_resource.debug_id);
         switch (pending_resource.state.tag) {
             case PendingResource::State::AwaitingLibrary:
-                LogDebug(k_log_module, "    Awaiting library");
+                LogDebug(ModuleName::SampleLibraryServer, "    Awaiting library");
                 break;
             case PendingResource::State::AwaitingAudio: {
                 auto& resource = pending_resource.state.Get<PendingResource::ListedPointer>();
                 switch (resource.tag) {
                     case LoadRequestType::Instrument: {
                         auto inst = resource.Get<ListedInstrument*>();
-                        LogDebug(k_log_module,
+                        LogDebug(ModuleName::SampleLibraryServer,
                                  "    Awaiting audio for instrument {}",
                                  inst->inst.instrument.name);
                         for (auto& audio_data : inst->audio_data_set) {
-                            LogDebug(k_log_module,
+                            LogDebug(ModuleName::SampleLibraryServer,
                                      "      Audio data: {}, {}",
                                      audio_data->audio_data.hash,
                                      EnumToString(audio_data->state.Load(LoadMemoryOrder::Relaxed)));
@@ -975,8 +978,10 @@ static void DumpPendingResourcesDebugInfo(PendingResources& pending_resources) {
                     }
                     case LoadRequestType::Ir: {
                         auto ir = resource.Get<ListedImpulseResponse*>();
-                        LogDebug(k_log_module, "    Awaiting audio for IR {}", ir->ir.ir.path);
-                        LogDebug(k_log_module,
+                        LogDebug(ModuleName::SampleLibraryServer,
+                                 "    Awaiting audio for IR {}",
+                                 ir->ir.ir.path);
+                        LogDebug(ModuleName::SampleLibraryServer,
                                  "      Audio data: {}, {}",
                                  ir->audio_data->audio_data.hash,
                                  EnumToString(ir->audio_data->state.Load(LoadMemoryOrder::Relaxed)));
@@ -985,10 +990,14 @@ static void DumpPendingResourcesDebugInfo(PendingResources& pending_resources) {
                 }
                 break;
             }
-            case PendingResource::State::Cancelled: LogDebug(k_log_module, "    Cancelled"); break;
-            case PendingResource::State::Failed: LogDebug(k_log_module, "    Failed"); break;
+            case PendingResource::State::Cancelled:
+                LogDebug(ModuleName::SampleLibraryServer, "    Cancelled");
+                break;
+            case PendingResource::State::Failed:
+                LogDebug(ModuleName::SampleLibraryServer, "    Failed");
+                break;
             case PendingResource::State::CompletedSuccessfully:
-                LogDebug(k_log_module, "    Completed successfully");
+                LogDebug(ModuleName::SampleLibraryServer, "    Completed successfully");
                 break;
         }
     }
@@ -1430,16 +1439,18 @@ static void ServerThreadProc(Server& server) {
             if (!PRODUCTION_BUILD &&
                 server.request_debug_dump_current_state.Exchange(false, RmwMemoryOrder::Relaxed)) {
                 ZoneNamedN(dump, "dump", true);
-                LogDebug(k_log_module, "Dumping current state of loading thread");
-                LogDebug(k_log_module,
+                LogDebug(ModuleName::SampleLibraryServer, "Dumping current state of loading thread");
+                LogDebug(ModuleName::SampleLibraryServer,
                          "Libraries currently loading: {}",
                          pending_library_jobs.num_uncompleted_jobs.Load(LoadMemoryOrder::Relaxed));
                 DumpPendingResourcesDebugInfo(pending_resources);
-                LogDebug(k_log_module, "\nAvailable Libraries:");
+                LogDebug(ModuleName::SampleLibraryServer, "\nAvailable Libraries:");
                 for (auto& lib : server.libraries) {
-                    LogDebug(k_log_module, "  Library: {}", lib.value.lib->name);
+                    LogDebug(ModuleName::SampleLibraryServer, "  Library: {}", lib.value.lib->name);
                     for (auto& inst : lib.value.instruments)
-                        LogDebug(k_log_module, "    Instrument: {}", inst.inst.instrument.name);
+                        LogDebug(ModuleName::SampleLibraryServer,
+                                 "    Instrument: {}",
+                                 inst.inst.instrument.name);
                 }
             }
 
@@ -1736,7 +1747,8 @@ static Type& ExtractSuccess(tests::Tester& tester, LoadResult const& result, Loa
         }
     }
 
-    if (auto err = result.result.TryGet<ErrorCode>()) LogDebug(k_log_module, "Error: {}", *err);
+    if (auto err = result.result.TryGet<ErrorCode>())
+        LogDebug(ModuleName::SampleLibraryServer, "Error: {}", *err);
     REQUIRE_EQ(result.result.tag, LoadResult::ResultType::Success);
     auto opt_r = result.result.Get<Resource>().TryGetMut<Type>();
     REQUIRE(opt_r);

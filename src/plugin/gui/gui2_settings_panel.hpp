@@ -314,7 +314,7 @@ static bool AddExtraScanFolderDialog(GuiBoxSystem& box_system,
             return true;
         }
     } else {
-        LogError(k_gui_log_module, "Failed to create dialog: {}", o.Error());
+        LogError(ModuleName::Gui, "Failed to create dialog: {}", o.Error());
     }
     return false;
 }
@@ -613,7 +613,7 @@ static void PackagesSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext
                                     context.sample_lib_server);
                 }
             } else {
-                LogError(k_gui_log_module, "Failed to create dialog: {}", o.Error());
+                LogError(ModuleName::Gui, "Failed to create dialog: {}", o.Error());
             }
         }
     }

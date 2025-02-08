@@ -86,6 +86,8 @@ enum class Arch {
 constexpr auto k_arch = Arch::Aarch64;
 #elif defined(__x86_64__)
 constexpr auto k_arch = Arch::X86_64;
+#else
+#error "Unsupported architecture"
 #endif
 
 enum class Endianness {

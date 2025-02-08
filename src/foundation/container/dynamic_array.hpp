@@ -245,12 +245,16 @@ PUBLIC constexpr void RemoveSwapLast(DynArray auto& array, usize index) {
 }
 
 template <DynArray DynType, typename ArgumentType = DynType::ValueType>
-PUBLIC constexpr void RemoveValue(DynType& array, ArgumentType const& value) {
+PUBLIC constexpr usize RemoveValue(DynType& array, ArgumentType const& value) {
+    usize num_removed = 0;
     for (usize i = 0; i < array.size;)
-        if (array.data[i] == value)
+        if (array.data[i] == value) {
+            ++num_removed;
             dyn::Remove(array, i);
-        else
+        } else {
             ++i;
+        }
+    return num_removed;
 }
 
 PUBLIC constexpr usize RemoveValueIf(DynArray auto& array, auto&& should_remove_element) {
@@ -267,12 +271,16 @@ PUBLIC constexpr usize RemoveValueIf(DynArray auto& array, auto&& should_remove_
 }
 
 template <DynArray DynType, typename ArgumentType = DynType::ValueType>
-PUBLIC constexpr void RemoveValueSwapLast(DynType& array, ArgumentType const& value) {
+PUBLIC constexpr usize RemoveValueSwapLast(DynType& array, ArgumentType const& value) {
+    usize num_removed = 0;
     for (usize i = 0; i < array.size;)
-        if (array.data[i] == value)
+        if (array.data[i] == value) {
+            ++num_removed;
             dyn::RemoveSwapLast(array, i);
-        else
+        } else {
             ++i;
+        }
+    return num_removed;
 }
 
 PUBLIC constexpr usize RemoveValueIfSwapLast(DynArray auto& array, auto&& should_remove_element) {

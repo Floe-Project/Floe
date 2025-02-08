@@ -28,7 +28,7 @@ static void BackgroundThread(BackgroundQueue& queue, Span<Tag const> tags) {
     InitLogFolderIfNeeded();
 
     if (auto const o = ConsumeAndSubmitErrorFiles(sentry, *LogFolder(), scratch_arena); o.HasError())
-        LogError(k_log_module, "Failed to consume error files: {}", o.Error());
+        LogError(ModuleName::ErrorReporting, "Failed to consume error files: {}", o.Error());
 
     // start session
     if (!sentry.online_reporting_disabled.Load(LoadMemoryOrder::Relaxed) && k_online_reporting) {
@@ -50,9 +50,12 @@ static void BackgroundThread(BackgroundQueue& queue, Span<Tag const> tags) {
                                               },
                                       });
         if (o.HasError())
-            LogError(k_log_module, "Failed to send Sentry envelope: {}, {}", o.Error(), response);
+            LogError(ModuleName::ErrorReporting,
+                     "Failed to send Sentry envelope: {}, {}",
+                     o.Error(),
+                     response);
         else
-            LogDebug(k_log_module, "Sent Sentry envelope: {}", response);
+            LogDebug(ModuleName::ErrorReporting, "Sent Sentry envelope: {}", response);
     }
 
     while (true) {
@@ -87,9 +90,12 @@ static void BackgroundThread(BackgroundQueue& queue, Span<Tag const> tags) {
                                                   },
                                           });
             if (o.HasError())
-                LogError(k_log_module, "Failed to send Sentry envelope: {}, {}", o.Error(), response);
+                LogError(ModuleName::ErrorReporting,
+                         "Failed to send Sentry envelope: {}, {}",
+                         o.Error(),
+                         response);
             else
-                LogDebug(k_log_module, "Sent Sentry envelope: {}", response);
+                LogDebug(ModuleName::ErrorReporting, "Sent Sentry envelope: {}", response);
         }
 
         if (end) break;

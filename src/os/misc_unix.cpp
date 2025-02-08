@@ -616,7 +616,7 @@ bool TrySigFunction(int return_code, String message) {
     auto _ = strerror_r(errno, buffer, sizeof(buffer));
     auto const err_str = buffer;
 #endif
-    LogError(k_global_log_module,
+    LogError(ModuleName::Global,
              "failed {}, errno({}) {}",
              message,
              errno,

@@ -294,7 +294,7 @@ static bool OpenMidi(Standalone& standalone) {
     ASSERT(standalone.midi_stream == nullptr);
 
     if (auto result = Pm_Initialize(); result != pmNoError) {
-        LogError(k_main_log_module, "Pm_Initialize: {}", FromNullTerminated(Pm_GetErrorText(result)));
+        LogError(ModuleName::Standalone, "Pm_Initialize: {}", FromNullTerminated(Pm_GetErrorText(result)));
         return false;
     }
 
@@ -318,7 +318,7 @@ static bool OpenMidi(Standalone& standalone) {
     if (auto result = Pm_OpenInput(&standalone.midi_stream, *id_to_use, nullptr, 200, nullptr, nullptr);
         result != pmNoError) {
         standalone.floe_host_ext.standalone_midi_device_error = true;
-        LogError(k_main_log_module, "Pm_OpenInput: {}", FromNullTerminated(Pm_GetErrorText(result)));
+        LogError(ModuleName::Standalone, "Pm_OpenInput: {}", FromNullTerminated(Pm_GetErrorText(result)));
         return false;
     }
 
@@ -393,7 +393,7 @@ static PuglStatus OnEvent(PuglView* view, PuglEvent const* event) {
         case PUGL_UNREALIZE:
         case PUGL_CONFIGURE: {
             if (event->configure.style & PUGL_VIEW_STYLE_MAPPED) {
-                LogDebug(k_main_log_module, "PUGL: {}", fmt::DumpStruct(event->configure));
+                LogDebug(ModuleName::Standalone, "PUGL: {}", fmt::DumpStruct(event->configure));
                 auto gui = (clap_plugin_gui const*)p.plugin.get_extension(&p.plugin, CLAP_EXT_GUI);
                 ASSERT(gui);
                 if (gui->can_resize(&p.plugin)) {
@@ -503,12 +503,12 @@ static ErrorCodeOr<void> Main(String exe_path_rel) {
     DEFER { standalone.plugin.destroy(&standalone.plugin); };
 
     if (!OpenMidi(standalone)) {
-        LogError(k_main_log_module, "Could not open Midi");
+        LogError(ModuleName::Standalone, "Could not open Midi");
         return ErrorCode {StandaloneError::DeviceError};
     }
     DEFER { CloseMidi(standalone); };
     if (!OpenAudio(standalone)) {
-        LogError(k_main_log_module, "Could not open Audio");
+        LogError(ModuleName::Standalone, "Could not open Audio");
         return ErrorCode {StandaloneError::DeviceError};
     }
     DEFER { CloseAudio(standalone); };
@@ -601,7 +601,7 @@ static ErrorCodeOr<void> Main(String exe_path_rel) {
 int main(int, char** argv) {
     auto const o = Main(FromNullTerminated(argv[0]));
     if (o.HasError()) {
-        LogError(k_main_log_module, "Standalone error: {}", o.Error());
+        LogError(ModuleName::Standalone, "Standalone error: {}", o.Error());
         return 1;
     }
     return 0;

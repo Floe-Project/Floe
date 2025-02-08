@@ -21,16 +21,16 @@ void SharedEngineSystems::StartPollingThreadIfNeeded() {
                     ArenaAllocatorWithInlineStorage<2000> scratch_arena {PageAllocator::Instance()};
                     auto const o = CleanupOldLogFilesIfNeeded(scratch_arena);
                     if (o.HasError())
-                        LogError("global"_log_module, "Failed to cleanup old log files: {}", o.Error());
+                        LogError(ModuleName::Global, "Failed to cleanup old log files: {}", o.Error());
                 }
 
                 while (polling_running.Load(LoadMemoryOrder::Relaxed)) {
                     WaitIfValueIsExpected(polling_running, 1, 1000u);
                     {
-                        floe_instances_mutex.Lock();
-                        DEFER { floe_instances_mutex.Unlock(); };
-                        for (auto plugin : floe_instances)
-                            if (plugin) OnPollThread(*plugin);
+                        registered_floe_instances_mutex.Lock();
+                        DEFER { registered_floe_instances_mutex.Unlock(); };
+                        for (auto index : registered_floe_instances)
+                            OnPollThread(index);
                     }
                 }
             } catch (PanicException) {
@@ -70,8 +70,10 @@ SharedEngineSystems::SharedEngineSystems(Span<sentry::Tag const> tags)
                 break;
             }
             case SettingsTracking::ChangeType::WindowSize: {
-                for (auto plugin : floe_instances)
-                    if (plugin) RequestGuiResize(*plugin);
+                registered_floe_instances_mutex.Lock();
+                DEFER { registered_floe_instances_mutex.Unlock(); };
+                for (auto index : registered_floe_instances)
+                    RequestGuiResize(index);
                 break;
             }
             case SettingsTracking::ChangeType::OnlineReportingDisabled: {
@@ -110,20 +112,22 @@ SharedEngineSystems::~SharedEngineSystems() {
     {
         auto outcome = WriteSettingsFileIfChanged(settings);
         if (outcome.HasError())
-            LogError("global"_log_module, "Failed to write settings file: {}", outcome.Error());
+            LogError(ModuleName::Global, "Failed to write settings file: {}", outcome.Error());
     }
 
     ShutdownBackgroundErrorReporting();
 }
 
-void SharedEngineSystems::RegisterFloeInstance(clap_plugin const* plugin, FloeInstanceIndex index) {
-    floe_instances_mutex.Lock();
-    DEFER { floe_instances_mutex.Unlock(); };
-    floe_instances[index] = plugin;
+void SharedEngineSystems::RegisterFloeInstance(FloeInstanceIndex index) {
+    registered_floe_instances_mutex.Lock();
+    DEFER { registered_floe_instances_mutex.Unlock(); };
+    ASSERT(!Contains(registered_floe_instances, index));
+    dyn::Append(registered_floe_instances, index);
 }
 
 void SharedEngineSystems::UnregisterFloeInstance(FloeInstanceIndex index) {
-    floe_instances_mutex.Lock();
-    DEFER { floe_instances_mutex.Unlock(); };
-    floe_instances[index] = nullptr;
+    registered_floe_instances_mutex.Lock();
+    DEFER { registered_floe_instances_mutex.Unlock(); };
+    auto const num_removed = dyn::RemoveValueSwapLast(registered_floe_instances, index);
+    ASSERT(num_removed == 1);
 }

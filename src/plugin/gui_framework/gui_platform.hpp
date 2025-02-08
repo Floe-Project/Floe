@@ -19,7 +19,6 @@
 #include "settings/settings_gui.hpp"
 
 constexpr bool k_debug_gui_platform = false;
-constexpr auto k_gui_platform_log_module = "🔳gui-platform"_log_module;
 
 struct GuiPlatform {
     static constexpr uintptr k_pugl_timer_id = 200;
@@ -102,7 +101,7 @@ void X11SetParent(PuglView* view, uintptr parent);
 } // namespace detail
 
 PUBLIC ErrorCodeOr<void> CreateView(GuiPlatform& platform) {
-    Trace(k_gui_platform_log_module);
+    Trace(ModuleName::Gui);
 
     ASSERT(platform.world == nullptr);
     ASSERT(platform.view == nullptr);
@@ -119,7 +118,7 @@ PUBLIC ErrorCodeOr<void> CreateView(GuiPlatform& platform) {
         if (platform.world == nullptr) Panic("out of memory");
         puglSetWorldString(platform.world, PUGL_CLASS_NAME, "Floe");
         platform.world = platform.world;
-        LogInfo(k_gui_platform_log_module, "creating new world");
+        LogInfo(ModuleName::Gui, "creating new world");
     }
 
     platform.view = puglNewView(platform.world);
@@ -129,7 +128,7 @@ PUBLIC ErrorCodeOr<void> CreateView(GuiPlatform& platform) {
 }
 
 PUBLIC void DestroyView(GuiPlatform& platform) {
-    Trace(k_gui_platform_log_module);
+    Trace(ModuleName::Gui);
     if (platform.gui) {
         platform.gui.Clear();
 
@@ -140,7 +139,7 @@ PUBLIC void DestroyView(GuiPlatform& platform) {
                                                                                    CLAP_EXT_POSIX_FD_SUPPORT);
                 if (ext && ext->unregister_fd) {
                     bool const success = ext->unregister_fd(&platform.host, *platform.clap_posix_fd);
-                    if (!success) LogError(k_gui_platform_log_module, "failed to unregister fd");
+                    if (!success) LogError(ModuleName::Gui, "failed to unregister fd");
                 }
                 platform.clap_posix_fd = k_nullopt;
             }
@@ -151,7 +150,7 @@ PUBLIC void DestroyView(GuiPlatform& platform) {
                                                                                 CLAP_EXT_TIMER_SUPPORT);
                 if (ext && ext->unregister_timer) {
                     bool const success = ext->unregister_timer(&platform.host, *platform.clap_timer_id);
-                    if (!success) LogError(k_gui_platform_log_module, "failed to unregister timer");
+                    if (!success) LogError(ModuleName::Gui, "failed to unregister timer");
                 }
                 platform.clap_timer_id = k_nullopt;
             }
@@ -166,7 +165,7 @@ PUBLIC void DestroyView(GuiPlatform& platform) {
     platform.view = nullptr;
 
     if (!detail::CustomFloeHost(platform.host)) {
-        LogInfo(k_gui_platform_log_module, "freeing world");
+        LogInfo(ModuleName::Gui, "freeing world");
         puglFreeWorld(platform.world);
         platform.world = nullptr;
     }
@@ -210,12 +209,12 @@ PUBLIC ErrorCodeOr<void> SetVisible(GuiPlatform& platform, bool visible, Engine&
             puglSetViewHint(platform.view, PUGL_RESIZABLE, true);
             auto const size = gui_settings::WindowSize(platform.settings.settings.gui);
             TRY(Required(puglSetSize(platform.view, size.width, size.height)));
-            LogDebug(k_gui_platform_log_module, "creating size: {}x{}", size.width, size.height);
+            LogDebug(ModuleName::Gui, "creating size: {}x{}", size.width, size.height);
 
             TRY(Required(puglRealize(platform.view)));
             TRY(Required(
                 puglStartTimer(platform.view, platform.k_pugl_timer_id, 1.0 / (f64)k_gui_refresh_rate_hz)));
-            LogInfo(k_gui_platform_log_module,
+            LogInfo(ModuleName::Gui,
                     "realised, native handle {}, world {}",
                     (void*)puglGetNativeView(platform.view),
                     (void*)puglGetWorld(platform.view));
@@ -234,10 +233,10 @@ PUBLIC ErrorCodeOr<void> SetVisible(GuiPlatform& platform, bool visible, Engine&
                     auto const fd = detail::FdFromPuglWorld(platform.world);
                     ASSERT(fd != -1);
                     if (posix_fd->register_fd(&platform.host, fd, CLAP_POSIX_FD_READ)) {
-                        LogInfo(k_gui_platform_log_module, "registered fd {}", fd);
+                        LogInfo(ModuleName::Gui, "registered fd {}", fd);
                         platform.clap_posix_fd = fd;
                     } else
-                        LogError(k_gui_platform_log_module, "failed to register fd {}", fd);
+                        LogError(ModuleName::Gui, "failed to register fd {}", fd);
                 }
 
                 auto const timer_support =
@@ -248,10 +247,10 @@ PUBLIC ErrorCodeOr<void> SetVisible(GuiPlatform& platform, bool visible, Engine&
                     if (timer_support->register_timer(&platform.host,
                                                       (u32)(1000.0 / k_gui_refresh_rate_hz),
                                                       &timer_id)) {
-                        LogInfo(k_gui_platform_log_module, "registered timer");
+                        LogInfo(ModuleName::Gui, "registered timer");
                         platform.clap_timer_id = timer_id;
                     } else
-                        LogError(k_gui_platform_log_module, "failed to register timer");
+                        LogError(ModuleName::Gui, "failed to register timer");
                 }
             }
         }
@@ -269,7 +268,7 @@ PUBLIC bool SetSize(GuiPlatform& platform, UiSize new_size) {
 }
 
 PUBLIC UiSize WindowSize(GuiPlatform& platform) {
-    if (platform.view == nullptr) return gui_settings::WindowSize(platform.settings.settings.gui);
+    if (!platform.gui) return gui_settings::WindowSize(platform.settings.settings.gui);
     auto const size = puglGetFrame(platform.view);
     return {size.width, size.height};
 }
@@ -286,7 +285,7 @@ inline FloeClapExtensionHost const* CustomFloeHost(clap_host const& host) {
 
 static void LogIfSlow(Stopwatch& stopwatch, String message) {
     auto const elapsed = stopwatch.MillisecondsElapsed();
-    if (elapsed > 10) LogWarning(k_gui_platform_log_module, "{} took {}ms", message, elapsed);
+    if (elapsed > 10) LogWarning(ModuleName::Gui, "{} took {}ms", message, elapsed);
 }
 
 static bool IsUpdateNeeded(GuiPlatform& platform) {
@@ -510,7 +509,7 @@ static void CreateGraphicsContext(GuiPlatform& platform) {
     auto graphics_ctx = graphics::CreateNewDrawContext();
     auto const outcome = graphics_ctx->CreateDeviceObjects((void*)puglGetNativeView(platform.view));
     if (outcome.HasError()) {
-        LogError(k_gui_platform_log_module, "Failed to create graphics context: {}", outcome.Error());
+        LogError(ModuleName::Gui, "Failed to create graphics context: {}", outcome.Error());
         delete graphics_ctx;
         return;
     }
@@ -642,7 +641,7 @@ static void UpdateAndRender(GuiPlatform& platform) {
     Stopwatch sw {};
     DEFER {
         auto const elapsed = sw.MillisecondsElapsed();
-        if (elapsed > 10) LogWarning(k_gui_platform_log_module, "GUI update took {}ms", elapsed);
+        if (elapsed > 10) LogWarning(ModuleName::Gui, "GUI update took {}ms", elapsed);
     };
 
     auto const window_size = WindowSize(platform);
@@ -658,7 +657,7 @@ static void UpdateAndRender(GuiPlatform& platform) {
     do {
         // Mostly we'd only expect 1 or 2 updates but we set a hard limit of 4 as a fallback.
         if (num_repeats++ >= 4) {
-            LogWarning(k_gui_platform_log_module, "GUI update loop repeated too many times");
+            LogWarning(ModuleName::Gui, "GUI update loop repeated too many times");
             break;
         }
 
@@ -681,7 +680,7 @@ static void UpdateAndRender(GuiPlatform& platform) {
         auto o = platform.graphics_ctx->Render(platform.last_result.draw_data,
                                                window_size,
                                                platform.frame_state.draw_scale_factor);
-        if (o.HasError()) LogError(k_gui_platform_log_module, "GUI render failed: {}", o.Error());
+        if (o.HasError()) LogError(ModuleName::Gui, "GUI render failed: {}", o.Error());
     }
 }
 
@@ -697,21 +696,21 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
             case PUGL_NOTHING: break;
 
             case PUGL_REALIZE: {
-                LogDebug(k_gui_platform_log_module, "realize: {}", fmt::DumpStruct(event->any));
+                LogDebug(ModuleName::Gui, "realize: {}", fmt::DumpStruct(event->any));
                 puglGrabFocus(platform.view);
                 CreateGraphicsContext(platform);
                 break;
             }
 
             case PUGL_UNREALIZE: {
-                LogDebug(k_gui_platform_log_module, "unrealize {}", fmt::DumpStruct(event->any));
+                LogDebug(ModuleName::Gui, "unrealize {}", fmt::DumpStruct(event->any));
                 DestroyGraphicsContext(platform);
                 break;
             }
 
             // resized or moved
             case PUGL_CONFIGURE: {
-                LogDebug(k_gui_platform_log_module, "configure {}", fmt::DumpStruct(event->configure));
+                LogDebug(ModuleName::Gui, "configure {}", fmt::DumpStruct(event->configure));
                 if (platform.graphics_ctx)
                     platform.graphics_ctx->Resize({event->configure.width, event->configure.height});
                 if (event->configure.width)

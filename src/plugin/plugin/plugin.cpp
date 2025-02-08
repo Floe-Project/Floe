@@ -32,25 +32,53 @@
 
 [[clang::no_destroy]] Optional<SharedEngineSystems> g_shared_engine_systems {};
 
+// Logging is non-realtime only. We don't log in the audio thread.
 enum class ClapLoggingLevel {
-    Majority, // log only the majority of CLAP calls
-    AllNonRealtime, // log all CLAP calls except audio-thread ones
+    NonRecurring,
+    All,
 };
-constexpr ClapLoggingLevel k_clap_logging_level =
-    PRODUCTION_BUILD ? ClapLoggingLevel::Majority : ClapLoggingLevel::AllNonRealtime;
+constexpr ClapLoggingLevel k_clap_logging_level = ClapLoggingLevel::NonRecurring;
+
+// To make our CLAP interface bulletproof, we store a known index (based on a magic number) in the plugin_data
+// and only access our corresponding object if it's valid. This is safer than the alternative of directly
+// storing a pointer and dereferencing it without knowing for sure it's ours.
+
+constexpr uintptr k_clap_plugin_data_magic = 0xF10E;
+
+inline Optional<FloeInstanceIndex> IndexFromPluginData(uintptr plugin_data) {
+    auto v = plugin_data;
+    if (v < k_clap_plugin_data_magic) [[unlikely]]
+        return k_nullopt;
+    auto index = v - k_clap_plugin_data_magic;
+    if (index >= k_max_num_floe_instances) [[unlikely]]
+        return k_nullopt;
+    return (FloeInstanceIndex)index;
+}
+
+inline void* PluginDataFromIndex(FloeInstanceIndex index) {
+    return (void*)(k_clap_plugin_data_magic + index);
+}
 
 struct FloePluginInstance : PluginInstanceMessages {
-    FloePluginInstance(clap_host const* clap_host, FloeInstanceIndex id);
-    ~FloePluginInstance() { Trace(k_main_log_module); }
+    FloePluginInstance(clap_host const& host,
+                       FloeInstanceIndex index,
+                       clap_plugin const& plugin_interface_template)
+        : host(host)
+        , index(index) {
+        Trace(ModuleName::Main);
+        clap_plugin = plugin_interface_template;
+        clap_plugin.plugin_data = PluginDataFromIndex(index);
+    }
+    ~FloePluginInstance() { Trace(ModuleName::Gui); }
 
     clap_host const& host;
+    FloeInstanceIndex const index;
+
     clap_plugin clap_plugin;
 
     bool initialised {false};
     bool active {false};
     bool processing {false};
-
-    FloeInstanceIndex const index;
 
     TracyMessageConfig trace_config {
         .category = "clap",
@@ -75,37 +103,69 @@ struct FloePluginInstance : PluginInstanceMessages {
 
 inline Allocator& FloeInstanceAllocator() { return PageAllocator::Instance(); }
 
-static u16 g_num_initialised_plugins = 0;
-static u16 g_num_floe_instances = 0;
+static u16 g_floe_instances_initialised {};
+static Array<FloePluginInstance*, k_max_num_floe_instances> g_floe_instances {};
 
 // Macro because it declares a constructor/destructor object for timing start/end
 #define TRACE_CLAP_CALL(name) ZoneScopedMessage(floe.trace_config, name)
 
-inline void LogClapApi(FloePluginInstance& floe, ClapLoggingLevel level, String name) {
-    if (k_clap_logging_level >= level) LogInfo(k_clap_log_module, "{} #{}: {}", name, floe.index);
+inline void LogClapFunction(FloePluginInstance& floe, ClapLoggingLevel level, String name) {
+    if (k_clap_logging_level >= level) LogInfo(ModuleName::Clap, "{} #{}", name, floe.index);
 }
 
 inline void
 LogClapFunction(FloePluginInstance& floe, ClapLoggingLevel level, String name, String format, auto... args) {
     if (k_clap_logging_level >= level) {
         ArenaAllocatorWithInlineStorage<400> arena {PageAllocator::Instance()};
-        LogInfo(k_clap_log_module, "{} #{}: {}", name, floe.index, fmt::Format(arena, format, args...));
+        LogInfo(ModuleName::Clap, "{} #{}: {}", name, floe.index, fmt::Format(arena, format, args...));
     }
 }
 
 inline bool Check(FloePluginInstance& floe, bool condition, String function_name, String message) {
-    if (!condition) LogWarning(k_clap_log_module, "{} #{}: {}", function_name, floe.index, message);
+    if (!condition) [[unlikely]]
+        LogWarning(ModuleName::Clap, "{} #{}: {}", function_name, floe.index, message);
+    return condition;
+}
+
+inline bool CheckOnce(FloePluginInstance& floe,
+                      u8& warned_before_bitset,
+                      u8 warn_bit,
+                      bool condition,
+                      String function_name,
+                      String message) {
+    if (!condition) {
+        if (!(warned_before_bitset & warn_bit)) {
+            LogWarning(ModuleName::Clap, "{} #{}: {}", function_name, floe.index, message);
+            warned_before_bitset |= warn_bit;
+        }
+    }
     return condition;
 }
 
 inline bool Check(bool condition, String function_name, String message) {
-    if (!condition) LogWarning(k_clap_log_module, "{}: {}", function_name, message);
+    if (!condition) [[unlikely]]
+        LogWarning(ModuleName::Clap, "{}: {}", function_name, message);
     return condition;
 }
 
-static FloePluginInstance& GetFloe(clap_plugin const* plugin) {
-    ASSERT(plugin);
-    return *(FloePluginInstance*)plugin->plugin_data;
+inline bool
+CheckOnce(u8& warned_before_bitset, u8 warn_bit, bool condition, String function_name, String message) {
+    if (!condition) {
+        if (!(warned_before_bitset & warn_bit)) {
+            LogWarning(ModuleName::Clap, "{}: {}", function_name, message);
+            warned_before_bitset |= warn_bit;
+        }
+    }
+    return condition;
+}
+
+static FloePluginInstance* ExtractFloe(clap_plugin const* plugin) {
+    if (!plugin) [[unlikely]]
+        return nullptr;
+    auto index = IndexFromPluginData((uintptr)plugin->plugin_data);
+    if (!index) [[unlikely]]
+        return nullptr;
+    return g_floe_instances[*index];
 }
 
 bool ClapStateSave(clap_plugin const* plugin, clap_ostream const* stream) {
@@ -113,10 +173,13 @@ bool ClapStateSave(clap_plugin const* plugin, clap_ostream const* stream) {
 
     try {
         constexpr String k_func = "state.save";
-        if (!Check(plugin, k_func, "plugin is null")) return false;
 
-        auto& floe = GetFloe(plugin);
-        LogClapApi(floe, ClapLoggingLevel::Majority, k_func);
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!Check(f, k_func, "plugin ptr is invalid")) return false;
+            f;
+        });
+        LogClapFunction(floe, ClapLoggingLevel::NonRecurring, k_func);
         TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, stream, k_func, "stream is null")) return false;
@@ -134,10 +197,13 @@ static bool ClapStateLoad(clap_plugin const* plugin, clap_istream const* stream)
 
     try {
         constexpr String k_func = "state.load";
-        if (!Check(plugin, k_func, "plugin is null")) return false;
 
-        auto& floe = GetFloe(plugin);
-        LogClapApi(floe, ClapLoggingLevel::Majority, k_func);
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!Check(f, k_func, "plugin ptr is invalid")) return false;
+            f;
+        });
+        LogClapFunction(floe, ClapLoggingLevel::NonRecurring, k_func);
         TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, stream, k_func, "stream is null")) return false;
@@ -168,16 +234,15 @@ static bool ClapGuiIsApiSupported(clap_plugin_t const* plugin, char const* api, 
 
     try {
         constexpr String k_func = "gui.is_api_supported";
-        if (!Check(plugin, k_func, "plugin is null")) return false;
-        if (!Check(api, k_func, "api is null")) return false;
 
-        auto& floe = GetFloe(plugin);
-        LogClapFunction(floe,
-                        ClapLoggingLevel::AllNonRealtime,
-                        k_func,
-                        "api: {}, is_floating: {}",
-                        api,
-                        is_floating);
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!Check(f, k_func, "plugin ptr is invalid")) return false;
+            f;
+        });
+
+        if (!Check(api, k_func, "api is null")) return false;
+        LogClapFunction(floe, ClapLoggingLevel::All, k_func, "api: {}, is_floating: {}", api, is_floating);
 
         if (is_floating) return false;
         return NullTermStringsEqual(k_supported_gui_api, api);
@@ -191,10 +256,13 @@ static bool ClapGuiGetPrefferedApi(clap_plugin_t const* plugin, char const** api
 
     try {
         constexpr String k_func = "gui.get_preferred_api";
-        if (!Check(plugin, k_func, "plugin is null")) return false;
 
-        auto& floe = GetFloe(plugin);
-        LogClapApi(floe, ClapLoggingLevel::AllNonRealtime, k_func);
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!Check(f, k_func, "plugin ptr is invalid")) return false;
+            f;
+        });
+        LogClapFunction(floe, ClapLoggingLevel::All, k_func);
 
         if (is_floating) *is_floating = false;
         if (api) *api = k_supported_gui_api;
@@ -209,23 +277,28 @@ static bool ClapGuiCreate(clap_plugin_t const* plugin, char const* api, bool is_
 
     try {
         constexpr String k_func = "gui.create";
-        if (!Check(plugin, k_func, "plugin is null")) return false;
         if (!Check(api, k_func, "api is null")) return false;
 
-        auto& floe = GetFloe(plugin);
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!Check(f, k_func, "plugin ptr is invalid")) return false;
+            f;
+        });
         LogClapFunction(floe,
-                        ClapLoggingLevel::Majority,
+                        ClapLoggingLevel::NonRecurring,
                         k_func,
                         "api: {}, is_floating: {}",
                         api,
                         is_floating);
         TRACE_CLAP_CALL(k_func);
 
+        if (!Check(floe,
+                   NullTermStringsEqual(k_supported_gui_api, api) && !is_floating,
+                   k_func,
+                   "unsupported api"))
+            return false;
         if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return false;
         if (!Check(floe, floe.initialised, k_func, "not initialised")) return false;
-        if (!Check(floe, NullTermStringsEqual(k_supported_gui_api, api), k_func, "unsupported api"))
-            return false;
-        if (!Check(floe, !is_floating, k_func, "floating windows are not supported")) return false;
         if (!Check(floe, !floe.gui_platform, k_func, "already created gui")) return false;
 
         floe.gui_platform.Emplace(floe.host, g_shared_engine_systems->settings);
@@ -240,10 +313,13 @@ static void ClapGuiDestroy(clap_plugin const* plugin) {
 
     try {
         constexpr String k_func = "gui.destroy";
-        if (!Check(plugin, k_func, "plugin is null")) return;
 
-        auto& floe = GetFloe(plugin);
-        LogClapApi(floe, ClapLoggingLevel::Majority, k_func);
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!Check(f, k_func, "plugin ptr is invalid")) return;
+            f;
+        });
+        LogClapFunction(floe, ClapLoggingLevel::NonRecurring, k_func);
         TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return;
@@ -261,8 +337,12 @@ static bool ClapGuiSetScale(clap_plugin_t const* plugin, f64 scale) {
 
     try {
         constexpr String k_func = "gui.set_scale";
-        if (!Check(plugin, k_func, "plugin is null")) return false;
-        LogClapFunction(GetFloe(plugin), ClapLoggingLevel::AllNonRealtime, k_func, "scale: {}", scale);
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!Check(f, k_func, "plugin ptr is invalid")) return false;
+            f;
+        });
+        LogClapFunction(floe, ClapLoggingLevel::NonRecurring, k_func, "scale: {}", scale);
     } catch (PanicException) {
     }
 
@@ -274,10 +354,13 @@ static bool ClapGuiGetSize(clap_plugin_t const* plugin, u32* width, u32* height)
 
     try {
         constexpr String k_func = "gui.get_size";
-        if (!Check(plugin, k_func, "plugin is null")) return false;
 
-        auto& floe = GetFloe(plugin);
-        LogClapApi(floe, ClapLoggingLevel::Majority, k_func);
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!Check(f, k_func, "plugin ptr is invalid")) return false;
+            f;
+        });
+        LogClapFunction(floe, ClapLoggingLevel::All, k_func);
         TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, width || height, k_func, "width and height both null")) return false;
@@ -298,8 +381,12 @@ static bool ClapGuiCanResize(clap_plugin_t const* plugin) {
 
     try {
         constexpr String k_func = "gui.can_resize";
-        if (!Check(plugin, k_func, "plugin is null")) return false;
-        LogClapApi(GetFloe(plugin), ClapLoggingLevel::AllNonRealtime, k_func);
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!Check(f, k_func, "plugin ptr is invalid")) return false;
+            f;
+        });
+        LogClapFunction(floe, ClapLoggingLevel::All, k_func);
 
         // Should be main-thread but we don't care if it's not.
 
@@ -315,10 +402,13 @@ static bool ClapGuiGetResizeHints(clap_plugin_t const* plugin, clap_gui_resize_h
 
     try {
         constexpr String k_func = "gui.get_resize_hints";
-        if (!Check(plugin, k_func, "plugin is null")) return false;
 
-        auto& floe = GetFloe(plugin);
-        LogClapApi(floe, ClapLoggingLevel::AllNonRealtime, k_func);
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!Check(f, k_func, "plugin ptr is invalid")) return false;
+            f;
+        });
+        LogClapFunction(floe, ClapLoggingLevel::All, k_func);
         TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, hints, k_func, "hints is null")) return false;
@@ -359,11 +449,14 @@ static bool ClapGuiAdjustSize(clap_plugin_t const* plugin, u32* clap_width, u32*
 
     try {
         constexpr String k_func = "gui.adjust_size";
-        if (!Check(plugin, k_func, "plugin is null")) return false;
         if (!Check(clap_width && clap_height, k_func, "width or height is null")) return false;
 
-        auto& floe = GetFloe(plugin);
-        LogClapFunction(floe, ClapLoggingLevel::Majority, k_func, "{} x {}", *clap_width, *clap_height);
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!Check(f, k_func, "plugin ptr is invalid")) return false;
+            f;
+        });
+        LogClapFunction(floe, ClapLoggingLevel::NonRecurring, k_func, "{} x {}", *clap_width, *clap_height);
         TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return false;
@@ -398,10 +491,13 @@ static bool ClapGuiSetSize(clap_plugin_t const* plugin, u32 clap_width, u32 clap
 
     try {
         constexpr String k_func = "gui.set_size";
-        if (!Check(plugin, k_func, "plugin is null")) return false;
 
-        auto& floe = GetFloe(plugin);
-        LogClapFunction(floe, ClapLoggingLevel::Majority, k_func, "{} x {}", clap_width, clap_height);
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!Check(f, k_func, "plugin ptr is invalid")) return false;
+            f;
+        });
+        LogClapFunction(floe, ClapLoggingLevel::NonRecurring, k_func, "{} x {}", clap_width, clap_height);
         TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return false;
@@ -431,10 +527,13 @@ static bool ClapGuiSetParent(clap_plugin_t const* plugin, clap_window_t const* w
 
     try {
         constexpr String k_func = "gui.set_parent";
-        if (!Check(plugin, k_func, "plugin is null")) return false;
 
-        auto& floe = GetFloe(plugin);
-        LogClapApi(floe, ClapLoggingLevel::Majority, k_func);
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!Check(f, k_func, "plugin ptr is invalid")) return false;
+            f;
+        });
+        LogClapFunction(floe, ClapLoggingLevel::NonRecurring, k_func);
         TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, window, k_func, "window is null")) return false;
@@ -458,9 +557,13 @@ static bool ClapGuiSetTransient(clap_plugin_t const* plugin, clap_window_t const
 
     try {
         constexpr String k_func = "gui.set_transient";
-        if (!Check(plugin, k_func, "plugin is null")) return false;
 
-        LogClapApi(GetFloe(plugin), ClapLoggingLevel::AllNonRealtime, k_func);
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!Check(f, k_func, "plugin ptr is invalid")) return false;
+            f;
+        });
+        LogClapFunction(floe, ClapLoggingLevel::All, k_func);
 
         return false; // we don't support floating windows
     } catch (PanicException) {
@@ -474,9 +577,13 @@ static void ClapGuiSuggestTitle(clap_plugin_t const* plugin, char const*) {
 
     try {
         constexpr String k_func = "gui.set_transient";
-        if (!Check(plugin, k_func, "plugin is null")) return;
 
-        LogClapApi(GetFloe(plugin), ClapLoggingLevel::AllNonRealtime, k_func);
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!Check(f, k_func, "plugin ptr is invalid")) return;
+            f;
+        });
+        LogClapFunction(floe, ClapLoggingLevel::All, k_func);
 
         // we don't support floating windows
 
@@ -489,10 +596,13 @@ static bool ClapGuiShow(clap_plugin_t const* plugin) {
 
     try {
         constexpr String k_func = "gui.show";
-        if (!Check(plugin, k_func, "plugin is null")) return false;
 
-        auto& floe = GetFloe(plugin);
-        LogClapApi(floe, ClapLoggingLevel::Majority, k_func);
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!Check(f, k_func, "plugin ptr is invalid")) return false;
+            f;
+        });
+        LogClapFunction(floe, ClapLoggingLevel::NonRecurring, k_func);
         TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return false;
@@ -503,7 +613,7 @@ static bool ClapGuiShow(clap_plugin_t const* plugin) {
             static bool shown_graphics_info = false;
             if (!shown_graphics_info) {
                 shown_graphics_info = true;
-                LogInfo(k_main_log_module,
+                LogInfo(ModuleName::Gui,
                         "\n{}",
                         floe.gui_platform->graphics_ctx->graphics_device_info.Items());
             }
@@ -519,10 +629,13 @@ static bool ClapGuiHide(clap_plugin_t const* plugin) {
 
     try {
         constexpr String k_func = "gui.hide";
-        if (!Check(plugin, k_func, "plugin is null")) return false;
 
-        auto& floe = GetFloe(plugin);
-        LogClapApi(floe, ClapLoggingLevel::Majority, k_func);
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!Check(f, k_func, "plugin ptr is invalid")) return false;
+            f;
+        });
+        LogClapFunction(floe, ClapLoggingLevel::NonRecurring, k_func);
         TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return false;
@@ -581,10 +694,13 @@ static bool ClapParamsGetInfo(clap_plugin_t const* plugin, u32 param_index, clap
 
     try {
         constexpr String k_func = "params.get_info";
-        if (!Check(plugin, k_func, "plugin is null")) return false;
 
-        auto& floe = GetFloe(plugin);
-        LogClapFunction(floe, ClapLoggingLevel::AllNonRealtime, k_func, "index: {}", param_index);
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!Check(f, k_func, "plugin ptr is invalid")) return false;
+            f;
+        });
+        LogClapFunction(floe, ClapLoggingLevel::All, k_func, "index: {}", param_index);
 
         if (!Check(floe, param_info, k_func, "param_info is null")) return false;
         if (!Check(floe, param_index < k_num_parameters, k_func, "param_index out of range")) return false;
@@ -616,10 +732,13 @@ static bool ClapParamsGetValue(clap_plugin_t const* plugin, clap_id param_id, f6
 
     try {
         constexpr String k_func = "params.get_value";
-        if (!Check(plugin, k_func, "plugin is null")) return false;
 
-        auto& floe = GetFloe(plugin);
-        LogClapFunction(floe, ClapLoggingLevel::AllNonRealtime, k_func, "id: {}", param_id);
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!Check(f, k_func, "plugin ptr is invalid")) return false;
+            f;
+        });
+        LogClapFunction(floe, ClapLoggingLevel::All, k_func, "id: {}", param_id);
 
         auto const opt_index = ParamIdToIndex(param_id);
         if (!opt_index) return false;
@@ -654,10 +773,13 @@ static bool ClapParamsValueToText(clap_plugin_t const* plugin,
 
     try {
         constexpr String k_func = "params.value_to_text";
-        if (!Check(plugin, k_func, "plugin is null")) return false;
 
-        auto& floe = GetFloe(plugin);
-        LogClapFunction(floe, ClapLoggingLevel::AllNonRealtime, k_func, "id: {}, value: {}", param_id, value);
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!Check(f, k_func, "plugin ptr is invalid")) return false;
+            f;
+        });
+        LogClapFunction(floe, ClapLoggingLevel::All, k_func, "id: {}, value: {}", param_id, value);
 
         if (out_buffer_capacity == 0) return false;
         auto const opt_index = ParamIdToIndex(param_id);
@@ -683,10 +805,13 @@ static bool ClapParamsTextToValue(clap_plugin_t const* plugin,
 
     try {
         constexpr String k_func = "params.text_to_value";
-        if (!Check(plugin, k_func, "plugin is null")) return false;
 
-        auto& floe = GetFloe(plugin);
-        LogClapFunction(floe, ClapLoggingLevel::AllNonRealtime, k_func, "id: {}", param_id);
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!Check(f, k_func, "plugin ptr is invalid")) return false;
+            f;
+        });
+        LogClapFunction(floe, ClapLoggingLevel::All, k_func, "id: {}", param_id);
         TRACE_CLAP_CALL(k_func);
 
         auto const opt_index = ParamIdToIndex(param_id);
@@ -716,9 +841,12 @@ ClapParamsFlush(clap_plugin_t const* plugin, clap_input_events_t const* in, clap
         constexpr String k_func = "params.flush";
         if (!plugin) return;
 
-        auto& floe = GetFloe(plugin);
-        if (!floe.active)
-            LogClapFunction(floe, ClapLoggingLevel::AllNonRealtime, k_func, "num in: {}", in->size(in));
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!Check(f, k_func, "plugin ptr is invalid")) return;
+            f;
+        });
+        if (!floe.active) LogClapFunction(floe, ClapLoggingLevel::All, k_func, "num in: {}", in->size(in));
         TRACE_CLAP_CALL(k_func);
 
         if (!in) return;
@@ -755,8 +883,12 @@ static u32 ClapAudioPortsCount(clap_plugin_t const* plugin, [[maybe_unused]] boo
 
     try {
         constexpr String k_func = "audio_ports.count";
-        if (!Check(plugin, k_func, "plugin is null")) return 0;
-        LogClapFunction(GetFloe(plugin), ClapLoggingLevel::AllNonRealtime, k_func, "is_input: {}", is_input);
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!Check(f, k_func, "plugin ptr is invalid")) return 0;
+            f;
+        });
+        LogClapFunction(floe, ClapLoggingLevel::All, k_func, "is_input: {}", is_input);
 
         return 1;
     } catch (PanicException) {
@@ -772,10 +904,13 @@ ClapAudioPortsGet(clap_plugin_t const* plugin, u32 index, bool is_input, clap_au
 
     try {
         constexpr String k_func = "audio_ports.get";
-        if (!Check(plugin, k_func, "plugin is null")) return false;
-        auto& floe = GetFloe(plugin);
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!Check(f, k_func, "plugin ptr is invalid")) return false;
+            f;
+        });
         LogClapFunction(floe,
-                        ClapLoggingLevel::AllNonRealtime,
+                        ClapLoggingLevel::All,
                         "audio_ports.get",
                         "index: {}, is_input: {}",
                         index,
@@ -817,8 +952,12 @@ static u32 ClapNotePortsCount(clap_plugin_t const* plugin, bool is_input) {
 
     try {
         constexpr String k_func = "note_ports.count";
-        if (!Check(plugin, k_func, "plugin is null")) return 0;
-        LogClapFunction(GetFloe(plugin), ClapLoggingLevel::AllNonRealtime, k_func, "is_input: {}", is_input);
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!Check(f, k_func, "plugin ptr is invalid")) return false;
+            f;
+        });
+        LogClapFunction(floe, ClapLoggingLevel::All, k_func, "is_input: {}", is_input);
 
         return is_input ? 1 : 0;
     } catch (PanicException) {
@@ -834,9 +973,12 @@ ClapNotePortsGet(clap_plugin_t const* plugin, u32 index, bool is_input, clap_not
 
     try {
         constexpr String k_func = "note_ports.get";
-        if (!Check(plugin, k_func, "plugin is null")) return false;
-        auto& floe = GetFloe(plugin);
-        LogClapApi(floe, ClapLoggingLevel::AllNonRealtime, k_func);
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!Check(f, k_func, "plugin ptr is invalid")) return false;
+            f;
+        });
+        LogClapFunction(floe, ClapLoggingLevel::All, k_func);
 
         if (!Check(floe, index == 0, k_func, "index out of range")) return false;
         if (!Check(floe, info, k_func, "info is null")) return false;
@@ -876,77 +1018,72 @@ clap_plugin_thread_pool const floe_thread_pool {
     .exec = ClapThreadPoolExec,
 };
 
-// NOLINTNEXTLINE(cppcoreguidelines-interfaces-global-init): clang-tidy thinks g_log is initialised
+static void ClapTimerSupportOnTimer(clap_plugin_t const* plugin, clap_id timer_id) {
+    if (PanicOccurred()) return;
+
+    try {
+        constexpr String k_func = "timer_support.on_timer";
+
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!Check(f, k_func, "plugin ptr is invalid")) return;
+            f;
+        });
+        LogClapFunction(floe, ClapLoggingLevel::All, k_func);
+        TRACE_CLAP_CALL(k_func);
+
+        if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return;
+        if (!Check(floe, floe.initialised, k_func, "not initialised")) return;
+
+        // We don't care about the timer_id, we just want to poll.
+        PollForSettingsFileChanges(g_shared_engine_systems->settings);
+
+        if (floe.gui_platform) OnClapTimer(*floe.gui_platform, timer_id);
+        if (floe.engine) EngineCallbacks().on_timer(*floe.engine, timer_id);
+    } catch (PanicException) {
+    }
+}
+
 clap_plugin_timer_support const floe_timer {
-    .on_timer =
-        [](clap_plugin_t const* plugin, clap_id timer_id) {
-            if (PanicOccurred()) return;
-
-            try {
-                ASSERT(plugin);
-                auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-
-                if (!IsMainThread(floe.host)) {
-                    LogWarning(k_clap_log_module, "host misbehaving: on_timer() not on main thread");
-                    ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-                    return;
-                }
-
-                if (!floe.engine) {
-                    LogWarning(k_clap_log_module, "host misbehaving: on_timer() called before init()");
-                    ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-                    return;
-                }
-
-                ZoneScopedN("clap_plugin_timer_support on_timer");
-
-                // We don't care about the timer_id, we just want to poll.
-                PollForSettingsFileChanges(g_shared_engine_systems->settings);
-
-                if (floe.gui_platform) OnClapTimer(*floe.gui_platform, timer_id);
-                if (floe.engine) EngineCallbacks().on_timer(*floe.engine, timer_id);
-            } catch (PanicException) {
-            }
-        },
+    .on_timer = ClapTimerSupportOnTimer,
 };
 
-// NOLINTNEXTLINE(cppcoreguidelines-interfaces-global-init): clang-tidy thinks g_log is initialised
+static void ClapFdSupportOnFd(clap_plugin_t const* plugin, int fd, clap_posix_fd_flags_t) {
+    if (PanicOccurred()) return;
+
+    try {
+        constexpr String k_func = "posix_fd_support.on_fd";
+
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!Check(f, k_func, "plugin ptr is invalid")) return;
+            f;
+        });
+        LogClapFunction(floe, ClapLoggingLevel::All, k_func);
+        TRACE_CLAP_CALL(k_func);
+
+        if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return;
+        if (!Check(floe, floe.initialised, k_func, "not initialised")) return;
+
+        if (floe.gui_platform) OnPosixFd(*floe.gui_platform, fd);
+    } catch (PanicException) {
+    }
+}
+
 clap_plugin_posix_fd_support const floe_posix_fd {
-    .on_fd =
-        [](clap_plugin_t const* plugin, int fd, clap_posix_fd_flags_t) {
-            if (PanicOccurred()) return;
-
-            try {
-                ASSERT(plugin);
-                auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-
-                if (!IsMainThread(floe.host)) {
-                    LogWarning(k_clap_log_module, "host misbehaving: on_fd() not on main thread");
-                    ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-                    return;
-                }
-
-                if (!floe.engine) {
-                    LogWarning(k_clap_log_module, "host misbehaving: on_fd() called before init()");
-                    ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-                    return;
-                }
-
-                ZoneScopedN("clap_plugin_posix_fd_support on_fd");
-                if (floe.gui_platform) OnPosixFd(*floe.gui_platform, fd);
-            } catch (PanicException) {
-            }
-        },
+    .on_fd = ClapFdSupportOnFd,
 };
 
-// NOLINTNEXTLINE(cppcoreguidelines-interfaces-global-init): clang-tidy thinks g_panicking is initialised
-FloeClapExtensionPlugin const floe_custom_ext {
+FloeClapTestingExtension const floe_custom_ext {
     .state_change_is_pending = [](clap_plugin_t const* plugin) -> bool {
         if (PanicOccurred()) return false;
 
         try {
-            ASSERT(plugin);
-            auto& floe = *(FloePluginInstance*)plugin->plugin_data;
+            auto& floe = *({
+                auto f = ExtractFloe(plugin);
+                if (!Check(f, "state_change_is_pending", "plugin ptr is invalid")) return false;
+                f;
+            });
             return floe.engine->pending_state_change.HasValue();
         } catch (PanicException) {
             return false;
@@ -954,313 +1091,324 @@ FloeClapExtensionPlugin const floe_custom_ext {
     },
 };
 
-// NOLINTNEXTLINE(cppcoreguidelines-interfaces-global-init): clang-tidy thinks g_log is initialised
-clap_plugin const floe_plugin {
-    .desc = &k_plugin_info,
-    .plugin_data = nullptr,
+static bool ClapInit(const struct clap_plugin* plugin) {
+    if (PanicOccurred()) return false;
 
-    .init = [](clap_plugin const* plugin) -> bool {
-        if (PanicOccurred()) return false;
+    try {
+        constexpr String k_func = "init";
 
-        try {
-            LogDebug(k_clap_log_module, "init plugin");
-            ASSERT(plugin);
-
-            auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-
-            if (floe.initialised) {
-                LogWarning(k_clap_log_module, "host misbehaving: init() called twice");
-                ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-                return false;
-            }
-
-            if (auto const thread_check =
-                    (clap_host_thread_check const*)floe.host.get_extension(&floe.host, CLAP_EXT_THREAD_CHECK);
-                thread_check && !thread_check->is_main_thread(&floe.host)) {
-                LogWarning(k_clap_log_module, "host misbehaving: init() not on main thread");
-                ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-                return false;
-            }
-
-            ASSERT(g_num_initialised_plugins !=
-                   LargestRepresentableValue<decltype(g_num_initialised_plugins)>());
-
-            ZoneScopedMessage(floe.trace_config, "plugin init");
-
-            if (g_num_initialised_plugins++ == 0) {
-                SetThreadName("main");
-
-                DynamicArrayBounded<sentry::Tag, 4> tags {};
-                {
-                    // the clap spec says these should be valid
-                    ASSERT(floe.host.name && floe.host.name[0]);
-                    ASSERT(floe.host.version && floe.host.version[0]);
-
-                    auto const host_name = FromNullTerminated(floe.host.name);
-                    dyn::Append(tags, {"host_name"_s, host_name});
-                    dyn::Append(tags, {"host_version"_s, FromNullTerminated(floe.host.version)});
-                    if (floe.host.vendor && floe.host.vendor[0])
-                        dyn::Append(tags, {"host_vendor"_s, FromNullTerminated(floe.host.vendor)});
-                }
-
-                g_shared_engine_systems.Emplace(tags);
-
-                LogInfo(k_main_log_module,
-                        "host: {} {} {}",
-                        floe.host.vendor,
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!Check(f, k_func, "plugin ptr is invalid")) return false;
+            f;
+        });
+        if (!Check(floe, floe.host.name && floe.host.name[0], k_func, "host name is null")) return false;
+        if (!Check(floe, floe.host.version && floe.host.version[0], k_func, "host version is null"))
+            return false;
+        LogClapFunction(floe,
+                        ClapLoggingLevel::NonRecurring,
+                        k_func,
+                        "{} {}",
                         floe.host.name,
                         floe.host.version);
+        TRACE_CLAP_CALL(k_func);
 
-                ReportError(sentry::Error::Level::Info, "Floe plugin loaded"_s);
+        if (floe.initialised) return true;
+
+        if (auto const thread_check =
+                (clap_host_thread_check const*)floe.host.get_extension(&floe.host, CLAP_EXT_THREAD_CHECK);
+            thread_check)
+            if (!Check(floe, thread_check->is_main_thread(&floe.host), k_func, "not main thread"))
+                return false;
+
+        if (g_floe_instances_initialised++ == 0) {
+            SetThreadName("main");
+
+            DynamicArrayBounded<sentry::Tag, 4> tags {};
+            {
+                dyn::Append(tags, {"host_name"_s, FromNullTerminated(floe.host.name)});
+                dyn::Append(tags, {"host_version"_s, FromNullTerminated(floe.host.version)});
+                if (floe.host.vendor && floe.host.vendor[0])
+                    dyn::Append(tags, {"host_vendor"_s, FromNullTerminated(floe.host.vendor)});
             }
 
-            LogDebug(k_clap_log_module, "#{} init", floe.index);
+            g_shared_engine_systems.Emplace(tags);
 
-            floe.engine.Emplace(floe.host, *g_shared_engine_systems, floe);
+            LogInfo(ModuleName::Clap, "host: {} {} {}", floe.host.vendor, floe.host.name, floe.host.version);
 
-            // IMPORTANT: engine is initialised first
-            g_shared_engine_systems->RegisterFloeInstance(&floe.clap_plugin, floe.index);
-
-            floe.initialised = true;
-            return true;
-        } catch (PanicException) {
-            return false;
+            // TODO: remove this before release
+            if constexpr (!PRODUCTION_BUILD) ReportError(sentry::Error::Level::Info, "Floe plugin loaded"_s);
         }
-    },
 
-    .destroy =
-        [](clap_plugin const* plugin) {
-            if (PanicOccurred()) return;
+        floe.engine.Emplace(floe.host, *g_shared_engine_systems, floe);
 
-            try {
-                ASSERT(plugin);
+        // IMPORTANT: engine is initialised first
+        g_shared_engine_systems->RegisterFloeInstance(floe.index);
 
-                auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-                ZoneScopedMessage(floe.trace_config, "plugin destroy (init:{})", floe.initialised);
+        floe.initialised = true;
+        return true;
+    } catch (PanicException) {
+        return false;
+    }
+}
 
-                if (floe.initialised) {
-                    if (!IsMainThread(floe.host)) {
-                        LogWarning(k_clap_log_module, "host misbehaving: destroy() not on main thread");
-                        ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-                        return;
-                    }
+static bool ClapActivate(const struct clap_plugin* plugin,
+                         double sample_rate,
+                         uint32_t min_frames_count,
+                         uint32_t max_frames_count) {
+    if (PanicOccurred()) return false;
 
-                    if (floe.gui_platform) {
-                        LogWarning(k_clap_log_module,
-                                   "host misbehaving: destroy() called while gui is active");
-                        ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-                        floe_gui.destroy(plugin);
-                    }
+    try {
+        constexpr String k_func = "activate";
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!Check(f, k_func, "plugin ptr is invalid")) return false;
+            f;
+        });
+        LogClapFunction(floe, ClapLoggingLevel::NonRecurring, k_func);
+        TRACE_CLAP_CALL(k_func);
 
-                    if (floe.active) {
-                        LogWarning(k_clap_log_module, "host misbehaving: destroy() called while active");
-                        ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-                        floe_plugin.deactivate(plugin);
-                    }
+        if (!Check(floe, floe.initialised, k_func, "not initialised")) return false;
+        if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return false;
 
-                    // IMPORTANT: engine is cleared after
-                    g_shared_engine_systems->UnregisterFloeInstance(floe.index);
+        if (floe.active) return true;
 
-                    floe.engine.Clear();
-
-                    ASSERT(g_num_initialised_plugins);
-                    if (--g_num_initialised_plugins == 0) g_shared_engine_systems.Clear();
-                }
-
-                LogDebug(k_clap_log_module, "#{} destroy", floe.index);
-
-                --g_num_floe_instances;
-                FloeInstanceAllocator().Delete(&floe);
-            } catch (PanicException) {
-            }
-        },
-
-    .activate =
-        [](clap_plugin const* plugin, f64 sample_rate, u32 min_frames_count, u32 max_frames_count) -> bool {
-        if (PanicOccurred()) return false;
-
-        try {
-            ASSERT(plugin);
-            auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-            ZoneScopedMessage(floe.trace_config, "plugin activate");
-
-            if (!IsMainThread(floe.host)) {
-                LogWarning(k_clap_log_module, "host misbehaving: activate() not on main thread");
-                ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-                return false;
-            }
-
-            if (floe.active) {
-                LogWarning(k_clap_log_module, "host misbehaving: activate() when already active");
-                ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-                return false;
-            }
-
-            auto& processor = floe.engine->processor;
-            if (!processor.processor_callbacks.activate(processor,
-                                                        {
-                                                            .sample_rate = sample_rate,
-                                                            .min_block_size = min_frames_count,
-                                                            .max_block_size = max_frames_count,
-                                                        }))
-                return false;
-            floe.active = true;
-            return true;
-        } catch (PanicException) {
+        auto& processor = floe.engine->processor;
+        if (!processor.processor_callbacks.activate(processor,
+                                                    {
+                                                        .sample_rate = sample_rate,
+                                                        .min_block_size = min_frames_count,
+                                                        .max_block_size = max_frames_count,
+                                                    }))
             return false;
+        floe.active = true;
+        return true;
+    } catch (PanicException) {
+        return false;
+    }
+}
+
+static void ClapDeactivate(const struct clap_plugin* plugin) {
+    if (PanicOccurred()) return;
+
+    try {
+        constexpr String k_func = "deactivate";
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!Check(f, k_func, "plugin ptr is invalid")) return;
+            f;
+        });
+        LogClapFunction(floe, ClapLoggingLevel::NonRecurring, k_func);
+        TRACE_CLAP_CALL(k_func);
+
+        if (!Check(floe, floe.initialised, k_func, "not initialised")) return;
+        if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return;
+
+        if (!floe.active) return;
+
+        auto& processor = floe.engine->processor;
+        processor.processor_callbacks.deactivate(processor);
+        floe.active = false;
+    } catch (PanicException) {
+    }
+}
+
+static void ClapDestroy(const struct clap_plugin* plugin) {
+    if (PanicOccurred()) return;
+
+    try {
+        constexpr String k_func = "destroy";
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!Check(f, k_func, "plugin ptr is invalid")) return;
+            f;
+        });
+        LogClapFunction(floe, ClapLoggingLevel::NonRecurring, k_func);
+        TRACE_CLAP_CALL(k_func);
+
+        if (floe.initialised) {
+            if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return;
+
+            // These shouldn't be necessary, but we can easily handle them so we do.
+            if (floe.active) ClapDeactivate(plugin);
+            if (floe.gui_platform) ClapGuiDestroy(plugin);
+
+            // IMPORTANT: engine is cleared after unregistration.
+            g_shared_engine_systems->UnregisterFloeInstance(floe.index);
+
+            floe.engine.Clear();
+
+            ASSERT(g_floe_instances_initialised != 0);
+            if (--g_floe_instances_initialised == 0) g_shared_engine_systems.Clear();
         }
-    },
 
-    .deactivate =
-        [](clap_plugin const* plugin) {
-            if (PanicOccurred()) return;
+        auto const index = floe.index;
+        FloeInstanceAllocator().Delete(&floe);
+        g_floe_instances[index] = nullptr;
+    } catch (PanicException) {
+    }
+}
 
-            try {
-                ASSERT(plugin);
-                auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-                ZoneScopedMessage(floe.trace_config, "plugin activate");
+static bool ClapStartProcessing(const struct clap_plugin* plugin) {
+    if (PanicOccurred()) return false;
 
-                if (!IsMainThread(floe.host)) {
-                    LogWarning(k_clap_log_module, "host misbehaving: deactivate() not on main thread");
-                    ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-                    return;
-                }
+    try {
+        static u8 warned_before_bits {};
 
-                if (!floe.active) {
-                    LogWarning(k_clap_log_module, "host misbehaving: deactivate() when not active");
-                    ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-                    return;
-                }
+        constexpr String k_func = "start_processing";
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!CheckOnce(warned_before_bits, 0, f, k_func, "plugin ptr is invalid")) return false;
+            f;
+        });
+        TRACE_CLAP_CALL(k_func);
 
-                auto& processor = floe.engine->processor;
-                processor.processor_callbacks.deactivate(processor);
-                floe.active = false;
-            } catch (PanicException) {
-            }
-        },
-
-    .start_processing = [](clap_plugin const* plugin) -> bool {
-        if (PanicOccurred()) return false;
-
-        try {
-            auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-            ZoneScopedMessage(floe.trace_config, "plugin start_processing");
-
-            if (IsAudioThread(floe.host) == IsAudioThreadResult::No) {
-                LogWarning(k_clap_log_module, "host misbehaving: start_processing() not on audio thread");
-                ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-                return false;
-            }
-
-            if (!floe.active) {
-                LogWarning(k_clap_log_module, "host misbehaving: start_processing() when not active");
-                ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-                return false;
-            }
-
-            if (floe.processing) {
-                LogWarning(k_clap_log_module, "host misbehaving: start_processing() when already processing");
-                ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-                return false;
-            }
-
-            auto& processor = floe.engine->processor;
-            processor.processor_callbacks.start_processing(processor);
-            floe.processing = true;
-            return true;
-        } catch (PanicException) {
+        if (!CheckOnce(floe,
+                       warned_before_bits,
+                       1,
+                       IsAudioThread(floe.host) != IsAudioThreadResult::No,
+                       k_func,
+                       "not audio thread"))
             return false;
-        }
-    },
 
-    .stop_processing =
-        [](clap_plugin const* plugin) {
-            if (PanicOccurred()) return;
+        if (!CheckOnce(floe, warned_before_bits, 2, floe.active, k_func, "not active")) return false;
 
-            try {
-                auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-                ZoneScopedMessage(floe.trace_config, "plugin stop_processing");
+        if (floe.processing) return true;
 
-                if (IsAudioThread(floe.host) == IsAudioThreadResult::No) {
-                    LogWarning(k_clap_log_module, "host misbehaving: stop_processing() not on audio thread");
-                    ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-                    return;
-                }
+        auto& processor = floe.engine->processor;
+        processor.processor_callbacks.start_processing(processor);
+        floe.processing = true;
+        return true;
+    } catch (PanicException) {
+        return false;
+    }
+}
 
-                if (!floe.active) {
-                    LogWarning(k_clap_log_module, "host misbehaving: stop_processing() when not active");
-                    ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-                    return;
-                }
+static void ClapStopProcessing(const struct clap_plugin* plugin) {
+    if (PanicOccurred()) return;
 
-                if (!floe.processing) {
-                    LogWarning(k_clap_log_module, "host misbehaving: stop_processing() when not processing");
-                    ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-                    return;
-                }
+    try {
+        static u8 warned_before_bits {};
 
-                auto& processor = floe.engine->processor;
-                processor.processor_callbacks.stop_processing(processor);
-                floe.processing = false;
-            } catch (PanicException) {
-            }
-        },
+        constexpr String k_func = "stop_processing";
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!CheckOnce(warned_before_bits, 0, f, k_func, "plugin ptr is invalid")) return;
+            f;
+        });
+        TRACE_CLAP_CALL(k_func);
 
-    .reset =
-        [](clap_plugin const* plugin) {
-            if (PanicOccurred()) return;
+        if (!CheckOnce(floe,
+                       warned_before_bits,
+                       1,
+                       IsAudioThread(floe.host) != IsAudioThreadResult::No,
+                       k_func,
+                       "not audio thread"))
+            return;
 
-            try {
-                auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-                ZoneScopedMessage(floe.trace_config, "plugin reset");
+        if (!CheckOnce(floe, warned_before_bits, 2, floe.active, k_func, "not active")) return;
 
-                if (IsAudioThread(floe.host) == IsAudioThreadResult::No) {
-                    LogWarning(k_clap_log_module, "host misbehaving: reset() not on audio thread");
-                    ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-                    return;
-                }
+        if (!floe.processing) return;
 
-                if (!floe.active) {
-                    LogWarning(k_clap_log_module, "host misbehaving: reset() when not active");
-                    ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-                    return;
-                }
+        auto& processor = floe.engine->processor;
+        processor.processor_callbacks.stop_processing(processor);
+        floe.processing = false;
+    } catch (PanicException) {
+    }
+}
 
-                auto& processor = floe.engine->processor;
-                processor.processor_callbacks.reset(processor);
-            } catch (PanicException) {
-            }
-        },
+static void ClapReset(const struct clap_plugin* plugin) {
+    if (PanicOccurred()) return;
 
-    .process = [](clap_plugin const* plugin, clap_process_t const* process) -> clap_process_status {
-        if (PanicOccurred()) return CLAP_PROCESS_ERROR;
+    try {
+        static u8 warned_before_bits {};
 
-        try {
-            auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-            ZoneScopedMessage(floe.trace_config, "plugin process");
-            ZoneKeyNum("instance", floe.index);
-            ZoneKeyNum("events", process->in_events->size(process->in_events));
-            ZoneKeyNum("num_frames", process->frames_count);
+        constexpr String k_func = "reset";
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!CheckOnce(warned_before_bits, 0, f, k_func, "plugin ptr is invalid")) return;
+            f;
+        });
+        TRACE_CLAP_CALL(k_func);
 
-            if (!floe.active || !floe.processing || !process ||
-                IsAudioThread(floe.host) == IsAudioThreadResult::No)
+        if (!CheckOnce(floe,
+                       warned_before_bits,
+                       1,
+                       IsAudioThread(floe.host) != IsAudioThreadResult::No,
+                       k_func,
+                       "not audio thread"))
+            return;
+
+        if (!CheckOnce(floe, warned_before_bits, 2, floe.active, k_func, "not active")) return;
+
+        auto& processor = floe.engine->processor;
+        processor.processor_callbacks.reset(processor);
+    } catch (PanicException) {
+    }
+}
+
+static clap_process_status ClapProcess(const struct clap_plugin* plugin, clap_process_t const* process) {
+    if (PanicOccurred()) return CLAP_PROCESS_ERROR;
+
+    try {
+        static u8 warned_before_bits {};
+
+        constexpr String k_func = "process";
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!CheckOnce(warned_before_bits, 0, f, k_func, "plugin ptr is invalid"))
                 return CLAP_PROCESS_ERROR;
+            f;
+        });
+        TRACE_CLAP_CALL(k_func);
 
-            ASSERT(CheckInputEvents(process->in_events));
+        ZoneKeyNum("instance", floe.index);
+        ZoneKeyNum("events", process->in_events->size(process->in_events));
+        ZoneKeyNum("num_frames", process->frames_count);
 
-            ScopedNoDenormals const no_denormals;
-            auto& processor = floe.engine->processor;
-            return processor.processor_callbacks.process(floe.engine->processor, *process);
-        } catch (PanicException) {
+        if (!CheckOnce(floe,
+                       warned_before_bits,
+                       1,
+                       IsAudioThread(floe.host) != IsAudioThreadResult::No,
+                       k_func,
+                       "not audio thread"))
             return CLAP_PROCESS_ERROR;
-        }
-    },
+        if (!CheckOnce(floe, warned_before_bits, 2, floe.active, k_func, "not active"))
+            return CLAP_PROCESS_ERROR;
+        if (!CheckOnce(floe, warned_before_bits, 3, floe.processing, k_func, "not processing"))
+            return CLAP_PROCESS_ERROR;
+        if (!CheckOnce(floe, warned_before_bits, 4, process, k_func, "process is null"))
+            return CLAP_PROCESS_ERROR;
+        if (!CheckOnce(floe,
+                       warned_before_bits,
+                       5,
+                       CheckInputEvents(process->in_events),
+                       k_func,
+                       "invalid events"))
+            return CLAP_PROCESS_ERROR;
 
-    .get_extension = [](clap_plugin const* plugin, char const* id) -> void const* {
-        if (PanicOccurred()) return nullptr;
+        ScopedNoDenormals const no_denormals;
+        auto& processor = floe.engine->processor;
+        return processor.processor_callbacks.process(floe.engine->processor, *process);
+    } catch (PanicException) {
+        return CLAP_PROCESS_ERROR;
+    }
+}
 
-        auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-        ZoneScopedMessage(floe.trace_config, "plugin get_extension");
+static void const* ClapGetExtension(const struct clap_plugin* plugin, char const* id) {
+    if (PanicOccurred()) return nullptr;
+
+    try {
+        constexpr String k_func = "get_extension";
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!Check(f, k_func, "plugin ptr is invalid")) return nullptr;
+            f;
+        });
+        LogClapFunction(floe, ClapLoggingLevel::All, k_func, "id: {}", id);
+        TRACE_CLAP_CALL(k_func);
+        if (!Check(id, k_func, "id is null")) return nullptr;
+
         if (NullTermStringsEqual(id, CLAP_EXT_STATE)) return &floe_plugin_state;
         if (NullTermStringsEqual(id, CLAP_EXT_GUI)) return &floe_gui;
         if (NullTermStringsEqual(id, CLAP_EXT_PARAMS)) return &floe_params;
@@ -1270,52 +1418,72 @@ clap_plugin const floe_plugin {
         if (NullTermStringsEqual(id, CLAP_EXT_TIMER_SUPPORT)) return &floe_timer;
         if (NullTermStringsEqual(id, CLAP_EXT_POSIX_FD_SUPPORT)) return &floe_posix_fd;
         if (NullTermStringsEqual(id, k_floe_clap_extension_id)) return &floe_custom_ext;
-        return nullptr;
-    },
+    } catch (PanicException) {
+    }
 
-    .on_main_thread =
-        [](clap_plugin const* plugin) {
-            if (PanicOccurred()) return;
-
-            try {
-                auto& floe = *(FloePluginInstance*)plugin->plugin_data;
-                ZoneScopedMessage(floe.trace_config, "plugin on_main_thread");
-
-                if (!IsMainThread(floe.host)) {
-                    LogWarning(k_clap_log_module, "host misbehaving: on_main_thread() not on main thread");
-                    ASSERT(g_final_binary_type != FinalBinaryType::Standalone);
-                    return;
-                }
-
-                if (floe.engine) {
-                    PollForSettingsFileChanges(g_shared_engine_systems->settings);
-
-                    auto& processor = floe.engine->processor;
-                    processor.processor_callbacks.on_main_thread(processor);
-                    EngineCallbacks().on_main_thread(*floe.engine);
-                }
-            } catch (PanicException) {
-            }
-        },
-};
-
-FloePluginInstance::FloePluginInstance(clap_host const* host, FloeInstanceIndex index)
-    : host(*host)
-    , index(index) {
-    Trace(k_main_log_module);
-    clap_plugin = floe_plugin;
-    clap_plugin.plugin_data = this;
+    return nullptr;
 }
 
+static void ClapOnMainThread(const struct clap_plugin* plugin) {
+    if (PanicOccurred()) return;
+
+    try {
+        constexpr String k_func = "on_main_thread";
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!Check(f, k_func, "plugin ptr is invalid")) return;
+            f;
+        });
+        LogClapFunction(floe, ClapLoggingLevel::All, k_func);
+        TRACE_CLAP_CALL(k_func);
+
+        if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return;
+
+        if (floe.engine) {
+            PollForSettingsFileChanges(g_shared_engine_systems->settings);
+
+            auto& processor = floe.engine->processor;
+            processor.processor_callbacks.on_main_thread(processor);
+            EngineCallbacks().on_main_thread(*floe.engine);
+        }
+    } catch (PanicException) {
+    }
+}
+
+clap_plugin const floe_plugin {
+    .desc = &k_plugin_info,
+    .plugin_data = nullptr,
+    .init = ClapInit,
+    .destroy = ClapDestroy,
+    .activate = ClapActivate,
+    .deactivate = ClapDeactivate,
+    .start_processing = ClapStartProcessing,
+    .stop_processing = ClapStopProcessing,
+    .reset = ClapReset,
+    .process = ClapProcess,
+    .get_extension = ClapGetExtension,
+    .on_main_thread = ClapOnMainThread,
+};
+
 clap_plugin const* CreateFloeInstance(clap_host const* host) {
-    // TODO: fix g_num_floe_instances; instances can be added and removed - we can't just count it
-    if (g_num_floe_instances == k_max_num_floe_instances) return nullptr;
-    auto result = FloeInstanceAllocator().New<FloePluginInstance>(host, g_num_floe_instances++);
+    if (!Check(host, "create_plugin", "host is null")) return nullptr;
+    Optional<FloeInstanceIndex> index {};
+    for (auto [i, instance] : Enumerate<FloeInstanceIndex>(g_floe_instances)) {
+        if (instance == nullptr) {
+            index = i;
+            break;
+        }
+    }
+    if (!index) return nullptr;
+    auto result = FloeInstanceAllocator().New<FloePluginInstance>(*host, *index, floe_plugin);
+    if (!result) return nullptr;
+    g_floe_instances[*index] = result;
     return &result->clap_plugin;
 }
 
-void RequestGuiResize(clap_plugin const& plugin) {
-    auto const& floe = *(FloePluginInstance*)plugin.plugin_data;
+void RequestGuiResize(FloeInstanceIndex index) {
+    if (PanicOccurred()) return;
+    auto const& floe = *g_floe_instances[index];
     ASSERT(IsMainThread(floe.host));
     if (!floe.gui_platform) return;
     auto const host_gui = (clap_host_gui const*)floe.host.get_extension(&floe.host, CLAP_EXT_GUI);
@@ -1328,10 +1496,11 @@ void RequestGuiResize(clap_plugin const& plugin) {
     }
 }
 
-void OnPollThread(clap_plugin const& plugin) {
+void OnPollThread(FloeInstanceIndex index) {
+    if (PanicOccurred()) return;
     // We're on the polling thread, but we can be sure that the engine is active because our
     // Register/Unregister calls are correctly before/after.
-    auto& floe = *(FloePluginInstance*)plugin.plugin_data;
+    auto& floe = *g_floe_instances[index];
     ASSERT(floe.engine);
     EngineCallbacks().on_poll_thread(*floe.engine);
 }

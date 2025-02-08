@@ -22,8 +22,6 @@
 
 namespace package {
 
-constexpr auto k_log_mod = "📦pkg"_log_module;
-
 constexpr String k_libraries_subdir = "Libraries";
 constexpr String k_presets_subdir = "Presets";
 constexpr auto k_component_subdirs = Array {k_libraries_subdir, k_presets_subdir};
@@ -265,7 +263,7 @@ PUBLIC ErrorCodeOr<void> WriterAddLibrary(mz_zip_archive& zip,
                                           ArenaAllocator& scratch_arena,
                                           String program_name) {
     if (lib.file_format_specifics.tag == sample_lib::FileFormat::Mdata) {
-        LogInfo(k_log_mod, "Adding mdata file for library '{}'", lib.path);
+        LogInfo(ModuleName::Package, "Adding mdata file for library '{}'", lib.path);
         auto const mdata = TRY(ReadEntireFile(lib.path, scratch_arena)).ToByteSpan();
         WriterAddFile(zip,
                       path::Join(scratch_arena,
@@ -403,7 +401,7 @@ static ErrorCodeOr<sample_lib::Library*> ReaderReadLibraryMdata(PackageReader& p
     auto const stat = TRY(detail::FileStat(package, file_index));
     auto const mdata = TRY(detail::ExtractFileToMem(package, stat, arena));
     auto reader = ::Reader::FromMemory(mdata);
-    LogDebug(k_log_mod, "Reading mdata file: {}", path_in_zip);
+    LogDebug(ModuleName::Package, "Reading mdata file: {}", path_in_zip);
     auto const lib_outcome = sample_lib::ReadMdata(reader, path_in_zip, arena, arena);
     if (lib_outcome.HasError()) return ErrorCode {PackageError::InvalidLibrary};
     return lib_outcome.ReleaseValue();
@@ -465,7 +463,7 @@ static PackageError CreatePackageError(Writer error_log, ErrorCode error, Args c
 
     auto _ = error_log.WriteChars(error_buffer);
     auto _ = error_log.WriteChar('\n');
-    LogInfo(k_log_mod, "Package error: {}. {}", error_buffer, error);
+    LogInfo(ModuleName::Package, "Package error: {}. {}", error_buffer, error);
 
     return package_error;
 }
@@ -552,7 +550,7 @@ IteratePackageComponents(PackageReader& package,
             if (relative_path->size == 0) continue;
             if (Contains(*relative_path, '/')) continue;
 
-            LogDebug(k_log_mod, "Package contains component: {}", path);
+            LogDebug(ModuleName::Package, "Package contains component: {}", path);
 
             return Optional<Component> {Component {
                 .path = path.Clone(arena),

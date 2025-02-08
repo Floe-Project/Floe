@@ -7,11 +7,12 @@
 
 enum class LogLevel { Debug, Info, Warning, Error };
 
-struct WriteFormattedLogOptions {
+struct WriteLogLineOptions {
     bool ansi_colors = false;
     bool no_info_prefix = false;
     bool timestamp = false;
     bool thread = false;
+    bool newline = true;
 };
 
 struct LogRingBuffer {
@@ -81,33 +82,43 @@ struct LogRingBuffer {
     u16 read {};
 };
 
-using MessageWriteFunction = FunctionRef<ErrorCodeOr<void>(Writer)>;
-
-ErrorCodeOr<void> WriteFormattedLog(Writer writer,
-                                    String module_name,
-                                    LogLevel level,
-                                    MessageWriteFunction write_message,
-                                    WriteFormattedLogOptions options);
-
-// Strongly-typed string so that it's not confused with strings and string formatting
-struct LogModuleName {
-    constexpr LogModuleName() = default;
-    consteval explicit LogModuleName(String str) : str(str) {
-        for (auto c : str)
-            if (c == ' ' || c == '_' || IsUppercaseAscii(c))
-                throw "Log module names must be lowercase, use - instead of _ and not contain spaces";
-    }
-    String str {};
+enum class ModuleName {
+    Global,
+    Main,
+    Package,
+    Gui,
+    ErrorReporting,
+    Filesystem,
+    SampleLibrary,
+    Clap,
+    SampleLibraryServer,
+    Settings,
+    Standalone,
 };
-consteval LogModuleName operator""_log_module(char const* str, usize size) {
-    return LogModuleName {String {str, size}};
+
+constexpr String ModuleNameString(ModuleName module_name) {
+    switch (module_name) {
+        case ModuleName::Global: return "🌍glbl"_s;
+        case ModuleName::Main: return "🚀main"_s;
+        case ModuleName::Package: return "📦pkg";
+        case ModuleName::Gui: return "🖥️gui";
+        case ModuleName::ErrorReporting: return "⚠️report";
+        case ModuleName::Filesystem: return "📁fs";
+        case ModuleName::SampleLibrary: return "📚smpl-lib";
+        case ModuleName::Clap: return "👏clap";
+        case ModuleName::SampleLibraryServer: return "📚smpl-srv";
+        case ModuleName::Settings: return "⚙️sett";
+        case ModuleName::Standalone: return "🧍stand";
+    }
 }
 
-// global infrastructure that is related to startup and shutdown
-constexpr auto k_global_log_module = "🌍global"_log_module;
+using MessageWriteFunction = FunctionRef<ErrorCodeOr<void>(Writer)>;
 
-// main infrastructure related to the core of the application, the 'app' or 'instance' object
-constexpr auto k_main_log_module = "🚀main"_log_module;
+ErrorCodeOr<void> WriteLogLine(Writer writer,
+                               ModuleName module_name,
+                               LogLevel level,
+                               MessageWriteFunction write_message,
+                               WriteLogLineOptions options);
 
 struct LogConfig {
     enum class Destination { Stderr, File };
@@ -117,10 +128,10 @@ struct LogConfig {
 
 ErrorCodeOr<void> CleanupOldLogFilesIfNeeded(ArenaAllocator& scratch_arena);
 
-void Log(LogModuleName module_name, LogLevel level, FunctionRef<ErrorCodeOr<void>(Writer)> write_message);
+void Log(ModuleName module_name, LogLevel level, FunctionRef<ErrorCodeOr<void>(Writer)> write_message);
 
 template <typename... Args>
-void Log(LogModuleName module_name, LogLevel level, String format, Args const&... args) {
+void Log(ModuleName module_name, LogLevel level, String format, Args const&... args) {
     Log(module_name, level, [&](Writer writer) { return fmt::FormatToWriter(writer, format, args...); });
 }
 
@@ -131,13 +142,14 @@ void GetLatestLogMessages(DynamicArrayBounded<char, LogRingBuffer::k_buffer_size
 void InitLogger(LogConfig);
 void ShutdownLogger();
 
-void Trace(LogModuleName module_name, String message = {}, SourceLocation loc = SourceLocation::Current());
+// TODO: remove Trace
+void Trace(ModuleName module_name, String message = {}, SourceLocation loc = SourceLocation::Current());
 
 // A macro unfortunatly seems the best way to avoid repeating the same code while keep template
 // instantiations low (needed for fast compile times)
 #define DECLARE_LOG_FUNCTION(level)                                                                          \
     template <typename... Args>                                                                              \
-    void Log##level(LogModuleName module_name, String format, Args const&... args) {                         \
+    void Log##level(ModuleName module_name, String format, Args const&... args) {                            \
         if constexpr (sizeof...(args) == 0) {                                                                \
             Log(module_name, LogLevel::level, format);                                                       \
         } else {                                                                                             \

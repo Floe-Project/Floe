@@ -16,8 +16,6 @@
 #include "settings_gui.hpp"
 #include "settings_midi.hpp"
 
-constexpr auto k_log_mod = "🔧settings"_log_module;
-
 struct LegacyJsonSettingsParser {
     LegacyJsonSettingsParser(Settings& content, ArenaAllocator& a, ArenaAllocator& scratch_arena)
         : content(content)
@@ -289,7 +287,7 @@ Parse(Settings& content, ArenaAllocator& content_allocator, ArenaAllocator& scra
 }
 
 ErrorCodeOr<void> WriteFile(Settings const& data, FloePaths const& paths, String path, s128 time) {
-    LogDebug(k_log_mod, "Writing settings file: {}. Gui size: {}", path, data.gui.window_width);
+    LogDebug(ModuleName::Settings, "Writing settings file: {}. Gui size: {}", path, data.gui.window_width);
     ArenaAllocatorWithInlineStorage<4000> scratch_arena {Malloc::Instance()};
 
     DynamicArray<char> file_data {scratch_arena};
@@ -473,7 +471,7 @@ bool InitialiseSettingsFileData(Settings& file,
 }
 
 ErrorCodeOr<SettingsReadResult> ReadSettingsFile(ArenaAllocator& a, String path) {
-    LogDebug(k_log_mod, "Reading settings file: {}", path);
+    LogDebug(ModuleName::Settings, "Reading settings file: {}", path);
     auto file = TRY(OpenFile(path,
                              {
                                  .capability = FileMode::Capability::Read,

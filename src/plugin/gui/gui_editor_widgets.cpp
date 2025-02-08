@@ -198,8 +198,6 @@ constexpr String k_ui_col_map_categories[ToInt(UiColMap::Count)] = {
 #undef GUI_COL_MAP
 };
 
-constexpr auto k_editor_log_module = "editor"_log_module;
-
 static String UiStyleFilepath(Allocator& a, String filename) {
     return path::Join(a, Array {path::Directory(__FILE__).Value(), "live_edit_defs", filename});
 }
@@ -217,7 +215,7 @@ static void WriteColoursFile(LiveEditGui const& gui) {
     ArenaAllocator scratch_arena {page_allocator};
     auto outcome = OpenFile(UiStyleFilepath(scratch_arena, COLOURS_DEF_FILENAME), FileMode::Write());
     if (outcome.HasError()) {
-        LogError(k_editor_log_module, "{} failed: {}", __FUNCTION__, outcome.Error());
+        LogError(ModuleName::Gui, "{} failed: {}", __FUNCTION__, outcome.Error());
         return;
     }
 
@@ -232,7 +230,7 @@ static void WriteColoursFile(LiveEditGui const& gui) {
                                      c.with_brightness,
                                      c.with_alpha);
         if (o.HasError())
-            LogError(k_editor_log_module,
+            LogError(ModuleName::Gui,
                      "could not write to file {} for reasion {}",
                      COLOURS_DEF_FILENAME,
                      o.Error());
@@ -244,7 +242,7 @@ static void WriteSizesFile(LiveEditGui const& gui) {
     ArenaAllocator scratch_arena {page_allocator};
     auto outcome = OpenFile(UiStyleFilepath(scratch_arena, SIZES_DEF_FILENAME), FileMode::Write());
     if (outcome.HasError()) {
-        LogError(k_editor_log_module, "{} failed: {}", __FUNCTION__, outcome.Error());
+        LogError(ModuleName::Gui, "{} failed: {}", __FUNCTION__, outcome.Error());
         return;
     }
 
@@ -262,7 +260,7 @@ static void WriteSizesFile(LiveEditGui const& gui) {
                                      sz,
                                      unit_name);
         if (o.HasError())
-            LogError(k_editor_log_module,
+            LogError(ModuleName::Gui,
                      "could not write to file {} for reason {}",
                      SIZES_DEF_FILENAME,
                      o.Error());
@@ -274,7 +272,7 @@ static void WriteColourMapFile(LiveEditGui const& gui) {
     ArenaAllocator scratch_arena {page_allocator};
     auto outcome = OpenFile(UiStyleFilepath(scratch_arena, COLOUR_MAP_DEF_FILENAME), FileMode::Write());
     if (outcome.HasError()) {
-        LogError(k_editor_log_module, "{} failed: {}", __FUNCTION__, outcome.Error());
+        LogError(ModuleName::Gui, "{} failed: {}", __FUNCTION__, outcome.Error());
         return;
     }
 
@@ -291,7 +289,7 @@ static void WriteColourMapFile(LiveEditGui const& gui) {
                                      String(v.colour),
                                      String(v.high_contrast_colour));
         if (o.HasError())
-            LogError(k_editor_log_module,
+            LogError(ModuleName::Gui,
                      "could not write to file {} for reason {}",
                      COLOUR_MAP_DEF_FILENAME,
                      o.Error());

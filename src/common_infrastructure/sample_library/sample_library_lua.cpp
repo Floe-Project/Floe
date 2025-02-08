@@ -19,8 +19,6 @@
 
 namespace sample_lib {
 
-constexpr auto k_log_module = "lua"_log_module;
-
 ErrorCodeCategory const lua_error_category {
     .category_id = "LUA",
     .message = [](Writer const& writer, ErrorCode code) -> ErrorCodeOr<void> {
@@ -1146,7 +1144,7 @@ static VoidOrError<Error> TryRunLuaCode(LuaState& ctx, int r) {
         }
         case LUA_ERRMEM: return Error {LuaErrorCode::Memory, {}};
         case LUA_ERRERR:
-            LogError(k_log_module, "error while running the error handler function");
+            LogError(ModuleName::SampleLibrary, "error while running the Lua error handler function");
             return Error {LuaErrorCode::Unexpected, {}};
     }
     return Error {LuaErrorCode::Unexpected, {}};
@@ -1344,12 +1342,12 @@ LibraryPtrOrError ReadLua(Reader& reader,
                 case LUA_ERRMEM: return Error {LuaErrorCode::Memory, {}};
             }
 
-            LogError(k_log_module, "unknown error from lua_load: {}", r);
+            LogError(ModuleName::SampleLibrary, "unknown error from lua_load: {}", r);
             return Error {LuaErrorCode::Unexpected, {}};
         }
 
         if (!lua_isfunction(ctx.lua, -1)) {
-            LogError(k_log_module, "we're expecting the lua file to be a function");
+            LogError(ModuleName::SampleLibrary, "we're expecting the Lua file to be a function");
             return Error {LuaErrorCode::Unexpected, {}};
         }
 

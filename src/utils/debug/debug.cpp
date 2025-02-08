@@ -401,7 +401,7 @@ Optional<String> InitStacktraceState(Optional<String> current_binary_path) {
 
     auto state = g_backtrace_state.Load(LoadMemoryOrder::Acquire);
     if (state->failed_init_error) {
-        LogDebug(k_global_log_module, "Failed to initialise backtrace state: {}", *state->failed_init_error);
+        LogDebug(ModuleName::Global, "Failed to initialise backtrace state: {}", *state->failed_init_error);
         return *state->failed_init_error;
     }
     return k_nullopt;

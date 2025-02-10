@@ -136,22 +136,17 @@ PUBLIC void WaitForThreadEnd(BackgroundQueue& queue) {
 }
 
 // thread-safe, not signal-safe
-// Create a message and then fill in the fields, allocating using the message's arena.
-// Must not be called after WaitForThreadEnd()
-PUBLIC void ReportError(BackgroundQueue& queue, Error&& error) {
+// To use this, create a message and then fill in the fields, allocating using the message's arena. Move() it
+// into this function.
+PUBLIC bool TryEnqueueError(BackgroundQueue& queue, Error&& error) {
     if (!queue.end_thread.Load(LoadMemoryOrder::Acquire)) {
         if (queue.queue.TryPush(Move(error))) {
             queue.signaller.Signal();
-            return;
+            return true;
         }
     }
 
-    // We couldn't queue it, write the message to file instead
-    if (error.level >= ErrorEvent::Level::Error) {
-        SentryOrFallback sentry;
-        auto _ = WriteErrorToFile(*sentry, error);
-        LogDebug(ModuleName::ErrorReporting, "Error background thread is not enqueuable, writing to file");
-    }
+    return false;
 }
 
 } // namespace sentry

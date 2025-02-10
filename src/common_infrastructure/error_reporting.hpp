@@ -15,15 +15,16 @@ void InitBackgroundErrorReporting(Span<sentry::Tag const> tags);
 void ShutdownBackgroundErrorReporting();
 
 namespace detail {
-void ReportError(sentry::Error&& error, u64 error_id);
+void ReportError(sentry::Error&& error, Optional<u64> error_id);
 bool ErrorSentBefore(u64 error_id);
 } // namespace detail
 
 // thread-safe, not signal-safe, works even if InitErrorReporting() was not called
 template <typename... Args>
 __attribute__((noinline)) void
-ReportError(sentry::Error::Level level, u64 error_id, String format, Args const&... args) {
-    if (detail::ErrorSentBefore(error_id)) return;
+ReportError(sentry::Error::Level level, Optional<u64> error_id, String format, Args const&... args) {
+    if (error_id)
+        if (detail::ErrorSentBefore(*error_id)) return;
     sentry::Error error {};
     error.level = level;
     error.message = fmt::Format(error.arena, format, args...);

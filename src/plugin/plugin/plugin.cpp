@@ -1123,7 +1123,7 @@ static bool ClapInit(const struct clap_plugin* plugin) {
 
             // TODO: remove this before release
             if constexpr (!PRODUCTION_BUILD)
-                ReportError(sentry::Error::Level::Info, 0x12345678, "Floe plugin loaded"_s);
+                ReportError(sentry::Error::Level::Info, k_nullopt, "Floe plugin loaded"_s);
         }
 
         floe.engine.Emplace(floe.host, *g_shared_engine_systems, floe);

@@ -40,8 +40,8 @@ void SetErrorSent(u64 error_id) {
         dyn::Append(g_reported_error_ids, error_id);
 }
 
-void ReportError(sentry::Error&& error, u64 error_id) {
-    SetErrorSent(error_id);
+void ReportError(sentry::Error&& error, Optional<u64> error_id) {
+    if (error_id) SetErrorSent(*error_id);
 
     // For debug purposes, log the error.
     Log(ModuleName::ErrorReporting, LogLevel::Debug, [&error](Writer writer) -> ErrorCodeOr<void> {
@@ -56,14 +56,13 @@ void ReportError(sentry::Error&& error, u64 error_id) {
         return k_success;
     });
 
-    // Option 1: enqueue the error for the background thread
+    // Best option: enqueue the error for the background thread
     if (auto q = g_queue.Load(LoadMemoryOrder::Acquire); q && !PanicOccurred()) {
-        sentry::ReportError(*q, Move(error));
-        return;
+        if (sentry::TryEnqueueError(*q, Move(error))) return;
     }
 
-    // Option 2: write the message to file directly
-    if (WriteErrorToFile(*sentry::SentryOrFallback {}, error).Succeeded()) return;
+    // Fallback option: write the message to file directly
+    auto _ = WriteErrorToFile(*sentry::SentryOrFallback {}, error);
 }
 
 } // namespace detail

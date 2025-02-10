@@ -98,13 +98,13 @@ LibraryCheckExistingInstallation(Component const& component,
                                  sample_lib::Library const* existing_matching_library,
                                  ArenaAllocator& scratch_arena,
                                  Writer error_log) {
-    ASSERT(component.type == ComponentType::Library);
+    ASSERT_EQ(component.type, ComponentType::Library);
     ASSERT(component.library);
 
     if (!existing_matching_library) return ExistingInstalledComponent {.installed = false};
 
     auto const existing_folder = *path::Directory(existing_matching_library->path);
-    ASSERT(existing_matching_library->Id() == component.library->Id());
+    ASSERT_EQ(existing_matching_library->Id(), component.library->Id());
 
     auto const actual_checksums = ({
         auto const o = ChecksumsForFolder(existing_folder, scratch_arena, scratch_arena);
@@ -716,7 +716,7 @@ PUBLIC void DoJobPhase2(InstallJob& job);
 // and then call OnAllUserInputReceived.
 // [worker thread (probably)]
 PUBLIC void DoJobPhase1(InstallJob& job) {
-    ASSERT(job.state.Load(LoadMemoryOrder::Acquire) == InstallJob::State::Installing);
+    ASSERT_EQ(job.state.Load(LoadMemoryOrder::Acquire), InstallJob::State::Installing);
     auto const result = detail::DoJobPhase1(job);
     if (result != InstallJob::State::Installing) {
         job.state.Store(result, StoreMemoryOrder::Release);
@@ -728,7 +728,7 @@ PUBLIC void DoJobPhase1(InstallJob& job) {
 
 // [worker thread (probably)]
 PUBLIC void DoJobPhase2(InstallJob& job) {
-    ASSERT(job.state.Load(LoadMemoryOrder::Acquire) == InstallJob::State::Installing);
+    ASSERT_EQ(job.state.Load(LoadMemoryOrder::Acquire), InstallJob::State::Installing);
     auto const result = detail::DoJobPhase2(job);
     job.state.Store(result, StoreMemoryOrder::Release);
 }
@@ -736,7 +736,7 @@ PUBLIC void DoJobPhase2(InstallJob& job) {
 // Complete a job that was started but needed user input.
 // [main thread]
 PUBLIC void OnAllUserInputReceived(InstallJob& job, ThreadPool& thread_pool) {
-    ASSERT(job.state.Load(LoadMemoryOrder::Acquire) == InstallJob::State::AwaitingUserInput);
+    ASSERT_EQ(job.state.Load(LoadMemoryOrder::Acquire), InstallJob::State::AwaitingUserInput);
     for (auto& component : job.components)
         if (UserInputIsRequired(component.existing_installation_status))
             ASSERT(component.user_decision != InstallJob::UserDecision::Unknown);

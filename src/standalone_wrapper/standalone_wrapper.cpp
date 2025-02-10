@@ -544,8 +544,8 @@ static ErrorCodeOr<void> Main(String exe_path_rel) {
         TRY_CLAP(gui->adjust_size(&standalone.plugin, &clap_width, &clap_height));
 
         // We should have created a view that conforms to our own requirements.
-        ASSERT(original_width == clap_width);
-        ASSERT(original_height == clap_height);
+        ASSERT_EQ(original_width, clap_width);
+        ASSERT_EQ(original_height, clap_height);
     }
 
     auto const size = *ClapPixelsToPhysicalPixels(standalone.gui_view, clap_width, clap_height);

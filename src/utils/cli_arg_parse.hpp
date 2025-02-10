@@ -16,7 +16,7 @@ struct CommandLineArgDefinition {
 
 struct CommandLineArg {
     Optional<String> Value() const {
-        ASSERT(info.num_values == 1);
+        ASSERT_EQ(info.num_values, 1);
         return was_provided && values.size ? Optional<String> {values[0]} : k_nullopt;
     }
     CommandLineArgDefinition const& info;

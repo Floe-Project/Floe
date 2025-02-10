@@ -156,7 +156,7 @@ class PageAllocator final : public Allocator {
                 if (mem == nullptr) Panic("out of memory");
                 result = {(u8*)mem, request_page_size};
 
-                ASSERT(__builtin_align_up(result.data, cmd.alignment) == result.data);
+                ASSERT_EQ(__builtin_align_up(result.data, cmd.alignment), result.data);
 
                 return {result.data, cmd.allow_oversized_result ? result.size : cmd.size};
             }

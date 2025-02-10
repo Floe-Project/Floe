@@ -103,7 +103,7 @@ static Char32 STB_TEXTEDIT_GETCHAR(STB_TEXTEDIT_STRING* imgui, int idx) {
 // NOLINTNEXTLINE(readability-identifier-naming)
 static f32 STB_TEXTEDIT_GETWIDTH(STB_TEXTEDIT_STRING* imgui, int line_index, int char_index) {
     // get the width of the char at line_index, char_index
-    ASSERT(line_index == 0); // only support single line at the moment
+    ASSERT_EQ(line_index, 0); // only support single line at the moment
     auto c = imgui->textedit_text[(usize)char_index];
     auto font = imgui->graphics->context->CurrentFont();
     return font->GetCharAdvance((graphics::Char16)c) * (font->font_size_no_scale / font->font_size);
@@ -570,8 +570,8 @@ bool Context::WasJustHovered(Id id) { return IsHovered(id) && hovered_item_last_
 bool Context::WasJustUnhovered(Id id) { return !IsHovered(id) && hovered_item_last_frame == hovered_item; }
 
 void Context::Begin(WindowSettings settings) {
-    ASSERT(window_stack.size == 0);
-    ASSERT(current_popup_stack.size == 0);
+    ASSERT_EQ(window_stack.size, 0u);
+    ASSERT_EQ(current_popup_stack.size, 0u);
 
     draw_data.draw_lists = {};
     draw_data.total_vtx_count = 0;
@@ -675,8 +675,8 @@ void Context::Begin(WindowSettings settings) {
 
 void Context::End(ArenaAllocator& scratch_arena) {
     EndWindow(); // application window
-    ASSERT(window_stack.size == 0); // all BeginWindow calls must have an EndWindow
-    ASSERT(current_popup_stack.size == 0);
+    ASSERT_EQ(window_stack.size, 0u); // all BeginWindow calls must have an EndWindow
+    ASSERT_EQ(current_popup_stack.size, 0u);
 
     if (debug_show_register_widget_overlay) {
         for (auto& w : frame_output.mouse_tracked_rects) {

@@ -20,7 +20,7 @@ LeakDetectingAllocator::~LeakDetectingAllocator() {
         }
     }
 
-    ASSERT(m_allocations.size == 0);
+    ASSERT_EQ(m_allocations.size, 0u);
 }
 
 Span<u8> LeakDetectingAllocator::DoCommand(AllocatorCommandUnion const& command_union) {

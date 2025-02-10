@@ -172,7 +172,7 @@ static Optional<ParamProjection> ParamProjection(ParamIndex index) {
         (index == ParamIndex::StereoWidenWidth) || (index == ParamIndex::FilterResonance)) {
         ASSERT(k_param_descriptors[(u32)index].linear_range.min == 0 ||
                k_param_descriptors[(u32)index].linear_range.min == -1);
-        ASSERT(k_param_descriptors[(u32)index].linear_range.max == 1);
+        ASSERT_EQ(k_param_descriptors[(u32)index].linear_range.max, 1.0f);
         return ParamProjection::WasPercentNowFraction;
     }
 
@@ -777,7 +777,7 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
                     if (!Find(fallback_order_of_effects, (EffectType)fx_type))
                         fallback_order_of_effects[index++] = (EffectType)fx_type;
             }
-            ASSERT(index == fallback_order_of_effects.size);
+            ASSERT_EQ(index, fallback_order_of_effects.size);
         }
 
         if (parser.fx_order.size) {
@@ -788,7 +788,7 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
             if (effects.size != k_num_effect_types)
                 for (auto fx_type : fallback_order_of_effects)
                     dyn::AppendIfNotAlreadyThere(effects, fx_type);
-            ASSERT(effects.size == k_num_effect_types);
+            ASSERT_EQ(effects.size, k_num_effect_types);
 
             for (auto const i : Range(k_num_effect_types))
                 state.fx_order[i] = effects[i];
@@ -972,7 +972,7 @@ struct StateCoder {
         if (version >= version_added) {
             u32 check = counter;
             TRY(CodeNumber(check, version_added));
-            ASSERT(check == counter);
+            ASSERT_EQ(check, counter);
             counter++;
         }
         return k_success;

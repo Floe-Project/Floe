@@ -186,7 +186,7 @@ struct DirectXDrawContext : public DrawContext {
     }
 
     ErrorCodeOr<void> CreateFontTexture() override {
-        ASSERT(font_texture == nullptr);
+        ASSERT_EQ(font_texture, nullptr);
 
         // Build texture atlas
         unsigned char* pixels {};
@@ -215,7 +215,7 @@ struct DirectXDrawContext : public DrawContext {
                    ((u16)width * (u16)bytes_per_pixel));
         }
         auto r = font_texture->UnlockRect(0);
-        ASSERT(r == D3D_OK);
+        ASSERT_EQ(r, D3D_OK);
 
         // Store our identifier
         Fonts.TexID = (void*)font_texture;

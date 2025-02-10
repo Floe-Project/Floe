@@ -99,7 +99,7 @@ static void InitSentry(Sentry& sentry, DsnInfo dsn, Span<Tag const> tags) {
     sentry.online_reporting_disabled.Store(IsOnlineReportingDisabled(), StoreMemoryOrder::Relaxed);
 
     // clone the tags
-    ASSERT(sentry.tags.size == 0);
+    ASSERT_EQ(sentry.tags.size, 0u);
     sentry.tags = sentry.arena.Clone(tags, CloneType::Deep);
 
     // this data is common to every event we want to send, so let's cache it as a JSON blob

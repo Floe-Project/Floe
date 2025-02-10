@@ -11,7 +11,7 @@
 
 Span<String const> ParameterMenuItems(ParamIndex param_index) {
     auto const& param = k_param_descriptors[ToInt(param_index)];
-    ASSERT(param.value_type == ParamValueType::Menu);
+    ASSERT_EQ(param.value_type, ParamValueType::Menu);
     return MenuItems(param.menu_type);
 }
 

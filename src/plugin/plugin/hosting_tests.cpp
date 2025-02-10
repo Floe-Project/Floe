@@ -312,7 +312,7 @@ struct WaveFileArgs {
 ErrorCodeOr<void> WriteWaveFile(String filename, ArenaAllocator& scratch_arena, WaveFileArgs args) {
     static_assert(k_endianness == Endianness::Little, "Wave file format is little-endian, we don't convert");
 
-    ASSERT(args.data.size == args.num_channels);
+    ASSERT_EQ(args.data.size, args.num_channels);
     ASSERT(args.num_channels);
     ASSERT(args.num_frames);
     ASSERT(args.sample_rate > 0.0);

@@ -1039,7 +1039,7 @@ FlushParameterEvents(AudioProcessor& processor, clap_input_events const& in, cla
 
 clap_process_status Process(AudioProcessor& processor, clap_process const& process) {
     ZoneScoped;
-    ASSERT(process.audio_outputs_count == 1);
+    ASSERT_EQ(process.audio_outputs_count, 1u);
 
     if (process.audio_outputs->channel_count != 2) return CLAP_PROCESS_ERROR;
 
@@ -1160,7 +1160,7 @@ clap_process_status Process(AudioProcessor& processor, clap_process const& proce
                                                                k_fade_in_ms);
             }
 
-            ASSERT(processor.whole_engine_volume_fade.GetCurrentState() == VolumeFade::State::FullVolume);
+            ASSERT_EQ(processor.whole_engine_volume_fade.GetCurrentState(), VolumeFade::State::FullVolume);
             break;
         }
         case VolumeFade::State::FadeOut: {

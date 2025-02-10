@@ -359,7 +359,7 @@ static void UnwatchDirectory(int inotify_id, DirectoryWatcher::WatchedDirectory&
     auto native_data = (LinuxWatchedDirectory*)d.native_data.pointer;
     if (!native_data) return;
     auto const rc = inotify_rm_watch(inotify_id, native_data->root_watch_id);
-    ASSERT(rc == 0);
+    ASSERT_EQ(rc, 0);
     d.arena.Delete(native_data);
 }
 
@@ -482,7 +482,7 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                 } else {
                     dir.state = DirectoryWatcher::WatchedDirectory::State::WatchingFailed;
                     dir.directory_changes.error = outcome.Error();
-                    ASSERT(dir.native_data.pointer == nullptr);
+                    ASSERT_EQ(dir.native_data.pointer, nullptr);
                 }
                 break;
             }
@@ -490,7 +490,7 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                 if (dir.native_data.pointer != nullptr) {
                     auto& native_dir = *(LinuxWatchedDirectory*)dir.native_data.pointer;
                     for (auto& subdir : native_dir.subdirs) {
-                        ASSERT(subdir.watch_id_invalidated == false);
+                        ASSERT_EQ(subdir.watch_id_invalidated, false);
                         InotifyUnwatch(watcher.native_data.int_id, subdir.watch_id);
                     }
                     UnwatchDirectory(watcher.native_data.int_id, dir);

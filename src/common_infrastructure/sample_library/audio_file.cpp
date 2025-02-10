@@ -140,7 +140,7 @@ static ErrorCodeOr<AudioData> DecodeFlac(Reader& reader, Allocator& allocator) {
                 return;
             }
 
-            ASSERT(context.bits_per_sample == 0);
+            ASSERT_EQ(context.bits_per_sample, 0u);
 
             context.bits_per_sample = info.bits_per_sample;
 

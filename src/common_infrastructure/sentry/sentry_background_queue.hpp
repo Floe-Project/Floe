@@ -126,7 +126,7 @@ PUBLIC void RequestThreadEnd(BackgroundQueue& queue) {
 }
 
 PUBLIC void WaitForThreadEnd(BackgroundQueue& queue) {
-    ASSERT(queue.end_thread.Load(LoadMemoryOrder::Acquire) == true);
+    ASSERT_EQ(queue.end_thread.Load(LoadMemoryOrder::Acquire), true);
     if (queue.thread.Joinable()) queue.thread.Join();
 
     // it's possible there's still messages in the queue, let's write them to file

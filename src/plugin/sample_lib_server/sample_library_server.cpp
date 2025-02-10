@@ -252,7 +252,7 @@ static bool UpdateLibraryJobs(Server& server,
                               PendingLibraryJobs& pending_library_jobs,
                               ArenaAllocator& scratch_arena,
                               Optional<DirectoryWatcher>& watcher) {
-    ASSERT(CurrentThreadId() == pending_library_jobs.server_thread_id);
+    ASSERT_EQ(CurrentThreadId(), pending_library_jobs.server_thread_id);
     ZoneNamed(outer, true);
 
     // trigger folder scanning if any are marked as 'rescan-requested'
@@ -423,7 +423,7 @@ static bool UpdateLibraryJobs(Server& server,
                                                              new_state,
                                                              RmwMemoryOrder::AcquireRelease,
                                                              LoadMemoryOrder::Relaxed)) {
-                        ASSERT(expected == ScanFolder::State::RescanRequested);
+                        ASSERT_EQ(expected, ScanFolder::State::RescanRequested);
                     }
                 }
                 break;
@@ -714,7 +714,7 @@ LoadAudioAsync(ListedAudioData& audio_data, sample_lib::Library const& lib, Thre
             // At this point we must be in the Loading state so other threads know not to interfere. The
             // memory ordering used with the atomic 'state' variable reflects this: the Acquire memory order
             // above, and the Release memory order at the end.
-            ASSERT(audio_data.state.Load(LoadMemoryOrder::Relaxed) == FileLoadingState::Loading);
+            ASSERT_EQ(audio_data.state.Load(LoadMemoryOrder::Relaxed), FileLoadingState::Loading);
 
             auto const outcome = [&audio_data, &lib]() -> ErrorCodeOr<AudioData> {
                 auto reader = TRY(lib.create_file_reader(lib, audio_data.path));
@@ -801,7 +801,7 @@ static ListedInstrument* FetchOrCreateInstrument(LibrariesList::Node& lib_node,
                                                  sample_lib::Instrument const& inst,
                                                  ThreadPoolArgs thread_pool_args) {
     auto& lib = lib_node.value;
-    ASSERT(&inst.library == lib.lib);
+    ASSERT_EQ(&inst.library, lib.lib);
 
     for (auto& i : lib.instruments)
         if (i.inst.instrument.name == inst.name) {
@@ -949,7 +949,7 @@ struct PendingResources {
 };
 
 static void DumpPendingResourcesDebugInfo(PendingResources& pending_resources) {
-    ASSERT(CurrentThreadId() == pending_resources.server_thread_id);
+    ASSERT_EQ(CurrentThreadId(), pending_resources.server_thread_id);
     LogDebug(ModuleName::SampleLibraryServer,
              "Thread pool jobs: {}",
              pending_resources.thread_pool_jobs.counter.Load(LoadMemoryOrder::Relaxed));
@@ -1006,7 +1006,7 @@ static void DumpPendingResourcesDebugInfo(PendingResources& pending_resources) {
 static bool ConsumeResourceRequests(PendingResources& pending_resources,
                                     ArenaAllocator& arena,
                                     ThreadsafeQueue<QueuedRequest>& request_queue) {
-    ASSERT(CurrentThreadId() == pending_resources.server_thread_id);
+    ASSERT_EQ(CurrentThreadId(), pending_resources.server_thread_id);
     bool any_requests = false;
     while (auto queued_request = request_queue.TryPop()) {
         ZoneNamedN(req, "request", true);
@@ -1033,7 +1033,7 @@ static bool ConsumeResourceRequests(PendingResources& pending_resources,
 static bool UpdatePendingResources(PendingResources& pending_resources,
                                    Server& server,
                                    bool libraries_are_still_loading) {
-    ASSERT(CurrentThreadId() == server.server_thread_id);
+    ASSERT_EQ(CurrentThreadId(), server.server_thread_id);
 
     if (pending_resources.list.Empty()) return false;
 
@@ -1365,7 +1365,7 @@ static bool UpdatePendingResources(PendingResources& pending_resources,
 // Server thread
 
 static void ServerThreadUpdateMetrics(Server& server) {
-    ASSERT(CurrentThreadId() == server.server_thread_id);
+    ASSERT_EQ(CurrentThreadId(), server.server_thread_id);
     u32 num_insts_loaded = 0;
     u32 num_samples_loaded = 0;
     u64 total_bytes_used = 0;
@@ -1386,7 +1386,7 @@ static void ServerThreadUpdateMetrics(Server& server) {
 
 static void RemoveUnreferencedObjects(Server& server) {
     ZoneScoped;
-    ASSERT(CurrentThreadId() == server.server_thread_id);
+    ASSERT_EQ(CurrentThreadId(), server.server_thread_id);
 
     server.channels.Use([](auto& channels) {
         channels.RemoveIf([](AsyncCommsChannel const& h) { return !h.used.Load(LoadMemoryOrder::Relaxed); });

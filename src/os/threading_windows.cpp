@@ -116,7 +116,7 @@ bool Thread::Joinable() const { return m_thread.As<HANDLE>() != nullptr; }
 
 void Thread::Join() {
     ASSERT(Joinable());
-    ASSERT(WaitForSingleObject(m_thread.As<HANDLE>(), INFINITE) == WAIT_OBJECT_0);
+    ASSERT_EQ(WaitForSingleObject(m_thread.As<HANDLE>(), INFINITE), WAIT_OBJECT_0);
     CloseHandle(m_thread.As<HANDLE>());
     m_thread.As<HANDLE>() = nullptr;
 }

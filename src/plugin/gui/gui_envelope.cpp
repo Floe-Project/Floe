@@ -15,7 +15,7 @@ void GUIDoEnvelope(Gui* g,
                    bool greyed_out,
                    Array<LayerParamIndex, 4> adsr_layer_params,
                    GuiEnvelopeType type) {
-    ASSERT(adsr_layer_params.size == 4);
+    ASSERT_EQ(adsr_layer_params.size, 4u);
     auto& imgui = g->imgui;
     auto& engine = g->engine;
 

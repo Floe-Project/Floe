@@ -4,7 +4,7 @@
 #include "midi.hpp"
 
 Optional<RpnDetector::Rpn> RpnDetector::DetectRpnFromCcMessage(MidiMessage msg) {
-    ASSERT(msg.Type() == MidiMessageType::ControlChange);
+    ASSERT_EQ(msg.Type(), MidiMessageType::ControlChange);
 
     auto const cc_num = msg.CCNum();
     auto const cc_value = msg.CCValue();

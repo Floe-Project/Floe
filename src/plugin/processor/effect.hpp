@@ -52,7 +52,7 @@ struct EffectWetDryHelper {
 struct ScratchBuffers {
     class Buffer {
       public:
-        Buffer(f32* b, u32 size) : m_buffer(b), m_block_size(size) { ASSERT((usize)b % 16 == 0); }
+        Buffer(f32* b, u32 size) : m_buffer(b), m_block_size(size) { ASSERT_EQ((usize)b % 16, 0u); }
 
         Span<StereoAudioFrame> Interleaved() { return ToStereoFramesSpan(m_buffer, m_block_size); }
 

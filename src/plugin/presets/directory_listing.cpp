@@ -90,7 +90,7 @@ void DirectoryListing::Entry::AddChild(Entry* child, Index child_index) {
         auto last = LastChild();
         last->m_next = child_index;
         child->m_prev = CheckedCast<Index>(last - child->m_entry_array);
-        ASSERT(LastChild() == child);
+        ASSERT_EQ(LastChild(), child);
     }
     child->m_parent = CheckedCast<Index>(this - m_entry_array);
 }

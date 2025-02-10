@@ -140,7 +140,7 @@ class ConvolutionReverb final : public Effect {
 
         // TODO: we need to ensure this is the case before calling this function - show an error message
         ASSERT(num_channels && num_frames);
-        ASSERT(num_channels == 2);
+        ASSERT_EQ(num_channels, 2);
 
         DynamicArray<f32> channel_samples {PageAllocator::Instance()};
         dyn::Resize(channel_samples, num_frames);

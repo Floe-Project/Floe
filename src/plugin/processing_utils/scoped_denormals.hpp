@@ -28,16 +28,16 @@ class ScopedNoDenormals {
   public:
     ScopedNoDenormals() {
         auto result = fegetenv(&prev);
-        ASSERT(result == 0);
+        ASSERT_EQ(result, 0);
 
         fenv_t v = _FE_DFL_DISABLE_DENORMS_ENV;
         result = fesetenv(&v);
-        ASSERT(result == 0);
+        ASSERT_EQ(result, 0);
     }
 
     ~ScopedNoDenormals() {
         auto result = fesetenv(&prev);
-        ASSERT(result == 0);
+        ASSERT_EQ(result, 0);
     }
 
     fenv_t prev;

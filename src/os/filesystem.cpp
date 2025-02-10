@@ -311,7 +311,7 @@ ErrorCodeOr<Optional<Entry>> Next(RecursiveIterator& it, ArenaAllocator& result_
 
                     return entry;
                 } else {
-                    ASSERT(first.reached_end == true);
+                    ASSERT_EQ(first.reached_end, true);
                     Destroy(first);
                     it.stack.RemoveFirst();
                     continue;

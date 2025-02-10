@@ -1735,9 +1735,9 @@ bool FontAtlas::Build() {
         for (int i = 0; i < n; i++)
             if (tmp.rects[i].was_packed) tex_height = Max(tex_height, tmp.rects[i].y + tmp.rects[i].h);
     }
-    ASSERT(buf_rects_n == total_glyph_count);
-    ASSERT(buf_packedchars_n == total_glyph_count);
-    ASSERT(buf_ranges_n == total_glyph_range_count);
+    ASSERT_EQ(buf_rects_n, total_glyph_count);
+    ASSERT_EQ(buf_packedchars_n, total_glyph_count);
+    ASSERT_EQ(buf_ranges_n, total_glyph_range_count);
 
     // Create texture
     tex_height = (int)NextPowerOf2((u32)tex_height);
@@ -1931,7 +1931,7 @@ void Font::BuildLookupTable() {
 }
 
 void Font::GrowIndex(int new_size) {
-    ASSERT(index_x_advance.size == index_lookup.size);
+    ASSERT_EQ(index_x_advance.size, index_lookup.size);
     int const old_size = index_lookup.size;
     if (new_size <= old_size) return;
     index_x_advance.Resize(new_size);

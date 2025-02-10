@@ -125,7 +125,7 @@ struct FieldInfo {
                 }
                 TRY(fmt::FormatToWriter(writer, "\"{}\"", option));
                 if (multiline) {
-                    ASSERT(enum_options.size == enum_descriptions.size + 1);
+                    ASSERT_EQ(enum_options.size, enum_descriptions.size + 1);
                     TRY(fmt::FormatToWriter(writer, " => {}", enum_descriptions[enum_index]));
                     if (&option != (End(enum_options) - 2)) TRY(writer.WriteChar('\n'));
                 }
@@ -2444,7 +2444,7 @@ TEST_CASE(TestMdataConversion) {
 
         const auto o = WriteFile(path, lua_code);
         ASSERT(o.HasValue());
-        ASSERT(o.Value() == lua_code.size);
+        ASSERT_EQ(o.Value(), lua_code.size);
 
         _ = InterpretLua(lua_code, path, errors, scratch_arena);
 

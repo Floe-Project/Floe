@@ -129,5 +129,5 @@ void SharedEngineSystems::UnregisterFloeInstance(FloeInstanceIndex index) {
     registered_floe_instances_mutex.Lock();
     DEFER { registered_floe_instances_mutex.Unlock(); };
     auto const num_removed = dyn::RemoveValueSwapLast(registered_floe_instances, index);
-    ASSERT(num_removed == 1);
+    ASSERT_EQ(num_removed, 1u);
 }

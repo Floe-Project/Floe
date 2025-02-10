@@ -217,10 +217,10 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
                         // here. There could be various forms of raw samples, but in reality only 1 type was
                         // used.
                         auto const ext = path::Extension(GetString(library, f.virtual_filepath));
-                        ASSERT(ext == ".wav"_s);
-                        ASSERT(f.channels == 2);
-                        ASSERT(f.audio_format == mdata::AudioFileTypeRaw16Pcm);
-                        ASSERT(RoundPositiveFloat(f.sample_rate) == 44100);
+                        ASSERT_EQ(ext, ".wav"_s);
+                        ASSERT_EQ(f.channels, 2);
+                        ASSERT_EQ(f.audio_format, mdata::AudioFileTypeRaw16Pcm);
+                        ASSERT_EQ(RoundPositiveFloat(f.sample_rate), 44100);
                         static_assert(".wav"_s.size == k_raw_16_bit_stereo_44100_format_ext.size);
                         CopyStringIntoBufferWithNullTerm((char*)ext.data,
                                                          ext.size,
@@ -332,7 +332,7 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
         inst->regions = arena.AllocateExactSizeUninitialised<Region>(CheckedCast<usize>(i.total_num_regions));
         usize regions_span_index = 0;
         for (auto [group_index, group_info] : Enumerate(i.Groups())) {
-            ASSERT(group_index == (usize)group_info.index);
+            ASSERT_EQ(group_index, (usize)group_info.index);
 
             for (auto [region_index, region_info] : Enumerate<mdata::Index>(sampler_region_infos)) {
                 if (region_info.inst_info_index != i.index) continue;
@@ -402,7 +402,7 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
                 ++num_regions;
             }
         }
-        ASSERT((mdata::Index)inst->regions.size == i.total_num_regions);
+        ASSERT_EQ((mdata::Index)inst->regions.size, i.total_num_regions);
 
         inst->max_rr_pos = max_rr_pos;
 

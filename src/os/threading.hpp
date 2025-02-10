@@ -378,7 +378,7 @@ PUBLIC void CallOnce(CallOnceFlag& flag, FunctionRef<void()> function) {
                     Panic("Possible recursive call to CallOnce");
         }
     }
-    ASSERT(flag.v.Load(LoadMemoryOrder::Relaxed) == CallOnceFlag::k_called);
+    ASSERT_EQ(flag.v.Load(LoadMemoryOrder::Relaxed), CallOnceFlag::k_called);
 }
 
 // Futex-based mutex, possibly slower than the pthread/CriticalSection based mutexes, but doesn't require

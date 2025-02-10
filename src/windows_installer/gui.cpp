@@ -498,7 +498,7 @@ void EditWidget(GuiFramework& framework, u32 id, EditWidgetOptions const& option
 }
 
 u32 CreateStackLayoutWidget(GuiFramework& framework, Optional<u32> parent_id, WidgetOptions options) {
-    ASSERT(options.type.tag == WidgetType::Container);
+    ASSERT_EQ(options.type.tag, WidgetType::Container);
     auto parent = parent_id ? &framework.widgets[*parent_id] : nullptr;
     auto [widget, id] = framework.AllocWidget();
     widget.window = CreatePageWindow(widget, parent ? parent->window : nullptr);
@@ -537,7 +537,7 @@ u32 CreateWidget(GuiFramework& framework, u32 page, WidgetOptions options) {
     // https://devblogs.microsoft.com/oldnewthing/20031021-00/?p=42083
 
     auto& parent = framework.widgets[page];
-    ASSERT(parent.options.type.tag == WidgetType::Container);
+    ASSERT_EQ(parent.options.type.tag, WidgetType::Container);
 
     auto [widget, id] = framework.AllocWidget();
     widget.options = options;

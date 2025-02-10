@@ -449,7 +449,7 @@ ErrorCodeOr<MutableString> TemporaryDirectoryOnSameFilesystemAs(String path, All
         auto wide_result_buffer =
             temp_path_arena.AllocateExactSizeUninitialised<WCHAR>(base_path.size + filename.size + 1);
         usize pos = 0;
-        ASSERT(base_path[base_path.size - 1] == L'\\');
+        ASSERT_EQ(base_path[base_path.size - 1], L'\\');
         WriteAndIncrement(pos, wide_result_buffer, base_path);
         WriteAndIncrement(pos, wide_result_buffer, filename);
         WriteAndIncrement(pos, wide_result_buffer, L'\0');
@@ -1426,7 +1426,7 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                 dir.directory_changes.error = FilesystemWin32ErrorCode(GetLastError());
             }
         } else {
-            ASSERT(wait_result == WAIT_TIMEOUT);
+            ASSERT_EQ(wait_result, (DWORD)WAIT_TIMEOUT);
         }
 
         auto const succeeded = ReadDirectoryChangesW(windows_dir.handle,

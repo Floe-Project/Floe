@@ -77,7 +77,9 @@ constexpr Optional<UiSize> GetNearestAspectRatioSizeInsideSize(UiSize size, UiSi
 }
 
 constexpr bool IsAspectRatio(UiSize size, UiSize aspect_ratio) {
-    return GetNearestAspectRatioSizeInsideSize(size, aspect_ratio) == size;
+    auto const simplified_size = SimplifyAspectRatio(size);
+    auto const simplified_aspect_ratio = SimplifyAspectRatio(aspect_ratio);
+    return simplified_size == simplified_aspect_ratio;
 }
 
 PUBLIC UiSize CurrentAspectRatio(Settings::Gui const& gui) {

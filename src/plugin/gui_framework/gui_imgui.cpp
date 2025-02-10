@@ -1216,54 +1216,56 @@ TextInputResult Context::SingleLineTextInput(Rect r,
 
     if (IsHotOrActive(id)) frame_output.cursor_type = CursorType::IBeam;
 
-    // IMPROVE: we should be checking the modifier keys of the event rather than the current state of the
-    // modifier
+    auto const shift_bit = [](GuiFrameInput::KeyState::Event const& event) {
+        return event.modifiers.Get(ModifierKey::Modifier) ? STB_TEXTEDIT_K_SHIFT : 0;
+    };
 
-    u32 const shift_bit = frame_input.Key(ModifierKey::Shift).is_down ? STB_TEXTEDIT_K_SHIFT : 0;
-
-    if (auto backspaces = frame_input.Key(KeyCode::Backspace).presses_or_repeats; backspaces.size) {
-        for (auto _ : Range(backspaces.size))
-            stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_BACKSPACE | shift_bit));
+    if (auto const backspaces = frame_input.Key(KeyCode::Backspace).presses_or_repeats; backspaces.size) {
+        for (auto const& event : backspaces)
+            stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_BACKSPACE | shift_bit(event)));
         result.buffer_changed = true;
         reset_cursor = true;
-    } else if (auto deletes = frame_input.Key(KeyCode::Delete).presses_or_repeats; deletes.size) {
-        for (auto _ : Range(deletes.size))
-            stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_DELETE | shift_bit));
+    } else if (auto const deletes = frame_input.Key(KeyCode::Delete).presses_or_repeats; deletes.size) {
+        for (auto const& event : deletes)
+            stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_DELETE | shift_bit(event)));
         result.buffer_changed = true;
         reset_cursor = true;
-    } else if (frame_input.Key(KeyCode::End).presses.size) {
-        stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_LINEEND | shift_bit));
+    } else if (auto const ends = frame_input.Key(KeyCode::End).presses_or_repeats; ends.size) {
+        for (auto const& event : ends)
+            stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_LINEEND | shift_bit(event)));
         result.buffer_changed = true;
-    } else if (frame_input.Key(KeyCode::Home).presses.size) {
-        stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_LINESTART | shift_bit));
+    } else if (auto const homes = frame_input.Key(KeyCode::Home).presses_or_repeats; homes.size) {
+        for (auto const& event : homes)
+            stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_LINESTART | shift_bit(event)));
         result.buffer_changed = true;
-    } else if (frame_input.Key(KeyCode::Z).presses.size && frame_input.Key(ModifierKey::Modifier).is_down) {
-        // IMRPOVE: handle key repeats
-        stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_UNDO | shift_bit));
+    } else if (auto const zs = frame_input.Key(KeyCode::Z).presses_or_repeats; zs.size) {
+        for (auto const& event : zs)
+            if (event.modifiers.Get(ModifierKey::Modifier))
+                stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_UNDO | shift_bit(event)));
         result.buffer_changed = true;
 
-    } else if (frame_input.Key(KeyCode::Y).presses.size && frame_input.Key(ModifierKey::Modifier).is_down) {
-        stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_REDO | shift_bit));
+    } else if (auto const ys = frame_input.Key(KeyCode::Y).presses_or_repeats; ys.size) {
+        for (auto const& event : ys)
+            if (event.modifiers.Get(ModifierKey::Modifier))
+                stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_REDO | shift_bit(event)));
         result.buffer_changed = true;
-    } else if (auto lefts = frame_input.Key(KeyCode::LeftArrow).presses_or_repeats; lefts.size) {
+    } else if (auto const lefts = frame_input.Key(KeyCode::LeftArrow).presses_or_repeats; lefts.size) {
         reset_cursor = true;
-        for (auto event : lefts)
+        for (auto const event : lefts)
             stb_textedit_key(this,
                              &stb_state,
                              (int)((event.modifiers.Get(ModifierKey::Modifier) ? STB_TEXTEDIT_K_WORDLEFT
                                                                                : STB_TEXTEDIT_K_LEFT) |
-                                   shift_bit));
-    } else if (auto rights = frame_input.Key(KeyCode::RightArrow).presses_or_repeats; rights.size) {
+                                   shift_bit(event)));
+    } else if (auto const rights = frame_input.Key(KeyCode::RightArrow).presses_or_repeats; rights.size) {
         reset_cursor = true;
-        // IMPROVE: this is not perfect, we're using the current state of the modifier key rather than the
-        // state of the modifier key when the key was pressed. Our current GUI system doesn't support this.
-        for (auto event : rights)
+        for (auto const event : rights)
             stb_textedit_key(this,
                              &stb_state,
                              (int)((event.modifiers.Get(ModifierKey::Modifier) ? STB_TEXTEDIT_K_WORDRIGHT
                                                                                : STB_TEXTEDIT_K_RIGHT) |
-                                   shift_bit));
-    } else if (frame_input.Key(KeyCode::V).presses.size && frame_input.Key(ModifierKey::Modifier).is_down) {
+                                   shift_bit(event)));
+    } else if (auto const vs = frame_input.Key(KeyCode::V).presses_or_repeats; vs.size) {
         frame_output.wants_clipboard_text_paste = true;
     } else if ((frame_input.Key(KeyCode::C).presses.size || frame_input.Key(KeyCode::X).presses.size) &&
                frame_input.Key(ModifierKey::Modifier).is_down) {

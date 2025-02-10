@@ -86,7 +86,10 @@ PUBLIC void GlobalInit(GlobalInitOptions options) {
     });
 
     if (auto const err = InitStacktraceState(options.current_binary_path))
-        ReportError(sentry::Error::Level::Warning, "Failed to initialize stacktrace state: {}", *err);
+        ReportError(sentry::Error::Level::Warning,
+                    HashComptime("stacktrace_init_failed"),
+                    "Failed to initialize stacktrace state: {}",
+                    *err);
 
     InitLogger({.destination = ({
                     LogConfig::Destination d;

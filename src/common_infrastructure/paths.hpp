@@ -25,6 +25,7 @@ static Span<String> PossibleSettingsPaths(ArenaAllocator& arena) {
         dyn::Append(result, SettingsFilepath(&error_log));
         if (error_log.size) {
             ReportError(sentry::ErrorEvent::Level::Warning,
+                        HashComptime("settings path"),
                         "Failed to get known settings directory {}\n{}",
                         Last(result),
                         error_log);
@@ -85,6 +86,7 @@ static String AlwaysScannedFolder(ScanFolderType type, ArenaAllocator& allocator
         FloeKnownDirectory(allocator, dir_type, k_nullopt, {.create = true, .error_log = &error_writer});
     if (error_log.size) {
         ReportError(sentry::ErrorEvent::Level::Warning,
+                    HashComptime("dir") + ToInt(dir_type),
                     "Failed to get always scanned folder {}\n{}",
                     result,
                     error_log);

@@ -15,7 +15,7 @@ void InitBackgroundErrorReporting(Span<sentry::Tag const> tags);
 void ShutdownBackgroundErrorReporting();
 
 namespace detail {
-void ReportError(sentry::Error&& error);
+void ReportError(sentry::Error&& error, u64 error_id);
 bool ErrorSentBefore(u64 error_id);
 } // namespace detail
 
@@ -28,5 +28,5 @@ ReportError(sentry::Error::Level level, u64 error_id, String format, Args const&
     error.level = level;
     error.message = fmt::Format(error.arena, format, args...);
     error.stacktrace = CurrentStacktrace(ProgramCounter {CALL_SITE_PROGRAM_COUNTER});
-    detail::ReportError(Move(error));
+    detail::ReportError(Move(error), error_id);
 }

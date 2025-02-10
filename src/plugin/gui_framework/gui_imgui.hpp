@@ -101,6 +101,7 @@ struct TextInputFlags {
     bool32 chars_no_blank : 1; // Filter out spaces, tabs
     bool32 tab_focuses_next_input : 1;
     bool32 centre_align : 1;
+    bool32 wip_multiline : 1;
 };
 
 //

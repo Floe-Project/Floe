@@ -13,7 +13,8 @@
 
 namespace imgui {
 
-static constexpr f64 k_popup_open_and_close_delay_sec {0.2};
+constexpr f64 k_popup_open_and_close_delay_sec {0.2};
+constexpr bool k_stb_textedit_single_line_mode = true;
 
 // namespace imstring is based on dear imgui code
 // Copyright (c) 2014-2024 Omar Cornut
@@ -100,13 +101,14 @@ static int STB_TEXTEDIT_STRINGLEN(const STB_TEXTEDIT_STRING* imgui) { return img
 static Char32 STB_TEXTEDIT_GETCHAR(STB_TEXTEDIT_STRING* imgui, int idx) {
     return imgui->textedit_text[(usize)idx];
 }
+// returns the pixel delta from the xpos of the i'th character to the xpos of the i+1'th char for a line of
+// characters starting at character #n (i.e. accounts for kerning with previous char)
 // NOLINTNEXTLINE(readability-identifier-naming)
-static f32 STB_TEXTEDIT_GETWIDTH(STB_TEXTEDIT_STRING* imgui, int line_index, int char_index) {
-    // get the width of the char at line_index, char_index
-    ASSERT_EQ(line_index, 0); // only support single line at the moment
-    auto c = imgui->textedit_text[(usize)char_index];
+static f32 STB_TEXTEDIT_GETWIDTH(STB_TEXTEDIT_STRING* imgui, int i, int n) {
+    (void)i;
+    auto c = imgui->textedit_text[(usize)n];
     auto font = imgui->graphics->context->CurrentFont();
-    return font->GetCharAdvance((graphics::Char16)c) * (font->font_size / font->font_size);
+    return font->GetCharAdvance((graphics::Char16)c);
 }
 
 // NOLINTNEXTLINE(readability-identifier-naming)
@@ -159,11 +161,11 @@ static f32x2 InputTextCalcTextSizeW(Context* imgui,
 }
 
 // NOLINTNEXTLINE(readability-identifier-naming)
-static void STB_TEXTEDIT_LAYOUTROW(StbTexteditRow* r, STB_TEXTEDIT_STRING* imgui, int line_index) {
+static void STB_TEXTEDIT_LAYOUTROW(StbTexteditRow* r, STB_TEXTEDIT_STRING* imgui, int start_index) {
     Char32 const* text = imgui->textedit_text.data;
     Char32 const* text_remaining = nullptr;
     auto size = InputTextCalcTextSizeW(imgui,
-                                       text + line_index,
+                                       text + start_index,
                                        text + imgui->textedit_len,
                                        &text_remaining,
                                        nullptr,
@@ -174,7 +176,7 @@ static void STB_TEXTEDIT_LAYOUTROW(StbTexteditRow* r, STB_TEXTEDIT_STRING* imgui
     r->baseline_y_delta = size.y;
     r->ymin = 0.0f;
     r->ymax = size.y;
-    r->num_chars = (int)(text_remaining - (text + line_index));
+    r->num_chars = (int)(text_remaining - (text + start_index));
 }
 
 // NOLINTNEXTLINE(readability-identifier-naming)
@@ -437,6 +439,8 @@ f32x2 BestPopupPos(Rect base_r, Rect avoid_r, f32x2 window_size, bool find_left_
 static bool InputTextFilterCharacter(unsigned int* p_char, TextInputFlags flags) {
     unsigned int c = *p_char;
 
+    if (flags.wip_multiline && c == '\n') return true;
+
     if (c < 128 && c != ' ' && !IsPrintableAscii((char)(c & 0xFF))) {
         bool const pass = false;
         if (!pass) return false;
@@ -536,7 +540,7 @@ Context::Context(GuiFrameInput& frame_input, GuiFrameResult& frame_output)
     dyn::Append(id_stack, 0u);
     PushScissorStack();
     windows.Reserve(64);
-    stb_textedit_initialize_state(&stb_state, 1);
+    stb_textedit_initialize_state(&stb_state, k_stb_textedit_single_line_mode);
     dyn::Resize(textedit_text, 64);
     textedit_text_utf8.Reserve(64);
 }
@@ -1162,7 +1166,7 @@ TextInputResult Context::SingleLineTextInput(Rect r,
         if ((active_item.id && active_item.id != id) || (temp_active_item.id && temp_active_item.id != id))
             SetTextInputFocus(0, {});
 
-        if (frame_input.Key(KeyCode::Enter).presses.size) {
+        if (!flags.wip_multiline && frame_input.Key(KeyCode::Enter).presses.size) {
             result.enter_pressed = true;
             SetTextInputFocus(0, {});
         }
@@ -1304,7 +1308,17 @@ TextInputResult Context::SingleLineTextInput(Rect r,
         result.buffer_changed = true;
     }
 
-    if (frame_input.Key(KeyCode::Enter).presses.size) result.enter_pressed = true;
+    if (auto const enters = frame_input.Key(KeyCode::Enter).presses_or_repeats; enters.size) {
+        if (flags.wip_multiline) {
+            for (auto event : enters) {
+                if (event.modifiers.flags) continue;
+                stb_textedit_key(this, &stb_state, (int)'\n');
+            }
+        }
+
+        result.enter_pressed = true;
+        result.buffer_changed = true;
+    }
 
     bool const modifier_down = frame_input.Key(ModifierKey::Modifier).is_down;
     if (frame_input.input_utf32_chars.size && !modifier_down) {
@@ -1360,17 +1374,23 @@ TextInputResult Context::SingleLineTextInput(Rect r,
 
     {
         f32 const cursor_width = 2; // IMPROVE: scaling
+        u32 line_index = 0;
         auto font = graphics->context->CurrentFont();
-        char const* cursor_ptr = IncrementUTF8Characters(result.text.data, result.cursor);
+        auto cursor_ptr = result.text.data;
+        auto line_start = result.text.data;
+        for (auto _ : Range(result.cursor)) {
+            if (*cursor_ptr == '\n') {
+                line_start = cursor_ptr + 1;
+                line_index++;
+            }
+            cursor_ptr = IncrementUTF8Characters(cursor_ptr, 1);
+        }
+        ASSERT(cursor_ptr >= line_start);
         f32 const cursor_start =
-            font->CalcTextSizeA(font_size,
-                                FLT_MAX,
-                                0,
-                                {result.text.data, (usize)(cursor_ptr - result.text.data)})
-                .x;
+            font->CalcTextSizeA(font_size, FLT_MAX, 0, {line_start, (usize)(cursor_ptr - line_start)}).x;
 
         auto cursor_r = Rect {.x = result.text_pos.x + cursor_start,
-                              .y = result.text_pos.y - y_pad,
+                              .y = result.text_pos.y - y_pad + line_index * font_size,
                               .w = cursor_width,
                               .h = font_size + y_pad * 2};
 
@@ -1873,7 +1893,7 @@ void Context::EnableScissor() {
 }
 
 void Context::SetImguiTextEditState(String new_text) {
-    stb_textedit_initialize_state(&stb_state, 1);
+    stb_textedit_initialize_state(&stb_state, k_stb_textedit_single_line_mode);
     ZeroMemory(textedit_text.data, sizeof(*textedit_text.data) * textedit_text.size);
 
     textedit_len = imstring::Widen(textedit_text.data,
@@ -1889,7 +1909,7 @@ void Context::SetImguiTextEditState(String new_text) {
 void Context::SetTextInputFocus(Id id, String new_text) {
     if (id == 0) {
         active_text_input = id;
-        stb_textedit_initialize_state(&stb_state, 1);
+        stb_textedit_initialize_state(&stb_state, k_stb_textedit_single_line_mode);
         ZeroMemory(textedit_text.data, sizeof(*textedit_text.data) * textedit_text.size);
     } else if (active_text_input != id) {
         active_text_input = id;

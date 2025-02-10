@@ -190,6 +190,10 @@ test-windows-installer:
   set -euxo pipefail
   cd zig-out/x86_64-windows
   installer_file=$(find . -type f -name "*Installer*.exe")
+  if [[ -z "$installer_file" ]]; then
+    echo "Installer not found"
+    exit 1
+  fi
   if [[ "{{os()}}" == "windows" ]]; then
     powershell.exe -Command "\$p = Start-Process '$installer_file' -Args '--autorun' -Verb RunAs -Wait -PassThru; exit \$p.ExitCode"
   else

@@ -37,6 +37,10 @@ template <typename... Args>
     Panic(dyn::NullTerminated(buffer), loc);
 }
 
+// We could add ASSERT_LE, ASSERT_GE, etc. but it it doesn't tend to be useful to get the values of less-than
+// or greater-than comparisons in the panic message. It also makes the code harder to read. I think ASSERT_EQ
+// is the most useful and most readable so that's all we have for now.
+
 #define ASSERT_EQ(a, b)                                                                                      \
     do {                                                                                                     \
         if constexpr (RUNTIME_SAFETY_CHECKS_ON) {                                                            \

@@ -1124,6 +1124,8 @@ static bool ClapInit(const struct clap_plugin* plugin) {
             // TODO: remove this before release
             if constexpr (!PRODUCTION_BUILD)
                 ReportError(sentry::Error::Level::Info, k_nullopt, "Floe plugin loaded"_s);
+        } else {
+            if (!Check(ThreadName() == "main", k_func, "multiple main threads")) return false;
         }
 
         floe.engine.Emplace(floe.host, *g_shared_engine_systems, floe);

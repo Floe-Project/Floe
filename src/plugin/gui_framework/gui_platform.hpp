@@ -639,12 +639,10 @@ static void UpdateAndRender(GuiPlatform& platform) {
     };
 
     auto const window_size = WindowSize(platform);
-    auto const scale_factor = 1.0;
 
     platform.frame_state.graphics_ctx = platform.graphics_ctx;
     platform.frame_state.native_window = (void*)puglGetNativeView(platform.view);
     platform.frame_state.window_size = window_size;
-    platform.frame_state.draw_scale_factor = (f32)scale_factor;
     platform.frame_state.pugl_view = platform.view;
 
     u32 num_repeats = 0;
@@ -671,9 +669,7 @@ static void UpdateAndRender(GuiPlatform& platform) {
 
     if (platform.last_result.draw_data.draw_lists.size) {
         ZoneNamedN(render, "render", true);
-        auto o = platform.graphics_ctx->Render(platform.last_result.draw_data,
-                                               window_size,
-                                               platform.frame_state.draw_scale_factor);
+        auto o = platform.graphics_ctx->Render(platform.last_result.draw_data, window_size);
         if (o.HasError()) LogError(ModuleName::Gui, "GUI render failed: {}", o.Error());
     }
 }

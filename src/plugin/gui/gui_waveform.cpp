@@ -596,8 +596,7 @@ void GUIDoSampleWaveform(Gui* g, LayerProcessor* layer, Rect r) {
                                               g->scratch_arena,
                                               waveform_source,
                                               r.w,
-                                              r.h,
-                                              g->frame_input.draw_scale_factor);
+                                              r.h);
         if (tex.HasValue()) {
             g->imgui.graphics->AddImage(tex.Value(),
                                         waveform_r.Min() + f32x2 {offset * r.w, 0},

@@ -319,7 +319,6 @@ struct Font {
     static constexpr Char16 k_fallback_char = L'?';
     static constexpr Char16 k_invalid_codepoint = (Char16)-1;
 
-    f32 font_size_no_scale {};
     f32 font_size {};
 
     f32x2 display_offset {0, 1};
@@ -361,7 +360,7 @@ struct DrawContext {
     virtual ErrorCodeOr<TextureHandle> CreateTexture(u8 const* data, UiSize size, u16 bytes_per_pixel) = 0;
     virtual void DestroyTexture(TextureHandle& id) = 0;
 
-    virtual ErrorCodeOr<void> Render(DrawData draw_data, UiSize window_size, f32 display_ratio) = 0;
+    virtual ErrorCodeOr<void> Render(DrawData draw_data, UiSize window_size) = 0;
     virtual void Resize(UiSize) {}
 
     void
@@ -381,7 +380,7 @@ struct DrawContext {
     }
     f32 CurrentFontSize() {
         if (font_stack.Empty()) return 0;
-        return font_stack.Back()->font_size_no_scale;
+        return font_stack.Back()->font_size;
     }
 
     // TextureHandles can be invalidated between frames, use this method to check if your ID still has a

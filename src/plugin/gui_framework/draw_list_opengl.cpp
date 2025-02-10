@@ -124,11 +124,9 @@ struct OpenGLDrawContext : public DrawContext {
 
     void Resize(UiSize) override { DestroyDeviceObjects(); }
 
-    ErrorCodeOr<void> Render(DrawData draw_data, UiSize window_size, f32 draw_scale_factor) override {
+    ErrorCodeOr<void> Render(DrawData draw_data, UiSize window_size) override {
         ZoneScoped;
         if (draw_data.draw_lists.size == 0) return k_success;
-
-        ScaleClipRects(draw_data, draw_scale_factor);
 
         GLint last_texture;
         glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture);
@@ -149,10 +147,7 @@ struct OpenGLDrawContext : public DrawContext {
         // glHint( GL_POLYGON_SMOOTH_HINT, GL_NICEST );
 
         // Setup viewport, orthographic projection matrix
-        glViewport(0,
-                   0,
-                   (GLsizei)(window_size.width * draw_scale_factor),
-                   (GLsizei)(window_size.height * draw_scale_factor));
+        glViewport(0, 0, (GLsizei)(window_size.width), (GLsizei)(window_size.height));
         glMatrixMode(GL_PROJECTION);
         glPushMatrix();
         glLoadIdentity();
@@ -188,7 +183,7 @@ struct OpenGLDrawContext : public DrawContext {
                 } else {
                     glBindTexture(GL_TEXTURE_2D, (GLuint)(intptr_t)pcmd->texture_id);
                     glScissor((int)pcmd->clip_rect.x,
-                              (int)((window_size.height * draw_scale_factor) - pcmd->clip_rect.w),
+                              (int)((window_size.height) - pcmd->clip_rect.w),
                               (int)(pcmd->clip_rect.z - pcmd->clip_rect.x),
                               (int)(pcmd->clip_rect.w - pcmd->clip_rect.y));
                     glDrawElements(GL_TRIANGLES,

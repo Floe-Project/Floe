@@ -15,17 +15,17 @@
 #include "settings/settings_gui.hpp"
 
 static void SettingsLhsTextWidget(GuiBoxSystem& box_system, Box parent, String text) {
-    DoBox(box_system,
-          {
-              .parent = parent,
-              .text = text,
-              .font = FontType::Body,
-              .layout {
-                  .size = {style::k_settings_lhs_width,
-                           box_system.imgui.PixelsToPoints(
-                               box_system.fonts[ToInt(FontType::Body)]->font_size_no_scale)},
-              },
-          });
+    DoBox(
+        box_system,
+        {
+            .parent = parent,
+            .text = text,
+            .font = FontType::Body,
+            .layout {
+                .size = {style::k_settings_lhs_width,
+                         box_system.imgui.PixelsToPoints(box_system.fonts[ToInt(FontType::Body)]->font_size)},
+            },
+        });
 }
 
 static void SettingsRhsText(GuiBoxSystem& box_system, Box parent, String text) {

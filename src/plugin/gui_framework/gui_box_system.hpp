@@ -400,7 +400,7 @@ static bool Tooltip(GuiBoxSystem& builder, imgui::Id id, Rect r, String str) {
                                              style::Col(style::Colour::Background0),
                                              style::k_tooltip_rounding);
         imgui.overlay_graphics.AddText(font,
-                                       font->font_size_no_scale,
+                                       font->font_size,
                                        text_start,
                                        style::Col(style::Colour::Text),
                                        str,
@@ -414,7 +414,7 @@ PUBLIC Box DoBox(GuiBoxSystem& builder, BoxConfig const& config) {
     auto const box_index = builder.box_counter++;
     auto const font = builder.fonts[ToInt(config.font)];
     auto const font_size =
-        config.font_size != 0 ? builder.imgui.PointsToPixels(config.font_size) : font->font_size_no_scale;
+        config.font_size != 0 ? builder.imgui.PointsToPixels(config.font_size) : font->font_size;
 
     // IMPORTANT: if the string is very long, it needs to be word-wrapped manually by including newlines in
     // the text. This is necessary because our text rendering system is bad at doing huge amounts of

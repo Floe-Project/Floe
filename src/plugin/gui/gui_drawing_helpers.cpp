@@ -24,7 +24,7 @@ void DropShadow(imgui::Context const& imgui, Rect r, Optional<f32> rounding_opt)
 }
 
 f32x2 GetTextSize(graphics::Font* font, String str, Optional<f32> wrap_width) {
-    auto const result = font->CalcTextSizeA(font->font_size_no_scale, FLT_MAX, wrap_width.ValueOr(0), str);
+    auto const result = font->CalcTextSizeA(font->font_size, FLT_MAX, wrap_width.ValueOr(0), str);
     return {result.x, result.y};
 }
 

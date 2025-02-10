@@ -70,12 +70,8 @@ void DoTooltipText(Gui* g, String str, Rect r, bool rect_is_window_pos) {
                                          popup_r.Max(),
                                          LiveCol(imgui, UiColMap::TooltipBack),
                                          LiveSize(imgui, UiSizeId::CornerRounding));
-    imgui.overlay_graphics.AddText(font,
-                                   font->font_size_no_scale,
-                                   text_start,
-                                   LiveCol(imgui, UiColMap::TooltipText),
-                                   str,
-                                   size + 1);
+    imgui.overlay_graphics
+        .AddText(font, font->font_size, text_start, LiveCol(imgui, UiColMap::TooltipText), str, size + 1);
 
     g->imgui.graphics->context->PopFont();
 }

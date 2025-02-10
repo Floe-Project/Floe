@@ -26,7 +26,7 @@ PUBLIC void LoadFonts(graphics::DrawContext& graphics, Fonts& fonts) {
         config.font_data_reference_only = true;
         auto result =
             graphics.fonts.AddFontFromMemoryTTF((void*)ttf.data, (int)ttf.size, size, &config, ranges);
-        result->font_size_no_scale = size;
+        result->font_size = size;
         return result;
     };
 

@@ -1250,7 +1250,6 @@ void DrawList::AddTextJustified(Rect r,
                                 TextOverflowType overflow_type,
                                 f32 font_scaling) {
     auto font = context->CurrentFont();
-    auto const display_scale = font->font_size_no_scale / font->font_size;
     auto font_size = context->CurrentFontSize() * font_scaling;
 
     ArenaAllocatorWithInlineStorage<1000> temp_allocator {Malloc::Instance()};
@@ -1285,7 +1284,7 @@ void DrawList::AddTextJustified(Rect r,
                     f32 const char_width =
                         ((int)c < font->index_x_advance.size ? font->index_x_advance[(int)c]
                                                              : font->fallback_x_advance) *
-                        font_scaling * display_scale;
+                        font_scaling;
 
                     line_width += char_width;
 
@@ -1326,7 +1325,7 @@ void DrawList::AddTextJustified(Rect r,
                     f32 const char_width =
                         ((int)c < font->index_x_advance.size ? font->index_x_advance[(int)c]
                                                              : font->fallback_x_advance) *
-                        font_scaling * display_scale;
+                        font_scaling;
 
                     line_width += char_width;
 
@@ -1376,7 +1375,7 @@ void DrawList::AddText(Font const* font,
 }
 
 void DrawList::AddText(f32x2 const& pos, u32 col, String str) {
-    AddText(context->CurrentFont(), context->CurrentFont()->font_size_no_scale, pos, col, str);
+    AddText(context->CurrentFont(), context->CurrentFont()->font_size, pos, col, str);
 }
 
 static inline f32x2 Mul(f32x2 const& lhs, f32x2 const& rhs) { return f32x2 {lhs.x * rhs.x, lhs.y * rhs.y}; }

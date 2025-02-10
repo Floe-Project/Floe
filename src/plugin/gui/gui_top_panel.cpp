@@ -57,13 +57,13 @@ void TopPanel(Gui* g) {
                                                  .contents_align = layout::Alignment::Start,
                                              });
 
-    auto title = layout::CreateItem(
-        g->layout,
-        {
-            .parent = left_container,
-            .size = {LiveSize(g->imgui, UiSizeId::Top2TitleWidth), title_font->font_size_no_scale},
-            .margins = {.l = LiveSize(g->imgui, UiSizeId::Top2TitleMarginL)},
-        });
+    auto title =
+        layout::CreateItem(g->layout,
+                           {
+                               .parent = left_container,
+                               .size = {LiveSize(g->imgui, UiSizeId::Top2TitleWidth), title_font->font_size},
+                               .margins = {.l = LiveSize(g->imgui, UiSizeId::Top2TitleMarginL)},
+                           });
 
     auto right_container = layout::CreateItem(g->layout,
                                               {

@@ -116,7 +116,6 @@ struct GuiFrameInput {
     TimePoint time_prev {};
     f32 delta_time {};
     u64 update_count {};
-    f32 draw_scale_factor {1}; // TODO: I think we can remove this since pugl always provides us with pixels
     UiSize window_size {};
     void* native_window {}; // HWND, NSView*, etc.
     void* pugl_view {}; // PuglView* for the current frame

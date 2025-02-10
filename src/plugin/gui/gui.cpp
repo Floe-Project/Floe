@@ -278,7 +278,6 @@ static void SampleLibraryChanged(Gui* g, sample_lib::LibraryIdRef library_id) {
 }
 
 static void CreateFontsIfNeeded(Gui* g) {
-    g->imgui.SetPixelsPerPoint(PixelsPerPoint(g));
 
     //
     // Fonts
@@ -302,11 +301,10 @@ static void CreateFontsIfNeeded(Gui* g) {
             config.font_data_reference_only = true;
             auto font = graphics_ctx->fonts.AddFontFromMemoryTTF((void*)data.data,
                                                                  (int)data.size,
-                                                                 size * g->frame_input.draw_scale_factor,
+                                                                 size,
                                                                  &config,
                                                                  ranges);
             ASSERT(font != nullptr);
-            font->font_size_no_scale = size;
 
             return font;
         };
@@ -317,7 +315,6 @@ static void CreateFontsIfNeeded(Gui* g) {
             g->icons = load_font({data.data, data.size},
                                  mada_size,
                                  Array {graphics::GlyphRange {ICON_MIN_FA, ICON_MAX_FA}});
-            g->icons->font_size_no_scale = mada_size;
             ASSERT(g->icons != nullptr);
         }
 
@@ -568,6 +565,7 @@ static bool HasAnyErrorNotifications(Gui* g) {
 GuiFrameResult GuiUpdate(Gui* g) {
     ZoneScoped;
     ASSERT(IsMainThread(g->engine.host));
+    g->imgui.SetPixelsPerPoint(PixelsPerPoint(g));
 
     g->frame_output = {};
 
@@ -579,7 +577,6 @@ GuiFrameResult GuiUpdate(Gui* g) {
 
     CreateFontsIfNeeded(g);
     auto& imgui = g->imgui;
-    imgui.SetPixelsPerPoint(PixelsPerPoint(g));
 
     g->waveforms.StartFrame();
     DEFER { g->waveforms.EndFrame(*g->frame_input.graphics_ctx); };

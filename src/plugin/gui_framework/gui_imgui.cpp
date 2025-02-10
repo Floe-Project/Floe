@@ -106,7 +106,7 @@ static f32 STB_TEXTEDIT_GETWIDTH(STB_TEXTEDIT_STRING* imgui, int line_index, int
     ASSERT_EQ(line_index, 0); // only support single line at the moment
     auto c = imgui->textedit_text[(usize)char_index];
     auto font = imgui->graphics->context->CurrentFont();
-    return font->GetCharAdvance((graphics::Char16)c) * (font->font_size_no_scale / font->font_size);
+    return font->GetCharAdvance((graphics::Char16)c) * (font->font_size / font->font_size);
 }
 
 // NOLINTNEXTLINE(readability-identifier-naming)
@@ -123,7 +123,6 @@ static f32x2 InputTextCalcTextSizeW(Context* imgui,
                                     bool stop_on_new_line) {
     auto font = imgui->graphics->context->CurrentFont();
     auto line_height = imgui->graphics->context->CurrentFontSize();
-    f32 const scale = font->font_size_no_scale / font->font_size;
 
     auto text_size = f32x2 {0, 0};
     f32 line_width = 0.0f;
@@ -140,7 +139,7 @@ static f32x2 InputTextCalcTextSizeW(Context* imgui,
         }
         if (c == '\r') continue;
 
-        f32 const char_width = font->GetCharAdvance((unsigned short)c) * scale;
+        f32 const char_width = font->GetCharAdvance((unsigned short)c);
         line_width += char_width;
     }
 
@@ -1144,7 +1143,7 @@ TextInputResult Context::SingleLineTextInput(Rect r,
         auto x_offset = text_xpad_in_input_box;
         if (flags.centre_align) {
             auto font = graphics->context->CurrentFont();
-            auto size = font->CalcTextSizeA(font->font_size_no_scale, FLT_MAX, 0.0f, text).x;
+            auto size = font->CalcTextSizeA(font->font_size, FLT_MAX, 0.0f, text).x;
             x_offset = ((r.w / 2) - (size / 2));
         }
         return x_offset;
@@ -2088,7 +2087,6 @@ void Context::DebugWindow(Rect r) {
                       "%hu, %hu",
                       frame_input.window_size.width,
                       frame_input.window_size.height);
-        DebugTextItem("DisplayRatio", "%.2f", (f64)frame_input.draw_scale_factor);
         DebugTextItem("Widgets", "%d", (int)frame_output.mouse_tracked_rects.size);
 
         debug_y_pos += graphics->context->CurrentFontSize() * 2;
@@ -2353,7 +2351,7 @@ f32 Context::LargestStringWidth(f32 pad, void* items, int num, String (*GetStr)(
     f32 result = 0;
     for (auto const i : Range(num)) {
         auto str = GetStr(items, i);
-        auto len = font->CalcTextSizeA(font->font_size_no_scale, FLT_MAX, 0.0f, str).x;
+        auto len = font->CalcTextSizeA(font->font_size, FLT_MAX, 0.0f, str).x;
         if (len > result) result = len;
     }
     return (f32)(int)(result + pad * 2);

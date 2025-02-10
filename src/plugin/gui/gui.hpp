@@ -44,10 +44,8 @@ class FloeWaveformImages {
                                                        ArenaAllocator& scratch_arena,
                                                        WaveformAudioSource source,
                                                        f32 unscaled_width,
-                                                       f32 unscaled_height,
-                                                       f32 display_ratio) {
-        UiSize const size {CheckedCast<u16>(unscaled_width * display_ratio),
-                           CheckedCast<u16>(unscaled_height * display_ratio)};
+                                                       f32 unscaled_height) {
+        UiSize const size {CheckedCast<u16>(unscaled_width), CheckedCast<u16>(unscaled_height)};
 
         u64 source_hash = 0;
         switch (source.tag) {

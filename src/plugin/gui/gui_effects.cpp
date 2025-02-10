@@ -303,7 +303,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
     auto heading_font = g->fira_sans;
 
     auto get_heading_size = [&](String name) {
-        auto size = heading_font->CalcTextSizeA(heading_font->font_size_no_scale *
+        auto size = heading_font->CalcTextSizeA(heading_font->font_size *
                                                     buttons::EffectHeading(imgui, 0).text_scaling,
                                                 FLT_MAX,
                                                 0.0f,

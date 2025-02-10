@@ -231,7 +231,7 @@ static void DoErrorsModal(Gui* g) {
                         auto desc_r = Rect {.x = 0, .y = y_pos, .w = size.x, .h = size.y};
                         imgui.RegisterAndConvertRect(&desc_r);
                         imgui.graphics->AddText(font,
-                                                font->font_size_no_scale,
+                                                font->font_size,
                                                 desc_r.pos,
                                                 text_style.main_cols.reg,
                                                 error_text,

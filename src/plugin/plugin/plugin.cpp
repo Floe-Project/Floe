@@ -989,9 +989,11 @@ static void ClapThreadPoolExec(clap_plugin_t const* plugin, u32 task_index) {
     if (PanicOccurred()) return;
 
     try {
-        if (!plugin) return;
-
-        auto& floe = *(FloePluginInstance*)plugin->plugin_data;
+        auto& floe = *({
+            auto f = ExtractFloe(plugin);
+            if (!Check(f, "thread_pool.exec", "plugin ptr is invalid")) return;
+            f;
+        });
         TRACE_CLAP_CALL("thread_pool.exec");
 
         floe.engine->processor.processor_callbacks.on_thread_pool_exec(floe.engine->processor, task_index);

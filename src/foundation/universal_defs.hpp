@@ -343,6 +343,10 @@ PanicHook GetPanicHook(); // thread-safe
 
 extern thread_local bool g_in_signal_handler;
 
+#define ASSUME(expression)                                                                                   \
+    _Pragma("clang diagnostic push") _Pragma("clang diagnostic ignored \"-Wassume\"")                        \
+        __builtin_assume(!!(expression)) _Pragma("clang diagnostic pop")
+
 // NOTE: The expression may be discarded so it mustn't have side effects.
 // NOTE: We don't panic if PanicOccurred() is true because if a panic has happened the state of the program
 // can't be trusted to assert anything about it. Instead, we are just in a 'damage control' mode.
@@ -351,9 +355,7 @@ extern thread_local bool g_in_signal_handler;
         if constexpr (RUNTIME_SAFETY_CHECKS_ON) {                                                            \
             if (!(expression) && !PanicOccurred()) Panic("assertion failed: " #expression " " __VA_ARGS__);  \
         } else                                                                                               \
-            _Pragma("clang diagnostic push") _Pragma("clang diagnostic ignored \"-Wassume\"")                \
-                __builtin_assume(!!(expression));                                                            \
-        _Pragma("clang diagnostic pop")                                                                      \
+            ASSUME(expression);                                                                              \
     } while (0)
 
 // For use in hot code paths - this will be removed in production builds
@@ -362,9 +364,7 @@ extern thread_local bool g_in_signal_handler;
         if constexpr (RUNTIME_SAFETY_CHECKS_ON && !PRODUCTION_BUILD) {                                       \
             if (!(expression) && !PanicOccurred()) Panic("assertion failed: " #expression " " __VA_ARGS__);  \
         } else                                                                                               \
-            _Pragma("clang diagnostic push") _Pragma("clang diagnostic ignored \"-Wassume\"")                \
-                __builtin_assume(!!(expression));                                                            \
-        _Pragma("clang diagnostic pop")                                                                      \
+            ASSUME(expression);                                                                              \
     } while (0)
 
 #define TODO(message) Panic("TODO: " message)

@@ -619,7 +619,7 @@ static void PackagesSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext
     }
 }
 
-static void AppearanceSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& context) {
+static void GeneralSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& context) {
     auto const root = DoBox(box_system,
                             {
                                 .layout {
@@ -707,11 +707,10 @@ static void AppearanceSettingsPanel(GuiBoxSystem& box_system, SettingsPanelConte
     }
 
     {
-        auto const options_row = SettingsRow(box_system, root);
+        auto const style_row = SettingsRow(box_system, root);
 
-        SettingsLhsTextWidget(box_system, options_row, "Options");
-        auto const options_rhs_column =
-            SettingsRhsColumn(box_system, options_row, style::k_settings_small_gap);
+        SettingsLhsTextWidget(box_system, style_row, "Style");
+        auto const options_rhs_column = SettingsRhsColumn(box_system, style_row, style::k_settings_small_gap);
 
         if (SettingsCheckboxButton(box_system,
                                    options_rhs_column,
@@ -737,14 +736,20 @@ static void AppearanceSettingsPanel(GuiBoxSystem& box_system, SettingsPanelConte
                 !context.settings.settings.gui.high_contrast_gui;
             context.settings.tracking.changed = true;
         }
+    }
 
-        // TODO: move this, it's not really a 'Appearance' setting
+    {
+        auto const misc_row = SettingsRow(box_system, root);
+
+        SettingsLhsTextWidget(box_system, misc_row, "Misc");
+        auto const options_rhs_column = SettingsRhsColumn(box_system, misc_row, style::k_settings_small_gap);
+
         if (SettingsCheckboxButton(box_system,
                                    options_rhs_column,
-                                   "Disable anonymous online reporting",
+                                   "Disable anonymous error reports",
                                    context.settings.settings.online_reporting_disabled)) {
             gui_settings::SetDisableOnlineReporting(context.settings,
-                                                    !context.settings.settings.online_reporting_disabled);
+                                                    context.settings.settings.online_reporting_disabled);
         }
     }
 }
@@ -756,8 +761,8 @@ SettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& context, SettingsP
         for (auto const tab : EnumIterator<SettingsPanelState::Tab>()) {
             auto const index = ToInt(tab);
             switch (tab) {
-                case SettingsPanelState::Tab::Appearance:
-                    tabs[index] = {.icon = ICON_FA_PAINT_BRUSH, .text = "Appearance"};
+                case SettingsPanelState::Tab::General:
+                    tabs[index] = {.icon = ICON_FA_SLIDERS_H, .text = "General"};
                     break;
                 case SettingsPanelState::Tab::Folders:
                     tabs[index] = {.icon = ICON_FA_FOLDER_OPEN, .text = "Folders"};
@@ -785,7 +790,7 @@ SettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& context, SettingsP
                  .run = ({
                      TabPanelFunction f {};
                      switch (state.tab) {
-                         case SettingsPanelState::Tab::Appearance: f = AppearanceSettingsPanel; break;
+                         case SettingsPanelState::Tab::General: f = GeneralSettingsPanel; break;
                          case SettingsPanelState::Tab::Folders: f = FolderSettingsPanel; break;
                          case SettingsPanelState::Tab::Packages: f = PackagesSettingsPanel; break;
                          case SettingsPanelState::Tab::Count: PanicIfReached();

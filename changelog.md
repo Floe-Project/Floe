@@ -16,6 +16,7 @@ For instance: 0.0.1. Don't change the headings.
 - Add new fields to the Lua API to support license info and attribution, such as CC BY
 - Add attribution-required panel which appears when needed with generated copyable text for fulfilling attribution requirements. Synchronised between all instances of Floe. Makes complying with licenses like CC BY easy.
 - Enable selecting multiple package to install at once
+- Renamed Appearance settings to General since it's small and can be used for other settings
 - Make notifications dismiss themselves after a few seconds
 - Fixed externally deleted or moved-to-trash libraries not being removed from Floe
 - Fixed not installing to the chosen location

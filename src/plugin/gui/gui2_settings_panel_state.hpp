@@ -6,11 +6,11 @@
 
 struct SettingsPanelState {
     enum class Tab : u32 {
-        Appearance,
+        General,
         Folders,
         Packages,
         Count,
     };
     bool open {};
-    Tab tab {Tab::Appearance};
+    Tab tab {Tab::General};
 };

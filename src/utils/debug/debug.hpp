@@ -7,41 +7,6 @@
 
 #include "tracy_wrapped.hpp"
 
-// Sometimes don't want to depend on our usual string formatting because that code could be cause of the
-// problem we're trying to debug.
-struct InlineSprintfBuffer {
-    InlineSprintfBuffer() { buffer[0] = 0; }
-
-    void Append(char const* fmt, ...) __attribute__((__format__(__printf__, 2, 3))) {
-        va_list args;
-        va_start(args, fmt);
-        auto const n = stbsp_vsnprintf(write_ptr, size_remaining, fmt, args);
-        va_end(args);
-
-        if (n < 0) return;
-
-        auto const num_written = Min(size_remaining, n);
-        write_ptr += num_written;
-        size_remaining -= num_written;
-    }
-
-    String AsString() { return {buffer, ArraySize(buffer) - (usize)size_remaining}; }
-    char const* CString() { return buffer; }
-
-    char buffer[1024]; // always null-terminated
-    int size_remaining = (int)ArraySize(buffer);
-    char* write_ptr = buffer;
-};
-
-template <typename... Args>
-[[noreturn]] PUBLIC void PanicF(SourceLocation loc, String format, Args const&... args) {
-    DynamicArrayBounded<char, 1000> buffer {};
-    fmt::Append(buffer, format, args...);
-    Panic(dyn::NullTerminated(buffer), loc);
-}
-
-#define PANICF(format, ...) PanicF(SourceLocation::Current(), format, ##__VA_ARGS__)
-
 enum class StacktraceError {
     NotInitialised,
 };

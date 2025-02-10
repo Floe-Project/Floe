@@ -299,7 +299,7 @@ static bool CreateDirectoryWithAttributes(WCHAR* path, DWORD attributes) {
 static DWORD AttributesForDir(WCHAR* path, usize path_size, CreateDirectoryOptions options) {
     ASSERT(path_size);
     ASSERT(path);
-    ASSERT(path[path_size] == L'\0');
+    ASSERT_EQ(path[path_size], L'\0');
 
     DWORD attributes = 0;
     if (options.win32_hide_dirs_starting_with_dot) {

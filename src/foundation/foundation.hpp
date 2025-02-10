@@ -35,6 +35,7 @@
 #include "container/queue.hpp" // IWYU pragma: export
 #include "container/span.hpp" // IWYU pragma: export
 #include "container/tagged_union.hpp" // IWYU pragma: export
+#include "error/assert_f.hpp" // IWYU pragma: export
 #include "error/error_code.hpp" // IWYU pragma: export
 #include "error/error_with_path.hpp" // IWYU pragma: export
 #include "error/try.hpp" // IWYU pragma: export

@@ -39,7 +39,7 @@ struct ColourString {
     constexpr ColourString(String s) : size(s.size) { __builtin_memcpy(data, s.data, s.size); }
     constexpr operator String() const { return {data, size}; }
     void NullTerminate() {
-        ASSERT(size < ArraySize(data));
+        ASSERT_LT(size, ArraySize(data));
         data[size] = 0;
     }
     usize size {};

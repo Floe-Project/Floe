@@ -57,7 +57,7 @@ class SmoothedValueSystem {
     }
 
     rbj_filter::SmoothedCoefficients::State Value(FilterId smoother, u32 frame_index) const {
-        ASSERT(frame_index < m_num_valid_frames);
+        ASSERT_LT(frame_index, m_num_valid_frames);
 
         if (m_processed_filter_this_frame[u16(smoother)])
             return m_filter_result_buffer[u16(smoother) * m_num_valid_frames + frame_index];
@@ -187,7 +187,7 @@ class SmoothedValueSystem {
         }
 
         Type Value(u32 block_size, IdType smoother, u32 frame_index) const {
-            ASSERT(frame_index < block_size);
+            ASSERT_LT(frame_index, block_size);
 
             if (frame_index < num_frames_smoothed_this_block[u16(smoother)])
                 return result_buffer[u16(smoother) * block_size + frame_index];

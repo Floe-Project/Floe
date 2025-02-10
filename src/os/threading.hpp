@@ -320,7 +320,7 @@ struct AtomicCountdown {
         if (current == 0)
             WakeWaitingThreads(counter, NumWaitingThreads::All);
         else
-            ASSERT(current < LargestRepresentableValue<u32>());
+            ASSERT_LT(current, LargestRepresentableValue<u32>());
     }
 
     void Increase(u32 steps = 1) { counter.FetchAdd(steps, RmwMemoryOrder::AcquireRelease); }

@@ -302,11 +302,11 @@ ErrorCodeOr<MutableString> CurrentBinaryPath(Allocator& a) {
                                 }
                             }
                         }
-                        ASSERT(word_index < 100);
+                        ASSERT_LT(word_index, 100);
                     }
 
                     ++line_index;
-                    ASSERT(line_index < 20000);
+                    ASSERT_LT(line_index, 20000);
                 }
             } else {
                 size = readlink("/proc/self/exe", buffer.data, buffer.size);

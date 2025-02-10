@@ -208,10 +208,10 @@ inline void SampleGetData(AudioData const& s,
 
     if (loop) {
         ASSERT(loop->end <= frames_in_sample);
-        ASSERT(loop->start < frames_in_sample);
+        ASSERT_LT(loop->start, frames_in_sample);
         ASSERT(loop->end > loop->start);
     }
-    ASSERT(frame_pos < frames_in_sample);
+    ASSERT_LT(frame_pos, frames_in_sample);
 
     auto const frame_index = (int)frame_pos;
     auto x = (f32)frame_pos - (f32)frame_index;

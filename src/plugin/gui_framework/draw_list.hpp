@@ -73,11 +73,11 @@ struct Vector {
     int Capacity() const { return capacity; }
 
     ValueType& operator[](int i) {
-        ASSERT(i < size);
+        ASSERT_LT(i, size);
         return data[i];
     }
     ValueType const& operator[](int i) const {
-        ASSERT(i < size);
+        ASSERT_LT(i, size);
         return data[i];
     }
 

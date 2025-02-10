@@ -634,7 +634,7 @@ static bool PluginSaveState(Engine& engine, clap_ostream const& stream) {
                                  .read_or_write_data = [&](void* data, usize bytes) -> ErrorCodeOr<void> {
                                      u64 bytes_written = 0;
                                      while (bytes_written != bytes) {
-                                         ASSERT(bytes_written < bytes);
+                                         ASSERT_LT(bytes_written, bytes);
                                          auto const n = stream.write(&stream,
                                                                      (u8 const*)data + bytes_written,
                                                                      bytes - bytes_written);
@@ -670,7 +670,7 @@ static bool PluginLoadState(Engine& engine, clap_istream const& stream) {
                       .read_or_write_data = [&](void* data, usize bytes) -> ErrorCodeOr<void> {
                           u64 bytes_read = 0;
                           while (bytes_read != bytes) {
-                              ASSERT(bytes_read < bytes);
+                              ASSERT_LT(bytes_read, bytes);
                               auto const n = stream.read(&stream, (u8*)data + bytes_read, bytes - bytes_read);
                               if (n == 0) return ErrorCode(CommonError::InvalidFileFormat); // unexpected EOF
                               if (n < 0) return ErrorCode(CommonError::PluginHostError);

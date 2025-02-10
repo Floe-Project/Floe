@@ -147,7 +147,7 @@ struct EventQueue {
 
     clap_event_header* AtIndex(u32 index) const {
         ASSERT(first);
-        ASSERT(index < size);
+        ASSERT_LT(index, size);
         auto node = first;
         for (auto _ : Range(index)) {
             ASSERT(node);

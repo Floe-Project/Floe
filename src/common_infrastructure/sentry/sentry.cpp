@@ -78,12 +78,12 @@ static void CheckDsn(DsnInfo dsn) {
 }
 
 static void CheckTags(Span<Tag const> tags) {
-    ASSERT_LT(tags.size, 20u);
+    ASSERT(tags.size < 20);
     for (auto const& tag : tags) {
         ASSERT(tag.key.size);
         ASSERT(tag.value.size);
-        ASSERT_LT(tag.key.size, 200u);
-        ASSERT_LT(tag.value.size, 200u);
+        ASSERT(tag.key.size < 200);
+        ASSERT(tag.value.size < 200);
     }
 }
 

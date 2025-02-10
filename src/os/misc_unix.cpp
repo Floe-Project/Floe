@@ -338,7 +338,7 @@ DateAndTime UtcTimeFromNanosecondsSinceEpoch(s128 nanoseconds) {
         if (total_days < days_in_year) break;
         total_days -= days_in_year;
         dt.year++;
-        ASSERT_LT(dt.year, 3000);
+        ASSERT(dt.year < 3000);
     }
 
     // Calculate month and day
@@ -348,7 +348,7 @@ DateAndTime UtcTimeFromNanosecondsSinceEpoch(s128 nanoseconds) {
         if (total_days < days_in_month) break;
         total_days -= days_in_month;
         dt.months_since_jan++;
-        ASSERT_LT(dt.months_since_jan, 12);
+        ASSERT(dt.months_since_jan < 12);
     }
 
     dt.day_of_month = CheckedCast<s8>(total_days + 1);

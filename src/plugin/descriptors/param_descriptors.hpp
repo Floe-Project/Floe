@@ -2197,7 +2197,7 @@ Type ParamToInt(f32 value) {
     auto const i = (s64)Trunc(value);
     if constexpr (Enum<Type>) {
         ASSERT(i >= 0);
-        ASSERT_LT(i, (s64)Type::Count);
+        ASSERT(i < (s64)Type::Count);
     }
     return (Type)i;
 }

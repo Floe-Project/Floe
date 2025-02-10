@@ -276,7 +276,7 @@ void DrawList::ChannelsMerge() {
 }
 
 void DrawList::ChannelsSetCurrent(int idx) {
-    ASSERT_LT(idx, channels_count);
+    ASSERT(idx < channels_count);
     if (channels_current == idx) return;
     CopyMemory(&channels.data[channels_current].cmd_buffer,
                &cmd_buffer,
@@ -1617,7 +1617,7 @@ Font* FontAtlas::AddFontFromMemoryTTF(void* ttf_data,
                                       FontConfig const* font_cfg_template,
                                       Span<GlyphRange const> glyph_ranges) {
     FontConfig font_cfg = font_cfg_template ? *font_cfg_template : FontConfig();
-    ASSERT_LT(glyph_ranges.size, font_cfg.glyph_ranges.Capacity());
+    ASSERT(glyph_ranges.size < font_cfg.glyph_ranges.Capacity());
     ASSERT(font_cfg.font_data == nullptr);
     font_cfg.font_data = ttf_data;
     font_cfg.font_data_size = ttf_size;
@@ -1899,7 +1899,7 @@ void Font::BuildLookupTable() {
     for (int i = 0; i != glyphs.size; i++)
         max_codepoint = Max(max_codepoint, (int)glyphs[i].codepoint);
 
-    ASSERT_LT(glyphs.size, 0xFFFF);
+    ASSERT(glyphs.size < 0xFFFF);
     index_x_advance.Clear();
     index_lookup.Clear();
     GrowIndex(max_codepoint + 1);

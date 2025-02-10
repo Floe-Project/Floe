@@ -886,7 +886,7 @@ PUBLIC void ShutdownJobs(InstallJobs& jobs) {
         SleepThisThread(k_sleep_ms);
     }
 
-    ASSERT_LT(wait_ms, k_timeout_ms);
+    ASSERT(wait_ms < k_timeout_ms);
 
     jobs.RemoveAll();
 }

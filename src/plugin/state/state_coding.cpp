@@ -184,7 +184,8 @@ static Optional<ParamProjection> ParamProjection(ParamIndex index) {
         (index == ParamIndex::ConvolutionReverbWet) || (index == ParamIndex::ConvolutionReverbDry) ||
         (index == ParamIndex::BitCrushWet)) {
         ASSERT(k_param_descriptors[(u32)index].linear_range.min >= 0);
-        ASSERT_LT(k_param_descriptors[(u32)index].linear_range.max, 30); // it's unlikely to have an amp above 30
+        ASSERT(k_param_descriptors[(u32)index].linear_range.max <
+               30); // it's unlikely to have an amp above 30
         return ParamProjection::WasDbNowAmp;
     }
     return k_nullopt;

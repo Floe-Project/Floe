@@ -46,7 +46,7 @@ struct AttributionsStore {
     bool SerialiseString(String& str, ArenaAllocator& arena) {
         auto size = (u16)Min(str.size, LargestRepresentableValue<u16>() - 1uz);
         if (!SerialiseNumber(size)) return false;
-        ASSERT_LT(size, 200);
+        ASSERT(size < 200);
         if (mode == Mode::Read) {
             if (pos + size > data.size) return false;
             str = arena.Clone(Span {(char*)data.data + pos, size});

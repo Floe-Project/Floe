@@ -494,7 +494,7 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
                         if (next_region->trigger.velocity_range.start == region->trigger.velocity_range.end) {
                             auto const delta =
                                 (s8)(next_region->trigger.velocity_range.Size() * k_overlap_percent);
-                            ASSERT_LT(new_range.end, 100);
+                            ASSERT(new_range.end < 100);
                             new_range.end += delta;
                         }
                     }

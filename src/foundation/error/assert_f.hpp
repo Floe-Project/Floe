@@ -37,17 +37,27 @@ template <typename... Args>
     Panic(dyn::NullTerminated(buffer), loc);
 }
 
-#define ASSERT_EQ(a, b)                                                                                      \
+#define ASSERT_EXPR_OP(a, b, op)                                                                             \
     do {                                                                                                     \
         if constexpr (RUNTIME_SAFETY_CHECKS_ON) {                                                            \
-            auto x = a;                                                                                      \
-            auto y = b;                                                                                      \
-            if (!(x == y) && !PanicOccurred()) {                                                             \
-                PanicF(SourceLocation::Current(), "assertion failed: " #a " == " #b " | {} == {}", x, y);    \
+            auto const x = a;                                                                                \
+            auto const y = b;                                                                                \
+            if (!(x op y) && !PanicOccurred()) {                                                             \
+                PanicF(SourceLocation::Current(),                                                            \
+                       "assertion failed: " #a " " #op " " #b " | {} " #op " {}",                            \
+                       x,                                                                                    \
+                       y);                                                                                   \
             }                                                                                                \
         } else {                                                                                             \
-            ASSUME((a) == (b));                                                                              \
+            ASSUME((a)op(b));                                                                                \
         }                                                                                                    \
     } while (0)
+
+#define ASSERT_EQ(a, b)  ASSERT_EXPR_OP(a, b, ==)
+#define ASSERT_NE(a, b)  ASSERT_EXPR_OP(a, b, !=)
+#define ASSERT_LT(a, b)  ASSERT_EXPR_OP(a, b, <)
+#define ASSERT_LTE(a, b) ASSERT_EXPR_OP(a, b, <=)
+#define ASSERT_GT(a, b)  ASSERT_EXPR_OP(a, b, >)
+#define ASSERT_GTE(a, b) ASSERT_EXPR_OP(a, b, >=)
 
 #define PANICF(format, ...) PanicF(SourceLocation::Current(), format, ##__VA_ARGS__)

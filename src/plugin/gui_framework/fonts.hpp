@@ -20,14 +20,12 @@ enum class FontType : u32 {
 
 using Fonts = Array<graphics::Font*, ToInt(FontType::Count)>;
 
-PUBLIC void LoadFonts(graphics::DrawContext& graphics, Fonts& fonts) {
+PUBLIC void LoadFonts(graphics::DrawContext& graphics, Fonts& fonts, f32 pixels_per_point) {
     auto load_font = [&](BinaryData ttf, f32 size, graphics::GlyphRanges ranges) {
+        size *= pixels_per_point;
         graphics::FontConfig config {};
         config.font_data_reference_only = true;
-        auto result =
-            graphics.fonts.AddFontFromMemoryTTF((void*)ttf.data, (int)ttf.size, size, &config, ranges);
-        result->font_size = size;
-        return result;
+        return graphics.fonts.AddFontFromMemoryTTF((void*)ttf.data, (int)ttf.size, size, &config, ranges);
     };
 
     auto const def_ranges = graphics.fonts.GetGlyphRangesDefaultAudioPlugin();

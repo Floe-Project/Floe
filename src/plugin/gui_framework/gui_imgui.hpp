@@ -268,13 +268,25 @@ struct TextInputResult {
 
     f32x2 GetTextPos() const { return text_pos; }
 
+    struct SelectionIterator {
+        TextInputResult const& result;
+        graphics::DrawContext& draw_ctx;
+        char const* pos;
+        u32 remaining_chars;
+        u32 line_index;
+        bool reached_end;
+    };
+    static Optional<Rect> NextMultilineSelectionRect(SelectionIterator& it);
+
     bool enter_pressed {};
     bool buffer_changed {};
 
     f32x2 text_pos = {};
     Rect cursor_rect = {};
-    Rect selection_rect = {};
-    String text {}; // temporary, changes when TextInput is called again
+    Rect selection_rect = {}; // single line only
+    // temporary, changes when TextInput is called again, copy this into your own buffer if
+    // buffer_changed is true
+    String text {};
 
     int cursor = 0;
     int selection_start = 0;
@@ -351,8 +363,8 @@ struct Context {
     bool TextInputHasFocus(Id id) const;
     bool TextInputJustFocused(Id id) const;
     bool TextInputJustUnfocused(Id id) const;
-    void SetImguiTextEditState(String new_text);
-    void SetTextInputFocus(Id id, String new_text); // pass 0 to unfocus
+    void SetImguiTextEditState(String new_text, bool multiline);
+    void SetTextInputFocus(Id id, String new_text, bool multiline); // pass 0 to unfocus
     void TextInputSelectAll();
     void ResetTextInputCursorAnim();
 
@@ -599,7 +611,7 @@ struct Context {
     //
     //
     static constexpr f64 k_text_cursor_blink_rate {0.5};
-    f32 text_xpad_in_input_box = 4; // pixels, x offset for text inside a text input box
+    static constexpr f32 k_text_xpad_in_input_box = 4; // pixels, x offset for text inside a text input box
     f64 hover_popup_delay {0.10}; // delay before popups close
     f64 button_repeat_rate {0.1}; // rate at which button hold to repeat triggers
     WindowSettings default_window_style = {};

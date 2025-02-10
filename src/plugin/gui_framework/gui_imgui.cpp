@@ -14,7 +14,6 @@
 namespace imgui {
 
 constexpr f64 k_popup_open_and_close_delay_sec {0.2};
-constexpr bool k_stb_textedit_single_line_mode = true;
 
 // namespace imstring is based on dear imgui code
 // Copyright (c) 2014-2024 Omar Cornut
@@ -540,9 +539,9 @@ Context::Context(GuiFrameInput& frame_input, GuiFrameResult& frame_output)
     dyn::Append(id_stack, 0u);
     PushScissorStack();
     windows.Reserve(64);
-    stb_textedit_initialize_state(&stb_state, k_stb_textedit_single_line_mode);
-    dyn::Resize(textedit_text, 64);
-    textedit_text_utf8.Reserve(64);
+    stb_textedit_initialize_state(&stb_state, true);
+    dyn::Resize(textedit_text, Kb(4));
+    textedit_text_utf8.Reserve(Kb(4));
 }
 
 Context::~Context() {
@@ -1109,6 +1108,8 @@ TextInputResult Context::SingleLineTextInput(Rect r,
                                              TextInputFlags flags,
                                              ButtonFlags button_flags,
                                              bool select_all_on_first_open) {
+    ASSERT(!(flags.wip_multiline && flags.centre_align), "not supported");
+
     TextInputResult result {};
 
     int const starting_cursor = stb_state.cursor;
@@ -1117,15 +1118,16 @@ TextInputResult Context::SingleLineTextInput(Rect r,
     auto get_rel_click_point = [this](f32x2 pos, f32 offset) {
         f32x2 relative_click = frame_input.cursor_pos - pos;
         relative_click.x -= offset;
-        relative_click.y = graphics->context->CurrentFontSize() / 2;
+        // relative_click.y = graphics->context->CurrentFontSize() / 2;
         return relative_click;
     };
 
-    auto get_text_pos = [this](Rect r, f32 offset) {
+    auto get_text_pos = [&](Rect r, f32 offset) {
         auto font_size = graphics->context->CurrentFontSize();
-        auto text_r = r;
-        text_r.x += offset;
-        return f32x2 {text_r.x, text_r.y + (text_r.h - font_size) / 2};
+        auto pos = r.pos;
+        pos.x += offset;
+        if (!flags.wip_multiline) pos.y += (r.h - font_size) / 2; // centre Y
+        return pos;
     };
 
     bool set_focus = false;
@@ -1139,12 +1141,12 @@ TextInputResult Context::SingleLineTextInput(Rect r,
     }
 
     if (set_focus) {
-        SetTextInputFocus(id, text_unfocused);
+        SetTextInputFocus(id, text_unfocused, flags.wip_multiline);
         reset_cursor = true;
     }
 
     auto get_offset = [&](String text) {
-        auto x_offset = text_xpad_in_input_box;
+        auto x_offset = k_text_xpad_in_input_box;
         if (flags.centre_align) {
             auto font = graphics->context->CurrentFont();
             auto size = font->CalcTextSizeA(font->font_size, FLT_MAX, 0.0f, text).x;
@@ -1160,15 +1162,15 @@ TextInputResult Context::SingleLineTextInput(Rect r,
             !tab_just_used_to_focus) {
             tab_to_focus_next_input = true;
             tab_just_used_to_focus = true;
-            SetTextInputFocus(0, {});
+            SetTextInputFocus(0, {}, false);
         }
 
         if ((active_item.id && active_item.id != id) || (temp_active_item.id && temp_active_item.id != id))
-            SetTextInputFocus(0, {});
+            SetTextInputFocus(0, {}, false);
 
         if (!flags.wip_multiline && frame_input.Key(KeyCode::Enter).presses.size) {
             result.enter_pressed = true;
-            SetTextInputFocus(0, {});
+            SetTextInputFocus(0, {}, false);
         }
     }
 
@@ -1344,10 +1346,8 @@ TextInputResult Context::SingleLineTextInput(Rect r,
     result.selection_end = ::Max(stb_state.select_start, stb_state.select_end);
     result.text = textedit_text_utf8.Items();
 
-    auto font_size = graphics->context->CurrentFontSize();
-    auto text_r = r;
-    text_r.x += get_offset(result.text);
-    f32x2 const text_pos = {text_r.x, text_r.y + (text_r.h - font_size) / 2};
+    auto const font_size = graphics->context->CurrentFontSize();
+    f32x2 const text_pos = get_text_pos(r, get_offset(result.text));
 
     result.text_pos = text_pos;
 
@@ -1355,21 +1355,28 @@ TextInputResult Context::SingleLineTextInput(Rect r,
     {
         auto font = graphics->context->CurrentFont();
 
-        char const* start = IncrementUTF8Characters(result.text.data, result.selection_start);
-        char const* end = IncrementUTF8Characters(result.text.data, result.selection_end);
+        if (!flags.wip_multiline) {
+            char const* start = IncrementUTF8Characters(result.text.data, result.selection_start);
+            char const* end = IncrementUTF8Characters(result.text.data, result.selection_end);
 
-        f32 const selection_start =
-            font->CalcTextSizeA(font_size, FLT_MAX, 0, {result.text.data, (usize)(start - result.text.data)})
-                .x;
-        f32 const selection_size =
-            font->CalcTextSizeA(font_size, FLT_MAX, 0, {start, (usize)(end - start)}).x;
+            f32 const selection_start =
+                font->CalcTextSizeA(font_size,
+                                    FLT_MAX,
+                                    0,
+                                    {result.text.data, (usize)(start - result.text.data)})
+                    .x;
+            f32 const selection_size =
+                font->CalcTextSizeA(font_size, FLT_MAX, 0, {start, (usize)(end - start)}).x;
 
-        auto selection_r = Rect {.x = result.text_pos.x + selection_start,
-                                 .y = result.text_pos.y - y_pad,
-                                 .w = selection_size,
-                                 .h = font_size + y_pad * 2};
+            auto selection_r = Rect {.x = result.text_pos.x + selection_start,
+                                     .y = result.text_pos.y - y_pad,
+                                     .w = selection_size,
+                                     .h = font_size + y_pad * 2};
 
-        result.selection_rect = selection_r;
+            result.selection_rect = selection_r;
+        } else {
+            // Handled via the selection rect helper
+        }
     }
 
     {
@@ -1411,6 +1418,92 @@ TextInputResult Context::SingleLineTextInput(Rect r,
     if (TextInputJustFocused(id) && select_all_on_first_open) TextInputSelectAll();
 
     return result;
+}
+
+Optional<Rect> TextInputResult::NextMultilineSelectionRect(TextInputResult::SelectionIterator& it) {
+    ASSERT(it.result.HasSelection());
+    if (it.reached_end) return {};
+
+    if (!it.pos) {
+        // First call.
+        it.pos = it.result.text.data;
+        auto line_start = it.pos;
+
+        for (auto _ : Range(it.result.selection_start)) {
+            if (*it.pos == '\n') {
+                line_start = it.pos + 1;
+                it.line_index++;
+                ++it.pos;
+            } else {
+                it.pos = IncrementUTF8Characters(it.pos, 1);
+            }
+        }
+        auto const start_pos = it.pos;
+        auto const start_line_start = line_start;
+        auto const start_line_index = it.line_index;
+
+        it.remaining_chars = (u32)(it.result.selection_end - it.result.selection_start);
+
+        // We have the start of the selection and the line index. To complete this rect we need to iterate
+        // until either the end of the line or the end of the selection.
+        for (auto _ : Range(it.remaining_chars)) {
+            ASSERT(it.remaining_chars);
+            --it.remaining_chars;
+
+            if (*it.pos == '\n') {
+                line_start = it.pos + 1;
+                it.line_index++;
+                ++it.pos;
+                break;
+            }
+            it.pos = IncrementUTF8Characters(it.pos, 1);
+        }
+
+        char const* end_pos = it.pos;
+
+        auto font = it.draw_ctx.CurrentFont();
+        auto font_size = it.draw_ctx.CurrentFontSize();
+
+        Rect const result = {
+            .x = it.result.text_pos.x +
+                 font->CalcTextSizeA(font_size,
+                                     FLT_MAX,
+                                     0,
+                                     {start_line_start, (usize)(start_pos - start_line_start)})
+                     .x,
+            .y = it.result.text_pos.y - 2 + start_line_index * font_size,
+            .w = font->CalcTextSizeA(font_size, FLT_MAX, 0, {start_pos, (usize)(end_pos - start_pos)}).x,
+            .h = font_size + 4};
+
+        return result;
+    }
+
+    if (it.remaining_chars == 0) return k_nullopt;
+
+    auto const start_pos = it.pos;
+    auto const start_line_index = it.line_index;
+
+    for (auto _ : Range(it.remaining_chars)) {
+        ASSERT(it.remaining_chars);
+        --it.remaining_chars;
+
+        if (*it.pos == '\n') {
+            it.line_index++;
+            ++it.pos;
+            break;
+        }
+        it.pos = IncrementUTF8Characters(it.pos, 1);
+    }
+
+    auto const end_pos = it.pos;
+
+    auto font = it.draw_ctx.CurrentFont();
+    auto font_size = it.draw_ctx.CurrentFontSize();
+
+    return Rect {.x = it.result.text_pos.x,
+                 .y = it.result.text_pos.y - 2 + start_line_index * font_size,
+                 .w = font->CalcTextSizeA(font_size, FLT_MAX, 0, {start_pos, (usize)(end_pos - start_pos)}).x,
+                 .h = font_size + 4};
 }
 
 bool Context::PopupButtonBehavior(Rect r, Id button_id, Id popup_id, ButtonFlags flags) {
@@ -1892,8 +1985,8 @@ void Context::EnableScissor() {
     OnScissorChanged();
 }
 
-void Context::SetImguiTextEditState(String new_text) {
-    stb_textedit_initialize_state(&stb_state, k_stb_textedit_single_line_mode);
+void Context::SetImguiTextEditState(String new_text, bool multiline) {
+    stb_textedit_initialize_state(&stb_state, !multiline);
     ZeroMemory(textedit_text.data, sizeof(*textedit_text.data) * textedit_text.size);
 
     textedit_len = imstring::Widen(textedit_text.data,
@@ -1906,14 +1999,14 @@ void Context::SetImguiTextEditState(String new_text) {
     text_cursor_is_shown = true;
 }
 
-void Context::SetTextInputFocus(Id id, String new_text) {
+void Context::SetTextInputFocus(Id id, String new_text, bool multiline) {
     if (id == 0) {
         active_text_input = id;
-        stb_textedit_initialize_state(&stb_state, k_stb_textedit_single_line_mode);
+        stb_textedit_initialize_state(&stb_state, !multiline);
         ZeroMemory(textedit_text.data, sizeof(*textedit_text.data) * textedit_text.size);
     } else if (active_text_input != id) {
         active_text_input = id;
-        SetImguiTextEditState(new_text);
+        SetImguiTextEditState(new_text, multiline);
         ResetTextInputCursorAnim();
     }
 }

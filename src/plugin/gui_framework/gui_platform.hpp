@@ -505,10 +505,15 @@ static void DestroyGraphicsContext(GuiPlatform& platform) {
     }
 }
 
+// Data offer is where we decide if we want to accept data from the OS.
 static bool EventDataOffer(GuiPlatform& platform, PuglDataOfferEvent const& data_offer) {
     bool result = false;
     for (auto const type_index : Range(puglGetNumClipboardTypes(platform.view))) {
         auto const type = puglGetClipboardType(platform.view, type_index);
+        LogDebug(ModuleName::Gui,
+                 "clipboard data is being offered, type: {}, time: {}",
+                 type,
+                 data_offer.time);
         if (NullTermStringsEqual(type, "text/plain")) {
             puglAcceptOffer(platform.view, &data_offer, type_index);
             result = true;
@@ -517,9 +522,11 @@ static bool EventDataOffer(GuiPlatform& platform, PuglDataOfferEvent const& data
     return result;
 }
 
+// After we've accepted an offer, we get the data.
 static bool EventData(GuiPlatform& platform, PuglDataEvent const& data_event) {
     auto const type_index = data_event.typeIndex;
     auto const type = puglGetClipboardType(platform.view, type_index);
+    LogDebug(ModuleName::Gui, "clipboard data received, type: {}, time: {}", type, data_event.time);
     if (NullTermStringsEqual(type, "text/plain")) {
         usize size = 0;
         void const* data = puglGetClipboard(platform.view, type_index, &size);

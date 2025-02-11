@@ -591,20 +591,15 @@ static void HandlePostUpdateRequests(GuiPlatform& platform) {
     }
 
     if (platform.last_result.wants_clipboard_text_paste) {
+        LogDebug(ModuleName::Gui, "requesting OS to give us clipboard");
         // IMPORTANT: this will call into our event handler function right from here rather than queue things
         // up
         puglPaste(platform.view);
     }
 
     if (auto const cb = platform.last_result.set_clipboard_text; cb.size) {
-        // we can re-use the 'paste' clipboard buffer even though this is a 'copy' operation
-        auto& buffer = platform.frame_state.clipboard_text;
-        dyn::Assign(buffer, cb);
-
-        // IMPORTANT: pugl needs a null terminator despite also taking a size
-        if (!IS_LINUX && !EndsWith(buffer, '\0')) dyn::Append(buffer, '\0');
-
-        puglSetClipboard(platform.view, IS_LINUX ? "UTF8_STRING" : "text/plain", buffer.data, buffer.size);
+        LogDebug(ModuleName::Gui, "requesting copy into OS clipboard, size: {}", cb.size);
+        puglSetClipboard(platform.view, IS_LINUX ? "UTF8_STRING" : "text/plain", cb.data, cb.size);
     }
 }
 

@@ -388,9 +388,6 @@ static PuglStatus OnEvent(PuglView* view, PuglEvent const* event) {
             p.quit = true;
             break;
         }
-        case PUGL_NOTHING:
-        case PUGL_REALIZE:
-        case PUGL_UNREALIZE:
         case PUGL_CONFIGURE: {
             if (event->configure.style & PUGL_VIEW_STYLE_MAPPED) {
                 LogDebug(ModuleName::Standalone, "PUGL: {}", fmt::DumpStruct(event->configure));
@@ -405,6 +402,9 @@ static PuglStatus OnEvent(PuglView* view, PuglEvent const* event) {
             }
             break;
         }
+        case PUGL_NOTHING:
+        case PUGL_REALIZE:
+        case PUGL_UNREALIZE:
         case PUGL_UPDATE:
         case PUGL_EXPOSE:
         case PUGL_FOCUS_IN:

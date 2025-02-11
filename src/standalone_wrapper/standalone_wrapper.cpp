@@ -402,13 +402,23 @@ static PuglStatus OnEvent(PuglView* view, PuglEvent const* event) {
             }
             break;
         }
+        case PUGL_FOCUS_IN: {
+            auto gui = (clap_plugin_gui const*)p.plugin.get_extension(&p.plugin, CLAP_EXT_GUI);
+            ASSERT(gui);
+            gui->show(&p.plugin);
+            break;
+        }
+        case PUGL_FOCUS_OUT: {
+            auto gui = (clap_plugin_gui const*)p.plugin.get_extension(&p.plugin, CLAP_EXT_GUI);
+            ASSERT(gui);
+            gui->hide(&p.plugin);
+            break;
+        }
         case PUGL_NOTHING:
         case PUGL_REALIZE:
         case PUGL_UNREALIZE:
         case PUGL_UPDATE:
         case PUGL_EXPOSE:
-        case PUGL_FOCUS_IN:
-        case PUGL_FOCUS_OUT:
         case PUGL_KEY_PRESS:
         case PUGL_KEY_RELEASE:
         case PUGL_TEXT:

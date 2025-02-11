@@ -251,6 +251,7 @@ PUBLIC ErrorCodeOr<void> SetVisible(GuiPlatform& platform, bool visible, Engine&
 
         TRY(Required(puglShow(platform.view, PUGL_SHOW_PASSIVE)));
     } else {
+        platform.frame_state.Reset();
         // IMRPOVE: stop update timers, make things more efficient
         TRY(Required(puglHide(platform.view)));
     }
@@ -313,7 +314,16 @@ static ModifierFlags CreateModifierFlags(u32 pugl_mod_flags) {
     return result;
 }
 
+static void UpdateModifiers(GuiPlatform& platform, PuglMods mods) {
+    platform.frame_state.modifier_keys[ToInt(ModifierKey::Shift)] = mods & PUGL_MOD_SHIFT;
+    platform.frame_state.modifier_keys[ToInt(ModifierKey::Ctrl)] = mods & PUGL_MOD_CTRL;
+    platform.frame_state.modifier_keys[ToInt(ModifierKey::Alt)] = mods & PUGL_MOD_ALT;
+    platform.frame_state.modifier_keys[ToInt(ModifierKey::Super)] = mods & PUGL_MOD_SUPER;
+}
+
 static bool EventWheel(GuiPlatform& platform, PuglScrollEvent const& scroll_event) {
+    UpdateModifiers(platform, scroll_event.state);
+
     // IMPROVE: support horizontal scrolling
     if (scroll_event.direction != PUGL_SCROLL_UP && scroll_event.direction != PUGL_SCROLL_DOWN) return false;
 
@@ -324,6 +334,7 @@ static bool EventWheel(GuiPlatform& platform, PuglScrollEvent const& scroll_even
 }
 
 static bool EventMotion(GuiPlatform& platform, PuglMotionEvent const& motion_event) {
+    UpdateModifiers(platform, motion_event.state);
     auto const new_cursor_pos = f32x2 {(f32)motion_event.x, (f32)motion_event.y};
     bool result = false;
     platform.frame_state.cursor_pos = new_cursor_pos;
@@ -370,6 +381,7 @@ static Optional<MouseButton> RemapMouseButton(u32 button) {
 }
 
 static bool EventMouseButton(GuiPlatform& platform, PuglButtonEvent const& button_event, bool is_down) {
+    UpdateModifiers(platform, button_event.state);
     auto const button = RemapMouseButton(button_event.button);
     if (!button) return false;
 
@@ -459,41 +471,15 @@ static Optional<KeyCode> RemapKeyCode(u32 pugl_key) {
     return k_nullopt;
 }
 
-static Optional<ModifierKey> RemapModKey(u32 pugl_key) {
-    switch (pugl_key) {
-        case PUGL_KEY_SHIFT_L:
-        case PUGL_KEY_SHIFT_R: return ModifierKey::Shift;
-        case PUGL_KEY_CTRL_L:
-        case PUGL_KEY_CTRL_R: return ModifierKey::Ctrl;
-        case PUGL_KEY_ALT_L:
-        case PUGL_KEY_ALT_R: return ModifierKey::Alt;
-        case PUGL_KEY_SUPER_L:
-        case PUGL_KEY_SUPER_R: return ModifierKey::Super;
-    }
-    return k_nullopt;
-}
-
-static bool EventKeyModifier(GuiPlatform& platform, ModifierKey mod_key, bool is_down) {
-    auto& mod = platform.frame_state.modifier_keys[ToInt(mod_key)];
-    if (is_down) {
-        if (!mod.is_down) mod.presses = true;
-        ++mod.is_down;
-    } else {
-        --mod.is_down;
-        if (mod.is_down == 0) mod.releases = true;
-    }
-    return true;
-}
-
 static bool EventKey(GuiPlatform& platform, PuglKeyEvent const& key_event, bool is_down) {
+    UpdateModifiers(platform, key_event.state);
     if (auto const key_code = RemapKeyCode(key_event.key))
         return EventKeyRegular(platform, *key_code, is_down, CreateModifierFlags(key_event.state));
-    else if (auto const mod_key = RemapModKey(key_event.key))
-        return EventKeyModifier(platform, *mod_key, is_down);
     return false;
 }
 
 static bool EventText(GuiPlatform& platform, PuglTextEvent const& text_event) {
+    UpdateModifiers(platform, text_event.state);
     dyn::Append(platform.frame_state.input_utf32_chars, text_event.character);
     if (platform.last_result.wants_keyboard_input) return true;
     return false;
@@ -571,11 +557,6 @@ static void ClearImpermanentState(GuiFrameInput& frame_state) {
         btn.double_click = false;
         btn.presses.Clear();
         btn.releases.Clear();
-    }
-
-    for (auto& mod : frame_state.modifier_keys) {
-        mod.presses = 0;
-        mod.releases = 0;
     }
 
     for (auto& key : frame_state.keys) {
@@ -725,7 +706,10 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
             }
 
             case PUGL_FOCUS_IN:
-            case PUGL_FOCUS_OUT: break;
+            case PUGL_FOCUS_OUT: {
+                platform.frame_state.Reset();
+                break;
+            }
 
             case PUGL_KEY_PRESS: {
                 post_redisplay = EventKey(platform, event->key, true);

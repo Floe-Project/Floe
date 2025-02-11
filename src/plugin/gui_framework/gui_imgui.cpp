@@ -242,9 +242,9 @@ void Context::SetHotRaw(Id id) { temp_hot_item = id; }
 // check the modifier key flags to see if the click is allowed
 static bool CheckModifierKeys(ButtonFlags flags, GuiFrameInput const& io) {
     if (!(flags.requires_modifer || flags.requires_shift || flags.requires_alt)) return true;
-    if (flags.requires_modifer && io.Key(ModifierKey::Modifier).is_down) return true;
-    if (flags.requires_shift && io.Key(ModifierKey::Shift).is_down) return true;
-    if (flags.requires_alt && io.Key(ModifierKey::Alt).is_down) return true;
+    if (flags.requires_modifer && io.Key(ModifierKey::Modifier)) return true;
+    if (flags.requires_shift && io.Key(ModifierKey::Shift)) return true;
+    if (flags.requires_alt && io.Key(ModifierKey::Alt)) return true;
     return false;
 }
 
@@ -952,18 +952,18 @@ bool Context::SliderUnboundedBehavior(Rect r,
     constexpr f32 k_size = 64;
 
     if (ButtonBehavior(r, id, {.left_mouse = true, .triggers_on_mouse_down = true})) {
-        if ((flags.default_on_modifer) && frame_input.Key(ModifierKey::Modifier).is_down) val = default_val;
+        if ((flags.default_on_modifer) && frame_input.Key(ModifierKey::Modifier)) val = default_val;
         val_at_click = val;
         start_location = frame_input.cursor_pos;
     }
 
     if (IsActive(id)) {
         if (flags.slower_with_shift) {
-            if (frame_input.Key(ModifierKey::Shift).presses || frame_input.Key(ModifierKey::Shift).releases) {
+            if (frame_input.Key(ModifierKey::Shift)) {
                 val_at_click = val;
                 start_location = frame_input.cursor_pos;
             }
-            if (frame_input.Key(ModifierKey::Shift).is_down) sensitivity /= 6;
+            if (frame_input.Key(ModifierKey::Shift)) sensitivity /= 6;
         }
         if (frame_input.cursor_pos.x != -1 && frame_input.cursor_pos.y != -1) {
             auto d = frame_input.cursor_pos - start_location;
@@ -1322,7 +1322,7 @@ TextInputResult Context::SingleLineTextInput(Rect r,
         result.buffer_changed = true;
     }
 
-    bool const modifier_down = frame_input.Key(ModifierKey::Modifier).is_down;
+    bool const modifier_down = frame_input.Key(ModifierKey::Modifier);
     if (frame_input.input_utf32_chars.size && !modifier_down) {
         for (auto c : frame_input.input_utf32_chars) {
             if (InputTextFilterCharacter(&c, flags)) {
@@ -2193,10 +2193,10 @@ void Context::DebugWindow(Rect r) {
 
     if (DebugTextHeading(debug_general, "General")) {
         DebugTextItem("Update", "%llu", frame_input.update_count);
-        DebugTextItem("Key shift", "%d", (int)frame_input.Key(ModifierKey::Shift).is_down);
-        DebugTextItem("Key ctrl", "%d", (int)frame_input.Key(ModifierKey::Ctrl).is_down);
-        DebugTextItem("Key modifer", "%d", (int)frame_input.Key(ModifierKey::Modifier).is_down);
-        DebugTextItem("Key alt", "%d", (int)frame_input.Key(ModifierKey::Alt).is_down);
+        DebugTextItem("Key shift", "%d", (int)frame_input.Key(ModifierKey::Shift));
+        DebugTextItem("Key ctrl", "%d", (int)frame_input.Key(ModifierKey::Ctrl));
+        DebugTextItem("Key modifer", "%d", (int)frame_input.Key(ModifierKey::Modifier));
+        DebugTextItem("Key alt", "%d", (int)frame_input.Key(ModifierKey::Alt));
         DebugTextItem("Time", "%lld", frame_input.current_time);
         DebugTextItem("WindowSize",
                       "%hu, %hu",

@@ -77,13 +77,6 @@ struct GuiFrameInput {
         bool dragging_ended {}; // cleared every frame
     };
 
-    struct ModifierKeyState {
-        u8 is_down; // bool, but we use an int to incr/decr to correctly handle when there's both a left and
-                    // right key on the keyboard and they're used together
-        u8 presses; // key-down events since last frame, cleared every frame
-        u8 releases; // key-up events since last frame, cleared every frame
-    };
-
     struct KeyState {
         struct Event {
             ModifierFlags modifiers;
@@ -99,6 +92,18 @@ struct GuiFrameInput {
     auto const& Key(ModifierKey n) const { return modifier_keys[ToInt(n)]; }
     auto const& Key(KeyCode n) const { return keys[ToInt(n)]; }
 
+    void Reset() {
+        cursor_pos = {};
+        cursor_pos_prev = {};
+        cursor_delta = {};
+        mouse_scroll_delta_in_lines = {};
+        mouse_buttons = {};
+        modifier_keys = {};
+        keys = {};
+        dyn::Clear(clipboard_text);
+        dyn::Clear(input_utf32_chars);
+    }
+
     graphics::DrawContext* graphics_ctx {};
 
     f32x2 cursor_pos {};
@@ -107,7 +112,7 @@ struct GuiFrameInput {
     f32 mouse_scroll_delta_in_lines {};
     Array<MouseButtonState, ToInt(MouseButton::Count)> mouse_buttons {};
     Array<KeyState, ToInt(KeyCode::Count)> keys {};
-    Array<ModifierKeyState, ToInt(ModifierKey::Count)> modifier_keys {};
+    Array<bool, ToInt(ModifierKey::Count)> modifier_keys {};
     // may contain text from the OS clipboard if you requested it
     DynamicArray<char> clipboard_text {PageAllocator::Instance()};
     DynamicArrayBounded<u32, 16> input_utf32_chars {};

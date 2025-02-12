@@ -303,6 +303,44 @@ PUBLIC constexpr usize Utf8CodepointSize(char first_byte) {
 
 PUBLIC constexpr bool IsValidUtf8(String string) { return InvalidUtf8Position(string) == nullptr; }
 
+// The string must be valid UTF-8.
+PUBLIC constexpr usize FindUtf8TruncationPoint(String str, usize max_size) {
+    ASSERT(str.size > 0);
+    ASSERT(max_size < str.size);
+
+    auto const last = str.data[max_size - 1];
+
+    // Check if the last byte is part of a multi-byte sequence.
+    if (last & 0b10000000) {
+        if (last & 0b01000000) {
+            // If the last byte is the start of a multi-byte sequence, we know we can truncate 1 before it.
+            return max_size - 1;
+        } else {
+            // If the last byte is not the start of a multi-byte sequence, we need to find the start of the
+            // sequence.
+            ASSERT(max_size >= 2, "Invalid UTF-8 string");
+            ASSERT(str.size >= 2, "Invalid UTF-8 string");
+            auto const second_last = str.data[max_size - 2];
+
+            if ((second_last & 0b11100000) == 0b11100000) {
+                // 3-byte sequence
+                return max_size - 2;
+            } else {
+                ASSERT(max_size >= 3, "Invalid UTF-8 string");
+                ASSERT(str.size >= 3, "Invalid UTF-8 string");
+                auto const third_last = str.data[max_size - 3];
+
+                if ((third_last & 0b11110000) == 0b11110000) {
+                    // 4-byte sequence
+                    return max_size - 3;
+                }
+            }
+        }
+    }
+
+    return max_size;
+}
+
 PUBLIC constexpr Optional<String>
 SplitWithIterator(String whole, usize& cursor, char token, bool skip_consecutive = false) {
     if (cursor >= whole.size) return k_nullopt;

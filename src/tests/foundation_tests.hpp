@@ -2603,6 +2603,55 @@ TEST_CASE(TestStringAlgorithms) {
         CHECK(WhitespaceStrippedStart(" aa  "_s) == "aa  ");
     }
 
+    SUBCASE("FindUtf8TruncationPoint") {
+        auto check = [&](String str, usize max_len, usize expected) {
+            CAPTURE(str);
+            CAPTURE(max_len);
+            CAPTURE(expected);
+            auto result = FindUtf8TruncationPoint(str, max_len);
+            CHECK_EQ(result, expected);
+            CHECK(IsValidUtf8(str.SubSpan(0, result)));
+        };
+
+        SUBCASE("ascii") {
+            auto const str = "Hello World"_s;
+            check(str, 5, 5);
+            check(str, 10, 10);
+        }
+
+        SUBCASE("2-byte UTF-8 character") {
+            auto const str = "café"_s;
+            check(str, 4, 3);
+            check(str, 3, 3);
+        }
+
+        SUBCASE("3-byte UTF-8 character") {
+            // 0xE2 0x82 0xAC
+            auto const str = "Cost: €"_s;
+
+            check(str, 8, 6);
+            check(str, 7, 6);
+            check(str, 6, 6);
+            check(str, 5, 5);
+        }
+
+        SUBCASE("4-byte UTF-8 character") {
+            // "𐍈" (Gothic letter aiha) is 0xF0 0x90 0x8D 0x88 in UTF-8
+            auto const str = "Symbol: \xF0\x90\x8D\x88"_s;
+
+            check(str, 11, 8);
+            check(str, 10, 8);
+            check(str, 9, 8);
+            check(str, 8, 8);
+        }
+
+        SUBCASE("Edge cases") {
+            auto const str = "€"_s;
+            CHECK_EQ(FindUtf8TruncationPoint(str, 1), 0u);
+            CHECK_EQ(FindUtf8TruncationPoint(str, 2), 0u);
+        }
+    }
+
     return k_success;
 }
 

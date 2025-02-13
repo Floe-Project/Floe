@@ -93,6 +93,8 @@ int Narrow(char* out_buf, int out_buf_size, Char32 const* in_text, Char32 const*
 // Modified and adapted to fit the rest of the codebase.
 namespace stb {
 
+#define STB_TEXTEDIT_GETWIDTH_NEWLINE -1.0f
+
 // NOLINTNEXTLINE(readability-identifier-naming)
 static int STB_TEXTEDIT_STRINGLEN(const STB_TEXTEDIT_STRING* imgui) { return imgui->textedit_len; }
 
@@ -106,6 +108,7 @@ static Char32 STB_TEXTEDIT_GETCHAR(STB_TEXTEDIT_STRING* imgui, int idx) {
 static f32 STB_TEXTEDIT_GETWIDTH(STB_TEXTEDIT_STRING* imgui, int i, int n) {
     (void)i;
     auto c = imgui->textedit_text[(usize)n];
+    if (c == '\n') return STB_TEXTEDIT_GETWIDTH_NEWLINE;
     auto font = imgui->graphics->context->CurrentFont();
     return font->GetCharAdvance((graphics::Char16)c);
 }
@@ -438,7 +441,7 @@ f32x2 BestPopupPos(Rect base_r, Rect avoid_r, f32x2 window_size, bool find_left_
 static bool InputTextFilterCharacter(unsigned int* p_char, TextInputFlags flags) {
     unsigned int c = *p_char;
 
-    if (flags.wip_multiline && c == '\n') return true;
+    if (flags.multiline && c == '\n') return true;
 
     if (c < 128 && c != ' ' && !IsPrintableAscii((char)(c & 0xFF))) {
         bool const pass = false;
@@ -822,18 +825,12 @@ void Context::End(ArenaAllocator& scratch_arena) {
     prev_popup_menu_just_created = popup_menu_just_created;
     popup_menu_just_created = 0;
 
-    if (!frame_output.wants_keyboard_input) {
-        bool const wants_keyboard_input = active_text_input != 0;
-        if (wants_keyboard_input != frame_output.wants_keyboard_input) {
-        }
-        frame_output.wants_keyboard_input = wants_keyboard_input;
-    }
-    if (!frame_output.wants_mouse_capture) frame_output.wants_mouse_capture = AnItemIsActive();
-    if (!frame_output.wants_mouse_scroll) frame_output.wants_mouse_scroll = true;
-    if (!frame_output.wants_all_left_clicks)
-        frame_output.wants_all_left_clicks = focused_popup_window != nullptr || GetTextInput();
-    if (!frame_output.wants_all_right_clicks) frame_output.wants_all_right_clicks = false;
-    if (!frame_output.wants_all_middle_clicks) frame_output.wants_all_middle_clicks = false;
+    frame_output.wants_keyboard_input = active_text_input != 0;
+    frame_output.wants_mouse_capture = AnItemIsActive();
+    frame_output.wants_mouse_scroll = true;
+    frame_output.wants_all_left_clicks = focused_popup_window != nullptr || GetTextInput();
+    frame_output.wants_all_right_clicks = false;
+    frame_output.wants_all_middle_clicks = false;
 
     draw_data.draw_lists = output_draw_lists;
     frame_output.draw_data = draw_data;
@@ -1102,13 +1099,14 @@ bool Context::SetHot(Rect r, Id id, bool32 is_not_window_content) {
     return false;
 }
 
-TextInputResult Context::SingleLineTextInput(Rect r,
-                                             Id id,
-                                             String text_unfocused,
-                                             TextInputFlags flags,
-                                             ButtonFlags button_flags,
-                                             bool select_all_on_first_open) {
-    ASSERT(!(flags.wip_multiline && flags.centre_align), "not supported");
+TextInputResult Context::TextInput(Rect r,
+                                   Id id,
+                                   String text_unfocused,
+                                   TextInputFlags flags,
+                                   ButtonFlags button_flags,
+                                   bool select_all_on_first_open) {
+    ASSERT(!(flags.multiline && flags.centre_align), "not supported");
+    if (flags.multiline_wordwrap_hack) ASSERT(flags.multiline);
 
     TextInputResult result {};
 
@@ -1117,8 +1115,7 @@ TextInputResult Context::SingleLineTextInput(Rect r,
 
     auto get_rel_click_point = [this](f32x2 pos, f32 offset) {
         f32x2 relative_click = frame_input.cursor_pos - pos;
-        relative_click.x -= offset;
-        // relative_click.y = graphics->context->CurrentFontSize() / 2;
+        relative_click -= f32x2 {offset, 0};
         return relative_click;
     };
 
@@ -1126,7 +1123,7 @@ TextInputResult Context::SingleLineTextInput(Rect r,
         auto font_size = graphics->context->CurrentFontSize();
         auto pos = r.pos;
         pos.x += offset;
-        if (!flags.wip_multiline) pos.y += (r.h - font_size) / 2; // centre Y
+        if (!flags.multiline) pos.y += (r.h - font_size) / 2; // centre Y
         return pos;
     };
 
@@ -1141,7 +1138,7 @@ TextInputResult Context::SingleLineTextInput(Rect r,
     }
 
     if (set_focus) {
-        SetTextInputFocus(id, text_unfocused, flags.wip_multiline);
+        SetTextInputFocus(id, text_unfocused, flags.multiline);
         reset_cursor = true;
     }
 
@@ -1153,6 +1150,21 @@ TextInputResult Context::SingleLineTextInput(Rect r,
             x_offset = ((r.w / 2) - (size / 2));
         }
         return x_offset;
+    };
+
+    auto copy_selection_to_clipboard = [&]() {
+        auto const start = (usize)::Min(stb_state.select_start, stb_state.select_end);
+        auto const end = (usize)::Max(stb_state.select_start, stb_state.select_end);
+        auto const size = end - start;
+        if (!size) return;
+
+        dyn::Resize(clipboard_for_os, size * 4); // 1 utf32 could at most be 4 utf8 bytes
+
+        dyn::Resize(clipboard_for_os,
+                    (usize)imstring::Narrow(clipboard_for_os.data,
+                                            (int)clipboard_for_os.size,
+                                            textedit_text.data + start,
+                                            textedit_text.data + end));
     };
 
     if (IsHot(id)) frame_output.cursor_type = CursorType::IBeam;
@@ -1168,7 +1180,7 @@ TextInputResult Context::SingleLineTextInput(Rect r,
         if ((active_item.id && active_item.id != id) || (temp_active_item.id && temp_active_item.id != id))
             SetTextInputFocus(0, {}, false);
 
-        if (!flags.wip_multiline && frame_input.Key(KeyCode::Enter).presses.size) {
+        if (!flags.multiline && frame_input.Key(KeyCode::Enter).presses.size) {
             result.enter_pressed = true;
             SetTextInputFocus(0, {}, false);
         }
@@ -1182,26 +1194,13 @@ TextInputResult Context::SingleLineTextInput(Rect r,
         return result;
     }
 
-    auto x_offset = get_offset(textedit_text_utf8);
+    auto const initial_textedit_len = textedit_len;
+    auto const x_offset = get_offset(textedit_text_utf8);
 
-    if (frame_input.Mouse(MouseButton::Left).presses.size) {
-        text_input_selector_flags = {.left_mouse = true, .triggers_on_mouse_down = true};
-        if (!TextInputJustFocused(id) && result.HasSelection() &&
-            result.GetSelectionRect().Contains(frame_input.cursor_pos)) {
-            // if the mouse was clicked on a selected bit of text we only remove the selection on a mouse
-            // up
-            text_input_selector_flags = {.left_mouse = true, .triggers_on_mouse_up = true};
-        }
-    }
-
-    if (ButtonBehavior(r, id, text_input_selector_flags)) {
-        if (text_input_selector_flags.triggers_on_mouse_up &&
-            frame_input.Mouse(MouseButton::Left).dragging_ended) {
-        } else {
-            auto rel_pos = get_rel_click_point(r.pos, x_offset);
-            stb_textedit_click(this, &stb_state, rel_pos.x, rel_pos.y);
-            reset_cursor = true;
-        }
+    if (ButtonBehavior(r, id, {.left_mouse = true, .triggers_on_mouse_down = true})) {
+        auto rel_pos = get_rel_click_point(r.pos, x_offset);
+        stb_textedit_click(this, &stb_state, rel_pos.x, rel_pos.y);
+        reset_cursor = true;
     }
     if (IsActive(id)) {
         if (!frame_input.mouse_buttons[0].is_down) {
@@ -1223,39 +1222,62 @@ TextInputResult Context::SingleLineTextInput(Rect r,
     if (IsHotOrActive(id)) frame_output.cursor_type = CursorType::IBeam;
 
     auto const shift_bit = [](GuiFrameInput::KeyState::Event const& event) {
-        return event.modifiers.Get(ModifierKey::Modifier) ? STB_TEXTEDIT_K_SHIFT : 0;
+        return event.modifiers.Get(ModifierKey::Shift) ? STB_TEXTEDIT_K_SHIFT : 0;
     };
+
+    // Select word
+    if (frame_input.mouse_buttons[0].double_click) {
+        int start = stb_state.cursor;
+        for (; start-- > 0;) {
+            auto const c = textedit_text.data[start];
+            if (c == ' ' || c == '\n' || c == '\r' || c == '\t') break;
+        }
+        ASSERT(start >= -1);
+        stb_state.select_start = start + 1;
+
+        int end = stb_state.cursor;
+        for (; end < textedit_len; end++) {
+            auto const c = textedit_text.data[end];
+            if (c == ' ' || c == '\n' || c == '\r' || c == '\t') break;
+        }
+        stb_state.select_end = end;
+    }
 
     if (auto const backspaces = frame_input.Key(KeyCode::Backspace).presses_or_repeats; backspaces.size) {
         for (auto const& event : backspaces)
             stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_BACKSPACE | shift_bit(event)));
         result.buffer_changed = true;
         reset_cursor = true;
-    } else if (auto const deletes = frame_input.Key(KeyCode::Delete).presses_or_repeats; deletes.size) {
+    }
+    if (auto const deletes = frame_input.Key(KeyCode::Delete).presses_or_repeats; deletes.size) {
         for (auto const& event : deletes)
             stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_DELETE | shift_bit(event)));
         result.buffer_changed = true;
         reset_cursor = true;
-    } else if (auto const ends = frame_input.Key(KeyCode::End).presses_or_repeats; ends.size) {
+    }
+    if (auto const ends = frame_input.Key(KeyCode::End).presses_or_repeats; ends.size) {
         for (auto const& event : ends)
             stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_LINEEND | shift_bit(event)));
         result.buffer_changed = true;
-    } else if (auto const homes = frame_input.Key(KeyCode::Home).presses_or_repeats; homes.size) {
+    }
+    if (auto const homes = frame_input.Key(KeyCode::Home).presses_or_repeats; homes.size) {
         for (auto const& event : homes)
             stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_LINESTART | shift_bit(event)));
         result.buffer_changed = true;
-    } else if (auto const zs = frame_input.Key(KeyCode::Z).presses_or_repeats; zs.size) {
+    }
+    if (auto const zs = frame_input.Key(KeyCode::Z).presses_or_repeats; zs.size) {
         for (auto const& event : zs)
             if (event.modifiers.Get(ModifierKey::Modifier))
                 stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_UNDO | shift_bit(event)));
         result.buffer_changed = true;
-
-    } else if (auto const ys = frame_input.Key(KeyCode::Y).presses_or_repeats; ys.size) {
+    }
+    if (auto const ys = frame_input.Key(KeyCode::Y).presses_or_repeats; ys.size) {
         for (auto const& event : ys)
             if (event.modifiers.Get(ModifierKey::Modifier))
                 stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_REDO | shift_bit(event)));
         result.buffer_changed = true;
-    } else if (auto const lefts = frame_input.Key(KeyCode::LeftArrow).presses_or_repeats; lefts.size) {
+    }
+    if (auto const lefts = frame_input.Key(KeyCode::LeftArrow).presses_or_repeats; lefts.size) {
         reset_cursor = true;
         for (auto const event : lefts)
             stb_textedit_key(this,
@@ -1263,7 +1285,8 @@ TextInputResult Context::SingleLineTextInput(Rect r,
                              (int)((event.modifiers.Get(ModifierKey::Modifier) ? STB_TEXTEDIT_K_WORDLEFT
                                                                                : STB_TEXTEDIT_K_LEFT) |
                                    shift_bit(event)));
-    } else if (auto const rights = frame_input.Key(KeyCode::RightArrow).presses_or_repeats; rights.size) {
+    }
+    if (auto const rights = frame_input.Key(KeyCode::RightArrow).presses_or_repeats; rights.size) {
         reset_cursor = true;
         for (auto const event : rights)
             stb_textedit_key(this,
@@ -1271,26 +1294,50 @@ TextInputResult Context::SingleLineTextInput(Rect r,
                              (int)((event.modifiers.Get(ModifierKey::Modifier) ? STB_TEXTEDIT_K_WORDRIGHT
                                                                                : STB_TEXTEDIT_K_RIGHT) |
                                    shift_bit(event)));
-    } else if (auto const vs = frame_input.Key(KeyCode::V).presses_or_repeats; vs.size) {
+    }
+    if (auto const ups = frame_input.Key(KeyCode::UpArrow).presses_or_repeats; ups.size) {
+        reset_cursor = true;
+        for (auto const event : ups)
+            stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_UP | shift_bit(event)));
+    }
+    if (auto const downs = frame_input.Key(KeyCode::DownArrow).presses_or_repeats; downs.size) {
+        reset_cursor = true;
+        for (auto const event : downs)
+            stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_DOWN | shift_bit(event)));
+    }
+    if (auto const vs = frame_input.Key(KeyCode::V).presses_or_repeats; vs.size)
         frame_output.wants_clipboard_text_paste = true;
-    } else if ((frame_input.Key(KeyCode::C).presses.size || frame_input.Key(KeyCode::X).presses.size) &&
-               frame_input.Key(ModifierKey::Modifier).is_down) {
-        if (stb_state.select_start != stb_state.select_end) {
-            auto const min = (usize)::Min(stb_state.select_start, stb_state.select_end);
-            auto const max = (usize)::Max(stb_state.select_start, stb_state.select_end);
-
-            dyn::Resize(clipboard_for_os,
-                        (((max + 1) - min) * 4) + 1); // 1 utf32 could at most be 4 utf8 bytes
-
-            dyn::Resize(clipboard_for_os,
-                        (usize)imstring::Narrow(clipboard_for_os.data,
-                                                (int)clipboard_for_os.size,
-                                                textedit_text.data + min,
-                                                textedit_text.data + max + 1));
-
-            if (frame_input.Key(KeyCode::X).presses.size) {
+    if (auto const cs = frame_input.Key(KeyCode::C).presses_or_repeats; cs.size) {
+        for (auto const event : cs)
+            if (event.modifiers.Get(ModifierKey::Modifier)) {
+                copy_selection_to_clipboard();
+                break;
+            }
+    }
+    if (auto const xs = frame_input.Key(KeyCode::X).presses_or_repeats; xs.size) {
+        for (auto const event : xs)
+            if (event.modifiers.Get(ModifierKey::Modifier)) {
+                copy_selection_to_clipboard();
                 stb_textedit_cut(this, &stb_state);
                 result.buffer_changed = true;
+                break;
+            }
+    }
+    if (auto const as = frame_input.Key(KeyCode::A).presses_or_repeats; as.size) {
+        for (auto const event : as)
+            if (event.modifiers.Get(ModifierKey::Modifier)) {
+                TextInputSelectAll();
+                break;
+            }
+    }
+    if (auto const enters = frame_input.Key(KeyCode::Enter).presses_or_repeats; enters.size) {
+        if (flags.multiline) {
+            for (auto event : enters) {
+                if (event.modifiers.flags) continue;
+                result.enter_pressed = true;
+                result.buffer_changed = true;
+                reset_cursor = true;
+                stb_textedit_key(this, &stb_state, (int)'\n');
             }
         }
     }
@@ -1310,79 +1357,82 @@ TextInputResult Context::SingleLineTextInput(Rect r,
         result.buffer_changed = true;
     }
 
-    if (auto const enters = frame_input.Key(KeyCode::Enter).presses_or_repeats; enters.size) {
-        if (flags.wip_multiline) {
-            for (auto event : enters) {
-                if (event.modifiers.flags) continue;
-                stb_textedit_key(this, &stb_state, (int)'\n');
-            }
-        }
-
-        result.enter_pressed = true;
-        result.buffer_changed = true;
-    }
-
-    bool const modifier_down = frame_input.Key(ModifierKey::Modifier);
-    if (frame_input.input_utf32_chars.size && !modifier_down) {
+    if (frame_input.input_utf32_chars.size && !frame_input.Key(ModifierKey::Modifier)) {
         for (auto c : frame_input.input_utf32_chars) {
             if (InputTextFilterCharacter(&c, flags)) {
                 stb_textedit_key(this, &stb_state, (int)c);
                 result.buffer_changed = true;
+                reset_cursor = true;
             }
         }
     }
 
+    auto const font_size = graphics->context->CurrentFontSize();
+    auto font = graphics->context->CurrentFont();
+
     if (result.buffer_changed) {
-        dyn::Resize(textedit_text_utf8, (usize)textedit_len * 4); // 1 utf32 could at most be 4 utf8 bytes
-        dyn::Resize(textedit_text_utf8,
-                    (usize)imstring::Narrow(textedit_text_utf8.data,
-                                            (int)textedit_text_utf8.size,
-                                            textedit_text.data,
-                                            textedit_text.data + textedit_len));
+        for (u8 iteration = 0; iteration < 2; ++iteration) {
+            dyn::Resize(textedit_text_utf8, (usize)textedit_len * 4); // 1 utf32 could at most be 4 utf8 bytes
+            dyn::Resize(textedit_text_utf8,
+                        (usize)imstring::Narrow(textedit_text_utf8.data,
+                                                (int)textedit_text_utf8.size,
+                                                textedit_text.data,
+                                                textedit_text.data + textedit_len));
+
+            // Word-wrap for when we add 1 character and it goes over the edge. The string will end up with
+            // newlines in it. IMPROVE: this is an absolute hack to just cover the most common case.
+            if (flags.multiline_wordwrap_hack && stb_state.cursor == textedit_len &&
+                textedit_len == (initial_textedit_len + 1)) {
+
+                auto const max_width = r.w - k_text_xpad_in_input_box * 4;
+                if (max_width <= 0) break;
+
+                auto const* line_end = textedit_text_utf8.data + textedit_text_utf8.size - 1;
+                auto const* line_start = line_end;
+                while (line_start > textedit_text_utf8.data && *line_start != '\n')
+                    line_start--;
+                if (*line_start == '\n') line_start++;
+
+                if (line_end <= line_start) break;
+
+                auto const line_width = font->CalcTextSizeA(graphics->context->CurrentFontSize(),
+                                                            FLT_MAX,
+                                                            0,
+                                                            {line_start, (usize)(line_end - line_start)})
+                                            .x;
+
+                if (line_width < max_width) break;
+
+                auto* word_start = line_end;
+                while (word_start > line_start && *word_start != ' ')
+                    word_start--;
+                if (*word_start == ' ') ++word_start;
+                if (word_start != line_start) {
+                    u32 num_codepoints = 0;
+                    for (auto* c = word_start; c <= line_end; c = IncrementUTF8Characters(c, 1))
+                        num_codepoints++;
+                    stb_state.cursor -= num_codepoints;
+                    ASSERT(stb_state.cursor >= 0);
+                    stb_textedit_key(this, &stb_state, '\n');
+                    stb_state.cursor = textedit_len;
+                    continue; // loop again to re-narrow the text
+                }
+            }
+            break;
+        }
     }
 
     result.cursor = stb_state.cursor;
     result.selection_start = ::Min(stb_state.select_start, stb_state.select_end);
     result.selection_end = ::Max(stb_state.select_start, stb_state.select_end);
     result.text = textedit_text_utf8.Items();
-
-    auto const font_size = graphics->context->CurrentFontSize();
-    f32x2 const text_pos = get_text_pos(r, get_offset(result.text));
-
-    result.text_pos = text_pos;
+    result.text_pos = get_text_pos(r, get_offset(result.text));
 
     f32 const y_pad = 2;
-    {
-        auto font = graphics->context->CurrentFont();
-
-        if (!flags.wip_multiline) {
-            char const* start = IncrementUTF8Characters(result.text.data, result.selection_start);
-            char const* end = IncrementUTF8Characters(result.text.data, result.selection_end);
-
-            f32 const selection_start =
-                font->CalcTextSizeA(font_size,
-                                    FLT_MAX,
-                                    0,
-                                    {result.text.data, (usize)(start - result.text.data)})
-                    .x;
-            f32 const selection_size =
-                font->CalcTextSizeA(font_size, FLT_MAX, 0, {start, (usize)(end - start)}).x;
-
-            auto selection_r = Rect {.x = result.text_pos.x + selection_start,
-                                     .y = result.text_pos.y - y_pad,
-                                     .w = selection_size,
-                                     .h = font_size + y_pad * 2};
-
-            result.selection_rect = selection_r;
-        } else {
-            // Handled via the selection rect helper
-        }
-    }
 
     {
         f32 const cursor_width = 2; // IMPROVE: scaling
         u32 line_index = 0;
-        auto font = graphics->context->CurrentFont();
         auto cursor_ptr = result.text.data;
         auto line_start = result.text.data;
         for (auto _ : Range(result.cursor)) {
@@ -1393,8 +1443,9 @@ TextInputResult Context::SingleLineTextInput(Rect r,
             cursor_ptr = IncrementUTF8Characters(cursor_ptr, 1);
         }
         ASSERT(cursor_ptr >= line_start);
-        f32 const cursor_start =
-            font->CalcTextSizeA(font_size, FLT_MAX, 0, {line_start, (usize)(cursor_ptr - line_start)}).x;
+        auto const text_up_to_cursor = String {line_start, (usize)(cursor_ptr - line_start)};
+        ASSERT(!Contains(text_up_to_cursor, '\n'));
+        f32 const cursor_start = font->CalcTextSizeA(font_size, FLT_MAX, 0, text_up_to_cursor).x;
 
         auto cursor_r = Rect {.x = result.text_pos.x + cursor_start,
                               .y = result.text_pos.y - y_pad + line_index * font_size,
@@ -1420,16 +1471,16 @@ TextInputResult Context::SingleLineTextInput(Rect r,
     return result;
 }
 
-Optional<Rect> TextInputResult::NextMultilineSelectionRect(TextInputResult::SelectionIterator& it) {
-    ASSERT(it.result.HasSelection());
+Optional<Rect> TextInputResult::NextSelectionRect(TextInputResult::SelectionIterator& it) const {
+    ASSERT(HasSelection());
     if (it.reached_end) return {};
 
     if (!it.pos) {
         // First call.
-        it.pos = it.result.text.data;
+        it.pos = text.data;
         auto line_start = it.pos;
 
-        for (auto _ : Range(it.result.selection_start)) {
+        for (auto _ : Range(selection_start)) {
             if (*it.pos == '\n') {
                 line_start = it.pos + 1;
                 it.line_index++;
@@ -1442,7 +1493,7 @@ Optional<Rect> TextInputResult::NextMultilineSelectionRect(TextInputResult::Sele
         auto const start_line_start = line_start;
         auto const start_line_index = it.line_index;
 
-        it.remaining_chars = (u32)(it.result.selection_end - it.result.selection_start);
+        it.remaining_chars = (u32)(selection_end - selection_start);
 
         // We have the start of the selection and the line index. To complete this rect we need to iterate
         // until either the end of the line or the end of the selection.
@@ -1465,13 +1516,12 @@ Optional<Rect> TextInputResult::NextMultilineSelectionRect(TextInputResult::Sele
         auto font_size = it.draw_ctx.CurrentFontSize();
 
         Rect const result = {
-            .x = it.result.text_pos.x +
-                 font->CalcTextSizeA(font_size,
-                                     FLT_MAX,
-                                     0,
-                                     {start_line_start, (usize)(start_pos - start_line_start)})
-                     .x,
-            .y = it.result.text_pos.y - 2 + start_line_index * font_size,
+            .x = text_pos.x + font->CalcTextSizeA(font_size,
+                                                  FLT_MAX,
+                                                  0,
+                                                  {start_line_start, (usize)(start_pos - start_line_start)})
+                                  .x,
+            .y = text_pos.y - 2 + start_line_index * font_size,
             .w = font->CalcTextSizeA(font_size, FLT_MAX, 0, {start_pos, (usize)(end_pos - start_pos)}).x,
             .h = font_size + 4};
 
@@ -1500,8 +1550,8 @@ Optional<Rect> TextInputResult::NextMultilineSelectionRect(TextInputResult::Sele
     auto font = it.draw_ctx.CurrentFont();
     auto font_size = it.draw_ctx.CurrentFontSize();
 
-    return Rect {.x = it.result.text_pos.x,
-                 .y = it.result.text_pos.y - 2 + start_line_index * font_size,
+    return Rect {.x = text_pos.x,
+                 .y = text_pos.y - 2 + start_line_index * font_size,
                  .w = font->CalcTextSizeA(font_size, FLT_MAX, 0, {start_pos, (usize)(end_pos - start_pos)}).x,
                  .h = font_size + 4};
 }
@@ -2333,12 +2383,8 @@ bool Context::PopupButton(ButtonSettings settings, Rect r, Id popup_id, String s
 
 TextInputResult Context::TextInput(TextInputSettings settings, Rect r, Id id, String str) {
     RegisterAndConvertRect(&r);
-    auto edit = SingleLineTextInput(r,
-                                    id,
-                                    str,
-                                    settings.text_flags,
-                                    settings.button_flags,
-                                    settings.select_all_on_first_open);
+    auto edit =
+        TextInput(r, id, str, settings.text_flags, settings.button_flags, settings.select_all_on_first_open);
 
     settings.draw(*this, r, id, edit.text, &edit);
     return edit;
@@ -2356,12 +2402,12 @@ Context::DraggerResult Context::TextInputDraggerCustom(TextInputDraggerSettings 
 
     RegisterAndConvertRect(&r);
 
-    auto text_edit_result = SingleLineTextInput(r,
-                                                id,
-                                                display_string,
-                                                settings.text_input_settings.text_flags,
-                                                settings.text_input_settings.button_flags,
-                                                settings.text_input_settings.select_all_on_first_open);
+    auto text_edit_result = TextInput(r,
+                                      id,
+                                      display_string,
+                                      settings.text_input_settings.text_flags,
+                                      settings.text_input_settings.button_flags,
+                                      settings.text_input_settings.select_all_on_first_open);
 
     if (text_edit_result.enter_pressed) result.new_string_value = text_edit_result.text;
 

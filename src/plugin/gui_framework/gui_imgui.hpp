@@ -101,7 +101,8 @@ struct TextInputFlags {
     bool32 chars_no_blank : 1; // Filter out spaces, tabs
     bool32 tab_focuses_next_input : 1;
     bool32 centre_align : 1;
-    bool32 wip_multiline : 1;
+    bool32 multiline : 1;
+    bool32 multiline_wordwrap_hack : 1; // quick and dirty word wrap
 };
 
 //
@@ -256,11 +257,6 @@ struct ActiveItem {
 struct TextInputResult {
     bool HasSelection() const { return selection_start != selection_end; }
 
-    Rect GetSelectionRect() const {
-        ASSERT(HasSelection());
-        return selection_rect;
-    }
-
     Rect GetCursorRect() const {
         ASSERT(show_cursor);
         return cursor_rect;
@@ -269,21 +265,19 @@ struct TextInputResult {
     f32x2 GetTextPos() const { return text_pos; }
 
     struct SelectionIterator {
-        TextInputResult const& result;
         graphics::DrawContext& draw_ctx;
         char const* pos;
         u32 remaining_chars;
         u32 line_index;
         bool reached_end;
     };
-    static Optional<Rect> NextMultilineSelectionRect(SelectionIterator& it);
+    Optional<Rect> NextSelectionRect(SelectionIterator& it) const;
 
     bool enter_pressed {};
     bool buffer_changed {};
 
     f32x2 text_pos = {};
     Rect cursor_rect = {};
-    Rect selection_rect = {}; // single line only
     // temporary, changes when TextInput is called again, copy this into your own buffer if
     // buffer_changed is true
     String text {};
@@ -352,12 +346,8 @@ struct Context {
     //
     // Text Input
     //
-    TextInputResult SingleLineTextInput(Rect r,
-                                        Id id,
-                                        String text,
-                                        TextInputFlags flags,
-                                        ButtonFlags button_flags,
-                                        bool select_all);
+    TextInputResult
+    TextInput(Rect r, Id id, String text, TextInputFlags flags, ButtonFlags button_flags, bool select_all);
 
     Id GetTextInput() const { return active_text_input; }
     bool TextInputHasFocus(Id id) const;
@@ -654,10 +644,6 @@ struct Context {
     DynamicArray<Char32> textedit_text {Malloc::Instance()};
     DynamicArray<char> textedit_text_utf8 {Malloc::Instance()};
     int textedit_len = 0;
-    ButtonFlags text_input_selector_flags = {
-        .left_mouse = true,
-        .triggers_on_mouse_down = true,
-    };
 
     // window
     DynamicArray<Window*> sorted_windows {Malloc::Instance()}; // internal
@@ -800,8 +786,9 @@ PUBLIC void DefaultDrawTextInput(Context const& s, Rect r, Id id, String text, T
     s.graphics->AddRectFilled(r.Min(), r.Max(), col);
 
     if (result->HasSelection()) {
-        auto selection_r = result->GetSelectionRect();
-        s.graphics->AddRectFilled(selection_r.Min(), selection_r.Max(), 0xffffff00);
+        TextInputResult::SelectionIterator it {*s.graphics->context};
+        while (auto const sel_r = result->NextSelectionRect(it))
+            s.graphics->AddRectFilled(*sel_r, 0xff0000ff);
     }
 
     if (result->show_cursor) {

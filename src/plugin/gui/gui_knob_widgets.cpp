@@ -172,7 +172,7 @@ bool Knob(Gui* g, imgui::Id id, Parameter const& param, Rect r, Style const& sty
 
     if (g->param_text_editor_to_open && *g->param_text_editor_to_open == param.info.index) {
         g->param_text_editor_to_open.Clear();
-        g->imgui.SetTextInputFocus(id, display_string);
+        g->imgui.SetTextInputFocus(id, display_string, false);
     }
 
     auto const result = g->imgui.TextInputDraggerCustom(settings,

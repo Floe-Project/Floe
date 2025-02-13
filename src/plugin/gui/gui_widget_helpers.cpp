@@ -469,10 +469,9 @@ imgui::TextInputSettings GetParameterTextInputSettings() {
                                 rounding);
 
         if (result->HasSelection()) {
-            auto selection_r = result->GetSelectionRect();
-            imgui.graphics->AddRectFilled(selection_r.Min(),
-                                          selection_r.Max(),
-                                          LiveCol(imgui, UiColMap::TextInputSelection));
+            imgui::TextInputResult::SelectionIterator it {.draw_ctx = *imgui.graphics->context};
+            while (auto rect = result->NextSelectionRect(it))
+                imgui.graphics->AddRectFilled(*rect, LiveCol(imgui, UiColMap::TextInputSelection));
         }
 
         if (result->show_cursor) {
@@ -498,7 +497,7 @@ void HandleShowingTextEditorForParams(Gui* g, Rect r, Span<ParamIndex const> par
                 auto const str = p_obj.info.LinearValueToString(p_obj.LinearValue());
                 ASSERT(str.HasValue());
 
-                g->imgui.SetTextInputFocus(id, *str);
+                g->imgui.SetTextInputFocus(id, *str, false);
                 auto const text_input = g->imgui.TextInput(GetParameterTextInputSettings(), r, id, *str);
 
                 if (text_input.enter_pressed || g->imgui.TextInputJustUnfocused(id)) {

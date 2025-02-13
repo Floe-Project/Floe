@@ -680,10 +680,12 @@ void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
                                                       rounding);
 
                         if (result->HasSelection()) {
-                            auto selection_r = result->GetSelectionRect();
-                            imgui.graphics->AddRectFilled(selection_r.Min(),
-                                                          selection_r.Max(),
-                                                          LiveCol(imgui, UiColMap::BrowserSearchSelection));
+                            imgui::TextInputResult::SelectionIterator it {.draw_ctx =
+                                                                              *imgui.graphics->context};
+                            while (auto rect = result->NextSelectionRect(it))
+                                imgui.graphics->AddRectFilled(
+                                    *rect,
+                                    LiveCol(imgui, UiColMap::BrowserSearchSelection));
                         }
 
                         if (result->show_cursor) {

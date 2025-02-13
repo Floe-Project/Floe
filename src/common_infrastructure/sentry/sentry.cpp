@@ -87,6 +87,26 @@ static void CheckTags(Span<Tag const> tags) {
     }
 }
 
+static MutableString CreateJsonBlob(Sentry& sentry,
+                                    FunctionRef<ErrorCodeOr<void>(json::WriteContext& writer)> write_func) {
+    DynamicArray<char> blob {sentry.arena};
+    blob.Reserve(1024);
+    json::WriteContext json_writer {
+        .out = dyn::WriterFor(blob),
+        .add_whitespace = false,
+    };
+    auto _ = json::WriteObjectBegin(json_writer);
+    auto _ = write_func(json_writer);
+    auto _ = json::WriteObjectEnd(json_writer);
+
+    // we want to be able to print the context directly into an existing JSON event so we remove the
+    // object braces
+    dyn::Pop(blob);
+    dyn::Remove(blob, 0);
+
+    return blob.ToOwnedSpan();
+}
+
 // not thread-safe, dsn must be static, tags are cloned
 static void InitSentry(Sentry& sentry, DsnInfo dsn, Span<Tag const> tags) {
     CheckDsn(dsn);
@@ -102,74 +122,46 @@ static void InitSentry(Sentry& sentry, DsnInfo dsn, Span<Tag const> tags) {
     ASSERT_EQ(sentry.tags.size, 0u);
     sentry.tags = sentry.arena.Clone(tags, CloneType::Deep);
 
-    // this data is common to every event we want to send, so let's cache it as a JSON blob
-    {
-        DynamicArray<char> event_context_json {sentry.arena};
-        event_context_json.Reserve(1024);
-        json::WriteContext json_writer {
-            .out = dyn::WriterFor(event_context_json),
-            .add_whitespace = false,
-        };
-
-        auto _ = json::WriteObjectBegin(json_writer);
-
-        // user
-        if (sentry.device_id) {
-            auto _ = json::WriteKeyObjectBegin(json_writer, "user");
-            auto _ = json::WriteKeyValue(json_writer, "id", *sentry.device_id);
-            auto _ = json::WriteObjectEnd(json_writer);
-        }
-
-        // contexts
-        {
-            auto _ = json::WriteKeyObjectBegin(json_writer, "contexts");
-
-            // device
-            {
-                auto const system = CachedSystemStats();
-                auto _ = json::WriteKeyObjectBegin(json_writer, "device");
-                auto _ = json::WriteKeyValue(json_writer, "name", "desktop");
-                auto _ = json::WriteKeyValue(json_writer, "arch", system.Arch());
-                auto _ = json::WriteKeyValue(json_writer, "cpu_description", system.cpu_name);
-                auto _ = json::WriteKeyValue(json_writer, "processor_count", system.num_logical_cpus);
-                auto _ = json::WriteKeyValue(json_writer, "processor_frequency", system.frequency_mhz);
-                auto _ = json::WriteObjectEnd(json_writer);
-            }
-
-            // os
-            {
-                auto const os = GetOsInfo();
-                auto _ = json::WriteKeyObjectBegin(json_writer, "os");
-                auto _ = json::WriteKeyValue(json_writer, "name", os.name);
-                if (os.version.size) auto _ = json::WriteKeyValue(json_writer, "version", os.version);
-                if (os.build.size) auto _ = json::WriteKeyValue(json_writer, "build", os.build);
-                if (os.kernel_version.size)
-                    auto _ = json::WriteKeyValue(json_writer, "kernel_version", os.kernel_version);
-                if (os.pretty_name.size)
-                    auto _ = json::WriteKeyValue(json_writer, "pretty_name", os.pretty_name);
-                if (os.distribution_name.size)
-                    auto _ = json::WriteKeyValue(json_writer, "distribution_name", os.distribution_name);
-                if (os.distribution_version.size)
-                    auto _ =
-                        json::WriteKeyValue(json_writer, "distribution_version", os.distribution_version);
-                if (os.distribution_pretty_name.size)
-                    auto _ = json::WriteKeyValue(json_writer,
-                                                 "distribution_pretty_name",
-                                                 os.distribution_pretty_name);
-                auto _ = json::WriteObjectEnd(json_writer);
-            }
-
-            auto _ = json::WriteObjectEnd(json_writer);
-        }
-        auto _ = json::WriteObjectEnd(json_writer);
-
-        // we want to be able to print the context directly into an existing JSON event so we remove the
-        // object braces
-        dyn::Pop(event_context_json);
-        dyn::Remove(event_context_json, 0);
-
-        sentry.event_context_json = event_context_json.ToOwnedSpan();
+    if (sentry.device_id) {
+        sentry.user_context_json =
+            CreateJsonBlob(sentry, [&sentry](json::WriteContext& json) -> ErrorCodeOr<void> {
+                TRY(json::WriteKeyObjectBegin(json, "user"));
+                TRY(json::WriteKeyValue(json, "id", *sentry.device_id));
+                TRY(json::WriteObjectEnd(json));
+                return k_success;
+            });
     }
+
+    sentry.device_context_json = CreateJsonBlob(sentry, [](json::WriteContext& json) -> ErrorCodeOr<void> {
+        auto const system = CachedSystemStats();
+        TRY(json::WriteKeyObjectBegin(json, "device"));
+        TRY(json::WriteKeyValue(json, "name", "desktop"));
+        TRY(json::WriteKeyValue(json, "arch", system.Arch()));
+        TRY(json::WriteKeyValue(json, "cpu_description", system.cpu_name));
+        TRY(json::WriteKeyValue(json, "processor_count", system.num_logical_cpus));
+        TRY(json::WriteKeyValue(json, "processor_frequency", system.frequency_mhz));
+        TRY(json::WriteObjectEnd(json));
+        return k_success;
+    });
+
+    sentry.os_context_json = CreateJsonBlob(sentry, [](json::WriteContext& json_writer) -> ErrorCodeOr<void> {
+        auto const os = GetOsInfo();
+        TRY(json::WriteKeyObjectBegin(json_writer, "os"));
+        TRY(json::WriteKeyValue(json_writer, "name", os.name));
+        if (os.version.size) TRY(json::WriteKeyValue(json_writer, "version", os.version));
+        if (os.build.size) TRY(json::WriteKeyValue(json_writer, "build", os.build));
+        if (os.kernel_version.size)
+            TRY(json::WriteKeyValue(json_writer, "kernel_version", os.kernel_version));
+        if (os.pretty_name.size) TRY(json::WriteKeyValue(json_writer, "pretty_name", os.pretty_name));
+        if (os.distribution_name.size)
+            TRY(json::WriteKeyValue(json_writer, "distribution_name", os.distribution_name));
+        if (os.distribution_version.size)
+            TRY(json::WriteKeyValue(json_writer, "distribution_version", os.distribution_version));
+        if (os.distribution_pretty_name.size)
+            TRY(json::WriteKeyValue(json_writer, "distribution_pretty_name", os.distribution_pretty_name));
+        TRY(json::WriteObjectEnd(json_writer));
+        return k_success;
+    });
 }
 
 alignas(Sentry) static u8 g_sentry_storage[sizeof(Sentry)];
@@ -194,60 +186,35 @@ void InitBarebonesSentry(Sentry& sentry) {
                       StoreMemoryOrder::Relaxed);
     sentry.session_id = detail::Uuid(sentry.seed);
 
-    // this data is common to every event we want to send, so let's cache it as a JSON blob
-    {
-        DynamicArray<char> event_context_json {sentry.arena};
-        event_context_json.Reserve(1024);
-        json::WriteContext json_writer {
-            .out = dyn::WriterFor(event_context_json),
-            .add_whitespace = false,
-        };
+    sentry.device_context_json = CreateJsonBlob(sentry, [](json::WriteContext& json) -> ErrorCodeOr<void> {
+        TRY(json::WriteKeyObjectBegin(json, "device"));
+        TRY(json::WriteKeyValue(json, "name", "desktop"));
+        TRY(json::WriteKeyValue(json, "arch", ({
+                                    String s;
+                                    switch (k_arch) {
+                                        case Arch::X86_64: s = "x86_64"; break;
+                                        case Arch::Aarch64: s = "aarch64"; break;
+                                    }
+                                    s;
+                                })));
+        TRY(json::WriteObjectEnd(json));
 
-        auto _ = json::WriteObjectBegin(json_writer);
+        return k_success;
+    });
 
-        // contexts
-        {
-            auto _ = json::WriteKeyObjectBegin(json_writer, "contexts");
+    sentry.os_context_json = CreateJsonBlob(sentry, [](json::WriteContext& json) -> ErrorCodeOr<void> {
+        TRY(json::WriteKeyObjectBegin(json, "os"));
+        TRY(json::WriteKeyValue(json, "name", ({
+                                    String s;
+                                    if (IS_WINDOWS) s = "Windows";
+                                    if (IS_LINUX) s = "Linux";
+                                    if (IS_MACOS) s = "macOS";
+                                    s;
+                                })));
+        TRY(json::WriteObjectEnd(json));
 
-            // device
-            {
-                auto _ = json::WriteKeyObjectBegin(json_writer, "device");
-                auto _ = json::WriteKeyValue(json_writer, "name", "desktop");
-                auto _ = json::WriteKeyValue(json_writer, "arch", ({
-                                                 String s;
-                                                 switch (k_arch) {
-                                                     case Arch::X86_64: s = "x86_64"; break;
-                                                     case Arch::Aarch64: s = "aarch64"; break;
-                                                 }
-                                                 s;
-                                             }));
-                auto _ = json::WriteObjectEnd(json_writer);
-            }
-
-            // os
-            {
-                auto _ = json::WriteKeyObjectBegin(json_writer, "os");
-                auto _ = json::WriteKeyValue(json_writer, "name", ({
-                                                 String s {};
-                                                 if (IS_WINDOWS) s = "Windows";
-                                                 if (IS_LINUX) s = "Linux";
-                                                 if (IS_MACOS) s = "macOS";
-                                                 s;
-                                             }));
-                auto _ = json::WriteObjectEnd(json_writer);
-            }
-
-            auto _ = json::WriteObjectEnd(json_writer);
-        }
-        auto _ = json::WriteObjectEnd(json_writer);
-
-        // we want to be able to print the context directly into an existing JSON event so we remove the
-        // object braces
-        dyn::Pop(event_context_json);
-        dyn::Remove(event_context_json, 0);
-
-        sentry.event_context_json = event_context_json.ToOwnedSpan();
-    }
+        return k_success;
+    });
 }
 
 TEST_CASE(TestSentry) {
@@ -271,7 +238,7 @@ TEST_CASE(TestSentry) {
 
         // build an envelope
         DynamicArray<char> envelope {tester.scratch_arena};
-        auto writer = dyn::WriterFor(envelope);
+        EnvelopeWriter writer = {.writer = dyn::WriterFor(envelope)};
         TRY(EnvelopeAddHeader(sentry, writer, true));
         TRY(EnvelopeAddSessionUpdate(sentry, writer, SessionStatus::Ok));
         TRY(EnvelopeAddEvent(sentry,
@@ -285,7 +252,10 @@ TEST_CASE(TestSentry) {
                                      {"tag2", "value2"},
                                  }),
                              },
-                             false));
+                             {
+                                 .signal_safe = true,
+                                 .diagnostics = true,
+                             }));
         TRY(EnvelopeAddSessionUpdate(sentry, writer, SessionStatus::EndedNormally));
 
         CHECK(envelope.size > 0);

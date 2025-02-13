@@ -14,6 +14,7 @@
 #include "build_resources/embedded_files.h"
 #include "engine/engine.hpp"
 #include "gui/gui2_attribution_panel.hpp"
+#include "gui/gui2_feedback_panel.hpp"
 #include "gui/gui2_info_panel.hpp"
 #include "gui/gui2_notifications.hpp"
 #include "gui/gui2_package_install.hpp"
@@ -690,6 +691,13 @@ GuiFrameResult GuiUpdate(Gui* g) {
             };
 
             DoSettingsPanel(box_system, context, g->settings_panel_state);
+        }
+
+        {
+            FeedbackPanelContext context {
+                .notifications = g->notifications,
+            };
+            DoFeedbackPanel(box_system, context, g->feedback_panel_state);
         }
 
         {

@@ -78,3 +78,41 @@ void ShutdownBackgroundErrorReporting() {
         WebGlobalCleanup();
     });
 }
+
+static bool EmailIsValid(String email) {
+    if (!email.size) return false;
+    if (email.size > 256) return false;
+    if (email[0] == '@') return false;
+
+    auto at_pos = Find(email, '@');
+    if (!at_pos) return false;
+
+    email.RemovePrefix(*at_pos + 1);
+    if (!email.size) return false;
+    if (email[0] == '.') return false;
+
+    auto dot_pos = Find(email, '.');
+    if (!dot_pos) return false;
+
+    return true;
+}
+
+ReportFeedbackReturnCode
+ReportFeedback(String description, Optional<String> email, bool include_diagnostics) {
+    if (description.size == 0) return ReportFeedbackReturnCode::DescriptionEmpty;
+    if (description.size > sentry::FeedbackEvent::k_max_message_length)
+        return ReportFeedbackReturnCode::DescriptionTooLong;
+
+    if (email && !EmailIsValid(*email)) return ReportFeedbackReturnCode::InvalidEmail;
+
+    auto queue = g_queue.Load(LoadMemoryOrder::Acquire);
+    ASSERT(queue);
+
+    sentry::Feedback feedback {};
+    feedback.message = feedback.arena.Clone(description);
+    if (email) feedback.email = feedback.arena.Clone(*email);
+    feedback.include_diagnostics = include_diagnostics;
+
+    if (!sentry::TryEnqueueFeedback(*queue, Move(feedback))) return ReportFeedbackReturnCode::Busy;
+    return ReportFeedbackReturnCode::Success;
+}

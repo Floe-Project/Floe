@@ -31,3 +31,13 @@ ReportError(sentry::Error::Level level, Optional<u64> error_id, String format, A
     error.stacktrace = CurrentStacktrace(ProgramCounter {CALL_SITE_PROGRAM_COUNTER});
     detail::ReportError(Move(error), error_id);
 }
+
+enum class ReportFeedbackReturnCode {
+    Success,
+    InvalidEmail,
+    Busy,
+    DescriptionTooLong,
+    DescriptionEmpty,
+};
+
+ReportFeedbackReturnCode ReportFeedback(String description, Optional<String> email, bool include_diagnostics);

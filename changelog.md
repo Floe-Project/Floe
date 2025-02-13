@@ -13,6 +13,7 @@ For instance: 0.0.1. Don't change the headings.
 - Add support for packaging and installing MDATA libraries (Mirage)
 - Add tooltips to the settings GUI
 - Add new Info panel featuring info about installed libraries. 'About', 'Metrics' and 'Licenses' have been moved here too instead of being separate panels.
+- Add new Share Feedback panel for submitting bug reports and feature requests
 - Add new fields to the Lua API to support license info and attribution, such as CC BY
 - Add attribution-required panel which appears when needed with generated copyable text for fulfilling attribution requirements. Synchronised between all instances of Floe. Makes complying with licenses like CC BY easy.
 - Enable selecting multiple package to install at once

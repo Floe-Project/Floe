@@ -4,6 +4,7 @@
 #pragma once
 
 #include "engine/package_installation.hpp"
+#include "gui/gui2_common_modal_panel.hpp"
 #include "gui/gui2_notifications.hpp"
 #include "gui_framework/gui_box_system.hpp"
 
@@ -109,9 +110,9 @@ PUBLIC void PackageInstallAlertsPanel(GuiBoxSystem& box_system, package::Install
                                               },
                                           });
 
-            if (DialogTextButton(box_system, button_row, "Skip", {}))
+            if (TextButton(box_system, button_row, "Skip", {}))
                 component.user_decision = package::InstallJob::UserDecision::Skip;
-            if (DialogTextButton(box_system, button_row, "Overwrite", {}))
+            if (TextButton(box_system, button_row, "Overwrite", {}))
                 component.user_decision = package::InstallJob::UserDecision::Overwrite;
         }
     }

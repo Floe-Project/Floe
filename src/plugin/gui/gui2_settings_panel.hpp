@@ -76,50 +76,6 @@ static Box SettingsMenuButton(GuiBoxSystem& box_system, Box parent, String text,
     return button;
 }
 
-static bool SettingsCheckboxButton(GuiBoxSystem& box_system, Box parent, String text, bool state) {
-    auto const button = DoBox(box_system,
-                              {
-                                  .parent = parent,
-                                  .activate_on_click_button = MouseButton::Left,
-                                  .activation_click_event = ActivationClickEvent::Up,
-                                  .layout {
-                                      .size = {layout::k_hug_contents, layout::k_hug_contents},
-                                      .contents_gap = style::k_settings_medium_gap,
-                                      .contents_direction = layout::Direction::Row,
-                                      .contents_align = layout::Alignment::Start,
-                                  },
-                              });
-
-    DoBox(box_system,
-          {
-              .parent = button,
-              .text = state ? ICON_FA_CHECK : ""_s,
-              .font = FontType::SmallIcons,
-              .text_fill = style::Colour::Text,
-              .text_fill_hot = style::Colour::Text,
-              .text_fill_active = style::Colour::Text,
-              .text_align_x = TextAlignX::Centre,
-              .text_align_y = TextAlignY::Centre,
-              .background_fill = style::Colour::Background2,
-              .background_fill_auto_hot_active_overlay = true,
-              .border = style::Colour::Overlay0,
-              .border_auto_hot_active_overlay = true,
-              .round_background_corners = 0b1111,
-              .parent_dictates_hot_and_active = true,
-              .layout {
-                  .size = style::k_settings_icon_button_size,
-              },
-          });
-    DoBox(box_system,
-          {
-              .parent = button,
-              .text = text,
-              .size_from_text = true,
-          });
-
-    return button.button_fired;
-}
-
 static Box SettingsRow(GuiBoxSystem& box_system, Box parent) {
     return DoBox(box_system,
                  {
@@ -390,10 +346,10 @@ static void FolderSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& 
         });
         if (context.settings.settings.filesystem.extra_scan_folders[scan_folder_type].size !=
                 k_max_extra_scan_folders &&
-            DialogTextButton(box_system,
-                             rhs_column,
-                             "Add folder",
-                             fmt::FormatInline<100>("Add a folder to scan for {}", contents_name))) {
+            TextButton(box_system,
+                       rhs_column,
+                       "Add folder",
+                       fmt::FormatInline<100>("Add a folder to scan for {}", contents_name))) {
             AddExtraScanFolderDialog(box_system, context, (ScanFolderType)scan_folder_type, false);
         }
     }
@@ -584,10 +540,10 @@ static void PackagesSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext
         auto const rhs = SettingsRhsColumn(box_system, row, style::k_settings_small_gap);
         SettingsRhsText(box_system, rhs, "Install libraries and presets from a '.floe.zip' file");
         if (!context.package_install_jobs.Full() &&
-            DialogTextButton(box_system,
-                             rhs,
-                             "Install package",
-                             "Install libraries and presets from a '.floe.zip' file")) {
+            TextButton(box_system,
+                       rhs,
+                       "Install package",
+                       "Install libraries and presets from a '.floe.zip' file")) {
             if (auto const o = FilesystemDialog({
                     .type = DialogArguments::Type::OpenFile,
                     .allocator = box_system.arena,
@@ -712,26 +668,26 @@ static void GeneralSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext&
         SettingsLhsTextWidget(box_system, style_row, "Style");
         auto const options_rhs_column = SettingsRhsColumn(box_system, style_row, style::k_settings_small_gap);
 
-        if (SettingsCheckboxButton(box_system,
-                                   options_rhs_column,
-                                   "Show tooltips",
-                                   context.settings.settings.gui.show_tooltips)) {
+        if (CheckboxButton(box_system,
+                           options_rhs_column,
+                           "Show tooltips",
+                           context.settings.settings.gui.show_tooltips)) {
             context.settings.settings.gui.show_tooltips = !context.settings.settings.gui.show_tooltips;
             context.settings.tracking.changed = true;
         }
 
         {
             bool state = context.settings.settings.gui.show_keyboard;
-            if (SettingsCheckboxButton(box_system, options_rhs_column, "Show keyboard", state))
+            if (CheckboxButton(box_system, options_rhs_column, "Show keyboard", state))
                 gui_settings::SetShowKeyboard(context.settings.settings.gui,
                                               context.settings.tracking,
                                               !state);
         }
 
-        if (SettingsCheckboxButton(box_system,
-                                   options_rhs_column,
-                                   "High contrast GUI",
-                                   context.settings.settings.gui.high_contrast_gui)) {
+        if (CheckboxButton(box_system,
+                           options_rhs_column,
+                           "High contrast GUI",
+                           context.settings.settings.gui.high_contrast_gui)) {
             context.settings.settings.gui.high_contrast_gui =
                 !context.settings.settings.gui.high_contrast_gui;
             context.settings.tracking.changed = true;
@@ -744,10 +700,12 @@ static void GeneralSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext&
         SettingsLhsTextWidget(box_system, misc_row, "Misc");
         auto const options_rhs_column = SettingsRhsColumn(box_system, misc_row, style::k_settings_small_gap);
 
-        if (SettingsCheckboxButton(box_system,
-                                   options_rhs_column,
-                                   "Disable anonymous error reports",
-                                   context.settings.settings.online_reporting_disabled)) {
+        if (CheckboxButton(
+                box_system,
+                options_rhs_column,
+                "Disable anonymous error reports",
+                context.settings.settings.online_reporting_disabled,
+                "If an error occurs, Floe sends anonymous data about the error, your system, and Floe's state to a server. Additionally, Floe sends anonymous data points about when a session starts and ends for determining software health.")) {
             gui_settings::SetDisableOnlineReporting(context.settings,
                                                     context.settings.settings.online_reporting_disabled);
         }

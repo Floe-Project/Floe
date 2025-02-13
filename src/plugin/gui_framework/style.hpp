@@ -176,6 +176,8 @@ constexpr f32 k_settings_dialog_width = 625;
 constexpr f32 k_settings_dialog_height = 443;
 constexpr f32 k_info_dialog_width = k_settings_dialog_width;
 constexpr f32 k_info_dialog_height = k_settings_dialog_height;
+constexpr f32 k_feedback_dialog_width = 400;
+constexpr f32 k_feedback_dialog_height = k_settings_dialog_height;
 
 constexpr f64 k_tooltip_open_delay = 0.5;
 

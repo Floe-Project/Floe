@@ -122,18 +122,18 @@ static void LibrariesInfoPanel(GuiBoxSystem& box_system, InfoPanelContext& conte
                                           },
                                       });
         if (lib->library_url)
-            if (DialogTextButton(box_system, button_row, "Library Website", *lib->library_url))
+            if (TextButton(box_system, button_row, "Library Website", *lib->library_url))
                 OpenUrlInBrowser(*lib->library_url);
 
         if (lib->author_url)
-            if (DialogTextButton(box_system, button_row, "Author Website", *lib->author_url))
+            if (TextButton(box_system, button_row, "Author Website", *lib->author_url))
                 OpenUrlInBrowser(*lib->author_url);
 
         if (auto const dir = path::Directory(lib->path))
-            if (DialogTextButton(box_system,
-                                 button_row,
-                                 "Open Folder",
-                                 fmt::Assign(buffer, "Open {} in {}", *dir, GetFileBrowserAppName())))
+            if (TextButton(box_system,
+                           button_row,
+                           "Open Folder",
+                           fmt::Assign(buffer, "Open {} in {}", *dir, GetFileBrowserAppName())))
                 OpenFolderInFileBrowser(*dir);
     }
 
@@ -182,10 +182,10 @@ static void AboutInfoPanel(GuiBoxSystem& box_system, InfoPanelContext&) {
                                           },
                                       });
 
-        if (DialogTextButton(box_system, button_box, "Website & Manual", FLOE_HOMEPAGE_URL))
+        if (TextButton(box_system, button_box, "Website & Manual", FLOE_HOMEPAGE_URL))
             OpenUrlInBrowser(FLOE_HOMEPAGE_URL);
 
-        if (DialogTextButton(box_system, button_box, "Source code", FLOE_SOURCE_CODE_URL))
+        if (TextButton(box_system, button_box, "Source code", FLOE_SOURCE_CODE_URL))
             OpenUrlInBrowser(FLOE_SOURCE_CODE_URL);
     }
 }

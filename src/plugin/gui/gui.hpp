@@ -5,6 +5,7 @@
 #include "foundation/foundation.hpp"
 
 #include "engine/engine.hpp"
+#include "gui/gui2_feedback_panel_state.hpp"
 #include "gui/gui2_info_panel_state.hpp"
 #include "gui/gui2_notifications.hpp"
 #include "gui/gui2_settings_panel_state.hpp"
@@ -135,6 +136,7 @@ struct Gui {
     SettingsPanelState settings_panel_state {};
     InfoPanelState info_panel_state {};
     bool attribution_panel_open {};
+    FeedbackPanelState feedback_panel_state {};
     Notifications notifications {};
 
     GuiFrameInput& frame_input;

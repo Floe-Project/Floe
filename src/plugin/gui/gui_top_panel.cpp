@@ -32,6 +32,7 @@ static void DoDotsMenu(Gui* g) {
 
     if (top_menu.DoButton("Reset All Parameters")) SetAllParametersToDefaultValues(g->engine.processor);
     if (top_menu.DoButton("Randomise All Parameters")) RandomiseAllParameterValues(g->engine.processor);
+    if (top_menu.DoButton("Share Feedback")) g->feedback_panel_state.open = true;
 }
 
 void TopPanel(Gui* g) {

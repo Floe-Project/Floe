@@ -60,6 +60,18 @@ struct Error : ErrorEvent {
     ArenaAllocator arena {Malloc::Instance()};
 };
 
+struct FeedbackEvent {
+    static constexpr usize k_max_message_length = 4096;
+    String message;
+    Optional<String> email;
+    bool include_diagnostics {};
+    Optional<String> associated_event_id {};
+};
+
+struct Feedback : FeedbackEvent {
+    ArenaAllocator arena {Malloc::Instance()};
+};
+
 struct DsnInfo {
     String dsn;
     String host;
@@ -77,9 +89,17 @@ struct Sentry {
     Atomic<u64> seed = {};
     Atomic<bool> session_ended = false;
     FixedSizeAllocator<Kb(4)> arena {nullptr};
-    Span<char> event_context_json {};
+    Span<char> user_context_json {};
+    Span<char> device_context_json {};
+    Span<char> os_context_json {};
     Span<Tag> tags {};
     Atomic<bool> online_reporting_disabled = true;
+};
+
+struct EnvelopeWriter {
+    Optional<fmt::UuidArray> top_level_event_id {};
+    bool added_event = false;
+    Writer writer {};
 };
 
 namespace detail {
@@ -182,20 +202,19 @@ struct SentryOrFallback {
 };
 
 // thread-safe (for Sentry), signal-safe
-PUBLIC ErrorCodeOr<void> EnvelopeAddHeader(Sentry& sentry, Writer writer, bool include_sent_at) {
+PUBLIC ErrorCodeOr<void> EnvelopeAddHeader(Sentry& sentry, EnvelopeWriter& writer, bool include_sent_at) {
     json::WriteContext json_writer {
-        .out = writer,
+        .out = writer.writer,
         .add_whitespace = false,
     };
-
-    auto const event_id = detail::Uuid(sentry.seed);
+    if (!writer.top_level_event_id) writer.top_level_event_id = detail::Uuid(sentry.seed);
 
     TRY(json::WriteObjectBegin(json_writer));
     if constexpr (k_online_reporting) TRY(json::WriteKeyValue(json_writer, "dsn", sentry.dsn.dsn));
     if (include_sent_at) TRY(json::WriteKeyValue(json_writer, "sent_at", TimestampRfc3339UtcNow()));
-    TRY(json::WriteKeyValue(json_writer, "event_id", event_id));
+    TRY(json::WriteKeyValue(json_writer, "event_id", *writer.top_level_event_id));
     TRY(json::WriteObjectEnd(json_writer));
-    TRY(writer.WriteChar('\n'));
+    TRY(writer.writer.WriteChar('\n'));
 
     return k_success;
 }
@@ -211,7 +230,7 @@ enum class SessionStatus {
 // "Sessions are updated from events sent in. The most recent event holds the entire session state."
 // "A session does not have to be started in order to crash. Just reporting a crash is sufficient."
 [[maybe_unused]] PUBLIC ErrorCodeOr<void> EnvelopeAddSessionUpdate(Sentry& sentry,
-                                                                   Writer writer,
+                                                                   EnvelopeWriter& writer,
                                                                    SessionStatus status,
                                                                    Optional<u32> extra_num_errors = {}) {
     switch (status) {
@@ -252,7 +271,7 @@ enum class SessionStatus {
     });
 
     json::WriteContext json_writer {
-        .out = writer,
+        .out = writer.writer,
         .add_whitespace = false,
     };
 
@@ -261,7 +280,7 @@ enum class SessionStatus {
     TRY(json::WriteObjectBegin(json_writer));
     TRY(json::WriteKeyValue(json_writer, "type", "session"));
     TRY(json::WriteObjectEnd(json_writer));
-    TRY(writer.WriteChar('\n'));
+    TRY(writer.writer.WriteChar('\n'));
 
     // Item payload (session)
     json::ResetWriter(json_writer);
@@ -292,18 +311,31 @@ enum class SessionStatus {
         TRY(json::WriteObjectEnd(json_writer));
     }
     TRY(json::WriteObjectEnd(json_writer));
-    TRY(writer.WriteChar('\n'));
+    TRY(writer.writer.WriteChar('\n'));
 
     return k_success;
 }
+
+struct AddEventOptions {
+    bool signal_safe = true;
+    bool diagnostics = true;
+
+    // In Sentry, feedback is just variation of an ErrorEvent except it will have a different type in the
+    // header (feedback instead of event), and it will have a "feedback" object in the "contexts". Because
+    // it's so similar, we just add 'feedback' as an optional setting.
+    Optional<FeedbackEvent> feedback {};
+};
 
 // thread-safe (for Sentry), signal-safe if signal_safe is true
 // NOTE (Jan 2025): There's no pure informational concept in Sentry. All events are 'issues' regardless of
 // their level.
 [[maybe_unused]] PUBLIC ErrorCodeOr<void>
-EnvelopeAddEvent(Sentry& sentry, Writer writer, ErrorEvent event, bool signal_safe) {
-    ASSERT(event.message.size <= detail::k_max_message_length, "message too long");
+EnvelopeAddEvent(Sentry& sentry, EnvelopeWriter& writer, ErrorEvent event, AddEventOptions options) {
     ASSERT(event.tags.size < 100, "too many tags");
+    ASSERT(!(writer.added_event && options.feedback), "can't add feedback and event in the same envelope");
+    ASSERT(!(options.feedback && options.diagnostics),
+           "Sentry silently rejects feedback with other contexts/user");
+    if (!options.feedback) writer.added_event = true;
 
     switch (event.level) {
         case ErrorEvent::Level::Fatal:
@@ -316,19 +348,20 @@ EnvelopeAddEvent(Sentry& sentry, Writer writer, ErrorEvent event, bool signal_sa
     }
 
     json::WriteContext json_writer {
-        .out = writer,
+        .out = writer.writer,
         .add_whitespace = false,
     };
     auto const timestamp = TimestampRfc3339UtcNow();
     auto const event_id = detail::Uuid(sentry.seed);
+    if (!writer.top_level_event_id) writer.top_level_event_id = detail::Uuid(sentry.seed);
 
     // Item header (event)
     json::ResetWriter(json_writer);
     TRY(json::WriteObjectBegin(json_writer));
-    TRY(json::WriteKeyValue(json_writer, "type", "event"));
+    TRY(json::WriteKeyValue(json_writer, "type", options.feedback ? "feedback"_s : "event"_s));
     TRY(json::WriteKeyValue(json_writer, "event_id", event_id));
     TRY(json::WriteObjectEnd(json_writer));
-    TRY(writer.WriteChar('\n'));
+    TRY(writer.writer.WriteChar('\n'));
 
     // Item payload (event)
     json::ResetWriter(json_writer);
@@ -342,8 +375,11 @@ EnvelopeAddEvent(Sentry& sentry, Writer writer, ErrorEvent event, bool signal_sa
 
     // tags
     TRY(json::WriteKeyObjectBegin(json_writer, "tags"));
-    for (auto const tags :
-         Array {event.tags, sentry.tags, Array {Tag {"app_type", ToString(g_final_binary_type)}}}) {
+    for (auto const tags : Array {
+             event.tags,
+             options.diagnostics ? sentry.tags : Span<Tag> {},
+             Array {Tag {"app_type", ToString(g_final_binary_type)}},
+         }) {
         for (auto const& tag : tags) {
             if (!tag.key.size) continue;
             if (!tag.value.size) continue;
@@ -355,11 +391,11 @@ EnvelopeAddEvent(Sentry& sentry, Writer writer, ErrorEvent event, bool signal_sa
     TRY(json::WriteObjectEnd(json_writer));
 
     // message
-    {
+    if (event.message.size) {
+        if (event.message.size > detail::k_max_message_length) [[unlikely]]
+            event.message.size = FindUtf8TruncationPoint(event.message, detail::k_max_message_length);
         TRY(json::WriteKeyObjectBegin(json_writer, "message"));
-        TRY(json::WriteKeyValue(json_writer,
-                                "formatted",
-                                event.message.SubSpan(0, detail::k_max_message_length)));
+        TRY(json::WriteKeyValue(json_writer, "formatted", event.message));
         TRY(json::WriteObjectEnd(json_writer));
     }
 
@@ -397,7 +433,7 @@ EnvelopeAddEvent(Sentry& sentry, Writer writer, ErrorEvent event, bool signal_sa
             },
             {
                 .ansi_colours = false,
-                .demangle = !signal_safe,
+                .demangle = !options.signal_safe,
             });
         TRY(stacktrace_error);
         TRY(json::WriteArrayEnd(json_writer));
@@ -414,7 +450,7 @@ EnvelopeAddEvent(Sentry& sentry, Writer writer, ErrorEvent event, bool signal_sa
     }
 
     // breadcrumbs
-    if (!signal_safe) {
+    if (!options.signal_safe && options.diagnostics) {
         TRY(json::WriteKeyArrayBegin(json_writer, "breadcrumbs"));
 
         DynamicArrayBounded<char, LogRingBuffer::k_buffer_size> buffer;
@@ -428,14 +464,59 @@ EnvelopeAddEvent(Sentry& sentry, Writer writer, ErrorEvent event, bool signal_sa
         TRY(json::WriteArrayEnd(json_writer));
     }
 
+    if (options.diagnostics && sentry.user_context_json.size) {
+        TRY(writer.writer.WriteChar(','));
+        TRY(writer.writer.WriteChars(sentry.user_context_json));
+    }
+
     // insert the common context
-    {
-        TRY(writer.WriteChar(','));
-        TRY(writer.WriteChars(sentry.event_context_json));
+    if (options.diagnostics || options.feedback) {
+        TRY(json::WriteKeyObjectBegin(json_writer, "contexts"));
+
+        if (options.diagnostics) {
+            TRY(writer.writer.WriteChars(sentry.device_context_json));
+            TRY(writer.writer.WriteChar(','));
+            TRY(writer.writer.WriteChars(sentry.os_context_json));
+        }
+
+        if (options.feedback) {
+            TRY(json::WriteKeyObjectBegin(json_writer, "feedback"));
+            if (options.feedback->email)
+                TRY(json::WriteKeyValue(json_writer, "contact_email", *options.feedback->email));
+            TRY(json::WriteKeyValue(json_writer, "message", options.feedback->message));
+            if (options.feedback->associated_event_id)
+                TRY(json::WriteKeyValue(json_writer,
+                                        "associated_event_id",
+                                        *options.feedback->associated_event_id));
+            TRY(json::WriteObjectEnd(json_writer));
+        }
+
+        TRY(json::WriteObjectEnd(json_writer));
     }
 
     TRY(json::WriteObjectEnd(json_writer));
-    TRY(writer.WriteChar('\n'));
+    TRY(writer.writer.WriteChar('\n'));
+
+    return k_success;
+}
+
+// thread-safe, not signal-safe
+[[maybe_unused]] PUBLIC ErrorCodeOr<void>
+EnvelopeAddFeedback(Sentry& sentry, EnvelopeWriter& writer, FeedbackEvent feedback) {
+    ASSERT(feedback.message.size <= FeedbackEvent::k_max_message_length);
+
+    TRY(EnvelopeAddEvent(sentry,
+                         writer,
+                         {
+                             .level = ErrorEvent::Level::Info,
+                             .message = {},
+                             .tags = {},
+                         },
+                         {
+                             .signal_safe = false,
+                             .diagnostics = false,
+                             .feedback = feedback,
+                         }));
 
     return k_success;
 }
@@ -449,25 +530,28 @@ struct SubmissionOptions {
 // threadsafe (for Sentry), not signal-safe
 // Blocks until the submission is complete. If the submission fails, it will write the envelope to a file if
 // write_to_file_if_needed is true.
-PUBLIC ErrorCodeOr<void> SubmitEnvelope(Sentry& sentry,
-                                        String envelope_without_header,
-                                        ArenaAllocator& scratch_arena,
-                                        SubmissionOptions options) {
-    if (envelope_without_header.size == 0) return k_success;
+PUBLIC ErrorCodeOr<fmt::UuidArray> SubmitEnvelope(Sentry& sentry,
+                                                  String envelope_without_header,
+                                                  EnvelopeWriter const* existing_writer,
+                                                  ArenaAllocator& scratch_arena,
+                                                  SubmissionOptions options) {
+    ASSERT(envelope_without_header.size);
 
-    DynamicArray<char> envelope {scratch_arena};
-    envelope.Reserve(envelope_without_header.size + 200);
-    auto envelope_writer = dyn::WriterFor(envelope);
+    DynamicArray<char> envelope_buffer {scratch_arena};
+    envelope_buffer.Reserve(envelope_without_header.size + 200);
+    EnvelopeWriter writer;
+    if (existing_writer) writer = *existing_writer;
+    writer.writer = dyn::WriterFor(envelope_buffer);
 
-    auto _ = EnvelopeAddHeader(sentry, envelope_writer, true);
-    auto const online_envelope_header_size = envelope.size;
-    dyn::AppendSpan(envelope, envelope_without_header);
+    auto _ = EnvelopeAddHeader(sentry, writer, true);
+    auto const online_envelope_header_size = envelope_buffer.size;
+    dyn::AppendSpan(envelope_buffer, envelope_without_header);
 
     bool sent_online_successfully = false;
     ErrorCodeOr<void> result = k_success;
 
     if (!sentry.online_reporting_disabled.Load(LoadMemoryOrder::Relaxed) && k_online_reporting) {
-        LogDebug(ModuleName::ErrorReporting, "Posting to Sentry: {}", envelope);
+        LogDebug(ModuleName::ErrorReporting, "Posting to Sentry: {}", envelope_buffer);
 
         auto const envelope_url = fmt::Format(scratch_arena,
                                               "https://{}:443/api/{}/envelope/",
@@ -476,14 +560,14 @@ PUBLIC ErrorCodeOr<void> SubmitEnvelope(Sentry& sentry,
 
         auto const o = HttpsPost(
             envelope_url,
-            envelope,
+            envelope_buffer,
             Array {
                 "Content-Type: application/x-sentry-envelope"_s,
                 fmt::Format(scratch_arena,
                             "X-Sentry-Auth: Sentry sentry_version=7, sentry_client={}, sentry_key={}",
                             detail::k_user_agent,
                             sentry.dsn.public_key),
-                fmt::Format(scratch_arena, "Content-Length: {}", envelope.size),
+                fmt::Format(scratch_arena, "Content-Length: {}", envelope_buffer.size),
                 fmt::Format(scratch_arena,
                             "User-Agent: {} ({})"_s,
                             detail::k_user_agent,
@@ -498,12 +582,15 @@ PUBLIC ErrorCodeOr<void> SubmitEnvelope(Sentry& sentry,
         if (options.write_to_file_if_needed && o.HasError() && o.Error() != WebError::NetworkError) {
             auto _ = EnvelopeAddEvent(
                 sentry,
-                envelope_writer,
+                writer,
                 {
                     .level = ErrorEvent::Level::Error,
                     .message = fmt::Format(scratch_arena, "Failed to send to Sentry: {}", o.Error()),
                 },
-                false);
+                {
+                    .signal_safe = false,
+                    .diagnostics = true,
+                });
         }
 
         if (o.Succeeded()) sent_online_successfully = true;
@@ -515,16 +602,21 @@ PUBLIC ErrorCodeOr<void> SubmitEnvelope(Sentry& sentry,
         InitLogFolderIfNeeded();
         auto file = TRY(OpenFile(detail::UniqueErrorFilepath(*LogFolder(), sentry.seed, scratch_arena),
                                  FileMode::WriteNoOverwrite()));
-        TRY(EnvelopeAddHeader(sentry, file.Writer(), false));
+        EnvelopeWriter file_writer = writer;
+        file_writer.writer = file.Writer();
 
-        // We have just written a header appropriate for the file, so we make sure don't write the header
-        // appropriate for online submission by using SubSpan.
-        TRY(file.Write(envelope.Items().SubSpan(online_envelope_header_size)));
+        // Write a head to the file. Since we're writing to file we shouldn't include sent_at.
+        TRY(EnvelopeAddHeader(sentry, file_writer, false));
 
-        return k_success;
+        // Write the envelope items to the file, _excluding_ the already existing header since we just wrote a
+        // new one.
+        TRY(file.Write(envelope_buffer.Items().SubSpan(online_envelope_header_size)));
+
+        return *writer.top_level_event_id;
     }
 
-    return result;
+    if (result.HasError()) return result.Error();
+    return *writer.top_level_event_id;
 }
 
 // thread-safe, signal-safe on Unix
@@ -535,18 +627,21 @@ PUBLIC ErrorCodeOr<void> WriteCrashToFile(Sentry& sentry,
                                           Allocator& scratch_allocator) {
     auto file = TRY(OpenFile(detail::UniqueErrorFilepath(folder, sentry.seed, scratch_allocator),
                              FileMode::WriteNoOverwrite()));
+    EnvelopeWriter writer {.writer = file.Writer()};
 
-    TRY(EnvelopeAddHeader(sentry, file.Writer(), false));
+    TRY(EnvelopeAddHeader(sentry, writer, false));
     TRY(EnvelopeAddEvent(sentry,
-                         file.Writer(),
+                         writer,
                          {
                              .level = ErrorEvent::Level::Fatal,
                              .message = message,
                              .stacktrace = stacktrace,
                          },
-                         true));
-    if constexpr (k_online_reporting)
-        TRY(EnvelopeAddSessionUpdate(sentry, file.Writer(), SessionStatus::Crashed));
+                         {
+                             .signal_safe = true,
+                             .diagnostics = true,
+                         }));
+    if constexpr (k_online_reporting) TRY(EnvelopeAddSessionUpdate(sentry, writer, SessionStatus::Crashed));
 
     return k_success;
 }
@@ -558,7 +653,7 @@ PUBLIC ErrorCodeOr<void> SubmitCrash(Sentry& sentry,
                                      ArenaAllocator& scratch_arena,
                                      SubmissionOptions options) {
     DynamicArray<char> envelope_without_header {scratch_arena};
-    auto writer = dyn::WriterFor(envelope_without_header);
+    EnvelopeWriter writer = {.writer = dyn::WriterFor(envelope_without_header)};
 
     TRY(EnvelopeAddEvent(sentry,
                          writer,
@@ -567,22 +662,38 @@ PUBLIC ErrorCodeOr<void> SubmitCrash(Sentry& sentry,
                              .message = message,
                              .stacktrace = stacktrace,
                          },
-                         !IS_WINDOWS));
+                         {
+                             .signal_safe = !IS_WINDOWS,
+                             .diagnostics = true,
+                         }));
     if constexpr (k_online_reporting) TRY(EnvelopeAddSessionUpdate(sentry, writer, SessionStatus::Crashed));
-    TRY(SubmitEnvelope(sentry, envelope_without_header, scratch_arena, options));
+    TRY(SubmitEnvelope(sentry, envelope_without_header, &writer, scratch_arena, options));
 
     return k_success;
 }
 
-// thread-safe, not signal-safe
-PUBLIC ErrorCodeOr<void> WriteErrorToFile(Sentry& sentry, ErrorEvent const& event) {
+static ErrorCodeOr<File> OpenEnvelopeFileAndAddHeader(Sentry& sentry) {
     PathArena path_arena {PageAllocator::Instance()};
     InitLogFolderIfNeeded();
     auto file = TRY(OpenFile(detail::UniqueErrorFilepath(*LogFolder(), sentry.seed, path_arena),
                              FileMode::WriteNoOverwrite()));
+    EnvelopeWriter writer {.writer = file.Writer()};
+    TRY(EnvelopeAddHeader(sentry, writer, false));
+    return file;
+}
 
-    TRY(EnvelopeAddHeader(sentry, file.Writer(), false));
-    TRY(EnvelopeAddEvent(sentry, file.Writer(), event, false));
+// thread-safe, not signal-safe
+PUBLIC ErrorCodeOr<void> WriteErrorToFile(Sentry& sentry, ErrorEvent const& event) {
+    auto file = TRY(OpenEnvelopeFileAndAddHeader(sentry));
+    EnvelopeWriter writer {.writer = file.Writer()};
+    TRY(EnvelopeAddEvent(sentry, writer, event, {.signal_safe = false, .diagnostics = true}));
+    return k_success;
+}
+
+PUBLIC ErrorCodeOr<void> WriteFeedbackToFile(Sentry& sentry, FeedbackEvent const& feedback) {
+    auto file = TRY(OpenEnvelopeFileAndAddHeader(sentry));
+    EnvelopeWriter writer {.writer = file.Writer()};
+    TRY(EnvelopeAddFeedback(sentry, writer, feedback));
     return k_success;
 }
 
@@ -662,6 +773,7 @@ ConsumeAndSubmitErrorFiles(Sentry& sentry, String folder, ArenaAllocator& scratc
 
             TRY_OR(SubmitEnvelope(sentry,
                                   envelope_without_header,
+                                  nullptr,
                                   scratch_arena,
                                   {
                                       .write_to_file_if_needed = false,

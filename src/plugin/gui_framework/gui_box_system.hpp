@@ -91,6 +91,7 @@ struct Box {
     bool32 is_hot : 1 = false;
     bool32 is_active : 1 = false;
     bool32 button_fired : 1 = false;
+    imgui::TextInputResult const* text_input_result {};
 };
 
 struct GuiBoxSystem {
@@ -119,6 +120,7 @@ struct GuiBoxSystem {
     DynamicArray<Box> boxes {arena};
     DynamicArray<WordWrappedText> word_wrapped_texts {arena};
     bool mouse_down_on_modal_background = false;
+    imgui::TextInputResult last_text_input_result {};
 
     f32 const scrollbar_width = imgui.PointsToPixels(8);
     f32 const scrollbar_padding = imgui.PointsToPixels(style::k_scrollbar_rhs_space);
@@ -319,6 +321,8 @@ constexpr f32 k_no_wrap = 0;
 constexpr f32 k_wrap_to_parent = -1; // set size_from_text = true
 constexpr f32 k_default_font_size = 0;
 
+enum class TextInputBox : u32 { None, SingleLine, MultiLine, Count };
+
 struct BoxConfig {
     Optional<Box> parent {};
 
@@ -346,6 +350,10 @@ struct BoxConfig {
 
     // 4 bits, clockwise from top-left: top-left, top-right, bottom-right, bottom-left, set using 0b0001 etc.
     u32 round_background_corners : 4 = 0;
+
+    TextInputBox text_input_box : NumBitsNeededToStore(ToInt(TextInputBox::Count)) = TextInputBox::None;
+    style::Colour text_input_cursor : style::k_colour_bits = style::Colour::Text;
+    style::Colour text_input_selection : style::k_colour_bits = style::Colour::Highlight;
 
     MouseButton activate_on_click_button
         : NumBitsNeededToStore(ToInt(MouseButton::Count)) = MouseButton::Left;
@@ -490,6 +498,21 @@ PUBLIC Box DoBox(GuiBoxSystem& builder, BoxConfig const& config) {
                 box.is_active = builder.imgui.IsActive(box.imgui_id);
                 box.is_hot = builder.imgui.IsHot(box.imgui_id);
             }
+            if (config.text_input_box != TextInputBox::None) {
+                box.imgui_id = builder.imgui.GetID((usize)box_index);
+                builder.last_text_input_result = builder.imgui.TextInput(
+                    mouse_rect,
+                    box.imgui_id,
+                    config.text,
+                    config.text_input_box == TextInputBox::MultiLine
+                        ? imgui::TextInputFlags {.multiline = true, .multiline_wordwrap_hack = true}
+                        : imgui::TextInputFlags {},
+                    {.left_mouse = true, .triggers_on_mouse_down = true},
+                    false);
+                box.is_active = builder.imgui.TextInputHasFocus(box.imgui_id);
+                box.is_hot = builder.imgui.IsHot(box.imgui_id);
+                box.text_input_result = &builder.last_text_input_result;
+            }
             bool32 const is_active =
                 config.parent_dictates_hot_and_active ? config.parent->is_active : box.is_active;
             bool32 const is_hot = config.parent_dictates_hot_and_active ? config.parent->is_hot : box.is_hot;
@@ -565,7 +588,7 @@ PUBLIC Box DoBox(GuiBoxSystem& builder, BoxConfig const& config) {
                 builder.imgui.graphics->AddRect(r, col_u32, rounding, config.round_background_corners);
             }
 
-            if (config.text.size) {
+            if (config.text.size && config.text_input_box == TextInputBox::None) {
                 if (config.text_align_x != TextAlignX::Left || config.text_align_y != TextAlignY::Top) {
                     auto const text_size = font->CalcTextSizeA(font_size, FLT_MAX, 0, config.text);
                     auto const text_pos =
@@ -588,6 +611,30 @@ PUBLIC Box DoBox(GuiBoxSystem& builder, BoxConfig const& config) {
                                                     config.text,
                                                     wrap_width == k_wrap_to_parent ? rect.w : wrap_width);
                 }
+            }
+
+            if (config.text_input_box != TextInputBox::None) {
+                auto input_result = box.text_input_result;
+                ASSERT(input_result);
+
+                if (input_result->HasSelection()) {
+                    imgui::TextInputResult::SelectionIterator it {*builder.imgui.graphics->context};
+                    while (auto const r = input_result->NextSelectionRect(it))
+                        builder.imgui.graphics->AddRectFilled(
+                            *r,
+                            colours::WithAlpha(style::Col(config.text_input_selection), 100));
+                }
+
+                if (input_result->show_cursor) {
+                    auto cursor_r = input_result->GetCursorRect();
+                    builder.imgui.graphics->AddRectFilled(cursor_r.Min(),
+                                                          cursor_r.Max(),
+                                                          style::Col(config.text_input_cursor));
+                }
+
+                builder.imgui.graphics->AddText(input_result->GetTextPos(),
+                                                style::Col(config.text_fill),
+                                                input_result->text);
             }
 
             if (config.tooltip.size) Tooltip(builder, box.imgui_id, rect, config.tooltip);

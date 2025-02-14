@@ -111,6 +111,9 @@ FeedbackPanel(GuiBoxSystem& box_system, FeedbackPanelContext& context, FeedbackP
         switch (return_code) {
             case ReportFeedbackReturnCode::Success: {
                 notification_message = "Feedback submitted successfully"_s;
+                dyn::Clear(state.description);
+                dyn::Clear(state.email);
+                state.open = false;
                 break;
             }
             case ReportFeedbackReturnCode::InvalidEmail: {

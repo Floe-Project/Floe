@@ -7,6 +7,7 @@
 #include "common_infrastructure/constants.hpp"
 #include "common_infrastructure/sample_library/attribution_requirements.hpp"
 
+#include "autosave.hpp"
 #include "engine/package_installation.hpp"
 #include "processor/processor.hpp"
 #include "sample_lib_server/sample_library_server.hpp"
@@ -65,6 +66,7 @@ struct Engine : ProcessorListener {
     u64 random_seed = (u64)NanosecondsSinceEpoch();
 
     Atomic<bool> update_gui = false;
+    AutosaveState autosave_state {};
 
     package::InstallJobs package_install_jobs {};
 

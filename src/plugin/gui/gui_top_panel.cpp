@@ -63,8 +63,14 @@ void TopPanel(Gui* g) {
                            {
                                .parent = left_container,
                                .size = {LiveSize(g->imgui, UiSizeId::Top2TitleWidth), title_font->font_size},
-                               .margins = {.l = LiveSize(g->imgui, UiSizeId::Top2TitleMarginL)},
+                               .margins = {.l = LiveSize(g->imgui, UiSizeId::Top2TitleMarginL),
+                                           .r = LiveSize(g->imgui, UiSizeId::Top2TitleSubtitleGap)},
                            });
+    auto subtitle = layout::CreateItem(g->layout,
+                                       {
+                                           .parent = left_container,
+                                           .size = {layout::k_fill_parent, title_font->font_size},
+                                       });
 
     auto right_container = layout::CreateItem(g->layout,
                                               {
@@ -204,15 +210,23 @@ void TopPanel(Gui* g) {
     {
         if (title_font) g->imgui.graphics->context->PushFont(title_font);
 
-        String const name = "Floe";
-
         auto title_r = layout::GetRect(g->layout, title).Up(Round(-title_font->descent));
 
         labels::Label(g,
                       title_r,
-                      name,
+                      "Floe",
                       labels::Title(g->imgui, LiveCol(g->imgui, UiColMap::TopPanelTitleText)));
         if (title_font) g->imgui.graphics->context->PopFont();
+    }
+
+    {
+        auto subtitle_r = layout::GetRect(g->layout, subtitle).Up(Round(-title_font->descent + 1));
+        labels::Label(g,
+                      subtitle_r,
+                      fmt::Format(g->scratch_arena,
+                                  "v" FLOE_VERSION_STRING "  {}",
+                                  g->engine.autosave_state.instance_id),
+                      labels::Title(g->imgui, LiveCol(g->imgui, UiColMap::TopPanelSubtitleText)));
     }
 
     g->imgui.graphics->context->PushFont(g->mada);

@@ -13,6 +13,7 @@ struct FloePaths {
     String always_scanned_folder[ToInt(ScanFolderType::Count)];
     String settings_write_path;
     Span<String> possible_settings_paths; // sorted. the first is most recommended path to read
+    String autosave_path;
 };
 
 static Span<String> PossibleSettingsPaths(ArenaAllocator& arena) {
@@ -104,6 +105,22 @@ PUBLIC FloePaths CreateFloePaths(ArenaAllocator& arena) {
 
     for (auto const type : Range(ToInt(ScanFolderType::Count)))
         result.always_scanned_folder[type] = AlwaysScannedFolder((ScanFolderType)type, arena);
+
+    {
+        DynamicArrayBounded<char, Kb(1)> error_log;
+        auto writer = dyn::WriterFor(error_log);
+        result.autosave_path = FloeKnownDirectory(arena,
+                                                  FloeKnownDirectoryType::Autosaves,
+                                                  k_nullopt,
+                                                  {.create = true, .error_log = &writer});
+        if (error_log.size) {
+            ReportError(sentry::ErrorEvent::Level::Warning,
+                        HashComptime("autosave path"),
+                        "Failed to get autosave path {}\n{}",
+                        result.autosave_path,
+                        error_log);
+        }
+    }
 
     return result;
 }

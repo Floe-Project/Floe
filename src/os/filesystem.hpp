@@ -307,7 +307,7 @@ MutableString KnownDirectoryWithSubdirectories(Allocator& a,
 
 // Returns a Floe-specific path. Might be a KnownDirectory with a 'Floe' subdirectory. Just a wrapper around
 // KnownDirectoryWithSubdirectories.
-enum class FloeKnownDirectoryType : u8 { Logs, Settings, Libraries, Presets };
+enum class FloeKnownDirectoryType : u8 { Logs, Settings, Libraries, Presets, Autosaves };
 MutableString FloeKnownDirectory(Allocator& a,
                                  FloeKnownDirectoryType type,
                                  Optional<String> filename,

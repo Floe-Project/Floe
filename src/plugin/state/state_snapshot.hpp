@@ -45,3 +45,72 @@ struct StateSnapshotWithMetadata {
     StateSnapshot state;
     StateSnapshotMetadata metadata;
 };
+
+[[maybe_unused]] static auto PrintInstrumentId(InstrumentId id) {
+    DynamicArrayBounded<char, 100> result {};
+    switch (id.tag) {
+        case InstrumentType::None: fmt::Append(result, "None"_s); break;
+        case InstrumentType::WaveformSynth:
+            fmt::Append(result, "WaveformSynth: {}"_s, id.Get<WaveformType>());
+            break;
+        case InstrumentType::Sampler:
+            fmt::Append(result,
+                        "Sampler: {}/{}/{}"_s,
+                        id.Get<sample_lib::InstrumentId>().library.author,
+                        id.Get<sample_lib::InstrumentId>().library.name,
+                        id.Get<sample_lib::InstrumentId>().inst_name);
+            break;
+    }
+    return result;
+}
+
+PUBLIC void AssignDiffDescription(dyn::DynArray auto& diff_desc,
+                                  StateSnapshot const& old_state,
+                                  StateSnapshot const& new_state) {
+    dyn::Clear(diff_desc);
+
+    if (old_state.ir_id != new_state.ir_id) {
+        fmt::Append(diff_desc,
+                    "IR changed, old: {}:{} vs new: {}:{}\n"_s,
+                    old_state.ir_id.HasValue() ? old_state.ir_id.Value().library.name.Items() : "null"_s,
+                    old_state.ir_id.HasValue() ? old_state.ir_id.Value().ir_name.Items() : "null"_s,
+                    new_state.ir_id.HasValue() ? new_state.ir_id.Value().library.name.Items() : "null"_s,
+                    new_state.ir_id.HasValue() ? new_state.ir_id.Value().ir_name.Items() : "null"_s);
+    }
+
+    for (auto layer_index : Range(k_num_layers)) {
+        if (old_state.inst_ids[layer_index] != new_state.inst_ids[layer_index]) {
+            fmt::Append(diff_desc,
+                        "Layer {}: {} vs {}\n"_s,
+                        layer_index,
+                        PrintInstrumentId(old_state.inst_ids[layer_index]),
+                        PrintInstrumentId(new_state.inst_ids[layer_index]));
+        }
+    }
+
+    for (auto param_index : Range(k_num_parameters)) {
+        if (old_state.param_values[param_index] != new_state.param_values[param_index]) {
+            fmt::Append(diff_desc,
+                        "Param {}: {} vs {}\n"_s,
+                        k_param_descriptors[param_index].name,
+                        old_state.param_values[param_index],
+                        new_state.param_values[param_index]);
+        }
+    }
+
+    if (old_state.fx_order != new_state.fx_order) fmt::Append(diff_desc, "FX order changed\n"_s);
+
+    for (auto cc : Range<usize>(1, 128)) {
+        for (auto param_index : Range(k_num_parameters)) {
+            if (old_state.param_learned_ccs[param_index].Get(cc) !=
+                new_state.param_learned_ccs[param_index].Get(cc)) {
+                fmt::Append(diff_desc,
+                            "CC {}: Param {}: {} vs {}\n"_s,
+                            cc,
+                            k_param_descriptors[param_index].name,
+                            old_state.param_learned_ccs[param_index].Get(cc),
+                            new_state.param_learned_ccs[param_index].Get(cc));
+            }
+        }
+    }
+}

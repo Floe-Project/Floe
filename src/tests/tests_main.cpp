@@ -15,6 +15,7 @@
 
 #define TEST_REGISTER_FUNCTIONS                                                                              \
     X(RegisterAudioFileTests)                                                                                \
+    X(RegisterAutosaveTests)                                                                                 \
     X(RegisterAudioUtilsTests)                                                                               \
     X(RegisterChecksumFileTests)                                                                             \
     X(RegisterDirectoryListingTests)                                                                         \

@@ -124,6 +124,7 @@ MutableString FloeKnownDirectory(Allocator& a,
         case FloeKnownDirectoryType::Logs: {
             known_dir_type = KnownDirectoryType::Logs;
 #if IS_MACOS
+            // On macOS, the folder is ~/Library/Logs
             static constexpr auto k_dirs = Array {"Floe"_s};
 #else
             static constexpr auto k_dirs = Array {"Floe"_s, "Logs"};
@@ -146,6 +147,12 @@ MutableString FloeKnownDirectory(Allocator& a,
         case FloeKnownDirectoryType::Libraries: {
             known_dir_type = KnownDirectoryType::GlobalData;
             static constexpr auto k_dirs = Array {"Floe"_s, "Libraries"};
+            subdirectories = k_dirs;
+            break;
+        }
+        case FloeKnownDirectoryType::Autosaves: {
+            known_dir_type = KnownDirectoryType::GlobalData;
+            static constexpr auto k_dirs = Array {"Floe"_s, "Autosaves"};
             subdirectories = k_dirs;
             break;
         }

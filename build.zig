@@ -1633,6 +1633,7 @@ pub fn build(b: *std.Build) void {
             plugin.addCSourceFiles(.{
                 .files = &(.{
                     plugin_path ++ "/descriptors/param_descriptors.cpp",
+                    plugin_path ++ "/engine/autosave.cpp",
                     plugin_path ++ "/engine/engine.cpp",
                     plugin_path ++ "/engine/package_installation.cpp",
                     plugin_path ++ "/engine/shared_engine_systems.cpp",

@@ -482,7 +482,7 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                 } else {
                     dir.state = DirectoryWatcher::WatchedDirectory::State::WatchingFailed;
                     dir.directory_changes.error = outcome.Error();
-                    ASSERT_EQ(dir.native_data.pointer, nullptr);
+                    ASSERT(dir.native_data.pointer == nullptr);
                 }
                 break;
             }

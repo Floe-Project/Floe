@@ -20,7 +20,7 @@
 // - Provides an asynchronous request-response API (we tend to call response 'result')
 // - Very quick for resources that are already loaded
 // - Scans library folders and watches for file changes in them
-// - Has its own dedicated server thread but also makes use of a thread pool for loading big files
+// - Has its own dedicated thread but also makes use of a thread pool for loading big files
 // - Instantly aborts any pending loads that are no longer needed
 // - No duplication of resources in memory
 // - Provides progress/status metrics for other threads to read

@@ -245,3 +245,105 @@ PUBLIC bool TextButton(GuiBoxSystem& builder, Box parent, String text, String to
 
     return button.button_fired;
 }
+
+PUBLIC Optional<int>
+IntField(GuiBoxSystem& builder, Box parent, String label, f32 width, int value, int min, int max) {
+    bool changed = false;
+    auto const container = DoBox(builder,
+                                 {
+                                     .parent = parent,
+                                     .layout {
+                                         .size = {layout::k_hug_contents, layout::k_hug_contents},
+                                         .contents_direction = layout::Direction::Row,
+                                         .contents_align = layout::Alignment::Start,
+                                     },
+                                 });
+    if (DoBox(builder,
+              {
+                  .parent = container,
+                  .text = ICON_FA_CARET_LEFT,
+                  .font = FontType::Icons,
+                  .text_align_x = TextAlignX::Centre,
+                  .text_align_y = TextAlignY::Centre,
+                  .background_fill_auto_hot_active_overlay = true,
+                  .round_background_corners = 0b1001,
+                  .activate_on_click_button = MouseButton::Left,
+                  .activation_click_event = ActivationClickEvent::Up,
+                  .layout {
+                      .size = style::k_settings_icon_button_size,
+                  },
+                  .tooltip = "Decrease value"_s,
+              })
+            .button_fired) {
+        --value;
+        if (value < min) value = min;
+        changed = true;
+    }
+
+    {
+        auto const text = fmt::IntToString(value);
+        auto const text_input = DoBox(builder,
+                                      {
+                                          .parent = container,
+                                          .text = text,
+                                          .font = FontType::Body,
+                                          .text_fill = style::Colour::Text,
+                                          .text_fill_hot = style::Colour::Text,
+                                          .text_fill_active = style::Colour::Text,
+                                          .background_fill = style::Colour::Background2,
+                                          .background_fill_hot = style::Colour::Background2,
+                                          .background_fill_active = style::Colour::Background2,
+                                          .border = style::Colour::Overlay0,
+                                          .border_hot = style::Colour::Overlay1,
+                                          .border_active = style::Colour::Highlight,
+                                          .round_background_corners = 0b1111,
+                                          .text_input_box = TextInputBox::MultiLine,
+                                          .text_input_cursor = style::Colour::Text,
+                                          .text_input_selection = style::Colour::Highlight,
+                                          .layout {
+                                              .size = {width, 20},
+                                          },
+                                          .tooltip = "Enter a new value"_s,
+                                      });
+        if (text_input.text_input_result) {
+            auto const new_value = ParseInt(text_input.text_input_result->text, ParseIntBase::Decimal);
+            if (new_value.HasValue()) {
+                value = (int)Clamp<s64>(new_value.Value(), min, max);
+                changed = true;
+            }
+        }
+    }
+
+    if (DoBox(builder,
+              {
+                  .parent = container,
+                  .text = ICON_FA_CARET_RIGHT,
+                  .font = FontType::Icons,
+                  .text_align_x = TextAlignX::Centre,
+                  .text_align_y = TextAlignY::Centre,
+                  .background_fill_auto_hot_active_overlay = true,
+                  .round_background_corners = 0b0110,
+                  .activate_on_click_button = MouseButton::Left,
+                  .activation_click_event = ActivationClickEvent::Up,
+                  .layout {
+                      .size = style::k_settings_icon_button_size,
+                  },
+                  .tooltip = "Increase value"_s,
+              })
+            .button_fired) {
+        ++value;
+        if (value > max) value = max;
+        changed = true;
+    }
+
+    // label
+    DoBox(builder,
+          {
+              .parent = container,
+              .text = label,
+              .size_from_text = true,
+          });
+
+    if (changed) return value;
+    return k_nullopt;
+}

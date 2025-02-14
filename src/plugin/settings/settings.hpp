@@ -44,10 +44,14 @@ struct Settings {
         bool show_keyboard {true};
         int presets_random_mode {0};
         u16 window_width {0};
+        bool show_instance_name {true};
     } gui;
 
     // general
     bool online_reporting_disabled {};
+    u16 autosave_interval_seconds {10};
+    u16 max_autosaves_per_instance {16};
+    u16 autosave_delete_after_days {7};
 
     // We keep hold of entries in the file that we don't use. Other versions of Floe might still want these
     // so lets keep hold of them, and write them back to the file.

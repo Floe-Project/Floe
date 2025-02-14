@@ -59,7 +59,11 @@ enum class KeyType : u32 {
     ShowKeyboard,
     ShowTooltips,
     WindowWidth,
+    ShowInstanceName,
     OnlineReportingDisabled,
+    AutoSaveIntervalSeconds,
+    MaxAutosavesPerInstance,
+    AutoSaveDeleteAfterDays,
     Count,
 };
 
@@ -76,7 +80,11 @@ constexpr String Key(KeyType k) {
         case KeyType::ShowKeyboard: return "show_keyboard"_s;
         case KeyType::ShowTooltips: return "show_tooltips"_s;
         case KeyType::WindowWidth: return "window_width"_s;
+        case KeyType::ShowInstanceName: return "show_instance_name"_s;
         case KeyType::OnlineReportingDisabled: return "online_reporting_disabled"_s;
+        case KeyType::AutoSaveIntervalSeconds: return "autosave_interval_seconds"_s;
+        case KeyType::MaxAutosavesPerInstance: return "max_autosaves_per_instance"_s;
+        case KeyType::AutoSaveDeleteAfterDays: return "autosave_delete_after_days"_s;
         case KeyType::Count: PanicIfReached();
     }
 }

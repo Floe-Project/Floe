@@ -467,6 +467,15 @@ static void OnMainThread(Engine& engine) {
     if (engine.update_gui.Exchange(false, RmwMemoryOrder::Relaxed))
         engine.plugin_instance_messages.UpdateGui();
 
+    engine.autosave_state.max_autosaves_per_instance.Store(
+        engine.shared_engine_systems.settings.settings.max_autosaves_per_instance,
+        StoreMemoryOrder::Relaxed);
+    engine.autosave_state.autosave_delete_after_days.Store(
+        engine.shared_engine_systems.settings.settings.autosave_delete_after_days,
+        StoreMemoryOrder::Relaxed);
+    engine.autosave_state.autosave_interval_seconds.Store(
+        engine.shared_engine_systems.settings.settings.autosave_interval_seconds,
+        StoreMemoryOrder::Relaxed);
     if (AutosaveNeeded(engine.autosave_state))
         QueueAutosave(engine.autosave_state, CurrentStateSnapshot(engine));
 }

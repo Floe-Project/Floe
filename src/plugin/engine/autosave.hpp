@@ -11,6 +11,13 @@
 
 struct AutosaveState {
     enum class State { Idle, PendingSave, Saved };
+
+    // Configure these as needed
+    Atomic<u16> autosave_interval_seconds {10};
+    Atomic<u16> max_autosaves_per_instance {16};
+    Atomic<u16> autosave_delete_after_days {7};
+
+    // Private.
     DynamicArrayBounded<char, 16> instance_id;
     TimePoint last_save_time {};
     Mutex mutex {};

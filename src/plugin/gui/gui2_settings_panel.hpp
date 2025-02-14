@@ -692,12 +692,21 @@ static void GeneralSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext&
                 !context.settings.settings.gui.high_contrast_gui;
             context.settings.tracking.changed = true;
         }
+
+        if (CheckboxButton(box_system,
+                           options_rhs_column,
+                           "Show instance name",
+                           context.settings.settings.gui.show_instance_name)) {
+            context.settings.settings.gui.show_instance_name =
+                !context.settings.settings.gui.show_instance_name;
+            context.settings.tracking.changed = true;
+        }
     }
 
     {
         auto const misc_row = SettingsRow(box_system, root);
 
-        SettingsLhsTextWidget(box_system, misc_row, "Misc");
+        SettingsLhsTextWidget(box_system, misc_row, "General");
         auto const options_rhs_column = SettingsRhsColumn(box_system, misc_row, style::k_settings_small_gap);
 
         if (CheckboxButton(
@@ -708,6 +717,39 @@ static void GeneralSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext&
                 "If an error occurs, Floe sends anonymous data about the error, your system, and Floe's state to a server. Additionally, Floe sends anonymous data points about when a session starts and ends for determining software health.")) {
             gui_settings::SetDisableOnlineReporting(context.settings,
                                                     context.settings.settings.online_reporting_disabled);
+        }
+
+        if (auto const v = IntField(box_system,
+                                    options_rhs_column,
+                                    "Autosave interval (seconds)",
+                                    30.0f,
+                                    context.settings.settings.autosave_interval_seconds,
+                                    1,
+                                    3600)) {
+            context.settings.settings.autosave_interval_seconds = CheckedCast<u16>(*v);
+            context.settings.tracking.changed = true;
+        }
+
+        if (auto const v = IntField(box_system,
+                                    options_rhs_column,
+                                    "Max autosaves per instance",
+                                    30.0f,
+                                    context.settings.settings.max_autosaves_per_instance,
+                                    1,
+                                    100)) {
+            context.settings.settings.max_autosaves_per_instance = CheckedCast<u16>(*v);
+            context.settings.tracking.changed = true;
+        }
+
+        if (auto const v = IntField(box_system,
+                                    options_rhs_column,
+                                    "Autosave delete after days",
+                                    30.0f,
+                                    context.settings.settings.autosave_delete_after_days,
+                                    1,
+                                    365)) {
+            context.settings.settings.autosave_delete_after_days = CheckedCast<u16>(*v);
+            context.settings.tracking.changed = true;
         }
     }
 }

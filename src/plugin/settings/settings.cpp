@@ -277,7 +277,14 @@ Parse(Settings& content, ArenaAllocator& content_allocator, ArenaAllocator& scra
         if (SetIfMatching(line, Key(KeyType::ShowKeyboard), content.gui.show_keyboard)) continue;
         if (SetIfMatching(line, Key(KeyType::ShowTooltips), content.gui.show_tooltips)) continue;
         if (SetIfMatching(line, Key(KeyType::WindowWidth), content.gui.window_width)) continue;
+        if (SetIfMatching(line, Key(KeyType::ShowInstanceName), content.gui.show_instance_name)) continue;
         if (SetIfMatching(line, Key(KeyType::OnlineReportingDisabled), content.online_reporting_disabled))
+            continue;
+        if (SetIfMatching(line, Key(KeyType::AutoSaveIntervalSeconds), content.autosave_interval_seconds))
+            continue;
+        if (SetIfMatching(line, Key(KeyType::MaxAutosavesPerInstance), content.max_autosaves_per_instance))
+            continue;
+        if (SetIfMatching(line, Key(KeyType::AutoSaveDeleteAfterDays), content.autosave_delete_after_days))
             continue;
 
         dyn::Append(unknown_lines, line);
@@ -331,10 +338,23 @@ ErrorCodeOr<void> WriteFile(Settings const& data, FloePaths const& paths, String
         TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::ShowKeyboard), data.gui.show_keyboard));
         TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::ShowTooltips), data.gui.show_tooltips));
         TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::WindowWidth), data.gui.window_width));
+        TRY(fmt::AppendLine(writer, "{} = {}", Key(KeyType::ShowInstanceName), data.gui.show_instance_name));
         TRY(fmt::AppendLine(writer,
                             "{} = {}",
                             Key(KeyType::OnlineReportingDisabled),
                             data.online_reporting_disabled));
+        TRY(fmt::AppendLine(writer,
+                            "{} = {}",
+                            Key(KeyType::AutoSaveIntervalSeconds),
+                            data.autosave_interval_seconds));
+        TRY(fmt::AppendLine(writer,
+                            "{} = {}",
+                            Key(KeyType::MaxAutosavesPerInstance),
+                            data.max_autosaves_per_instance));
+        TRY(fmt::AppendLine(writer,
+                            "{} = {}",
+                            Key(KeyType::AutoSaveDeleteAfterDays),
+                            data.autosave_delete_after_days));
 
         for (auto line : data.unknown_lines_from_file)
             TRY(fmt::AppendLineRaw(writer, line));

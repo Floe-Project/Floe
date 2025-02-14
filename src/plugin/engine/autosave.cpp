@@ -7,10 +7,6 @@
 
 #include "state/state_coding.hpp"
 
-constexpr f64 k_autosave_interval_seconds = 60;
-constexpr s128 k_autosave_max_age_seconds = 60 * 60 * 24 * 7; // 1 week
-constexpr usize k_max_autosaves_per_instance = 8;
-
 static void AutosaveFilenamePrefix(DynamicArrayBounded<char, 32>& out, AutosaveState const& state) {
     fmt::Assign(out, "{} autosave ", state.instance_id);
 }
@@ -33,7 +29,9 @@ static ErrorCodeOr<void> CleanupExcessInstanceAutosaves(AutosaveState const& sta
                                                      .only_file_type = FileType::File,
                                                  }));
 
-    if (entries.size <= k_max_autosaves_per_instance) return k_success;
+    auto const max_autosaves_per_instance = state.max_autosaves_per_instance.Load(LoadMemoryOrder::Relaxed);
+
+    if (entries.size <= max_autosaves_per_instance) return k_success;
 
     struct EntryWithTime {
         dir_iterator::Entry const* entry;
@@ -51,7 +49,7 @@ static ErrorCodeOr<void> CleanupExcessInstanceAutosaves(AutosaveState const& sta
         return a.last_modified_time < b.last_modified_time;
     });
 
-    auto const excess_count = entries.size - k_max_autosaves_per_instance;
+    auto const excess_count = entries.size - max_autosaves_per_instance;
     for (auto i : Range(excess_count)) {
         auto const path =
             path::Join(scratch_arena, Array {paths.autosave_path, entries_with_times[i].entry->subpath});
@@ -94,7 +92,9 @@ Autosave(AutosaveState& state, StateSnapshot const& snapshot, FloePaths const& p
     return k_success;
 }
 
-static ErrorCodeOr<void> CleanupOldAutosavesIfNeeded(FloePaths const& paths, ArenaAllocator& scratch_arena) {
+static ErrorCodeOr<void> CleanupOldAutosavesIfNeeded(FloePaths const& paths,
+                                                     ArenaAllocator& scratch_arena,
+                                                     u16 k_autosave_max_age_days) {
     constexpr String k_wildcard = "*autosave*" FLOE_PRESET_FILE_EXTENSION;
     auto const entries = TRY(FindEntriesInFolder(scratch_arena,
                                                  paths.autosave_path,
@@ -116,7 +116,8 @@ static ErrorCodeOr<void> CleanupOldAutosavesIfNeeded(FloePaths const& paths, Are
 
         auto const delta_ns = now - file_time;
         auto const delta_secs = delta_ns / 1'000'000'000;
-        if (delta_secs < (s128)k_autosave_max_age_seconds) continue;
+        auto const max_age_secs = (s128)k_autosave_max_age_days * 24 * 60 * 60;
+        if (delta_secs < max_age_secs) continue;
 
         auto const path = path::Join(scratch_arena, Array {paths.autosave_path, entry.subpath});
         DEFER { scratch_arena.Free(path.ToByteSpan()); };
@@ -168,12 +169,16 @@ void AutosaveToFileIfNeeded(AutosaveState& state, FloePaths const& paths) {
         ArenaAllocatorWithInlineStorage<1000> scratch_arena {PageAllocator::Instance()};
         static bool first_call = true;
         if (Exchange(first_call, false)) {
-            TRY_OR(CleanupOldAutosavesIfNeeded(paths, scratch_arena), {
-                ReportError(sentry::Error::Level::Error,
-                            HashComptime("autosave cleanup"),
-                            "cleanup old autosaves failed: {}",
-                            error);
-            });
+            TRY_OR(
+                CleanupOldAutosavesIfNeeded(paths,
+                                            scratch_arena,
+                                            state.autosave_delete_after_days.Load(LoadMemoryOrder::Relaxed)),
+                {
+                    ReportError(sentry::Error::Level::Error,
+                                HashComptime("autosave cleanup"),
+                                "cleanup old autosaves failed: {}",
+                                error);
+                });
         }
         TRY_OR(CleanupExcessInstanceAutosaves(state, paths, scratch_arena), {
             ReportError(sentry::Error::Level::Error,
@@ -185,7 +190,8 @@ void AutosaveToFileIfNeeded(AutosaveState& state, FloePaths const& paths) {
 }
 
 bool AutosaveNeeded(AutosaveState const& state) {
-    return state.last_save_time.SecondsFromNow() >= k_autosave_interval_seconds;
+    return state.last_save_time.SecondsFromNow() >=
+           state.autosave_interval_seconds.Load(LoadMemoryOrder::Relaxed);
 }
 
 void QueueAutosave(AutosaveState& state, StateSnapshot const& snapshot) {
@@ -236,7 +242,7 @@ TEST_CASE(TestAutosave) {
     AutosaveToFileIfNeeded(state, paths);
 
     // do it multiple time to check file rotation
-    for (auto _ : Range(k_max_autosaves_per_instance + 1)) {
+    for (auto _ : Range(state.max_autosaves_per_instance.Load(LoadMemoryOrder::Relaxed) + 1)) {
         snapshot.param_values[0] += 1;
         QueueAutosave(state, snapshot);
         AutosaveToFileIfNeeded(state, paths);

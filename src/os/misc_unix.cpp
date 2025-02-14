@@ -279,23 +279,6 @@ DateAndTime LocalTimeFromNanosecondsSinceEpoch(s128 nanoseconds) {
     };
 }
 
-static bool IsLeapYear(int year) {
-    if (year % 4 != 0) return false;
-    if (year % 100 != 0) return true;
-    if (year % 400 != 0) return false;
-    return true;
-}
-
-// Returns number of days in the given month (0-11) for the given year
-static int DaysOfMonth(int month, int year) {
-    // Days in each month (non-leap year)
-    constexpr int k_days_in_month[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-
-    if (month == 1 && IsLeapYear(year)) // February in leap year
-        return 29;
-    return k_days_in_month[month];
-}
-
 DateAndTime UtcTimeFromNanosecondsSinceEpoch(s128 nanoseconds) {
     // We don't use gmtime_r because it's not signal safe.
 

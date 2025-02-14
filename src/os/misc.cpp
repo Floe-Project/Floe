@@ -68,13 +68,59 @@ Writer StdWriter(StdStream stream) {
 bool IsRunningUnderWine() { return false; }
 #endif
 
-DynamicArrayBounded<char, k_timestamp_max_str_size> Timestamp() {
-    return fmt::FormatInline<k_timestamp_max_str_size>(
+DynamicArrayBounded<char, fmt::k_timestamp_str_size> Timestamp() {
+    return fmt::FormatInline<fmt::k_timestamp_str_size>(
         "{}",
         LocalTimeFromNanosecondsSinceEpoch(NanosecondsSinceEpoch()));
 }
-DynamicArrayBounded<char, k_timestamp_max_str_size> TimestampUtc() {
-    return fmt::FormatInline<k_timestamp_max_str_size>(
+DynamicArrayBounded<char, fmt::k_timestamp_str_size> TimestampUtc() {
+    return fmt::FormatInline<fmt::k_timestamp_str_size>(
         "{}",
         UtcTimeFromNanosecondsSinceEpoch(NanosecondsSinceEpoch()));
+}
+
+constexpr auto CountLeapYears(s16 year) {
+    // Count years divisible by 4 (including 1970)
+    auto const years_div_4 = (year - 1) / 4 - 1969 / 4;
+    // Subtract years divisible by 100
+    auto const years_div_100 = (year - 1) / 100 - 1969 / 100;
+    // Add back years divisible by 400
+    auto const years_div_400 = (year - 1) / 400 - 1969 / 400;
+
+    return years_div_4 - years_div_100 + years_div_400;
+}
+
+s128 NanosecondsSinceEpoch(DateAndTime const& date) {
+    constexpr s32 k_days_before_month[] = {0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334};
+    constexpr s64 k_nanos_per_second = 1000000000LL;
+    constexpr s64 k_nanos_per_minute = k_nanos_per_second * 60LL;
+    constexpr s64 k_nanos_per_hour = k_nanos_per_minute * 60LL;
+    constexpr s64 k_nanos_per_day = k_nanos_per_hour * 24LL;
+
+    ASSERT(date.IsValid(true));
+
+    s128 result = 0;
+
+    // Calculate total days since epoch using year difference and leap years
+    auto const year_diff = date.year - 1970;
+    auto const leap_days = CountLeapYears(date.year);
+    result = ((year_diff * 365LL) + leap_days) * k_nanos_per_day;
+
+    // Add days from months using lookup table
+    result += k_days_before_month[date.months_since_jan] * k_nanos_per_day;
+
+    // Add leap day if we're past February in a leap year
+    if (date.months_since_jan > 1 && IsLeapYear(date.year)) result += k_nanos_per_day;
+
+    // Add days in current month
+    result += (date.day_of_month - 1) * k_nanos_per_day;
+
+    result += date.hour * k_nanos_per_hour;
+    result += date.minute * k_nanos_per_minute;
+    result += date.second * k_nanos_per_second;
+    result += date.millisecond * 1000000LL;
+    result += date.microsecond * 1000LL;
+    result += date.nanosecond;
+
+    return result;
 }

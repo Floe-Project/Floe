@@ -55,6 +55,7 @@ DateAndTime          | t          | Print as RFC 3339 with UTC timezone
 */
 
 constexpr usize k_rfc3339_utc_size = "YYYY-MM-ddTHH:mm:ss.sssZ"_s.size;
+constexpr auto k_timestamp_str_size = "2022-12-31 23:59:59.999"_s.size;
 
 struct FormatOptions {
     bool auto_float_format = false;

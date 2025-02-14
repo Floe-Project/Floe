@@ -217,6 +217,7 @@ ErrorCodeOr<String> ReadAllStdin(Allocator& allocator);
 
 s128 NanosecondsSinceEpoch(); // signal-safe
 s64 MicrosecondsSinceEpoch(); // signal-safe
+s128 NanosecondsSinceEpoch(DateAndTime const&);
 DateAndTime LocalTimeFromNanosecondsSinceEpoch(s128 nanoseconds); // not signal-safe
 DateAndTime UtcTimeFromNanosecondsSinceEpoch(s128 nanoseconds); // signal-safe
 
@@ -236,9 +237,8 @@ inline DateAndTime UtcTimeFromMicrosecondsSinceEpoch(s64 microseconds) {
     return UtcTimeFromNanosecondsSinceEpoch((s128)microseconds * 1'000);
 }
 
-constexpr auto k_timestamp_max_str_size = "2022-12-31 23:59:59.999"_s.size;
-DynamicArrayBounded<char, k_timestamp_max_str_size> Timestamp(); // not signal-safe
-DynamicArrayBounded<char, k_timestamp_max_str_size> TimestampUtc(); // signal-safe
+DynamicArrayBounded<char, fmt::k_timestamp_str_size> Timestamp(); // not signal-safe
+DynamicArrayBounded<char, fmt::k_timestamp_str_size> TimestampUtc(); // signal-safe
 
 // RFC 3339, YYYY-MM-DDThh:mm:ss.sssZ
 ErrorCodeOr<void> IsoUtcTimestamp(DateAndTime date, Writer writer);

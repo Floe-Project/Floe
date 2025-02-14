@@ -45,6 +45,70 @@ TEST_CASE(TestEpochTime) {
         check_against_std(t, std_utc_time);
     }
 
+    SUBCASE("datetime to ns") {
+        DateAndTime dt {
+            .year = 1970,
+            .months_since_jan = 0,
+            .day_of_month = 1,
+            .hour = 0,
+            .minute = 0,
+            .second = 0,
+            .millisecond = 0,
+        };
+        CHECK_EQ(NanosecondsSinceEpoch(dt), 0);
+
+        // One day after epoch
+        dt = {
+            .year = 1970,
+            .months_since_jan = 0,
+            .day_of_month = 2,
+            .hour = 0,
+            .minute = 0,
+            .second = 0,
+            .millisecond = 0,
+        };
+        CHECK_EQ(NanosecondsSinceEpoch(dt), 86400 * (s128)1'000'000'000);
+
+        // Epoch timestamp: 1739464477
+        // Date and time (GMT): Thursday, 13 February 2025 16:34:37
+        dt = {
+            .year = 2025,
+            .months_since_jan = 1,
+            .day_of_month = 13,
+            .hour = 16,
+            .minute = 34,
+            .second = 37,
+            .millisecond = 0,
+        };
+        CHECK_EQ(NanosecondsSinceEpoch(dt), 1739464477 * (s128)1'000'000'000);
+
+        // Epoch timestamp: 951755677
+        // Date and time (GMT): Monday, 28 February 2000 16:34:37
+        dt = {
+            .year = 2000,
+            .months_since_jan = 1,
+            .day_of_month = 28,
+            .hour = 16,
+            .minute = 34,
+            .second = 37,
+            .millisecond = 0,
+        };
+        CHECK_EQ(NanosecondsSinceEpoch(dt), 951755677 * (s128)1'000'000'000);
+
+        // Epoch timestamp: 951825600
+        // Date and time (GMT): Tuesday, 29 February 2000 12:00:00
+        dt = {
+            .year = 2000,
+            .months_since_jan = 1,
+            .day_of_month = 29,
+            .hour = 12,
+            .minute = 0,
+            .second = 0,
+            .millisecond = 0,
+        };
+        CHECK_EQ(NanosecondsSinceEpoch(dt), 951825600 * (s128)1'000'000'000);
+    }
+
     return k_success;
 }
 

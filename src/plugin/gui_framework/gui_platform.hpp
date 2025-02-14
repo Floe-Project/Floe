@@ -315,6 +315,15 @@ static ModifierFlags CreateModifierFlags(u32 pugl_mod_flags) {
 }
 
 static void UpdateModifiers(GuiPlatform& platform, PuglMods mods) {
+    if (((mods & PUGL_MOD_SHIFT) != 0) != platform.frame_state.modifier_keys[ToInt(ModifierKey::Shift)])
+        LogDebug(ModuleName::Gui, "shift: {}", (mods & PUGL_MOD_SHIFT) != 0);
+    if (((mods & PUGL_MOD_CTRL) != 0) != platform.frame_state.modifier_keys[ToInt(ModifierKey::Ctrl)])
+        LogDebug(ModuleName::Gui, "ctrl: {}", (mods & PUGL_MOD_CTRL) != 0);
+    if (((mods & PUGL_MOD_ALT) != 0) != platform.frame_state.modifier_keys[ToInt(ModifierKey::Alt)])
+        LogDebug(ModuleName::Gui, "alt: {}", (mods & PUGL_MOD_ALT) != 0);
+    if (((mods & PUGL_MOD_SUPER) != 0) != platform.frame_state.modifier_keys[ToInt(ModifierKey::Super)])
+        LogDebug(ModuleName::Gui, "super: {}", (mods & PUGL_MOD_SUPER) != 0);
+
     platform.frame_state.modifier_keys[ToInt(ModifierKey::Shift)] = mods & PUGL_MOD_SHIFT;
     platform.frame_state.modifier_keys[ToInt(ModifierKey::Ctrl)] = mods & PUGL_MOD_CTRL;
     platform.frame_state.modifier_keys[ToInt(ModifierKey::Alt)] = mods & PUGL_MOD_ALT;
@@ -390,6 +399,13 @@ static bool EventMouseButton(GuiPlatform& platform, PuglButtonEvent const& butto
         .time = TimePoint::Now(),
         .modifiers = CreateModifierFlags(button_event.state),
     };
+    LogDebug(ModuleName::Gui,
+             "button: {} is_down: {}, modifier: {}, alt: {}, shift: {}",
+             *button,
+             is_down,
+             e.modifiers.Get(ModifierKey::Modifier),
+             e.modifiers.Get(ModifierKey::Alt),
+             e.modifiers.Get(ModifierKey::Shift));
 
     auto& btn = platform.frame_state.mouse_buttons[ToInt(*button)];
     btn.is_down = is_down;

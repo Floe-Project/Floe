@@ -1221,7 +1221,7 @@ TextInputResult Context::TextInput(Rect r,
 
     if (IsHotOrActive(id)) frame_output.cursor_type = CursorType::IBeam;
 
-    auto const shift_bit = [](GuiFrameInput::KeyState::Event const& event) {
+    auto const shift_bit = [](GuiFrameInput::KeyState::Event const& event) -> int {
         return event.modifiers.Get(ModifierKey::Shift) ? STB_TEXTEDIT_K_SHIFT : 0;
     };
 
@@ -1245,65 +1245,65 @@ TextInputResult Context::TextInput(Rect r,
 
     if (auto const backspaces = frame_input.Key(KeyCode::Backspace).presses_or_repeats; backspaces.size) {
         for (auto const& event : backspaces)
-            stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_BACKSPACE | shift_bit(event)));
+            stb_textedit_key(this, &stb_state, STB_TEXTEDIT_K_BACKSPACE | shift_bit(event));
         result.buffer_changed = true;
         reset_cursor = true;
     }
     if (auto const deletes = frame_input.Key(KeyCode::Delete).presses_or_repeats; deletes.size) {
         for (auto const& event : deletes)
-            stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_DELETE | shift_bit(event)));
+            stb_textedit_key(this, &stb_state, STB_TEXTEDIT_K_DELETE | shift_bit(event));
         result.buffer_changed = true;
         reset_cursor = true;
     }
     if (auto const ends = frame_input.Key(KeyCode::End).presses_or_repeats; ends.size) {
         for (auto const& event : ends)
-            stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_LINEEND | shift_bit(event)));
+            stb_textedit_key(this, &stb_state, STB_TEXTEDIT_K_LINEEND | shift_bit(event));
         result.buffer_changed = true;
     }
     if (auto const homes = frame_input.Key(KeyCode::Home).presses_or_repeats; homes.size) {
         for (auto const& event : homes)
-            stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_LINESTART | shift_bit(event)));
+            stb_textedit_key(this, &stb_state, STB_TEXTEDIT_K_LINESTART | shift_bit(event));
         result.buffer_changed = true;
     }
     if (auto const zs = frame_input.Key(KeyCode::Z).presses_or_repeats; zs.size) {
         for (auto const& event : zs)
             if (event.modifiers.Get(ModifierKey::Modifier))
-                stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_UNDO | shift_bit(event)));
+                stb_textedit_key(this, &stb_state, STB_TEXTEDIT_K_UNDO | shift_bit(event));
         result.buffer_changed = true;
     }
     if (auto const ys = frame_input.Key(KeyCode::Y).presses_or_repeats; ys.size) {
         for (auto const& event : ys)
             if (event.modifiers.Get(ModifierKey::Modifier))
-                stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_REDO | shift_bit(event)));
+                stb_textedit_key(this, &stb_state, STB_TEXTEDIT_K_REDO | shift_bit(event));
         result.buffer_changed = true;
     }
     if (auto const lefts = frame_input.Key(KeyCode::LeftArrow).presses_or_repeats; lefts.size) {
         reset_cursor = true;
         for (auto const event : lefts)
-            stb_textedit_key(this,
-                             &stb_state,
-                             (int)((event.modifiers.Get(ModifierKey::Modifier) ? STB_TEXTEDIT_K_WORDLEFT
-                                                                               : STB_TEXTEDIT_K_LEFT) |
-                                   shift_bit(event)));
+            stb_textedit_key(
+                this,
+                &stb_state,
+                (event.modifiers.Get(ModifierKey::Modifier) ? STB_TEXTEDIT_K_WORDLEFT : STB_TEXTEDIT_K_LEFT) |
+                    shift_bit(event));
     }
     if (auto const rights = frame_input.Key(KeyCode::RightArrow).presses_or_repeats; rights.size) {
         reset_cursor = true;
         for (auto const event : rights)
             stb_textedit_key(this,
                              &stb_state,
-                             (int)((event.modifiers.Get(ModifierKey::Modifier) ? STB_TEXTEDIT_K_WORDRIGHT
-                                                                               : STB_TEXTEDIT_K_RIGHT) |
-                                   shift_bit(event)));
+                             (event.modifiers.Get(ModifierKey::Modifier) ? STB_TEXTEDIT_K_WORDRIGHT
+                                                                         : STB_TEXTEDIT_K_RIGHT) |
+                                 shift_bit(event));
     }
     if (auto const ups = frame_input.Key(KeyCode::UpArrow).presses_or_repeats; ups.size) {
         reset_cursor = true;
         for (auto const event : ups)
-            stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_UP | shift_bit(event)));
+            stb_textedit_key(this, &stb_state, STB_TEXTEDIT_K_UP | shift_bit(event));
     }
     if (auto const downs = frame_input.Key(KeyCode::DownArrow).presses_or_repeats; downs.size) {
         reset_cursor = true;
         for (auto const event : downs)
-            stb_textedit_key(this, &stb_state, (int)(STB_TEXTEDIT_K_DOWN | shift_bit(event)));
+            stb_textedit_key(this, &stb_state, STB_TEXTEDIT_K_DOWN | shift_bit(event));
     }
     if (auto const vs = frame_input.Key(KeyCode::V).presses_or_repeats; vs.size)
         frame_output.wants_clipboard_text_paste = true;

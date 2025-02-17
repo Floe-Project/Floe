@@ -284,7 +284,7 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
         if (mdata::SpecialAudioDataFromInstPath(path) != mdata::SpecialAudioDataTypeNone) continue;
 
         auto name = path::Filename(path);
-        if (auto f = library.insts_by_name.Find(name)) {
+        if (library.insts_by_name.Find(name)) {
             // The MDATA format didn't require instrument names to be unique, but we now do. Most instrument
             // names were unique anyways in the available MDATA libraries. However, the few conflicts that
             // existed must be handled when we read old presets. Therefore, be careful changing this renaming

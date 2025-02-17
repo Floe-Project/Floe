@@ -35,7 +35,7 @@ DirectoryListing::Index DirectoryListing::Entry::NumChildren(bool recursive) con
         RecursiveDirectoryIteratorAllocator allocator {Malloc::Instance()};
         Index count = 0;
         RecursiveTreeWalker recursive_walker {(Entry*)this, allocator};
-        while (auto child = recursive_walker.Next(true))
+        while (recursive_walker.Next(true))
             ++count;
         return count;
     }

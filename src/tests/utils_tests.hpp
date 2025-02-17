@@ -373,7 +373,7 @@ void DoAtomicQueueTest(tests::Tester& tester, String name) {
             SUBCASE("int") {
                 AtomicQueue<int, k_size, k_num_producers, k_num_consumers> q;
 
-                REQUIRE(q.template Push(Array<int, 1> {99}));
+                REQUIRE(q.Push(Array<int, 1> {99}));
                 Array<int, 1> buf;
                 REQUIRE(q.Pop(buf) == 1);
                 REQUIRE(buf[0] == 99);

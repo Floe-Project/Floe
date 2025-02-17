@@ -35,7 +35,8 @@ OsInfo GetOsInfo() {
         if (auto* module_handle = ::GetModuleHandleW(L"ntdll.dll")) {
             using RtlGetVersion = LONG(WINAPI*)(PRTL_OSVERSIONINFOW);
 
-            if (auto* rtl_get_version = (RtlGetVersion)::GetProcAddress(module_handle, "RtlGetVersion")) {
+            if (auto* rtl_get_version =
+                    (RtlGetVersion)(void*)::GetProcAddress(module_handle, "RtlGetVersion")) {
                 version_info.dwOSVersionInfoSize = sizeof(version_info);
                 LONG status_success = 0;
 

@@ -635,7 +635,7 @@ fn genericFlags(context: *BuildContext, target: std.Build.ResolvedTarget, extra_
             // By default, zig enables UBSan (unless ReleaseFast mode) in trap mode. Meaning it will catch undefined
             // behaviour and trigger a trap which can be caught by signal handlers. UBSan also has a mode where undefined
             // behaviour will instead call various functions. This is called the UBSan runtime. It's really easy to implement
-            // the 'minimal' version of this runtime: we just have to declare a nuch of functions like __ubsan_handle_x. So
+            // the 'minimal' version of this runtime: we just have to declare a bunch of functions like __ubsan_handle_x. So
             // that's what we do rather than trying to link with the system's version.
             // https://github.com/ziglang/zig/issues/5163#issuecomment-811606110
             try flags.append("-fno-sanitize-trap=undefined"); // undo zig's default behaviour (trap mode)

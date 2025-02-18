@@ -588,8 +588,9 @@ fn genericFlags(context: *BuildContext, target: std.Build.ResolvedTarget, extra_
     }
 
     // make the __FILE__ macro non-absolute
-    try flags.append("-fmacro-prefix-map=" ++ rootdir ++ "/=");
-    try flags.append("-ffile-prefix-map=" ++ rootdir ++ "/=");
+    const build_root = context.b.pathFromRoot("");
+    try flags.append(context.b.fmt("-fmacro-prefix-map={s}/=", .{build_root}));
+    try flags.append(context.b.fmt("-ffile-prefix-map={s}/=", .{build_root}));
 
     if (context.build_mode == .production) {
         try flags.append("-fvisibility=hidden");

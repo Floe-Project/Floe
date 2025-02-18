@@ -1920,6 +1920,22 @@ pub fn build(b: *std.Build) void {
             b.getInstallStep().dependOn(&b.addInstallArtifact(floe_standalone, .{ .dest_dir = install_subfolder }).step);
             join_compile_commands.step.dependOn(&floe_standalone.step);
             applyUniversalSettings(&build_context, floe_standalone);
+
+            var post_install_step = b.allocator.create(PostInstallStep) catch @panic("OOM");
+            post_install_step.* = PostInstallStep{
+                .step = std.Build.Step.init(.{
+                    .id = std.Build.Step.Id.custom,
+                    .name = "Post install config",
+                    .owner = b,
+                    .makeFn = performPostInstallConfig,
+                }),
+                .make_macos_bundle = false,
+                .context = &build_context,
+                .compile_step = floe_standalone,
+            };
+            post_install_step.step.dependOn(&floe_standalone.step);
+            post_install_step.step.dependOn(b.getInstallStep());
+            build_context.master_step.dependOn(&post_install_step.step);
         }
 
         const vst3_sdk = b.addStaticLibrary(.{

@@ -3,11 +3,10 @@
 
 #include "param_descriptors.hpp"
 
-#include "foundation/container/tagged_union.hpp"
 #include "foundation/foundation.hpp"
 #include "tests/framework.hpp"
 
-#include "processing_utils/audio_utils.hpp"
+#include "audio_utils.hpp"
 
 Span<String const> ParameterMenuItems(ParamIndex param_index) {
     auto const& param = k_param_descriptors[ToInt(param_index)];

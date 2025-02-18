@@ -8,7 +8,8 @@
 #include "foundation/foundation.hpp"
 #include "os/misc.hpp"
 
-#include "descriptors/param_descriptors.hpp"
+#include "common_infrastructure/descriptors/param_descriptors.hpp"
+
 #include "effect.hpp"
 #include "processing_utils/filters.hpp"
 #include "processing_utils/lfo.hpp"

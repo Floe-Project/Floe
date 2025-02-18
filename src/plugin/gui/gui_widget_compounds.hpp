@@ -5,7 +5,7 @@
 
 #include "foundation/foundation.hpp"
 
-#include "descriptors/param_descriptors.hpp"
+#include "common_infrastructure/descriptors/param_descriptors.hpp"
 #include "gui_framework/gui_live_edit.hpp"
 #include "gui_fwd.hpp"
 #include "gui_knob_widgets.hpp"

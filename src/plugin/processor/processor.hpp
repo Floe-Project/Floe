@@ -10,8 +10,8 @@
 #include "utils/thread_extra/atomic_queue.hpp"
 
 #include "common_infrastructure/constants.hpp"
+#include "common_infrastructure/descriptors/param_descriptors.hpp"
 
-#include "descriptors/param_descriptors.hpp"
 #include "effect_bitcrush.hpp"
 #include "effect_chorus.hpp"
 #include "effect_compressor_stillwell_majortom.hpp"

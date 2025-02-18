@@ -4,7 +4,7 @@
 #pragma once
 #include "foundation/foundation.hpp"
 
-#include "audio_utils.hpp"
+#include "common_infrastructure/audio_utils.hpp"
 
 struct StereoAudioFrame {
     constexpr StereoAudioFrame() : l(0), r(0) {}

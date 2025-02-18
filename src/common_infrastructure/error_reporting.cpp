@@ -12,6 +12,42 @@ __attribute__((visibility("hidden"))) alignas(sentry::BackgroundQueue) static u8
 __attribute__((visibility("hidden"))) static MutexThin g_reported_error_ids_mutex = {};
 __attribute__((visibility("hidden"))) static DynamicArrayBounded<u64, 48> g_reported_error_ids = {};
 
+constexpr bool k_online_reporting_disabled_default = false;
+constexpr String k_online_reporting_disabled_settings_key = "online_reporting_disabled"_s;
+
+bool IsOnlineReportingDisabled(sts::Settings const& settings) {
+    return sts::LookupBool(settings, k_online_reporting_disabled_settings_key)
+        .ValueOr(k_online_reporting_disabled_default);
+}
+
+// We manually read the file because we don't want to depend on having some initialised settings object.
+bool IsOnlineReportingDisabled() {
+    ArenaAllocatorWithInlineStorage<Kb(4)> arena {PageAllocator::Instance()};
+    auto try_read = [&]() -> ErrorCodeOr<bool> {
+        auto const file_data = TRY(sts::ReadEntireSettingsFile(SettingsFilepath(), arena)).file_data;
+        auto const table = sts::ParseSettingsFile(file_data, arena);
+        return sts::LookupBool(table, k_online_reporting_disabled_settings_key)
+            .ValueOr(k_online_reporting_disabled_default);
+    };
+
+    auto const outcome = try_read();
+    if (outcome.HasError()) {
+        if (outcome.Error() == FilesystemError::PathDoesNotExist) return k_online_reporting_disabled_default;
+
+        // We couldn't read the file, so we can't know either way. It could just be an temporary filesystem
+        // error, so we can't assume the user's preference so we'll say reporting is disabled.
+        return true;
+    }
+
+    return outcome.Value();
+}
+
+void SetOnlineReportingDisabled(sts::Settings& settings, bool disabled) {
+    if (auto sentry = sentry::GlobalSentry())
+        sentry->online_reporting_disabled.Store(disabled, StoreMemoryOrder::Relaxed);
+    sts::SetValue(settings, k_online_reporting_disabled_settings_key, disabled);
+}
+
 void InitBackgroundErrorReporting(Span<sentry::Tag const> tags) {
     CountedInit(g_init_flag, [&]() {
         auto existing = g_queue.Load(LoadMemoryOrder::Acquire);

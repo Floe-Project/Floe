@@ -49,6 +49,7 @@ struct PathPool {
         return {new_path->buffer.data, p.size};
     }
 
+    // It is ok if the string is not in the pool.
     void Free(String p) {
         Path* prev = nullptr;
         for (auto i = used_list; i != nullptr; i = i->next) {

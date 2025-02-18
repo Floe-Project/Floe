@@ -9,6 +9,9 @@
 #pragma once
 #include "foundation/memory/allocators.hpp"
 
+// IMPORTANT: don't set k_hash_function to a function that is header-only. It can result in the type of the
+// HashTable being different across compilation units.
+
 struct DummyValueType {};
 
 template <typename T>
@@ -16,7 +19,7 @@ concept TriviallyCopyableOrDummy = TriviallyCopyable<T> || Same<DummyValueType, 
 
 template <TriviallyCopyable KeyType,
           TriviallyCopyableOrDummy ValueType,
-          u64 (*k_hash_function)(KeyType) = Hash<KeyType>>
+          u64 (*k_hash_function)(KeyType) = nullptr>
 struct HashTable {
     struct Element {
         [[no_unique_address]] ValueType data {};
@@ -60,7 +63,16 @@ struct HashTable {
     static constexpr usize k_max_size = ((usize)-1 / 2 + 1);
     static constexpr u64 k_tombstone = 0xdeadc0de;
 
-    static u64 Hash(KeyType k) { return k_hash_function(k); }
+    static u64 Hash(KeyType k) {
+        // IMPORTANT: we don't set Hash as the k_hash_function in the template arguments because we don't know
+        // if Hash is consistent accross different compilation units. It might be a header-only function in
+        // which case the _type_ of the HashTable will vary depending on the compilation unit leading to
+        // cryptic linker errors.
+        if constexpr (k_hash_function == nullptr)
+            return ::Hash(k);
+        else
+            return k_hash_function(k);
+    }
 
     // Quadratic probing is used in case of hash collision
     Element* Lookup(KeyType key, u64 hash, usize _dead) const {
@@ -77,7 +89,7 @@ struct HashTable {
 
     Element* FindElement(KeyType key) const {
         if (!elems) return nullptr;
-        Element* element = Lookup(key, k_hash_function(key), 0);
+        Element* element = Lookup(key, Hash(key), 0);
         if (element->active) return element;
         return nullptr;
     }
@@ -234,7 +246,7 @@ struct HashTable {
 
 template <TriviallyCopyable KeyType,
           TriviallyCopyableOrDummy ValueType,
-          u64 (*k_hash_function)(KeyType) = Hash<KeyType>>
+          u64 (*k_hash_function)(KeyType) = nullptr>
 struct DynamicHashTable {
     using Table = HashTable<KeyType, ValueType, k_hash_function>;
 
@@ -299,7 +311,7 @@ struct DynamicHashTable {
     Table table {};
 };
 
-template <TriviallyCopyable KeyType, u64 (*k_hash_function)(KeyType) = Hash<KeyType>>
+template <TriviallyCopyable KeyType, u64 (*k_hash_function)(KeyType) = nullptr>
 struct Set : HashTable<KeyType, DummyValueType, k_hash_function> {
     using Table = HashTable<KeyType, DummyValueType, k_hash_function>;
 
@@ -318,7 +330,7 @@ struct Set : HashTable<KeyType, DummyValueType, k_hash_function> {
     bool Contains(KeyType key) const { return this->FindElement(key); }
 };
 
-template <TriviallyCopyable KeyType, u64 (*k_hash_function)(KeyType) = Hash<KeyType>>
+template <TriviallyCopyable KeyType, u64 (*k_hash_function)(KeyType) = nullptr>
 struct DynamicSet : DynamicHashTable<KeyType, DummyValueType, k_hash_function> {
     using Set = Set<KeyType, k_hash_function>;
 

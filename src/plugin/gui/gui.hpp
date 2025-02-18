@@ -4,6 +4,8 @@
 #pragma once
 #include "foundation/foundation.hpp"
 
+#include "common_infrastructure/settings/settings_file.hpp"
+
 #include "engine/engine.hpp"
 #include "gui/gui2_feedback_panel_state.hpp"
 #include "gui/gui2_info_panel_state.hpp"
@@ -18,7 +20,6 @@
 #include "gui_framework/layout.hpp"
 #include "gui_layer.hpp"
 #include "gui_preset_browser.hpp"
-#include "settings/settings.hpp"
 
 struct GuiFrameInput;
 
@@ -143,7 +144,7 @@ struct Gui {
     GuiFrameResult frame_output;
     Engine& engine;
     SharedEngineSystems& shared_engine_systems;
-    SettingsFile& settings;
+    sts::Settings& settings;
 
     layout::Context layout = {};
     imgui::Context imgui {frame_input, frame_output};

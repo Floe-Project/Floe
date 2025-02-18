@@ -4,7 +4,7 @@
 #pragma once
 #include "foundation/foundation.hpp"
 
-#include "settings.hpp"
+#include "common_infrastructure/settings/settings_file.hpp"
 
 namespace gui_settings {
 
@@ -82,51 +82,73 @@ constexpr bool IsAspectRatio(UiSize size, UiSize aspect_ratio) {
     return simplified_size == simplified_aspect_ratio;
 }
 
-PUBLIC UiSize CurrentAspectRatio(Settings::Gui const& gui) {
+PUBLIC UiSize CurrentAspectRatio(sts::Settings const& settings) {
     ASSERT(CheckThreadName("main"));
-    return gui.show_keyboard ? k_aspect_ratio_with_keyboard : k_aspect_ratio_without_keyboard;
+    return sts::LookupBool(settings, sts::key::k_show_keyboard).ValueOr(true)
+               ? k_aspect_ratio_with_keyboard
+               : k_aspect_ratio_without_keyboard;
 }
 
-PUBLIC UiSize WindowSize(Settings::Gui const& gui) {
+// A clamped value but not necessarily aligned to the aspect ratio
+static u16 RawClampedWindowWidth(sts::Settings const& settings) {
     ASSERT(CheckThreadName("main"));
-    auto const w = CreateFromWidth(gui.window_width, CurrentAspectRatio(gui));
+    return (u16)Clamp<s64>(
+        sts::LookupInt(settings, sts::key::k_window_width).ValueOr(k_default_gui_width_approx),
+        k_min_gui_width,
+        k_largest_gui_size);
+}
+
+PUBLIC u16 WindowWidth(sts::Settings const& settings) {
+    ASSERT(CheckThreadName("main"));
+    static_assert(k_aspect_ratio_with_keyboard.width == k_aspect_ratio_without_keyboard.width);
+    return CreateFromWidth(RawClampedWindowWidth(settings), k_aspect_ratio_with_keyboard).width;
+}
+
+PUBLIC UiSize WindowSize(sts::Settings const& settings) {
+    ASSERT(CheckThreadName("main"));
+    auto const w = CreateFromWidth(RawClampedWindowWidth(settings), CurrentAspectRatio(settings));
     ASSERT(w.width >= k_min_gui_width);
     return w;
 }
 
 // We don't set the height because it's calculated based on the aspect ratio and whether the gui keyboard
 // is shown or not
-PUBLIC void SetWindowSize(Settings::Gui& gui, SettingsTracking& tracking, u16 width) {
+PUBLIC void SetWindowSize(sts::Settings& settings, u16 width) {
     ASSERT(CheckThreadName("main"));
     auto new_width = CreateFromWidth(width, k_aspect_ratio_without_keyboard).width;
     if (new_width < k_min_gui_width) new_width = k_min_gui_width;
-    if (gui.window_width == new_width) return;
-    gui.window_width = new_width;
-    tracking.changed = true;
-    if (tracking.on_change) tracking.on_change(SettingsTracking::ChangeType::WindowSize);
+    sts::SetValue(settings, sts::key::k_window_width, (s64)new_width);
 }
 
-PUBLIC f32 KeyboardHeight(Settings::Gui const& gui) {
+PUBLIC f32 KeyboardHeight(sts::Settings const& settings) {
     ASSERT(CheckThreadName("main"));
-    auto const width = gui.window_width;
+    auto const width = RawClampedWindowWidth(settings);
     return (f32)(CreateFromWidth(width, k_aspect_ratio_with_keyboard).height -
                  CreateFromWidth(width, k_aspect_ratio_without_keyboard).height);
 }
 
-PUBLIC void SetShowKeyboard(Settings::Gui& gui, SettingsTracking& tracking, bool show) {
+// TODO: use an enum for bool settings like we do for autosave
+
+PUBLIC bool ShowTooltips(sts::Settings const& settings) {
     ASSERT(CheckThreadName("main"));
-    gui.show_keyboard = show;
-    tracking.changed = true;
-    if (tracking.on_change) tracking.on_change(SettingsTracking::ChangeType::WindowSize);
+    return sts::LookupBool(settings, sts::key::k_show_tooltips).ValueOr(true);
 }
 
-// TODO: this should go somewhere else, it's not really a gui setting
-PUBLIC void SetDisableOnlineReporting(SettingsFile& settings, bool disable) {
+PUBLIC bool HighContrastGui(sts::Settings const& settings) {
     ASSERT(CheckThreadName("main"));
-    settings.settings.online_reporting_disabled = disable;
-    settings.tracking.changed = true;
-    if (settings.tracking.on_change)
-        settings.tracking.on_change(SettingsTracking::ChangeType::OnlineReportingDisabled);
+    return sts::LookupBool(settings, sts::key::k_high_contrast_gui).ValueOr(false);
+}
+
+PUBLIC bool ShowKeyboard(sts::Settings const& settings) {
+    ASSERT(CheckThreadName("main"));
+    return sts::LookupBool(settings, sts::key::k_show_keyboard).ValueOr(true);
+}
+
+constexpr String k_show_instance_name = "show_instance_name"_s;
+
+PUBLIC bool ShowInstanceName(sts::Settings const& settings) {
+    ASSERT(CheckThreadName("main"));
+    return sts::LookupBool(settings, k_show_instance_name).ValueOr(true);
 }
 
 } // namespace gui_settings

@@ -7,7 +7,9 @@
 #include "utils/debug/debug.hpp"
 #include "utils/debug/tracy_wrapped.hpp"
 
+#include "common_infrastructure/descriptors/param_descriptors.hpp"
 #include "common_infrastructure/error_reporting.hpp"
+#include "common_infrastructure/settings/settings_file.hpp"
 
 #include "clap/ext/audio-ports.h"
 #include "clap/ext/note-ports.h"
@@ -18,14 +20,12 @@
 #include "clap/host.h"
 #include "clap/id.h"
 #include "clap/process.h"
-#include "descriptors/param_descriptors.hpp"
 #include "engine/engine.hpp"
 #include "engine/shared_engine_systems.hpp"
 #include "gui_framework/gui_platform.hpp"
 #include "plugin.hpp"
 #include "processing_utils/scoped_denormals.hpp"
 #include "processor/processor.hpp"
-#include "settings/settings.hpp"
 
 //
 #include "os/undef_windows_macros.h"
@@ -402,7 +402,7 @@ static bool ClapGuiGetResizeHints(clap_plugin_t const* plugin, clap_gui_resize_h
         hints->can_resize_vertically = true;
         hints->can_resize_horizontally = true;
         hints->preserve_aspect_ratio = true;
-        auto const ratio = gui_settings::CurrentAspectRatio(g_shared_engine_systems->settings.settings.gui);
+        auto const ratio = gui_settings::CurrentAspectRatio(g_shared_engine_systems->settings);
         hints->aspect_ratio_width = ratio.width;
         hints->aspect_ratio_height = ratio.height;
         return true;
@@ -421,7 +421,7 @@ GetUsableSizeWithinDimensions(GuiPlatform& gui_platform, u32 clap_width, u32 cla
 
     auto const aspect_ratio_conformed_size = gui_settings::GetNearestAspectRatioSizeInsideSize(
         *size,
-        gui_settings::CurrentAspectRatio(g_shared_engine_systems->settings.settings.gui));
+        gui_settings::CurrentAspectRatio(g_shared_engine_systems->settings));
 
     if (!aspect_ratio_conformed_size) return k_nullopt;
     if (aspect_ratio_conformed_size->width < gui_settings::k_min_gui_width) return k_nullopt;
@@ -452,7 +452,7 @@ static bool ClapGuiAdjustSize(clap_plugin_t const* plugin, u32* clap_width, u32*
 
             auto const aspect_ratio_conformed_size = gui_settings::GetNearestAspectRatioSizeInsideSize32(
                 {*clap_width, *clap_height},
-                gui_settings::CurrentAspectRatio(g_shared_engine_systems->settings.settings.gui));
+                gui_settings::CurrentAspectRatio(g_shared_engine_systems->settings));
 
             if (!aspect_ratio_conformed_size) return false;
 
@@ -495,7 +495,7 @@ static bool ClapGuiSetSize(clap_plugin_t const* plugin, u32 clap_width, u32 clap
         if (!Check(floe,
                    gui_settings::IsAspectRatio(
                        *size,
-                       gui_settings::CurrentAspectRatio(g_shared_engine_systems->settings.settings.gui)),
+                       gui_settings::CurrentAspectRatio(g_shared_engine_systems->settings)),
                    k_func,
                    "invalid aspect ratio")) {
             return false;
@@ -1023,7 +1023,7 @@ static void ClapTimerSupportOnTimer(clap_plugin_t const* plugin, clap_id timer_i
         if (!Check(floe, floe.initialised, k_func, "not initialised")) return;
 
         // We don't care about the timer_id, we just want to poll.
-        PollForSettingsFileChanges(g_shared_engine_systems->settings);
+        sts::PollForExternalChanges(g_shared_engine_systems->settings);
 
         if (floe.gui_platform) OnClapTimer(*floe.gui_platform, timer_id);
         if (floe.engine) EngineCallbacks().on_timer(*floe.engine, timer_id);
@@ -1391,7 +1391,7 @@ static void ClapOnMainThread(const struct clap_plugin* plugin) {
         if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return;
 
         if (floe.engine) {
-            PollForSettingsFileChanges(g_shared_engine_systems->settings);
+            sts::PollForExternalChanges(g_shared_engine_systems->settings);
 
             auto& processor = floe.engine->processor;
             processor.processor_callbacks.on_main_thread(processor);
@@ -1439,9 +1439,9 @@ void RequestGuiResize(FloeInstanceIndex index) {
     if (!floe.gui_platform) return;
     auto const host_gui = (clap_host_gui const*)floe.host.get_extension(&floe.host, CLAP_EXT_GUI);
     if (host_gui) {
-        auto const size = PhysicalPixelsToClapPixels(
-            floe.gui_platform->view,
-            gui_settings::WindowSize(g_shared_engine_systems->settings.settings.gui));
+        auto const size =
+            PhysicalPixelsToClapPixels(floe.gui_platform->view,
+                                       gui_settings::WindowSize(g_shared_engine_systems->settings));
         host_gui->resize_hints_changed(&floe.host);
         host_gui->request_resize(&floe.host, size.width, size.height);
     }

@@ -75,16 +75,18 @@ void BotPanel(Gui* g) {
 
     auto up_id = imgui.GetID("Up");
     auto dn_id = imgui.GetID("Dn");
-    auto& settings = g->settings.settings.gui;
+    auto& settings = g->settings;
+    auto keyboard_octave = (int)Clamp<s64>(
+        sts::LookupInt(settings, sts::key::k_gui_keyboard_octave).ValueOr(k_octave_default_offset),
+        k_octave_lowest,
+        k_octave_highest);
     if (buttons::Button(g, up_id, oct_up_r, ICON_FA_CARET_UP, buttons::IconButton(imgui))) {
-        int const new_octave = Min(settings.keyboard_octave + 1, k_octave_highest);
-        settings.keyboard_octave = new_octave;
-        g->settings.tracking.changed = true;
+        keyboard_octave = Min(keyboard_octave + 1, k_octave_highest);
+        sts::SetValue(settings, sts::key::k_gui_keyboard_octave, (s64)keyboard_octave);
     }
     if (buttons::Button(g, dn_id, oct_dn_r, ICON_FA_CARET_DOWN, buttons::IconButton(imgui))) {
-        int const new_octave = Max(settings.keyboard_octave - 1, k_octave_lowest);
-        settings.keyboard_octave = new_octave;
-        g->settings.tracking.changed = true;
+        keyboard_octave = Max(keyboard_octave - 1, k_octave_lowest);
+        sts::SetValue(settings, sts::key::k_gui_keyboard_octave, (s64)keyboard_octave);
     }
     Tooltip(g, up_id, oct_up_r, "GUI Keyboard Octave Up"_s);
     Tooltip(g, dn_id, oct_dn_r, "GUI Keyboard Octave Down"_s);
@@ -95,13 +97,14 @@ void BotPanel(Gui* g) {
                           oct_text_r,
                           k_octave_lowest,
                           k_octave_highest,
-                          settings.keyboard_octave,
+                          keyboard_octave,
                           draggers::DefaultStyle(imgui).WithNoBackground().WithSensitivity(500))) {
-        g->settings.tracking.changed = true;
+        ASSERT(keyboard_octave >= k_octave_lowest && keyboard_octave <= k_octave_highest);
+        sts::SetValue(settings, sts::key::k_gui_keyboard_octave, (s64)keyboard_octave);
     }
     Tooltip(g, oct_text_id, oct_text_r, "GUI Keyboard Octave - Double Click To Edit"_s);
 
-    if (auto key = KeyboardGui(g, keyboard_r, settings.keyboard_octave)) {
+    if (auto key = KeyboardGui(g, keyboard_r, keyboard_octave)) {
         if (key->is_down)
             engine.processor.events_for_audio_thread.Push(
                 GuiNoteClicked {.key = key->note, .velocity = key->velocity});

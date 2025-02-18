@@ -4,6 +4,7 @@
 #pragma once
 
 #include "sentry/sentry.hpp"
+#include "settings/settings_file.hpp"
 
 // Reporting an error means sending it the online service (if enabled), or writing it a file - ready to be
 // sent later (either automatically or when manually requested as part of a bug report).
@@ -41,3 +42,7 @@ enum class ReportFeedbackReturnCode {
 };
 
 ReportFeedbackReturnCode ReportFeedback(String description, Optional<String> email, bool include_diagnostics);
+
+bool IsOnlineReportingDisabled(sts::Settings const& settings);
+bool IsOnlineReportingDisabled(); // slow version, reads the settings file directly
+void SetOnlineReportingDisabled(sts::Settings& settings, bool disabled);

@@ -8,6 +8,8 @@
 #include "foundation/foundation.hpp"
 #include "os/filesystem.hpp"
 
+#include "common_infrastructure/paths.hpp"
+
 #include "config.h"
 #include "gui.hpp"
 #include "gui/gui_label_widgets.hpp"
@@ -23,11 +25,13 @@ PresetBrowser::PresetBrowser(Gui* g, PresetBrowserPersistentData& persistent_dat
     , g(g) {
 
     if (persistent_data.show_preset_panel || force_listing_fetch) {
-        listing = FetchOrRescanPresetsFolder(
-            g->shared_engine_systems.preset_listing,
-            RescanMode::RescanAsyncIfNeeded,
-            g->settings.settings.filesystem.extra_scan_folders[ToInt(ScanFolderType::Presets)],
-            &g->shared_engine_systems.thread_pool);
+        listing =
+            FetchOrRescanPresetsFolder(g->shared_engine_systems.preset_listing,
+                                       RescanMode::RescanAsyncIfNeeded,
+                                       filesystem_settings::ExtraScanFolders(g->settings,
+                                                                             g->shared_engine_systems.paths,
+                                                                             ScanFolderType::Presets),
+                                       &g->shared_engine_systems.thread_pool);
     }
     if (listing.listing) {
         current_preset = g->engine.last_snapshot.metadata.Path()

@@ -6,8 +6,8 @@
 #include "foundation/foundation.hpp"
 
 #include "common_infrastructure/constants.hpp"
+#include "common_infrastructure/descriptors/param_descriptors.hpp"
 
-#include "descriptors/param_descriptors.hpp"
 #include "layer_processor.hpp"
 #include "processing_utils/audio_processing_context.hpp"
 #include "processor/effect_stereo_widen.hpp"

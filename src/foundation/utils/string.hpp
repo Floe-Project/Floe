@@ -558,6 +558,7 @@ PUBLIC constexpr bool IsDigit(char c) { return c >= '0' && c <= '9'; }
 PUBLIC constexpr bool IsHexDigit(char c) {
     return IsDigit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
 }
+PUBLIC constexpr bool IsLowercaseAscii(char c) { return c >= 'a' && c <= 'z'; }
 PUBLIC constexpr bool IsAlpha(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); }
 PUBLIC constexpr bool IsAlphanum(char c) { return IsAlpha(c) || IsDigit(c); }
 PUBLIC constexpr bool IsEndOfLine(char c) { return c == '\n' || c == '\r'; }

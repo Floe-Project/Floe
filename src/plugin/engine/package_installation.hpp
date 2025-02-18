@@ -3,9 +3,10 @@
 
 #pragma once
 #include "common_infrastructure/package_format.hpp"
+#include "common_infrastructure/paths.hpp"
+#include "common_infrastructure/settings/settings_file.hpp"
 
 #include "sample_lib_server/sample_library_server.hpp"
-#include "settings/settings.hpp"
 
 // This is a higher-level API on top of package_format.hpp.
 //
@@ -816,7 +817,8 @@ using InstallJobs = BoundedList<ManagedInstallJob, 16>;
 // [main thread]
 PUBLIC void AddJob(InstallJobs& jobs,
                    String zip_path,
-                   SettingsFile& settings,
+                   sts::Settings& settings,
+                   FloePaths const& paths,
                    ThreadPool& thread_pool,
                    ArenaAllocator& scratch_arena,
                    sample_lib_server::Server& sample_library_server) {
@@ -831,14 +833,17 @@ PUBLIC void AddJob(InstallJobs& jobs,
         CreateJobOptions {
             .zip_path = zip_path,
             .libraries_install_folder =
-                settings.settings.filesystem.install_location[ToInt(ScanFolderType::Libraries)],
+                sts::LookupString(settings, sts::key::k_libraries_install_location)
+                    .ValueOr(paths.always_scanned_folder[ToInt(ScanFolderType::Libraries)]),
             .presets_install_folder =
-                settings.settings.filesystem.install_location[ToInt(ScanFolderType::Presets)],
+                sts::LookupString(settings, sts::key::k_presets_install_location)
+                    .ValueOr(paths.always_scanned_folder[ToInt(ScanFolderType::Presets)]),
             .server = sample_library_server,
             .preset_folders = CombineStringArrays(
                 scratch_arena,
-                settings.settings.filesystem.extra_scan_folders[ToInt(ScanFolderType::Presets)],
-                Array {settings.paths.always_scanned_folder[ToInt(ScanFolderType::Presets)]}),
+                sts::LookupValues<String, k_max_extra_scan_folders>(settings,
+                                                                    sts::key::k_extra_presets_folder),
+                Array {paths.always_scanned_folder[ToInt(ScanFolderType::Presets)]}),
         });
     thread_pool.AddJob([job]() {
         try {

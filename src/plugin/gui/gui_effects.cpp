@@ -8,7 +8,7 @@
 
 #include "os/threading.hpp"
 
-#include "descriptors/param_descriptors.hpp"
+#include "common_infrastructure/descriptors/param_descriptors.hpp"
 #include "engine/engine.hpp"
 #include "gui.hpp"
 #include "gui/gui_dragger_widgets.hpp"

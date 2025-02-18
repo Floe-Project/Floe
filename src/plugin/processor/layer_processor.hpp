@@ -4,8 +4,9 @@
 #pragma once
 #include "foundation/foundation.hpp"
 
+#include "common_infrastructure/descriptors/param_descriptors.hpp"
+
 #include "clap/host.h"
-#include "descriptors/param_descriptors.hpp"
 #include "param.hpp"
 #include "plugin/plugin.hpp"
 #include "processing_utils/adsr.hpp"

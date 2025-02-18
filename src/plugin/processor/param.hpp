@@ -5,7 +5,7 @@
 #include "foundation/foundation.hpp"
 #include "os/threading.hpp"
 
-#include "descriptors/param_descriptors.hpp"
+#include "common_infrastructure/descriptors/param_descriptors.hpp"
 
 // TODO: This should be replaced by a new system. The atomic operations here are sketchy and we want a new
 // system that is far more robust and supports sample-accurate automation.

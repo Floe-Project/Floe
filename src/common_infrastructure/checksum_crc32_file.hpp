@@ -4,7 +4,6 @@
 #pragma once
 #include <miniz.h>
 
-#include "foundation/container/hash_table.hpp"
 #include "foundation/foundation.hpp"
 #include "os/filesystem.hpp"
 

@@ -10,15 +10,16 @@
 
 #include "common_infrastructure/common_errors.hpp"
 #include "common_infrastructure/constants.hpp"
+#include "common_infrastructure/descriptors/param_descriptors.hpp"
 #include "common_infrastructure/error_reporting.hpp"
 #include "common_infrastructure/sample_library/attribution_requirements.hpp"
+#include "common_infrastructure/settings/settings_file.hpp"
 
 #include "clap/ext/timer-support.h"
-#include "descriptors/param_descriptors.hpp"
 #include "plugin/plugin.hpp"
 #include "processor/layer_processor.hpp"
 #include "sample_lib_server/sample_library_server.hpp"
-#include "settings/settings.hpp"
+#include "settings_midi.hpp"
 #include "shared_engine_systems.hpp"
 #include "state/instrument.hpp"
 #include "state/state_coding.hpp"
@@ -467,17 +468,10 @@ static void OnMainThread(Engine& engine) {
     if (engine.update_gui.Exchange(false, RmwMemoryOrder::Relaxed))
         engine.plugin_instance_messages.UpdateGui();
 
-    engine.autosave_state.max_autosaves_per_instance.Store(
-        engine.shared_engine_systems.settings.settings.max_autosaves_per_instance,
-        StoreMemoryOrder::Relaxed);
-    engine.autosave_state.autosave_delete_after_days.Store(
-        engine.shared_engine_systems.settings.settings.autosave_delete_after_days,
-        StoreMemoryOrder::Relaxed);
-    engine.autosave_state.autosave_interval_seconds.Store(
-        engine.shared_engine_systems.settings.settings.autosave_interval_seconds,
-        StoreMemoryOrder::Relaxed);
-    if (AutosaveNeeded(engine.autosave_state))
-        QueueAutosave(engine.autosave_state, CurrentStateSnapshot(engine));
+    if (AutosaveNeeded(engine.autosave_state, engine.shared_engine_systems.settings))
+        QueueAutosave(engine.autosave_state,
+                      engine.shared_engine_systems.settings,
+                      CurrentStateSnapshot(engine));
 }
 
 void Engine::OnProcessorChange(ChangeFlags flags) {
@@ -505,10 +499,10 @@ Engine::Engine(clap_host const& host,
                   },
           })} {
 
-    for (auto ccs = shared_engine_systems.settings.settings.midi.cc_to_param_mapping; ccs != nullptr;
-         ccs = ccs->next)
-        for (auto param = ccs->param; param != nullptr; param = param->next)
-            processor.param_learned_ccs[ToInt(*ParamIdToIndex(param->id))].Set(ccs->cc_num);
+    for (auto const i : EnumIterator<ParamIndex>()) {
+        processor.param_learned_ccs[ToInt(i)].AssignBlockwise(
+            midi_settings::PersistentCcsForParam(shared_engine_systems.settings, ParamIndexToId(i)));
+    }
 
     last_snapshot.state = CurrentStateSnapshot(*this);
 
@@ -517,12 +511,13 @@ Engine::Engine(clap_host const& host,
     presets_folder_listener_id =
         shared_engine_systems.preset_listing.scanned_folder.listeners.Add([&engine = *this]() {
             RunFunctionOnMainThread(engine, [&engine]() {
-                auto listing =
-                    FetchOrRescanPresetsFolder(engine.shared_engine_systems.preset_listing,
-                                               RescanMode::DontRescan,
-                                               engine.shared_engine_systems.settings.settings.filesystem
-                                                   .extra_scan_folders[ToInt(ScanFolderType::Presets)],
-                                               nullptr);
+                auto listing = FetchOrRescanPresetsFolder(
+                    engine.shared_engine_systems.preset_listing,
+                    RescanMode::DontRescan,
+                    filesystem_settings::ExtraScanFolders(engine.shared_engine_systems.settings,
+                                                          engine.shared_engine_systems.paths,
+                                                          ScanFolderType::Presets),
+                    nullptr);
 
                 if (engine.pending_preset_selection_criteria) {
                     LoadPresetFromListing(engine, *engine.pending_preset_selection_criteria, listing);

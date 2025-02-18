@@ -15,8 +15,8 @@
 
 #include "engine/engine.hpp"
 #include "gui/gui.hpp"
+#include "gui/settings_gui.hpp"
 #include "gui_frame.hpp"
-#include "settings/settings_gui.hpp"
 
 constexpr bool k_debug_gui_platform = false;
 
@@ -24,7 +24,7 @@ struct GuiPlatform {
     static constexpr uintptr k_pugl_timer_id = 200;
 
     clap_host const& host;
-    SettingsFile& settings;
+    sts::Settings& settings;
     PuglWorld* world {};
     PuglView* view {};
     CursorType current_cursor {CursorType::Default};
@@ -207,7 +207,7 @@ PUBLIC ErrorCodeOr<void> SetVisible(GuiPlatform& platform, bool visible, Engine&
             puglSetViewHint(platform.view, PUGL_CONTEXT_DEBUG, RUNTIME_SAFETY_CHECKS_ON);
 
             puglSetViewHint(platform.view, PUGL_RESIZABLE, true);
-            auto const size = gui_settings::WindowSize(platform.settings.settings.gui);
+            auto const size = gui_settings::WindowSize(platform.settings);
             TRY(Required(puglSetSize(platform.view, size.width, size.height)));
             LogDebug(ModuleName::Gui, "creating size: {}x{}", size.width, size.height);
 
@@ -263,7 +263,7 @@ PUBLIC bool SetSize(GuiPlatform& platform, UiSize new_size) {
 }
 
 PUBLIC UiSize WindowSize(GuiPlatform& platform) {
-    if (!platform.gui) return gui_settings::WindowSize(platform.settings.settings.gui);
+    if (!platform.gui) return gui_settings::WindowSize(platform.settings);
     auto const size = puglGetFrame(platform.view);
     return {size.width, size.height};
 }
@@ -703,9 +703,7 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
                 if (platform.graphics_ctx)
                     platform.graphics_ctx->Resize({event->configure.width, event->configure.height});
                 if (event->configure.width)
-                    gui_settings::SetWindowSize(platform.settings.settings.gui,
-                                                platform.settings.tracking,
-                                                event->configure.width);
+                    gui_settings::SetWindowSize(platform.settings, event->configure.width);
                 break;
             }
 

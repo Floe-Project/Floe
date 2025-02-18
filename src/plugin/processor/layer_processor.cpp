@@ -5,9 +5,9 @@
 
 #include "foundation/foundation.hpp"
 
+#include "common_infrastructure/descriptors/param_descriptors.hpp"
 #include "common_infrastructure/sample_library/sample_library.hpp"
 
-#include "descriptors/param_descriptors.hpp"
 #include "param.hpp"
 #include "processing_utils/audio_processing_context.hpp"
 #include "processing_utils/filters.hpp"

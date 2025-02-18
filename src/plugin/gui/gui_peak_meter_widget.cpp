@@ -5,9 +5,10 @@
 
 #include "foundation/foundation.hpp"
 
+#include "common_infrastructure/audio_utils.hpp"
+
 #include "gui.hpp"
 #include "gui_framework/gui_live_edit.hpp"
-#include "processing_utils/audio_utils.hpp"
 
 namespace peak_meters {
 

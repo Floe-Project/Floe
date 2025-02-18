@@ -5,8 +5,10 @@
 #include "foundation/foundation.hpp"
 #include "os/filesystem.hpp"
 
-#include "common_infrastructure/error_reporting.hpp"
+#include "error_reporting.hpp"
+#include "settings/settings_file.hpp"
 
+constexpr usize k_max_extra_scan_folders {16};
 enum class ScanFolderType : u8 { Presets, Libraries, Count };
 
 struct FloePaths {
@@ -124,3 +126,91 @@ PUBLIC FloePaths CreateFloePaths(ArenaAllocator& arena) {
 
     return result;
 }
+
+// TODO: better unify these functions with the FloePaths structu - perhaps make FloePaths the first argument.
+// Perhaps add as static functions.
+
+namespace filesystem_settings {
+
+PUBLIC DynamicArrayBounded<String, k_max_extra_scan_folders>
+ExtraScanFolders(sts::Settings& settings, FloePaths const& paths, ScanFolderType type) {
+    ASSERT(CheckThreadName("main"));
+    String key {};
+    switch (type) {
+        case ScanFolderType::Presets: key = sts::key::k_extra_presets_folder; break;
+        case ScanFolderType::Libraries: key = sts::key::k_extra_libraries_folder; break;
+        case ScanFolderType::Count: PanicIfReached(); break;
+    }
+
+    auto values = sts::LookupValue(settings, key);
+    if (!values) return {};
+
+    DynamicArrayBounded<String, k_max_extra_scan_folders> result;
+    for (auto node = &*values; node; node = node->next) {
+        auto const v = node->TryGet<String>();
+        if (!v) continue;
+        if (!path::IsAbsolute(*v)) continue;
+        if (!IsValidUtf8(*v)) continue;
+        if (path::Equal(*v, paths.always_scanned_folder[ToInt(type)])) continue;
+        dyn::AppendIfNotAlreadyThere(result, *v);
+    }
+    return result;
+}
+
+constexpr String InstallLocationSettingsKey(ScanFolderType type) {
+    switch (type) {
+        case ScanFolderType::Presets: return sts::key::k_presets_install_location;
+        case ScanFolderType::Libraries: return sts::key::k_libraries_install_location;
+        case ScanFolderType::Count: PanicIfReached(); break;
+    }
+    return {};
+}
+
+PUBLIC String InstallLocation(sts::Settings& settings, FloePaths const& paths, ScanFolderType type) {
+    auto v = sts::LookupString(settings, InstallLocationSettingsKey(type));
+    auto const fallback = paths.always_scanned_folder[ToInt(type)];
+    if (!v) return fallback;
+    if (!path::IsAbsolute(*v) || !IsValidUtf8(*v)) return fallback;
+    if (!Contains(ExtraScanFolders(settings, paths, type), *v)) return fallback;
+    return *v;
+}
+
+PUBLIC void
+SetInstallLocation(sts::Settings& settings, FloePaths const& paths, ScanFolderType type, String path) {
+    ASSERT(CheckThreadName("main"));
+    ASSERT(path::IsAbsolute(path));
+    ASSERT(IsValidUtf8(path));
+    if (!Contains(ExtraScanFolders(settings, paths, type), path)) return;
+
+    sts::SetValue(settings, InstallLocationSettingsKey(type), path);
+}
+
+constexpr String ScanFolderSettingsKey(ScanFolderType type) {
+    switch (type) {
+        case ScanFolderType::Presets: return sts::key::k_extra_presets_folder;
+        case ScanFolderType::Libraries: return sts::key::k_extra_libraries_folder;
+        case ScanFolderType::Count: PanicIfReached(); break;
+    }
+    return {};
+}
+
+PUBLIC void AddScanFolder(sts::Settings& settings, FloePaths const& paths, ScanFolderType type, String path) {
+    ASSERT(CheckThreadName("main"));
+    ASSERT(path::IsAbsolute(path));
+    ASSERT(IsValidUtf8(path));
+    if (path::Equal(path, paths.always_scanned_folder[ToInt(type)])) return;
+
+    sts::AddValue(settings, ScanFolderSettingsKey(type), path);
+}
+
+PUBLIC void
+RemoveScanFolder(sts::Settings& settings, FloePaths const& paths, ScanFolderType type, String path) {
+    ASSERT(CheckThreadName("main"));
+
+    if (sts::RemoveValue(settings, ScanFolderSettingsKey(type), path)) {
+        if (path == InstallLocation(settings, paths, type))
+            SetInstallLocation(settings, paths, type, paths.always_scanned_folder[ToInt(type)]);
+    }
+}
+
+} // namespace filesystem_settings

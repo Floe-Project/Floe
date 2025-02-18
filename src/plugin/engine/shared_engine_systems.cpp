@@ -9,7 +9,6 @@
 #include "common_infrastructure/error_reporting.hpp"
 
 #include "plugin/plugin.hpp"
-#include "settings/settings.hpp"
 
 void SharedEngineSystems::StartPollingThreadIfNeeded() {
     if (polling_running.Load(LoadMemoryOrder::Acquire)) return;
@@ -42,60 +41,44 @@ void SharedEngineSystems::StartPollingThreadIfNeeded() {
 SharedEngineSystems::SharedEngineSystems(Span<sentry::Tag const> tags)
     : arena(PageAllocator::Instance(), Kb(4))
     , paths(CreateFloePaths(arena))
-    , settings {.paths = paths}
+    , settings {.arena = PageAllocator::Instance()}
     , sample_library_server(thread_pool,
                             paths.always_scanned_folder[ToInt(ScanFolderType::Libraries)],
                             error_notifications) {
     InitBackgroundErrorReporting(tags);
 
-    settings.tracking.on_change = [this](SettingsTracking::Change change) {
+    settings.on_change = [this](String key, sts::Value const* value) {
         ASSERT(CheckThreadName("main"));
 
-        switch (change.tag) {
-            case SettingsTracking::ChangeType::ScanFolder: {
-                auto type = change.Get<ScanFolderType>();
-                switch (type) {
-                    case ScanFolderType::Presets:
-                        preset_listing.scanned_folder.needs_rescan.Store(true, StoreMemoryOrder::Relaxed);
-                        break;
-                    case ScanFolderType::Libraries: {
-                        sample_lib_server::SetExtraScanFolders(
-                            sample_library_server,
-                            settings.settings.filesystem
-                                .extra_scan_folders[ToInt(ScanFolderType::Libraries)]);
-                        break;
-                    }
-                    case ScanFolderType::Count: PanicIfReached();
-                }
-                break;
+        if (key == sts::key::k_extra_libraries_folder) {
+            DynamicArrayBounded<String, k_max_extra_scan_folders> extra_scan_folders;
+            for (auto v = value; v; v = v->next) {
+                if (extra_scan_folders.size == k_max_extra_scan_folders) break;
+                dyn::AppendIfNotAlreadyThere(extra_scan_folders, v->Get<String>());
             }
-            case SettingsTracking::ChangeType::WindowSize: {
-                registered_floe_instances_mutex.Lock();
-                DEFER { registered_floe_instances_mutex.Unlock(); };
-                for (auto index : registered_floe_instances)
-                    RequestGuiResize(index);
-                break;
-            }
-            case SettingsTracking::ChangeType::OnlineReportingDisabled: {
-                if (auto sentry = sentry::GlobalSentry()) {
-                    sentry->online_reporting_disabled.Store(settings.settings.online_reporting_disabled,
-                                                            StoreMemoryOrder::Relaxed);
-                }
-
-                break;
-            }
+            sample_lib_server::SetExtraScanFolders(sample_library_server, extra_scan_folders);
+        } else if (key == sts::key::k_extra_presets_folder) {
+            preset_listing.scanned_folder.needs_rescan.Store(true, StoreMemoryOrder::Relaxed);
+        } else if (key == sts::key::k_window_width) {
+            registered_floe_instances_mutex.Lock();
+            DEFER { registered_floe_instances_mutex.Unlock(); };
+            for (auto index : registered_floe_instances)
+                RequestGuiResize(index);
         }
     };
 
     thread_pool.Init("global", {});
 
-    InitSettingsFile(settings, paths);
+    sts::Init(settings, paths.possible_settings_paths);
 
-    ASSERT(settings.settings.gui.window_width != 0);
-
-    sample_lib_server::SetExtraScanFolders(
-        sample_library_server,
-        settings.settings.filesystem.extra_scan_folders[ToInt(ScanFolderType::Libraries)]);
+    if (auto const value = sts::LookupValue(settings, sts::key::k_extra_libraries_folder)) {
+        DynamicArrayBounded<String, k_max_extra_scan_folders> extra_scan_folders;
+        for (auto v = &*value; v; v = v->next) {
+            if (extra_scan_folders.size == k_max_extra_scan_folders) break;
+            dyn::AppendIfNotAlreadyThere(extra_scan_folders, v->Get<String>());
+        }
+        sample_lib_server::SetExtraScanFolders(sample_library_server, extra_scan_folders);
+    }
 }
 
 SharedEngineSystems::~SharedEngineSystems() {
@@ -105,15 +88,8 @@ SharedEngineSystems::~SharedEngineSystems() {
         polling_thread.Join();
     }
 
-    settings.tracking.on_change = {};
-
-    DeinitSettingsFile(settings);
-
-    {
-        auto outcome = WriteSettingsFileIfChanged(settings);
-        if (outcome.HasError())
-            LogError(ModuleName::Global, "Failed to write settings file: {}", outcome.Error());
-    }
+    sts::WriteIfNeeded(settings);
+    sts::Deinit(settings);
 
     ShutdownBackgroundErrorReporting();
 }

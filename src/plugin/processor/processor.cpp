@@ -5,8 +5,9 @@
 
 #include "os/threading.hpp"
 
+#include "common_infrastructure/descriptors/param_descriptors.hpp"
+
 #include "clap/ext/params.h"
-#include "descriptors/param_descriptors.hpp"
 #include "param.hpp"
 #include "plugin/plugin.hpp"
 #include "voices.hpp"

@@ -9,14 +9,14 @@
 #include "utils/json/json_reader.hpp"
 #include "utils/json/json_writer.hpp"
 
+#include "common_infrastructure/audio_utils.hpp"
 #include "common_infrastructure/common_errors.hpp"
 #include "common_infrastructure/constants.hpp"
+#include "common_infrastructure/descriptors/effect_descriptors.hpp"
+#include "common_infrastructure/descriptors/param_descriptors.hpp"
 #include "common_infrastructure/sample_library/mdata.hpp"
 
 #include "config.h"
-#include "descriptors/effect_descriptors.hpp"
-#include "descriptors/param_descriptors.hpp"
-#include "processing_utils/audio_utils.hpp"
 #include "state_snapshot.hpp"
 
 using namespace json;

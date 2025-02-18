@@ -3,6 +3,8 @@
 
 #include <IconsFontAwesome5.h>
 
+#include "common_infrastructure/paths.hpp"
+
 #include "engine/engine.hpp"
 #include "gui_button_widgets.hpp"
 #include "gui_menu.hpp"
@@ -11,6 +13,7 @@
 #include "gui_widget_compounds.hpp"
 #include "gui_widget_helpers.hpp"
 #include "presets/presets_folder.hpp"
+#include "settings_gui.hpp"
 #include "state/state_snapshot.hpp"
 
 static void PresetsWindowButton(Gui* g, Engine* a, Rect r) {
@@ -221,14 +224,15 @@ void TopPanel(Gui* g) {
 
     {
         auto subtitle_r = layout::GetRect(g->layout, subtitle).Up(Round(-title_font->descent + 1));
-        labels::Label(g,
-                      subtitle_r,
-                      fmt::Format(g->scratch_arena,
-                                  "v" FLOE_VERSION_STRING "  {}",
-                                  g->shared_engine_systems.settings.settings.gui.show_instance_name
-                                      ? String {g->engine.autosave_state.instance_id}
-                                      : ""_s),
-                      labels::Title(g->imgui, LiveCol(g->imgui, UiColMap::TopPanelSubtitleText)));
+        labels::Label(
+            g,
+            subtitle_r,
+            fmt::Format(g->scratch_arena,
+                        "v" FLOE_VERSION_STRING "  {}",
+                        sts::LookupBool(g->settings, gui_settings::k_show_instance_name).ValueOr(true)
+                            ? String {g->engine.autosave_state.instance_id}
+                            : ""_s),
+            labels::Title(g->imgui, LiveCol(g->imgui, UiColMap::TopPanelSubtitleText)));
     }
 
     g->imgui.graphics->context->PushFont(g->mada);
@@ -251,7 +255,11 @@ void TopPanel(Gui* g) {
     }
     if (g->icons) g->frame_input.graphics_ctx->PushFont(g->icons);
 
-    auto& settings = g->settings.settings.gui;
+    auto& settings = g->settings;
+    auto const randomise_mode = (PresetRandomiseMode)Clamp(
+        sts::LookupInt(settings, sts::key::k_presets_random_mode).ValueOr((s64)PresetRandomiseMode::All),
+        (s64)PresetRandomiseMode::All,
+        (s64)PresetRandomiseMode::BrowserFilters);
     {
         auto btn_id = g->imgui.GetID("rand_pre");
         if (buttons::Button(g,
@@ -259,7 +267,7 @@ void TopPanel(Gui* g) {
                             preset_rand_r,
                             ICON_FA_RANDOM,
                             large_icon_button_style.WithIconScaling(0.8f))) {
-            switch ((PresetRandomiseMode)settings.presets_random_mode) {
+            switch (randomise_mode) {
                 case PresetRandomiseMode::All:
                     preset_load_criteria = PresetRandomiseCriteria {PresetRandomiseMode::All};
                     break;
@@ -276,7 +284,7 @@ void TopPanel(Gui* g) {
         }
 
         String preset_mode_description = {};
-        switch ((PresetRandomiseMode)settings.presets_random_mode) {
+        switch (randomise_mode) {
             case PresetRandomiseMode::All: preset_mode_description = "Load any random preset"; break;
             case PresetRandomiseMode::BrowserFilters:
                 preset_mode_description =
@@ -308,8 +316,9 @@ void TopPanel(Gui* g) {
             *preset_load_criteria,
             FetchOrRescanPresetsFolder(g->engine.shared_engine_systems.preset_listing,
                                        RescanMode::RescanAsyncIfNeeded,
-                                       g->engine.shared_engine_systems.settings.settings.filesystem
-                                           .extra_scan_folders[ToInt(ScanFolderType::Presets)],
+                                       filesystem_settings::ExtraScanFolders(g->settings,
+                                                                             g->shared_engine_systems.paths,
+                                                                             ScanFolderType::Presets),
                                        &g->engine.shared_engine_systems.thread_pool));
         g->preset_browser_data.scroll_to_show_current_preset = true;
     }
@@ -354,11 +363,10 @@ void TopPanel(Gui* g) {
             };
 
             PopupMenuItems items(g, options.Items());
-            auto mode = settings.presets_random_mode;
-            if (items.DoMultipleMenuItems(mode)) {
-                g->settings.tracking.changed = true;
-                settings.presets_random_mode = mode;
-            }
+            auto mode =
+                (int)Clamp<s64>(sts::LookupInt(settings, sts::key::k_presets_random_mode).ValueOr(0), 0, 3);
+            if (items.DoMultipleMenuItems(mode))
+                sts::SetValue(settings, sts::key::k_presets_random_mode, (s64)mode);
 
             g->imgui.EndWindow();
         }

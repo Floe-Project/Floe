@@ -189,12 +189,65 @@ void AutosaveToFileIfNeeded(AutosaveState& state, FloePaths const& paths) {
     }
 }
 
-bool AutosaveNeeded(AutosaveState const& state) {
-    return state.last_save_time.SecondsFromNow() >=
-           state.autosave_interval_seconds.Load(LoadMemoryOrder::Relaxed);
+AutosaveSettingInfo GetAutosaveSettingInfo(AutosaveSetting setting) {
+    switch (setting) {
+        case AutosaveSetting::AutosaveIntervalSeconds:
+            return {
+                .gui_label = "Autosave interval (seconds)"_s,
+                .key = "autosave_interval_seconds"_s,
+                .default_value = AutosaveState::k_default_autosave_interval_seconds,
+                .min_value = 1,
+                .max_value = 60 * 60,
+            };
+        case AutosaveSetting::MaxAutosavesPerInstance:
+            return {
+                .gui_label = "Max autosaves per instance"_s,
+                .key = "max_autosaves_per_instance"_s,
+                .default_value = AutosaveState::k_default_max_autosaves_per_instance,
+                .min_value = 1,
+                .max_value = 100,
+            };
+        case AutosaveSetting::AutosaveDeleteAfterDays:
+            return {
+                .gui_label = "Autosave delete after days"_s,
+                .key = "autosave_delete_after_days"_s,
+                .default_value = AutosaveState::k_default_autosave_delete_after_days,
+                .min_value = 1,
+                .max_value = 365,
+            };
+        case AutosaveSetting::Count: break;
+    }
+    PanicIfReached();
+    return {};
 }
 
-void QueueAutosave(AutosaveState& state, StateSnapshot const& snapshot) {
+u16 GetAutosaveSetting(sts::Settings const& settings, AutosaveSetting setting) {
+    auto const info = GetAutosaveSettingInfo(setting);
+    auto v = sts::LookupInt(settings, info.key);
+    if (!v) return CheckedCast<u16>(info.default_value);
+    v = Clamp<s64>(*v, info.min_value, info.max_value);
+    return CheckedCast<u16>(*v);
+}
+
+void SetAutosaveSetting(sts::Settings& settings, AutosaveSetting setting, u16 value) {
+    auto const info = GetAutosaveSettingInfo(setting);
+    auto const v = Clamp<s64>(value, info.min_value, info.max_value);
+    sts::SetValue(settings, info.key, v);
+}
+
+bool AutosaveNeeded(AutosaveState const& state, sts::Settings const& settings) {
+    return state.last_save_time.SecondsFromNow() >=
+           GetAutosaveSetting(settings, AutosaveSetting::AutosaveIntervalSeconds);
+}
+
+void QueueAutosave(AutosaveState& state, sts::Settings const& settings, StateSnapshot const& snapshot) {
+    state.autosave_delete_after_days.Store(
+        GetAutosaveSetting(settings, AutosaveSetting::AutosaveDeleteAfterDays),
+        StoreMemoryOrder::Relaxed);
+    state.max_autosaves_per_instance.Store(
+        GetAutosaveSetting(settings, AutosaveSetting::MaxAutosavesPerInstance),
+        StoreMemoryOrder::Relaxed);
+
     state.mutex.Lock();
     DEFER { state.mutex.Unlock(); };
     switch (state.state) {
@@ -225,6 +278,7 @@ static String TestPresetPath(tests::Tester& tester, String filename) {
 TEST_CASE(TestAutosave) {
     AutosaveState state {};
     auto const paths = CreateFloePaths(tester.arena);
+    sts::Settings settings {};
 
     // We need to load some valid state to test autosave.
     auto snapshot = TRY(LoadPresetFile(TestPresetPath(tester, "sine.floe-preset"), tester.scratch_arena));
@@ -232,19 +286,19 @@ TEST_CASE(TestAutosave) {
     InitAutosaveState(state, tester.random_seed, snapshot);
 
     // We don't need check the result since it's time-based and we don't want to wait in a test.
-    AutosaveNeeded(state);
+    AutosaveNeeded(state, settings);
 
     // main thread
     snapshot.param_values[0] += 1;
-    QueueAutosave(state, snapshot);
+    QueueAutosave(state, settings, snapshot);
 
     // background thread
     AutosaveToFileIfNeeded(state, paths);
 
     // do it multiple time to check file rotation
-    for (auto _ : Range(state.max_autosaves_per_instance.Load(LoadMemoryOrder::Relaxed) + 1)) {
+    for (auto _ : Range(GetAutosaveSetting(settings, AutosaveSetting::MaxAutosavesPerInstance) + 1)) {
         snapshot.param_values[0] += 1;
-        QueueAutosave(state, snapshot);
+        QueueAutosave(state, settings, snapshot);
         AutosaveToFileIfNeeded(state, paths);
     }
 

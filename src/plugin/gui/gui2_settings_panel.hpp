@@ -10,9 +10,7 @@
 #include "gui2_settings_panel_state.hpp"
 #include "gui_framework/gui_box_system.hpp"
 #include "sample_lib_server/sample_library_server.hpp"
-#include "settings/settings.hpp"
-#include "settings/settings_filesystem.hpp"
-#include "settings/settings_gui.hpp"
+#include "settings_gui.hpp"
 
 static void SettingsLhsTextWidget(GuiBoxSystem& box_system, Box parent, String text) {
     DoBox(
@@ -196,7 +194,8 @@ SettingsFolderSelector(GuiBoxSystem& box_system, Box parent, String path, String
 }
 
 struct SettingsPanelContext {
-    SettingsFile& settings;
+    sts::Settings& settings;
+    FloePaths const& paths;
     sample_lib_server::Server& sample_lib_server;
     package::InstallJobs& package_install_jobs;
     ThreadPool& thread_pool;
@@ -242,7 +241,7 @@ static bool AddExtraScanFolderDialog(GuiBoxSystem& box_system,
                                      ScanFolderType type,
                                      bool set_as_install_location) {
     Optional<String> default_folder {};
-    if (auto const extra_paths = context.settings.settings.filesystem.extra_scan_folders[ToInt(type)];
+    if (auto const extra_paths = filesystem_settings::ExtraScanFolders(context.settings, context.paths, type);
         extra_paths.size)
         default_folder = extra_paths[0];
 
@@ -264,9 +263,9 @@ static bool AddExtraScanFolderDialog(GuiBoxSystem& box_system,
         });
         o.HasValue()) {
         if (auto const paths = o.Value(); paths.size) {
-            filesystem_settings::AddScanFolder(context.settings, type, paths[0]);
+            filesystem_settings::AddScanFolder(context.settings, context.paths, type, paths[0]);
             if (set_as_install_location)
-                filesystem_settings::SetInstallLocation(context.settings, type, paths[0]);
+                filesystem_settings::SetInstallLocation(context.settings, context.paths, type, paths[0]);
             return true;
         }
     } else {
@@ -289,7 +288,7 @@ static void FolderSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& 
                                 },
                             });
 
-    for (auto const scan_folder_type : Range(ToInt(ScanFolderType::Count))) {
+    for (auto const scan_folder_type : EnumIterator<ScanFolderType>()) {
         auto const row = SettingsRow(box_system, root);
         SettingsLhsTextWidget(box_system, row, ({
                                   String s;
@@ -306,7 +305,7 @@ static void FolderSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& 
         DynamicArrayBounded<char, 200> subtext_buffer {};
 
         {
-            auto const dir = context.settings.paths.always_scanned_folder[scan_folder_type];
+            auto const dir = context.paths.always_scanned_folder[ToInt(scan_folder_type)];
             SetFolderSubtext(subtext_buffer,
                              dir,
                              true,
@@ -318,7 +317,8 @@ static void FolderSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& 
         }
 
         Optional<String> to_remove {};
-        for (auto const dir : context.settings.settings.filesystem.extra_scan_folders[scan_folder_type]) {
+        for (auto const dir :
+             filesystem_settings::ExtraScanFolders(context.settings, context.paths, scan_folder_type)) {
             SetFolderSubtext(subtext_buffer,
                              dir,
                              false,
@@ -332,7 +332,8 @@ static void FolderSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& 
         }
         if (to_remove)
             filesystem_settings::RemoveScanFolder(context.settings,
-                                                  (ScanFolderType)scan_folder_type,
+                                                  context.paths,
+                                                  scan_folder_type,
                                                   *to_remove);
 
         auto const contents_name = ({
@@ -344,7 +345,7 @@ static void FolderSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& 
             }
             s;
         });
-        if (context.settings.settings.filesystem.extra_scan_folders[scan_folder_type].size !=
+        if (filesystem_settings::ExtraScanFolders(context.settings, context.paths, scan_folder_type).size !=
                 k_max_extra_scan_folders &&
             TextButton(box_system,
                        rhs_column,
@@ -385,12 +386,12 @@ static void InstallLocationMenu(GuiBoxSystem& box_system,
                                 });
 
         if (item.button_fired) {
-            filesystem_settings::SetInstallLocation(context.settings, scan_folder_type, path);
+            filesystem_settings::SetInstallLocation(context.settings, context.paths, scan_folder_type, path);
             box_system.imgui.CloseTopPopupOnly();
         }
 
         auto const current_install_location =
-            context.settings.settings.filesystem.install_location[ToInt(scan_folder_type)];
+            filesystem_settings::InstallLocation(context.settings, context.paths, scan_folder_type);
 
         DoBox(box_system,
               {
@@ -434,12 +435,13 @@ static void InstallLocationMenu(GuiBoxSystem& box_system,
     };
 
     {
-        auto const dir = context.settings.paths.always_scanned_folder[ToInt(scan_folder_type)];
+        auto const dir = context.paths.always_scanned_folder[ToInt(scan_folder_type)];
         SetFolderSubtext(subtext_buffer, dir, true, scan_folder_type, context.sample_lib_server);
         menu_item(dir, subtext_buffer);
     }
 
-    for (auto const dir : context.settings.settings.filesystem.extra_scan_folders[ToInt(scan_folder_type)]) {
+    for (auto const dir :
+         filesystem_settings::ExtraScanFolders(context.settings, context.paths, scan_folder_type)) {
         SetFolderSubtext(subtext_buffer, dir, false, scan_folder_type, context.sample_lib_server);
         menu_item(dir, subtext_buffer);
     }
@@ -495,7 +497,7 @@ static void PackagesSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext
                                 },
                             });
 
-    for (auto const scan_folder_type : Range(ToInt(ScanFolderType::Count))) {
+    for (auto const scan_folder_type : EnumIterator<ScanFolderType>()) {
         auto const row = SettingsRow(box_system, root);
         SettingsLhsTextWidget(box_system, row, ({
                                   String s;
@@ -509,10 +511,11 @@ static void PackagesSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext
                                   s;
                               }));
 
-        auto const popup_id = box_system.imgui.GetID(scan_folder_type);
+        auto const popup_id = box_system.imgui.GetID(ToInt(scan_folder_type));
 
-        String menu_text = context.settings.settings.filesystem.install_location[scan_folder_type];
-        if (auto const default_dir = context.settings.paths.always_scanned_folder[scan_folder_type];
+        String menu_text =
+            filesystem_settings::InstallLocation(context.settings, context.paths, scan_folder_type);
+        if (auto const default_dir = context.paths.always_scanned_folder[ToInt(scan_folder_type)];
             menu_text == default_dir) {
             menu_text = "Default";
         }
@@ -564,6 +567,7 @@ static void PackagesSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext
                     package::AddJob(context.package_install_jobs,
                                     path,
                                     context.settings,
+                                    context.paths,
                                     context.thread_pool,
                                     box_system.arena,
                                     context.sample_lib_server);
@@ -654,11 +658,11 @@ static void GeneralSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext&
         }
 
         if (width_change) {
-            auto const new_width = (int)context.settings.settings.gui.window_width + *width_change * 110;
-            if (new_width > 0 && new_width < UINT16_MAX)
-                gui_settings::SetWindowSize(context.settings.settings.gui,
-                                            context.settings.tracking,
-                                            (u16)new_width);
+            auto const new_width =
+                Clamp<s64>(gui_settings::WindowWidth(context.settings) + *width_change * 110,
+                           0,
+                           LargestRepresentableValue<u16>());
+            gui_settings::SetWindowSize(context.settings, (u16)new_width);
         }
     }
 
@@ -668,38 +672,28 @@ static void GeneralSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext&
         SettingsLhsTextWidget(box_system, style_row, "Style");
         auto const options_rhs_column = SettingsRhsColumn(box_system, style_row, style::k_settings_small_gap);
 
-        if (CheckboxButton(box_system,
-                           options_rhs_column,
-                           "Show tooltips",
-                           context.settings.settings.gui.show_tooltips)) {
-            context.settings.settings.gui.show_tooltips = !context.settings.settings.gui.show_tooltips;
-            context.settings.tracking.changed = true;
+        {
+            auto const state = gui_settings::ShowTooltips(context.settings);
+            if (CheckboxButton(box_system, options_rhs_column, "Show tooltips", state))
+                sts::SetValue(context.settings, sts::key::k_show_tooltips, !state);
         }
 
         {
-            bool state = context.settings.settings.gui.show_keyboard;
+            auto const state = gui_settings::ShowKeyboard(context.settings);
             if (CheckboxButton(box_system, options_rhs_column, "Show keyboard", state))
-                gui_settings::SetShowKeyboard(context.settings.settings.gui,
-                                              context.settings.tracking,
-                                              !state);
+                sts::SetValue(context.settings, sts::key::k_show_keyboard, !state);
         }
 
-        if (CheckboxButton(box_system,
-                           options_rhs_column,
-                           "High contrast GUI",
-                           context.settings.settings.gui.high_contrast_gui)) {
-            context.settings.settings.gui.high_contrast_gui =
-                !context.settings.settings.gui.high_contrast_gui;
-            context.settings.tracking.changed = true;
+        {
+            auto const state = gui_settings::HighContrastGui(context.settings);
+            if (CheckboxButton(box_system, options_rhs_column, "High contrast GUI", state))
+                sts::SetValue(context.settings, sts::key::k_high_contrast_gui, !state);
         }
 
-        if (CheckboxButton(box_system,
-                           options_rhs_column,
-                           "Show instance name",
-                           context.settings.settings.gui.show_instance_name)) {
-            context.settings.settings.gui.show_instance_name =
-                !context.settings.settings.gui.show_instance_name;
-            context.settings.tracking.changed = true;
+        {
+            auto const state = gui_settings::ShowInstanceName(context.settings);
+            if (CheckboxButton(box_system, options_rhs_column, "Show instance name", state))
+                sts::SetValue(context.settings, gui_settings::k_show_instance_name, !state);
         }
     }
 
@@ -709,47 +703,29 @@ static void GeneralSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext&
         SettingsLhsTextWidget(box_system, misc_row, "General");
         auto const options_rhs_column = SettingsRhsColumn(box_system, misc_row, style::k_settings_small_gap);
 
-        if (CheckboxButton(
-                box_system,
-                options_rhs_column,
-                "Disable anonymous error reports",
-                context.settings.settings.online_reporting_disabled,
-                "If an error occurs, Floe sends anonymous data about the error, your system, and Floe's state to a server. Additionally, Floe sends anonymous data points about when a session starts and ends for determining software health.")) {
-            gui_settings::SetDisableOnlineReporting(context.settings,
-                                                    context.settings.settings.online_reporting_disabled);
+        {
+            auto const state = IsOnlineReportingDisabled(context.settings);
+            if (CheckboxButton(
+                    box_system,
+                    options_rhs_column,
+                    "Disable anonymous error reports",
+                    state,
+                    "If an error occurs, Floe sends anonymous data about the error, your system, and Floe's state to a server. Additionally, Floe sends anonymous data points about when a session starts and ends for determining software health.")) {
+                SetOnlineReportingDisabled(context.settings, !state);
+            }
         }
 
-        if (auto const v = IntField(box_system,
-                                    options_rhs_column,
-                                    "Autosave interval (seconds)",
-                                    30.0f,
-                                    context.settings.settings.autosave_interval_seconds,
-                                    1,
-                                    3600)) {
-            context.settings.settings.autosave_interval_seconds = CheckedCast<u16>(*v);
-            context.settings.tracking.changed = true;
-        }
-
-        if (auto const v = IntField(box_system,
-                                    options_rhs_column,
-                                    "Max autosaves per instance",
-                                    30.0f,
-                                    context.settings.settings.max_autosaves_per_instance,
-                                    1,
-                                    100)) {
-            context.settings.settings.max_autosaves_per_instance = CheckedCast<u16>(*v);
-            context.settings.tracking.changed = true;
-        }
-
-        if (auto const v = IntField(box_system,
-                                    options_rhs_column,
-                                    "Autosave delete after days",
-                                    30.0f,
-                                    context.settings.settings.autosave_delete_after_days,
-                                    1,
-                                    365)) {
-            context.settings.settings.autosave_delete_after_days = CheckedCast<u16>(*v);
-            context.settings.tracking.changed = true;
+        for (auto const autosave_setting : EnumIterator<AutosaveSetting>()) {
+            auto const info = GetAutosaveSettingInfo(autosave_setting);
+            if (auto const v = IntField(box_system,
+                                        options_rhs_column,
+                                        info.gui_label,
+                                        30.0f,
+                                        GetAutosaveSetting(context.settings, autosave_setting),
+                                        info.min_value,
+                                        info.max_value)) {
+                SetAutosaveSetting(context.settings, autosave_setting, CheckedCast<u16>(*v));
+            }
         }
     }
 }

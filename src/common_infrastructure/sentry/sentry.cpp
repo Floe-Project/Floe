@@ -6,7 +6,8 @@
 #include "os/filesystem.hpp"
 #include "tests/framework.hpp"
 
-#include "common_infrastructure/settings/settings_file.hpp"
+#include "error_reporting.hpp"
+#include "settings/settings_file.hpp"
 
 namespace sentry {
 

@@ -343,8 +343,9 @@ fn postInstallMacosBinary(context: *BuildContext, step: *std.Build.Step, make_ma
         final_binary_path = path;
     }
 
-    if (context.build_mode != .production)
-        try step.evalChildProcess(&.{ "dsymutil", final_binary_path.? });
+    if (context.optimise != .ReleaseFast) {
+        _ = try step.evalChildProcess(&.{ "dsymutil", final_binary_path.? });
+    }
 }
 
 const LipoStep = struct {
@@ -1588,15 +1589,17 @@ pub fn build(b: *std.Build) void {
             const path = "src/common_infrastructure";
             common_infrastructure.addCSourceFiles(.{
                 .files = &.{
-                    path ++ "/common_errors.cpp",
                     path ++ "/checksum_crc32_file.cpp",
-                    path ++ "/package_format.cpp",
+                    path ++ "/common_errors.cpp",
                     path ++ "/error_reporting.cpp",
-                    path ++ "/sentry/sentry.cpp",
+                    path ++ "/package_format.cpp",
                     path ++ "/sample_library/audio_file.cpp",
-                    path ++ "/settings/settings_file.cpp",
                     path ++ "/sample_library/sample_library_lua.cpp",
                     path ++ "/sample_library/sample_library_mdata.cpp",
+                    path ++ "/sentry/sentry.cpp",
+                    path ++ "/settings/settings_file.cpp",
+                    path ++ "/descriptors/param_descriptors.cpp",
+                    path ++ "/audio_utils.cpp",
                 },
                 .flags = cpp_fp_flags,
             });
@@ -1633,7 +1636,6 @@ pub fn build(b: *std.Build) void {
 
             plugin.addCSourceFiles(.{
                 .files = &(.{
-                    plugin_path ++ "/descriptors/param_descriptors.cpp",
                     plugin_path ++ "/engine/autosave.cpp",
                     plugin_path ++ "/engine/engine.cpp",
                     plugin_path ++ "/engine/package_installation.cpp",
@@ -1670,14 +1672,12 @@ pub fn build(b: *std.Build) void {
                     plugin_path ++ "/presets/directory_listing.cpp",
                     plugin_path ++ "/presets/presets_folder.cpp",
                     plugin_path ++ "/presets/scanned_folder.cpp",
-                    plugin_path ++ "/processing_utils/audio_utils.cpp",
                     plugin_path ++ "/processing_utils/midi.cpp",
                     plugin_path ++ "/processing_utils/volume_fade.cpp",
                     plugin_path ++ "/processor/layer_processor.cpp",
                     plugin_path ++ "/processor/processor.cpp",
                     plugin_path ++ "/processor/voices.cpp",
                     plugin_path ++ "/sample_lib_server/sample_library_server.cpp",
-                    plugin_path ++ "/settings/settings.cpp",
                     plugin_path ++ "/state/state_coding.cpp",
                 }),
                 .flags = cpp_fp_flags,

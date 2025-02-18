@@ -573,6 +573,12 @@ struct ArenaAllocator : public Allocator {
         return first;
     }
 
+    bool ContainsPointer(u8 const* p) const {
+        for (auto r = first; r != nullptr; r = r->next)
+            if (::ContainsPointer(r->BufferView(), p)) return true;
+        return false;
+    }
+
     usize minimum_bytes_per_region {};
     Region* first {}; // AKA current
     Region* last {};

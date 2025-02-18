@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #pragma once
-#include "descriptors/param_descriptors.hpp"
+#include "common_infrastructure/audio_utils.hpp"
+#include "common_infrastructure/descriptors/param_descriptors.hpp"
+
 #include "dsp_stillwell_majortom.hpp"
 #include "effect.hpp"
-#include "processing_utils/audio_utils.hpp"
 #include "processing_utils/smoothed_value_system.hpp"
 
 class Compressor final : public Effect {

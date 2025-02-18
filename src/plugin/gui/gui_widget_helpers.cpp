@@ -5,13 +5,15 @@
 
 #include <IconsFontAwesome5.h>
 
-#include "descriptors/param_descriptors.hpp"
+#include "common_infrastructure/descriptors/param_descriptors.hpp"
+
+#include "engine/settings_midi.hpp"
 #include "gui.hpp"
 #include "gui_drawing_helpers.hpp"
 #include "gui_framework/gui_live_edit.hpp"
 #include "gui_label_widgets.hpp"
 #include "gui_window.hpp"
-#include "settings/settings_midi.hpp"
+#include "settings_gui.hpp"
 
 void StartFloeMenu(Gui* g) { g->imgui.graphics->context->PushFont(g->roboto_small); }
 
@@ -77,8 +79,7 @@ void DoTooltipText(Gui* g, String str, Rect r, bool rect_is_window_pos) {
 }
 
 bool Tooltip(Gui* g, imgui::Id id, Rect r, String str, bool rect_is_window_pos) {
-    auto& settings = g->settings.settings.gui;
-    if (!settings.show_tooltips) return false;
+    if (!gui_settings::ShowTooltips(g->settings)) return false;
 
     auto& imgui = g->imgui;
     f64 const delay {0.5};
@@ -167,8 +168,7 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
         else
             check_max_size(k_learn_text);
 
-        auto const persistent_ccs =
-            midi_settings::PersistentCcsForParam(g->settings.settings.midi, ParamIndexToId(param));
+        auto const persistent_ccs = midi_settings::PersistentCcsForParam(g->settings, ParamIndexToId(param));
 
         auto param_ccs = GetLearnedCCsBitsetForParam(engine.processor, param);
         auto const num_ccs_for_param = (int)param_ccs.NumSet();
@@ -262,7 +262,7 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
             }
 
             auto const persistent_ccs =
-                midi_settings::PersistentCcsForParam(g->settings.settings.midi, ParamIndexToId(param));
+                midi_settings::PersistentCcsForParam(g->settings, ParamIndexToId(param));
 
             auto ccs_bitset = GetLearnedCCsBitsetForParam(engine.processor, param);
             bool closes_popups = false;
@@ -286,8 +286,7 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
                                         state,
                                         fmt::Format(g->scratch_arena, k_always_set_fmt, cc_num),
                                         buttons::MenuItem(imgui, closes_popups))) {
-                        midi_settings::AddPersistentCcToParamMapping(g->settings.settings.midi,
-                                                                     g->settings.arena,
+                        midi_settings::AddPersistentCcToParamMapping(g->settings,
                                                                      (u8)cc_num,
                                                                      ParamIndexToId(param));
                     }
@@ -308,7 +307,7 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
                                         state,
                                         fmt::Format(g->scratch_arena, k_always_set_fmt, cc_num),
                                         buttons::MenuItem(imgui, closes_popups))) {
-                        midi_settings::RemovePersistentCcToParamMapping(g->settings.settings.midi,
+                        midi_settings::RemovePersistentCcToParamMapping(g->settings,
                                                                         cc_num,
                                                                         ParamIndexToId(param));
                     }

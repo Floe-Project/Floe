@@ -61,6 +61,8 @@ struct Writer {
 // SPDX-License-Identifier: MIT
 template <usize k_size>
 struct BufferedWriter {
+    ~BufferedWriter() { ASSERT(end == 0, "missing Flush()"); }
+
     ErrorCodeOr<void> Flush() {
         if (end) {
             TRY(unbuffered_writer.WriteBytes({buf.data, end}));

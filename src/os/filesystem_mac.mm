@@ -192,7 +192,10 @@ MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirecto
     String fallback {};
     switch (type) {
         case KnownDirectoryType::Temporary: {
-            auto result = a.Clone(NSStringToString(NSTemporaryDirectory()));
+            auto temp_dir = NSStringToString(NSTemporaryDirectory());
+            ASSERT(path::IsAbsolute(temp_dir));
+            if (temp_dir[temp_dir.size - 1] == '/') temp_dir.size--;
+            auto result = a.Clone(temp_dir);
             if (options.create) {
                 if (auto const o =
                         CreateDirectory(result,

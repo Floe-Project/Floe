@@ -46,7 +46,6 @@ PUBLIC void GlobalInit(GlobalInitOptions options) {
         // Step 1: log the error for easier local debugging.
         Log(ModuleName::ErrorReporting, LogLevel::Error, [&](Writer writer) -> ErrorCodeOr<void> {
             TRY(writer.WriteChars(message));
-            TRY(writer.WriteChar('\n'));
             if (stacktrace) {
                 auto stack = stacktrace->Items();
                 if (stack[0] == loc_pc) stack.RemovePrefix(1);

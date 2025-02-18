@@ -19,11 +19,10 @@
 #include "os/misc.hpp"
 #include "utils/logger/logger.hpp"
 
+#include "common_infrastructure/audio_utils.hpp"
 #include "common_infrastructure/global.hpp"
 
 #include "plugin/plugin/plugin.hpp"
-#include "plugin/processing_utils/audio_utils.hpp"
-#include "plugin/settings/settings_gui.hpp"
 
 // A very simple 'standalone' host for development purposes.
 
@@ -545,8 +544,6 @@ static ErrorCodeOr<void> Main(String exe_path_rel) {
     u32 clap_width;
     u32 clap_height;
     TRY_CLAP(gui->get_size(&standalone.plugin, &clap_width, &clap_height));
-    ASSERT(clap_width >= gui_settings::k_min_gui_width);
-    ASSERT(clap_width <= gui_settings::k_largest_gui_size);
 
     {
         auto const original_width = clap_width;

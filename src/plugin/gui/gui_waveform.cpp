@@ -6,6 +6,7 @@
 #include <IconsFontAwesome5.h>
 
 #include "common_infrastructure/descriptors/param_descriptors.hpp"
+
 #include "gui.hpp"
 #include "gui_drawing_helpers.hpp"
 #include "gui_framework/gui_live_edit.hpp"

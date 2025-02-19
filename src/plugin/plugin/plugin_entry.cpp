@@ -49,10 +49,7 @@ static clap_plugin_factory const factory = {
 // NOLINTBEGIN
 extern "C" void* __dso_handle;
 extern "C" void __cxa_finalize(void*);
-__attribute__((destructor)) void ZigBugWorkaround() {
-    LogDebug(ModuleName::Global, "ZigBugWorkaround");
-    __cxa_finalize(__dso_handle);
-}
+__attribute__((destructor)) void ZigBugWorkaround() { __cxa_finalize(__dso_handle); }
 // NOLINTEND
 #endif
 

@@ -67,7 +67,7 @@ static bool ClapEntryInit(char const* plugin_path_c_str) {
 
         auto const inside_init = g_inside_init.FetchAdd(1, RmwMemoryOrder::AcquireRelease);
         DEFER { g_inside_init.FetchSub(1, RmwMemoryOrder::AcquireRelease); };
-        ASSERT(!inside_init, "host called entry.init from multiple threads simultaneously");
+        if (inside_init) return false; // The host is misbehaving
 
         if (!plugin_path_c_str) return false;
         auto const plugin_path = FromNullTerminated(plugin_path_c_str);
@@ -137,7 +137,7 @@ static void ClapEntryDeinit() {
 
         auto const inside_deinit = g_inside_deinit.FetchAdd(1, RmwMemoryOrder::AcquireRelease);
         DEFER { g_inside_deinit.FetchSub(1, RmwMemoryOrder::AcquireRelease); };
-        ASSERT(!inside_deinit, "host called entry.deinit from multiple threads simultaneously");
+        if (inside_deinit) return; // The host is misbehaving
 
         LogInfo(ModuleName::Clap, "entry.deinit");
 

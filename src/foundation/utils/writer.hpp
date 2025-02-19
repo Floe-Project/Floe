@@ -61,8 +61,12 @@ struct Writer {
 // SPDX-License-Identifier: MIT
 template <usize k_size>
 struct BufferedWriter {
-    ~BufferedWriter() { ASSERT(end == 0, "missing Flush()"); }
+    ~BufferedWriter() {
+        // We don't Flush() here because we want to handle any flush errors outside this code.
+        ASSERT(end == 0, "missing Flush()");
+    }
 
+    // If it fails, the end is not reset to 0.
     ErrorCodeOr<void> Flush() {
         if (end) {
             TRY(unbuffered_writer.WriteBytes({buf.data, end}));
@@ -70,6 +74,8 @@ struct BufferedWriter {
         }
         return k_success;
     }
+
+    void Reset() { end = 0; }
 
     ::Writer Writer() {
         ::Writer result;

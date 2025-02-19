@@ -16,6 +16,7 @@
 namespace sts {
 
 SettingsTable ParseSettingsFile(String file_data, ArenaAllocator& arena) {
+    if (file_data.size == 0) return {};
     ASSERT(file_data.size < k_max_file_size);
     ASSERT(arena.ContainsPointer((u8 const*)file_data.data));
 

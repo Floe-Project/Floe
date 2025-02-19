@@ -229,13 +229,13 @@ void Log(ModuleName module_name, LogLevel level, FunctionRef<ErrorCodeOr<void>(W
                     // code.
                     for (auto _ : Range(50)) {
                         // Try opening the file with exclusive access.
-                        auto file_outcome =
-                            OpenFile(standard_path,
-                                     {
-                                         .capability = FileMode::Capability::Append,
-                                         .share = FileMode::Share::DeleteRename | FileMode::Share::ReadWrite,
-                                         .creation = FileMode::Creation::CreateNew, // Exclusive access
-                                     });
+                        auto file_outcome = OpenFile(
+                            standard_path,
+                            {
+                                .capability = FileMode::Capability::Append,
+                                .win32_share = FileMode::Share::DeleteRename | FileMode::Share::ReadWrite,
+                                .creation = FileMode::Creation::CreateNew, // Exclusive access
+                            });
                         if (file_outcome.HasError()) {
                             if (file_outcome.Error() == FilesystemError::PathAlreadyExists) {
                                 // We try to oust the standard log file by renaming it to a unique name.

@@ -189,7 +189,7 @@ ErrorCodeOr<File> OpenFile(String filename, FileMode mode) {
 
     auto const share = ({
         DWORD s {};
-        auto const share_flags = ToInt(mode.share);
+        auto const share_flags = ToInt(mode.win32_share);
         if (share_flags & ToInt(FileMode::Share::Read)) s |= FILE_SHARE_READ;
         if (share_flags & ToInt(FileMode::Share::Write)) s |= FILE_SHARE_WRITE;
         if (share_flags & ToInt(FileMode::Share::DeleteRename)) s |= FILE_SHARE_DELETE;

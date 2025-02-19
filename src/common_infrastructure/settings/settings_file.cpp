@@ -269,7 +269,7 @@ ErrorCodeOr<ReadResult> ReadEntireSettingsFile(String path, ArenaAllocator& aren
     auto file = TRY(OpenFile(path,
                              {
                                  .capability = FileMode::Capability::Read,
-                                 .share = FileMode::Share::ReadWrite | FileMode::Share::DeleteRename,
+                                 .win32_share = FileMode::Share::ReadWrite | FileMode::Share::DeleteRename,
                                  .creation = FileMode::Creation::OpenExisting,
                              }));
     TRY(file.Lock({.type = FileLockOptions::Type::Shared}));
@@ -320,7 +320,7 @@ WriteSettingsFile(SettingsTable const& table, String path, Optional<s128> set_la
     auto file = TRY(OpenFile(path,
                              {
                                  .capability = FileMode::Capability::Write,
-                                 .share = FileMode::Share::ReadWrite,
+                                 .win32_share = FileMode::Share::ReadWrite,
                                  .creation = FileMode::Creation::CreateAlways,
                                  .everyone_read_write = true,
                              }));

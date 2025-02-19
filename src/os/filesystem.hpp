@@ -37,7 +37,7 @@ struct FileMode {
     static constexpr FileMode Read() {
         return {
             .capability = Capability::Read,
-            .share = Share::Read,
+            .win32_share = Share::Read,
             .creation = Creation::OpenExisting,
             .everyone_read_write = false,
         };
@@ -47,7 +47,7 @@ struct FileMode {
     static constexpr FileMode Write() {
         return {
             .capability = Capability::Write,
-            .share = Share::None,
+            .win32_share = Share::None,
             .creation = Creation::CreateAlways,
             .everyone_read_write = false,
         };
@@ -57,7 +57,7 @@ struct FileMode {
     static constexpr FileMode WriteNoOverwrite() {
         return {
             .capability = Capability::Write,
-            .share = Share::None,
+            .win32_share = Share::None,
             .creation = Creation::CreateNew,
             .everyone_read_write = false,
         };
@@ -67,7 +67,7 @@ struct FileMode {
     static constexpr FileMode ReadWrite() {
         return {
             .capability = Capability::ReadWrite,
-            .share = Share::ReadWrite,
+            .win32_share = Share::ReadWrite,
             .creation = Creation::OpenAlways,
             .everyone_read_write = false,
         };
@@ -78,7 +78,7 @@ struct FileMode {
     static constexpr FileMode WriteEveryoneReadWrite() {
         return {
             .capability = Capability::Write,
-            .share = Share::None,
+            .win32_share = Share::None,
             .creation = Creation::CreateAlways,
             .everyone_read_write = true,
         };
@@ -88,7 +88,7 @@ struct FileMode {
     static constexpr FileMode Append() {
         return {
             .capability = Capability::Write | Capability::Append,
-            .share = Share::None,
+            .win32_share = Share::None,
             .creation = Creation::OpenAlways,
             .everyone_read_write = false,
         };
@@ -124,7 +124,7 @@ struct FileMode {
     };
 
     Capability capability = Capability::Read;
-    Share share = Share::Read;
+    Share win32_share = Share::Read;
     Creation creation = Creation::OpenExisting;
 
     // Add extra permissions to the file so that any user on the system can read and write to it.

@@ -291,7 +291,18 @@ void Log(ModuleName module_name, LogLevel level, FunctionRef<ErrorCodeOr<void>(W
                 }
 
                 BufferedWriter<Kb(4)> buffered_writer {file->Writer()};
-                DEFER { auto _ = buffered_writer.Flush(); };
+                DEFER {
+                    auto outcome = buffered_writer.Flush();
+                    if (outcome.HasError()) {
+                        log_to_stderr(ModuleName::Global, LogLevel::Error, [outcome](Writer writer) {
+                            return fmt::FormatToWriter(writer,
+                                                       "defer flush failed to write log file: {}"_s,
+                                                       outcome.Error());
+                        });
+                    }
+                    // We've done what we can with the outcome, let's not trigger any assertion.
+                    buffered_writer.Reset();
+                };
 
                 auto o = WriteLogLine(buffered_writer.Writer(),
                                       module_name,

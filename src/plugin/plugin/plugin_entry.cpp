@@ -58,6 +58,8 @@ __attribute__((destructor)) void ZigBugWorkaround() {
 
 static bool g_init = false;
 
+static Atomic<u32> g_inside_init {0};
+
 // init and deinit are never called at the same time as any other clap function, including itself.
 // Might be called more than once. See the clap docs for full details.
 static bool ClapEntryInit(char const* plugin_path_c_str) {
@@ -65,6 +67,10 @@ static bool ClapEntryInit(char const* plugin_path_c_str) {
 
     try {
         if (Exchange(g_init, true)) return true; // already initialised
+
+        auto const inside_init = g_inside_init.FetchAdd(1, RmwMemoryOrder::AcquireRelease);
+        DEFER { g_inside_init.FetchSub(1, RmwMemoryOrder::AcquireRelease); };
+        ASSERT(!inside_init, "host called entry.init from multiple threads simultaneously");
 
         if (!plugin_path_c_str) return false;
         auto const plugin_path = FromNullTerminated(plugin_path_c_str);
@@ -124,11 +130,17 @@ static bool ClapEntryInit(char const* plugin_path_c_str) {
     }
 }
 
+static Atomic<u32> g_inside_deinit {0};
+
 static void ClapEntryDeinit() {
     if (PanicOccurred()) return;
 
     try {
         if (!Exchange(g_init, false)) return; // already deinitialised
+
+        auto const inside_deinit = g_inside_deinit.FetchAdd(1, RmwMemoryOrder::AcquireRelease);
+        DEFER { g_inside_deinit.FetchSub(1, RmwMemoryOrder::AcquireRelease); };
+        ASSERT(!inside_deinit, "host called entry.deinit from multiple threads simultaneously");
 
         LogInfo(ModuleName::Clap, "entry.deinit");
 

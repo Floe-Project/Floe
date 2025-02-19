@@ -286,7 +286,7 @@ void Log(ModuleName module_name, LogLevel level, FunctionRef<ErrorCodeOr<void>(W
                 auto file = g_file;
 
                 if (!file) {
-                    log_to_stderr(ModuleName::Global, level, write_message);
+                    log_to_stderr(module_name, level, write_message);
                     return;
                 }
 

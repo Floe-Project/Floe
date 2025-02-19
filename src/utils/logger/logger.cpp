@@ -223,10 +223,11 @@ void Log(ModuleName module_name, LogLevel level, FunctionRef<ErrorCodeOr<void>(W
 
                     // We have a few requirements here:
                     // - If possible, we want a log file with a fixed name so that it's easier to find and
-                    // debug.
+                    //   use for debugging.
                     // - We don't want to overwrite any log files.
                     // - We need to correctly handle the case where other processes are running this same
-                    // code.
+                    //   code at the same time; this can happen when the host loads plugins in different
+                    //   processes.
                     for (auto _ : Range(50)) {
                         // Try opening the file with exclusive access.
                         auto file_outcome = OpenFile(

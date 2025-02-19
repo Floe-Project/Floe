@@ -261,6 +261,7 @@ void QueueAutosave(AutosaveState& state, sts::Settings const& settings, StateSna
                 if constexpr (!PRODUCTION_BUILD) {
                     DynamicArrayBounded<char, Kb(4)> diff {};
                     AssignDiffDescription(diff, state.snapshot, snapshot);
+                    if (EndsWith(diff, '\n')) --diff.size;
                     LogDebug(ModuleName::Main, "Autosave diff: {}", diff);
                 }
                 state.snapshot = snapshot;

@@ -139,12 +139,12 @@ ErrorCodeOr<void> CleanupOldLogFilesIfNeeded(ArenaAllocator& scratch_arena) {
     return k_success;
 }
 
-__attribute__((visibility("hidden"))) static CountedInitFlag g_counted_init_flag {};
-__attribute__((visibility("hidden"))) static CallOnceFlag g_call_once_flag {};
-__attribute__((visibility("hidden"))) alignas(File) static u8 g_file_storage[sizeof(File)];
-__attribute__((visibility("hidden"))) static File* g_file = nullptr;
-__attribute__((visibility("hidden"))) static LogConfig g_config {};
-__attribute__((visibility("hidden"))) static LogRingBuffer g_message_ring_buffer {};
+static CountedInitFlag g_counted_init_flag {};
+static CallOnceFlag g_call_once_flag {};
+alignas(File) static u8 g_file_storage[sizeof(File)];
+static File* g_file = nullptr;
+static LogConfig g_config {};
+static LogRingBuffer g_message_ring_buffer {};
 
 void InitLogger(LogConfig config) {
     CountedInit(g_counted_init_flag, [&]() { g_config = config; });

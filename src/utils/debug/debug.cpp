@@ -328,12 +328,10 @@ struct BacktraceState {
     backtrace_state* state = nullptr;
 };
 
-__attribute__((visibility("hidden"))) alignas(BacktraceState) static u8
-    g_backtrace_state_storage[sizeof(BacktraceState)] {};
-__attribute__((visibility("hidden"))) static Atomic<BacktraceState*> g_backtrace_state {};
-__attribute__((visibility("hidden"))) static CountedInitFlag g_init {};
-__attribute__((
-    visibility("hidden"))) static MutableString g_current_binary_path {}; // includes null terminator
+alignas(BacktraceState) static u8 g_backtrace_state_storage[sizeof(BacktraceState)] {};
+static Atomic<BacktraceState*> g_backtrace_state {};
+static CountedInitFlag g_init {};
+static MutableString g_current_binary_path {}; // includes null terminator
 
 static Allocator& StateAllocator() { return PageAllocator::Instance(); }
 

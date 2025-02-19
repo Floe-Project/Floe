@@ -5,12 +5,11 @@
 
 #include "sentry/sentry_background_queue.hpp"
 
-__attribute__((visibility("hidden"))) static CountedInitFlag g_init_flag {};
-__attribute__((visibility("hidden"))) static Atomic<sentry::BackgroundQueue*> g_queue = nullptr;
-__attribute__((visibility("hidden"))) alignas(sentry::BackgroundQueue) static u8
-    g_worker_storage[sizeof(sentry::BackgroundQueue)];
-__attribute__((visibility("hidden"))) static MutexThin g_reported_error_ids_mutex = {};
-__attribute__((visibility("hidden"))) static DynamicArrayBounded<u64, 48> g_reported_error_ids = {};
+static CountedInitFlag g_init_flag {};
+static Atomic<sentry::BackgroundQueue*> g_queue = nullptr;
+alignas(sentry::BackgroundQueue) static u8 g_worker_storage[sizeof(sentry::BackgroundQueue)];
+static MutexThin g_reported_error_ids_mutex = {};
+static DynamicArrayBounded<u64, 48> g_reported_error_ids = {};
 
 constexpr bool k_online_reporting_disabled_default = false;
 constexpr String k_online_reporting_disabled_settings_key = "online_reporting_disabled"_s;

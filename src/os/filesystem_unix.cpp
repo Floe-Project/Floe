@@ -278,7 +278,7 @@ ErrorCodeOr<File> OpenFile(String filename, FileMode mode) {
     return File(fd);
 }
 
-static void volatile* __attribute__((visibility("hidden"))) g_this_binary_symbol = nullptr;
+static void volatile* g_this_binary_symbol = nullptr;
 
 ErrorCodeOr<MutableString> CurrentBinaryPath(Allocator& a) {
     Dl_info info;

@@ -269,9 +269,9 @@ static String ExceptionCodeString(DWORD code) {
     return {};
 }
 
-__attribute__((visibility("hidden"))) static void* g_exception_handler = nullptr;
-__attribute__((visibility("hidden"))) static CrashHookFunction g_crash_hook {};
-__attribute__((visibility("hidden"))) static CountedInitFlag g_crash_hook_init_flag {};
+static void* g_exception_handler = nullptr;
+static CrashHookFunction g_crash_hook {};
+static CountedInitFlag g_crash_hook_init_flag {};
 
 void BeginCrashDetection(CrashHookFunction hook) {
     CountedInit(g_crash_hook_init_flag, [hook]() {

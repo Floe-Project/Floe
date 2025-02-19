@@ -228,14 +228,28 @@ ErrorCodeOr<File> OpenFile(String filename, FileMode mode) {
     {
         auto const capability = ToInt(mode.capability);
 
-        if (capability & ToInt(FileMode::Capability::Append)) flags |= O_APPEND;
-
         if ((capability & ToInt(FileMode::Capability::ReadWrite)) == ToInt(FileMode::Capability::ReadWrite))
             flags |= O_RDWR;
         else if (capability & ToInt(FileMode::Capability::Write))
             flags |= O_WRONLY;
         else if (capability & ToInt(FileMode::Capability::Read))
             flags |= O_RDONLY;
+
+        if (capability & ToInt(FileMode::Capability::Append)) {
+            flags |= O_APPEND;
+
+            // We want Append mode to match Windows, where by default it includes Write access. open()
+            // requires at least one of O_RDONLY, O_WRONLY, or O_RDWR.
+
+            // Add O_WRONLY if neither O_RDONLY nor O_RDWR are set.
+            if (!(flags & (O_RDONLY | O_RDWR))) flags |= O_WRONLY;
+
+            // If O_RDONLY is set, replace it with O_RDWR.
+            if (flags & O_RDONLY) {
+                flags &= ~O_RDONLY;
+                flags |= O_RDWR;
+            }
+        }
     }
 
     switch (mode.creation) {
@@ -249,6 +263,7 @@ ErrorCodeOr<File> OpenFile(String filename, FileMode mode) {
     int fd =
         open(NullTerminated(filename, temp_allocator), flags, CheckedCast<mode_t>(mode.default_permissions));
     if (fd == -1) return FilesystemErrnoErrorCode(errno, "open");
+    ASSERT(fd >= 0);
 
     if (mode.everyone_read_write) {
         // It's necessary to use fchmod() to set the permissions instead of open(mode = 0666) because open()

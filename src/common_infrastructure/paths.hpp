@@ -142,7 +142,7 @@ ExtraScanFolders(sts::Settings& settings, FloePaths const& paths, ScanFolderType
         case ScanFolderType::Count: PanicIfReached(); break;
     }
 
-    auto values = sts::LookupValue(settings, key);
+    auto values = sts::LookupValues(settings, key);
     if (!values) return {};
 
     DynamicArrayBounded<String, k_max_extra_scan_folders> result;

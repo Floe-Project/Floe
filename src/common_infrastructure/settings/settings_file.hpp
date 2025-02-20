@@ -6,25 +6,36 @@
 #include "os/filesystem.hpp"
 #include "os/misc.hpp"
 
-// Settings are stored in a simple INI-like file format. The same key can appear on multiple lines, in which
-// case the same key has multiple values.
+// Settings are stored in the INI file format.
 //
-// Settings are for anything we want to persist between sessions, e.g. window size, extra library folders,
-// etc.
+// This is for anything we want to persist between sessions, e.g. window size, extra library folders, etc.
 //
 // We want settings to be both forwards and backwards compatible because sometimes multiple versions of Floe
 // can be installed at the same type (for example, when using multiple plugin folders, DAWs can sometimes load
 // the plugin from either version). This isn't a common senario but it's one that can sometimes occur. We want
 // both old and new versions of Floe to be able to read and write the settings file without losing any data.
-// Loosing settings can be frustrating for users.
+//
+// INI is not a strict format, these are our rules:
+// - 'key = value\n' syntax. Spaces or tabs around the = are ignored.
+// - Key and value must be on the same line.
+// - There's no escaping of special characters.
+// - The same key can appear multiple times with different values, in which case the same key has multiple
+//   values (an array). These values are unordered. Duplicate values for the same key are ignored.
+// - Keys must be a-z, 0-9, and _. Same for section names.
+// - Sections are in square brackets: [section_name].
+// - Comments are lines starting with a semicolon.
+//
+// Settings are kept in a hash table. The key is a string or a section + key pair. The value is a linked list.
+// You can loop over the table to get all the key-value pairs.
 
 namespace sts {
 
 constexpr usize k_max_file_size = Kb(32);
-constexpr usize k_max_key_size = 64;
+constexpr usize k_max_key_part_size = 50; // also for sections
+constexpr usize k_max_key_size = k_max_key_part_size * 2 + 1; // keys can have 2 parts separated by a dot
 constexpr f64 k_settings_file_watcher_poll_interval_seconds = 1;
 
-enum class ValueType : u32 {
+enum class ValueType : u8 {
     String,
     Int,
     Bool,
@@ -41,7 +52,23 @@ struct Value : ValueUnion {
     Value* next {};
 };
 
-using SettingsTable = HashTable<String, Value*>;
+struct SectionAndKey {
+    bool operator==(SectionAndKey const& other) const = default;
+    String section;
+    String key;
+};
+enum class KeyType : u32 { Global, Sectioned };
+
+// Our HashTable implementation currently requires keys to be default constructible.
+constexpr auto TaggedUnionDefaultValue(sts::KeyType) { return ""_s; }
+
+using Key =
+    TaggedUnion<KeyType, TypeAndTag<String, KeyType::Global>, TypeAndTag<SectionAndKey, KeyType::Sectioned>>;
+
+ErrorCodeOr<void> CustomValueToString(Writer writer, Key key, fmt::FormatOptions options);
+u64 HashKey(Key key);
+
+using SettingsTable = HashTable<Key, Value*, HashKey>;
 
 SettingsTable ParseSettingsFile(String file_data, ArenaAllocator& arena);
 SettingsTable ParseLegacySettingsFile(String file_data, ArenaAllocator& arena);
@@ -56,13 +83,19 @@ ErrorCodeOr<void> WriteSettingsTable(SettingsTable const& table, Writer writer);
 ErrorCodeOr<void>
 WriteSettingsFile(SettingsTable const& table, String path, Optional<s128> set_last_modified);
 
-Optional<s64> LookupInt(SettingsTable const& table, String key);
-Optional<bool> LookupBool(SettingsTable const& table, String key);
-Optional<String> LookupString(SettingsTable const& table, String key);
+// NOTE: you shouldn't trust the values you get from any of the Lookup functions because they could be
+// manually modified in the file, or they could be from a different version of Floe that had different uses of
+// the same key. Therefore, you should always validate the values before using them.
 
-// Can return null. ValueNode is an intrusive linked list. Iterate through it using 'next'.
-// The order of values is always undefined.
-Value const* LookupValue(SettingsTable const& table, String key);
+// These functions assume that the key has a single value (or no value). If you want to lookup multiple
+// values, then use LookupValues.
+Optional<s64> LookupInt(SettingsTable const& table, Key key);
+Optional<bool> LookupBool(SettingsTable const& table, Key key);
+Optional<String> LookupString(SettingsTable const& table, Key key);
+
+// Can return null. Value is an intrusive linked list. Iterate through it using 'next'.
+// The order of values is always undefined. There's guaranteed to not be duplicate values for a key.
+Value const* LookupValues(SettingsTable const& table, Key key);
 
 template <dyn::DynArray DynArrayType>
 PUBLIC void ValuesToArray(Value const* value_list, DynArrayType& array) {
@@ -72,24 +105,24 @@ PUBLIC void ValuesToArray(Value const* value_list, DynArrayType& array) {
 }
 
 template <dyn::DynArray DynArrayType>
-PUBLIC void LookupValues(SettingsTable const& table, String key, DynArrayType& array) {
+PUBLIC void LookupValues(SettingsTable const& table, Key key, DynArrayType& array) {
     dyn::Clear(array);
-    if (auto v = LookupValue(table, key)) ValuesToArray(v, array);
+    if (auto v = LookupValues(table, key)) ValuesToArray(v, array);
 }
 
 template <typename Type, usize k_size>
-PUBLIC DynamicArrayBounded<Type, k_size> LookupValues(SettingsTable const& table, String key) {
+PUBLIC DynamicArrayBounded<Type, k_size> LookupValues(SettingsTable const& table, Key key) {
     DynamicArrayBounded<Type, k_size> result;
     LookupValues(table, key, result);
     return result;
 }
 
-// SettingsTable DeepCloneSettingsTable(SettingsTable const& table, ArenaAllocator& arena);
-
 namespace key {
 // We have code that needs to remap legacy settings keys to new keys, so we need to store this here. Usually
 // though, settings keys should be private to the module that needs them.
-constexpr String k_cc_to_param_id_map = "cc_to_param_id_map"_s;
+namespace section {
+constexpr String k_cc_to_param_id_map_section = "cc_to_param_id_map"_s;
+}
 constexpr String k_extra_libraries_folder = "extra_libraries_folder"_s;
 constexpr String k_extra_presets_folder = "extra_presets_folder"_s;
 constexpr String k_libraries_install_location = "libraries_install_location"_s;
@@ -119,9 +152,9 @@ struct Settings : SettingsTable {
     s128 last_known_file_modified_time {};
     bool write_to_file_needed {};
 
-    // null for 'value' means the key was removed. Also remember ValueNode is a linked list if you are
+    // null for 'value' means the key was removed. Also remember Value is a linked list if you are
     // expecting multiple values.
-    TrivialFixedSizeFunction<8, void(String key, Value const* value)> on_change {};
+    TrivialFixedSizeFunction<8, void(Key key, Value const* value_list)> on_change {};
 
     // Watcher
     ArenaAllocator watcher_scratch {PageAllocator::Instance()};
@@ -137,12 +170,12 @@ struct SetValueOptions {
 
 // The value will be allocated in the arena/path_pool (the string is cloned).
 // Sets the value of key to the single value 'value'. If the key already has a value, it will be replaced.
-void SetValue(Settings& settings, String key, ValueUnion value, SetValueOptions options = {});
+void SetValue(Settings& settings, Key key, ValueUnion value, SetValueOptions options = {});
 
 // Same as SetValue in all ways, except instead of replacing all/eny values, this logic is used: if the key
 // already has value(s), each value will be compared to the new value; if the new value matches any of the
 // existing values, nothing will be added.
-bool AddValue(Settings& settings, String key, ValueUnion value, SetValueOptions options = {});
+bool AddValue(Settings& settings, Key key, ValueUnion value, SetValueOptions options = {});
 
 struct RemoveValueOptions {
     bool dont_track_changes {};
@@ -150,10 +183,10 @@ struct RemoveValueOptions {
 
 // The value will be compared to all values for the given key, if it matches it will be removed.
 // If the last value is removed, the key will be removed.
-bool RemoveValue(Settings& settings, String key, ValueUnion value, RemoveValueOptions options = {});
+bool RemoveValue(Settings& settings, Key key, ValueUnion value, RemoveValueOptions options = {});
 
 // Remove key and all values associated with it.
-void Remove(Settings& settings, String key, RemoveValueOptions options = {});
+void Remove(Settings& settings, Key key, RemoveValueOptions options = {});
 
 struct ReplaceSettingsOptions {
     // Whether keys in the exsiting settings should be removed if they don't exist in the new table. Keys that

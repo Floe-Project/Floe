@@ -47,7 +47,7 @@ SharedEngineSystems::SharedEngineSystems(Span<sentry::Tag const> tags)
                             error_notifications) {
     InitBackgroundErrorReporting(tags);
 
-    settings.on_change = [this](String key, sts::Value const* value) {
+    settings.on_change = [this](sts::Key key, sts::Value const* value) {
         ASSERT(CheckThreadName("main"));
 
         if (key == sts::key::k_extra_libraries_folder) {
@@ -71,7 +71,7 @@ SharedEngineSystems::SharedEngineSystems(Span<sentry::Tag const> tags)
 
     sts::Init(settings, paths.possible_settings_paths);
 
-    if (auto const value = sts::LookupValue(settings, sts::key::k_extra_libraries_folder)) {
+    if (auto const value = sts::LookupValues(settings, sts::key::k_extra_libraries_folder)) {
         DynamicArrayBounded<String, k_max_extra_scan_folders> extra_scan_folders;
         for (auto v = &*value; v; v = v->next) {
             if (extra_scan_folders.size == k_max_extra_scan_folders) break;

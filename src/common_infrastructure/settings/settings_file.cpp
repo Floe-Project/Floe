@@ -15,39 +15,74 @@
 
 namespace sts {
 
+static bool IsKeyValid(String key) {
+    if (key.size == 0) return false;
+    if (key.size > k_max_key_part_size) return false;
+    for (auto c : key)
+        if (!IsLowercaseAscii(c) && !IsDigit(c) && c != '_') return false;
+    return true;
+}
+
+u64 HashKey(Key key) {
+    switch (key.tag) {
+        case KeyType::Global: return Hash(key.Get<String>());
+        case KeyType::Sectioned: {
+            auto const k = key.Get<SectionAndKey>();
+            return HashMultiple(Array {k.section, k.key});
+        }
+    }
+    PanicIfReached();
+    return 0;
+}
+
+ErrorCodeOr<void> CustomValueToString(Writer writer, Key key, fmt::FormatOptions options) {
+    switch (key.tag) {
+        case KeyType::Global: return ValueToString(writer, key.Get<String>(), options);
+        case KeyType::Sectioned: {
+            auto const k = key.Get<SectionAndKey>();
+            auto const size = 1 + k.section.size + 2 + k.key.size;
+            TRY(PadToRequiredWidthIfNeeded(writer, options, size));
+            TRY(writer.WriteChars("["));
+            TRY(ValueToString(writer, k.section, options));
+            TRY(writer.WriteChars("]."));
+            TRY(ValueToString(writer, k.key, options));
+            return k_success;
+        }
+    }
+}
+
 SettingsTable ParseSettingsFile(String file_data, ArenaAllocator& arena) {
     if (file_data.size == 0) return {};
     ASSERT(file_data.size < k_max_file_size);
     ASSERT(arena.ContainsPointer((u8 const*)file_data.data));
 
-    DynamicHashTable<String, Value*> table {arena, 24};
+    DynamicHashTable<Key, Value*, HashKey> table {arena, 24};
+
+    Optional<String> section {};
 
     for (auto line : SplitIterator {.whole = file_data, .token = '\n', .skip_consecutive = true}) {
         line = WhitespaceStrippedStart(line);
         if (line.size == 0 || line[0] == ';') continue;
 
+        if (line[0] == '[') {
+            auto maybe_section = WhitespaceStrippedEnd(line);
+            if (Last(maybe_section) == ']') {
+                maybe_section.RemovePrefix(1);
+                maybe_section.RemoveSuffix(1);
+                if (IsKeyValid(maybe_section)) {
+                    section = maybe_section;
+                    continue;
+                }
+            }
+        }
+
         auto const equals = Find(line, '=');
         if (!equals) continue;
 
-        auto const key = WhitespaceStrippedEnd(line.SubSpan(0, *equals));
-        if (key.size > k_max_key_size) {
-            LogWarning(ModuleName::Settings, "key too long");
+        auto key = WhitespaceStrippedEnd(line.SubSpan(0, *equals));
+        if (!IsKeyValid(key)) {
+            LogWarning(ModuleName::Settings, "invalid key {}", key.SubSpan(0, k_max_key_part_size));
             continue;
-        }
-        if (!key.size) {
-            LogWarning(ModuleName::Settings, "empty key");
-            continue;
-        }
-        {
-            bool invalid_key = false;
-            for (auto c : key) {
-                if (!IsLowercaseAscii(c) && !IsDigit(c) && c != '_') {
-                    LogWarning(ModuleName::Settings, "invalid key {}", key);
-                    invalid_key = true;
-                    break;
-                }
-            }
-            if (invalid_key) continue;
         }
 
         auto const value_str = line.SubSpan(*equals + 1);
@@ -70,10 +105,13 @@ SettingsTable ParseSettingsFile(String file_data, ArenaAllocator& arena) {
             // We don't need to clone the string here because we've asserted it's already in the arena.
             value = arena.New<Value>(WhitespaceStrippedStart(value_str));
 
-        if (auto v = table.Find(key))
+        Key full_key {key};
+        if (section) full_key = SectionAndKey {*section, key};
+
+        if (auto v = table.Find(full_key))
             SinglyLinkedListPrepend(*v, value);
         else
-            table.Insert(key, value); // As above, we don't need to clone key.
+            table.Insert(full_key, value);
     }
 
     return table.ToOwnedTable();
@@ -165,22 +203,18 @@ SettingsTable ParseLegacySettingsFile(String file_data, ArenaAllocator& arena) {
                                 event.key,
                                 [&](json::EventHandlerStack&, json::Event const& event) {
                                     if (event.type == json::EventType::String) {
-                                        auto result = ParamFromLegacyId(event.string);
-                                        if (result && result->tag == ParamExistance::StillExists) {
-                                            auto const existing = table.Find(key::k_cc_to_param_id_map);
-                                            auto const value = (String)fmt::Format(
-                                                arena,
-                                                "{}:{}",
-                                                cc_num,
-                                                k_param_descriptors
+                                        if (auto const result = ParamFromLegacyId(event.string);
+                                            result && result->tag == ParamExistance::StillExists) {
+                                            auto const section = key::section::k_cc_to_param_id_map_section;
+                                            auto const key = fmt::IntToString(cc_num);
+                                            auto const value =
+                                                (s64)k_param_descriptors
                                                     [ToInt(result->GetFromTag<ParamExistance::StillExists>())]
-                                                        .id);
-                                            if (existing)
-                                                SinglyLinkedListPrepend(*existing, arena.New<Value>(value));
-                                            else
-                                                table.InsertGrowIfNeeded(arena,
-                                                                         key::k_cc_to_param_id_map,
-                                                                         arena.New<Value>(value));
+                                                        .id;
+                                            table.InsertGrowIfNeeded(
+                                                arena,
+                                                SectionAndKey {.section = section, .key = key},
+                                                arena.New<Value>(value));
                                         }
                                         return true;
                                     }
@@ -287,30 +321,87 @@ ErrorCodeOr<ReadResult> ReadEntireSettingsFile(String path, ArenaAllocator& aren
     };
 }
 
-ErrorCodeOr<void> WriteSettingsTable(SettingsTable const& table, Writer writer) {
-    for (auto const [key, value_list_ptr] : table) {
-        for (auto value = *value_list_ptr; value; value = value->next) {
-            TRY(writer.WriteChars(key));
-            TRY(writer.WriteChars(" = "));
-            switch (value->tag) {
-                case ValueType::String: {
-                    auto const s = value->Get<String>();
-                    TRY(writer.WriteChars(s));
-                    break;
-                }
-                case ValueType::Int: {
-                    auto const i = value->Get<s64>();
-                    TRY(writer.WriteChars(fmt::IntToString(i)));
-                    break;
-                }
-                case ValueType::Bool: {
-                    auto const b = value->Get<bool>();
-                    TRY(writer.WriteChars(b ? "true"_s : "false"));
-                    break;
-                }
-            }
-            TRY(writer.WriteChars("\n"));
+static ErrorCodeOr<void> WriteKeyValLine(String key, ValueUnion const& value, Writer writer) {
+    TRY(writer.WriteChars(key));
+    TRY(writer.WriteChars(" = "));
+    switch (value.tag) {
+        case ValueType::String: {
+            auto const s = value.Get<String>();
+            TRY(writer.WriteChars(s));
+            break;
         }
+        case ValueType::Int: {
+            auto const i = value.Get<s64>();
+            TRY(writer.WriteChars(fmt::IntToString(i)));
+            break;
+        }
+        case ValueType::Bool: {
+            auto const b = value.Get<bool>();
+            TRY(writer.WriteChars(b ? "true"_s : "false"));
+            break;
+        }
+    }
+    TRY(writer.WriteChars("\n"));
+
+    return k_success;
+}
+
+static ErrorCodeOr<void> WriteKeyValLineValueList(String key, Value const* value_list, Writer writer) {
+    for (auto value = value_list; value; value = value->next)
+        TRY(WriteKeyValLine(key, *value, writer));
+    return k_success;
+}
+
+#define ALLOW_UNSAFE_POINTER_TAGGING                                                                         \
+    __attribute__((no_sanitize("pointer-overflow"))) __attribute__((no_sanitize("alignment")))
+
+ErrorCodeOr<void> WriteSettingsTable(SettingsTable const& table, Writer writer) {
+    // We use a 'pointer tagging' technique with value->next to track keys that we have written. This avoids
+    // the need to allocate any tracking data.
+    static_assert(alignof(Value*) != 1);
+    auto const set_dirty = [](Value* value) ALLOW_UNSAFE_POINTER_TAGGING {
+        value->next = (Value*)((uintptr)value->next + 1);
+    };
+    auto const clear_dirty = [](Value* value) ALLOW_UNSAFE_POINTER_TAGGING {
+        value->next = (Value*)((uintptr)value->next - 1);
+    };
+    auto const is_dirty = [](Value* value) ALLOW_UNSAFE_POINTER_TAGGING {
+        return !IsAligned(value->next, alignof(Value*));
+    };
+
+    // Write sectionless keys first
+    for (auto const [key, value_list_ptr] : table) {
+        if (key.tag == KeyType::Sectioned) continue;
+        TRY(WriteKeyValLineValueList(key.Get<String>(), *value_list_ptr, writer));
+        set_dirty(*value_list_ptr);
+    }
+
+    // Write sectioned keys
+    for (auto const [key_union, value_list_ptr] : table) {
+        if (is_dirty(*value_list_ptr)) continue;
+
+        auto const [section, key] = key_union.Get<SectionAndKey>();
+
+        TRY(writer.WriteChars("\n["));
+        TRY(writer.WriteChars(section));
+        TRY(writer.WriteChars("]\n"));
+
+        // Write all keys in this section
+        for (auto const [other_key_union, other_value_list_ptr] : table) {
+            if (is_dirty(*other_value_list_ptr)) continue;
+
+            auto const [other_section, other_key] = other_key_union.Get<SectionAndKey>();
+            if (section != other_section) continue;
+
+            TRY(WriteKeyValLineValueList(other_key, *other_value_list_ptr, writer));
+            set_dirty(*other_value_list_ptr);
+        }
+    }
+
+    // Un-dirty
+    for (auto const [key, value_list_ptr] : table) {
+        ASSERT(is_dirty(*value_list_ptr));
+        clear_dirty(*value_list_ptr);
     }
 
     return k_success;
@@ -341,57 +432,33 @@ WriteSettingsFile(SettingsTable const& table, String path, Optional<s128> set_la
     return k_success;
 }
 
-// [[maybe_unused]]
-// SettingsTable DeepCloneSettingsTable(SettingsTable const& table, ArenaAllocator& arena) {
-//     DynamicHashTable<String, ValueNode> new_table {arena, table.size};
-//     for (auto [key, value] : table) {
-//         new_table.Insert(key, Clone(*value, arena));
-//         if (value->next) {
-//             auto existing = new_table.Find(key);
-//             for (auto v = value->next; v; v = v->next) {
-//                 auto new_value = arena.New<ValueNode>({Clone(*v, arena)});
-//                 new_value->next = existing;
-//                 *existing = *new_value;
-//             }
-//         }
-//     }
-//     return new_table.ToOwnedTable();
-// }
-
-Optional<s64> LookupInt(SettingsTable const& table, String key) {
+Optional<s64> LookupInt(SettingsTable const& table, Key key) {
     if (auto const v = table.Find(key)) {
         if ((*v)->tag == ValueType::Int) return (*v)->Get<s64>();
     }
     return k_nullopt;
 }
 
-Optional<bool> LookupBool(SettingsTable const& table, String key) {
+Optional<bool> LookupBool(SettingsTable const& table, Key key) {
     if (auto const v = table.Find(key)) {
         if ((*v)->tag == ValueType::Bool) return (*v)->Get<bool>();
     }
     return k_nullopt;
 }
 
-Optional<String> LookupString(SettingsTable const& table, String key) {
+Optional<String> LookupString(SettingsTable const& table, Key key) {
     if (auto const v = table.Find(key)) {
         if ((*v)->tag == ValueType::String) return (*v)->Get<String>();
     }
     return k_nullopt;
 }
 
-Value const* LookupValue(SettingsTable const& table, String key) {
+Value const* LookupValues(SettingsTable const& table, Key key) {
     if (auto const v = table.Find(key)) return *v;
     return nullptr;
 }
 
-static void CheckValueForSet(ValueUnion value) {
-    if (auto const str = value.TryGet<String>()) {
-        ASSERT(str->size < Kb(8));
-        ASSERT(IsValidUtf8(*str));
-    }
-}
-
-static void OnChange(Settings& settings, String key, Value const* value) {
+static void OnChange(Settings& settings, Key key, Value const* value) {
     settings.write_to_file_needed = true;
     if (settings.on_change) settings.on_change(key, value);
 }
@@ -404,6 +471,31 @@ static ValueUnion CloneValueUnion(ValueUnion const& v, PathPool& pool, ArenaAllo
 
 static void FreeValueUnion(ValueUnion const& v, PathPool& pool) {
     if (v.tag == ValueType::String) pool.Free(v.Get<String>());
+}
+
+static Key CloneKey(Key const& k, PathPool& pool, ArenaAllocator& arena) {
+    switch (k.tag) {
+        case KeyType::Global: return pool.Clone(k.Get<String>(), arena);
+        case KeyType::Sectioned: {
+            auto const section_and_key = k.Get<SectionAndKey>();
+            return SectionAndKey {pool.Clone(section_and_key.section, arena),
+                                  pool.Clone(section_and_key.key, arena)};
+        }
+    }
+    PanicIfReached();
+    return ""_s;
+}
+
+static void FreeKey(Key const& k, PathPool& pool) {
+    switch (k.tag) {
+        case KeyType::Global: pool.Free(k.Get<String>()); break;
+        case KeyType::Sectioned: {
+            auto const section_and_key = k.Get<SectionAndKey>();
+            pool.Free(section_and_key.section);
+            pool.Free(section_and_key.key);
+            break;
+        }
+    }
 }
 
 static Value* AllocateValue(Settings& settings, ValueUnion value) {
@@ -421,9 +513,7 @@ static void AddValueToFreeList(Settings& settings, Value* value) {
     settings.free_values = value;
 }
 
-void SetValue(Settings& settings, String key, ValueUnion value, SetValueOptions options) {
-    CheckValueForSet(value);
-
+void SetValue(Settings& settings, Key key, ValueUnion value, SetValueOptions options) {
     Value* new_value {};
 
     auto const existing_values_ptr = settings.Find(key);
@@ -453,7 +543,7 @@ void SetValue(Settings& settings, String key, ValueUnion value, SetValueOptions 
 
         auto const inserted = settings.InsertGrowIfNeeded(
             settings.arena,
-            options.clone_key_string ? settings.path_pool.Clone(key, settings.arena) : key,
+            options.clone_key_string ? CloneKey(key, settings.path_pool, settings.arena) : key,
             new_value);
         ASSERT(inserted);
     }
@@ -461,9 +551,7 @@ void SetValue(Settings& settings, String key, ValueUnion value, SetValueOptions 
     if (!options.dont_track_changes) OnChange(settings, key, new_value);
 }
 
-bool AddValue(Settings& settings, String key, ValueUnion value, SetValueOptions options) {
-    CheckValueForSet(value);
-
+bool AddValue(Settings& settings, Key key, ValueUnion value, SetValueOptions options) {
     Value* first_node {};
 
     auto existing_values_ptr = settings.Find(key);
@@ -480,7 +568,7 @@ bool AddValue(Settings& settings, String key, ValueUnion value, SetValueOptions 
         first_node = AllocateValue(settings, CloneValueUnion(value, settings.path_pool, settings.arena));
         auto const inserted = settings.InsertGrowIfNeeded(
             settings.arena,
-            options.clone_key_string ? settings.path_pool.Clone(key, settings.arena) : key,
+            options.clone_key_string ? CloneKey(key, settings.path_pool, settings.arena) : key,
             first_node);
         ASSERT(inserted);
     }
@@ -489,7 +577,7 @@ bool AddValue(Settings& settings, String key, ValueUnion value, SetValueOptions 
     return true;
 }
 
-bool RemoveValue(Settings& settings, String key, ValueUnion value, RemoveValueOptions options) {
+bool RemoveValue(Settings& settings, Key key, ValueUnion value, RemoveValueOptions options) {
     auto const existing_values_ptr = settings.Find(key);
     if (!existing_values_ptr) return false;
     auto& existing_values = *existing_values_ptr;
@@ -507,7 +595,7 @@ bool RemoveValue(Settings& settings, String key, ValueUnion value, RemoveValueOp
 
     if (removed && !options.dont_track_changes) {
         if (single_value) {
-            settings.path_pool.Free(key);
+            FreeKey(key, settings.path_pool);
             settings.Delete(key);
             OnChange(settings, key, nullptr);
         } else {
@@ -518,7 +606,7 @@ bool RemoveValue(Settings& settings, String key, ValueUnion value, RemoveValueOp
     return removed;
 }
 
-void Remove(Settings& settings, String key, RemoveValueOptions options) {
+void Remove(Settings& settings, Key key, RemoveValueOptions options) {
     auto existing = settings.Find(key);
     if (!existing) return;
 
@@ -530,7 +618,7 @@ void Remove(Settings& settings, String key, RemoveValueOptions options) {
             settings.free_values = node;
             node = next;
         }
-        settings.path_pool.Free(key);
+        FreeKey(key, settings.path_pool);
         settings.Delete(key);
     }
 
@@ -735,7 +823,7 @@ TEST_CASE(TestJsonParsing) {
     auto const table = ParseLegacySettingsFile(json, tester.scratch_arena);
 
     {
-        auto const v = LookupValue(table, key::k_extra_libraries_folder);
+        auto const v = LookupValues(table, key::k_extra_libraries_folder);
         REQUIRE(v);
         CHECK(v->next);
 
@@ -766,13 +854,15 @@ TEST_CASE(TestJsonParsing) {
           fmt::Format(tester.scratch_arena, "{}Presets"_s, root_dir));
 
     {
-        auto const v = LookupValue(table, key::k_cc_to_param_id_map);
+        auto const v = LookupValues(table,
+                                    SectionAndKey {
+                                        .section = key::section::k_cc_to_param_id_map_section,
+                                        .key = "1",
+                                    });
         REQUIRE(v);
         CHECK(!v->next);
-        REQUIRE(v->tag == ValueType::String);
-        CHECK_EQ(
-            v->Get<String>(),
-            fmt::Format(tester.arena, "1:{}"_s, k_param_descriptors[ToInt(ParamIndex::MasterVolume)].id));
+        REQUIRE(v->tag == ValueType::Int);
+        CHECK_EQ(v->Get<s64>(), k_param_descriptors[ToInt(ParamIndex::MasterVolume)].id);
     }
 
     return k_success;
@@ -788,19 +878,20 @@ TEST_CASE(TestSettings) {
 #endif
 
         struct KeyVal {
-            String key;
+            Key key;
             ValueUnion value;
         };
         auto const keyvals = ArrayT<KeyVal>({
             {key::k_show_tooltips, true},
             {key::k_gui_keyboard_octave, (s64)0},
-            {key::k_high_contrast_gui, true},
+            {SectionAndKey {.section = "section", .key = "key1"}, true},
+            {SectionAndKey {.section = "section", .key = "key2"}, false},
             {key::k_show_keyboard, true},
             {key::k_presets_random_mode, (s64)3},
             {key::k_window_width, (s64)1200},
-            {key::k_cc_to_param_id_map, "10:1"_s},
-            {key::k_cc_to_param_id_map, "10:3"_s},
-            {key::k_cc_to_param_id_map, "10:4"_s},
+            {SectionAndKey {.section = key::section::k_cc_to_param_id_map_section, .key = "10"}, (s64)1},
+            {SectionAndKey {.section = key::section::k_cc_to_param_id_map_section, .key = "10"}, (s64)3},
+            {SectionAndKey {.section = key::section::k_cc_to_param_id_map_section, .key = "10"}, (s64)4},
             {"unknown_key"_s, "unknown value"_s},
             {key::k_extra_libraries_folder, ROOT "Libraries"_s},
             {key::k_extra_libraries_folder, ROOT "Floe Libraries"_s},
@@ -808,25 +899,26 @@ TEST_CASE(TestSettings) {
 
         });
 
-        Settings settings;
-
-        for (auto const& kv : keyvals)
-            AddValue(settings, kv.key, kv.value, {});
-
         DynamicArray<char> file_data {tester.scratch_arena};
-        TRY(WriteSettingsTable(settings, dyn::WriterFor(file_data)));
-        ParseSettingsFile(file_data, tester.scratch_arena);
+        {
+            Settings settings;
+            for (auto const& kv : keyvals)
+                AddValue(settings, kv.key, kv.value, {});
+            TRY(WriteSettingsTable(settings, dyn::WriterFor(file_data)));
+        }
+
+        auto const settings = ParseSettingsFile(file_data, tester.scratch_arena);
 
         for (auto const& kv : keyvals) {
             DynamicArrayBounded<ValueUnion, 4> expected_values;
             for (auto const& other_kv : keyvals)
                 if (kv.key == other_kv.key) dyn::Append(expected_values, other_kv.value);
 
-            auto first_value = LookupValue(settings, kv.key);
-            REQUIRE(first_value);
+            auto value_list = LookupValues(settings, kv.key);
+            REQUIRE(value_list);
 
             usize num_values = 0;
-            for (auto value = &*first_value; value; value = value->next) {
+            for (auto value = value_list; value; value = value->next) {
                 ++num_values;
                 bool is_in_expected = false;
                 for (auto const& expected_value : expected_values) {
@@ -840,6 +932,10 @@ TEST_CASE(TestSettings) {
 
             CHECK_EQ(num_values, expected_values.size);
         }
+
+        // Check for some specific values
+        CHECK(*LookupBool(settings, SectionAndKey {.section = "section", .key = "key1"}) == true);
+        CHECK(*LookupBool(settings, SectionAndKey {.section = "section", .key = "key2"}) == false);
     }
 
     SUBCASE("file read/write") {
@@ -853,8 +949,8 @@ TEST_CASE(TestSettings) {
 
             auto const table = ParseSettingsFile(file_data.file_data, tester.scratch_arena);
             CHECK_EQ(table.size, 2u);
-            CHECK_EQ(*LookupString(table, "key1"), "value1"_s);
-            CHECK_EQ(*LookupString(table, "key2"), "value2"_s);
+            CHECK_EQ(*LookupString(table, "key1"_s), "value1"_s);
+            CHECK_EQ(*LookupString(table, "key2"_s), "value2"_s);
 
             TRY(WriteSettingsFile(table, filename, k_nullopt));
         }
@@ -870,7 +966,7 @@ TEST_CASE(TestSettings) {
         String const file_data = tester.scratch_arena.Clone("key = "_s);
         auto const table = ParseSettingsFile(file_data, tester.scratch_arena);
         CHECK_EQ(table.size, 1u);
-        auto const v = LookupValue(table, "key");
+        auto const v = LookupValues(table, "key"_s);
         CHECK(v == nullptr);
     }
 
@@ -879,8 +975,8 @@ TEST_CASE(TestSettings) {
         CHECK(settings.free_values == nullptr);
 
         for (auto _ : Range(10)) {
-            AddValue(settings, "key", "value"_s);
-            RemoveValue(settings, "key", "value"_s);
+            AddValue(settings, "key"_s, "value"_s);
+            RemoveValue(settings, "key"_s, "value"_s);
         }
 
         // There should be exactly one value in the free list.
@@ -903,7 +999,7 @@ TEST_CASE(TestSettings) {
             DynamicArrayBounded<String, 3> expected_values;
         } callback_ctx {tester, {}};
 
-        settings.on_change = [&callback_ctx](String key, Value const* value) {
+        settings.on_change = [&callback_ctx](Key key, Value const* value) {
             auto& tester = callback_ctx.tester;
             CHECK_EQ(key, k_key);
             usize num_values = 0;
@@ -980,7 +1076,7 @@ TEST_CASE(TestSettings) {
             AddValue(settings2, k_key, k_beta);
 
             // We're expecting one on_change callback for the value change.
-            settings1.on_change = [&tester](String key, Value const* value) {
+            settings1.on_change = [&tester](Key key, Value const* value) {
                 CHECK_EQ(key, k_key);
                 CHECK_EQ(value->Get<String>(), k_beta);
                 CHECK(value->next == nullptr);
@@ -1000,7 +1096,7 @@ TEST_CASE(TestSettings) {
             AddValue(settings2, k_key, k_gamma);
 
             // We should receive a callback for the key containing 2 values.
-            settings1.on_change = [&tester](String key, Value const* value) {
+            settings1.on_change = [&tester](Key key, Value const* value) {
                 CHECK_EQ(key, k_key);
                 usize num_values = 0;
                 for (auto v = value; v; v = v->next) {
@@ -1018,7 +1114,7 @@ TEST_CASE(TestSettings) {
         SUBCASE("new key added") {
             AddValue(settings2, k_key, k_alpha);
 
-            settings1.on_change = [&tester](String key, Value const* value) {
+            settings1.on_change = [&tester](Key key, Value const* value) {
                 CHECK_EQ(key, k_key);
                 CHECK_EQ(value->Get<String>(), k_alpha);
                 CHECK(value->next == nullptr);
@@ -1029,26 +1125,26 @@ TEST_CASE(TestSettings) {
         SUBCASE("existing keys retain") {
             AddValue(settings1, k_key, k_alpha);
 
-            AddValue(settings2, "other_key", k_beta);
+            AddValue(settings2, "other_key"_s, k_beta);
 
             ReplaceSettings(settings1, settings2, {.remove_keys_not_in_new_table = false});
 
             // The existing key should still be present, along with the new key.
             CHECK_EQ(settings1.size, 2u);
             CHECK_EQ(*LookupString(settings1, k_key), k_alpha);
-            CHECK_EQ(*LookupString(settings1, "other_key"), k_beta);
+            CHECK_EQ(*LookupString(settings1, "other_key"_s), k_beta);
         }
 
         SUBCASE("existing keys removed") {
             AddValue(settings1, k_key, k_alpha);
 
-            AddValue(settings2, "other_key", k_beta);
+            AddValue(settings2, "other_key"_s, k_beta);
 
             ReplaceSettings(settings1, settings2, {.remove_keys_not_in_new_table = true});
 
             // The existing key should be removed, and the new key should be present.
             CHECK_EQ(settings1.size, 1u);
-            CHECK_EQ(*LookupString(settings1, "other_key"), k_beta);
+            CHECK_EQ(*LookupString(settings1, "other_key"_s), k_beta);
         }
     }
 

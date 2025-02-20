@@ -1224,6 +1224,10 @@ TEST_CASE(TestHashTable) {
         CHECK(tab.Insert("900", 900));
         CHECK(tab.Insert("112", 112));
 
+        CHECK(tab.Find("foo"));
+        CHECK(tab.Find("bar"));
+        CHECK(!tab.Find("baz"));
+
         CHECK(tab.table.Elements().size > 5);
         CHECK(tab.table.size == 5);
 

@@ -74,16 +74,28 @@ struct HashTable {
             return k_hash_function(k);
     }
 
-    // Quadratic probing is used in case of hash collision
-    Element* Lookup(KeyType key, u64 hash, usize _dead) const {
+    // Quadratic probing is used if there's a hash collision
+    Element* Lookup(KeyType key, u64 hash, u64 dead_hash_value) const {
         ASSERT(elems);
+
         Element* element;
-        for (u64 i = hash, j = 1;; i += j++) {
-            element = elems + (i & mask);
-            if ((!element->active && (!element->hash || element->hash == _dead)) ||
-                (element->hash == hash && element->key == key))
-                break;
+        usize index = hash;
+        usize step = 1;
+
+        while (true) {
+            element = elems + (index & mask);
+
+            if (!element->active) {
+                if (!element->hash) break;
+                if (element->hash == dead_hash_value) break;
+            }
+
+            if (element->hash == hash && element->key == key) break;
+
+            index += step;
+            step++;
         }
+
         return element;
     }
 
@@ -138,7 +150,7 @@ struct HashTable {
         element->active = false;
         element->hash = k_tombstone;
         --size;
-        ++dead;
+        ++num_dead;
         return true;
     }
 
@@ -146,7 +158,7 @@ struct HashTable {
         elems[index].active = false;
         elems[index].hash = k_tombstone;
         --size;
-        ++dead;
+        ++num_dead;
     }
 
     void DeleteAll() {
@@ -186,12 +198,12 @@ struct HashTable {
         Element* element = Lookup(key, hash, k_tombstone);
 
         if (element->active) return false; // already exists
-        if (size + dead > mask - mask / 4) {
+        if (size + num_dead > mask - mask / 4) {
             PanicIfReached();
             return false; // too full
         }
 
-        if (element->hash == k_tombstone) --dead;
+        if (element->hash == k_tombstone) --num_dead;
         ++size;
         element->key = key;
         element->active = true;
@@ -212,12 +224,12 @@ struct HashTable {
         element->key = key;
         element->data = value;
         element->hash = hash;
-        if (++size + dead > mask - mask / 4) {
+        if (++size + num_dead > mask - mask / 4) {
             IncreaseCapacity(allocator, 2 * size);
-            dead = 0;
+            num_dead = 0;
         } else if (old_hash == k_tombstone) {
             // re-used tomb
-            --dead;
+            --num_dead;
         }
         return true;
     }
@@ -241,7 +253,7 @@ struct HashTable {
     Element* elems {};
     usize mask {};
     usize size {};
-    usize dead {};
+    usize num_dead {};
 };
 
 template <TriviallyCopyable KeyType,

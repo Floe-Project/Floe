@@ -10,6 +10,11 @@
 //
 // This is for anything we want to persist between sessions, e.g. window size, extra library folders, etc.
 //
+// In general, we take the approach that the settings system doesn't know anything about the data it's
+// storing. Intstead, each part of the code that uses the settings should know their own keys and validate the
+// values they get from the settings. However, for backwards compatibility this system does know about keys in
+// the legacy file format so that it can remap them.
+//
 // We want settings to be both forwards and backwards compatible because sometimes multiple versions of Floe
 // can be installed at the same type (for example, when using multiple plugin folders, DAWs can sometimes load
 // the plugin from either version). This isn't a common senario but it's one that can sometimes occur. We want
@@ -130,24 +135,6 @@ PUBLIC DynamicArrayBounded<Type, k_size> LookupValues(SettingsTable const& table
     return result;
 }
 
-namespace key {
-// We have code that needs to remap legacy settings keys to new keys, so we need to store this here. Usually
-// though, settings keys should be private to the module that needs them.
-namespace section {
-constexpr String k_cc_to_param_id_map_section = "cc_to_param_id_map"_s;
-}
-constexpr String k_extra_libraries_folder = "extra_libraries_folder"_s;
-constexpr String k_extra_presets_folder = "extra_presets_folder"_s;
-constexpr String k_libraries_install_location = "libraries_install_location"_s;
-constexpr String k_presets_install_location = "presets_install_location"_s;
-constexpr String k_gui_keyboard_octave = "gui_keyboard_octave"_s;
-constexpr String k_high_contrast_gui = "high_contrast_gui"_s;
-constexpr String k_presets_random_mode = "presets_random_mode"_s;
-constexpr String k_show_keyboard = "show_keyboard"_s;
-constexpr String k_show_tooltips = "show_tooltips"_s;
-constexpr String k_window_width = "window_width"_s;
-} // namespace key
-
 // =================================================================================================
 // Higher-level API
 // =================================================================================================
@@ -165,8 +152,8 @@ struct Settings : SettingsTable {
     s128 last_known_file_modified_time {};
     bool write_to_file_needed {};
 
-    // null for 'value' means the key was removed. Also remember Value is a linked list if you are
-    // expecting multiple values.
+    // null for 'value' means the key was removed. Also remember Value is a linked list if you are expecting
+    // multiple values.
     TrivialFixedSizeFunction<8, void(Key key, Value const* value_list)> on_change {};
 
     // Watcher
@@ -219,5 +206,23 @@ void Deinit(Settings& settings);
 void WriteIfNeeded(Settings& settings);
 
 void PollForExternalChanges(Settings& settings);
+
+namespace key {
+// We have code that needs to remap legacy settings keys to new keys, so we need to store this here. Usually
+// though, settings keys should be private to the module that needs them.
+namespace section {
+constexpr String k_cc_to_param_id_map_section = "cc_to_param_id_map"_s;
+}
+constexpr String k_extra_libraries_folder = "extra_libraries_folder"_s;
+constexpr String k_extra_presets_folder = "extra_presets_folder"_s;
+constexpr String k_libraries_install_location = "libraries_install_location"_s;
+constexpr String k_presets_install_location = "presets_install_location"_s;
+constexpr String k_gui_keyboard_octave = "gui_keyboard_octave"_s;
+constexpr String k_high_contrast_gui = "high_contrast_gui"_s;
+constexpr String k_presets_random_mode = "presets_random_mode"_s;
+constexpr String k_show_keyboard = "show_keyboard"_s;
+constexpr String k_show_tooltips = "show_tooltips"_s;
+constexpr String k_window_width = "window_width"_s;
+} // namespace key
 
 } // namespace sts

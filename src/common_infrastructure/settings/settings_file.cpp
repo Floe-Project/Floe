@@ -234,16 +234,26 @@ SettingsTable ParseLegacySettingsFile(String file_data, ArenaAllocator& arena) {
                                     if (event.type == json::EventType::String) {
                                         if (auto const result = ParamFromLegacyId(event.string);
                                             result && result->tag == ParamExistance::StillExists) {
-                                            auto const section = key::section::k_cc_to_param_id_map_section;
-                                            auto const key = (s64)cc_num;
+                                            auto const key =
+                                                SectionedKey {key::section::k_cc_to_param_id_map_section,
+                                                              (s64)cc_num};
                                             auto const value =
                                                 (s64)k_param_descriptors
                                                     [ToInt(result->GetFromTag<ParamExistance::StillExists>())]
                                                         .id;
-                                            table.InsertGrowIfNeeded(
-                                                arena,
-                                                SectionedKey {.section = section, .key = key},
-                                                arena.New<Value>(value));
+
+                                            auto const existing = table.Find(key);
+                                            if (existing) {
+                                                for (auto v = *existing; v; v = v->next)
+                                                    if (*v == value) return true;
+                                                SinglyLinkedListPrepend(*existing, arena.New<Value>(value));
+                                            } else {
+                                                bool const inserted =
+                                                    table.InsertGrowIfNeeded(arena,
+                                                                             key,
+                                                                             arena.New<Value>(value));
+                                                ASSERT(inserted);
+                                            }
                                         }
                                         return true;
                                     }

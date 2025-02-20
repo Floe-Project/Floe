@@ -53,6 +53,11 @@ struct TypeListGet<TypeList<>, k_index, 0> {};
 template <typename T, int k_index>
 using TypeListGetT = typename TypeListGet<T, k_index>::Type;
 
+template <typename TagType>
+concept TaggedUnionDefaultConstructible = requires(TagType e) {
+    { TaggedUnionDefaultValue(e) };
+};
+
 template <typename TagType, CompatibleTypeAndTag<TagType>... Ts>
 class TaggedUnion {
     template <int k_index>
@@ -119,6 +124,11 @@ class TaggedUnion {
   public:
     TaggedUnion(TaggedUnion const& other) = default;
     TaggedUnion& operator=(TaggedUnion const& other) = default;
+
+    TaggedUnion() requires TaggedUnionDefaultConstructible<TagType>
+    {
+        Set(TaggedUnionDefaultValue(TagType {}));
+    }
 
     // Set with a type
     // ===========================================================

@@ -25,8 +25,8 @@
 // - Sections are in square brackets: [section_name].
 // - Comments are lines starting with a semicolon.
 //
-// Settings are kept in a hash table. The key is a string or a section + key pair. The value is a linked list.
-// You can loop over the table to get all the key-value pairs.
+// Settings are kept in a hash table. The key is a string/int or a section + key string/int pair. The value is
+// a linked list. You can loop over the table to get all the key-value pairs.
 
 namespace sts {
 
@@ -48,22 +48,35 @@ using ValueUnion = TaggedUnion<ValueType,
 
 struct Value : ValueUnion {
     bool operator==(ValueUnion const& v) const { return (ValueUnion const&)*this == v; }
-
     Value* next {};
 };
 
-struct SectionAndKey {
-    bool operator==(SectionAndKey const& other) const = default;
-    String section;
-    String key;
+enum class KeyValueType : u8 {
+    String,
+    Int,
 };
-enum class KeyType : u32 { Global, Sectioned };
+
+using KeyValueUnion =
+    TaggedUnion<KeyValueType, TypeAndTag<String, KeyValueType::String>, TypeAndTag<s64, KeyValueType::Int>>;
+
+struct SectionedKey {
+    bool operator==(SectionedKey const& other) const = default;
+    String section;
+    KeyValueUnion key;
+};
+
+// NOTE: GlobalString and GlobalInt could be combined and stored using KeyValueUnion, but it makes the API a
+// little less ergonomic because we'd then have to explictly specify the KeyValueUnion type when creating a
+// key, rather than just String or s64.
+enum class KeyType : u32 { GlobalString, GlobalInt, Sectioned };
 
 // Our HashTable implementation currently requires keys to be default constructible.
 constexpr auto TaggedUnionDefaultValue(sts::KeyType) { return ""_s; }
 
-using Key =
-    TaggedUnion<KeyType, TypeAndTag<String, KeyType::Global>, TypeAndTag<SectionAndKey, KeyType::Sectioned>>;
+using Key = TaggedUnion<KeyType,
+                        TypeAndTag<String, KeyType::GlobalString>,
+                        TypeAndTag<s64, KeyType::GlobalInt>,
+                        TypeAndTag<SectionedKey, KeyType::Sectioned>>;
 
 ErrorCodeOr<void> CustomValueToString(Writer writer, Key key, fmt::FormatOptions options);
 u64 HashKey(Key key);

@@ -25,10 +25,20 @@ static bool IsKeyValid(String key) {
 
 u64 HashKey(Key key) {
     switch (key.tag) {
-        case KeyType::Global: return Hash(key.Get<String>());
+        case KeyType::GlobalString: return Hash(key.Get<String>());
+        case KeyType::GlobalInt: {
+            auto const v = key.Get<s64>();
+            return Hash(Span {(u8 const*)&v, sizeof(v)});
+        }
         case KeyType::Sectioned: {
-            auto const k = key.Get<SectionAndKey>();
-            return HashMultiple(Array {k.section, k.key});
+            auto const k = key.Get<SectionedKey>();
+            auto hash = HashInit();
+            HashUpdate(hash, k.section);
+            switch (k.key.tag) {
+                case KeyValueType::String: HashUpdate(hash, k.key.Get<String>()); break;
+                case KeyValueType::Int: HashUpdate(hash, k.key.Get<s64>()); break;
+            }
+            return hash;
         }
     }
     PanicIfReached();
@@ -37,15 +47,27 @@ u64 HashKey(Key key) {
 
 ErrorCodeOr<void> CustomValueToString(Writer writer, Key key, fmt::FormatOptions options) {
     switch (key.tag) {
-        case KeyType::Global: return ValueToString(writer, key.Get<String>(), options);
+        case KeyType::GlobalString: return ValueToString(writer, key.Get<String>(), options);
+        case KeyType::GlobalInt: return ValueToString(writer, key.Get<s64>(), options);
         case KeyType::Sectioned: {
-            auto const k = key.Get<SectionAndKey>();
-            auto const size = 1 + k.section.size + 2 + k.key.size;
+            auto const k = key.Get<SectionedKey>();
+            DynamicArrayBounded<char, k_max_key_size> buffer;
+            String key_str {};
+            switch (k.key.tag) {
+                case KeyValueType::String: key_str = k.key.Get<String>(); break;
+                case KeyValueType::Int:
+                    static_assert(k_max_key_size >= 32);
+                    auto const size = fmt::IntToString(k.key.Get<s64>(), buffer.data, {});
+                    key_str = String {buffer.data, size};
+                    break;
+            }
+
+            auto const size = 1 + k.section.size + 2 + key_str.size;
             TRY(PadToRequiredWidthIfNeeded(writer, options, size));
             TRY(writer.WriteChars("["));
             TRY(ValueToString(writer, k.section, options));
             TRY(writer.WriteChars("]."));
-            TRY(ValueToString(writer, k.key, options));
+            TRY(ValueToString(writer, key_str, options));
             return k_success;
         }
     }
@@ -105,8 +127,15 @@ SettingsTable ParseSettingsFile(String file_data, ArenaAllocator& arena) {
             // We don't need to clone the string here because we've asserted it's already in the arena.
             value = arena.New<Value>(WhitespaceStrippedStart(value_str));
 
+        auto const key_int = ParseInt(key, ParseIntBase::Decimal);
+
         Key full_key {key};
-        if (section) full_key = SectionAndKey {*section, key};
+        if (section) {
+            full_key = SectionedKey {*section, key};
+            if (key_int) full_key = SectionedKey {*section, *key_int};
+        } else {
+            if (key_int) full_key = (s64)*key_int;
+        }
 
         if (auto v = table.Find(full_key))
             SinglyLinkedListPrepend(*v, value);
@@ -206,14 +235,14 @@ SettingsTable ParseLegacySettingsFile(String file_data, ArenaAllocator& arena) {
                                         if (auto const result = ParamFromLegacyId(event.string);
                                             result && result->tag == ParamExistance::StillExists) {
                                             auto const section = key::section::k_cc_to_param_id_map_section;
-                                            auto const key = fmt::IntToString(cc_num);
+                                            auto const key = (s64)cc_num;
                                             auto const value =
                                                 (s64)k_param_descriptors
                                                     [ToInt(result->GetFromTag<ParamExistance::StillExists>())]
                                                         .id;
                                             table.InsertGrowIfNeeded(
                                                 arena,
-                                                SectionAndKey {.section = section, .key = key},
+                                                SectionedKey {.section = section, .key = key},
                                                 arena.New<Value>(value));
                                         }
                                         return true;
@@ -321,8 +350,11 @@ ErrorCodeOr<ReadResult> ReadEntireSettingsFile(String path, ArenaAllocator& aren
     };
 }
 
-static ErrorCodeOr<void> WriteKeyValLine(String key, ValueUnion const& value, Writer writer) {
-    TRY(writer.WriteChars(key));
+static ErrorCodeOr<void> WriteKeyValLine(KeyValueUnion const& key, ValueUnion const& value, Writer writer) {
+    switch (key.tag) {
+        case KeyValueType::String: TRY(writer.WriteChars(key.Get<String>())); break;
+        case KeyValueType::Int: TRY(writer.WriteChars(fmt::IntToString(key.Get<s64>()))); break;
+    }
     TRY(writer.WriteChars(" = "));
     switch (value.tag) {
         case ValueType::String: {
@@ -346,7 +378,8 @@ static ErrorCodeOr<void> WriteKeyValLine(String key, ValueUnion const& value, Wr
     return k_success;
 }
 
-static ErrorCodeOr<void> WriteKeyValLineValueList(String key, Value const* value_list, Writer writer) {
+static ErrorCodeOr<void>
+WriteKeyValLineValueList(KeyValueUnion const& key, Value const* value_list, Writer writer) {
     for (auto value = value_list; value; value = value->next)
         TRY(WriteKeyValLine(key, *value, writer));
     return k_success;
@@ -371,8 +404,14 @@ ErrorCodeOr<void> WriteSettingsTable(SettingsTable const& table, Writer writer) 
 
     // Write sectionless keys first
     for (auto const [key, value_list_ptr] : table) {
-        if (key.tag == KeyType::Sectioned) continue;
-        TRY(WriteKeyValLineValueList(key.Get<String>(), *value_list_ptr, writer));
+        KeyValueUnion key_value {""_s};
+        switch (key.tag) {
+            case KeyType::GlobalString: key_value = key.Get<String>(); break;
+            case KeyType::GlobalInt: key_value = key.Get<s64>(); break;
+            case KeyType::Sectioned: continue;
+        }
+
+        TRY(WriteKeyValLineValueList(key_value, *value_list_ptr, writer));
         set_dirty(*value_list_ptr);
     }
 
@@ -380,7 +419,13 @@ ErrorCodeOr<void> WriteSettingsTable(SettingsTable const& table, Writer writer) 
     for (auto const [key_union, value_list_ptr] : table) {
         if (is_dirty(*value_list_ptr)) continue;
 
-        auto const [section, key] = key_union.Get<SectionAndKey>();
+        String section {};
+
+        switch (key_union.tag) {
+            case KeyType::GlobalString:
+            case KeyType::GlobalInt: PanicIfReached();
+            case KeyType::Sectioned: section = key_union.Get<SectionedKey>().section; break;
+        }
 
         TRY(writer.WriteChars("\n["));
         TRY(writer.WriteChars(section));
@@ -390,7 +435,13 @@ ErrorCodeOr<void> WriteSettingsTable(SettingsTable const& table, Writer writer) 
         for (auto const [other_key_union, other_value_list_ptr] : table) {
             if (is_dirty(*other_value_list_ptr)) continue;
 
-            auto const [other_section, other_key] = other_key_union.Get<SectionAndKey>();
+            switch (other_key_union.tag) {
+                case KeyType::GlobalString:
+                case KeyType::GlobalInt: PanicIfReached();
+                case KeyType::Sectioned: break;
+            }
+
+            auto const [other_section, other_key] = other_key_union.Get<SectionedKey>();
             if (section != other_section) continue;
 
             TRY(WriteKeyValLineValueList(other_key, *other_value_list_ptr, writer));
@@ -475,11 +526,15 @@ static void FreeValueUnion(ValueUnion const& v, PathPool& pool) {
 
 static Key CloneKey(Key const& k, PathPool& pool, ArenaAllocator& arena) {
     switch (k.tag) {
-        case KeyType::Global: return pool.Clone(k.Get<String>(), arena);
+        case KeyType::GlobalString: return pool.Clone(k.Get<String>(), arena);
+        case KeyType::GlobalInt: return k.Get<s64>();
         case KeyType::Sectioned: {
-            auto const section_and_key = k.Get<SectionAndKey>();
-            return SectionAndKey {pool.Clone(section_and_key.section, arena),
-                                  pool.Clone(section_and_key.key, arena)};
+            SectionedKey result = k.Get<SectionedKey>();
+            result.section = pool.Clone(result.section, arena);
+            switch (result.key.tag) {
+                case KeyValueType::String: result.key = pool.Clone(result.key.Get<String>(), arena); break;
+                case KeyValueType::Int: break;
+            }
         }
     }
     PanicIfReached();
@@ -488,11 +543,15 @@ static Key CloneKey(Key const& k, PathPool& pool, ArenaAllocator& arena) {
 
 static void FreeKey(Key const& k, PathPool& pool) {
     switch (k.tag) {
-        case KeyType::Global: pool.Free(k.Get<String>()); break;
+        case KeyType::GlobalString: pool.Free(k.Get<String>()); break;
+        case KeyType::GlobalInt: break;
         case KeyType::Sectioned: {
-            auto const section_and_key = k.Get<SectionAndKey>();
-            pool.Free(section_and_key.section);
-            pool.Free(section_and_key.key);
+            auto const sectioned_key = k.Get<SectionedKey>();
+            pool.Free(sectioned_key.section);
+            switch (sectioned_key.key.tag) {
+                case KeyValueType::String: pool.Free(sectioned_key.key.Get<String>()); break;
+                case KeyValueType::Int: break;
+            }
             break;
         }
     }
@@ -855,9 +914,9 @@ TEST_CASE(TestJsonParsing) {
 
     {
         auto const v = LookupValues(table,
-                                    SectionAndKey {
+                                    SectionedKey {
                                         .section = key::section::k_cc_to_param_id_map_section,
-                                        .key = "1",
+                                        .key = (s64)1,
                                     });
         REQUIRE(v);
         CHECK(!v->next);
@@ -884,14 +943,14 @@ TEST_CASE(TestSettings) {
         auto const keyvals = ArrayT<KeyVal>({
             {key::k_show_tooltips, true},
             {key::k_gui_keyboard_octave, (s64)0},
-            {SectionAndKey {.section = "section", .key = "key1"}, true},
-            {SectionAndKey {.section = "section", .key = "key2"}, false},
+            {SectionedKey {.section = "section", .key = "key1"_s}, true},
+            {SectionedKey {.section = "section", .key = "key2"_s}, false},
             {key::k_show_keyboard, true},
             {key::k_presets_random_mode, (s64)3},
             {key::k_window_width, (s64)1200},
-            {SectionAndKey {.section = key::section::k_cc_to_param_id_map_section, .key = "10"}, (s64)1},
-            {SectionAndKey {.section = key::section::k_cc_to_param_id_map_section, .key = "10"}, (s64)3},
-            {SectionAndKey {.section = key::section::k_cc_to_param_id_map_section, .key = "10"}, (s64)4},
+            {SectionedKey {.section = key::section::k_cc_to_param_id_map_section, .key = (s64)10}, (s64)1},
+            {SectionedKey {.section = key::section::k_cc_to_param_id_map_section, .key = (s64)10}, (s64)3},
+            {SectionedKey {.section = key::section::k_cc_to_param_id_map_section, .key = (s64)10}, (s64)4},
             {"unknown_key"_s, "unknown value"_s},
             {key::k_extra_libraries_folder, ROOT "Libraries"_s},
             {key::k_extra_libraries_folder, ROOT "Floe Libraries"_s},
@@ -905,11 +964,13 @@ TEST_CASE(TestSettings) {
             for (auto const& kv : keyvals)
                 AddValue(settings, kv.key, kv.value, {});
             TRY(WriteSettingsTable(settings, dyn::WriterFor(file_data)));
+            tester.log.Debug("file_data: {}", file_data);
         }
 
         auto const settings = ParseSettingsFile(file_data, tester.scratch_arena);
 
         for (auto const& kv : keyvals) {
+            CAPTURE(kv.key);
             DynamicArrayBounded<ValueUnion, 4> expected_values;
             for (auto const& other_kv : keyvals)
                 if (kv.key == other_kv.key) dyn::Append(expected_values, other_kv.value);
@@ -934,8 +995,8 @@ TEST_CASE(TestSettings) {
         }
 
         // Check for some specific values
-        CHECK(*LookupBool(settings, SectionAndKey {.section = "section", .key = "key1"}) == true);
-        CHECK(*LookupBool(settings, SectionAndKey {.section = "section", .key = "key2"}) == false);
+        CHECK(*LookupBool(settings, SectionedKey {.section = "section", .key = "key1"_s}) == true);
+        CHECK(*LookupBool(settings, SectionedKey {.section = "section", .key = "key2"_s}) == false);
     }
 
     SUBCASE("file read/write") {

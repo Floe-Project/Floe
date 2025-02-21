@@ -17,7 +17,7 @@ namespace sts {
 
 static bool IsKeyValid(String key) {
     if (key.size == 0) return false;
-    if (key.size > k_max_key_part_size) return false;
+    if (key.size > k_max_key_size) return false;
     for (auto c : key)
         if (!IsLowercaseAscii(c) && !IsDigit(c) && c != '_') return false;
     return true;
@@ -103,7 +103,7 @@ SettingsTable ParseSettingsFile(String file_data, ArenaAllocator& arena) {
 
         auto key = WhitespaceStrippedEnd(line.SubSpan(0, *equals));
         if (!IsKeyValid(key)) {
-            LogWarning(ModuleName::Settings, "invalid key {}", key.SubSpan(0, k_max_key_part_size));
+            LogWarning(ModuleName::Settings, "invalid key {}", key.SubSpan(0, k_max_key_size));
             continue;
         }
 

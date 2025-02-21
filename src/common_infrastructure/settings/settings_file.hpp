@@ -36,8 +36,7 @@
 namespace sts {
 
 constexpr usize k_max_file_size = Kb(32);
-constexpr usize k_max_key_part_size = 50; // also for sections
-constexpr usize k_max_key_size = k_max_key_part_size * 2 + 1; // keys can have 2 parts separated by a dot
+constexpr usize k_max_key_size = 50; // also for sections
 constexpr f64 k_settings_file_watcher_poll_interval_seconds = 1;
 
 enum class ValueType : u8 {

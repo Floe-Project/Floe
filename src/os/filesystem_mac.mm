@@ -592,7 +592,7 @@ void EventCallback([[maybe_unused]] ConstFSEventStreamRef stream_ref,
             MAYBE_UNUSED auto u5 = fmt::AppendLine(writer, "  }}");
         }
 
-        MAYBE_UNUSED auto u6 = StdPrint(StdStream::Err, info);
+        LogDebug(ModuleName::Filesystem, info);
     }
 
     {
@@ -621,6 +621,7 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
     auto& mac_watcher = *(MacWatcher*)watcher.native_data.pointer;
     if (any_states_changed) {
         if (mac_watcher.stream) {
+            if constexpr (k_debug_fsevents) LogDebug(ModuleName::Filesystem, "stopping FSEventStream");
             FSEventStreamStop(mac_watcher.stream);
             FSEventStreamInvalidate(mac_watcher.stream);
             FSEventStreamRelease(mac_watcher.stream);
@@ -673,6 +674,8 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                 }
             };
 
+            if constexpr (k_debug_fsevents) LogDebug(ModuleName::Filesystem, "starting FSEventStream");
+
             mac_watcher.stream =
                 FSEventStreamCreate(kCFAllocatorDefault,
                                     &EventCallback,
@@ -722,10 +725,11 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                     // FSEvents ONLY supports recursive watching so we just have to ignore subdirectory
                     // events
                     if (!dir.recursive && Contains(subpath, '/')) {
-                        LogDebug(ModuleName::Filesystem,
-                                 "Ignoring subdirectory event: {} because {} is watched non-recursively",
-                                 subpath,
-                                 dir.path);
+                        if constexpr (k_debug_fsevents)
+                            LogDebug(ModuleName::Filesystem,
+                                     "ignoring subdirectory event: {} because {} is watched non-recursively",
+                                     subpath,
+                                     dir.path);
                         continue;
                     }
 

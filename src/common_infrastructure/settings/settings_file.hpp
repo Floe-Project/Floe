@@ -204,7 +204,11 @@ void Deinit(Settings& settings);
 
 void WriteIfNeeded(Settings& settings);
 
-void PollForExternalChanges(Settings& settings);
+struct PollForExternalChangesOptions {
+    bool ignore_rate_limiting {};
+};
+
+void PollForExternalChanges(Settings& settings, PollForExternalChangesOptions options = {});
 
 namespace key {
 // We have code that needs to remap legacy settings keys to new keys, so we need to store this here. Usually

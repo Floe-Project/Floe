@@ -791,10 +791,8 @@ void ReplaceSettings(Settings& settings, SettingsTable const& new_table, Replace
     }
 }
 
-void PollForExternalChanges(Settings& settings) {
-    ASSERT(CheckThreadName("main"));
-
-    if (!settings.watcher.HasValue()) return;
+void PollForExternalChanges(Settings& settings, PollForExternalChangesOptions options) {
+    if (!settings.watcher) return;
 
     if (settings.write_to_file_needed) {
         // We ignore external changes if we have unsaved changes ourselves - our changes are probably more
@@ -802,8 +800,10 @@ void PollForExternalChanges(Settings& settings) {
         return;
     }
 
-    if ((settings.last_watcher_poll_time + k_settings_file_watcher_poll_interval_seconds) > TimePoint::Now())
-        return;
+    if (!options.ignore_rate_limiting)
+        if ((settings.last_watcher_poll_time + k_settings_file_watcher_poll_interval_seconds) >
+            TimePoint::Now())
+            return;
     DEFER { settings.last_watcher_poll_time = TimePoint::Now(); };
 
     auto const path = SettingsFilepath();
@@ -813,16 +813,20 @@ void PollForExternalChanges(Settings& settings) {
         .path = dir,
         .recursive = false,
     };
-    auto const outcome = PollDirectoryChanges(settings.watcher.Value(),
-                                              {
-                                                  .dirs_to_watch = Array {watch_dir},
-                                                  .result_arena = settings.watcher_scratch,
-                                                  .scratch_arena = settings.watcher_scratch,
-                                              });
+    auto const changes = TRY_OR(PollDirectoryChanges(settings.watcher.Value(),
+                                                     {
+                                                         .dirs_to_watch = Array {watch_dir},
+                                                         .result_arena = settings.watcher_scratch,
+                                                         .scratch_arena = settings.watcher_scratch,
+                                                     }),
+                                {
+                                    ReportError(sentry::Error::Level::Warning,
+                                                SourceLocationHash(),
+                                                "failed to poll for settings changes: {}",
+                                                error);
+                                });
     DEFER { settings.watcher_scratch.ResetCursorAndConsolidateRegions(); };
 
-    if (outcome.HasError()) return;
-    auto const& changes = outcome.Value();
     for (auto const& change : changes) {
         for (auto const& subpath : change.subpath_changesets) {
             if (!path::Equal(subpath.subpath, path::Filename(path))) continue;
@@ -836,9 +840,13 @@ void PollForExternalChanges(Settings& settings) {
             // we update our values to exactly match the new table.
             auto const read_result = TRY_OR(ReadEntireSettingsFile(path, settings.watcher_scratch), return);
             auto const new_table = ParseSettingsFile(read_result.file_data, settings.watcher_scratch);
-            settings.last_known_file_modified_time = read_result.file_last_modified;
 
             ReplaceSettings(settings, new_table, {.remove_keys_not_in_new_table = false});
+
+            // We just loaded fresh data from the file, so we can mark that we don't need to write to the
+            // file.
+            settings.last_known_file_modified_time = read_result.file_last_modified;
+            settings.write_to_file_needed = false;
             return;
         }
     }
@@ -1217,6 +1225,82 @@ TEST_CASE(TestSettings) {
             CHECK_EQ(settings1.size, 1u);
             CHECK_EQ(*LookupString(settings1, "other_key"_s), k_beta);
         }
+    }
+
+    SUBCASE("file watcher poll") {
+        auto const filepath = SettingsFilepath();
+
+        // The settings system only polls the official SettingsFilepath(), so we need to write to that file.
+        // Let's first backup the existing file and restore it when we're done.
+        auto const original_settings_file_data = ({
+            Optional<String> d {};
+            auto const o = ReadEntireFile(filepath, tester.scratch_arena);
+            if (o.HasValue()) d = o.Value();
+            d;
+        });
+        DEFER {
+            if (original_settings_file_data) auto _ = WriteFile(filepath, *original_settings_file_data);
+        };
+
+        constexpr String k_file_data = "key1 = value1\nkey2 = value2\n"_s;
+        TRY(WriteFile(filepath, k_file_data));
+
+        Settings settings;
+
+        Init(settings, Array {filepath});
+        DEFER { Deinit(settings); };
+
+        CHECK(!settings.write_to_file_needed);
+
+        CHECK_EQ(settings.size, 2u);
+        CHECK_EQ(*LookupString(settings, "key1"_s), "value1"_s);
+        CHECK_EQ(*LookupString(settings, "key2"_s), "value2"_s);
+
+        PollForExternalChanges(settings, {.ignore_rate_limiting = true});
+        CHECK(!settings.write_to_file_needed);
+
+        CHECK_EQ(settings.size, 2u);
+        CHECK_EQ(*LookupString(settings, "key1"_s), "value1"_s);
+        CHECK_EQ(*LookupString(settings, "key2"_s), "value2"_s);
+
+        // Add a new key.
+        {
+            auto f = TRY(OpenFile(filepath,
+                                  {
+                                      .capability = FileMode::Capability::Append,
+                                      .win32_share = FileMode::Share::Read,
+                                      .creation = FileMode::Creation::OpenExisting,
+                                  }));
+            TRY(f.Write("key3 = value3\n"_s));
+            TRY(f.Flush());
+        }
+
+        for (auto _ : Range(25)) {
+            CHECK(!settings.write_to_file_needed);
+            PollForExternalChanges(settings, {.ignore_rate_limiting = true});
+            if (settings.size != 2) break;
+            SleepThisThread(1); // wait for the file watcher to pick up the change
+        }
+
+        CHECK_EQ(settings.size, 3u);
+        CHECK_EQ(*LookupString(settings, "key1"_s), "value1"_s);
+        CHECK_EQ(*LookupString(settings, "key2"_s), "value2"_s);
+        CHECK_EQ(*LookupString(settings, "key3"_s), "value3"_s);
+
+        // Replace the value of key1.
+        TRY(WriteFile(filepath, "key1 = value4\n"_s));
+
+        for (auto _ : Range(25)) {
+            PollForExternalChanges(settings, {.ignore_rate_limiting = true});
+            CHECK(!settings.write_to_file_needed);
+            if (LookupString(settings, "key1"_s) == "value4"_s) break;
+            SleepThisThread(1); // wait for the file watcher to pick up the change
+        }
+
+        CHECK_EQ(settings.size, 3u);
+        CHECK_EQ(*LookupString(settings, "key1"_s), "value4"_s);
+        CHECK_EQ(*LookupString(settings, "key2"_s), "value2"_s);
+        CHECK_EQ(*LookupString(settings, "key3"_s), "value3"_s);
     }
 
     return k_success;

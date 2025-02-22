@@ -83,7 +83,7 @@ using Key = TaggedUnion<KeyType,
                         TypeAndTag<SectionedKey, KeyType::Sectioned>>;
 
 ErrorCodeOr<void> CustomValueToString(Writer writer, Key key, fmt::FormatOptions options);
-u64 HashKey(Key key);
+u64 HashKey(Key const& key);
 
 using SettingsTable = HashTable<Key, Value*, HashKey>;
 

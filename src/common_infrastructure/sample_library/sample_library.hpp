@@ -26,7 +26,7 @@ struct LibraryPath {
     explicit operator String() const { return str; }
 };
 
-PUBLIC constexpr u64 Hash(LibraryPath path) { return HashFnv1a(path.str); }
+u64 Hash(LibraryPath const& path);
 
 struct Range {
     constexpr bool operator==(Range const& other) const = default;
@@ -165,7 +165,7 @@ struct Library {
     Optional<LibraryPath> icon_image_path {};
     HashTable<String, Instrument*> insts_by_name {};
     HashTable<String, ImpulseResponse*> irs_by_name {};
-    HashTable<LibraryPath, FileAttribution, Hash> files_requiring_attribution {};
+    HashTable<LibraryPath, FileAttribution, sample_lib::Hash> files_requiring_attribution {};
     u32 num_instrument_samples {};
     u32 num_regions {};
     String path {}; // real filesystem path to mdata or lua file

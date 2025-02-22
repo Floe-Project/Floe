@@ -23,7 +23,7 @@ static bool IsKeyValid(String key) {
     return true;
 }
 
-u64 HashKey(Key key) {
+u64 HashKey(Key const& key) {
     switch (key.tag) {
         case KeyType::GlobalString: return Hash(key.Get<String>());
         case KeyType::GlobalInt: {

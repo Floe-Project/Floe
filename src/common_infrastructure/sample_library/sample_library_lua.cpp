@@ -19,6 +19,8 @@
 
 namespace sample_lib {
 
+u64 Hash(LibraryPath const& path) { return HashFnv1a(path.str); }
+
 ErrorCodeCategory const lua_error_category {
     .category_id = "LUA",
     .message = [](Writer const& writer, ErrorCode code) -> ErrorCodeOr<void> {

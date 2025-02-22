@@ -20,6 +20,10 @@
 
 namespace sample_lib_server {
 
+namespace detail {
+u64 HashLibraryRef(sample_lib::LibraryIdRef const& id) { return id.Hash(); }
+} // namespace detail
+
 using namespace detail;
 constexpr String k_trace_category = "SLS";
 constexpr u32 k_trace_colour = 0xfcba03;

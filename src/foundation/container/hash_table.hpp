@@ -17,9 +17,12 @@ struct DummyValueType {};
 template <typename T>
 concept TriviallyCopyableOrDummy = TriviallyCopyable<T> || Same<DummyValueType, T>;
 
+template <typename KeyType>
+using HashFunction = u64 (*)(KeyType const&);
+
 template <TriviallyCopyable KeyType,
           TriviallyCopyableOrDummy ValueType,
-          u64 (*k_hash_function)(KeyType) = nullptr>
+          HashFunction<KeyType> k_hash_function = nullptr>
 struct HashTable {
     struct Element {
         [[no_unique_address]] ValueType data {};
@@ -258,7 +261,7 @@ struct HashTable {
 
 template <TriviallyCopyable KeyType,
           TriviallyCopyableOrDummy ValueType,
-          u64 (*k_hash_function)(KeyType) = nullptr>
+          HashFunction<KeyType> k_hash_function = nullptr>
 struct DynamicHashTable {
     using Table = HashTable<KeyType, ValueType, k_hash_function>;
 
@@ -323,7 +326,7 @@ struct DynamicHashTable {
     Table table {};
 };
 
-template <TriviallyCopyable KeyType, u64 (*k_hash_function)(KeyType) = nullptr>
+template <TriviallyCopyable KeyType, HashFunction<KeyType> k_hash_function = nullptr>
 struct Set : HashTable<KeyType, DummyValueType, k_hash_function> {
     using Table = HashTable<KeyType, DummyValueType, k_hash_function>;
 
@@ -342,7 +345,7 @@ struct Set : HashTable<KeyType, DummyValueType, k_hash_function> {
     bool Contains(KeyType key) const { return this->FindElement(key); }
 };
 
-template <TriviallyCopyable KeyType, u64 (*k_hash_function)(KeyType) = nullptr>
+template <TriviallyCopyable KeyType, HashFunction<KeyType> k_hash_function = nullptr>
 struct DynamicSet : DynamicHashTable<KeyType, DummyValueType, k_hash_function> {
     using Set = Set<KeyType, k_hash_function>;
 

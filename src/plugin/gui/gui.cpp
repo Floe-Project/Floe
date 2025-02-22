@@ -34,7 +34,7 @@
 
 static f32 PixelsPerPoint(Gui* g) {
     constexpr auto k_points_in_width = 1000.0f; // 1000 just because it's easy to work with
-    return (f32)gui_settings::WindowWidth(g->settings) / k_points_in_width;
+    return (f32)g->frame_input.window_size.width / k_points_in_width;
 }
 
 enum class LibraryImageType { Icon, Background };

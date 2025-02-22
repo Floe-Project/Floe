@@ -733,18 +733,8 @@ static void GeneralSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext&
 
         Setting(box_system, context, options_rhs_column, IsOnlineReportingDisabledSettingDescriptor());
 
-        for (auto const autosave_setting : EnumIterator<AutosaveSetting>()) {
-            auto const info = GetAutosaveSettingInfo(autosave_setting);
-            if (auto const v = IntField(box_system,
-                                        options_rhs_column,
-                                        info.gui_label,
-                                        30.0f,
-                                        GetAutosaveSetting(context.settings, autosave_setting),
-                                        info.min_value,
-                                        info.max_value)) {
-                SetAutosaveSetting(context.settings, autosave_setting, CheckedCast<u16>(*v));
-            }
-        }
+        for (auto const autosave_setting : EnumIterator<AutosaveSetting>())
+            Setting(box_system, context, options_rhs_column, SettingDescriptor(autosave_setting));
     }
 }
 

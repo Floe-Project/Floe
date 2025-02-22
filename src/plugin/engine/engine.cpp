@@ -574,6 +574,7 @@ static void PluginOnPollThread(Engine& engine) {
 
 static void PluginOnSettingsChange(Engine& engine, sts::Key key, sts::Value const* value) {
     ASSERT(IsMainThread(engine.host));
+    OnSettingsChange(engine.autosave_state, key, value);
 }
 
 usize MegabytesUsedBySamples(Engine const& engine) {

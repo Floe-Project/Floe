@@ -189,63 +189,84 @@ void AutosaveToFileIfNeeded(AutosaveState& state, FloePaths const& paths) {
     }
 }
 
-AutosaveSettingInfo GetAutosaveSettingInfo(AutosaveSetting setting) {
+sts::Descriptor SettingDescriptor(AutosaveSetting setting) {
     switch (setting) {
         case AutosaveSetting::AutosaveIntervalSeconds:
             return {
+                .key = "autosave-interval-seconds"_s,
+                .value_requirements =
+                    sts::Descriptor::IntRequirements {
+                        .min_value = 1,
+                        .max_value = 60 * 60,
+                        .clamp_to_range = true,
+                    },
+                .default_value = (s64)AutosaveState::k_default_autosave_interval_seconds,
                 .gui_label = "Autosave interval (seconds)"_s,
-                .key = "autosave_interval_seconds"_s,
-                .default_value = AutosaveState::k_default_autosave_interval_seconds,
-                .min_value = 1,
-                .max_value = 60 * 60,
             };
         case AutosaveSetting::MaxAutosavesPerInstance:
             return {
+                .key = "max-autosaves-per-instance"_s,
+                .value_requirements =
+                    sts::Descriptor::IntRequirements {
+                        .min_value = 1,
+                        .max_value = 100,
+                        .clamp_to_range = true,
+                    },
+                .default_value = (s64)AutosaveState::k_default_max_autosaves_per_instance,
                 .gui_label = "Max autosaves per instance"_s,
-                .key = "max_autosaves_per_instance"_s,
-                .default_value = AutosaveState::k_default_max_autosaves_per_instance,
-                .min_value = 1,
-                .max_value = 100,
             };
         case AutosaveSetting::AutosaveDeleteAfterDays:
             return {
+                .key = "autosave-delete-after-days"_s,
+                .value_requirements =
+                    sts::Descriptor::IntRequirements {
+                        .min_value = 1,
+                        .max_value = 365,
+                        .clamp_to_range = true,
+                    },
+                .default_value = (s64)AutosaveState::k_default_autosave_delete_after_days,
                 .gui_label = "Autosave delete after days"_s,
-                .key = "autosave_delete_after_days"_s,
-                .default_value = AutosaveState::k_default_autosave_delete_after_days,
-                .min_value = 1,
-                .max_value = 365,
             };
         case AutosaveSetting::Count: break;
     }
     PanicIfReached();
-    return {};
 }
 
-u16 GetAutosaveSetting(sts::Settings const& settings, AutosaveSetting setting) {
-    auto const info = GetAutosaveSettingInfo(setting);
-    auto v = sts::LookupInt(settings, info.key);
-    if (!v) return CheckedCast<u16>(info.default_value);
-    v = Clamp<s64>(*v, info.min_value, info.max_value);
-    return CheckedCast<u16>(*v);
+void OnSettingsChange(AutosaveState& state, sts::Key const& key, sts::Value const* value) {
+    for (auto const setting : EnumIterator<AutosaveSetting>()) {
+        if (auto const v = sts::Match(key, value, SettingDescriptor(setting))) {
+            switch (setting) {
+                case AutosaveSetting::AutosaveIntervalSeconds: break;
+                case AutosaveSetting::MaxAutosavesPerInstance:
+                    state.max_autosaves_per_instance.Store(CheckedCast<u16>(value->Get<s64>()),
+                                                           StoreMemoryOrder::Relaxed);
+                    break;
+                case AutosaveSetting::AutosaveDeleteAfterDays:
+                    state.autosave_delete_after_days.Store(CheckedCast<u16>(value->Get<s64>()),
+                                                           StoreMemoryOrder::Relaxed);
+                    break;
+                case AutosaveSetting::Count: break;
+            }
+            return;
+        }
+    }
 }
 
-void SetAutosaveSetting(sts::Settings& settings, AutosaveSetting setting, u16 value) {
-    auto const info = GetAutosaveSettingInfo(setting);
-    auto const v = Clamp<s64>(value, info.min_value, info.max_value);
-    sts::SetValue(settings, info.key, v);
+static s64 AutosaveSettingIntValue(AutosaveSetting setting, sts::Settings const& settings) {
+    return sts::GetValue(settings, SettingDescriptor(setting)).value.Get<s64>();
 }
 
 bool AutosaveNeeded(AutosaveState const& state, sts::Settings const& settings) {
     return state.last_save_time.SecondsFromNow() >=
-           GetAutosaveSetting(settings, AutosaveSetting::AutosaveIntervalSeconds);
+           (f64)AutosaveSettingIntValue(AutosaveSetting::AutosaveIntervalSeconds, settings);
 }
 
 void QueueAutosave(AutosaveState& state, sts::Settings const& settings, StateSnapshot const& snapshot) {
     state.autosave_delete_after_days.Store(
-        GetAutosaveSetting(settings, AutosaveSetting::AutosaveDeleteAfterDays),
+        CheckedCast<u16>(AutosaveSettingIntValue(AutosaveSetting::AutosaveDeleteAfterDays, settings)),
         StoreMemoryOrder::Relaxed);
     state.max_autosaves_per_instance.Store(
-        GetAutosaveSetting(settings, AutosaveSetting::MaxAutosavesPerInstance),
+        CheckedCast<u16>(AutosaveSettingIntValue(AutosaveSetting::MaxAutosavesPerInstance, settings)),
         StoreMemoryOrder::Relaxed);
 
     state.mutex.Lock();
@@ -297,7 +318,7 @@ TEST_CASE(TestAutosave) {
     AutosaveToFileIfNeeded(state, paths);
 
     // do it multiple time to check file rotation
-    for (auto _ : Range(GetAutosaveSetting(settings, AutosaveSetting::MaxAutosavesPerInstance) + 1)) {
+    for (auto _ : Range(AutosaveSettingIntValue(AutosaveSetting::MaxAutosavesPerInstance, settings) + 1)) {
         snapshot.param_values[0] += 1;
         QueueAutosave(state, settings, snapshot);
         AutosaveToFileIfNeeded(state, paths);

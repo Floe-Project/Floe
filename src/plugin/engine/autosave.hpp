@@ -31,24 +31,17 @@ void InitAutosaveState(AutosaveState& state, u64& random_seed, StateSnapshot con
 bool AutosaveNeeded(AutosaveState const& state, sts::Settings const& settings);
 void QueueAutosave(AutosaveState& state, sts::Settings const& settings, StateSnapshot const& snapshot);
 
-// Run from background thread
-void AutosaveToFileIfNeeded(AutosaveState& state, FloePaths const& paths);
-
-enum class AutosaveSetting {
+enum class AutosaveSetting : u8 {
     AutosaveIntervalSeconds,
     MaxAutosavesPerInstance,
     AutosaveDeleteAfterDays,
     Count,
 };
-struct AutosaveSettingInfo {
-    String gui_label;
-    String key;
-    u16 default_value;
-    u16 min_value;
-    u16 max_value;
-};
 
-AutosaveSettingInfo GetAutosaveSettingInfo(AutosaveSetting setting);
+// Use with sts::SetValue, sts::GetValue
+sts::Descriptor SettingDescriptor(AutosaveSetting setting);
 
-u16 GetAutosaveSetting(sts::Settings const& settings, AutosaveSetting setting);
-void SetAutosaveSetting(sts::Settings& settings, AutosaveSetting setting, u16 value);
+void OnSettingsChange(AutosaveState& state, sts::Key const& key, sts::Value const* value);
+
+// Run from background thread
+void AutosaveToFileIfNeeded(AutosaveState& state, FloePaths const& paths);

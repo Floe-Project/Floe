@@ -61,24 +61,7 @@ struct Standalone {
             [](clap_host_t const* h) {
                 auto& standalone = *(Standalone*)h->host_data;
                 ASSERT(standalone.plugin_created);
-                auto gui =
-                    (clap_plugin_gui const*)standalone.plugin.get_extension(&standalone.plugin, CLAP_EXT_GUI);
-                clap_gui_resize_hints resize_hints;
-                if (!gui->get_resize_hints(&standalone.plugin, &resize_hints)) PanicIfReached();
-                if (resize_hints.can_resize_vertically && resize_hints.can_resize_horizontally) {
-                    if (puglSetViewHint(standalone.gui_view,
-                                        PUGL_RESIZABLE,
-                                        gui->can_resize(&standalone.plugin)) != PUGL_SUCCESS) {
-                        PanicIfReached();
-                    };
-                    if (resize_hints.preserve_aspect_ratio)
-                        if (puglSetSizeHint(standalone.gui_view,
-                                            PUGL_FIXED_ASPECT,
-                                            (PuglSpan)resize_hints.aspect_ratio_width,
-                                            (PuglSpan)resize_hints.aspect_ratio_height) != PUGL_SUCCESS) {
-                            PanicIfReached();
-                        };
-                }
+                standalone.resize_hints_changed.Store(true, StoreMemoryOrder::Relaxed);
             },
         .request_resize =
             [](clap_host_t const* h, uint32_t width, uint32_t height) {
@@ -163,6 +146,7 @@ struct Standalone {
     PuglWorld* gui_world {};
     PuglView* gui_view {};
     Atomic<u32> requested_resize {k_invalid_encoded_ui_size};
+    Atomic<bool> resize_hints_changed {false};
 
     bool quit = false;
     bool plugin_created = false; // plugins are forbidden to call host APIs while creating
@@ -584,6 +568,27 @@ static ErrorCodeOr<void> Main(String exe_path_rel) {
     while (!standalone.quit) {
         if (standalone.callback_requested.Exchange(false, RmwMemoryOrder::Relaxed))
             standalone.plugin.on_main_thread(&standalone.plugin);
+
+        if (standalone.resize_hints_changed.Exchange(false, RmwMemoryOrder::Relaxed)) {
+            clap_gui_resize_hints resize_hints;
+            if (gui->get_resize_hints(&standalone.plugin, &resize_hints)) {
+                if (resize_hints.can_resize_vertically && resize_hints.can_resize_horizontally) {
+                    if (puglSetViewHint(standalone.gui_view,
+                                        PUGL_RESIZABLE,
+                                        gui->can_resize(&standalone.plugin)) != PUGL_SUCCESS) {
+                        PanicIfReached();
+                    };
+                    if (resize_hints.preserve_aspect_ratio)
+                        if (puglSetSizeHint(standalone.gui_view,
+                                            PUGL_FIXED_ASPECT,
+                                            (PuglSpan)resize_hints.aspect_ratio_width,
+                                            (PuglSpan)resize_hints.aspect_ratio_height) != PUGL_SUCCESS) {
+                            PanicIfReached();
+                        };
+                }
+            }
+        }
+
         if (auto const encoded_uisize =
                 standalone.requested_resize.Exchange(k_invalid_encoded_ui_size, RmwMemoryOrder::Relaxed);
             encoded_uisize != k_invalid_encoded_ui_size) {
@@ -591,9 +596,12 @@ static ErrorCodeOr<void> Main(String exe_path_rel) {
             auto const physical_pixels = *ClapPixelsToPhysicalPixels(standalone.gui_view,
                                                                      requested_clap_size.width,
                                                                      requested_clap_size.height);
-            puglSetSize(standalone.gui_view, physical_pixels.width, physical_pixels.height);
-            gui->set_size(&standalone.plugin, requested_clap_size.width, requested_clap_size.height);
+            puglSetSizeHint(standalone.gui_view,
+                            PUGL_CURRENT_SIZE,
+                            physical_pixels.width,
+                            physical_pixels.height);
         }
+
         auto const st = puglUpdate(standalone.gui_world, 0);
         if (st != PUGL_SUCCESS && st != PUGL_FAILURE) return ErrorCode {st};
         SleepThisThread(8);

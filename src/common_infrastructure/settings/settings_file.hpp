@@ -273,18 +273,18 @@ namespace key {
 // We have code that needs to remap legacy settings keys to new keys, so we need to store this here. Usually
 // though, settings keys should be private to the module that needs them.
 namespace section {
-constexpr String k_cc_to_param_id_map_section = "cc_to_param_id_map"_s;
+constexpr String k_cc_to_param_id_map_section = "Default Map MIDI CC to Param IDs"_s;
 }
-constexpr String k_extra_libraries_folder = "extra_libraries_folder"_s;
-constexpr String k_extra_presets_folder = "extra_presets_folder"_s;
-constexpr String k_libraries_install_location = "libraries_install_location"_s;
-constexpr String k_presets_install_location = "presets_install_location"_s;
-constexpr String k_gui_keyboard_octave = "gui_keyboard_octave"_s;
-constexpr String k_high_contrast_gui = "high_contrast_gui"_s;
-constexpr String k_presets_random_mode = "presets_random_mode"_s;
-constexpr String k_show_keyboard = "show_keyboard"_s;
-constexpr String k_show_tooltips = "show_tooltips"_s;
-constexpr String k_window_width = "window_width"_s;
+constexpr String k_extra_libraries_folder = "extra-libraries-folder"_s;
+constexpr String k_extra_presets_folder = "extra-presets-folder"_s;
+constexpr String k_libraries_install_location = "libraries-install-location"_s;
+constexpr String k_presets_install_location = "presets-install-location"_s;
+constexpr String k_gui_keyboard_octave = "gui-keyboard-octave"_s;
+constexpr String k_high_contrast_gui = "high-contrast-gui"_s;
+constexpr String k_presets_random_mode = "presets-random-mode"_s;
+constexpr String k_show_keyboard = "show-keyboard"_s;
+constexpr String k_show_tooltips = "show-tooltips"_s;
+constexpr String k_window_width = "window-width"_s;
 } // namespace key
 
 } // namespace sts

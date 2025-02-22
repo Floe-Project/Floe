@@ -7,9 +7,9 @@
 #include "gui_effects.hpp"
 #include "gui_framework/colours.hpp"
 #include "gui_framework/gui_live_edit.hpp"
+#include "gui_settings.hpp"
 #include "gui_widget_helpers.hpp"
 #include "gui_window.hpp"
-#include "settings_gui.hpp"
 
 static void DoBlurredBackground(Gui* g,
                                 Rect r,
@@ -18,15 +18,14 @@ static void DoBlurredBackground(Gui* g,
                                 sample_lib::LibraryIdRef library_id,
                                 f32x2 mid_panel_size,
                                 f32 opacity) {
-    if (gui_settings::HighContrastGui(g->settings)) return;
+    if (sts::GetBool(g->settings, SettingDescriptor(GuiSetting::HighContrastGui))) return;
     auto& imgui = g->imgui;
     auto const panel_rounding = LiveSize(imgui, UiSizeId::BlurredPanelRounding);
 
     auto imgs = LibraryImagesFromLibraryId(g, library_id);
 
     if (imgs && imgs->blurred_background) {
-        if (auto tex = g->frame_input.graphics_ctx->GetTextureFromImage(imgs->blurred_background);
-            tex && !gui_settings::HighContrastGui(g->settings)) {
+        if (auto tex = g->frame_input.graphics_ctx->GetTextureFromImage(imgs->blurred_background)) {
 
             auto const whole_uv = GetMaxUVToMaintainAspectRatio(*imgs->background, mid_panel_size);
             auto const left_margin = r.x - window->parent_window->bounds.x;
@@ -132,7 +131,7 @@ void MidPanel(Gui* g) {
 
             auto const layer_width_without_pad = RoundUpToNearestMultiple(r.w, k_num_layers) / k_num_layers;
 
-            if (!gui_settings::HighContrastGui(g->settings)) {
+            if (!sts::GetBool(g->settings, SettingDescriptor(GuiSetting::HighContrastGui))) {
                 auto const overall_lib = LibraryForOverallBackground(engine);
                 if (overall_lib)
                     DoBlurredBackground(

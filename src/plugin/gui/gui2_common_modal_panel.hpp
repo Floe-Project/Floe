@@ -246,8 +246,8 @@ PUBLIC bool TextButton(GuiBoxSystem& builder, Box parent, String text, String to
     return button.button_fired;
 }
 
-PUBLIC Optional<int>
-IntField(GuiBoxSystem& builder, Box parent, String label, f32 width, int value, int min, int max) {
+PUBLIC Optional<s64>
+IntField(GuiBoxSystem& builder, Box parent, String label, f32 width, s64 value, s64 min, s64 max) {
     bool changed = false;
     auto const container = DoBox(builder,
                                  {
@@ -308,7 +308,7 @@ IntField(GuiBoxSystem& builder, Box parent, String label, f32 width, int value, 
         if (text_input.text_input_result) {
             auto const new_value = ParseInt(text_input.text_input_result->text, ParseIntBase::Decimal);
             if (new_value.HasValue()) {
-                value = (int)Clamp<s64>(new_value.Value(), min, max);
+                value = Clamp<s64>(new_value.Value(), min, max);
                 changed = true;
             }
         }

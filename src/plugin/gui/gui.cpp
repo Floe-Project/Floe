@@ -21,15 +21,17 @@
 #include "gui/gui2_settings_panel.hpp"
 #include "gui_editor_widgets.hpp"
 #include "gui_editors.hpp"
+#include "gui_framework/aspect_ratio.hpp"
 #include "gui_framework/draw_list.hpp"
 #include "gui_framework/gui_imgui.hpp"
 #include "gui_framework/gui_live_edit.hpp"
+#include "gui_framework/gui_platform.hpp"
+#include "gui_framework/image.hpp"
 #include "gui_modal_windows.hpp"
+#include "gui_settings.hpp"
 #include "gui_widget_helpers.hpp"
-#include "image.hpp"
 #include "plugin/plugin.hpp"
 #include "sample_lib_server/sample_library_server.hpp"
-#include "settings_gui.hpp"
 #include "state/state_coding.hpp"
 
 static f32 PixelsPerVw(Gui* g) {
@@ -575,11 +577,13 @@ static bool HasAnyErrorNotifications(Gui* g) {
 GuiFrameResult GuiUpdate(Gui* g) {
     ZoneScoped;
     ASSERT(IsMainThread(g->engine.host));
-    g->imgui.SetPixelsPerPoint(PixelsPerPoint(g));
+    g->imgui.SetPixelsPerVw(PixelsPerVw(g));
 
     g->frame_output = {};
 
-    live_edit::g_high_contrast_gui = gui_settings::HighContrastGui(g->settings); // IMRPOVE: hacky
+    live_edit::g_high_contrast_gui =
+        sts::GetBool(g->settings,
+                     SettingDescriptor(GuiSetting::HighContrastGui)); // IMRPOVE: hacky
     g->scratch_arena.ResetCursorAndConsolidateRegions();
 
     while (auto function = g->main_thread_callbacks.TryPop(g->scratch_arena))
@@ -598,10 +602,12 @@ GuiFrameResult GuiUpdate(Gui* g) {
     g->frame_input.graphics_ctx->PushFont(g->fira_sans);
     DEFER { g->frame_input.graphics_ctx->PopFont(); };
 
+    auto const top_and_mid_h =
+        HeightFromWidth(g->frame_input.window_size.width, k_aspect_ratio_without_keyboard);
+
     auto const top_h = LiveSize(imgui, UiSizeId::Top2Height);
-    auto const bot_h =
-        gui_settings::ShowKeyboard(g->settings) ? gui_settings::KeyboardHeight(g->settings) : 0;
-    auto const mid_h = (f32)g->frame_input.window_size.height - (top_h + bot_h);
+    auto const mid_h = top_and_mid_h - top_h;
+    auto const bot_h = g->frame_input.window_size.height - top_and_mid_h;
 
     auto draw_top_window = [](IMGUI_DRAW_WINDOW_BG_ARGS) {
         auto r = window->unpadded_bounds;
@@ -614,7 +620,7 @@ GuiFrameResult GuiUpdate(Gui* g) {
 
         imgui.graphics->AddRectFilled(r.Min(), r.Max(), LiveCol(imgui, UiColMap::MidPanelBack));
 
-        if (!gui_settings::HighContrastGui(g->settings)) {
+        if (!sts::GetBool(g->settings, SettingDescriptor(GuiSetting::HighContrastGui))) {
             auto overall_library = LibraryForOverallBackground(g->engine);
             if (overall_library) {
                 auto imgs = LibraryImagesFromLibraryId(g, *overall_library);
@@ -664,7 +670,7 @@ GuiFrameResult GuiUpdate(Gui* g) {
         imgui.EndWindow();
     }
 
-    if (gui_settings::ShowKeyboard(g->settings)) {
+    if (sts::GetBool(g->settings, SettingDescriptor(GuiSetting::ShowKeyboard))) {
         auto bot_settings = imgui::DefWindow();
         bot_settings.pad_top_left = {8, 8};
         bot_settings.pad_bottom_right = {8, 8};
@@ -689,7 +695,7 @@ GuiFrameResult GuiUpdate(Gui* g) {
             .fonts = g->fonts,
             .layout = g->layout,
         };
-        box_system.show_tooltips = gui_settings::ShowTooltips(g->settings);
+        box_system.show_tooltips = sts::GetBool(g->settings, SettingDescriptor(GuiSetting::ShowTooltips));
 
         {
             SettingsPanelContext context {

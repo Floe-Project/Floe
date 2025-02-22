@@ -5,12 +5,13 @@
 
 #include "os/misc.hpp"
 
+#include "engine/autosave.hpp"
 #include "engine/package_installation.hpp"
+#include "gui/gui_settings.hpp"
 #include "gui2_common_modal_panel.hpp"
 #include "gui2_settings_panel_state.hpp"
 #include "gui_framework/gui_box_system.hpp"
 #include "sample_lib_server/sample_library_server.hpp"
-#include "settings_gui.hpp"
 
 static void SettingsLhsTextWidget(GuiBoxSystem& box_system, Box parent, String text) {
     DoBox(box_system,
@@ -686,11 +687,10 @@ static void GeneralSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext&
         }
 
         if (width_change) {
-            auto const new_width =
-                Clamp<s64>(gui_settings::WindowWidth(context.settings) + *width_change * 110,
-                           0,
-                           LargestRepresentableValue<u16>());
-            gui_settings::SetWindowSize(context.settings, (u16)new_width);
+            auto const desc = SettingDescriptor(GuiSetting::WindowWidth);
+            auto const width = sts::GetInt(context.settings, desc);
+            auto const new_width = width + *width_change * 110;
+            sts::SetValue(context.settings, desc, new_width);
         }
     }
 
@@ -700,28 +700,9 @@ static void GeneralSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext&
         SettingsLhsTextWidget(box_system, style_row, "Style");
         auto const options_rhs_column = SettingsRhsColumn(box_system, style_row, style::k_settings_small_gap);
 
-        {
-            auto const state = gui_settings::ShowTooltips(context.settings);
-            if (CheckboxButton(box_system, options_rhs_column, "Show tooltips", state))
-                sts::SetValue(context.settings, sts::key::k_show_tooltips, !state);
-        }
-
-        {
-            auto const state = gui_settings::ShowKeyboard(context.settings);
-            if (CheckboxButton(box_system, options_rhs_column, "Show keyboard", state))
-                sts::SetValue(context.settings, sts::key::k_show_keyboard, !state);
-        }
-
-        {
-            auto const state = gui_settings::HighContrastGui(context.settings);
-            if (CheckboxButton(box_system, options_rhs_column, "High contrast GUI", state))
-                sts::SetValue(context.settings, sts::key::k_high_contrast_gui, !state);
-        }
-
-        {
-            auto const state = gui_settings::ShowInstanceName(context.settings);
-            if (CheckboxButton(box_system, options_rhs_column, "Show instance name", state))
-                sts::SetValue(context.settings, gui_settings::k_show_instance_name, !state);
+        for (auto const gui_setting : EnumIterator<GuiSetting>()) {
+            if (gui_setting == GuiSetting::WindowWidth) continue;
+            Setting(box_system, context, options_rhs_column, SettingDescriptor(gui_setting));
         }
     }
 

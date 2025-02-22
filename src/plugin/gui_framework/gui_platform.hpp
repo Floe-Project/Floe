@@ -13,12 +13,22 @@
 
 #include "foundation/foundation.hpp"
 
+#include "aspect_ratio.hpp"
 #include "engine/engine.hpp"
 #include "gui/gui.hpp"
-#include "gui/settings_gui.hpp"
+#include "gui/gui_settings.hpp"
 #include "gui_frame.hpp"
 
 constexpr bool k_debug_gui_platform = false;
+
+constexpr UiSize k_aspect_ratio_without_keyboard = {100, 61};
+constexpr UiSize k_aspect_ratio_with_keyboard = {100, 68};
+
+constexpr u16 k_min_gui_width = k_aspect_ratio_with_keyboard.width * 2;
+constexpr u16 k_max_gui_width = k_aspect_ratio_with_keyboard.width * 100;
+constexpr u32 k_largest_gui_size = LargestRepresentableValue<u16>();
+
+constexpr u16 k_default_gui_width = SizeWithAspectRatio(910, k_aspect_ratio_without_keyboard).width;
 
 struct GuiPlatform {
     static constexpr uintptr k_pugl_timer_id = 200;
@@ -124,6 +134,25 @@ PUBLIC ErrorCodeOr<void> CreateView(GuiPlatform& platform) {
     platform.view = puglNewView(platform.world);
     if (platform.view == nullptr) Panic("out of memory");
 
+    puglSetViewHint(platform.view, PUGL_RESIZABLE, true);
+    puglSetPositionHint(platform.view, PUGL_DEFAULT_POSITION, 0, 0);
+
+    auto const default_size = DesiredWindowSize(platform.settings);
+    puglSetSizeHint(platform.view, PUGL_DEFAULT_SIZE, default_size.width, default_size.height);
+    puglSetSizeHint(platform.view, PUGL_CURRENT_SIZE, default_size.width, default_size.height);
+
+    auto const aspect_ratio = DesiredAspectRatio(platform.settings);
+
+    auto const min_size = SizeWithAspectRatio(k_min_gui_width, aspect_ratio);
+    ASSERT(min_size.width >= k_min_gui_width);
+    puglSetSizeHint(platform.view, PUGL_MIN_SIZE, min_size.width, min_size.height);
+
+    auto const max_size = SizeWithAspectRatio(k_max_gui_width, aspect_ratio);
+    ASSERT(max_size.width <= k_largest_gui_size);
+    puglSetSizeHint(platform.view, PUGL_MAX_SIZE, max_size.width, max_size.height);
+
+    puglSetSizeHint(platform.view, PUGL_FIXED_ASPECT, aspect_ratio.width, aspect_ratio.height);
+
     return k_success;
 }
 
@@ -187,7 +216,7 @@ PUBLIC ErrorCodeOr<void> SetParent(GuiPlatform& platform, clap_window_t const& w
     ASSERT(platform.view);
     ASSERT(!puglGetNativeView(platform.view), "SetParent called after window realised");
     // NOTE: "This must be called before puglRealize(), reparenting is not supported"
-    TRY(Required(puglSetParentWindow(platform.view, (uintptr)window.ptr)));
+    TRY(Required(puglSetParent(platform.view, (uintptr)window.ptr)));
     return k_success;
 }
 
@@ -206,17 +235,11 @@ PUBLIC ErrorCodeOr<void> SetVisible(GuiPlatform& platform, bool visible, Engine&
                 puglSetViewHint(platform.view, PUGL_CONTEXT_PROFILE, PUGL_OPENGL_COMPATIBILITY_PROFILE)));
             puglSetViewHint(platform.view, PUGL_CONTEXT_DEBUG, RUNTIME_SAFETY_CHECKS_ON);
 
-            puglSetViewHint(platform.view, PUGL_RESIZABLE, true);
-            auto const size = gui_settings::WindowSize(platform.settings);
-            TRY(Required(puglSetSize(platform.view, size.width, size.height)));
-            LogDebug(ModuleName::Gui, "creating size: {}x{}", size.width, size.height);
-
             TRY(Required(puglRealize(platform.view)));
             TRY(Required(
                 puglStartTimer(platform.view, platform.k_pugl_timer_id, 1.0 / (f64)k_gui_refresh_rate_hz)));
 
-            detail::X11SetParent(platform.view, puglGetParentWindow(platform.view));
-            puglSetPosition(platform.view, 0, 0);
+            detail::X11SetParent(platform.view, puglGetParent(platform.view));
 
             platform.gui.Emplace(platform.frame_state, plugin);
 
@@ -259,12 +282,11 @@ PUBLIC ErrorCodeOr<void> SetVisible(GuiPlatform& platform, bool visible, Engine&
 }
 
 PUBLIC bool SetSize(GuiPlatform& platform, UiSize new_size) {
-    return puglSetSize(platform.view, new_size.width, new_size.height) == PUGL_SUCCESS;
+    return puglSetSizeHint(platform.view, PUGL_CURRENT_SIZE, new_size.width, new_size.height) == PUGL_SUCCESS;
 }
 
-PUBLIC UiSize WindowSize(GuiPlatform& platform) {
-    if (!platform.gui) return gui_settings::WindowSize(platform.settings);
-    auto const size = puglGetFrame(platform.view);
+PUBLIC UiSize GetSize(GuiPlatform& platform) {
+    auto const size = puglGetSizeHint(platform.view, PUGL_CURRENT_SIZE);
     return {size.width, size.height};
 }
 
@@ -637,8 +659,7 @@ static void UpdateAndRender(GuiPlatform& platform) {
         if (elapsed > 10) LogWarning(ModuleName::Gui, "GUI update took {}ms", elapsed);
     };
 
-    auto const window_size = WindowSize(platform);
-
+    auto const window_size = GetSize(platform);
     platform.frame_state.graphics_ctx = platform.graphics_ctx;
     platform.frame_state.native_window = (void*)puglGetNativeView(platform.view);
     platform.frame_state.window_size = window_size;
@@ -699,11 +720,23 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
 
             // resized or moved
             case PUGL_CONFIGURE: {
-                LogDebug(ModuleName::Gui, "configure {}", fmt::DumpStruct(event->configure));
-                if (platform.graphics_ctx)
-                    platform.graphics_ctx->Resize({event->configure.width, event->configure.height});
-                if (event->configure.width)
-                    gui_settings::SetWindowSize(platform.settings, event->configure.width);
+                auto const& configure = event->configure;
+                LogDebug(ModuleName::Gui, "configure {}", fmt::DumpStruct(configure));
+                auto const size = NearestAspectRatioSizeInsideSize({configure.width, configure.height},
+                                                                   DesiredAspectRatio(platform.settings));
+
+                if (size && size->width >= k_min_gui_width && size->width <= k_max_gui_width) {
+                    sts::SetValue(platform.settings,
+                                  SettingDescriptor(GuiSetting::WindowWidth),
+                                  (s64)size->width);
+                    if (platform.graphics_ctx) platform.graphics_ctx->Resize(*size);
+                } else {
+                    LogWarning(ModuleName::Gui,
+                               "resized to an invalid size: {} x {}",
+                               configure.width,
+                               configure.height);
+                }
+
                 break;
             }
 
@@ -784,7 +817,7 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
             case PUGL_LOOP_LEAVE: break;
         }
 
-        if (post_redisplay) puglPostRedisplay(view);
+        if (post_redisplay) puglObscureView(view);
 
         return PUGL_SUCCESS;
     } catch (PanicException) {

@@ -540,18 +540,22 @@ static ErrorCodeOr<void> Main(String exe_path_rel) {
     auto const size = *ClapPixelsToPhysicalPixels(standalone.gui_view, clap_width, clap_height);
     TRY_PUGL(
         puglSetSizeHint(standalone.gui_view, PUGL_DEFAULT_SIZE, (PuglSpan)size.width, (PuglSpan)size.height));
+    TRY_PUGL(
+        puglSetSizeHint(standalone.gui_view, PUGL_CURRENT_SIZE, (PuglSpan)size.width, (PuglSpan)size.height));
 
-    clap_gui_resize_hints resize_hints;
-    TRY_CLAP(gui->get_resize_hints(&standalone.plugin, &resize_hints));
-    if (resize_hints.can_resize_vertically && resize_hints.can_resize_horizontally) {
-        TRY_PUGL(puglSetViewHint(standalone.gui_view, PUGL_RESIZABLE, gui->can_resize(&standalone.plugin)));
-        if (resize_hints.preserve_aspect_ratio)
-            TRY_PUGL(puglSetSizeHint(standalone.gui_view,
-                                     PUGL_FIXED_ASPECT,
-                                     (PuglSpan)resize_hints.aspect_ratio_width,
-                                     (PuglSpan)resize_hints.aspect_ratio_height));
+    {
+        clap_gui_resize_hints resize_hints;
+        TRY_CLAP(gui->get_resize_hints(&standalone.plugin, &resize_hints));
+        if (resize_hints.can_resize_vertically && resize_hints.can_resize_horizontally) {
+            TRY_PUGL(
+                puglSetViewHint(standalone.gui_view, PUGL_RESIZABLE, gui->can_resize(&standalone.plugin)));
+            if (resize_hints.preserve_aspect_ratio)
+                TRY_PUGL(puglSetSizeHint(standalone.gui_view,
+                                         PUGL_FIXED_ASPECT,
+                                         (PuglSpan)resize_hints.aspect_ratio_width,
+                                         (PuglSpan)resize_hints.aspect_ratio_height));
+        }
     }
-    TRY_PUGL(puglSetSize(standalone.gui_view, size.width, size.height));
 
     TRY_PUGL(puglRealize(standalone.gui_view));
     DEFER { puglUnrealize(standalone.gui_view); };

@@ -16,12 +16,13 @@ For instance: 0.0.1. Don't change the headings.
 - Add new Share Feedback panel for submitting bug reports and feature requests
 - Add new fields to the Lua API to support license info and attribution, such as CC BY
 - Add attribution-required panel which appears when needed with generated copyable text for fulfilling attribution requirements. Synchronised between all instances of Floe. Makes complying with licenses like CC BY easy.
-- Add autosave feature, which saves the current state of Floe every minute. This is useful for recovering from crashes. Configurable in the settings.
-- Enable selecting multiple package to install at once
+- Add autosave feature, which efficiently saves the current state of Floe at a configurable interval. This is useful for recovering from crashes. Configurable in the settings.
+- Add ability to select multiple packages to install at once
 - Renamed Appearance settings to General since it's small and can be used for other settings
 - Make notifications dismiss themselves after a few seconds
 - Fixed externally deleted or moved-to-trash libraries not being removed from Floe
 - Fixed not installing to the chosen location
+- Make window resizing work better: fixed aspect ratio, correct remembering of previous size, correct keyboard show/hide, resizable to any size within a reasonable range.
 
 ## 0.0.2
 - Fix Windows installer crash

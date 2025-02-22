@@ -10,10 +10,10 @@
 #include "gui_menu.hpp"
 #include "gui_modal_windows.hpp"
 #include "gui_peak_meter_widget.hpp"
+#include "gui_settings.hpp"
 #include "gui_widget_compounds.hpp"
 #include "gui_widget_helpers.hpp"
 #include "presets/presets_folder.hpp"
-#include "settings_gui.hpp"
 #include "state/state_snapshot.hpp"
 
 static void PresetsWindowButton(Gui* g, Engine* a, Rect r) {
@@ -224,15 +224,14 @@ void TopPanel(Gui* g) {
 
     {
         auto subtitle_r = layout::GetRect(g->layout, subtitle).Up(Round(-title_font->descent + 1));
-        labels::Label(
-            g,
-            subtitle_r,
-            fmt::Format(g->scratch_arena,
-                        "v" FLOE_VERSION_STRING "  {}",
-                        sts::LookupBool(g->settings, gui_settings::k_show_instance_name).ValueOr(true)
-                            ? String {g->engine.autosave_state.instance_id}
-                            : ""_s),
-            labels::Title(g->imgui, LiveCol(g->imgui, UiColMap::TopPanelSubtitleText)));
+        auto const show_instance_name =
+            sts::GetBool(g->settings, SettingDescriptor(GuiSetting::ShowInstanceName));
+        labels::Label(g,
+                      subtitle_r,
+                      fmt::Format(g->scratch_arena,
+                                  "v" FLOE_VERSION_STRING "  {}",
+                                  show_instance_name ? String {g->engine.autosave_state.instance_id} : ""_s),
+                      labels::Title(g->imgui, LiveCol(g->imgui, UiColMap::TopPanelSubtitleText)));
     }
 
     g->imgui.graphics->context->PushFont(g->mada);

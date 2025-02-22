@@ -60,8 +60,8 @@
             .hash = "1220c8a30a9f05d36e186274ddbf9a7af94f211dd368557792727dd73353beff155c",
         },
         .pugl = .{
-            .url = "git+https://github.com/lv2/pugl#f7b3fe466e7c443b4ec60901899fc538b66c0cc1",
-            .hash = "12204d8c6054a2b2a39c6d6d7f5b47bdfbc93bc5709a240f1eed1187df06175ce59a",
+            .url = "git+https://github.com/lv2/pugl#66afe808e8c17f41cf6122158df96361cb42cccb",
+            .hash = "1220fc50d31ffbbf21a8a6243c5f025b66062a03c54e8f951ee9f322062cf766f7a5",
         },
         .pffft = .{
             .url = "https://bitbucket.org/jpommier/pffft/get/fbc405860280.zip",

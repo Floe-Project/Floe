@@ -12,8 +12,8 @@
 #include "gui_drawing_helpers.hpp"
 #include "gui_framework/gui_live_edit.hpp"
 #include "gui_label_widgets.hpp"
+#include "gui_settings.hpp"
 #include "gui_window.hpp"
-#include "settings_gui.hpp"
 
 void StartFloeMenu(Gui* g) { g->imgui.graphics->context->PushFont(g->roboto_small); }
 
@@ -79,7 +79,7 @@ void DoTooltipText(Gui* g, String str, Rect r, bool rect_is_window_pos) {
 }
 
 bool Tooltip(Gui* g, imgui::Id id, Rect r, String str, bool rect_is_window_pos) {
-    if (!gui_settings::ShowTooltips(g->settings)) return false;
+    if (!sts::GetBool(g->settings, SettingDescriptor(GuiSetting::ShowTooltips))) return false;
 
     auto& imgui = g->imgui;
     f64 const delay {0.5};

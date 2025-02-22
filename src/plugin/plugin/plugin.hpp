@@ -189,9 +189,5 @@ static constexpr clap_plugin_descriptor k_plugin_info {
 // can return null
 clap_plugin const* CreateFloeInstance(clap_host const* clap_host);
 
-// Request that the host resize the available space for the plugin. The host will likely follow this up with a
-// call to set_size(). So we shouldn't do that ourselves.
-void RequestGuiResize(FloeInstanceIndex index);
-
 void OnPollThread(FloeInstanceIndex index);
-void OnSettingsChange(FloeInstanceIndex index, sts::Key key, sts::Value const* value);
+void OnSettingsChange(FloeInstanceIndex index, sts::Key const& key, sts::Value const* value);

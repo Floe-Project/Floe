@@ -59,11 +59,6 @@ SharedEngineSystems::SharedEngineSystems(Span<sentry::Tag const> tags)
             sample_lib_server::SetExtraScanFolders(sample_library_server, extra_scan_folders);
         } else if (key == sts::key::k_extra_presets_folder) {
             preset_listing.scanned_folder.needs_rescan.Store(true, StoreMemoryOrder::Relaxed);
-        } else if (key == sts::key::k_window_width) {
-            registered_floe_instances_mutex.Lock();
-            DEFER { registered_floe_instances_mutex.Unlock(); };
-            for (auto index : registered_floe_instances)
-                RequestGuiResize(index);
         }
         ErrorReportingOnSettingsChange(key, value);
 

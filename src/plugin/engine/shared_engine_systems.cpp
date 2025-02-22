@@ -65,6 +65,7 @@ SharedEngineSystems::SharedEngineSystems(Span<sentry::Tag const> tags)
             for (auto index : registered_floe_instances)
                 RequestGuiResize(index);
         }
+        ErrorReportingOnSettingsChange(key, value);
     };
 
     thread_pool.Init("global", {});

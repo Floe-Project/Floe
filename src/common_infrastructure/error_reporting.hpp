@@ -43,6 +43,10 @@ enum class ReportFeedbackReturnCode {
 
 ReportFeedbackReturnCode ReportFeedback(String description, Optional<String> email, bool include_diagnostics);
 
-bool IsOnlineReportingDisabled(sts::Settings const& settings);
-bool IsOnlineReportingDisabled(); // slow version, reads the settings file directly
-void SetOnlineReportingDisabled(sts::Settings& settings, bool disabled);
+// Use this with sts::SetValue, sts::GetValue
+sts::Descriptor const& IsOnlineReportingDisabledSettingDescriptor();
+void ErrorReportingOnSettingsChange(sts::Key const& key, sts::Value const* value);
+
+// Slow version, reads the settings file directly. Allows you to get the value without relying on any settings
+// object.
+bool IsOnlineReportingDisabled();

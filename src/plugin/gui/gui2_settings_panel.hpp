@@ -578,6 +578,35 @@ static void PackagesSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext
     }
 }
 
+static void
+Setting(GuiBoxSystem& box_system, SettingsPanelContext& context, Box parent, sts::Descriptor const& info) {
+    switch (info.value_requirements.tag) {
+        case sts::ValueType::Int: {
+            auto const& int_info = info.value_requirements.Get<sts::Descriptor::IntRequirements>();
+            if (auto const v = IntField(box_system,
+                                        parent,
+                                        info.gui_label,
+                                        30.0f,
+                                        sts::GetValue(context.settings, info).value.Get<s64>(),
+                                        int_info.min_value,
+                                        int_info.max_value)) {
+                sts::SetValue(context.settings, info, *v);
+            }
+            break;
+        }
+        case sts::ValueType::Bool: {
+            auto const state = sts::GetValue(context.settings, info).value.Get<bool>();
+            if (CheckboxButton(box_system, parent, info.gui_label, state, info.long_description))
+                sts::SetValue(context.settings, info, !state);
+            break;
+        }
+        case sts::ValueType::String: {
+            Panic("not implemented");
+            break;
+        }
+    }
+}
+
 static void GeneralSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& context) {
     auto const root = DoBox(box_system,
                             {
@@ -702,17 +731,7 @@ static void GeneralSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext&
         SettingsLhsTextWidget(box_system, misc_row, "General");
         auto const options_rhs_column = SettingsRhsColumn(box_system, misc_row, style::k_settings_small_gap);
 
-        {
-            auto const state = IsOnlineReportingDisabled(context.settings);
-            if (CheckboxButton(
-                    box_system,
-                    options_rhs_column,
-                    "Disable anonymous error reports",
-                    state,
-                    "If an error occurs, Floe sends anonymous data about the error, your system, and Floe's state to a server. Additionally, Floe sends anonymous data points about when a session starts and ends for determining software health.")) {
-                SetOnlineReportingDisabled(context.settings, !state);
-            }
-        }
+        Setting(box_system, context, options_rhs_column, IsOnlineReportingDisabledSettingDescriptor());
 
         for (auto const autosave_setting : EnumIterator<AutosaveSetting>()) {
             auto const info = GetAutosaveSettingInfo(autosave_setting);

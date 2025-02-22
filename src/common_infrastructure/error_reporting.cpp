@@ -14,12 +14,25 @@ static DynamicArrayBounded<u64, 48> g_reported_error_ids = {};
 constexpr bool k_online_reporting_disabled_default = false;
 constexpr String k_online_reporting_disabled_settings_key = "online_reporting_disabled"_s;
 
-bool IsOnlineReportingDisabled(sts::Settings const& settings) {
-    return sts::LookupBool(settings, k_online_reporting_disabled_settings_key)
-        .ValueOr(k_online_reporting_disabled_default);
+sts::Descriptor const& IsOnlineReportingDisabledSettingDescriptor() {
+    static sts::Descriptor const d {
+        .key = k_online_reporting_disabled_settings_key,
+        .value_requirements = sts::ValueType::Bool,
+        .default_value = k_online_reporting_disabled_default,
+        .gui_label = "Disable anonymous error reports",
+        .long_description =
+            "If an error occurs, Floe sends anonymous data about the error, your system, and Floe's state to a server. Additionally, Floe sends anonymous data points about when a session starts and ends for determining software health.",
+    };
+    return d;
 }
 
-// We manually read the file because we don't want to depend on having some initialised settings object.
+void ErrorReportingOnSettingsChange(sts::Key const& key, sts::Value const* value) {
+    if (auto const v = sts::Match(key, value, IsOnlineReportingDisabledSettingDescriptor())) {
+        if (auto sentry = sentry::GlobalSentry())
+            sentry->online_reporting_disabled.Store(v->Get<bool>(), StoreMemoryOrder::Relaxed);
+    }
+}
+
 bool IsOnlineReportingDisabled() {
     ArenaAllocatorWithInlineStorage<Kb(4)> arena {PageAllocator::Instance()};
     auto try_read = [&]() -> ErrorCodeOr<bool> {
@@ -34,17 +47,12 @@ bool IsOnlineReportingDisabled() {
         if (outcome.Error() == FilesystemError::PathDoesNotExist) return k_online_reporting_disabled_default;
 
         // We couldn't read the file, so we can't know either way. It could just be an temporary filesystem
-        // error, so we can't assume the user's preference so we'll say reporting is disabled.
+        // error, so we can't assume the user's preference so we'll go for the less controversial option:
+        // disable online reporting.
         return true;
     }
 
     return outcome.Value();
-}
-
-void SetOnlineReportingDisabled(sts::Settings& settings, bool disabled) {
-    if (auto sentry = sentry::GlobalSentry())
-        sentry->online_reporting_disabled.Store(disabled, StoreMemoryOrder::Relaxed);
-    sts::SetValue(settings, k_online_reporting_disabled_settings_key, disabled);
 }
 
 void InitBackgroundErrorReporting(Span<sentry::Tag const> tags) {

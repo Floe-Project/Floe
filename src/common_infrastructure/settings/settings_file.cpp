@@ -21,6 +21,23 @@ static bool IsKeyValid(String key) {
     return true;
 }
 
+static bool IsKeyValid(Key const& key) {
+    switch (key.tag) {
+        case KeyType::GlobalString: return IsKeyValid(key.Get<String>());
+        case KeyType::GlobalInt: return true;
+        case KeyType::Sectioned: {
+            auto const k = key.Get<SectionedKey>();
+            if (!IsKeyValid(k.section)) return false;
+            switch (k.key.tag) {
+                case KeyValueType::String: return IsKeyValid(k.key.Get<String>());
+                case KeyValueType::Int: return true;
+            }
+        }
+    }
+    PanicIfReached();
+    return false;
+}
+
 u64 HashKey(Key const& key) {
     switch (key.tag) {
         case KeyType::GlobalString: return Hash(key.Get<String>());
@@ -581,6 +598,7 @@ static void AddValueToFreeList(Settings& settings, Value* value) {
 }
 
 void SetValue(Settings& settings, Key key, ValueUnion value, SetValueOptions options) {
+    ASSERT(IsKeyValid(key));
     Value* new_value {};
 
     auto const existing_values_ptr = settings.Find(key);
@@ -619,6 +637,7 @@ void SetValue(Settings& settings, Key key, ValueUnion value, SetValueOptions opt
 }
 
 bool AddValue(Settings& settings, Key key, ValueUnion value, SetValueOptions options) {
+    ASSERT(IsKeyValid(key));
     Value* first_node {};
 
     auto existing_values_ptr = settings.Find(key);
@@ -645,6 +664,7 @@ bool AddValue(Settings& settings, Key key, ValueUnion value, SetValueOptions opt
 }
 
 bool RemoveValue(Settings& settings, Key key, ValueUnion value, RemoveValueOptions options) {
+    ASSERT(IsKeyValid(key));
     auto const existing_values_ptr = settings.Find(key);
     if (!existing_values_ptr) return false;
     auto& existing_values = *existing_values_ptr;
@@ -674,6 +694,7 @@ bool RemoveValue(Settings& settings, Key key, ValueUnion value, RemoveValueOptio
 }
 
 void Remove(Settings& settings, Key key, RemoveValueOptions options) {
+    ASSERT(IsKeyValid(key));
     auto existing = settings.Find(key);
     if (!existing) return;
 

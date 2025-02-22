@@ -10,9 +10,14 @@
 //
 // This is for anything we want to persist between sessions, e.g. window size, extra library folders, etc.
 //
-// In general, we take the approach that the settings system doesn't know anything about the data it's
-// storing. Intstead, each part of the code that uses the settings should know their own keys and validate the
-// values they get from the settings. However, for backwards compatibility this system does know about keys in
+// Primarily, settings are controlled by the user through the GUI. However, we also support users manually
+// editing the settings file. We use a directory watcher and a diff algorithm to detect changes to the file
+// and update the settings accordingly. This is also neccessary in the case that there are multiple processes
+// running Floe at the same time (this can happen in some DAWs).
+//
+// In general, we take the approach that the settings system doesn't know anything about the data that it is
+// storing. Instead, each part of the code that uses the settings should know their own keys and validate the
+// values they get from the settings. However, for backwards compatibility this code does know about keys in
 // the legacy file format so that it can remap them.
 //
 // We want settings to be both forwards and backwards compatible because sometimes multiple versions of Floe
@@ -20,15 +25,17 @@
 // the plugin from either version). This isn't a common senario but it's one that can sometimes occur. We want
 // both old and new versions of Floe to be able to read and write the settings file without losing any data.
 //
-// INI is not a strict format, these are our rules:
+// INI is not a strict format. These are our specific rules:
 // - 'key = value\n' syntax. Spaces or tabs around the = are ignored.
 // - Key and value must be on the same line.
 // - There's no escaping of special characters.
+// - There's no quoting of strings.
 // - The same key can appear multiple times with different values, in which case the same key has multiple
 //   values (an array). These values are unordered. Duplicate values for the same key are ignored.
-// - Keys/section-names must <= k_max_key_size long.
-// - Sections are in square brackets: [Section Name].
+// - Keys and sections must be <= k_max_key_size long.
+// - Sections are in square brackets on line of their own: [Section Name].
 // - Comments are lines starting with a semicolon.
+// - We don't enforce a format for keys, but prefer keys-with-dashes.
 //
 // Settings are kept in a hash table. The key is a string/int or a section + key string/int pair. The value is
 // a linked list. You can loop over the table to get all the key-value pairs.

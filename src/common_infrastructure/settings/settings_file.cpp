@@ -122,25 +122,23 @@ SettingsTable ParseSettingsFile(String file_data, ArenaAllocator& arena) {
             continue;
         }
 
-        auto const value_str = line.SubSpan(*equals + 1);
-
-        auto const stripped_value_str = WhitespaceStripped(value_str);
+        auto const value_str = WhitespaceStripped(line.SubSpan(*equals + 1));
 
         usize num_chars_read = {};
 
         Value* value = nullptr;
-        if (stripped_value_str.size == 0)
+        if (value_str.size == 0)
             value = nullptr; // empty values are allowed
-        else if (IsEqualToCaseInsensitiveAscii(stripped_value_str, "true"_s))
+        else if (IsEqualToCaseInsensitiveAscii(value_str, "true"_s))
             value = arena.New<Value>(true);
-        else if (IsEqualToCaseInsensitiveAscii(stripped_value_str, "false"_s))
+        else if (IsEqualToCaseInsensitiveAscii(value_str, "false"_s))
             value = arena.New<Value>(false);
-        else if (auto const v = ParseInt(stripped_value_str, ParseIntBase::Decimal, &num_chars_read);
-                 v && num_chars_read == stripped_value_str.size)
+        else if (auto const v = ParseInt(value_str, ParseIntBase::Decimal, &num_chars_read, false);
+                 v && num_chars_read == value_str.size)
             value = arena.New<Value>(*v);
         else
             // We don't need to clone the string here because we've asserted it's already in the arena.
-            value = arena.New<Value>(WhitespaceStrippedStart(value_str));
+            value = arena.New<Value>(value_str);
 
         auto const key_int = ParseInt(key, ParseIntBase::Decimal);
 

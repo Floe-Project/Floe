@@ -188,7 +188,7 @@ String SettingsFilepath(String* error_log) {
         auto writer = dyn::WriterFor(error_log_buffer);
         return FloeKnownDirectory(allocator,
                                   FloeKnownDirectoryType::Settings,
-                                  "settings.ini"_s,
+                                  "floe.ini"_s,
                                   {.create = true, .error_log = &writer});
     }();
     if (error_log) *error_log = error_log_buffer;

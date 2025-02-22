@@ -572,6 +572,10 @@ static void PluginOnPollThread(Engine& engine) {
     AutosaveToFileIfNeeded(engine.autosave_state, engine.shared_engine_systems.paths);
 }
 
+static void PluginOnSettingsChange(Engine& engine, sts::Key key, sts::Value const* value) {
+    ASSERT(IsMainThread(engine.host));
+}
+
 usize MegabytesUsedBySamples(Engine const& engine) {
     usize result = 0;
     for (auto& l : engine.processor.layer_processors) {
@@ -660,6 +664,7 @@ PluginCallbacks<Engine> EngineCallbacks() {
         .on_main_thread = OnMainThread,
         .on_timer = PluginOnTimer,
         .on_poll_thread = PluginOnPollThread,
+        .on_settings_change = PluginOnSettingsChange,
         .save_state = PluginSaveState,
         .load_state = PluginLoadState,
     };

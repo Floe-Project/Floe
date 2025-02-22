@@ -1455,3 +1455,11 @@ void OnPollThread(FloeInstanceIndex index) {
     ASSERT(floe.engine);
     EngineCallbacks().on_poll_thread(*floe.engine);
 }
+
+void OnSettingsChange(FloeInstanceIndex index, sts::Key key, sts::Value const* value) {
+    if (PanicOccurred()) return;
+    auto& floe = *g_floe_instances[index];
+    ASSERT(IsMainThread(floe.host));
+    ASSERT(floe.engine);
+    EngineCallbacks().on_settings_change(*floe.engine, key, value);
+}

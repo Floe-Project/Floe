@@ -24,7 +24,7 @@ static void LibrariesInfoPanel(GuiBoxSystem& box_system, InfoPanelContext& conte
     auto const root = DoBox(box_system,
                             {
                                 .layout {
-                                    .size = box_system.imgui.PixelsToPoints(box_system.imgui.Size()),
+                                    .size = box_system.imgui.PixelsToVw(box_system.imgui.Size()),
                                     .contents_padding = {.lrtb = style::k_spacing},
                                     .contents_gap = style::k_spacing,
                                     .contents_direction = layout::Direction::Column,
@@ -151,7 +151,7 @@ static void AboutInfoPanel(GuiBoxSystem& box_system, InfoPanelContext&) {
     auto const root = DoBox(box_system,
                             {
                                 .layout {
-                                    .size = box_system.imgui.PixelsToPoints(box_system.imgui.Size()),
+                                    .size = box_system.imgui.PixelsToVw(box_system.imgui.Size()),
                                     .contents_padding = {.lrtb = style::k_spacing},
                                     .contents_gap = style::k_spacing,
                                     .contents_direction = layout::Direction::Column,
@@ -194,7 +194,7 @@ static void MetricsInfoPanel(GuiBoxSystem& box_system, InfoPanelContext& context
     auto const root = DoBox(box_system,
                             {
                                 .layout {
-                                    .size = box_system.imgui.PixelsToPoints(box_system.imgui.Size()),
+                                    .size = box_system.imgui.PixelsToVw(box_system.imgui.Size()),
                                     .contents_padding = {.lrtb = style::k_spacing},
                                     .contents_gap = style::k_spacing,
                                     .contents_direction = layout::Direction::Column,
@@ -240,7 +240,7 @@ static void LegalInfoPanel(GuiBoxSystem& box_system, InfoPanelContext&) {
     auto const root = DoBox(box_system,
                             {
                                 .layout {
-                                    .size = box_system.imgui.PixelsToPoints(box_system.imgui.Size()),
+                                    .size = box_system.imgui.PixelsToVw(box_system.imgui.Size()),
                                     .contents_padding = {.lrtb = style::k_spacing},
                                     .contents_gap = 4,
                                     .contents_direction = layout::Direction::Column,
@@ -386,8 +386,8 @@ PUBLIC void DoInfoPanel(GuiBoxSystem& box_system, InfoPanelContext& context, Inf
                          ModalPanel {
                              .r = CentredRect(
                                  {.pos = 0, .size = box_system.imgui.frame_input.window_size.ToFloat2()},
-                                 f32x2 {box_system.imgui.PointsToPixels(style::k_info_dialog_width),
-                                        box_system.imgui.PointsToPixels(style::k_info_dialog_height)}),
+                                 f32x2 {box_system.imgui.VwToPixels(style::k_info_dialog_width),
+                                        box_system.imgui.VwToPixels(style::k_info_dialog_height)}),
                              .imgui_id = box_system.imgui.GetID("new info"),
                              .on_close = [&state]() { state.open = false; },
                              .close_on_click_outside = true,

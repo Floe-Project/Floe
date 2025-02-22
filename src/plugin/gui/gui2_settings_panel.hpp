@@ -13,17 +13,16 @@
 #include "settings_gui.hpp"
 
 static void SettingsLhsTextWidget(GuiBoxSystem& box_system, Box parent, String text) {
-    DoBox(
-        box_system,
-        {
-            .parent = parent,
-            .text = text,
-            .font = FontType::Body,
-            .layout {
-                .size = {style::k_settings_lhs_width,
-                         box_system.imgui.PixelsToPoints(box_system.fonts[ToInt(FontType::Body)]->font_size)},
-            },
-        });
+    DoBox(box_system,
+          {
+              .parent = parent,
+              .text = text,
+              .font = FontType::Body,
+              .layout {
+                  .size = {style::k_settings_lhs_width,
+                           box_system.imgui.PixelsToVw(box_system.fonts[ToInt(FontType::Body)]->font_size)},
+              },
+          });
 }
 
 static void SettingsRhsText(GuiBoxSystem& box_system, Box parent, String text) {
@@ -280,7 +279,7 @@ static void FolderSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& 
     auto const root = DoBox(box_system,
                             {
                                 .layout {
-                                    .size = box_system.imgui.PixelsToPoints(box_system.imgui.Size()),
+                                    .size = box_system.imgui.PixelsToVw(box_system.imgui.Size()),
                                     .contents_padding = {.lrtb = style::k_spacing},
                                     .contents_gap = style::k_settings_large_gap,
                                     .contents_direction = layout::Direction::Column,
@@ -451,7 +450,7 @@ static void InstallLocationMenu(GuiBoxSystem& box_system,
               .parent = root,
               .background_fill = style::Colour::Overlay0,
               .layout {
-                  .size = {layout::k_fill_parent, box_system.imgui.PixelsToPoints(1)},
+                  .size = {layout::k_fill_parent, box_system.imgui.PixelsToVw(1)},
                   .margins {.tb = style::k_menu_item_padding_y},
               },
           });
@@ -489,7 +488,7 @@ static void PackagesSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext
     auto const root = DoBox(box_system,
                             {
                                 .layout {
-                                    .size = box_system.imgui.PixelsToPoints(box_system.imgui.Size()),
+                                    .size = box_system.imgui.PixelsToVw(box_system.imgui.Size()),
                                     .contents_padding = {.lrtb = style::k_spacing},
                                     .contents_gap = style::k_settings_medium_gap,
                                     .contents_direction = layout::Direction::Column,
@@ -583,7 +582,7 @@ static void GeneralSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext&
     auto const root = DoBox(box_system,
                             {
                                 .layout {
-                                    .size = box_system.imgui.PixelsToPoints(box_system.imgui.Size()),
+                                    .size = box_system.imgui.PixelsToVw(box_system.imgui.Size()),
                                     .contents_padding = {.lrtb = style::k_spacing},
                                     .contents_gap = style::k_settings_medium_gap,
                                     .contents_direction = layout::Direction::Column,
@@ -634,7 +633,7 @@ static void GeneralSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext&
                   .parent = button_container,
                   .background_fill = style::Colour::Surface2,
                   .layout {
-                      .size = {box_system.imgui.PixelsToPoints(1), layout::k_fill_parent},
+                      .size = {box_system.imgui.PixelsToVw(1), layout::k_fill_parent},
                   },
               });
         if (DoBox(box_system,
@@ -798,8 +797,8 @@ DoSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& context, Setting
                          ModalPanel {
                              .r = CentredRect(
                                  {.pos = 0, .size = box_system.imgui.frame_input.window_size.ToFloat2()},
-                                 f32x2 {box_system.imgui.PointsToPixels(style::k_settings_dialog_width),
-                                        box_system.imgui.PointsToPixels(style::k_settings_dialog_height)}),
+                                 f32x2 {box_system.imgui.VwToPixels(style::k_settings_dialog_width),
+                                        box_system.imgui.VwToPixels(style::k_settings_dialog_height)}),
                              .imgui_id = box_system.imgui.GetID("new settings"),
                              .on_close = [&state]() { state.open = false; },
                              .close_on_click_outside = true,

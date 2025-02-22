@@ -89,8 +89,8 @@ PUBLIC void DoAttributionPanel(GuiBoxSystem& box_system, AttributionPanelContext
                          ModalPanel {
                              .r = CentredRect(
                                  {.pos = 0, .size = box_system.imgui.frame_input.window_size.ToFloat2()},
-                                 f32x2 {box_system.imgui.PointsToPixels(style::k_info_dialog_width),
-                                        box_system.imgui.PointsToPixels(style::k_info_dialog_height)}),
+                                 f32x2 {box_system.imgui.VwToPixels(style::k_info_dialog_width),
+                                        box_system.imgui.VwToPixels(style::k_info_dialog_height)}),
                              .imgui_id = box_system.imgui.GetID("new info"),
                              .on_close = [&open]() { open = false; },
                              .close_on_click_outside = true,

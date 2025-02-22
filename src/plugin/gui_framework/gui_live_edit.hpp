@@ -6,11 +6,11 @@
 
 enum class UiSizeUnit : u8 {
     None,
-    Points,
+    Vw,
     Count,
 };
 
-constexpr String k_ui_size_units_text[] = {"None", "Points"};
+constexpr String k_ui_size_units_text[] = {"None", "Vw"};
 static_assert(ArraySize(k_ui_size_units_text) == ToInt(UiSizeUnit::Count));
 
 // The build system needs to -I the directory containing these files

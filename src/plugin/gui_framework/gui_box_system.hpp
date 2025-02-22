@@ -122,19 +122,16 @@ struct GuiBoxSystem {
     bool mouse_down_on_modal_background = false;
     imgui::TextInputResult last_text_input_result {};
 
-    f32 const scrollbar_width = imgui.PointsToPixels(8);
-    f32 const scrollbar_padding = imgui.PointsToPixels(style::k_scrollbar_rhs_space);
+    f32 const scrollbar_width = imgui.VwToPixels(8);
+    f32 const scrollbar_padding = imgui.VwToPixels(style::k_scrollbar_rhs_space);
     imgui::DrawWindowScrollbar* const draw_scrollbar = [](IMGUI_DRAW_WINDOW_SCROLLBAR_ARGS) {
         u32 handle_col = style::Col(style::Colour::Surface1);
         if (imgui.IsHotOrActive(id)) handle_col = style::Col(style::Colour::Surface2);
-        imgui.graphics->AddRectFilled(handle_rect.Min(),
-                                      handle_rect.Max(),
-                                      handle_col,
-                                      imgui.PointsToPixels(4));
+        imgui.graphics->AddRectFilled(handle_rect.Min(), handle_rect.Max(), handle_col, imgui.VwToPixels(4));
     };
 
     imgui::DrawWindowBackground* const draw_window = [](IMGUI_DRAW_WINDOW_BG_ARGS) {
-        auto const rounding = imgui.PointsToPixels(style::k_panel_rounding);
+        auto const rounding = imgui.VwToPixels(style::k_panel_rounding);
         auto r = window->unpadded_bounds;
         draw::DropShadow(imgui, r, rounding);
         imgui.graphics->AddRectFilled(r, style::Col(style::Colour::Background0), rounding);
@@ -149,8 +146,8 @@ struct GuiBoxSystem {
     imgui::WindowSettings const popup_settings {
         .flags =
             imgui::WindowFlags_AutoWidth | imgui::WindowFlags_AutoHeight | imgui::WindowFlags_AutoPosition,
-        .pad_top_left = {1, imgui.PointsToPixels(style::k_panel_rounding)},
-        .pad_bottom_right = {1, imgui.PointsToPixels(style::k_panel_rounding)},
+        .pad_top_left = {1, imgui.VwToPixels(style::k_panel_rounding)},
+        .pad_bottom_right = {1, imgui.VwToPixels(style::k_panel_rounding)},
         .scrollbar_padding = scrollbar_padding,
         .scrollbar_padding_top = 0,
         .scrollbar_width = scrollbar_width,
@@ -380,10 +377,10 @@ static bool Tooltip(GuiBoxSystem& builder, imgui::Id id, Rect r, String str) {
         DEFER { builder.imgui.graphics->context->PopFont(); };
 
         auto const font = imgui.overlay_graphics.context->CurrentFont();
-        auto const pad_x = imgui.PointsToPixels(style::k_tooltip_pad_x);
-        auto const pad_y = imgui.PointsToPixels(style::k_tooltip_pad_y);
+        auto const pad_x = imgui.VwToPixels(style::k_tooltip_pad_x);
+        auto const pad_y = imgui.VwToPixels(style::k_tooltip_pad_y);
 
-        auto text_size = draw::GetTextSize(font, str, imgui.PointsToPixels(style::k_tooltip_max_width));
+        auto text_size = draw::GetTextSize(font, str, imgui.VwToPixels(style::k_tooltip_max_width));
 
         Rect popup_r;
         popup_r.x = r.x;
@@ -422,7 +419,7 @@ PUBLIC Box DoBox(GuiBoxSystem& builder, BoxConfig const& config) {
     auto const box_index = builder.box_counter++;
     auto const font = builder.fonts[ToInt(config.font)];
     auto const font_size =
-        config.font_size != 0 ? builder.imgui.PointsToPixels(config.font_size) : font->font_size;
+        config.font_size != 0 ? builder.imgui.VwToPixels(config.font_size) : font->font_size;
 
     // IMPORTANT: if the string is very long, it needs to be word-wrapped manually by including newlines in
     // the text. This is necessary because our text rendering system is bad at doing huge amounts of
@@ -442,11 +439,11 @@ PUBLIC Box DoBox(GuiBoxSystem& builder, BoxConfig const& config) {
                             layout.parent = config.parent->layout_id;
 
                         layout.size =
-                            Max(builder.imgui.pixels_per_point * layout.size, f32x2(layout::k_fill_parent));
+                            Max(builder.imgui.pixels_per_vw * layout.size, f32x2(layout::k_fill_parent));
 
-                        layout.margins.lrtb *= builder.imgui.pixels_per_point;
-                        layout.contents_gap *= builder.imgui.pixels_per_point;
-                        layout.contents_padding.lrtb *= builder.imgui.pixels_per_point;
+                        layout.margins.lrtb *= builder.imgui.pixels_per_vw;
+                        layout.contents_gap *= builder.imgui.pixels_per_vw;
+                        layout.contents_padding.lrtb *= builder.imgui.pixels_per_vw;
 
                         if (config.size_from_text) {
                             if (wrap_width != k_wrap_to_parent)
@@ -483,7 +480,7 @@ PUBLIC Box DoBox(GuiBoxSystem& builder, BoxConfig const& config) {
             auto const rect =
                 builder.imgui.GetRegisteredAndConvertedRect(layout::GetRect(builder.layout, box.layout_id));
             auto const mouse_rect =
-                rect.Expanded(builder.imgui.PointsToPixels(config.extra_margin_for_mouse_events));
+                rect.Expanded(builder.imgui.VwToPixels(config.extra_margin_for_mouse_events));
 
             if (config.activation_click_event != ActivationClickEvent::None) {
                 imgui::ButtonFlags button_flags {
@@ -536,9 +533,8 @@ PUBLIC Box DoBox(GuiBoxSystem& builder, BoxConfig const& config) {
                 // exclusively for the mouse so we should use the mouse rect
                 if (config.background_fill == style::Colour::None) r = mouse_rect;
 
-                auto const rounding = config.round_background_corners
-                                          ? builder.imgui.PointsToPixels(style::k_button_rounding)
-                                          : 0;
+                auto const rounding =
+                    config.round_background_corners ? builder.imgui.VwToPixels(style::k_button_rounding) : 0;
 
                 u32 col_u32 = style::Col(background_fill);
                 if (config.background_fill_auto_hot_active_overlay) {
@@ -571,9 +567,8 @@ PUBLIC Box DoBox(GuiBoxSystem& builder, BoxConfig const& config) {
                 auto r = rect;
                 if (config.border == style::Colour::None) r = mouse_rect;
 
-                auto const rounding = config.round_background_corners
-                                          ? builder.imgui.PointsToPixels(style::k_button_rounding)
-                                          : 0;
+                auto const rounding =
+                    config.round_background_corners ? builder.imgui.VwToPixels(style::k_button_rounding) : 0;
 
                 u32 col_u32 = style::Col(border);
                 if (config.border_auto_hot_active_overlay) {

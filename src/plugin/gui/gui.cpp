@@ -32,7 +32,7 @@
 #include "settings_gui.hpp"
 #include "state/state_coding.hpp"
 
-static f32 PixelsPerPoint(Gui* g) {
+static f32 PixelsPerVw(Gui* g) {
     constexpr auto k_points_in_width = 1000.0f; // 1000 just because it's easy to work with
     return (f32)g->frame_input.window_size.width / k_points_in_width;
 }
@@ -287,12 +287,12 @@ static void CreateFontsIfNeeded(Gui* g) {
     if (graphics_ctx->fonts.tex_id == nullptr) {
         graphics_ctx->fonts.Clear();
 
-        LoadFonts(*graphics_ctx, g->fonts, g->imgui.pixels_per_point);
+        LoadFonts(*graphics_ctx, g->fonts, g->imgui.pixels_per_vw);
 
-        auto const fira_sans_size = g->imgui.PointsToPixels(16);
-        auto const roboto_small_size = g->imgui.PointsToPixels(16);
-        auto const mada_big_size = g->imgui.PointsToPixels(23);
-        auto const mada_size = g->imgui.PointsToPixels(18);
+        auto const fira_sans_size = g->imgui.VwToPixels(16);
+        auto const roboto_small_size = g->imgui.VwToPixels(16);
+        auto const mada_big_size = g->imgui.VwToPixels(23);
+        auto const mada_size = g->imgui.VwToPixels(18);
 
         auto const def_ranges = graphics_ctx->fonts.GetGlyphRangesDefaultAudioPlugin();
 

@@ -480,11 +480,14 @@ struct Context {
     //
     // > Misc
     //
-    f32 PointsToPixels(f32 points) const { return points * pixels_per_point; }
-    f32x2 PointsToPixels(f32x2 points) const { return points * pixels_per_point; }
-    f32 PixelsToPoints(f32 pixels) const { return pixels / pixels_per_point; }
-    f32x2 PixelsToPoints(f32x2 pixels) const { return pixels / pixels_per_point; }
-    void SetPixelsPerPoint(f32 v) { pixels_per_point = v; }
+
+    // Similar to CSS vw units, we have a concept of 'viewport width' relative units. They allow us to
+    // make our GUI scale with the window size.
+    f32 VwToPixels(f32 vw) const { return vw * pixels_per_vw; }
+    f32x2 VwToPixels(f32x2 vw) const { return vw * pixels_per_vw; }
+    f32 PixelsToVw(f32 pixels) const { return pixels / pixels_per_vw; }
+    f32x2 PixelsToVw(f32x2 pixels) const { return pixels / pixels_per_vw; }
+    void SetPixelsPerVw(f32 v) { pixels_per_vw = v; }
 
     f32x2 WindowPosToScreenPos(f32x2 rel_pos);
     f32x2 ScreenPosToWindowPos(f32x2 screen_pos);
@@ -605,7 +608,7 @@ struct Context {
     f64 hover_popup_delay {0.10}; // delay before popups close
     f64 button_repeat_rate {0.1}; // rate at which button hold to repeat triggers
     WindowSettings default_window_style = {};
-    f32 pixels_per_point = 1.0f;
+    f32 pixels_per_vw = 1.0f;
 
     graphics::DrawList* graphics = nullptr; // Shortcut to the current windows graphics
     GuiFrameInput& frame_input;
@@ -941,8 +944,8 @@ inline u32 LiveCol(imgui::Context const&, UiColMap type) {
 inline f32 LiveSize(imgui::Context const& imgui, UiSizeId size_id) {
     f32 res = 1;
     switch (imgui::g_live_edit_values.ui_sizes_units[ToInt(size_id)]) {
-        case UiSizeUnit::Points:
-            res = imgui.PointsToPixels(imgui::g_live_edit_values.ui_sizes[ToInt(size_id)]);
+        case UiSizeUnit::Vw:
+            res = imgui.VwToPixels(imgui::g_live_edit_values.ui_sizes[ToInt(size_id)]);
             break;
         case UiSizeUnit::None: res = imgui::g_live_edit_values.ui_sizes[ToInt(size_id)]; break;
         case UiSizeUnit::Count: PanicIfReached();

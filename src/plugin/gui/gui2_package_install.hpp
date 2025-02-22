@@ -53,7 +53,7 @@ PUBLIC void PackageInstallAlertsPanel(GuiBoxSystem& box_system, package::Install
     auto const root = DoBox(box_system,
                             {
                                 .layout {
-                                    .size = box_system.imgui.PixelsToPoints(box_system.imgui.Size()),
+                                    .size = box_system.imgui.PixelsToVw(box_system.imgui.Size()),
                                     .contents_padding = {.lrtb = style::k_spacing},
                                     .contents_gap = style::k_spacing,
                                     .contents_direction = layout::Direction::Column,
@@ -241,8 +241,8 @@ PUBLIC void DoPackageInstallNotifications(GuiBoxSystem& box_system,
                              ModalPanel {
                                  .r = CentredRect(
                                      {.pos = 0, .size = box_system.imgui.frame_input.window_size.ToFloat2()},
-                                     f32x2 {box_system.imgui.PointsToPixels(style::k_install_dialog_width),
-                                            box_system.imgui.PointsToPixels(style::k_install_dialog_height)}),
+                                     f32x2 {box_system.imgui.VwToPixels(style::k_install_dialog_width),
+                                            box_system.imgui.VwToPixels(style::k_install_dialog_height)}),
                                  .imgui_id = box_system.imgui.GetID("install alerts"),
                                  .on_close = {},
                                  .close_on_click_outside = false,

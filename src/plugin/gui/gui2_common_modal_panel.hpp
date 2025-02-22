@@ -9,7 +9,7 @@ PUBLIC Box DoModalRootBox(GuiBoxSystem& box_system) {
     return DoBox(box_system,
                  {
                      .layout {
-                         .size = box_system.imgui.PixelsToPoints(box_system.imgui.Size()),
+                         .size = box_system.imgui.PixelsToVw(box_system.imgui.Size()),
                          .contents_direction = layout::Direction::Column,
                          .contents_align = layout::Alignment::Start,
                      },
@@ -81,7 +81,7 @@ static Box DoModalDivider(GuiBoxSystem& box_system, Box parent) {
                      .parent = parent,
                      .background_fill = style::Colour::Surface2,
                      .layout {
-                         .size = {layout::k_fill_parent, box_system.imgui.PixelsToPoints(1)},
+                         .size = {layout::k_fill_parent, box_system.imgui.PixelsToVw(1)},
                      },
                  });
 }

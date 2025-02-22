@@ -155,6 +155,14 @@ constexpr auto k_colours = [] {
 
 constexpr u32 Col(Colour colour) { return k_colours[ToInt(colour)]; }
 
+// TODO: use a strong type for viewport width
+// struct Vw {
+//     explicit constexpr Vw(f32 value) : value(value) {}
+//     explicit constexpr operator f32() const { return value; }
+//     f32 value;
+// };
+// constexpr Vw operator""_vw(long double value) { return Vw((f32)(value)); }
+
 constexpr f32 k_spacing = 16.0f;
 constexpr f32 k_button_rounding = 3.0f;
 constexpr f32 k_button_padding_x = 5.0f;

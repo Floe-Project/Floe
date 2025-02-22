@@ -697,7 +697,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
     }
 
     auto const draw_divider = [&](layout::Id id) {
-        auto const room_at_scroll_window_bottom = imgui.PointsToPixels(15);
+        auto const room_at_scroll_window_bottom = imgui.VwToPixels(15);
         auto const line_r =
             imgui.GetRegisteredAndConvertedRect(layout::GetRect(lay, id).WithH(room_at_scroll_window_bottom));
         imgui.graphics->AddLine(line_r.TopLeft(),

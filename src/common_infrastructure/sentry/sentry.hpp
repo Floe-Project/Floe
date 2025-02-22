@@ -414,8 +414,9 @@ EnvelopeAddEvent(Sentry& sentry, EnvelopeWriter& writer, ErrorEvent event, AddEv
                 auto try_write = [&]() -> ErrorCodeOr<void> {
                     TRY(json::WriteObjectBegin(json_writer));
 
-                    if (auto const filename =
-                            TrimStartIfMatches(frame.filename, String {FLOE_PROJECT_ROOT_PATH});
+                    if (auto const filename = TrimStartIfMatches(
+                            frame.filename,
+                            ConcatArrays(FLOE_PROJECT_ROOT_PATH ""_ca, path::k_dir_separator_str));
                         filename.size) {
                         TRY(json::WriteKeyValue(json_writer, "filename", filename));
                         TRY(json::WriteKeyValue(json_writer, "in_app", true));

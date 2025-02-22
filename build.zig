@@ -1036,7 +1036,7 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = build_context.optimise,
         });
-        stb_sprintf.addCSourceFile(.{ .file = b.path("third_party_libs/stb_sprintf.c") });
+        stb_sprintf.addCSourceFile(.{ .file = b.path("third_party_libs/stb_sprintf.c"), .flags = generic_flags });
         stb_sprintf.addIncludePath(build_context.dep_stb.path(""));
         stb_sprintf.linkLibC();
 
@@ -1045,7 +1045,7 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = build_context.optimise,
         });
-        xxhash.addCSourceFile(.{ .file = build_context.dep_xxhash.path("xxhash.c") });
+        xxhash.addCSourceFile(.{ .file = build_context.dep_xxhash.path("xxhash.c"), .flags = generic_flags });
         xxhash.linkLibC();
 
         const tracy = b.addStaticLibrary(.{
@@ -1142,6 +1142,7 @@ pub fn build(b: *std.Build) void {
                     "state.c",
                     "posix.c",
                 },
+                .flags = generic_flags,
             });
 
             const backtrace_supported_header = b.addConfigHeader(
@@ -1201,6 +1202,7 @@ pub fn build(b: *std.Build) void {
                             "pecoff.c",
                             "alloc.c",
                         },
+                        .flags = generic_flags,
                     });
                 },
                 .macos => {
@@ -1209,8 +1211,16 @@ pub fn build(b: *std.Build) void {
                         .HAVE_FCNTL = 1,
                     });
 
-                    libbacktrace.addCSourceFiles(.{ .root = libbacktrace_root_path, .files = &posix_sources });
-                    libbacktrace.addCSourceFiles(.{ .root = libbacktrace_root_path, .files = &.{"macho.c"} });
+                    libbacktrace.addCSourceFiles(.{
+                        .root = libbacktrace_root_path,
+                        .files = &posix_sources,
+                        .flags = generic_flags,
+                    });
+                    libbacktrace.addCSourceFiles(.{
+                        .root = libbacktrace_root_path,
+                        .files = &.{"macho.c"},
+                        .flags = generic_flags,
+                    });
                 },
                 .linux => {
                     config_header.addValues(.{
@@ -1221,8 +1231,16 @@ pub fn build(b: *std.Build) void {
                         .HAVE_FCNTL = 1,
                     });
 
-                    libbacktrace.addCSourceFiles(.{ .root = libbacktrace_root_path, .files = &.{"elf.c"} });
-                    libbacktrace.addCSourceFiles(.{ .root = libbacktrace_root_path, .files = &posix_sources });
+                    libbacktrace.addCSourceFiles(.{
+                        .root = libbacktrace_root_path,
+                        .files = &.{"elf.c"},
+                        .flags = generic_flags,
+                    });
+                    libbacktrace.addCSourceFiles(.{
+                        .root = libbacktrace_root_path,
+                        .files = &posix_sources,
+                        .flags = generic_flags,
+                    });
                 },
                 else => {
                     unreachable;
@@ -1250,6 +1268,7 @@ pub fn build(b: *std.Build) void {
                     "internal.c",
                     "internal.c",
                 },
+                .flags = generic_flags,
             });
 
             switch (target.result.os.tag) {
@@ -1261,6 +1280,7 @@ pub fn build(b: *std.Build) void {
                             "win_gl.c",
                             "win_stub.c",
                         },
+                        .flags = generic_flags,
                     });
                     pugl.linkSystemLibrary("opengl32");
                     pugl.linkSystemLibrary("gdi32");
@@ -1303,6 +1323,7 @@ pub fn build(b: *std.Build) void {
                             "x11_gl.c",
                             "x11_stub.c",
                         },
+                        .flags = generic_flags,
                     });
                     pugl.root_module.addCMacro("USE_XRANDR", "0");
                     pugl.root_module.addCMacro("USE_XSYNC", "1");
@@ -1417,10 +1438,10 @@ pub fn build(b: *std.Build) void {
         });
         stb_image.addCSourceFile(.{
             .file = b.path("third_party_libs/stb_image_impls.c"),
-            .flags = &(.{
+            .flags = genericFlags(&build_context, target, &(.{
                 // stb_image_resize2 uses undefined behaviour and so we need to turn off zig's default-on UB sanitizer
                 "-fno-sanitize=undefined",
-            } ++ stb_image_config_flags),
+            } ++ stb_image_config_flags)) catch unreachable,
         });
         stb_image.addIncludePath(build_context.dep_stb.path(""));
         stb_image.linkLibC();
@@ -1430,7 +1451,7 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = build_context.optimise,
         });
-        dr_wav.addCSourceFile(.{ .file = b.path("third_party_libs/dr_wav_implementation.c") });
+        dr_wav.addCSourceFile(.{ .file = b.path("third_party_libs/dr_wav_implementation.c"), .flags = generic_flags });
         dr_wav.addIncludePath(build_context.dep_dr_libs.path(""));
         dr_wav.linkLibC();
 
@@ -1490,6 +1511,7 @@ pub fn build(b: *std.Build) void {
                     "stream_encoder_framing.c",
                     "window.c",
                 },
+                .flags = generic_flags,
             });
 
             const config_header = b.addConfigHeader(
@@ -1661,6 +1683,7 @@ pub fn build(b: *std.Build) void {
                     plugin_path ++ "/gui/gui_widget_compounds.cpp",
                     plugin_path ++ "/gui/gui_widget_helpers.cpp",
                     plugin_path ++ "/gui/gui_window.cpp",
+                    plugin_path ++ "/gui/settings_gui.cpp",
                     plugin_path ++ "/gui_framework/draw_list.cpp",
                     plugin_path ++ "/gui_framework/draw_list_opengl.cpp",
                     plugin_path ++ "/gui_framework/gui_imgui.cpp",

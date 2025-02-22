@@ -82,7 +82,7 @@ using Key = TaggedUnion<KeyType,
                         TypeAndTag<s64, KeyType::GlobalInt>,
                         TypeAndTag<SectionedKey, KeyType::Sectioned>>;
 
-ErrorCodeOr<void> CustomValueToString(Writer writer, Key key, fmt::FormatOptions options);
+ErrorCodeOr<void> CustomValueToString(Writer writer, Key const& key, fmt::FormatOptions options);
 u64 HashKey(Key const& key);
 
 using SettingsTable = HashTable<Key, Value*, HashKey>;
@@ -106,13 +106,13 @@ WriteSettingsFile(SettingsTable const& table, String path, Optional<s128> set_la
 
 // These functions assume that the key has a single value (or no value). If you want to lookup multiple
 // values, then use LookupValues.
-Optional<s64> LookupInt(SettingsTable const& table, Key key);
-Optional<bool> LookupBool(SettingsTable const& table, Key key);
-Optional<String> LookupString(SettingsTable const& table, Key key);
+Optional<s64> LookupInt(SettingsTable const& table, Key const& key);
+Optional<bool> LookupBool(SettingsTable const& table, Key const& key);
+Optional<String> LookupString(SettingsTable const& table, Key const& key);
 
 // Can return null. Value is an intrusive linked list. Iterate through it using 'next'.
 // The order of values is always undefined. There's guaranteed to not be duplicate values for a key.
-Value const* LookupValues(SettingsTable const& table, Key key);
+Value const* LookupValues(SettingsTable const& table, Key const& key);
 
 template <dyn::DynArray DynArrayType>
 PUBLIC void ValuesToArray(Value const* value_list, DynArrayType& array) {
@@ -122,13 +122,13 @@ PUBLIC void ValuesToArray(Value const* value_list, DynArrayType& array) {
 }
 
 template <dyn::DynArray DynArrayType>
-PUBLIC void LookupValues(SettingsTable const& table, Key key, DynArrayType& array) {
+PUBLIC void LookupValues(SettingsTable const& table, Key const& key, DynArrayType& array) {
     dyn::Clear(array);
     if (auto v = LookupValues(table, key)) ValuesToArray(v, array);
 }
 
 template <typename Type, usize k_size>
-PUBLIC DynamicArrayBounded<Type, k_size> LookupValues(SettingsTable const& table, Key key) {
+PUBLIC DynamicArrayBounded<Type, k_size> LookupValues(SettingsTable const& table, Key const& key) {
     DynamicArrayBounded<Type, k_size> result;
     LookupValues(table, key, result);
     return result;
@@ -140,7 +140,6 @@ PUBLIC DynamicArrayBounded<Type, k_size> LookupValues(SettingsTable const& table
 //
 // This is a 'managed' instance of the settings table. It is designed to be a long-lived object that can be
 // edited over time.
-
 struct Settings : SettingsTable {
     ArenaAllocator arena {PageAllocator::Instance()};
     PathPool path_pool {};
@@ -151,9 +150,9 @@ struct Settings : SettingsTable {
     s128 last_known_file_modified_time {};
     bool write_to_file_needed {};
 
-    // null for 'value' means the key was removed. Also remember Value is a linked list if you are expecting
-    // multiple values.
-    TrivialFixedSizeFunction<8, void(Key key, Value const* value_list)> on_change {};
+    // If value is null it means the key was removed. Also remember Value is a linked list if you are
+    // expecting multiple values.
+    TrivialFixedSizeFunction<8, void(Key const& key, Value const* value_list)> on_change {};
 
     // Watcher
     ArenaAllocator watcher_scratch {PageAllocator::Instance()};
@@ -168,13 +167,14 @@ struct SetValueOptions {
 };
 
 // The value will be allocated in the arena/path_pool (the string is cloned).
-// Sets the value of key to the single value 'value'. If the key already has a value, it will be replaced.
-void SetValue(Settings& settings, Key key, ValueUnion value, SetValueOptions options = {});
+// Sets the value of key to the single value 'value'. If the key already has any values, they will be
+// replaced.
+void SetValue(Settings& settings, Key const& key, ValueUnion const& value, SetValueOptions options = {});
 
 // Same as SetValue in all ways, except instead of replacing all/eny values, this logic is used: if the key
 // already has value(s), each value will be compared to the new value; if the new value matches any of the
 // existing values, nothing will be added.
-bool AddValue(Settings& settings, Key key, ValueUnion value, SetValueOptions options = {});
+bool AddValue(Settings& settings, Key const& key, ValueUnion const& value, SetValueOptions options = {});
 
 struct RemoveValueOptions {
     bool dont_track_changes {};
@@ -182,10 +182,13 @@ struct RemoveValueOptions {
 
 // The value will be compared to all values for the given key, if it matches it will be removed.
 // If the last value is removed, the key will be removed.
-bool RemoveValue(Settings& settings, Key key, ValueUnion value, RemoveValueOptions options = {});
+bool RemoveValue(Settings& settings,
+                 Key const& key,
+                 ValueUnion const& value,
+                 RemoveValueOptions options = {});
 
 // Remove key and all values associated with it.
-void Remove(Settings& settings, Key key, RemoveValueOptions options = {});
+void Remove(Settings& settings, Key const& key, RemoveValueOptions options = {});
 
 struct ReplaceSettingsOptions {
     // Whether keys in the exsiting settings should be removed if they don't exist in the new table. Keys that

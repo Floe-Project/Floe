@@ -47,7 +47,7 @@ SharedEngineSystems::SharedEngineSystems(Span<sentry::Tag const> tags)
                             error_notifications) {
     InitBackgroundErrorReporting(tags);
 
-    settings.on_change = [this](sts::Key key, sts::Value const* value) {
+    settings.on_change = [this](sts::Key const& key, sts::Value const* value) {
         ASSERT(CheckThreadName("main"));
 
         if (key == sts::key::k_extra_libraries_folder) {

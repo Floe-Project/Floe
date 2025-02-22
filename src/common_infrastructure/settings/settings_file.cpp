@@ -60,7 +60,7 @@ u64 HashKey(Key const& key) {
     return 0;
 }
 
-ErrorCodeOr<void> CustomValueToString(Writer writer, Key key, fmt::FormatOptions options) {
+ErrorCodeOr<void> CustomValueToString(Writer writer, Key const& key, fmt::FormatOptions options) {
     switch (key.tag) {
         case KeyType::GlobalString: return ValueToString(writer, key.Get<String>(), options);
         case KeyType::GlobalInt: return ValueToString(writer, key.Get<s64>(), options);
@@ -508,33 +508,33 @@ WriteSettingsFile(SettingsTable const& table, String path, Optional<s128> set_la
     return k_success;
 }
 
-Optional<s64> LookupInt(SettingsTable const& table, Key key) {
+Optional<s64> LookupInt(SettingsTable const& table, Key const& key) {
     if (auto const v = table.Find(key)) {
         if ((*v)->tag == ValueType::Int) return (*v)->Get<s64>();
     }
     return k_nullopt;
 }
 
-Optional<bool> LookupBool(SettingsTable const& table, Key key) {
+Optional<bool> LookupBool(SettingsTable const& table, Key const& key) {
     if (auto const v = table.Find(key)) {
         if ((*v)->tag == ValueType::Bool) return (*v)->Get<bool>();
     }
     return k_nullopt;
 }
 
-Optional<String> LookupString(SettingsTable const& table, Key key) {
+Optional<String> LookupString(SettingsTable const& table, Key const& key) {
     if (auto const v = table.Find(key)) {
         if ((*v)->tag == ValueType::String) return (*v)->Get<String>();
     }
     return k_nullopt;
 }
 
-Value const* LookupValues(SettingsTable const& table, Key key) {
+Value const* LookupValues(SettingsTable const& table, Key const& key) {
     if (auto const v = table.Find(key)) return *v;
     return nullptr;
 }
 
-static void OnChange(Settings& settings, Key key, Value const* value) {
+static void OnChange(Settings& settings, Key const& key, Value const* value) {
     settings.write_to_file_needed = true;
     if (settings.on_change) settings.on_change(key, value);
 }
@@ -582,7 +582,7 @@ static void FreeKey(Key const& k, PathPool& pool) {
     }
 }
 
-static Value* AllocateValue(Settings& settings, ValueUnion value) {
+static Value* AllocateValue(Settings& settings, ValueUnion const& value) {
     if (settings.free_values) {
         auto result = settings.free_values;
         settings.free_values = settings.free_values->next;
@@ -597,7 +597,7 @@ static void AddValueToFreeList(Settings& settings, Value* value) {
     settings.free_values = value;
 }
 
-void SetValue(Settings& settings, Key key, ValueUnion value, SetValueOptions options) {
+void SetValue(Settings& settings, Key const& key, ValueUnion const& value, SetValueOptions options) {
     ASSERT(IsKeyValid(key));
     Value* new_value {};
 
@@ -636,7 +636,7 @@ void SetValue(Settings& settings, Key key, ValueUnion value, SetValueOptions opt
     if (!options.dont_track_changes) OnChange(settings, key, new_value);
 }
 
-bool AddValue(Settings& settings, Key key, ValueUnion value, SetValueOptions options) {
+bool AddValue(Settings& settings, Key const& key, ValueUnion const& value, SetValueOptions options) {
     ASSERT(IsKeyValid(key));
     Value* first_node {};
 
@@ -663,7 +663,7 @@ bool AddValue(Settings& settings, Key key, ValueUnion value, SetValueOptions opt
     return true;
 }
 
-bool RemoveValue(Settings& settings, Key key, ValueUnion value, RemoveValueOptions options) {
+bool RemoveValue(Settings& settings, Key const& key, ValueUnion const& value, RemoveValueOptions options) {
     ASSERT(IsKeyValid(key));
     auto const existing_values_ptr = settings.Find(key);
     if (!existing_values_ptr) return false;
@@ -693,7 +693,7 @@ bool RemoveValue(Settings& settings, Key key, ValueUnion value, RemoveValueOptio
     return removed;
 }
 
-void Remove(Settings& settings, Key key, RemoveValueOptions options) {
+void Remove(Settings& settings, Key const& key, RemoveValueOptions options) {
     ASSERT(IsKeyValid(key));
     auto existing = settings.Find(key);
     if (!existing) return;

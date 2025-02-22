@@ -178,7 +178,6 @@ ValidateResult ValidatedOrDefault(ValueUnion const& value, Descriptor const& des
 // Looks up the single value, if it exists, validates and constrains it, otherwise returns the default value.
 // Guaranteed to return the value in the correct type.
 ValidateResult GetValue(SettingsTable const& table, Descriptor const& descriptor);
-
 bool GetBool(SettingsTable const& table, Descriptor const& descriptor);
 s64 GetInt(SettingsTable const& table, Descriptor const& descriptor);
 String GetString(SettingsTable const& table, Descriptor const& descriptor);
@@ -186,6 +185,9 @@ String GetString(SettingsTable const& table, Descriptor const& descriptor);
 // If the key doesn't match the descriptor, returns nullopt. Else it returns the validated, constrained, or
 // default value. Useful inside the on_change callback.
 Optional<ValueUnion> Match(Key const& key, Value const* value_list, Descriptor const& descriptor);
+Optional<bool> MatchBool(Key const& key, Value const* value_list, Descriptor const& descriptor);
+Optional<s64> MatchInt(Key const& key, Value const* value_list, Descriptor const& descriptor);
+Optional<String> MatchString(Key const& key, Value const* value_list, Descriptor const& descriptor);
 
 // This is a 'managed' instance of the settings table. It is designed to be a long-lived object that can be
 // edited over time.

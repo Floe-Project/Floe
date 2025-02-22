@@ -595,6 +595,24 @@ Optional<ValueUnion> Match(Key const& key, Value const* value_list, Descriptor c
     return ValidatedOrDefault(*value_list, descriptor).value;
 }
 
+Optional<bool> MatchBool(Key const& key, Value const* value_list, Descriptor const& descriptor) {
+    ASSERT(descriptor.value_requirements.tag == ValueType::Bool);
+    if (auto const v = Match(key, value_list, descriptor)) return v->Get<bool>();
+    return k_nullopt;
+}
+
+Optional<s64> MatchInt(Key const& key, Value const* value_list, Descriptor const& descriptor) {
+    ASSERT(descriptor.value_requirements.tag == ValueType::Int);
+    if (auto const v = Match(key, value_list, descriptor)) return v->Get<s64>();
+    return k_nullopt;
+}
+
+Optional<String> MatchString(Key const& key, Value const* value_list, Descriptor const& descriptor) {
+    ASSERT(descriptor.value_requirements.tag == ValueType::String);
+    if (auto const v = Match(key, value_list, descriptor)) return v->Get<String>();
+    return k_nullopt;
+}
+
 static void OnChange(Settings& settings, Key const& key, Value const* value) {
     settings.write_to_file_needed = true;
     if (settings.on_change) settings.on_change(key, value);

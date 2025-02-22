@@ -18,8 +18,6 @@ namespace sts {
 static bool IsKeyValid(String key) {
     if (key.size == 0) return false;
     if (key.size > k_max_key_size) return false;
-    for (auto c : key)
-        if (!IsLowercaseAscii(c) && !IsDigit(c) && c != '_') return false;
     return true;
 }
 

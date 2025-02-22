@@ -26,8 +26,8 @@
 // - There's no escaping of special characters.
 // - The same key can appear multiple times with different values, in which case the same key has multiple
 //   values (an array). These values are unordered. Duplicate values for the same key are ignored.
-// - Keys must be a-z, 0-9, and _. Same for section names.
-// - Sections are in square brackets: [section_name].
+// - Keys/section-names must <= k_max_key_size long.
+// - Sections are in square brackets: [Section Name].
 // - Comments are lines starting with a semicolon.
 //
 // Settings are kept in a hash table. The key is a string/int or a section + key string/int pair. The value is

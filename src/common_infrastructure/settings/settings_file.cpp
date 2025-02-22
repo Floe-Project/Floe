@@ -532,6 +532,69 @@ Value const* LookupValues(SettingsTable const& table, Key const& key) {
     return nullptr;
 }
 
+ValidateResult ValidatedOrDefault(ValueUnion const& value, Descriptor const& descriptor) {
+    ASSERT(descriptor.value_requirements.tag == value.tag);
+    switch (value.tag) {
+        case ValueType::Int: {
+            auto const info = descriptor.value_requirements.Get<Descriptor::IntRequirements>();
+            auto val = value.Get<s64>();
+            if (info.clamp_to_range)
+                val = Clamp(val, info.min_value, info.max_value);
+            else if (val < info.min_value || val > info.max_value)
+                return {descriptor.default_value, true};
+            if (info.custom_constrainer) info.custom_constrainer(val);
+            return {val, val == descriptor.default_value.Get<s64>()};
+        }
+        case ValueType::Bool: return {value, false};
+        case ValueType::String: {
+            auto const info = descriptor.value_requirements.Get<Descriptor::StringRequirements>();
+            auto& val = value.Get<String>();
+            if (val.size < info.min_length || val.size > info.max_length)
+                return {descriptor.default_value, true};
+            if (info.ensure_valid_utf8 && !IsValidUtf8(val)) return {descriptor.default_value, true};
+            if (info.ensure_absolute_path && !path::IsAbsolute(val)) return {descriptor.default_value, true};
+            return {value, false};
+        }
+    }
+}
+
+ValidateResult GetValue(SettingsTable const& table, Descriptor const& descriptor) {
+    auto const v_ptr = table.Find(descriptor.key);
+    if (!v_ptr) return {descriptor.default_value, true};
+    auto const& v = **v_ptr;
+    if (v.tag != descriptor.value_requirements.tag) return {descriptor.default_value, true};
+    return ValidatedOrDefault(v, descriptor);
+}
+
+bool GetBool(SettingsTable const& table, Descriptor const& descriptor) {
+    ASSERT(descriptor.value_requirements.tag == ValueType::Bool);
+    return GetValue(table, descriptor).value.Get<bool>();
+}
+
+s64 GetInt(SettingsTable const& table, Descriptor const& descriptor) {
+    ASSERT(descriptor.value_requirements.tag == ValueType::Int);
+    return GetValue(table, descriptor).value.Get<s64>();
+}
+
+String GetString(SettingsTable const& table, Descriptor const& descriptor) {
+    ASSERT(descriptor.value_requirements.tag == ValueType::String);
+    return GetValue(table, descriptor).value.Get<String>();
+}
+
+Optional<ValueUnion> Match(Key const& key, Value const* value_list, Descriptor const& descriptor) {
+    if (key != descriptor.key) return k_nullopt;
+
+    // If the key matches, but the value is nullptr, the value was removed, we should return the default
+    // value.
+    if (value_list == nullptr) return descriptor.default_value;
+
+    // If the value was set, but with the wrong type, we should use the default value.
+    if (value_list->tag != descriptor.value_requirements.tag) return descriptor.default_value;
+
+    // Otherwise, validate and constrain the value.
+    return ValidatedOrDefault(*value_list, descriptor).value;
+}
+
 static void OnChange(Settings& settings, Key const& key, Value const* value) {
     settings.write_to_file_needed = true;
     if (settings.on_change) settings.on_change(key, value);
@@ -622,6 +685,8 @@ void SetValue(Settings& settings, Key const& key, ValueUnion const& value, SetVa
         *existing_values = {CloneValueUnion(value, settings.path_pool, settings.arena)};
         new_value = existing_values;
     } else {
+        if (options.overwrite_only) return;
+
         new_value = AllocateValue(settings, CloneValueUnion(value, settings.path_pool, settings.arena));
 
         auto const inserted = settings.InsertGrowIfNeeded(
@@ -632,6 +697,19 @@ void SetValue(Settings& settings, Key const& key, ValueUnion const& value, SetVa
     }
 
     if (!options.dont_track_changes) OnChange(settings, key, new_value);
+}
+
+void SetValue(Settings& settings,
+              Descriptor const& descriptor,
+              ValueUnion const& value,
+              SetValueOptions options) {
+    auto const [v, is_default] = ValidatedOrDefault(value, descriptor);
+    // If the value is default, we don't need to write it unless it already exists in the file. If it already
+    // exists in the file it might have been set deliberately by the user. Whatever the reason, it's a
+    // stronger intention than defering to the default value, and we should explicitly signal that it has a
+    // new value.
+    if (is_default) options.overwrite_only = true;
+    SetValue(settings, descriptor.key, v, options);
 }
 
 bool AddValue(Settings& settings, Key const& key, ValueUnion const& value, SetValueOptions options) {
@@ -649,6 +727,8 @@ bool AddValue(Settings& settings, Key const& key, ValueUnion const& value, SetVa
         last->next = AllocateValue(settings, CloneValueUnion(value, settings.path_pool, settings.arena));
         first_node = existing_values;
     } else {
+        if (options.overwrite_only) return false;
+
         first_node = AllocateValue(settings, CloneValueUnion(value, settings.path_pool, settings.arena));
         auto const inserted = settings.InsertGrowIfNeeded(
             settings.arena,
@@ -858,7 +938,7 @@ void PollForExternalChanges(Settings& settings, PollForExternalChangesOptions op
             auto const read_result = TRY_OR(ReadEntireSettingsFile(path, settings.watcher_scratch), return);
             auto const new_table = ParseSettingsFile(read_result.file_data, settings.watcher_scratch);
 
-            ReplaceSettings(settings, new_table, {.remove_keys_not_in_new_table = false});
+            ReplaceSettings(settings, new_table, {.remove_keys_not_in_new_table = true});
 
             // We just loaded fresh data from the file, so we can mark that we don't need to write to the
             // file.
@@ -1304,7 +1384,7 @@ TEST_CASE(TestSettings) {
         CHECK_EQ(*LookupString(settings, "key2"_s), "value2"_s);
         CHECK_EQ(*LookupString(settings, "key3"_s), "value3"_s);
 
-        // Replace the value of key1.
+        // Replace the value of key1, remove everything else.
         TRY(WriteFile(filepath, "key1 = value4\n"_s));
 
         for (auto _ : Range(25)) {
@@ -1314,10 +1394,131 @@ TEST_CASE(TestSettings) {
             SleepThisThread(1); // wait for the file watcher to pick up the change
         }
 
-        CHECK_EQ(settings.size, 3u);
+        CHECK_EQ(settings.size, 1u);
         CHECK_EQ(*LookupString(settings, "key1"_s), "value4"_s);
-        CHECK_EQ(*LookupString(settings, "key2"_s), "value2"_s);
-        CHECK_EQ(*LookupString(settings, "key3"_s), "value3"_s);
+    }
+
+    SUBCASE("descriptor") {
+        Descriptor int_descriptor {
+            .key = "key"_s,
+            .value_requirements =
+                Descriptor::IntRequirements {
+                    .min_value = 0,
+                    .max_value = 10,
+                    .custom_constrainer = nullptr,
+                    .clamp_to_range = true,
+                },
+            .default_value = (s64)5,
+            .gui_label = "Key"_s,
+            .long_description = "This is a key"_s,
+        };
+        SUBCASE("int") {
+            auto const validate = [&](s64 value) {
+                return ValidatedOrDefault(value, int_descriptor).value.Get<s64>();
+            };
+
+            SUBCASE("basics") {
+                CHECK_EQ(validate(5), 5);
+                CHECK_EQ(validate(0), 0);
+
+                // value should be clamped to the range
+                CHECK_EQ(validate(100), 10);
+                CHECK_EQ(validate(-100), 0);
+            }
+
+            SUBCASE("no clamp") {
+                int_descriptor.value_requirements.Get<Descriptor::IntRequirements>().clamp_to_range = false;
+                CHECK_EQ(validate(100), 5);
+                CHECK_EQ(validate(-100), 5);
+            }
+
+            SUBCASE("custom constrainer") {
+                int_descriptor.value_requirements.Get<Descriptor::IntRequirements>().custom_constrainer =
+                    [](s64& value) { value = 7; };
+                CHECK_EQ(validate(100), 7);
+                CHECK_EQ(validate(5), 7);
+            }
+        }
+
+        SUBCASE("string") {
+            Descriptor descriptor {
+                .key = "key"_s,
+                .value_requirements =
+                    Descriptor::StringRequirements {
+                        .min_length = 2,
+                        .max_length = 10,
+                        .ensure_valid_utf8 = false,
+                        .ensure_absolute_path = false,
+                    },
+                .default_value = "default"_s,
+                .gui_label = "Key"_s,
+                .long_description = "This is a key"_s,
+            };
+            auto const validate = [&](String value) {
+                return ValidatedOrDefault(value, descriptor).value.Get<String>();
+            };
+
+            CHECK_EQ(validate("value"), "value"_s);
+            CHECK_EQ(validate("valuevaluevalue"), "default"_s); // too long
+            CHECK_EQ(validate("v"), "default"_s); // too short
+
+            // ensure_utf8
+            descriptor.value_requirements.Get<Descriptor::StringRequirements>().ensure_valid_utf8 = true;
+            CHECK_EQ(validate("value"), "value"_s);
+            CHECK_EQ(validate("value\xFF"), "default"_s);
+
+            // ensure_absolute_path
+            descriptor.value_requirements.Get<Descriptor::StringRequirements>().ensure_absolute_path = true;
+            if constexpr (IS_WINDOWS)
+                CHECK_EQ(validate("C:\\value"), "C:\\value"_s);
+            else
+                CHECK_EQ(validate("/value"), "/value"_s);
+            CHECK_EQ(validate("value"), "default"_s);
+        }
+
+        SUBCASE("get value") {
+            SettingsTable settings;
+            SUBCASE("not present") {
+                {
+                    auto const result = GetValue(settings, int_descriptor);
+                    CHECK(result.is_default);
+                    CHECK_EQ(result.value.Get<s64>(), 5);
+                }
+            }
+
+            SUBCASE("already valid") {
+                settings.InsertGrowIfNeeded(tester.scratch_arena,
+                                            int_descriptor.key,
+                                            tester.scratch_arena.New<Value>((s64)7));
+                {
+                    auto const result = GetValue(settings, int_descriptor);
+                    CHECK(!result.is_default);
+                    CHECK_EQ(result.value.Get<s64>(), 7);
+                }
+            }
+
+            SUBCASE("invalid") {
+                settings.InsertGrowIfNeeded(tester.scratch_arena,
+                                            int_descriptor.key,
+                                            tester.scratch_arena.New<Value>((s64)100));
+                {
+                    auto const result = GetValue(settings, int_descriptor);
+                    CHECK(!result.is_default);
+                    CHECK_EQ(result.value.Get<s64>(), 10);
+                }
+            }
+
+            SUBCASE("wrong type") {
+                settings.InsertGrowIfNeeded(tester.scratch_arena,
+                                            int_descriptor.key,
+                                            tester.scratch_arena.New<Value>("value"_s));
+                {
+                    auto const result = GetValue(settings, int_descriptor);
+                    CHECK(result.is_default);
+                    CHECK_EQ(result.value.Get<s64>(), 5);
+                }
+            }
+        }
     }
 
     return k_success;

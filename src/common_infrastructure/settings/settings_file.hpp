@@ -140,6 +140,7 @@ PUBLIC DynamicArrayBounded<Type, k_size> LookupValues(SettingsTable const& table
 
 // Information for validating and constraining values. Single-value only for now. For multi-value, you'll need
 // to use the LookupValues function and manually validate.
+// Can't be constexpr sadly because of the TaggedUnions.
 struct Descriptor {
     struct IntRequirements {
         s64 min_value = SmallestRepresentableValue<s64>();
@@ -151,7 +152,7 @@ struct Descriptor {
     struct StringRequirements {
         usize min_length = 0;
         usize max_length = LargestRepresentableValue<usize>();
-        u32 ensure_utf8 : 1 = false;
+        u32 ensure_valid_utf8 : 1 = false;
         u32 ensure_absolute_path : 1 = false;
     };
 
@@ -212,12 +213,17 @@ struct Settings : SettingsTable {
 struct SetValueOptions {
     bool clone_key_string {};
     bool dont_track_changes {};
+    bool overwrite_only {}; // do nothing if the key doesn't exist already
 };
 
 // The value will be allocated in the arena/path_pool (the string is cloned).
 // Sets the value of key to the single value 'value'. If the key already has any values, they will be
 // replaced.
 void SetValue(Settings& settings, Key const& key, ValueUnion const& value, SetValueOptions options = {});
+void SetValue(Settings& settings,
+              Descriptor const& descriptor,
+              ValueUnion const& value,
+              SetValueOptions options = {});
 
 // Same as SetValue in all ways, except instead of replacing all/eny values, this logic is used: if the key
 // already has value(s), each value will be compared to the new value; if the new value matches any of the

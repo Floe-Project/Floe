@@ -3,11 +3,11 @@
 
 #include <stb_image.h>
 #include <stb_image_resize2.h>
-#include <utils/logger/logger.hpp>
 
 #include "foundation/foundation.hpp"
 #include "os/filesystem.hpp"
 #include "os/misc.hpp"
+#include "utils/logger/logger.hpp"
 
 #include "common_infrastructure/common_errors.hpp"
 

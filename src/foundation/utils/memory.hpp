@@ -117,7 +117,7 @@ PUBLIC constexpr void WriteAndIncrement(UnsignedInt auto& pos, DestType* dest, T
                       { t.size } -> Convertible<usize>;
                       { t.data } -> Convertible<typename Type::ValueType const*>;
                   }) {
-        CopyMemory(&dest[pos], src.data, src.size * sizeof(DestType));
+        __builtin_memcpy(&dest[pos], src.data, src.size * sizeof(DestType));
         pos += src.size;
     } else if constexpr (Fundamental<Type> && sizeof(Type) == sizeof(DestType)) {
         dest[pos] = (DestType)src;

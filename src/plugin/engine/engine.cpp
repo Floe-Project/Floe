@@ -19,7 +19,6 @@
 #include "plugin/plugin.hpp"
 #include "processor/layer_processor.hpp"
 #include "sample_lib_server/sample_library_server.hpp"
-#include "settings_midi.hpp"
 #include "shared_engine_systems.hpp"
 #include "state/instrument.hpp"
 #include "state/state_coding.hpp"
@@ -498,11 +497,6 @@ Engine::Engine(clap_host const& host,
                           [lib_id, &engine]() { SampleLibraryChanged(engine, lib_id); });
                   },
           })} {
-
-    for (auto const i : EnumIterator<ParamIndex>()) {
-        processor.param_learned_ccs[ToInt(i)].AssignBlockwise(
-            midi_settings::PersistentCcsForParam(shared_engine_systems.settings, ParamIndexToId(i)));
-    }
 
     last_snapshot.state = CurrentStateSnapshot(*this);
 

@@ -11,6 +11,7 @@
 #include "gui2_common_modal_panel.hpp"
 #include "gui2_settings_panel_state.hpp"
 #include "gui_framework/gui_box_system.hpp"
+#include "processor/processor.hpp"
 #include "sample_lib_server/sample_library_server.hpp"
 
 static void SettingsLhsTextWidget(GuiBoxSystem& box_system, Box parent, String text) {
@@ -713,6 +714,10 @@ static void GeneralSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext&
         auto const options_rhs_column = SettingsRhsColumn(box_system, misc_row, style::k_settings_small_gap);
 
         Setting(box_system, context, options_rhs_column, IsOnlineReportingDisabledSettingDescriptor());
+        Setting(box_system,
+                context,
+                options_rhs_column,
+                SettingDescriptor(ProcessorSetting::DefaultCcParamMappings));
 
         for (auto const autosave_setting : EnumIterator<AutosaveSetting>())
             Setting(box_system, context, options_rhs_column, SettingDescriptor(autosave_setting));

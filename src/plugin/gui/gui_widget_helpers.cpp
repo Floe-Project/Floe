@@ -7,7 +7,6 @@
 
 #include "common_infrastructure/descriptors/param_descriptors.hpp"
 
-#include "engine/settings_midi.hpp"
 #include "gui.hpp"
 #include "gui_drawing_helpers.hpp"
 #include "gui_framework/gui_live_edit.hpp"
@@ -168,7 +167,7 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
         else
             check_max_size(k_learn_text);
 
-        auto const persistent_ccs = midi_settings::PersistentCcsForParam(g->settings, ParamIndexToId(param));
+        auto const persistent_ccs = PersistentCcsForParam(g->settings, ParamIndexToId(param));
 
         auto param_ccs = GetLearnedCCsBitsetForParam(engine.processor, param);
         auto const num_ccs_for_param = (int)param_ccs.NumSet();
@@ -261,8 +260,7 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
                 pos += item_height;
             }
 
-            auto const persistent_ccs =
-                midi_settings::PersistentCcsForParam(g->settings, ParamIndexToId(param));
+            auto const persistent_ccs = PersistentCcsForParam(g->settings, ParamIndexToId(param));
 
             auto ccs_bitset = GetLearnedCCsBitsetForParam(engine.processor, param);
             bool closes_popups = false;
@@ -286,9 +284,7 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
                                         state,
                                         fmt::Format(g->scratch_arena, k_always_set_fmt, cc_num),
                                         buttons::MenuItem(imgui, closes_popups))) {
-                        midi_settings::AddPersistentCcToParamMapping(g->settings,
-                                                                     (u8)cc_num,
-                                                                     ParamIndexToId(param));
+                        AddPersistentCcToParamMapping(g->settings, (u8)cc_num, ParamIndexToId(param));
                     }
                     pos += item_height;
                 }
@@ -307,9 +303,7 @@ void MidiLearnMenu(Gui* g, Span<ParamIndex> params, Rect r) {
                                         state,
                                         fmt::Format(g->scratch_arena, k_always_set_fmt, cc_num),
                                         buttons::MenuItem(imgui, closes_popups))) {
-                        midi_settings::RemovePersistentCcToParamMapping(g->settings,
-                                                                        cc_num,
-                                                                        ParamIndexToId(param));
+                        RemovePersistentCcToParamMapping(g->settings, cc_num, ParamIndexToId(param));
                     }
                     pos += item_height;
 

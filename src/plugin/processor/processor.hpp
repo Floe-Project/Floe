@@ -186,7 +186,7 @@ struct ProcessorListener {
 };
 
 struct AudioProcessor {
-    AudioProcessor(clap_host const& host, ProcessorListener& listener);
+    AudioProcessor(clap_host const& host, ProcessorListener& listener, sts::SettingsTable const& settings);
     ~AudioProcessor();
 
     clap_host const& host;
@@ -267,6 +267,12 @@ struct AudioProcessor {
     PluginCallbacks<AudioProcessor> processor_callbacks;
 };
 
+enum class ProcessorSetting {
+    DefaultCcParamMappings,
+};
+
+sts::Descriptor SettingDescriptor(ProcessorSetting);
+
 void SetInstrument(AudioProcessor& processor, u32 layer_index, Instrument const& instrument);
 void SetConvolutionIrAudioData(AudioProcessor& processor, AudioData const* audio_data);
 
@@ -289,9 +295,23 @@ void SetAllParametersToDefaultValues(AudioProcessor&);
 void RandomiseAllParameterValues(AudioProcessor&);
 void RandomiseAllEffectParameterValues(AudioProcessor&);
 
+struct MappedCcToParam {
+    ParamIndex param;
+    u7 cc;
+};
+
+constexpr auto const k_default_cc_to_param_mapping = Array {
+    MappedCcToParam {ParamIndex::MasterDynamics, 1},
+    MappedCcToParam {ParamIndex::MasterVolume, 7},
+};
+
 bool IsMidiCCLearnActive(AudioProcessor const& processor);
 void LearnMidiCC(AudioProcessor& processor, ParamIndex param);
 void CancelMidiCCLearn(AudioProcessor& processor);
 void UnlearnMidiCC(AudioProcessor& processor, ParamIndex param, u7 cc_num_to_remove);
 Bitset<128> GetLearnedCCsBitsetForParam(AudioProcessor const& processor, ParamIndex param);
 bool CcControllerMovedParamRecently(AudioProcessor const& processor, ParamIndex param);
+
+void AddPersistentCcToParamMapping(sts::Settings& settings, u8 cc_num, u32 param_id);
+void RemovePersistentCcToParamMapping(sts::Settings& settings, u8 cc_num, u32 param_id);
+Bitset<128> PersistentCcsForParam(sts::SettingsTable const& settings, u32 param_id);

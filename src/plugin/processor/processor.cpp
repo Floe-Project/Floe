@@ -6,11 +6,86 @@
 #include "os/threading.hpp"
 
 #include "common_infrastructure/descriptors/param_descriptors.hpp"
+#include "common_infrastructure/settings/settings_file.hpp"
 
 #include "clap/ext/params.h"
 #include "param.hpp"
 #include "plugin/plugin.hpp"
 #include "voices.hpp"
+
+consteval auto PersistentDefaultCcParamMappingsString() {
+    constexpr String k_start = "CC ";
+    constexpr String k_middle = " -> ";
+    constexpr String k_end = "\n";
+
+    constexpr usize k_size = []() {
+        usize size = 0;
+        for (auto const m : k_default_cc_to_param_mapping) {
+            size += k_start.size;
+
+            if (m.cc < 10)
+                size += 1;
+            else if (m.cc < 100)
+                size += 2;
+            else
+                size += 3;
+
+            size += k_middle.size;
+
+            auto const p = k_param_descriptors[ToInt(m.param)];
+            for (auto const mod : p.module_parts) {
+                if (mod == ParameterModule::None) break;
+                size += k_parameter_module_strings[ToInt(mod)].size;
+                size += 1; // ' '
+            }
+            size += p.name.size;
+
+            size += k_end.size;
+        }
+        return size;
+    }();
+
+    Array<char, k_size> result {};
+    usize i = 0;
+    for (auto const m : k_default_cc_to_param_mapping) {
+        WriteAndIncrement(i, result, k_start);
+        i += fmt::IntToString(m.cc, result.data + i);
+        WriteAndIncrement(i, result, k_middle);
+
+        auto const p = k_param_descriptors[ToInt(m.param)];
+        for (auto const mod : p.module_parts) {
+            if (mod == ParameterModule::None) break;
+            WriteAndIncrement(i, result, k_parameter_module_strings[ToInt(mod)]);
+            WriteAndIncrement(i, result, ' ');
+        }
+        WriteAndIncrement(i, result, p.name);
+
+        WriteAndIncrement(i, result, k_end);
+    }
+
+    return result;
+}
+
+constexpr auto k_str = PersistentDefaultCcParamMappingsString();
+static_assert(k_str[0] == 'C');
+
+sts::Descriptor SettingDescriptor(ProcessorSetting s) {
+    switch (s) {
+        case ProcessorSetting::DefaultCcParamMappings: {
+            static constexpr auto k_description =
+                ConcatArrays("When Floe starts, map these MIDI CC to parameters:\n"_ca,
+                             PersistentDefaultCcParamMappingsString());
+            return {
+                .key = "default-cc-param-mappings"_s,
+                .value_requirements = sts::ValueType::Bool,
+                .default_value = true,
+                .gui_label = "Start with default CC to param mappings"_s,
+                .long_description = k_description,
+
+            };
+        }
+    }
+}
 
 bool EffectIsOn(Parameters const& params, Effect* effect) {
     return params[ToInt(k_effect_info[ToInt(effect->type)].on_param_index)].ValueAsBool();
@@ -46,6 +121,44 @@ bool CcControllerMovedParamRecently(AudioProcessor const& processor, ParamIndex 
     ASSERT(IsMainThread(processor.host));
     return (processor.time_when_cc_moved_param[ToInt(param)].Load(LoadMemoryOrder::Relaxed) + 0.4) >
            TimePoint::Now();
+}
+
+void AddPersistentCcToParamMapping(sts::Settings& settings, u8 cc_num, u32 param_id) {
+    ASSERT(cc_num > 0 && cc_num <= 127);
+    ASSERT(ParamIdToIndex(param_id));
+    sts::AddValue(settings,
+                  sts::SectionedKey {sts::key::section::k_cc_to_param_id_map_section, (s64)cc_num},
+                  (s64)param_id);
+}
+
+void RemovePersistentCcToParamMapping(sts::Settings& settings, u8 cc_num, u32 param_id) {
+    sts::RemoveValue(settings,
+                     sts::SectionedKey {sts::key::section::k_cc_to_param_id_map_section, (s64)cc_num},
+                     (s64)param_id);
+}
+
+Bitset<128> PersistentCcsForParam(sts::SettingsTable const& settings, u32 param_id) {
+    Bitset<128> result {};
+
+    for (auto const [key_union, value_list_ptr] : settings) {
+        auto const sectioned_key = key_union.TryGet<sts::SectionedKey>();
+        if (!sectioned_key) continue;
+        auto const [section, key] = *sectioned_key;
+        if (section != sts::key::section::k_cc_to_param_id_map_section) continue;
+        if (key.tag != sts::KeyValueType::Int) continue;
+
+        auto const cc_num = key.Get<s64>();
+        if (cc_num < 1 || cc_num > 127) continue;
+
+        for (auto value = *value_list_ptr; value; value = value->next) {
+            if (*value == (s64)param_id) {
+                result.Set((usize)cc_num);
+                break;
+            }
+        }
+    }
+
+    return result;
 }
 
 static void HandleMuteSolo(AudioProcessor& processor) {
@@ -1399,7 +1512,9 @@ static void OnThreadPoolExec(AudioProcessor& processor, u32 index) {
     OnThreadPoolExec(processor.voice_pool, index);
 }
 
-AudioProcessor::AudioProcessor(clap_host const& host, ProcessorListener& listener)
+AudioProcessor::AudioProcessor(clap_host const& host,
+                               ProcessorListener& listener,
+                               sts::SettingsTable const& settings)
     : host(host)
     , audio_processing_context {.host = host}
     , listener(listener)
@@ -1438,6 +1553,12 @@ AudioProcessor::AudioProcessor(clap_host const& host, ProcessorListener& listene
     changed.SetAll();
     ProcessorOnParamChange(*this, {params.data, changed});
     smoothed_value_system.ResetAll();
+
+    if (sts::GetBool(settings, SettingDescriptor(ProcessorSetting::DefaultCcParamMappings)))
+        for (auto const mapping : k_default_cc_to_param_mapping)
+            param_learned_ccs[ToInt(mapping.param)].Set(mapping.cc);
+    for (auto const i : EnumIterator<ParamIndex>())
+        param_learned_ccs[ToInt(i)].AssignBlockwise(PersistentCcsForParam(settings, ParamIndexToId(i)));
 
     processor_callbacks = {
         .activate = Activate,

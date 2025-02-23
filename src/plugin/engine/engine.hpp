@@ -60,7 +60,7 @@ struct Engine : ProcessorListener {
     SharedEngineSystems& shared_engine_systems;
     ArenaAllocator error_arena {PageAllocator::Instance()};
     ThreadsafeErrorNotifications error_notifications {};
-    AudioProcessor processor {host, *this};
+    AudioProcessor processor {host, *this, shared_engine_systems.settings};
     PluginInstanceMessages& plugin_instance_messages;
 
     u64 random_seed = (u64)NanosecondsSinceEpoch();

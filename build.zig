@@ -954,7 +954,7 @@ pub fn build(b: *std.Build) void {
         const floe_version = std.SemanticVersion.parse(floe_version_string.?) catch @panic("invalid version");
 
         const generic_flags = genericFlags(&build_context, target, &.{}) catch unreachable;
-        const generic_fp_flags = genericFlags(&build_context, target, &.{
+        const generic_floe_flags = genericFlags(&build_context, target, &.{
             "-gen-cdb-fragment-path",
             compileCommandsDirForTarget(b.allocator, target.result) catch unreachable, // IMPROVE: will this error if the path contains a space?
             "-Werror",
@@ -995,9 +995,9 @@ pub fn build(b: *std.Build) void {
             "-DNOMINMAX",
         }) catch unreachable;
         const cpp_flags = cppFlags(b, generic_flags, &.{}) catch unreachable;
-        const cpp_fp_flags = cppFlags(b, generic_fp_flags, &.{}) catch unreachable;
+        const cpp_floe_flags = cppFlags(b, generic_floe_flags, &.{}) catch unreachable;
         const objcpp_flags = objcppFlags(b, generic_flags, &.{}) catch unreachable;
-        const objcpp_fp_flags = objcppFlags(b, generic_fp_flags, &.{}) catch unreachable;
+        const objcpp_floe_flags = objcppFlags(b, generic_floe_flags, &.{}) catch unreachable;
 
         const floe_version_major: i64 = @intCast(floe_version.major);
         const floe_version_minor: i64 = @intCast(floe_version.minor);
@@ -1392,7 +1392,7 @@ pub fn build(b: *std.Build) void {
 
             switch (target.result.os.tag) {
                 .windows => {
-                    library.addCSourceFiles(.{ .files = &windows_source_files, .flags = cpp_fp_flags });
+                    library.addCSourceFiles(.{ .files = &windows_source_files, .flags = cpp_floe_flags });
                     library.linkSystemLibrary("dbghelp");
                     library.linkSystemLibrary("shlwapi");
                     library.linkSystemLibrary("ole32");
@@ -1404,15 +1404,15 @@ pub fn build(b: *std.Build) void {
                     library.linkSystemLibrary("api-ms-win-core-synch-l1-2-0");
                 },
                 .macos => {
-                    library.addCSourceFiles(.{ .files = &unix_source_files, .flags = cpp_fp_flags });
-                    library.addCSourceFiles(.{ .files = &macos_source_files, .flags = objcpp_fp_flags });
+                    library.addCSourceFiles(.{ .files = &unix_source_files, .flags = cpp_floe_flags });
+                    library.addCSourceFiles(.{ .files = &macos_source_files, .flags = objcpp_floe_flags });
                     library.linkFramework("Cocoa");
                     library.linkFramework("CoreFoundation");
                     library.linkFramework("AppKit");
                 },
                 .linux => {
-                    library.addCSourceFiles(.{ .files = &unix_source_files, .flags = cpp_fp_flags });
-                    library.addCSourceFiles(.{ .files = &linux_source_files, .flags = cpp_fp_flags });
+                    library.addCSourceFiles(.{ .files = &unix_source_files, .flags = cpp_floe_flags });
+                    library.addCSourceFiles(.{ .files = &linux_source_files, .flags = cpp_floe_flags });
                     library.linkSystemLibrary2("libcurl", .{ .use_pkg_config = use_pkg_config });
                 },
                 else => {
@@ -1420,7 +1420,7 @@ pub fn build(b: *std.Build) void {
                 },
             }
 
-            library.addCSourceFiles(.{ .files = &generic_source_files, .flags = cpp_fp_flags });
+            library.addCSourceFiles(.{ .files = &generic_source_files, .flags = cpp_floe_flags });
             library.addConfigHeader(build_config_step);
             library.linkLibC();
             library.linkLibrary(tracy);
@@ -1623,7 +1623,7 @@ pub fn build(b: *std.Build) void {
                     path ++ "/descriptors/param_descriptors.cpp",
                     path ++ "/audio_utils.cpp",
                 },
-                .flags = cpp_fp_flags,
+                .flags = cpp_floe_flags,
             });
 
             common_infrastructure.linkLibrary(lua);
@@ -1703,7 +1703,7 @@ pub fn build(b: *std.Build) void {
                     plugin_path ++ "/sample_lib_server/sample_library_server.cpp",
                     plugin_path ++ "/state/state_coding.cpp",
                 }),
-                .flags = cpp_fp_flags,
+                .flags = cpp_floe_flags,
             });
 
             const licences_header = b.addConfigHeader(.{
@@ -1747,7 +1747,7 @@ pub fn build(b: *std.Build) void {
             });
             docs_preprocessor.addCSourceFiles(.{ .files = &.{
                 "src/docs_preprocessor/docs_preprocessor.cpp",
-            }, .flags = cpp_fp_flags });
+            }, .flags = cpp_floe_flags });
             docs_preprocessor.linkLibrary(common_infrastructure);
             docs_preprocessor.addIncludePath(b.path("src"));
             docs_preprocessor.addConfigHeader(build_config_step);
@@ -1765,7 +1765,7 @@ pub fn build(b: *std.Build) void {
             packager.addCSourceFiles(.{ .files = &.{
                 "src/packager_tool/packager.cpp",
                 "src/common_infrastructure/final_binary_type.cpp",
-            }, .flags = cpp_fp_flags });
+            }, .flags = cpp_floe_flags });
             packager.defineCMacro("FINAL_BINARY_TYPE", "Packager");
             packager.linkLibrary(common_infrastructure);
             packager.addIncludePath(b.path("src"));
@@ -1790,7 +1790,7 @@ pub fn build(b: *std.Build) void {
             clap.addCSourceFiles(.{ .files = &.{
                 "src/plugin/plugin/plugin_entry.cpp",
                 "src/common_infrastructure/final_binary_type.cpp",
-            }, .flags = cpp_fp_flags });
+            }, .flags = cpp_floe_flags });
             clap.defineCMacro("FINAL_BINARY_TYPE", "Clap");
             clap.addConfigHeader(build_config_step);
             clap.addIncludePath(b.path("src"));
@@ -1931,7 +1931,7 @@ pub fn build(b: *std.Build) void {
                     "src/plugin/plugin/plugin_entry.cpp",
                     "src/common_infrastructure/final_binary_type.cpp",
                 },
-                .flags = cpp_fp_flags,
+                .flags = cpp_floe_flags,
             });
 
             floe_standalone.defineCMacro("FINAL_BINARY_TYPE", "Standalone");
@@ -2189,7 +2189,7 @@ pub fn build(b: *std.Build) void {
             vst3.addCSourceFiles(.{ .files = &.{
                 "src/plugin/plugin/plugin_entry.cpp",
                 "src/common_infrastructure/final_binary_type.cpp",
-            }, .flags = cpp_fp_flags });
+            }, .flags = cpp_floe_flags });
             vst3.defineCMacro("FINAL_BINARY_TYPE", "Vst3");
 
             const wrapper_src_path = build_context.dep_clap_wrapper.path("src");
@@ -2352,7 +2352,7 @@ pub fn build(b: *std.Build) void {
                 au.addCSourceFiles(.{ .files = &.{
                     "src/plugin/plugin/plugin_entry.cpp",
                     "src/common_infrastructure/final_binary_type.cpp",
-                }, .flags = cpp_fp_flags });
+                }, .flags = cpp_floe_flags });
                 au.defineCMacro("FINAL_BINARY_TYPE", "AuV2");
 
                 const wrapper_src_path = build_context.dep_clap_wrapper.path("src");
@@ -2542,7 +2542,7 @@ pub fn build(b: *std.Build) void {
                     .file = b.path(installer_path ++ "/resources.rc"),
                     .flags = flags.items,
                 });
-                flags.appendSlice(cpp_fp_flags) catch unreachable;
+                flags.appendSlice(cpp_floe_flags) catch unreachable;
 
                 win_installer.addCSourceFiles(.{
                     .files = &.{
@@ -2590,7 +2590,7 @@ pub fn build(b: *std.Build) void {
             tests.addCSourceFiles(.{ .files = &.{
                 "src/tests/tests_main.cpp",
                 "src/common_infrastructure/final_binary_type.cpp",
-            }, .flags = cpp_fp_flags });
+            }, .flags = cpp_floe_flags });
             tests.defineCMacro("FINAL_BINARY_TYPE", "Tests");
             tests.addConfigHeader(build_config_step);
             tests.linkLibrary(plugin);

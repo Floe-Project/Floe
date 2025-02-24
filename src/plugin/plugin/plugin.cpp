@@ -124,7 +124,7 @@ LogClapFunction(FloePluginInstance& floe, ClapFunctionType level, String name, S
 
 inline bool Check(FloePluginInstance& floe, bool condition, String function_name, String message) {
     if (!condition) [[unlikely]] {
-        ReportError(sentry::Error::Level::Error,
+        ReportError(ErrorLevel::Error,
                     HashMultiple(Array {function_name, message}),
                     "{} #{}: {}",
                     function_name,
@@ -136,7 +136,7 @@ inline bool Check(FloePluginInstance& floe, bool condition, String function_name
 
 inline bool Check(bool condition, String function_name, String message) {
     if (!condition) [[unlikely]] {
-        ReportError(sentry::Error::Level::Error,
+        ReportError(ErrorLevel::Error,
                     HashMultiple(Array {function_name, message}),
                     "{}: {}",
                     function_name,
@@ -209,7 +209,7 @@ clap_plugin_state const floe_plugin_state {
 
 static bool LogIfError(ErrorCodeOr<void> const& ec, String name) {
     if (ec.HasError()) {
-        ReportError(sentry::Error::Level::Warning, Hash(name), name);
+        ReportError(ErrorLevel::Warning, Hash(name), name);
         return false;
     }
     return true;
@@ -1123,7 +1123,7 @@ static bool ClapInit(const struct clap_plugin* plugin) {
 
             // TODO: remove this before release
             if constexpr (!PRODUCTION_BUILD)
-                ReportError(sentry::Error::Level::Info, k_nullopt, "Floe plugin loaded"_s);
+                ReportError(ErrorLevel::Info, k_nullopt, "Floe plugin loaded"_s);
         } else {
             if (!Check(ThreadName() == "main", k_func, "multiple main threads")) return false;
         }

@@ -16,7 +16,7 @@ static Span<String> PossiblePrefFilePaths(ArenaAllocator& arena) {
         String error_log {};
         dyn::Append(result, PreferencesFilepath(&error_log));
         if (error_log.size) {
-            ReportError(sentry::ErrorEvent::Level::Warning,
+            ReportError(ErrorLevel::Warning,
                         SourceLocationHash(),
                         "Failed to get known preferences directory {}\n{}",
                         Last(result),
@@ -76,7 +76,7 @@ static String AlwaysScannedFolder(ScanFolderType type, ArenaAllocator& allocator
     auto const result =
         FloeKnownDirectory(allocator, dir_type, k_nullopt, {.create = true, .error_log = &error_writer});
     if (error_log.size) {
-        ReportError(sentry::ErrorEvent::Level::Warning,
+        ReportError(ErrorLevel::Warning,
                     HashComptime("always scanned folder") + ToInt(dir_type),
                     "Failed to get always scanned folder {}\n{}",
                     result,
@@ -104,7 +104,7 @@ FloePaths CreateFloePaths(ArenaAllocator& arena) {
                                                   k_nullopt,
                                                   {.create = true, .error_log = &writer});
         if (error_log.size) {
-            ReportError(sentry::ErrorEvent::Level::Warning,
+            ReportError(ErrorLevel::Warning,
                         HashComptime("autosave path"),
                         "Failed to get autosave path {}\n{}",
                         result.autosave_path,

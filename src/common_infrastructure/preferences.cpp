@@ -904,7 +904,7 @@ void Init(Preferences& prefs, Span<String const> possible_paths) {
     if (watcher.HasValue())
         prefs.watcher.Emplace(watcher.ReleaseValue());
     else
-        ReportError(sentry::Error::Level::Warning,
+        ReportError(ErrorLevel::Warning,
                     SourceLocationHash(),
                     "failed to create preferences directory watcher: {}",
                     watcher.Error());
@@ -920,7 +920,7 @@ void WriteIfNeeded(Preferences& prefs) {
 
     prefs.last_known_file_modified_time = NanosecondsSinceEpoch();
     TRY_OR(WritePreferencesFile(prefs, PreferencesFilepath(), prefs.last_known_file_modified_time), {
-        ReportError(sentry::Error::Level::Error,
+        ReportError(ErrorLevel::Error,
                     SourceLocationHash(),
                     "failed to write preferences file: {}",
                     error);
@@ -1006,7 +1006,7 @@ void PollForExternalChanges(Preferences& prefs, PollForExternalChangesOptions op
                                                          .scratch_arena = prefs.watcher_scratch,
                                                      }),
                                 {
-                                    ReportError(sentry::Error::Level::Warning,
+                                    ReportError(ErrorLevel::Warning,
                                                 SourceLocationHash(),
                                                 "failed to poll for preferences changes: {}",
                                                 error);

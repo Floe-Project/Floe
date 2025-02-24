@@ -103,7 +103,7 @@ static ErrorCodeOr<void> TryInstall(Component const& comp) {
     PathArena arena {Malloc::Instance()};
     auto const path = path::Join(arena, Array {comp.install_dir, comp.info.filename});
     TRY_OR(WriteFile(path, comp.data), {
-        ReportError(sentry::Error::Level::Warning, k_nullopt, "Failed to install file {}: {}", path, error);
+        ReportError(ErrorLevel::Warning, k_nullopt, "Failed to install file {}: {}", path, error);
         return error;
     });
 
@@ -268,7 +268,7 @@ Application* CreateApplication(GuiFramework& framework, u32 root_layout_id) {
         };
 
         if (error_buffer.size)
-            ReportError(sentry::Error::Level::Error,
+            ReportError(ErrorLevel::Error,
                         k_nullopt,
                         "Failed to get install directory {}: {}",
                         app->components[i].install_dir,

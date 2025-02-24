@@ -20,14 +20,26 @@ void ReportError(sentry::Error&& error, Optional<u64> error_id);
 bool ErrorSentBefore(u64 error_id);
 } // namespace detail
 
+enum class ErrorLevel { Debug, Info, Warning, Error, Fatal };
+
 // thread-safe, not signal-safe, works even if InitErrorReporting() was not called
 template <typename... Args>
 __attribute__((noinline)) void
-ReportError(sentry::Error::Level level, Optional<u64> error_id, String format, Args const&... args) {
+ReportError(ErrorLevel level, Optional<u64> error_id, String format, Args const&... args) {
     if (error_id)
         if (detail::ErrorSentBefore(*error_id)) return;
     sentry::Error error {};
-    error.level = level;
+    error.level = ({
+        sentry::Error::Level l;
+        switch (level) {
+            case ErrorLevel::Debug: l = sentry::Error::Level::Debug; break;
+            case ErrorLevel::Info: l = sentry::Error::Level::Info; break;
+            case ErrorLevel::Warning: l = sentry::Error::Level::Warning; break;
+            case ErrorLevel::Error: l = sentry::Error::Level::Error; break;
+            case ErrorLevel::Fatal: l = sentry::Error::Level::Fatal; break;
+        }
+        l;
+    });
     error.message = fmt::Format(error.arena, format, args...);
     error.stacktrace = CurrentStacktrace(ProgramCounter {CALL_SITE_PROGRAM_COUNTER});
     detail::ReportError(Move(error), error_id);
@@ -47,6 +59,6 @@ ReportFeedbackReturnCode ReportFeedback(String description, Optional<String> ema
 prefs::Descriptor const& IsOnlineReportingDisabledDescriptor();
 void ErrorReportingOnPreferenceChanged(prefs::Key const& key, prefs::Value const* value);
 
-// Slow version, reads the preferences file directly. Allows you to get the value without relying on any preferences
-// object.
+// Slow version, reads the preferences file directly. Allows you to get the value without relying on any
+// preferences object.
 bool IsOnlineReportingDisabled();

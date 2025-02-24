@@ -773,7 +773,7 @@ void SetValue(Preferences& prefs, Key const& key, ValueUnion const& value, SetVa
         ASSERT(inserted);
     }
 
-    if (!options.dont_track_changes) OnChange(prefs, key, new_value);
+    if (!options.dont_track_changes) MarkChanged(prefs, key, new_value);
 }
 
 void SetValue(Preferences& prefs,
@@ -814,7 +814,7 @@ bool AddValue(Preferences& prefs, Key const& key, ValueUnion const& value, SetVa
         ASSERT(inserted);
     }
 
-    if (!options.dont_track_changes) OnChange(prefs, key, first_node);
+    if (!options.dont_track_changes) MarkChanged(prefs, key, first_node);
     return true;
 }
 
@@ -852,9 +852,9 @@ bool RemoveValue(Preferences& prefs, Key const& key, ValueUnion const& value, Re
         if (single_value) {
             FreeKey(key, prefs.path_pool);
             prefs.Delete(key);
-            OnChange(prefs, key, nullptr);
+            MarkChanged(prefs, key, nullptr);
         } else {
-            OnChange(prefs, key, existing_values);
+            MarkChanged(prefs, key, existing_values);
         }
     }
 
@@ -878,7 +878,7 @@ void Remove(Preferences& prefs, Key const& key, RemoveValueOptions options) {
         prefs.Delete(key);
     }
 
-    if (!options.dont_track_changes) OnChange(prefs, key, nullptr);
+    if (!options.dont_track_changes) MarkChanged(prefs, key, nullptr);
 }
 
 void Init(Preferences& prefs, Span<String const> possible_paths) {
@@ -934,7 +934,7 @@ void ReplacePreferences(Preferences& prefs, PreferencesTable const& new_table, R
         for (auto const [key, value] : prefs) {
             if (!new_table.Find(key)) {
                 Remove(prefs, key, {.dont_track_changes = true});
-                OnChange(prefs, key, nullptr);
+                MarkChanged(prefs, key, nullptr);
             }
         }
     }
@@ -975,7 +975,7 @@ void ReplacePreferences(Preferences& prefs, PreferencesTable const& new_table, R
             changed = true;
         }
 
-        if (changed) OnChange(prefs, key, *prefs.Find(key));
+        if (changed) MarkChanged(prefs, key, *prefs.Find(key));
     }
 }
 

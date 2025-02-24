@@ -315,9 +315,7 @@ void TopPanel(Gui* g) {
             *preset_load_criteria,
             FetchOrRescanPresetsFolder(g->engine.shared_engine_systems.preset_listing,
                                        RescanMode::RescanAsyncIfNeeded,
-                                       filesystem_prefs::ExtraScanFolders(g->prefs,
-                                                                          g->shared_engine_systems.paths,
-                                                                          ScanFolderType::Presets),
+                                       ExtraScanFolders(g->shared_engine_systems.paths, g->prefs, ScanFolderType::Presets),
                                        &g->engine.shared_engine_systems.thread_pool));
         g->preset_browser_data.scroll_to_show_current_preset = true;
     }

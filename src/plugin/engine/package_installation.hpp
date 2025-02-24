@@ -833,17 +833,14 @@ PUBLIC void AddJob(InstallJobs& jobs,
         CreateJobOptions {
             .zip_path = zip_path,
             .libraries_install_folder =
-                prefs::LookupString(prefs, prefs::key::k_libraries_install_location)
-                    .ValueOr(paths.always_scanned_folder[ToInt(ScanFolderType::Libraries)]),
+                prefs::GetString(prefs, InstallLocationDescriptor(paths, prefs, ScanFolderType::Libraries)),
             .presets_install_folder =
-                prefs::LookupString(prefs, prefs::key::k_presets_install_location)
-                    .ValueOr(paths.always_scanned_folder[ToInt(ScanFolderType::Presets)]),
+                prefs::GetString(prefs, InstallLocationDescriptor(paths, prefs, ScanFolderType::Presets)),
             .server = sample_library_server,
-            .preset_folders = CombineStringArrays(
-                scratch_arena,
-                prefs::LookupValues<String, k_max_extra_scan_folders>(prefs,
-                                                                      prefs::key::k_extra_presets_folder),
-                Array {paths.always_scanned_folder[ToInt(ScanFolderType::Presets)]}),
+            .preset_folders =
+                CombineStringArrays(scratch_arena,
+                                    ExtraScanFolders(paths, prefs, ScanFolderType::Presets),
+                                    Array {paths.always_scanned_folder[ToInt(ScanFolderType::Presets)]}),
         });
     thread_pool.AddJob([job]() {
         try {

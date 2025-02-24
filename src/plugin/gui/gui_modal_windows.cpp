@@ -276,12 +276,11 @@ static void DoLoadingOverlay(Gui* g) {
     auto const settings = ModalWindowSettings(g->imgui);
 
     if (g->engine.pending_state_change ||
-        FetchOrRescanPresetsFolder(g->shared_engine_systems.preset_listing,
-                                   RescanMode::DontRescan,
-                                   filesystem_prefs::ExtraScanFolders(g->prefs,
-                                                                      g->shared_engine_systems.paths,
-                                                                      ScanFolderType::Presets),
-                                   nullptr)
+        FetchOrRescanPresetsFolder(
+            g->shared_engine_systems.preset_listing,
+            RescanMode::DontRescan,
+            ExtraScanFolders(g->shared_engine_systems.paths, g->prefs, ScanFolderType::Presets),
+            nullptr)
             .is_loading) {
         imgui.BeginWindow(settings, r, "LoadingModal");
         DEFER { imgui.EndWindow(); };

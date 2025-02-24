@@ -5,6 +5,8 @@
 
 #include "tests/framework.hpp"
 
+#include "common_infrastructure/error_reporting.hpp"
+
 #include "state/state_coding.hpp"
 
 static void AutosaveFilenamePrefix(DynamicArrayBounded<char, 32>& out, AutosaveState const& state) {

@@ -28,9 +28,7 @@ PresetBrowser::PresetBrowser(Gui* g, PresetBrowserPersistentData& persistent_dat
         listing =
             FetchOrRescanPresetsFolder(g->shared_engine_systems.preset_listing,
                                        RescanMode::RescanAsyncIfNeeded,
-                                       filesystem_prefs::ExtraScanFolders(g->prefs,
-                                                                          g->shared_engine_systems.paths,
-                                                                          ScanFolderType::Presets),
+                                       ExtraScanFolders(g->shared_engine_systems.paths, g->prefs, ScanFolderType::Presets),
                                        &g->shared_engine_systems.thread_pool);
     }
     if (listing.listing) {

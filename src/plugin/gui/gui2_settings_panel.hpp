@@ -242,8 +242,7 @@ static bool AddExtraScanFolderDialog(GuiBoxSystem& box_system,
                                      ScanFolderType type,
                                      bool set_as_install_location) {
     Optional<String> default_folder {};
-    if (auto const extra_paths = filesystem_prefs::ExtraScanFolders(context.settings, context.paths, type);
-        extra_paths.size)
+    if (auto const extra_paths = ExtraScanFolders(context.paths, context.settings, type); extra_paths.size)
         default_folder = extra_paths[0];
 
     if (auto const o = FilesystemDialog({
@@ -264,9 +263,14 @@ static bool AddExtraScanFolderDialog(GuiBoxSystem& box_system,
         });
         o.HasValue()) {
         if (auto const paths = o.Value(); paths.size) {
-            filesystem_prefs::AddScanFolder(context.settings, context.paths, type, paths[0]);
-            if (set_as_install_location)
-                filesystem_prefs::SetInstallLocation(context.settings, context.paths, type, paths[0]);
+            prefs::AddValue(context.settings,
+                            ExtraScanFolderDescriptor(context.paths, type),
+                            (String)paths[0]);
+            if (set_as_install_location) {
+                prefs::SetValue(context.settings,
+                                InstallLocationDescriptor(context.paths, context.settings, type),
+                                (String)paths[0]);
+            }
             return true;
         }
     } else {
@@ -318,8 +322,7 @@ static void FolderSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& 
         }
 
         Optional<String> to_remove {};
-        for (auto const dir :
-             filesystem_prefs::ExtraScanFolders(context.settings, context.paths, scan_folder_type)) {
+        for (auto const dir : ExtraScanFolders(context.paths, context.settings, scan_folder_type)) {
             SetFolderSubtext(subtext_buffer,
                              dir,
                              false,
@@ -332,7 +335,9 @@ static void FolderSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& 
             }
         }
         if (to_remove)
-            filesystem_prefs::RemoveScanFolder(context.settings, context.paths, scan_folder_type, *to_remove);
+            prefs::RemoveValue(context.settings,
+                               ExtraScanFolderDescriptor(context.paths, scan_folder_type).key,
+                               *to_remove);
 
         auto const contents_name = ({
             String s;
@@ -343,7 +348,7 @@ static void FolderSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& 
             }
             s;
         });
-        if (filesystem_prefs::ExtraScanFolders(context.settings, context.paths, scan_folder_type).size !=
+        if (ExtraScanFolders(context.paths, context.settings, scan_folder_type).size !=
                 k_max_extra_scan_folders &&
             TextButton(box_system,
                        rhs_column,
@@ -384,17 +389,20 @@ static void InstallLocationMenu(GuiBoxSystem& box_system,
                                 });
 
         if (item.button_fired) {
-            filesystem_prefs::SetInstallLocation(context.settings, context.paths, scan_folder_type, path);
+            prefs::SetValue(context.settings,
+                            InstallLocationDescriptor(context.paths, context.settings, scan_folder_type),
+                            path);
             box_system.imgui.CloseTopPopupOnly();
         }
 
         auto const current_install_location =
-            filesystem_prefs::InstallLocation(context.settings, context.paths, scan_folder_type);
+            prefs::GetString(context.settings,
+                             InstallLocationDescriptor(context.paths, context.settings, scan_folder_type));
 
         DoBox(box_system,
               {
                   .parent = item,
-                  .text = path == current_install_location ? String(ICON_FA_CHECK) : "",
+                  .text = path::Equal(path, current_install_location) ? String(ICON_FA_CHECK) : "",
                   .font = FontType::Icons,
                   .text_fill = style::Colour::Subtext0,
                   .layout {
@@ -438,8 +446,7 @@ static void InstallLocationMenu(GuiBoxSystem& box_system,
         menu_item(dir, subtext_buffer);
     }
 
-    for (auto const dir :
-         filesystem_prefs::ExtraScanFolders(context.settings, context.paths, scan_folder_type)) {
+    for (auto const dir : ExtraScanFolders(context.paths, context.settings, scan_folder_type)) {
         SetFolderSubtext(subtext_buffer, dir, false, scan_folder_type, context.sample_lib_server);
         menu_item(dir, subtext_buffer);
     }
@@ -512,7 +519,8 @@ static void PackagesSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext
         auto const popup_id = box_system.imgui.GetID(ToInt(scan_folder_type));
 
         String menu_text =
-            filesystem_prefs::InstallLocation(context.settings, context.paths, scan_folder_type);
+            prefs::GetString(context.settings,
+                             InstallLocationDescriptor(context.paths, context.settings, scan_folder_type));
         if (auto const default_dir = context.paths.always_scanned_folder[ToInt(scan_folder_type)];
             menu_text == default_dir) {
             menu_text = "Default";

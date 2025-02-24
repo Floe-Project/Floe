@@ -1614,6 +1614,7 @@ pub fn build(b: *std.Build) void {
                     path ++ "/common_errors.cpp",
                     path ++ "/error_reporting.cpp",
                     path ++ "/package_format.cpp",
+                    path ++ "/paths.cpp",
                     path ++ "/sample_library/audio_file.cpp",
                     path ++ "/sample_library/sample_library_lua.cpp",
                     path ++ "/sample_library/sample_library_mdata.cpp",

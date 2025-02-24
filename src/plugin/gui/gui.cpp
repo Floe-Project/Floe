@@ -346,9 +346,8 @@ static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
     switch (type) {
         case DialogType::AddNewLibraryScanFolder: {
             Optional<String> default_folder {};
-            if (auto extra_paths = filesystem_prefs::ExtraScanFolders(g->prefs,
-                                                                      g->shared_engine_systems.paths,
-                                                                      ScanFolderType::Libraries);
+            if (auto extra_paths =
+                    ExtraScanFolders(g->shared_engine_systems.paths, g->prefs, ScanFolderType::Libraries);
                 extra_paths.size)
                 default_folder = extra_paths[0];
 
@@ -362,18 +361,17 @@ static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
             }));
             if (paths.size) {
                 auto const path = paths[0];
-                filesystem_prefs::AddScanFolder(g->prefs,
-                                                g->shared_engine_systems.paths,
-                                                ScanFolderType::Libraries,
-                                                path);
+                prefs::AddValue(
+                    g->prefs,
+                    ExtraScanFolderDescriptor(g->shared_engine_systems.paths, ScanFolderType::Libraries),
+                    (String)path);
             }
             break;
         }
         case DialogType::AddNewPresetsScanFolder: {
             Optional<String> default_folder {};
-            if (auto extra_paths = filesystem_prefs::ExtraScanFolders(g->prefs,
-                                                                      g->shared_engine_systems.paths,
-                                                                      ScanFolderType::Presets);
+            if (auto extra_paths =
+                    ExtraScanFolders(g->shared_engine_systems.paths, g->prefs, ScanFolderType::Presets);
                 extra_paths.size)
                 default_folder = extra_paths[0];
 
@@ -387,10 +385,10 @@ static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
             }));
             if (paths.size) {
                 auto const path = paths[0];
-                filesystem_prefs::AddScanFolder(g->prefs,
-                                                g->shared_engine_systems.paths,
-                                                ScanFolderType::Presets,
-                                                path);
+                prefs::AddValue(
+                    g->prefs,
+                    ExtraScanFolderDescriptor(g->shared_engine_systems.paths, ScanFolderType::Presets),
+                    (String)path);
             }
             break;
         }
@@ -398,9 +396,7 @@ static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
         case DialogType::SavePreset: {
             Optional<String> default_path {};
             auto const preset_scan_folders =
-                filesystem_prefs::ExtraScanFolders(g->prefs,
-                                                   g->shared_engine_systems.paths,
-                                                   ScanFolderType::Presets);
+                ExtraScanFolders(g->shared_engine_systems.paths, g->prefs, ScanFolderType::Presets);
             if (preset_scan_folders.size) {
                 default_path =
                     path::Join(g->scratch_arena,

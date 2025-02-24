@@ -324,8 +324,6 @@ constexpr String k_cc_to_param_id_map_section = "Default Map MIDI CC to Param ID
 }
 constexpr String k_extra_libraries_folder = "extra-libraries-folder"_s;
 constexpr String k_extra_presets_folder = "extra-presets-folder"_s;
-constexpr String k_libraries_install_location = "libraries-install-location"_s;
-constexpr String k_presets_install_location = "presets-install-location"_s;
 constexpr String k_gui_keyboard_octave = "gui-keyboard-octave"_s;
 constexpr String k_high_contrast_gui = "high-contrast-gui"_s;
 constexpr String k_presets_random_mode = "presets-random-mode"_s;

@@ -508,9 +508,7 @@ Engine::Engine(clap_host const& host,
                 auto listing = FetchOrRescanPresetsFolder(
                     engine.shared_engine_systems.preset_listing,
                     RescanMode::DontRescan,
-                    filesystem_prefs::ExtraScanFolders(engine.shared_engine_systems.prefs,
-                                                       engine.shared_engine_systems.paths,
-                                                       ScanFolderType::Presets),
+                    ExtraScanFolders(engine.shared_engine_systems.paths, engine.shared_engine_systems.prefs, ScanFolderType::Presets),
                     nullptr);
 
                 if (engine.pending_preset_selection_criteria) {

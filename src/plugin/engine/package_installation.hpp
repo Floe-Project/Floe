@@ -4,7 +4,7 @@
 #pragma once
 #include "common_infrastructure/package_format.hpp"
 #include "common_infrastructure/paths.hpp"
-#include "common_infrastructure/settings/settings_file.hpp"
+#include "common_infrastructure/preferences.hpp"
 
 #include "sample_lib_server/sample_library_server.hpp"
 
@@ -817,7 +817,7 @@ using InstallJobs = BoundedList<ManagedInstallJob, 16>;
 // [main thread]
 PUBLIC void AddJob(InstallJobs& jobs,
                    String zip_path,
-                   sts::Settings& settings,
+                   sts::Preferences& prefs,
                    FloePaths const& paths,
                    ThreadPool& thread_pool,
                    ArenaAllocator& scratch_arena,
@@ -833,16 +833,15 @@ PUBLIC void AddJob(InstallJobs& jobs,
         CreateJobOptions {
             .zip_path = zip_path,
             .libraries_install_folder =
-                sts::LookupString(settings, sts::key::k_libraries_install_location)
+                sts::LookupString(prefs, sts::key::k_libraries_install_location)
                     .ValueOr(paths.always_scanned_folder[ToInt(ScanFolderType::Libraries)]),
             .presets_install_folder =
-                sts::LookupString(settings, sts::key::k_presets_install_location)
+                sts::LookupString(prefs, sts::key::k_presets_install_location)
                     .ValueOr(paths.always_scanned_folder[ToInt(ScanFolderType::Presets)]),
             .server = sample_library_server,
             .preset_folders = CombineStringArrays(
                 scratch_arena,
-                sts::LookupValues<String, k_max_extra_scan_folders>(settings,
-                                                                    sts::key::k_extra_presets_folder),
+                sts::LookupValues<String, k_max_extra_scan_folders>(prefs, sts::key::k_extra_presets_folder),
                 Array {paths.always_scanned_folder[ToInt(ScanFolderType::Presets)]}),
         });
     thread_pool.AddJob([job]() {

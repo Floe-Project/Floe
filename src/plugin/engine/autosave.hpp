@@ -6,7 +6,7 @@
 #include "os/misc.hpp"
 
 #include "common_infrastructure/paths.hpp"
-#include "common_infrastructure/settings/settings_file.hpp"
+#include "common_infrastructure/preferences.hpp"
 
 #include "state/state_snapshot.hpp"
 
@@ -28,8 +28,8 @@ struct AutosaveState {
 // Run from main thread
 // Check if an autosave is needed, and if so, create a snapshot and queue it.
 void InitAutosaveState(AutosaveState& state, u64& random_seed, StateSnapshot const& initial_state);
-bool AutosaveNeeded(AutosaveState const& state, sts::Settings const& settings);
-void QueueAutosave(AutosaveState& state, sts::Settings const& settings, StateSnapshot const& snapshot);
+bool AutosaveNeeded(AutosaveState const& state, sts::Preferences const& settings);
+void QueueAutosave(AutosaveState& state, sts::Preferences const& settings, StateSnapshot const& snapshot);
 
 enum class AutosaveSetting : u8 {
     AutosaveIntervalSeconds,
@@ -41,7 +41,7 @@ enum class AutosaveSetting : u8 {
 // Use with sts::SetValue, sts::GetValue
 sts::Descriptor SettingDescriptor(AutosaveSetting setting);
 
-void OnSettingsChange(AutosaveState& state, sts::Key const& key, sts::Value const* value);
+void OnPreferenceChanged(AutosaveState& state, sts::Key const& key, sts::Value const* value);
 
 // Run from background thread
 void AutosaveToFileIfNeeded(AutosaveState& state, FloePaths const& paths);

@@ -10,15 +10,16 @@ For instance: 0.0.1. Don't change the headings.
 # Changelog
 
 ## 0.0.3
+- Rename 'settings' to 'preferences'
 - Add support for packaging and installing MDATA libraries (Mirage)
-- Add tooltips to the settings GUI
+- Add tooltips to the preferences GUI
 - Add new Info panel featuring info about installed libraries. 'About', 'Metrics' and 'Licenses' have been moved here too instead of being separate panels.
 - Add new Share Feedback panel for submitting bug reports and feature requests
 - Add new fields to the Lua API to support license info and attribution, such as CC BY
 - Add attribution-required panel which appears when needed with generated copyable text for fulfilling attribution requirements. Synchronised between all instances of Floe. Makes complying with licenses like CC BY easy.
-- Add autosave feature, which efficiently saves the current state of Floe at a configurable interval. This is useful for recovering from crashes. Configurable in the settings.
+- Add autosave feature, which efficiently saves the current state of Floe at a configurable interval. This is useful for recovering from crashes. Configurable in the preferences.
 - Add ability to select multiple packages to install at once
-- Renamed Appearance settings to General since it's small and can be used for other settings
+- Renamed Appearance preferences to General since it's small and can be used for other preferences
 - Make notifications dismiss themselves after a few seconds
 - Fixed externally deleted or moved-to-trash libraries not being removed from Floe
 - Fixed not installing to the chosen location

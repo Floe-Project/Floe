@@ -59,7 +59,6 @@ Feel free to use the discussions on GitHub for questions, feedback, and ideas. R
 - `src/plugin/processing_utils`: utilities for processing audio
 - `src/plugin/processor`: the audio processing pipeline
 - `src/plugin/sample_lib_server`: system that loads and manages sample libraries
-- `src/plugin/settings`: settings file interaction
 - `src/plugin/state`: serialisation of engine state
 
 #### Auxiliaries/tools

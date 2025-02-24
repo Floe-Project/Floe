@@ -225,7 +225,7 @@ void TopPanel(Gui* g) {
     {
         auto subtitle_r = layout::GetRect(g->layout, subtitle).Up(Round(-title_font->descent + 1));
         auto const show_instance_name =
-            sts::GetBool(g->settings, SettingDescriptor(GuiSetting::ShowInstanceName));
+            sts::GetBool(g->prefs, SettingDescriptor(GuiSetting::ShowInstanceName));
         labels::Label(g,
                       subtitle_r,
                       fmt::Format(g->scratch_arena,
@@ -254,7 +254,7 @@ void TopPanel(Gui* g) {
     }
     if (g->icons) g->frame_input.graphics_ctx->PushFont(g->icons);
 
-    auto& settings = g->settings;
+    auto& settings = g->prefs;
     auto const randomise_mode = (PresetRandomiseMode)Clamp(
         sts::LookupInt(settings, sts::key::k_presets_random_mode).ValueOr((s64)PresetRandomiseMode::All),
         (s64)PresetRandomiseMode::All,
@@ -315,7 +315,7 @@ void TopPanel(Gui* g) {
             *preset_load_criteria,
             FetchOrRescanPresetsFolder(g->engine.shared_engine_systems.preset_listing,
                                        RescanMode::RescanAsyncIfNeeded,
-                                       filesystem_settings::ExtraScanFolders(g->settings,
+                                       filesystem_prefs::ExtraScanFolders(g->prefs,
                                                                              g->shared_engine_systems.paths,
                                                                              ScanFolderType::Presets),
                                        &g->engine.shared_engine_systems.thread_pool));

@@ -6,37 +6,38 @@
 #include "os/filesystem.hpp"
 
 #include "error_reporting.hpp"
-#include "settings/settings_file.hpp"
+#include "preferences.hpp"
 
 constexpr usize k_max_extra_scan_folders {16};
 enum class ScanFolderType : u8 { Presets, Libraries, Count };
 
 struct FloePaths {
     String always_scanned_folder[ToInt(ScanFolderType::Count)];
-    String settings_write_path;
-    Span<String> possible_settings_paths; // sorted. the first is most recommended path to read
+    String preferences_path; // path to write to
+    Span<String> possible_preferences_paths; // sorted. the first is most recommended path to read
     String autosave_path;
 };
 
-static Span<String> PossibleSettingsPaths(ArenaAllocator& arena) {
+static Span<String> PossiblePrefFilePaths(ArenaAllocator& arena) {
     DynamicArray<String> result {arena};
     result.Reserve(5);
 
     // Best path
     {
         String error_log {};
-        dyn::Append(result, SettingsFilepath(&error_log));
+        dyn::Append(result, PreferencesFilepath(&error_log));
         if (error_log.size) {
             ReportError(sentry::ErrorEvent::Level::Warning,
-                        HashComptime("settings path"),
-                        "Failed to get known settings directory {}\n{}",
+                        SourceLocationHash(),
+                        "Failed to get known preferences directory {}\n{}",
                         Last(result),
                         error_log);
         }
     }
 
-    // Legacy paths
-    // In the past some of these were poorly chosen as locations for saving settings due to file permissions.
+    // Paths that Mirage used.
+    // Some of these are actually a bit problematic for reading/writing due to permissions but it doesn't
+    // matter for this case. We're just doing our best to retain any existing preferences.
     {
         auto try_add_path = [&](KnownDirectoryType known_dir, Span<String const> sub_paths, String filename) {
             dyn::Append(result,
@@ -98,11 +99,11 @@ static String AlwaysScannedFolder(ScanFolderType type, ArenaAllocator& allocator
 }
 
 PUBLIC FloePaths CreateFloePaths(ArenaAllocator& arena) {
-    auto const possible_settings_paths = PossibleSettingsPaths(arena);
+    auto const possible_prefs_paths = PossiblePrefFilePaths(arena);
 
     FloePaths result {
-        .settings_write_path = possible_settings_paths[0],
-        .possible_settings_paths = possible_settings_paths,
+        .preferences_path = possible_prefs_paths[0],
+        .possible_preferences_paths = possible_prefs_paths,
     };
 
     for (auto const type : Range(ToInt(ScanFolderType::Count)))
@@ -130,10 +131,10 @@ PUBLIC FloePaths CreateFloePaths(ArenaAllocator& arena) {
 // TODO: better unify these functions with the FloePaths structu - perhaps make FloePaths the first argument.
 // Perhaps add as static functions.
 
-namespace filesystem_settings {
+namespace filesystem_prefs {
 
 PUBLIC DynamicArrayBounded<String, k_max_extra_scan_folders>
-ExtraScanFolders(sts::Settings& settings, FloePaths const& paths, ScanFolderType type) {
+ExtraScanFolders(sts::Preferences& prefs, FloePaths const& paths, ScanFolderType type) {
     ASSERT(CheckThreadName("main"));
     String key {};
     switch (type) {
@@ -142,7 +143,7 @@ ExtraScanFolders(sts::Settings& settings, FloePaths const& paths, ScanFolderType
         case ScanFolderType::Count: PanicIfReached(); break;
     }
 
-    auto values = sts::LookupValues(settings, key);
+    auto values = sts::LookupValues(prefs, key);
     if (!values) return {};
 
     DynamicArrayBounded<String, k_max_extra_scan_folders> result;
@@ -157,7 +158,7 @@ ExtraScanFolders(sts::Settings& settings, FloePaths const& paths, ScanFolderType
     return result;
 }
 
-constexpr String InstallLocationSettingsKey(ScanFolderType type) {
+constexpr String InstallLocationPrefsKey(ScanFolderType type) {
     switch (type) {
         case ScanFolderType::Presets: return sts::key::k_presets_install_location;
         case ScanFolderType::Libraries: return sts::key::k_libraries_install_location;
@@ -166,26 +167,26 @@ constexpr String InstallLocationSettingsKey(ScanFolderType type) {
     return {};
 }
 
-PUBLIC String InstallLocation(sts::Settings& settings, FloePaths const& paths, ScanFolderType type) {
-    auto v = sts::LookupString(settings, InstallLocationSettingsKey(type));
+PUBLIC String InstallLocation(sts::Preferences& prefs, FloePaths const& paths, ScanFolderType type) {
+    auto v = sts::LookupString(prefs, InstallLocationPrefsKey(type));
     auto const fallback = paths.always_scanned_folder[ToInt(type)];
     if (!v) return fallback;
     if (!path::IsAbsolute(*v) || !IsValidUtf8(*v)) return fallback;
-    if (!Contains(ExtraScanFolders(settings, paths, type), *v)) return fallback;
+    if (!Contains(ExtraScanFolders(prefs, paths, type), *v)) return fallback;
     return *v;
 }
 
 PUBLIC void
-SetInstallLocation(sts::Settings& settings, FloePaths const& paths, ScanFolderType type, String path) {
+SetInstallLocation(sts::Preferences& prefs, FloePaths const& paths, ScanFolderType type, String path) {
     ASSERT(CheckThreadName("main"));
     ASSERT(path::IsAbsolute(path));
     ASSERT(IsValidUtf8(path));
-    if (!Contains(ExtraScanFolders(settings, paths, type), path)) return;
+    if (!Contains(ExtraScanFolders(prefs, paths, type), path)) return;
 
-    sts::SetValue(settings, InstallLocationSettingsKey(type), path);
+    sts::SetValue(prefs, InstallLocationPrefsKey(type), path);
 }
 
-constexpr String ScanFolderSettingsKey(ScanFolderType type) {
+constexpr String ScanFolderPrefsKey(ScanFolderType type) {
     switch (type) {
         case ScanFolderType::Presets: return sts::key::k_extra_presets_folder;
         case ScanFolderType::Libraries: return sts::key::k_extra_libraries_folder;
@@ -194,23 +195,23 @@ constexpr String ScanFolderSettingsKey(ScanFolderType type) {
     return {};
 }
 
-PUBLIC void AddScanFolder(sts::Settings& settings, FloePaths const& paths, ScanFolderType type, String path) {
+PUBLIC void AddScanFolder(sts::Preferences& prefs, FloePaths const& paths, ScanFolderType type, String path) {
     ASSERT(CheckThreadName("main"));
     ASSERT(path::IsAbsolute(path));
     ASSERT(IsValidUtf8(path));
     if (path::Equal(path, paths.always_scanned_folder[ToInt(type)])) return;
 
-    sts::AddValue(settings, ScanFolderSettingsKey(type), path);
+    sts::AddValue(prefs, ScanFolderPrefsKey(type), path);
 }
 
 PUBLIC void
-RemoveScanFolder(sts::Settings& settings, FloePaths const& paths, ScanFolderType type, String path) {
+RemoveScanFolder(sts::Preferences& prefs, FloePaths const& paths, ScanFolderType type, String path) {
     ASSERT(CheckThreadName("main"));
 
-    if (sts::RemoveValue(settings, ScanFolderSettingsKey(type), path)) {
-        if (path == InstallLocation(settings, paths, type))
-            SetInstallLocation(settings, paths, type, paths.always_scanned_folder[ToInt(type)]);
+    if (sts::RemoveValue(prefs, ScanFolderPrefsKey(type), path)) {
+        if (path == InstallLocation(prefs, paths, type))
+            SetInstallLocation(prefs, paths, type, paths.always_scanned_folder[ToInt(type)]);
     }
 }
 
-} // namespace filesystem_settings
+} // namespace filesystem_prefs

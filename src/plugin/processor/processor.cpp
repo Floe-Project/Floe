@@ -6,7 +6,7 @@
 #include "os/threading.hpp"
 
 #include "common_infrastructure/descriptors/param_descriptors.hpp"
-#include "common_infrastructure/settings/settings_file.hpp"
+#include "common_infrastructure/preferences.hpp"
 
 #include "clap/ext/params.h"
 #include "param.hpp"
@@ -123,24 +123,24 @@ bool CcControllerMovedParamRecently(AudioProcessor const& processor, ParamIndex 
            TimePoint::Now();
 }
 
-void AddPersistentCcToParamMapping(sts::Settings& settings, u8 cc_num, u32 param_id) {
+void AddPersistentCcToParamMapping(sts::Preferences& prefs, u8 cc_num, u32 param_id) {
     ASSERT(cc_num > 0 && cc_num <= 127);
     ASSERT(ParamIdToIndex(param_id));
-    sts::AddValue(settings,
+    sts::AddValue(prefs,
                   sts::SectionedKey {sts::key::section::k_cc_to_param_id_map_section, (s64)cc_num},
                   (s64)param_id);
 }
 
-void RemovePersistentCcToParamMapping(sts::Settings& settings, u8 cc_num, u32 param_id) {
-    sts::RemoveValue(settings,
+void RemovePersistentCcToParamMapping(sts::Preferences& prefs, u8 cc_num, u32 param_id) {
+    sts::RemoveValue(prefs,
                      sts::SectionedKey {sts::key::section::k_cc_to_param_id_map_section, (s64)cc_num},
                      (s64)param_id);
 }
 
-Bitset<128> PersistentCcsForParam(sts::SettingsTable const& settings, u32 param_id) {
+Bitset<128> PersistentCcsForParam(sts::PreferencesTable const& prefs, u32 param_id) {
     Bitset<128> result {};
 
-    for (auto const [key_union, value_list_ptr] : settings) {
+    for (auto const [key_union, value_list_ptr] : prefs) {
         auto const sectioned_key = key_union.TryGet<sts::SectionedKey>();
         if (!sectioned_key) continue;
         auto const [section, key] = *sectioned_key;
@@ -1514,7 +1514,7 @@ static void OnThreadPoolExec(AudioProcessor& processor, u32 index) {
 
 AudioProcessor::AudioProcessor(clap_host const& host,
                                ProcessorListener& listener,
-                               sts::SettingsTable const& settings)
+                               sts::PreferencesTable const& prefs)
     : host(host)
     , audio_processing_context {.host = host}
     , listener(listener)
@@ -1554,11 +1554,11 @@ AudioProcessor::AudioProcessor(clap_host const& host,
     ProcessorOnParamChange(*this, {params.data, changed});
     smoothed_value_system.ResetAll();
 
-    if (sts::GetBool(settings, SettingDescriptor(ProcessorSetting::DefaultCcParamMappings)))
+    if (sts::GetBool(prefs, SettingDescriptor(ProcessorSetting::DefaultCcParamMappings)))
         for (auto const mapping : k_default_cc_to_param_mapping)
             param_learned_ccs[ToInt(mapping.param)].Set(mapping.cc);
     for (auto const i : EnumIterator<ParamIndex>())
-        param_learned_ccs[ToInt(i)].AssignBlockwise(PersistentCcsForParam(settings, ParamIndexToId(i)));
+        param_learned_ccs[ToInt(i)].AssignBlockwise(PersistentCcsForParam(prefs, ParamIndexToId(i)));
 
     processor_callbacks = {
         .activate = Activate,

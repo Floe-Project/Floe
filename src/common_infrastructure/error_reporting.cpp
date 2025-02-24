@@ -12,11 +12,11 @@ static MutexThin g_reported_error_ids_mutex = {};
 static DynamicArrayBounded<u64, 48> g_reported_error_ids = {};
 
 constexpr bool k_online_reporting_disabled_default = false;
-constexpr String k_online_reporting_disabled_settings_key = "online_reporting_disabled"_s;
+constexpr String k_online_reporting_disabled_preference_key = "online_reporting_disabled"_s;
 
-sts::Descriptor const& IsOnlineReportingDisabledSettingDescriptor() {
+sts::Descriptor const& IsOnlineReportingDisabledDescriptor() {
     static sts::Descriptor const d {
-        .key = k_online_reporting_disabled_settings_key,
+        .key = k_online_reporting_disabled_preference_key,
         .value_requirements = sts::ValueType::Bool,
         .default_value = k_online_reporting_disabled_default,
         .gui_label = "Disable anonymous error reports",
@@ -26,8 +26,8 @@ sts::Descriptor const& IsOnlineReportingDisabledSettingDescriptor() {
     return d;
 }
 
-void ErrorReportingOnSettingsChange(sts::Key const& key, sts::Value const* value) {
-    if (auto const v = sts::Match(key, value, IsOnlineReportingDisabledSettingDescriptor())) {
+void ErrorReportingOnPreferenceChanged(sts::Key const& key, sts::Value const* value) {
+    if (auto const v = sts::Match(key, value, IsOnlineReportingDisabledDescriptor())) {
         if (auto sentry = sentry::GlobalSentry())
             sentry->online_reporting_disabled.Store(v->Get<bool>(), StoreMemoryOrder::Relaxed);
     }
@@ -36,9 +36,9 @@ void ErrorReportingOnSettingsChange(sts::Key const& key, sts::Value const* value
 bool IsOnlineReportingDisabled() {
     ArenaAllocatorWithInlineStorage<Kb(4)> arena {PageAllocator::Instance()};
     auto try_read = [&]() -> ErrorCodeOr<bool> {
-        auto const file_data = TRY(sts::ReadEntireSettingsFile(SettingsFilepath(), arena)).file_data;
-        auto const table = sts::ParseSettingsFile(file_data, arena);
-        return sts::LookupBool(table, k_online_reporting_disabled_settings_key)
+        auto const file_data = TRY(sts::ReadEntirePreferencesFile(PreferencesFilepath(), arena)).file_data;
+        auto const table = sts::ParsePreferencesFile(file_data, arena);
+        return sts::LookupBool(table, k_online_reporting_disabled_preference_key)
             .ValueOr(k_online_reporting_disabled_default);
     };
 

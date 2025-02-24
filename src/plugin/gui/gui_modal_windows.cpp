@@ -8,7 +8,7 @@
 #include "foundation/foundation.hpp"
 
 #include "common_infrastructure/paths.hpp"
-#include "common_infrastructure/settings/settings_file.hpp"
+#include "common_infrastructure/preferences.hpp"
 
 #include "engine/engine.hpp"
 #include "gui.hpp"
@@ -278,7 +278,7 @@ static void DoLoadingOverlay(Gui* g) {
     if (g->engine.pending_state_change ||
         FetchOrRescanPresetsFolder(g->shared_engine_systems.preset_listing,
                                    RescanMode::DontRescan,
-                                   filesystem_settings::ExtraScanFolders(g->settings,
+                                   filesystem_prefs::ExtraScanFolders(g->prefs,
                                                                          g->shared_engine_systems.paths,
                                                                          ScanFolderType::Presets),
                                    nullptr)

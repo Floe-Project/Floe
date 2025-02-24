@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "common_infrastructure/settings/settings_file.hpp"
+#include "common_infrastructure/preferences.hpp"
 
 enum class GuiSetting : u8 {
     ShowTooltips,
@@ -16,5 +16,5 @@ enum class GuiSetting : u8 {
 
 sts::Descriptor SettingDescriptor(GuiSetting);
 
-UiSize DesiredAspectRatio(sts::Settings const&);
-UiSize DesiredWindowSize(sts::Settings const&);
+UiSize DesiredAspectRatio(sts::Preferences const&);
+UiSize DesiredWindowSize(sts::Preferences const&);

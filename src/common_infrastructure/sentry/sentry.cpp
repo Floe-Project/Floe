@@ -7,7 +7,7 @@
 #include "tests/framework.hpp"
 
 #include "error_reporting.hpp"
-#include "settings/settings_file.hpp"
+#include "preferences.hpp"
 
 namespace sentry {
 

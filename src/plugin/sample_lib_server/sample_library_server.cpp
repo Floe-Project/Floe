@@ -1083,7 +1083,7 @@ static bool UpdatePendingResources(PendingResources& pending_resources,
                 fmt::Append(err->value.title, "{} library not found", library_id);
                 fmt::Append(
                     err->value.message,
-                    "\"{}\" is not installed or is otherwise unavailable. Check your settings or consult the library installation instructions.",
+                    "\"{}\" is not installed or is otherwise unavailable. Check your preferences or consult the library installation instructions.",
                     library_id);
                 if (library_id == sample_lib::k_mirage_compat_library_id) {
                     fmt::Append(

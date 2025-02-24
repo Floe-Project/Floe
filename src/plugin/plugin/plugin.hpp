@@ -5,7 +5,7 @@
 #include "os/threading.hpp"
 
 #include "common_infrastructure/constants.hpp"
-#include "common_infrastructure/settings/settings_file.hpp"
+#include "common_infrastructure/preferences.hpp"
 
 #include "clap/ext/gui.h"
 #include "clap/ext/thread-check.h"
@@ -76,7 +76,7 @@ struct PluginCallbacks {
     void (*on_poll_thread)(UserObject&) = [](UserObject&) {};
 
     // [main-thread]
-    void (*on_settings_change)(UserObject&, sts::Key, sts::Value const*) =
+    void (*on_preference_changed)(UserObject&, sts::Key, sts::Value const*) =
         [](UserObject&, sts::Key, sts::Value const*) {};
 
     // [audio-thread]
@@ -190,4 +190,4 @@ static constexpr clap_plugin_descriptor k_plugin_info {
 clap_plugin const* CreateFloeInstance(clap_host const* clap_host);
 
 void OnPollThread(FloeInstanceIndex index);
-void OnSettingsChange(FloeInstanceIndex index, sts::Key const& key, sts::Value const* value);
+void OnPreferenceChanged(FloeInstanceIndex index, sts::Key const& key, sts::Value const* value);

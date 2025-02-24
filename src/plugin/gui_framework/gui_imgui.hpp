@@ -487,7 +487,10 @@ struct Context {
     f32x2 VwToPixels(f32x2 vw) const { return vw * pixels_per_vw; }
     f32 PixelsToVw(f32 pixels) const { return pixels / pixels_per_vw; }
     f32x2 PixelsToVw(f32x2 pixels) const { return pixels / pixels_per_vw; }
-    void SetPixelsPerVw(f32 v) { pixels_per_vw = v; }
+    void SetPixelsPerVw(f32 v) {
+        ASSERT(v > 0);
+        pixels_per_vw = v;
+    }
 
     f32x2 WindowPosToScreenPos(f32x2 rel_pos);
     f32x2 ScreenPosToWindowPos(f32x2 screen_pos);

@@ -9,7 +9,7 @@
 
 #include "common_infrastructure/descriptors/param_descriptors.hpp"
 #include "common_infrastructure/error_reporting.hpp"
-#include "common_infrastructure/settings/settings_file.hpp"
+#include "common_infrastructure/preferences.hpp"
 
 #include "clap/ext/audio-ports.h"
 #include "clap/ext/note-ports.h"
@@ -34,16 +34,16 @@
 [[clang::no_destroy]] Optional<SharedEngineSystems> g_shared_engine_systems {};
 
 // Logging is non-realtime only. We don't log in the audio thread.
-enum class ClapLoggingLevel {
+// Some main-thread CLAP functions are called very frequently, so we only log them at a certain level.
+enum class ClapFunctionType {
     NonRecurring,
-    All,
+    Any,
 };
-constexpr ClapLoggingLevel k_clap_logging_level = ClapLoggingLevel::NonRecurring;
+constexpr ClapFunctionType k_clap_logging_level = ClapFunctionType::NonRecurring;
 
 // To make our CLAP interface bulletproof, we store a known index (based on a magic number) in the plugin_data
 // and only access our corresponding object if it's valid. This is safer than the alternative of directly
 // storing a pointer and dereferencing it without knowing for sure it's ours.
-
 constexpr uintptr k_clap_plugin_data_magic = 0xF10E;
 
 inline Optional<FloeInstanceIndex> IndexFromPluginData(uintptr plugin_data) {
@@ -110,12 +110,12 @@ static Array<FloePluginInstance*, k_max_num_floe_instances> g_floe_instances {};
 // Macro because it declares a constructor/destructor object for timing start/end
 #define TRACE_CLAP_CALL(name) ZoneScopedMessage(floe.trace_config, name)
 
-inline void LogClapFunction(FloePluginInstance& floe, ClapLoggingLevel level, String name) {
+inline void LogClapFunction(FloePluginInstance& floe, ClapFunctionType level, String name) {
     if (k_clap_logging_level >= level) LogInfo(ModuleName::Clap, "{} #{}", name, floe.index);
 }
 
 inline void
-LogClapFunction(FloePluginInstance& floe, ClapLoggingLevel level, String name, String format, auto... args) {
+LogClapFunction(FloePluginInstance& floe, ClapFunctionType level, String name, String format, auto... args) {
     if (k_clap_logging_level >= level) {
         ArenaAllocatorWithInlineStorage<400> arena {PageAllocator::Instance()};
         LogInfo(ModuleName::Clap, "{} #{}: {}", name, floe.index, fmt::Format(arena, format, args...));
@@ -165,7 +165,7 @@ bool ClapStateSave(clap_plugin const* plugin, clap_ostream const* stream) {
             if (!Check(f, k_func, "plugin ptr is invalid")) return false;
             f;
         });
-        LogClapFunction(floe, ClapLoggingLevel::NonRecurring, k_func);
+        LogClapFunction(floe, ClapFunctionType::NonRecurring, k_func);
         TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, stream, k_func, "stream is null")) return false;
@@ -189,7 +189,7 @@ static bool ClapStateLoad(clap_plugin const* plugin, clap_istream const* stream)
             if (!Check(f, k_func, "plugin ptr is invalid")) return false;
             f;
         });
-        LogClapFunction(floe, ClapLoggingLevel::NonRecurring, k_func);
+        LogClapFunction(floe, ClapFunctionType::NonRecurring, k_func);
         TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, stream, k_func, "stream is null")) return false;
@@ -228,7 +228,7 @@ static bool ClapGuiIsApiSupported(clap_plugin_t const* plugin, char const* api, 
         });
 
         if (!Check(api, k_func, "api is null")) return false;
-        LogClapFunction(floe, ClapLoggingLevel::All, k_func, "api: {}, is_floating: {}", api, is_floating);
+        LogClapFunction(floe, ClapFunctionType::Any, k_func, "api: {}, is_floating: {}", api, is_floating);
 
         if (is_floating) return false;
         return NullTermStringsEqual(k_supported_gui_api, api);
@@ -248,7 +248,7 @@ static bool ClapGuiGetPrefferedApi(clap_plugin_t const* plugin, char const** api
             if (!Check(f, k_func, "plugin ptr is invalid")) return false;
             f;
         });
-        LogClapFunction(floe, ClapLoggingLevel::All, k_func);
+        LogClapFunction(floe, ClapFunctionType::Any, k_func);
 
         if (is_floating) *is_floating = false;
         if (api) *api = k_supported_gui_api;
@@ -271,7 +271,7 @@ static bool ClapGuiCreate(clap_plugin_t const* plugin, char const* api, bool is_
             f;
         });
         LogClapFunction(floe,
-                        ClapLoggingLevel::NonRecurring,
+                        ClapFunctionType::NonRecurring,
                         k_func,
                         "api: {}, is_floating: {}",
                         api,
@@ -287,7 +287,7 @@ static bool ClapGuiCreate(clap_plugin_t const* plugin, char const* api, bool is_
         if (!Check(floe, floe.initialised, k_func, "not initialised")) return false;
         if (!Check(floe, !floe.gui_platform, k_func, "already created gui")) return false;
 
-        floe.gui_platform.Emplace(floe.host, g_shared_engine_systems->settings);
+        floe.gui_platform.Emplace(floe.host, g_shared_engine_systems->prefs);
         return LogIfError(CreateView(*floe.gui_platform), "CreateView");
     } catch (PanicException) {
         return false;
@@ -305,7 +305,7 @@ static void ClapGuiDestroy(clap_plugin const* plugin) {
             if (!Check(f, k_func, "plugin ptr is invalid")) return;
             f;
         });
-        LogClapFunction(floe, ClapLoggingLevel::NonRecurring, k_func);
+        LogClapFunction(floe, ClapFunctionType::NonRecurring, k_func);
         TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return;
@@ -328,7 +328,7 @@ static bool ClapGuiSetScale(clap_plugin_t const* plugin, f64 scale) {
             if (!Check(f, k_func, "plugin ptr is invalid")) return false;
             f;
         });
-        LogClapFunction(floe, ClapLoggingLevel::NonRecurring, k_func, "scale: {}", scale);
+        LogClapFunction(floe, ClapFunctionType::NonRecurring, k_func, "scale: {}", scale);
     } catch (PanicException) {
     }
 
@@ -346,7 +346,7 @@ static bool ClapGuiGetSize(clap_plugin_t const* plugin, u32* width, u32* height)
             if (!Check(f, k_func, "plugin ptr is invalid")) return false;
             f;
         });
-        LogClapFunction(floe, ClapLoggingLevel::All, k_func);
+        LogClapFunction(floe, ClapFunctionType::Any, k_func);
         TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, width || height, k_func, "width and height both null")) return false;
@@ -373,7 +373,7 @@ static bool ClapGuiCanResize(clap_plugin_t const* plugin) {
             if (!Check(f, k_func, "plugin ptr is invalid")) return false;
             f;
         });
-        LogClapFunction(floe, ClapLoggingLevel::All, k_func);
+        LogClapFunction(floe, ClapFunctionType::Any, k_func);
 
         // Should be main-thread but we don't care if it's not.
 
@@ -395,7 +395,7 @@ static bool ClapGuiGetResizeHints(clap_plugin_t const* plugin, clap_gui_resize_h
             if (!Check(f, k_func, "plugin ptr is invalid")) return false;
             f;
         });
-        LogClapFunction(floe, ClapLoggingLevel::All, k_func);
+        LogClapFunction(floe, ClapFunctionType::Any, k_func);
         TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, hints, k_func, "hints is null")) return false;
@@ -404,7 +404,7 @@ static bool ClapGuiGetResizeHints(clap_plugin_t const* plugin, clap_gui_resize_h
         hints->can_resize_vertically = true;
         hints->can_resize_horizontally = true;
         hints->preserve_aspect_ratio = true;
-        auto const ratio = DesiredAspectRatio(g_shared_engine_systems->settings);
+        auto const ratio = DesiredAspectRatio(g_shared_engine_systems->prefs);
         hints->aspect_ratio_width = ratio.width;
         hints->aspect_ratio_height = ratio.height;
         return true;
@@ -422,7 +422,7 @@ GetUsableSizeWithinDimensions(GuiPlatform& gui_platform, u32 clap_width, u32 cla
     if (!size) return k_nullopt;
 
     auto const aspect_ratio_conformed_size =
-        NearestAspectRatioSizeInsideSize(*size, DesiredAspectRatio(g_shared_engine_systems->settings));
+        NearestAspectRatioSizeInsideSize(*size, DesiredAspectRatio(g_shared_engine_systems->prefs));
 
     if (!aspect_ratio_conformed_size) return k_nullopt;
     if (aspect_ratio_conformed_size->width < k_min_gui_width) return k_nullopt;
@@ -442,7 +442,7 @@ static bool ClapGuiAdjustSize(clap_plugin_t const* plugin, u32* clap_width, u32*
             if (!Check(f, k_func, "plugin ptr is invalid")) return false;
             f;
         });
-        LogClapFunction(floe, ClapLoggingLevel::NonRecurring, k_func, "{} x {}", *clap_width, *clap_height);
+        LogClapFunction(floe, ClapFunctionType::NonRecurring, k_func, "{} x {}", *clap_width, *clap_height);
         TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return false;
@@ -453,7 +453,7 @@ static bool ClapGuiAdjustSize(clap_plugin_t const* plugin, u32* clap_width, u32*
 
             auto const aspect_ratio_conformed_size =
                 NearestAspectRatioSizeInsideSize32({*clap_width, *clap_height},
-                                                   DesiredAspectRatio(g_shared_engine_systems->settings));
+                                                   DesiredAspectRatio(g_shared_engine_systems->prefs));
 
             if (!aspect_ratio_conformed_size) return false;
 
@@ -483,7 +483,7 @@ static bool ClapGuiSetSize(clap_plugin_t const* plugin, u32 clap_width, u32 clap
             if (!Check(f, k_func, "plugin ptr is invalid")) return false;
             f;
         });
-        LogClapFunction(floe, ClapLoggingLevel::NonRecurring, k_func, "{} x {}", clap_width, clap_height);
+        LogClapFunction(floe, ClapFunctionType::NonRecurring, k_func, "{} x {}", clap_width, clap_height);
         TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return false;
@@ -493,7 +493,7 @@ static bool ClapGuiSetSize(clap_plugin_t const* plugin, u32 clap_width, u32 clap
 
         if (!Check(floe, size && size->width >= k_min_gui_width, k_func, "invalid size")) return false;
         if (!Check(floe,
-                   IsAspectRatio(*size, DesiredAspectRatio(g_shared_engine_systems->settings)),
+                   IsAspectRatio(*size, DesiredAspectRatio(g_shared_engine_systems->prefs)),
                    k_func,
                    "invalid aspect ratio")) {
             return false;
@@ -516,7 +516,7 @@ static bool ClapGuiSetParent(clap_plugin_t const* plugin, clap_window_t const* w
             if (!Check(f, k_func, "plugin ptr is invalid")) return false;
             f;
         });
-        LogClapFunction(floe, ClapLoggingLevel::NonRecurring, k_func);
+        LogClapFunction(floe, ClapFunctionType::NonRecurring, k_func);
         TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, window, k_func, "window is null")) return false;
@@ -546,7 +546,7 @@ static bool ClapGuiSetTransient(clap_plugin_t const* plugin, clap_window_t const
             if (!Check(f, k_func, "plugin ptr is invalid")) return false;
             f;
         });
-        LogClapFunction(floe, ClapLoggingLevel::All, k_func);
+        LogClapFunction(floe, ClapFunctionType::Any, k_func);
 
         return false; // we don't support floating windows
     } catch (PanicException) {
@@ -566,7 +566,7 @@ static void ClapGuiSuggestTitle(clap_plugin_t const* plugin, char const*) {
             if (!Check(f, k_func, "plugin ptr is invalid")) return;
             f;
         });
-        LogClapFunction(floe, ClapLoggingLevel::All, k_func);
+        LogClapFunction(floe, ClapFunctionType::Any, k_func);
 
         // we don't support floating windows
 
@@ -585,7 +585,7 @@ static bool ClapGuiShow(clap_plugin_t const* plugin) {
             if (!Check(f, k_func, "plugin ptr is invalid")) return false;
             f;
         });
-        LogClapFunction(floe, ClapLoggingLevel::NonRecurring, k_func);
+        LogClapFunction(floe, ClapFunctionType::NonRecurring, k_func);
         TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return false;
@@ -618,7 +618,7 @@ static bool ClapGuiHide(clap_plugin_t const* plugin) {
             if (!Check(f, k_func, "plugin ptr is invalid")) return false;
             f;
         });
-        LogClapFunction(floe, ClapLoggingLevel::NonRecurring, k_func);
+        LogClapFunction(floe, ClapFunctionType::NonRecurring, k_func);
         TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return false;
@@ -683,7 +683,7 @@ static bool ClapParamsGetInfo(clap_plugin_t const* plugin, u32 param_index, clap
             if (!Check(f, k_func, "plugin ptr is invalid")) return false;
             f;
         });
-        LogClapFunction(floe, ClapLoggingLevel::All, k_func, "index: {}", param_index);
+        LogClapFunction(floe, ClapFunctionType::Any, k_func, "index: {}", param_index);
 
         if (!Check(floe, param_info, k_func, "param_info is null")) return false;
         if (!Check(floe, param_index < k_num_parameters, k_func, "param_index out of range")) return false;
@@ -721,7 +721,7 @@ static bool ClapParamsGetValue(clap_plugin_t const* plugin, clap_id param_id, f6
             if (!Check(f, k_func, "plugin ptr is invalid")) return false;
             f;
         });
-        LogClapFunction(floe, ClapLoggingLevel::All, k_func, "id: {}", param_id);
+        LogClapFunction(floe, ClapFunctionType::Any, k_func, "id: {}", param_id);
 
         auto const opt_index = ParamIdToIndex(param_id);
         if (!opt_index) return false;
@@ -762,7 +762,7 @@ static bool ClapParamsValueToText(clap_plugin_t const* plugin,
             if (!Check(f, k_func, "plugin ptr is invalid")) return false;
             f;
         });
-        LogClapFunction(floe, ClapLoggingLevel::All, k_func, "id: {}, value: {}", param_id, value);
+        LogClapFunction(floe, ClapFunctionType::Any, k_func, "id: {}, value: {}", param_id, value);
 
         if (out_buffer_capacity == 0) return false;
         auto const opt_index = ParamIdToIndex(param_id);
@@ -794,7 +794,7 @@ static bool ClapParamsTextToValue(clap_plugin_t const* plugin,
             if (!Check(f, k_func, "plugin ptr is invalid")) return false;
             f;
         });
-        LogClapFunction(floe, ClapLoggingLevel::All, k_func, "id: {}", param_id);
+        LogClapFunction(floe, ClapFunctionType::Any, k_func, "id: {}", param_id);
         TRACE_CLAP_CALL(k_func);
 
         auto const opt_index = ParamIdToIndex(param_id);
@@ -829,7 +829,7 @@ ClapParamsFlush(clap_plugin_t const* plugin, clap_input_events_t const* in, clap
             if (!Check(f, k_func, "plugin ptr is invalid")) return;
             f;
         });
-        if (!floe.active) LogClapFunction(floe, ClapLoggingLevel::All, k_func, "num in: {}", in->size(in));
+        if (!floe.active) LogClapFunction(floe, ClapFunctionType::Any, k_func, "num in: {}", in->size(in));
         TRACE_CLAP_CALL(k_func);
 
         if (!in) return;
@@ -871,7 +871,7 @@ static u32 ClapAudioPortsCount(clap_plugin_t const* plugin, [[maybe_unused]] boo
             if (!Check(f, k_func, "plugin ptr is invalid")) return 0;
             f;
         });
-        LogClapFunction(floe, ClapLoggingLevel::All, k_func, "is_input: {}", is_input);
+        LogClapFunction(floe, ClapFunctionType::Any, k_func, "is_input: {}", is_input);
 
         return 1;
     } catch (PanicException) {
@@ -893,7 +893,7 @@ ClapAudioPortsGet(clap_plugin_t const* plugin, u32 index, bool is_input, clap_au
             f;
         });
         LogClapFunction(floe,
-                        ClapLoggingLevel::All,
+                        ClapFunctionType::Any,
                         "audio_ports.get",
                         "index: {}, is_input: {}",
                         index,
@@ -940,7 +940,7 @@ static u32 ClapNotePortsCount(clap_plugin_t const* plugin, bool is_input) {
             if (!Check(f, k_func, "plugin ptr is invalid")) return false;
             f;
         });
-        LogClapFunction(floe, ClapLoggingLevel::All, k_func, "is_input: {}", is_input);
+        LogClapFunction(floe, ClapFunctionType::Any, k_func, "is_input: {}", is_input);
 
         return is_input ? 1 : 0;
     } catch (PanicException) {
@@ -961,7 +961,7 @@ ClapNotePortsGet(clap_plugin_t const* plugin, u32 index, bool is_input, clap_not
             if (!Check(f, k_func, "plugin ptr is invalid")) return false;
             f;
         });
-        LogClapFunction(floe, ClapLoggingLevel::All, k_func);
+        LogClapFunction(floe, ClapFunctionType::Any, k_func);
 
         if (!Check(floe, index == 0, k_func, "index out of range")) return false;
         if (!Check(floe, info, k_func, "info is null")) return false;
@@ -1014,14 +1014,14 @@ static void ClapTimerSupportOnTimer(clap_plugin_t const* plugin, clap_id timer_i
             if (!Check(f, k_func, "plugin ptr is invalid")) return;
             f;
         });
-        LogClapFunction(floe, ClapLoggingLevel::All, k_func);
+        LogClapFunction(floe, ClapFunctionType::Any, k_func);
         TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return;
         if (!Check(floe, floe.initialised, k_func, "not initialised")) return;
 
         // We don't care about the timer_id, we just want to poll.
-        sts::PollForExternalChanges(g_shared_engine_systems->settings);
+        sts::PollForExternalChanges(g_shared_engine_systems->prefs);
 
         if (floe.gui_platform) OnClapTimer(*floe.gui_platform, timer_id);
         if (floe.engine) EngineCallbacks().on_timer(*floe.engine, timer_id);
@@ -1044,7 +1044,7 @@ static void ClapFdSupportOnFd(clap_plugin_t const* plugin, int fd, clap_posix_fd
             if (!Check(f, k_func, "plugin ptr is invalid")) return;
             f;
         });
-        LogClapFunction(floe, ClapLoggingLevel::All, k_func);
+        LogClapFunction(floe, ClapFunctionType::Any, k_func);
         TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return;
@@ -1091,7 +1091,7 @@ static bool ClapInit(const struct clap_plugin* plugin) {
         if (!Check(floe, floe.host.version && floe.host.version[0], k_func, "host version is null"))
             return false;
         LogClapFunction(floe,
-                        ClapLoggingLevel::NonRecurring,
+                        ClapFunctionType::NonRecurring,
                         k_func,
                         "{} {}",
                         floe.host.name,
@@ -1153,7 +1153,7 @@ static bool ClapActivate(const struct clap_plugin* plugin,
             if (!Check(f, k_func, "plugin ptr is invalid")) return false;
             f;
         });
-        LogClapFunction(floe, ClapLoggingLevel::NonRecurring, k_func);
+        LogClapFunction(floe, ClapFunctionType::NonRecurring, k_func);
         TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, floe.initialised, k_func, "not initialised")) return false;
@@ -1186,7 +1186,7 @@ static void ClapDeactivate(const struct clap_plugin* plugin) {
             if (!Check(f, k_func, "plugin ptr is invalid")) return;
             f;
         });
-        LogClapFunction(floe, ClapLoggingLevel::NonRecurring, k_func);
+        LogClapFunction(floe, ClapFunctionType::NonRecurring, k_func);
         TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, floe.initialised, k_func, "not initialised")) return;
@@ -1211,7 +1211,7 @@ static void ClapDestroy(const struct clap_plugin* plugin) {
             if (!Check(f, k_func, "plugin ptr is invalid")) return;
             f;
         });
-        LogClapFunction(floe, ClapLoggingLevel::NonRecurring, k_func);
+        LogClapFunction(floe, ClapFunctionType::NonRecurring, k_func);
         TRACE_CLAP_CALL(k_func);
 
         if (floe.initialised) {
@@ -1354,7 +1354,7 @@ static void const* ClapGetExtension(const struct clap_plugin* plugin, char const
             if (!Check(f, k_func, "plugin ptr is invalid")) return nullptr;
             f;
         });
-        LogClapFunction(floe, ClapLoggingLevel::All, k_func, "id: {}", id);
+        LogClapFunction(floe, ClapFunctionType::Any, k_func, "id: {}", id);
         TRACE_CLAP_CALL(k_func);
         if (!Check(id, k_func, "id is null")) return nullptr;
 
@@ -1383,13 +1383,13 @@ static void ClapOnMainThread(const struct clap_plugin* plugin) {
             if (!Check(f, k_func, "plugin ptr is invalid")) return;
             f;
         });
-        LogClapFunction(floe, ClapLoggingLevel::All, k_func);
+        LogClapFunction(floe, ClapFunctionType::Any, k_func);
         TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return;
 
         if (floe.engine) {
-            sts::PollForExternalChanges(g_shared_engine_systems->settings);
+            sts::PollForExternalChanges(g_shared_engine_systems->prefs);
 
             auto& processor = floe.engine->processor;
             processor.processor_callbacks.on_main_thread(processor);
@@ -1439,7 +1439,7 @@ void OnPollThread(FloeInstanceIndex index) {
     EngineCallbacks().on_poll_thread(*floe.engine);
 }
 
-void OnSettingsChange(FloeInstanceIndex index, sts::Key const& key, sts::Value const* value) {
+void OnPreferenceChanged(FloeInstanceIndex index, sts::Key const& key, sts::Value const* value) {
     if (PanicOccurred()) return;
     auto& floe = *g_floe_instances[index];
     ASSERT(IsMainThread(floe.host));
@@ -1453,7 +1453,7 @@ void OnSettingsChange(FloeInstanceIndex index, sts::Key const& key, sts::Value c
                         (clap_host_gui const*)floe.host.get_extension(&floe.host, CLAP_EXT_GUI)) {
                     auto const size =
                         PhysicalPixelsToClapPixels(floe.gui_platform->view,
-                                                   DesiredWindowSize(g_shared_engine_systems->settings));
+                                                   DesiredWindowSize(g_shared_engine_systems->prefs));
                     host_gui->request_resize(&floe.host, size.width, size.height);
                 }
             }
@@ -1463,12 +1463,12 @@ void OnSettingsChange(FloeInstanceIndex index, sts::Key const& key, sts::Value c
                     (clap_host_gui const*)floe.host.get_extension(&floe.host, CLAP_EXT_GUI)) {
                 auto const size =
                     PhysicalPixelsToClapPixels(floe.gui_platform->view,
-                                               DesiredWindowSize(g_shared_engine_systems->settings));
+                                               DesiredWindowSize(g_shared_engine_systems->prefs));
                 host_gui->resize_hints_changed(&floe.host);
                 host_gui->request_resize(&floe.host, size.width, size.height);
             }
         }
     }
 
-    EngineCallbacks().on_settings_change(*floe.engine, key, value);
+    EngineCallbacks().on_preference_changed(*floe.engine, key, value);
 }

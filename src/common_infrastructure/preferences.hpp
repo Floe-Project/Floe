@@ -6,24 +6,25 @@
 #include "os/filesystem.hpp"
 #include "os/misc.hpp"
 
-// Settings are stored in the INI file format.
+// Preferences are stored in the INI file format.
 //
 // This is for anything we want to persist between sessions, e.g. window size, extra library folders, etc.
 //
-// Primarily, settings are controlled by the user through the GUI. However, we also support users manually
-// editing the settings file. We use a directory watcher and a diff algorithm to detect changes to the file
-// and update the settings accordingly. This is also neccessary in the case that there are multiple processes
-// running Floe at the same time (this can happen in some DAWs).
+// Primarily, preferences are controlled by the user through the GUI. However, we also support users manually
+// editing the preferences file. We use a directory watcher and a diff algorithm to detect changes to the file
+// and update the preferences accordingly. This is also neccessary in the case that there are multiple
+// processes running Floe at the same time (this can happen in some DAWs).
 //
-// In general, we take the approach that the settings system doesn't know anything about the data that it is
-// storing. Instead, each part of the code that uses the settings should know their own keys and validate the
-// values they get from the settings. However, for backwards compatibility this code does know about keys in
-// the legacy file format so that it can remap them.
+// In general, we take the approach that the preferences system doesn't know anything about the data that it
+// is storing. Instead, each part of the code that uses the preferences should know their own keys and
+// validate the values they get from the preferences. However, for backwards compatibility this code does know
+// about keys in the legacy file format so that it can remap them.
 //
-// We want settings to be both forwards and backwards compatible because sometimes multiple versions of Floe
-// can be installed at the same type (for example, when using multiple plugin folders, DAWs can sometimes load
-// the plugin from either version). This isn't a common senario but it's one that can sometimes occur. We want
-// both old and new versions of Floe to be able to read and write the settings file without losing any data.
+// We want preferences to be both forwards and backwards compatible because sometimes multiple versions of
+// Floe can be installed at the same type (for example, when using multiple plugin folders, DAWs can sometimes
+// load the plugin from either version). This isn't a common senario but it's one that can sometimes occur. We
+// want both old and new versions of Floe to be able to read and write the preferences file without losing any
+// data.
 //
 // INI is not a strict format. These are our specific rules:
 // - 'key = value\n' syntax. Spaces or tabs around the = are ignored.
@@ -37,14 +38,14 @@
 // - Comments are lines starting with a semicolon.
 // - We don't enforce a format for keys, but prefer keys-with-dashes.
 //
-// Settings are kept in a hash table. The key is a string/int or a section + key string/int pair. The value is
-// a linked list. You can loop over the table to get all the key-value pairs.
+// Preferences are kept in a hash table. The key is a string/int or a section + key string/int pair. The value
+// is a linked list. You can loop over the table to get all the key-value pairs.
 
 namespace sts {
 
 constexpr usize k_max_file_size = Kb(32);
 constexpr usize k_max_key_size = 50; // also for sections
-constexpr f64 k_settings_file_watcher_poll_interval_seconds = 1;
+constexpr f64 k_preferences_file_watcher_poll_interval_seconds = 1;
 
 enum class ValueType : u8 {
     String,
@@ -92,20 +93,20 @@ using Key = TaggedUnion<KeyType,
 ErrorCodeOr<void> CustomValueToString(Writer writer, Key const& key, fmt::FormatOptions options);
 u64 HashKey(Key const& key);
 
-using SettingsTable = HashTable<Key, Value*, HashKey>;
+using PreferencesTable = HashTable<Key, Value*, HashKey>;
 
-SettingsTable ParseSettingsFile(String file_data, ArenaAllocator& arena);
-SettingsTable ParseLegacySettingsFile(String file_data, ArenaAllocator& arena);
+PreferencesTable ParsePreferencesFile(String file_data, ArenaAllocator& arena);
+PreferencesTable ParseLegacyPreferencesFile(String file_data, ArenaAllocator& arena);
 
 struct ReadResult {
     String file_data;
     s128 file_last_modified {};
 };
-ErrorCodeOr<ReadResult> ReadEntireSettingsFile(String path, ArenaAllocator& arena);
+ErrorCodeOr<ReadResult> ReadEntirePreferencesFile(String path, ArenaAllocator& arena);
 
-ErrorCodeOr<void> WriteSettingsTable(SettingsTable const& table, Writer writer);
+ErrorCodeOr<void> WritePreferencesTable(PreferencesTable const& table, Writer writer);
 ErrorCodeOr<void>
-WriteSettingsFile(SettingsTable const& table, String path, Optional<s128> set_last_modified);
+WritePreferencesFile(PreferencesTable const& table, String path, Optional<s128> set_last_modified);
 
 // NOTE: you shouldn't trust the values you get from any of the Lookup functions because they could be
 // manually modified in the file, or they could be from a different version of Floe that had different uses of
@@ -113,13 +114,13 @@ WriteSettingsFile(SettingsTable const& table, String path, Optional<s128> set_la
 
 // These functions assume that the key has a single value (or no value). If you want to lookup multiple
 // values, then use LookupValues.
-Optional<s64> LookupInt(SettingsTable const& table, Key const& key);
-Optional<bool> LookupBool(SettingsTable const& table, Key const& key);
-Optional<String> LookupString(SettingsTable const& table, Key const& key);
+Optional<s64> LookupInt(PreferencesTable const& table, Key const& key);
+Optional<bool> LookupBool(PreferencesTable const& table, Key const& key);
+Optional<String> LookupString(PreferencesTable const& table, Key const& key);
 
 // Can return null. Value is an intrusive linked list. Iterate through it using 'next'.
 // The order of values is always undefined. There's guaranteed to not be duplicate values for a key.
-Value const* LookupValues(SettingsTable const& table, Key const& key);
+Value const* LookupValues(PreferencesTable const& table, Key const& key);
 
 template <dyn::DynArray DynArrayType>
 PUBLIC void ValuesToArray(Value const* value_list, DynArrayType& array) {
@@ -129,13 +130,13 @@ PUBLIC void ValuesToArray(Value const* value_list, DynArrayType& array) {
 }
 
 template <dyn::DynArray DynArrayType>
-PUBLIC void LookupValues(SettingsTable const& table, Key const& key, DynArrayType& array) {
+PUBLIC void LookupValues(PreferencesTable const& table, Key const& key, DynArrayType& array) {
     dyn::Clear(array);
     if (auto v = LookupValues(table, key)) ValuesToArray(v, array);
 }
 
 template <typename Type, usize k_size>
-PUBLIC DynamicArrayBounded<Type, k_size> LookupValues(SettingsTable const& table, Key const& key) {
+PUBLIC DynamicArrayBounded<Type, k_size> LookupValues(PreferencesTable const& table, Key const& key) {
     DynamicArrayBounded<Type, k_size> result;
     LookupValues(table, key, result);
     return result;
@@ -184,10 +185,10 @@ ValidateResult ValidatedOrDefault(ValueUnion const& value, Descriptor const& des
 
 // Looks up the single value, if it exists, validates and constrains it, otherwise returns the default value.
 // Guaranteed to return the value in the correct type.
-ValidateResult GetValue(SettingsTable const& table, Descriptor const& descriptor);
-bool GetBool(SettingsTable const& table, Descriptor const& descriptor);
-s64 GetInt(SettingsTable const& table, Descriptor const& descriptor);
-String GetString(SettingsTable const& table, Descriptor const& descriptor);
+ValidateResult GetValue(PreferencesTable const& table, Descriptor const& descriptor);
+bool GetBool(PreferencesTable const& table, Descriptor const& descriptor);
+s64 GetInt(PreferencesTable const& table, Descriptor const& descriptor);
+String GetString(PreferencesTable const& table, Descriptor const& descriptor);
 
 // If the key doesn't match the descriptor, returns nullopt. Else it returns the validated, constrained, or
 // default value. Useful inside the on_change callback.
@@ -196,9 +197,9 @@ Optional<bool> MatchBool(Key const& key, Value const* value_list, Descriptor con
 Optional<s64> MatchInt(Key const& key, Value const* value_list, Descriptor const& descriptor);
 Optional<String> MatchString(Key const& key, Value const* value_list, Descriptor const& descriptor);
 
-// This is a 'managed' instance of the settings table. It is designed to be a long-lived object that can be
+// This is a 'managed' instance of the preferences table. It is designed to be a long-lived object that can be
 // edited over time.
-struct Settings : SettingsTable {
+struct Preferences : PreferencesTable {
     ArenaAllocator arena {PageAllocator::Instance()};
     PathPool path_pool {};
     Value* free_values {};
@@ -228,8 +229,11 @@ struct SetValueOptions {
 // The value will be allocated in the arena/path_pool (the string is cloned).
 // Sets the value of key to the single value 'value'. If the key already has any values, they will be
 // replaced.
-void SetValue(Settings& settings, Key const& key, ValueUnion const& value, SetValueOptions options = {});
-void SetValue(Settings& settings,
+void SetValue(Preferences& preferences,
+              Key const& key,
+              ValueUnion const& value,
+              SetValueOptions options = {});
+void SetValue(Preferences& preferences,
               Descriptor const& descriptor,
               ValueUnion const& value,
               SetValueOptions options = {});
@@ -237,7 +241,10 @@ void SetValue(Settings& settings,
 // Same as SetValue in all ways, except instead of replacing all/eny values, this logic is used: if the key
 // already has value(s), each value will be compared to the new value; if the new value matches any of the
 // existing values, nothing will be added.
-bool AddValue(Settings& settings, Key const& key, ValueUnion const& value, SetValueOptions options = {});
+bool AddValue(Preferences& preferences,
+              Key const& key,
+              ValueUnion const& value,
+              SetValueOptions options = {});
 
 struct RemoveValueOptions {
     bool dont_track_changes {};
@@ -245,40 +252,42 @@ struct RemoveValueOptions {
 
 // The value will be compared to all values for the given key, if it matches it will be removed.
 // If the last value is removed, the key will be removed.
-bool RemoveValue(Settings& settings,
+bool RemoveValue(Preferences& preferences,
                  Key const& key,
                  ValueUnion const& value,
                  RemoveValueOptions options = {});
 
 // Remove key and all values associated with it.
-void Remove(Settings& settings, Key const& key, RemoveValueOptions options = {});
+void Remove(Preferences& preferences, Key const& key, RemoveValueOptions options = {});
 
-struct ReplaceSettingsOptions {
-    // Whether keys in the exsiting settings should be removed if they don't exist in the new table. Keys that
-    // do exist in the new table always entirely replace all existing values.
+struct ReplaceOptions {
+    // Whether keys in the exsiting preferences should be removed if they don't exist in the new table. Keys
+    // that do exist in the new table always entirely replace all existing values.
     bool remove_keys_not_in_new_table {};
 };
 
-// Entirely replaces the settings table with a new one. Emits minimal on_change notifications for all
+// Entirely replaces the preferences table with a new one. Emits minimal on_change notifications for all
 // keys/value that have changed.
-void ReplaceSettings(Settings& settings, SettingsTable const& new_table, ReplaceSettingsOptions options = {});
+void ReplacePreferences(Preferences& preferences,
+                        PreferencesTable const& new_table,
+                        ReplaceOptions options = {});
 
 // Inits the object. Reads and parses the file. possible_paths should be sorted in order of
 // preference. The first is the most preferred.
-void Init(Settings& settings, Span<String const> possible_paths);
-void Deinit(Settings& settings);
+void Init(Preferences& preferences, Span<String const> possible_paths);
+void Deinit(Preferences& preferences);
 
-void WriteIfNeeded(Settings& settings);
+void WriteIfNeeded(Preferences& preferences);
 
 struct PollForExternalChangesOptions {
     bool ignore_rate_limiting {};
 };
 
-void PollForExternalChanges(Settings& settings, PollForExternalChangesOptions options = {});
+void PollForExternalChanges(Preferences& preferences, PollForExternalChangesOptions options = {});
 
 namespace key {
-// We have code that needs to remap legacy settings keys to new keys, so we need to store this here. Usually
-// though, settings keys should be private to the module that needs them.
+// We have code that needs to remap legacy preference keys to new keys, so we need to store this here.
+// Usually though, preference keys should be private to the module that needs them.
 namespace section {
 constexpr String k_cc_to_param_id_map_section = "Default Map MIDI CC to Param IDs"_s;
 }

@@ -15,8 +15,8 @@
 
 #define TEST_REGISTER_FUNCTIONS                                                                              \
     X(RegisterAudioFileTests)                                                                                \
-    X(RegisterAutosaveTests)                                                                                 \
     X(RegisterAudioUtilsTests)                                                                               \
+    X(RegisterAutosaveTests)                                                                                 \
     X(RegisterChecksumFileTests)                                                                             \
     X(RegisterDirectoryListingTests)                                                                         \
     X(RegisterFoundationTests)                                                                               \
@@ -29,10 +29,10 @@
     X(RegisterPackageFormatTests)                                                                            \
     X(RegisterPackageInstallationTests)                                                                      \
     X(RegisterParamDescriptorTests)                                                                          \
+    X(RegisterPreferencesTests)                                                                              \
     X(RegisterPresetTests)                                                                                   \
     X(RegisterSampleLibraryLoaderTests)                                                                      \
     X(RegisterSentryTests)                                                                                   \
-    X(RegisterSettingsFileTests)                                                                             \
     X(RegisterStateCodingTests)                                                                              \
     X(RegisterUtilsTests)                                                                                    \
     X(RegisterVolumeFadeTests)

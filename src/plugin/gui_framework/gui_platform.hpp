@@ -34,7 +34,7 @@ struct GuiPlatform {
     static constexpr uintptr k_pugl_timer_id = 200;
 
     clap_host const& host;
-    sts::Settings& settings;
+    sts::Preferences& prefs;
     PuglWorld* world {};
     PuglView* view {};
     CursorType current_cursor {CursorType::Default};
@@ -137,11 +137,11 @@ PUBLIC ErrorCodeOr<void> CreateView(GuiPlatform& platform) {
     puglSetViewHint(platform.view, PUGL_RESIZABLE, true);
     puglSetPositionHint(platform.view, PUGL_DEFAULT_POSITION, 0, 0);
 
-    auto const default_size = DesiredWindowSize(platform.settings);
+    auto const default_size = DesiredWindowSize(platform.prefs);
     puglSetSizeHint(platform.view, PUGL_DEFAULT_SIZE, default_size.width, default_size.height);
     puglSetSizeHint(platform.view, PUGL_CURRENT_SIZE, default_size.width, default_size.height);
 
-    auto const aspect_ratio = DesiredAspectRatio(platform.settings);
+    auto const aspect_ratio = DesiredAspectRatio(platform.prefs);
 
     auto const min_size = SizeWithAspectRatio(k_min_gui_width, aspect_ratio);
     ASSERT(min_size.width >= k_min_gui_width);
@@ -723,10 +723,10 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
                 auto const& configure = event->configure;
                 LogDebug(ModuleName::Gui, "configure {}", fmt::DumpStruct(configure));
                 auto const size = NearestAspectRatioSizeInsideSize({configure.width, configure.height},
-                                                                   DesiredAspectRatio(platform.settings));
+                                                                   DesiredAspectRatio(platform.prefs));
 
                 if (size && size->width >= k_min_gui_width && size->width <= k_max_gui_width) {
-                    sts::SetValue(platform.settings,
+                    sts::SetValue(platform.prefs,
                                   SettingDescriptor(GuiSetting::WindowWidth),
                                   (s64)size->width);
                     if (platform.graphics_ctx) platform.graphics_ctx->Resize(*size);

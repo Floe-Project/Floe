@@ -5,7 +5,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Preset Folders
 
-![Folder Settings GUI](../images/folder-settings.png)
+![Folder Preferences GUI](../images/folder-preferences.png)
 
 Floe automatically scans for presets in a set of folders - including subfolders. This works in the exact same way as your [library folders](./library-folders.md).
 

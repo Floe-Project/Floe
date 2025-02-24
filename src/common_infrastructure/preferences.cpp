@@ -1,7 +1,7 @@
 // Copyright 2025 Sam Windell
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "settings_file.hpp"
+#include "preferences.hpp"
 
 #include "os/filesystem.hpp"
 #include "os/misc.hpp"
@@ -88,7 +88,7 @@ ErrorCodeOr<void> CustomValueToString(Writer writer, Key const& key, fmt::Format
     }
 }
 
-SettingsTable ParseSettingsFile(String file_data, ArenaAllocator& arena) {
+PreferencesTable ParsePreferencesFile(String file_data, ArenaAllocator& arena) {
     if (file_data.size == 0) return {};
     ASSERT(file_data.size < k_max_file_size);
     ASSERT(arena.ContainsPointer((u8 const*)file_data.data));
@@ -118,7 +118,7 @@ SettingsTable ParseSettingsFile(String file_data, ArenaAllocator& arena) {
 
         auto key = WhitespaceStrippedEnd(line.SubSpan(0, *equals));
         if (!IsKeyValid(key)) {
-            LogWarning(ModuleName::Settings, "invalid key {}", key.SubSpan(0, k_max_key_size));
+            LogWarning(ModuleName::Preferences, "invalid key {}", key.SubSpan(0, k_max_key_size));
             continue;
         }
 
@@ -159,7 +159,7 @@ SettingsTable ParseSettingsFile(String file_data, ArenaAllocator& arena) {
     return table.ToOwnedTable();
 }
 
-SettingsTable ParseLegacySettingsFile(String file_data, ArenaAllocator& arena) {
+PreferencesTable ParseLegacyPreferencesFile(String file_data, ArenaAllocator& arena) {
     ASSERT(file_data.size < k_max_file_size);
     ASSERT(arena.ContainsPointer((u8 const*)file_data.data));
 
@@ -193,7 +193,7 @@ SettingsTable ParseLegacySettingsFile(String file_data, ArenaAllocator& arena) {
                     event,
                     "gui_settings",
                     [this](json::EventHandlerStack& handler_stack, json::Event const& event) {
-                        return HandleGUISettings(handler_stack, event);
+                        return HandleGui(handler_stack, event);
                     }))
                 return true;
             return false;
@@ -283,7 +283,7 @@ SettingsTable ParseLegacySettingsFile(String file_data, ArenaAllocator& arena) {
             return false;
         }
 
-        bool HandleGUISettings(json::EventHandlerStack&, json::Event const& event) {
+        bool HandleGui(json::EventHandlerStack&, json::Event const& event) {
             u16 gui_size_index {};
             if (SetIfMatching(event, "GUISize", gui_size_index)) {
                 // We used to set the window size based on an index in an array.
@@ -321,7 +321,7 @@ SettingsTable ParseLegacySettingsFile(String file_data, ArenaAllocator& arena) {
             return false;
         }
 
-        SettingsTable& table;
+        PreferencesTable& table;
         ArenaAllocator& arena;
 
         u8 cc_num {};
@@ -329,7 +329,7 @@ SettingsTable ParseLegacySettingsFile(String file_data, ArenaAllocator& arena) {
 
     ArenaAllocatorWithInlineStorage<1000> scratch_arena {PageAllocator::Instance()};
 
-    SettingsTable table {};
+    PreferencesTable table {};
 
     Parser parser {
         .table = table,
@@ -343,15 +343,15 @@ SettingsTable ParseLegacySettingsFile(String file_data, ArenaAllocator& arena) {
                                scratch_arena,
                                {});
     if (o.HasError()) {
-        // If the JSON is invalid we can't do anything about it, we'll just have to start with empty settings.
+        // If the JSON is invalid we can't do anything about it, we'll just have to start with empty prefs.
         return table;
     }
 
     return table;
 }
 
-ErrorCodeOr<ReadResult> ReadEntireSettingsFile(String path, ArenaAllocator& arena) {
-    LogDebug(ModuleName::Settings, "Reading settings file: {}", path);
+ErrorCodeOr<ReadResult> ReadEntirePreferencesFile(String path, ArenaAllocator& arena) {
+    LogDebug(ModuleName::Preferences, "Reading preferences file: {}", path);
 
     auto file = TRY(OpenFile(path,
                              {
@@ -411,7 +411,7 @@ WriteKeyValLineValueList(KeyValueUnion const& key, Value const* value_list, Writ
 #define ALLOW_UNSAFE_POINTER_TAGGING                                                                         \
     __attribute__((no_sanitize("pointer-overflow"))) __attribute__((no_sanitize("alignment")))
 
-ErrorCodeOr<void> WriteSettingsTable(SettingsTable const& table, Writer writer) {
+ErrorCodeOr<void> WritePreferencesTable(PreferencesTable const& table, Writer writer) {
     // We use a 'pointer tagging' technique with value->next to track keys that we have written. This avoids
     // the need to allocate any tracking data.
     static_assert(alignof(Value*) != 1);
@@ -482,7 +482,7 @@ ErrorCodeOr<void> WriteSettingsTable(SettingsTable const& table, Writer writer) 
 }
 
 ErrorCodeOr<void>
-WriteSettingsFile(SettingsTable const& table, String path, Optional<s128> set_last_modified) {
+WritePreferencesFile(PreferencesTable const& table, String path, Optional<s128> set_last_modified) {
     auto file = TRY(OpenFile(path,
                              {
                                  .capability = FileMode::Capability::Write,
@@ -497,7 +497,7 @@ WriteSettingsFile(SettingsTable const& table, String path, Optional<s128> set_la
     BufferedWriter<Kb(4)> buffered_writer {
         .unbuffered_writer = file.Writer(),
     };
-    TRY(WriteSettingsTable(table, buffered_writer.Writer()));
+    TRY(WritePreferencesTable(table, buffered_writer.Writer()));
 
     TRY(buffered_writer.Flush());
     TRY(file.Flush());
@@ -506,28 +506,28 @@ WriteSettingsFile(SettingsTable const& table, String path, Optional<s128> set_la
     return k_success;
 }
 
-Optional<s64> LookupInt(SettingsTable const& table, Key const& key) {
+Optional<s64> LookupInt(PreferencesTable const& table, Key const& key) {
     if (auto const v = table.Find(key)) {
         if ((*v)->tag == ValueType::Int) return (*v)->Get<s64>();
     }
     return k_nullopt;
 }
 
-Optional<bool> LookupBool(SettingsTable const& table, Key const& key) {
+Optional<bool> LookupBool(PreferencesTable const& table, Key const& key) {
     if (auto const v = table.Find(key)) {
         if ((*v)->tag == ValueType::Bool) return (*v)->Get<bool>();
     }
     return k_nullopt;
 }
 
-Optional<String> LookupString(SettingsTable const& table, Key const& key) {
+Optional<String> LookupString(PreferencesTable const& table, Key const& key) {
     if (auto const v = table.Find(key)) {
         if ((*v)->tag == ValueType::String) return (*v)->Get<String>();
     }
     return k_nullopt;
 }
 
-Value const* LookupValues(SettingsTable const& table, Key const& key) {
+Value const* LookupValues(PreferencesTable const& table, Key const& key) {
     if (auto const v = table.Find(key)) return *v;
     return nullptr;
 }
@@ -558,7 +558,7 @@ ValidateResult ValidatedOrDefault(ValueUnion const& value, Descriptor const& des
     }
 }
 
-ValidateResult GetValue(SettingsTable const& table, Descriptor const& descriptor) {
+ValidateResult GetValue(PreferencesTable const& table, Descriptor const& descriptor) {
     auto const v_ptr = table.Find(descriptor.key);
     if (!v_ptr) return {descriptor.default_value, true};
     auto const& v = **v_ptr;
@@ -566,17 +566,17 @@ ValidateResult GetValue(SettingsTable const& table, Descriptor const& descriptor
     return ValidatedOrDefault(v, descriptor);
 }
 
-bool GetBool(SettingsTable const& table, Descriptor const& descriptor) {
+bool GetBool(PreferencesTable const& table, Descriptor const& descriptor) {
     ASSERT(descriptor.value_requirements.tag == ValueType::Bool);
     return GetValue(table, descriptor).value.Get<bool>();
 }
 
-s64 GetInt(SettingsTable const& table, Descriptor const& descriptor) {
+s64 GetInt(PreferencesTable const& table, Descriptor const& descriptor) {
     ASSERT(descriptor.value_requirements.tag == ValueType::Int);
     return GetValue(table, descriptor).value.Get<s64>();
 }
 
-String GetString(SettingsTable const& table, Descriptor const& descriptor) {
+String GetString(PreferencesTable const& table, Descriptor const& descriptor) {
     ASSERT(descriptor.value_requirements.tag == ValueType::String);
     return GetValue(table, descriptor).value.Get<String>();
 }
@@ -613,9 +613,9 @@ Optional<String> MatchString(Key const& key, Value const* value_list, Descriptor
     return k_nullopt;
 }
 
-static void OnChange(Settings& settings, Key const& key, Value const* value) {
-    settings.write_to_file_needed = true;
-    if (settings.on_change) settings.on_change(key, value);
+static void OnChange(Preferences& prefs, Key const& key, Value const* value) {
+    prefs.write_to_file_needed = true;
+    if (prefs.on_change) prefs.on_change(key, value);
 }
 
 static ValueUnion CloneValueUnion(ValueUnion const& v, PathPool& pool, ArenaAllocator& arena) {
@@ -661,63 +661,63 @@ static void FreeKey(Key const& k, PathPool& pool) {
     }
 }
 
-static Value* AllocateValue(Settings& settings, ValueUnion const& value) {
-    if (settings.free_values) {
-        auto result = settings.free_values;
-        settings.free_values = settings.free_values->next;
+static Value* AllocateValue(Preferences& prefs, ValueUnion const& value) {
+    if (prefs.free_values) {
+        auto result = prefs.free_values;
+        prefs.free_values = prefs.free_values->next;
         *result = {value};
         return result;
     }
-    return settings.arena.New<Value>(value);
+    return prefs.arena.New<Value>(value);
 }
 
-static void AddValueToFreeList(Settings& settings, Value* value) {
-    value->next = settings.free_values;
-    settings.free_values = value;
+static void AddValueToFreeList(Preferences& prefs, Value* value) {
+    value->next = prefs.free_values;
+    prefs.free_values = value;
 }
 
-void SetValue(Settings& settings, Key const& key, ValueUnion const& value, SetValueOptions options) {
+void SetValue(Preferences& prefs, Key const& key, ValueUnion const& value, SetValueOptions options) {
     ASSERT(IsKeyValid(key));
     Value* new_value {};
 
-    auto const existing_values_ptr = settings.Find(key);
+    auto const existing_values_ptr = prefs.Find(key);
     if (existing_values_ptr) {
         auto const existing_values = *existing_values_ptr;
         if (existing_values->next == nullptr && *existing_values == value) return;
 
         // Free the content of all existing values
         for (auto node = existing_values; node;) {
-            FreeValueUnion(*node, settings.path_pool);
+            FreeValueUnion(*node, prefs.path_pool);
 
             // We will reuse the first node, but for the others, we should add them to the free_values list.
             if (node == existing_values) {
                 node = node->next;
             } else {
                 auto next = node->next;
-                AddValueToFreeList(settings, node);
+                AddValueToFreeList(prefs, node);
                 node = next;
             }
         }
 
         // We can reuse the first node.
-        *existing_values = {CloneValueUnion(value, settings.path_pool, settings.arena)};
+        *existing_values = {CloneValueUnion(value, prefs.path_pool, prefs.arena)};
         new_value = existing_values;
     } else {
         if (options.overwrite_only) return;
 
-        new_value = AllocateValue(settings, CloneValueUnion(value, settings.path_pool, settings.arena));
+        new_value = AllocateValue(prefs, CloneValueUnion(value, prefs.path_pool, prefs.arena));
 
-        auto const inserted = settings.InsertGrowIfNeeded(
-            settings.arena,
-            options.clone_key_string ? CloneKey(key, settings.path_pool, settings.arena) : key,
+        auto const inserted = prefs.InsertGrowIfNeeded(
+            prefs.arena,
+            options.clone_key_string ? CloneKey(key, prefs.path_pool, prefs.arena) : key,
             new_value);
         ASSERT(inserted);
     }
 
-    if (!options.dont_track_changes) OnChange(settings, key, new_value);
+    if (!options.dont_track_changes) OnChange(prefs, key, new_value);
 }
 
-void SetValue(Settings& settings,
+void SetValue(Preferences& prefs,
               Descriptor const& descriptor,
               ValueUnion const& value,
               SetValueOptions options) {
@@ -727,14 +727,14 @@ void SetValue(Settings& settings,
     // stronger intention than defering to the default value, and we should explicitly signal that it has a
     // new value.
     if (is_default) options.overwrite_only = true;
-    SetValue(settings, descriptor.key, v, options);
+    SetValue(prefs, descriptor.key, v, options);
 }
 
-bool AddValue(Settings& settings, Key const& key, ValueUnion const& value, SetValueOptions options) {
+bool AddValue(Preferences& prefs, Key const& key, ValueUnion const& value, SetValueOptions options) {
     ASSERT(IsKeyValid(key));
     Value* first_node {};
 
-    auto existing_values_ptr = settings.Find(key);
+    auto existing_values_ptr = prefs.Find(key);
     if (existing_values_ptr) {
         auto const existing_values = *existing_values_ptr;
         auto last = existing_values;
@@ -742,26 +742,26 @@ bool AddValue(Settings& settings, Key const& key, ValueUnion const& value, SetVa
             if (*last->next == value) return false;
         ASSERT(last->next == nullptr);
 
-        last->next = AllocateValue(settings, CloneValueUnion(value, settings.path_pool, settings.arena));
+        last->next = AllocateValue(prefs, CloneValueUnion(value, prefs.path_pool, prefs.arena));
         first_node = existing_values;
     } else {
         if (options.overwrite_only) return false;
 
-        first_node = AllocateValue(settings, CloneValueUnion(value, settings.path_pool, settings.arena));
-        auto const inserted = settings.InsertGrowIfNeeded(
-            settings.arena,
-            options.clone_key_string ? CloneKey(key, settings.path_pool, settings.arena) : key,
+        first_node = AllocateValue(prefs, CloneValueUnion(value, prefs.path_pool, prefs.arena));
+        auto const inserted = prefs.InsertGrowIfNeeded(
+            prefs.arena,
+            options.clone_key_string ? CloneKey(key, prefs.path_pool, prefs.arena) : key,
             first_node);
         ASSERT(inserted);
     }
 
-    if (!options.dont_track_changes) OnChange(settings, key, first_node);
+    if (!options.dont_track_changes) OnChange(prefs, key, first_node);
     return true;
 }
 
-bool RemoveValue(Settings& settings, Key const& key, ValueUnion const& value, RemoveValueOptions options) {
+bool RemoveValue(Preferences& prefs, Key const& key, ValueUnion const& value, RemoveValueOptions options) {
     ASSERT(IsKeyValid(key));
-    auto const existing_values_ptr = settings.Find(key);
+    auto const existing_values_ptr = prefs.Find(key);
     if (!existing_values_ptr) return false;
     auto& existing_values = *existing_values_ptr;
 
@@ -771,97 +771,97 @@ bool RemoveValue(Settings& settings, Key const& key, ValueUnion const& value, Re
         existing_values,
         [&](Value const& node) { return node == value; },
         [&](Value* node) {
-            FreeValueUnion(*node, settings.path_pool);
-            AddValueToFreeList(settings, node);
+            FreeValueUnion(*node, prefs.path_pool);
+            AddValueToFreeList(prefs, node);
             removed = true;
         });
 
     if (removed && !options.dont_track_changes) {
         if (single_value) {
-            FreeKey(key, settings.path_pool);
-            settings.Delete(key);
-            OnChange(settings, key, nullptr);
+            FreeKey(key, prefs.path_pool);
+            prefs.Delete(key);
+            OnChange(prefs, key, nullptr);
         } else {
-            OnChange(settings, key, existing_values);
+            OnChange(prefs, key, existing_values);
         }
     }
 
     return removed;
 }
 
-void Remove(Settings& settings, Key const& key, RemoveValueOptions options) {
+void Remove(Preferences& prefs, Key const& key, RemoveValueOptions options) {
     ASSERT(IsKeyValid(key));
-    auto existing = settings.Find(key);
+    auto existing = prefs.Find(key);
     if (!existing) return;
 
     {
         for (auto node = *existing; node;) {
-            FreeValueUnion(*node, settings.path_pool);
+            FreeValueUnion(*node, prefs.path_pool);
             auto next = node->next;
-            node->next = settings.free_values;
-            settings.free_values = node;
+            node->next = prefs.free_values;
+            prefs.free_values = node;
             node = next;
         }
-        FreeKey(key, settings.path_pool);
-        settings.Delete(key);
+        FreeKey(key, prefs.path_pool);
+        prefs.Delete(key);
     }
 
-    if (!options.dont_track_changes) OnChange(settings, key, nullptr);
+    if (!options.dont_track_changes) OnChange(prefs, key, nullptr);
 }
 
-void Init(Settings& settings, Span<String const> possible_paths) {
-    ASSERT(settings.size == 0);
+void Init(Preferences& prefs, Span<String const> possible_paths) {
+    ASSERT(prefs.size == 0);
 
     for (auto const path : possible_paths) {
-        auto const read_result = TRY_OR(ReadEntireSettingsFile(path, settings.arena), {
+        auto const read_result = TRY_OR(ReadEntirePreferencesFile(path, prefs.arena), {
             if (error == FilesystemError::PathDoesNotExist || error == FilesystemError::AccessDenied)
                 continue;
-            LogWarning(ModuleName::Settings, "failed to read settings file: {}, {}", path, error);
+            LogWarning(ModuleName::Preferences, "failed to read preferences file: {}, {}", path, error);
             continue;
         });
-        settings.last_known_file_modified_time = read_result.file_last_modified;
+        prefs.last_known_file_modified_time = read_result.file_last_modified;
 
         if (path::Equal(path::Extension(path), ".json"_s))
-            (SettingsTable&)settings = ParseLegacySettingsFile(read_result.file_data, settings.arena);
+            (PreferencesTable&)prefs = ParseLegacyPreferencesFile(read_result.file_data, prefs.arena);
         else
-            (SettingsTable&)settings = ParseSettingsFile(read_result.file_data, settings.arena);
+            (PreferencesTable&)prefs = ParsePreferencesFile(read_result.file_data, prefs.arena);
     }
 
-    auto watcher = CreateDirectoryWatcher(settings.watcher_arena);
+    auto watcher = CreateDirectoryWatcher(prefs.watcher_arena);
     if (watcher.HasValue())
-        settings.watcher.Emplace(watcher.ReleaseValue());
+        prefs.watcher.Emplace(watcher.ReleaseValue());
     else
         ReportError(sentry::Error::Level::Warning,
                     SourceLocationHash(),
-                    "failed to create settings directory watcher: {}",
+                    "failed to create preferences directory watcher: {}",
                     watcher.Error());
 }
 
-void Deinit(Settings& settings) {
-    settings.on_change = {};
-    if (settings.watcher.HasValue()) DestoryDirectoryWatcher(settings.watcher.Value());
+void Deinit(Preferences& prefs) {
+    prefs.on_change = {};
+    if (prefs.watcher.HasValue()) DestoryDirectoryWatcher(prefs.watcher.Value());
 }
 
-void WriteIfNeeded(Settings& settings) {
-    if (!settings.write_to_file_needed) return;
+void WriteIfNeeded(Preferences& prefs) {
+    if (!prefs.write_to_file_needed) return;
 
-    settings.last_known_file_modified_time = NanosecondsSinceEpoch();
-    TRY_OR(WriteSettingsFile(settings, SettingsFilepath(), settings.last_known_file_modified_time), {
+    prefs.last_known_file_modified_time = NanosecondsSinceEpoch();
+    TRY_OR(WritePreferencesFile(prefs, PreferencesFilepath(), prefs.last_known_file_modified_time), {
         ReportError(sentry::Error::Level::Error,
                     SourceLocationHash(),
-                    "failed to write settings file: {}",
+                    "failed to write preferences file: {}",
                     error);
     });
 
-    settings.write_to_file_needed = false;
+    prefs.write_to_file_needed = false;
 }
 
-void ReplaceSettings(Settings& settings, SettingsTable const& new_table, ReplaceSettingsOptions options) {
+void ReplacePreferences(Preferences& prefs, PreferencesTable const& new_table, ReplaceOptions options) {
     if (options.remove_keys_not_in_new_table) {
-        for (auto const [key, value] : settings) {
+        for (auto const [key, value] : prefs) {
             if (!new_table.Find(key)) {
-                Remove(settings, key, {.dont_track_changes = true});
-                OnChange(settings, key, nullptr);
+                Remove(prefs, key, {.dont_track_changes = true});
+                OnChange(prefs, key, nullptr);
             }
         }
     }
@@ -871,12 +871,12 @@ void ReplaceSettings(Settings& settings, SettingsTable const& new_table, Replace
 
         bool changed = false;
 
-        if (auto existing_value_list_ptr = settings.Find(key)) {
+        if (auto existing_value_list_ptr = prefs.Find(key)) {
             auto const existing_value_list = *existing_value_list_ptr;
 
             // Add new values that don't already exist.
             for (auto new_v = new_value_list; new_v; new_v = new_v->next)
-                if (AddValue(settings, key, *new_v, {.clone_key_string = true, .dont_track_changes = true}))
+                if (AddValue(prefs, key, *new_v, {.clone_key_string = true, .dont_track_changes = true}))
                     changed = true;
 
             // Remove all old values that no longer exist.
@@ -892,82 +892,82 @@ void ReplaceSettings(Settings& settings, SettingsTable const& new_table, Replace
                     }
                 }
                 if (!exists_in_new_values) {
-                    RemoveValue(settings, key, *old_v, {.dont_track_changes = true});
+                    RemoveValue(prefs, key, *old_v, {.dont_track_changes = true});
                     changed = true;
                 }
             }
         } else {
             for (auto v = new_value_list; v; v = v->next)
-                AddValue(settings, key, *v, {.clone_key_string = true, .dont_track_changes = true});
+                AddValue(prefs, key, *v, {.clone_key_string = true, .dont_track_changes = true});
             changed = true;
         }
 
-        if (changed) OnChange(settings, key, *settings.Find(key));
+        if (changed) OnChange(prefs, key, *prefs.Find(key));
     }
 }
 
-void PollForExternalChanges(Settings& settings, PollForExternalChangesOptions options) {
-    if (!settings.watcher) return;
+void PollForExternalChanges(Preferences& prefs, PollForExternalChangesOptions options) {
+    if (!prefs.watcher) return;
 
-    if (settings.write_to_file_needed) {
+    if (prefs.write_to_file_needed) {
         // We ignore external changes if we have unsaved changes ourselves - our changes are probably more
         // recent.
         return;
     }
 
     if (!options.ignore_rate_limiting)
-        if ((settings.last_watcher_poll_time + k_settings_file_watcher_poll_interval_seconds) >
+        if ((prefs.last_watcher_poll_time + k_preferences_file_watcher_poll_interval_seconds) >
             TimePoint::Now())
             return;
-    DEFER { settings.last_watcher_poll_time = TimePoint::Now(); };
+    DEFER { prefs.last_watcher_poll_time = TimePoint::Now(); };
 
-    auto const path = SettingsFilepath();
+    auto const path = PreferencesFilepath();
     auto const dir = *path::Directory(path);
 
     DirectoryToWatch const watch_dir {
         .path = dir,
         .recursive = false,
     };
-    auto const changes = TRY_OR(PollDirectoryChanges(settings.watcher.Value(),
+    auto const changes = TRY_OR(PollDirectoryChanges(prefs.watcher.Value(),
                                                      {
                                                          .dirs_to_watch = Array {watch_dir},
-                                                         .result_arena = settings.watcher_scratch,
-                                                         .scratch_arena = settings.watcher_scratch,
+                                                         .result_arena = prefs.watcher_scratch,
+                                                         .scratch_arena = prefs.watcher_scratch,
                                                      }),
                                 {
                                     ReportError(sentry::Error::Level::Warning,
                                                 SourceLocationHash(),
-                                                "failed to poll for settings changes: {}",
+                                                "failed to poll for preferences changes: {}",
                                                 error);
                                 });
-    DEFER { settings.watcher_scratch.ResetCursorAndConsolidateRegions(); };
+    DEFER { prefs.watcher_scratch.ResetCursorAndConsolidateRegions(); };
 
     for (auto const& change : changes) {
         for (auto const& subpath : change.subpath_changesets) {
             if (!path::Equal(subpath.subpath, path::Filename(path))) continue;
 
             // We ignore changes that are older or the same as our last known modification time.
-            if (TRY_OR(LastModifiedTimeNsSinceEpoch(path), return) <= settings.last_known_file_modified_time)
+            if (TRY_OR(LastModifiedTimeNsSinceEpoch(path), return) <= prefs.last_known_file_modified_time)
                 continue;
 
-            // We need to apply the new settings to our existing settings. If we have a key that doesn't exist
+            // We need to apply the new prefs to our existing prefs. If we have a key that doesn't exist
             // in the new table, we keep our existing key-value, but for all keys that exist in the new table,
             // we update our values to exactly match the new table.
-            auto const read_result = TRY_OR(ReadEntireSettingsFile(path, settings.watcher_scratch), return);
-            auto const new_table = ParseSettingsFile(read_result.file_data, settings.watcher_scratch);
+            auto const read_result = TRY_OR(ReadEntirePreferencesFile(path, prefs.watcher_scratch), return);
+            auto const new_table = ParsePreferencesFile(read_result.file_data, prefs.watcher_scratch);
 
-            ReplaceSettings(settings, new_table, {.remove_keys_not_in_new_table = true});
+            ReplacePreferences(prefs, new_table, {.remove_keys_not_in_new_table = true});
 
             // We just loaded fresh data from the file, so we can mark that we don't need to write to the
             // file.
-            settings.last_known_file_modified_time = read_result.file_last_modified;
-            settings.write_to_file_needed = false;
+            prefs.last_known_file_modified_time = read_result.file_last_modified;
+            prefs.write_to_file_needed = false;
             return;
         }
     }
 }
 
-TEST_CASE(TestJsonParsing) {
+TEST_CASE(TestLegacyPreferences) {
     DynamicArray<char> json {R"foo({
     "presets_folder": "{ROOT}Presets",
     "use_old_param_mapping": false,
@@ -1012,7 +1012,7 @@ TEST_CASE(TestJsonParsing) {
     auto const root_dir = IS_WINDOWS ? "C:/"_s : "/";
     dyn::Replace(json, "{ROOT}"_s, root_dir);
 
-    auto const table = ParseLegacySettingsFile(json, tester.scratch_arena);
+    auto const table = ParseLegacyPreferencesFile(json, tester.scratch_arena);
 
     {
         auto const v = LookupValues(table, key::k_extra_libraries_folder);
@@ -1060,7 +1060,7 @@ TEST_CASE(TestJsonParsing) {
     return k_success;
 }
 
-TEST_CASE(TestSettings) {
+TEST_CASE(TestPreferences) {
     SUBCASE("read/write basics") {
 
 #if IS_WINDOWS
@@ -1093,14 +1093,14 @@ TEST_CASE(TestSettings) {
 
         DynamicArray<char> file_data {tester.scratch_arena};
         {
-            Settings settings;
+            Preferences prefs;
             for (auto const& kv : keyvals)
-                AddValue(settings, kv.key, kv.value, {});
-            TRY(WriteSettingsTable(settings, dyn::WriterFor(file_data)));
+                AddValue(prefs, kv.key, kv.value, {});
+            TRY(WritePreferencesTable(prefs, dyn::WriterFor(file_data)));
             tester.log.Debug("file_data: {}", file_data);
         }
 
-        auto const settings = ParseSettingsFile(file_data, tester.scratch_arena);
+        auto const prefs = ParsePreferencesFile(file_data, tester.scratch_arena);
 
         for (auto const& kv : keyvals) {
             CAPTURE(kv.key);
@@ -1108,7 +1108,7 @@ TEST_CASE(TestSettings) {
             for (auto const& other_kv : keyvals)
                 if (kv.key == other_kv.key) dyn::Append(expected_values, other_kv.value);
 
-            auto value_list = LookupValues(settings, kv.key);
+            auto value_list = LookupValues(prefs, kv.key);
             REQUIRE(value_list);
 
             usize num_values = 0;
@@ -1128,8 +1128,8 @@ TEST_CASE(TestSettings) {
         }
 
         // Check for some specific values
-        CHECK(*LookupBool(settings, SectionedKey {.section = "section", .key = "key1"_s}) == true);
-        CHECK(*LookupBool(settings, SectionedKey {.section = "section", .key = "key2"_s}) == false);
+        CHECK(*LookupBool(prefs, SectionedKey {.section = "section", .key = "key1"_s}) == true);
+        CHECK(*LookupBool(prefs, SectionedKey {.section = "section", .key = "key2"_s}) == false);
     }
 
     SUBCASE("file read/write") {
@@ -1138,44 +1138,44 @@ TEST_CASE(TestSettings) {
         TRY(WriteFile(filename, k_file_data));
 
         {
-            auto const file_data = TRY(ReadEntireSettingsFile(filename, tester.scratch_arena));
+            auto const file_data = TRY(ReadEntirePreferencesFile(filename, tester.scratch_arena));
             CHECK_EQ(file_data.file_data, k_file_data);
 
-            auto const table = ParseSettingsFile(file_data.file_data, tester.scratch_arena);
+            auto const table = ParsePreferencesFile(file_data.file_data, tester.scratch_arena);
             CHECK_EQ(table.size, 2u);
             CHECK_EQ(*LookupString(table, "key1"_s), "value1"_s);
             CHECK_EQ(*LookupString(table, "key2"_s), "value2"_s);
 
-            TRY(WriteSettingsFile(table, filename, k_nullopt));
+            TRY(WritePreferencesFile(table, filename, k_nullopt));
         }
 
         // Read again
         {
-            auto const file_data = TRY(ReadEntireSettingsFile(filename, tester.scratch_arena));
+            auto const file_data = TRY(ReadEntirePreferencesFile(filename, tester.scratch_arena));
             CHECK_EQ(file_data.file_data, k_file_data);
         }
     }
 
     SUBCASE("empty values are ok") {
         String const file_data = tester.scratch_arena.Clone("key = "_s);
-        auto const table = ParseSettingsFile(file_data, tester.scratch_arena);
+        auto const table = ParsePreferencesFile(file_data, tester.scratch_arena);
         CHECK_EQ(table.size, 1u);
         auto const v = LookupValues(table, "key"_s);
         CHECK(v == nullptr);
     }
 
     SUBCASE("values are recycled") {
-        Settings settings;
-        CHECK(settings.free_values == nullptr);
+        Preferences prefs;
+        CHECK(prefs.free_values == nullptr);
 
         for (auto _ : Range(10)) {
-            AddValue(settings, "key"_s, "value"_s);
-            RemoveValue(settings, "key"_s, "value"_s);
+            AddValue(prefs, "key"_s, "value"_s);
+            RemoveValue(prefs, "key"_s, "value"_s);
         }
 
         // There should be exactly one value in the free list.
-        REQUIRE(settings.free_values);
-        CHECK(settings.free_values->next == nullptr);
+        REQUIRE(prefs.free_values);
+        CHECK(prefs.free_values->next == nullptr);
     }
 
     static constexpr String k_key = "key";
@@ -1184,7 +1184,7 @@ TEST_CASE(TestSettings) {
     static constexpr String k_gamma = "gamma"_s;
 
     SUBCASE("change listener") {
-        Settings settings;
+        Preferences prefs;
 
         // on_change is a fixed size function object that only has room for one pointer, so we combine our
         // necessary data into a single object.
@@ -1193,7 +1193,7 @@ TEST_CASE(TestSettings) {
             DynamicArrayBounded<String, 3> expected_values;
         } callback_ctx {tester, {}};
 
-        settings.on_change = [&callback_ctx](Key key, Value const* value) {
+        prefs.on_change = [&callback_ctx](Key key, Value const* value) {
             auto& tester = callback_ctx.tester;
             CHECK_EQ(key, k_key);
             usize num_values = 0;
@@ -1212,85 +1212,85 @@ TEST_CASE(TestSettings) {
 
         SUBCASE("set") {
             set_expected_callback(Array {k_alpha});
-            SetValue(settings, k_key, k_alpha);
+            SetValue(prefs, k_key, k_alpha);
 
             // replace with a new value
             set_expected_callback(Array {k_beta});
-            SetValue(settings, k_key, k_beta);
+            SetValue(prefs, k_key, k_beta);
 
             // add a second value
             set_expected_callback(Array {k_beta, k_gamma});
-            AddValue(settings, k_key, k_gamma);
+            AddValue(prefs, k_key, k_gamma);
         }
 
         SUBCASE("simple add and remove") {
             set_expected_callback(Array {k_alpha});
-            AddValue(settings, k_key, k_alpha);
+            AddValue(prefs, k_key, k_alpha);
 
             set_expected_callback({});
-            RemoveValue(settings, k_key, k_alpha);
+            RemoveValue(prefs, k_key, k_alpha);
         }
 
         SUBCASE("add multiple") {
             set_expected_callback(Array {k_alpha});
-            AddValue(settings, k_key, k_alpha);
+            AddValue(prefs, k_key, k_alpha);
 
             set_expected_callback(Array {k_alpha, k_beta});
-            AddValue(settings, k_key, k_beta);
+            AddValue(prefs, k_key, k_beta);
 
             SUBCASE("remove alpha first") {
                 set_expected_callback(Array {k_beta});
-                RemoveValue(settings, k_key, k_alpha);
+                RemoveValue(prefs, k_key, k_alpha);
 
                 set_expected_callback({});
-                RemoveValue(settings, k_key, k_beta);
+                RemoveValue(prefs, k_key, k_beta);
             }
 
             SUBCASE("remove beta first") {
                 set_expected_callback(Array {k_alpha});
-                RemoveValue(settings, k_key, k_beta);
+                RemoveValue(prefs, k_key, k_beta);
 
                 set_expected_callback({});
-                RemoveValue(settings, k_key, k_alpha);
+                RemoveValue(prefs, k_key, k_alpha);
             }
 
             SUBCASE("remove key") {
                 set_expected_callback({});
-                Remove(settings, k_key, {});
+                Remove(prefs, k_key, {});
             }
         }
     }
 
-    SUBCASE("replace entire settings") {
-        Settings settings1;
-        Settings settings2;
+    SUBCASE("replace entire prefs") {
+        Preferences prefs1;
+        Preferences prefs2;
 
         SUBCASE("one value change") {
-            AddValue(settings1, k_key, k_alpha);
-            AddValue(settings2, k_key, k_beta);
+            AddValue(prefs1, k_key, k_alpha);
+            AddValue(prefs2, k_key, k_beta);
 
             // We're expecting one on_change callback for the value change.
-            settings1.on_change = [&tester](Key key, Value const* value) {
+            prefs1.on_change = [&tester](Key key, Value const* value) {
                 CHECK_EQ(key, k_key);
                 CHECK_EQ(value->Get<String>(), k_beta);
                 CHECK(value->next == nullptr);
             };
-            ReplaceSettings(settings1, settings2, {});
+            ReplacePreferences(prefs1, prefs2, {});
 
-            CHECK_EQ(settings1.size, 1u);
-            CHECK_EQ(*LookupString(settings1, k_key), k_beta);
+            CHECK_EQ(prefs1.size, 1u);
+            CHECK_EQ(*LookupString(prefs1, k_key), k_beta);
         }
 
         SUBCASE("multiple values replaced") {
-            AddValue(settings1, k_key, k_alpha);
-            AddValue(settings1, k_key, k_beta);
-            AddValue(settings1, k_key, k_gamma);
+            AddValue(prefs1, k_key, k_alpha);
+            AddValue(prefs1, k_key, k_beta);
+            AddValue(prefs1, k_key, k_gamma);
 
-            AddValue(settings2, k_key, k_beta);
-            AddValue(settings2, k_key, k_gamma);
+            AddValue(prefs2, k_key, k_beta);
+            AddValue(prefs2, k_key, k_gamma);
 
             // We should receive a callback for the key containing 2 values.
-            settings1.on_change = [&tester](Key key, Value const* value) {
+            prefs1.on_change = [&tester](Key key, Value const* value) {
                 CHECK_EQ(key, k_key);
                 usize num_values = 0;
                 for (auto v = value; v; v = v->next) {
@@ -1299,84 +1299,84 @@ TEST_CASE(TestSettings) {
                 }
                 CHECK_EQ(num_values, 2u);
             };
-            ReplaceSettings(settings1, settings2, {});
+            ReplacePreferences(prefs1, prefs2, {});
 
-            CHECK_EQ(settings1.size, 1u);
-            CHECK_EQ(*LookupString(settings1, k_key), k_beta);
+            CHECK_EQ(prefs1.size, 1u);
+            CHECK_EQ(*LookupString(prefs1, k_key), k_beta);
         }
 
         SUBCASE("new key added") {
-            AddValue(settings2, k_key, k_alpha);
+            AddValue(prefs2, k_key, k_alpha);
 
-            settings1.on_change = [&tester](Key key, Value const* value) {
+            prefs1.on_change = [&tester](Key key, Value const* value) {
                 CHECK_EQ(key, k_key);
                 CHECK_EQ(value->Get<String>(), k_alpha);
                 CHECK(value->next == nullptr);
             };
-            ReplaceSettings(settings1, settings2, {});
+            ReplacePreferences(prefs1, prefs2, {});
         }
 
         SUBCASE("existing keys retain") {
-            AddValue(settings1, k_key, k_alpha);
+            AddValue(prefs1, k_key, k_alpha);
 
-            AddValue(settings2, "other_key"_s, k_beta);
+            AddValue(prefs2, "other_key"_s, k_beta);
 
-            ReplaceSettings(settings1, settings2, {.remove_keys_not_in_new_table = false});
+            ReplacePreferences(prefs1, prefs2, {.remove_keys_not_in_new_table = false});
 
             // The existing key should still be present, along with the new key.
-            CHECK_EQ(settings1.size, 2u);
-            CHECK_EQ(*LookupString(settings1, k_key), k_alpha);
-            CHECK_EQ(*LookupString(settings1, "other_key"_s), k_beta);
+            CHECK_EQ(prefs1.size, 2u);
+            CHECK_EQ(*LookupString(prefs1, k_key), k_alpha);
+            CHECK_EQ(*LookupString(prefs1, "other_key"_s), k_beta);
         }
 
         SUBCASE("existing keys removed") {
-            AddValue(settings1, k_key, k_alpha);
+            AddValue(prefs1, k_key, k_alpha);
 
-            AddValue(settings2, "other_key"_s, k_beta);
+            AddValue(prefs2, "other_key"_s, k_beta);
 
-            ReplaceSettings(settings1, settings2, {.remove_keys_not_in_new_table = true});
+            ReplacePreferences(prefs1, prefs2, {.remove_keys_not_in_new_table = true});
 
             // The existing key should be removed, and the new key should be present.
-            CHECK_EQ(settings1.size, 1u);
-            CHECK_EQ(*LookupString(settings1, "other_key"_s), k_beta);
+            CHECK_EQ(prefs1.size, 1u);
+            CHECK_EQ(*LookupString(prefs1, "other_key"_s), k_beta);
         }
     }
 
     SUBCASE("file watcher poll") {
-        auto const filepath = SettingsFilepath();
+        auto const filepath = PreferencesFilepath();
 
-        // The settings system only polls the official SettingsFilepath(), so we need to write to that file.
-        // Let's first backup the existing file and restore it when we're done.
-        auto const original_settings_file_data = ({
+        // The prefs system only polls the official PreferencesFilepath(), so we need to write to that
+        // file. Let's first backup the existing file and restore it when we're done.
+        auto const original_prefs_file_data = ({
             Optional<String> d {};
             auto const o = ReadEntireFile(filepath, tester.scratch_arena);
             if (o.HasValue()) d = o.Value();
             d;
         });
         DEFER {
-            if (original_settings_file_data) auto _ = WriteFile(filepath, *original_settings_file_data);
+            if (original_prefs_file_data) auto _ = WriteFile(filepath, *original_prefs_file_data);
         };
 
         constexpr String k_file_data = "key1 = value1\nkey2 = value2\n"_s;
         TRY(WriteFile(filepath, k_file_data));
 
-        Settings settings;
+        Preferences prefs;
 
-        Init(settings, Array {filepath});
-        DEFER { Deinit(settings); };
+        Init(prefs, Array {filepath});
+        DEFER { Deinit(prefs); };
 
-        CHECK(!settings.write_to_file_needed);
+        CHECK(!prefs.write_to_file_needed);
 
-        CHECK_EQ(settings.size, 2u);
-        CHECK_EQ(*LookupString(settings, "key1"_s), "value1"_s);
-        CHECK_EQ(*LookupString(settings, "key2"_s), "value2"_s);
+        CHECK_EQ(prefs.size, 2u);
+        CHECK_EQ(*LookupString(prefs, "key1"_s), "value1"_s);
+        CHECK_EQ(*LookupString(prefs, "key2"_s), "value2"_s);
 
-        PollForExternalChanges(settings, {.ignore_rate_limiting = true});
-        CHECK(!settings.write_to_file_needed);
+        PollForExternalChanges(prefs, {.ignore_rate_limiting = true});
+        CHECK(!prefs.write_to_file_needed);
 
-        CHECK_EQ(settings.size, 2u);
-        CHECK_EQ(*LookupString(settings, "key1"_s), "value1"_s);
-        CHECK_EQ(*LookupString(settings, "key2"_s), "value2"_s);
+        CHECK_EQ(prefs.size, 2u);
+        CHECK_EQ(*LookupString(prefs, "key1"_s), "value1"_s);
+        CHECK_EQ(*LookupString(prefs, "key2"_s), "value2"_s);
 
         // Add a new key.
         {
@@ -1391,29 +1391,29 @@ TEST_CASE(TestSettings) {
         }
 
         for (auto _ : Range(25)) {
-            CHECK(!settings.write_to_file_needed);
-            PollForExternalChanges(settings, {.ignore_rate_limiting = true});
-            if (settings.size != 2) break;
+            CHECK(!prefs.write_to_file_needed);
+            PollForExternalChanges(prefs, {.ignore_rate_limiting = true});
+            if (prefs.size != 2) break;
             SleepThisThread(1); // wait for the file watcher to pick up the change
         }
 
-        CHECK_EQ(settings.size, 3u);
-        CHECK_EQ(*LookupString(settings, "key1"_s), "value1"_s);
-        CHECK_EQ(*LookupString(settings, "key2"_s), "value2"_s);
-        CHECK_EQ(*LookupString(settings, "key3"_s), "value3"_s);
+        CHECK_EQ(prefs.size, 3u);
+        CHECK_EQ(*LookupString(prefs, "key1"_s), "value1"_s);
+        CHECK_EQ(*LookupString(prefs, "key2"_s), "value2"_s);
+        CHECK_EQ(*LookupString(prefs, "key3"_s), "value3"_s);
 
         // Replace the value of key1, remove everything else.
         TRY(WriteFile(filepath, "key1 = value4\n"_s));
 
         for (auto _ : Range(25)) {
-            PollForExternalChanges(settings, {.ignore_rate_limiting = true});
-            CHECK(!settings.write_to_file_needed);
-            if (LookupString(settings, "key1"_s) == "value4"_s) break;
+            PollForExternalChanges(prefs, {.ignore_rate_limiting = true});
+            CHECK(!prefs.write_to_file_needed);
+            if (LookupString(prefs, "key1"_s) == "value4"_s) break;
             SleepThisThread(1); // wait for the file watcher to pick up the change
         }
 
-        CHECK_EQ(settings.size, 1u);
-        CHECK_EQ(*LookupString(settings, "key1"_s), "value4"_s);
+        CHECK_EQ(prefs.size, 1u);
+        CHECK_EQ(*LookupString(prefs, "key1"_s), "value4"_s);
     }
 
     SUBCASE("descriptor") {
@@ -1495,43 +1495,43 @@ TEST_CASE(TestSettings) {
         }
 
         SUBCASE("get value") {
-            SettingsTable settings;
+            PreferencesTable prefs;
             SUBCASE("not present") {
                 {
-                    auto const result = GetValue(settings, int_descriptor);
+                    auto const result = GetValue(prefs, int_descriptor);
                     CHECK(result.is_default);
                     CHECK_EQ(result.value.Get<s64>(), 5);
                 }
             }
 
             SUBCASE("already valid") {
-                settings.InsertGrowIfNeeded(tester.scratch_arena,
-                                            int_descriptor.key,
-                                            tester.scratch_arena.New<Value>((s64)7));
+                prefs.InsertGrowIfNeeded(tester.scratch_arena,
+                                         int_descriptor.key,
+                                         tester.scratch_arena.New<Value>((s64)7));
                 {
-                    auto const result = GetValue(settings, int_descriptor);
+                    auto const result = GetValue(prefs, int_descriptor);
                     CHECK(!result.is_default);
                     CHECK_EQ(result.value.Get<s64>(), 7);
                 }
             }
 
             SUBCASE("invalid") {
-                settings.InsertGrowIfNeeded(tester.scratch_arena,
-                                            int_descriptor.key,
-                                            tester.scratch_arena.New<Value>((s64)100));
+                prefs.InsertGrowIfNeeded(tester.scratch_arena,
+                                         int_descriptor.key,
+                                         tester.scratch_arena.New<Value>((s64)100));
                 {
-                    auto const result = GetValue(settings, int_descriptor);
+                    auto const result = GetValue(prefs, int_descriptor);
                     CHECK(!result.is_default);
                     CHECK_EQ(result.value.Get<s64>(), 10);
                 }
             }
 
             SUBCASE("wrong type") {
-                settings.InsertGrowIfNeeded(tester.scratch_arena,
-                                            int_descriptor.key,
-                                            tester.scratch_arena.New<Value>("value"_s));
+                prefs.InsertGrowIfNeeded(tester.scratch_arena,
+                                         int_descriptor.key,
+                                         tester.scratch_arena.New<Value>("value"_s));
                 {
-                    auto const result = GetValue(settings, int_descriptor);
+                    auto const result = GetValue(prefs, int_descriptor);
                     CHECK(result.is_default);
                     CHECK_EQ(result.value.Get<s64>(), 5);
                 }
@@ -1544,7 +1544,7 @@ TEST_CASE(TestSettings) {
 
 } // namespace sts
 
-TEST_REGISTRATION(RegisterSettingsFileTests) {
-    REGISTER_TEST(sts::TestJsonParsing);
-    REGISTER_TEST(sts::TestSettings);
+TEST_REGISTRATION(RegisterPreferencesTests) {
+    REGISTER_TEST(sts::TestLegacyPreferences);
+    REGISTER_TEST(sts::TestPreferences);
 }

@@ -132,9 +132,9 @@ MutableString FloeKnownDirectory(Allocator& a,
             subdirectories = k_dirs;
             break;
         }
-        case FloeKnownDirectoryType::Settings: {
+        case FloeKnownDirectoryType::Preferences: {
             known_dir_type = KnownDirectoryType::GlobalData;
-            static constexpr auto k_dirs = Array {"Floe"_s, "Settings"};
+            static constexpr auto k_dirs = Array {"Floe"_s, "Preferences"};
             subdirectories = k_dirs;
             break;
         }
@@ -181,13 +181,13 @@ Optional<String> LogFolder() {
     return g_log_folder_path;
 }
 
-String SettingsFilepath(String* error_log) {
+String PreferencesFilepath(String* error_log) {
     static DynamicArrayBounded<char, 200> error_log_buffer;
     static String path = []() {
         static FixedSizeAllocator<500> allocator {&PageAllocator::Instance()};
         auto writer = dyn::WriterFor(error_log_buffer);
         return FloeKnownDirectory(allocator,
-                                  FloeKnownDirectoryType::Settings,
+                                  FloeKnownDirectoryType::Preferences,
                                   "floe.ini"_s,
                                   {.create = true, .error_log = &writer});
     }();

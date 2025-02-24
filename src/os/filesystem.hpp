@@ -277,7 +277,7 @@ enum class KnownDirectoryType : u8 {
     GlobalVst3Plugins,
     GlobalClapPlugins,
 
-    // NOTE: per-user sample library locations are not typically used.
+    // NOTE: per-user plugin locations are not typically used.
     UserVst3Plugins,
     UserClapPlugins,
 
@@ -307,15 +307,15 @@ MutableString KnownDirectoryWithSubdirectories(Allocator& a,
 
 // Returns a Floe-specific path. Might be a KnownDirectory with a 'Floe' subdirectory. Just a wrapper around
 // KnownDirectoryWithSubdirectories.
-enum class FloeKnownDirectoryType : u8 { Logs, Settings, Libraries, Presets, Autosaves };
+enum class FloeKnownDirectoryType : u8 { Logs, Preferences, Libraries, Presets, Autosaves };
 MutableString FloeKnownDirectory(Allocator& a,
                                  FloeKnownDirectoryType type,
                                  Optional<String> filename,
                                  KnownDirectoryOptions options);
 
-// Path of Floe's settings file. This is static and doesn't change during the lifetime of the program.
+// Path of Floe's preferences file. This is static and doesn't change during the lifetime of the program.
 // thread-safe
-String SettingsFilepath(String* error_log = nullptr);
+String PreferencesFilepath(String* error_log = nullptr);
 
 // The path where logs and error reports are written to. This is static and doesn't change during the lifetime
 // of the program.

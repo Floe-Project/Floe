@@ -4,7 +4,7 @@
 #pragma once
 #include "foundation/foundation.hpp"
 
-#include "common_infrastructure/settings/settings_file.hpp"
+#include "common_infrastructure/preferences.hpp"
 
 #include "engine/engine.hpp"
 #include "gui/gui2_feedback_panel_state.hpp"
@@ -144,7 +144,7 @@ struct Gui {
     GuiFrameResult frame_output;
     Engine& engine;
     SharedEngineSystems& shared_engine_systems;
-    sts::Settings& settings;
+    sts::Preferences& prefs;
 
     layout::Context layout = {};
     imgui::Context imgui {frame_input, frame_output};

@@ -93,7 +93,7 @@ enum class ModuleName {
     SampleLibrary,
     Clap,
     SampleLibraryServer,
-    Settings,
+    Preferences,
     Standalone,
 };
 
@@ -108,7 +108,7 @@ constexpr String ModuleNameString(ModuleName module_name) {
         case ModuleName::SampleLibrary: return "📚smpl-lib";
         case ModuleName::Clap: return "👏clap";
         case ModuleName::SampleLibraryServer: return "📚smpl-srv";
-        case ModuleName::Settings: return "⚙️sett";
+        case ModuleName::Preferences: return "⚙️sett";
         case ModuleName::Standalone: return "🧍stand";
     }
 }

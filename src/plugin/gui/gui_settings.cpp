@@ -64,20 +64,20 @@ sts::Descriptor SettingDescriptor(GuiSetting setting) {
     }
 }
 
-UiSize DesiredAspectRatio(sts::Settings const& settings) {
+UiSize DesiredAspectRatio(sts::Preferences const& settings) {
     ASSERT(CheckThreadName("main"));
     return sts::GetBool(settings, SettingDescriptor(GuiSetting::ShowKeyboard))
                ? k_aspect_ratio_with_keyboard
                : k_aspect_ratio_without_keyboard;
 }
 
-UiSize DesiredWindowSize(sts::Settings const& settings) {
+UiSize DesiredWindowSize(sts::Preferences const& settings) {
     ASSERT(CheckThreadName("main"));
     return SizeWithAspectRatio((u16)sts::GetInt(settings, SettingDescriptor(GuiSetting::WindowWidth)),
                                DesiredAspectRatio(settings));
 }
 
-f32 KeyboardHeight(sts::Settings const& settings) {
+f32 KeyboardHeight(sts::Preferences const& settings) {
     ASSERT(CheckThreadName("main"));
     static_assert(k_aspect_ratio_with_keyboard.height > k_aspect_ratio_without_keyboard.height);
     static_assert(k_aspect_ratio_with_keyboard.width == k_aspect_ratio_without_keyboard.width);

@@ -75,7 +75,7 @@ void BotPanel(Gui* g) {
 
     auto up_id = imgui.GetID("Up");
     auto dn_id = imgui.GetID("Dn");
-    auto& settings = g->settings;
+    auto& settings = g->prefs;
     auto keyboard_octave = (int)Clamp<s64>(
         sts::LookupInt(settings, sts::key::k_gui_keyboard_octave).ValueOr(k_octave_default_offset),
         k_octave_lowest,

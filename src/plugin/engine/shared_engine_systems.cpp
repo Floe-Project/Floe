@@ -41,13 +41,13 @@ void SharedEngineSystems::StartPollingThreadIfNeeded() {
 SharedEngineSystems::SharedEngineSystems(Span<sentry::Tag const> tags)
     : arena(PageAllocator::Instance(), Kb(4))
     , paths(CreateFloePaths(arena))
-    , settings {.arena = PageAllocator::Instance()}
+    , prefs {.arena = PageAllocator::Instance()}
     , sample_library_server(thread_pool,
                             paths.always_scanned_folder[ToInt(ScanFolderType::Libraries)],
                             error_notifications) {
     InitBackgroundErrorReporting(tags);
 
-    settings.on_change = [this](sts::Key const& key, sts::Value const* value) {
+    prefs.on_change = [this](sts::Key const& key, sts::Value const* value) {
         ASSERT(CheckThreadName("main"));
 
         if (key == sts::key::k_extra_libraries_folder) {
@@ -60,19 +60,19 @@ SharedEngineSystems::SharedEngineSystems(Span<sentry::Tag const> tags)
         } else if (key == sts::key::k_extra_presets_folder) {
             preset_listing.scanned_folder.needs_rescan.Store(true, StoreMemoryOrder::Relaxed);
         }
-        ErrorReportingOnSettingsChange(key, value);
+        ErrorReportingOnPreferenceChanged(key, value);
 
         registered_floe_instances_mutex.Lock();
         DEFER { registered_floe_instances_mutex.Unlock(); };
         for (auto index : registered_floe_instances)
-            OnSettingsChange(index, key, value);
+            OnPreferenceChanged(index, key, value);
     };
 
     thread_pool.Init("global", {});
 
-    sts::Init(settings, paths.possible_settings_paths);
+    sts::Init(prefs, paths.possible_preferences_paths);
 
-    if (auto const value = sts::LookupValues(settings, sts::key::k_extra_libraries_folder)) {
+    if (auto const value = sts::LookupValues(prefs, sts::key::k_extra_libraries_folder)) {
         DynamicArrayBounded<String, k_max_extra_scan_folders> extra_scan_folders;
         for (auto v = &*value; v; v = v->next) {
             if (extra_scan_folders.size == k_max_extra_scan_folders) break;
@@ -89,8 +89,8 @@ SharedEngineSystems::~SharedEngineSystems() {
         polling_thread.Join();
     }
 
-    sts::WriteIfNeeded(settings);
-    sts::Deinit(settings);
+    sts::WriteIfNeeded(prefs);
+    sts::Deinit(prefs);
 
     ShutdownBackgroundErrorReporting();
 }

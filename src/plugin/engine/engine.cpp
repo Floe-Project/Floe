@@ -13,7 +13,7 @@
 #include "common_infrastructure/descriptors/param_descriptors.hpp"
 #include "common_infrastructure/error_reporting.hpp"
 #include "common_infrastructure/sample_library/attribution_requirements.hpp"
-#include "common_infrastructure/settings/settings_file.hpp"
+#include "common_infrastructure/preferences.hpp"
 
 #include "clap/ext/timer-support.h"
 #include "plugin/plugin.hpp"
@@ -467,9 +467,9 @@ static void OnMainThread(Engine& engine) {
     if (engine.update_gui.Exchange(false, RmwMemoryOrder::Relaxed))
         engine.plugin_instance_messages.UpdateGui();
 
-    if (AutosaveNeeded(engine.autosave_state, engine.shared_engine_systems.settings))
+    if (AutosaveNeeded(engine.autosave_state, engine.shared_engine_systems.prefs))
         QueueAutosave(engine.autosave_state,
-                      engine.shared_engine_systems.settings,
+                      engine.shared_engine_systems.prefs,
                       CurrentStateSnapshot(engine));
 }
 
@@ -508,7 +508,7 @@ Engine::Engine(clap_host const& host,
                 auto listing = FetchOrRescanPresetsFolder(
                     engine.shared_engine_systems.preset_listing,
                     RescanMode::DontRescan,
-                    filesystem_settings::ExtraScanFolders(engine.shared_engine_systems.settings,
+                    filesystem_prefs::ExtraScanFolders(engine.shared_engine_systems.prefs,
                                                           engine.shared_engine_systems.paths,
                                                           ScanFolderType::Presets),
                     nullptr);
@@ -566,9 +566,9 @@ static void PluginOnPollThread(Engine& engine) {
     AutosaveToFileIfNeeded(engine.autosave_state, engine.shared_engine_systems.paths);
 }
 
-static void PluginOnSettingsChange(Engine& engine, sts::Key key, sts::Value const* value) {
+static void PluginOnPreferenceChanged(Engine& engine, sts::Key key, sts::Value const* value) {
     ASSERT(IsMainThread(engine.host));
-    OnSettingsChange(engine.autosave_state, key, value);
+    OnPreferenceChanged(engine.autosave_state, key, value);
 }
 
 usize MegabytesUsedBySamples(Engine const& engine) {
@@ -659,7 +659,7 @@ PluginCallbacks<Engine> EngineCallbacks() {
         .on_main_thread = OnMainThread,
         .on_timer = PluginOnTimer,
         .on_poll_thread = PluginOnPollThread,
-        .on_settings_change = PluginOnSettingsChange,
+        .on_preference_changed = PluginOnPreferenceChanged,
         .save_state = PluginSaveState,
         .load_state = PluginLoadState,
     };

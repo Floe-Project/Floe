@@ -814,6 +814,7 @@ void Init(Preferences& prefs, Span<String const> possible_paths) {
             (PreferencesTable&)prefs = ParseLegacyPreferencesFile(read_result.file_data, prefs.arena);
         else
             (PreferencesTable&)prefs = ParsePreferencesFile(read_result.file_data, prefs.arena);
+        break;
     }
 
     auto watcher = CreateDirectoryWatcher(prefs.watcher_arena);

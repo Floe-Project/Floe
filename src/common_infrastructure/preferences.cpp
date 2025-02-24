@@ -573,6 +573,39 @@ String GetString(PreferencesTable const& table, Descriptor const& descriptor) {
     return GetValue(table, descriptor).value.Get<String>();
 }
 
+template <typename Type>
+static usize GetValuesTemplate(PreferencesTable const& table, Descriptor const& descriptor, Span<Type> out) {
+    auto const v_ptr = table.Find(descriptor.key);
+    if (!v_ptr) return 0;
+    auto const& v = **v_ptr;
+
+    usize pos = 0;
+    for (auto node = &v; node; node = node->next) {
+        auto const validated = ValidatedOrDefault(*node, descriptor);
+        if (validated.is_default) continue;
+        if constexpr (Same<Type, ValueUnion>)
+            out[pos++] = validated.value;
+        else
+            out[pos++] = validated.value.Get<Type>();
+        if (pos == out.size) break;
+    }
+
+    return pos;
+}
+
+usize GetValues(PreferencesTable const& table, Descriptor const& descriptor, Span<ValueUnion> out) {
+    return GetValuesTemplate(table, descriptor, out);
+}
+usize GetValues(PreferencesTable const& table, Descriptor const& descriptor, Span<bool> out) {
+    return GetValuesTemplate(table, descriptor, out);
+}
+usize GetValues(PreferencesTable const& table, Descriptor const& descriptor, Span<s64> out) {
+    return GetValuesTemplate(table, descriptor, out);
+}
+usize GetValues(PreferencesTable const& table, Descriptor const& descriptor, Span<String> out) {
+    return GetValuesTemplate(table, descriptor, out);
+}
+
 Optional<ValueUnion> Match(Key const& key, Value const* value_list, Descriptor const& descriptor) {
     if (key != descriptor.key) return k_nullopt;
 
@@ -602,7 +635,43 @@ Optional<String> MatchString(Key const& key, Value const* value_list, Descriptor
     return k_nullopt;
 }
 
-static void OnChange(Preferences& prefs, Key const& key, Value const* value) {
+template <typename Type>
+static Optional<usize>
+MatchValuesTemplate(Key const& key, Value const* value_list, Descriptor const& descriptor, Span<Type> out) {
+    if (key != descriptor.key) return k_nullopt;
+
+    usize pos = 0;
+    for (auto node = value_list; node; node = node->next) {
+        auto const validated = ValidatedOrDefault(*node, descriptor);
+        if (validated.is_default) continue;
+        if constexpr (Same<Type, ValueUnion>)
+            out[pos++] = validated.value;
+        else
+            out[pos++] = validated.value.Get<Type>();
+        if (pos == out.size) break;
+    }
+
+    return pos;
+}
+
+Optional<usize>
+MatchValues(Key const& key, Value const* value_list, Descriptor const& descriptor, Span<ValueUnion> out) {
+    return MatchValuesTemplate(key, value_list, descriptor, out);
+}
+Optional<usize>
+MatchValues(Key const& key, Value const* value_list, Descriptor const& descriptor, Span<bool> out) {
+    return MatchValuesTemplate(key, value_list, descriptor, out);
+}
+Optional<usize>
+MatchValues(Key const& key, Value const* value_list, Descriptor const& descriptor, Span<String> out) {
+    return MatchValuesTemplate(key, value_list, descriptor, out);
+}
+Optional<usize>
+MatchValues(Key const& key, Value const* value_list, Descriptor const& descriptor, Span<s64> out) {
+    return MatchValuesTemplate(key, value_list, descriptor, out);
+}
+
+static void MarkChanged(Preferences& prefs, Key const& key, Value const* value) {
     prefs.write_to_file_needed = true;
     if (prefs.on_change) prefs.on_change(key, value);
 }
@@ -746,6 +815,19 @@ bool AddValue(Preferences& prefs, Key const& key, ValueUnion const& value, SetVa
 
     if (!options.dont_track_changes) OnChange(prefs, key, first_node);
     return true;
+}
+
+void AddValue(Preferences& preferences,
+              Descriptor const& descriptor,
+              ValueUnion const& value,
+              SetValueOptions options) {
+    auto const [v, is_default] = ValidatedOrDefault(value, descriptor);
+
+    // The default_value of a descriptor in a multi-value situation isn't really a default value, it's just a
+    // marker that the value is not set. We should not add it.
+    if (is_default) return;
+
+    AddValue(preferences, descriptor.key, v, options);
 }
 
 bool RemoveValue(Preferences& prefs, Key const& key, ValueUnion const& value, RemoveValueOptions options) {
@@ -1516,44 +1598,86 @@ TEST_CASE(TestPreferences) {
         SUBCASE("get value") {
             PreferencesTable prefs;
             SUBCASE("not present") {
-                {
-                    auto const result = GetValue(prefs, int_descriptor);
-                    CHECK(result.is_default);
-                    CHECK_EQ(result.value.Get<s64>(), 5);
-                }
+                auto const result = GetValue(prefs, int_descriptor);
+                CHECK(result.is_default);
+                CHECK_EQ(result.value.Get<s64>(), 5);
             }
 
             SUBCASE("already valid") {
                 prefs.InsertGrowIfNeeded(tester.scratch_arena,
                                          int_descriptor.key,
                                          tester.scratch_arena.New<Value>((s64)7));
-                {
-                    auto const result = GetValue(prefs, int_descriptor);
-                    CHECK(!result.is_default);
-                    CHECK_EQ(result.value.Get<s64>(), 7);
-                }
+                auto const result = GetValue(prefs, int_descriptor);
+                CHECK(!result.is_default);
+                CHECK_EQ(result.value.Get<s64>(), 7);
             }
 
             SUBCASE("invalid") {
                 prefs.InsertGrowIfNeeded(tester.scratch_arena,
                                          int_descriptor.key,
                                          tester.scratch_arena.New<Value>((s64)100));
-                {
-                    auto const result = GetValue(prefs, int_descriptor);
-                    CHECK(!result.is_default);
-                    CHECK_EQ(result.value.Get<s64>(), 10);
-                }
+                auto const result = GetValue(prefs, int_descriptor);
+                CHECK(!result.is_default);
+                CHECK_EQ(result.value.Get<s64>(), 10);
             }
 
             SUBCASE("wrong type") {
                 prefs.InsertGrowIfNeeded(tester.scratch_arena,
                                          int_descriptor.key,
                                          tester.scratch_arena.New<Value>("value"_s));
-                {
-                    auto const result = GetValue(prefs, int_descriptor);
-                    CHECK(result.is_default);
-                    CHECK_EQ(result.value.Get<s64>(), 5);
-                }
+                auto const result = GetValue(prefs, int_descriptor);
+                CHECK(result.is_default);
+                CHECK_EQ(result.value.Get<s64>(), 5);
+            }
+
+            SUBCASE("multiple") {
+                prefs.InsertGrowIfNeeded(tester.scratch_arena,
+                                         int_descriptor.key,
+                                         tester.scratch_arena.New<Value>((s64)7));
+                auto v = prefs.Find(int_descriptor.key);
+                SinglyLinkedListPrepend(*v, tester.scratch_arena.New<Value>((s64)8));
+                SinglyLinkedListPrepend(*v, tester.scratch_arena.New<Value>("foo"_s));
+                SinglyLinkedListPrepend(*v, tester.scratch_arena.New<Value>((s64)100));
+
+                DynamicArrayBounded<s64, 5> buffer {};
+                buffer.size = buffer.Capacity();
+                auto const num_written = GetValues(prefs, int_descriptor, buffer);
+                CHECK_EQ(num_written, 3u);
+                buffer.size = num_written;
+                CHECK(Contains(buffer, 7));
+                CHECK(Contains(buffer, 8));
+                CHECK(Contains(buffer, 10));
+            }
+        }
+
+        SUBCASE("match") {
+            PreferencesTable prefs;
+            SUBCASE("finds matching value") {
+                prefs.InsertGrowIfNeeded(tester.scratch_arena,
+                                         int_descriptor.key,
+                                         tester.scratch_arena.New<Value>((s64)7));
+
+                auto first_item = *(*prefs.begin()).value_ptr;
+                auto const opt = Match(int_descriptor.key, first_item, int_descriptor);
+                REQUIRE(opt);
+                CHECK_EQ(opt->Get<s64>(), 7);
+            }
+
+            SUBCASE("doesn't find non-existing") {
+                Value value = {"string"_s};
+                auto const opt = Match("foo"_s, &value, int_descriptor);
+                CHECK(!opt);
+            }
+
+            SUBCASE("constrains matching value") {
+                prefs.InsertGrowIfNeeded(tester.scratch_arena,
+                                         int_descriptor.key,
+                                         tester.scratch_arena.New<Value>((s64)100));
+
+                auto first_item = *(*prefs.begin()).value_ptr;
+                auto const opt = Match(int_descriptor.key, first_item, int_descriptor);
+                REQUIRE(opt);
+                CHECK_EQ(opt->Get<s64>(), 10);
             }
         }
     }

@@ -194,6 +194,21 @@ bool GetBool(PreferencesTable const& table, Descriptor const& descriptor);
 s64 GetInt(PreferencesTable const& table, Descriptor const& descriptor);
 String GetString(PreferencesTable const& table, Descriptor const& descriptor);
 
+// Fills 'out' with valid values matching the descriptor. Returns the number of values written.
+usize GetValues(PreferencesTable const& table, Descriptor const& descriptor, Span<ValueUnion> out);
+usize GetValues(PreferencesTable const& table, Descriptor const& descriptor, Span<bool> out);
+usize GetValues(PreferencesTable const& table, Descriptor const& descriptor, Span<s64> out);
+usize GetValues(PreferencesTable const& table, Descriptor const& descriptor, Span<String> out);
+
+template <typename Type, usize k_size>
+PUBLIC DynamicArrayBounded<Type, k_size> GetValues(PreferencesTable const& table,
+                                                   Descriptor const& descriptor) {
+    DynamicArrayBounded<Type, k_size> result;
+    result.size = k_size - 1;
+    result.size = GetValues(table, descriptor, result);
+    return result;
+}
+
 // If the key doesn't match the descriptor, returns nullopt. Else it returns the validated, constrained, or
 // default value. Useful inside the on_change callback.
 Optional<ValueUnion> Match(Key const& key, Value const* value_list, Descriptor const& descriptor);
@@ -201,7 +216,15 @@ Optional<bool> MatchBool(Key const& key, Value const* value_list, Descriptor con
 Optional<s64> MatchInt(Key const& key, Value const* value_list, Descriptor const& descriptor);
 Optional<String> MatchString(Key const& key, Value const* value_list, Descriptor const& descriptor);
 
-// This is a 'managed' instance of the preferences table. It is designed to be a long-lived object that can be
+Optional<usize>
+MatchValues(Key const& key, Value const* value_list, Descriptor const& descriptor, Span<ValueUnion> out);
+Optional<usize>
+MatchValues(Key const& key, Value const* value_list, Descriptor const& descriptor, Span<bool> out);
+Optional<usize>
+MatchValues(Key const& key, Value const* value_list, Descriptor const& descriptor, Span<String> out);
+Optional<usize>
+MatchValues(Key const& key, Value const* value_list, Descriptor const& descriptor, Span<s64> out);
+
 // edited over time.
 struct Preferences : PreferencesTable {
     ArenaAllocator arena {PageAllocator::Instance()};
@@ -247,6 +270,10 @@ void SetValue(Preferences& preferences,
 // existing values, nothing will be added.
 bool AddValue(Preferences& preferences,
               Key const& key,
+              ValueUnion const& value,
+              SetValueOptions options = {});
+void AddValue(Preferences& preferences,
+              Descriptor const& descriptor,
               ValueUnion const& value,
               SetValueOptions options = {});
 

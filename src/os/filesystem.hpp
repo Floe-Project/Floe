@@ -228,6 +228,7 @@ ErrorCodeOr<MutableString> ReadSectionOfFile(String filename,
 
 ErrorCodeOr<u64> FileSize(String filename);
 ErrorCodeOr<s128> LastModifiedTimeNsSinceEpoch(String filename);
+ErrorCodeOr<void> SetLastModifiedTimeNsSinceEpoch(String filename, s128 time);
 
 ErrorCodeOr<usize> WriteFile(String filename, Span<u8 const> data);
 inline ErrorCodeOr<usize> WriteFile(String filename, Span<char const> data) {

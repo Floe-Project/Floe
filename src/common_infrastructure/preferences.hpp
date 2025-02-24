@@ -105,8 +105,9 @@ struct ReadResult {
 ErrorCodeOr<ReadResult> ReadEntirePreferencesFile(String path, ArenaAllocator& arena);
 
 ErrorCodeOr<void> WritePreferencesTable(PreferencesTable const& table, Writer writer);
-ErrorCodeOr<void>
-WritePreferencesFile(PreferencesTable const& table, String path, Optional<s128> set_last_modified);
+ErrorCodeOr<void> WritePreferencesFile(PreferencesTable const& table,
+                                       String path,
+                                       Optional<s128> set_last_modified = NanosecondsSinceEpoch());
 
 // NOTE: you shouldn't trust the values you get from any of the Lookup functions because they could be
 // manually modified in the file, or they could be from a different version of Floe that had different uses of

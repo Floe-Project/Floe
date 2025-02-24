@@ -945,8 +945,8 @@ void PollForExternalChanges(Preferences& prefs, PollForExternalChangesOptions op
             if (!path::Equal(subpath.subpath, path::Filename(path))) continue;
 
             // We ignore changes that are older or the same as our last known modification time.
-            if (TRY_OR(LastModifiedTimeNsSinceEpoch(path), return) <= prefs.last_known_file_modified_time)
-                continue;
+            auto const file_last_modified = TRY_OR(LastModifiedTimeNsSinceEpoch(path), return);
+            if (file_last_modified <= prefs.last_known_file_modified_time) continue;
 
             // We need to apply the new prefs to our existing prefs. If we have a key that doesn't exist
             // in the new table, we keep our existing key-value, but for all keys that exist in the new table,
@@ -1144,7 +1144,7 @@ TEST_CASE(TestPreferences) {
             CHECK_EQ(*LookupString(table, "key1"_s), "value1"_s);
             CHECK_EQ(*LookupString(table, "key2"_s), "value2"_s);
 
-            TRY(WritePreferencesFile(table, filename, k_nullopt));
+            TRY(WritePreferencesFile(table, filename));
         }
 
         // Read again
@@ -1369,8 +1369,10 @@ TEST_CASE(TestPreferences) {
         CHECK_EQ(*LookupString(prefs, "key1"_s), "value1"_s);
         CHECK_EQ(*LookupString(prefs, "key2"_s), "value2"_s);
 
+        auto const last_know_modified_time = prefs.last_known_file_modified_time;
         PollForExternalChanges(prefs, {.ignore_rate_limiting = true});
         CHECK(!prefs.write_to_file_needed);
+        CHECK_EQ(last_know_modified_time, prefs.last_known_file_modified_time);
 
         CHECK_EQ(prefs.size, 2u);
         CHECK_EQ(*LookupString(prefs, "key1"_s), "value1"_s);
@@ -1378,14 +1380,24 @@ TEST_CASE(TestPreferences) {
 
         // Add a new key.
         {
-            auto f = TRY(OpenFile(filepath,
-                                  {
-                                      .capability = FileMode::Capability::Append,
-                                      .win32_share = FileMode::Share::Read,
-                                      .creation = FileMode::Creation::OpenExisting,
-                                  }));
-            TRY(f.Write("key3 = value3\n"_s));
-            TRY(f.Flush());
+            auto const t1 = NanosecondsSinceEpoch();
+            {
+                auto f = TRY(OpenFile(filepath,
+                                      {
+                                          .capability = FileMode::Capability::Append,
+                                          .win32_share = FileMode::Share::Read,
+                                          .creation = FileMode::Creation::OpenExisting,
+                                      }));
+                TRY(f.Write("key3 = value3\n"_s));
+                TRY(f.Flush());
+                // We need to explicitly set the last modified time because otherwise the OS might only update
+                // it lazily - and our subsequent check might not see the change.
+                TRY(f.SetLastModifiedTimeNsSinceEpoch(NanosecondsSinceEpoch()));
+            }
+            auto const t2 = TRY(LastModifiedTimeNsSinceEpoch(filepath));
+            CAPTURE(t1);
+            CAPTURE(t2);
+            REQUIRE(t2 > t1);
         }
 
         for (auto _ : Range(25)) {
@@ -1401,7 +1413,13 @@ TEST_CASE(TestPreferences) {
         CHECK_EQ(*LookupString(prefs, "key3"_s), "value3"_s);
 
         // Replace the value of key1, remove everything else.
-        TRY(WriteFile(filepath, "key1 = value4\n"_s));
+        {
+            auto const t1 = NanosecondsSinceEpoch();
+            TRY(WriteFile(filepath, "key1 = value4\n"_s));
+            TRY(SetLastModifiedTimeNsSinceEpoch(filepath, NanosecondsSinceEpoch()));
+            auto const t2 = TRY(LastModifiedTimeNsSinceEpoch(filepath));
+            REQUIRE(t2 > t1);
+        }
 
         for (auto _ : Range(25)) {
             PollForExternalChanges(prefs, {.ignore_rate_limiting = true});

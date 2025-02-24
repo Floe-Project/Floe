@@ -377,6 +377,10 @@ ErrorCodeOr<s128> LastModifiedTimeNsSinceEpoch(String filename) {
     return TRY(OpenFile(filename, FileMode::Read())).LastModifiedTimeNsSinceEpoch();
 }
 
+ErrorCodeOr<void> SetLastModifiedTimeNsSinceEpoch(String filename, s128 time) {
+    return TRY(OpenFile(filename, FileMode::Read())).SetLastModifiedTimeNsSinceEpoch(time);
+}
+
 ErrorCodeOr<MutableString>
 File::ReadSectionOfFile(usize const bytes_offset_from_file_start, usize const size_in_bytes, Allocator& a) {
     TRY(Seek((s64)bytes_offset_from_file_start, SeekOrigin::Start));

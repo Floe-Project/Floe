@@ -591,6 +591,7 @@ fn genericFlags(context: *BuildContext, target: std.Build.ResolvedTarget, extra_
     // make the __FILE__ macro non-absolute
     const build_root = context.b.pathFromRoot("");
     try flags.append(context.b.fmt("-fmacro-prefix-map={s}/=", .{build_root}));
+    // try flags.append(context.b.fmt("-fdebug-prefix-map={s}/=", .{build_root}));
     try flags.append(context.b.fmt("-ffile-prefix-map={s}/=", .{build_root}));
     try flags.append("-fvisibility=hidden");
 
@@ -937,7 +938,6 @@ pub fn build(b: *std.Build) void {
             .use_as_default = target.query.eql(target_for_compile_commands.query),
         };
 
-        // NOTE (Sam, 27th June 2023): we can set the field override_dest_dir to this value, but it does not effect the PDB location on Windows. PDB's will end up in different folders. I'm not sure if this is a bug or not.
         const install_subfolder_string = b.dupe(archAndOsPair(target.result).slice());
         const install_subfolder = std.Build.Step.InstallArtifact.Options.Dir{
             .override = std.Build.InstallDir{ .custom = install_subfolder_string },

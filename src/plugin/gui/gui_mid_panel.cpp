@@ -18,7 +18,7 @@ static void DoBlurredBackground(Gui* g,
                                 sample_lib::LibraryIdRef library_id,
                                 f32x2 mid_panel_size,
                                 f32 opacity) {
-    if (sts::GetBool(g->prefs, SettingDescriptor(GuiSetting::HighContrastGui))) return;
+    if (prefs::GetBool(g->prefs, SettingDescriptor(GuiSetting::HighContrastGui))) return;
     auto& imgui = g->imgui;
     auto const panel_rounding = LiveSize(imgui, UiSizeId::BlurredPanelRounding);
 
@@ -131,7 +131,7 @@ void MidPanel(Gui* g) {
 
             auto const layer_width_without_pad = RoundUpToNearestMultiple(r.w, k_num_layers) / k_num_layers;
 
-            if (!sts::GetBool(g->prefs, SettingDescriptor(GuiSetting::HighContrastGui))) {
+            if (!prefs::GetBool(g->prefs, SettingDescriptor(GuiSetting::HighContrastGui))) {
                 auto const overall_lib = LibraryForOverallBackground(engine);
                 if (overall_lib)
                     DoBlurredBackground(

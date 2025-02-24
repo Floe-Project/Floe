@@ -14,7 +14,7 @@ enum class GuiSetting : u8 {
     Count,
 };
 
-sts::Descriptor SettingDescriptor(GuiSetting);
+prefs::Descriptor SettingDescriptor(GuiSetting);
 
-UiSize DesiredAspectRatio(sts::Preferences const&);
-UiSize DesiredWindowSize(sts::Preferences const&);
+UiSize DesiredAspectRatio(prefs::Preferences const&);
+UiSize DesiredWindowSize(prefs::Preferences const&);

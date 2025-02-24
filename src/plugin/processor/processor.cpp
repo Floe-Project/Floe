@@ -69,7 +69,7 @@ consteval auto PersistentDefaultCcParamMappingsString() {
 constexpr auto k_str = PersistentDefaultCcParamMappingsString();
 static_assert(k_str[0] == 'C');
 
-sts::Descriptor SettingDescriptor(ProcessorSetting s) {
+prefs::Descriptor SettingDescriptor(ProcessorSetting s) {
     switch (s) {
         case ProcessorSetting::DefaultCcParamMappings: {
             static constexpr auto k_description =
@@ -77,7 +77,7 @@ sts::Descriptor SettingDescriptor(ProcessorSetting s) {
                              PersistentDefaultCcParamMappingsString());
             return {
                 .key = "default-cc-param-mappings"_s,
-                .value_requirements = sts::ValueType::Bool,
+                .value_requirements = prefs::ValueType::Bool,
                 .default_value = true,
                 .gui_label = "Start with default CC to param mappings"_s,
                 .long_description = k_description,
@@ -123,29 +123,29 @@ bool CcControllerMovedParamRecently(AudioProcessor const& processor, ParamIndex 
            TimePoint::Now();
 }
 
-void AddPersistentCcToParamMapping(sts::Preferences& prefs, u8 cc_num, u32 param_id) {
+void AddPersistentCcToParamMapping(prefs::Preferences& prefs, u8 cc_num, u32 param_id) {
     ASSERT(cc_num > 0 && cc_num <= 127);
     ASSERT(ParamIdToIndex(param_id));
-    sts::AddValue(prefs,
-                  sts::SectionedKey {sts::key::section::k_cc_to_param_id_map_section, (s64)cc_num},
-                  (s64)param_id);
+    prefs::AddValue(prefs,
+                    prefs::SectionedKey {prefs::key::section::k_cc_to_param_id_map_section, (s64)cc_num},
+                    (s64)param_id);
 }
 
-void RemovePersistentCcToParamMapping(sts::Preferences& prefs, u8 cc_num, u32 param_id) {
-    sts::RemoveValue(prefs,
-                     sts::SectionedKey {sts::key::section::k_cc_to_param_id_map_section, (s64)cc_num},
-                     (s64)param_id);
+void RemovePersistentCcToParamMapping(prefs::Preferences& prefs, u8 cc_num, u32 param_id) {
+    prefs::RemoveValue(prefs,
+                       prefs::SectionedKey {prefs::key::section::k_cc_to_param_id_map_section, (s64)cc_num},
+                       (s64)param_id);
 }
 
-Bitset<128> PersistentCcsForParam(sts::PreferencesTable const& prefs, u32 param_id) {
+Bitset<128> PersistentCcsForParam(prefs::PreferencesTable const& prefs, u32 param_id) {
     Bitset<128> result {};
 
     for (auto const [key_union, value_list_ptr] : prefs) {
-        auto const sectioned_key = key_union.TryGet<sts::SectionedKey>();
+        auto const sectioned_key = key_union.TryGet<prefs::SectionedKey>();
         if (!sectioned_key) continue;
         auto const [section, key] = *sectioned_key;
-        if (section != sts::key::section::k_cc_to_param_id_map_section) continue;
-        if (key.tag != sts::KeyValueType::Int) continue;
+        if (section != prefs::key::section::k_cc_to_param_id_map_section) continue;
+        if (key.tag != prefs::KeyValueType::Int) continue;
 
         auto const cc_num = key.Get<s64>();
         if (cc_num < 1 || cc_num > 127) continue;
@@ -1514,7 +1514,7 @@ static void OnThreadPoolExec(AudioProcessor& processor, u32 index) {
 
 AudioProcessor::AudioProcessor(clap_host const& host,
                                ProcessorListener& listener,
-                               sts::PreferencesTable const& prefs)
+                               prefs::PreferencesTable const& prefs)
     : host(host)
     , audio_processing_context {.host = host}
     , listener(listener)
@@ -1554,7 +1554,7 @@ AudioProcessor::AudioProcessor(clap_host const& host,
     ProcessorOnParamChange(*this, {params.data, changed});
     smoothed_value_system.ResetAll();
 
-    if (sts::GetBool(prefs, SettingDescriptor(ProcessorSetting::DefaultCcParamMappings)))
+    if (prefs::GetBool(prefs, SettingDescriptor(ProcessorSetting::DefaultCcParamMappings)))
         for (auto const mapping : k_default_cc_to_param_mapping)
             param_learned_ccs[ToInt(mapping.param)].Set(mapping.cc);
     for (auto const i : EnumIterator<ParamIndex>())

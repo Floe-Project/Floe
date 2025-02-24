@@ -12,8 +12,8 @@
 #include "common_infrastructure/constants.hpp"
 #include "common_infrastructure/descriptors/param_descriptors.hpp"
 #include "common_infrastructure/error_reporting.hpp"
-#include "common_infrastructure/sample_library/attribution_requirements.hpp"
 #include "common_infrastructure/preferences.hpp"
+#include "common_infrastructure/sample_library/attribution_requirements.hpp"
 
 #include "clap/ext/timer-support.h"
 #include "plugin/plugin.hpp"
@@ -509,8 +509,8 @@ Engine::Engine(clap_host const& host,
                     engine.shared_engine_systems.preset_listing,
                     RescanMode::DontRescan,
                     filesystem_prefs::ExtraScanFolders(engine.shared_engine_systems.prefs,
-                                                          engine.shared_engine_systems.paths,
-                                                          ScanFolderType::Presets),
+                                                       engine.shared_engine_systems.paths,
+                                                       ScanFolderType::Presets),
                     nullptr);
 
                 if (engine.pending_preset_selection_criteria) {
@@ -566,7 +566,7 @@ static void PluginOnPollThread(Engine& engine) {
     AutosaveToFileIfNeeded(engine.autosave_state, engine.shared_engine_systems.paths);
 }
 
-static void PluginOnPreferenceChanged(Engine& engine, sts::Key key, sts::Value const* value) {
+static void PluginOnPreferenceChanged(Engine& engine, prefs::Key key, prefs::Value const* value) {
     ASSERT(IsMainThread(engine.host));
     OnPreferenceChanged(engine.autosave_state, key, value);
 }

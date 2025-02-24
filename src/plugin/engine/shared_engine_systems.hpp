@@ -6,8 +6,8 @@
 #include "utils/thread_extra/thread_pool.hpp"
 
 #include "common_infrastructure/paths.hpp"
-#include "common_infrastructure/sentry/sentry.hpp"
 #include "common_infrastructure/preferences.hpp"
+#include "common_infrastructure/sentry/sentry.hpp"
 
 #include "clap/plugin.h"
 #include "presets/presets_folder.hpp"
@@ -32,7 +32,7 @@ struct SharedEngineSystems {
     ArenaAllocator arena;
     ThreadsafeErrorNotifications error_notifications {};
     FloePaths paths;
-    sts::Preferences prefs;
+    prefs::Preferences prefs;
     ThreadPool thread_pool;
     PresetsListing preset_listing {paths.always_scanned_folder[ToInt(ScanFolderType::Presets)],
                                    error_notifications};

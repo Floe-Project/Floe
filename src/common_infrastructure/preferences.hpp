@@ -41,7 +41,7 @@
 // Preferences are kept in a hash table. The key is a string/int or a section + key string/int pair. The value
 // is a linked list. You can loop over the table to get all the key-value pairs.
 
-namespace sts {
+namespace prefs {
 
 constexpr usize k_max_file_size = Kb(32);
 constexpr usize k_max_key_size = 50; // also for sections
@@ -83,7 +83,7 @@ struct SectionedKey {
 enum class KeyType : u32 { GlobalString, GlobalInt, Sectioned };
 
 // Our HashTable implementation currently requires keys to be default constructible.
-constexpr auto TaggedUnionDefaultValue(sts::KeyType) { return ""_s; }
+constexpr auto TaggedUnionDefaultValue(KeyType) { return ""_s; }
 
 using Key = TaggedUnion<KeyType,
                         TypeAndTag<String, KeyType::GlobalString>,
@@ -303,4 +303,4 @@ constexpr String k_show_tooltips = "show-tooltips"_s;
 constexpr String k_window_width = "window-width"_s;
 } // namespace key
 
-} // namespace sts
+} // namespace prefs

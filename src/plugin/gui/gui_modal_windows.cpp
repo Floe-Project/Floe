@@ -279,8 +279,8 @@ static void DoLoadingOverlay(Gui* g) {
         FetchOrRescanPresetsFolder(g->shared_engine_systems.preset_listing,
                                    RescanMode::DontRescan,
                                    filesystem_prefs::ExtraScanFolders(g->prefs,
-                                                                         g->shared_engine_systems.paths,
-                                                                         ScanFolderType::Presets),
+                                                                      g->shared_engine_systems.paths,
+                                                                      ScanFolderType::Presets),
                                    nullptr)
             .is_loading) {
         imgui.BeginWindow(settings, r, "LoadingModal");

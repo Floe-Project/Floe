@@ -47,17 +47,17 @@ SharedEngineSystems::SharedEngineSystems(Span<sentry::Tag const> tags)
                             error_notifications) {
     InitBackgroundErrorReporting(tags);
 
-    prefs.on_change = [this](sts::Key const& key, sts::Value const* value) {
+    prefs.on_change = [this](prefs::Key const& key, prefs::Value const* value) {
         ASSERT(CheckThreadName("main"));
 
-        if (key == sts::key::k_extra_libraries_folder) {
+        if (key == prefs::key::k_extra_libraries_folder) {
             DynamicArrayBounded<String, k_max_extra_scan_folders> extra_scan_folders;
             for (auto v = value; v; v = v->next) {
                 if (extra_scan_folders.size == k_max_extra_scan_folders) break;
                 dyn::AppendIfNotAlreadyThere(extra_scan_folders, v->Get<String>());
             }
             sample_lib_server::SetExtraScanFolders(sample_library_server, extra_scan_folders);
-        } else if (key == sts::key::k_extra_presets_folder) {
+        } else if (key == prefs::key::k_extra_presets_folder) {
             preset_listing.scanned_folder.needs_rescan.Store(true, StoreMemoryOrder::Relaxed);
         }
         ErrorReportingOnPreferenceChanged(key, value);
@@ -70,9 +70,9 @@ SharedEngineSystems::SharedEngineSystems(Span<sentry::Tag const> tags)
 
     thread_pool.Init("global", {});
 
-    sts::Init(prefs, paths.possible_preferences_paths);
+    prefs::Init(prefs, paths.possible_preferences_paths);
 
-    if (auto const value = sts::LookupValues(prefs, sts::key::k_extra_libraries_folder)) {
+    if (auto const value = prefs::LookupValues(prefs, prefs::key::k_extra_libraries_folder)) {
         DynamicArrayBounded<String, k_max_extra_scan_folders> extra_scan_folders;
         for (auto v = &*value; v; v = v->next) {
             if (extra_scan_folders.size == k_max_extra_scan_folders) break;
@@ -89,8 +89,8 @@ SharedEngineSystems::~SharedEngineSystems() {
         polling_thread.Join();
     }
 
-    sts::WriteIfNeeded(prefs);
-    sts::Deinit(prefs);
+    prefs::WriteIfNeeded(prefs);
+    prefs::Deinit(prefs);
 
     ShutdownBackgroundErrorReporting();
 }

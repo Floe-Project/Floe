@@ -189,13 +189,13 @@ void AutosaveToFileIfNeeded(AutosaveState& state, FloePaths const& paths) {
     }
 }
 
-sts::Descriptor SettingDescriptor(AutosaveSetting setting) {
+prefs::Descriptor SettingDescriptor(AutosaveSetting setting) {
     switch (setting) {
         case AutosaveSetting::AutosaveIntervalSeconds:
             return {
                 .key = "autosave-interval-seconds"_s,
                 .value_requirements =
-                    sts::Descriptor::IntRequirements {
+                    prefs::Descriptor::IntRequirements {
                         .min_value = 1,
                         .max_value = 60 * 60,
                         .clamp_to_range = true,
@@ -207,7 +207,7 @@ sts::Descriptor SettingDescriptor(AutosaveSetting setting) {
             return {
                 .key = "max-autosaves-per-instance"_s,
                 .value_requirements =
-                    sts::Descriptor::IntRequirements {
+                    prefs::Descriptor::IntRequirements {
                         .min_value = 1,
                         .max_value = 100,
                         .clamp_to_range = true,
@@ -219,7 +219,7 @@ sts::Descriptor SettingDescriptor(AutosaveSetting setting) {
             return {
                 .key = "autosave-delete-after-days"_s,
                 .value_requirements =
-                    sts::Descriptor::IntRequirements {
+                    prefs::Descriptor::IntRequirements {
                         .min_value = 1,
                         .max_value = 365,
                         .clamp_to_range = true,
@@ -232,9 +232,9 @@ sts::Descriptor SettingDescriptor(AutosaveSetting setting) {
     PanicIfReached();
 }
 
-void OnPreferenceChanged(AutosaveState& state, sts::Key const& key, sts::Value const* value) {
+void OnPreferenceChanged(AutosaveState& state, prefs::Key const& key, prefs::Value const* value) {
     for (auto const setting : EnumIterator<AutosaveSetting>()) {
-        if (auto const v = sts::Match(key, value, SettingDescriptor(setting))) {
+        if (auto const v = prefs::Match(key, value, SettingDescriptor(setting))) {
             switch (setting) {
                 case AutosaveSetting::AutosaveIntervalSeconds: break;
                 case AutosaveSetting::MaxAutosavesPerInstance:
@@ -252,16 +252,16 @@ void OnPreferenceChanged(AutosaveState& state, sts::Key const& key, sts::Value c
     }
 }
 
-static s64 AutosaveSettingIntValue(AutosaveSetting setting, sts::Preferences const& settings) {
-    return sts::GetValue(settings, SettingDescriptor(setting)).value.Get<s64>();
+static s64 AutosaveSettingIntValue(AutosaveSetting setting, prefs::Preferences const& settings) {
+    return prefs::GetValue(settings, SettingDescriptor(setting)).value.Get<s64>();
 }
 
-bool AutosaveNeeded(AutosaveState const& state, sts::Preferences const& settings) {
+bool AutosaveNeeded(AutosaveState const& state, prefs::Preferences const& settings) {
     return state.last_save_time.SecondsFromNow() >=
            (f64)AutosaveSettingIntValue(AutosaveSetting::AutosaveIntervalSeconds, settings);
 }
 
-void QueueAutosave(AutosaveState& state, sts::Preferences const& settings, StateSnapshot const& snapshot) {
+void QueueAutosave(AutosaveState& state, prefs::Preferences const& settings, StateSnapshot const& snapshot) {
     state.autosave_delete_after_days.Store(
         CheckedCast<u16>(AutosaveSettingIntValue(AutosaveSetting::AutosaveDeleteAfterDays, settings)),
         StoreMemoryOrder::Relaxed);
@@ -300,7 +300,7 @@ static String TestPresetPath(tests::Tester& tester, String filename) {
 TEST_CASE(TestAutosave) {
     AutosaveState state {};
     auto const paths = CreateFloePaths(tester.arena);
-    sts::Preferences settings {};
+    prefs::Preferences settings {};
 
     // We need to load some valid state to test autosave.
     auto snapshot = TRY(LoadPresetFile(TestPresetPath(tester, "sine.floe-preset"), tester.scratch_arena));

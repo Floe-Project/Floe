@@ -195,7 +195,7 @@ SettingsFolderSelector(GuiBoxSystem& box_system, Box parent, String path, String
 }
 
 struct SettingsPanelContext {
-    sts::Preferences& settings;
+    prefs::Preferences& settings;
     FloePaths const& paths;
     sample_lib_server::Server& sample_lib_server;
     package::InstallJobs& package_install_jobs;
@@ -332,10 +332,7 @@ static void FolderSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& 
             }
         }
         if (to_remove)
-            filesystem_prefs::RemoveScanFolder(context.settings,
-                                                  context.paths,
-                                                  scan_folder_type,
-                                                  *to_remove);
+            filesystem_prefs::RemoveScanFolder(context.settings, context.paths, scan_folder_type, *to_remove);
 
         auto const contents_name = ({
             String s;
@@ -581,28 +578,28 @@ static void PackagesSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext
 }
 
 static void
-Setting(GuiBoxSystem& box_system, SettingsPanelContext& context, Box parent, sts::Descriptor const& info) {
+Setting(GuiBoxSystem& box_system, SettingsPanelContext& context, Box parent, prefs::Descriptor const& info) {
     switch (info.value_requirements.tag) {
-        case sts::ValueType::Int: {
-            auto const& int_info = info.value_requirements.Get<sts::Descriptor::IntRequirements>();
+        case prefs::ValueType::Int: {
+            auto const& int_info = info.value_requirements.Get<prefs::Descriptor::IntRequirements>();
             if (auto const v = IntField(box_system,
                                         parent,
                                         info.gui_label,
                                         30.0f,
-                                        sts::GetValue(context.settings, info).value.Get<s64>(),
+                                        prefs::GetValue(context.settings, info).value.Get<s64>(),
                                         int_info.min_value,
                                         int_info.max_value)) {
-                sts::SetValue(context.settings, info, *v);
+                prefs::SetValue(context.settings, info, *v);
             }
             break;
         }
-        case sts::ValueType::Bool: {
-            auto const state = sts::GetValue(context.settings, info).value.Get<bool>();
+        case prefs::ValueType::Bool: {
+            auto const state = prefs::GetValue(context.settings, info).value.Get<bool>();
             if (CheckboxButton(box_system, parent, info.gui_label, state, info.long_description))
-                sts::SetValue(context.settings, info, !state);
+                prefs::SetValue(context.settings, info, !state);
             break;
         }
-        case sts::ValueType::String: {
+        case prefs::ValueType::String: {
             Panic("not implemented");
             break;
         }
@@ -689,9 +686,9 @@ static void GeneralSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext&
 
         if (width_change) {
             auto const desc = SettingDescriptor(GuiSetting::WindowWidth);
-            auto const width = sts::GetInt(context.settings, desc);
+            auto const width = prefs::GetInt(context.settings, desc);
             auto const new_width = width + *width_change * 110;
-            sts::SetValue(context.settings, desc, new_width);
+            prefs::SetValue(context.settings, desc, new_width);
         }
     }
 

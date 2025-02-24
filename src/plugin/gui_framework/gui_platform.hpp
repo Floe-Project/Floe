@@ -34,7 +34,7 @@ struct GuiPlatform {
     static constexpr uintptr k_pugl_timer_id = 200;
 
     clap_host const& host;
-    sts::Preferences& prefs;
+    prefs::Preferences& prefs;
     PuglWorld* world {};
     PuglView* view {};
     CursorType current_cursor {CursorType::Default};
@@ -726,9 +726,9 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
                                                                    DesiredAspectRatio(platform.prefs));
 
                 if (size && size->width >= k_min_gui_width && size->width <= k_max_gui_width) {
-                    sts::SetValue(platform.prefs,
-                                  SettingDescriptor(GuiSetting::WindowWidth),
-                                  (s64)size->width);
+                    prefs::SetValue(platform.prefs,
+                                    SettingDescriptor(GuiSetting::WindowWidth),
+                                    (s64)size->width);
                     if (platform.graphics_ctx) platform.graphics_ctx->Resize(*size);
                 } else {
                     LogWarning(ModuleName::Gui,

@@ -28,8 +28,8 @@ struct AutosaveState {
 // Run from main thread
 // Check if an autosave is needed, and if so, create a snapshot and queue it.
 void InitAutosaveState(AutosaveState& state, u64& random_seed, StateSnapshot const& initial_state);
-bool AutosaveNeeded(AutosaveState const& state, sts::Preferences const& settings);
-void QueueAutosave(AutosaveState& state, sts::Preferences const& settings, StateSnapshot const& snapshot);
+bool AutosaveNeeded(AutosaveState const& state, prefs::Preferences const& settings);
+void QueueAutosave(AutosaveState& state, prefs::Preferences const& settings, StateSnapshot const& snapshot);
 
 enum class AutosaveSetting : u8 {
     AutosaveIntervalSeconds,
@@ -38,10 +38,10 @@ enum class AutosaveSetting : u8 {
     Count,
 };
 
-// Use with sts::SetValue, sts::GetValue
-sts::Descriptor SettingDescriptor(AutosaveSetting setting);
+// Use with prefs::SetValue, prefs::GetValue
+prefs::Descriptor SettingDescriptor(AutosaveSetting setting);
 
-void OnPreferenceChanged(AutosaveState& state, sts::Key const& key, sts::Value const* value);
+void OnPreferenceChanged(AutosaveState& state, prefs::Key const& key, prefs::Value const* value);
 
 // Run from background thread
 void AutosaveToFileIfNeeded(AutosaveState& state, FloePaths const& paths);

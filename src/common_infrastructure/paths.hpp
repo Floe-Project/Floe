@@ -133,16 +133,16 @@ PUBLIC FloePaths CreateFloePaths(ArenaAllocator& arena) {
 namespace filesystem_prefs {
 
 PUBLIC DynamicArrayBounded<String, k_max_extra_scan_folders>
-ExtraScanFolders(sts::Preferences& prefs, FloePaths const& paths, ScanFolderType type) {
+ExtraScanFolders(prefs::Preferences& prefs, FloePaths const& paths, ScanFolderType type) {
     ASSERT(CheckThreadName("main"));
     String key {};
     switch (type) {
-        case ScanFolderType::Presets: key = sts::key::k_extra_presets_folder; break;
-        case ScanFolderType::Libraries: key = sts::key::k_extra_libraries_folder; break;
+        case ScanFolderType::Presets: key = prefs::key::k_extra_presets_folder; break;
+        case ScanFolderType::Libraries: key = prefs::key::k_extra_libraries_folder; break;
         case ScanFolderType::Count: PanicIfReached(); break;
     }
 
-    auto values = sts::LookupValues(prefs, key);
+    auto values = prefs::LookupValues(prefs, key);
     if (!values) return {};
 
     DynamicArrayBounded<String, k_max_extra_scan_folders> result;
@@ -159,15 +159,15 @@ ExtraScanFolders(sts::Preferences& prefs, FloePaths const& paths, ScanFolderType
 
 constexpr String InstallLocationPrefsKey(ScanFolderType type) {
     switch (type) {
-        case ScanFolderType::Presets: return sts::key::k_presets_install_location;
-        case ScanFolderType::Libraries: return sts::key::k_libraries_install_location;
+        case ScanFolderType::Presets: return prefs::key::k_presets_install_location;
+        case ScanFolderType::Libraries: return prefs::key::k_libraries_install_location;
         case ScanFolderType::Count: PanicIfReached(); break;
     }
     return {};
 }
 
-PUBLIC String InstallLocation(sts::Preferences& prefs, FloePaths const& paths, ScanFolderType type) {
-    auto v = sts::LookupString(prefs, InstallLocationPrefsKey(type));
+PUBLIC String InstallLocation(prefs::Preferences& prefs, FloePaths const& paths, ScanFolderType type) {
+    auto v = prefs::LookupString(prefs, InstallLocationPrefsKey(type));
     auto const fallback = paths.always_scanned_folder[ToInt(type)];
     if (!v) return fallback;
     if (!path::IsAbsolute(*v) || !IsValidUtf8(*v)) return fallback;
@@ -176,38 +176,39 @@ PUBLIC String InstallLocation(sts::Preferences& prefs, FloePaths const& paths, S
 }
 
 PUBLIC void
-SetInstallLocation(sts::Preferences& prefs, FloePaths const& paths, ScanFolderType type, String path) {
+SetInstallLocation(prefs::Preferences& prefs, FloePaths const& paths, ScanFolderType type, String path) {
     ASSERT(CheckThreadName("main"));
     ASSERT(path::IsAbsolute(path));
     ASSERT(IsValidUtf8(path));
     if (!Contains(ExtraScanFolders(prefs, paths, type), path)) return;
 
-    sts::SetValue(prefs, InstallLocationPrefsKey(type), path);
+    prefs::SetValue(prefs, InstallLocationPrefsKey(type), path);
 }
 
 constexpr String ScanFolderPrefsKey(ScanFolderType type) {
     switch (type) {
-        case ScanFolderType::Presets: return sts::key::k_extra_presets_folder;
-        case ScanFolderType::Libraries: return sts::key::k_extra_libraries_folder;
+        case ScanFolderType::Presets: return prefs::key::k_extra_presets_folder;
+        case ScanFolderType::Libraries: return prefs::key::k_extra_libraries_folder;
         case ScanFolderType::Count: PanicIfReached(); break;
     }
     return {};
 }
 
-PUBLIC void AddScanFolder(sts::Preferences& prefs, FloePaths const& paths, ScanFolderType type, String path) {
+PUBLIC void
+AddScanFolder(prefs::Preferences& prefs, FloePaths const& paths, ScanFolderType type, String path) {
     ASSERT(CheckThreadName("main"));
     ASSERT(path::IsAbsolute(path));
     ASSERT(IsValidUtf8(path));
     if (path::Equal(path, paths.always_scanned_folder[ToInt(type)])) return;
 
-    sts::AddValue(prefs, ScanFolderPrefsKey(type), path);
+    prefs::AddValue(prefs, ScanFolderPrefsKey(type), path);
 }
 
 PUBLIC void
-RemoveScanFolder(sts::Preferences& prefs, FloePaths const& paths, ScanFolderType type, String path) {
+RemoveScanFolder(prefs::Preferences& prefs, FloePaths const& paths, ScanFolderType type, String path) {
     ASSERT(CheckThreadName("main"));
 
-    if (sts::RemoveValue(prefs, ScanFolderPrefsKey(type), path)) {
+    if (prefs::RemoveValue(prefs, ScanFolderPrefsKey(type), path)) {
         if (path == InstallLocation(prefs, paths, type))
             SetInstallLocation(prefs, paths, type, paths.always_scanned_folder[ToInt(type)]);
     }

@@ -225,7 +225,7 @@ void TopPanel(Gui* g) {
     {
         auto subtitle_r = layout::GetRect(g->layout, subtitle).Up(Round(-title_font->descent + 1));
         auto const show_instance_name =
-            sts::GetBool(g->prefs, SettingDescriptor(GuiSetting::ShowInstanceName));
+            prefs::GetBool(g->prefs, SettingDescriptor(GuiSetting::ShowInstanceName));
         labels::Label(g,
                       subtitle_r,
                       fmt::Format(g->scratch_arena,
@@ -256,7 +256,7 @@ void TopPanel(Gui* g) {
 
     auto& settings = g->prefs;
     auto const randomise_mode = (PresetRandomiseMode)Clamp(
-        sts::LookupInt(settings, sts::key::k_presets_random_mode).ValueOr((s64)PresetRandomiseMode::All),
+        prefs::LookupInt(settings, prefs::key::k_presets_random_mode).ValueOr((s64)PresetRandomiseMode::All),
         (s64)PresetRandomiseMode::All,
         (s64)PresetRandomiseMode::BrowserFilters);
     {
@@ -316,8 +316,8 @@ void TopPanel(Gui* g) {
             FetchOrRescanPresetsFolder(g->engine.shared_engine_systems.preset_listing,
                                        RescanMode::RescanAsyncIfNeeded,
                                        filesystem_prefs::ExtraScanFolders(g->prefs,
-                                                                             g->shared_engine_systems.paths,
-                                                                             ScanFolderType::Presets),
+                                                                          g->shared_engine_systems.paths,
+                                                                          ScanFolderType::Presets),
                                        &g->engine.shared_engine_systems.thread_pool));
         g->preset_browser_data.scroll_to_show_current_preset = true;
     }
@@ -363,9 +363,11 @@ void TopPanel(Gui* g) {
 
             PopupMenuItems items(g, options.Items());
             auto mode =
-                (int)Clamp<s64>(sts::LookupInt(settings, sts::key::k_presets_random_mode).ValueOr(0), 0, 3);
+                (int)Clamp<s64>(prefs::LookupInt(settings, prefs::key::k_presets_random_mode).ValueOr(0),
+                                0,
+                                3);
             if (items.DoMultipleMenuItems(mode))
-                sts::SetValue(settings, sts::key::k_presets_random_mode, (s64)mode);
+                prefs::SetValue(settings, prefs::key::k_presets_random_mode, (s64)mode);
 
             g->imgui.EndWindow();
         }

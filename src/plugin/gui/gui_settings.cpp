@@ -5,29 +5,29 @@
 
 #include "gui_framework/gui_platform.hpp"
 
-sts::Descriptor SettingDescriptor(GuiSetting setting) {
+prefs::Descriptor SettingDescriptor(GuiSetting setting) {
     ASSERT(CheckThreadName("main"));
     switch (setting) {
         case GuiSetting::ShowTooltips:
             return {
-                .key = sts::key::k_show_tooltips,
-                .value_requirements = sts::ValueType::Bool,
+                .key = prefs::key::k_show_tooltips,
+                .value_requirements = prefs::ValueType::Bool,
                 .default_value = true,
                 .gui_label = "Show tooltips",
                 .long_description = "Show descriptions when hovering over controls.",
             };
         case GuiSetting::ShowKeyboard:
             return {
-                .key = sts::key::k_show_keyboard,
-                .value_requirements = sts::ValueType::Bool,
+                .key = prefs::key::k_show_keyboard,
+                .value_requirements = prefs::ValueType::Bool,
                 .default_value = true,
                 .gui_label = "Show keyboard",
                 .long_description = "Show the on-screen keyboard.",
             };
         case GuiSetting::HighContrastGui:
             return {
-                .key = sts::key::k_high_contrast_gui,
-                .value_requirements = sts::ValueType::Bool,
+                .key = prefs::key::k_high_contrast_gui,
+                .value_requirements = prefs::ValueType::Bool,
                 .default_value = false,
                 .gui_label = "High contrast GUI",
                 .long_description = "Use a high contrast colour scheme.",
@@ -35,16 +35,16 @@ sts::Descriptor SettingDescriptor(GuiSetting setting) {
         case GuiSetting::ShowInstanceName:
             return {
                 .key = "show-instance-name"_s,
-                .value_requirements = sts::ValueType::Bool,
+                .value_requirements = prefs::ValueType::Bool,
                 .default_value = true,
                 .gui_label = "Show instance name",
                 .long_description = "Show the name of the instance in the top panel GUI.",
             };
         case GuiSetting::WindowWidth:
             return {
-                .key = sts::key::k_window_width,
+                .key = prefs::key::k_window_width,
                 .value_requirements =
-                    sts::Descriptor::IntRequirements {
+                    prefs::Descriptor::IntRequirements {
                         .min_value = (s64)k_min_gui_width,
                         .max_value = (s64)k_largest_gui_size,
                         .custom_constrainer =
@@ -64,24 +64,24 @@ sts::Descriptor SettingDescriptor(GuiSetting setting) {
     }
 }
 
-UiSize DesiredAspectRatio(sts::Preferences const& settings) {
+UiSize DesiredAspectRatio(prefs::Preferences const& settings) {
     ASSERT(CheckThreadName("main"));
-    return sts::GetBool(settings, SettingDescriptor(GuiSetting::ShowKeyboard))
+    return prefs::GetBool(settings, SettingDescriptor(GuiSetting::ShowKeyboard))
                ? k_aspect_ratio_with_keyboard
                : k_aspect_ratio_without_keyboard;
 }
 
-UiSize DesiredWindowSize(sts::Preferences const& settings) {
+UiSize DesiredWindowSize(prefs::Preferences const& settings) {
     ASSERT(CheckThreadName("main"));
-    return SizeWithAspectRatio((u16)sts::GetInt(settings, SettingDescriptor(GuiSetting::WindowWidth)),
+    return SizeWithAspectRatio((u16)prefs::GetInt(settings, SettingDescriptor(GuiSetting::WindowWidth)),
                                DesiredAspectRatio(settings));
 }
 
-f32 KeyboardHeight(sts::Preferences const& settings) {
+f32 KeyboardHeight(prefs::Preferences const& settings) {
     ASSERT(CheckThreadName("main"));
     static_assert(k_aspect_ratio_with_keyboard.height > k_aspect_ratio_without_keyboard.height);
     static_assert(k_aspect_ratio_with_keyboard.width == k_aspect_ratio_without_keyboard.width);
-    auto const width = (u16)sts::GetInt(settings, SettingDescriptor(GuiSetting::WindowWidth));
+    auto const width = (u16)prefs::GetInt(settings, SettingDescriptor(GuiSetting::WindowWidth));
     return (f32)(SizeWithAspectRatio(width, k_aspect_ratio_with_keyboard).height -
                  SizeWithAspectRatio(width, k_aspect_ratio_without_keyboard).height);
 }

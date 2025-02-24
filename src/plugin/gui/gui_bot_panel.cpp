@@ -77,16 +77,16 @@ void BotPanel(Gui* g) {
     auto dn_id = imgui.GetID("Dn");
     auto& settings = g->prefs;
     auto keyboard_octave = (int)Clamp<s64>(
-        sts::LookupInt(settings, sts::key::k_gui_keyboard_octave).ValueOr(k_octave_default_offset),
+        prefs::LookupInt(settings, prefs::key::k_gui_keyboard_octave).ValueOr(k_octave_default_offset),
         k_octave_lowest,
         k_octave_highest);
     if (buttons::Button(g, up_id, oct_up_r, ICON_FA_CARET_UP, buttons::IconButton(imgui))) {
         keyboard_octave = Min(keyboard_octave + 1, k_octave_highest);
-        sts::SetValue(settings, sts::key::k_gui_keyboard_octave, (s64)keyboard_octave);
+        prefs::SetValue(settings, prefs::key::k_gui_keyboard_octave, (s64)keyboard_octave);
     }
     if (buttons::Button(g, dn_id, oct_dn_r, ICON_FA_CARET_DOWN, buttons::IconButton(imgui))) {
         keyboard_octave = Max(keyboard_octave - 1, k_octave_lowest);
-        sts::SetValue(settings, sts::key::k_gui_keyboard_octave, (s64)keyboard_octave);
+        prefs::SetValue(settings, prefs::key::k_gui_keyboard_octave, (s64)keyboard_octave);
     }
     Tooltip(g, up_id, oct_up_r, "GUI Keyboard Octave Up"_s);
     Tooltip(g, dn_id, oct_dn_r, "GUI Keyboard Octave Down"_s);
@@ -100,7 +100,7 @@ void BotPanel(Gui* g) {
                           keyboard_octave,
                           draggers::DefaultStyle(imgui).WithNoBackground().WithSensitivity(500))) {
         ASSERT(keyboard_octave >= k_octave_lowest && keyboard_octave <= k_octave_highest);
-        sts::SetValue(settings, sts::key::k_gui_keyboard_octave, (s64)keyboard_octave);
+        prefs::SetValue(settings, prefs::key::k_gui_keyboard_octave, (s64)keyboard_octave);
     }
     Tooltip(g, oct_text_id, oct_text_r, "GUI Keyboard Octave - Double Click To Edit"_s);
 

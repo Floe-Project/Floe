@@ -13,7 +13,7 @@
 #include "descriptors/param_descriptors.hpp"
 #include "error_reporting.hpp"
 
-namespace sts {
+namespace prefs {
 
 static bool IsKeyValid(String key) {
     if (key.size == 0) return false;
@@ -1542,9 +1542,9 @@ TEST_CASE(TestPreferences) {
     return k_success;
 }
 
-} // namespace sts
+} // namespace prefs
 
 TEST_REGISTRATION(RegisterPreferencesTests) {
-    REGISTER_TEST(sts::TestLegacyPreferences);
-    REGISTER_TEST(sts::TestPreferences);
+    REGISTER_TEST(prefs::TestLegacyPreferences);
+    REGISTER_TEST(prefs::TestPreferences);
 }

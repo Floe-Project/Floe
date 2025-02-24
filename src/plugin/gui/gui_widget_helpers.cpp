@@ -78,7 +78,7 @@ void DoTooltipText(Gui* g, String str, Rect r, bool rect_is_window_pos) {
 }
 
 bool Tooltip(Gui* g, imgui::Id id, Rect r, String str, bool rect_is_window_pos) {
-    if (!sts::GetBool(g->prefs, SettingDescriptor(GuiSetting::ShowTooltips))) return false;
+    if (!prefs::GetBool(g->prefs, SettingDescriptor(GuiSetting::ShowTooltips))) return false;
 
     auto& imgui = g->imgui;
     f64 const delay {0.5};

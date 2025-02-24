@@ -1021,7 +1021,7 @@ static void ClapTimerSupportOnTimer(clap_plugin_t const* plugin, clap_id timer_i
         if (!Check(floe, floe.initialised, k_func, "not initialised")) return;
 
         // We don't care about the timer_id, we just want to poll.
-        sts::PollForExternalChanges(g_shared_engine_systems->prefs);
+        prefs::PollForExternalChanges(g_shared_engine_systems->prefs);
 
         if (floe.gui_platform) OnClapTimer(*floe.gui_platform, timer_id);
         if (floe.engine) EngineCallbacks().on_timer(*floe.engine, timer_id);
@@ -1389,7 +1389,7 @@ static void ClapOnMainThread(const struct clap_plugin* plugin) {
         if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return;
 
         if (floe.engine) {
-            sts::PollForExternalChanges(g_shared_engine_systems->prefs);
+            prefs::PollForExternalChanges(g_shared_engine_systems->prefs);
 
             auto& processor = floe.engine->processor;
             processor.processor_callbacks.on_main_thread(processor);
@@ -1439,14 +1439,14 @@ void OnPollThread(FloeInstanceIndex index) {
     EngineCallbacks().on_poll_thread(*floe.engine);
 }
 
-void OnPreferenceChanged(FloeInstanceIndex index, sts::Key const& key, sts::Value const* value) {
+void OnPreferenceChanged(FloeInstanceIndex index, prefs::Key const& key, prefs::Value const* value) {
     if (PanicOccurred()) return;
     auto& floe = *g_floe_instances[index];
     ASSERT(IsMainThread(floe.host));
     ASSERT(floe.engine);
 
     if (floe.gui_platform) {
-        if (auto const width = sts::MatchInt(key, value, SettingDescriptor(GuiSetting::WindowWidth))) {
+        if (auto const width = prefs::MatchInt(key, value, SettingDescriptor(GuiSetting::WindowWidth))) {
             auto const current_size = GetSize(*floe.gui_platform);
             if (current_size.width != *width) {
                 if (auto const host_gui =
@@ -1458,7 +1458,7 @@ void OnPreferenceChanged(FloeInstanceIndex index, sts::Key const& key, sts::Valu
                 }
             }
         } else if (auto const show_keyboard =
-                       sts::MatchBool(key, value, SettingDescriptor(GuiSetting::ShowKeyboard))) {
+                       prefs::MatchBool(key, value, SettingDescriptor(GuiSetting::ShowKeyboard))) {
             if (auto const host_gui =
                     (clap_host_gui const*)floe.host.get_extension(&floe.host, CLAP_EXT_GUI)) {
                 auto const size =

@@ -144,7 +144,7 @@ struct Gui {
     GuiFrameResult frame_output;
     Engine& engine;
     SharedEngineSystems& shared_engine_systems;
-    sts::Preferences& prefs;
+    prefs::Preferences& prefs;
 
     layout::Context layout = {};
     imgui::Context imgui {frame_input, frame_output};

@@ -347,8 +347,8 @@ static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
         case DialogType::AddNewLibraryScanFolder: {
             Optional<String> default_folder {};
             if (auto extra_paths = filesystem_prefs::ExtraScanFolders(g->prefs,
-                                                                         g->shared_engine_systems.paths,
-                                                                         ScanFolderType::Libraries);
+                                                                      g->shared_engine_systems.paths,
+                                                                      ScanFolderType::Libraries);
                 extra_paths.size)
                 default_folder = extra_paths[0];
 
@@ -363,17 +363,17 @@ static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
             if (paths.size) {
                 auto const path = paths[0];
                 filesystem_prefs::AddScanFolder(g->prefs,
-                                                   g->shared_engine_systems.paths,
-                                                   ScanFolderType::Libraries,
-                                                   path);
+                                                g->shared_engine_systems.paths,
+                                                ScanFolderType::Libraries,
+                                                path);
             }
             break;
         }
         case DialogType::AddNewPresetsScanFolder: {
             Optional<String> default_folder {};
             if (auto extra_paths = filesystem_prefs::ExtraScanFolders(g->prefs,
-                                                                         g->shared_engine_systems.paths,
-                                                                         ScanFolderType::Presets);
+                                                                      g->shared_engine_systems.paths,
+                                                                      ScanFolderType::Presets);
                 extra_paths.size)
                 default_folder = extra_paths[0];
 
@@ -388,9 +388,9 @@ static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
             if (paths.size) {
                 auto const path = paths[0];
                 filesystem_prefs::AddScanFolder(g->prefs,
-                                                   g->shared_engine_systems.paths,
-                                                   ScanFolderType::Presets,
-                                                   path);
+                                                g->shared_engine_systems.paths,
+                                                ScanFolderType::Presets,
+                                                path);
             }
             break;
         }
@@ -399,8 +399,8 @@ static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
             Optional<String> default_path {};
             auto const preset_scan_folders =
                 filesystem_prefs::ExtraScanFolders(g->prefs,
-                                                      g->shared_engine_systems.paths,
-                                                      ScanFolderType::Presets);
+                                                   g->shared_engine_systems.paths,
+                                                   ScanFolderType::Presets);
             if (preset_scan_folders.size) {
                 default_path =
                     path::Join(g->scratch_arena,
@@ -582,8 +582,8 @@ GuiFrameResult GuiUpdate(Gui* g) {
     g->frame_output = {};
 
     live_edit::g_high_contrast_gui =
-        sts::GetBool(g->prefs,
-                     SettingDescriptor(GuiSetting::HighContrastGui)); // IMRPOVE: hacky
+        prefs::GetBool(g->prefs,
+                       SettingDescriptor(GuiSetting::HighContrastGui)); // IMRPOVE: hacky
     g->scratch_arena.ResetCursorAndConsolidateRegions();
 
     while (auto function = g->main_thread_callbacks.TryPop(g->scratch_arena))
@@ -620,7 +620,7 @@ GuiFrameResult GuiUpdate(Gui* g) {
 
         imgui.graphics->AddRectFilled(r.Min(), r.Max(), LiveCol(imgui, UiColMap::MidPanelBack));
 
-        if (!sts::GetBool(g->prefs, SettingDescriptor(GuiSetting::HighContrastGui))) {
+        if (!prefs::GetBool(g->prefs, SettingDescriptor(GuiSetting::HighContrastGui))) {
             auto overall_library = LibraryForOverallBackground(g->engine);
             if (overall_library) {
                 auto imgs = LibraryImagesFromLibraryId(g, *overall_library);
@@ -670,7 +670,7 @@ GuiFrameResult GuiUpdate(Gui* g) {
         imgui.EndWindow();
     }
 
-    if (sts::GetBool(g->prefs, SettingDescriptor(GuiSetting::ShowKeyboard))) {
+    if (prefs::GetBool(g->prefs, SettingDescriptor(GuiSetting::ShowKeyboard))) {
         auto bot_settings = imgui::DefWindow();
         bot_settings.pad_top_left = {8, 8};
         bot_settings.pad_bottom_right = {8, 8};
@@ -695,7 +695,7 @@ GuiFrameResult GuiUpdate(Gui* g) {
             .fonts = g->fonts,
             .layout = g->layout,
         };
-        box_system.show_tooltips = sts::GetBool(g->prefs, SettingDescriptor(GuiSetting::ShowTooltips));
+        box_system.show_tooltips = prefs::GetBool(g->prefs, SettingDescriptor(GuiSetting::ShowTooltips));
 
         {
             SettingsPanelContext context {
@@ -750,7 +750,7 @@ GuiFrameResult GuiUpdate(Gui* g) {
     DoWholeEditor(g);
     imgui.End(g->scratch_arena);
 
-    sts::WriteIfNeeded(g->prefs);
+    prefs::WriteIfNeeded(g->prefs);
 
     return g->frame_output;
 }

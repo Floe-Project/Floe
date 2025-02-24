@@ -76,8 +76,8 @@ struct PluginCallbacks {
     void (*on_poll_thread)(UserObject&) = [](UserObject&) {};
 
     // [main-thread]
-    void (*on_preference_changed)(UserObject&, sts::Key, sts::Value const*) =
-        [](UserObject&, sts::Key, sts::Value const*) {};
+    void (*on_preference_changed)(UserObject&, prefs::Key, prefs::Value const*) =
+        [](UserObject&, prefs::Key, prefs::Value const*) {};
 
     // [audio-thread]
     void (*on_thread_pool_exec)(UserObject&, u32 task_index) {};
@@ -190,4 +190,4 @@ static constexpr clap_plugin_descriptor k_plugin_info {
 clap_plugin const* CreateFloeInstance(clap_host const* clap_host);
 
 void OnPollThread(FloeInstanceIndex index);
-void OnPreferenceChanged(FloeInstanceIndex index, sts::Key const& key, sts::Value const* value);
+void OnPreferenceChanged(FloeInstanceIndex index, prefs::Key const& key, prefs::Value const* value);

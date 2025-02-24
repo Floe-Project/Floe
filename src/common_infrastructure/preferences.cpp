@@ -916,9 +916,7 @@ void PollForExternalChanges(Preferences& prefs, PollForExternalChangesOptions op
     }
 
     if (!options.ignore_rate_limiting)
-        if ((prefs.last_watcher_poll_time + k_preferences_file_watcher_poll_interval_seconds) >
-            TimePoint::Now())
-            return;
+        if ((prefs.last_watcher_poll_time + k_file_watcher_poll_interval_seconds) > TimePoint::Now()) return;
     DEFER { prefs.last_watcher_poll_time = TimePoint::Now(); };
 
     auto const path = PreferencesFilepath();

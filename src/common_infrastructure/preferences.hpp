@@ -45,7 +45,7 @@ namespace prefs {
 
 constexpr usize k_max_file_size = Kb(32);
 constexpr usize k_max_key_size = 50; // also for sections
-constexpr f64 k_preferences_file_watcher_poll_interval_seconds = 1;
+constexpr f64 k_file_watcher_poll_interval_seconds = 1;
 
 enum class ValueType : u8 {
     String,

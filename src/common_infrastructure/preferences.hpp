@@ -147,22 +147,24 @@ PUBLIC DynamicArrayBounded<Type, k_size> LookupValues(PreferencesTable const& ta
 // Higher-level API
 // =================================================================================================
 
-// Information for validating and constraining values. Single-value only for now. For multi-value, you'll need
-// to use the LookupValues function and manually validate.
-// Can't be constexpr sadly because of the TaggedUnions.
+// Validators are functions that validator or constrain a value. Returns true if value is valid.
+// If false, the value will be replaced with the default value. 'value' is a reference, you can modify
+// it and return true if you want to keep the value.
+using IntValidator = TrivialFixedSizeFunction<32, bool(s64& value)>;
+using StringValidator = TrivialFixedSizeFunction<32, bool(String& value)>;
+
+// Information for validating and constraining individual values.
+// Can't be constexpr sadly because of the TaggedUnion and validators.
+// Primarily used for single-value keys, however, you can use it for multi-value keys validation too. In that
+// case, default_value is not really a default value, but instead a special indicator that the value does not
+// pass validation.
 struct Descriptor {
     struct IntRequirements {
-        s64 min_value = SmallestRepresentableValue<s64>();
-        s64 max_value = LargestRepresentableValue<s64>();
-        void (*custom_constrainer)(s64& value) = nullptr;
-        bool clamp_to_range : 1 = true;
+        IntValidator validator {}; // optional
     };
 
     struct StringRequirements {
-        usize min_length = 0;
-        usize max_length = LargestRepresentableValue<usize>();
-        u32 ensure_valid_utf8 : 1 = false;
-        u32 ensure_absolute_path : 1 = false;
+        StringValidator validator {}; // optional
     };
 
     using ValueRequirements = TaggedUnion<ValueType,
@@ -181,10 +183,11 @@ struct ValidateResult {
     bool is_default; // saves you from having to do a comparison with the default value
 };
 
-// Returns the valid, constrained value or the default value if not.
+// Returns the valid, constrained value or the default value if not. In a multi-value setting the default
+// value means the value is invalid.
 ValidateResult ValidatedOrDefault(ValueUnion const& value, Descriptor const& descriptor);
 
-// Looks up the single value, if it exists, validates and constrains it, otherwise returns the default value.
+// Looks up the single value, if it exists and validates it, otherwise returns the default value.
 // Guaranteed to return the value in the correct type.
 ValidateResult GetValue(PreferencesTable const& table, Descriptor const& descriptor);
 bool GetBool(PreferencesTable const& table, Descriptor const& descriptor);

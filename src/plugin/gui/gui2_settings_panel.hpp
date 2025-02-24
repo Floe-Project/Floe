@@ -587,8 +587,10 @@ Setting(GuiBoxSystem& box_system, SettingsPanelContext& context, Box parent, pre
                                         info.gui_label,
                                         30.0f,
                                         prefs::GetValue(context.settings, info).value.Get<s64>(),
-                                        int_info.min_value,
-                                        int_info.max_value)) {
+                                        [&int_info](s64 value) {
+                                            if (int_info.validator) int_info.validator(value);
+                                            return value;
+                                        })) {
                 prefs::SetValue(context.settings, info, *v);
             }
             break;

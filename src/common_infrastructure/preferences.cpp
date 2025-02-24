@@ -533,27 +533,20 @@ Value const* LookupValues(PreferencesTable const& table, Key const& key) {
 }
 
 ValidateResult ValidatedOrDefault(ValueUnion const& value, Descriptor const& descriptor) {
-    ASSERT(descriptor.value_requirements.tag == value.tag);
+    if (value.tag != descriptor.value_requirements.tag) return {descriptor.default_value, true};
     switch (value.tag) {
         case ValueType::Int: {
             auto const info = descriptor.value_requirements.Get<Descriptor::IntRequirements>();
             auto val = value.Get<s64>();
-            if (info.clamp_to_range)
-                val = Clamp(val, info.min_value, info.max_value);
-            else if (val < info.min_value || val > info.max_value)
-                return {descriptor.default_value, true};
-            if (info.custom_constrainer) info.custom_constrainer(val);
+            if (info.validator && !info.validator(val)) return {descriptor.default_value, true};
             return {val, val == descriptor.default_value.Get<s64>()};
         }
         case ValueType::Bool: return {value, false};
         case ValueType::String: {
             auto const info = descriptor.value_requirements.Get<Descriptor::StringRequirements>();
-            auto& val = value.Get<String>();
-            if (val.size < info.min_length || val.size > info.max_length)
-                return {descriptor.default_value, true};
-            if (info.ensure_valid_utf8 && !IsValidUtf8(val)) return {descriptor.default_value, true};
-            if (info.ensure_absolute_path && !path::IsAbsolute(val)) return {descriptor.default_value, true};
-            return {value, false};
+            auto val = value.Get<String>();
+            if (info.validator && !info.validator(val)) return {descriptor.default_value, true};
+            return {val, val == descriptor.default_value.Get<String>()};
         }
     }
 }
@@ -562,7 +555,6 @@ ValidateResult GetValue(PreferencesTable const& table, Descriptor const& descrip
     auto const v_ptr = table.Find(descriptor.key);
     if (!v_ptr) return {descriptor.default_value, true};
     auto const& v = **v_ptr;
-    if (v.tag != descriptor.value_requirements.tag) return {descriptor.default_value, true};
     return ValidatedOrDefault(v, descriptor);
 }
 
@@ -587,9 +579,6 @@ Optional<ValueUnion> Match(Key const& key, Value const* value_list, Descriptor c
     // If the key matches, but the value is nullptr, the value was removed, we should return the default
     // value.
     if (value_list == nullptr) return descriptor.default_value;
-
-    // If the value was set, but with the wrong type, we should use the default value.
-    if (value_list->tag != descriptor.value_requirements.tag) return descriptor.default_value;
 
     // Otherwise, validate and constrain the value.
     return ValidatedOrDefault(*value_list, descriptor).value;
@@ -1437,10 +1426,11 @@ TEST_CASE(TestPreferences) {
             .key = "key"_s,
             .value_requirements =
                 Descriptor::IntRequirements {
-                    .min_value = 0,
-                    .max_value = 10,
-                    .custom_constrainer = nullptr,
-                    .clamp_to_range = true,
+                    .validator =
+                        [](s64& value) {
+                            value = Clamp<s64>(value, 0, 10);
+                            return true;
+                        },
                 },
             .default_value = (s64)5,
             .gui_label = "Key"_s,
@@ -1461,14 +1451,22 @@ TEST_CASE(TestPreferences) {
             }
 
             SUBCASE("no clamp") {
-                int_descriptor.value_requirements.Get<Descriptor::IntRequirements>().clamp_to_range = false;
+                int_descriptor.value_requirements.Get<Descriptor::IntRequirements>().validator =
+                    [](s64& value) {
+                        if (value < 0) return false;
+                        if (value > 10) return false;
+                        return true;
+                    };
                 CHECK_EQ(validate(100), 5);
                 CHECK_EQ(validate(-100), 5);
             }
 
             SUBCASE("custom constrainer") {
-                int_descriptor.value_requirements.Get<Descriptor::IntRequirements>().custom_constrainer =
-                    [](s64& value) { value = 7; };
+                int_descriptor.value_requirements.Get<Descriptor::IntRequirements>().validator =
+                    [](s64& value) {
+                        value = 7;
+                        return true;
+                    };
                 CHECK_EQ(validate(100), 7);
                 CHECK_EQ(validate(5), 7);
             }
@@ -1479,10 +1477,12 @@ TEST_CASE(TestPreferences) {
                 .key = "key"_s,
                 .value_requirements =
                     Descriptor::StringRequirements {
-                        .min_length = 2,
-                        .max_length = 10,
-                        .ensure_valid_utf8 = false,
-                        .ensure_absolute_path = false,
+                        .validator =
+                            [](String& value) {
+                                if (value.size < 2) return false;
+                                if (value.size > 10) return false;
+                                return true;
+                            },
                     },
                 .default_value = "default"_s,
                 .gui_label = "Key"_s,
@@ -1497,12 +1497,14 @@ TEST_CASE(TestPreferences) {
             CHECK_EQ(validate("v"), "default"_s); // too short
 
             // ensure_utf8
-            descriptor.value_requirements.Get<Descriptor::StringRequirements>().ensure_valid_utf8 = true;
+            descriptor.value_requirements.Get<Descriptor::StringRequirements>().validator =
+                [](String& value) { return IsValidUtf8(value); };
             CHECK_EQ(validate("value"), "value"_s);
             CHECK_EQ(validate("value\xFF"), "default"_s);
 
             // ensure_absolute_path
-            descriptor.value_requirements.Get<Descriptor::StringRequirements>().ensure_absolute_path = true;
+            descriptor.value_requirements.Get<Descriptor::StringRequirements>().validator =
+                [](String& value) { return path::IsAbsolute(value); };
             if constexpr (IS_WINDOWS)
                 CHECK_EQ(validate("C:\\value"), "C:\\value"_s);
             else

@@ -246,9 +246,13 @@ PUBLIC bool TextButton(GuiBoxSystem& builder, Box parent, String text, String to
     return button.button_fired;
 }
 
-PUBLIC Optional<s64>
-IntField(GuiBoxSystem& builder, Box parent, String label, f32 width, s64 value, s64 min, s64 max) {
-    bool changed = false;
+PUBLIC Optional<s64> IntField(GuiBoxSystem& builder,
+                              Box parent,
+                              String label,
+                              f32 width,
+                              s64 value,
+                              FunctionRef<s64(s64 value)> constrainer) {
+    auto const initial_value = value;
     auto const container = DoBox(builder,
                                  {
                                      .parent = parent,
@@ -275,9 +279,7 @@ IntField(GuiBoxSystem& builder, Box parent, String label, f32 width, s64 value, 
                   .tooltip = "Decrease value"_s,
               })
             .button_fired) {
-        --value;
-        if (value < min) value = min;
-        changed = true;
+        value = constrainer(value - 1);
     }
 
     {
@@ -307,10 +309,7 @@ IntField(GuiBoxSystem& builder, Box parent, String label, f32 width, s64 value, 
                                       });
         if (text_input.text_input_result) {
             auto const new_value = ParseInt(text_input.text_input_result->text, ParseIntBase::Decimal);
-            if (new_value.HasValue()) {
-                value = Clamp<s64>(new_value.Value(), min, max);
-                changed = true;
-            }
+            if (new_value.HasValue()) value = constrainer(new_value.Value());
         }
     }
 
@@ -331,9 +330,7 @@ IntField(GuiBoxSystem& builder, Box parent, String label, f32 width, s64 value, 
                   .tooltip = "Increase value"_s,
               })
             .button_fired) {
-        ++value;
-        if (value > max) value = max;
-        changed = true;
+        value = constrainer(value + 1);
     }
 
     // label
@@ -344,6 +341,6 @@ IntField(GuiBoxSystem& builder, Box parent, String label, f32 width, s64 value, 
               .size_from_text = true,
           });
 
-    if (changed) return value;
+    if (value != initial_value) return value;
     return k_nullopt;
 }

@@ -196,9 +196,11 @@ prefs::Descriptor SettingDescriptor(AutosaveSetting setting) {
                 .key = "autosave-interval-seconds"_s,
                 .value_requirements =
                     prefs::Descriptor::IntRequirements {
-                        .min_value = 1,
-                        .max_value = 60 * 60,
-                        .clamp_to_range = true,
+                        .validator =
+                            [](s64& value) {
+                                value = Clamp<s64>(value, 1, 60 * 60);
+                                return true;
+                            },
                     },
                 .default_value = (s64)AutosaveState::k_default_autosave_interval_seconds,
                 .gui_label = "Autosave interval (seconds)"_s,
@@ -208,9 +210,11 @@ prefs::Descriptor SettingDescriptor(AutosaveSetting setting) {
                 .key = "max-autosaves-per-instance"_s,
                 .value_requirements =
                     prefs::Descriptor::IntRequirements {
-                        .min_value = 1,
-                        .max_value = 100,
-                        .clamp_to_range = true,
+                        .validator =
+                            [](s64& value) {
+                                value = Clamp<s64>(value, 1, 100);
+                                return true;
+                            },
                     },
                 .default_value = (s64)AutosaveState::k_default_max_autosaves_per_instance,
                 .gui_label = "Max autosaves per instance"_s,
@@ -220,9 +224,11 @@ prefs::Descriptor SettingDescriptor(AutosaveSetting setting) {
                 .key = "autosave-delete-after-days"_s,
                 .value_requirements =
                     prefs::Descriptor::IntRequirements {
-                        .min_value = 1,
-                        .max_value = 365,
-                        .clamp_to_range = true,
+                        .validator =
+                            [](s64& value) {
+                                value = Clamp<s64>(value, 1, 365);
+                                return true;
+                            },
                     },
                 .default_value = (s64)AutosaveState::k_default_autosave_delete_after_days,
                 .gui_label = "Autosave delete after days"_s,

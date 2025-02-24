@@ -45,16 +45,13 @@ prefs::Descriptor SettingDescriptor(GuiSetting setting) {
                 .key = prefs::key::k_window_width,
                 .value_requirements =
                     prefs::Descriptor::IntRequirements {
-                        .min_value = (s64)k_min_gui_width,
-                        .max_value = (s64)k_largest_gui_size,
-                        .custom_constrainer =
+                        .validator =
                             [](s64& value) {
-                                static_assert(k_aspect_ratio_with_keyboard.width ==
-                                              k_aspect_ratio_without_keyboard.width);
+                                value = Clamp<s64>(value, k_min_gui_width, k_largest_gui_size);
                                 value =
                                     SizeWithAspectRatio((u16)value, k_aspect_ratio_without_keyboard).width;
+                                return true;
                             },
-                        .clamp_to_range = true,
                     },
                 .default_value = (s64)k_default_gui_width,
                 .gui_label = "Window width",

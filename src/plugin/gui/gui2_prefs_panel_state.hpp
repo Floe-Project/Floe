@@ -4,7 +4,7 @@
 #pragma once
 #include "foundation/foundation.hpp"
 
-struct SettingsPanelState {
+struct PreferencesPanelState {
     enum class Tab : u32 {
         General,
         Folders,

@@ -14,7 +14,7 @@ The project has taken a new direction and so we decided to give it a new name.
 - Mirage is already the name of a hardware sampler from the 80s - we want to avoid confusion.
 
 ### Backwards-compatible with Mirage
-Floe can load Mirage's libraries, presets and settings file. If you have Mirage installed already, Floe will be able to find the same libraries and presets as Mirage. 
+Floe can load Mirage's libraries, presets and preferences file. If you have Mirage installed already, Floe will be able to find the same libraries and presets as Mirage. 
 
 You can leave Mirage installed if you want to keep using it: Floe will not interfere with Mirage's installation.
 

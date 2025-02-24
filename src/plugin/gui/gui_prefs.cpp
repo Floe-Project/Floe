@@ -1,7 +1,7 @@
 // Copyright 2025 Sam Windell
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "gui_settings.hpp"
+#include "gui_prefs.hpp"
 
 #include "gui_framework/gui_platform.hpp"
 
@@ -61,24 +61,24 @@ prefs::Descriptor SettingDescriptor(GuiSetting setting) {
     }
 }
 
-UiSize DesiredAspectRatio(prefs::Preferences const& settings) {
+UiSize DesiredAspectRatio(prefs::Preferences const& preferences) {
     ASSERT(CheckThreadName("main"));
-    return prefs::GetBool(settings, SettingDescriptor(GuiSetting::ShowKeyboard))
+    return prefs::GetBool(preferences, SettingDescriptor(GuiSetting::ShowKeyboard))
                ? k_aspect_ratio_with_keyboard
                : k_aspect_ratio_without_keyboard;
 }
 
-UiSize DesiredWindowSize(prefs::Preferences const& settings) {
+UiSize DesiredWindowSize(prefs::Preferences const& preferences) {
     ASSERT(CheckThreadName("main"));
-    return SizeWithAspectRatio((u16)prefs::GetInt(settings, SettingDescriptor(GuiSetting::WindowWidth)),
-                               DesiredAspectRatio(settings));
+    return SizeWithAspectRatio((u16)prefs::GetInt(preferences, SettingDescriptor(GuiSetting::WindowWidth)),
+                               DesiredAspectRatio(preferences));
 }
 
-f32 KeyboardHeight(prefs::Preferences const& settings) {
+f32 KeyboardHeight(prefs::Preferences const& preferences) {
     ASSERT(CheckThreadName("main"));
     static_assert(k_aspect_ratio_with_keyboard.height > k_aspect_ratio_without_keyboard.height);
     static_assert(k_aspect_ratio_with_keyboard.width == k_aspect_ratio_without_keyboard.width);
-    auto const width = (u16)prefs::GetInt(settings, SettingDescriptor(GuiSetting::WindowWidth));
+    auto const width = (u16)prefs::GetInt(preferences, SettingDescriptor(GuiSetting::WindowWidth));
     return (f32)(SizeWithAspectRatio(width, k_aspect_ratio_with_keyboard).height -
                  SizeWithAspectRatio(width, k_aspect_ratio_without_keyboard).height);
 }

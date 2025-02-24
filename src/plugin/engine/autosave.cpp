@@ -260,21 +260,21 @@ void OnPreferenceChanged(AutosaveState& state, prefs::Key const& key, prefs::Val
     }
 }
 
-static s64 AutosaveSettingIntValue(AutosaveSetting setting, prefs::Preferences const& settings) {
-    return prefs::GetValue(settings, SettingDescriptor(setting)).value.Get<s64>();
+static s64 AutosaveSettingIntValue(AutosaveSetting setting, prefs::Preferences const& preferences) {
+    return prefs::GetValue(preferences, SettingDescriptor(setting)).value.Get<s64>();
 }
 
-bool AutosaveNeeded(AutosaveState const& state, prefs::Preferences const& settings) {
+bool AutosaveNeeded(AutosaveState const& state, prefs::Preferences const& preferences) {
     return state.last_save_time.SecondsFromNow() >=
-           (f64)AutosaveSettingIntValue(AutosaveSetting::AutosaveIntervalSeconds, settings);
+           (f64)AutosaveSettingIntValue(AutosaveSetting::AutosaveIntervalSeconds, preferences);
 }
 
-void QueueAutosave(AutosaveState& state, prefs::Preferences const& settings, StateSnapshot const& snapshot) {
+void QueueAutosave(AutosaveState& state, prefs::Preferences const& preferences, StateSnapshot const& snapshot) {
     state.autosave_delete_after_days.Store(
-        CheckedCast<u16>(AutosaveSettingIntValue(AutosaveSetting::AutosaveDeleteAfterDays, settings)),
+        CheckedCast<u16>(AutosaveSettingIntValue(AutosaveSetting::AutosaveDeleteAfterDays, preferences)),
         StoreMemoryOrder::Relaxed);
     state.max_autosaves_per_instance.Store(
-        CheckedCast<u16>(AutosaveSettingIntValue(AutosaveSetting::MaxAutosavesPerInstance, settings)),
+        CheckedCast<u16>(AutosaveSettingIntValue(AutosaveSetting::MaxAutosavesPerInstance, preferences)),
         StoreMemoryOrder::Relaxed);
 
     state.mutex.Lock();
@@ -308,7 +308,7 @@ static String TestPresetPath(tests::Tester& tester, String filename) {
 TEST_CASE(TestAutosave) {
     AutosaveState state {};
     auto const paths = CreateFloePaths(tester.arena);
-    prefs::Preferences settings {};
+    prefs::Preferences preferences {};
 
     // We need to load some valid state to test autosave.
     auto snapshot = TRY(LoadPresetFile(TestPresetPath(tester, "sine.floe-preset"), tester.scratch_arena));
@@ -316,19 +316,19 @@ TEST_CASE(TestAutosave) {
     InitAutosaveState(state, tester.random_seed, snapshot);
 
     // We don't need check the result since it's time-based and we don't want to wait in a test.
-    AutosaveNeeded(state, settings);
+    AutosaveNeeded(state, preferences);
 
     // main thread
     snapshot.param_values[0] += 1;
-    QueueAutosave(state, settings, snapshot);
+    QueueAutosave(state, preferences, snapshot);
 
     // background thread
     AutosaveToFileIfNeeded(state, paths);
 
     // do it multiple time to check file rotation
-    for (auto _ : Range(AutosaveSettingIntValue(AutosaveSetting::MaxAutosavesPerInstance, settings) + 1)) {
+    for (auto _ : Range(AutosaveSettingIntValue(AutosaveSetting::MaxAutosavesPerInstance, preferences) + 1)) {
         snapshot.param_values[0] += 1;
-        QueueAutosave(state, settings, snapshot);
+        QueueAutosave(state, preferences, snapshot);
         AutosaveToFileIfNeeded(state, paths);
     }
 

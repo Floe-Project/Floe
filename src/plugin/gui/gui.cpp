@@ -18,7 +18,7 @@
 #include "gui/gui2_info_panel.hpp"
 #include "gui/gui2_notifications.hpp"
 #include "gui/gui2_package_install.hpp"
-#include "gui/gui2_settings_panel.hpp"
+#include "gui/gui2_prefs_panel.hpp"
 #include "gui_editor_widgets.hpp"
 #include "gui_editors.hpp"
 #include "gui_framework/aspect_ratio.hpp"
@@ -28,7 +28,7 @@
 #include "gui_framework/gui_platform.hpp"
 #include "gui_framework/image.hpp"
 #include "gui_modal_windows.hpp"
-#include "gui_settings.hpp"
+#include "gui_prefs.hpp"
 #include "gui_widget_helpers.hpp"
 #include "plugin/plugin.hpp"
 #include "sample_lib_server/sample_library_server.hpp"
@@ -694,15 +694,15 @@ GuiFrameResult GuiUpdate(Gui* g) {
         box_system.show_tooltips = prefs::GetBool(g->prefs, SettingDescriptor(GuiSetting::ShowTooltips));
 
         {
-            SettingsPanelContext context {
-                .settings = g->prefs,
+            PreferencesPanelContext context {
+                .prefs = g->prefs,
                 .paths = g->shared_engine_systems.paths,
                 .sample_lib_server = g->shared_engine_systems.sample_library_server,
                 .package_install_jobs = g->engine.package_install_jobs,
                 .thread_pool = g->shared_engine_systems.thread_pool,
             };
 
-            DoSettingsPanel(box_system, context, g->settings_panel_state);
+            DoPreferencesPanel(box_system, context, g->preferences_panel_state);
         }
 
         {

@@ -47,6 +47,6 @@ ReportFeedbackReturnCode ReportFeedback(String description, Optional<String> ema
 prefs::Descriptor const& IsOnlineReportingDisabledDescriptor();
 void ErrorReportingOnPreferenceChanged(prefs::Key const& key, prefs::Value const* value);
 
-// Slow version, reads the settings file directly. Allows you to get the value without relying on any settings
+// Slow version, reads the preferences file directly. Allows you to get the value without relying on any preferences
 // object.
 bool IsOnlineReportingDisabled();

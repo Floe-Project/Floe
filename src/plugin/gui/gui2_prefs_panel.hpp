@@ -7,27 +7,27 @@
 
 #include "engine/autosave.hpp"
 #include "engine/package_installation.hpp"
-#include "gui/gui_settings.hpp"
+#include "gui/gui_prefs.hpp"
 #include "gui2_common_modal_panel.hpp"
-#include "gui2_settings_panel_state.hpp"
+#include "gui2_prefs_panel_state.hpp"
 #include "gui_framework/gui_box_system.hpp"
 #include "processor/processor.hpp"
 #include "sample_lib_server/sample_library_server.hpp"
 
-static void SettingsLhsTextWidget(GuiBoxSystem& box_system, Box parent, String text) {
+static void PreferencesLhsTextWidget(GuiBoxSystem& box_system, Box parent, String text) {
     DoBox(box_system,
           {
               .parent = parent,
               .text = text,
               .font = FontType::Body,
               .layout {
-                  .size = {style::k_settings_lhs_width,
+                  .size = {style::k_prefs_lhs_width,
                            box_system.imgui.PixelsToVw(box_system.fonts[ToInt(FontType::Body)]->font_size)},
               },
           });
 }
 
-static void SettingsRhsText(GuiBoxSystem& box_system, Box parent, String text) {
+static void PreferencesRhsText(GuiBoxSystem& box_system, Box parent, String text) {
     DoBox(box_system,
           {
               .parent = parent,
@@ -38,7 +38,7 @@ static void SettingsRhsText(GuiBoxSystem& box_system, Box parent, String text) {
           });
 }
 
-static Box SettingsMenuButton(GuiBoxSystem& box_system, Box parent, String text, String tooltip) {
+static Box PreferencesMenuButton(GuiBoxSystem& box_system, Box parent, String text, String tooltip) {
     auto const button =
         DoBox(box_system,
               {
@@ -75,7 +75,7 @@ static Box SettingsMenuButton(GuiBoxSystem& box_system, Box parent, String text,
     return button;
 }
 
-static Box SettingsRow(GuiBoxSystem& box_system, Box parent) {
+static Box PreferencesRow(GuiBoxSystem& box_system, Box parent) {
     return DoBox(box_system,
                  {
                      .parent = parent,
@@ -88,7 +88,7 @@ static Box SettingsRow(GuiBoxSystem& box_system, Box parent) {
                  });
 }
 
-static Box SettingsRhsColumn(GuiBoxSystem& box_system, Box parent, f32 gap) {
+static Box PreferencesRhsColumn(GuiBoxSystem& box_system, Box parent, f32 gap) {
     return DoBox(box_system,
                  {
                      .parent = parent,
@@ -108,13 +108,13 @@ struct FolderSelectorResult {
 };
 
 static FolderSelectorResult
-SettingsFolderSelector(GuiBoxSystem& box_system, Box parent, String path, String subtext, bool deletable) {
+PreferencesFolderSelector(GuiBoxSystem& box_system, Box parent, String path, String subtext, bool deletable) {
     auto const container = DoBox(box_system,
                                  {
                                      .parent = parent,
                                      .layout {
                                          .size = {layout::k_fill_parent, layout::k_hug_contents},
-                                         .contents_gap = style::k_settings_small_gap,
+                                         .contents_gap = style::k_prefs_small_gap,
                                          .contents_direction = layout::Direction::Column,
                                          .contents_cross_axis_align = layout::CrossAxisAlign::Start,
                                      },
@@ -145,7 +145,7 @@ SettingsFolderSelector(GuiBoxSystem& box_system, Box parent, String path, String
                                                  .parent = path_container,
                                                  .layout {
                                                      .size = {layout::k_hug_contents, layout::k_hug_contents},
-                                                     .contents_gap = style::k_settings_small_gap,
+                                                     .contents_gap = style::k_prefs_small_gap,
                                                      .contents_direction = layout::Direction::Row,
                                                  },
                                              });
@@ -189,13 +189,13 @@ SettingsFolderSelector(GuiBoxSystem& box_system, Box parent, String path, String
               })
             .button_fired;
 
-    if (subtext.size) SettingsRhsText(box_system, container, subtext);
+    if (subtext.size) PreferencesRhsText(box_system, container, subtext);
 
     return result;
 }
 
-struct SettingsPanelContext {
-    prefs::Preferences& settings;
+struct PreferencesPanelContext {
+    prefs::Preferences& prefs;
     FloePaths const& paths;
     sample_lib_server::Server& sample_lib_server;
     package::InstallJobs& package_install_jobs;
@@ -238,11 +238,11 @@ static void SetFolderSubtext(DynamicArrayBounded<char, 200>& out,
 }
 
 static bool AddExtraScanFolderDialog(GuiBoxSystem& box_system,
-                                     SettingsPanelContext& context,
+                                     PreferencesPanelContext& context,
                                      ScanFolderType type,
                                      bool set_as_install_location) {
     Optional<String> default_folder {};
-    if (auto const extra_paths = ExtraScanFolders(context.paths, context.settings, type); extra_paths.size)
+    if (auto const extra_paths = ExtraScanFolders(context.paths, context.prefs, type); extra_paths.size)
         default_folder = extra_paths[0];
 
     if (auto const o = FilesystemDialog({
@@ -263,12 +263,10 @@ static bool AddExtraScanFolderDialog(GuiBoxSystem& box_system,
         });
         o.HasValue()) {
         if (auto const paths = o.Value(); paths.size) {
-            prefs::AddValue(context.settings,
-                            ExtraScanFolderDescriptor(context.paths, type),
-                            (String)paths[0]);
+            prefs::AddValue(context.prefs, ExtraScanFolderDescriptor(context.paths, type), (String)paths[0]);
             if (set_as_install_location) {
-                prefs::SetValue(context.settings,
-                                InstallLocationDescriptor(context.paths, context.settings, type),
+                prefs::SetValue(context.prefs,
+                                InstallLocationDescriptor(context.paths, context.prefs, type),
                                 (String)paths[0]);
             }
             return true;
@@ -279,7 +277,7 @@ static bool AddExtraScanFolderDialog(GuiBoxSystem& box_system,
     return false;
 }
 
-static void FolderSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& context) {
+static void FolderPreferencesPanel(GuiBoxSystem& box_system, PreferencesPanelContext& context) {
     sample_lib_server::RequestScanningOfUnscannedFolders(context.sample_lib_server);
 
     auto const root = DoBox(box_system,
@@ -287,25 +285,25 @@ static void FolderSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& 
                                 .layout {
                                     .size = box_system.imgui.PixelsToVw(box_system.imgui.Size()),
                                     .contents_padding = {.lrtb = style::k_spacing},
-                                    .contents_gap = style::k_settings_large_gap,
+                                    .contents_gap = style::k_prefs_large_gap,
                                     .contents_direction = layout::Direction::Column,
                                     .contents_align = layout::Alignment::Start,
                                 },
                             });
 
     for (auto const scan_folder_type : EnumIterator<ScanFolderType>()) {
-        auto const row = SettingsRow(box_system, root);
-        SettingsLhsTextWidget(box_system, row, ({
-                                  String s;
-                                  switch ((ScanFolderType)scan_folder_type) {
-                                      case ScanFolderType::Libraries: s = "Sample library folders"; break;
-                                      case ScanFolderType::Presets: s = "Preset folders"; break;
-                                      case ScanFolderType::Count: PanicIfReached();
-                                  }
-                                  s;
-                              }));
+        auto const row = PreferencesRow(box_system, root);
+        PreferencesLhsTextWidget(box_system, row, ({
+                                     String s;
+                                     switch ((ScanFolderType)scan_folder_type) {
+                                         case ScanFolderType::Libraries: s = "Sample library folders"; break;
+                                         case ScanFolderType::Presets: s = "Preset folders"; break;
+                                         case ScanFolderType::Count: PanicIfReached();
+                                     }
+                                     s;
+                                 }));
 
-        auto const rhs_column = SettingsRhsColumn(box_system, row, style::k_settings_medium_gap);
+        auto const rhs_column = PreferencesRhsColumn(box_system, row, style::k_prefs_medium_gap);
 
         DynamicArrayBounded<char, 200> subtext_buffer {};
 
@@ -316,26 +314,26 @@ static void FolderSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& 
                              true,
                              (ScanFolderType)scan_folder_type,
                              context.sample_lib_server);
-            if (auto const o = SettingsFolderSelector(box_system, rhs_column, dir, subtext_buffer, false);
+            if (auto const o = PreferencesFolderSelector(box_system, rhs_column, dir, subtext_buffer, false);
                 o.open_pressed)
                 OpenFolderInFileBrowser(dir);
         }
 
         Optional<String> to_remove {};
-        for (auto const dir : ExtraScanFolders(context.paths, context.settings, scan_folder_type)) {
+        for (auto const dir : ExtraScanFolders(context.paths, context.prefs, scan_folder_type)) {
             SetFolderSubtext(subtext_buffer,
                              dir,
                              false,
                              (ScanFolderType)scan_folder_type,
                              context.sample_lib_server);
-            if (auto const o = SettingsFolderSelector(box_system, rhs_column, dir, subtext_buffer, true);
+            if (auto const o = PreferencesFolderSelector(box_system, rhs_column, dir, subtext_buffer, true);
                 o.open_pressed || o.delete_pressed) {
                 if (o.open_pressed) OpenFolderInFileBrowser(dir);
                 if (o.delete_pressed) to_remove = dir;
             }
         }
         if (to_remove)
-            prefs::RemoveValue(context.settings,
+            prefs::RemoveValue(context.prefs,
                                ExtraScanFolderDescriptor(context.paths, scan_folder_type).key,
                                *to_remove);
 
@@ -348,7 +346,7 @@ static void FolderSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& 
             }
             s;
         });
-        if (ExtraScanFolders(context.paths, context.settings, scan_folder_type).size !=
+        if (ExtraScanFolders(context.paths, context.prefs, scan_folder_type).size !=
                 k_max_extra_scan_folders &&
             TextButton(box_system,
                        rhs_column,
@@ -360,7 +358,7 @@ static void FolderSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& 
 }
 
 static void InstallLocationMenu(GuiBoxSystem& box_system,
-                                SettingsPanelContext& context,
+                                PreferencesPanelContext& context,
                                 ScanFolderType scan_folder_type) {
     sample_lib_server::RequestScanningOfUnscannedFolders(context.sample_lib_server);
 
@@ -389,15 +387,15 @@ static void InstallLocationMenu(GuiBoxSystem& box_system,
                                 });
 
         if (item.button_fired) {
-            prefs::SetValue(context.settings,
-                            InstallLocationDescriptor(context.paths, context.settings, scan_folder_type),
+            prefs::SetValue(context.prefs,
+                            InstallLocationDescriptor(context.paths, context.prefs, scan_folder_type),
                             path);
             box_system.imgui.CloseTopPopupOnly();
         }
 
         auto const current_install_location =
-            prefs::GetString(context.settings,
-                             InstallLocationDescriptor(context.paths, context.settings, scan_folder_type));
+            prefs::GetString(context.prefs,
+                             InstallLocationDescriptor(context.paths, context.prefs, scan_folder_type));
 
         DoBox(box_system,
               {
@@ -406,7 +404,7 @@ static void InstallLocationMenu(GuiBoxSystem& box_system,
                   .font = FontType::Icons,
                   .text_fill = style::Colour::Subtext0,
                   .layout {
-                      .size = style::k_settings_icon_button_size,
+                      .size = style::k_prefs_icon_button_size,
                       .margins {.l = style::k_menu_item_padding_x},
                   },
 
@@ -446,7 +444,7 @@ static void InstallLocationMenu(GuiBoxSystem& box_system,
         menu_item(dir, subtext_buffer);
     }
 
-    for (auto const dir : ExtraScanFolders(context.paths, context.settings, scan_folder_type)) {
+    for (auto const dir : ExtraScanFolders(context.paths, context.prefs, scan_folder_type)) {
         SetFolderSubtext(subtext_buffer, dir, false, scan_folder_type, context.sample_lib_server);
         menu_item(dir, subtext_buffer);
     }
@@ -461,23 +459,23 @@ static void InstallLocationMenu(GuiBoxSystem& box_system,
               },
           });
 
-    auto const add_button = DoBox(box_system,
-                                  {
-                                      .parent = root,
-                                      .background_fill_auto_hot_active_overlay = true,
-                                      .activate_on_click_button = MouseButton::Left,
-                                      .activation_click_event = ActivationClickEvent::Up,
-                                      .layout {
-                                          .size = {layout::k_fill_parent, layout::k_hug_contents},
-                                          .contents_padding = {.l = style::k_menu_item_padding_x * 2 +
-                                                                    style::k_settings_icon_button_size,
-                                                               .r = style::k_menu_item_padding_x,
-                                                               .tb = style::k_menu_item_padding_y},
-                                          .contents_direction = layout::Direction::Row,
-                                          .contents_align = layout::Alignment::Start,
-                                      },
-                                      .tooltip = "Select a new folder"_s,
-                                  });
+    auto const add_button = DoBox(
+        box_system,
+        {
+            .parent = root,
+            .background_fill_auto_hot_active_overlay = true,
+            .activate_on_click_button = MouseButton::Left,
+            .activation_click_event = ActivationClickEvent::Up,
+            .layout {
+                .size = {layout::k_fill_parent, layout::k_hug_contents},
+                .contents_padding = {.l = style::k_menu_item_padding_x * 2 + style::k_prefs_icon_button_size,
+                                     .r = style::k_menu_item_padding_x,
+                                     .tb = style::k_menu_item_padding_y},
+                .contents_direction = layout::Direction::Row,
+                .contents_align = layout::Alignment::Start,
+            },
+            .tooltip = "Select a new folder"_s,
+        });
     DoBox(box_system,
           {
               .parent = add_button,
@@ -490,43 +488,43 @@ static void InstallLocationMenu(GuiBoxSystem& box_system,
             box_system.imgui.CloseTopPopupOnly();
 }
 
-static void PackagesSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& context) {
+static void PackagesPreferencesPanel(GuiBoxSystem& box_system, PreferencesPanelContext& context) {
     auto const root = DoBox(box_system,
                             {
                                 .layout {
                                     .size = box_system.imgui.PixelsToVw(box_system.imgui.Size()),
                                     .contents_padding = {.lrtb = style::k_spacing},
-                                    .contents_gap = style::k_settings_medium_gap,
+                                    .contents_gap = style::k_prefs_medium_gap,
                                     .contents_direction = layout::Direction::Column,
                                     .contents_align = layout::Alignment::Start,
                                 },
                             });
 
     for (auto const scan_folder_type : EnumIterator<ScanFolderType>()) {
-        auto const row = SettingsRow(box_system, root);
-        SettingsLhsTextWidget(box_system, row, ({
-                                  String s;
-                                  switch ((ScanFolderType)scan_folder_type) {
-                                      case ScanFolderType::Libraries:
-                                          s = "Sample library install folder";
-                                          break;
-                                      case ScanFolderType::Presets: s = "Preset install folder"; break;
-                                      case ScanFolderType::Count: PanicIfReached();
-                                  }
-                                  s;
-                              }));
+        auto const row = PreferencesRow(box_system, root);
+        PreferencesLhsTextWidget(box_system, row, ({
+                                     String s;
+                                     switch ((ScanFolderType)scan_folder_type) {
+                                         case ScanFolderType::Libraries:
+                                             s = "Sample library install folder";
+                                             break;
+                                         case ScanFolderType::Presets: s = "Preset install folder"; break;
+                                         case ScanFolderType::Count: PanicIfReached();
+                                     }
+                                     s;
+                                 }));
 
         auto const popup_id = box_system.imgui.GetID(ToInt(scan_folder_type));
 
         String menu_text =
-            prefs::GetString(context.settings,
-                             InstallLocationDescriptor(context.paths, context.settings, scan_folder_type));
+            prefs::GetString(context.prefs,
+                             InstallLocationDescriptor(context.paths, context.prefs, scan_folder_type));
         if (auto const default_dir = context.paths.always_scanned_folder[ToInt(scan_folder_type)];
             menu_text == default_dir) {
             menu_text = "Default";
         }
 
-        auto const btn = SettingsMenuButton(box_system, row, menu_text, "Select install location");
+        auto const btn = PreferencesMenuButton(box_system, row, menu_text, "Select install location");
         if (btn.button_fired) box_system.imgui.OpenPopup(popup_id, btn.imgui_id);
 
         AddPanel(box_system,
@@ -544,10 +542,10 @@ static void PackagesSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext
     }
 
     {
-        auto const row = SettingsRow(box_system, root);
-        SettingsLhsTextWidget(box_system, row, "Install");
-        auto const rhs = SettingsRhsColumn(box_system, row, style::k_settings_small_gap);
-        SettingsRhsText(box_system, rhs, "Install libraries and presets from a '.floe.zip' file");
+        auto const row = PreferencesRow(box_system, root);
+        PreferencesLhsTextWidget(box_system, row, "Install");
+        auto const rhs = PreferencesRhsColumn(box_system, row, style::k_prefs_small_gap);
+        PreferencesRhsText(box_system, rhs, "Install libraries and presets from a '.floe.zip' file");
         if (!context.package_install_jobs.Full() &&
             TextButton(box_system,
                        rhs,
@@ -572,7 +570,7 @@ static void PackagesSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext
                 for (auto const path : o.Value()) {
                     package::AddJob(context.package_install_jobs,
                                     path,
-                                    context.settings,
+                                    context.prefs,
                                     context.paths,
                                     context.thread_pool,
                                     box_system.arena,
@@ -585,8 +583,10 @@ static void PackagesSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext
     }
 }
 
-static void
-Setting(GuiBoxSystem& box_system, SettingsPanelContext& context, Box parent, prefs::Descriptor const& info) {
+static void Setting(GuiBoxSystem& box_system,
+                    PreferencesPanelContext& context,
+                    Box parent,
+                    prefs::Descriptor const& info) {
     switch (info.value_requirements.tag) {
         case prefs::ValueType::Int: {
             auto const& int_info = info.value_requirements.Get<prefs::Descriptor::IntRequirements>();
@@ -594,19 +594,19 @@ Setting(GuiBoxSystem& box_system, SettingsPanelContext& context, Box parent, pre
                                         parent,
                                         info.gui_label,
                                         30.0f,
-                                        prefs::GetValue(context.settings, info).value.Get<s64>(),
+                                        prefs::GetValue(context.prefs, info).value.Get<s64>(),
                                         [&int_info](s64 value) {
                                             if (int_info.validator) int_info.validator(value);
                                             return value;
                                         })) {
-                prefs::SetValue(context.settings, info, *v);
+                prefs::SetValue(context.prefs, info, *v);
             }
             break;
         }
         case prefs::ValueType::Bool: {
-            auto const state = prefs::GetValue(context.settings, info).value.Get<bool>();
+            auto const state = prefs::GetValue(context.prefs, info).value.Get<bool>();
             if (CheckboxButton(box_system, parent, info.gui_label, state, info.long_description))
-                prefs::SetValue(context.settings, info, !state);
+                prefs::SetValue(context.prefs, info, !state);
             break;
         }
         case prefs::ValueType::String: {
@@ -616,22 +616,22 @@ Setting(GuiBoxSystem& box_system, SettingsPanelContext& context, Box parent, pre
     }
 }
 
-static void GeneralSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& context) {
+static void GeneralPreferencesPanel(GuiBoxSystem& box_system, PreferencesPanelContext& context) {
     auto const root = DoBox(box_system,
                             {
                                 .layout {
                                     .size = box_system.imgui.PixelsToVw(box_system.imgui.Size()),
                                     .contents_padding = {.lrtb = style::k_spacing},
-                                    .contents_gap = style::k_settings_medium_gap,
+                                    .contents_gap = style::k_prefs_medium_gap,
                                     .contents_direction = layout::Direction::Column,
                                     .contents_align = layout::Alignment::Start,
                                 },
                             });
 
     {
-        auto const row = SettingsRow(box_system, root);
+        auto const row = PreferencesRow(box_system, root);
 
-        SettingsLhsTextWidget(box_system, row, "GUI size");
+        PreferencesLhsTextWidget(box_system, row, "GUI size");
 
         auto const button_container = DoBox(box_system,
                                             {
@@ -659,7 +659,7 @@ static void GeneralSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext&
                       .activate_on_click_button = MouseButton::Left,
                       .activation_click_event = ActivationClickEvent::Up,
                       .layout {
-                          .size = style::k_settings_icon_button_size,
+                          .size = style::k_prefs_icon_button_size,
                       },
                       .tooltip = "Decrease GUI size"_s,
                   })
@@ -686,7 +686,7 @@ static void GeneralSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext&
                       .activate_on_click_button = MouseButton::Left,
                       .activation_click_event = ActivationClickEvent::Up,
                       .layout {
-                          .size = style::k_settings_icon_button_size,
+                          .size = style::k_prefs_icon_button_size,
                       },
                       .tooltip = "Increase GUI size"_s,
                   })
@@ -696,17 +696,17 @@ static void GeneralSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext&
 
         if (width_change) {
             auto const desc = SettingDescriptor(GuiSetting::WindowWidth);
-            auto const width = prefs::GetInt(context.settings, desc);
+            auto const width = prefs::GetInt(context.prefs, desc);
             auto const new_width = width + *width_change * 110;
-            prefs::SetValue(context.settings, desc, new_width);
+            prefs::SetValue(context.prefs, desc, new_width);
         }
     }
 
     {
-        auto const style_row = SettingsRow(box_system, root);
+        auto const style_row = PreferencesRow(box_system, root);
 
-        SettingsLhsTextWidget(box_system, style_row, "Style");
-        auto const options_rhs_column = SettingsRhsColumn(box_system, style_row, style::k_settings_small_gap);
+        PreferencesLhsTextWidget(box_system, style_row, "Style");
+        auto const options_rhs_column = PreferencesRhsColumn(box_system, style_row, style::k_prefs_small_gap);
 
         for (auto const gui_setting : EnumIterator<GuiSetting>()) {
             if (gui_setting == GuiSetting::WindowWidth) continue;
@@ -715,10 +715,10 @@ static void GeneralSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext&
     }
 
     {
-        auto const misc_row = SettingsRow(box_system, root);
+        auto const misc_row = PreferencesRow(box_system, root);
 
-        SettingsLhsTextWidget(box_system, misc_row, "General");
-        auto const options_rhs_column = SettingsRhsColumn(box_system, misc_row, style::k_settings_small_gap);
+        PreferencesLhsTextWidget(box_system, misc_row, "General");
+        auto const options_rhs_column = PreferencesRhsColumn(box_system, misc_row, style::k_prefs_small_gap);
 
         Setting(box_system, context, options_rhs_column, IsOnlineReportingDisabledDescriptor());
         Setting(box_system,
@@ -732,22 +732,22 @@ static void GeneralSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext&
 }
 
 static void
-SettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& context, SettingsPanelState& state) {
+PreferencesPanel(GuiBoxSystem& box_system, PreferencesPanelContext& context, PreferencesPanelState& state) {
     constexpr auto k_tab_config = []() {
-        Array<ModalTabConfig, ToInt(SettingsPanelState::Tab::Count)> tabs {};
-        for (auto const tab : EnumIterator<SettingsPanelState::Tab>()) {
+        Array<ModalTabConfig, ToInt(PreferencesPanelState::Tab::Count)> tabs {};
+        for (auto const tab : EnumIterator<PreferencesPanelState::Tab>()) {
             auto const index = ToInt(tab);
             switch (tab) {
-                case SettingsPanelState::Tab::General:
+                case PreferencesPanelState::Tab::General:
                     tabs[index] = {.icon = ICON_FA_SLIDERS_H, .text = "General"};
                     break;
-                case SettingsPanelState::Tab::Folders:
+                case PreferencesPanelState::Tab::Folders:
                     tabs[index] = {.icon = ICON_FA_FOLDER_OPEN, .text = "Folders"};
                     break;
-                case SettingsPanelState::Tab::Packages:
+                case PreferencesPanelState::Tab::Packages:
                     tabs[index] = {.icon = ICON_FA_BOX_OPEN, .text = "Packages"};
                     break;
-                case SettingsPanelState::Tab::Count: PanicIfReached();
+                case PreferencesPanelState::Tab::Count: PanicIfReached();
             }
         }
         return tabs;
@@ -755,22 +755,22 @@ SettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& context, SettingsP
 
     auto const root = DoModal(box_system,
                               {
-                                  .title = "Settings"_s,
+                                  .title = "Preferences"_s,
                                   .on_close = [&state] { state.open = false; },
                                   .tabs = k_tab_config,
                                   .current_tab_index = ToIntRef(state.tab),
                               });
 
-    using TabPanelFunction = void (*)(GuiBoxSystem&, SettingsPanelContext&);
+    using TabPanelFunction = void (*)(GuiBoxSystem&, PreferencesPanelContext&);
     AddPanel(box_system,
              Panel {
                  .run = ({
                      TabPanelFunction f {};
                      switch (state.tab) {
-                         case SettingsPanelState::Tab::General: f = GeneralSettingsPanel; break;
-                         case SettingsPanelState::Tab::Folders: f = FolderSettingsPanel; break;
-                         case SettingsPanelState::Tab::Packages: f = PackagesSettingsPanel; break;
-                         case SettingsPanelState::Tab::Count: PanicIfReached();
+                         case PreferencesPanelState::Tab::General: f = GeneralPreferencesPanel; break;
+                         case PreferencesPanelState::Tab::Folders: f = FolderPreferencesPanel; break;
+                         case PreferencesPanelState::Tab::Packages: f = PackagesPreferencesPanel; break;
+                         case PreferencesPanelState::Tab::Count: PanicIfReached();
                      }
                      [f, &context](GuiBoxSystem& box_system) { f(box_system, context); };
                  }),
@@ -790,18 +790,18 @@ SettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& context, SettingsP
 }
 
 PUBLIC void
-DoSettingsPanel(GuiBoxSystem& box_system, SettingsPanelContext& context, SettingsPanelState& state) {
+DoPreferencesPanel(GuiBoxSystem& box_system, PreferencesPanelContext& context, PreferencesPanelState& state) {
     if (state.open) {
         RunPanel(box_system,
                  Panel {
-                     .run = [&context, &state](GuiBoxSystem& b) { SettingsPanel(b, context, state); },
+                     .run = [&context, &state](GuiBoxSystem& b) { PreferencesPanel(b, context, state); },
                      .data =
                          ModalPanel {
                              .r = CentredRect(
                                  {.pos = 0, .size = box_system.imgui.frame_input.window_size.ToFloat2()},
-                                 f32x2 {box_system.imgui.VwToPixels(style::k_settings_dialog_width),
-                                        box_system.imgui.VwToPixels(style::k_settings_dialog_height)}),
-                             .imgui_id = box_system.imgui.GetID("new settings"),
+                                 f32x2 {box_system.imgui.VwToPixels(style::k_prefs_dialog_width),
+                                        box_system.imgui.VwToPixels(style::k_prefs_dialog_height)}),
+                             .imgui_id = box_system.imgui.GetID("prefs"),
                              .on_close = [&state]() { state.open = false; },
                              .close_on_click_outside = true,
                              .darken_background = true,

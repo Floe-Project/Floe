@@ -10,7 +10,7 @@
 #include "gui_menu.hpp"
 #include "gui_modal_windows.hpp"
 #include "gui_peak_meter_widget.hpp"
-#include "gui_settings.hpp"
+#include "gui_prefs.hpp"
 #include "gui_widget_compounds.hpp"
 #include "gui_widget_helpers.hpp"
 #include "presets/presets_folder.hpp"
@@ -254,9 +254,9 @@ void TopPanel(Gui* g) {
     }
     if (g->icons) g->frame_input.graphics_ctx->PushFont(g->icons);
 
-    auto& settings = g->prefs;
+    auto& preferences = g->prefs;
     auto const randomise_mode = (PresetRandomiseMode)Clamp(
-        prefs::LookupInt(settings, prefs::key::k_presets_random_mode).ValueOr((s64)PresetRandomiseMode::All),
+        prefs::LookupInt(preferences, prefs::key::k_presets_random_mode).ValueOr((s64)PresetRandomiseMode::All),
         (s64)PresetRandomiseMode::All,
         (s64)PresetRandomiseMode::BrowserFilters);
     {
@@ -361,11 +361,11 @@ void TopPanel(Gui* g) {
 
             PopupMenuItems items(g, options.Items());
             auto mode =
-                (int)Clamp<s64>(prefs::LookupInt(settings, prefs::key::k_presets_random_mode).ValueOr(0),
+                (int)Clamp<s64>(prefs::LookupInt(preferences, prefs::key::k_presets_random_mode).ValueOr(0),
                                 0,
                                 3);
             if (items.DoMultipleMenuItems(mode))
-                prefs::SetValue(settings, prefs::key::k_presets_random_mode, (s64)mode);
+                prefs::SetValue(preferences, prefs::key::k_presets_random_mode, (s64)mode);
 
             g->imgui.EndWindow();
         }
@@ -376,8 +376,8 @@ void TopPanel(Gui* g) {
         auto btn_id = g->imgui.GetID("sets");
         auto btn_r = layout::GetRect(g->layout, cog);
         if (buttons::Button(g, btn_id, btn_r, ICON_FA_COG, large_icon_button_style))
-            g->settings_panel_state.open = true;
-        Tooltip(g, btn_id, btn_r, "Open settings window"_s);
+            g->preferences_panel_state.open = true;
+        Tooltip(g, btn_id, btn_r, "Open preferences window"_s);
     }
 
     {

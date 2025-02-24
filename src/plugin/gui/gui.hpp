@@ -10,7 +10,7 @@
 #include "gui/gui2_feedback_panel_state.hpp"
 #include "gui/gui2_info_panel_state.hpp"
 #include "gui/gui2_notifications.hpp"
-#include "gui/gui2_settings_panel_state.hpp"
+#include "gui/gui2_prefs_panel_state.hpp"
 #include "gui/gui_modal_windows.hpp"
 #include "gui_editor_widgets.hpp"
 #include "gui_envelope.hpp"
@@ -134,7 +134,7 @@ struct Gui {
     bool show_purchasable_libraries = false;
     bool show_news = false;
 
-    SettingsPanelState settings_panel_state {};
+    PreferencesPanelState preferences_panel_state {};
     InfoPanelState info_panel_state {};
     bool attribution_panel_open {};
     FeedbackPanelState feedback_panel_state {};

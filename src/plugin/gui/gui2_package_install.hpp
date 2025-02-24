@@ -81,7 +81,7 @@ PUBLIC void PackageInstallAlertsPanel(GuiBoxSystem& box_system, package::Install
                                              .parent = root,
                                              .layout {
                                                  .size = {layout::k_fill_parent, layout::k_hug_contents},
-                                                 .contents_gap = style::k_settings_medium_gap,
+                                                 .contents_gap = style::k_prefs_medium_gap,
                                                  .contents_direction = layout::Direction::Column,
                                                  .contents_align = layout::Alignment::Start,
                                                  .contents_cross_axis_align = layout::CrossAxisAlign::Start,
@@ -104,7 +104,7 @@ PUBLIC void PackageInstallAlertsPanel(GuiBoxSystem& box_system, package::Install
                                               .parent = container,
                                               .layout {
                                                   .size = {layout::k_fill_parent, layout::k_hug_contents},
-                                                  .contents_gap = style::k_settings_medium_gap,
+                                                  .contents_gap = style::k_prefs_medium_gap,
                                                   .contents_direction = layout::Direction::Row,
                                                   .contents_align = layout::Alignment::Start,
                                               },

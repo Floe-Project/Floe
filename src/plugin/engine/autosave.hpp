@@ -28,8 +28,8 @@ struct AutosaveState {
 // Run from main thread
 // Check if an autosave is needed, and if so, create a snapshot and queue it.
 void InitAutosaveState(AutosaveState& state, u64& random_seed, StateSnapshot const& initial_state);
-bool AutosaveNeeded(AutosaveState const& state, prefs::Preferences const& settings);
-void QueueAutosave(AutosaveState& state, prefs::Preferences const& settings, StateSnapshot const& snapshot);
+bool AutosaveNeeded(AutosaveState const& state, prefs::Preferences const& preferences);
+void QueueAutosave(AutosaveState& state, prefs::Preferences const& preferences, StateSnapshot const& snapshot);
 
 enum class AutosaveSetting : u8 {
     AutosaveIntervalSeconds,

@@ -22,7 +22,7 @@
 #include "clap/process.h"
 #include "engine/engine.hpp"
 #include "engine/shared_engine_systems.hpp"
-#include "gui/gui_settings.hpp"
+#include "gui/gui_prefs.hpp"
 #include "gui_framework/gui_platform.hpp"
 #include "plugin.hpp"
 #include "processing_utils/scoped_denormals.hpp"

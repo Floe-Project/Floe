@@ -188,7 +188,7 @@ struct ProcessorListener {
 struct AudioProcessor {
     AudioProcessor(clap_host const& host,
                    ProcessorListener& listener,
-                   prefs::PreferencesTable const& settings);
+                   prefs::PreferencesTable const& preferences);
     ~AudioProcessor();
 
     clap_host const& host;
@@ -314,6 +314,6 @@ void UnlearnMidiCC(AudioProcessor& processor, ParamIndex param, u7 cc_num_to_rem
 Bitset<128> GetLearnedCCsBitsetForParam(AudioProcessor const& processor, ParamIndex param);
 bool CcControllerMovedParamRecently(AudioProcessor const& processor, ParamIndex param);
 
-void AddPersistentCcToParamMapping(prefs::Preferences& settings, u8 cc_num, u32 param_id);
-void RemovePersistentCcToParamMapping(prefs::Preferences& settings, u8 cc_num, u32 param_id);
-Bitset<128> PersistentCcsForParam(prefs::PreferencesTable const& settings, u32 param_id);
+void AddPersistentCcToParamMapping(prefs::Preferences& preferences, u8 cc_num, u32 param_id);
+void RemovePersistentCcToParamMapping(prefs::Preferences& preferences, u8 cc_num, u32 param_id);
+Bitset<128> PersistentCcsForParam(prefs::PreferencesTable const& preferences, u32 param_id);

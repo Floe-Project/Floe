@@ -181,7 +181,7 @@ CheckboxButton(GuiBoxSystem& box_system, Box parent, String text, bool state, St
                                   .activation_click_event = ActivationClickEvent::Up,
                                   .layout {
                                       .size = {layout::k_hug_contents, layout::k_hug_contents},
-                                      .contents_gap = style::k_settings_medium_gap,
+                                      .contents_gap = style::k_prefs_medium_gap,
                                       .contents_direction = layout::Direction::Row,
                                       .contents_align = layout::Alignment::Start,
                                   },
@@ -205,7 +205,7 @@ CheckboxButton(GuiBoxSystem& box_system, Box parent, String text, bool state, St
               .round_background_corners = 0b1111,
               .parent_dictates_hot_and_active = true,
               .layout {
-                  .size = style::k_settings_icon_button_size,
+                  .size = style::k_prefs_icon_button_size,
               },
           });
     DoBox(box_system,
@@ -274,7 +274,7 @@ PUBLIC Optional<s64> IntField(GuiBoxSystem& builder,
                   .activate_on_click_button = MouseButton::Left,
                   .activation_click_event = ActivationClickEvent::Up,
                   .layout {
-                      .size = style::k_settings_icon_button_size,
+                      .size = style::k_prefs_icon_button_size,
                   },
                   .tooltip = "Decrease value"_s,
               })
@@ -325,7 +325,7 @@ PUBLIC Optional<s64> IntField(GuiBoxSystem& builder,
                   .activate_on_click_button = MouseButton::Left,
                   .activation_click_event = ActivationClickEvent::Up,
                   .layout {
-                      .size = style::k_settings_icon_button_size,
+                      .size = style::k_prefs_icon_button_size,
                   },
                   .tooltip = "Increase value"_s,
               })

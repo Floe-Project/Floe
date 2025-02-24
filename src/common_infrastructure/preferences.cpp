@@ -483,6 +483,7 @@ ErrorCodeOr<void> WritePreferencesTable(PreferencesTable const& table, Writer wr
 
 ErrorCodeOr<void>
 WritePreferencesFile(PreferencesTable const& table, String path, Optional<s128> set_last_modified) {
+    LogDebug(ModuleName::Preferences, "Writing preferences file: {}", path);
     auto file = TRY(OpenFile(path,
                              {
                                  .capability = FileMode::Capability::Write,

@@ -152,7 +152,7 @@ void Trace(ModuleName module_name, String message = {}, SourceLocation loc = Sou
     template <typename... Args>                                                                              \
     void Log##level(ModuleName module_name, String format, Args const&... args) {                            \
         if constexpr (sizeof...(args) == 0) {                                                                \
-            Log(module_name, LogLevel::level, format);                                                       \
+            Log(module_name, LogLevel::level, [&](Writer writer) { return writer.WriteChars(format); });     \
         } else {                                                                                             \
             Log(module_name, LogLevel::level, [&](Writer writer) {                                           \
                 return fmt::FormatToWriter(writer, format, args...);                                         \

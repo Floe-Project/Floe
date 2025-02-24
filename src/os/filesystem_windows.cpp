@@ -565,19 +565,15 @@ MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirecto
             break;
         }
 
-        case KnownDirectoryType::LegacyAllUsersData:
-            config.folder_id = FOLDERID_Public;
-            config.fallback_absolute = "C:\\Users\\Public";
-            break;
-        case KnownDirectoryType::LegacyAllUsersSettings:
+        case KnownDirectoryType::MirageGlobalPreferences:
             config.folder_id = FOLDERID_ProgramData;
             config.fallback_absolute = "C:\\ProgramData";
             break;
-        case KnownDirectoryType::LegacyPluginSettings:
+        case KnownDirectoryType::MiragePreferences:
             config.folder_id = FOLDERID_RoamingAppData;
             config.fallback_user = "AppData\\Roaming";
             break;
-        case KnownDirectoryType::LegacyData:
+        case KnownDirectoryType::MiragePreferencesAlternate:
             config.folder_id = FOLDERID_RoamingAppData;
             config.fallback_user = "AppData\\Roaming";
             break;

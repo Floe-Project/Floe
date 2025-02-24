@@ -307,7 +307,7 @@ MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirecto
             break;
         }
 
-        case KnownDirectoryType::LegacyPluginSettings: {
+        case KnownDirectoryType::MiragePreferences: {
             dir_type = NSMusicDirectory;
             domain = NSUserDomainMask;
             static constexpr auto k_dirs = Array {"Audio Music Apps"_s, "Plug-In Settings"};
@@ -315,17 +315,12 @@ MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirecto
             fallback = "Music";
             break;
         }
-        case KnownDirectoryType::LegacyData:
+        case KnownDirectoryType::MiragePreferencesAlternate:
             dir_type = NSApplicationSupportDirectory;
             domain = NSUserDomainMask;
             fallback = "Application Support";
             break;
-        case KnownDirectoryType::LegacyAllUsersData:
-            dir_type = NSApplicationSupportDirectory;
-            domain = NSLocalDomainMask;
-            fallback = "/Library/Application Support";
-            break;
-        case KnownDirectoryType::LegacyAllUsersSettings:
+        case KnownDirectoryType::MirageGlobalPreferences:
             dir_type = NSApplicationSupportDirectory;
             domain = NSLocalDomainMask;
             fallback = "/Library/Application Support";

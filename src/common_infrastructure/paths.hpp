@@ -50,26 +50,25 @@ static Span<String> PossiblePrefFilePaths(ArenaAllocator& arena) {
 
         // C:/ProgramData/FrozenPlain/Mirage/mirage.json
         // /Library/Application Support/FrozenPlain/Mirage/mirage.json
-        try_add_path(KnownDirectoryType::LegacyAllUsersSettings,
+        try_add_path(KnownDirectoryType::MirageGlobalPreferences,
                      Array {"FrozenPlain"_s, "Mirage", "Settings"},
                      "mirage.json"_s);
 
-        if constexpr (IS_WINDOWS)
-            // ~/AppData/Roaming/FrozenPlain/Mirage/mirage.json
-            try_add_path(KnownDirectoryType::LegacyPluginSettings,
-                         Array {"FrozenPlain"_s, "Mirage"},
-                         "mirage.json"_s);
-        else
-            // ~/Music/Audio Music Apps/Plug-In Settings/FrozenPlain/Mirage/mirage.json
-            try_add_path(KnownDirectoryType::LegacyPluginSettings, Array {"FrozenPlain"_s}, "mirage.json"_s);
+        // ~/AppData/Roaming/FrozenPlain/Mirage/mirage.json
+        // ~/Music/Audio Music Apps/Plug-In Settings/FrozenPlain/mirage.json
+        {
+            DynamicArrayBounded<String, 2> sub_paths;
+            dyn::Append(sub_paths, "FrozenPlain"_s);
+            if constexpr (IS_WINDOWS) dyn::Append(sub_paths, "Mirage");
+            try_add_path(KnownDirectoryType::MiragePreferences, sub_paths, "mirage.json"_s);
+        }
 
+        // macOS had an additional possible path.
+        // ~/Library/Application Support/FrozenPlain/Mirage/mirage.json
         if constexpr (IS_MACOS) {
-            // /Library/Application Support/FrozenPlain/Mirage/mirage.json
-            try_add_path(KnownDirectoryType::LegacyAllUsersData,
+            try_add_path(KnownDirectoryType::MiragePreferencesAlternate,
                          Array {"FrozenPlain"_s, "Mirage"},
                          "mirage.json");
-            // ~/Library/Application Support/FrozenPlain/Mirage/mirage.json
-            try_add_path(KnownDirectoryType::LegacyData, Array {"FrozenPlain"_s, "Mirage"}, "mirage.json");
         }
     }
 

@@ -294,10 +294,9 @@ MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirecto
         case KnownDirectoryType::GlobalClapPlugins: abs_path = "/usr/lib/clap"_s; break;
         case KnownDirectoryType::GlobalVst3Plugins: abs_path = "/usr/lib/vst3"_s; break;
 
-        case KnownDirectoryType::LegacyData: home_path = ""; break;
-        case KnownDirectoryType::LegacyAllUsersSettings:
-        case KnownDirectoryType::LegacyPluginSettings: home_path = ".config"; break;
-        case KnownDirectoryType::LegacyAllUsersData: abs_path = "/var/lib"_s; break;
+        case KnownDirectoryType::MiragePreferencesAlternate: home_path = ""; break;
+        case KnownDirectoryType::MirageGlobalPreferences:
+        case KnownDirectoryType::MiragePreferences: home_path = ".config"; break;
 
         case KnownDirectoryType::Count: PanicIfReached();
     }

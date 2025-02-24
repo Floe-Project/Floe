@@ -281,10 +281,9 @@ enum class KnownDirectoryType : u8 {
     UserVst3Plugins,
     UserClapPlugins,
 
-    LegacyAllUsersData,
-    LegacyAllUsersSettings,
-    LegacyData,
-    LegacyPluginSettings,
+    MirageGlobalPreferences,
+    MiragePreferences,
+    MiragePreferencesAlternate,
 
     Count,
 };

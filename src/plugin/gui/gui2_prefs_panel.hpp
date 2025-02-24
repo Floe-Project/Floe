@@ -5,12 +5,15 @@
 
 #include "os/misc.hpp"
 
+#include "common_infrastructure/error_reporting.hpp"
+
 #include "engine/autosave.hpp"
 #include "engine/package_installation.hpp"
 #include "gui/gui_prefs.hpp"
 #include "gui2_common_modal_panel.hpp"
 #include "gui2_prefs_panel_state.hpp"
 #include "gui_framework/gui_box_system.hpp"
+#include "gui_framework/gui_platform.hpp"
 #include "processor/processor.hpp"
 #include "sample_lib_server/sample_library_server.hpp"
 
@@ -616,6 +619,12 @@ static void Setting(GuiBoxSystem& box_system,
     }
 }
 
+constexpr s64 AlignTo(s64 value, s64 alignment) {
+    s64 remainder = value % alignment;
+    if (remainder == 0) return value;
+    return value + (alignment - remainder);
+}
+
 static void GeneralPreferencesPanel(GuiBoxSystem& box_system, PreferencesPanelContext& context) {
     auto const root = DoBox(box_system,
                             {
@@ -697,7 +706,7 @@ static void GeneralPreferencesPanel(GuiBoxSystem& box_system, PreferencesPanelCo
         if (width_change) {
             auto const desc = SettingDescriptor(GuiSetting::WindowWidth);
             auto const width = prefs::GetInt(context.prefs, desc);
-            auto const new_width = width + *width_change * 110;
+            auto const new_width = width + *width_change * AlignTo(100, k_aspect_ratio_with_keyboard.width);
             prefs::SetValue(context.prefs, desc, new_width);
         }
     }

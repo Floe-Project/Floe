@@ -1,0 +1,38 @@
+// SPDX-License-Identifier: CC0-1.0
+// SPDX-FileCopyrightText: 2024 Sam Windell
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Standalone",
+            "runInTerminal": true,
+            "program": "floe_standalone"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Tests",
+            "runInTerminal": true,
+            "program": "tests",
+            "args": [
+                "--log-level=debug",
+                "--filter=*"
+            ]
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Floe Packager",
+            "runInTerminal": true,
+            "program": "floe-packager",
+            "args": [
+                "--library-folders",
+                "~/Floe/Libraries/wraith.mdata",
+                "--output-folder",
+                ".floe-cache/"
+            ]
+        }
+    ]
+}

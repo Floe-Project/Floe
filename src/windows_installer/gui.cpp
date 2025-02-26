@@ -1184,15 +1184,17 @@ static ErrorCodeOr<int> Main(HINSTANCE h_instance, int cmd_show, ArgsCstr args) 
         framework.bold_font == nullptr)
         CheckLastError("Failed to get font");
 
+    auto const config = AppConfig();
+
     framework.root = CreateWindowExW(WS_EX_CLIENTEDGE,
                                      k_root_window_class_name,
-                                     k_window_title,
+                                     config.window_title,
                                      WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX |
                                          WS_MAXIMIZEBOX | WS_SIZEBOX,
                                      CW_USEDEFAULT,
                                      CW_USEDEFAULT,
-                                     k_window_width,
-                                     k_window_height,
+                                     config.window_width,
+                                     config.window_height,
                                      nullptr,
                                      nullptr,
                                      h_instance,

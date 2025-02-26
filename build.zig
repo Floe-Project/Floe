@@ -526,6 +526,133 @@ fn performPostInstallConfig(step: *std.Build.Step, prog_node: std.Progress.Node)
     }
 }
 
+pub const WindowsCodeSignStep = struct {
+    step: std.Build.Step,
+    file_path: []const u8,
+    description: []const u8,
+    cache_dir: []const u8,
+    context: *BuildContext,
+};
+
+// TODO: use this for clap and vst3
+pub fn addWindowsCodeSignStep(
+    context: *BuildContext,
+    file_path: []const u8,
+    description: []const u8,
+    cache_dir: []const u8,
+) ?*std.Build.Step {
+    // if (context.build_mode != .production) return null;
+
+    const cs_step = context.b.allocator.create(WindowsCodeSignStep) catch @panic("OOM");
+    cs_step.* = WindowsCodeSignStep{
+        .step = std.Build.Step.init(.{
+            .id = std.Build.Step.Id.custom,
+            .name = "Windows code signing",
+            .owner = context.b,
+            .makeFn = performWindowsCodeSign,
+        }),
+        .file_path = context.b.dupe(file_path),
+        .description = context.b.dupe(description),
+        .cache_dir = context.b.dupe(cache_dir),
+        .context = context,
+    };
+
+    return &cs_step.step;
+}
+
+fn performWindowsCodeSign(step: *std.Build.Step, prog_node: std.Progress.Node) !void {
+    const self: *WindowsCodeSignStep = @fieldParentPtr("step", step);
+    _ = prog_node;
+
+    const b = self.context.b;
+
+    // Get absolute paths
+    const abs_file = b.pathFromRoot(self.file_path);
+    const cache_path = b.pathFromRoot(self.cache_dir);
+
+    // Create the cert file directory if needed
+    const cert_dir = std.fs.path.dirname(cache_path);
+    if (cert_dir) |dir| {
+        try std.fs.cwd().makePath(dir);
+    }
+
+    // Get environment variables
+    const cert_pfx = std.process.getEnvVarOwned(b.allocator, "WINDOWS_CODESIGN_CERT_PFX") catch |err| {
+        std.log.err("Failed to get WINDOWS_CODESIGN_CERT_PFX environment variable: {}", .{err});
+        return err;
+    };
+    defer b.allocator.free(cert_pfx);
+
+    const cert_password = std.process.getEnvVarOwned(b.allocator, "WINDOWS_CODESIGN_CERT_PFX_PASSWORD") catch |err| {
+        std.log.err("Failed to get WINDOWS_CODESIGN_CERT_PFX_PASSWORD environment variable: {}", .{err});
+        return err;
+    };
+    defer b.allocator.free(cert_password);
+
+    // Create cert file if it doesn't exist
+    const cert_file_path = try std.fs.path.join(b.allocator, &[_][]const u8{ cache_path, "windows-codesign-cert.pfx" });
+    defer b.allocator.free(cert_file_path);
+
+    var found_cert = true;
+    std.fs.accessAbsolute(cert_file_path, .{}) catch {
+        found_cert = false;
+    };
+    if (!found_cert) {
+        // Decode base64 encoded certificate and write to file
+        const size = try std.base64.standard.Decoder.calcSizeForSlice(cert_pfx);
+        const decoded = try b.allocator.alloc(u8, size);
+        defer b.allocator.free(decoded);
+
+        try std.base64.standard.Decoder.decode(decoded, cert_pfx);
+
+        var file = try std.fs.createFileAbsolute(cert_file_path, .{});
+        defer file.close();
+
+        try file.writeAll(decoded);
+    }
+
+    // Create the signed output path
+    const signed_path = try std.fmt.allocPrint(b.allocator, "{s}.signed", .{abs_file});
+    defer b.allocator.free(signed_path);
+
+    // Execute osslsigncode
+    const result = try std.process.Child.run(.{
+        .allocator = b.allocator,
+        .argv = &[_][]const u8{
+            "osslsigncode",
+            "sign",
+            "-pkcs12",
+            cert_file_path,
+            "-pass",
+            cert_password,
+            "-n",
+            self.description,
+            "-i",
+            "https://github.com/Floe-Project/Floe",
+            "-t",
+            "http://timestamp.sectigo.com",
+            "-in",
+            abs_file,
+            "-out",
+            signed_path,
+        },
+    });
+    defer {
+        b.allocator.free(result.stdout);
+        b.allocator.free(result.stderr);
+    }
+
+    if (result.term.Exited != 0) {
+        std.log.err("osslsigncode failed: {s}", .{result.stderr});
+        return error.SigningFailed;
+    }
+
+    // Move the signed file to the original location
+    try std.fs.renameAbsolute(signed_path, abs_file);
+
+    std.log.info("Successfully code signed {s}", .{abs_file});
+}
+
 const BuildMode = enum {
     development,
     performance_profiling,
@@ -939,8 +1066,9 @@ pub fn build(b: *std.Build) void {
         };
 
         const install_subfolder_string = b.dupe(archAndOsPair(target.result).slice());
+        const install_dir = std.Build.InstallDir{ .custom = install_subfolder_string };
         const install_subfolder = std.Build.Step.InstallArtifact.Options.Dir{
-            .override = std.Build.InstallDir{ .custom = install_subfolder_string },
+            .override = install_dir,
         };
 
         var floe_version_string: ?[]const u8 = null;
@@ -2461,83 +2589,127 @@ pub fn build(b: *std.Build) void {
             const sidebar_image = getExternalResource(&build_context, "Logos/rasterized/win-installer-sidebar.png");
 
             {
-                const win_installer_description = "Installer for Floe plugins";
-                const manifest_path = std.fs.path.join(b.allocator, &.{ floe_cache_relative, "installer.manifest" }) catch @panic("OOM");
-                {
-                    const file = std.fs.createFileAbsolute(b.pathJoin(&.{ rootdir, manifest_path }), .{ .truncate = true }) catch @panic("could not create file");
-                    defer file.close();
-                    file.writeAll(b.fmt(
-                        \\ <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-                        \\ <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
-                        \\ <assemblyIdentity
-                        \\     version="1.0.0.0"
-                        \\     processorArchitecture="amd64"
-                        \\     name="{[vendor]s}.Floe.Installer"
-                        \\     type="win32"
-                        \\ />
-                        \\ <description>{[description]s}</description>
-                        \\ <dependency>
-                        \\     <dependentAssembly>
-                        \\         <assemblyIdentity
-                        \\             type="win32"
-                        \\             name="Microsoft.Windows.Common-Controls"
-                        \\             version="6.0.0.0"
-                        \\             processorArchitecture="amd64"
-                        \\             publicKeyToken="6595b64144ccf1df"
-                        \\             language="*"
-                        \\         />
-                        \\     </dependentAssembly>
-                        \\ </dependency>
-                        \\ <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
-                        \\     <application>
-                        \\         <!-- Windows 10, 11 -->
-                        \\         <supportedOS Id="{{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}}"/>
-                        \\         <!-- Windows 8.1 -->
-                        \\         <supportedOS Id="{{1f676c76-80e1-4239-95bb-83d0f6d0da78}}"/>
-                        \\         <!-- Windows 8 -->
-                        \\         <supportedOS Id="{{4a2f28e3-53b9-4441-ba9c-d69d4a4a6e38}}"/>
-                        \\     </application>
-                        \\ </compatibility>
-                        \\ <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
-                        \\     <security>
-                        \\         <requestedPrivileges>
-                        \\         <requestedExecutionLevel level="{[execution_level]s}" uiAccess="false" />
-                        \\         </requestedPrivileges>
-                        \\     </security>
-                        \\ </trustInfo>
-                        \\ <asmv3:application>
-                        \\     <asmv3:windowsSettings xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">
-                        \\         <dpiAwareness>PerMonitorV2</dpiAwareness>
-                        \\         <longPathAware>true</longPathAware>
-                        \\     </asmv3:windowsSettings>
-                        \\     <asmv3:windowsSettings xmlns="http://schemas.microsoft.com/SMI/2019/WindowsSettings">
-                        \\         <activeCodePage>UTF-8</activeCodePage>
-                        \\     </asmv3:windowsSettings>
-                        \\ </asmv3:application>
-                        \\ </assembly>
-                    , .{
-                        .description = win_installer_description,
-                        .execution_level = if (windows_installer_require_admin) "requireAdministrator" else "asInvoker",
-                        .vendor = floe_vendor,
-                    })) catch @panic("could not write to file");
+                const writeManifest = (struct {
+                    fn writeManifest(builder: *std.Build, name: []const u8, require_admin: bool, description: []const u8) []const u8 {
+                        const manifest_path = std.fs.path.join(builder.allocator, &.{ floe_cache_relative, builder.fmt("{s}.manifest", .{name}) }) catch @panic("OOM");
+                        const file = std.fs.createFileAbsolute(builder.pathJoin(&.{ rootdir, manifest_path }), .{ .truncate = true }) catch @panic("could not create file");
+                        defer file.close();
+                        file.writeAll(builder.fmt(
+                            \\ <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+                            \\ <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+                            \\ <assemblyIdentity
+                            \\     version="1.0.0.0"
+                            \\     processorArchitecture="amd64"
+                            \\     name="{[vendor]s}.Floe.{[name]s}"
+                            \\     type="win32"
+                            \\ />
+                            \\ <description>{[description]s}</description>
+                            \\ <dependency>
+                            \\     <dependentAssembly>
+                            \\         <assemblyIdentity
+                            \\             type="win32"
+                            \\             name="Microsoft.Windows.Common-Controls"
+                            \\             version="6.0.0.0"
+                            \\             processorArchitecture="amd64"
+                            \\             publicKeyToken="6595b64144ccf1df"
+                            \\             language="*"
+                            \\         />
+                            \\     </dependentAssembly>
+                            \\ </dependency>
+                            \\ <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+                            \\     <application>
+                            \\         <!-- Windows 10, 11 -->
+                            \\         <supportedOS Id="{{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}}"/>
+                            \\         <!-- Windows 8.1 -->
+                            \\         <supportedOS Id="{{1f676c76-80e1-4239-95bb-83d0f6d0da78}}"/>
+                            \\         <!-- Windows 8 -->
+                            \\         <supportedOS Id="{{4a2f28e3-53b9-4441-ba9c-d69d4a4a6e38}}"/>
+                            \\     </application>
+                            \\ </compatibility>
+                            \\ <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
+                            \\     <security>
+                            \\         <requestedPrivileges>
+                            \\         <requestedExecutionLevel level="{[execution_level]s}" uiAccess="false" />
+                            \\         </requestedPrivileges>
+                            \\     </security>
+                            \\ </trustInfo>
+                            \\ <asmv3:application>
+                            \\     <asmv3:windowsSettings xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">
+                            \\         <dpiAwareness>PerMonitorV2</dpiAwareness>
+                            \\         <longPathAware>true</longPathAware>
+                            \\     </asmv3:windowsSettings>
+                            \\     <asmv3:windowsSettings xmlns="http://schemas.microsoft.com/SMI/2019/WindowsSettings">
+                            \\         <activeCodePage>UTF-8</activeCodePage>
+                            \\     </asmv3:windowsSettings>
+                            \\ </asmv3:application>
+                            \\ </assembly>
+                        , .{
+                            .name = name,
+                            .description = description,
+                            .execution_level = if (require_admin) "requireAdministrator" else "asInvoker",
+                            .vendor = floe_vendor,
+                        })) catch @panic("could not write to file");
+                        return manifest_path;
+                    }
+                }).writeManifest;
+
+                const uninstaller_name = "Floe-Uninstaller";
+                const win_uninstaller = b.addExecutable(.{
+                    .name = uninstaller_name,
+                    .target = target,
+                    .optimize = build_context.optimise,
+                    .version = floe_version,
+                    .win32_manifest = b.path(writeManifest(b, "Uninstaller", windows_installer_require_admin, "Uninstaller for Floe plugins")),
+                });
+                win_uninstaller.subsystem = .Windows;
+
+                win_uninstaller.addCSourceFiles(.{
+                    .files = &.{
+                        installer_path ++ "/uninstaller.cpp",
+                        installer_path ++ "/gui.cpp",
+                        "src/common_infrastructure/final_binary_type.cpp",
+                    },
+                    .flags = cpp_floe_flags,
+                });
+                win_uninstaller.defineCMacro("FINAL_BINARY_TYPE", "WindowsUninstaller");
+                win_uninstaller.linkSystemLibrary("gdi32");
+                win_uninstaller.linkSystemLibrary("version");
+                win_uninstaller.linkSystemLibrary("comctl32");
+                win_uninstaller.addConfigHeader(build_config_step);
+                win_uninstaller.addIncludePath(b.path("src"));
+                win_uninstaller.addObject(stb_image);
+                win_uninstaller.linkLibrary(library);
+                win_uninstaller.linkLibrary(miniz);
+                win_uninstaller.linkLibrary(common_infrastructure);
+                applyUniversalSettings(&build_context, win_uninstaller);
+                join_compile_commands.step.dependOn(&win_uninstaller.step);
+
+                const uninstall_artifact_step = b.addInstallArtifact(win_uninstaller, .{ .dest_dir = install_subfolder });
+                build_context.master_step.dependOn(&uninstall_artifact_step.step);
+
+                const sign_step = addWindowsCodeSignStep(&build_context, b.getInstallPath(install_dir, win_uninstaller.out_filename), "Floe Application", floe_cache_relative);
+                if (sign_step) |s| {
+                    s.dependOn(&uninstall_artifact_step.step);
                 }
 
+                const win_installer_description = "Installer for Floe plugins";
                 const win_installer = b.addExecutable(.{
                     .name = b.fmt("Floe-Installer-v{s}", .{ .version = floe_version_string.? }),
                     .target = target,
                     .optimize = build_context.optimise,
                     .version = floe_version,
-                    .win32_manifest = b.path(manifest_path),
+                    .win32_manifest = b.path(writeManifest(b, "Installer", windows_installer_require_admin, win_installer_description)),
                 });
-                var flags = std.ArrayList([]const u8).init(b.allocator);
-
                 win_installer.subsystem = .Windows;
+
+                var flags = std.ArrayList([]const u8).init(b.allocator);
 
                 if (sidebar_image != null) {
                     flags.append(b.fmt("-DSIDEBAR_IMAGE_PATH=\"{s}\"", .{sidebar_image.?.relative_path})) catch unreachable;
                 }
-                flags.append("-DCLAP_PLUGIN_PATH=\"zig-out/x86_64-windows/Floe.clap\"") catch unreachable;
-                // flags.append("-DVST3_PLUGIN_PATH=\"zig-out/x86_64-windows/Floe.vst3\"") catch unreachable; // TODO: renable when we build VST3
+                flags.append("-DCLAP_PLUGIN_PATH_RELATIVE_BUILD_ROOT=\"zig-out/x86_64-windows/Floe.clap\"") catch unreachable;
+                flags.append(b.fmt("-DUNINSTALLER_PATH_RELATIVE_BUILD_ROOT=\"zig-out/x86_64-windows/{s}\"", .{win_uninstaller.out_filename})) catch unreachable;
+                // flags.append("-DVST3_PLUGIN_PATH_RELATIVE_BUILD_ROOT=\"zig-out/x86_64-windows/Floe.vst3\"") catch unreachable; // TODO: renable when we build VST3
                 win_installer.addWin32ResourceFile(.{
                     .file = b.path(installer_path ++ "/resources.rc"),
                     .flags = flags.items,
@@ -2574,6 +2746,11 @@ pub fn build(b: *std.Build) void {
                 // everything needs to be installed before we compile the installer because it needs to embed the plugins
                 win_installer.step.dependOn(&vst3_post_install_step.step);
                 win_installer.step.dependOn(&clap_post_install_step.step);
+                if (sign_step) |s| {
+                    win_installer.step.dependOn(s);
+                } else {
+                    win_installer.step.dependOn(&uninstall_artifact_step.step);
+                }
 
                 const artifact_step = b.addInstallArtifact(win_installer, .{ .dest_dir = install_subfolder });
                 build_context.master_step.dependOn(&artifact_step.step);

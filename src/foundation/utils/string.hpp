@@ -125,7 +125,7 @@ PUBLIC constexpr Optional<MutableString> Narrow(Allocator& a, WString wstr) {
     return result.ToOwnedSpan();
 }
 
-// do not Free() the result.
+// do not Free() the result. Has a null terminator, but it is not included in the size.
 PUBLIC constexpr Optional<Span<wchar_t>> WidenAllocNullTerm(ArenaAllocator& allocator, String utf8_str) {
     DynamicArray<wchar_t> buffer {allocator};
     if (!WidenAppend(buffer, utf8_str)) return k_nullopt;

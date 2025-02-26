@@ -3,8 +3,10 @@
 
 #include "installer.hpp"
 
-#include <stb_image.h>
 #include <windows.h>
+//
+#include <shlobj.h>
+#include <stb_image.h>
 
 //
 #include "os/undef_windows_macros.h"
@@ -20,6 +22,7 @@
 #include "common_infrastructure/error_reporting.hpp"
 
 #include "gui.hpp"
+#include "registry.hpp"
 
 enum class Pages : u32 {
     Configuration,
@@ -110,6 +113,27 @@ static ErrorCodeOr<void> TryInstall(Component const& comp) {
     return k_success;
 }
 
+static void TryInstallUninstaller() {
+    ArenaAllocatorWithInlineStorage<1000> arena {Malloc::Instance()};
+
+    auto const uninstaller_exe_path = TRY_OPT_OR(UninstallerPath(arena, true), return);
+
+    // Write the uninstaller exe
+    {
+        auto const file_data = TRY_OR(GetResource(UNINSTALLER_RESOURCE_ID), Panic("Failed to load uninstaller"));
+        TRY_OR(WriteFile(uninstaller_exe_path, file_data), {
+            ReportError(ErrorLevel::Warning,
+                        k_nullopt,
+                        "Failed to install uninstaller '{}': {}",
+                        uninstaller_exe_path,
+                        error);
+            return;
+        });
+    }
+
+    CreateUninstallRegistryKey(arena, uninstaller_exe_path);
+}
+
 static void BackgroundInstallingThread(Application& app) {
     ArenaAllocatorWithInlineStorage<1000> arena {Malloc::Instance()};
     auto const start_time = TimePoint::Now();
@@ -120,6 +144,8 @@ static void BackgroundInstallingThread(Application& app) {
         if (comp.data.size != 0) outcome = TryInstall(comp);
         app.installation_results.Use([i, outcome](InstallationResults& r) { r[i] = outcome; });
     }
+
+    TryInstallUninstaller();
 
     // Intentional delay because it feels good
     constexpr auto k_min_seconds = 1.5;
@@ -279,7 +305,7 @@ Application* CreateApplication(GuiFramework& framework, u32 root_layout_id) {
                 ASSERT(
                     IsEqualToCaseInsensitiveAscii(path::Filename(app->components[i].install_dir), "CLAP"_s));
                 break;
-#ifdef VST3_PLUGIN_PATH
+#ifdef VST3_PLUGIN_PATH_RELATIVE_BUILD_ROOT
             case ComponentTypes::VST3:
                 ASSERT(
                     IsEqualToCaseInsensitiveAscii(path::Filename(app->components[i].install_dir), "VST3"_s));
@@ -293,7 +319,7 @@ Application* CreateApplication(GuiFramework& framework, u32 root_layout_id) {
     constexpr u16 k_margin = 10;
 
     {
-        auto const found_sidebar_image = GetResource(SIDEBAR_IMAGE_RC_ID);
+        auto const found_sidebar_image = GetResource(SIDEBAR_IMAGE_RESOURCE_ID);
         if (found_sidebar_image.HasValue()) {
             auto const& bin_data = found_sidebar_image.Value();
 
@@ -577,4 +603,12 @@ void HandleUserInteraction(Application& app, GuiFramework& framework, UserIntera
         case UserInteraction::Type::TextInputChanged:
         case UserInteraction::Type::TextInputEnterPressed: break;
     }
+}
+
+AppConfig GetAppConfig() {
+    return {
+        .window_width = 620,
+        .window_height = 470,
+        .window_title = L"Floe Installer v" WIDEN_STRING_LITERAL(FLOE_VERSION_STRING),
+    };
 }

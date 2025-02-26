@@ -9,7 +9,7 @@
 
 enum class ComponentTypes : u32 {
     Clap,
-#ifdef VST3_PLUGIN_PATH
+#ifdef VST3_PLUGIN_PATH_RELATIVE_BUILD_ROOT
     VST3,
 #endif
     Count,
@@ -26,15 +26,15 @@ constexpr auto k_plugin_infos = Array {
     ComponentInfo {
         .name = "Floe CLAP Plugin v" FLOE_VERSION_STRING,
         .install_dir = KnownDirectoryType::GlobalClapPlugins,
-        .filename = path::Filename(CLAP_PLUGIN_PATH),
-        .resource_id = CLAP_PLUGIN_RC_ID,
+        .filename = path::Filename(CLAP_PLUGIN_PATH_RELATIVE_BUILD_ROOT),
+        .resource_id = CLAP_PLUGIN_RESOURCE_ID,
     },
-#ifdef VST3_PLUGIN_PATH
+#ifdef VST3_PLUGIN_PATH_RELATIVE_BUILD_ROOT
     ComponentInfo {
         .name = "Floe VST3 Plugin v" FLOE_VERSION_STRING,
         .install_dir = KnownDirectoryType::GlobalVst3Plugins,
-        .filename = path::Filename(VST3_PLUGIN_PATH),
-        .resource_id = VST3_PLUGIN_RC_ID,
+        .filename = path::Filename(VST3_PLUGIN_PATH_RELATIVE_BUILD_ROOT),
+        .resource_id = VST3_PLUGIN_RESOURCE_ID,
     },
 #endif
 };

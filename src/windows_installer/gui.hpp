@@ -14,14 +14,17 @@
 struct Application;
 struct GuiFramework;
 
+constexpr u32 k_timer_ms = 20;
+constexpr usize k_max_widgets = 150;
+
 #define WIDEN_MACRO_HELPER(x)   L##x
 #define WIDEN_STRING_LITERAL(x) WIDEN_MACRO_HELPER(x)
 
-constexpr u16 k_window_width = 620;
-constexpr u16 k_window_height = 470;
-constexpr u32 k_timer_ms = 20;
-constexpr usize k_max_widgets = 150;
-constexpr wchar_t const* k_window_title = L"Floe Installer v" WIDEN_STRING_LITERAL(FLOE_VERSION_STRING);
+struct AppConfig {
+    u16 window_width;
+    u16 window_height;
+    wchar_t const* window_title;
+};
 
 enum class Orientation { Vertical, Horizontal };
 enum class Alignment { Start, End };
@@ -155,6 +158,7 @@ String GetText(GuiFramework& framework, u32 id);
 bool AutorunMode(GuiFramework& framework);
 
 // Defined in installer code
+AppConfig GetAppConfig();
 Application* CreateApplication(GuiFramework& framework, u32 root_layout);
 void OnTimer(Application& app, GuiFramework& framework);
 [[nodiscard]] int DestroyApplication(Application& app, GuiFramework& framework); // returns main return code

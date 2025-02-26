@@ -2,6 +2,7 @@
 #include <shlobj.h>
 #include <windows.h>
 //
+#include "os/misc_windows.hpp"
 #include "os/undef_windows_macros.h"
 //
 
@@ -43,16 +44,20 @@ PUBLIC Optional<String> UninstallerPath(ArenaAllocator& arena, bool create) {
 PUBLIC void CreateUninstallRegistryKey(ArenaAllocator& arena, String uninstaller_exe_path) {
     // Create the uninstall registry key
     HKEY h_key;
-    if (RegCreateKeyExW(HKEY_LOCAL_MACHINE,
-                        k_uninstall_key,
-                        0,
-                        nullptr,
-                        REG_OPTION_NON_VOLATILE,
-                        KEY_WRITE,
-                        nullptr,
-                        &h_key,
-                        nullptr) != ERROR_SUCCESS) {
-        ReportError(ErrorLevel::Warning, k_nullopt, "Failed to create registry key for uninstaller");
+    if (auto const rc = RegCreateKeyExW(HKEY_LOCAL_MACHINE,
+                                        k_uninstall_key,
+                                        0,
+                                        nullptr,
+                                        REG_OPTION_NON_VOLATILE,
+                                        KEY_WRITE,
+                                        nullptr,
+                                        &h_key,
+                                        nullptr);
+        rc != ERROR_SUCCESS) {
+        ReportError(ErrorLevel::Warning,
+                    k_nullopt,
+                    "Failed to create registry key for uninstaller: {}",
+                    Win32ErrorCode((DWORD)rc));
         return;
     }
     DEFER { RegCloseKey(h_key); };
@@ -60,24 +65,32 @@ PUBLIC void CreateUninstallRegistryKey(ArenaAllocator& arena, String uninstaller
     // Set the uninstall string (path to the uninstaller).
     // wide_path has a null terminator but it's not included in the size.
     auto const wide_path = *WidenAllocNullTerm(arena, uninstaller_exe_path);
-    if (RegSetValueExW(h_key,
-                       L"UninstallString",
-                       0,
-                       REG_SZ,
-                       (const BYTE*)wide_path.data,
-                       (DWORD)(wide_path.size + 1) * sizeof(wchar_t)) != ERROR_SUCCESS) {
-        ReportError(ErrorLevel::Warning, k_nullopt, "Failed to set uninstall string in registry");
+    if (auto const rc = RegSetValueExW(h_key,
+                                       L"UninstallString",
+                                       0,
+                                       REG_SZ,
+                                       (const BYTE*)wide_path.data,
+                                       (DWORD)(wide_path.size + 1) * sizeof(wchar_t));
+        rc != ERROR_SUCCESS) {
+        ReportError(ErrorLevel::Warning,
+                    k_nullopt,
+                    "Failed to set uninstall string in registry: {}",
+                    Win32ErrorCode((DWORD)rc));
         return;
     }
 
     WString constexpr k_display_name = L"Floe Audio Plugin"_s;
-    if (RegSetValueExW(h_key,
-                       L"DisplayName",
-                       0,
-                       REG_SZ,
-                       (const BYTE*)k_display_name.data,
-                       (DWORD)(k_display_name.size + 1) * sizeof(wchar_t)) != ERROR_SUCCESS) {
-        ReportError(ErrorLevel::Warning, k_nullopt, "Failed to set display name in registry");
+    if (auto const rc = RegSetValueExW(h_key,
+                                       L"DisplayName",
+                                       0,
+                                       REG_SZ,
+                                       (const BYTE*)k_display_name.data,
+                                       (DWORD)(k_display_name.size + 1) * sizeof(wchar_t));
+        rc != ERROR_SUCCESS) {
+        ReportError(ErrorLevel::Warning,
+                    k_nullopt,
+                    "Failed to set display name in registry: {}",
+                    Win32ErrorCode((DWORD)rc));
         return;
     }
 
@@ -101,8 +114,11 @@ PUBLIC void CreateUninstallRegistryKey(ArenaAllocator& arena, String uninstaller
 }
 
 PUBLIC void RemoveUninstallRegistryKey() {
-    if (RegDeleteKeyW(HKEY_LOCAL_MACHINE, k_uninstall_key) != ERROR_SUCCESS)
-        ReportError(ErrorLevel::Warning, k_nullopt, "Failed to delete uninstall registry key");
+    if (auto const rc = RegDeleteKeyW(HKEY_LOCAL_MACHINE, k_uninstall_key); rc != ERROR_SUCCESS)
+        ReportError(ErrorLevel::Warning,
+                    k_nullopt,
+                    "Failed to delete uninstall registry key: {}",
+                    Win32ErrorCode((DWORD)rc));
 }
 
 PUBLIC void RemoveFileOnReboot(String path, ArenaAllocator& arena) {
@@ -110,6 +126,7 @@ PUBLIC void RemoveFileOnReboot(String path, ArenaAllocator& arena) {
     if (!MoveFileExW(wide_path.data, nullptr, MOVEFILE_DELAY_UNTIL_REBOOT))
         ReportError(ErrorLevel::Warning,
                     k_nullopt,
-                    "Failed to schedule file for deletion on reboot: {}",
-                    path);
+                    "Failed to schedule file for deletion on reboot: {}: {}",
+                    path,
+                    Win32ErrorCode(GetLastError()));
 }

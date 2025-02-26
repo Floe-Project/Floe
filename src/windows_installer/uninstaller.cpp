@@ -6,12 +6,21 @@
 #include "gui.hpp"
 #include "windows_installer/registry.hpp"
 
+// NOTE: Lot's of room for improvement in UX here. For now, this gets the job done. Improvements could
+// include:
+// - Don't block GUI thread while uninstalling
+// - Use checkboxes to select what to uninstall
+// - Show progress bar
+// - Support uninstalling libraries/presets
+// - Don't show error messages - the user can't do anything about them anyways.
+
 struct Application {
     u32 uninstall_floe_button;
     u32 uninstall_mirage_buttton;
-    u32 cancel_button;
+    u32 finish_button;
     u32 result_textbox;
     bool has_error = false;
+    bool uninstall_attempted = false;
 };
 
 AppConfig GetAppConfig() {
@@ -61,7 +70,7 @@ Application* CreateApplication(GuiFramework& framework, u32 root_layout) {
             .margins = {0, 0, 2, 8},
             .expand_x = true,
             .text =
-                "This tiny application will remove Floe from your system. It does not remove libraries or presets.\n\nSimply click the uninstall button below.",
+                "This program will remove Floe from your system. It does not remove libraries or presets.",
             .type = WidgetOptions::Label {.style = LabelStyle::Regular},
         });
 
@@ -97,15 +106,17 @@ Application* CreateApplication(GuiFramework& framework, u32 root_layout) {
                                                           .orientation = Orientation::Horizontal,
                                                       },
                                               });
-    app->cancel_button = CreateWidget(framework,
+    app->finish_button = CreateWidget(framework,
                                       bottom_row,
                                       {
-                                          .text = "Cancel",
+                                          .text = "Finish",
                                           .type = WidgetOptions::Button {.is_default = false},
                                       });
 
     if (AutorunMode(framework))
         EditWidget(framework, app->uninstall_floe_button, {.simulate_button_press = true});
+
+    RecalculateLayout(framework);
 
     return app;
 }
@@ -188,6 +199,7 @@ void HandleUserInteraction(Application& app, GuiFramework& framework, UserIntera
                 String const name = info.widget_id == app.uninstall_floe_button ? "Floe"_s : "Mirage";
 
                 app.has_error = false;
+                app.uninstall_attempted = true;
                 EditWidget(framework,
                            app.result_textbox,
                            {.text = fmt::Format(scratch, "Uninstalling {}...\n", name)});
@@ -213,7 +225,7 @@ void HandleUserInteraction(Application& app, GuiFramework& framework, UserIntera
                 else
                     EditWidget(framework, app.result_textbox, {.text = error_log});
 
-            } else if (info.widget_id == app.cancel_button) {
+            } else if (info.widget_id == app.finish_button) {
                 ExitProgram(framework);
             }
             break;
@@ -231,12 +243,14 @@ void OnTimer(Application&, GuiFramework&) {}
 [[nodiscard]] int DestroyApplication(Application& app, GuiFramework&) {
     if (app.has_error) return 1;
 
-    ArenaAllocator scratch {PageAllocator::Instance()};
-    if (auto const uninstall_path = UninstallerPath(scratch, false)) {
-        RemoveFileOnReboot(*uninstall_path, scratch);
-        if (auto const dir = path::Directory(*uninstall_path)) RemoveFileOnReboot(*dir, scratch);
+    if (app.uninstall_attempted) {
+        ArenaAllocator scratch {PageAllocator::Instance()};
+        if (auto const uninstall_path = UninstallerPath(scratch, false)) {
+            RemoveFileOnReboot(*uninstall_path, scratch);
+            if (auto const dir = path::Directory(*uninstall_path)) RemoveFileOnReboot(*dir, scratch);
 
-        RemoveUninstallRegistryKey();
+            RemoveUninstallRegistryKey();
+        }
     }
 
     return 0;

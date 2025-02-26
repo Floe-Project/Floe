@@ -663,6 +663,8 @@ MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirecto
             dyn::Append(wide_result, L'\\');
             dyn::AppendSpan(wide_result, subfolder);
             if (options.create) {
+                dyn::Append(wide_result, L'\0');
+                DEFER { dyn::Pop(wide_result); };
                 if (!CreateDirectoryW(wide_result.data, nullptr)) {
                     auto const err = GetLastError();
                     if (err != ERROR_ALREADY_EXISTS) {

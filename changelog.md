@@ -12,7 +12,7 @@ For instance: 0.0.1. Don't change the headings.
 ## 0.0.3
 - Rename 'settings' to 'preferences'
 - Add support for packaging and installing MDATA libraries (Mirage)
-- Add a Floe uninstaller for Windows, integrated into Windows' 'Installed Apps' control panel
+- Add a Floe uninstaller for Windows, integrated into Windows' 'Add or Remove Programs' control panel
 - Add tooltips to the preferences GUI
 - Add new Info panel featuring info about installed libraries. 'About', 'Metrics' and 'Licenses' have been moved here too instead of being separate panels.
 - Add new Share Feedback panel for submitting bug reports and feature requests

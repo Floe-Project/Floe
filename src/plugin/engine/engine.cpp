@@ -468,9 +468,7 @@ static void OnMainThread(Engine& engine) {
         engine.plugin_instance_messages.UpdateGui();
 
     if (AutosaveNeeded(engine.autosave_state, engine.shared_engine_systems.prefs))
-        QueueAutosave(engine.autosave_state,
-                      engine.shared_engine_systems.prefs,
-                      CurrentStateSnapshot(engine));
+        QueueAutosave(engine.autosave_state, CurrentStateSnapshot(engine));
 }
 
 void Engine::OnProcessorChange(ChangeFlags flags) {
@@ -500,16 +498,17 @@ Engine::Engine(clap_host const& host,
 
     last_snapshot.state = CurrentStateSnapshot(*this);
 
-    InitAutosaveState(autosave_state, random_seed, last_snapshot.state);
+    InitAutosaveState(autosave_state, shared_engine_systems.prefs, random_seed, last_snapshot.state);
 
     presets_folder_listener_id =
         shared_engine_systems.preset_listing.scanned_folder.listeners.Add([&engine = *this]() {
             RunFunctionOnMainThread(engine, [&engine]() {
-                auto listing = FetchOrRescanPresetsFolder(
-                    engine.shared_engine_systems.preset_listing,
-                    RescanMode::DontRescan,
-                    ExtraScanFolders(engine.shared_engine_systems.paths, engine.shared_engine_systems.prefs, ScanFolderType::Presets),
-                    nullptr);
+                auto listing = FetchOrRescanPresetsFolder(engine.shared_engine_systems.preset_listing,
+                                                          RescanMode::DontRescan,
+                                                          ExtraScanFolders(engine.shared_engine_systems.paths,
+                                                                           engine.shared_engine_systems.prefs,
+                                                                           ScanFolderType::Presets),
+                                                          nullptr);
 
                 if (engine.pending_preset_selection_criteria) {
                     LoadPresetFromListing(engine, *engine.pending_preset_selection_criteria, listing);

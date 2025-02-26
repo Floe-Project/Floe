@@ -459,6 +459,23 @@ EnvelopeAddEvent(Sentry& sentry, EnvelopeWriter& writer, ErrorEvent event, AddEv
         DynamicArrayBounded<char, LogRingBuffer::k_buffer_size> buffer;
         GetLatestLogMessages(buffer);
         for (auto const message : SplitIterator {.whole = buffer, .token = '\0', .skip_consecutive = true}) {
+            // We are not expecting any log messages to contain paths because they could contain usernames. We
+            // have a policy of only ever logging non-personal information. However, let's have a safety net
+            // just in case.
+            {
+                String path_start;
+                if constexpr (IS_WINDOWS)
+                    path_start = "C:\\";
+                else if constexpr (IS_MACOS)
+                    path_start = "/Users/";
+                else if constexpr (IS_LINUX)
+                    path_start = "/home/";
+                if (ContainsSpan(message, path_start)) {
+                    if constexpr (!PRODUCTION_BUILD) Panic("log message contains a path");
+                    continue;
+                }
+            }
+
             TRY(json::WriteObjectBegin(json_writer));
             TRY(json::WriteKeyValue(json_writer, "message", message));
             TRY(json::WriteObjectEnd(json_writer));

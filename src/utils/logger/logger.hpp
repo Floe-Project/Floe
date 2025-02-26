@@ -5,6 +5,13 @@
 #include "foundation/foundation.hpp"
 #include "os/threading.hpp"
 
+// About logging:
+// - Debug logs are for debugging on a developer's machine. Use them however you want. They are disabled in
+//   production build
+// - All other log types are for production use. We have a strict policy: log about the state of the program,
+//   and only ever non-personal external state. For example, never log a filepath. It could contain a
+//   username. On the other hand, information about the CPU is fine because it's not personal.
+
 enum class LogLevel { Debug, Info, Warning, Error };
 
 struct WriteLogLineOptions {

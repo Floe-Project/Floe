@@ -118,7 +118,7 @@ PreferencesTable ParsePreferencesFile(String file_data, ArenaAllocator& arena) {
 
         auto key = WhitespaceStrippedEnd(line.SubSpan(0, *equals));
         if (!IsKeyValid(key)) {
-            LogWarning(ModuleName::Preferences, "invalid key {}", key.SubSpan(0, k_max_key_size));
+            LogWarning(ModuleName::Preferences, "invalid key");
             continue;
         }
 
@@ -888,7 +888,7 @@ void Init(Preferences& prefs, Span<String const> possible_paths) {
         auto const read_result = TRY_OR(ReadEntirePreferencesFile(path, prefs.arena), {
             if (error == FilesystemError::PathDoesNotExist || error == FilesystemError::AccessDenied)
                 continue;
-            LogWarning(ModuleName::Preferences, "failed to read preferences file: {}, {}", path, error);
+            LogWarning(ModuleName::Preferences, "failed to read preferences file: {}", error);
             continue;
         });
         prefs.last_known_file_modified_time = read_result.file_last_modified;

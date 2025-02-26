@@ -21,25 +21,25 @@ static Optional<fmt::UuidArray> DeviceId(Atomic<u64>& seed) {
                                                        {.create = true});
 
     auto file = TRY_OR(OpenFile(path, FileMode::ReadWrite()), {
-        LogError(ModuleName::ErrorReporting, "Failed to create device_id file: {}, {}", path, error);
+        LogError(ModuleName::ErrorReporting, "Failed to create device_id file: {}", error);
         return k_nullopt;
     });
 
     TRY_OR(file.Lock({.type = FileLockOptions::Type::Exclusive}), {
-        LogError(ModuleName::ErrorReporting, "Failed to lock device_id file: {}, {}", path, error);
+        LogError(ModuleName::ErrorReporting, "Failed to lock device_id file: {}", error);
         return k_nullopt;
     });
     DEFER { auto _ = file.Unlock(); };
 
     auto const size = TRY_OR(file.FileSize(), {
-        LogError(ModuleName::ErrorReporting, "Failed to get size of device_id file: {}, {}", path, error);
+        LogError(ModuleName::ErrorReporting, "Failed to get size of device_id file: {}", error);
         return k_nullopt;
     });
 
     if (size == fmt::k_uuid_size) {
         fmt::UuidArray uuid {};
         TRY_OR(file.Read(uuid.data, uuid.size), {
-            LogError(ModuleName::ErrorReporting, "Failed to read device_id file: {}, {}", path, error);
+            LogError(ModuleName::ErrorReporting, "Failed to read device_id file: {}", error);
             return k_nullopt;
         });
 
@@ -57,14 +57,13 @@ static Optional<fmt::UuidArray> DeviceId(Atomic<u64>& seed) {
     auto const uuid = detail::Uuid(seed);
 
     TRY_OR(file.Seek(0, File::SeekOrigin::Start),
-           { LogError(ModuleName::ErrorReporting, "Failed to seek device_id file: {}, {}", path, error); });
+           { LogError(ModuleName::ErrorReporting, "Failed to seek device_id file: {}", error); });
 
-    TRY_OR(file.Truncate(0), {
-        LogError(ModuleName::ErrorReporting, "Failed to truncate device_id file: {}, {}", path, error);
-    });
+    TRY_OR(file.Truncate(0),
+           { LogError(ModuleName::ErrorReporting, "Failed to truncate device_id file: {}", error); });
 
     TRY_OR(file.Write(uuid),
-           { LogError(ModuleName::ErrorReporting, "Failed to write device_id file: {}, {}", path, error); });
+           { LogError(ModuleName::ErrorReporting, "Failed to write device_id file: {}", error); });
 
     auto _ = file.Flush();
 

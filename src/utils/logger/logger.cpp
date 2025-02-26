@@ -197,7 +197,10 @@ void Log(ModuleName module_name, LogLevel level, FunctionRef<ErrorCodeOr<void>(W
                 DEFER { mutex.Unlock(); };
 
                 BufferedWriter<Kb(4)> buffered_writer {StdWriter(StdStream::Err)};
-                DEFER { auto _ = buffered_writer.Flush(); };
+                DEFER {
+                    auto _ = buffered_writer.Flush();
+                    buffered_writer.Reset();
+                };
 
                 auto _ = WriteLogLine(buffered_writer.Writer(), module_name, level, write_message, k_config);
             };

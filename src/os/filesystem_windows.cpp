@@ -183,7 +183,10 @@ ErrorCodeOr<File> OpenFile(String filename, FileMode mode) {
         else if (cap & ToInt(FileMode::Capability::Read))
             a = GENERIC_READ;
 
-        if (cap & ToInt(FileMode::Capability::Append)) a |= FILE_APPEND_DATA;
+        if (cap & ToInt(FileMode::Capability::Append)) {
+            a |= FILE_APPEND_DATA | FILE_WRITE_ATTRIBUTES;
+            a &= ~(DWORD)FILE_WRITE_DATA; // FILE_WRITE_DATA overwrides our desired append behaviour
+        }
         a;
     });
 

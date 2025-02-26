@@ -101,11 +101,10 @@ check-format:
 [unix]
 check-spelling:
   #!/usr/bin/env bash
-  output=$(fd . -e .md --exclude third_party_libs/ --exclude src/readme.md | xargs hunspell -l -d en_GB -p docs/ignored-spellings.dic)
+  set -euo pipefail
+  output=$(fd . -e .md --exclude third_party_libs/ --exclude src/readme.md | xargs hunspell -l -d en_GB -p docs/ignored-spellings.dic | sort -u)
   echo "$output"
-  if [[ -n "$output" ]]; then
-    exit 1
-  fi
+  test "$output" == ""
 
 [unix]
 check-links:

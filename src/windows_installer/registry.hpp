@@ -36,7 +36,9 @@ PUBLIC Optional<String> UninstallerPath(ArenaAllocator& arena, bool create) {
         });
     }
 
-    path = path::JoinAppendResizeAllocation(arena, path, Array {"Floe-Uninstaller.exe"_s});
+    path = path::JoinAppendResizeAllocation(arena,
+                                            path,
+                                            Array {path::Filename(UNINSTALLER_PATH_RELATIVE_BUILD_ROOT)});
 
     return path;
 }

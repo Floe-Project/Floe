@@ -2834,13 +2834,21 @@ pub fn build(b: *std.Build) void {
                 });
                 win_uninstaller.subsystem = .Windows;
 
+                var flags = std.ArrayList([]const u8).init(b.allocator);
+                flags.append(
+                    b.fmt(
+                        "-DUNINSTALLER_PATH_RELATIVE_BUILD_ROOT=\"zig-out/x86_64-windows/{s}\"",
+                        .{win_uninstaller.out_filename},
+                    ),
+                ) catch unreachable;
+
                 win_uninstaller.addCSourceFiles(.{
                     .files = &.{
                         installer_path ++ "/uninstaller.cpp",
                         installer_path ++ "/gui.cpp",
                         "src/common_infrastructure/final_binary_type.cpp",
                     },
-                    .flags = cpp_floe_flags,
+                    .flags = cppFlags(b, cpp_floe_flags, flags.items) catch unreachable,
                 });
                 win_uninstaller.defineCMacro("FINAL_BINARY_TYPE", "WindowsUninstaller");
                 win_uninstaller.linkSystemLibrary("gdi32");
@@ -2886,8 +2894,6 @@ pub fn build(b: *std.Build) void {
                 });
                 win_installer.subsystem = .Windows;
 
-                var flags = std.ArrayList([]const u8).init(b.allocator);
-
                 if (sidebar_image != null) {
                     flags.append(
                         b.fmt(
@@ -2898,12 +2904,6 @@ pub fn build(b: *std.Build) void {
                 }
                 flags.append(
                     "-DCLAP_PLUGIN_PATH_RELATIVE_BUILD_ROOT=\"zig-out/x86_64-windows/Floe.clap\"",
-                ) catch unreachable;
-                flags.append(
-                    b.fmt(
-                        "-DUNINSTALLER_PATH_RELATIVE_BUILD_ROOT=\"zig-out/x86_64-windows/{s}\"",
-                        .{win_uninstaller.out_filename},
-                    ),
                 ) catch unreachable;
                 // flags.append("-DVST3_PLUGIN_PATH_RELATIVE_BUILD_ROOT=\"zig-out/x86_64-windows/Floe.vst3\"") catch unreachable; // TODO: renable when we build VST3
                 win_installer.addWin32ResourceFile(.{

@@ -378,7 +378,13 @@ ErrorCodeOr<s128> LastModifiedTimeNsSinceEpoch(String filename) {
 }
 
 ErrorCodeOr<void> SetLastModifiedTimeNsSinceEpoch(String filename, s128 time) {
-    return TRY(OpenFile(filename, FileMode::Read())).SetLastModifiedTimeNsSinceEpoch(time);
+    return TRY(OpenFile(filename,
+                        {
+                            .capability = FileMode::Capability::Write,
+                            .win32_share = FileMode::Share::ReadWrite | FileMode::Share::DeleteRename,
+                            .creation = FileMode::Creation::OpenExisting,
+                        }))
+        .SetLastModifiedTimeNsSinceEpoch(time);
 }
 
 ErrorCodeOr<MutableString>

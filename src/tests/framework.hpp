@@ -71,7 +71,7 @@ constexpr auto k_libraries_test_files_subdir = "libraries"_s;
 
 struct Result {
     __attribute__((noinline)) Result(ErrorCode ec)
-        : stacktrace(CurrentStacktrace(StacktraceFrames {3}))
+        : stacktrace(CurrentStacktrace(StacktraceFrames {2}))
         , outcome(ec) {}
     Result(SuccessType s) : outcome(s) { stacktrace = StacktraceStack {}; }
     Optional<StacktraceStack> stacktrace;

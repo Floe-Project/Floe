@@ -41,66 +41,53 @@ PUBLIC Optional<String> UninstallerPath(ArenaAllocator& arena, bool create) {
     return path;
 }
 
+static bool TryOrReportError(LONG rc, String action) {
+    if (rc == ERROR_SUCCESS) return true;
+    ReportError(ErrorLevel::Warning, k_nullopt, "Failed to {}: {}", action, Win32ErrorCode((DWORD)rc));
+    return false;
+}
+
+static bool SetRegString(HKEY h_key, wchar_t const* name, WString value, bool required) {
+    // We're expecting a null terminator at the end of the string, but not included in the size.
+    ASSERT(Last(value) != 0);
+    ASSERT(*(value.data + value.size) == 0);
+    auto const rc = RegSetValueExW(h_key,
+                                   name,
+                                   0,
+                                   REG_SZ,
+                                   (const BYTE*)value.data,
+                                   (DWORD)(value.size + 1) * sizeof(wchar_t));
+    if (required) return TryOrReportError(rc, "set registry string"_s);
+
+    return true;
+}
+
 PUBLIC void CreateUninstallRegistryKey(ArenaAllocator& arena, String uninstaller_exe_path) {
     // Create the uninstall registry key
     HKEY h_key;
-    if (auto const rc = RegCreateKeyExW(HKEY_LOCAL_MACHINE,
-                                        k_uninstall_key,
-                                        0,
-                                        nullptr,
-                                        REG_OPTION_NON_VOLATILE,
-                                        KEY_WRITE,
-                                        nullptr,
-                                        &h_key,
-                                        nullptr);
-        rc != ERROR_SUCCESS) {
-        ReportError(ErrorLevel::Warning,
-                    k_nullopt,
-                    "Failed to create registry key for uninstaller: {}",
-                    Win32ErrorCode((DWORD)rc));
+    if (!TryOrReportError(RegCreateKeyExW(HKEY_LOCAL_MACHINE,
+                                          k_uninstall_key,
+                                          0,
+                                          nullptr,
+                                          REG_OPTION_NON_VOLATILE,
+                                          KEY_WRITE,
+                                          nullptr,
+                                          &h_key,
+                                          nullptr),
+                          "create uninstall registry key")) {
         return;
     }
     DEFER { RegCloseKey(h_key); };
 
     // Set the uninstall string (path to the uninstaller).
     // wide_path has a null terminator but it's not included in the size.
-    auto const wide_path = *WidenAllocNullTerm(arena, uninstaller_exe_path);
-    if (auto const rc = RegSetValueExW(h_key,
-                                       L"UninstallString",
-                                       0,
-                                       REG_SZ,
-                                       (const BYTE*)wide_path.data,
-                                       (DWORD)(wide_path.size + 1) * sizeof(wchar_t));
-        rc != ERROR_SUCCESS) {
-        ReportError(ErrorLevel::Warning,
-                    k_nullopt,
-                    "Failed to set uninstall string in registry: {}",
-                    Win32ErrorCode((DWORD)rc));
-        return;
-    }
+    auto const uninstall_path_wide = *WidenAllocNullTerm(arena, uninstaller_exe_path);
+    if (!SetRegString(h_key, L"UninstallString", uninstall_path_wide, true)) return;
 
-    WString constexpr k_display_name = L"Floe Audio Plugin"_s;
-    if (auto const rc = RegSetValueExW(h_key,
-                                       L"DisplayName",
-                                       0,
-                                       REG_SZ,
-                                       (const BYTE*)k_display_name.data,
-                                       (DWORD)(k_display_name.size + 1) * sizeof(wchar_t));
-        rc != ERROR_SUCCESS) {
-        ReportError(ErrorLevel::Warning,
-                    k_nullopt,
-                    "Failed to set display name in registry: {}",
-                    Win32ErrorCode((DWORD)rc));
-        return;
-    }
+    if (!SetRegString(h_key, L"DisplayName", L"Floe Audio Plugin"_s, true)) return;
 
     // We can use the uninstaller as the icon source
-    RegSetValueExW(h_key,
-                   L"DisplayIcon",
-                   0,
-                   REG_SZ,
-                   (const BYTE*)wide_path.data,
-                   (DWORD)(wide_path.size + 1) * sizeof(wchar_t));
+    SetRegString(h_key, L"DisplayIcon", uninstall_path_wide, false);
 
     {
         DWORD const no_modify = 1;
@@ -111,6 +98,25 @@ PUBLIC void CreateUninstallRegistryKey(ArenaAllocator& arena, String uninstaller
         DWORD const no_repair = 1;
         RegSetValueExW(h_key, L"NoRepair", 0, REG_DWORD, (const BYTE*)&no_repair, sizeof(no_repair));
     }
+
+    SetRegString(h_key, L"DisplayVersion", L"" FLOE_VERSION_STRING, false);
+
+    {
+        DWORD const major = FLOE_MAJOR_VERSION;
+        RegSetValueExW(h_key, L"VersionMajor", 0, REG_DWORD, (const BYTE*)&major, sizeof(major));
+    }
+
+    {
+        DWORD const minor = FLOE_MINOR_VERSION;
+        RegSetValueExW(h_key, L"VersionMinor", 0, REG_DWORD, (const BYTE*)&minor, sizeof(minor));
+    }
+
+    {
+        DWORD const version = (FLOE_MAJOR_VERSION << 16) | FLOE_MINOR_VERSION;
+        RegSetValueExW(h_key, L"Version", 0, REG_DWORD, (const BYTE*)&version, sizeof(version));
+    }
+
+    SetRegString(h_key, L"URLInfoAbout", L"" FLOE_HOMEPAGE_URL, false);
 }
 
 PUBLIC void RemoveUninstallRegistryKey() {

@@ -14,7 +14,11 @@
 // - For native compiling, we rely on nix and pkg-config. Use 'pkg-config --list-all | fzf' to find
 //   the names of libraries to use when doing linkSystemLibrary2().
 //
-// NOTE: this whole file needs to be refactored. We need to more closely follow Zig's build system patterns: steps, step dependencies, enable parallelism of steps where possible, etc.
+// NOTE: this whole file needs to be refactored.
+// We need to more closely follow Zig's build system patterns: steps, step dependencies, enable
+// parallelism of steps where possible, etc.
+// Additionally, I think it will pay off to move all tests and scripts to zig too, so we can have
+// a single point of truth for all configuration, building and testing
 
 const std = @import("std");
 const builtin = @import("builtin");

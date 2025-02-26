@@ -11,13 +11,10 @@
 #include "state/state_snapshot.hpp"
 
 struct AutosaveState {
-    static constexpr u8 k_default_autosave_interval_seconds = 10;
-    static constexpr u8 k_default_max_autosaves_per_instance = 16;
-    static constexpr u8 k_default_autosave_delete_after_days = 7;
 
     enum class State { Idle, PendingSave, Saved };
-    Atomic<u16> max_autosaves_per_instance {k_default_max_autosaves_per_instance};
-    Atomic<u16> autosave_delete_after_days {k_default_autosave_delete_after_days};
+    Atomic<u16> max_autosaves_per_instance {};
+    Atomic<u16> autosave_delete_after_days {};
     DynamicArrayBounded<char, 16> instance_id;
     TimePoint last_save_time {};
     Mutex mutex {};
@@ -27,9 +24,12 @@ struct AutosaveState {
 
 // Run from main thread
 // Check if an autosave is needed, and if so, create a snapshot and queue it.
-void InitAutosaveState(AutosaveState& state, u64& random_seed, StateSnapshot const& initial_state);
+void InitAutosaveState(AutosaveState& state,
+                       prefs::PreferencesTable const& prefs,
+                       u64& random_seed,
+                       StateSnapshot const& initial_state);
 bool AutosaveNeeded(AutosaveState const& state, prefs::Preferences const& preferences);
-void QueueAutosave(AutosaveState& state, prefs::Preferences const& preferences, StateSnapshot const& snapshot);
+void QueueAutosave(AutosaveState& state, StateSnapshot const& snapshot);
 
 enum class AutosaveSetting : u8 {
     AutosaveIntervalSeconds,

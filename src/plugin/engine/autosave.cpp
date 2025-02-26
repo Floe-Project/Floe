@@ -64,8 +64,6 @@ static ErrorCodeOr<void> CleanupExcessInstanceAutosaves(AutosaveState const& sta
 
 static ErrorCodeOr<void>
 Autosave(AutosaveState& state, StateSnapshot const& snapshot, FloePaths const& paths) {
-    state.last_save_time = TimePoint::Now();
-
     PathArena arena {PageAllocator::Instance()};
 
     DynamicArrayBounded<char, 32> prefix;
@@ -130,7 +128,14 @@ static ErrorCodeOr<void> CleanupOldAutosavesIfNeeded(FloePaths const& paths,
     return k_success;
 }
 
-void InitAutosaveState(AutosaveState& state, u64& random_seed, StateSnapshot const& initial_state) {
+static s64 AutosaveSettingIntValue(AutosaveSetting setting, prefs::PreferencesTable const& preferences) {
+    return prefs::GetValue(preferences, SettingDescriptor(setting)).value.Get<s64>();
+}
+
+void InitAutosaveState(AutosaveState& state,
+                       prefs::PreferencesTable const& prefs,
+                       u64& random_seed,
+                       StateSnapshot const& initial_state) {
     constexpr auto k_instance_words = Array {
         "wave"_s, "pond",  "beam", "drift", "breeze", "flow",  "spark",  "glow",  "river",  "cloud",
         "stream", "rain",  "sun",  "moon",  "star",   "wind",  "storm",  "frost", "flame",  "mist",
@@ -148,6 +153,10 @@ void InitAutosaveState(AutosaveState& state, u64& random_seed, StateSnapshot con
     state.last_save_time = TimePoint::Now();
     state.state = AutosaveState::State::Saved;
     state.snapshot = initial_state;
+    state.autosave_delete_after_days.raw =
+        (u16)AutosaveSettingIntValue(AutosaveSetting::AutosaveDeleteAfterDays, prefs);
+    state.max_autosaves_per_instance.raw =
+        (u16)AutosaveSettingIntValue(AutosaveSetting::MaxAutosavesPerInstance, prefs);
 }
 
 void AutosaveToFileIfNeeded(AutosaveState& state, FloePaths const& paths) {
@@ -165,9 +174,8 @@ void AutosaveToFileIfNeeded(AutosaveState& state, FloePaths const& paths) {
         }
     }
     if (snapshot) {
-        TRY_OR(Autosave(state, *snapshot, paths), {
-            ReportError(ErrorLevel::Error, HashComptime("autosave"), "autosave failed: {}", error);
-        });
+        TRY_OR(Autosave(state, *snapshot, paths),
+               { ReportError(ErrorLevel::Error, HashComptime("autosave"), "autosave failed: {}", error); });
         ArenaAllocatorWithInlineStorage<1000> scratch_arena {PageAllocator::Instance()};
         static bool first_call = true;
         if (Exchange(first_call, false)) {
@@ -204,7 +212,7 @@ prefs::Descriptor SettingDescriptor(AutosaveSetting setting) {
                                 return true;
                             },
                     },
-                .default_value = (s64)AutosaveState::k_default_autosave_interval_seconds,
+                .default_value = (s64)10,
                 .gui_label = "Autosave interval (seconds)"_s,
             };
         case AutosaveSetting::MaxAutosavesPerInstance:
@@ -218,7 +226,7 @@ prefs::Descriptor SettingDescriptor(AutosaveSetting setting) {
                                 return true;
                             },
                     },
-                .default_value = (s64)AutosaveState::k_default_max_autosaves_per_instance,
+                .default_value = (s64)16,
                 .gui_label = "Max autosaves per instance"_s,
             };
         case AutosaveSetting::AutosaveDeleteAfterDays:
@@ -232,7 +240,7 @@ prefs::Descriptor SettingDescriptor(AutosaveSetting setting) {
                                 return true;
                             },
                     },
-                .default_value = (s64)AutosaveState::k_default_autosave_delete_after_days,
+                .default_value = (s64)7,
                 .gui_label = "Autosave delete after days"_s,
             };
         case AutosaveSetting::Count: break;
@@ -260,23 +268,12 @@ void OnPreferenceChanged(AutosaveState& state, prefs::Key const& key, prefs::Val
     }
 }
 
-static s64 AutosaveSettingIntValue(AutosaveSetting setting, prefs::Preferences const& preferences) {
-    return prefs::GetValue(preferences, SettingDescriptor(setting)).value.Get<s64>();
-}
-
 bool AutosaveNeeded(AutosaveState const& state, prefs::Preferences const& preferences) {
     return state.last_save_time.SecondsFromNow() >=
            (f64)AutosaveSettingIntValue(AutosaveSetting::AutosaveIntervalSeconds, preferences);
 }
 
-void QueueAutosave(AutosaveState& state, prefs::Preferences const& preferences, StateSnapshot const& snapshot) {
-    state.autosave_delete_after_days.Store(
-        CheckedCast<u16>(AutosaveSettingIntValue(AutosaveSetting::AutosaveDeleteAfterDays, preferences)),
-        StoreMemoryOrder::Relaxed);
-    state.max_autosaves_per_instance.Store(
-        CheckedCast<u16>(AutosaveSettingIntValue(AutosaveSetting::MaxAutosavesPerInstance, preferences)),
-        StoreMemoryOrder::Relaxed);
-
+void QueueAutosave(AutosaveState& state, StateSnapshot const& snapshot) {
     state.mutex.Lock();
     DEFER { state.mutex.Unlock(); };
     switch (state.state) {
@@ -298,6 +295,7 @@ void QueueAutosave(AutosaveState& state, prefs::Preferences const& preferences, 
             }
             break;
     }
+    state.last_save_time = TimePoint::Now();
 }
 
 static String TestPresetPath(tests::Tester& tester, String filename) {
@@ -313,14 +311,14 @@ TEST_CASE(TestAutosave) {
     // We need to load some valid state to test autosave.
     auto snapshot = TRY(LoadPresetFile(TestPresetPath(tester, "sine.floe-preset"), tester.scratch_arena));
 
-    InitAutosaveState(state, tester.random_seed, snapshot);
+    InitAutosaveState(state, preferences, tester.random_seed, snapshot);
 
     // We don't need check the result since it's time-based and we don't want to wait in a test.
     AutosaveNeeded(state, preferences);
 
     // main thread
     snapshot.param_values[0] += 1;
-    QueueAutosave(state, preferences, snapshot);
+    QueueAutosave(state, snapshot);
 
     // background thread
     AutosaveToFileIfNeeded(state, paths);
@@ -328,7 +326,7 @@ TEST_CASE(TestAutosave) {
     // do it multiple time to check file rotation
     for (auto _ : Range(AutosaveSettingIntValue(AutosaveSetting::MaxAutosavesPerInstance, preferences) + 1)) {
         snapshot.param_values[0] += 1;
-        QueueAutosave(state, preferences, snapshot);
+        QueueAutosave(state, snapshot);
         AutosaveToFileIfNeeded(state, paths);
     }
 

@@ -591,16 +591,13 @@ pub const WindowsCodeSignStep = struct {
     step: std.Build.Step,
     file_path: []const u8,
     description: []const u8,
-    cache_dir: []const u8,
     context: *BuildContext,
 };
 
-// TODO: use this for clap and vst3
 pub fn addWindowsCodeSignStep(
     context: *BuildContext,
     file_path: []const u8,
     description: []const u8,
-    cache_dir: []const u8,
 ) ?*std.Build.Step {
     if (context.build_mode != .production) return null;
 
@@ -614,7 +611,6 @@ pub fn addWindowsCodeSignStep(
         }),
         .file_path = context.b.dupe(file_path),
         .description = context.b.dupe(description),
-        .cache_dir = context.b.dupe(cache_dir),
         .context = context,
     };
 
@@ -629,7 +625,7 @@ fn performWindowsCodeSign(step: *std.Build.Step, prog_node: std.Progress.Node) !
 
     // Get absolute paths
     const abs_file = b.pathFromRoot(self.file_path);
-    const cache_path = b.pathFromRoot(self.cache_dir);
+    const cache_path = b.pathFromRoot(floe_cache_relative);
 
     // Create the cert file directory if needed
     const cert_dir = std.fs.path.dirname(cache_path);
@@ -638,15 +634,15 @@ fn performWindowsCodeSign(step: *std.Build.Step, prog_node: std.Progress.Node) !
     }
 
     // Get environment variables
-    const cert_pfx = std.process.getEnvVarOwned(b.allocator, "WINDOWS_CODESIGN_CERT_PFX") catch |err| {
-        std.log.err("Failed to get WINDOWS_CODESIGN_CERT_PFX environment variable: {}", .{err});
-        return err;
+    const cert_pfx = b.graph.env_map.get("WINDOWS_CODESIGN_CERT_PFX") orelse {
+        std.log.err("missing WINDOWS_CODESIGN_CERT_PFX environment variable", .{});
+        return error.MissingEnvironmentVariable;
     };
     defer b.allocator.free(cert_pfx);
 
-    const cert_password = std.process.getEnvVarOwned(b.allocator, "WINDOWS_CODESIGN_CERT_PFX_PASSWORD") catch |err| {
-        std.log.err("Failed to get WINDOWS_CODESIGN_CERT_PFX_PASSWORD environment variable: {}", .{err});
-        return err;
+    const cert_password = b.graph.env_map.get("WINDOWS_CODESIGN_CERT_PFX_PASSWORD") orelse {
+        std.log.err("missing WINDOWS_CODESIGN_CERT_PFX_PASSWORD environment variable", .{});
+        return error.MissingEnvironmentVariable;
     };
     defer b.allocator.free(cert_password);
 
@@ -2033,10 +2029,25 @@ pub fn build(b: *std.Build) void {
             join_compile_commands.step.dependOn(&packager.step);
             addToLipoSteps(&build_context, packager, false) catch @panic("OOM");
             applyUniversalSettings(&build_context, packager);
-            b.getInstallStep().dependOn(&b.addInstallArtifact(packager, .{ .dest_dir = install_subfolder }).step);
+            const packager_install_artifact_step = b.addInstallArtifact(
+                packager,
+                .{ .dest_dir = install_subfolder },
+            );
+            b.getInstallStep().dependOn(&packager_install_artifact_step.step);
+
+            const sign_step = addWindowsCodeSignStep(
+                &build_context,
+                b.getInstallPath(install_dir, packager.out_filename),
+                "Floe library packager",
+            );
+            if (sign_step) |s| {
+                s.dependOn(&packager.step);
+                s.dependOn(b.getInstallStep());
+                build_context.master_step.dependOn(s);
+            }
         }
 
-        var clap_post_install_step = b.allocator.create(PostInstallStep) catch @panic("OOM");
+        var clap_final_step: ?*std.Build.Step = null;
         {
             const clap = b.addSharedLibrary(.{
                 .name = "Floe.clap",
@@ -2067,6 +2078,7 @@ pub fn build(b: *std.Build) void {
             join_compile_commands.step.dependOn(&clap.step);
             addToLipoSteps(&build_context, clap, true) catch @panic("OOM");
 
+            var clap_post_install_step = b.allocator.create(PostInstallStep) catch @panic("OOM");
             clap_post_install_step.* = PostInstallStep{
                 .step = std.Build.Step.init(.{
                     .id = std.Build.Step.Id.custom,
@@ -2081,7 +2093,19 @@ pub fn build(b: *std.Build) void {
             clap_post_install_step.step.dependOn(&clap.step);
             clap_post_install_step.step.dependOn(b.getInstallStep());
 
-            build_context.master_step.dependOn(&clap_post_install_step.step);
+            const sign_step = addWindowsCodeSignStep(
+                &build_context,
+                b.getInstallPath(install_dir, clap.name),
+                "Floe CLAP Plugin",
+            );
+            if (sign_step) |s| {
+                s.dependOn(&clap_post_install_step.step);
+                build_context.master_step.dependOn(s);
+                clap_final_step = s;
+            } else {
+                build_context.master_step.dependOn(&clap_post_install_step.step);
+                clap_final_step = &clap_post_install_step.step;
+            }
         }
 
         // standalone is for development-only at the moment
@@ -2424,7 +2448,7 @@ pub fn build(b: *std.Build) void {
             }
         }
 
-        var vst3_post_install_step = b.allocator.create(PostInstallStep) catch @panic("OOM");
+        var vst3_final_step: ?*std.Build.Step = null;
         {
             const vst3 = b.addSharedLibrary(.{
                 .name = "Floe.vst3",
@@ -2546,6 +2570,7 @@ pub fn build(b: *std.Build) void {
             }) catch @panic("OOM");
             addToLipoSteps(&build_context, vst3, true) catch @panic("OOM");
 
+            var vst3_post_install_step = b.allocator.create(PostInstallStep) catch @panic("OOM");
             vst3_post_install_step.* = PostInstallStep{
                 .step = std.Build.Step.init(.{
                     .id = std.Build.Step.Id.custom,
@@ -2558,7 +2583,20 @@ pub fn build(b: *std.Build) void {
                 .compile_step = vst3,
             };
             vst3_post_install_step.step.dependOn(b.getInstallStep());
-            build_context.master_step.dependOn(&vst3_post_install_step.step);
+
+            const sign_step = addWindowsCodeSignStep(
+                &build_context,
+                b.getInstallPath(install_dir, vst3.name),
+                "Floe VST3 Plugin",
+            );
+            if (sign_step) |s| {
+                s.dependOn(&vst3_post_install_step.step);
+                build_context.master_step.dependOn(s);
+                vst3_final_step = s;
+            } else {
+                build_context.master_step.dependOn(&vst3_post_install_step.step);
+                vst3_final_step = &vst3_post_install_step.step;
+            }
         }
 
         if (target.result.os.tag == .macos) {
@@ -2872,8 +2910,7 @@ pub fn build(b: *std.Build) void {
                 const sign_step = addWindowsCodeSignStep(
                     &build_context,
                     b.getInstallPath(install_dir, win_uninstaller.out_filename),
-                    "Floe Application",
-                    floe_cache_relative,
+                    "Floe Uninstaller",
                 );
                 if (sign_step) |s| {
                     s.dependOn(&uninstall_artifact_step.step);
@@ -2941,8 +2978,8 @@ pub fn build(b: *std.Build) void {
 
                 // everything needs to be installed before we compile the installer because it needs to embed the
                 // plugins
-                win_installer.step.dependOn(&vst3_post_install_step.step);
-                win_installer.step.dependOn(&clap_post_install_step.step);
+                win_installer.step.dependOn(vst3_final_step.?);
+                win_installer.step.dependOn(clap_final_step.?);
                 if (sign_step) |s| {
                     win_installer.step.dependOn(s);
                 } else {

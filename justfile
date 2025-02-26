@@ -456,29 +456,6 @@ _create-manual-install-readme os_name:
   echo "" >> readme.txt
   echo "Installation instructions: https://floe.audio/" >> readme.txt
 
-[unix, no-cd]
-windows-codesign-file file description:
-  #!/usr/bin/env bash
-  set -euo pipefail # don't use 'set -x' because it might print sensitive information
-
-  cert_file={{justfile_directory()}}/{{cache_dir}}/windows-codesign-cert.pfx
-  if [[ ! -f $cert_file ]]; then
-    # decode the base64-encoded certificate string
-    echo "$WINDOWS_CODESIGN_CERT_PFX" | base64 -d > $cert_file
-  fi
-
-  # signtool.exe alternative
-  osslsigncode sign \
-    -pkcs12 $cert_file \
-    -pass "$WINDOWS_CODESIGN_CERT_PFX_PASSWORD" \
-    -n "{{description}}" \
-    -i https://github.com/Floe-Project/Floe \
-    -t http://timestamp.sectigo.com \
-    -in "{{file}}" \
-    -out "{{file}}.signed"
-
-  mv {{file}}.signed {{file}}
-
 [unix]
 windows-prepare-release:
   #!/usr/bin/env bash
@@ -491,12 +468,7 @@ windows-prepare-release:
   [[ ! -d zig-out/x86_64-windows ]] && echo "x86_64-windows folder not found" && exit 1
   cd zig-out/x86_64-windows
 
-  # just windows-codesign-file Floe.vst3 "Floe VST3" # TODO: re-enable when wrappers are supported
-  just windows-codesign-file Floe.clap "Floe CLAP"
-  just windows-codesign-file floe-packager.exe "Floe Packager"
-
   installer_file=$(find . -type f -name "*Installer*.exe")
-  just windows-codesign-file $installer_file "Installer for Floe"
 
   # zip the installer
   final_installer_name=$(echo $installer_file | sed 's/.exe//')

@@ -602,7 +602,7 @@ pub fn addWindowsCodeSignStep(
     description: []const u8,
     cache_dir: []const u8,
 ) ?*std.Build.Step {
-    // if (context.build_mode != .production) return null;
+    if (context.build_mode != .production) return null;
 
     const cs_step = context.b.allocator.create(WindowsCodeSignStep) catch @panic("OOM");
     cs_step.* = WindowsCodeSignStep{

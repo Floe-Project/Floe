@@ -14,6 +14,7 @@
 AAX
 AUv2
 Ableton
+AppData
 Async
 Audioata
 Bitwig
@@ -53,11 +54,13 @@ Roadmap
 SFZ
 SPDX
 SSE2
+Steinberg
 Synthwave
 Utils
 VST2
 VST3
 VST3Validator
+VSTPlugins
 WAV
 WIP
 Windell
@@ -66,6 +69,8 @@ Zulip
 api
 asc
 async
+autosave
+autosaves
 c1
 c4
 center
@@ -82,6 +87,7 @@ crossfade
 d1
 d4
 dev
+dll
 doesn
 expandability
 extensibility
@@ -107,6 +113,7 @@ math
 md
 mdBook
 mdbook
+mirage64
 mkdocs
 notarization
 os
@@ -117,7 +124,9 @@ png
 polyphonically
 preprocess
 preprocessor
+resizable
 roadmap
+shouldn
 src
 srcset
 structs

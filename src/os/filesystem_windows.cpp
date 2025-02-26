@@ -816,10 +816,16 @@ ErrorCodeOr<void> Delete(String path, DeleteOptions options) {
     PathArena temp_path_arena {Malloc::Instance()};
     auto const wide_path = TRY(path::MakePathForWin32(path, temp_path_arena, true));
 
+    auto const is_error_ok = [&options](DWORD error) {
+        if (options.fail_if_not_exists) return false;
+        if (error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND) return true;
+        return false;
+    };
+
     if (options.type == DeleteOptions::Type::Any) {
         if (DeleteFileW(wide_path.path.data) != 0)
             return k_success;
-        else if (GetLastError() == ERROR_FILE_NOT_FOUND && !options.fail_if_not_exists)
+        else if (is_error_ok(GetLastError()))
             return k_success;
         else if (GetLastError() == ERROR_ACCESS_DENIED) // it's probably a directory
             options.type = DeleteOptions::Type::DirectoryRecursively;
@@ -832,7 +838,7 @@ ErrorCodeOr<void> Delete(String path, DeleteOptions options) {
             if (DeleteFileW(wide_path.path.data) != 0) {
                 return k_success;
             } else {
-                if (GetLastError() == ERROR_FILE_NOT_FOUND && !options.fail_if_not_exists) return k_success;
+                if (is_error_ok(GetLastError())) return k_success;
                 return FilesystemWin32ErrorCode(GetLastError(), "DeleteW");
             }
             break;
@@ -841,7 +847,7 @@ ErrorCodeOr<void> Delete(String path, DeleteOptions options) {
             if (RemoveDirectoryW(wide_path.path.data) != 0) {
                 return k_success;
             } else {
-                if (GetLastError() == ERROR_FILE_NOT_FOUND && !options.fail_if_not_exists) return k_success;
+                if (is_error_ok(GetLastError())) return k_success;
                 return FilesystemWin32ErrorCode(GetLastError(), "RemoveDirectoryW");
             }
             break;
@@ -854,7 +860,7 @@ ErrorCodeOr<void> Delete(String path, DeleteOptions options) {
             if (RemoveDirectoryW(wide_path.path.data) != 0) {
                 return k_success;
             } else {
-                if (GetLastError() == ERROR_FILE_NOT_FOUND && !options.fail_if_not_exists) return k_success;
+                if (is_error_ok(GetLastError())) return k_success;
                 if (GetLastError() == ERROR_DIR_NOT_EMPTY)
                     return Win32DeleteDirectory(wide_path.path, temp_path_arena);
                 return FilesystemWin32ErrorCode(GetLastError(), "RemoveDirectoryW");

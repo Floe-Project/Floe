@@ -255,10 +255,11 @@ void TopPanel(Gui* g) {
     if (g->icons) g->frame_input.graphics_ctx->PushFont(g->icons);
 
     auto& preferences = g->prefs;
-    auto const randomise_mode = (PresetRandomiseMode)Clamp(
-        prefs::LookupInt(preferences, prefs::key::k_presets_random_mode).ValueOr((s64)PresetRandomiseMode::All),
-        (s64)PresetRandomiseMode::All,
-        (s64)PresetRandomiseMode::BrowserFilters);
+    auto const randomise_mode =
+        (PresetRandomiseMode)Clamp(prefs::LookupInt(preferences, prefs::key::k_presets_random_mode)
+                                       .ValueOr((s64)PresetRandomiseMode::All),
+                                   (s64)PresetRandomiseMode::All,
+                                   (s64)PresetRandomiseMode::BrowserFilters);
     {
         auto btn_id = g->imgui.GetID("rand_pre");
         if (buttons::Button(g,
@@ -313,10 +314,11 @@ void TopPanel(Gui* g) {
         LoadPresetFromListing(
             g->engine,
             *preset_load_criteria,
-            FetchOrRescanPresetsFolder(g->engine.shared_engine_systems.preset_listing,
-                                       RescanMode::RescanAsyncIfNeeded,
-                                       ExtraScanFolders(g->shared_engine_systems.paths, g->prefs, ScanFolderType::Presets),
-                                       &g->engine.shared_engine_systems.thread_pool));
+            FetchOrRescanPresetsFolder(
+                g->engine.shared_engine_systems.preset_listing,
+                RescanMode::RescanAsyncIfNeeded,
+                ExtraScanFolders(g->shared_engine_systems.paths, g->prefs, ScanFolderType::Presets),
+                &g->engine.shared_engine_systems.thread_pool));
         g->preset_browser_data.scroll_to_show_current_preset = true;
     }
 

@@ -920,10 +920,7 @@ void WriteIfNeeded(Preferences& prefs) {
 
     prefs.last_known_file_modified_time = NanosecondsSinceEpoch();
     TRY_OR(WritePreferencesFile(prefs, PreferencesFilepath(), prefs.last_known_file_modified_time), {
-        ReportError(ErrorLevel::Error,
-                    SourceLocationHash(),
-                    "failed to write preferences file: {}",
-                    error);
+        ReportError(ErrorLevel::Error, SourceLocationHash(), "failed to write preferences file: {}", error);
     });
 
     prefs.write_to_file_needed = false;

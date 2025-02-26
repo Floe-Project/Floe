@@ -120,7 +120,8 @@ static void TryInstallUninstaller() {
 
     // Write the uninstaller exe
     {
-        auto const file_data = TRY_OR(GetResource(UNINSTALLER_RESOURCE_ID), Panic("Failed to load uninstaller"));
+        auto const file_data =
+            TRY_OR(GetResource(UNINSTALLER_RESOURCE_ID), Panic("Failed to load uninstaller"));
         TRY_OR(WriteFile(uninstaller_exe_path, file_data), {
             ReportError(ErrorLevel::Warning,
                         k_nullopt,

@@ -25,11 +25,11 @@ PresetBrowser::PresetBrowser(Gui* g, PresetBrowserPersistentData& persistent_dat
     , g(g) {
 
     if (persistent_data.show_preset_panel || force_listing_fetch) {
-        listing =
-            FetchOrRescanPresetsFolder(g->shared_engine_systems.preset_listing,
-                                       RescanMode::RescanAsyncIfNeeded,
-                                       ExtraScanFolders(g->shared_engine_systems.paths, g->prefs, ScanFolderType::Presets),
-                                       &g->shared_engine_systems.thread_pool);
+        listing = FetchOrRescanPresetsFolder(
+            g->shared_engine_systems.preset_listing,
+            RescanMode::RescanAsyncIfNeeded,
+            ExtraScanFolders(g->shared_engine_systems.paths, g->prefs, ScanFolderType::Presets),
+            &g->shared_engine_systems.thread_pool);
     }
     if (listing.listing) {
         current_preset = g->engine.last_snapshot.metadata.Path()

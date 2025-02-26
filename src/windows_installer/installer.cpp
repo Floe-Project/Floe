@@ -611,5 +611,6 @@ AppConfig GetAppConfig() {
         .window_width = 620,
         .window_height = 470,
         .window_title = L"Floe Installer v" WIDEN_STRING_LITERAL(FLOE_VERSION_STRING),
+        .description = "Installer Floe plugins",
     };
 }

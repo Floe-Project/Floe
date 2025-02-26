@@ -16,9 +16,10 @@ struct Application {
 
 AppConfig GetAppConfig() {
     return {
-        .window_width = 300,
+        .window_width = 400,
         .window_height = 400,
         .window_title = L"Floe Uninstaller",
+        .description = "Uninstall Floe plugins",
     };
 }
 

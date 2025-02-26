@@ -24,6 +24,7 @@ struct AppConfig {
     u16 window_width;
     u16 window_height;
     wchar_t const* window_title;
+    String description;
 };
 
 enum class Orientation { Vertical, Horizontal };

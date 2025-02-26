@@ -1082,6 +1082,8 @@ static ErrorCodeOr<int> Main(HINSTANCE h_instance, int cmd_show, ArgsCstr args) 
     GlobalInit({.init_error_reporting = true, .set_main_thread = true});
     DEFER { GlobalDeinit({.shutdown_error_reporting = true}); };
 
+    auto const config = GetAppConfig();
+
     ArenaAllocatorWithInlineStorage<1024> arena {PageAllocator::Instance()};
 
     auto const cli_args = TRY(ParseCommandLineArgsStandard(arena,
@@ -1090,7 +1092,7 @@ static ErrorCodeOr<int> Main(HINSTANCE h_instance, int cmd_show, ArgsCstr args) 
                                                            {
                                                                .handle_help_option = true,
                                                                .print_usage_on_error = true,
-                                                               .description = "Install Floe plugins",
+                                                               .description = config.description,
                                                                .version = FLOE_VERSION_STRING,
                                                            }));
 
@@ -1183,8 +1185,6 @@ static ErrorCodeOr<int> Main(HINSTANCE h_instance, int cmd_show, ArgsCstr args) 
     if (framework.regular_font == nullptr || framework.heading_font == nullptr ||
         framework.bold_font == nullptr)
         CheckLastError("Failed to get font");
-
-    auto const config = AppConfig();
 
     framework.root = CreateWindowExW(WS_EX_CLIENTEDGE,
                                      k_root_window_class_name,

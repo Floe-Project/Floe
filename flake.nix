@@ -156,6 +156,7 @@
               pkgs.gnused
               pkgs.coreutils
               pkgs.jq
+              pkgs.fd
               pkgs.just
               pkgs.reuse
               pkgs.mdbook

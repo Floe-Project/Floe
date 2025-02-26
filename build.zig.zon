@@ -52,8 +52,8 @@
             .hash = "1220967b3455d5b2e950a346dac71225b25dc1e17521dff724a73bff9a819846a056",
         },
         .libbacktrace = .{
-            .url = "git+https://github.com/SamWindell/libbacktrace#ff50f5f869f3331cbf866964350eb694d205855b",
-            .hash = "1220379f64b08223ff7b126150d5093bbf8e9995e45b9253ca63215a380a5b572c8f",
+            .url = "git+https://github.com/SamWindell/libbacktrace#8c232c7dc09fcb8bb21addf44c9b7fab4ff37499",
+            .hash = "1220875298a6546e893239e5d8c9a2528aabcca85d8d11bfeb8ea0162ade5d8ad416",
         },
         .lua = .{
             .url = "https://github.com/lua/lua/archive/refs/tags/v5.4.7.tar.gz",

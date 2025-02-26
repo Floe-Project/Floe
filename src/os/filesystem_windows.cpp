@@ -1204,6 +1204,8 @@ ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments args) {
 constexpr DWORD k_directory_changes_filter = FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME |
                                              FILE_NOTIFY_CHANGE_SIZE | FILE_NOTIFY_CHANGE_LAST_WRITE;
 
+constexpr bool k_debug_log_watcher = false && !PRODUCTION_BUILD;
+
 struct WindowsWatchedDirectory {
     alignas(16) Array<u8, Kb(32)> buffer;
     HANDLE handle {};
@@ -1404,6 +1406,11 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
                         auto const narrowed = Narrow(args.result_arena, filename);
                         if (narrowed.HasValue()) {
                             ASSERT(IsValidUtf8(narrowed.Value()));
+                            if constexpr (k_debug_log_watcher)
+                                LogDebug(ModuleName::Filesystem,
+                                         "ReadDirectoryChanges: {} {}",
+                                         narrowed.Value(),
+                                         DirectoryWatcher::ChangeType::ToString(changes));
                             dir.directory_changes.Add(
                                 {
                                     .subpath = narrowed.Value(),

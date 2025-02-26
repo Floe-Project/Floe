@@ -757,7 +757,7 @@ const stb_image_config_flags = [_][]const u8{
     "-DSTBI_MAX_DIMENSIONS=65535", // we use u16 for dimensions
 };
 
-fn genericFlags(
+fn universalFlags(
     context: *BuildContext,
     target: std.Build.ResolvedTarget,
     extra_flags: []const []const u8,
@@ -875,11 +875,11 @@ fn genericFlags(
 
 fn cppFlags(
     b: *std.Build,
-    generic_flags: [][]const u8,
+    universal_flags: [][]const u8,
     extra_flags: []const []const u8,
 ) ![][]const u8 {
     var flags = std.ArrayList([]const u8).init(b.allocator);
-    try flags.appendSlice(generic_flags);
+    try flags.appendSlice(universal_flags);
     try flags.appendSlice(extra_flags);
     try flags.append("-std=c++2c");
     return try flags.toOwnedSlice();
@@ -887,11 +887,11 @@ fn cppFlags(
 
 fn objcppFlags(
     b: *std.Build,
-    generic_flags: [][]const u8,
+    universal_flags: [][]const u8,
     extra_flags: []const []const u8,
 ) ![][]const u8 {
     var flags = std.ArrayList([]const u8).init(b.allocator);
-    try flags.appendSlice(generic_flags);
+    try flags.appendSlice(universal_flags);
     try flags.appendSlice(extra_flags);
     try flags.append("-std=c++2b");
     try flags.append("-ObjC++");
@@ -1178,8 +1178,8 @@ pub fn build(b: *std.Build) void {
 
         const floe_version = std.SemanticVersion.parse(floe_version_string.?) catch @panic("invalid version");
 
-        const generic_flags = genericFlags(&build_context, target, &.{}) catch unreachable;
-        const generic_floe_flags = genericFlags(&build_context, target, &.{
+        const universal_flags = universalFlags(&build_context, target, &.{}) catch unreachable;
+        const universal_floe_flags = universalFlags(&build_context, target, &.{
             "-gen-cdb-fragment-path",
             // IMPROVE: will this error if the path contains a space?
             compileCommandsDirForTarget(b.allocator, target.result) catch unreachable,
@@ -1225,10 +1225,10 @@ pub fn build(b: *std.Build) void {
             "-DSTRICT",
             "-DNOMINMAX",
         }) catch unreachable;
-        const cpp_flags = cppFlags(b, generic_flags, &.{}) catch unreachable;
-        const cpp_floe_flags = cppFlags(b, generic_floe_flags, &.{}) catch unreachable;
-        const objcpp_flags = objcppFlags(b, generic_flags, &.{}) catch unreachable;
-        const objcpp_floe_flags = objcppFlags(b, generic_floe_flags, &.{}) catch unreachable;
+        const cpp_flags = cppFlags(b, universal_flags, &.{}) catch unreachable;
+        const cpp_floe_flags = cppFlags(b, universal_floe_flags, &.{}) catch unreachable;
+        const objcpp_flags = objcppFlags(b, universal_flags, &.{}) catch unreachable;
+        const objcpp_floe_flags = objcppFlags(b, universal_floe_flags, &.{}) catch unreachable;
 
         const floe_version_major: i64 = @intCast(floe_version.major);
         const floe_version_minor: i64 = @intCast(floe_version.minor);
@@ -1267,7 +1267,7 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = build_context.optimise,
         });
-        stb_sprintf.addCSourceFile(.{ .file = b.path("third_party_libs/stb_sprintf.c"), .flags = generic_flags });
+        stb_sprintf.addCSourceFile(.{ .file = b.path("third_party_libs/stb_sprintf.c"), .flags = universal_flags });
         stb_sprintf.addIncludePath(build_context.dep_stb.path(""));
         stb_sprintf.linkLibC();
 
@@ -1276,7 +1276,7 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = build_context.optimise,
         });
-        xxhash.addCSourceFile(.{ .file = build_context.dep_xxhash.path("xxhash.c"), .flags = generic_flags });
+        xxhash.addCSourceFile(.{ .file = build_context.dep_xxhash.path("xxhash.c"), .flags = universal_flags });
         xxhash.linkLibC();
 
         const tracy = b.addStaticLibrary(.{
@@ -1373,7 +1373,7 @@ pub fn build(b: *std.Build) void {
                     "state.c",
                     "posix.c",
                 },
-                .flags = generic_flags,
+                .flags = universal_flags,
             });
 
             const backtrace_supported_header = b.addConfigHeader(
@@ -1433,7 +1433,7 @@ pub fn build(b: *std.Build) void {
                             "pecoff.c",
                             "alloc.c",
                         },
-                        .flags = generic_flags,
+                        .flags = universal_flags,
                     });
                 },
                 .macos => {
@@ -1445,12 +1445,12 @@ pub fn build(b: *std.Build) void {
                     libbacktrace.addCSourceFiles(.{
                         .root = libbacktrace_root_path,
                         .files = &posix_sources,
-                        .flags = generic_flags,
+                        .flags = universal_flags,
                     });
                     libbacktrace.addCSourceFiles(.{
                         .root = libbacktrace_root_path,
                         .files = &.{"macho.c"},
-                        .flags = generic_flags,
+                        .flags = universal_flags,
                     });
                 },
                 .linux => {
@@ -1465,12 +1465,12 @@ pub fn build(b: *std.Build) void {
                     libbacktrace.addCSourceFiles(.{
                         .root = libbacktrace_root_path,
                         .files = &.{"elf.c"},
-                        .flags = generic_flags,
+                        .flags = universal_flags,
                     });
                     libbacktrace.addCSourceFiles(.{
                         .root = libbacktrace_root_path,
                         .files = &posix_sources,
-                        .flags = generic_flags,
+                        .flags = universal_flags,
                     });
                 },
                 else => {
@@ -1499,7 +1499,7 @@ pub fn build(b: *std.Build) void {
                     "internal.c",
                     "internal.c",
                 },
-                .flags = generic_flags,
+                .flags = universal_flags,
             });
 
             switch (target.result.os.tag) {
@@ -1511,7 +1511,7 @@ pub fn build(b: *std.Build) void {
                             "win_gl.c",
                             "win_stub.c",
                         },
-                        .flags = generic_flags,
+                        .flags = universal_flags,
                     });
                     pugl.linkSystemLibrary("opengl32");
                     pugl.linkSystemLibrary("gdi32");
@@ -1525,7 +1525,7 @@ pub fn build(b: *std.Build) void {
                             "mac_gl.m",
                             "mac_stub.m",
                         },
-                        .flags = genericFlags(&build_context, target, &.{
+                        .flags = universalFlags(&build_context, target, &.{
                             b.fmt("-DPuglWindow=PuglWindowFPFloe{}{}{}", .{
                                 floe_version.major,
                                 floe_version.minor,
@@ -1554,7 +1554,7 @@ pub fn build(b: *std.Build) void {
                             "x11_gl.c",
                             "x11_stub.c",
                         },
-                        .flags = generic_flags,
+                        .flags = universal_flags,
                     });
                     pugl.root_module.addCMacro("USE_XRANDR", "0");
                     pugl.root_module.addCMacro("USE_XSYNC", "1");
@@ -1583,7 +1583,7 @@ pub fn build(b: *std.Build) void {
         {
             const library_path = "src";
 
-            const generic_source_files = .{
+            const common_source_files = .{
                 library_path ++ "/utils/debug/debug.cpp",
                 library_path ++ "/utils/leak_detecting_allocator.cpp",
                 library_path ++ "/tests/framework.cpp",
@@ -1651,7 +1651,7 @@ pub fn build(b: *std.Build) void {
                 },
             }
 
-            library.addCSourceFiles(.{ .files = &generic_source_files, .flags = cpp_floe_flags });
+            library.addCSourceFiles(.{ .files = &common_source_files, .flags = cpp_floe_flags });
             library.addConfigHeader(build_config_step);
             library.linkLibC();
             library.linkLibrary(tracy);
@@ -1669,7 +1669,7 @@ pub fn build(b: *std.Build) void {
         });
         stb_image.addCSourceFile(.{
             .file = b.path("third_party_libs/stb_image_impls.c"),
-            .flags = genericFlags(&build_context, target, &(.{
+            .flags = universalFlags(&build_context, target, &(.{
                 // stb_image_resize2 uses undefined behaviour and so we need to turn off zig's default-on
                 // UB sanitizer
                 "-fno-sanitize=undefined",
@@ -1686,7 +1686,7 @@ pub fn build(b: *std.Build) void {
         dr_wav.addCSourceFile(
             .{
                 .file = b.path("third_party_libs/dr_wav_implementation.c"),
-                .flags = generic_flags,
+                .flags = universal_flags,
             },
         );
         dr_wav.addIncludePath(build_context.dep_dr_libs.path(""));
@@ -1706,7 +1706,7 @@ pub fn build(b: *std.Build) void {
                     "miniz_tinfl.c",
                     "miniz_zip.c",
                 },
-                .flags = generic_flags,
+                .flags = universal_flags,
             });
             miniz.addIncludePath(build_context.dep_miniz.path(""));
             miniz.linkLibC();
@@ -1752,7 +1752,7 @@ pub fn build(b: *std.Build) void {
                     "stream_encoder_framing.c",
                     "window.c",
                 },
-                .flags = generic_flags,
+                .flags = universal_flags,
             });
 
             const config_header = b.addConfigHeader(
@@ -1811,7 +1811,7 @@ pub fn build(b: *std.Build) void {
                 });
                 fft_flags = &.{"-DAUDIOFFT_PFFFT"};
             }
-            fft_flags = genericFlags(&build_context, target, fft_flags) catch unreachable;
+            fft_flags = universalFlags(&build_context, target, fft_flags) catch unreachable;
 
             fft_convolver.addCSourceFiles(.{
                 .files = &.{
@@ -2095,7 +2095,7 @@ pub fn build(b: *std.Build) void {
                 // disabling pulse audio because it was causing lots of stutters on my machine
                 miniaudio.addCSourceFile(.{
                     .file = b.path("third_party_libs/miniaudio.c"),
-                    .flags = genericFlags(&build_context, target, &.{"-DMA_NO_PULSEAUDIO"}) catch @panic("OOM"),
+                    .flags = universalFlags(&build_context, target, &.{"-DMA_NO_PULSEAUDIO"}) catch @panic("OOM"),
                 });
                 miniaudio.linkLibC();
                 miniaudio.addIncludePath(build_context.dep_miniaudio.path(""));
@@ -2131,7 +2131,7 @@ pub fn build(b: *std.Build) void {
                         "pm_common/pmutil.c",
                         "porttime/porttime.c",
                     },
-                    .flags = generic_flags,
+                    .flags = universal_flags,
                 });
                 switch (target.result.os.tag) {
                     .macos => {
@@ -2143,7 +2143,7 @@ pub fn build(b: *std.Build) void {
                                 "porttime/ptmacosx_cf.c",
                                 "porttime/ptmacosx_mach.c",
                             },
-                            .flags = generic_flags,
+                            .flags = universal_flags,
                         });
                         portmidi.linkFramework("CoreAudio");
                         portmidi.linkFramework("CoreMIDI");
@@ -2157,7 +2157,7 @@ pub fn build(b: *std.Build) void {
                                 "pm_win/pmwinmm.c",
                                 "porttime/ptwinmm.c",
                             },
-                            .flags = generic_flags,
+                            .flags = universal_flags,
                         });
                         portmidi.linkSystemLibrary("winmm");
                     },
@@ -2169,7 +2169,7 @@ pub fn build(b: *std.Build) void {
                                 "pm_linux/pmlinuxalsa.c",
                                 "porttime/ptlinux.c",
                             },
-                            .flags = genericFlags(&build_context, target, &.{"-DPMALSA"}) catch @panic("OOM"),
+                            .flags = universalFlags(&build_context, target, &.{"-DPMALSA"}) catch @panic("OOM"),
                         });
                         portmidi.linkSystemLibrary2("alsa", .{ .use_pkg_config = use_pkg_config });
                     },
@@ -2248,7 +2248,7 @@ pub fn build(b: *std.Build) void {
             } else {
                 extra_flags.append("-DRELEASE=1") catch unreachable;
             }
-            const flags = genericFlags(&build_context, target, extra_flags.items) catch unreachable;
+            const flags = universalFlags(&build_context, target, extra_flags.items) catch unreachable;
 
             {
                 vst3_sdk.addCSourceFiles(.{
@@ -2455,7 +2455,7 @@ pub fn build(b: *std.Build) void {
             extra_flags.append("-fno-char8_t") catch unreachable;
             extra_flags.append("-DMACOS_USE_STD_FILESYSTEM=1") catch unreachable;
             extra_flags.append("-DCLAP_WRAPPER_VERSION=\"0.9.1\"") catch unreachable;
-            const flags = cppFlags(b, generic_flags, extra_flags.items) catch unreachable;
+            const flags = cppFlags(b, universal_flags, extra_flags.items) catch unreachable;
 
             vst3.addCSourceFiles(.{
                 .files = &.{
@@ -2621,7 +2621,7 @@ pub fn build(b: *std.Build) void {
                 flags.append("-DMACOS_USE_STD_FILESYSTEM=1") catch unreachable;
                 flags.append("-DCLAP_WRAPPER_VERSION=\"0.9.1\"") catch unreachable;
                 flags.append("-DSTATICALLY_LINKED_CLAP_ENTRY=1") catch unreachable;
-                flags.appendSlice(generic_flags) catch unreachable;
+                flags.appendSlice(universal_flags) catch unreachable;
 
                 au.addCSourceFiles(.{ .files = &.{
                     "src/plugin/plugin/plugin_entry.cpp",

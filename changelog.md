@@ -12,13 +12,16 @@ For instance: 0.0.1. Don't change the headings.
 ## 0.0.3
 - Rename 'settings' to 'preferences'
 - Add support for packaging and installing MDATA libraries (Mirage)
+- Add a Floe uninstaller for Windows, integrated into Windows' 'Installed Apps' control panel
 - Add tooltips to the preferences GUI
 - Add new Info panel featuring info about installed libraries. 'About', 'Metrics' and 'Licenses' have been moved here too instead of being separate panels.
 - Add new Share Feedback panel for submitting bug reports and feature requests
 - Add new fields to the Lua API to support license info and attribution, such as CC BY
 - Add attribution-required panel which appears when needed with generated copyable text for fulfilling attribution requirements. Synchronised between all instances of Floe. Makes complying with licenses like CC BY easy.
+- Add error reporting. We are now better able to fix bugs. When an error occurs, an anonymous report is sent to us. You can disable this in the preferences. This pairs with the new Share Feedback panel - that form can also be used to report bugs.
 - Add autosave feature, which efficiently saves the current state of Floe at a configurable interval. This is useful for recovering from crashes. Configurable in the preferences.
 - Add ability to select multiple packages to install at once
+- Preferences system is more robust and flexible. Preferences are saved in a small file. It syncs between all instances of Floe - even if the instances are in different processes. Additionally, you can edit the preferences file directly if you want to; the results will be instantly reflected in Floe.
 - Renamed Appearance preferences to General since it's small and can be used for other preferences
 - Make notifications dismiss themselves after a few seconds
 - Fixed externally deleted or moved-to-trash libraries not being removed from Floe

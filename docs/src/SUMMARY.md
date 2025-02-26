@@ -19,6 +19,8 @@ SPDX-License-Identifier: GPL-3.0-or-later
   - [Library Folders](./about/library-folders.md)
   - [Preset Folders](./about/preset-folders.md)
   - [Attribution](./about/attribution.md)
+  - [Autosave](./about/autosave.md)
+  - [Error Reporting](./about/error-reporting.md)
   - [Roadmap](./about/roadmap.md)
 
 - [Developers]()

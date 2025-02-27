@@ -194,13 +194,12 @@ test-windows-installer:
     exit 1
   fi
   if [[ "{{os()}}" == "windows" ]]; then
-    reg_key=HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{1395024D-2B55-4B81-88CA-26DF09D175B1}
     powershell.exe -Command "\$p = Start-Process '$installer_file' -Args '--autorun' -Verb RunAs -Wait -PassThru; exit \$p.ExitCode"
-    reg query "$reg_key" /v UninstallString
+    reg query "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{1395024D-2B55-4B81-88CA-26DF09D175B1}" /v UninstallString
     powershell.exe -Command "\$p = Start-Process 'C:\Program Files\Floe\Floe-Uninstaller.exe' -Args '--autorun' -Verb RunAs -Wait -PassThru; exit \$p.ExitCode"
 
     set +e  # Temporarily disable error propagation
-    reg query "$reg_key" /v UninstallString
+    reg query "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{1395024D-2B55-4B81-88CA-26DF09D175B1}" /v UninstallString
     if [ $? -eq 0 ]; then
         echo "ERROR: Registry key still exists after uninstall"
         exit 1

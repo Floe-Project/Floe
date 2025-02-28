@@ -425,8 +425,9 @@ parallel tasks:
 [unix]
 echo-latest-changes:
   #!/usr/bin/env bash
-  # we look for the heading with the version number and then print everything until the next heading
-  changes=$(sed -n "/## $(cat version.txt)/,/## /{ /## /!p }" changelog.md)
+  # Extract text from the heading with the current version number until the next heading with exactly 2 hashes
+  version=$(cat version.txt)
+  changes=$(sed -n "/^## $version/,/^## [^#]/ { /^## [^#]/!p }" changelog.md)
   printf "%s" "$changes" # trim trailing newline
 
 [unix]

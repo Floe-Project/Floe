@@ -7,7 +7,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 ## Windows
 
-On Windows, Floe can be uninstalled using the standard method for uninstalling software, via the 'Installed Apps' or 'Add or Remove Programs' control panel. See the [Windows documentation here](https://support.microsoft.com/en-gb/windows/uninstall-or-remove-apps-and-programs-in-windows-4b55f974-2cc6-2d2b-d092-5905080eaf98).
+On Windows, Floe can be uninstalled using the standard method for uninstalling software, via the 'Add or Remove Programs' control panel. See the [Windows documentation here](https://support.microsoft.com/en-gb/windows/uninstall-or-remove-apps-and-programs-in-windows-4b55f974-2cc6-2d2b-d092-5905080eaf98).
 
 This uninstalls Floe, but not libraries or presets. Follow the instructions below to delete libraries and presets.
 

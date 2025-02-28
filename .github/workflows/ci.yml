@@ -19,10 +19,10 @@ env:
 
 jobs:
   mac-compile-and-test:
+    runs-on: macos-latest
     permissions:
       id-token: write
       contents: read
-    runs-on: macos-latest
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
@@ -53,10 +53,10 @@ jobs:
           path: ~/Library/Logs/Floe/*
 
   linux-compile-and-test:
+    runs-on: ubuntu-latest
     permissions:
       id-token: write
       contents: read
-    runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4

@@ -12,6 +12,9 @@ env:
 jobs:
   build-windows:
     runs-on: ubuntu-latest # NOTE: we don't actually use Windows
+    env:
+      WINDOWS_CODESIGN_CERT_PFX: ${{ secrets.WINDOWS_CODESIGN_CERT_PFX }}
+      WINDOWS_CODESIGN_CERT_PFX_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_CERT_PFX_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -31,9 +34,6 @@ jobs:
           just build-release windows
 
       - run: just windows-prepare-release
-        env:
-          WINDOWS_CODESIGN_CERT_PFX: ${{ secrets.WINDOWS_CODESIGN_CERT_PFX }}
-          WINDOWS_CODESIGN_CERT_PFX_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_CERT_PFX_PASSWORD }}
 
       - name: 'get release dir from just'
         run: |

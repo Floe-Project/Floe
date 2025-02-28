@@ -12,6 +12,9 @@ env:
 jobs:
   build-windows:
     runs-on: ubuntu-latest # NOTE: we don't actually use Windows
+    permissions:
+      id-token: write
+      contents: read
     env:
       WINDOWS_CODESIGN_CERT_PFX: ${{ secrets.WINDOWS_CODESIGN_CERT_PFX }}
       WINDOWS_CODESIGN_CERT_PFX_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_CERT_PFX_PASSWORD }}
@@ -21,12 +24,9 @@ jobs:
           submodules: recursive
 
       - uses: DeterminateSystems/nix-installer-action@main
-      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - uses: DeterminateSystems/flakehub-cache-action@main
       - uses: nicknovitski/nix-develop@v1.1.0
       - uses: Hanaasagi/zig-action-cache@master
-        with:
-          cache-directories: |
-            .floe-cache
 
       - run: |
           # NOTE: the logos probably have copyright so this should only be done if you have permission
@@ -48,18 +48,18 @@ jobs:
 
   build-macos:
     runs-on: macos-latest
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
 
       - uses: DeterminateSystems/nix-installer-action@main
-      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - uses: DeterminateSystems/flakehub-cache-action@main
       - uses: nicknovitski/nix-develop@v1.1.0
       - uses: Hanaasagi/zig-action-cache@master
-        with:
-          cache-directories: |
-            .floe-cache
 
       - run: |
           just build-release mac_ub

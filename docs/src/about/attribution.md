@@ -22,4 +22,4 @@ Floe makes it dead-easy to comply with attribution requirements. When you use a 
 
 ![Attribution GUI](../images/attributions-gui.png)
 
-Example of the attribution GUI in Floe
+_Example of the attribution GUI in Floe_

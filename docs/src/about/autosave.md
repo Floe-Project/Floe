@@ -7,7 +7,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 Floe reduces the chance of you losing your work by automatically saving its state frequently. 
 
-This is useful if either Floe or the DAW crashes unexpectedly. We strive to make Floe reliable for professional work. 
+Autosaves are useful if either Floe or the DAW crashes unexpectedly — hopefully a very rare occurrence. But they're also useful for other reasons such as accidentally removing a track, or changing parameters in a way you didn't intend.
 
 Every instance of Floe has an auto-generated name, for example: dawn-205. You can see this in the top panel of Floe's window. This is useful because it helps identify which instance of Floe an autosave came from so that you can correctly restore it. Autosave files also contain the date and time they were created.
 

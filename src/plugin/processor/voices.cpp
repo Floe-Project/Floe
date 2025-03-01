@@ -318,7 +318,7 @@ void StartVoice(VoicePool& pool,
                 s.generator = InstrumentType::Sampler;
 
                 s.is_active = true;
-                s.amp = s_params.amp;
+                s.amp = s_params.amp * (f32)DbToAmpApprox((f64)s_params.region.options.volume_db);
                 s.sampler.region = &s_params.region;
                 s.sampler.data = &s_params.audio_data;
                 ASSERT(s.sampler.data != nullptr);

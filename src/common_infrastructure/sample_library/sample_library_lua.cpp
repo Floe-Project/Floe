@@ -395,6 +395,7 @@ struct TableFields<Region::Options> {
         TimbreCrossfadeRegion,
         AutoMapKeyRangeGroup,
         FeatherOverlappingVelocityRegions,
+        VolumeDb,
         Count,
     };
 
@@ -448,6 +449,19 @@ struct TableFields<Region::Options> {
                     .set =
                         [](SET_FIELD_VALUE_ARGS) {
                             FIELD_OBJ.feather_overlapping_velocity_regions = lua_toboolean(ctx.lua, -1);
+                        },
+                };
+            case Field::VolumeDb:
+                return {
+                    .name = "volume_db",
+                    .description_sentence = "The volume of the region in decibels.",
+                    .example = "-3",
+                    .default_value = "0",
+                    .lua_type = LUA_TNUMBER,
+                    .required = false,
+                    .set =
+                        [](SET_FIELD_VALUE_ARGS) {
+                            FIELD_OBJ.volume_db = (f32)luaL_checknumber(ctx.lua, -1);
                         },
                 };
             case Field::Count: break;

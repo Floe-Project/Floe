@@ -258,31 +258,33 @@ static void WriterAddChecksumForFolder(mz_zip_archive& zip,
 
 } // namespace detail
 
-PUBLIC ErrorCodeOr<void> WriterAddLibrary(mz_zip_archive& zip,
-                                          sample_lib::Library const& lib,
-                                          ArenaAllocator& scratch_arena,
-                                          String program_name) {
+PUBLIC ErrorCodeOr<Optional<String>> WriterAddLibrary(mz_zip_archive& zip,
+                                                      sample_lib::Library const& lib,
+                                                      ArenaAllocator& scratch_arena,
+                                                      String program_name) {
     if (lib.file_format_specifics.tag == sample_lib::FileFormat::Mdata) {
-        LogInfo(ModuleName::Package, "Adding mdata file for library '{}'", lib.path);
+        LogDebug(ModuleName::Package, "Adding mdata file for library '{}'", lib.path);
         auto const mdata = TRY(ReadEntireFile(lib.path, scratch_arena)).ToByteSpan();
         WriterAddFile(zip,
                       path::Join(scratch_arena,
                                  Array {k_libraries_subdir,
-                                        fmt::FormatInline<100>("{} - {}.mdata", lib.author, lib.name)},
+                                        path::MakeSafeForFilename(
+                                            fmt::Format(scratch_arena, "{} - {}.mdata", lib.author, lib.name),
+                                            scratch_arena)},
                                  path::Format::Posix),
                       mdata);
-        return k_success;
+        return k_nullopt;
     }
 
     auto const subdirs =
-        Array {k_libraries_subdir, fmt::Format(scratch_arena, "{} - {}", lib.author, lib.name)};
+        Array {k_libraries_subdir,
+               path::MakeSafeForFilename(fmt::Format(scratch_arena, "{} - {}", lib.author, lib.name),
+                                         scratch_arena)};
+    auto const subdirs_str = path::Join(scratch_arena, subdirs, path::Format::Posix);
 
     TRY(detail::WriterAddAllFiles(zip, *path::Directory(lib.path), scratch_arena, subdirs));
-    detail::WriterAddChecksumForFolder(zip,
-                                       path::Join(scratch_arena, subdirs, path::Format::Posix),
-                                       scratch_arena,
-                                       program_name);
-    return k_success;
+    detail::WriterAddChecksumForFolder(zip, subdirs_str, scratch_arena, program_name);
+    return subdirs_str;
 }
 
 PUBLIC ErrorCodeOr<void> WriterAddPresetsFolder(mz_zip_archive& zip,

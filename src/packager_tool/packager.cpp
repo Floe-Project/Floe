@@ -77,12 +77,14 @@ static ErrorCodeOr<sample_lib::Library*> ReadLua(String lua_path, ArenaAllocator
 }
 
 struct AboutLibraryDocument {
-    String filename;
+    String filename_in_zip;
     String file_data;
 };
 
-static ErrorCodeOr<AboutLibraryDocument>
-WriteAboutLibraryDocument(sample_lib::Library const& lib, ArenaAllocator& arena, Paths paths) {
+static ErrorCodeOr<AboutLibraryDocument> WriteAboutLibraryDocument(sample_lib::Library const& lib,
+                                                                   ArenaAllocator& arena,
+                                                                   Paths paths,
+                                                                   String library_folder_in_zip) {
     ASSERT(lib.file_format_specifics.tag == sample_lib::FileFormat::Lua);
 
     auto const about_library_doc = ({
@@ -104,7 +106,11 @@ WriteAboutLibraryDocument(sample_lib::Library const& lib, ArenaAllocator& arena,
                                  }));
 
     return AboutLibraryDocument {
-        .filename = fmt::Format(arena, "About {}.rtf"_s, path::MakeSafeForFilename(lib.name, arena)),
+        .filename_in_zip = path::Join(
+            arena,
+            Array {library_folder_in_zip,
+                   fmt::Format(arena, "About {}.rtf"_s, path::MakeSafeForFilename(lib.name, arena))},
+            path::Format::Posix),
         .file_data = file_data,
     };
 }
@@ -214,10 +220,11 @@ static ErrorCodeOr<int> Main(ArgsCstr args) {
             return ErrorCode {CommonError::NotFound};
 
         if (create_package) {
-            auto const about_doc = TRY(WriteAboutLibraryDocument(*lib, arena, paths));
-            StdPrintF(StdStream::Out, "Adding library document: {}\n", about_doc.filename);
-            package::WriterAddFile(package, about_doc.filename, about_doc.file_data.ToByteSpan());
-            TRY(package::WriterAddLibrary(package, *lib, arena, program_name));
+            auto const library_folder_in_zip =
+                TRY(package::WriterAddLibrary(package, *lib, arena, program_name));
+            auto const about_doc = TRY(WriteAboutLibraryDocument(*lib, arena, paths, *library_folder_in_zip));
+            StdPrintF(StdStream::Out, "Adding library document: {}\n", about_doc.filename_in_zip);
+            package::WriterAddFile(package, about_doc.filename_in_zip, about_doc.file_data.ToByteSpan());
         }
     }
 

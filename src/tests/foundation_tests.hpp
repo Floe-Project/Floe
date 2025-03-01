@@ -2110,6 +2110,17 @@ TEST_CASE(TestPath) {
         }
     }
 
+    SUBCASE("MakeSafeForFilename") {
+        CHECK_EQ(MakeSafeForFilename("foo", scratch_arena), "foo"_s);
+        CHECK_EQ(MakeSafeForFilename("foo/bar", scratch_arena), "foo bar"_s);
+        CHECK_EQ(MakeSafeForFilename("foo/bar/baz", scratch_arena), "foo bar baz"_s);
+        CHECK_EQ(MakeSafeForFilename("", scratch_arena), ""_s);
+        CHECK_EQ(MakeSafeForFilename("\"\"\"", scratch_arena), ""_s);
+        CHECK_EQ(MakeSafeForFilename("foo  ", scratch_arena), "foo"_s);
+        CHECK_EQ(MakeSafeForFilename("foo  \"", scratch_arena), "foo"_s);
+        CHECK_EQ(MakeSafeForFilename("foo: <bar>|<baz>", scratch_arena), "foo bar baz"_s);
+    }
+
     return k_success;
 }
 

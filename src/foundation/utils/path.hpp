@@ -415,19 +415,29 @@ PUBLIC ErrorCodeOr<Win32Path> MakePathForWin32(String path, ArenaAllocator& aren
 }
 
 PUBLIC String MakeSafeForFilename(String name, Allocator& allocator) {
-    constexpr auto k_invalid_chars = "/\\:*?\"<>|"_s;
+    if (name.size == 0) return {};
+
+    constexpr auto k_remove_chars = ":*?\"<>"_s;
+    constexpr auto k_replace_chars = "/\\|"_s;
     auto new_name = allocator.Clone(name);
     usize pos = 0;
-    for (auto& c : new_name)
-        if (!Contains(k_invalid_chars, c)) new_name[pos++] = c;
+    for (auto& c : new_name) {
+        if (Contains(k_remove_chars, c)) continue;
+        if (Contains(k_replace_chars, c)) {
+            new_name[pos++] = ' ';
+            continue;
+        }
+
+        new_name[pos++] = c;
+    }
+
+    // Trim trailing spaces
+    while (pos && new_name[pos - 1] == ' ')
+        --pos;
 
     if (pos == 0) {
-        for (auto i : Range(name.size))
-            if (Contains(k_invalid_chars, name[i]))
-                new_name[i] = '_';
-            else
-                new_name[i] = name[i];
-        pos = name.size;
+        allocator.Free(new_name.ToByteSpan());
+        return {};
     }
 
     return allocator.ResizeType(new_name, pos, pos);

@@ -102,7 +102,9 @@ static ErrorCodeOr<void> WriteAboutLibraryDocument(sample_lib::Library const& li
                                  }));
 
     auto const output_path =
-        path::Join(arena, Array {library_folder, fmt::Format(arena, "About {}.rtf"_s, lib.name)});
+        path::Join(arena,
+                   Array {library_folder,
+                          fmt::Format(arena, "About {}.rtf"_s, path::MakeSafeForFilename(lib.name, arena))});
     TRY(WriteFile(output_path, result_data));
 
     return k_success;
@@ -145,9 +147,14 @@ static ErrorCodeOr<void> CheckNeededPackageCliArgs(Span<CommandLineArg const> ar
 static String
 PackageName(ArenaAllocator& arena, sample_lib::Library const* lib, CommandLineArg const& package_name_arg) {
     if (package_name_arg.was_provided)
-        return fmt::Format(arena, "{} Package{}", package_name_arg.values[0], package::k_file_extension);
+        return fmt::Format(arena,
+                           "{} Package{}",
+                           path::MakeSafeForFilename(package_name_arg.values[0], arena),
+                           package::k_file_extension);
     ASSERT(lib);
-    return fmt::Format(arena, "{} - {} Package{}", lib->author, lib->name, package::k_file_extension);
+    return path::MakeSafeForFilename(
+        fmt::Format(arena, "{} - {} Package{}", lib->author, lib->name, package::k_file_extension),
+        arena);
 }
 
 static ErrorCodeOr<int> Main(ArgsCstr args) {

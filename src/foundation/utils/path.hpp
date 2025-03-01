@@ -414,4 +414,23 @@ PUBLIC ErrorCodeOr<Win32Path> MakePathForWin32(String path, ArenaAllocator& aren
     return path::MakePathForWin32(ArrayT<WString>({Widen(arena, path).Value()}), arena, long_path_prefix);
 }
 
+PUBLIC String MakeSafeForFilename(String name, Allocator& allocator) {
+    constexpr auto k_invalid_chars = "/\\:*?\"<>|"_s;
+    auto new_name = allocator.Clone(name);
+    usize pos = 0;
+    for (auto& c : new_name)
+        if (!Contains(k_invalid_chars, c)) new_name[pos++] = c;
+
+    if (pos == 0) {
+        for (auto i : Range(name.size))
+            if (Contains(k_invalid_chars, name[i]))
+                new_name[i] = '_';
+            else
+                new_name[i] = name[i];
+        pos = name.size;
+    }
+
+    return allocator.ResizeType(new_name, pos, pos);
+}
+
 } // namespace path

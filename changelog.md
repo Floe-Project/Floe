@@ -27,6 +27,8 @@ For instance: 0.0.1. Don't change the headings.
 - Fixed externally deleted or moved-to-trash libraries not being removed from Floe
 - Fixed not installing to the chosen location
 - Make window resizing work better: fixed aspect ratio, correct remembering of previous size, correct keyboard show/hide, resizable to any size within a reasonable range.
+- Fix packager adding documents into the actual library rather than the package
+
 
 ## 0.0.2
 - Fix Windows installer crash

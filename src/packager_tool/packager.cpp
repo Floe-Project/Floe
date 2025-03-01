@@ -76,38 +76,37 @@ static ErrorCodeOr<sample_lib::Library*> ReadLua(String lua_path, ArenaAllocator
     return outcome.Get<sample_lib::Library*>();
 }
 
-static ErrorCodeOr<void> WriteAboutLibraryDocument(sample_lib::Library const& lib,
-                                                   ArenaAllocator& arena,
-                                                   Paths paths,
-                                                   String library_folder) {
+struct AboutLibraryDocument {
+    String filename;
+    String file_data;
+};
+
+static ErrorCodeOr<AboutLibraryDocument>
+WriteAboutLibraryDocument(sample_lib::Library const& lib, ArenaAllocator& arena, Paths paths) {
+    ASSERT(lib.file_format_specifics.tag == sample_lib::FileFormat::Lua);
+
     auto const about_library_doc = ({
         auto data = EmbeddedAboutLibraryTemplateRtf();
         arena.Clone(Span {(char const*)data.data, data.size});
     });
 
-    String description = {};
-    if (lib.description) description = *lib.description;
-
-    auto const result_data =
+    auto const file_data =
         fmt::FormatStringReplace(arena,
                                  about_library_doc,
                                  ArrayT<fmt::StringReplacement>({
                                      {"__LIBRARY_NAME__", lib.name},
+                                     {"__LIBRARY_DESCRIPTION__", lib.description.ValueOr("")},
                                      {"__LUA_FILENAME__", path::Filename(paths.lua)},
                                      {"__LICENSE_FILENAME__", path::Filename(paths.license)},
                                      {"__FLOE_HOMEPAGE_URL__", FLOE_HOMEPAGE_URL},
                                      {"__FLOE_MANUAL_URL__", FLOE_MANUAL_URL},
                                      {"__FLOE_DOWNLOAD_URL__", FLOE_DOWNLOAD_URL},
-                                     {"__LIBRARY_DESCRIPTION__", description},
                                  }));
 
-    auto const output_path =
-        path::Join(arena,
-                   Array {library_folder,
-                          fmt::Format(arena, "About {}.rtf"_s, path::MakeSafeForFilename(lib.name, arena))});
-    TRY(WriteFile(output_path, result_data));
-
-    return k_success;
+    return AboutLibraryDocument {
+        .filename = fmt::Format(arena, "About {}.rtf"_s, path::MakeSafeForFilename(lib.name, arena)),
+        .file_data = file_data,
+    };
 }
 
 static ErrorCodeOr<void> CheckNeededPackageCliArgs(Span<CommandLineArg const> args) {
@@ -214,9 +213,12 @@ static ErrorCodeOr<int> Main(ArgsCstr args) {
         if (!sample_lib::CheckAllReferencedFilesExist(*lib, StdWriter(StdStream::Err)))
             return ErrorCode {CommonError::NotFound};
 
-        TRY(WriteAboutLibraryDocument(*lib, arena, paths, library_path));
-
-        if (create_package) TRY(package::WriterAddLibrary(package, *lib, arena, program_name));
+        if (create_package) {
+            auto const about_doc = TRY(WriteAboutLibraryDocument(*lib, arena, paths));
+            StdPrintF(StdStream::Out, "Adding library document: {}\n", about_doc.filename);
+            package::WriterAddFile(package, about_doc.filename, about_doc.file_data.ToByteSpan());
+            TRY(package::WriterAddLibrary(package, *lib, arena, program_name));
+        }
     }
 
     if (create_package)
@@ -228,7 +230,9 @@ static ErrorCodeOr<int> Main(ArgsCstr args) {
             auto data = EmbeddedPackageInstallationRtf();
             arena.Clone(Span {(char const*)data.data, data.size});
         });
-        package::WriterAddFile(package, "Installation.rtf"_s, how_to_install_doc.ToByteSpan());
+        constexpr String k_installation_doc_name = "Installation.rtf"_s;
+        StdPrintF(StdStream::Out, "Adding installation document: {}\n", k_installation_doc_name);
+        package::WriterAddFile(package, k_installation_doc_name, how_to_install_doc.ToByteSpan());
 
         auto const package_path = path::Join(
             arena,

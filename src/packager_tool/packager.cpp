@@ -76,10 +76,10 @@ static ErrorCodeOr<sample_lib::Library*> ReadLua(String lua_path, ArenaAllocator
     return outcome.Get<sample_lib::Library*>();
 }
 
-static ErrorCodeOr<void> WriteAboutLibraryHtml(sample_lib::Library const& lib,
-                                               ArenaAllocator& arena,
-                                               Paths paths,
-                                               String library_folder) {
+static ErrorCodeOr<void> WriteAboutLibraryDocument(sample_lib::Library const& lib,
+                                                   ArenaAllocator& arena,
+                                                   Paths paths,
+                                                   String library_folder) {
     auto const about_library_doc = ({
         auto data = EmbeddedAboutLibraryTemplateRtf();
         arena.Clone(Span {(char const*)data.data, data.size});
@@ -207,7 +207,7 @@ static ErrorCodeOr<int> Main(ArgsCstr args) {
         if (!sample_lib::CheckAllReferencedFilesExist(*lib, StdWriter(StdStream::Err)))
             return ErrorCode {CommonError::NotFound};
 
-        TRY(WriteAboutLibraryHtml(*lib, arena, paths, library_path));
+        TRY(WriteAboutLibraryDocument(*lib, arena, paths, library_path));
 
         if (create_package) TRY(package::WriterAddLibrary(package, *lib, arena, program_name));
     }

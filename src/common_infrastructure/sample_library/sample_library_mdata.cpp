@@ -13,7 +13,9 @@
 
 namespace sample_lib {
 
-static Range ConvertVelocityToStartEndRange(s8 low_velo, s8 high_velo) {
+// Converts from inclusive MIDI-1 style velocity range, for example 1-127, to the new 0-100 exclusive range
+// (the second number is one past the last).
+static Range MapMidiVelocityRangeToNormalizedRange(s8 low_velo, s8 high_velo) {
     auto const lo = Max((s8)1, low_velo) - 1;
     auto const hi = high_velo - 1;
 
@@ -28,7 +30,7 @@ static Range ConvertVelocityToStartEndRange(s8 low_velo, s8 high_velo) {
 
 TEST_CASE(TestConvertVelocityRange) {
     auto check = [&](s8 low_velo, s8 high_velo, Range expected_out) {
-        auto const out = ConvertVelocityToStartEndRange(low_velo, high_velo);
+        auto const out = MapMidiVelocityRangeToNormalizedRange(low_velo, high_velo);
         REQUIRE_EQ(out.start, expected_out.start);
         REQUIRE_EQ(out.end, expected_out.end);
     };
@@ -372,8 +374,8 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
                             .event = trigger_event,
                             .key_range = {CheckedCast<u8>(region_info.low_note),
                                           CheckedCast<u8>((int)region_info.high_note + 1)},
-                            .velocity_range =
-                                ConvertVelocityToStartEndRange(region_info.low_velo, region_info.high_velo),
+                            .velocity_range = MapMidiVelocityRangeToNormalizedRange(region_info.low_velo,
+                                                                                    region_info.high_velo),
                             .round_robin_index = ({
                                 Optional<u32> rr {};
                                 if (!groups_are_xfade_layers &&

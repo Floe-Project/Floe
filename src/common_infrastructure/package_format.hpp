@@ -138,7 +138,7 @@ PUBLIC void WriterAddParentFolders(mz_zip_archive& zip, String path) {
     WriterAddParentFolders(zip, *parent_path);
 }
 
-PUBLIC void WriterAddFile(mz_zip_archive& zip, String path, Span<u8 const> data) {
+[[nodiscard]] PUBLIC bool WriterAddFile(mz_zip_archive& zip, String path, Span<u8 const> data) {
     ArenaAllocatorWithInlineStorage<200> scratch_arena {Malloc::Instance()};
     DynamicArray<char> archived_path {scratch_arena};
     dyn::Assign(archived_path, path);
@@ -149,8 +149,7 @@ PUBLIC void WriterAddFile(mz_zip_archive& zip, String path, Span<u8 const> data)
             if (c == '\\') c = '/';
     }
 
-    if (detail::AlreadyExists(zip, archived_path))
-        PanicF(SourceLocation::Current(), "File already exists in zip: {}", path);
+    if (detail::AlreadyExists(zip, archived_path)) return false;
 
     WriterAddParentFolders(zip, path);
 
@@ -166,6 +165,7 @@ PUBLIC void WriterAddFile(mz_zip_archive& zip, String path, Span<u8 const> data)
                "Failed to add file to zip: {}",
                mz_zip_get_error_string(mz_zip_get_last_error(&zip)));
     }
+    return true;
 }
 
 PUBLIC void WriterFinalise(mz_zip_archive& zip) {
@@ -204,7 +204,7 @@ static ErrorCodeOr<void> WriterAddAllFiles(mz_zip_archive& zip,
             auto const file_data =
                 TRY(ReadEntireFile(dir_iterator::FullPath(it, *entry, inner_arena), inner_arena))
                     .ToByteSpan();
-            WriterAddFile(zip, archive_path, file_data);
+            if (!WriterAddFile(zip, archive_path, file_data)) return {FilesystemError::PathAlreadyExists};
         }
     }
 
@@ -251,9 +251,11 @@ static void WriterAddChecksumForFolder(mz_zip_archive& zip,
                                .file_size = file_stat.m_uncomp_size,
                            });
     }
-    WriterAddFile(zip,
-                  path::Join(scratch_arena, Array {folder_in_archive, k_checksums_file}, path::Format::Posix),
-                  checksums.Items().ToByteSpan());
+    auto const added_checksum = WriterAddFile(
+        zip,
+        path::Join(scratch_arena, Array {folder_in_archive, k_checksums_file}, path::Format::Posix),
+        checksums.Items().ToByteSpan());
+    ASSERT(added_checksum);
 }
 
 } // namespace detail
@@ -265,14 +267,16 @@ PUBLIC ErrorCodeOr<Optional<String>> WriterAddLibrary(mz_zip_archive& zip,
     if (lib.file_format_specifics.tag == sample_lib::FileFormat::Mdata) {
         LogDebug(ModuleName::Package, "Adding mdata file for library '{}'", lib.path);
         auto const mdata = TRY(ReadEntireFile(lib.path, scratch_arena)).ToByteSpan();
-        WriterAddFile(zip,
-                      path::Join(scratch_arena,
-                                 Array {k_libraries_subdir,
-                                        path::MakeSafeForFilename(
-                                            fmt::Format(scratch_arena, "{} - {}.mdata", lib.author, lib.name),
-                                            scratch_arena)},
-                                 path::Format::Posix),
-                      mdata);
+        if (!WriterAddFile(
+                zip,
+                path::Join(scratch_arena,
+                           Array {k_libraries_subdir,
+                                  path::MakeSafeForFilename(
+                                      fmt::Format(scratch_arena, "{} - {}.mdata", lib.author, lib.name),
+                                      scratch_arena)},
+                           path::Format::Posix),
+                mdata))
+            return {FilesystemError::PathAlreadyExists};
         return k_nullopt;
     }
 

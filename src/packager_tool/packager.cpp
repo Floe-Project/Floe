@@ -223,8 +223,15 @@ static ErrorCodeOr<int> Main(ArgsCstr args) {
             auto const library_folder_in_zip =
                 TRY(package::WriterAddLibrary(package, *lib, arena, program_name));
             auto const about_doc = TRY(WriteAboutLibraryDocument(*lib, arena, paths, *library_folder_in_zip));
-            StdPrintF(StdStream::Out, "Adding library document: {}\n", about_doc.filename_in_zip);
-            package::WriterAddFile(package, about_doc.filename_in_zip, about_doc.file_data.ToByteSpan());
+            if (!package::WriterAddFile(package,
+                                        about_doc.filename_in_zip,
+                                        about_doc.file_data.ToByteSpan())) {
+                StdPrintF(StdStream::Out,
+                          "Error: auto-generated {} already exists - remove it\n",
+                          about_doc.filename_in_zip);
+                return ErrorCode {FilesystemError::PathAlreadyExists};
+            }
+            StdPrintF(StdStream::Out, "Added library document: {}\n", about_doc.filename_in_zip);
         }
     }
 
@@ -238,8 +245,13 @@ static ErrorCodeOr<int> Main(ArgsCstr args) {
             arena.Clone(Span {(char const*)data.data, data.size});
         });
         constexpr String k_installation_doc_name = "Installation.rtf"_s;
-        StdPrintF(StdStream::Out, "Adding installation document: {}\n", k_installation_doc_name);
-        package::WriterAddFile(package, k_installation_doc_name, how_to_install_doc.ToByteSpan());
+        if (!package::WriterAddFile(package, k_installation_doc_name, how_to_install_doc.ToByteSpan())) {
+            StdPrintF(StdStream::Out,
+                      "Error: auto-generated {} already exists - remove it\n",
+                      k_installation_doc_name);
+            return ErrorCode {FilesystemError::PathAlreadyExists};
+        }
+        StdPrintF(StdStream::Out, "Added installation document: {}\n", k_installation_doc_name);
 
         auto const package_path = path::Join(
             arena,

@@ -100,6 +100,7 @@ PUBLIC void GlobalInit(GlobalInitOptions options) {
                         case FinalBinaryType::Packager:
                         case FinalBinaryType::WindowsInstaller:
                         case FinalBinaryType::WindowsUninstaller:
+                        case FinalBinaryType::DocsPreprocessor:
                         case FinalBinaryType::Tests: d = LogConfig::Destination::Stderr; break;
                     }
                     d;

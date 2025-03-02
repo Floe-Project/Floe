@@ -11,6 +11,7 @@
 #include "utils/json/json_writer.hpp"
 
 #include "common_infrastructure/common_errors.hpp"
+#include "common_infrastructure/global.hpp"
 #include "common_infrastructure/sample_library/sample_library.hpp"
 
 #include "config.h"
@@ -314,7 +315,8 @@ static ErrorCodeOr<int> Main(ArgsCstr args) {
 }
 
 int main(int argc, char** argv) {
-    SetThreadName("main");
+    GlobalInit({.init_error_reporting = false, .set_main_thread = true});
+    DEFER { GlobalDeinit({.shutdown_error_reporting = false}); };
     auto result = Main({argc, argv});
     if (result.HasError()) {
         StdPrintF(StdStream::Err, "Error: {}", result.Error());

@@ -1253,6 +1253,7 @@ pub fn build(b: *std.Build) void {
             .FLOE_PACKAGES_INFO_URL = floe_packages_info_url,
             .FLOE_SOURCE_CODE_URL = floe_source_code_url,
             .FLOE_PROJECT_ROOT_PATH = rootdir,
+            .FLOE_PROJECT_CACHE_PATH = b.pathJoin(&.{ rootdir, floe_cache_relative }),
             .FLOE_VENDOR = floe_vendor,
             .IS_WINDOWS = target.result.os.tag == .windows,
             .IS_MACOS = target.result.os.tag == .macos,
@@ -2001,9 +2002,11 @@ pub fn build(b: *std.Build) void {
             docs_preprocessor.addCSourceFiles(.{
                 .files = &.{
                     "src/docs_preprocessor/docs_preprocessor.cpp",
+                    "src/common_infrastructure/final_binary_type.cpp",
                 },
                 .flags = cpp_floe_flags,
             });
+            docs_preprocessor.defineCMacro("FINAL_BINARY_TYPE", "DocsPreprocessor");
             docs_preprocessor.linkLibrary(common_infrastructure);
             docs_preprocessor.addIncludePath(b.path("src"));
             docs_preprocessor.addConfigHeader(build_config_step);

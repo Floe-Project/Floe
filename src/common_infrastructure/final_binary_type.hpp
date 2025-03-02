@@ -13,6 +13,7 @@ enum class FinalBinaryType {
     WindowsUninstaller,
     AuV2,
     Tests,
+    DocsPreprocessor,
 };
 
 constexpr String ToString(FinalBinaryType type) {
@@ -25,6 +26,7 @@ constexpr String ToString(FinalBinaryType type) {
         case FinalBinaryType::WindowsUninstaller: return "windows_uninstaller"_s;
         case FinalBinaryType::AuV2: return "au_v2"_s;
         case FinalBinaryType::Tests: return "tests"_s;
+        case FinalBinaryType::DocsPreprocessor: return "docs_preprocessor"_s;
     }
     PanicIfReached();
 }

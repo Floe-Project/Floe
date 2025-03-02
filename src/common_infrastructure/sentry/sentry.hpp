@@ -414,20 +414,23 @@ EnvelopeAddEvent(Sentry& sentry, EnvelopeWriter& writer, ErrorEvent event, AddEv
                 auto try_write = [&]() -> ErrorCodeOr<void> {
                     TRY(json::WriteObjectBegin(json_writer));
 
-                    if (auto const filename = TrimStartIfMatches(
-                            frame.filename,
-                            ConcatArrays(FLOE_PROJECT_ROOT_PATH ""_ca, path::k_dir_separator_str));
-                        filename.size) {
-                        TRY(json::WriteKeyValue(json_writer, "filename", filename));
+                    // NOTE: our own filepaths should be relative because we use -fmacro-prefix-map
+                    // -fdebug-prefix-map and -ffile-prefix-map. We ignore absolute paths because they could
+                    // contain usernames.
+                    if (frame.filename.size && !path::IsAbsolute(frame.filename)) {
+                        TRY(json::WriteKeyValue(json_writer, "filename", frame.filename));
                         TRY(json::WriteKeyValue(json_writer, "in_app", true));
                         TRY(json::WriteKeyValue(json_writer, "lineno", frame.line));
 
-                        HashUpdate(fingerprint, filename);
+                        HashUpdate(fingerprint, frame.filename);
                         HashUpdate(fingerprint, frame.line);
-                    }
 
-                    if (frame.function_name.size)
-                        TRY(json::WriteKeyValue(json_writer, "function", frame.function_name));
+                        if (frame.function_name.size)
+                            TRY(json::WriteKeyValue(json_writer, "function", frame.function_name));
+                    } else {
+                        TRY(json::WriteKeyValue(json_writer, "filename", "external-file"_s));
+                        TRY(json::WriteKeyValue(json_writer, "in_app", false));
+                    }
 
                     TRY(json::WriteObjectEnd(json_writer));
                     return k_success;

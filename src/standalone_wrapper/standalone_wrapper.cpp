@@ -363,6 +363,7 @@ static void CloseAudio(Standalone& standalone) {
 
 static PuglStatus OnEvent(PuglView* view, PuglEvent const* event) {
     auto& p = *(Standalone*)puglGetHandle(view);
+    if (PanicOccurred()) return PUGL_UNKNOWN_ERROR;
 
     // if (event->type != PUGL_UPDATE && event->type != PUGL_TIMER)
     //     printEvent(event, "PUGL (standalone): ", true);

@@ -427,6 +427,20 @@ static int NumSkipFrames(StacktraceSkipOptions skip) {
     return CheckedCast<int>(skip.TryGetOpt<StacktraceFrames>().ValueOr(StacktraceFrames {1}));
 }
 
+static String Filename(char const* filename) {
+    if (!filename) return ""_s;
+    auto result = FromNullTerminated(filename);
+
+    // NOTE(Sam, 2nd March, Linux): despite using -fmacro-prefix-map -fdebug-prefix-map and
+    // -ffile-prefix-map, we still sometimes get absolute paths - somehow on some files the
+    // absolute prefix is added back on after the prefix map is applied. I know this because if we
+    // use prefix-map to create a nonsense name, we can see the nonsense name in the output - in
+    // the middle of the path.
+    result =
+        TrimStartIfMatches(result, ConcatArrays(FLOE_PROJECT_ROOT_PATH ""_ca, path::k_dir_separator_str));
+    return result;
+}
+
 Optional<StacktraceStack> CurrentStacktrace(StacktraceSkipOptions skip) {
     auto state = g_backtrace_state.Load(LoadMemoryOrder::Acquire);
 
@@ -478,7 +492,7 @@ static int HandleStacktraceLine(void* data,
 
     FrameInfo const frame {
         .function_name = function_name,
-        .filename = filename ? FromNullTerminated(filename) : "unknown-file"_s,
+        .filename = filename ? Filename(filename) : "unknown-file"_s,
         .line = lineno,
     };
     ctx.return_value = frame.Write(ctx.line_num++, ctx.writer, ctx.options);
@@ -570,7 +584,7 @@ void StacktraceToCallback(Span<uintptr const> stack,
                 }
                 if (!function_name.size) function_name = function ? FromNullTerminated(function) : ""_s;
 
-                ctx.callback({function_name, filename ? FromNullTerminated(filename) : ""_s, lineno});
+                ctx.callback({function_name, Filename(filename), lineno});
 
                 return 0;
             },

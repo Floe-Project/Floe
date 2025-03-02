@@ -786,11 +786,12 @@ fn universalFlags(
         try flags.append("-fno-use-cxa-atexit");
     }
 
-    // make the __FILE__ macro non-absolute
+    // We want __builtin_FILE() and __FILE__ to be portable because we use this information in stacktraces and
+    // logging so we change the absolute paths of all files to be relative to the build root.
     const build_root = context.b.pathFromRoot("");
     try flags.append(context.b.fmt("-fmacro-prefix-map={s}/=", .{build_root}));
-    // try flags.append(context.b.fmt("-fdebug-prefix-map={s}/=", .{build_root}));
     try flags.append(context.b.fmt("-ffile-prefix-map={s}/=", .{build_root}));
+    try flags.append(context.b.fmt("-fdebug-prefix-map={s}/=", .{build_root}));
     try flags.append("-fvisibility=hidden");
 
     if (context.build_mode != .production and target.query.isNativeOs() and context.enable_tracy) {

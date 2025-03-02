@@ -135,10 +135,30 @@ static ErrorCodeOr<String> PreprocessMarkdownBlob(String markdown_blob) {
 
         // get the latest release version and the download links
         {
+            auto const cached_reponse_path =
+                path::Join(scratch, Array {String(FLOE_PROJECT_CACHE_PATH), "latest-release.json"});
 
-            DynamicArray<char> json_data {scratch};
-            TRY(HttpsGet("https://api.github.com/repos/Floe-Project/Floe/releases/latest",
-                         dyn::WriterFor(json_data)));
+            auto const cached_response = ({
+                Optional<String> response = {};
+                auto const o = ReadEntireFile(cached_reponse_path, scratch);
+                if (o.HasError()) {
+                    if (o.Error() != FilesystemError::PathDoesNotExist) return o.Error();
+                } else
+                    response = o.Value();
+                response;
+            });
+
+            String json_data {};
+
+            if (cached_response) {
+                json_data = *cached_response;
+            } else {
+                DynamicArray<char> data {scratch};
+                TRY(HttpsGet("https://api.github.com/repos/Floe-Project/Floe/releases/latest",
+                             dyn::WriterFor(data)));
+                json_data = data.ToOwnedSpan();
+                TRY(WriteFile(cached_reponse_path, json_data));
+            }
 
             String latest_release_version {};
             struct Asset {

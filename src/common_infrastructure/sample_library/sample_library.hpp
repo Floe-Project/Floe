@@ -67,6 +67,7 @@ struct Region {
     struct Options {
         Optional<Range> timbre_crossfade_region {};
         bool feather_overlapping_velocity_regions {};
+        f32 volume_db {0};
 
         // private
         Optional<String> auto_map_key_range_group {};

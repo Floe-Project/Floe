@@ -175,7 +175,7 @@ static ErrorCodeOr<AudioData> DecodeFlac(Reader& reader, Allocator& allocator) {
     auto const process_success = FLAC__stream_decoder_process_until_end_of_stream(decoder);
 
     if (!process_success || context.flac_error) {
-        allocator.Free(context.interleaved_samples.ToByteSpan());
+        if (context.interleaved_samples.size) allocator.Free(context.interleaved_samples.ToByteSpan());
         if (context.error_code) return *context.error_code;
         if (context.flac_error)
             return ErrorCode(AudioFileError::FileHasInvalidData,
@@ -249,7 +249,7 @@ static ErrorCodeOr<AudioData> DecodeWav(Reader& reader, Allocator& allocator) {
     auto const num_read =
         drwav_read_pcm_frames_f32(&wav, wav.totalPCMFrameCount, (f32*)result.interleaved_samples.data);
     if (num_read != wav.totalPCMFrameCount) {
-        allocator.Free(result.interleaved_samples.ToByteSpan());
+        if (result.interleaved_samples.size) allocator.Free(result.interleaved_samples.ToByteSpan());
         if (context.error_code) return *context.error_code;
         return ErrorCode {AudioFileError::FileHasInvalidData};
     }

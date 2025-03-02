@@ -620,7 +620,7 @@ GuiFrameResult GuiUpdate(Gui* g) {
             auto overall_library = LibraryForOverallBackground(g->engine);
             if (overall_library) {
                 auto imgs = LibraryImagesFromLibraryId(g, *overall_library);
-                if (imgs->background) {
+                if (imgs && imgs->background) {
                     auto tex = g->frame_input.graphics_ctx->GetTextureFromImage(*imgs->background);
                     if (tex) {
                         imgui.graphics->AddImage(*tex,

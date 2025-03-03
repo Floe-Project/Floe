@@ -173,11 +173,12 @@ struct ParamFlags {
 enum class ParameterModule : u8 {
     None = 0,
 
-    Master,
-    Effect,
     Layer1,
     Layer2,
     Layer3,
+
+    Effect,
+    Master,
 
     Lfo,
     Loop,
@@ -205,11 +206,13 @@ enum class ParameterModule : u8 {
 constexpr String k_parameter_module_strings[] = {
     "",
 
-    "Master",     "Effect",     "Layer 1", "Layer 2",     "Layer 3",
+    "Layer 1",    "Layer 2",    "Layer 3",
 
-    "LFO",        "Loop",       "Filter",  "MIDI",        "EQ",      "Volume Envelope",
+    "Effect",     "Master",
 
-    "Distortion", "Reverb",     "Delay",   "StereoWiden", "Chorus",  "Phaser",          "Convolution Reverb",
+    "LFO",        "Loop",       "Filter",  "MIDI",        "EQ",     "Volume Envelope",
+
+    "Distortion", "Reverb",     "Delay",   "StereoWiden", "Chorus", "Phaser",          "Convolution Reverb",
     "Bitcrush",   "Compressor",
 
     "Band 1",     "Band 2",

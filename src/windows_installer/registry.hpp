@@ -106,18 +106,20 @@ PUBLIC void CreateUninstallRegistryKey(ArenaAllocator& arena, String uninstaller
 
     SetRegString(h_key, L"DisplayVersion", L"" FLOE_VERSION_STRING, false);
 
+    auto const floe_version = ParseVersionString(FLOE_VERSION_STRING).Value();
+
     {
-        DWORD const major = FLOE_MAJOR_VERSION;
+        DWORD const major = floe_version.major;
         RegSetValueExW(h_key, L"VersionMajor", 0, REG_DWORD, (const BYTE*)&major, sizeof(major));
     }
 
     {
-        DWORD const minor = FLOE_MINOR_VERSION;
+        DWORD const minor = floe_version.minor;
         RegSetValueExW(h_key, L"VersionMinor", 0, REG_DWORD, (const BYTE*)&minor, sizeof(minor));
     }
 
     {
-        DWORD const version = (FLOE_MAJOR_VERSION << 16) | FLOE_MINOR_VERSION;
+        DWORD const version = (floe_version.major << 16) | floe_version.minor;
         RegSetValueExW(h_key, L"Version", 0, REG_DWORD, (const BYTE*)&version, sizeof(version));
     }
 

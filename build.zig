@@ -1166,6 +1166,8 @@ pub fn build(b: *std.Build) void {
             .override = install_dir,
         };
 
+        const git_commit = std.mem.trim(u8, b.run(&.{ "git", "rev-parse", "--short", "HEAD" }), " \r\n\t");
+
         var floe_version_string: ?[]const u8 = null;
         {
             var file = std.fs.openFileAbsolute(
@@ -1175,9 +1177,14 @@ pub fn build(b: *std.Build) void {
             defer file.close();
             floe_version_string = file.readToEndAlloc(b.allocator, 256) catch @panic("version.txt error");
             floe_version_string = std.mem.trim(u8, floe_version_string.?, " \r\n\t");
+
+            if (build_context.build_mode != .production) {
+                floe_version_string = b.fmt("{s}+{s}", .{ floe_version_string.?, git_commit });
+            }
         }
 
         const floe_version = std.SemanticVersion.parse(floe_version_string.?) catch @panic("invalid version");
+        const floe_version_hash = std.hash.Fnv1a_32.hash(floe_version_string.?);
 
         const universal_flags = universalFlags(&build_context, target, &.{}) catch unreachable;
         const universal_floe_flags = universalFlags(&build_context, target, &.{
@@ -1199,11 +1206,7 @@ pub fn build(b: *std.Build) void {
             "-Wdouble-promotion",
             "-Woverloaded-virtual",
             "-Wno-missing-field-initializers",
-            b.fmt("-DOBJC_NAME_PREFIX=Floe{d}{d}{d}", .{
-                floe_version.major,
-                floe_version.minor,
-                floe_version.patch,
-            }),
+            b.fmt("-DOBJC_NAME_PREFIX=Floe{d}", .{floe_version_hash}),
             "-DFLAC__NO_DLL",
             "-DPUGL_DISABLE_DEPRECATED",
             "-DPUGL_STATIC",
@@ -1231,9 +1234,6 @@ pub fn build(b: *std.Build) void {
         const objcpp_flags = objcppFlags(b, universal_flags, &.{}) catch unreachable;
         const objcpp_floe_flags = objcppFlags(b, universal_floe_flags, &.{}) catch unreachable;
 
-        const floe_version_major: i64 = @intCast(floe_version.major);
-        const floe_version_minor: i64 = @intCast(floe_version.minor);
-        const floe_version_patch: i64 = @intCast(floe_version.patch);
         const windows_ntddi_version: i64 = @intFromEnum(std.Target.Os.WindowsVersion.parse(min_windows_version) catch @panic("invalid win ver"));
 
         const build_config_step = b.addConfigHeader(.{
@@ -1241,9 +1241,6 @@ pub fn build(b: *std.Build) void {
         }, .{
             .PRODUCTION_BUILD = build_context.build_mode == .production,
             .RUNTIME_SAFETY_CHECKS_ON = build_context.optimise == .Debug or build_context.optimise == .ReleaseSafe,
-            .FLOE_MAJOR_VERSION = floe_version_major,
-            .FLOE_MINOR_VERSION = floe_version_minor,
-            .FLOE_PATCH_VERSION = floe_version_patch,
             .FLOE_VERSION_STRING = floe_version_string,
             .FLOE_DESCRIPTION = floe_description,
             .FLOE_HOMEPAGE_URL = floe_homepage_url,
@@ -1263,7 +1260,6 @@ pub fn build(b: *std.Build) void {
             .MIN_WINDOWS_NTDDI_VERSION = windows_ntddi_version,
             .MIN_MACOS_VERSION = min_macos_version,
             .SENTRY_DSN = b.graph.env_map.get("SENTRY_DSN"),
-            .GIT_COMMIT_HASH = std.mem.trim(u8, b.run(&.{ "git", "rev-parse", "HEAD" }), " \r\n\t"),
         });
 
         var stb_sprintf = b.addObject(.{

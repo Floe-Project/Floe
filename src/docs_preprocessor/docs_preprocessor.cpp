@@ -78,171 +78,162 @@ static ErrorCodeOr<String> PreprocessMarkdownBlob(String markdown_blob) {
         ExpandIdentifier(result, Identifier("sample-library-example-lua-no-comments"), buffer, scratch);
     }
 
+    ExpandIdentifier(result,
+                     Identifier("lua-version"),
+                     String {LUA_VERSION_MAJOR "." LUA_VERSION_MINOR},
+                     scratch);
+
     {
-        ExpandIdentifier(result,
-                         Identifier("lua-version"),
-                         String {LUA_VERSION_MAJOR "." LUA_VERSION_MINOR},
-                         scratch);
+        String windows_version = {};
 
-        {
-            String windows_version = {};
-
-            // From public domain https://github.com/reactos/reactos/blob/master/sdk/include/psdk/sdkddkver.h
-            switch (MIN_WINDOWS_NTDDI_VERSION) {
-                case 0x0A000000: windows_version = "Windows 10"; break; // 10240 / 1507 / Threshold 1
-                case 0x0A000001: windows_version = "Windows 10 (Build 10586)"; break; // 1511 / Threshold 2
-                case 0x0A000002: windows_version = "Windows 10 (Build 14393)"; break; // 1607 / Redstone 1
-                case 0x0A000003: windows_version = "Windows 10 (Build 15063)"; break; // 1703 / Redstone 2
-                case 0x0A000004: windows_version = "Windows 10 (Build 16299)"; break; // 1709 / Redstone 3
-                case 0x0A000005: windows_version = "Windows 10 (Build 17134)"; break; // 1803 / Redstone 4
-                case 0x0A000006: windows_version = "Windows 10 (Build 17763)"; break; // 1809 / Redstone 5
-                case 0x0A000007:
-                    windows_version = "Windows 10 (Build 18362)";
-                    break; // 1903 / 19H1 "Titanium"
-                case 0x0A000008: windows_version = "Windows 10 (Build 19041)"; break; // 2004 / Vibranium
-                case 0x0A000009: windows_version = "Windows 10 (Build 19042)"; break; // 20H2 / Manganese
-                case 0x0A00000A: windows_version = "Windows 10 (Build 19043)"; break; // 21H1 / Ferrum
-                case 0x0A00000B: windows_version = "Windows 11"; break; // 22000 / 21H2 / Cobalt
-                case 0x0A00000C: windows_version = "Windows 11 (Build 22621)"; break; // 22H2 / Nickel
-                case 0x0A00000D: windows_version = "Windows 11 (Build 22621)"; break; // 22H2 / Copper
-                default: PanicIfReached();
-            }
-
-            ExpandIdentifier(result, Identifier("min-windows-version"), windows_version, scratch);
+        // From public domain https://github.com/reactos/reactos/blob/master/sdk/include/psdk/sdkddkver.h
+        switch (MIN_WINDOWS_NTDDI_VERSION) {
+            case 0x0A000000: windows_version = "Windows 10"; break; // 10240 / 1507 / Threshold 1
+            case 0x0A000001: windows_version = "Windows 10 (Build 10586)"; break; // 1511 / Threshold 2
+            case 0x0A000002: windows_version = "Windows 10 (Build 14393)"; break; // 1607 / Redstone 1
+            case 0x0A000003: windows_version = "Windows 10 (Build 15063)"; break; // 1703 / Redstone 2
+            case 0x0A000004: windows_version = "Windows 10 (Build 16299)"; break; // 1709 / Redstone 3
+            case 0x0A000005: windows_version = "Windows 10 (Build 17134)"; break; // 1803 / Redstone 4
+            case 0x0A000006: windows_version = "Windows 10 (Build 17763)"; break; // 1809 / Redstone 5
+            case 0x0A000007: windows_version = "Windows 10 (Build 18362)"; break; // 1903 / 19H1 "Titanium"
+            case 0x0A000008: windows_version = "Windows 10 (Build 19041)"; break; // 2004 / Vibranium
+            case 0x0A000009: windows_version = "Windows 10 (Build 19042)"; break; // 20H2 / Manganese
+            case 0x0A00000A: windows_version = "Windows 10 (Build 19043)"; break; // 21H1 / Ferrum
+            case 0x0A00000B: windows_version = "Windows 11"; break; // 22000 / 21H2 / Cobalt
+            case 0x0A00000C: windows_version = "Windows 11 (Build 22621)"; break; // 22H2 / Nickel
+            case 0x0A00000D: windows_version = "Windows 11 (Build 22621)"; break; // 22H2 / Copper
+            default: PanicIfReached();
         }
 
-        {
-            auto const macos_version = ParseVersionString(MIN_MACOS_VERSION).Value();
-            DynamicArrayBounded<char, 64> macos_version_str {"macOS "};
-            ASSERT(macos_version.major != 0);
-            fmt::Append(macos_version_str, "{}", macos_version.major);
-            if (macos_version.minor != 0) fmt::Append(macos_version_str, ".{}", macos_version.minor);
-            if (macos_version.patch != 0) fmt::Append(macos_version_str, ".{}", macos_version.patch);
+        ExpandIdentifier(result, Identifier("min-windows-version"), windows_version, scratch);
+    }
 
-            String release_name = {};
-            switch (macos_version.major) {
-                case 11: release_name = "Big Sur"; break;
-                case 12: release_name = "Monterey"; break;
-                case 13: release_name = "Ventura"; break;
-                case 14: release_name = "Sonoma"; break;
-                case 15: release_name = "Sequoia"; break;
-                default: PanicIfReached();
-            }
-            fmt::Append(macos_version_str, " ({})", release_name);
+    {
+        auto const macos_version = ParseVersionString(MIN_MACOS_VERSION).Value();
+        DynamicArrayBounded<char, 64> macos_version_str {"macOS "};
+        ASSERT(macos_version.major != 0);
+        fmt::Append(macos_version_str, "{}", macos_version.major);
+        if (macos_version.minor != 0) fmt::Append(macos_version_str, ".{}", macos_version.minor);
+        if (macos_version.patch != 0) fmt::Append(macos_version_str, ".{}", macos_version.patch);
 
-            ExpandIdentifier(result, Identifier("min-macos-version"), macos_version_str, scratch);
+        String release_name = {};
+        switch (macos_version.major) {
+            case 11: release_name = "Big Sur"; break;
+            case 12: release_name = "Monterey"; break;
+            case 13: release_name = "Ventura"; break;
+            case 14: release_name = "Sonoma"; break;
+            case 15: release_name = "Sequoia"; break;
+            default: PanicIfReached();
+        }
+        fmt::Append(macos_version_str, " ({})", release_name);
+
+        ExpandIdentifier(result, Identifier("min-macos-version"), macos_version_str, scratch);
+    }
+
+    // get the latest release version and the download links
+    {
+        auto const cached_reponse_path =
+            path::Join(scratch, Array {String(FLOE_PROJECT_CACHE_PATH), "latest-release.json"});
+
+        auto const cached_response = ({
+            Optional<String> response = {};
+            auto const o = ReadEntireFile(cached_reponse_path, scratch);
+            if (o.HasError()) {
+                if (o.Error() != FilesystemError::PathDoesNotExist) return o.Error();
+            } else
+                response = o.Value();
+            response;
+        });
+
+        String json_data {};
+
+        if (cached_response) {
+            json_data = *cached_response;
+        } else {
+            DynamicArray<char> data {scratch};
+            TRY(HttpsGet("https://api.github.com/repos/Floe-Project/Floe/releases/latest",
+                         dyn::WriterFor(data)));
+            json_data = data.ToOwnedSpan();
+            TRY(WriteFile(cached_reponse_path, json_data));
         }
 
-        // get the latest release version and the download links
+        String latest_release_version {};
+        struct Asset {
+            String name;
+            usize size;
+            String url;
+        };
+        ArenaList<Asset, false> assets {scratch};
+
+        auto const handle_asset_object = [&](json::EventHandlerStack&, json::Event const& event) {
+            if (event.type == json::EventType::HandlingStarted) {
+                *assets.PrependUninitialised() = {};
+                return true;
+            }
+
+            if (json::SetIfMatchingRef(event, "name", assets.first->data.name)) return true;
+            if (json::SetIfMatching(event, "size", assets.first->data.size)) return true;
+            if (json::SetIfMatchingRef(event, "browser_download_url", assets.first->data.url)) return true;
+
+            return false;
+        };
+
+        auto const handle_assets_array = [&](json::EventHandlerStack& handler_stack,
+                                             json::Event const& event) {
+            if (SetIfMatchingObject(handler_stack, event, "", handle_asset_object)) return true;
+            return false;
+        };
+
+        auto const handle_root_object = [&](json::EventHandlerStack& handler_stack,
+                                            json::Event const& event) {
+            json::SetIfMatchingRef(event, "tag_name", latest_release_version);
+            if (SetIfMatchingArray(handler_stack, event, "assets", handle_assets_array)) return true;
+            return false;
+        };
+
+        auto const o = json::Parse(json_data, handle_root_object, scratch, {});
+
+        if (o.HasError()) return ErrorCode {CommonError::InvalidFileFormat};
+
         {
-            auto const cached_reponse_path =
-                path::Join(scratch, Array {String(FLOE_PROJECT_CACHE_PATH), "latest-release.json"});
+            DynamicArrayBounded<char, 250> name {};
+            for (auto& asset : assets) {
+                dyn::Assign(name, asset.name);
+                dyn::Replace(name, latest_release_version, ""_s);
+                dyn::Replace(name, "--"_s, "-"_s);
+                name.size -= path::Extension(name).size;
 
-            auto const cached_response = ({
-                Optional<String> response = {};
-                auto const o = ReadEntireFile(cached_reponse_path, scratch);
-                if (o.HasError()) {
-                    if (o.Error() != FilesystemError::PathDoesNotExist) return o.Error();
-                } else
-                    response = o.Value();
-                response;
-            });
-
-            String json_data {};
-
-            if (cached_response) {
-                json_data = *cached_response;
-            } else {
-                DynamicArray<char> data {scratch};
-                TRY(HttpsGet("https://api.github.com/repos/Floe-Project/Floe/releases/latest",
-                             dyn::WriterFor(data)));
-                json_data = data.ToOwnedSpan();
-                TRY(WriteFile(cached_reponse_path, json_data));
-            }
-
-            String latest_release_version {};
-            struct Asset {
-                String name;
-                usize size;
-                String url;
-            };
-            ArenaList<Asset, false> assets {scratch};
-
-            auto const handle_asset_object = [&](json::EventHandlerStack&, json::Event const& event) {
-                if (event.type == json::EventType::HandlingStarted) {
-                    *assets.PrependUninitialised() = {};
-                    return true;
-                }
-
-                if (json::SetIfMatchingRef(event, "name", assets.first->data.name)) return true;
-                if (json::SetIfMatching(event, "size", assets.first->data.size)) return true;
-                if (json::SetIfMatchingRef(event, "browser_download_url", assets.first->data.url))
-                    return true;
-
-                return false;
-            };
-
-            auto const handle_assets_array = [&](json::EventHandlerStack& handler_stack,
-                                                 json::Event const& event) {
-                if (SetIfMatchingObject(handler_stack, event, "", handle_asset_object)) return true;
-                return false;
-            };
-
-            auto const handle_root_object = [&](json::EventHandlerStack& handler_stack,
-                                                json::Event const& event) {
-                json::SetIfMatchingRef(event, "tag_name", latest_release_version);
-                if (SetIfMatchingArray(handler_stack, event, "assets", handle_assets_array)) return true;
-                return false;
-            };
-
-            auto const o = json::Parse(json_data, handle_root_object, scratch, {});
-
-            if (o.HasError()) return ErrorCode {CommonError::InvalidFileFormat};
-
-            {
-                DynamicArrayBounded<char, 250> name {};
-                for (auto& asset : assets) {
-                    dyn::Assign(name, asset.name);
-                    dyn::Replace(name, latest_release_version, ""_s);
-                    dyn::Replace(name, "--"_s, "-"_s);
-                    name.size -= path::Extension(name).size;
-
-                    dyn::AppendSpan(name, "-markdown-link");
-                    ExpandIdentifier(result,
-                                     Identifier(name),
-                                     fmt::Format(scratch,
-                                                 "[Download {}]({}) ({} MB)",
-                                                 asset.name,
-                                                 asset.url,
-                                                 asset.size / 1024 / 1024),
-                                     scratch);
-                }
-            }
-
-            {
-                if (StartsWith(latest_release_version, 'v')) latest_release_version.RemovePrefix(1);
-                if (latest_release_version.size == 0) return ErrorCode {CommonError::InvalidFileFormat};
+                dyn::AppendSpan(name, "-markdown-link");
                 ExpandIdentifier(result,
-                                 Identifier("latest-release-version"),
-                                 latest_release_version,
+                                 Identifier(name),
+                                 fmt::Format(scratch,
+                                             "[Download {}]({}) ({} MB)",
+                                             asset.name,
+                                             asset.url,
+                                             asset.size / 1024 / 1024),
                                  scratch);
             }
         }
 
-        // packger tool --help
         {
-            DynamicArray<char> packager_help {scratch};
-            TRY(PrintUsage(dyn::WriterFor(packager_help),
-                           "floe-packager",
-                           k_packager_description,
-                           k_packager_command_line_args_defs));
-            ExpandIdentifier(result,
-                             Identifier("packager-help"),
-                             WhitespaceStrippedEnd(String(packager_help)),
-                             scratch);
+            if (StartsWith(latest_release_version, 'v')) latest_release_version.RemovePrefix(1);
+            if (latest_release_version.size == 0) return ErrorCode {CommonError::InvalidFileFormat};
+            ExpandIdentifier(result, Identifier("latest-release-version"), latest_release_version, scratch);
         }
     }
 
+    // packger tool --help
+    {
+        DynamicArray<char> packager_help {scratch};
+        TRY(PrintUsage(dyn::WriterFor(packager_help),
+                       "floe-packager",
+                       k_packager_description,
+                       k_packager_command_line_args_defs));
+        ExpandIdentifier(result,
+                         Identifier("packager-help"),
+                         WhitespaceStrippedEnd(String(packager_help)),
+                         scratch);
+    }
     return result.ToOwnedSpan();
 }
 

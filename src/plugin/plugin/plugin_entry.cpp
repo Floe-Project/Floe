@@ -95,29 +95,9 @@ static bool ClapEntryInit(char const* plugin_path_c_str) {
             .set_main_thread = false,
         });
 
-#if !PRODUCTION_BUILD
-#define VERSION GIT_COMMIT_HASH
-#else
-#define VERSION "v" FLOE_VERSION_STRING
-#endif
-
-#if IS_MACOS
-#define OS_NAME "macOS"
-#elif IS_WINDOWS
-#define OS_NAME "Windows"
-#elif IS_LINUX
-#define OS_NAME "Linux"
-#endif
-
-#ifdef __aarch64__
-#define ARCH_NAME "aarch64"
-#elif defined(__x86_64__)
-#define ARCH_NAME "x86_64"
-#else
-#error "Unsupported architecture"
-#endif
-
-        LogInfo(ModuleName::Clap, "entry.init: ver: " VERSION ", os: " OS_NAME ", arch: " ARCH_NAME);
+        LogInfo(ModuleName::Clap,
+                "entry.init: ver: " FLOE_VERSION_STRING ", os: " OS_DISPLAY_NAME
+                ", arch: " ARCH_DISPLAY_NAME);
 
         LogDebug(ModuleName::Global, "given plugin path: {}", plugin_path);
 

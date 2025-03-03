@@ -1258,6 +1258,8 @@ pub fn build(b: *std.Build) void {
             .IS_WINDOWS = target.result.os.tag == .windows,
             .IS_MACOS = target.result.os.tag == .macos,
             .IS_LINUX = target.result.os.tag == .linux,
+            .OS_DISPLAY_NAME = b.fmt("{s}", .{@tagName(target.result.os.tag)}),
+            .ARCH_DISPLAY_NAME = b.fmt("{s}", .{@tagName(target.result.cpu.arch)}),
             .MIN_WINDOWS_NTDDI_VERSION = windows_ntddi_version,
             .MIN_MACOS_VERSION = min_macos_version,
             .SENTRY_DSN = b.graph.env_map.get("SENTRY_DSN"),

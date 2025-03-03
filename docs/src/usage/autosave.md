@@ -22,3 +22,5 @@ Some additional things to note:
 - Floe will automatically delete autosaves older than a given number of days.
 - Floe will only keep a certain number of autosaves per instance. If the limit is reached, the oldest autosave will be deleted to make room for the new one.
 - Autosaves are tiny files, typically around 2 Kb in size. Your computer won't run out of space because of them.
+
+In the future we'd like to add a friendly interface for browsing and restoring autosaves.

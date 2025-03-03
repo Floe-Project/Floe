@@ -32,23 +32,23 @@ Repeat this for each folder in Floe preferences panel.
 ### Delete Floe
 Floe consists of plugin files, and a preferences file. The preferences file is normally tiny: around 1 Kb in size. Plugins files are normally around 15 MB in size.
 
-Delete the following files:
+Delete the following files if they exist:
 
 ##### macOS
-- Preferences (may not exist): `/Users/Shared/Floe/Preferences/floe.ini`
+- Preferences: `/Users/Shared/Floe/Preferences/floe.ini`
 - CLAP: `/Library/Audio/Plug-Ins/CLAP/Floe.clap`
 - VST3: `/Library/Audio/Plug-Ins/VST3/Floe.vst3`
 - AU: `/Library/Audio/Plug-Ins/Components/Floe.component`
 
 ##### Windows
 For Windows, use the uninstaller program described above. If you want to manually delete Floe, delete the following files:
-- Preferences (may not exist): `C:\Users\Public\Floe\Preferences\floe.ini`
+- Preferences: `C:\Users\Public\Floe\Preferences\floe.ini`
 - CLAP: `C:\Program Files\Common Files\CLAP\Floe.clap`
 - VST3: `C:\Program Files\Common Files\VST3\Floe.vst3`
 
 
 ### Delete Mirage
-If you used to have [Mirage](../about/mirage.md) installed then some additional files may be present. To uninstall Mirage, delete the following files. Some of these files may not exist.
+If you used to have [Mirage](../about-the-project/mirage.md) installed then some additional files may be present. To uninstall Mirage, delete the following files. Some of these files may not exist.
 
 ##### macOS
 - Preferences: `/Library/Application Support/FrozenPlain/Mirage/Settings/mirage.json`

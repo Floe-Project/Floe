@@ -11,6 +11,8 @@
 #include "utils/json/json_writer.hpp"
 
 #include "common_infrastructure/common_errors.hpp"
+#include "common_infrastructure/descriptors/effect_descriptors.hpp"
+#include "common_infrastructure/descriptors/param_descriptors.hpp"
 #include "common_infrastructure/global.hpp"
 #include "common_infrastructure/sample_library/sample_library.hpp"
 
@@ -234,6 +236,42 @@ static ErrorCodeOr<String> PreprocessMarkdownBlob(String markdown_blob) {
                          WhitespaceStrippedEnd(String(packager_help)),
                          scratch);
     }
+
+    {
+        DynamicArray<char> param_table {scratch};
+        fmt::Append(param_table, "| Module | Name | ID | Description |\n");
+        fmt::Append(param_table, "|--|--|--|--|\n");
+
+        Array<ParamDescriptor const*, k_num_parameters> descriptors;
+        for (auto const i : Range(k_num_parameters))
+            descriptors[i] = &k_param_descriptors[i];
+        Sort(descriptors, [](ParamDescriptor const* a, ParamDescriptor const* b) {
+            if (ToInt(a->module_parts[0]) == ToInt(b->module_parts[0])) return a->id < b->id;
+            return ToInt(a->module_parts[0]) < ToInt(b->module_parts[0]);
+        });
+
+        for (auto const& p : descriptors)
+            fmt::Append(param_table,
+                        "| {} | {} | {} | {} |\n",
+                        p->ModuleString(),
+                        p->name,
+                        p->id,
+                        p->tooltip);
+        ExpandIdentifier(result, Identifier("parameter-table"), param_table, scratch);
+    }
+
+    {
+        DynamicArray<char> effects_table {scratch};
+        fmt::Append(effects_table, "| Name | Description |\n");
+        fmt::Append(effects_table, "|--|--|\n");
+
+        for (auto const& e : k_effect_info)
+            fmt::Append(effects_table, "| {} | {} |\n", e.name, e.description);
+        ExpandIdentifier(result, Identifier("effects-table"), effects_table, scratch);
+    }
+
+    ExpandIdentifier(result, Identifier("effects-count"), fmt::IntToString(k_num_effect_types), scratch);
+
     return result.ToOwnedSpan();
 }
 

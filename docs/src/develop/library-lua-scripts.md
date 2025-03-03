@@ -5,14 +5,14 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Library Lua Scripts
 
-This document describes the functions you can use in your sample library's [`floe.lua` script](develop-libraries.md#the-floelua-file) to create and configure the library and its instruments.
+The `floe.lua` file is the most important part of a Floe sample library. This page serves as documentation for all of the functions that you can use in your script to create and configure the library and its instruments.
 
-Floe runs your script using Lua v==lua-version==. You have access to some of [Lua's standard libraries](https://www.lua.org/manual/5.4/manual.html#6): `math`, `string`, `table` and `utf8`. The other standard libraries are not available - including the `require` function. This is to minimise security risks.
+Floe runs your script using Lua v==lua-version==, providing you with access to these [standard libraries](https://www.lua.org/manual/5.4/manual.html#6): `math`, `string`, `table` and `utf8`. The other standard libraries are not available - including the `require` function. This is to minimise security risks.
 
 If there are any errors in your script, Floe will show them on the GUI along with a line number and a description of the problem.
 
 ## Library Functions
-Use these functions to create your sample library. Take note of the `[required]` annotations - omitting these fields will cause an error. 
+Use these functions to create your sample library. Take note of the `[required]` annotations - omitting fields marked with these will cause an error. 
 
 
 ### `floe.new_library`

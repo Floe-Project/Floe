@@ -5,11 +5,22 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Developing Libraries for Floe
 
-This document explains the details of Floe's sample library format and how to develop libraries for it. Developing libraries for Floe does require some basic programming knowledge.
+This page explains how to develop sample libraries for Floe. Some basic programming knowledge is required.
 
-Be sure to read the [About Sample Libraries](../about/sample-libraries.md) page first.
+## Floe's sample library format
 
-## Why a new format?
+Floe's format is designed for configuring audio files into playable instruments. It does not add any audio-manipulation or custom GUIs. Floe has a ready-to-use GUI and lots of audio parameters. In the future we might add more advanced scripting/GUI creation features to the format. The format is designed to be extended whilst retaining backwards compatibility.
+
+Floe's sample library format currently supports the following features: 
+- Velocity layers
+- Round-robin
+- Crossfade layers
+- Loop points with crossfade 
+- Convolution reverb IRs
+- Velocity layer feathering
+- Trigger samples on note-off
+
+### Why a new format?
 No existing format met our requirements for Floe, which are:
 - Libraries should be plain folders of audio files.
 - Libraries should be portable across filesystems & operating systems.
@@ -17,8 +28,13 @@ No existing format met our requirements for Floe, which are:
 - The format should be extensible - allowing us to innovate in the field of sampling.
 - The solution should easily integrate into Floe's codebase.
 
-## Simple configuration
-This format is designed for configuring audio files into playable instruments. It does not add any programming logic or custom GUIs. Floe has a ready-to-use GUI and lots of audio parameters.
+### Developer friendly
+Floe's format is designed to be developer-friendly. It plays well into the tooling and experience of people who are used to dealing with code:
+- Works with version control: libraries are just folders of files, they're portable across filesystems and operating systems.
+- Hot reloading: Floe automatically reloads the library whenever you change a file: Lua, audio, or images. It creates a very fast feedback loop.
+- Uses a full programming language: Lua is simple, powerful, and widely used. You can use variables, functions, loops, and conditionals to configure your library.
+- Floe's Lua API is simple and clear.
+
 
 ## The structure
 
@@ -37,11 +53,11 @@ Let's look at the structure of a Floe sample library:
     └── 📄icon.png
 ```
 
-There's only one essential part of a Floe sample library: the `floe.lua` file. This file can also end with `.floe.lua` - for example, `woodwind-textures.floe.lua`.
+There's only one essential part of a Floe sample library: the `floe.lua` file. This file can have a custom name so long as it ends with `.floe.lua` - for example, `woodwind-textures.floe.lua`.
 
 The rest of the structure are conventions that are recommended but not required:
-- **Licence**: Sample libraries are recommended to have a file called Licence that describes the terms of use of the library. It can be any format.
-- **About**: A file that describes the library. Any file format. Information about a library is useful for when someone might not have Floe's GUI available. Use this document to explain what the library contains, website links and any other information that might be useful.
+- **Licence**: Sample libraries are recommended to have a file called Licence that describes the terms-of-use of the library. It can be any format: PDF, TXT, etc.
+- **About**: A file that describes the library. Any file format. Information about a library is useful for when someone might not have Floe's GUI available. Use this document to explain what the library contains, website links and any other information that might be useful. Floe's [packager tool](./packaging.md#packager-command-line-tool) can automatically generate this file.
 - **Library folder name**: The folder containing the `floe.lua` file should be named: "Developer - Library Name".
 - **Subfolders**: Subfolders are up to the developer. We recommend 'Samples' for audio files and 'Images' for images. These can have any number of subfolders. Your `floe.lua` file can reference any file in these subfolders.
 
@@ -51,7 +67,7 @@ The `floe.lua` file is the most important part of a library. It's a script that 
 
 This file uses [Floe's Lua functions](library-lua-scripts.md) to create the library, create instruments, and add regions and impulse responses. It can reference any file in the library using relative paths.
 
-Here's an example of a `floe.lua` file:
+Here's a made-up example of a `floe.lua` file:
 ```lua
 ==sample-library-example-lua-no-comments==
 ```
@@ -64,14 +80,14 @@ Here's an example of a `floe.lua` file:
 ## How to get started
 For now, we'll assume that you have a folder of audio samples and know what notes they correspond to.
 
-1. Create a new folder in one of Floe's [sample library folders](../about/sample-libraries.md#your-library-folders). We recommend naming it 'Author Name - Library Name'.
+1. Create a new folder in one of Floe's [sample library folders](../usage/sample-libraries.md). We recommend naming it 'Author Name - Library Name'.
 1. Create a file in that folder called `my-library.floe.lua`.
 1. Create a subfolder called `Samples` and put your audio files in there.
-1. Open the Lua file in your text editor. Sublime Text or Visual Studio Code are good choices.
+1. Open the Lua file in your text editor. Sublime Text or Visual Studio Code are reasonable choices.
 1. Use the `floe.new_library()` function to create your library, filling in all the fields marked `[required]` in the [Floe's Lua reference](library-lua-scripts.md).
-1. Use `floe.new_instrument()` to create an instrument, and then add regions to it using `floe.add_region()`.
+1. Use `floe.new_instrument()` to create an instrument, and then add regions to it using `floe.add_region()`, again, filling in the fields that are documented.
 1. At the end of the file, return the library object you just created.
-1. Floe automatically scans its library folders and will tell you if there's any errors.
+1. Floe automatically detects when a file changes and will tell you if there's any errors.
 
 
 ## Creating high-quality samples
@@ -90,13 +106,13 @@ Here are some guidelines for levels:
 - The noise floor should be as low as possible: -60 dB is a good target. Use high-quality noise reduction tools to remove noise from your samples if you need to. Noise levels can quickly stack up with a multi-sampled instrument played polyphonically. Being too aggressive with algorithmic noise reduction can make your samples sound unnatural - so it's a balance.
 
 ### Sample rate, bit depth, and file format
-Floe only supports FLAC and WAV files. We recommend using FLAC for your samples. It's lossless and can reduce the file size by 50% to 70%. Floe loads FLAC files very quickly.
+Floe only supports FLAC and WAV files. We recommend using FLAC for your samples. It's lossless and can reduce the file size by 50% to 70% compared to WAV. Floe loads FLAC files very quickly.
 
 We find 44.1 kHz and 16-bit is often a perfectly reasonable choice. 48 kHz and 24-bit might also be appropriate in certain cases.
 
 ### Volume envelopes of samples
 Floe blurs the line between a sampler and a sample-based synthesizer. It has lots of parameters for manipulating the sound in real-time.
 
-If your sample is a single continuous sound, then don't include a fade-in or fade-out in the sample. Floe has a GUI for volume envelopes that offer more control: they can be adjusted to any value, automated by the DAW, and they are independent of the playback speed of the sample. If you have a sample that is stretched across a keyboard range, it will be sped-up or slowed-down in order to be the correct pitch. If there's a volume fade then the speed of the fade will change depending on the pitch of the voice. This is not normally a desirable effect.
+If your sample is a single continuous sound, then don't include a fade-in or fade-out in the sample. Floe has a GUI for volume envelopes that offer more control: they can be adjusted to any value, automated by the DAW, and they are independent of the playback speed of the sample. If you have a sample that is stretched across a keyboard range, it will be sped-up or slowed-down in order to be the correct pitch. If there's a volume fade, then the speed of the fade will change depending on the pitch of the voice. This is not normally a desirable effect.
 
 If your sound has important timbral variation over time, then don't cut that away. Only if the sound is a constant tone should you remove the fade in/out.

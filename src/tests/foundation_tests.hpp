@@ -2237,7 +2237,6 @@ TEST_CASE(TestRandomFloatGenerator) {
 TEST_CASE(TestVersion) {
     CHECK(Version {1, 0, 0}.ToString(tester.scratch_arena) == "1.0.0"_s);
     CHECK(Version {10, 99, 99}.ToString(tester.scratch_arena) == "10.99.99"_s);
-    CHECK(Version {10, 99, 99, 2u}.ToString(tester.scratch_arena) == "10.99.99-Beta2"_s);
 
     CHECK(Version {1, 0, 0} == Version {1, 0, 0});
     CHECK(Version {1, 1, 0} > Version {1, 0, 0});
@@ -2246,40 +2245,38 @@ TEST_CASE(TestVersion) {
     CHECK(Version {1, 0, 100} < Version {2, 4, 10});
     CHECK(Version {0, 0, 100} < Version {0, 0, 101});
 
-    CHECK(Version {1, 0, 0, 1u} < Version {1, 0, 0});
-    CHECK(Version {1, 0, 0, 1u} == Version {1, 0, 0, 1u});
-    CHECK(Version {1, 0, 0, 2u} > Version {1, 0, 0, 1u});
-
     auto const check_string_parsing = [&](String str, Version ver) {
         CAPTURE(str);
         auto const parsed_ver = ParseVersionString(str);
-        CHECK(parsed_ver.HasValue());
+        REQUIRE(parsed_ver.HasValue());
         CAPTURE(parsed_ver->ToString(tester.scratch_arena));
         CAPTURE(ver.ToString(tester.scratch_arena));
         CHECK(ver == *parsed_ver);
     };
 
     CHECK(!ParseVersionString("1"));
+    CHECK(!ParseVersionString("1.2"));
     CHECK(!ParseVersionString("hello"));
     CHECK(!ParseVersionString(",,what"));
     CHECK(!ParseVersionString("1,1,2"));
     CHECK(!ParseVersionString("1a,1,2bv"));
     CHECK(!ParseVersionString("200a.200.400a"));
+    CHECK(!ParseVersionString("."));
     CHECK(!ParseVersionString(".."));
     CHECK(!ParseVersionString("..."));
-    CHECK(!ParseVersionString("1.2.3.4"));
+    CHECK(!ParseVersionString("...."));
     CHECK(!ParseVersionString(".1.2"));
     CHECK(!ParseVersionString("12.."));
     CHECK(!ParseVersionString(".1."));
-    CHECK(!ParseVersionString("1.1.0-blah1"));
     CHECK(!ParseVersionString(""));
+    CHECK(!ParseVersionString(" 200   .  4.99 "));
 
     check_string_parsing("1.1.1", {1, 1, 1});
-    check_string_parsing(" 200   .  4.99 ", {200, 4, 99});
     check_string_parsing("0.0.0", {0, 0, 0});
     check_string_parsing("1.0.99", {1, 0, 99});
-    check_string_parsing("1.0.0-Beta1", {1, 0, 0, 1u});
-    check_string_parsing("1.0.0-Beta100", {1, 0, 0, 100u});
+    check_string_parsing("1.0.0-alpha.1", {1, 0, 0});
+    check_string_parsing("1.0.0-alpha+abcdef", {1, 0, 0});
+    check_string_parsing("1.0.0-alpha+2.2.0", {1, 0, 0});
 
     {
         u32 prev_version = 0;

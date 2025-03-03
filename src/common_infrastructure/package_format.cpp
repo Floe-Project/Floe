@@ -62,7 +62,7 @@ static ErrorCodeOr<void> ReadTestPackage(tests::Tester& tester, Span<u8 const> z
     DynamicArray<char> error_buffer {tester.scratch_arena};
 
     package::PackageReader package {reader};
-    auto outcome = package::ReaderInit(package, dyn::WriterFor(error_buffer));
+    auto outcome = package::ReaderInit(package);
     if (outcome.HasError()) {
         TEST_FAILED("Failed to create package reader: {}. error_log: {}",
                     ErrorCode {outcome.Error()},
@@ -76,16 +76,13 @@ static ErrorCodeOr<void> ReadTestPackage(tests::Tester& tester, Span<u8 const> z
     usize components_found = 0;
     while (true) {
         auto const component = ({
-            auto const o = package::IteratePackageComponents(package,
-                                                             iterator,
-                                                             tester.scratch_arena,
-                                                             dyn::WriterFor(error_buffer));
+            auto const o = package::IteratePackageComponents(package, iterator, tester.scratch_arena);
             if (o.HasError()) {
                 TEST_FAILED("Failed to read package component: {}, error_log: {}",
                             ErrorCode {o.Error()},
                             error_buffer);
             }
-            o.ReleaseValue();
+            o.Value();
         });
         if (!component) break;
         CHECK(error_buffer.size == 0);
@@ -137,7 +134,7 @@ TEST_CASE(TestPackageFormat) {
         DynamicArray<char> error_buffer {tester.scratch_arena};
 
         package::PackageReader package {reader};
-        auto outcome = package::ReaderInit(package, dyn::WriterFor(error_buffer));
+        auto outcome = package::ReaderInit(package);
         CHECK(outcome.HasError());
     }
 

@@ -94,11 +94,10 @@ struct InstallJob {
 
 namespace detail {
 
-static ValueOrError<ExistingInstalledComponent, PackageError>
+static ErrorCodeOr<ExistingInstalledComponent>
 LibraryCheckExistingInstallation(Component const& component,
                                  sample_lib::Library const* existing_matching_library,
-                                 ArenaAllocator& scratch_arena,
-                                 Writer error_log) {
+                                 ArenaAllocator& scratch_arena) {
     ASSERT_EQ(component.type, ComponentType::Library);
     ASSERT(component.library);
 
@@ -107,15 +106,7 @@ LibraryCheckExistingInstallation(Component const& component,
     auto const existing_folder = *path::Directory(existing_matching_library->path);
     ASSERT_EQ(existing_matching_library->Id(), component.library->Id());
 
-    auto const actual_checksums = ({
-        auto const o = ChecksumsForFolder(existing_folder, scratch_arena, scratch_arena);
-        if (o.HasError())
-            return detail::CreatePackageError(error_log,
-                                              o.Error(),
-                                              "Couldn't read folder \"{}\"",
-                                              existing_folder);
-        o.Value();
-    });
+    auto const actual_checksums = TRY(ChecksumsForFolder(existing_folder, scratch_arena, scratch_arena));
 
     if (!ChecksumsDiffer(component.checksum_values, actual_checksums, k_nullopt))
         return ExistingInstalledComponent {
@@ -158,30 +149,21 @@ LibraryCheckExistingInstallation(Component const& component,
 //
 // We take this approach because there is no reason to overwrite preset files. Preset files are tiny. If
 // there's a 'version 2' of a preset pack, then it might as well be installed alongside version 1.
-static ValueOrError<ExistingInstalledComponent, PackageError>
+static ErrorCodeOr<ExistingInstalledComponent>
 PresetsCheckExistingInstallation(Component const& component,
                                  Span<String const> presets_folders,
-                                 ArenaAllocator& scratch_arena,
-                                 Writer error_log) {
+                                 ArenaAllocator& scratch_arena) {
     for (auto const folder : presets_folders) {
-        auto const entries = ({
-            auto const o = FindEntriesInFolder(scratch_arena,
-                                               folder,
-                                               {
-                                                   .options {
-                                                       .wildcard = "*",
-                                                       .get_file_size = true,
-                                                       .skip_dot_files = true,
-                                                   },
-                                                   .recursive = true,
-                                               });
-            if (o.HasError())
-                return detail::CreatePackageError(error_log,
-                                                  o.Error(),
-                                                  "Couldn't read folder \"{}\"",
-                                                  folder);
-            o.Value();
-        });
+        auto const entries = TRY(FindEntriesInFolder(scratch_arena,
+                                                     folder,
+                                                     {
+                                                         .options {
+                                                             .wildcard = "*",
+                                                             .get_file_size = true,
+                                                             .skip_dot_files = true,
+                                                         },
+                                                         .recursive = true,
+                                                     }));
 
         if constexpr (IS_WINDOWS)
             for (auto& entry : entries)
@@ -223,15 +205,7 @@ PresetsCheckExistingInstallation(Component const& component,
                     auto const full_path =
                         path::Join(scratch_arena, Array {folder, dir_entry.subpath, expected_path});
 
-                    auto const matches_file = ({
-                        auto const o = FileMatchesChecksum(full_path, *checksum, scratch_arena);
-                        if (o.HasError())
-                            return detail::CreatePackageError(error_log,
-                                                              o.Error(),
-                                                              "Couldn't read file \"{}\"",
-                                                              full_path);
-                        o.Value();
-                    });
+                    auto const matches_file = TRY(FileMatchesChecksum(full_path, *checksum, scratch_arena));
 
                     if (!matches_file) {
                         matches_exactly = false;
@@ -313,7 +287,7 @@ static ErrorCodeOr<void> ExtractFolder(PackageReader& package,
                                        String destination_folder,
                                        ArenaAllocator& scratch_arena,
                                        HashTable<String, ChecksumValues> destination_checksums) {
-    LogInfo(ModuleName::Package, "Extracting folder: {} to {}", dir_in_zip, destination_folder);
+    LogInfo(ModuleName::Package, "extracting folder");
     for (auto const file_index : Range(mz_zip_reader_get_num_files(&package.zip))) {
         auto const file_stat = TRY(detail::FileStat(package, file_index));
         if (file_stat.m_is_directory) continue;
@@ -354,12 +328,11 @@ static ErrorCodeOr<void> ExtractFolder(PackageReader& package,
 // Extracts to a temp folder than then renames to the final location. This ensures we either fail or succeed,
 // with no in-between cases where the folder is partially extracted. Additionally, it doesn't generate lots of
 // filesystem-change notifications which Floe might try to process and fail on.
-static VoidOrError<PackageError> ReaderInstallComponent(PackageReader& package,
-                                                        Component const& component,
-                                                        ArenaAllocator& scratch_arena,
-                                                        Writer error_log,
-                                                        String destination_path,
-                                                        InstallJob::DestinationWriteMode write_mode) {
+static ErrorCodeOr<void> ReaderInstallComponent(PackageReader& package,
+                                                Component const& component,
+                                                ArenaAllocator& scratch_arena,
+                                                String destination_path,
+                                                InstallJob::DestinationWriteMode write_mode) {
     ASSERT(path::IsAbsolute(destination_path));
 
     auto const resolved_destination_path = ({
@@ -367,16 +340,7 @@ static VoidOrError<PackageError> ReaderInstallComponent(PackageReader& package,
 
         if (write_mode == InstallJob::DestinationWriteMode::CreateUniqueSubpath) {
             f = path::Join(scratch_arena, Array {f, path::Filename(component.path)});
-
-            auto const o = detail::ResolvePossibleFilenameConflicts(f, scratch_arena);
-            if (o.HasError())
-                return detail::CreatePackageError(error_log,
-                                                  o.Error(),
-                                                  "Couldn't access destination folder \"{}\"",
-                                                  f);
-            if (o.Value() != f)
-                LogInfo(ModuleName::Package, "Resolved folder name conflict: {} -> {}", f, o.Value());
-            f = o.Value();
+            f = TRY(detail::ResolvePossibleFilenameConflicts(f, scratch_arena));
         }
 
         f;
@@ -391,15 +355,13 @@ static VoidOrError<PackageError> ReaderInstallComponent(PackageReader& package,
     auto const temp_path = ({
         ASSERT(GetFileType(destination_path).HasValue());
 
-        auto const o = TemporaryDirectoryOnSameFilesystemAs(destination_path, scratch_arena);
-        if (o.HasError()) {
-            return detail::CreatePackageError(error_log,
-                                              o.Error(),
-                                              "Unable to access a temporary folder for \"{}\"",
-                                              destination_path);
-        }
+        auto result = (String)TRY_OR(TemporaryDirectoryOnSameFilesystemAs(destination_path, scratch_arena), {
+            ReportError(ErrorLevel::Warning,
+                        SourceLocationHash(),
+                        "Unable to access a temporary folder: {}",
+                        error);
+        });
 
-        auto result = String(o.Value());
         if (single_file) result = path::Join(scratch_arena, Array {result, path::Filename(component.path)});
         result;
     });
@@ -412,22 +374,13 @@ static VoidOrError<PackageError> ReaderInstallComponent(PackageReader& package,
     };
 
     if (single_file) {
-        if (auto const o = detail::ExtractFile(package, component.path, temp_path); o.HasError()) {
-            return detail::CreatePackageError(error_log,
-                                              o.Error(),
-                                              "Couldn't extract {}",
-                                              path::Filename(component.path));
-        }
-    } else if (auto const o = detail::ExtractFolder(package,
-                                                    component.path,
-                                                    temp_path,
-                                                    scratch_arena,
-                                                    component.checksum_values);
-               o.HasError()) {
-        return detail::CreatePackageError(error_log,
-                                          o.Error(),
-                                          "Couldn't extract to temporary folder \"{}\"",
-                                          temp_path);
+        TRY(detail::ExtractFile(package, component.path, temp_path));
+    } else {
+        TRY(detail::ExtractFolder(package,
+                                  component.path,
+                                  temp_path,
+                                  scratch_arena,
+                                  component.checksum_values));
     }
 
     if (auto const rename_o = Rename(temp_path, resolved_destination_path); rename_o.HasError()) {
@@ -455,13 +408,7 @@ static VoidOrError<PackageError> ReaderInstallComponent(PackageReader& package,
                 WriteAndIncrement(pos, new_name, ')');
                 new_name.size = pos;
 
-                auto const o = Rename(resolved_destination_path, new_name);
-                if (o.HasError()) {
-                    return detail::CreatePackageError(error_log,
-                                                      o.Error(),
-                                                      "Couldn't install files to your install folder \"{}\"",
-                                                      resolved_destination_path);
-                }
+                TRY(Rename(resolved_destination_path, new_name));
             }
 
             // The old folder is out of the way so we can now install the new component.
@@ -469,10 +416,7 @@ static VoidOrError<PackageError> ReaderInstallComponent(PackageReader& package,
                 // We failed to install the new files, try to restore the old files.
                 auto const _ = Rename(new_name, resolved_destination_path);
 
-                return detail::CreatePackageError(error_log,
-                                                  rename2_o.Error(),
-                                                  "Couldn't install files to your install folder \"{}\"",
-                                                  resolved_destination_path);
+                return rename2_o.Error();
             }
 
             // The new component is installed, let's try to trash the old folder.
@@ -483,27 +427,15 @@ static VoidOrError<PackageError> ReaderInstallComponent(PackageReader& package,
                 // Try to undo the rename
                 auto const _ = Rename(new_name, resolved_destination_path);
 
-                return detail::CreatePackageError(error_log,
-                                                  o.Error(),
-                                                  "Couldn't send folder \"{}\" to your " TRASH_NAME,
-                                                  resolved_destination_path);
+                return o.Error();
             }
-
         } else {
-            return detail::CreatePackageError(error_log,
-                                              rename_o.Error(),
-                                              "Couldn't install files to your install folder \"{}\"",
-                                              resolved_destination_path);
+            return rename_o.Error();
         }
     }
 
     // remove hidden
-    if (auto const o = WindowsSetFileAttributes(resolved_destination_path, k_nullopt); o.HasError()) {
-        return detail::CreatePackageError(error_log,
-                                          o.Error(),
-                                          "Failed to make \"{}\" visible",
-                                          resolved_destination_path);
-    }
+    TRY(WindowsSetFileAttributes(resolved_destination_path, k_nullopt));
 
     return k_success;
 }
@@ -528,7 +460,7 @@ static InstallJob::State DoJobPhase1(InstallJob& job) {
 
     job.reader = PackageReader {.zip_file_reader = *job.file_reader};
 
-    TRY_H(ReaderInit(*job.reader, dyn::WriterFor(job.error_buffer)));
+    TRY_H(ReaderInit(*job.reader));
 
     PackageComponentIndex it {};
     bool user_input_needed = false;
@@ -540,8 +472,7 @@ static InstallJob::State DoJobPhase1(InstallJob& job) {
             return InstallJob::State::DoneError;
         }
 
-        auto const component =
-            TRY_H(IteratePackageComponents(*job.reader, it, job.arena, dyn::WriterFor(job.error_buffer)));
+        auto const component = TRY_H(IteratePackageComponents(*job.reader, it, job.arena));
         if (!component) {
             // end of folders
             break;
@@ -578,8 +509,7 @@ static InstallJob::State DoJobPhase1(InstallJob& job) {
                     r = TRY_H(
                         detail::LibraryCheckExistingInstallation(*component,
                                                                  existing_lib ? &*existing_lib : nullptr,
-                                                                 job.arena,
-                                                                 dyn::WriterFor(job.error_buffer)));
+                                                                 job.arena));
                     if (existing_lib) {
                         destination_path = job.arena.Clone(*path::Directory(existing_lib->path));
                         write_mode = InstallJob::DestinationWriteMode::OverwriteDirectly;
@@ -591,10 +521,8 @@ static InstallJob::State DoJobPhase1(InstallJob& job) {
                     break;
                 }
                 case package::ComponentType::Presets: {
-                    r = TRY_H(detail::PresetsCheckExistingInstallation(*component,
-                                                                       job.preset_folders,
-                                                                       job.arena,
-                                                                       dyn::WriterFor(job.error_buffer)));
+                    r = TRY_H(
+                        detail::PresetsCheckExistingInstallation(*component, job.preset_folders, job.arena));
                     destination_path = job.presets_install_folder;
                     write_mode = InstallJob::DestinationWriteMode::CreateUniqueSubpath;
                     break;
@@ -645,7 +573,6 @@ static InstallJob::State DoJobPhase2(InstallJob& job) {
         TRY_H(ReaderInstallComponent(*job.reader,
                                      component.component,
                                      job.arena,
-                                     dyn::WriterFor(job.error_buffer),
                                      component.destination_path,
                                      component.destination_write_mode));
 

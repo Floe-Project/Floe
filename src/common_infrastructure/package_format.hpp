@@ -10,6 +10,7 @@
 #include "utils/debug/debug.hpp"
 
 #include "checksum_crc32_file.hpp"
+#include "error_reporting.hpp"
 #include "miniz_zip.h"
 #include "sample_library/sample_library.hpp"
 
@@ -310,14 +311,18 @@ struct PackageReader {
     Reader& zip_file_reader;
     mz_zip_archive zip {};
     u64 seed = (u64)NanosecondsSinceEpoch();
-    Optional<ErrorCode> zip_file_read_error {};
+    Optional<ErrorCode> read_callback_error {}; // we need a way to pass out the error from the read callback
 };
 
 namespace detail {
 
-static ErrorCode ZipReadError(PackageReader const& package) {
-    if (package.zip_file_read_error) return *package.zip_file_read_error;
-    return ErrorCode {PackageError::FileCorrupted};
+static ErrorCode ZipReadError(PackageReader const& package, SourceLocation loc = SourceLocation::Current()) {
+    if (package.read_callback_error) {
+        auto err = *package.read_callback_error;
+        err.source_location = loc;
+        return err;
+    }
+    return ErrorCode {PackageError::FileCorrupted, nullptr, loc};
 }
 
 static ErrorCodeOr<mz_zip_archive_file_stat> FileStat(PackageReader& package, mz_uint file_index) {
@@ -429,78 +434,30 @@ ReaderChecksumValuesForDir(PackageReader& package, String dir_in_zip, ArenaAlloc
     return table.ToOwnedTable();
 }
 
-template <typename... Args>
-static PackageError CreatePackageError(Writer error_log, ErrorCode error, Args const&... args) {
-    auto const package_error = ({
-        PackageError e;
-        if (error.category == &PackageErrorCodeType())
-            e = (PackageError)error.code;
-        else if (error == FilesystemError::AccessDenied)
-            e = PackageError::AccessDenied;
-        else if (error == FilesystemError::NotEmpty)
-            e = PackageError::NotEmpty;
-        else
-            e = PackageError::FilesystemError;
-        e;
-    });
-
-    DynamicArrayBounded<char, 1000> error_buffer;
-    if constexpr (sizeof...(args) > 0) {
-        fmt::Append(error_buffer, args...);
-        dyn::AppendSpan(error_buffer, ": ");
-    }
-
-    fmt::Append(error_buffer, "{u}", ErrorCode {package_error});
-    if (error != package_error)
-        fmt::Append(error_buffer, ". {u}.", error);
-    else
-        dyn::Append(error_buffer, '.');
-
-    String possible_fix {};
-    switch (package_error) {
-        case PackageError::FileCorrupted: possible_fix = "Try redownloading the package"; break;
-        case PackageError::NotFloePackage: possible_fix = "Make sure the file is a Floe package"; break;
-        case PackageError::InvalidLibrary: possible_fix = "Contact the developer"; break;
-        case PackageError::AccessDenied: possible_fix = "Install the package manually"; break;
-        case PackageError::FilesystemError: possible_fix = "Try again"; break;
-        case PackageError::NotEmpty: possible_fix = {}; break;
-    }
-    if (possible_fix.size) fmt::Append(error_buffer, " {}.", possible_fix);
-
-    auto _ = error_log.WriteChars(error_buffer);
-    auto _ = error_log.WriteChar('\n');
-    LogInfo(ModuleName::Package, "Package error: {}. {}", error_buffer, error);
-
-    return package_error;
-}
-
 } // namespace detail
 
-PUBLIC VoidOrError<PackageError> ReaderInit(PackageReader& package, Writer error_log) {
+PUBLIC ErrorCodeOr<void> ReaderInit(PackageReader& package) {
     mz_zip_zero_struct(&package.zip);
     package.zip.m_pRead =
         [](void* io_opaque_ptr, mz_uint64 file_offset, void* buffer, usize buffer_size) -> usize {
         auto& package = *(PackageReader*)io_opaque_ptr;
         package.zip_file_reader.pos = file_offset;
-        auto const o = package.zip_file_reader.Read(buffer, buffer_size);
-        if (o.HasError()) {
-            package.zip_file_read_error = o.Error();
+        auto const num_read = TRY_OR(package.zip_file_reader.Read(buffer, buffer_size), {
+            // We store the error because we can't pass it out in the return value.
+            package.read_callback_error = error;
             return 0;
-        }
-        return o.Value();
+        });
+        return num_read;
     };
     package.zip.m_pIO_opaque = &package;
 
     if (!mz_zip_reader_init(&package.zip, package.zip_file_reader.size, 0))
-        return detail::CreatePackageError(error_log, detail::ZipReadError(package));
+        return detail::ZipReadError(package);
 
     bool known_subdirs = false;
     for (auto const file_index : Range(mz_zip_reader_get_num_files(&package.zip))) {
-        auto const file_stat = ({
-            auto const o = detail::FileStat(package, file_index);
-            if (o.HasError()) return detail::CreatePackageError(error_log, o.Error());
-            o.Value();
-        });
+        auto const file_stat =
+            TRY_OR(detail::FileStat(package, file_index), return detail::ZipReadError(package););
         auto const path = detail::PathWithoutTrailingSlash(file_stat.m_filename);
         for (auto const known_subdir : Array {k_libraries_subdir, k_presets_subdir}) {
             if (path == known_subdir || detail::RelativePathIfInFolder(path, known_subdir)) {
@@ -512,9 +469,7 @@ PUBLIC VoidOrError<PackageError> ReaderInit(PackageReader& package, Writer error
 
     if (!known_subdirs) {
         mz_zip_reader_end(&package.zip);
-        return detail::CreatePackageError(error_log,
-                                          ErrorCode {PackageError::NotFloePackage},
-                                          "Package is missing Libraries or Presets subfolders");
+        return {PackageError::NotFloePackage};
     }
 
     return k_success;
@@ -537,26 +492,18 @@ struct Component {
 using PackageComponentIndex = mz_uint;
 
 // Call this repeatedly until it returns nullopt
-PUBLIC ValueOrError<Optional<Component>, PackageError>
-IteratePackageComponents(PackageReader& package,
-                         PackageComponentIndex& file_index,
-                         ArenaAllocator& arena,
-                         Writer error_log) {
+PUBLIC ErrorCodeOr<Optional<Component>>
+IteratePackageComponents(PackageReader& package, PackageComponentIndex& file_index, ArenaAllocator& arena) {
     DEFER { ++file_index; };
     for (; file_index < mz_zip_reader_get_num_files(&package.zip); ++file_index) {
-        auto const file_stat = ({
-            auto const o = detail::FileStat(package, file_index);
-            if (o.HasError()) return detail::CreatePackageError(error_log, o.Error());
-            o.Value();
-        });
+        auto const file_stat =
+            TRY_OR(detail::FileStat(package, file_index), return detail::ZipReadError(package););
         auto const path = detail::PathWithoutTrailingSlash(file_stat.m_filename);
         for (auto const folder : k_component_subdirs) {
             auto const relative_path = detail::RelativePathIfInFolder(path, folder);
             if (!relative_path) continue;
             if (relative_path->size == 0) continue;
             if (Contains(*relative_path, '/')) continue;
-
-            LogDebug(ModuleName::Package, "Package contains component: {}", path);
 
             return Optional<Component> {Component {
                 .path = path.Clone(arena),
@@ -570,24 +517,18 @@ IteratePackageComponents(PackageReader& package,
                         PanicIfReached();
                     t;
                 }),
-                .checksum_values = ({
-                    auto const o = detail::ReaderChecksumValuesForDir(package, path, arena);
-                    if (o.HasError()) return detail::CreatePackageError(error_log, o.Error());
-                    o.Value();
-                }),
+                .checksum_values = TRY_OR(detail::ReaderChecksumValuesForDir(package, path, arena),
+                                          return detail::ZipReadError(package);),
                 .library = ({
                     sample_lib::Library* lib = nullptr;
                     if (folder == k_libraries_subdir) {
                         lib = ({
-                            auto const o =
-                                path::Extension(path) != ".mdata"
-                                    ? detail::ReaderReadLibraryLua(package, path, arena)
-                                    : detail::ReaderReadLibraryMdata(package, file_index, path, arena);
-                            if (o.HasError()) return detail::CreatePackageError(error_log, o.Error());
-                            if (!o.Value())
-                                return detail::CreatePackageError(error_log,
-                                                                  ErrorCode {PackageError::InvalidLibrary});
-                            o.Value();
+                            auto const library =
+                                TRY(!path::Equal(path::Extension(path), ".mdata")
+                                        ? detail::ReaderReadLibraryLua(package, path, arena)
+                                        : detail::ReaderReadLibraryMdata(package, file_index, path, arena));
+                            if (!library) return {PackageError::InvalidLibrary};
+                            library;
                         });
                     }
                     lib;

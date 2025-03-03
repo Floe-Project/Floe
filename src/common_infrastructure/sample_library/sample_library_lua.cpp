@@ -347,7 +347,7 @@ struct TableFields<Region::File> {
                 return {
                     .name = "loop",
                     .description_sentence =
-                        "The region of the file that can be looped. It should be an array: 3 integers and 1 boolean: { start, end, crossfade, is_ping_pong boolean }. Note that the end number is not inclusive. The start and end numbers can be negative meaning they index the file from the end rather than the start. For example, -1 == number_frames_in_file, -2 == (number_frames_in_file - 1), etc.",
+                        "The region of the file that can be looped. It should be an array: 3 integers and 1 boolean: { start, end, crossfade, is_ping_pong boolean }. Start is inclusive, end is exclusive. The start and end numbers can be negative meaning they index the file from the end rather than the start. For example, -1 == number_frames_in_file, -2 == (number_frames_in_file - 1), etc.",
                     .example = "{ 24, 6600, 100, false }",
                     .default_value = "no loop",
                     .lua_type = LUA_TTABLE,
@@ -405,7 +405,7 @@ struct TableFields<Region::Options> {
                 return {
                     .name = "timbre_crossfade_region",
                     .description_sentence =
-                        "The start and end point, from 0 to 100, of the Timbre knob on Floe's GUI that this region should be heard. You should overlay this range with other timbre_crossfade_regions. Floe will create an even crossfade of all overlapping sounds. Note that the end number is not inclusive.",
+                        "The start and end point, from 0 to 100, of the Timbre knob on Floe's GUI that this region should be heard. You should overlay this range with other timbre_crossfade_regions. Floe will create an even crossfade of all overlapping sounds. The start number is inclusive, end is exclusive.",
                     .example = "{ 0, 50 }",
                     .default_value = "no timbre-crossfade",
                     .lua_type = LUA_TTABLE,
@@ -506,7 +506,7 @@ struct TableFields<Region::TriggerCriteria> {
                 return {
                     .name = "key_range",
                     .description_sentence =
-                        "The pitch range of the keyboard that this region is mapped to. These should be MIDI note numbers, from 0 to 127. Note that the end number is not inclusive.",
+                        "The pitch range of the keyboard that this region is mapped to. These should be MIDI note numbers, from 0 to 128. The start number is inclusive, the end is exclusive.",
                     .example = "{ 60, 64 }",
                     .default_value = "{ 60, 64 }",
                     .lua_type = LUA_TTABLE,
@@ -530,13 +530,14 @@ struct TableFields<Region::TriggerCriteria> {
                 return {
                     .name = "velocity_range",
                     .description_sentence =
-                        "The velocity range of the keyboard that this region is mapped to. This should be an array of 2 numbers ranging from 0 to 100. The first number represents the start of the velocity range and the second number represents 1-past the end of the range.",
+                        "The velocity range of the keyboard that this region is mapped to. This should be an array of 2 numbers ranging from 0 to 100. The start number is inclusive, the end is exclusive.",
                     .example = "{ 0, 100 }",
                     .default_value = "{ 0, 100 }",
                     .lua_type = LUA_TTABLE,
                     .required = false,
                     .set =
                         [](SET_FIELD_VALUE_ARGS) {
+                            // IMPROVE: support floats
                             auto const vals = ListOfInts(ctx, 2, info);
                             if (vals[0] < 0 || vals[1] > 100 || vals[1] < 1 || vals[1] > 101)
                                 luaL_error(
@@ -884,7 +885,8 @@ struct TableFields<Library> {
             case Field::Description:
                 return {
                     .name = "description",
-                    .description_sentence = "A description of the library.",
+                    .description_sentence =
+                        "A description of the library. You can be verbose and use newlines (\\n).",
                     .example =
                         "A collection of resonating metal objects sampled using a handheld stereo recorder.",
                     .default_value = "no description",

@@ -108,7 +108,19 @@ check-spelling:
 
 [unix]
 check-links:
-  lychee --exclude 'installation/download-and-install-floe.html' --exclude 'v%7B%7B#include' docs readme.md changelog.md
+  #!/usr/bin/env bash
+  set -euxo pipefail
+
+  # If our website is being served locally (mdbook serve), we can check links against the local version by remapping
+  # floe.audio to localhost.
+  mdbook_localhost="http://localhost:3000"
+  declare -a extra_args=()
+  if curl -s --head --request GET "$mdbook_localhost" | grep "200 OK" > /dev/null; then
+    extra_args=(--remap "https://floe.audio $mdbook_localhost")
+  fi
+  lychee --exclude 'v%7B%7B#include' \
+         "${extra_args[@]}" \
+         docs readme.md changelog.md
 
 # install Compile DataBase (compile_commands.json)
 install-cbd arch_os_pair=native_arch_os_pair:
@@ -312,7 +324,12 @@ checks_ci := replace(
 test level="0" build="": (_build_if_requested build "dev") (parallel if level == "0" { checks_level_0 } else { checks_level_1 })
 
 [unix]
-test-ci: (parallel checks_ci)
+test-ci: 
+  #!/usr/bin/env bash
+  pushd docs
+  mdbook serve
+  popd
+  just parallel checks_ci
 
 [unix]
 install-pre-commit-hook:

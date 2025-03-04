@@ -29,7 +29,7 @@ Floe is an engine, it requires sample libraries to play.
 Alpha version of Floe's GUI showing multiple libraries loaded.
 
 <p style="text-align: center; margin-top: 40px;">
-<a href="installation/download-and-install-floe.html" style="
+<a href="https://floe.audio/installation/download-and-install-floe.html" style="
   background-color: #555e85; 
   border: none; 
   border-radius: 4px; 

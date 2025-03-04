@@ -1862,18 +1862,19 @@ pub fn build(b: *std.Build) void {
             const path = "src/common_infrastructure";
             common_infrastructure.addCSourceFiles(.{
                 .files = &.{
+                    path ++ "/audio_utils.cpp",
                     path ++ "/checksum_crc32_file.cpp",
                     path ++ "/common_errors.cpp",
+                    path ++ "/descriptors/param_descriptors.cpp",
                     path ++ "/error_reporting.cpp",
+                    path ++ "/global.cpp",
                     path ++ "/package_format.cpp",
                     path ++ "/paths.cpp",
+                    path ++ "/preferences.cpp",
                     path ++ "/sample_library/audio_file.cpp",
                     path ++ "/sample_library/sample_library_lua.cpp",
                     path ++ "/sample_library/sample_library_mdata.cpp",
                     path ++ "/sentry/sentry.cpp",
-                    path ++ "/preferences.cpp",
-                    path ++ "/descriptors/param_descriptors.cpp",
-                    path ++ "/audio_utils.cpp",
                 },
                 .flags = cpp_floe_flags,
             });

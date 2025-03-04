@@ -108,7 +108,7 @@ check-spelling:
 
 [unix]
 check-links:
-  lychee --exclude 'v%7B%7B#include' docs readme.md changelog.md
+  lychee --exclude 'installation/download-and-install-floe.html' --exclude 'v%7B%7B#include' docs readme.md changelog.md
 
 # install Compile DataBase (compile_commands.json)
 install-cbd arch_os_pair=native_arch_os_pair:

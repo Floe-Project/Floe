@@ -121,7 +121,7 @@ jobs:
         with:
           name: logs-linux
           if-no-files-found: ignore
-          path: ~/.local/state/Floe/*
+          path: ~/.local/state/Floe/Logs/*
 
   windows-test:
     runs-on: windows-latest
@@ -165,7 +165,7 @@ jobs:
         with:
           name: logs-windows
           if-no-files-found: ignore
-          path: ~/AppData/Local/Floe/*
+          path: ~/AppData/Local/Floe/Logs/*
   
   notify:
     if: ${{ github.ref == 'refs/heads/main' && !cancelled() }}

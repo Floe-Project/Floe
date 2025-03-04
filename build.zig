@@ -794,7 +794,7 @@ fn universalFlags(
     try flags.append(context.b.fmt("-fdebug-prefix-map={s}/=", .{build_root}));
     try flags.append("-fvisibility=hidden");
 
-    if (context.build_mode != .production and target.query.isNativeOs() and context.enable_tracy) {
+    if (context.build_mode != .production and context.enable_tracy) {
         try flags.append("-DTRACY_ENABLE");
         try flags.append("-DTRACY_MANUAL_LIFETIME");
         try flags.append("-DTRACY_DELAYED_INIT");

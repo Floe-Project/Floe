@@ -76,8 +76,8 @@
             .hash = "1220f5d96c857e20be7ed56e7d613fb320fca16a92511cae78679cd4755bdc14b045",
         },
         .tracy = .{
-            .url = "https://github.com/wolfpld/tracy/archive/refs/tags/v0.10.tar.gz",
-            .hash = "12202aac930cebaf2b57f443cacc2483478580a72f1316b4f0a720ddd91246fce69d",
+            .url = "https://github.com/wolfpld/tracy/archive/refs/tags/v0.11.1.tar.gz",
+            .hash = "122022a478dccaed1309fb5d022f4041eec45d40c93a855ed24fad970774c2426d91",
         },
         .vst3_sdk = .{
             .url = "https://github.com/Floe-Project/vst3sdk/archive/refs/tags/v3.7.9.tar.gz",

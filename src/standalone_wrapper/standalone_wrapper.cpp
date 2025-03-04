@@ -476,8 +476,8 @@ inline ErrorCodeCategory const& ErrorCategoryForEnum(StandaloneError) { return s
 extern clap_plugin_entry const clap_entry;
 
 static ErrorCodeOr<void> Main(String exe_path_rel) {
-    ArenaAllocator arena {PageAllocator::Instance()};
-    auto exe_path = DynamicArray<char>::FromOwnedSpan(TRY(AbsolutePath(arena, exe_path_rel)), arena);
+    FixedSizeAllocator<Kb(1)> allocator {nullptr};
+    auto exe_path = DynamicArray<char>::FromOwnedSpan(TRY(AbsolutePath(allocator, exe_path_rel)), allocator);
 
     GlobalInit({
         .current_binary_path = exe_path,

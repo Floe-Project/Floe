@@ -363,19 +363,18 @@ static void CloseAudio(Standalone& standalone) {
 }
 
 static PuglStatus OnEvent(PuglView* view, PuglEvent const* event) {
+    ZoneScoped;
+    ZoneNameF("Standalone: %s", PuglEventString(event->type));
+
     auto& p = *(Standalone*)puglGetHandle(view);
     if (PanicOccurred()) return PUGL_UNKNOWN_ERROR;
 
-    // if (event->type != PUGL_UPDATE && event->type != PUGL_TIMER)
-    //     printEvent(event, "PUGL (standalone): ", true);
     switch (event->type) {
         case PUGL_CLOSE: {
-            ZoneScopedN("Standalone: PUGL_CLOSE");
             p.quit = true;
             break;
         }
         case PUGL_CONFIGURE: {
-            ZoneScopedN("Standalone: PUGL_CONFIGURE");
             if (event->configure.style & PUGL_VIEW_STYLE_MAPPED) {
                 LogDebug(ModuleName::Standalone, "PUGL: {}", fmt::DumpStruct(event->configure));
                 auto gui = (clap_plugin_gui const*)p.plugin.get_extension(&p.plugin, CLAP_EXT_GUI);
@@ -390,13 +389,11 @@ static PuglStatus OnEvent(PuglView* view, PuglEvent const* event) {
             break;
         }
         case PUGL_FOCUS_IN: {
-            ZoneScopedN("Standalone: PUGL_FOCUS_IN");
             auto gui = (clap_plugin_gui const*)p.plugin.get_extension(&p.plugin, CLAP_EXT_GUI);
             if (gui) gui->show(&p.plugin);
             break;
         }
         case PUGL_FOCUS_OUT: {
-            ZoneScopedN("Standalone: PUGL_FOCUS_OUT");
             auto gui = (clap_plugin_gui const*)p.plugin.get_extension(&p.plugin, CLAP_EXT_GUI);
             if (gui) gui->hide(&p.plugin);
             break;

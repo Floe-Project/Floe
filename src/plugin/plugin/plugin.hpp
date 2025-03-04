@@ -191,3 +191,5 @@ clap_plugin const* CreateFloeInstance(clap_host const* clap_host);
 
 void OnPollThread(FloeInstanceIndex index);
 void OnPreferenceChanged(FloeInstanceIndex index, prefs::Key const& key, prefs::Value const* value);
+
+char const* PuglEventString(PuglEventType type);

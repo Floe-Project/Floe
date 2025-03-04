@@ -215,6 +215,36 @@ static bool LogIfError(ErrorCodeOr<void> const& ec, String name) {
     return true;
 }
 
+char const* PuglEventString(PuglEventType type) {
+    switch (type) {
+        case PUGL_CLOSE: return "PUGL_CLOSE";
+        case PUGL_CONFIGURE: return "PUGL_CONFIGURE";
+        case PUGL_FOCUS_IN: return "PUGL_FOCUS_IN";
+        case PUGL_FOCUS_OUT: return "PUGL_FOCUS_OUT";
+        case PUGL_NOTHING: return "PUGL_NOTHING";
+        case PUGL_REALIZE: return "PUGL_REALIZE";
+        case PUGL_UNREALIZE: return "PUGL_UNREALIZE";
+        case PUGL_UPDATE: return "PUGL_UPDATE";
+        case PUGL_EXPOSE: return "PUGL_EXPOSE";
+        case PUGL_KEY_PRESS: return "PUGL_KEY_PRESS";
+        case PUGL_KEY_RELEASE: return "PUGL_KEY_RELEASE";
+        case PUGL_TEXT: return "PUGL_TEXT";
+        case PUGL_POINTER_IN: return "PUGL_POINTER_IN";
+        case PUGL_POINTER_OUT: return "PUGL_POINTER_OUT";
+        case PUGL_BUTTON_PRESS: return "PUGL_BUTTON_PRESS";
+        case PUGL_BUTTON_RELEASE: return "PUGL_BUTTON_RELEASE";
+        case PUGL_MOTION: return "PUGL_MOTION";
+        case PUGL_SCROLL: return "PUGL_SCROLL";
+        case PUGL_CLIENT: return "PUGL_CLIENT";
+        case PUGL_TIMER: return "PUGL_TIMER";
+        case PUGL_LOOP_ENTER: return "PUGL_LOOP_ENTER";
+        case PUGL_LOOP_LEAVE: return "PUGL_LOOP_LEAVE";
+        case PUGL_DATA_OFFER: return "PUGL_DATA_OFFER";
+        case PUGL_DATA: return "PUGL_DATA";
+    }
+    return "";
+}
+
 static bool ClapGuiIsApiSupported(clap_plugin_t const* plugin, char const* api, bool is_floating) {
     ZoneScoped;
     if (PanicOccurred()) return false;

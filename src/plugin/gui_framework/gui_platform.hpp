@@ -695,6 +695,8 @@ static void UpdateAndRender(GuiPlatform& platform) {
 }
 
 static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
+    ZoneScoped;
+    ZoneNameF("%s", PuglEventString(event->type));
     if (PanicOccurred()) return PUGL_FAILURE;
 
     try {
@@ -706,7 +708,6 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
             case PUGL_NOTHING: break;
 
             case PUGL_REALIZE: {
-                ZoneScopedN("PUGL_REALIZE");
                 LogDebug(ModuleName::Gui, "realize: {}", fmt::DumpStruct(event->any));
                 puglGrabFocus(platform.view);
                 CreateGraphicsContext(platform);
@@ -714,7 +715,6 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
             }
 
             case PUGL_UNREALIZE: {
-                ZoneScopedN("PUGL_UNREALIZE");
                 LogDebug(ModuleName::Gui, "unrealize {}", fmt::DumpStruct(event->any));
                 DestroyGraphicsContext(platform);
                 break;
@@ -722,7 +722,6 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
 
             // resized or moved
             case PUGL_CONFIGURE: {
-                ZoneScopedN("PUGL_CONFIGURE");
                 auto const& configure = event->configure;
                 LogDebug(ModuleName::Gui, "configure {}", fmt::DumpStruct(configure));
                 auto const size = NearestAspectRatioSizeInsideSize({configure.width, configure.height},
@@ -748,7 +747,6 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
             }
 
             case PUGL_EXPOSE: {
-                ZoneScopedN("PUGL_EXPOSE");
                 UpdateAndRender(platform);
                 break;
             }
@@ -760,31 +758,26 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
 
             case PUGL_FOCUS_IN:
             case PUGL_FOCUS_OUT: {
-                ZoneScopedN("PUGL_FOCUS");
                 platform.frame_state.Reset();
                 break;
             }
 
             case PUGL_KEY_PRESS: {
-                ZoneScopedN("PUGL_KEY_PRESS");
                 post_redisplay = EventKey(platform, event->key, true);
                 break;
             }
 
             case PUGL_KEY_RELEASE: {
-                ZoneScopedN("PUGL_KEY_RELEASE");
                 post_redisplay = EventKey(platform, event->key, false);
                 break;
             }
 
             case PUGL_TEXT: {
-                ZoneScopedN("PUGL_TEXT");
                 post_redisplay = EventText(platform, event->text);
                 break;
             }
 
             case PUGL_POINTER_IN: {
-                ZoneScopedN("PUGL_POINTER_IN");
                 puglGrabFocus(platform.view);
                 break;
             }
@@ -792,45 +785,43 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
 
             case PUGL_BUTTON_PRESS:
             case PUGL_BUTTON_RELEASE: {
-                ZoneScopedN("PUGL_BUTTON");
                 post_redisplay = EventMouseButton(platform, event->button, event->type == PUGL_BUTTON_PRESS);
                 break;
             }
 
             case PUGL_MOTION: {
-                ZoneScopedN("PUGL_MOTION");
                 post_redisplay = EventMotion(platform, event->motion);
                 break;
             }
 
             case PUGL_SCROLL: {
-                ZoneScopedN("PUGL_SCROLL");
                 post_redisplay = EventWheel(platform, event->scroll);
                 break;
             }
 
             case PUGL_TIMER: {
-                ZoneScopedN("PUGL_TIMER");
                 if (event->timer.id == platform.k_pugl_timer_id) post_redisplay = IsUpdateNeeded(platform);
                 break;
             }
 
             case PUGL_DATA_OFFER: {
-                ZoneScopedN("PUGL_DATA_OFFER");
                 post_redisplay = EventDataOffer(platform, event->offer);
                 break;
             }
 
             case PUGL_DATA: {
-                ZoneScopedN("PUGL_DATA");
                 post_redisplay = EventData(platform, event->data);
                 break;
             }
 
             case PUGL_CLIENT: break;
 
-            case PUGL_LOOP_ENTER:
-            case PUGL_LOOP_LEAVE: break;
+            case PUGL_LOOP_ENTER: {
+                break;
+            }
+            case PUGL_LOOP_LEAVE: {
+                break;
+            }
         }
 
         if (post_redisplay) puglObscureView(view);

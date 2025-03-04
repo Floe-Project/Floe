@@ -38,6 +38,7 @@ jobs:
             .floe-cache
 
       - run: just build mac_ub
+      - run: just install-docs-preprocessor
       - run: just test-ci
 
       - name: Upload errors
@@ -79,6 +80,9 @@ jobs:
 
       - if: '!cancelled()'
         run: just build mac_ub
+
+      - if: '!cancelled()'
+        run: just install-docs-preprocessor
 
       - if: '!cancelled()'
         run: just test-ci
@@ -213,12 +217,7 @@ jobs:
 
       - run: just build native
 
-      - name: Install docs_preprocessor system-wide
-        run: |
-          set -x
-          FLOE_BIN_DIR=$(just --evaluate native_binary_dir_abs)
-          sudo install "$FLOE_BIN_DIR/docs_preprocessor" /usr/local/bin/ 2>&1 || { echo "Failed to install binary: $?"; exit 1; }
-          echo "Installation completed"
+      - run: just install-docs-preprocessor
 
       - name: Deploy GitHub Pages
         run: |

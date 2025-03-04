@@ -157,6 +157,14 @@ upload-errors:
     fi
   done
 
+# For some reason, on CI, the docs_preprocessor binary is not being found. This is a workaround.
+[unix]
+install-docs-preprocessor:
+  #!/usr/bin/env bash
+  set -x
+  sudo install "{{native_binary_dir_abs}}/docs_preprocessor" /usr/local/bin/ 2>&1 || { echo "Failed to install binary: $?"; exit 1; }
+  echo "Installation completed"
+
 # IMPROVE: (June 2024) cppcheck v2.14.0 and v2.14.1 thinks there are syntax errors in valid code. It could be a cppcheck bug or it could be an incompatibility in how we are using it. Regardless, we should try again in the future and see if it's fixed. If it works it should run alongside clang-tidy in CI, etc.
 # cppcheck arch_os_pair=native_arch_os_pair:
 #   # IMPROVE: use --check-level=exhaustive?
@@ -326,10 +334,16 @@ test level="0" build="": (_build_if_requested build "dev") (parallel if level ==
 [unix]
 test-ci: 
   #!/usr/bin/env bash
+
   pushd docs
-  mdbook serve
+  mdbook serve &
+  MDBOOK_PID=$!
+  sleep 2 # Wait a moment for the server to fully start
   popd
+
   just parallel checks_ci
+
+  kill $MDBOOK_PID
 
 [unix]
 install-pre-commit-hook:

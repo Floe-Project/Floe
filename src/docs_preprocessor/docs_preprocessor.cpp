@@ -219,7 +219,10 @@ static ErrorCodeOr<String> PreprocessMarkdownBlob(String markdown_blob) {
 
         {
             if (StartsWith(latest_release_version, 'v')) latest_release_version.RemovePrefix(1);
-            if (latest_release_version.size == 0) return ErrorCode {CommonError::InvalidFileFormat};
+            if (latest_release_version.size == 0) {
+                LogError(ModuleName::Main, "Failed to parse github release version: {}\n", json_data);
+                return ErrorCode {CommonError::InvalidFileFormat};
+            }
             ExpandIdentifier(result, Identifier("latest-release-version"), latest_release_version, scratch);
         }
     }

@@ -119,7 +119,7 @@ PUBLIC void CreateUninstallRegistryKey(ArenaAllocator& arena, String uninstaller
     }
 
     {
-        DWORD const version = (floe_version.major << 16) | floe_version.minor;
+        auto const version = ((DWORD)floe_version.major << 16) | (DWORD)floe_version.minor;
         RegSetValueExW(h_key, L"Version", 0, REG_DWORD, (const BYTE*)&version, sizeof(version));
     }
 

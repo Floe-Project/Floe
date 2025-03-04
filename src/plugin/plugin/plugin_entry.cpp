@@ -71,10 +71,12 @@ static bool ClapEntryInit(char const* plugin_path_c_str) {
 
         if (!plugin_path_c_str) return false;
         auto const plugin_path = FromNullTerminated(plugin_path_c_str);
+        constexpr auto k_plugin_path_max_len = Kb(2);
+        if (plugin_path.size > k_plugin_path_max_len) return false;
         if (!path::IsAbsolute(plugin_path)) return false;
         if (!IsValidUtf8(plugin_path)) return false;
 
-        [[maybe_unused]] ArenaAllocatorWithInlineStorage<2000> arena {PageAllocator::Instance()};
+        DynamicArrayBounded<char, k_plugin_path_max_len> modified_plugin_path;
         GlobalInit({
             .current_binary_path = ({
                 String p = plugin_path;
@@ -82,11 +84,10 @@ static bool ClapEntryInit(char const* plugin_path_c_str) {
                 // the subpaths to get the binary path
                 if (IS_MACOS && g_final_binary_type != FinalBinaryType::Standalone) {
                     constexpr String k_subpath = "/Contents/MacOS/Floe"_s;
-                    auto binary_path = arena.AllocateExactSizeUninitialised<char>(p.size + k_subpath.size);
-                    usize pos = 0;
-                    WriteAndIncrement(pos, binary_path, p);
-                    WriteAndIncrement(pos, binary_path, k_subpath);
-                    p = binary_path;
+                    if (p.size + k_subpath.size > k_plugin_path_max_len) return false;
+                    dyn::AppendSpan(modified_plugin_path, p);
+                    dyn::AppendSpan(modified_plugin_path, k_subpath);
+                    p = modified_plugin_path;
                     if constexpr (!PRODUCTION_BUILD) ASSERT(GetFileType(p).HasValue());
                 }
                 p;

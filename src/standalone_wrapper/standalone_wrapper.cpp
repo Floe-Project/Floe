@@ -546,8 +546,7 @@ static ErrorCodeOr<void> Main(String exe_path_rel) {
     auto const size = *ClapPixelsToPhysicalPixels(standalone.gui_view, clap_width, clap_height);
     TRY_PUGL(
         puglSetSizeHint(standalone.gui_view, PUGL_DEFAULT_SIZE, (PuglSpan)size.width, (PuglSpan)size.height));
-    TRY_PUGL(
-        puglSetSizeHint(standalone.gui_view, PUGL_CURRENT_SIZE, (PuglSpan)size.width, (PuglSpan)size.height));
+    puglSetSizeHint(standalone.gui_view, PUGL_CURRENT_SIZE, (PuglSpan)size.width, (PuglSpan)size.height);
 
     {
         clap_gui_resize_hints resize_hints;

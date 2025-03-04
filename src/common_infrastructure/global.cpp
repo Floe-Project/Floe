@@ -153,5 +153,6 @@ void GlobalDeinit(GlobalShutdownOptions options) {
 
     ShutdownLogger();
 
+    ASSERT(g_tracy_init);
     if (--g_tracy_init == 0) ShutdownTracy();
 }

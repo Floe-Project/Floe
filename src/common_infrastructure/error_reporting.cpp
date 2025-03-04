@@ -56,6 +56,7 @@ bool IsOnlineReportingDisabled() {
 }
 
 void InitBackgroundErrorReporting(Span<sentry::Tag const> tags) {
+    ZoneScoped;
     CountedInit(g_init_flag, [&]() {
         auto existing = g_queue.Load(LoadMemoryOrder::Acquire);
         if (existing) return;
@@ -84,6 +85,7 @@ void SetErrorSent(u64 error_id) {
 }
 
 void ReportError(sentry::Error&& error, Optional<u64> error_id) {
+    ZoneScoped;
     if (error_id) SetErrorSent(*error_id);
 
     // For debug purposes, log the error.
@@ -111,6 +113,7 @@ void ReportError(sentry::Error&& error, Optional<u64> error_id) {
 } // namespace detail
 
 void ShutdownBackgroundErrorReporting() {
+    ZoneScoped;
     CountedDeinit(g_init_flag, [&]() {
         LogDebug({}, "Shutting down background error reporting");
         auto q = g_queue.Load(LoadMemoryOrder::Acquire);

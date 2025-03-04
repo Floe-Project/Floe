@@ -70,7 +70,10 @@ struct FloePluginInstance : PluginInstanceMessages {
         clap_plugin = plugin_interface_template;
         clap_plugin.plugin_data = PluginDataFromIndex(index);
     }
-    ~FloePluginInstance() { Trace(ModuleName::Gui); }
+    ~FloePluginInstance() {
+        ZoneScoped;
+        Trace(ModuleName::Gui);
+    }
 
     clap_host const& host;
     FloeInstanceIndex const index;

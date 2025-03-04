@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <curl/curl.h>
 
+#include "utils/debug/tracy_wrapped.hpp"
 #include "utils/logger/logger.hpp"
 
 #include "misc.hpp"
@@ -14,9 +15,15 @@ size_t WriteFunction(void* ptr, size_t size, size_t nmemb, void* data) {
     return size * nmemb;
 }
 
-void WebGlobalInit() { curl_global_init(CURL_GLOBAL_DEFAULT); }
+void WebGlobalInit() {
+    ZoneScoped;
+    curl_global_init(CURL_GLOBAL_DEFAULT);
+}
 
-void WebGlobalCleanup() { curl_global_cleanup(); }
+void WebGlobalCleanup() {
+    ZoneScoped;
+    curl_global_cleanup();
+}
 
 ErrorCodeOr<void> HttpsGet(String url, Writer writer, RequestOptions options) {
     auto curl = curl_easy_init();

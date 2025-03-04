@@ -609,6 +609,7 @@ bool TrySigFunction(int return_code, String message) {
 }
 
 void BeginCrashDetection(CrashHookFunction hook) {
+    ZoneScoped;
     g_crash_hook.Store(hook, StoreMemoryOrder::Release);
 
     ++g_signals_installed;
@@ -627,6 +628,7 @@ void BeginCrashDetection(CrashHookFunction hook) {
 }
 
 void EndCrashDetection() {
+    ZoneScoped;
     ASSERT(g_signals_installed > 0);
     --g_signals_installed;
     if (g_signals_installed != 0) return;

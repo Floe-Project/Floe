@@ -336,6 +336,7 @@ static MutableString g_current_binary_path {}; // includes null terminator
 static Allocator& StateAllocator() { return PageAllocator::Instance(); }
 
 Optional<String> InitStacktraceState(Optional<String> current_binary_path) {
+    ZoneScoped;
     CountedInit(g_init, [current_binary_path] {
         if (current_binary_path) {
             ASSERT(current_binary_path->size);
@@ -406,6 +407,7 @@ Optional<String> InitStacktraceState(Optional<String> current_binary_path) {
 }
 
 void ShutdownStacktraceState() {
+    ZoneScoped;
     CountedDeinit(g_init, [] {
         if (auto state = g_backtrace_state.Exchange(nullptr, RmwMemoryOrder::AcquireRelease)) {
             if (g_current_binary_path.size) StateAllocator().Free(g_current_binary_path.ToByteSpan());

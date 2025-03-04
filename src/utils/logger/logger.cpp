@@ -147,10 +147,12 @@ static LogConfig g_config {};
 static LogRingBuffer g_message_ring_buffer {};
 
 void InitLogger(LogConfig config) {
+    ZoneScoped;
     CountedInit(g_counted_init_flag, [&]() { g_config = config; });
 }
 
 void ShutdownLogger() {
+    ZoneScoped;
     CountedDeinit(g_counted_init_flag, []() {
         if (auto file = Exchange(g_file, nullptr)) file->~File();
         g_call_once_flag.Reset();

@@ -494,7 +494,7 @@ static void WindowsShellExecute(String arg) {
                     // pass
                 }
             },
-            "WindowsShellExecute");
+            "shellexe");
         thread.Detach();
     }
 }

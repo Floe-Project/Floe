@@ -85,8 +85,8 @@ static bool ClapEntryInit(char const* plugin_path_c_str) {
                 if (IS_MACOS && g_final_binary_type != FinalBinaryType::Standalone) {
                     constexpr String k_subpath = "/Contents/MacOS/Floe"_s;
                     if (p.size + k_subpath.size > k_plugin_path_max_len) return false;
-                    dyn::AppendSpan(modified_plugin_path, p);
-                    dyn::AppendSpan(modified_plugin_path, k_subpath);
+                    dyn::AppendSpanAssumeCapacity(modified_plugin_path, p);
+                    dyn::AppendSpanAssumeCapacity(modified_plugin_path, k_subpath);
                     p = modified_plugin_path;
                     if constexpr (!PRODUCTION_BUILD) ASSERT(GetFileType(p).HasValue());
                 }

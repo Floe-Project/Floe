@@ -164,6 +164,15 @@ PUBLIC constexpr bool AppendSpan(DynType& array, SpanFor<DynType> new_items) {
     return true;
 }
 
+template <DynArray DynType>
+PUBLIC constexpr bool AppendSpanAssumeCapacity(DynType& array, SpanFor<DynType> new_items) {
+    auto write_ptr = array.data + array.size;
+    for (auto const new_items_index : Range(new_items.size))
+        PLACEMENT_NEW(write_ptr + new_items_index) DynType::ValueType(new_items[new_items_index]);
+    array.ResizeWithoutCtorDtor(array.size + new_items.size);
+    return true;
+}
+
 // Returns true if item was added
 template <DynArray DynType, typename ArgumentType = DynType::ValueType>
 PUBLIC constexpr bool AppendIfNotAlreadyThere(DynType& array, ArgumentType&& v) {

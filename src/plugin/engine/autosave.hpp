@@ -12,7 +12,7 @@
 
 struct AutosaveState {
 
-    enum class State { Idle, PendingSave, Saved };
+    enum class State { Idle, SaveRequested, Saved };
     Atomic<u16> max_autosaves_per_instance {};
     Atomic<u16> autosave_delete_after_days {};
     DynamicArrayBounded<char, 16> instance_id;

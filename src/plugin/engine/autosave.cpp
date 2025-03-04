@@ -9,17 +9,13 @@
 
 #include "state/state_coding.hpp"
 
-static void AutosaveFilenamePrefix(DynamicArrayBounded<char, 32>& out, AutosaveState const& state) {
-    fmt::Assign(out, "{} autosave ", state.instance_id);
-}
+constexpr auto k_autosave_filename_prefix = "autosave"_ca;
 
 static ErrorCodeOr<void> CleanupExcessInstanceAutosaves(AutosaveState const& state,
                                                         FloePaths const& paths,
                                                         ArenaAllocator& scratch_arena) {
-    DynamicArrayBounded<char, 32> wildcard;
-    AutosaveFilenamePrefix(wildcard, state);
-    dyn::Append(wildcard, '*');
-    dyn::AppendSpan(wildcard, FLOE_PRESET_FILE_EXTENSION);
+    ZoneScoped;
+    auto const wildcard = fmt::FormatInline<32>("*{}*", state.instance_id);
 
     auto const entries = TRY(FindEntriesInFolder(scratch_arena,
                                                  paths.autosave_path,
@@ -55,6 +51,7 @@ static ErrorCodeOr<void> CleanupExcessInstanceAutosaves(AutosaveState const& sta
     for (auto i : Range(excess_count)) {
         auto const path =
             path::Join(scratch_arena, Array {paths.autosave_path, entries_with_times[i].entry->subpath});
+        LogDebug(ModuleName::Main, "Deleting excess autosave: {}", path);
         DEFER { scratch_arena.Free(path.ToByteSpan()); };
         auto _ = Delete(path, {.type = DeleteOptions::Type::File, .fail_if_not_exists = false});
     }
@@ -64,17 +61,16 @@ static ErrorCodeOr<void> CleanupExcessInstanceAutosaves(AutosaveState const& sta
 
 static ErrorCodeOr<void>
 Autosave(AutosaveState& state, StateSnapshot const& snapshot, FloePaths const& paths) {
+    ZoneScoped;
     PathArena arena {PageAllocator::Instance()};
 
-    DynamicArrayBounded<char, 32> prefix;
-    AutosaveFilenamePrefix(prefix, state);
-
-    DynamicArrayBounded<char, 32> unique_name;
+    DynamicArrayBounded<char, 64> filename;
     {
         auto seed = RandomSeed();
         auto const date = LocalTimeNow();
-        fmt::Assign(unique_name,
-                    "{02}{02} {02}s {} {} {} {} ({})",
+        fmt::Assign(filename,
+                    "{} {02}-{02}-{02} {} {} {} {} {} ({})" FLOE_PRESET_FILE_EXTENSION,
+                    k_autosave_filename_prefix,
                     date.hour,
                     date.minute,
                     date.second,
@@ -82,10 +78,10 @@ Autosave(AutosaveState& state, StateSnapshot const& snapshot, FloePaths const& p
                     date.day_of_month,
                     date.MonthName(),
                     date.year,
+                    state.instance_id,
                     RandomIntInRange<u32>(seed, 1000, 9999));
     }
 
-    auto const filename = fmt::Join(arena, Array {String {prefix}, unique_name, FLOE_PRESET_FILE_EXTENSION});
     auto const path = path::Join(arena, Array {paths.autosave_path, filename});
     TRY(SavePresetFile(path, snapshot));
 
@@ -95,7 +91,9 @@ Autosave(AutosaveState& state, StateSnapshot const& snapshot, FloePaths const& p
 static ErrorCodeOr<void> CleanupOldAutosavesIfNeeded(FloePaths const& paths,
                                                      ArenaAllocator& scratch_arena,
                                                      u16 k_autosave_max_age_days) {
-    constexpr String k_wildcard = "*autosave*" FLOE_PRESET_FILE_EXTENSION;
+    ZoneScoped;
+    constexpr auto k_wildcard =
+        ConcatArrays("*"_ca, k_autosave_filename_prefix, "*"_ca, FLOE_PRESET_FILE_EXTENSION ""_ca);
     auto const entries = TRY(FindEntriesInFolder(scratch_arena,
                                                  paths.autosave_path,
                                                  {
@@ -160,13 +158,15 @@ void InitAutosaveState(AutosaveState& state,
 }
 
 void AutosaveToFileIfNeeded(AutosaveState& state, FloePaths const& paths) {
+    ZoneScoped;
+    LogDebug(ModuleName::Main, "AutosaveToFileIfNeeded");
     Optional<StateSnapshot> snapshot {};
     {
         state.mutex.Lock();
         DEFER { state.mutex.Unlock(); };
         switch (state.state) {
             case AutosaveState::State::Idle: return;
-            case AutosaveState::State::PendingSave:
+            case AutosaveState::State::SaveRequested:
                 snapshot = state.snapshot;
                 state.state = AutosaveState::State::Saved;
                 break;
@@ -175,7 +175,7 @@ void AutosaveToFileIfNeeded(AutosaveState& state, FloePaths const& paths) {
     }
     if (snapshot) {
         TRY_OR(Autosave(state, *snapshot, paths),
-               { ReportError(ErrorLevel::Error, HashComptime("autosave"), "autosave failed: {}", error); });
+               ReportError(ErrorLevel::Error, HashComptime("autosave"), "autosave failed: {}", error););
         ArenaAllocatorWithInlineStorage<1000> scratch_arena {PageAllocator::Instance()};
         static bool first_call = true;
         if (Exchange(first_call, false)) {
@@ -190,12 +190,11 @@ void AutosaveToFileIfNeeded(AutosaveState& state, FloePaths const& paths) {
                                 error);
                 });
         }
-        TRY_OR(CleanupExcessInstanceAutosaves(state, paths, scratch_arena), {
-            ReportError(ErrorLevel::Error,
-                        HashComptime("autosave cleanup"),
-                        "cleanup excess autosaves failed: {}",
-                        error);
-        });
+        TRY_OR(CleanupExcessInstanceAutosaves(state, paths, scratch_arena),
+               ReportError(ErrorLevel::Error,
+                           HashComptime("autosave cleanup"),
+                           "cleanup excess autosaves failed: {}",
+                           error););
     }
 }
 
@@ -269,20 +268,24 @@ void OnPreferenceChanged(AutosaveState& state, prefs::Key const& key, prefs::Val
 }
 
 bool AutosaveNeeded(AutosaveState const& state, prefs::Preferences const& preferences) {
+    ZoneScoped;
     return state.last_save_time.SecondsFromNow() >=
            (f64)AutosaveSettingIntValue(AutosaveSetting::AutosaveIntervalSeconds, preferences);
 }
 
 void QueueAutosave(AutosaveState& state, StateSnapshot const& snapshot) {
+    ZoneScoped;
+    LogDebug(ModuleName::Main, "QueueAutosave");
     state.mutex.Lock();
     DEFER { state.mutex.Unlock(); };
     switch (state.state) {
         case AutosaveState::State::Idle:
-        case AutosaveState::State::PendingSave:
+        case AutosaveState::State::SaveRequested:
             state.snapshot = snapshot;
-            state.state = AutosaveState::State::PendingSave;
+            state.state = AutosaveState::State::SaveRequested;
             break;
         case AutosaveState::State::Saved:
+            // We only queue a new autosave if the snapshot has changed.
             if (state.snapshot != snapshot) {
                 if constexpr (!PRODUCTION_BUILD) {
                     DynamicArrayBounded<char, Kb(4)> diff {};
@@ -291,7 +294,7 @@ void QueueAutosave(AutosaveState& state, StateSnapshot const& snapshot) {
                     LogDebug(ModuleName::Main, "Autosave diff: {}", diff);
                 }
                 state.snapshot = snapshot;
-                state.state = AutosaveState::State::PendingSave;
+                state.state = AutosaveState::State::SaveRequested;
             }
             break;
     }

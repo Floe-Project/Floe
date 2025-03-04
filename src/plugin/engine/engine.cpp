@@ -524,11 +524,11 @@ Engine::Engine(clap_host const& host,
         if (auto const timer_support =
                 (clap_host_timer_support const*)host.get_extension(&host, CLAP_EXT_TIMER_SUPPORT);
             timer_support && timer_support->register_timer) {
-            clap_id timer_id;
-            if (timer_support->register_timer(&host, 1000, &timer_id)) attributions_poll_timer_id = timer_id;
+            clap_id id;
+            if (timer_support->register_timer(&host, 1000, &id)) timer_id = id;
         }
-        if (!attributions_poll_timer_id) shared_engine_systems.StartPollingThreadIfNeeded();
     }
+    shared_engine_systems.StartPollingThreadIfNeeded();
 }
 
 Engine::~Engine() {
@@ -540,25 +540,27 @@ Engine::~Engine() {
     sample_lib_server::CloseAsyncCommsChannel(shared_engine_systems.sample_library_server,
                                               sample_lib_server_async_channel);
 
-    if (attributions_poll_timer_id) {
-        auto const timer_support =
-            (clap_host_timer_support const*)host.get_extension(&host, CLAP_EXT_TIMER_SUPPORT);
-        if (timer_support && timer_support->unregister_timer)
-            timer_support->unregister_timer(&host, *attributions_poll_timer_id);
+    if (timer_id) {
+        if (auto const timer_support =
+                (clap_host_timer_support const*)host.get_extension(&host, CLAP_EXT_TIMER_SUPPORT);
+            timer_support && timer_support->unregister_timer)
+            timer_support->unregister_timer(&host, *timer_id);
     }
 }
 
 static void PluginOnTimer(Engine& engine, clap_id timer_id) {
     ASSERT(IsMainThread(engine.host));
-    if (timer_id == *engine.attributions_poll_timer_id) {
-        if (AttributionTextNeedsUpdate(engine.attribution_requirements))
-            UpdateAttributionText(engine, engine.error_arena);
-    }
+    if (timer_id == *engine.timer_id) OnMainThread(engine);
 }
 
 static void PluginOnPollThread(Engine& engine) {
-    // we want to poll for attribution text updates
-    engine.host.request_callback(&engine.host);
+    // If we don't have a timer, we shall use this thread to trigger regular main thread calls.
+    if (!engine.timer_id) {
+        if (engine.last_poll_thread_time.SecondsFromNow() >= 0.5) {
+            engine.last_poll_thread_time = TimePoint::Now();
+            engine.host.request_callback(&engine.host);
+        }
+    }
 
     AutosaveToFileIfNeeded(engine.autosave_state, engine.shared_engine_systems.paths);
 }

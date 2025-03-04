@@ -73,7 +73,8 @@ struct Engine : ProcessorListener {
     AttributionRequirementsState attribution_requirements {
         .shared_attributions_store = shared_engine_systems.shared_attributions_store,
     };
-    Optional<clap_id> attributions_poll_timer_id {};
+    Optional<clap_id> timer_id {};
+    TimePoint last_poll_thread_time {};
 
     // IMPORTANT: debug-only, remove this
     DynamicArrayBounded<char, 200> state_change_description {};

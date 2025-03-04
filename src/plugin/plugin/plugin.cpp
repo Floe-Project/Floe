@@ -107,9 +107,6 @@ inline Allocator& FloeInstanceAllocator() { return PageAllocator::Instance(); }
 static u16 g_floe_instances_initialised {};
 static Array<FloePluginInstance*, k_max_num_floe_instances> g_floe_instances {};
 
-// Macro because it declares a constructor/destructor object for timing start/end
-#define TRACE_CLAP_CALL(name) ZoneScopedMessage(floe.trace_config, name)
-
 inline void LogClapFunction(FloePluginInstance& floe, ClapFunctionType level, String name) {
     if (k_clap_logging_level >= level) LogInfo(ModuleName::Clap, "{} #{}", name, floe.index);
 }
@@ -155,6 +152,7 @@ static FloePluginInstance* ExtractFloe(clap_plugin const* plugin) {
 }
 
 bool ClapStateSave(clap_plugin const* plugin, clap_ostream const* stream) {
+    ZoneScoped;
     if (PanicOccurred()) return false;
 
     try {
@@ -166,7 +164,6 @@ bool ClapStateSave(clap_plugin const* plugin, clap_ostream const* stream) {
             f;
         });
         LogClapFunction(floe, ClapFunctionType::NonRecurring, k_func);
-        TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, stream, k_func, "stream is null")) return false;
         if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return false;
@@ -179,6 +176,7 @@ bool ClapStateSave(clap_plugin const* plugin, clap_ostream const* stream) {
 }
 
 static bool ClapStateLoad(clap_plugin const* plugin, clap_istream const* stream) {
+    ZoneScoped;
     if (PanicOccurred()) return false;
 
     try {
@@ -190,7 +188,6 @@ static bool ClapStateLoad(clap_plugin const* plugin, clap_istream const* stream)
             f;
         });
         LogClapFunction(floe, ClapFunctionType::NonRecurring, k_func);
-        TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, stream, k_func, "stream is null")) return false;
         if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return false;
@@ -216,6 +213,7 @@ static bool LogIfError(ErrorCodeOr<void> const& ec, String name) {
 }
 
 static bool ClapGuiIsApiSupported(clap_plugin_t const* plugin, char const* api, bool is_floating) {
+    ZoneScoped;
     if (PanicOccurred()) return false;
 
     try {
@@ -238,6 +236,7 @@ static bool ClapGuiIsApiSupported(clap_plugin_t const* plugin, char const* api, 
 }
 
 static bool ClapGuiGetPrefferedApi(clap_plugin_t const* plugin, char const** api, bool* is_floating) {
+    ZoneScoped;
     if (PanicOccurred()) return false;
 
     try {
@@ -259,6 +258,7 @@ static bool ClapGuiGetPrefferedApi(clap_plugin_t const* plugin, char const** api
 }
 
 static bool ClapGuiCreate(clap_plugin_t const* plugin, char const* api, bool is_floating) {
+    ZoneScoped;
     if (PanicOccurred()) return false;
 
     try {
@@ -276,7 +276,6 @@ static bool ClapGuiCreate(clap_plugin_t const* plugin, char const* api, bool is_
                         "api: {}, is_floating: {}",
                         api,
                         is_floating);
-        TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe,
                    NullTermStringsEqual(k_supported_gui_api, api) && !is_floating,
@@ -295,6 +294,7 @@ static bool ClapGuiCreate(clap_plugin_t const* plugin, char const* api, bool is_
 }
 
 static void ClapGuiDestroy(clap_plugin const* plugin) {
+    ZoneScoped;
     if (PanicOccurred()) return;
 
     try {
@@ -306,7 +306,6 @@ static void ClapGuiDestroy(clap_plugin const* plugin) {
             f;
         });
         LogClapFunction(floe, ClapFunctionType::NonRecurring, k_func);
-        TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return;
         if (!Check(floe, floe.gui_platform.HasValue(), k_func, "no gui created")) return;
@@ -319,6 +318,7 @@ static void ClapGuiDestroy(clap_plugin const* plugin) {
 }
 
 static bool ClapGuiSetScale(clap_plugin_t const* plugin, f64 scale) {
+    ZoneScoped;
     if (PanicOccurred()) return false;
 
     try {
@@ -336,6 +336,7 @@ static bool ClapGuiSetScale(clap_plugin_t const* plugin, f64 scale) {
 }
 
 static bool ClapGuiGetSize(clap_plugin_t const* plugin, u32* width, u32* height) {
+    ZoneScoped;
     if (PanicOccurred()) return false;
 
     try {
@@ -347,7 +348,6 @@ static bool ClapGuiGetSize(clap_plugin_t const* plugin, u32* width, u32* height)
             f;
         });
         LogClapFunction(floe, ClapFunctionType::Any, k_func);
-        TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, width || height, k_func, "width and height both null")) return false;
         if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return false;
@@ -364,6 +364,7 @@ static bool ClapGuiGetSize(clap_plugin_t const* plugin, u32* width, u32* height)
 }
 
 static bool ClapGuiCanResize(clap_plugin_t const* plugin) {
+    ZoneScoped;
     if (PanicOccurred()) return false;
 
     try {
@@ -385,6 +386,7 @@ static bool ClapGuiCanResize(clap_plugin_t const* plugin) {
 }
 
 static bool ClapGuiGetResizeHints(clap_plugin_t const* plugin, clap_gui_resize_hints_t* hints) {
+    ZoneScoped;
     if (PanicOccurred()) return false;
 
     try {
@@ -396,7 +398,6 @@ static bool ClapGuiGetResizeHints(clap_plugin_t const* plugin, clap_gui_resize_h
             f;
         });
         LogClapFunction(floe, ClapFunctionType::Any, k_func);
-        TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, hints, k_func, "hints is null")) return false;
         if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return false;
@@ -431,6 +432,7 @@ GetUsableSizeWithinDimensions(GuiPlatform& gui_platform, u32 clap_width, u32 cla
 }
 
 static bool ClapGuiAdjustSize(clap_plugin_t const* plugin, u32* clap_width, u32* clap_height) {
+    ZoneScoped;
     if (PanicOccurred()) return false;
 
     try {
@@ -443,7 +445,6 @@ static bool ClapGuiAdjustSize(clap_plugin_t const* plugin, u32* clap_width, u32*
             f;
         });
         LogClapFunction(floe, ClapFunctionType::NonRecurring, k_func, "{} x {}", *clap_width, *clap_height);
-        TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return false;
 
@@ -473,6 +474,7 @@ static bool ClapGuiAdjustSize(clap_plugin_t const* plugin, u32* clap_width, u32*
 }
 
 static bool ClapGuiSetSize(clap_plugin_t const* plugin, u32 clap_width, u32 clap_height) {
+    ZoneScoped;
     if (PanicOccurred()) return false;
 
     try {
@@ -484,7 +486,6 @@ static bool ClapGuiSetSize(clap_plugin_t const* plugin, u32 clap_width, u32 clap
             f;
         });
         LogClapFunction(floe, ClapFunctionType::NonRecurring, k_func, "{} x {}", clap_width, clap_height);
-        TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return false;
         if (!Check(floe, floe.gui_platform.HasValue(), k_func, "no gui created")) return false;
@@ -506,6 +507,7 @@ static bool ClapGuiSetSize(clap_plugin_t const* plugin, u32 clap_width, u32 clap
 }
 
 static bool ClapGuiSetParent(clap_plugin_t const* plugin, clap_window_t const* window) {
+    ZoneScoped;
     if (PanicOccurred()) return false;
 
     try {
@@ -517,7 +519,6 @@ static bool ClapGuiSetParent(clap_plugin_t const* plugin, clap_window_t const* w
             f;
         });
         LogClapFunction(floe, ClapFunctionType::NonRecurring, k_func);
-        TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, window, k_func, "window is null")) return false;
         if (!Check(floe, window->ptr, k_func, "window ptr is null")) return false;
@@ -536,6 +537,7 @@ static bool ClapGuiSetParent(clap_plugin_t const* plugin, clap_window_t const* w
 }
 
 static bool ClapGuiSetTransient(clap_plugin_t const* plugin, clap_window_t const*) {
+    ZoneScoped;
     if (PanicOccurred()) return false;
 
     try {
@@ -556,6 +558,7 @@ static bool ClapGuiSetTransient(clap_plugin_t const* plugin, clap_window_t const
 }
 
 static void ClapGuiSuggestTitle(clap_plugin_t const* plugin, char const*) {
+    ZoneScoped;
     if (PanicOccurred()) return;
 
     try {
@@ -575,6 +578,7 @@ static void ClapGuiSuggestTitle(clap_plugin_t const* plugin, char const*) {
 }
 
 static bool ClapGuiShow(clap_plugin_t const* plugin) {
+    ZoneScoped;
     if (PanicOccurred()) return false;
 
     try {
@@ -586,7 +590,6 @@ static bool ClapGuiShow(clap_plugin_t const* plugin) {
             f;
         });
         LogClapFunction(floe, ClapFunctionType::NonRecurring, k_func);
-        TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return false;
         if (!Check(floe, floe.gui_platform.HasValue(), k_func, "no gui created")) return false;
@@ -608,6 +611,7 @@ static bool ClapGuiShow(clap_plugin_t const* plugin) {
 }
 
 static bool ClapGuiHide(clap_plugin_t const* plugin) {
+    ZoneScoped;
     if (PanicOccurred()) return false;
 
     try {
@@ -619,7 +623,6 @@ static bool ClapGuiHide(clap_plugin_t const* plugin) {
             f;
         });
         LogClapFunction(floe, ClapFunctionType::NonRecurring, k_func);
-        TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return false;
         if (!Check(floe, floe.gui_platform.HasValue(), k_func, "no gui created")) return false;
@@ -670,9 +673,13 @@ clap_plugin_gui const floe_gui {
     return true;
 }
 
-static u32 ClapParamsCount(clap_plugin_t const*) { return (u32)k_num_parameters; }
+static u32 ClapParamsCount(clap_plugin_t const*) {
+    ZoneScoped;
+    return (u32)k_num_parameters;
+}
 
 static bool ClapParamsGetInfo(clap_plugin_t const* plugin, u32 param_index, clap_param_info_t* param_info) {
+    ZoneScoped;
     if (PanicOccurred()) return false;
 
     try {
@@ -711,6 +718,7 @@ static bool ClapParamsGetInfo(clap_plugin_t const* plugin, u32 param_index, clap
 }
 
 static bool ClapParamsGetValue(clap_plugin_t const* plugin, clap_id param_id, f64* out_value) {
+    ZoneScoped;
     if (PanicOccurred()) return false;
 
     try {
@@ -752,6 +760,7 @@ static bool ClapParamsValueToText(clap_plugin_t const* plugin,
                                   f64 value,
                                   char* out_buffer,
                                   u32 out_buffer_capacity) {
+    ZoneScoped;
     if (PanicOccurred()) return false;
 
     try {
@@ -784,6 +793,7 @@ static bool ClapParamsTextToValue(clap_plugin_t const* plugin,
                                   clap_id param_id,
                                   char const* param_value_text,
                                   f64* out_value) {
+    ZoneScoped;
     if (PanicOccurred()) return false;
 
     try {
@@ -795,7 +805,6 @@ static bool ClapParamsTextToValue(clap_plugin_t const* plugin,
             f;
         });
         LogClapFunction(floe, ClapFunctionType::Any, k_func, "id: {}", param_id);
-        TRACE_CLAP_CALL(k_func);
 
         auto const opt_index = ParamIdToIndex(param_id);
         if (!opt_index) return false;
@@ -818,6 +827,7 @@ static bool ClapParamsTextToValue(clap_plugin_t const* plugin,
 // [active ? audio-thread : main-thread]
 static void
 ClapParamsFlush(clap_plugin_t const* plugin, clap_input_events_t const* in, clap_output_events_t const* out) {
+    ZoneScoped;
     if (PanicOccurred()) return;
 
     try {
@@ -830,7 +840,6 @@ ClapParamsFlush(clap_plugin_t const* plugin, clap_input_events_t const* in, clap
             f;
         });
         if (!floe.active) LogClapFunction(floe, ClapFunctionType::Any, k_func, "num in: {}", in->size(in));
-        TRACE_CLAP_CALL(k_func);
 
         if (!in) return;
         if (!out) return;
@@ -862,6 +871,7 @@ static constexpr clap_id k_input_port_id = 1;
 static constexpr clap_id k_output_port_id = 2;
 
 static u32 ClapAudioPortsCount(clap_plugin_t const* plugin, [[maybe_unused]] bool is_input) {
+    ZoneScoped;
     if (PanicOccurred()) return 0;
 
     try {
@@ -883,6 +893,7 @@ static u32 ClapAudioPortsCount(clap_plugin_t const* plugin, [[maybe_unused]] boo
 
 static bool
 ClapAudioPortsGet(clap_plugin_t const* plugin, u32 index, bool is_input, clap_audio_port_info_t* info) {
+    ZoneScoped;
     if (PanicOccurred()) return 0;
 
     try {
@@ -931,6 +942,7 @@ clap_plugin_audio_ports const floe_audio_ports {
 static constexpr clap_id k_main_note_port_id = 1; // never change this
 
 static u32 ClapNotePortsCount(clap_plugin_t const* plugin, bool is_input) {
+    ZoneScoped;
     if (PanicOccurred()) return 0;
 
     try {
@@ -952,6 +964,7 @@ static u32 ClapNotePortsCount(clap_plugin_t const* plugin, bool is_input) {
 
 static bool
 ClapNotePortsGet(clap_plugin_t const* plugin, u32 index, bool is_input, clap_note_port_info_t* info) {
+    ZoneScoped;
     if (PanicOccurred()) return 0;
 
     try {
@@ -984,6 +997,7 @@ clap_plugin_note_ports const floe_note_ports {
 };
 
 static void ClapThreadPoolExec(clap_plugin_t const* plugin, u32 task_index) {
+    ZoneScoped;
     if (PanicOccurred()) return;
 
     try {
@@ -992,7 +1006,6 @@ static void ClapThreadPoolExec(clap_plugin_t const* plugin, u32 task_index) {
             if (!Check(f, "thread_pool.exec", "plugin ptr is invalid")) return;
             f;
         });
-        TRACE_CLAP_CALL("thread_pool.exec");
 
         floe.engine->processor.processor_callbacks.on_thread_pool_exec(floe.engine->processor, task_index);
     } catch (PanicException) {
@@ -1004,6 +1017,7 @@ clap_plugin_thread_pool const floe_thread_pool {
 };
 
 static void ClapTimerSupportOnTimer(clap_plugin_t const* plugin, clap_id timer_id) {
+    ZoneScoped;
     if (PanicOccurred()) return;
 
     try {
@@ -1015,7 +1029,6 @@ static void ClapTimerSupportOnTimer(clap_plugin_t const* plugin, clap_id timer_i
             f;
         });
         LogClapFunction(floe, ClapFunctionType::Any, k_func);
-        TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return;
         if (!Check(floe, floe.initialised, k_func, "not initialised")) return;
@@ -1034,6 +1047,7 @@ clap_plugin_timer_support const floe_timer {
 };
 
 static void ClapFdSupportOnFd(clap_plugin_t const* plugin, int fd, clap_posix_fd_flags_t) {
+    ZoneScoped;
     if (PanicOccurred()) return;
 
     try {
@@ -1045,7 +1059,6 @@ static void ClapFdSupportOnFd(clap_plugin_t const* plugin, int fd, clap_posix_fd
             f;
         });
         LogClapFunction(floe, ClapFunctionType::Any, k_func);
-        TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return;
         if (!Check(floe, floe.initialised, k_func, "not initialised")) return;
@@ -1061,6 +1074,7 @@ clap_plugin_posix_fd_support const floe_posix_fd {
 
 FloeClapTestingExtension const floe_custom_ext {
     .state_change_is_pending = [](clap_plugin_t const* plugin) -> bool {
+        ZoneScoped;
         if (PanicOccurred()) return false;
 
         try {
@@ -1077,6 +1091,7 @@ FloeClapTestingExtension const floe_custom_ext {
 };
 
 static bool ClapInit(const struct clap_plugin* plugin) {
+    ZoneScoped;
     if (PanicOccurred()) return false;
 
     try {
@@ -1096,7 +1111,6 @@ static bool ClapInit(const struct clap_plugin* plugin) {
                         "{} {}",
                         floe.host.name,
                         floe.host.version);
-        TRACE_CLAP_CALL(k_func);
 
         if (floe.initialised) return true;
 
@@ -1143,6 +1157,7 @@ static bool ClapActivate(const struct clap_plugin* plugin,
                          double sample_rate,
                          uint32_t min_frames_count,
                          uint32_t max_frames_count) {
+    ZoneScoped;
     if (PanicOccurred()) return false;
 
     try {
@@ -1153,7 +1168,6 @@ static bool ClapActivate(const struct clap_plugin* plugin,
             f;
         });
         LogClapFunction(floe, ClapFunctionType::NonRecurring, k_func);
-        TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, floe.initialised, k_func, "not initialised")) return false;
         if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return false;
@@ -1176,6 +1190,7 @@ static bool ClapActivate(const struct clap_plugin* plugin,
 }
 
 static void ClapDeactivate(const struct clap_plugin* plugin) {
+    ZoneScoped;
     if (PanicOccurred()) return;
 
     try {
@@ -1186,7 +1201,6 @@ static void ClapDeactivate(const struct clap_plugin* plugin) {
             f;
         });
         LogClapFunction(floe, ClapFunctionType::NonRecurring, k_func);
-        TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, floe.initialised, k_func, "not initialised")) return;
         if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return;
@@ -1201,6 +1215,7 @@ static void ClapDeactivate(const struct clap_plugin* plugin) {
 }
 
 static void ClapDestroy(const struct clap_plugin* plugin) {
+    ZoneScoped;
     if (PanicOccurred()) return;
 
     try {
@@ -1211,7 +1226,6 @@ static void ClapDestroy(const struct clap_plugin* plugin) {
             f;
         });
         LogClapFunction(floe, ClapFunctionType::NonRecurring, k_func);
-        TRACE_CLAP_CALL(k_func);
 
         if (floe.initialised) {
             if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return;
@@ -1237,6 +1251,7 @@ static void ClapDestroy(const struct clap_plugin* plugin) {
 }
 
 static bool ClapStartProcessing(const struct clap_plugin* plugin) {
+    ZoneScoped;
     if (PanicOccurred()) return false;
 
     try {
@@ -1246,7 +1261,6 @@ static bool ClapStartProcessing(const struct clap_plugin* plugin) {
             if (!Check(f, k_func, "plugin ptr is invalid")) return false;
             f;
         });
-        TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, IsAudioThread(floe.host) != IsAudioThreadResult::No, k_func, "not audio thread"))
             return false;
@@ -1265,6 +1279,7 @@ static bool ClapStartProcessing(const struct clap_plugin* plugin) {
 }
 
 static void ClapStopProcessing(const struct clap_plugin* plugin) {
+    ZoneScoped;
     if (PanicOccurred()) return;
 
     try {
@@ -1274,7 +1289,6 @@ static void ClapStopProcessing(const struct clap_plugin* plugin) {
             if (!Check(f, k_func, "plugin ptr is invalid")) return;
             f;
         });
-        TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, IsAudioThread(floe.host) != IsAudioThreadResult::No, k_func, "not audio thread"))
             return;
@@ -1299,7 +1313,6 @@ static void ClapReset(const struct clap_plugin* plugin) {
             if (!Check(f, k_func, "plugin ptr is invalid")) return;
             f;
         });
-        TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, IsAudioThread(floe.host) != IsAudioThreadResult::No, k_func, "not audio thread"))
             return;
@@ -1312,6 +1325,7 @@ static void ClapReset(const struct clap_plugin* plugin) {
 }
 
 static clap_process_status ClapProcess(const struct clap_plugin* plugin, clap_process_t const* process) {
+    ZoneScoped;
     if (PanicOccurred()) return CLAP_PROCESS_ERROR;
 
     try {
@@ -1321,7 +1335,6 @@ static clap_process_status ClapProcess(const struct clap_plugin* plugin, clap_pr
             if (!Check(f, k_func, "plugin ptr is invalid")) return CLAP_PROCESS_ERROR;
             f;
         });
-        TRACE_CLAP_CALL(k_func);
 
         ZoneKeyNum("instance", floe.index);
         ZoneKeyNum("events", process->in_events->size(process->in_events));
@@ -1344,6 +1357,7 @@ static clap_process_status ClapProcess(const struct clap_plugin* plugin, clap_pr
 }
 
 static void const* ClapGetExtension(const struct clap_plugin* plugin, char const* id) {
+    ZoneScoped;
     if (PanicOccurred()) return nullptr;
 
     try {
@@ -1354,7 +1368,6 @@ static void const* ClapGetExtension(const struct clap_plugin* plugin, char const
             f;
         });
         LogClapFunction(floe, ClapFunctionType::Any, k_func, "id: {}", id);
-        TRACE_CLAP_CALL(k_func);
         if (!Check(id, k_func, "id is null")) return nullptr;
 
         if (NullTermStringsEqual(id, CLAP_EXT_STATE)) return &floe_plugin_state;
@@ -1373,6 +1386,7 @@ static void const* ClapGetExtension(const struct clap_plugin* plugin, char const
 }
 
 static void ClapOnMainThread(const struct clap_plugin* plugin) {
+    ZoneScoped;
     if (PanicOccurred()) return;
 
     try {
@@ -1383,7 +1397,6 @@ static void ClapOnMainThread(const struct clap_plugin* plugin) {
             f;
         });
         LogClapFunction(floe, ClapFunctionType::Any, k_func);
-        TRACE_CLAP_CALL(k_func);
 
         if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return;
 
@@ -1414,6 +1427,7 @@ clap_plugin const floe_plugin {
 };
 
 clap_plugin const* CreateFloeInstance(clap_host const* host) {
+    ZoneScoped;
     if (!Check(host, "create_plugin", "host is null")) return nullptr;
     Optional<FloeInstanceIndex> index {};
     for (auto [i, instance] : Enumerate<FloeInstanceIndex>(g_floe_instances)) {
@@ -1430,6 +1444,7 @@ clap_plugin const* CreateFloeInstance(clap_host const* host) {
 }
 
 void OnPollThread(FloeInstanceIndex index) {
+    ZoneScoped;
     if (PanicOccurred()) return;
     // We're on the polling thread, but we can be sure that the engine is active because our
     // Register/Unregister calls are correctly before/after.
@@ -1439,6 +1454,7 @@ void OnPollThread(FloeInstanceIndex index) {
 }
 
 void OnPreferenceChanged(FloeInstanceIndex index, prefs::Key const& key, prefs::Value const* value) {
+    ZoneScoped;
     if (PanicOccurred()) return;
     auto& floe = *g_floe_instances[index];
     ASSERT(IsMainThread(floe.host));

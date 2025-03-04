@@ -112,10 +112,6 @@ PUBLIC void TracyMessageEx(TracyMessageConfig config, String format, Args const&
     TracyMessageC(msg.data, msg.size, config.colour);
 }
 
-#define ZoneScopedMessage(config, format, ...)                                                               \
-    TracyMessageEx(config, format, ##__VA_ARGS__);                                                           \
-    ZoneScopedN(format)
-
 #define ZoneKeyNum(key, num)                                                                                 \
     do {                                                                                                     \
         if constexpr (k_tracy_enable) {                                                                      \

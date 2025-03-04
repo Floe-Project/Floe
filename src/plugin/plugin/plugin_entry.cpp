@@ -7,6 +7,7 @@
 #include "utils/debug/tracy_wrapped.hpp"
 #include "utils/logger/logger.hpp"
 
+#include "common_infrastructure/final_binary_type.hpp"
 #include "common_infrastructure/global.hpp"
 
 #include "clap/factory/plugin-factory.h"

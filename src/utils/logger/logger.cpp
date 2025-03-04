@@ -182,6 +182,12 @@ void Log(ModuleName module_name, LogLevel level, FunctionRef<ErrorCodeOr<void>(W
         g_message_ring_buffer.Write(message);
     }
 
+    if (level == LogLevel::Debug) {
+        DynamicArrayBounded<char, Kb(8)> message;
+        auto const o = write_message(dyn::WriterFor(message));
+        if (o.Succeeded()) TracyMessage(message.data, message.size);
+    }
+
     // For debugging purposes, we also log to a file or stderr.
     if constexpr (!PRODUCTION_BUILD) {
         static auto log_to_stderr =

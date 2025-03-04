@@ -3,6 +3,7 @@
 
 #pragma once
 #include "foundation/foundation.hpp"
+#include "utils/debug/tracy_wrapped.hpp"
 
 #include "fonts.hpp"
 #include "gui/gui_drawing_helpers.hpp"
@@ -181,6 +182,7 @@ PUBLIC void AddPanel(GuiBoxSystem& box_system, Panel panel) {
 }
 
 PUBLIC void Run(GuiBoxSystem& builder, Panel* panel) {
+    ZoneScoped;
     if (!panel) return;
 
     switch (panel->data.tag) {
@@ -239,19 +241,28 @@ PUBLIC void Run(GuiBoxSystem& builder, Panel* panel) {
         dyn::Clear(builder.boxes);
         dyn::Clear(builder.word_wrapped_texts);
 
-        builder.box_counter = 0;
-        builder.state = GuiBoxSystem::State::LayoutBoxes;
-        panel->run(builder);
+        {
+            ZoneNamedN(prof1, "Box system: create layout", true);
+            builder.box_counter = 0;
+            builder.state = GuiBoxSystem::State::LayoutBoxes;
+            panel->run(builder);
+        }
 
         builder.layout.item_height_from_width_calculation = [&builder](layout::Id id, f32 width) {
             return HeightOfWrappedText(builder, id, width);
         };
 
-        layout::RunContext(builder.layout);
+        {
+            ZoneNamedN(prof2, "Box system: calculate layout", true);
+            layout::RunContext(builder.layout);
+        }
 
-        builder.box_counter = 0;
-        builder.state = GuiBoxSystem::State::HandleInputAndRender;
-        panel->run(builder);
+        {
+            ZoneNamedN(prof3, "Box system: handle input and render", true);
+            builder.box_counter = 0;
+            builder.state = GuiBoxSystem::State::HandleInputAndRender;
+            panel->run(builder);
+        }
     }
 
     // Fill in the rect of new panels so we can reuse the layout system.
@@ -365,6 +376,7 @@ struct BoxConfig {
 };
 
 static bool Tooltip(GuiBoxSystem& builder, imgui::Id id, Rect r, String str) {
+    ZoneScoped;
     if (!builder.show_tooltips) return false;
 
     auto& imgui = builder.imgui;

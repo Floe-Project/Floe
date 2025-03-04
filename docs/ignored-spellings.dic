@@ -2,18 +2,25 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 10px
+15px
+16px
 1rem
 20milestone
 20px
 20state
+2px
 2rem
 30px
+32px
 3Aissue
 3Aopen
 3Av1
 3rem
+3s
 40px
 4px
+555e85
+5px
 7HEJ7SF75K
 80s
 AAX
@@ -155,6 +162,7 @@ preprocessor
 relicense
 resizable
 retriggered
+rgba
 roadmap
 s3a2
 shouldn

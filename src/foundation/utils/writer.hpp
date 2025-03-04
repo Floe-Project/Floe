@@ -77,6 +77,11 @@ struct BufferedWriter {
 
     void Reset() { end = 0; }
 
+    void FlushReset() {
+        auto _ = Flush();
+        Reset();
+    }
+
     ::Writer Writer() {
         ::Writer result;
         result.Set<BufferedWriter>(*this,

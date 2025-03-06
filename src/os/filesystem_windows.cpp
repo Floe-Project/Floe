@@ -1139,6 +1139,12 @@ ErrorCodeOr<Span<MutableString>> FilesystemDialogInternal(DialogArguments args) 
         HRESULT_TRY(f->SetTitle(wide_title.data));
     }
 
+    {
+        DWORD flags = 0;
+        HRESULT_TRY(f->GetOptions(&flags));
+        HRESULT_TRY(f->SetOptions(flags | FOS_FORCEFILESYSTEM));
+    }
+
     if (args.type == DialogArguments::Type::SelectFolder) {
         DWORD flags = 0;
         HRESULT_TRY(f->GetOptions(&flags));

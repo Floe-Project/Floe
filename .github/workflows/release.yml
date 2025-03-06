@@ -101,7 +101,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          sparse-checkout: version.txt
+          fetch-depth: 0
 
       - uses: taiki-e/install-action@just
 
@@ -136,7 +136,7 @@ jobs:
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
         with:
           environment: production
-          version: v${{ env.VERSION }}
+          release: v${{ env.VERSION }}
 
       - if: '!cancelled()'
         run: |

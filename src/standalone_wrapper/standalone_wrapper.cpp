@@ -609,9 +609,8 @@ static ErrorCodeOr<void> Main(String exe_path_rel) {
                             physical_pixels.height);
         }
 
-        auto const st = puglUpdate(standalone.gui_world, 0);
+        auto const st = puglUpdate(standalone.gui_world, 1.0 / 60.0);
         if (st != PUGL_SUCCESS && st != PUGL_FAILURE) return ErrorCode {st};
-        SleepThisThread(8);
     }
 
     gui->destroy(&standalone.plugin);

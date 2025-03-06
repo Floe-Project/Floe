@@ -46,7 +46,7 @@ struct LogRingBuffer {
 
         // if there's no room for this message, we remove the oldest messages until there is room
         while (true) {
-            auto const used = (u32)write - (u32)read;
+            auto const used = (decltype(write))(write - read);
             ASSERT_HOT(used <= buffer.size);
             auto const remaining = buffer.size - used;
             // we need the extra byte for prefixing the message with its size

@@ -41,7 +41,7 @@ struct LogRingBuffer {
         if (message.size > k_max_message_size) [[unlikely]]
             message.size = FindUtf8TruncationPoint(message, k_max_message_size);
 
-        mutex.Lock();
+        if (!mutex.Lock(2000u)) throw PanicException {};
         DEFER { mutex.Unlock(); };
 
         // if there's no room for this message, we remove the oldest messages until there is room

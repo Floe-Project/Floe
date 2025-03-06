@@ -394,8 +394,10 @@ struct MutexThin {
 
     Atomic<u32> state = k_unlocked;
 
-    void Lock() {
-        if (!TryLock()) LockSlow();
+    // Returns false if timed out.
+    bool Lock(Optional<u32> timeout_ms = {}) {
+        if (!TryLock()) return LockSlow(timeout_ms);
+        return true;
     }
 
     bool TryLock() {
@@ -406,11 +408,16 @@ struct MutexThin {
                                          LoadMemoryOrder::Relaxed);
     }
 
-    void LockSlow() {
-        if (state.Load(LoadMemoryOrder::Relaxed) == k_contended) WaitIfValueIsExpected(state, k_contended);
+    // Returns false if timed out.
+    bool LockSlow(Optional<u32> timeout_ms = {}) {
+        if (state.Load(LoadMemoryOrder::Relaxed) == k_contended) {
+            if (WaitIfValueIsExpected(state, k_contended, timeout_ms) == WaitResult::TimedOut) return false;
+        }
 
         while (state.Exchange(k_contended, RmwMemoryOrder::Acquire) != k_unlocked)
-            WaitIfValueIsExpected(state, k_contended);
+            if (WaitIfValueIsExpected(state, k_contended, timeout_ms) == WaitResult::TimedOut) return false;
+
+        return true;
     }
 
     void Unlock() {

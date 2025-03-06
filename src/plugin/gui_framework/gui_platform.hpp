@@ -525,6 +525,7 @@ static bool EventText(GuiPlatform& platform, PuglTextEvent const& text_event) {
 }
 
 static void CreateGraphicsContext(GuiPlatform& platform) {
+    ZoneScoped;
     auto graphics_ctx = graphics::CreateNewDrawContext();
     auto const outcome = graphics_ctx->CreateDeviceObjects((void*)puglGetNativeView(platform.view));
     if (outcome.HasError()) {
@@ -536,6 +537,7 @@ static void CreateGraphicsContext(GuiPlatform& platform) {
 }
 
 static void DestroyGraphicsContext(GuiPlatform& platform) {
+    ZoneScoped;
     if (platform.graphics_ctx) {
         platform.graphics_ctx->DestroyDeviceObjects();
         platform.graphics_ctx->fonts.Clear();

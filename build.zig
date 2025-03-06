@@ -600,10 +600,12 @@ pub const WindowsCodeSignStep = struct {
 
 pub fn addWindowsCodeSignStep(
     context: *BuildContext,
+    target: std.Build.ResolvedTarget,
     file_path: []const u8,
     description: []const u8,
 ) ?*std.Build.Step {
     if (context.build_mode != .production) return null;
+    if (target.result.os.tag != .windows) return null;
 
     const cs_step = context.b.allocator.create(WindowsCodeSignStep) catch @panic("OOM");
     cs_step.* = WindowsCodeSignStep{
@@ -2044,6 +2046,7 @@ pub fn build(b: *std.Build) void {
 
             const sign_step = addWindowsCodeSignStep(
                 &build_context,
+                target,
                 b.getInstallPath(install_dir, packager.out_filename),
                 "Floe library packager",
             );
@@ -2102,6 +2105,7 @@ pub fn build(b: *std.Build) void {
 
             const sign_step = addWindowsCodeSignStep(
                 &build_context,
+                target,
                 b.getInstallPath(install_dir, clap.name),
                 "Floe CLAP Plugin",
             );
@@ -2593,6 +2597,7 @@ pub fn build(b: *std.Build) void {
 
             const sign_step = addWindowsCodeSignStep(
                 &build_context,
+                target,
                 b.getInstallPath(install_dir, vst3.name),
                 "Floe VST3 Plugin",
             );
@@ -2916,6 +2921,7 @@ pub fn build(b: *std.Build) void {
 
                 const sign_step = addWindowsCodeSignStep(
                     &build_context,
+                    target,
                     b.getInstallPath(install_dir, win_uninstaller.out_filename),
                     "Floe Uninstaller",
                 );

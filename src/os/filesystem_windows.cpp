@@ -1064,9 +1064,7 @@ ErrorCodeOr<Optional<Entry>> Next(Iterator& it, ArenaAllocator& result_arena) {
 //
 // ==========================================================================================================
 
-ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments args) {
-    auto const com_library_usage = TRY(ScopedWin32ComUsage::Create());
-
+ErrorCodeOr<Span<MutableString>> FilesystemDialogInternal(DialogArguments args) {
     auto const ids = ({
         struct Ids {
             IID rclsid;
@@ -1089,8 +1087,9 @@ ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments args) {
         i;
     });
 
-    IFileDialog* f;
-    HRESULT_TRY(CoCreateInstance(ids.rclsid, nullptr, CLSCTX_ALL, ids.riid, reinterpret_cast<void**>(&f)));
+    IFileDialog* f {};
+    HRESULT_TRY(CoCreateInstance(ids.rclsid, nullptr, CLSCTX_ALL, ids.riid, (void**)&f));
+    ASSERT(f);
     DEFER { f->Release(); };
 
     if (args.default_path) {
@@ -1105,6 +1104,7 @@ ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments args) {
             Replace(dir, L'/', L'\\');
             IShellItem* item = nullptr;
             HRESULT_TRY(SHCreateItemFromParsingName(dir.data, nullptr, IID_PPV_ARGS(&item)));
+            ASSERT(item);
             DEFER { item->Release(); };
 
             constexpr bool k_forced_default_folder = true;
@@ -1154,7 +1154,10 @@ ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments args) {
         HRESULT_TRY(f->SetOptions(flags | FOS_ALLOWMULTISELECT));
     }
 
-    if (auto hr = f->Show((HWND)args.parent_window); hr != S_OK) {
+    auto const parent_hwnd = (HWND)args.parent_window;
+    if (parent_hwnd) ASSERT(IsWindow(parent_hwnd));
+
+    if (auto hr = f->Show(parent_hwnd); hr != S_OK) {
         if (hr == HRESULT_FROM_WIN32(ERROR_CANCELLED)) return Span<MutableString> {};
         return FilesystemWin32ErrorCode(HresultToWin32(hr), "Show()");
     }
@@ -1194,6 +1197,84 @@ ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments args) {
             result[item_index] = TRY(utf8_path_from_shell_item(p_item));
         }
         return result;
+    }
+}
+
+ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments args) {
+    // COM initialization is confusing. To help clear things up:
+    // - "Apartment" is a term used in COM to describe a threading isolation model.
+    // - CoInitializeEx sets the apartment model for the calling thread.
+    // - COINIT_APARTMENTTHREADED (0x2) creates a Single-Threaded Apartment (STA):
+    //   - Objects can only be accessed by the thread that created them
+    //   - COM provides message pumping infrastructure (but you still need a message loop)
+    //   - Access from other threads is marshaled through the message queue
+    // - COINIT_MULTITHREADED (0x0) creates a Multi-Threaded Apartment (MTA):
+    //   - Objects can be accessed by any thread in the MTA
+    //   - No automatic message marshaling or pumping
+    //   - Objects must implement their own thread synchronization
+    // - UI components like dialogs require a message pump, so they must be used in an STA.
+    //   Microsoft states:
+    //     "Note: The multi-threaded apartment is intended for use by non-GUI threads. Threads in
+    //     multi-threaded apartments should not perform UI actions. This is because UI threads require a
+    //     message pump, and COM does not pump messages for threads in a multi-threaded apartment."
+    //   By "multi-threaded apartment" they mean COINIT_MULTITHREADED.
+    //
+    // Conclusion: For UI components like IFileDialog, initialize COM with COINIT_APARTMENTTHREADED. If your
+    // thread is already initialized with COINIT_MULTITHREADED, you'll need to create a new thread with
+    // to use UI components.
+    //
+    // As an audio plugin, we can't know for sure the state of COM when we're called.
+
+    if (auto const hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+        SUCCEEDED(hr)) {
+        // Either we set up COM ourselves, or it was already initialised with the same mode. Either way, we
+        // should call CoUninitialize() later.
+        DEFER { CoUninitialize(); };
+        return FilesystemDialogInternal(args);
+    } else {
+        LogWarning(ModuleName::Filesystem, "{} fallback COM init", __FUNCTION__);
+        // We do not have COINIT_APARTMENTTHREADED, so we must create a new thread with that mode and run the
+        // dialog there.
+        struct Context {
+            DialogArguments const& args;
+            ErrorCodeOr<Span<MutableString>> result;
+        };
+        Context context {.args = args};
+        auto thread = CreateThread(
+            nullptr,
+            0,
+            [](void* p) -> DWORD {
+                auto& context = *(Context*)p;
+
+                auto const hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+                ASSERT(SUCCEEDED(hr), "new thread couldn't initialize COM");
+                DEFER { CoUninitialize(); };
+
+                context.result = FilesystemDialogInternal(context.args);
+                return 0;
+            },
+            &context,
+            0,
+            nullptr);
+        ASSERT(thread);
+
+        // IFileDialog::Show() will block infinitely because it needs us to handle messages for our
+        // window (WM_SHOWWINDOW for example). We need to pump those messages here.
+        do {
+            MSG msg;
+            while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
+                LogDebug(ModuleName::Filesystem,
+                         "{} pumping message: 0x{x}, for us: {}",
+                         __FUNCTION__,
+                         msg.message,
+                         msg.hwnd == (HWND)args.parent_window);
+                TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
+        } while (WaitForSingleObject(thread, 10) == WAIT_TIMEOUT);
+
+        CloseHandle(thread);
+        return context.result;
     }
 }
 

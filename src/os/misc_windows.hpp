@@ -24,27 +24,3 @@ inline ErrorCode HresultErrorCode(HRESULT hr,
                                   SourceLocation source_location = SourceLocation::Current()) {
     return Win32ErrorCode(HresultToWin32(hr), info_for_developer, source_location);
 }
-
-class ScopedWin32ComUsage {
-  public:
-    static ErrorCodeOr<ScopedWin32ComUsage> Create() {
-        auto const hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-        if (hr != S_OK && hr != S_FALSE && hr != RPC_E_CHANGED_MODE) {
-            ASSERT(hr != E_INVALIDARG);
-            return HresultErrorCode(hr, "CoInitializeEx");
-        }
-        return ScopedWin32ComUsage(true);
-    }
-
-    NON_COPYABLE(ScopedWin32ComUsage);
-
-    ~ScopedWin32ComUsage() {
-        if (m_init) CoUninitialize();
-    }
-
-    ScopedWin32ComUsage(ScopedWin32ComUsage&& other) { Swap(m_init, other.m_init); }
-
-  private:
-    ScopedWin32ComUsage(bool init = false) : m_init(init) {}
-    bool m_init {};
-};

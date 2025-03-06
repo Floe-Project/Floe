@@ -492,8 +492,14 @@ static void WindowsShellExecute(String arg) {
             [wide_arg = wide_arg.ToOwnedSpan()]() mutable {
                 try {
                     DEFER { Malloc::Instance().Free(wide_arg.ToByteSpan()); };
-                    if (auto scoped_com = ScopedWin32ComUsage::Create(); scoped_com.HasValue())
-                        ShellExecuteW(nullptr, L"open", wide_arg.data, nullptr, nullptr, SW_SHOW);
+
+                    auto const com_init_hr =
+                        CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+                    DEFER {
+                        if (SUCCEEDED(com_init_hr)) CoUninitialize();
+                    };
+
+                    ShellExecuteW(nullptr, L"open", wide_arg.data, nullptr, nullptr, SW_SHOW);
                 } catch (PanicException) {
                     // pass
                 }
@@ -564,13 +570,4 @@ TEST_CASE(TestWindowsErrors) {
     return k_success;
 }
 
-TEST_CASE(TestScopedWin32ComUsage) {
-    auto com_lib1 = ScopedWin32ComUsage::Create();
-    { auto com_lib2 = ScopedWin32ComUsage::Create(); }
-    return k_success;
-}
-
-TEST_REGISTRATION(RegisterWindowsSpecificTests) {
-    REGISTER_TEST(TestScopedWin32ComUsage);
-    REGISTER_TEST(TestWindowsErrors);
-}
+TEST_REGISTRATION(RegisterWindowsSpecificTests) { REGISTER_TEST(TestWindowsErrors); }

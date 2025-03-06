@@ -792,8 +792,6 @@ ErrorCodeOr<String> TrashFileOrDirectory(String path, Allocator&) {
     ASSERT(IsValidUtf8(path));
     ASSERT(path::IsAbsolute(path));
 
-    auto const com_library_usage = TRY(ScopedWin32ComUsage::Create());
-
     PathArena temp_path_arena {Malloc::Instance()};
     DynamicArray<WCHAR> wide_path {temp_path_arena};
     WidenAppend(wide_path, path);

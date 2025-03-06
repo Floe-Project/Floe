@@ -62,6 +62,13 @@ void ResetPanic() { g_panic_occurred.Store(false, StoreMemoryOrder::Release); }
         }
         default: {
             auto _ = StdPrint(StdStream::Err, "Panic occurred while handling a panic, aborting\n");
+            if constexpr (IS_WINDOWS) {
+                // TODO: we do a null dereference here to trigger the windows vectored exception handler. This
+                // is a workaround because we don't have a signal handler installed on Windows and therefore
+                // SIGABRT is not caught. We should installer a signal handler on Windows.
+                int* pointer = nullptr;
+                *pointer = 42;
+            }
             __builtin_abort();
             break;
         }

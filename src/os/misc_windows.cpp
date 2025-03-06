@@ -273,6 +273,10 @@ static void* g_exception_handler = nullptr;
 static CrashHookFunction g_crash_hook {};
 static CountedInitFlag g_crash_hook_init_flag {};
 
+// TODO: we need to support signal handling as well.
+// On Windows, vectored exception handlers are called for some hardware exceptions and win32 exceptions
+// (RaiseException, SEH). For example, a null pointer dereference will trigger this exception. However, we
+// should also handle signals like SIGABRT, SIGSEGV, etc.
 void BeginCrashDetection(CrashHookFunction hook) {
     CountedInit(g_crash_hook_init_flag, [hook]() {
         g_crash_hook = hook;

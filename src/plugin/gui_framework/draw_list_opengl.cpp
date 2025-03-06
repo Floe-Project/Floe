@@ -48,8 +48,9 @@ static constexpr ErrorCodeCategory k_gl_error_category {
 
 ErrorCodeOr<void> CheckGLError(String function) {
     ErrorCodeOr<void> err {};
-    GLenum gl_err;
-    while ((gl_err = glGetError()) != GL_NO_ERROR) {
+    for (auto const _ : Range(20)) {
+        auto const gl_err = glGetError();
+        if (gl_err == GL_NO_ERROR) break;
         err = ErrorCode(k_gl_error_category, gl_err);
         LogDebug(ModuleName::Gui, "GL Error: {}: {}", function, err.Error());
     }

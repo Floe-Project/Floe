@@ -644,13 +644,16 @@ fn performWindowsCodeSign(step: *std.Build.Step, prog_node: std.Progress.Node) !
         std.log.err("missing WINDOWS_CODESIGN_CERT_PFX environment variable", .{});
         return error.MissingEnvironmentVariable;
     };
-    defer b.allocator.free(cert_pfx);
+
+    if (cert_pfx.len == 0) {
+        std.log.err("WINDOWS_CODESIGN_CERT_PFX environment variable is empty", .{});
+        return error.MissingEnvironmentVariable;
+    }
 
     const cert_password = b.graph.env_map.get("WINDOWS_CODESIGN_CERT_PFX_PASSWORD") orelse {
         std.log.err("missing WINDOWS_CODESIGN_CERT_PFX_PASSWORD environment variable", .{});
         return error.MissingEnvironmentVariable;
     };
-    defer b.allocator.free(cert_password);
 
     // Create cert file if it doesn't exist
     const cert_file_path = try std.fs.path.join(

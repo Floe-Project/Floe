@@ -375,7 +375,8 @@ static PuglStatus OnEvent(PuglView* view, PuglEvent const* event) {
             break;
         }
         case PUGL_CONFIGURE: {
-            if (event->configure.style & PUGL_VIEW_STYLE_MAPPED) {
+            if (event->configure.style & PUGL_VIEW_STYLE_MAPPED &&
+                event->configure.style & PUGL_VIEW_STYLE_RESIZING) {
                 LogDebug(ModuleName::Standalone, "PUGL: {}", fmt::DumpStruct(event->configure));
                 auto gui = (clap_plugin_gui const*)p.plugin.get_extension(&p.plugin, CLAP_EXT_GUI);
                 ASSERT(gui);

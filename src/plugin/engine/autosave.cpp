@@ -51,7 +51,6 @@ static ErrorCodeOr<void> CleanupExcessInstanceAutosaves(AutosaveState const& sta
     for (auto i : Range(excess_count)) {
         auto const path =
             path::Join(scratch_arena, Array {paths.autosave_path, entries_with_times[i].entry->subpath});
-        LogDebug(ModuleName::Main, "Deleting excess autosave: {}", path);
         DEFER { scratch_arena.Free(path.ToByteSpan()); };
         auto _ = Delete(path, {.type = DeleteOptions::Type::File, .fail_if_not_exists = false});
     }
@@ -159,7 +158,6 @@ void InitAutosaveState(AutosaveState& state,
 
 void AutosaveToFileIfNeeded(AutosaveState& state, FloePaths const& paths) {
     ZoneScoped;
-    LogDebug(ModuleName::Main, "AutosaveToFileIfNeeded");
     Optional<StateSnapshot> snapshot {};
     {
         state.mutex.Lock();
@@ -275,7 +273,6 @@ bool AutosaveNeeded(AutosaveState const& state, prefs::Preferences const& prefer
 
 void QueueAutosave(AutosaveState& state, StateSnapshot const& snapshot) {
     ZoneScoped;
-    LogDebug(ModuleName::Main, "QueueAutosave");
     state.mutex.Lock();
     DEFER { state.mutex.Unlock(); };
     switch (state.state) {

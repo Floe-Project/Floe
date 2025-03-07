@@ -361,6 +361,18 @@ PUBLIC ErrorCodeOr<void> ValueToString(Writer writer, T const& value, FormatOpti
         return k_success;
     }
 
+    else if constexpr (Vector<Type>) {
+        ASSERT(options.required_width == 0); // IMPROVE: support width option
+        constexpr auto k_num_elements = NumVectorElements<Type>();
+        TRY(writer.WriteChar('('));
+        for (auto const i : Range(k_num_elements)) {
+            TRY(ValueToString(writer, value[i], options));
+            if (i != k_num_elements - 1) TRY(writer.WriteChars(", "_s));
+        }
+        TRY(writer.WriteChar(')'));
+        return k_success;
+    }
+
     else if constexpr (TypeWithCustomValueToString<Type>)
         return CustomValueToString(writer, value, options);
 

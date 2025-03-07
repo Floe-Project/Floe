@@ -1161,6 +1161,7 @@ TEST_CASE(TestPreferences) {
             {SectionedKey {.section = key::section::k_cc_to_param_id_map_section, .key = (s64)10}, (s64)3},
             {SectionedKey {.section = key::section::k_cc_to_param_id_map_section, .key = (s64)10}, (s64)4},
             {"unknown_key"_s, "unknown value"_s},
+            {"unknown_key"_s, "unknown value"_s},
             {key::k_extra_libraries_folder, ROOT "Libraries"_s},
             {key::k_extra_libraries_folder, ROOT "Floe Libraries"_s},
             {key::k_extra_presets_folder, ROOT "Projects/Test"_s},
@@ -1182,7 +1183,8 @@ TEST_CASE(TestPreferences) {
             CAPTURE(kv.key);
             DynamicArrayBounded<ValueUnion, 4> expected_values;
             for (auto const& other_kv : keyvals)
-                if (kv.key == other_kv.key) dyn::Append(expected_values, other_kv.value);
+                if (kv.key == other_kv.key && kv.value != other_kv.value)
+                    dyn::Append(expected_values, other_kv.value);
 
             auto value_list = LookupValues(prefs, kv.key);
             REQUIRE(value_list);

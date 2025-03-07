@@ -842,15 +842,14 @@ void AddValue(Preferences& preferences,
 
 bool RemoveValue(Preferences& prefs, Key const& key, ValueUnion const& value, RemoveValueOptions options) {
     ASSERT(IsKeyValid(key));
-    auto const existing_values_ptr = prefs.Find(key);
-    if (!existing_values_ptr) return false;
-    auto& existing_values = *existing_values_ptr;
+    auto const existing_element = prefs.FindElement(key);
+    if (!existing_element) return false;
+    auto& existing_values = existing_element->data;
 
     bool removed = false;
-    bool single_value = existing_values->next == nullptr;
     SinglyLinkedListRemoveIf(
         existing_values,
-        [&](Value const& node) { return node == value; },
+        [&](ValueUnion const& node) { return node == value; },
         [&](Value* node) {
             FreeValueUnion(*node, prefs.path_pool);
             AddValueToFreeList(prefs, node);
@@ -858,9 +857,9 @@ bool RemoveValue(Preferences& prefs, Key const& key, ValueUnion const& value, Re
         });
 
     if (removed && !options.dont_track_changes) {
-        if (single_value) {
+        if (existing_values == nullptr) {
             FreeKey(key, prefs.path_pool);
-            prefs.Delete(key);
+            prefs.DeleteElement(existing_element);
             MarkChanged(prefs, key, nullptr);
         } else {
             MarkChanged(prefs, key, existing_values);

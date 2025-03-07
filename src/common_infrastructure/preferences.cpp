@@ -584,6 +584,7 @@ template <typename Type>
 static usize GetValuesTemplate(PreferencesTable const& table, Descriptor const& descriptor, Span<Type> out) {
     auto const v_ptr = table.Find(descriptor.key);
     if (!v_ptr) return 0;
+    if (!*v_ptr) return 0;
     auto const& v = **v_ptr;
 
     usize pos = 0;

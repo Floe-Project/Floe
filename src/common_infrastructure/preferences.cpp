@@ -803,9 +803,11 @@ bool AddValue(Preferences& prefs, Key const& key, ValueUnion const& value, SetVa
     auto existing_values_ptr = prefs.Find(key);
     if (existing_values_ptr) {
         auto const existing_values = *existing_values_ptr;
+        for (auto v = existing_values; v; v = v->next)
+            if (*v == value) return false;
         auto last = existing_values;
         for (; last->next; last = last->next)
-            if (*last->next == value) return false;
+            if (*last == value) return false;
         ASSERT(last->next == nullptr);
 
         last->next = AllocateValue(prefs, CloneValueUnion(value, prefs.path_pool, prefs.arena));

@@ -387,9 +387,10 @@ static bool ClapGuiGetSize(clap_plugin_t const* plugin, u32* width, u32* height)
         if (!Check(floe, floe.gui_platform.HasValue(), k_func, "no gui created")) return false;
 
         auto const size = GetSize(*floe.gui_platform);
+        auto const clap_size = PhysicalPixelsToClapPixels(floe.gui_platform->view, size);
 
-        if (width) *width = size.width;
-        if (height) *height = size.height;
+        if (width) *width = clap_size.width;
+        if (height) *height = clap_size.height;
         return true;
     } catch (PanicException) {
         return false;

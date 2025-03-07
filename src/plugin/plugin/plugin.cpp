@@ -1496,13 +1496,14 @@ void OnPreferenceChanged(FloeInstanceIndex index, prefs::Key const& key, prefs::
 
     if (floe.gui_platform) {
         if (auto const width = prefs::MatchInt(key, value, SettingDescriptor(GuiSetting::WindowWidth))) {
-            auto const current_size = GetSize(*floe.gui_platform);
-            if (current_size.width != *width) {
+            auto const current_width = GetSize(*floe.gui_platform).width;
+            if (current_width != *width) {
                 if (auto const host_gui =
                         (clap_host_gui const*)floe.host.get_extension(&floe.host, CLAP_EXT_GUI)) {
                     auto const size =
                         PhysicalPixelsToClapPixels(floe.gui_platform->view,
                                                    DesiredWindowSize(g_shared_engine_systems->prefs));
+                    LogInfo(ModuleName::Gui, "Requesting resize to {}x{}", size.width, size.height);
                     host_gui->request_resize(&floe.host, size.width, size.height);
                 }
             }

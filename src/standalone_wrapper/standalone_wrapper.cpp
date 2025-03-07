@@ -375,12 +375,19 @@ static PuglStatus OnEvent(PuglView* view, PuglEvent const* event) {
             break;
         }
         case PUGL_CONFIGURE: {
-            if (event->configure.style & PUGL_VIEW_STYLE_MAPPED &&
-                event->configure.style & PUGL_VIEW_STYLE_RESIZING) {
-                LogDebug(ModuleName::Standalone, "PUGL: {}", fmt::DumpStruct(event->configure));
+            LogDebug(ModuleName::Standalone,
+                     "Parent configure: {}x{}, {}x{}, mapped: {}, resizing: {}",
+                     event->configure.x,
+                     event->configure.y,
+                     event->configure.width,
+                     event->configure.height,
+                     event->configure.style & PUGL_VIEW_STYLE_MAPPED,
+                     event->configure.style & PUGL_VIEW_STYLE_RESIZING);
+            if (event->configure.style & PUGL_VIEW_STYLE_MAPPED) {
                 auto gui = (clap_plugin_gui const*)p.plugin.get_extension(&p.plugin, CLAP_EXT_GUI);
                 ASSERT(gui);
                 if (gui->can_resize(&p.plugin)) {
+                    // CLAP always wants window sizes in the OS's pixel units.
                     auto const scale_factor = puglGetScaleFactor(view);
                     auto width = (u32)(event->configure.width / scale_factor);
                     auto height = (u32)(event->configure.height / scale_factor);
@@ -603,6 +610,10 @@ static ErrorCodeOr<void> Main(String exe_path_rel) {
             auto const physical_pixels = *ClapPixelsToPhysicalPixels(standalone.gui_view,
                                                                      requested_clap_size.width,
                                                                      requested_clap_size.height);
+            LogDebug(ModuleName::Standalone,
+                     "Handling resize request, setting parent window to: {} x {}",
+                     physical_pixels.width,
+                     physical_pixels.height);
             puglSetSizeHint(standalone.gui_view,
                             PUGL_CURRENT_SIZE,
                             physical_pixels.width,

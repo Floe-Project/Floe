@@ -116,6 +116,7 @@ struct GuiFrameInput {
     // may contain text from the OS clipboard if you requested it
     DynamicArray<char> clipboard_text {PageAllocator::Instance()};
     DynamicArrayBounded<u32, 16> input_utf32_chars {};
+    ArenaStack<String> file_picker_results {};
 
     TimePoint current_time {};
     TimePoint time_prev {};
@@ -137,6 +138,20 @@ struct MouseTrackedRect {
 };
 
 enum class CursorType { Default, Hand, IBeam, AllArrows, HorizontalArrows, VerticalArrows, Count };
+
+struct FilePickerDialogOptions {
+    enum class Type { SaveFile, OpenFile, SelectFolder };
+    struct FileFilter {
+        String description;
+        String wildcard_filter;
+    };
+
+    Type type {Type::OpenFile};
+    String title {"Select File"};
+    Optional<String> default_path {}; // folder and file
+    Span<FileFilter const> filters {};
+    bool allow_multiple_selection {};
+};
 
 // Fill this struct every frame to instruct the caller about the GUI's needs.
 struct GuiFrameResult {
@@ -185,6 +200,10 @@ struct GuiFrameResult {
     // Set this to the text that you want put into the OS clipboard
     // Must be valid until the next frame.
     Span<char> set_clipboard_text {};
+
+    // Set this to request a file picker dialog be opened. Rejected if a dialog is already open. The
+    // application owns the memory, not the framework. The memory must persist until the next frame.
+    Optional<FilePickerDialogOptions> file_picker_dialog {};
 
     // Must be valid until the next frame.
     graphics::DrawData draw_data {};

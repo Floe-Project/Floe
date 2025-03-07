@@ -9,6 +9,7 @@
 
 #include "engine/autosave.hpp"
 #include "engine/package_installation.hpp"
+#include "gui/gui_file_picker.hpp"
 #include "gui/gui_prefs.hpp"
 #include "gui2_common_modal_panel.hpp"
 #include "gui2_prefs_panel_state.hpp"
@@ -203,6 +204,7 @@ struct PreferencesPanelContext {
     sample_lib_server::Server& sample_lib_server;
     package::InstallJobs& package_install_jobs;
     ThreadPool& thread_pool;
+    FilePickerState& file_picker_state;
 };
 
 static void SetFolderSubtext(DynamicArrayBounded<char, 200>& out,
@@ -238,46 +240,6 @@ static void SetFolderSubtext(DynamicArrayBounded<char, 200>& out,
         }
         case ScanFolderType::Count: break;
     }
-}
-
-static bool AddExtraScanFolderDialog(GuiBoxSystem& box_system,
-                                     PreferencesPanelContext& context,
-                                     ScanFolderType type,
-                                     bool set_as_install_location) {
-    Optional<String> default_folder {};
-    if (auto const extra_paths = ExtraScanFolders(context.paths, context.prefs, type); extra_paths.size)
-        default_folder = extra_paths[0];
-
-    if (auto const o = FilesystemDialog({
-            .type = DialogArguments::Type::SelectFolder,
-            .allocator = box_system.arena,
-            .title = fmt::Format(box_system.arena, "Select {} Folder", ({
-                                     String s {};
-                                     switch (type) {
-                                         case ScanFolderType::Libraries: s = "Libraries"; break;
-                                         case ScanFolderType::Presets: s = "Presets"; break;
-                                         case ScanFolderType::Count: PanicIfReached();
-                                     }
-                                     s;
-                                 })),
-            .default_path = default_folder,
-            .filters = {},
-            .parent_window = box_system.imgui.frame_input.native_window,
-        });
-        o.HasValue()) {
-        if (auto const paths = o.Value(); paths.size) {
-            prefs::AddValue(context.prefs, ExtraScanFolderDescriptor(context.paths, type), (String)paths[0]);
-            if (set_as_install_location) {
-                prefs::SetValue(context.prefs,
-                                InstallLocationDescriptor(context.paths, context.prefs, type),
-                                (String)paths[0]);
-            }
-            return true;
-        }
-    } else {
-        LogError(ModuleName::Gui, "Failed to create dialog: {}", o.Error());
-    }
-    return false;
 }
 
 static void FolderPreferencesPanel(GuiBoxSystem& box_system, PreferencesPanelContext& context) {
@@ -355,7 +317,12 @@ static void FolderPreferencesPanel(GuiBoxSystem& box_system, PreferencesPanelCon
                        rhs_column,
                        "Add folder",
                        fmt::FormatInline<100>("Add a folder to scan for {}", contents_name))) {
-            AddExtraScanFolderDialog(box_system, context, (ScanFolderType)scan_folder_type, false);
+            OpenFilePickerAddExtraScanFolders(
+                context.file_picker_state,
+                box_system.imgui.frame_output,
+                context.prefs,
+                context.paths,
+                {.type = (ScanFolderType)scan_folder_type, .set_as_install_folder = false});
         }
     }
 }
@@ -486,9 +453,14 @@ static void InstallLocationMenu(GuiBoxSystem& box_system,
               .size_from_text = true,
           });
 
-    if (add_button.button_fired)
-        if (AddExtraScanFolderDialog(box_system, context, scan_folder_type, true))
-            box_system.imgui.CloseTopPopupOnly();
+    if (add_button.button_fired) {
+        OpenFilePickerAddExtraScanFolders(context.file_picker_state,
+                                          box_system.imgui.frame_output,
+                                          context.prefs,
+                                          context.paths,
+                                          {.type = scan_folder_type, .set_as_install_folder = true});
+        box_system.imgui.CloseTopPopupOnly();
+    }
 }
 
 static void PackagesPreferencesPanel(GuiBoxSystem& box_system, PreferencesPanelContext& context) {
@@ -554,34 +526,7 @@ static void PackagesPreferencesPanel(GuiBoxSystem& box_system, PreferencesPanelC
                        rhs,
                        "Install package",
                        "Install libraries and presets from a '.floe.zip' file")) {
-            if (auto const o = FilesystemDialog({
-                    .type = DialogArguments::Type::OpenFile,
-                    .allocator = box_system.arena,
-                    .title = "Select 1 or more Floe Package",
-                    .default_path =
-                        KnownDirectory(box_system.arena, KnownDirectoryType::Downloads, {.create = false}),
-                    .filters = ArrayT<DialogArguments::FileFilter>({
-                        {
-                            .description = "Floe Package"_s,
-                            .wildcard_filter = "*.floe.zip"_s,
-                        },
-                    }),
-                    .allow_multiple_selection = true,
-                    .parent_window = box_system.imgui.frame_input.native_window,
-                });
-                o.HasValue()) {
-                for (auto const path : o.Value()) {
-                    package::AddJob(context.package_install_jobs,
-                                    path,
-                                    context.prefs,
-                                    context.paths,
-                                    context.thread_pool,
-                                    box_system.arena,
-                                    context.sample_lib_server);
-                }
-            } else {
-                LogError(ModuleName::Gui, "Failed to create dialog: {}", o.Error());
-            }
+            OpenFilePickerInstallPackage(context.file_picker_state, box_system.imgui.frame_output);
         }
     }
 }

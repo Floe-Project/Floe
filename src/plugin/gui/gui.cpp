@@ -19,6 +19,7 @@
 #include "gui/gui2_notifications.hpp"
 #include "gui/gui2_package_install.hpp"
 #include "gui/gui2_prefs_panel.hpp"
+#include "gui/gui_file_picker.hpp"
 #include "gui_editor_widgets.hpp"
 #include "gui_editors.hpp"
 #include "gui_framework/aspect_ratio.hpp"
@@ -342,107 +343,6 @@ static void CreateFontsIfNeeded(Gui* g) {
     }
 }
 
-static ErrorCodeOr<void> OpenDialog(Gui* g, DialogType type) {
-    switch (type) {
-        case DialogType::AddNewLibraryScanFolder: {
-            Optional<String> default_folder {};
-            if (auto extra_paths =
-                    ExtraScanFolders(g->shared_engine_systems.paths, g->prefs, ScanFolderType::Libraries);
-                extra_paths.size)
-                default_folder = extra_paths[0];
-
-            auto const paths = TRY(FilesystemDialog({
-                .type = DialogArguments::Type::SelectFolder,
-                .allocator = g->scratch_arena,
-                .title = "Select Floe Library Folder",
-                .default_path = default_folder,
-                .filters = {},
-                .parent_window = g->frame_input.native_window,
-            }));
-            if (paths.size) {
-                auto const path = paths[0];
-                prefs::AddValue(
-                    g->prefs,
-                    ExtraScanFolderDescriptor(g->shared_engine_systems.paths, ScanFolderType::Libraries),
-                    (String)path);
-            }
-            break;
-        }
-        case DialogType::AddNewPresetsScanFolder: {
-            Optional<String> default_folder {};
-            if (auto extra_paths =
-                    ExtraScanFolders(g->shared_engine_systems.paths, g->prefs, ScanFolderType::Presets);
-                extra_paths.size)
-                default_folder = extra_paths[0];
-
-            auto const paths = TRY(FilesystemDialog({
-                .type = DialogArguments::Type::SelectFolder,
-                .allocator = g->scratch_arena,
-                .title = "Select Floe Presets Folder",
-                .default_path = default_folder,
-                .filters = {},
-                .parent_window = g->frame_input.native_window,
-            }));
-            if (paths.size) {
-                auto const path = paths[0];
-                prefs::AddValue(
-                    g->prefs,
-                    ExtraScanFolderDescriptor(g->shared_engine_systems.paths, ScanFolderType::Presets),
-                    (String)path);
-            }
-            break;
-        }
-        case DialogType::LoadPreset:
-        case DialogType::SavePreset: {
-            Optional<String> default_path {};
-            auto const preset_scan_folders =
-                ExtraScanFolders(g->shared_engine_systems.paths, g->prefs, ScanFolderType::Presets);
-            if (preset_scan_folders.size) {
-                default_path =
-                    path::Join(g->scratch_arena,
-                               Array {preset_scan_folders[0], "untitled" FLOE_PRESET_FILE_EXTENSION});
-            }
-
-            constexpr auto k_filters = ArrayT<DialogArguments::FileFilter>({{
-                .description = "Floe Preset"_s,
-                .wildcard_filter = "*.floe-*"_s,
-            }});
-
-            if (type == DialogType::LoadPreset) {
-                auto const paths = TRY(FilesystemDialog({
-                    .type = DialogArguments::Type::OpenFile,
-                    .allocator = g->scratch_arena,
-                    .title = "Load Floe Preset",
-                    .default_path = default_path,
-                    .filters = k_filters.Items(),
-                    .parent_window = g->frame_input.native_window,
-                }));
-                if (paths.size) LoadPresetFromFile(g->engine, paths[0]);
-            } else if (type == DialogType::SavePreset) {
-                auto const paths = TRY(FilesystemDialog({
-                    .type = DialogArguments::Type::SaveFile,
-                    .allocator = g->scratch_arena,
-                    .title = "Save Floe Preset",
-                    .default_path = default_path,
-                    .filters = k_filters.Items(),
-                    .parent_window = g->frame_input.native_window,
-                }));
-                if (paths.size) SaveCurrentStateToFile(g->engine, paths[0]);
-            } else {
-                PanicIfReached();
-            }
-            break;
-        }
-    }
-
-    return k_success;
-}
-
-void Gui::OpenDialog(DialogType type) {
-    auto const outcome = ::OpenDialog(this, type);
-    if (outcome.HasError()) LogError(ModuleName::Gui, "Failed to create dialog: {}", outcome.Error());
-}
-
 Gui::Gui(GuiFrameInput& frame_input, Engine& engine)
     : frame_input(frame_input)
     , engine(engine)
@@ -585,6 +485,18 @@ GuiFrameResult GuiUpdate(Gui* g) {
     while (auto function = g->main_thread_callbacks.TryPop(g->scratch_arena))
         (*function)();
 
+    CheckForFilePickerResults(g->imgui.frame_input,
+                              g->file_picker_state,
+                              {
+                                  .prefs = g->prefs,
+                                  .paths = g->shared_engine_systems.paths,
+                                  .package_install_jobs = g->engine.package_install_jobs,
+                                  .thread_pool = g->shared_engine_systems.thread_pool,
+                                  .scratch_arena = g->scratch_arena,
+                                  .sample_lib_server = g->shared_engine_systems.sample_library_server,
+                                  .engine = g->engine,
+                              });
+
     CreateFontsIfNeeded(g);
     auto& imgui = g->imgui;
 
@@ -700,6 +612,7 @@ GuiFrameResult GuiUpdate(Gui* g) {
                 .sample_lib_server = g->shared_engine_systems.sample_library_server,
                 .package_install_jobs = g->engine.package_install_jobs,
                 .thread_pool = g->shared_engine_systems.thread_pool,
+                .file_picker_state = g->file_picker_state,
             };
 
             DoPreferencesPanel(box_system, context, g->preferences_panel_state);

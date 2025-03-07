@@ -1964,6 +1964,22 @@ pub fn build(b: *std.Build) void {
                 .flags = cpp_floe_flags,
             });
 
+            switch (target.result.os.tag) {
+                .windows => {},
+                .linux => {},
+                .macos => {
+                    plugin.addCSourceFiles(.{
+                        .files = &.{
+                            plugin_path ++ "/gui_framework/gui_platform_mac.mm",
+                        },
+                        .flags = objcpp_floe_flags,
+                    });
+                },
+                else => {
+                    unreachable;
+                },
+            }
+
             const licences_header = b.addConfigHeader(.{
                 .include_path = "licence_texts.h",
                 .style = .blank,

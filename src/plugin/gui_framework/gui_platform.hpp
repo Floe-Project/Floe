@@ -45,6 +45,8 @@ struct GuiPlatform {
     Optional<clap_id> clap_timer_id {};
     Optional<int> clap_posix_fd {};
     bool inside_update {};
+    ArenaAllocator file_picker_result_arena {Malloc::Instance()};
+    void *native_file_picker{nullptr};
 };
 
 // Public API
@@ -104,6 +106,9 @@ namespace detail {
 static PuglStatus EventHandler(PuglView* view, PuglEvent const* event);
 static void LogIfSlow(Stopwatch& stopwatch, String message);
 inline FloeClapExtensionHost const* CustomFloeHost(clap_host const& host);
+
+ErrorCodeOr<void> OpenNativeFilePicker(GuiPlatform& platform, FilePickerDialogOptions const& options);
+void CloseNativeFilePicker(GuiPlatform& platform);
 
 // Linux only, we need a way get the file descriptor from the X11 Display, but there's all kinds of macro
 // problems if we directly include X11 headers here, so we'll do it in a separate translation unit
@@ -276,6 +281,7 @@ PUBLIC ErrorCodeOr<void> SetVisible(GuiPlatform& platform, bool visible, Engine&
         TRY(Required(puglShow(platform.view, PUGL_SHOW_PASSIVE)));
     } else {
         platform.frame_state.Reset();
+        detail::CloseNativeFilePicker(platform);
         // IMRPOVE: stop update timers, make things more efficient
         TRY(Required(puglHide(platform.view)));
     }
@@ -613,12 +619,14 @@ static void ClearImpermanentState(GuiFrameInput& frame_state) {
         key.presses_or_repeats.Clear();
     }
 
+    frame_state.file_picker_results.Clear();
     frame_state.input_utf32_chars = {};
     frame_state.mouse_scroll_delta_in_lines = 0;
     dyn::Clear(frame_state.clipboard_text);
     frame_state.event_arena.ResetCursorAndConsolidateRegions();
     ++frame_state.update_count;
 }
+
 
 static void HandlePostUpdateRequests(GuiPlatform& platform) {
     if (platform.last_result.cursor_type != platform.current_cursor) {
@@ -649,6 +657,15 @@ static void HandlePostUpdateRequests(GuiPlatform& platform) {
         LogDebug(ModuleName::Gui, "requesting copy into OS clipboard, size: {}", cb.size);
         puglSetClipboard(platform.view, IS_LINUX ? "UTF8_STRING" : "text/plain", cb.data, cb.size);
     }
+
+    if (platform.last_result.file_picker_dialog)
+        if (auto const o = OpenNativeFilePicker(platform, *platform.last_result.file_picker_dialog);
+            o.HasError()) {
+            ReportError(ErrorLevel::Error,
+                        SourceLocationHash(),
+                        "Failed to open file picker dialog: {}",
+                        o.Error());
+        }
 }
 
 static void UpdateAndRender(GuiPlatform& platform) {

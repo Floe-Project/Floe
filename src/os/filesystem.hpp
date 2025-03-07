@@ -424,26 +424,6 @@ struct WindowsFileAttributes {
 // no-op on non-Windows. If attributes is not given, it will remove all attributes.
 ErrorCodeOr<void> WindowsSetFileAttributes(String path, Optional<WindowsFileAttributes> attributes);
 
-// Dialog for selecting files or folders
-// =======================================================================================================
-struct DialogArguments {
-    enum class Type { SaveFile, OpenFile, SelectFolder };
-    struct FileFilter {
-        String description;
-        String wildcard_filter;
-    };
-
-    Type type;
-    Allocator& allocator;
-    String title;
-    Optional<String> default_path; // folder and file
-    Span<FileFilter const> filters;
-    bool allow_multiple_selection;
-    void* parent_window;
-};
-
-ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments args);
-
 // DirectoryIterator
 // =======================================================================================================
 

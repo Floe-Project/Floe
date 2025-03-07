@@ -353,6 +353,16 @@ PUBLIC Margins GetMargins(Context& ctx, Id id) {
 
 PUBLIC Id CreateItem(Context& ctx, ItemOptions options) {
     auto const id = CreateItem(ctx);
+    if (ToInt(id) == 0) {
+        // The root item should be a container with a known size, otherwise we can't calculate the layout.
+        ASSERT(All(options.size != k_hug_contents));
+        ASSERT(All(options.size != k_fill_parent));
+        ASSERT(All(options.size > 0));
+        ASSERT(!options.parent);
+        ASSERT(options.anchor == Anchor::None);
+        ASSERT(!options.set_item_height_after_width_calculated);
+        ASSERT(All(options.margins.lrtb == 0));
+    }
     auto& item = *GetItem(ctx, id);
     item.container_padding_ltrb =
         __builtin_shufflevector(options.contents_padding.lrtb, options.contents_padding.lrtb, 0, 2, 1, 3);

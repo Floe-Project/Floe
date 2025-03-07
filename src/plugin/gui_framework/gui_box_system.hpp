@@ -4,6 +4,7 @@
 #pragma once
 #include "foundation/foundation.hpp"
 #include "utils/debug/tracy_wrapped.hpp"
+#include "utils/logger/logger.hpp"
 
 #include "fonts.hpp"
 #include "gui/gui_drawing_helpers.hpp"
@@ -93,6 +94,7 @@ struct Box {
     bool32 is_active : 1 = false;
     bool32 button_fired : 1 = false;
     imgui::TextInputResult const* text_input_result {};
+    SourceLocation source_location;
 };
 
 struct GuiBoxSystem {
@@ -188,6 +190,8 @@ PUBLIC void Run(GuiBoxSystem& builder, Panel* panel) {
     switch (panel->data.tag) {
         case PanelType::Subpanel: {
             auto const& subpanel = panel->data.Get<Subpanel>();
+            auto const size = panel->rect->size;
+            ASSERT(All(size > 0));
             builder.imgui.BeginWindow(builder.regular_window_settings, subpanel.imgui_id, *panel->rect);
             break;
         }
@@ -254,7 +258,30 @@ PUBLIC void Run(GuiBoxSystem& builder, Panel* panel) {
 
         {
             ZoneNamedN(prof2, "Box system: calculate layout", true);
+            LogDebug(ModuleName::Gui,
+                     "Layout root's size pre-calculated: {}",
+                     layout::GetSize(builder.layout, layout::Id {0}));
             layout::RunContext(builder.layout);
+            LogDebug(ModuleName::Gui,
+                     "Layout root's size post-calculated: {}",
+                     layout::GetSize(builder.layout, layout::Id {0}));
+            for (auto const i : Range(layout::ItemsCount(builder.layout))) {
+                auto const size = layout::GetSize(builder.layout, (layout::Id)i);
+                if (!All(size > 0)) {
+                    // let's get some more information
+                    for (auto const& box : builder.boxes) {
+                        if (box.layout_id == (layout::Id)i) {
+                            LogDebug(ModuleName::Gui,
+                                     "Box {}, layout_id {}, has invalid size {}, source location: {}",
+                                     i,
+                                     box.layout_id,
+                                     size,
+                                     box.source_location);
+                            PanicIfReached();
+                        }
+                    }
+                }
+            }
         }
 
         {
@@ -271,15 +298,17 @@ PUBLIC void Run(GuiBoxSystem& builder, Panel* panel) {
         if (p->rect) continue;
         switch (p->data.tag) {
             case PanelType::Subpanel: {
-                auto data = p->data.Get<Subpanel>();
-                p->rect = layout::GetRect(builder.layout, data.id);
+                auto const data = p->data.Get<Subpanel>();
+                auto const subpanel_rect = layout::GetRect(builder.layout, data.id);
+                ASSERT(All(subpanel_rect.size > 0));
+                p->rect = subpanel_rect;
                 break;
             }
             case PanelType::Modal: {
                 break;
             }
             case PanelType::Popup: {
-                auto data = p->data.Get<PopupPanel>();
+                auto const data = p->data.Get<PopupPanel>();
                 p->rect = layout::GetRect(builder.layout, data.creator_layout_id);
                 // we now have a relative position of the creator of the popup (usually a button). We
                 // need to convert it to screen space. When we run the panel, the imgui system will
@@ -427,7 +456,9 @@ static bool Tooltip(GuiBoxSystem& builder, imgui::Id id, Rect r, String str) {
     return false;
 }
 
-PUBLIC Box DoBox(GuiBoxSystem& builder, BoxConfig const& config) {
+PUBLIC Box DoBox(GuiBoxSystem& builder,
+                 BoxConfig const& config,
+                 SourceLocation source_location = SourceLocation::Current()) {
     auto const box_index = builder.box_counter++;
     auto const font = builder.fonts[ToInt(config.font)];
     auto const font_size =
@@ -471,6 +502,7 @@ PUBLIC Box DoBox(GuiBoxSystem& builder, BoxConfig const& config) {
                         layout;
                     })),
                 .imgui_id = {},
+                .source_location = source_location,
             };
 
             if (config.size_from_text && wrap_width == k_wrap_to_parent) {

@@ -483,10 +483,22 @@ struct Context {
 
     // Similar to CSS vw units, we have a concept of 'viewport width' relative units. They allow us to
     // make our GUI scale with the window size.
-    f32 VwToPixels(f32 vw) const { return vw * pixels_per_vw; }
-    f32x2 VwToPixels(f32x2 vw) const { return vw * pixels_per_vw; }
-    f32 PixelsToVw(f32 pixels) const { return pixels / pixels_per_vw; }
-    f32x2 PixelsToVw(f32x2 pixels) const { return pixels / pixels_per_vw; }
+    f32 VwToPixels(f32 vw) const {
+        ASSERT_HOT(vw >= 0);
+        return vw * pixels_per_vw;
+    }
+    f32x2 VwToPixels(f32x2 vw) const {
+        ASSERT_HOT(All(vw >= 0.0f));
+        return vw * pixels_per_vw;
+    }
+    f32 PixelsToVw(f32 pixels) const {
+        ASSERT_HOT(pixels_per_vw >= 0);
+        return pixels / pixels_per_vw;
+    }
+    f32x2 PixelsToVw(f32x2 pixels) const {
+        ASSERT_HOT(All(pixels >= 0.0f));
+        return pixels / pixels_per_vw;
+    }
     void SetPixelsPerVw(f32 v) {
         ASSERT(v > 0);
         pixels_per_vw = v;

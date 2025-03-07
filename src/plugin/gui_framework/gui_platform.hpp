@@ -246,26 +246,26 @@ PUBLIC ErrorCodeOr<void> SetVisible(GuiPlatform& platform, bool visible, Engine&
 
             if constexpr (IS_LINUX) {
                 // https://nakst.gitlab.io/tutorial/clap-part-3.html
-                auto const posix_fd =
-                    (clap_host_posix_fd_support const*)platform.host.get_extension(&platform.host,
-                                                                                   CLAP_EXT_POSIX_FD_SUPPORT);
-                if (posix_fd && posix_fd->register_fd) {
+                if (auto const posix_fd_extension =
+                        (clap_host_posix_fd_support const*)
+                            platform.host.get_extension(&platform.host, CLAP_EXT_POSIX_FD_SUPPORT);
+                    posix_fd_extension && posix_fd_extension->register_fd) {
                     auto const fd = detail::FdFromPuglWorld(platform.world);
                     ASSERT(fd != -1);
-                    if (posix_fd->register_fd(&platform.host, fd, CLAP_POSIX_FD_READ))
+                    if (posix_fd_extension->register_fd(&platform.host, fd, CLAP_POSIX_FD_READ))
                         platform.clap_posix_fd = fd;
                     else
                         LogError(ModuleName::Gui, "failed to register fd {}", fd);
                 }
 
-                auto const timer_support =
-                    (clap_host_timer_support const*)platform.host.get_extension(&platform.host,
-                                                                                CLAP_EXT_TIMER_SUPPORT);
-                if (timer_support && timer_support->register_timer) {
+                if (auto const timer_support_extension =
+                        (clap_host_timer_support const*)platform.host.get_extension(&platform.host,
+                                                                                    CLAP_EXT_TIMER_SUPPORT);
+                    timer_support_extension && timer_support_extension->register_timer) {
                     clap_id timer_id;
-                    if (timer_support->register_timer(&platform.host,
-                                                      (u32)(1000.0 / k_gui_refresh_rate_hz),
-                                                      &timer_id)) {
+                    if (timer_support_extension->register_timer(&platform.host,
+                                                                (u32)(1000.0 / k_gui_refresh_rate_hz),
+                                                                &timer_id)) {
                         platform.clap_timer_id = timer_id;
                     } else
                         LogError(ModuleName::Gui, "failed to register timer");

@@ -745,6 +745,7 @@ PreferencesPanel(GuiBoxSystem& box_system, PreferencesPanelContext& context, Pre
 
 PUBLIC void
 DoPreferencesPanel(GuiBoxSystem& box_system, PreferencesPanelContext& context, PreferencesPanelState& state) {
+    ASSERT(box_system.imgui.Width() > 0);
     if (state.open) {
         RunPanel(box_system,
                  Panel {

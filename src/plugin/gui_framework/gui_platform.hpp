@@ -690,6 +690,7 @@ static void UpdateAndRender(GuiPlatform& platform) {
     };
 
     auto const window_size = GetSize(platform);
+    ASSERT(window_size.width >= k_min_gui_width && window_size.width <= k_max_gui_width);
     platform.frame_state.graphics_ctx = platform.graphics_ctx;
     platform.frame_state.native_window = (void*)puglGetNativeView(platform.view);
     platform.frame_state.window_size = window_size;

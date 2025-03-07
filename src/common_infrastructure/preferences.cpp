@@ -150,9 +150,15 @@ PreferencesTable ParsePreferencesFile(String file_data, ArenaAllocator& arena) {
             if (key_int) full_key = (s64)*key_int;
         }
 
-        if (auto v = table.Find(full_key))
-            SinglyLinkedListPrepend(*v, value);
-        else
+        if (auto v = table.Find(full_key)) {
+            bool already_present = false;
+            for (auto existing_value = *v; existing_value; existing_value = existing_value->next)
+                if (*existing_value == *value) {
+                    already_present = true;
+                    break;
+                }
+            if (!already_present) SinglyLinkedListPrepend(*v, value);
+        } else
             table.Insert(full_key, value);
     }
 

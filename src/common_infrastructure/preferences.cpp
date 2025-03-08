@@ -1190,10 +1190,11 @@ TEST_CASE(TestPreferences) {
 
         for (auto const& kv : keyvals) {
             CAPTURE(kv.key);
+
             DynamicArrayBounded<ValueUnion, 4> expected_values;
             for (auto const& other_kv : keyvals)
-                if (kv.key == other_kv.key && kv.value != other_kv.value)
-                    dyn::Append(expected_values, other_kv.value);
+                if (kv.key == other_kv.key) dyn::AppendIfNotAlreadyThere(expected_values, other_kv.value);
+            CAPTURE(expected_values.Items());
 
             auto value_list = LookupValues(prefs, kv.key);
             REQUIRE(value_list);
@@ -1201,14 +1202,12 @@ TEST_CASE(TestPreferences) {
             usize num_values = 0;
             for (auto value = value_list; value; value = value->next) {
                 ++num_values;
-                bool is_in_expected = false;
-                for (auto const& expected_value : expected_values) {
-                    if (*value == expected_value) {
-                        is_in_expected = true;
-                        break;
-                    }
+                if (!Contains(expected_values, *value)) {
+                    TEST_FAILED("value not expected key: {}, value: {}, expected_values: {}",
+                                kv.key,
+                                *value,
+                                expected_values.Items());
                 }
-                if (!is_in_expected) TEST_FAILED("value not expected ({}): {}", kv.key, value->Get<String>());
             }
 
             CHECK_EQ(num_values, expected_values.size);

@@ -1965,7 +1965,14 @@ pub fn build(b: *std.Build) void {
             });
 
             switch (target.result.os.tag) {
-                .windows => {},
+                .windows => {
+                    plugin.addCSourceFiles(.{
+                        .files = &.{
+                            plugin_path ++ "/gui_framework/gui_platform_windows.cpp",
+                        },
+                        .flags = cpp_floe_flags,
+                    });
+                },
                 .linux => {},
                 .macos => {
                     plugin.addCSourceFiles(.{

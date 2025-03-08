@@ -334,6 +334,7 @@ test level="0" build="": (_build_if_requested build "dev") (parallel if level ==
 [unix]
 test-ci: 
   #!/usr/bin/env bash
+  set -x
 
   pushd docs
   mdbook serve &
@@ -341,7 +342,7 @@ test-ci:
   sleep 2 # Wait a moment for the server to fully start
   popd
 
-  just parallel {{checks_ci}}
+  just parallel "{{checks_ci}}"
 
   kill $MDBOOK_PID
 
@@ -416,6 +417,7 @@ test-ci-windows:
 [unix]
 parallel tasks:
   #!/usr/bin/env bash
+  set -x
   mkdir -p {{cache_dir}}
   results_json={{cache_dir}}/parallel_cmd_results.json
 

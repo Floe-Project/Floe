@@ -209,7 +209,7 @@ clap_plugin_state const floe_plugin_state {
 
 static bool LogIfError(ErrorCodeOr<void> const& ec, String name) {
     if (ec.HasError()) {
-        ReportError(ErrorLevel::Warning, Hash(name), name);
+        ReportError(ErrorLevel::Warning, Hash(name), "{}: {}", name, ec.Error());
         return false;
     }
     return true;

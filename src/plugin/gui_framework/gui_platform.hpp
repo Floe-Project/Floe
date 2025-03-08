@@ -46,7 +46,7 @@ struct GuiPlatform {
     Optional<int> clap_posix_fd {};
     bool inside_update {};
     ArenaAllocator file_picker_result_arena {Malloc::Instance()};
-    void *native_file_picker{nullptr};
+    void* native_file_picker {nullptr};
 };
 
 // Public API
@@ -629,7 +629,6 @@ static void ClearImpermanentState(GuiFrameInput& frame_state) {
     frame_state.event_arena.ResetCursorAndConsolidateRegions();
     ++frame_state.update_count;
 }
-
 
 static void HandlePostUpdateRequests(GuiPlatform& platform) {
     if (platform.last_result.cursor_type != platform.current_cursor) {

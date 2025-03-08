@@ -1946,7 +1946,7 @@ pub fn build(b: *std.Build) void {
                     plugin_path ++ "/gui_framework/draw_list.cpp",
                     plugin_path ++ "/gui_framework/draw_list_opengl.cpp",
                     plugin_path ++ "/gui_framework/gui_imgui.cpp",
-                    plugin_path ++ "/gui_framework/gui_platform_native_helpers.cpp",
+                    plugin_path ++ "/gui_framework/gui_platform.cpp",
                     plugin_path ++ "/gui_framework/layout.cpp",
                     plugin_path ++ "/plugin/hosting_tests.cpp",
                     plugin_path ++ "/plugin/plugin.cpp",
@@ -1973,7 +1973,14 @@ pub fn build(b: *std.Build) void {
                         .flags = cpp_floe_flags,
                     });
                 },
-                .linux => {},
+                .linux => {
+                    plugin.addCSourceFiles(.{
+                        .files = &.{
+                            plugin_path ++ "/gui_framework/gui_platform_linux.cpp",
+                        },
+                        .flags = cpp_floe_flags,
+                    });
+                },
                 .macos => {
                     plugin.addCSourceFiles(.{
                         .files = &.{

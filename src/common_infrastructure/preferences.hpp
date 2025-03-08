@@ -91,6 +91,7 @@ using Key = TaggedUnion<KeyType,
                         TypeAndTag<SectionedKey, KeyType::Sectioned>>;
 
 ErrorCodeOr<void> CustomValueToString(Writer writer, Key const& key, fmt::FormatOptions options);
+ErrorCodeOr<void> CustomValueToString(Writer writer, ValueUnion const& key, fmt::FormatOptions options);
 u64 HashKey(Key const& key);
 
 using PreferencesTable = HashTable<Key, Value*, HashKey>;

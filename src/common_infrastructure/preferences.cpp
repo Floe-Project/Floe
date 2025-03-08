@@ -60,6 +60,15 @@ u64 HashKey(Key const& key) {
     return 0;
 }
 
+ErrorCodeOr<void> CustomValueToString(Writer writer, ValueUnion const& key, fmt::FormatOptions options) {
+    switch (key.tag) {
+        case ValueType::String: return ValueToString(writer, key.Get<String>(), options);
+        case ValueType::Int: return ValueToString(writer, key.Get<s64>(), options);
+        case ValueType::Bool: return ValueToString(writer, key.Get<bool>(), options);
+    }
+    return k_success;
+}
+
 ErrorCodeOr<void> CustomValueToString(Writer writer, Key const& key, fmt::FormatOptions options) {
     switch (key.tag) {
         case KeyType::GlobalString: return ValueToString(writer, key.Get<String>(), options);

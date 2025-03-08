@@ -58,6 +58,7 @@ struct ModifierFlags {
 
 enum class MouseButton : u32 { Left, Right, Middle, Count };
 
+// The framework gives the application this struct every frame.
 struct GuiFrameInput {
     struct MouseButtonState {
         struct Event {
@@ -116,6 +117,10 @@ struct GuiFrameInput {
     // may contain text from the OS clipboard if you requested it
     DynamicArray<char> clipboard_text {PageAllocator::Instance()};
     DynamicArrayBounded<u32, 16> input_utf32_chars {};
+
+    // A list of filepaths that the user selected in the (now closed) file picker dialog. Cleared every frame.
+    // If needed, you will need to have stored what these relate to - what GuiFrameResult::file_picker_dialog
+    // was set to.
     ArenaStack<String> file_picker_results {};
 
     TimePoint current_time {};
@@ -153,7 +158,7 @@ struct FilePickerDialogOptions {
     bool allow_multiple_selection {};
 };
 
-// Fill this struct every frame to instruct the caller about the GUI's needs.
+// Fill this struct every frame to instruct the framework about the application's needs.
 struct GuiFrameResult {
     enum class UpdateRequest {
         // 1. GUI will sleep until there's user iteraction or a timed wakeup fired
@@ -201,8 +206,9 @@ struct GuiFrameResult {
     // Must be valid until the next frame.
     Span<char> set_clipboard_text {};
 
-    // Set this to request a file picker dialog be opened. Rejected if a dialog is already open. The
-    // application owns the memory, not the framework. The memory must persist until the next frame.
+    // Set this to request a file picker dialog be opened. It's rejected if a dialog is already open. The
+    // application owns object, not the framework. The memory must persist until the next frame. You will
+    // receive the results in GuiFrameInput::file_picker_results - check that variable every frame.
     Optional<FilePickerDialogOptions> file_picker_dialog {};
 
     // Must be valid until the next frame.

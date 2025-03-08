@@ -103,17 +103,22 @@ static ErrorCodeOr<void> Required(PuglStatus status) {
 }
 
 namespace detail {
+
 static PuglStatus EventHandler(PuglView* view, PuglEvent const* event);
 static void LogIfSlow(Stopwatch& stopwatch, String message);
 inline FloeClapExtensionHost const* CustomFloeHost(clap_host const& host);
 
+// Due to the way Windows, Linux and macOS handle file pickers, we have this design:
+// - This function may or may not block, depending on the platform.
+// - Either way, it will fill GuiFrameInput::file_picker_results with the selected file paths for the
+//   application to consume on its next frame.
 ErrorCodeOr<void> OpenNativeFilePicker(GuiPlatform& platform, FilePickerDialogOptions const& options);
 void CloseNativeFilePicker(GuiPlatform& platform);
 
-// Linux only, we need a way get the file descriptor from the X11 Display, but there's all kinds of macro
-// problems if we directly include X11 headers here, so we'll do it in a separate translation unit
+// Linux only
 int FdFromPuglWorld(PuglWorld* world);
 void X11SetParent(PuglView* view, uintptr parent);
+
 } // namespace detail
 
 PUBLIC ErrorCodeOr<void> CreateView(GuiPlatform& platform) {

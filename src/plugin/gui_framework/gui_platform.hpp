@@ -164,6 +164,9 @@ PUBLIC ErrorCodeOr<void> CreateView(GuiPlatform& platform) {
 
 PUBLIC void DestroyView(GuiPlatform& platform) {
     Trace(ModuleName::Gui);
+
+    detail::CloseNativeFilePicker(platform);
+
     if (platform.gui) {
         platform.gui.Clear();
 

@@ -157,6 +157,13 @@ struct HashTable {
         return true;
     }
 
+    void DeleteElement(Element* element) {
+        element->active = false;
+        element->hash = k_tombstone;
+        --size;
+        ++num_dead;
+    }
+
     void DeleteIndex(usize index) {
         elems[index].active = false;
         elems[index].hash = k_tombstone;

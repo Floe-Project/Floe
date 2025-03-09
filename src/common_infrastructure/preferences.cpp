@@ -60,6 +60,15 @@ u64 HashKey(Key const& key) {
     return 0;
 }
 
+ErrorCodeOr<void> CustomValueToString(Writer writer, ValueUnion const& key, fmt::FormatOptions options) {
+    switch (key.tag) {
+        case ValueType::String: return ValueToString(writer, key.Get<String>(), options);
+        case ValueType::Int: return ValueToString(writer, key.Get<s64>(), options);
+        case ValueType::Bool: return ValueToString(writer, key.Get<bool>(), options);
+    }
+    return k_success;
+}
+
 ErrorCodeOr<void> CustomValueToString(Writer writer, Key const& key, fmt::FormatOptions options) {
     switch (key.tag) {
         case KeyType::GlobalString: return ValueToString(writer, key.Get<String>(), options);
@@ -150,9 +159,15 @@ PreferencesTable ParsePreferencesFile(String file_data, ArenaAllocator& arena) {
             if (key_int) full_key = (s64)*key_int;
         }
 
-        if (auto v = table.Find(full_key))
-            SinglyLinkedListPrepend(*v, value);
-        else
+        if (auto v = table.Find(full_key)) {
+            bool already_present = false;
+            for (auto existing_value = *v; existing_value; existing_value = existing_value->next)
+                if (*existing_value == *value) {
+                    already_present = true;
+                    break;
+                }
+            if (!already_present) SinglyLinkedListPrepend(*v, value);
+        } else
             table.Insert(full_key, value);
     }
 
@@ -578,6 +593,7 @@ template <typename Type>
 static usize GetValuesTemplate(PreferencesTable const& table, Descriptor const& descriptor, Span<Type> out) {
     auto const v_ptr = table.Find(descriptor.key);
     if (!v_ptr) return 0;
+    if (!*v_ptr) return 0;
     auto const& v = **v_ptr;
 
     usize pos = 0;
@@ -796,9 +812,11 @@ bool AddValue(Preferences& prefs, Key const& key, ValueUnion const& value, SetVa
     auto existing_values_ptr = prefs.Find(key);
     if (existing_values_ptr) {
         auto const existing_values = *existing_values_ptr;
+        for (auto v = existing_values; v; v = v->next)
+            if (*v == value) return false;
         auto last = existing_values;
         for (; last->next; last = last->next)
-            if (*last->next == value) return false;
+            if (*last == value) return false;
         ASSERT(last->next == nullptr);
 
         last->next = AllocateValue(prefs, CloneValueUnion(value, prefs.path_pool, prefs.arena));
@@ -833,15 +851,14 @@ void AddValue(Preferences& preferences,
 
 bool RemoveValue(Preferences& prefs, Key const& key, ValueUnion const& value, RemoveValueOptions options) {
     ASSERT(IsKeyValid(key));
-    auto const existing_values_ptr = prefs.Find(key);
-    if (!existing_values_ptr) return false;
-    auto& existing_values = *existing_values_ptr;
+    auto const existing_element = prefs.FindElement(key);
+    if (!existing_element) return false;
+    auto& existing_values = existing_element->data;
 
     bool removed = false;
-    bool single_value = existing_values->next == nullptr;
     SinglyLinkedListRemoveIf(
         existing_values,
-        [&](Value const& node) { return node == value; },
+        [&](ValueUnion const& node) { return node == value; },
         [&](Value* node) {
             FreeValueUnion(*node, prefs.path_pool);
             AddValueToFreeList(prefs, node);
@@ -849,9 +866,9 @@ bool RemoveValue(Preferences& prefs, Key const& key, ValueUnion const& value, Re
         });
 
     if (removed && !options.dont_track_changes) {
-        if (single_value) {
+        if (existing_values == nullptr) {
             FreeKey(key, prefs.path_pool);
-            prefs.Delete(key);
+            prefs.DeleteElement(existing_element);
             MarkChanged(prefs, key, nullptr);
         } else {
             MarkChanged(prefs, key, existing_values);
@@ -1153,6 +1170,7 @@ TEST_CASE(TestPreferences) {
             {SectionedKey {.section = key::section::k_cc_to_param_id_map_section, .key = (s64)10}, (s64)3},
             {SectionedKey {.section = key::section::k_cc_to_param_id_map_section, .key = (s64)10}, (s64)4},
             {"unknown_key"_s, "unknown value"_s},
+            {"unknown_key"_s, "unknown value"_s},
             {key::k_extra_libraries_folder, ROOT "Libraries"_s},
             {key::k_extra_libraries_folder, ROOT "Floe Libraries"_s},
             {key::k_extra_presets_folder, ROOT "Projects/Test"_s},
@@ -1172,9 +1190,11 @@ TEST_CASE(TestPreferences) {
 
         for (auto const& kv : keyvals) {
             CAPTURE(kv.key);
+
             DynamicArrayBounded<ValueUnion, 4> expected_values;
             for (auto const& other_kv : keyvals)
-                if (kv.key == other_kv.key) dyn::Append(expected_values, other_kv.value);
+                if (kv.key == other_kv.key) dyn::AppendIfNotAlreadyThere(expected_values, other_kv.value);
+            CAPTURE(expected_values.Items());
 
             auto value_list = LookupValues(prefs, kv.key);
             REQUIRE(value_list);
@@ -1182,14 +1202,12 @@ TEST_CASE(TestPreferences) {
             usize num_values = 0;
             for (auto value = value_list; value; value = value->next) {
                 ++num_values;
-                bool is_in_expected = false;
-                for (auto const& expected_value : expected_values) {
-                    if (*value == expected_value) {
-                        is_in_expected = true;
-                        break;
-                    }
+                if (!Contains(expected_values, *value)) {
+                    TEST_FAILED("value not expected key: {}, value: {}, expected_values: {}",
+                                kv.key,
+                                *value,
+                                expected_values.Items());
                 }
-                if (!is_in_expected) TEST_FAILED("value not expected ({}): {}", kv.key, value->Get<String>());
             }
 
             CHECK_EQ(num_values, expected_values.size);

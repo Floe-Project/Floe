@@ -18,33 +18,34 @@
 
 #include "gui_platform.hpp"
 
-// TODO: support file filters, maybe with allowedContentTypes?
-// #define DIALOG_DELEGATE_CLASS MAKE_UNIQUE_OBJC_NAME(DialogDelegate)
-//
-// @interface DIALOG_DELEGATE_CLASS : NSObject <NSOpenSavePanelDelegate>
-// @property Span<FilePickerDialogOptions::FileFilter const> filters; // NOLINT
-// @end
-//
-// @implementation DIALOG_DELEGATE_CLASS
-// - (BOOL)panel:(id)sender shouldEnableURL:(NSURL*)url {
-//     NSString* ns_filename = [url lastPathComponent];
-//     auto const filename = NSStringToString(ns_filename);
-//
-//     NSNumber* is_directory = nil;
-//
-//     BOOL outcome = [url getResourceValue:&is_directory forKey:NSURLIsDirectoryKey error:nil];
-//     if (!outcome) return YES;
-//     if (is_directory) return YES;
-//
-//     for (auto filter : self.filters)
-//         if (MatchWildcard(filter.wildcard_filter, filename)) return YES;
-//
-//     return NO;
-// }
-// @end
+#define DIALOG_DELEGATE_CLASS MAKE_UNIQUE_OBJC_NAME(DialogDelegate)
+
+@interface DIALOG_DELEGATE_CLASS : NSObject <NSOpenSavePanelDelegate>
+@property Span<FilePickerDialogOptions::FileFilter const> filters; // NOLINT
+@end
+
+@implementation DIALOG_DELEGATE_CLASS
+- (BOOL)panel:(id)sender shouldEnableURL:(NSURL*)url {
+    // Enable directories so that the user can navigate into them.
+    BOOL is_directory;
+    [[NSFileManager defaultManager] fileExistsAtPath:[url path] isDirectory:&is_directory];
+    if (is_directory) return YES;
+
+    // Only enable files that match the filter.
+    NSString* ns_filename = [url lastPathComponent];
+    auto const filename = NSStringToString(ns_filename);
+    for (auto filter : self.filters) {
+        LogDebug(ModuleName::Gui, "comparing {}, filter: {}", filename, filter.wildcard_filter);
+        if (MatchWildcard(filter.wildcard_filter, filename)) return YES;
+    }
+
+    return NO;
+}
+@end
 
 struct NativeFilePicker {
     NSSavePanel* panel = nullptr;
+    DIALOG_DELEGATE_CLASS* delegate = nullptr;
 };
 
 constexpr uintptr k_file_picker_completed = 0xD1A106;
@@ -57,33 +58,42 @@ bool detail::NativeFilePickerOnClientMessage(GuiPlatform& platform, uintptr data
     if (!native_file_picker.panel) return false;
 
     ASSERT([NSThread isMainThread]);
+    ASSERT(!native_file_picker.panel.visible, "panel should be closed");
     platform.frame_state.file_picker_results = {};
     platform.file_picker_result_arena.ResetCursorAndConsolidateRegions();
 
+    bool update_gui = false;
+
     auto const response = (NSModalResponse)data2;
     if (response == NSModalResponseOK) {
+        auto const append_result = [&](NSURL* url) {
+            NSString* path = [[url path] stringByResolvingSymlinksInPath];
+            auto utf8 = FromNullTerminated(path.UTF8String);
+            ASSERT(path::IsAbsolute(utf8));
+            ASSERT(IsValidUtf8(utf8));
+
+            platform.frame_state.file_picker_results.Append(utf8.Clone(platform.file_picker_result_arena),
+                                                            platform.file_picker_result_arena);
+        };
+
         if ([native_file_picker.panel isKindOfClass:[NSOpenPanel class]]) {
             auto open_panel = (NSOpenPanel*)native_file_picker.panel;
 
             for (auto const i : Range<NSUInteger>(open_panel.URLs.count)) {
-                NSURL* selection = open_panel.URLs[i];
-                NSString* path = [[selection path] stringByResolvingSymlinksInPath];
-                auto utf8 = FromNullTerminated(path.UTF8String);
-                ASSERT(path::IsAbsolute(utf8));
-
-                platform.frame_state.file_picker_results.Append(utf8.Clone(platform.file_picker_result_arena),
-                                                                platform.file_picker_result_arena);
+                append_result(open_panel.URLs[i]);
             }
         } else {
-            // NSSavePanel
+            auto save_panel = native_file_picker.panel;
+            append_result(save_panel.URL);
         }
-        return true;
+        update_gui = true;
     }
 
     native_file_picker.panel = nullptr; // release
+    native_file_picker.delegate = nullptr; // release
     platform.native_file_picker.Clear();
 
-    return false;
+    return update_gui;
 }
 
 ErrorCodeOr<void> detail::OpenNativeFilePicker(GuiPlatform& platform,
@@ -104,6 +114,11 @@ ErrorCodeOr<void> detail::OpenNativeFilePicker(GuiPlatform& platform,
                 ASSERT(!native_file_picker.panel);
                 native_file_picker.panel = (NSSavePanel*)open_panel; // retain
 
+                native_file_picker.delegate = [[DIALOG_DELEGATE_CLASS alloc] init];
+                native_file_picker.delegate.filters =
+                    platform.file_picker_result_arena.Clone(options.filters, CloneType::Deep);
+                open_panel.delegate = native_file_picker.delegate;
+
                 open_panel.canChooseDirectories = options.type == FilePickerDialogOptions::Type::SelectFolder;
                 open_panel.canChooseFiles = options.type == FilePickerDialogOptions::Type::OpenFile;
                 open_panel.canCreateDirectories = YES;
@@ -120,10 +135,6 @@ ErrorCodeOr<void> detail::OpenNativeFilePicker(GuiPlatform& platform,
 
         auto panel = native_file_picker.panel;
 
-        // auto delegate = [[DIALOG_DELEGATE_CLASS alloc] init];
-        // delegate.filters = options.filters;
-        // panel.delegate = delegate;
-
         panel.parentWindow = ((__bridge NSView*)(void*)puglGetNativeView(platform.view)).window;
         panel.title = StringToNSString(options.title);
         [panel setLevel:NSModalPanelWindowLevel];
@@ -135,7 +146,7 @@ ErrorCodeOr<void> detail::OpenNativeFilePicker(GuiPlatform& platform,
 
         [panel beginWithCompletionHandler:^(NSInteger response) {
           // I don't think we can assert that this is always the main thread, so let's send it via
-          // Pugl's event system which should be safe.
+          // Pugl's event system which should guarantee main thread.
           PuglEvent const event {.client = {
                                      .type = PUGL_CLIENT,
                                      .flags = PUGL_IS_SEND_EVENT,
@@ -147,7 +158,8 @@ ErrorCodeOr<void> detail::OpenNativeFilePicker(GuiPlatform& platform,
         }];
 
     } @catch (NSException* e) {
-        // TODO: report the error somehow
+        LogError(ModuleName::Gui, "error opening native file picker: {}", e.description.UTF8String);
+        return ErrorFromNSError([NSError errorWithDomain:@"" code:0 userInfo:nil]);
     }
     return k_success;
 }
@@ -158,5 +170,6 @@ void detail::CloseNativeFilePicker(GuiPlatform& platform) {
     if (!native_file_picker.panel) return;
     [native_file_picker.panel close];
     native_file_picker.panel = nullptr; // release
+    native_file_picker.delegate = nullptr; // release
     platform.native_file_picker.Clear();
 }

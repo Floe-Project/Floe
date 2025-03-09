@@ -46,7 +46,7 @@ struct GuiPlatform {
     Optional<int> clap_posix_fd {};
     bool inside_update {};
     ArenaAllocator file_picker_result_arena {Malloc::Instance()};
-    Optional<OpaqueHandle<IS_WINDOWS ? 160 : 8>> native_file_picker {};
+    Optional<OpaqueHandle<IS_WINDOWS ? 160 : 16>> native_file_picker {};
 };
 
 // Public API

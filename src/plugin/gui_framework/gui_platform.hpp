@@ -731,7 +731,6 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
 
     try {
         auto& platform = *(GuiPlatform*)puglGetHandle(view);
-        LogDebug(ModuleName::Gui, "event: {}", PuglEventString(event->type));
 
         // On Windows, this event handler can be called from inside itself. This is due to blocking operations
         // such IFileDialog::Show() pumping messages itself.

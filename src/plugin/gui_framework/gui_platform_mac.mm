@@ -43,10 +43,13 @@
 // }
 // @end
 
+bool detail::NativeFilePickerOnClientMessage(GuiPlatform&, uintptr, uintptr) { return false; }
+
 ErrorCodeOr<void> detail::OpenNativeFilePicker(GuiPlatform& platform,
                                                FilePickerDialogOptions const& options) {
     ASSERT(platform.view);
     if (platform.native_file_picker) return k_success;
+    platform.native_file_picker.Emplace();
     @try {
         // auto delegate = [[DIALOG_DELEGATE_CLASS alloc] init];
         // delegate.filters = options.filters;
@@ -57,7 +60,7 @@ ErrorCodeOr<void> detail::OpenNativeFilePicker(GuiPlatform& platform,
                 ASSERT([NSApp activationPolicy] != NSApplicationActivationPolicyProhibited);
 
                 NSOpenPanel* open_panel = [NSOpenPanel openPanel];
-                platform.native_file_picker = (__bridge_retained void *)(NSSavePanel *)open_panel;
+                platform.native_file_picker->As<void*>() = (__bridge_retained void*)(NSSavePanel*)open_panel;
 
                 // open_panel.delegate = delegate;
                 open_panel.parentWindow = ((__bridge NSView*)(void*)puglGetNativeView(platform.view)).window;
@@ -74,7 +77,7 @@ ErrorCodeOr<void> detail::OpenNativeFilePicker(GuiPlatform& platform,
                     open_panel.directoryURL = [NSURL fileURLWithPath:StringToNSString(*options.default_path)];
 
                 [open_panel beginWithCompletionHandler:^(NSInteger response) {
-                  ASSERT([NSThread isMainThread]);
+                  ASSERT([NSThread isMainThread]); // TODO: is this assertion guaranteed to be true?
                   platform.frame_state.file_picker_results = {};
                   platform.file_picker_result_arena.ResetCursorAndConsolidateRegions();
                   if (response == NSModalResponseOK) {
@@ -90,7 +93,7 @@ ErrorCodeOr<void> detail::OpenNativeFilePicker(GuiPlatform& platform,
                       }
                   } else {
                   }
-                  platform.native_file_picker = nullptr;
+                  platform.native_file_picker.Clear();
                 }];
 
                 break;
@@ -126,7 +129,7 @@ ErrorCodeOr<void> detail::OpenNativeFilePicker(GuiPlatform& platform,
 
 void detail::CloseNativeFilePicker(GuiPlatform& platform) {
     if (!platform.native_file_picker) return;
-    auto panel = (__bridge_transfer NSSavePanel*)platform.native_file_picker;
+    auto panel = (__bridge_transfer NSSavePanel*)platform.native_file_picker->As<void*>();
 
     [panel close];
 }

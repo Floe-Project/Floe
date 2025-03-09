@@ -11,6 +11,7 @@
 #include <X11/Xlib.h>
 
 void detail::CloseNativeFilePicker(GuiPlatform&) {}
+bool detail::NativeFilePickerOnClientMessage(GuiPlatform&, uintptr, uintptr) { return false; }
 
 ErrorCodeOr<void> detail::OpenNativeFilePicker(GuiPlatform& platform, FilePickerDialogOptions const& args) {
     ASSERT(ThreadName() == "main");
@@ -19,8 +20,8 @@ ErrorCodeOr<void> detail::OpenNativeFilePicker(GuiPlatform& platform, FilePicker
     if (args.default_path) ASSERT(path::IsAbsolute(*args.default_path));
 
     // This implmentation is blocking, so we only need to check for recursion.
-    platform.native_file_picker = (void*)true;
-    DEFER { platform.native_file_picker = nullptr; };
+    platform.native_file_picker.Emplace();
+    DEFER { platform.native_file_picker.Clear(); };
 
     platform.frame_state.file_picker_results.Clear();
     platform.file_picker_result_arena.ResetCursorAndConsolidateRegions();

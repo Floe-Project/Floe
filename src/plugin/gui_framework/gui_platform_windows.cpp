@@ -12,12 +12,34 @@
 
 #include "gui_platform.hpp"
 
+struct NativeFilePicker {
+    bool running {};
+    HANDLE thread {};
+    FilePickerDialogOptions args {};
+    HWND parent {};
+    ArenaAllocator thread_arena {Malloc::Instance(), 256};
+    Span<MutableString> result {};
+};
+
+constexpr uintptr k_file_picker_message_data = 0xD1A106;
+
 #define HRESULT_TRY(windows_call)                                                                            \
     if (auto hr = windows_call; !SUCCEEDED(hr)) {                                                            \
         return Win32ErrorCode(HresultToWin32(hr), #windows_call);                                            \
     }
 
-void detail::CloseNativeFilePicker(GuiPlatform&) {}
+void detail::CloseNativeFilePicker(GuiPlatform& platform) {
+    if (!platform.native_file_picker) return;
+    auto& native = platform.native_file_picker->As<NativeFilePicker>();
+    if (native.thread) {
+        PostThreadMessageW(GetThreadId(native.thread), WM_CLOSE, 0, 0);
+        auto const wait_result = WaitForSingleObject(native.thread, INFINITE);
+        ASSERT_EQ(wait_result, WAIT_OBJECT_0);
+        CloseHandle(native.thread);
+    }
+    native.~NativeFilePicker();
+    platform.native_file_picker.Clear();
+}
 
 ErrorCodeOr<Span<MutableString>>
 RunFilePicker(FilePickerDialogOptions const& args, ArenaAllocator& arena, HWND parent) {
@@ -118,6 +140,7 @@ RunFilePicker(FilePickerDialogOptions const& args, ArenaAllocator& arena, HWND p
 
     if (parent) ASSERT(IsWindow(parent));
 
+    LogDebug(ModuleName::Gui, "Showing file picker dialog");
     if (auto hr = f->Show(parent); hr != S_OK) {
         if (hr == HRESULT_FROM_WIN32(ERROR_CANCELLED)) return Span<MutableString> {};
         return Win32ErrorCode(HresultToWin32(hr), "Show()");
@@ -161,106 +184,124 @@ RunFilePicker(FilePickerDialogOptions const& args, ArenaAllocator& arena, HWND p
     }
 }
 
-ErrorCodeOr<void> detail::OpenNativeFilePicker(GuiPlatform& platform, FilePickerDialogOptions const& args) {
+bool detail::NativeFilePickerOnClientMessage(GuiPlatform& platform, uintptr data1, uintptr data2) {
     ASSERT(ThreadName() == "main");
 
-    if (platform.native_file_picker) return k_success;
+    if (data1 != k_file_picker_message_data) return false;
+    if (data2 != k_file_picker_message_data) return false;
+    if (!platform.native_file_picker) return false;
 
-    // This implementation of the file picker is blocking. We don't need any external state because it's
-    // entirely contained within this function.
-    platform.native_file_picker = (void*)true;
-    DEFER { platform.native_file_picker = nullptr; };
+    auto& native_file_picker = platform.native_file_picker->As<NativeFilePicker>();
+
+    // The thread should have exited by now so this should be immediate.
+    auto const wait_result = WaitForSingleObject(native_file_picker.thread, INFINITE);
+    ASSERT_EQ(wait_result, WAIT_OBJECT_0);
+    CloseHandle(native_file_picker.thread);
+    native_file_picker.thread = nullptr;
 
     platform.frame_state.file_picker_results.Clear();
     platform.file_picker_result_arena.ResetCursorAndConsolidateRegions();
+    for (auto const path : native_file_picker.result)
+        platform.frame_state.file_picker_results.Append(path.Clone(platform.file_picker_result_arena),
+                                                        platform.file_picker_result_arena);
+    native_file_picker.running = false;
 
-    // COM initialization is confusing. To help clear things up:
-    // - "Apartment" is a term used in COM to describe a threading isolation model.
-    // - CoInitializeEx sets the apartment model for the calling thread.
-    // - COINIT_APARTMENTTHREADED (0x2) creates a Single-Threaded Apartment (STA):
-    //   - Objects can only be accessed by the thread that created them
-    //   - COM provides message pumping infrastructure (but you still need a message loop)
-    //   - Access from other threads is marshaled through the message queue
-    // - COINIT_MULTITHREADED (0x0) creates a Multi-Threaded Apartment (MTA):
-    //   - Objects can be accessed by any thread in the MTA
-    //   - No automatic message marshaling or pumping
-    //   - Objects must implement their own thread synchronization
-    // - UI components like dialogs require a message pump, so they must be used in an STA.
-    //   Microsoft states:
-    //     "Note: The multi-threaded apartment is intended for use by non-GUI threads. Threads in
-    //     multi-threaded apartments should not perform UI actions. This is because UI threads require a
-    //     message pump, and COM does not pump messages for threads in a multi-threaded apartment."
-    //   By "multi-threaded apartment" they mean COINIT_MULTITHREADED.
-    //
-    // Conclusion: For UI components like IFileDialog, initialize COM with COINIT_APARTMENTTHREADED. If your
-    // thread is already initialized with COINIT_MULTITHREADED, you'll need to create a new thread with
-    // to use UI components.
-    //
-    // As an audio plugin, we can't know for sure the state of COM when we're called.
+    return false;
+}
 
-    Span<MutableString> result;
-    if (auto const hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-        SUCCEEDED(hr)) {
-        // Either we set up COM ourselves, or it was already initialised with the same mode. Either way, we
-        // should call CoUninitialize() later.
-        DEFER { CoUninitialize(); };
-        result = TRY(
-            RunFilePicker(args, platform.file_picker_result_arena, (HWND)puglGetNativeView(platform.view)));
+// COM initialisation is confusing. To help clear things up:
+// - "Apartment" is a term used in COM to describe a threading isolation model.
+// - CoInitializeEx sets the apartment model for the calling thread.
+// - COINIT_APARTMENTTHREADED (0x2) creates a Single-Threaded Apartment (STA):
+//   - Objects can only be accessed by the thread that created them
+//   - COM provides message pumping infrastructure
+//   - Access from other threads is marshaled through the message queue
+// - COINIT_MULTITHREADED (0x0) creates a Multi-Threaded Apartment (MTA):
+//   - Objects can be accessed by any thread in the MTA
+//   - No automatic message marshaling or pumping
+//   - Objects must implement their own thread synchronization
+// - UI components like dialogs require a message pump, so they must be used in an STA.
+//   Microsoft states:
+//     "Note: The multi-threaded apartment is intended for use by non-GUI threads. Threads in
+//     multi-threaded apartments should not perform UI actions. This is because UI threads require a
+//     message pump, and COM does not pump messages for threads in a multi-threaded apartment."
+//   By "multi-threaded apartment" they mean COINIT_MULTITHREADED.
+//
+// For UI components like IFileDialog, we need COM with COINIT_APARTMENTTHREADED. If the main thread
+// thread is already initialised with COINIT_MULTITHREADED, we _cannot_ use UI components because the
+// thread does not have a message pump.
+//
+// As an audio plugin, we can't know for sure the state of COM when we're called. So for robustness, we
+// need to create a new thread to handle the file picker where we can guarantee the correct COM.
+//
+// Some additional information regarding IFileDialog:
+// - IFileDialog::Show() will block until the dialog is closed.
+// - IFileDialog::Show() will pump it's own messages, but first it _requires_ you to pump messages for the
+//   parent HWND that you pass in. You will be sent WM_SHOWWINDOW for example. You must consume this event
+//   otherwise IFileDialog::Show() will block forever, and never show it's own dialog.
+
+ErrorCodeOr<void> detail::OpenNativeFilePicker(GuiPlatform& platform, FilePickerDialogOptions const& args) {
+    LogDebug(ModuleName::Gui, "OpenNativeFilePicker");
+    ASSERT(ThreadName() == "main");
+
+    NativeFilePicker* native_file_picker = nullptr;
+
+    if (!platform.native_file_picker) {
+        platform.native_file_picker.Emplace(); // Create the OpaqueHandle
+        native_file_picker = &platform.native_file_picker->As<NativeFilePicker>();
+        PLACEMENT_NEW(native_file_picker)
+        NativeFilePicker {}; // Initialise the NativeFilePicker in the OpaqueHandle
     } else {
-        LogWarning(ModuleName::Filesystem, "{} fallback COM init", __FUNCTION__);
-        // We do not have COINIT_APARTMENTTHREADED, so we must create a new thread with that mode and run the
-        // dialog there.
-        struct Context {
-            FilePickerDialogOptions const& args;
-            HWND parent;
-            ArenaAllocator& arena;
-            ErrorCodeOr<Span<MutableString>> result;
-        };
-        Context context {
-            .args = args,
-            .parent = (HWND)puglGetNativeView(platform.view),
-            .arena = platform.file_picker_result_arena,
-        };
-        auto thread = CreateThread(
-            nullptr,
-            0,
-            [](void* p) -> DWORD {
-                auto& context = *(Context*)p;
-
-                auto const hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-                ASSERT(SUCCEEDED(hr), "new thread couldn't initialize COM");
-                DEFER { CoUninitialize(); };
-
-                context.result = RunFilePicker(context.args, context.arena, context.parent);
-                return 0;
-            },
-            &context,
-            0,
-            nullptr);
-        ASSERT(thread);
-
-        // IFileDialog::Show() will block infinitely because it needs us to handle messages for our
-        // window (WM_SHOWWINDOW for example). We need to pump those messages here.
-        do {
-            MSG msg;
-            while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
-                LogDebug(ModuleName::Filesystem,
-                         "{} pumping message: 0x{x}, for us: {}",
-                         __FUNCTION__,
-                         msg.message,
-                         msg.hwnd == context.parent);
-                TranslateMessage(&msg);
-                DispatchMessageW(&msg);
-            }
-        } while (WaitForSingleObject(thread, 10) == WAIT_TIMEOUT);
-
-        CloseHandle(thread);
-        if (context.result.HasError()) return context.result.Error();
-        result = context.result.Value();
+        native_file_picker = &platform.native_file_picker->As<NativeFilePicker>();
     }
 
-    for (auto const path : result)
-        platform.frame_state.file_picker_results.Append(path, platform.file_picker_result_arena);
+    if (native_file_picker->running) {
+        // Already open. We only allow one at a time.
+        return k_success;
+    }
+
+    ASSERT(!native_file_picker->thread);
+    native_file_picker->running = true;
+    native_file_picker->thread_arena.ResetCursorAndConsolidateRegions();
+    native_file_picker->args = args.Clone(native_file_picker->thread_arena, CloneType::Deep);
+    native_file_picker->parent = (HWND)puglGetNativeView(platform.view);
+    native_file_picker->thread = CreateThread(
+        nullptr,
+        0,
+        [](void* p) -> DWORD {
+            auto& platform = *(GuiPlatform*)p;
+            auto& native_file_picker = platform.native_file_picker->As<NativeFilePicker>();
+
+            auto const hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+            ASSERT(SUCCEEDED(hr), "new thread couldn't initialise COM");
+            DEFER { CoUninitialize(); };
+
+            native_file_picker.result = TRY_OR(RunFilePicker(native_file_picker.args,
+                                                             native_file_picker.thread_arena,
+                                                             native_file_picker.parent),
+                                               ReportError(ErrorLevel::Error,
+                                                           SourceLocationHash(),
+                                                           "windows file picker failed: {}",
+                                                           error));
+
+            // We have results, now we need to send them back to the main thread.
+            PuglEvent const event {
+                .client =
+                    {
+                        .type = PUGL_CLIENT,
+                        .flags = PUGL_IS_SEND_EVENT,
+                        .data1 = k_file_picker_message_data,
+                        .data2 = k_file_picker_message_data,
+                    },
+            };
+            ASSERT(puglSendEvent(platform.view, &event) == PUGL_SUCCESS);
+
+            return 0;
+        },
+        &platform,
+        0,
+        nullptr);
+    ASSERT(native_file_picker->thread);
 
     return k_success;
 }

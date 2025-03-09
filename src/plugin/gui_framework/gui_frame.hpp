@@ -147,9 +147,25 @@ enum class CursorType { Default, Hand, IBeam, AllArrows, HorizontalArrows, Verti
 struct FilePickerDialogOptions {
     enum class Type { SaveFile, OpenFile, SelectFolder };
     struct FileFilter {
+        FileFilter Clone(Allocator& a, CloneType t) const {
+            return {
+                .description = description.Clone(a, t),
+                .wildcard_filter = wildcard_filter.Clone(a, t),
+            };
+        }
         String description;
         String wildcard_filter;
     };
+
+    FilePickerDialogOptions Clone(Allocator& a, CloneType t) const {
+        return {
+            .type = type,
+            .title = title.Clone(a, t),
+            .default_path = default_path.Clone(a, t),
+            .filters = a.Clone(filters, t),
+            .allow_multiple_selection = allow_multiple_selection,
+        };
+    }
 
     Type type {Type::OpenFile};
     String title {"Select File"};

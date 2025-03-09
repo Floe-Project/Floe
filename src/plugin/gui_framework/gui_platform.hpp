@@ -46,7 +46,7 @@ struct GuiPlatform {
     Optional<int> clap_posix_fd {};
     bool inside_update {};
     ArenaAllocator file_picker_result_arena {Malloc::Instance()};
-    void* native_file_picker {nullptr};
+    Optional<OpaqueHandle<IS_WINDOWS ? 160 : 8>> native_file_picker {};
 };
 
 // Public API
@@ -114,6 +114,9 @@ inline FloeClapExtensionHost const* CustomFloeHost(clap_host const& host);
 //   application to consume on its next frame.
 ErrorCodeOr<void> OpenNativeFilePicker(GuiPlatform& platform, FilePickerDialogOptions const& options);
 void CloseNativeFilePicker(GuiPlatform& platform);
+
+// Returns true to request the platform to update the GUI.
+bool NativeFilePickerOnClientMessage(GuiPlatform& platform, uintptr data1, uintptr data2);
 
 // Linux only
 int FdFromPuglWorld(PuglWorld* world);
@@ -728,6 +731,7 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
 
     try {
         auto& platform = *(GuiPlatform*)puglGetHandle(view);
+        LogDebug(ModuleName::Gui, "event: {}", PuglEventString(event->type));
 
         // On Windows, this event handler can be called from inside itself. This is due to blocking operations
         // such IFileDialog::Show() pumping messages itself.
@@ -847,7 +851,11 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
                 break;
             }
 
-            case PUGL_CLIENT: break;
+            case PUGL_CLIENT: {
+                post_redisplay =
+                    NativeFilePickerOnClientMessage(platform, event->client.data1, event->client.data2);
+                break;
+            }
 
             case PUGL_LOOP_ENTER: {
                 break;

@@ -122,7 +122,7 @@ void GlobalInit(GlobalInitOptions options) {
                                          writer,
                                          {
                                              .ansi_colours = true,
-                                             .demangle = false,
+                                             .demangle = IS_WINDOWS,
                                          });
             }
             auto _ = writer.WriteChar('\n');

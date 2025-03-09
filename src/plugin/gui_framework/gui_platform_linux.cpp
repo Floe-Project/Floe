@@ -26,6 +26,9 @@ ErrorCodeOr<void> detail::OpenNativeFilePicker(GuiPlatform& platform, FilePicker
     platform.frame_state.file_picker_results.Clear();
     platform.file_picker_result_arena.ResetCursorAndConsolidateRegions();
 
+    // IMPROVE: use Gtk Dialog directly instead of zenity so that we can associate the dialog with the window
+    // so that there is better UX for the dialog appearing on top of the window.
+
     // IMPROVE: be more considered with buffer size
     DynamicArrayBounded<char, 3000> command {};
     dyn::AppendSpan(command, "zenity --file-selection "_s);

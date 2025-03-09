@@ -566,6 +566,11 @@ PUBLIC constexpr bool IsSpacing(char c) { return c == ' ' || c == '\t'; }
 PUBLIC constexpr bool IsWhitespace(char c) { return IsSpacing(c) || IsEndOfLine(c); }
 PUBLIC constexpr bool IsPrintableAscii(char c) { return c >= 32 && c <= 126; }
 PUBLIC constexpr bool IsUppercaseAscii(char c) { return c >= 'A' && c <= 'Z'; }
+PUBLIC constexpr bool IsPrintableAscii(String str) {
+    for (auto const c : str)
+        if (!IsPrintableAscii(c)) return false;
+    return true;
+}
 
 // https://en.wikipedia.org/wiki/Whitespace_character
 PUBLIC constexpr bool IsSpaceU32(u32 c) {

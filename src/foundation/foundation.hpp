@@ -10,6 +10,7 @@
 #include "utils/maths.hpp" // IWYU pragma: export
 #include "utils/maths_constexpr.hpp" // IWYU pragma: export
 #include "utils/memory.hpp" // IWYU pragma: export
+#include "utils/opaque_handle.hpp" // IWYU pragma: export
 #include "utils/path.hpp" // IWYU pragma: export
 #include "utils/random.hpp" // IWYU pragma: export
 #include "utils/simd.hpp" // IWYU pragma: export

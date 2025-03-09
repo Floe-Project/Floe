@@ -391,7 +391,6 @@ Optional<Version> MacosBundleVersion(String path) {
     return ParseVersionString(str);
 }
 
-
 // NOTE: It seems you can receive filesystem events from before you start watching the directory even if you
 // use the kFSEventStreamEventIdSinceNow flag. There could be some sort of buffering going on.
 

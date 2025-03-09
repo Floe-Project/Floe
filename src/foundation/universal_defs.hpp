@@ -699,8 +699,7 @@ struct PlacementNewTag {};
     constexpr ~ClassName() requires(TriviallyCopyable<ValueTypeName>)                                        \
     = default
 
-#ifndef OBJC_NAME_PREFIX
-#error                                                                                                       \
-    "OBJC_NAME_PREFIX is missing; you must define this. When multiple bundles are loaded, the names of Objective-C classes are not namespaced, meaning that 2 different bundles could have name collisions. The only way to fix this is to make each bundle have a whole set of unique names for Objective-C classes"
-#endif
-#define MAKE_UNIQUE_OBJC_NAME(name) CONCAT(OBJC_NAME_PREFIX, name)
+// Objective-C classes need to have globally unique because if two classes have the same name, the objective-c
+// runtime is undefined which one it will use. This is across all currently loaded bundles. i.e. different
+// versions of Floe, or multiple plugins.
+#define MAKE_UNIQUE_OBJC_NAME(name) CONCAT(name, FLOE_VERSION_HASH)

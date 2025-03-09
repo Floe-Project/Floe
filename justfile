@@ -342,9 +342,11 @@ test-ci:
   sleep 2 # Wait a moment for the server to fully start
   popd
 
-  just parallel "{{checks_ci}}"
+  return_code=$(just parallel "{{checks_ci}}")
 
   kill $MDBOOK_PID
+
+  exit $return_code
 
 [unix]
 install-pre-commit-hook:

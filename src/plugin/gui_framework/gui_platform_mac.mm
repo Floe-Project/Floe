@@ -79,9 +79,8 @@ bool detail::NativeFilePickerOnClientMessage(GuiPlatform& platform, uintptr data
         if ([native_file_picker.panel isKindOfClass:[NSOpenPanel class]]) {
             auto open_panel = (NSOpenPanel*)native_file_picker.panel;
 
-            for (auto const i : Range<NSUInteger>(open_panel.URLs.count)) {
+            for (auto const i : Range<NSUInteger>(open_panel.URLs.count))
                 append_result(open_panel.URLs[i]);
-            }
         } else {
             auto save_panel = native_file_picker.panel;
             append_result(save_panel.URL);

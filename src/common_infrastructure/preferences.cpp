@@ -1680,6 +1680,15 @@ TEST_CASE(TestPreferences) {
         }
     }
 
+    SUBCASE("store a long string") {
+        Preferences prefs;
+        auto long_string = tester.scratch_arena.AllocateExactSizeUninitialised<char>(1000);
+        for (auto& c : long_string)
+            c = 'a';
+        AddValue(prefs, "key"_s, (String)long_string);
+        CHECK_EQ(*LookupString(prefs, "key"_s), long_string);
+    }
+
     return k_success;
 }
 

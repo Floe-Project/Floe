@@ -23,53 +23,6 @@
 
 #include "filesystem.hpp"
 
-ErrorCodeOr<Span<MutableString>> FilesystemDialog(DialogArguments args) {
-    DynamicArrayBounded<char, 3000> command {};
-    dyn::AppendSpan(command, "zenity --file-selection "_s);
-    fmt::Append(command, "--title=\"{}\" ", args.title);
-    if (args.default_path) fmt::Append(command, "--filename=\"{}\" ", *args.default_path);
-    for (auto f : args.filters)
-        fmt::Append(command, "--file-filter=\"{}|{}\" ", f.description, f.wildcard_filter);
-
-    if (args.allow_multiple_selection) dyn::AppendSpan(command, "--multiple "_s);
-
-    switch (args.type) {
-        case DialogArguments::Type::SelectFolder: {
-            dyn::AppendSpan(command, "--directory "_s);
-            break;
-        }
-        case DialogArguments::Type::OpenFile: {
-            break;
-        }
-        case DialogArguments::Type::SaveFile: {
-            dyn::AppendSpan(command, "--save "_s);
-            break;
-        }
-    }
-
-    FILE* f = popen(dyn::NullTerminated(command), "r");
-    if (f) {
-        char filenames[8000];
-        auto _ = fgets(filenames, ArraySize(filenames), f);
-        pclose(f);
-
-        auto output = FromNullTerminated(filenames);
-        LogDebug({}, "zenity output: {}", output);
-
-        while (output.size && Last(output) == '\n')
-            output.RemoveSuffix(1);
-
-        DynamicArray<MutableString> result {args.allocator};
-        for (auto part : SplitIterator {output, '|'})
-            if (path::IsAbsolute(part)) dyn::Append(result, result.allocator.Clone(part));
-        return result.ToOwnedSpan();
-    } else {
-        return FilesystemErrnoErrorCode(errno);
-    }
-
-    return Span<MutableString> {};
-}
-
 static ErrorCodeOr<ssize> CopyFile(char const* source, char const* destination) {
     int input;
     int output;

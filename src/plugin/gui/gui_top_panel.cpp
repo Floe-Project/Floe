@@ -337,7 +337,12 @@ void TopPanel(Gui* g) {
                 if (items.DoButton(save_over_text)) SaveCurrentStateToFile(g->engine, *existing_path);
             }
 
-            if (items.DoButton("Save Preset As")) g->OpenDialog(DialogType::SavePreset);
+            if (items.DoButton("Save Preset As")) {
+                OpenFilePickerSavePreset(g->file_picker_state,
+                                         g->imgui.frame_output,
+                                         g->prefs,
+                                         g->shared_engine_systems.paths);
+            }
 
             g->imgui.EndWindow();
         }

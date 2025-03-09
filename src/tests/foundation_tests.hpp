@@ -76,6 +76,15 @@ TEST_CASE(TestPathPool) {
         CHECK(pool.free_list != nullptr);
     }
 
+    SUBCASE("very long string") {
+        auto const long_string = a.AllocateExactSizeUninitialised<char>(1000);
+        for (auto& c : long_string)
+            c = 'a';
+        auto const p = pool.Clone((String)long_string, a);
+        CHECK_EQ(p, long_string);
+
+        pool.Free(p);
+    }
     return k_success;
 }
 

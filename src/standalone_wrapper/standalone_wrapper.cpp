@@ -396,14 +396,9 @@ static PuglStatus OnEvent(PuglView* view, PuglEvent const* event) {
             }
             break;
         }
-        case PUGL_FOCUS_IN: {
-            auto gui = (clap_plugin_gui const*)p.plugin.get_extension(&p.plugin, CLAP_EXT_GUI);
-            if (gui) gui->show(&p.plugin);
-            break;
-        }
+        case PUGL_FOCUS_IN:
         case PUGL_FOCUS_OUT: {
-            auto gui = (clap_plugin_gui const*)p.plugin.get_extension(&p.plugin, CLAP_EXT_GUI);
-            if (gui) gui->hide(&p.plugin);
+            // TODO: on macOS, we are not getting focus events in the child
             break;
         }
         case PUGL_NOTHING:

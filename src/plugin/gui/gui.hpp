@@ -14,6 +14,7 @@
 #include "gui/gui_modal_windows.hpp"
 #include "gui_editor_widgets.hpp"
 #include "gui_envelope.hpp"
+#include "gui_file_picker.hpp"
 #include "gui_framework/draw_list.hpp"
 #include "gui_framework/fonts.hpp"
 #include "gui_framework/gui_imgui.hpp"
@@ -115,18 +116,9 @@ class FloeWaveformImages {
     DynamicArray<Waveform> m_waveforms {Malloc::Instance()};
 };
 
-enum class DialogType {
-    AddNewLibraryScanFolder,
-    AddNewPresetsScanFolder,
-    SavePreset,
-    LoadPreset,
-};
-
 struct Gui {
     Gui(GuiFrameInput& frame_input, Engine& engine);
     ~Gui();
-
-    void OpenDialog(DialogType type);
 
     PageAllocator page_allocator;
     ArenaAllocator scratch_arena {page_allocator};
@@ -139,6 +131,7 @@ struct Gui {
     bool attribution_panel_open {};
     FeedbackPanelState feedback_panel_state {};
     Notifications notifications {};
+    FilePickerState file_picker_state {.data = FilePickerStateType::None};
 
     GuiFrameInput& frame_input;
     GuiFrameResult frame_output;

@@ -58,6 +58,7 @@ struct ModifierFlags {
 
 enum class MouseButton : u32 { Left, Right, Middle, Count };
 
+// The framework gives the application this struct every frame.
 struct GuiFrameInput {
     struct MouseButtonState {
         struct Event {
@@ -117,6 +118,11 @@ struct GuiFrameInput {
     DynamicArray<char> clipboard_text {PageAllocator::Instance()};
     DynamicArrayBounded<u32, 16> input_utf32_chars {};
 
+    // A list of filepaths that the user selected in the (now closed) file picker dialog. Cleared every frame.
+    // If needed, you will need to have stored what these relate to - what GuiFrameResult::file_picker_dialog
+    // was set to.
+    ArenaStack<String> file_picker_results {};
+
     TimePoint current_time {};
     TimePoint time_prev {};
     f32 delta_time {};
@@ -138,7 +144,37 @@ struct MouseTrackedRect {
 
 enum class CursorType { Default, Hand, IBeam, AllArrows, HorizontalArrows, VerticalArrows, Count };
 
-// Fill this struct every frame to instruct the caller about the GUI's needs.
+struct FilePickerDialogOptions {
+    enum class Type { SaveFile, OpenFile, SelectFolder };
+    struct FileFilter {
+        FileFilter Clone(Allocator& a, CloneType t) const {
+            return {
+                .description = description.Clone(a, t),
+                .wildcard_filter = wildcard_filter.Clone(a, t),
+            };
+        }
+        String description;
+        String wildcard_filter;
+    };
+
+    FilePickerDialogOptions Clone(Allocator& a, CloneType t) const {
+        return {
+            .type = type,
+            .title = title.Clone(a, t),
+            .default_path = default_path.Clone(a, t),
+            .filters = a.Clone(filters, t),
+            .allow_multiple_selection = allow_multiple_selection,
+        };
+    }
+
+    Type type {Type::OpenFile};
+    String title {"Select File"};
+    Optional<String> default_path {}; // folder and file
+    Span<FileFilter const> filters {};
+    bool allow_multiple_selection {};
+};
+
+// Fill this struct every frame to instruct the framework about the application's needs.
 struct GuiFrameResult {
     enum class UpdateRequest {
         // 1. GUI will sleep until there's user iteraction or a timed wakeup fired
@@ -185,6 +221,11 @@ struct GuiFrameResult {
     // Set this to the text that you want put into the OS clipboard
     // Must be valid until the next frame.
     Span<char> set_clipboard_text {};
+
+    // Set this to request a file picker dialog be opened. It's rejected if a dialog is already open. The
+    // application owns object, not the framework. The memory must persist until the next frame. You will
+    // receive the results in GuiFrameInput::file_picker_results - check that variable every frame.
+    Optional<FilePickerDialogOptions> file_picker_dialog {};
 
     // Must be valid until the next frame.
     graphics::DrawData draw_data {};

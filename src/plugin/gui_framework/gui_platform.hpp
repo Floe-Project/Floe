@@ -45,6 +45,8 @@ struct GuiPlatform {
     Optional<clap_id> clap_timer_id {};
     Optional<int> clap_posix_fd {};
     bool inside_update {};
+    ArenaAllocator file_picker_result_arena {Malloc::Instance()};
+    Optional<OpaqueHandle<IS_WINDOWS ? 160 : 16>> native_file_picker {};
 };
 
 // Public API
@@ -101,14 +103,25 @@ static ErrorCodeOr<void> Required(PuglStatus status) {
 }
 
 namespace detail {
+
 static PuglStatus EventHandler(PuglView* view, PuglEvent const* event);
 static void LogIfSlow(Stopwatch& stopwatch, String message);
 inline FloeClapExtensionHost const* CustomFloeHost(clap_host const& host);
 
-// Linux only, we need a way get the file descriptor from the X11 Display, but there's all kinds of macro
-// problems if we directly include X11 headers here, so we'll do it in a separate translation unit
+// Due to the way Windows, Linux and macOS handle file pickers, we have this design:
+// - This function may or may not block, depending on the platform.
+// - Either way, it will fill GuiFrameInput::file_picker_results with the selected file paths for the
+//   application to consume on its next frame.
+ErrorCodeOr<void> OpenNativeFilePicker(GuiPlatform& platform, FilePickerDialogOptions const& options);
+void CloseNativeFilePicker(GuiPlatform& platform);
+
+// Returns true to request the platform to update the GUI.
+bool NativeFilePickerOnClientMessage(GuiPlatform& platform, uintptr data1, uintptr data2);
+
+// Linux only
 int FdFromPuglWorld(PuglWorld* world);
 void X11SetParent(PuglView* view, uintptr parent);
+
 } // namespace detail
 
 PUBLIC ErrorCodeOr<void> CreateView(GuiPlatform& platform) {
@@ -159,6 +172,9 @@ PUBLIC ErrorCodeOr<void> CreateView(GuiPlatform& platform) {
 
 PUBLIC void DestroyView(GuiPlatform& platform) {
     Trace(ModuleName::Gui);
+
+    detail::CloseNativeFilePicker(platform);
+
     if (platform.gui) {
         platform.gui.Clear();
 
@@ -276,6 +292,7 @@ PUBLIC ErrorCodeOr<void> SetVisible(GuiPlatform& platform, bool visible, Engine&
         TRY(Required(puglShow(platform.view, PUGL_SHOW_PASSIVE)));
     } else {
         platform.frame_state.Reset();
+        detail::CloseNativeFilePicker(platform);
         // IMRPOVE: stop update timers, make things more efficient
         TRY(Required(puglHide(platform.view)));
     }
@@ -613,6 +630,7 @@ static void ClearImpermanentState(GuiFrameInput& frame_state) {
         key.presses_or_repeats.Clear();
     }
 
+    frame_state.file_picker_results.Clear();
     frame_state.input_utf32_chars = {};
     frame_state.mouse_scroll_delta_in_lines = 0;
     dyn::Clear(frame_state.clipboard_text);
@@ -649,6 +667,15 @@ static void HandlePostUpdateRequests(GuiPlatform& platform) {
         LogDebug(ModuleName::Gui, "requesting copy into OS clipboard, size: {}", cb.size);
         puglSetClipboard(platform.view, IS_LINUX ? "UTF8_STRING" : "text/plain", cb.data, cb.size);
     }
+
+    if (platform.last_result.file_picker_dialog)
+        if (auto const o = OpenNativeFilePicker(platform, *platform.last_result.file_picker_dialog);
+            o.HasError()) {
+            ReportError(ErrorLevel::Error,
+                        SourceLocationHash(),
+                        "Failed to open file picker dialog: {}",
+                        o.Error());
+        }
 }
 
 static void UpdateAndRender(GuiPlatform& platform) {
@@ -823,7 +850,11 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
                 break;
             }
 
-            case PUGL_CLIENT: break;
+            case PUGL_CLIENT: {
+                post_redisplay =
+                    NativeFilePickerOnClientMessage(platform, event->client.data1, event->client.data2);
+                break;
+            }
 
             case PUGL_LOOP_ENTER: {
                 break;

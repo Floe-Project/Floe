@@ -43,83 +43,108 @@
 // }
 // @end
 
-bool detail::NativeFilePickerOnClientMessage(GuiPlatform&, uintptr, uintptr) { return false; }
+struct NativeFilePicker {
+    NSSavePanel* panel = nullptr;
+};
+
+constexpr uintptr k_file_picker_completed = 0xD1A106;
+
+bool detail::NativeFilePickerOnClientMessage(GuiPlatform& platform, uintptr data1, uintptr data2) {
+    if (!platform.native_file_picker) return false;
+    if (data1 != k_file_picker_completed) return false;
+
+    auto& native_file_picker = platform.native_file_picker->As<NativeFilePicker>();
+    if (!native_file_picker.panel) return false;
+
+    ASSERT([NSThread isMainThread]);
+    platform.frame_state.file_picker_results = {};
+    platform.file_picker_result_arena.ResetCursorAndConsolidateRegions();
+
+    auto const response = (NSModalResponse)data2;
+    if (response == NSModalResponseOK) {
+        if ([native_file_picker.panel isKindOfClass:[NSOpenPanel class]]) {
+            auto open_panel = (NSOpenPanel*)native_file_picker.panel;
+
+            for (auto const i : Range<NSUInteger>(open_panel.URLs.count)) {
+                NSURL* selection = open_panel.URLs[i];
+                NSString* path = [[selection path] stringByResolvingSymlinksInPath];
+                auto utf8 = FromNullTerminated(path.UTF8String);
+                ASSERT(path::IsAbsolute(utf8));
+
+                platform.frame_state.file_picker_results.Append(utf8.Clone(platform.file_picker_result_arena),
+                                                                platform.file_picker_result_arena);
+            }
+        } else {
+            // NSSavePanel
+        }
+        return true;
+    }
+
+    native_file_picker.panel = nullptr; // release
+    platform.native_file_picker.Clear();
+
+    return false;
+}
 
 ErrorCodeOr<void> detail::OpenNativeFilePicker(GuiPlatform& platform,
                                                FilePickerDialogOptions const& options) {
     ASSERT(platform.view);
     if (platform.native_file_picker) return k_success;
     platform.native_file_picker.Emplace();
+    auto& native_file_picker = platform.native_file_picker->As<NativeFilePicker>();
+
     @try {
-        // auto delegate = [[DIALOG_DELEGATE_CLASS alloc] init];
-        // delegate.filters = options.filters;
+        ASSERT([NSThread isMainThread]);
+        ASSERT([NSApp activationPolicy] != NSApplicationActivationPolicyProhibited);
+
         switch (options.type) {
             case FilePickerDialogOptions::Type::OpenFile:
             case FilePickerDialogOptions::Type::SelectFolder: {
-                ASSERT([NSThread isMainThread]);
-                ASSERT([NSApp activationPolicy] != NSApplicationActivationPolicyProhibited);
-
                 NSOpenPanel* open_panel = [NSOpenPanel openPanel];
-                platform.native_file_picker->As<void*>() = (__bridge_retained void*)(NSSavePanel*)open_panel;
+                ASSERT(!native_file_picker.panel);
+                native_file_picker.panel = (NSSavePanel*)open_panel; // retain
 
-                // open_panel.delegate = delegate;
-                open_panel.parentWindow = ((__bridge NSView*)(void*)puglGetNativeView(platform.view)).window;
-
-                open_panel.title = StringToNSString(options.title);
-                [open_panel setLevel:NSModalPanelWindowLevel];
-                open_panel.showsResizeIndicator = YES;
-                open_panel.showsHiddenFiles = NO;
                 open_panel.canChooseDirectories = options.type == FilePickerDialogOptions::Type::SelectFolder;
                 open_panel.canChooseFiles = options.type == FilePickerDialogOptions::Type::OpenFile;
                 open_panel.canCreateDirectories = YES;
                 open_panel.allowsMultipleSelection = options.allow_multiple_selection;
-                if (options.default_path)
-                    open_panel.directoryURL = [NSURL fileURLWithPath:StringToNSString(*options.default_path)];
-
-                [open_panel beginWithCompletionHandler:^(NSInteger response) {
-                  ASSERT([NSThread isMainThread]); // TODO: is this assertion guaranteed to be true?
-                  platform.frame_state.file_picker_results = {};
-                  platform.file_picker_result_arena.ResetCursorAndConsolidateRegions();
-                  if (response == NSModalResponseOK) {
-                      for (auto const i : Range<NSUInteger>(open_panel.URLs.count)) {
-                          NSURL* selection = open_panel.URLs[i];
-                          NSString* path = [[selection path] stringByResolvingSymlinksInPath];
-                          auto utf8 = FromNullTerminated(path.UTF8String);
-                          ASSERT(path::IsAbsolute(utf8));
-
-                          platform.frame_state.file_picker_results.Append(
-                              utf8.Clone(platform.file_picker_result_arena),
-                              platform.file_picker_result_arena);
-                      }
-                  } else {
-                  }
-                  platform.native_file_picker.Clear();
-                }];
-
                 break;
             }
             case FilePickerDialogOptions::Type::SaveFile: {
-                // NSSavePanel* panel = [NSSavePanel savePanel];
-                // panel.title = StringToNSString(options.title);
-                // [panel setLevel:NSModalPanelWindowLevel];
-                // if (options.default_path) {
-                //     if (auto const dir = path::Directory(*options.default_path))
-                //         panel.directoryURL = [NSURL fileURLWithPath:StringToNSString(*dir)
-                //         isDirectory:YES];
-                // }
-                //
-                // auto const response = [panel runModal];
-                // if (response == NSModalResponseOK) {
-                //     auto const path = NSStringToString([[panel URL] path]);
-                //     if (path::IsAbsolute(path)) {
-                //         auto result = options.allocator.AllocateExactSizeUninitialised<MutableString>(1);
-                //         result[0] = path.Clone(options.allocator);
-                //         return result;
-                //     }
-                // }
+                NSSavePanel* save_panel = [NSSavePanel savePanel];
+                ASSERT(!native_file_picker.panel);
+                native_file_picker.panel = (NSSavePanel*)save_panel; // retain
                 break;
             }
         }
+
+        auto panel = native_file_picker.panel;
+
+        // auto delegate = [[DIALOG_DELEGATE_CLASS alloc] init];
+        // delegate.filters = options.filters;
+        // panel.delegate = delegate;
+
+        panel.parentWindow = ((__bridge NSView*)(void*)puglGetNativeView(platform.view)).window;
+        panel.title = StringToNSString(options.title);
+        [panel setLevel:NSModalPanelWindowLevel];
+        panel.showsResizeIndicator = YES;
+        panel.showsHiddenFiles = NO;
+        panel.canCreateDirectories = YES;
+        if (options.default_path)
+            panel.directoryURL = [NSURL fileURLWithPath:StringToNSString(*options.default_path)];
+
+        [panel beginWithCompletionHandler:^(NSInteger response) {
+          // I don't think we can assert that this is always the main thread, so let's send it via
+          // Pugl's event system which should be safe.
+          PuglEvent const event {.client = {
+                                     .type = PUGL_CLIENT,
+                                     .flags = PUGL_IS_SEND_EVENT,
+                                     .data1 = k_file_picker_completed,
+                                     .data2 = (uintptr)response,
+                                 }};
+          auto const rc = puglSendEvent(platform.view, &event);
+          ASSERT(rc == PUGL_SUCCESS);
+        }];
 
     } @catch (NSException* e) {
         // TODO: report the error somehow
@@ -129,7 +154,9 @@ ErrorCodeOr<void> detail::OpenNativeFilePicker(GuiPlatform& platform,
 
 void detail::CloseNativeFilePicker(GuiPlatform& platform) {
     if (!platform.native_file_picker) return;
-    auto panel = (__bridge_transfer NSSavePanel*)platform.native_file_picker->As<void*>();
-
-    [panel close];
+    auto& native_file_picker = platform.native_file_picker->As<NativeFilePicker>();
+    if (!native_file_picker.panel) return;
+    [native_file_picker.panel close];
+    native_file_picker.panel = nullptr; // release
+    platform.native_file_picker.Clear();
 }

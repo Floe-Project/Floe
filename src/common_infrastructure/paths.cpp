@@ -124,7 +124,7 @@ prefs::Descriptor ExtraScanFolderDescriptor(FloePaths const& paths, ScanFolderTy
                         if (value.size > 8000) return false;
                         if (!path::IsAbsolute(value)) return false;
                         if (!IsValidUtf8(value)) return false;
-                        if (value == paths.always_scanned_folder[ToInt(type)]) return false;
+                        if (path::Equal(value, paths.always_scanned_folder[ToInt(type)])) return false;
                         return true;
                     },
             },

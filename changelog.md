@@ -9,6 +9,9 @@ For instance: 0.0.1. Don't change the headings.
 
 # Changelog
 
+## 0.0.4-alpha
+Fix crash when opening the preset browser.
+
 ## 0.0.3-alpha
 Version 0.0.3-alpha is a big step towards a stable release. There's been 250 changed files with 17,898 code additions and 7,634 deletions since the last release. 
 

@@ -364,7 +364,6 @@ PUBLIC Id CreateItem(Context& ctx, ItemOptions options) {
         ASSERT(!options.parent);
         ASSERT(options.anchor == Anchor::None);
         ASSERT(!options.set_item_height_after_width_calculated);
-        ASSERT(All(options.margins.lrtb == 0));
     }
 
     if (auto const width = options.size.x; width > 0)

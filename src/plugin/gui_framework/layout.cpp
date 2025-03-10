@@ -251,7 +251,7 @@ static void CalcSize(Context& ctx, Id const id, u32 const dim) {
     // Set the mutable rect output data to the starting input data
     ctx.rects[ToInt(id)][dim] = item->margins_ltrb[dim];
 
-    // If we have an explicit input size, just set our output size (which other calc_size and arrange
+    // If we have an explicit input size, ust set our output size (which other calc_size and arrange
     // procedures will use) to it.
     if (item->size[dim] != 0) {
         ctx.rects[ToInt(id)][size_dim] = item->size[dim];
@@ -348,7 +348,7 @@ static ALWAYS_INLINE void ArrangeStacked(Context& ctx, Id id, u32 const dim, boo
             else if (total > 0) {
                 switch (item_flags & flags::Justify) {
                     case flags::Justify:
-                        // justify when not wrapping or not in last line, or not manually breaking
+                        // ustify when not wrapping or not in last line, or not manually breaking
                         if (!wrap || ((end_child_id != k_invalid_id) && !hardbreak))
                             spacer = extra_space / (f32)(total - 1);
                         break;

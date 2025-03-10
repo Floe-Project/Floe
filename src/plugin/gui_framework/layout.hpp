@@ -224,8 +224,10 @@ ALWAYS_INLINE inline void SetItemSize(Item& item, f32x2 size) {
         item.size[0] = 0;
         item.flags &= ~flags::HorizontalSizeFixed;
         item.flags |= flags::AnchorLeftAndRight;
-    } else
+    } else {
+        ASSERT(w > 0);
         item.flags |= flags::HorizontalSizeFixed;
+    }
 
     auto const h = size[1];
     if (h == k_hug_contents)
@@ -234,8 +236,10 @@ ALWAYS_INLINE inline void SetItemSize(Item& item, f32x2 size) {
         item.size[1] = 0;
         item.flags &= ~flags::VerticalSizeFixed;
         item.flags |= flags::AnchorTopAndBottom;
-    } else
+    } else {
+        ASSERT(h > 0);
         item.flags |= flags::VerticalSizeFixed;
+    }
 }
 ALWAYS_INLINE inline void SetSize(Context& ctx, Id id, f32x2 size) { SetItemSize(*GetItem(ctx, id), size); }
 
@@ -353,6 +357,7 @@ PUBLIC Margins GetMargins(Context& ctx, Id id) {
 
 PUBLIC Id CreateItem(Context& ctx, ItemOptions options) {
     auto const id = CreateItem(ctx);
+
     if (ToInt(id) == 0) {
         // The root item should be a container with a known size, otherwise we can't calculate the layout.
         ASSERT(All(options.size != k_hug_contents));
@@ -363,6 +368,12 @@ PUBLIC Id CreateItem(Context& ctx, ItemOptions options) {
         ASSERT(!options.set_item_height_after_width_calculated);
         ASSERT(All(options.margins.lrtb == 0));
     }
+
+    if (auto const width = options.size.x; width > 0)
+        ASSERT(options.contents_padding.l + options.contents_padding.r < width);
+    if (auto const height = options.size.y; height > 0)
+        ASSERT(options.contents_padding.t + options.contents_padding.b < height);
+
     auto& item = *GetItem(ctx, id);
     item.container_padding_ltrb =
         __builtin_shufflevector(options.contents_padding.lrtb, options.contents_padding.lrtb, 0, 2, 1, 3);

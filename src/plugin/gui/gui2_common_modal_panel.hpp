@@ -36,6 +36,7 @@ struct ModalTabBarConfig {
 
 // Creates a standard panel header with title and close button
 PUBLIC Box DoModalHeader(GuiBoxSystem& box_system, ModalHeaderConfig const& config) {
+    ASSERT(config.title.size);
     auto const title_container = DoBox(box_system,
                                        {
                                            .parent = config.parent,

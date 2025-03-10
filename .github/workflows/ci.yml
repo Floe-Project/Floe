@@ -8,9 +8,11 @@ on:
   push:
     branches:
       - main
+      - develop
   pull_request:
     branches:
       - main
+      - develop
   release:
     types: [published] # our website needs to update its download links
 
@@ -176,8 +178,8 @@ jobs:
           path: ~/AppData/Local/Floe/Logs/*
   
   notify:
-    # We run this for main, and also for PRs that are not from forks; in other words, PRs originating from Floe devs.
-    if: ${{ (github.ref == 'refs/heads/main' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)) && !cancelled() }}
+    # We run this for main/develop, and also for PRs that are not from forks; in other words, PRs originating from Floe devs.
+    if: ${{ ((github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)) && !cancelled() }}
     runs-on: ubuntu-latest
     needs: [linux-compile-and-test, windows-test, mac-compile-and-test]
     steps:

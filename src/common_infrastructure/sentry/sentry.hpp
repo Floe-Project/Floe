@@ -580,25 +580,25 @@ PUBLIC ErrorCodeOr<fmt::UuidArray> SubmitEnvelope(Sentry& sentry,
                                               sentry.dsn.host,
                                               sentry.dsn.project_id);
 
-        auto const o = HttpsPost(
-            envelope_url,
-            envelope_buffer,
-            Array {
-                "Content-Type: application/x-sentry-envelope"_s,
-                fmt::Format(scratch_arena,
-                            "X-Sentry-Auth: Sentry sentry_version=7, sentry_client={}, sentry_key={}",
-                            detail::k_user_agent,
-                            sentry.dsn.public_key),
-                fmt::Format(scratch_arena, "Content-Length: {}", envelope_buffer.size),
-                fmt::Format(scratch_arena,
-                            "User-Agent: {} ({})"_s,
-                            detail::k_user_agent,
-                            IS_WINDOWS ? "Windows"
-                            : IS_LINUX ? "Linux"
-                                       : "macOS"),
-            },
-            options.response,
-            options.request_options);
+        auto const headers = Array {
+            "Content-Type: application/x-sentry-envelope"_s,
+            fmt::Format(scratch_arena,
+                        "X-Sentry-Auth: Sentry sentry_version=7, sentry_client={}, sentry_key={}",
+                        detail::k_user_agent,
+                        sentry.dsn.public_key),
+            fmt::Format(scratch_arena, "Content-Length: {}", envelope_buffer.size),
+            fmt::Format(scratch_arena,
+                        "User-Agent: {} ({})"_s,
+                        detail::k_user_agent,
+                        IS_WINDOWS ? "Windows"
+                        : IS_LINUX ? "Linux"
+                                   : "macOS"),
+        };
+
+        ASSERT(!options.request_options.headers.size);
+        options.request_options.headers = headers;
+
+        auto const o = HttpsPost(envelope_url, envelope_buffer, options.response, options.request_options);
 
         // If there's an error other than just the internet being down, we want to capture that too.
         if (options.write_to_file_if_needed && o.HasError() && o.Error() != WebError::NetworkError) {

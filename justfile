@@ -343,8 +343,11 @@ test-ci:
   popd
 
   just parallel "{{checks_ci}}"
+  return_code=$?
 
   kill $MDBOOK_PID
+
+  exit $return_code
 
 [unix]
 install-pre-commit-hook:

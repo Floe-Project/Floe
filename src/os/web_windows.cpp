@@ -54,6 +54,17 @@ ErrorCodeOr<void> HttpsGet(String url, Writer response_writer, RequestOptions op
     if (!request) return ErrorCode {WebError::NetworkError};
     DEFER { WinHttpCloseHandle(request); };
 
+    // Add custom headers
+    for (auto const& header : options.headers) {
+        auto wide_header = *Widen(temp_arena, header);
+        if (!WinHttpAddRequestHeaders(request,
+                                      wide_header.data,
+                                      (DWORD)wide_header.size,
+                                      WINHTTP_ADDREQ_FLAG_ADD)) {
+            return ErrorCode {WebError::ApiError};
+        }
+    }
+
     if (!WinHttpSendRequest(request, WINHTTP_NO_ADDITIONAL_HEADERS, 0, WINHTTP_NO_REQUEST_DATA, 0, 0, 0))
         return ErrorCode {WebError::NetworkError};
 
@@ -77,11 +88,8 @@ ErrorCodeOr<void> HttpsGet(String url, Writer response_writer, RequestOptions op
     return k_success;
 }
 
-ErrorCodeOr<void> HttpsPost(String url,
-                            String body,
-                            Span<String> headers,
-                            Optional<Writer> response_writer,
-                            RequestOptions options) {
+ErrorCodeOr<void>
+HttpsPost(String url, String body, Optional<Writer> response_writer, RequestOptions options) {
     ArenaAllocatorWithInlineStorage<1000> temp_arena {Malloc::Instance()};
     URL_COMPONENTS url_comps {};
     url_comps.dwStructSize = sizeof(URL_COMPONENTS);
@@ -126,7 +134,7 @@ ErrorCodeOr<void> HttpsPost(String url,
     DEFER { WinHttpCloseHandle(request); };
 
     // Add custom headers
-    for (auto const& header : headers) {
+    for (auto const& header : options.headers) {
         auto wide_header = *Widen(temp_arena, header);
         if (!WinHttpAddRequestHeaders(request,
                                       wide_header.data,

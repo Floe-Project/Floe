@@ -16,7 +16,15 @@
 
 ErrorCodeOr<void> HttpsGet(String url, Writer writer, RequestOptions options) {
     NSURL* nsurl = [NSURL URLWithString:StringToNSString(url)];
-    NSURLRequest* request = [NSURLRequest requestWithURL:nsurl];
+    NSMutableURLRequest* request = [NSMutableURLRequest requestWithURL:nsurl];
+    [request setHTTPMethod:@"GET"];
+
+    // Add custom headers
+    for (auto const& header : options.headers) {
+        NSString* header_string = StringToNSString(header);
+        NSArray* components = [header_string componentsSeparatedByString:@": "];
+        if (components.count == 2) [request setValue:components[1] forHTTPHeaderField:components[0]];
+    }
 
     NSURLSessionConfiguration* session_config = [NSURLSessionConfiguration defaultSessionConfiguration];
     session_config.timeoutIntervalForRequest = (f64)options.timeout_seconds;
@@ -49,11 +57,8 @@ ErrorCodeOr<void> HttpsGet(String url, Writer writer, RequestOptions options) {
     return result;
 }
 
-ErrorCodeOr<void> HttpsPost(String url,
-                            String body,
-                            Span<String> headers,
-                            Optional<Writer> response_writer,
-                            RequestOptions options) {
+ErrorCodeOr<void>
+HttpsPost(String url, String body, Optional<Writer> response_writer, RequestOptions options) {
     NSURL* nsurl = [NSURL URLWithString:StringToNSString(url)];
     NSMutableURLRequest* request = [NSMutableURLRequest requestWithURL:nsurl];
     [request setHTTPMethod:@"POST"];
@@ -63,7 +68,7 @@ ErrorCodeOr<void> HttpsPost(String url,
     [request setHTTPBody:request_body];
 
     // Add custom headers
-    for (auto const& header : headers) {
+    for (auto const& header : options.headers) {
         NSString* header_string = StringToNSString(header);
         NSArray* components = [header_string componentsSeparatedByString:@": "];
         if (components.count == 2) [request setValue:components[1] forHTTPHeaderField:components[0]];

@@ -45,6 +45,8 @@ struct PathPool {
         new_path->buffer = arena.AllocateExactSizeUninitialised<char>(Max(p.size, 64uz));
         new_path->buffer_refs = 1;
         CopyMemory(new_path->buffer.data, p.data, p.size);
+        if (new_path->buffer.size != p.size)
+            ZeroMemory(new_path->buffer.data + p.size, new_path->buffer.size - p.size);
         SinglyLinkedListPrepend(used_list, new_path);
         return {new_path->buffer.data, p.size};
     }

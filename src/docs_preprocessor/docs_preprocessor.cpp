@@ -152,9 +152,16 @@ static ErrorCodeOr<String> PreprocessMarkdownBlob(String markdown_blob) {
         if (cached_response) {
             json_data = *cached_response;
         } else {
+            Span<String> headers {};
+            if (auto const token = GetEnvironmentVariable("GITHUB_TOKEN"_s, scratch)) {
+                headers = scratch.AllocateExactSizeUninitialised<String>(1);
+                headers[0] = fmt::Format(scratch, "Authorization: Bearer {}", *token);
+            }
+
             DynamicArray<char> data {scratch};
             TRY(HttpsGet("https://api.github.com/repos/Floe-Project/Floe/releases/latest",
-                         dyn::WriterFor(data)));
+                         dyn::WriterFor(data),
+                         {.headers = headers}));
             json_data = data.ToOwnedSpan();
             TRY(WriteFile(cached_reponse_path, json_data));
         }

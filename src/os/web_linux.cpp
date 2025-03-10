@@ -67,11 +67,8 @@ ErrorCodeOr<void> HttpsGet(String url, Writer writer, RequestOptions options) {
     return k_success;
 }
 
-ErrorCodeOr<void> HttpsPost(String url,
-                            String body,
-                            Span<String> headers,
-                            Optional<Writer> response_writer,
-                            RequestOptions options) {
+ErrorCodeOr<void>
+HttpsPost(String url, String body, Optional<Writer> response_writer, RequestOptions options) {
     auto curl = curl_easy_init();
     if (!curl) return ErrorCode {WebError::ApiError};
     DEFER { curl_easy_cleanup(curl); };
@@ -95,11 +92,13 @@ ErrorCodeOr<void> HttpsPost(String url,
 
     struct curl_slist* curl_headers = nullptr;
     DEFER { curl_slist_free_all(curl_headers); };
-    for (auto const& header : headers) {
-        ASSERT(header.size);
-        curl_headers = curl_slist_append(curl_headers, NullTerminated(header, arena));
+    if (options.headers.size) {
+        for (auto const& header : options.headers) {
+            ASSERT(header.size);
+            curl_headers = curl_slist_append(curl_headers, NullTerminated(header, arena));
+        }
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, curl_headers);
     }
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, curl_headers);
 
     char error_buffer[CURL_ERROR_SIZE] {};
     curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, error_buffer);

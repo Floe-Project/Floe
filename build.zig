@@ -1211,7 +1211,6 @@ pub fn build(b: *std.Build) void {
             "-Wdouble-promotion",
             "-Woverloaded-virtual",
             "-Wno-missing-field-initializers",
-            b.fmt("-DOBJC_NAME_PREFIX=Floe{d}", .{floe_version_hash}),
             "-DFLAC__NO_DLL",
             "-DPUGL_DISABLE_DEPRECATED",
             "-DPUGL_STATIC",
@@ -1247,6 +1246,7 @@ pub fn build(b: *std.Build) void {
             .PRODUCTION_BUILD = build_context.build_mode == .production,
             .RUNTIME_SAFETY_CHECKS_ON = build_context.optimise == .Debug or build_context.optimise == .ReleaseSafe,
             .FLOE_VERSION_STRING = floe_version_string,
+            .FLOE_VERSION_HASH = floe_version_hash,
             .FLOE_DESCRIPTION = floe_description,
             .FLOE_HOMEPAGE_URL = floe_homepage_url,
             .FLOE_MANUAL_URL = floe_manual_url,
@@ -1496,6 +1496,7 @@ pub fn build(b: *std.Build) void {
         });
         {
             const pugl_path = build_context.dep_pugl.path("src");
+            const pugl_version = std.hash.Fnv1a_32.hash(build_context.dep_pugl.builder.pkg_hash);
 
             pugl.addCSourceFiles(.{
                 .root = pugl_path,
@@ -1531,21 +1532,12 @@ pub fn build(b: *std.Build) void {
                             "mac_stub.m",
                         },
                         .flags = universalFlags(&build_context, target, &.{
-                            b.fmt("-DPuglWindow=PuglWindowFPFloe{}{}{}", .{
-                                floe_version.major,
-                                floe_version.minor,
-                                floe_version.patch,
-                            }),
-                            b.fmt("-DPuglWrapperView=PuglWrapperViewFPFloe{}{}{}", .{
-                                floe_version.major,
-                                floe_version.minor,
-                                floe_version.patch,
-                            }),
-                            b.fmt("-DPuglOpenGLView=PuglOpenGLViewFPFloe{}{}{}", .{
-                                floe_version.major,
-                                floe_version.minor,
-                                floe_version.patch,
-                            }),
+                            // Make unique names to avoid collisions with other versions of Pugl that might be
+                            // loaded in the application (other plugins). Objective-C uses a global namespace.
+                            b.fmt("-DPuglWindow=PuglWindow{d}", .{pugl_version}),
+                            b.fmt("-DPuglWindowDelegate=PuglWindowDelegate{d}", .{pugl_version}),
+                            b.fmt("-DPuglWrapperView=PuglWrapperView{d}", .{pugl_version}),
+                            b.fmt("-DPuglOpenGLView=PuglOpenGLView{d}", .{pugl_version}),
                         }) catch @panic("OOM"),
                     });
                     pugl.linkFramework("OpenGL");
@@ -2774,7 +2766,7 @@ pub fn build(b: *std.Build) void {
                         \\     return fillAUCV_{[name]s}(viewInfo);
                         \\ }}
                     , .{
-                        .name = b.fmt("Floe{d}{d}{d}", .{ floe_version.major, floe_version.minor, floe_version.patch }),
+                        .name = b.fmt("Floe{d}", .{floe_version_hash}),
                     })) catch @panic("could not write to file");
                 }
 

@@ -81,6 +81,20 @@ OsInfo GetOsInfo() {
     return result;
 }
 
+Optional<MutableString> GetEnvironmentVariable(char const* name, Allocator& a) {
+    return GetEnvironmentVariable(FromNullTerminated(name), a);
+}
+
+Optional<MutableString> GetEnvironmentVariable(String name, Allocator& a) {
+    ArenaAllocatorWithInlineStorage<4000> scratch {PageAllocator::Instance()};
+    auto const w_name = WidenAllocNullTerm(scratch, name).Value();
+    auto const size = GetEnvironmentVariableW(w_name.data, nullptr, 0);
+    if (size == 0) return k_nullopt;
+    auto const buffer = scratch.AllocateExactSizeUninitialised<WCHAR>(size);
+    GetEnvironmentVariableW(w_name.data, buffer.data, size);
+    return Narrow(a, buffer).Value();
+}
+
 u64 RandomSeed() {
     auto const pid = GetCurrentProcessId();
     auto const tid = GetCurrentThreadId();

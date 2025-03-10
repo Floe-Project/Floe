@@ -1254,6 +1254,29 @@ TEST_CASE(TestWeb) {
     return k_success;
 }
 
+TEST_CASE(TestGetEnvVar) {
+    SUBCASE("c string version") {
+        auto const v = GetEnvironmentVariable("PATH", tester.scratch_arena);
+        CHECK(v);
+        CHECK(v->size > 0);
+        tester.log.Debug("PATH: {}", v);
+    }
+
+    SUBCASE("string version") {
+        auto const v = GetEnvironmentVariable("PATH"_s, tester.scratch_arena);
+        CHECK(v);
+        CHECK(v->size > 0);
+        tester.log.Debug("PATH: {}", v);
+    }
+
+    SUBCASE("non-existant variable") {
+        auto const v = GetEnvironmentVariable("FMNDTEBORPDXCMW"_s, tester.scratch_arena);
+        CHECK(!v);
+    }
+
+    return k_success;
+}
+
 TEST_REGISTRATION(RegisterOsTests) {
     REGISTER_TEST(TestCallOnce);
     REGISTER_TEST(TestDirectoryWatcher);
@@ -1263,6 +1286,7 @@ TEST_REGISTRATION(RegisterOsTests) {
     REGISTER_TEST(TestFileApi);
     REGISTER_TEST(TestFilesystem);
     REGISTER_TEST(TestFutex);
+    REGISTER_TEST(TestGetEnvVar);
     REGISTER_TEST(TestGetInfo);
     REGISTER_TEST(TestLockableSharedMemory);
     REGISTER_TEST(TestMutex);

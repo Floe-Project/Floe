@@ -60,6 +60,10 @@ void TryShrinkPages(void* ptr, usize old_size, usize new_size);
 void* AlignedAlloc(usize alignment, usize size);
 void AlignedFree(void* ptr);
 
+// NOT thread-safe. Use only in single-threaded contexts. We use getenv() on Unix.
+Optional<MutableString> GetEnvironmentVariable(char const* name, Allocator& a);
+Optional<MutableString> GetEnvironmentVariable(String name, Allocator& a);
+
 // LockableSharedMemory is never closed, we rely on the OS to clean it up which usually happens after reboot.
 // The memory is shared between processes.
 struct LockableSharedMemory {

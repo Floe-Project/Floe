@@ -61,6 +61,21 @@ void FreePages(void* ptr, usize bytes) {
     munmap(ptr, bytes);
 }
 
+// IMPROVE: safer ways of getting environment variables. It seems to be frought with danger on Unix, but
+// possible options:
+// - macOS: NSProcessInfo environment property
+// - Linux: read /proc/self/environ
+Optional<MutableString> GetEnvironmentVariable(char const* name, Allocator& a) {
+    auto const value = getenv(name); // NOLINT(concurrency-mt-unsafe)
+    if (value == nullptr) return k_nullopt;
+    return a.Clone(FromNullTerminated(value));
+}
+
+Optional<MutableString> GetEnvironmentVariable(String name, Allocator& a) {
+    ArenaAllocatorWithInlineStorage<500> scratch {PageAllocator::Instance()};
+    return GetEnvironmentVariable(NullTerminated(name, scratch), a);
+}
+
 struct LockableSharedMemoryNative {
     sem_t* sema;
 };

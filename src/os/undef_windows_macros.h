@@ -37,3 +37,6 @@
 #ifdef LoadLibrary
 #undef LoadLibrary
 #endif
+#ifdef GetEnvironmentVariable
+#undef GetEnvironmentVariable
+#endif

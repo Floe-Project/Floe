@@ -440,6 +440,8 @@ PUBLIC Box DoBox(GuiBoxSystem& builder,
     auto const font = builder.fonts[ToInt(config.font)];
     auto const font_size =
         config.font_size != 0 ? builder.imgui.VwToPixels(config.font_size) : font->font_size;
+    ASSERT(font_size > 0);
+    ASSERT(font_size < 10000);
 
     // IMPORTANT: if the string is very long, it needs to be word-wrapped manually by including newlines in
     // the text. This is necessary because our text rendering system is bad at doing huge amounts of

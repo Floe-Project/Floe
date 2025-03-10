@@ -452,34 +452,41 @@ PUBLIC Box DoBox(GuiBoxSystem& builder,
     switch (builder.state) {
         case GuiBoxSystem::State::LayoutBoxes: {
             auto const box = Box {
-                .layout_id = layout::CreateItem(
-                    builder.layout,
-                    ({
-                        layout::ItemOptions layout = config.layout;
+                .layout_id =
+                    layout::CreateItem(builder.layout, ({
+                                           layout::ItemOptions layout = config.layout;
 
-                        if (config.parent) [[likely]]
-                            layout.parent = config.parent->layout_id;
+                                           if (config.parent) [[likely]]
+                                               layout.parent = config.parent->layout_id;
 
-                        layout.size =
-                            Max(builder.imgui.pixels_per_vw * layout.size, f32x2(layout::k_fill_parent));
+                                           // If the size is a pixel size (not one of the special values),
+                                           // convert it to pixels.
+                                           if (layout.size[0] > 0)
+                                               layout.size[0] *= builder.imgui.pixels_per_vw;
+                                           if (layout.size[1] > 0)
+                                               layout.size[1] *= builder.imgui.pixels_per_vw;
 
-                        layout.margins.lrtb *= builder.imgui.pixels_per_vw;
-                        layout.contents_gap *= builder.imgui.pixels_per_vw;
-                        layout.contents_padding.lrtb *= builder.imgui.pixels_per_vw;
+                                           layout.margins.lrtb *= builder.imgui.pixels_per_vw;
+                                           layout.contents_gap *= builder.imgui.pixels_per_vw;
+                                           layout.contents_padding.lrtb *= builder.imgui.pixels_per_vw;
 
-                        if (config.size_from_text) {
-                            if (wrap_width != k_wrap_to_parent)
-                                layout.size =
-                                    font->CalcTextSizeA(font_size, FLT_MAX, wrap_width, config.text);
-                            else {
-                                // We can't know the text size until we know the parent width.
-                                layout.size = {layout::k_fill_parent, 1};
-                                layout.set_item_height_after_width_calculated = true;
-                            }
-                        }
+                                           if (config.size_from_text) {
+                                               if (wrap_width != k_wrap_to_parent) {
+                                                   layout.size = font->CalcTextSizeA(font_size,
+                                                                                     FLT_MAX,
+                                                                                     wrap_width,
+                                                                                     config.text);
+                                                   ASSERT(layout.size[1] > 0);
+                                               } else {
+                                                   // We can't know the text size until we know the parent
+                                                   // width.
+                                                   layout.size = {layout::k_fill_parent, 1};
+                                                   layout.set_item_height_after_width_calculated = true;
+                                               }
+                                           }
 
-                        layout;
-                    })),
+                                           layout;
+                                       })),
                 .imgui_id = {},
                 .source_location = source_location,
             };

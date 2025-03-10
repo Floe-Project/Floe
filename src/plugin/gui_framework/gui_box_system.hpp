@@ -258,30 +258,7 @@ PUBLIC void Run(GuiBoxSystem& builder, Panel* panel) {
 
         {
             ZoneNamedN(prof2, "Box system: calculate layout", true);
-            LogDebug(ModuleName::Gui,
-                     "Layout root's size pre-calculated: {}",
-                     layout::GetSize(builder.layout, layout::Id {0}));
             layout::RunContext(builder.layout);
-            LogDebug(ModuleName::Gui,
-                     "Layout root's size post-calculated: {}",
-                     layout::GetSize(builder.layout, layout::Id {0}));
-            for (auto const i : Range(layout::ItemsCount(builder.layout))) {
-                auto const size = layout::GetSize(builder.layout, (layout::Id)i);
-                if (!All(size > 0)) {
-                    // let's get some more information
-                    for (auto const& box : builder.boxes) {
-                        if (box.layout_id == (layout::Id)i) {
-                            LogDebug(ModuleName::Gui,
-                                     "Box {}, layout_id {}, has invalid size {}, source location: {}",
-                                     i,
-                                     box.layout_id,
-                                     size,
-                                     box.source_location);
-                            PanicIfReached();
-                        }
-                    }
-                }
-            }
         }
 
         {

@@ -1225,8 +1225,10 @@ TEST_CASE(TestWeb) {
         DynamicArray<char> buffer {tester.scratch_arena};
         auto o = HttpsPost("https://httpbin.org/post",
                            "data",
-                           Array {"Content-Type: text/plain"_s},
-                           dyn::WriterFor(buffer));
+                           dyn::WriterFor(buffer),
+                           {
+                               .headers = Array {"Content-Type: text/plain"_s},
+                           });
         if (o.HasError()) {
             LOG_WARNING("Failed to HttpsPost: {}", o.Error());
         } else {

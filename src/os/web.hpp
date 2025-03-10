@@ -32,13 +32,11 @@ void WebGlobalInit();
 void WebGlobalCleanup();
 
 struct RequestOptions {
+    Span<String const> headers;
     f32 timeout_seconds = 10.0f;
 };
 
 // blocking
 ErrorCodeOr<void> HttpsGet(String url, Writer writer, RequestOptions options = {});
-ErrorCodeOr<void> HttpsPost(String url,
-                            String body,
-                            Span<String> headers,
-                            Optional<Writer> response_writer,
-                            RequestOptions options = {});
+ErrorCodeOr<void>
+HttpsPost(String url, String body, Optional<Writer> response_writer, RequestOptions options = {});

@@ -1,7 +1,7 @@
 # Copyright 2024-2025 Sam Windell
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-name: CI
+name: Tests
 
 on:
   workflow_dispatch:

@@ -9,6 +9,7 @@
 #include "foundation/container/tagged_union.hpp"
 #include "foundation/error/error_code.hpp"
 #include "foundation/universal_defs.hpp"
+#include "foundation/utils/geometry.hpp"
 #include "foundation/utils/random.hpp"
 #include "foundation/utils/string.hpp"
 #include "foundation/utils/time.hpp"
@@ -358,6 +359,17 @@ PUBLIC ErrorCodeOr<void> ValueToString(Writer writer, T const& value, FormatOpti
         __builtin_dump_struct(&value.value, DumpStructSprintf, ctx);
         if (ctx.pos != ArraySize(ctx.buffer)) --ctx.pos;
         TRY(writer.WriteChars(String {ctx.buffer, ctx.pos}));
+        return k_success;
+    }
+
+    else if constexpr (Same<Type, Rect>) {
+        // IMPROVE: support width option
+        ASSERT(options.required_width == 0);
+        TRY(writer.WriteChar('('));
+        TRY(ValueToString(writer, value.pos, options));
+        TRY(writer.WriteChars(", "_s));
+        TRY(ValueToString(writer, value.size, options));
+        TRY(writer.WriteChar(')'));
         return k_success;
     }
 

@@ -193,7 +193,11 @@ template <typename T>
 PUBLIC ErrorCodeOr<void> ValueToString(Writer writer, T const& value, FormatOptions options) {
     using Type = RemoveCV<T>;
 
-    if constexpr (IsSpecializationOf<Type, Optional>) {
+    if constexpr (TypeWithCustomValueToString<Type>) {
+        return CustomValueToString(writer, value, options);
+    }
+
+    else if constexpr (IsSpecializationOf<Type, Optional>) {
         if (value.HasValue())
             return ValueToString(writer, *value, options);
         else
@@ -384,9 +388,6 @@ PUBLIC ErrorCodeOr<void> ValueToString(Writer writer, T const& value, FormatOpti
         TRY(writer.WriteChar(')'));
         return k_success;
     }
-
-    else if constexpr (TypeWithCustomValueToString<Type>)
-        return CustomValueToString(writer, value, options);
 
     else
         static_assert(

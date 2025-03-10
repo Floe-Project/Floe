@@ -39,7 +39,9 @@ jobs:
 
       - run: just build mac_ub
       - run: just install-docs-preprocessor
-      - run: just test-ci
+      - env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: just test-ci
 
       - name: Upload errors
         if: '!cancelled()'
@@ -85,6 +87,8 @@ jobs:
         run: just install-docs-preprocessor
 
       - if: '!cancelled()'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: just test-ci
 
       - if: '!cancelled()'
@@ -220,6 +224,8 @@ jobs:
       - run: just install-docs-preprocessor
 
       - name: Deploy GitHub Pages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd docs
           wget https://raw.githubusercontent.com/Floe-Project/Floe-Logos/main/rasterized/favicon.png -P theme

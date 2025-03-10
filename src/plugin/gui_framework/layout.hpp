@@ -359,10 +359,8 @@ PUBLIC Id CreateItem(Context& ctx, ItemOptions options) {
     auto const id = CreateItem(ctx);
 
     if (ToInt(id) == 0) {
-        // The root item should be a container with a known size, otherwise we can't calculate the layout.
-        ASSERT(All(options.size != k_hug_contents));
         ASSERT(All(options.size != k_fill_parent));
-        ASSERT(All(options.size > 0));
+        ASSERT(All(options.size >= 0));
         ASSERT(!options.parent);
         ASSERT(options.anchor == Anchor::None);
         ASSERT(!options.set_item_height_after_width_calculated);

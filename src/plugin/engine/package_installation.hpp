@@ -198,8 +198,8 @@ PresetsCheckExistingInstallation(Component const& component,
                 for (auto const [expected_path, checksum] : component.checksum_values) {
                     auto const cursor = scratch_arena.TotalUsed();
                     DEFER {
-                        scratch_arena.TryShrinkTotalUsed(cursor);
-                        ASSERT(scratch_arena.TotalUsed() >= cursor);
+                        auto const new_used = scratch_arena.TryShrinkTotalUsed(cursor);
+                        ASSERT(new_used >= cursor);
                     };
 
                     auto const full_path =

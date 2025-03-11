@@ -237,6 +237,7 @@ struct Server {
     Atomic<u64> total_bytes_used_by_samples {};
     Atomic<u32> num_insts_loaded {};
     Atomic<u32> num_samples_loaded {};
+    Atomic<u32> is_scanning_libraries {}; // you can use WaitIfValueIsExpected
 
     // private
     Mutex scan_folders_writer_mutex;
@@ -295,10 +296,6 @@ void SetExtraScanFolders(Server& server, Span<String const> folders);
 // trigger a scan of any unscanned folders.
 // [threadsafe]
 void RequestScanningOfUnscannedFolders(Server& server);
-
-// Returns true is the server scanning for sample libraries or is processing a scan-request.
-// [threadsafe]
-bool IsScanningSampleLibraries(Server& server);
 
 // [threadsafe]
 void RescanFolder(Server& server, String folder);

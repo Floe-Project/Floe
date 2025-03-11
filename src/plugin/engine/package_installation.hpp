@@ -488,18 +488,15 @@ static InstallJob::State DoJobPhase1(InstallJob& job) {
                     ASSERT(component->library);
                     sample_lib_server::RequestScanningOfUnscannedFolders(job.sample_lib_server);
 
-                    u32 wait_ms = 0;
-                    while (sample_lib_server::IsScanningSampleLibraries(job.sample_lib_server)) {
-                        constexpr u32 k_sleep_ms = 100;
-                        SleepThisThread(k_sleep_ms);
-                        wait_ms += k_sleep_ms;
-
-                        constexpr u32 k_timeout_ms = 120 * 1000;
-                        if (wait_ms >= k_timeout_ms) {
-                            dyn::AppendSpan(job.error_buffer,
-                                            "timed out waiting for sample libraries to be scanned\n");
-                            return InstallJob::State::DoneError;
-                        }
+                    auto const succeed =
+                        WaitIfValueIsExpectedStrong(job.sample_lib_server.is_scanning_libraries,
+                                                    true,
+                                                    120u * 1000);
+                    if (!succeed) {
+                        ReportError(ErrorLevel::Error,
+                                    SourceLocationHash(),
+                                    "timed out waiting for sample libraries to be scanned");
+                        return InstallJob::State::DoneError;
                     }
 
                     auto existing_lib = sample_lib_server::FindLibraryRetained(job.sample_lib_server,

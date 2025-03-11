@@ -229,7 +229,7 @@ static void ReadLibraryAsync(PendingLibraryJobs& pending_library_jobs,
 }
 
 // threadsafe
-static bool RequestLibraryFolderScanIfNeeded(ScanFolderList& scan_folders) {
+static bool MarkNotScannedFoldersRescanRequested(ScanFolderList& scan_folders) {
     bool any_rescan_requested = false;
     for (auto& n : scan_folders)
         if (auto f = n.TryScoped()) {
@@ -1466,7 +1466,7 @@ static void ServerThreadProc(Server& server) {
 
             if (ConsumeResourceRequests(pending_resources, scratch_arena, server.request_queue)) {
                 // For quick initialisation, we load libraries only when there's been a request.
-                RequestLibraryFolderScanIfNeeded(server.scan_folders);
+                MarkNotScannedFoldersRescanRequested(server.scan_folders);
             }
 
             // There's 2 separate systems here. The library loading, and then the audio loading (which
@@ -1475,6 +1475,10 @@ static void ServerThreadProc(Server& server) {
 
             auto const libraries_are_still_loading =
                 UpdateLibraryJobs(server, pending_library_jobs, scratch_arena, watcher);
+            if (!libraries_are_still_loading) {
+                server.is_scanning_libraries.Store(false, StoreMemoryOrder::Relaxed);
+                WakeWaitingThreads(server.is_scanning_libraries, NumWaitingThreads::All);
+            }
 
             auto const resources_are_still_loading =
                 UpdatePendingResources(pending_resources, server, libraries_are_still_loading);
@@ -1637,58 +1641,66 @@ RequestId SendAsyncLoadRequest(Server& server, AsyncCommsChannel& channel, LoadR
 }
 
 void RequestScanningOfUnscannedFolders(Server& server) {
-    RequestLibraryFolderScanIfNeeded(server.scan_folders);
+    if (MarkNotScannedFoldersRescanRequested(server.scan_folders)) {
+        server.is_scanning_libraries.Store(true, StoreMemoryOrder::SequentiallyConsistent);
+        server.work_signaller.Signal();
+    }
 }
 
 void RescanFolder(Server& server, String path) {
+    bool found = false;
     for (auto& n : server.scan_folders)
         if (auto f = n.TryScoped()) {
-            if (path::Equal(f->path, path) || path::IsWithinDirectory(path, f->path))
+            if (path::Equal(f->path, path) || path::IsWithinDirectory(path, f->path)) {
                 f->state.Store(ScanFolder::State::RescanRequested, StoreMemoryOrder::Relaxed);
+                found = true;
+            }
         }
-    server.work_signaller.Signal();
-}
-
-bool IsScanningSampleLibraries(Server& server) {
-    for (auto& n : server.scan_folders)
-        if (auto f = n.TryScoped()) {
-            auto const state = f->state.Load(LoadMemoryOrder::Relaxed);
-            if (state != ScanFolder::State::ScannedSuccessfully && state != ScanFolder::State::ScanFailed)
-                return true;
-        }
-
-    return server.num_uncompleted_library_jobs.Load(LoadMemoryOrder::Relaxed) != 0;
+    if (found) {
+        server.is_scanning_libraries.Store(true, StoreMemoryOrder::SequentiallyConsistent);
+        server.work_signaller.Signal();
+    }
 }
 
 void SetExtraScanFolders(Server& server, Span<String const> extra_folders) {
-    server.scan_folders_writer_mutex.Lock();
-    DEFER { server.scan_folders_writer_mutex.Unlock(); };
+    bool edited = false;
+    {
+        server.scan_folders_writer_mutex.Lock();
+        DEFER { server.scan_folders_writer_mutex.Unlock(); };
 
-    for (auto it = server.scan_folders.begin(); it != server.scan_folders.end();)
-        if (it->value.source == ScanFolder::Source::ExtraFolder && !Find(extra_folders, it->value.path))
-            it = server.scan_folders.Remove(it);
-        else
-            ++it;
+        for (auto it = server.scan_folders.begin(); it != server.scan_folders.end();)
+            if (it->value.source == ScanFolder::Source::ExtraFolder && !Find(extra_folders, it->value.path)) {
+                it = server.scan_folders.Remove(it);
+                edited = true;
+            } else
+                ++it;
 
-    for (auto e : extra_folders) {
-        bool already_present = false;
-        for (auto& l : server.scan_folders)
-            if (l.value.path == e) already_present = true;
-        if (already_present) continue;
+        for (auto e : extra_folders) {
+            bool already_present = false;
+            for (auto& l : server.scan_folders)
+                if (l.value.path == e) already_present = true;
+            if (already_present) continue;
 
-        ArenaAllocatorWithInlineStorage<1000> scratch_arena {Malloc::Instance()};
-        auto node = server.scan_folders.AllocateUninitialised();
-        PLACEMENT_NEW(&node->value) ScanFolder();
-        dyn::Assign(node->value.path, e);
-        node->value.source = ScanFolder::Source::ExtraFolder;
-        node->value.state.raw = ScanFolder::State::NotScanned;
-        server.scan_folders.Insert(node);
+            ArenaAllocatorWithInlineStorage<1000> scratch_arena {Malloc::Instance()};
+            auto node = server.scan_folders.AllocateUninitialised();
+            PLACEMENT_NEW(&node->value) ScanFolder();
+            dyn::Assign(node->value.path, e);
+            node->value.source = ScanFolder::Source::ExtraFolder;
+            node->value.state.raw = ScanFolder::State::NotScanned;
+            server.scan_folders.Insert(node);
+            edited = true;
+        }
+    }
+
+    if (edited) {
+        server.is_scanning_libraries.Store(true, StoreMemoryOrder::SequentiallyConsistent);
+        server.work_signaller.Signal();
     }
 }
 
 Span<RefCounted<sample_lib::Library>> AllLibrariesRetained(Server& server, ArenaAllocator& arena) {
     // IMPROVE: is this slow to do at every request for a library?
-    if (RequestLibraryFolderScanIfNeeded(server.scan_folders)) server.work_signaller.Signal();
+    RequestScanningOfUnscannedFolders(server);
 
     DynamicArray<RefCounted<sample_lib::Library>> result(arena);
     for (auto& i : server.libraries) {
@@ -1702,7 +1714,7 @@ Span<RefCounted<sample_lib::Library>> AllLibrariesRetained(Server& server, Arena
 
 RefCounted<sample_lib::Library> FindLibraryRetained(Server& server, sample_lib::LibraryIdRef id) {
     // IMPROVE: is this slow to do at every request for a library?
-    if (RequestLibraryFolderScanIfNeeded(server.scan_folders)) server.work_signaller.Signal();
+    RequestScanningOfUnscannedFolders(server);
 
     server.libraries_by_id_mutex.Lock();
     DEFER { server.libraries_by_id_mutex.Unlock(); };

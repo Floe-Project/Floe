@@ -277,6 +277,14 @@ enum class NumWaitingThreads { One, All };
 WaitResult WaitIfValueIsExpected(Atomic<u32>& value, u32 expected, Optional<u32> timeout_milliseconds = {});
 void WakeWaitingThreads(Atomic<u32>& value, NumWaitingThreads num_waiters);
 
+inline bool
+WaitIfValueIsExpectedStrong(Atomic<u32>& value, u32 expected, Optional<u32> timeout_milliseconds = {}) {
+    while (value.Load(LoadMemoryOrder::Acquire) == expected)
+        if (WaitIfValueIsExpected(value, expected, timeout_milliseconds) == WaitResult::TimedOut)
+            return false;
+    return true;
+}
+
 // llvm-project/libc/src/__support/threads/sleep.h
 inline static void SpinLoopPause() {
 #if defined(__X86_64__)

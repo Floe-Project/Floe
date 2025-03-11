@@ -58,7 +58,7 @@ Furthermore, Floe's loop and crossfade controls allow for exploration of the wor
 It's available as a plugin for your DAW (CLAP, VST3 and AU) on Windows and macOS. It's free and open-source and always will be due to its GPL licence. There's no lock-in, no sign-up, no nagging, just a focus on helping you make music.
 
 ## Built on a solid foundation
-Floe's ancestor, Mirage, has been used by thousands of musicians and producers, professional and indie, in 13 products. Floe is the next step in the evolution of Mirage, with a renewed focus on developing a hassle-free platform for new sample libraries.
+Floe's ancestor, Mirage, has been used by thousands of musicians and producers — professional and hobbyist — in 13 products. Floe is the next step in the evolution of Mirage, with a renewed focus on developing a hassle-free platform for new sample libraries.
 
 ## Ongoing development
 Floe is an ongoing project. We plan to expand its capabilities while always maintaining backwards compatibility. We're always open to feedback and suggestions. By consolidating our efforts into improving this engine, we improve the capabilities of all of its libraries.

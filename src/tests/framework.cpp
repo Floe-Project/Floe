@@ -116,67 +116,70 @@ int RunAllTests(Tester& tester, Span<String> filter_patterns) {
     tester.log.Info("Running tests ...");
     Stopwatch const overall_stopwatch;
 
-    for (auto& test_case : tester.test_cases) {
-        if (filter_patterns.size) {
-            bool matches_any_pattern = false;
-            for (auto const& pattern : filter_patterns) {
-                if (MatchWildcard(pattern, test_case.title)) {
-                    matches_any_pattern = true;
-                    break;
-                }
-            }
-            if (!matches_any_pattern) continue;
-        }
-
-        tester.current_test_case = &test_case;
-        tester.log.Debug("Running ...");
-
-        tester.subcases_passed.Clear();
-        tester.fixture_pointer = nullptr;
-        tester.delete_fixture = nullptr;
-        tester.fixture_arena.ResetCursorAndConsolidateRegions();
-
-        Stopwatch const stopwatch;
-
-        bool run_test = true;
-        do {
-            tester.scratch_arena.ResetCursorAndConsolidateRegions();
-            tester.should_reenter = false;
-            tester.subcases_current_max_level = 0;
-            dyn::Clear(tester.subcases_stack);
-
-            try {
-                auto const result = test_case.f(tester);
-                if (result.outcome.HasError()) {
-                    tester.should_reenter = false;
-                    tester.current_test_case->failed = true;
-                    tester.log.Error("Failed: test returned an error:\n{}", result.outcome.Error());
-                    if (result.stacktrace.HasValue()) {
-                        ASSERT(result.stacktrace.Value().size);
-                        auto const str = StacktraceString(result.stacktrace.Value(), tester.scratch_arena);
-                        tester.log.Info("Stacktrace:\n{}", str);
+    for (auto _ : Range(tester.repeat_tests)) {
+        for (auto& test_case : tester.test_cases) {
+            if (filter_patterns.size) {
+                bool matches_any_pattern = false;
+                for (auto const& pattern : filter_patterns) {
+                    if (MatchWildcard(pattern, test_case.title)) {
+                        matches_any_pattern = true;
+                        break;
                     }
                 }
-            } catch (TestFailed const& _) {
-            } catch (PanicException) {
-                tester.should_reenter = false;
-                tester.current_test_case->failed = true;
-                tester.log.Error("Failed: test panicked");
-            } catch (...) {
-                tester.should_reenter = false;
-                tester.current_test_case->failed = true;
-                tester.log.Error("Failed: an exception was thrown");
+                if (!matches_any_pattern) continue;
             }
 
-            if (!tester.should_reenter) run_test = false;
-        } while (run_test);
+            tester.current_test_case = &test_case;
+            tester.log.Debug("Running ...");
 
-        if (tester.delete_fixture) tester.delete_fixture(tester.fixture_pointer, tester.fixture_arena);
+            tester.subcases_passed.Clear();
+            tester.fixture_pointer = nullptr;
+            tester.delete_fixture = nullptr;
+            tester.fixture_arena.ResetCursorAndConsolidateRegions();
 
-        if (!test_case.failed)
-            tester.log.Debug(ANSI_COLOUR_FOREGROUND_GREEN("Passed") " ({})\n", stopwatch);
-        else
-            tester.log.Error("Failed\n");
+            Stopwatch const stopwatch;
+
+            bool run_test = true;
+            do {
+                tester.scratch_arena.ResetCursorAndConsolidateRegions();
+                tester.should_reenter = false;
+                tester.subcases_current_max_level = 0;
+                dyn::Clear(tester.subcases_stack);
+
+                try {
+                    auto const result = test_case.f(tester);
+                    if (result.outcome.HasError()) {
+                        tester.should_reenter = false;
+                        tester.current_test_case->failed = true;
+                        tester.log.Error("Failed: test returned an error:\n{}", result.outcome.Error());
+                        if (result.stacktrace.HasValue()) {
+                            ASSERT(result.stacktrace.Value().size);
+                            auto const str =
+                                StacktraceString(result.stacktrace.Value(), tester.scratch_arena);
+                            tester.log.Info("Stacktrace:\n{}", str);
+                        }
+                    }
+                } catch (TestFailed const& _) {
+                } catch (PanicException) {
+                    tester.should_reenter = false;
+                    tester.current_test_case->failed = true;
+                    tester.log.Error("Failed: test panicked");
+                } catch (...) {
+                    tester.should_reenter = false;
+                    tester.current_test_case->failed = true;
+                    tester.log.Error("Failed: an exception was thrown");
+                }
+
+                if (!tester.should_reenter) run_test = false;
+            } while (run_test);
+
+            if (tester.delete_fixture) tester.delete_fixture(tester.fixture_pointer, tester.fixture_arena);
+
+            if (!test_case.failed)
+                tester.log.Debug(ANSI_COLOUR_FOREGROUND_GREEN("Passed") " ({})\n", stopwatch);
+            else
+                tester.log.Error("Failed\n");
+        }
     }
     tester.current_test_case = nullptr;
 

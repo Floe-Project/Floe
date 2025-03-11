@@ -77,6 +77,7 @@ ErrorCodeOr<int> Main(ArgsCstr args) {
     enum class CommandLineArgId : u32 {
         Filter,
         LogLevel,
+        Repeats,
         Count,
     };
 
@@ -97,6 +98,14 @@ ErrorCodeOr<int> Main(ArgsCstr args) {
             .required = false,
             .num_values = 1,
         },
+        {
+            .id = (u32)CommandLineArgId::Repeats,
+            .key = "repeats",
+            .description = "Number of times to repeat the tests",
+            .value_type = "count",
+            .required = false,
+            .num_values = 1,
+        },
     });
 
     ArenaAllocatorWithInlineStorage<1000> arena {PageAllocator::Instance()};
@@ -109,6 +118,15 @@ ErrorCodeOr<int> Main(ArgsCstr args) {
                                                            }));
 
     TRY(SetLogLevel(tester, cli_args[ToInt(CommandLineArgId::LogLevel)].Value()));
+
+    if (auto const repeats_str = cli_args[ToInt(CommandLineArgId::Repeats)].Value()) {
+        auto const parsed_int = ParseInt(*repeats_str, ParseIntBase::Decimal);
+        if (!parsed_int || (*parsed_int < 1 || *parsed_int > LargestRepresentableValue<u16>())) {
+            StdPrintF(StdStream::Err, "Invalid number of repeats: {}\n", *repeats_str);
+            return ErrorCode {CliError::InvalidArguments};
+        }
+        tester.repeat_tests = (u16)*parsed_int;
+    }
 
     // Register the test functions
 #define X(fn) fn(tester);

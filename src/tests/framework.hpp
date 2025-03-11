@@ -202,6 +202,7 @@ struct Tester {
     ArenaAllocator fixture_arena {PageAllocator::Instance()};
     void* fixture_pointer {};
     DeleteFixturePointer delete_fixture {};
+    u16 repeat_tests = 1;
 };
 
 void RegisterTest(Tester& tester, TestFunction f, String title);
@@ -218,7 +219,7 @@ constexpr auto k_build_resources_subdir = "build_resources"_s;
 String TempFolder(Tester& tester); // exists, writable, unique, deleted on exit
 String TempFilename(Tester& tester); // unique path inside TempFolder(), doesn't exist
 
-String TestFilesFolder(Tester& tester); // this repos folder that contains test files
+String TestFilesFolder(Tester& tester); // this repo's folder that contains test files
 String HumanCheckableOutputFilesFolder(Tester& tester); // place to put files that need manually checking
 Optional<String> BuildResourcesFolder(Tester& tester);
 

@@ -554,9 +554,7 @@ struct ArenaAllocator : public Allocator {
 
     // private
     Region* CreateAndPrependRegionToList(usize size, usize previous_size) {
-        auto const memory_region_size = (usize)Max<s64>((s64)minimum_bytes_per_region,
-                                                        (s64)size,
-                                                        (s64)previous_size + (s64)previous_size / 2);
+        auto const memory_region_size = Max(minimum_bytes_per_region, size, previous_size * 2);
         auto data = child_allocator.Allocate({
             .size = memory_region_size + Region::HeaderAllocSize(),
             .alignment = k_max_alignment,

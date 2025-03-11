@@ -521,26 +521,46 @@ struct ArenaAllocator : public Allocator {
     }
 
     usize TryShrinkTotalUsed(usize size) {
+        if (!first) return 0;
+
+        // We need to work out what region the size is in by starting from the last (oldest) region and
+        // working towards the first (newest).
         usize pos = 0;
-        for (auto r = last; r != nullptr; r = last->prev) {
+        for (auto r = last; r != nullptr; r = r->prev) {
+            if (r == first) {
+                auto const new_current_region_cursor = size - pos;
+                ASSERT(new_current_region_cursor <= current_region_cursor);
+
+                if constexpr (RUNTIME_SAFETY_CHECKS_ON)
+                    FillMemory(first->BufferData() + new_current_region_cursor,
+                               0xCD,
+                               current_region_cursor - new_current_region_cursor);
+
+                current_region_cursor = new_current_region_cursor;
+                return size;
+            }
+
             auto const next_pos = pos + r->BufferSize();
             if (size >= pos && size < next_pos) {
-                if (r == first) {
-                    if constexpr (RUNTIME_SAFETY_CHECKS_ON) {
-                        ASSERT(size <= r->BufferSize());
-                        // fill the memory with a pattern to help catch use-after-free bugs
-                        FillMemory(r->BufferData() + size, 0xCD, r->BufferSize() - size);
-                    }
-                    current_region_cursor = size - pos;
-                    return size;
-                } else {
-                    // we can't shrink without deallocating regions, so we just trim what we can from the top
-                    current_region_cursor = 0;
-                    return TotalUsed();
-                }
+                // The size we were given is not in the first (newest) region. We would need to deallocate
+                // regions and would leave the arena using a smaller region as its first. For efficiency
+                // reasons, this probably isn't what we want. So instead, we just trim what we can from
+                // the newest region.
+
+                if constexpr (RUNTIME_SAFETY_CHECKS_ON)
+                    FillMemory(first->BufferData(), 0xCD, current_region_cursor);
+
+                current_region_cursor = 0;
+
+                usize total_used = next_pos;
+                for (auto r2 = first->next; r2 != r; r2 = r2->next)
+                    total_used += r2->BufferSize();
+                return total_used;
             }
             pos = next_pos;
         }
+
+        Panic("size is greater than total arena used");
         return 0;
     }
 

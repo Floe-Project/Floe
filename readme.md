@@ -49,6 +49,6 @@ Some parts of the codebase need some love (I'm looking at you GUI and audio proc
 Feel free to use the discussions on GitHub for questions, feedback, and ideas. Report bugs to the Github issue tracker. Also, FrozenPlain has a Floe section on their [forum](https://forum.frozenplain.com).
 
 ### CI
-![CI](https://github.com/Floe-Project/Floe/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/Floe-Project/Floe/actions/workflows/tests.yml/badge.svg)
 [![codecov](https://codecov.io/github/Floe-Project/Floe/graph/badge.svg?token=7HEJ7SF75K)](https://codecov.io/github/Floe-Project/Floe)
 [![CodeFactor](https://www.codefactor.io/repository/github/floe-project/floe/badge/main)](https://www.codefactor.io/repository/github/floe-project/floe/overview/main)

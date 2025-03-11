@@ -177,8 +177,13 @@ _build_if_requested condition build-type:
 format:
   {{all_src_files}} | xargs clang-format -i
 
+# Clap Validator seems to have a bug that crashes the validator. 
+# https://github.com/free-audio/clap-validator/issues/21
+# We workaround this by skipping process and param tests.
+clap_val_args := "--test-filter '.*(process|param).*' --invert-filter"
+
 test-clap-val build="": (_build_if_requested build "native")
-  clap-validator validate --in-process {{native_binary_dir}}/Floe.clap
+  clap-validator validate {{clap_val_args}} {{native_binary_dir}}/Floe.clap
 
 test-units build="" +args="": (_build_if_requested build "native")
   {{native_binary_dir}}/tests {{args}} --log-level=debug
@@ -260,7 +265,7 @@ test-windows-clap-val:
     just _download-and-unzip-to-cache-dir  "https://github.com/free-audio/clap-validator/releases/download/0.3.2/clap-validator-0.3.2-windows.zip"
     chmod +x "$exe"
   fi
-  timeout 5 {{run_windows_program}} "$exe" validate zig-out/x86_64-windows/Floe.clap
+  timeout 5 {{run_windows_program}} "$exe" validate {{clap_val_args}} zig-out/x86_64-windows/Floe.clap
 
 [linux]
 coverage build="": (_build_if_requested build "native")

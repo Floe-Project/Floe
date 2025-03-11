@@ -491,22 +491,21 @@ struct ArenaAllocator : public Allocator {
             return;
         }
 
-        usize size_used = 0;
-        for (auto region = first; region != nullptr;) {
-            size_used += region->size;
-            if (region->next != nullptr) {
-                auto region_to_free = region;
-                region = region->next;
-                child_allocator.Free(region_to_free->AllocedMemory());
-            } else {
-                break;
-            }
+        // Start at the last region (oldest) and work our way back to the first (newest), freeing regions and
+        // summing the sizes.
+        usize size_used = current_region_cursor;
+        for (auto r = first->next; r != nullptr;) {
+            size_used += r->BufferSize();
+
+            auto const region_to_free = r;
+            r = r->next;
+            child_allocator.Free(region_to_free->AllocedMemory());
         }
 
-        ASSERT(last != nullptr);
+        // The first region is the newest and largest region so we use that for resizing.
         auto const data = child_allocator.Resize({
-            .allocation = last->AllocedMemory(),
-            .new_size = size_used,
+            .allocation = first->AllocedMemory(),
+            .new_size = size_used + Region::HeaderAllocSize(),
             .allow_oversize_result = true,
         });
 

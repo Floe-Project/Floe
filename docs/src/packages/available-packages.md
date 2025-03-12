@@ -58,6 +58,15 @@ This is a basic free ocarina from [FreePats](https://freepats.zenvoid.org/), con
 | Download | [Download FreePats - Ocarina Package.floe.zip](https://github.com/Floe-Project/Ocarina/releases/download/v1.0/FreePats.-.Ocarina.Package.floe.zip) |
 | Download Size | 4.3 MB |
 
+## Mirage Compatibility
+
+For Mirage libraries to fully work inside Floe, the Mirage Compatibility library is needed. This library will normally be included alongside Mirage libraries, but it can also be installed separately.
+
+| Mirage Compatibility | |
+|:--|:--|
+| Cost | Free - no attribution required (FrozenPlain's license) |
+| Download | [Download Mirage Compatibility Package.floe.zip](https://github.com/FrozenPlain/floe-mirage-compatibility/releases/download/v1.0/FrozenPlain.-.Mirage.Compatibility.Package.floe.zip) |
+| Download Size | 8.9 MB |
 
 ## FrozenPlain
 [FrozenPlain](https://www.frozenplain.com) will be converting all of their libraries to the Floe format.

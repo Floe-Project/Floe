@@ -83,18 +83,15 @@ PUBLIC void OpenFilePickerInstallPackage(FilePickerState& state, GuiFrameResult&
     state.data = FilePickerStateType::InstallPackage;
 }
 
-static String
-PresetFileDefaultPath(ArenaAllocator& arena, prefs::Preferences const& prefs, FloePaths const& paths) {
-    auto const preset_scan_folders = ExtraScanFolders(paths, prefs, ScanFolderType::Presets);
-    if (preset_scan_folders.size)
-        return path::Join(arena, Array {preset_scan_folders[0], "untitled" FLOE_PRESET_FILE_EXTENSION});
-    return {};
+static String PresetFileDefaultPath(ArenaAllocator& arena, FloePaths const& paths) {
+    auto const result = path::Join(arena,
+                                   Array {paths.always_scanned_folder[ToInt(ScanFolderType::Presets)],
+                                          "untitled" FLOE_PRESET_FILE_EXTENSION});
+    return result;
 }
 
-PUBLIC void OpenFilePickerSavePreset(FilePickerState& state,
-                                     GuiFrameResult& frame_result,
-                                     prefs::Preferences const& prefs,
-                                     FloePaths const& paths) {
+PUBLIC void
+OpenFilePickerSavePreset(FilePickerState& state, GuiFrameResult& frame_result, FloePaths const& paths) {
     state.arena.ResetCursorAndConsolidateRegions();
 
     static constexpr auto k_filters = ArrayT<FilePickerDialogOptions::FileFilter>({
@@ -107,7 +104,7 @@ PUBLIC void OpenFilePickerSavePreset(FilePickerState& state,
     frame_result.file_picker_dialog = FilePickerDialogOptions {
         .type = FilePickerDialogOptions::Type::SaveFile,
         .title = "Save Floe Preset",
-        .default_path = PresetFileDefaultPath(state.arena, prefs, paths),
+        .default_path = PresetFileDefaultPath(state.arena, paths),
         .filters = k_filters,
         .allow_multiple_selection = false,
     };
@@ -115,10 +112,8 @@ PUBLIC void OpenFilePickerSavePreset(FilePickerState& state,
     state.data = FilePickerStateType::SavePreset;
 }
 
-PUBLIC void OpenFilePickerLoadPreset(FilePickerState& state,
-                                     GuiFrameResult& frame_result,
-                                     prefs::Preferences const& prefs,
-                                     FloePaths const& paths) {
+PUBLIC void
+OpenFilePickerLoadPreset(FilePickerState& state, GuiFrameResult& frame_result, FloePaths const& paths) {
     state.arena.ResetCursorAndConsolidateRegions();
     static constexpr auto k_filters = ArrayT<FilePickerDialogOptions::FileFilter>({
         {
@@ -134,7 +129,7 @@ PUBLIC void OpenFilePickerLoadPreset(FilePickerState& state,
     frame_result.file_picker_dialog = FilePickerDialogOptions {
         .type = FilePickerDialogOptions::Type::OpenFile,
         .title = "Load Floe Preset",
-        .default_path = PresetFileDefaultPath(state.arena, prefs, paths),
+        .default_path = PresetFileDefaultPath(state.arena, paths),
         .filters = k_filters,
         .allow_multiple_selection = false,
     };

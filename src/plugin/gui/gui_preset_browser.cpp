@@ -568,7 +568,6 @@ void PresetBrowser::DoPresetBrowserPanel(Rect const mid_panel_r) {
                                     buttons::PresetsBrowserPopupButton(imgui))) {
                     OpenFilePickerLoadPreset(g->file_picker_state,
                                              g->imgui.frame_output,
-                                             g->prefs,
                                              g->shared_engine_systems.paths);
                 }
                 Tooltip(g, load_file_id, load_file_r, "Load an external preset from a file"_s);

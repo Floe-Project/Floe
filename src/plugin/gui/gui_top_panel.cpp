@@ -340,7 +340,6 @@ void TopPanel(Gui* g) {
             if (items.DoButton("Save Preset As")) {
                 OpenFilePickerSavePreset(g->file_picker_state,
                                          g->imgui.frame_output,
-                                         g->prefs,
                                          g->shared_engine_systems.paths);
             }
 

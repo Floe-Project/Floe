@@ -656,6 +656,13 @@ static void HandlePostUpdateRequests(GuiPlatform& platform) {
                       }));
     }
 
+    if (platform.last_result.wants_keyboard_input) {
+        if (!puglHasFocus(platform.view)) {
+            auto const result = puglGrabFocus(platform.view);
+            if (result != PUGL_SUCCESS) LogWarning(ModuleName::Gui, "failed to grab focus: {}", result);
+        }
+    }
+
     if (platform.last_result.wants_clipboard_text_paste) {
         LogDebug(ModuleName::Gui, "requesting OS to give us clipboard");
         // IMPORTANT: this will call into our event handler function right from here rather than queue things
@@ -744,7 +751,6 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
 
             case PUGL_REALIZE: {
                 LogDebug(ModuleName::Gui, "realize: {}", fmt::DumpStruct(event->any));
-                puglGrabFocus(platform.view);
                 CreateGraphicsContext(platform);
                 break;
             }
@@ -815,7 +821,6 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
             }
 
             case PUGL_POINTER_IN: {
-                puglGrabFocus(platform.view);
                 break;
             }
             case PUGL_POINTER_OUT: break;

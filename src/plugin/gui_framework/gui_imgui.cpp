@@ -1305,8 +1305,14 @@ TextInputResult Context::TextInput(Rect r,
         for (auto const event : downs)
             stb_textedit_key(this, &stb_state, STB_TEXTEDIT_K_DOWN | shift_bit(event));
     }
-    if (auto const vs = frame_input.Key(KeyCode::V).presses_or_repeats; vs.size)
-        frame_output.wants_clipboard_text_paste = true;
+    if (auto const vs = frame_input.Key(KeyCode::V).presses_or_repeats; vs.size) {
+        for (auto const event : vs) {
+            if (event.modifiers.Get(ModifierKey::Modifier)) {
+                frame_output.wants_clipboard_text_paste = true;
+                break;
+            }
+        }
+    }
     if (auto const cs = frame_input.Key(KeyCode::C).presses_or_repeats; cs.size) {
         for (auto const event : cs)
             if (event.modifiers.Get(ModifierKey::Modifier)) {

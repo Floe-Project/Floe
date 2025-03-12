@@ -77,7 +77,7 @@ ImagePixelsFromLibrary(Gui* g, sample_lib::Library const& lib, LibraryImageType 
             if (auto const dir = path::Directory(mirage_compat_lib->path); dir) {
                 String const library_subdir = lib.name == "Wraith Demo" ? "Wraith" : lib.name;
                 auto const path =
-                    path::Join(g->scratch_arena, Array {*dir, "images"_s, library_subdir, filename});
+                    path::Join(g->scratch_arena, Array {*dir, "Images"_s, library_subdir, filename});
                 auto outcome = DecodeImageFromFile(path);
                 if (outcome.HasValue()) return outcome.ReleaseValue();
             }

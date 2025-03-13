@@ -1204,20 +1204,24 @@ TEST_CASE(TestWeb) {
         } else {
             tester.log.Debug("GET response: {}", buffer);
 
-            using namespace json;
-            auto parse_o = json::Parse(buffer,
-                                       [&](EventHandlerStack&, Event const& event) {
-                                           String url;
-                                           if (SetIfMatchingRef(event, "url", url)) {
-                                               CHECK_EQ(url, "https://httpbin.org/get"_s);
-                                               return true;
-                                           }
-                                           return false;
-                                       },
-                                       tester.scratch_arena,
-                                       {});
-            if (parse_o.HasError())
-                TEST_FAILED("Invalid HTTP GET JSON response: {}", parse_o.Error().message);
+            if (!ContainsCaseInsensitiveAscii(buffer, "unavailable"_s)) {
+                using namespace json;
+                auto parse_o = json::Parse(buffer,
+                                           [&](EventHandlerStack&, Event const& event) {
+                                               String url;
+                                               if (SetIfMatchingRef(event, "url", url)) {
+                                                   CHECK_EQ(url, "https://httpbin.org/get"_s);
+                                                   return true;
+                                               }
+                                               return false;
+                                           },
+                                           tester.scratch_arena,
+                                           {});
+                if (parse_o.HasError())
+                    TEST_FAILED("Invalid HTTP GET JSON response: {}", parse_o.Error().message);
+            } else {
+                LOG_WARNING("HTTP test server is unavailable");
+            }
         }
     }
 
@@ -1234,20 +1238,24 @@ TEST_CASE(TestWeb) {
         } else {
             tester.log.Debug("POST response: {}", buffer);
 
-            using namespace json;
-            auto parse_o = json::Parse(buffer,
-                                       [&](EventHandlerStack&, Event const& event) {
-                                           String data;
-                                           if (SetIfMatchingRef(event, "data", data)) {
-                                               CHECK_EQ(data, "data"_s);
-                                               return true;
-                                           }
-                                           return false;
-                                       },
-                                       tester.scratch_arena,
-                                       {});
-            if (parse_o.HasError())
-                TEST_FAILED("Invalid HTTP POST JSON response: {}", parse_o.Error().message);
+            if (!ContainsCaseInsensitiveAscii(buffer, "unavailable"_s)) {
+                using namespace json;
+                auto parse_o = json::Parse(buffer,
+                                           [&](EventHandlerStack&, Event const& event) {
+                                               String data;
+                                               if (SetIfMatchingRef(event, "data", data)) {
+                                                   CHECK_EQ(data, "data"_s);
+                                                   return true;
+                                               }
+                                               return false;
+                                           },
+                                           tester.scratch_arena,
+                                           {});
+                if (parse_o.HasError())
+                    TEST_FAILED("Invalid HTTP POST JSON response: {}", parse_o.Error().message);
+            } else {
+                LOG_WARNING("HTTP test server is unavailable");
+            }
         }
     }
 

@@ -662,6 +662,7 @@ struct Context {
     DynamicArray<Char32> textedit_text {Malloc::Instance()};
     DynamicArray<char> textedit_text_utf8 {Malloc::Instance()};
     int textedit_len = 0;
+    bool active_text_input_shown = false; // Unfocus active input if it's not shown in the frame
 
     // window
     DynamicArray<Window*> sorted_windows {Malloc::Instance()}; // internal

@@ -669,6 +669,8 @@ void Context::Begin(WindowSettings settings) {
 
     next_window_contents_size = {0, 0};
 
+    active_text_input_shown = false;
+
     overlay_graphics.context = frame_input.graphics_ctx;
     overlay_graphics.BeginDraw();
 
@@ -682,6 +684,8 @@ void Context::End(ArenaAllocator& scratch_arena) {
     EndWindow(); // application window
     ASSERT_EQ(window_stack.size, 0u); // all BeginWindow calls must have an EndWindow
     ASSERT_EQ(current_popup_stack.size, 0u);
+
+    if (!active_text_input_shown) SetTextInputFocus(0, {}, false);
 
     if (debug_show_register_widget_overlay) {
         for (auto& w : frame_output.mouse_tracked_rects) {
@@ -1193,6 +1197,8 @@ TextInputResult Context::TextInput(Rect r,
         result.text = text;
         return result;
     }
+
+    active_text_input_shown = true;
 
     auto const initial_textedit_len = textedit_len;
     auto const x_offset = get_offset(textedit_text_utf8);

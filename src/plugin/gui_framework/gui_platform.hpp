@@ -756,10 +756,6 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
     try {
         auto& platform = *(GuiPlatform*)puglGetHandle(view);
 
-        // On Windows, this event handler can be called from inside itself. This is due to blocking operations
-        // such IFileDialog::Show() pumping messages itself.
-        if (platform.inside_update) return PUGL_SUCCESS;
-
         bool post_redisplay = false;
 
         switch (event->type) {
@@ -804,6 +800,9 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
             }
 
             case PUGL_EXPOSE: {
+                // On Windows, this event handler might be called from inside itself.
+                if (platform.inside_update) return PUGL_SUCCESS;
+
                 platform.inside_update = true;
                 UpdateAndRender(platform);
                 platform.inside_update = false;

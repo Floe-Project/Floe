@@ -9,6 +9,12 @@ For instance: 0.0.1. Don't change the headings.
 
 # Changelog
 
+## 0.0.5-alpha
+- Fix text being pasted into text field when just pressing 'V' rather than 'Ctrl+V' 
+- Windows: fix unable to use spacebar in text fields due to the host stealing the keypress
+- Fix crash when trying to load or save a preset from file
+- Improve the default background image
+
 ## 0.0.4-alpha
 Fix crash when opening the preset browser.
 

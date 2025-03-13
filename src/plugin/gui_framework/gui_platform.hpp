@@ -32,6 +32,7 @@ constexpr u16 k_default_gui_width = SizeWithAspectRatio(910, k_aspect_ratio_with
 
 struct GuiPlatform {
     static constexpr uintptr k_pugl_timer_id = 200;
+    static constexpr char const* k_window_class_name = "FloeSampler";
 
     clap_host const& host;
     prefs::Preferences& prefs;
@@ -47,6 +48,7 @@ struct GuiPlatform {
     bool inside_update {};
     ArenaAllocator file_picker_result_arena {Malloc::Instance()};
     Optional<OpaqueHandle<IS_WINDOWS ? 160 : 16>> native_file_picker {};
+    bool windows_keyboard_hook_added {};
 };
 
 // Public API
@@ -122,6 +124,10 @@ bool NativeFilePickerOnClientMessage(GuiPlatform& platform, uintptr data1, uintp
 int FdFromPuglWorld(PuglWorld* world);
 void X11SetParent(PuglView* view, uintptr parent);
 
+// Windows only
+void AddWindowsKeyboardHook(GuiPlatform& platform);
+void RemoveWindowsKeyboardHook(GuiPlatform& platform);
+
 } // namespace detail
 
 PUBLIC ErrorCodeOr<void> CreateView(GuiPlatform& platform) {
@@ -140,7 +146,7 @@ PUBLIC ErrorCodeOr<void> CreateView(GuiPlatform& platform) {
     } else {
         platform.world = puglNewWorld(PUGL_MODULE, 0);
         if (platform.world == nullptr) Panic("out of memory");
-        puglSetWorldString(platform.world, PUGL_CLASS_NAME, "Floe");
+        puglSetWorldString(platform.world, PUGL_CLASS_NAME, GuiPlatform::k_window_class_name);
         platform.world = platform.world;
         LogInfo(ModuleName::Gui, "creating new world");
     }
@@ -172,6 +178,10 @@ PUBLIC ErrorCodeOr<void> CreateView(GuiPlatform& platform) {
 
 PUBLIC void DestroyView(GuiPlatform& platform) {
     Trace(ModuleName::Gui);
+
+    if constexpr (IS_WINDOWS) {
+        if (platform.windows_keyboard_hook_added) detail::RemoveWindowsKeyboardHook(platform);
+    }
 
     detail::CloseNativeFilePicker(platform);
 
@@ -660,6 +670,12 @@ static void HandlePostUpdateRequests(GuiPlatform& platform) {
         if (!puglHasFocus(platform.view)) {
             auto const result = puglGrabFocus(platform.view);
             if (result != PUGL_SUCCESS) LogWarning(ModuleName::Gui, "failed to grab focus: {}", result);
+        }
+        if constexpr (IS_WINDOWS) {
+            if (!platform.windows_keyboard_hook_added) {
+                detail::AddWindowsKeyboardHook(platform);
+                platform.windows_keyboard_hook_added = true;
+            }
         }
     }
 

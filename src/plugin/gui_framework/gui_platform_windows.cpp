@@ -305,3 +305,138 @@ ErrorCodeOr<void> detail::OpenNativeFilePicker(GuiPlatform& platform, FilePicker
 
     return k_success;
 }
+
+static bool HandleMessage(MSG const& msg, int code, WPARAM w_param) {
+    // "If code is HC_ACTION, the hook procedure must process the message"
+    if (code != HC_ACTION) return false;
+
+    // "The message has been removed from the queue." We only want to process messages that aren't otherwise
+    // going to be processed.
+    if (w_param != PM_REMOVE) return false;
+
+    if (!msg.hwnd) return false;
+
+    // We only care about keyboard messages.
+    {
+        constexpr auto k_accepted_messages =
+            Array {(UINT)WM_KEYDOWN, WM_SYSKEYDOWN, WM_KEYUP, WM_SYSKEYUP, WM_CHAR, WM_SYSCHAR};
+        if (!Contains(k_accepted_messages, msg.message)) return false;
+    }
+
+    LogDebug(ModuleName::Gui, "HandleMessage");
+
+    // We only care about messages to our window.
+    {
+        constexpr auto k_floe_class_name_len = NullTerminatedSize(GuiPlatform::k_window_class_name);
+        char class_name[k_floe_class_name_len + 1];
+        auto const class_name_len = GetClassNameA(msg.hwnd, class_name, sizeof(class_name));
+        if (class_name_len == 0) {
+            ReportError(ErrorLevel::Warning,
+                        SourceLocationHash(),
+                        "failed to get class name for hwnd, {}",
+                        Win32ErrorCode(GetLastError()));
+            return false;
+        }
+
+        if (class_name_len != k_floe_class_name_len) return false; // Not our window.
+        if (!MemoryIsEqual(class_name, GuiPlatform::k_window_class_name, k_floe_class_name_len))
+            return false; // Not our window.
+    }
+
+    ASSERT(ThreadName() == "main");
+
+    // We only want messages when wants_keyboard_input is true.
+    {
+        // WARNING: doing this is not part of Pugl's public API - it might break.
+        auto view = (PuglView*)GetWindowLongPtrW(msg.hwnd, GWLP_USERDATA);
+
+        auto& platform = *(GuiPlatform*)puglGetHandle(view);
+
+        if (!platform.last_result.wants_keyboard_input) {
+            LogDebug(ModuleName::Gui, "wants_keyboard_input is false");
+            return false;
+        }
+    }
+
+    LogDebug(ModuleName::Gui, "comsuming hook message");
+
+    // "If the message is translated (that is, a character message is posted to the thread's message queue),
+    // the return value is nonzero. If the message is WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, or WM_SYSKEYUP, the
+    // return value is nonzero, regardless of the translation."
+    if (TranslateMessage(&msg)) {
+        // We don't want the message in the message queue because it might reach other windows - we want to
+        // consume it for ourselves.
+        MSG peeked {};
+        if (PeekMessageW(&peeked, msg.hwnd, WM_CHAR, WM_DEADCHAR, PM_REMOVE) ||
+            PeekMessageW(&peeked, msg.hwnd, WM_SYSCHAR, WM_SYSDEADCHAR, PM_REMOVE)) {
+            SendMessageW(msg.hwnd, msg.message, msg.wParam, msg.lParam);
+            return true;
+        }
+    }
+    SendMessageW(msg.hwnd, msg.message, msg.wParam, msg.lParam);
+
+    return true;
+}
+
+// GetMsgProc
+// https://learn.microsoft.com/en-us/windows/win32/winmsg/getmsgproc
+static LRESULT CALLBACK MessageHook(int code, WPARAM w_param, LPARAM l_param) {
+    auto& msg = *(MSG*)l_param;
+    if (HandleMessage(msg, code, w_param)) {
+        // "The GetMsgProc hook procedure can examine or modify the message."
+        msg = {}; // We scrub it so that no one else gets it.
+        return 0;
+    }
+
+    return CallNextHookEx(nullptr, code, w_param, l_param);
+}
+
+static HHOOK g_keyboard_hook {};
+static u32 g_keyboard_hook_ref_count {};
+
+void detail::AddWindowsKeyboardHook(GuiPlatform& platform) {
+    LogDebug(ModuleName::Gui, "AddWindowsKeyboardHook");
+    ASSERT(ThreadName() == "main");
+
+    if (g_keyboard_hook_ref_count++ > 0) return;
+
+    ASSERT(!g_keyboard_hook);
+
+    auto window = (HWND)puglGetNativeView(platform.view);
+    ASSERT(window);
+
+    HMODULE instance = nullptr;
+    if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                                GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                            (LPCTSTR)detail::AddWindowsKeyboardHook,
+                            &instance)) {
+        instance = GetModuleHandleW(nullptr);
+    }
+    ASSERT(instance);
+
+    g_keyboard_hook = SetWindowsHookExW(WH_GETMESSAGE, MessageHook, instance, GetCurrentThreadId());
+
+    if (!g_keyboard_hook) {
+        ReportError(ErrorLevel::Warning,
+                    SourceLocationHash(),
+                    "failed to install keyboard hook, {}",
+                    Win32ErrorCode(GetLastError()));
+    }
+}
+
+void detail::RemoveWindowsKeyboardHook(GuiPlatform&) {
+    ASSERT(ThreadName() == "main");
+
+    if (--g_keyboard_hook_ref_count > 0) return;
+
+    // It can be null if it failed.
+    if (!g_keyboard_hook) return;
+
+    if (!UnhookWindowsHookEx(g_keyboard_hook)) {
+        ReportError(ErrorLevel::Warning,
+                    SourceLocationHash(),
+                    "failed to remove keyboard hook, {}",
+                    Win32ErrorCode(GetLastError()));
+    }
+    g_keyboard_hook = nullptr;
+}

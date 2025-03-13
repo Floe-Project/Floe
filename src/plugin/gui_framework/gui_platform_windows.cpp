@@ -140,7 +140,6 @@ RunFilePicker(FilePickerDialogOptions const& args, ArenaAllocator& arena, HWND p
 
     if (parent) ASSERT(IsWindow(parent));
 
-    LogDebug(ModuleName::Gui, "Showing file picker dialog");
     if (auto hr = f->Show(parent); hr != S_OK) {
         if (hr == HRESULT_FROM_WIN32(ERROR_CANCELLED)) return Span<MutableString> {};
         return Win32ErrorCode(HresultToWin32(hr), "Show()");
@@ -241,7 +240,6 @@ bool detail::NativeFilePickerOnClientMessage(GuiPlatform& platform, uintptr data
 //   otherwise IFileDialog::Show() will block forever, and never show it's own dialog.
 
 ErrorCodeOr<void> detail::OpenNativeFilePicker(GuiPlatform& platform, FilePickerDialogOptions const& args) {
-    LogDebug(ModuleName::Gui, "OpenNativeFilePicker");
     ASSERT(ThreadName() == "main");
 
     NativeFilePicker* native_file_picker = nullptr;
@@ -323,8 +321,6 @@ static bool HandleMessage(MSG const& msg, int code, WPARAM w_param) {
         if (!Contains(k_accepted_messages, msg.message)) return false;
     }
 
-    LogDebug(ModuleName::Gui, "HandleMessage");
-
     // We only care about messages to our window.
     {
         constexpr auto k_floe_class_name_len = NullTerminatedSize(GuiPlatform::k_window_class_name);
@@ -352,13 +348,8 @@ static bool HandleMessage(MSG const& msg, int code, WPARAM w_param) {
 
         auto& platform = *(GuiPlatform*)puglGetHandle(view);
 
-        if (!platform.last_result.wants_keyboard_input) {
-            LogDebug(ModuleName::Gui, "wants_keyboard_input is false");
-            return false;
-        }
+        if (!platform.last_result.wants_keyboard_input) return false;
     }
-
-    LogDebug(ModuleName::Gui, "comsuming hook message");
 
     // "If the message is translated (that is, a character message is posted to the thread's message queue),
     // the return value is nonzero. If the message is WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, or WM_SYSKEYUP, the
@@ -395,7 +386,6 @@ static HHOOK g_keyboard_hook {};
 static u32 g_keyboard_hook_ref_count {};
 
 void detail::AddWindowsKeyboardHook(GuiPlatform& platform) {
-    LogDebug(ModuleName::Gui, "AddWindowsKeyboardHook");
     ASSERT(ThreadName() == "main");
 
     if (g_keyboard_hook_ref_count++ > 0) return;

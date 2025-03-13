@@ -513,7 +513,7 @@ bool Context::WakeupAtTimedInterval(TimePoint& counter, f64 interval_seconds) {
 
 void Context::AddTimedWakeup(TimePoint time, char const* timer_name) {
     (void)timer_name;
-    dyn::Append(timed_wakeups, time);
+    dyn::AppendIfNotAlreadyThere(timed_wakeups, time);
 }
 
 void Context::PushID(String str) { dyn::Append(id_stack, GetID(str)); }

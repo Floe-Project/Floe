@@ -38,6 +38,7 @@ Celtique
 Changelog
 CodeFactor
 CrashingWaves
+Ctrl
 Cubase
 DAW
 DAWs
@@ -136,6 +137,7 @@ img
 ir
 json
 justfile
+keypress
 linux
 lua
 macOS
@@ -167,6 +169,7 @@ roadmap
 s3a2
 shouldn
 signup
+spacebar
 src
 srcset
 stacktraces

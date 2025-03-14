@@ -68,6 +68,34 @@ PUBLIC constexpr T Pow(T x, T y) {
     return __builtin_elementwise_pow(x, y);
 }
 
+template <F32Vector T>
+PUBLIC constexpr T Map(T value, T in_min, T in_max, T out_min, T out_max) {
+    auto const denominator = in_max - in_min;
+    auto const factor = (denominator != 0) ? (value - in_min) * (out_max - out_min) / denominator : 0;
+    return out_min + factor;
+}
+
+// Doesn't check for divide by zero.
+template <F32Vector T>
+PUBLIC constexpr T MapUnchecked(T value, T in_min, T in_max, T out_min, T out_max) {
+    return out_min + (value - in_min) * (out_max - out_min) / (in_max - in_min);
+}
+
+template <F32Vector T>
+PUBLIC constexpr T MapTo01(T value, T in_min, T in_max) {
+    return Map(value, in_min, in_max, T(0), T(1));
+}
+
+template <F32Vector T>
+PUBLIC constexpr T MapTo01Unchecked(T value, T in_min, T in_max) {
+    return MapUnchecked(value, in_min, in_max, T(0), T(1));
+}
+
+template <F32Vector T>
+PUBLIC constexpr T MapFrom01(T value, T out_min, T out_max) {
+    return MapUnchecked(value, T(0), T(1), out_min, out_max);
+}
+
 #define DEFINE_BUILTIN_SIMD_MATHS_FUNC(name, func)                                                           \
     template <F32Vector T>                                                                                   \
     PUBLIC ALWAYS_INLINE constexpr T name(T x) {                                                             \

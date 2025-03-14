@@ -9,7 +9,7 @@
 
 struct StereoPeakMeter {
     struct Snapshot {
-        Array<f32, 2> levels {};
+        f32x2 levels {};
     };
 
     // not thread-safe
@@ -36,27 +36,20 @@ struct StereoPeakMeter {
     // not thread-safe
     void AddBuffer(Span<StereoAudioFrame> frames) {
         for (auto const i : Range(frames.size)) {
-            auto const abs_f = Abs(frames[i]);
+            auto const frame = LoadUnalignedToType<f32x2>(&frames[i].l);
+            auto const abs_f = Abs(frame);
 
-            if (abs_f.l > m_levels[0]) {
-                m_levels[0] = abs_f.l;
-                m_falldown_steps[0] = abs_f.l / m_falldown_divisor;
-            } else
-                m_levels[0] = Max(0.0f, m_levels[0] - m_falldown_steps[0]);
+            auto const is_new_peak = abs_f > m_levels;
 
-            if (abs_f.r > m_levels[1]) {
-                m_levels[1] = abs_f.r;
-                m_falldown_steps[1] = abs_f.r / m_falldown_divisor;
-            } else
-                m_levels[1] = Max(0.0f, m_levels[1] - m_falldown_steps[1]);
+            m_levels = is_new_peak ? abs_f : Max<f32x2>(0.0f, m_levels - m_falldown_steps);
+            m_falldown_steps = is_new_peak ? (abs_f / m_falldown_divisor) : m_falldown_steps;
 
-            if (abs_f.l > 1 || abs_f.r > 1)
+            if (Any(abs_f > 1))
                 m_clipping_detection_counter = m_clipping_detection_start_counter;
             else if (m_clipping_detection_counter != 0)
                 --m_clipping_detection_counter;
 
-            m_smoothed_levels[0] = SmoothOutput(m_levels[0], m_prev_levels[0]);
-            m_smoothed_levels[1] = SmoothOutput(m_levels[1], m_prev_levels[1]);
+            m_smoothed_levels = SmoothOutput(m_levels, m_prev_levels);
         }
 
         m_snapshot.Store(
@@ -68,7 +61,7 @@ struct StereoPeakMeter {
     }
 
     // not thread-safe
-    bool Silent() const { return m_levels[0] == 0 && m_levels[1] == 0; }
+    bool Silent() const { return All(m_levels == 0); }
 
     // thread-safe
     Snapshot GetSnapshot() const { return m_snapshot.Load(LoadMemoryOrder::Relaxed); }
@@ -78,17 +71,17 @@ struct StereoPeakMeter {
     }
 
   private:
-    static f32 SmoothOutput(f32 output, f32& prev_output) {
+    static f32x2 SmoothOutput(f32x2 output, f32x2& prev_output) {
         static constexpr f32 k_smoothing_amount = 0.001f;
-        f32 const result = prev_output + k_smoothing_amount * (output - prev_output);
+        auto const result = prev_output + k_smoothing_amount * (output - prev_output);
         prev_output = result;
         return result;
     }
 
-    Array<f32, 2> m_falldown_steps {};
-    Array<f32, 2> m_levels {};
-    Array<f32, 2> m_smoothed_levels {};
-    Array<f32, 2> m_prev_levels {};
+    f32x2 m_falldown_steps {};
+    f32x2 m_levels {};
+    f32x2 m_smoothed_levels {};
+    f32x2 m_prev_levels {};
     f32 m_falldown_divisor {};
     u32 m_clipping_detection_start_counter {};
     u32 m_clipping_detection_counter {};

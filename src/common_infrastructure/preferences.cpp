@@ -899,10 +899,11 @@ void Remove(Preferences& prefs, Key const& key, RemoveValueOptions options) {
     MarkChanged(prefs, key, nullptr, options);
 }
 
-void Init(Preferences& prefs, Span<String const> possible_paths) {
-    ASSERT(prefs.size == 0);
+Optional<usize> Init(Preferences& prefs, Span<String const> possible_paths) {
+    ASSERT(prefs.size == 0, "already init");
 
-    for (auto const path : possible_paths) {
+    Optional<usize> path_index_loaded {};
+    for (auto const [index, path] : Enumerate(possible_paths)) {
         auto const read_result = TRY_OR(ReadEntirePreferencesFile(path, prefs.arena), {
             if (error == FilesystemError::PathDoesNotExist || error == FilesystemError::AccessDenied)
                 continue;
@@ -915,6 +916,7 @@ void Init(Preferences& prefs, Span<String const> possible_paths) {
             (PreferencesTable&)prefs = ParseLegacyPreferencesFile(read_result.file_data, prefs.arena);
         else
             (PreferencesTable&)prefs = ParsePreferencesFile(read_result.file_data, prefs.arena);
+        path_index_loaded = index;
         break;
     }
 
@@ -926,6 +928,8 @@ void Init(Preferences& prefs, Span<String const> possible_paths) {
                     SourceLocationHash(),
                     "failed to create preferences directory watcher: {}",
                     watcher.Error());
+
+    return path_index_loaded;
 }
 
 void Deinit(Preferences& prefs) {

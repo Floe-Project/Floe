@@ -306,9 +306,9 @@ void ReplacePreferences(Preferences& preferences,
                         PreferencesTable const& new_table,
                         ReplaceOptions options = {});
 
-// Inits the object. Reads and parses the file. possible_paths should be sorted in order of
-// preference. The first is the most preferred.
-void Init(Preferences& preferences, Span<String const> possible_paths);
+// Inits the object. Reads and parses the file. possible_paths should be sorted in order of preference. The
+// first is the most preferred. Returns the index of the path that was used, or nullopt if no path was used.
+Optional<usize> Init(Preferences& preferences, Span<String const> possible_paths);
 void Deinit(Preferences& preferences);
 
 void WriteIfNeeded(Preferences& preferences);

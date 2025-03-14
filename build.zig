@@ -28,10 +28,8 @@ const floe_copyright = "Sam Windell";
 const floe_vendor = "Floe";
 const floe_homepage_url = "https://floe.audio";
 const floe_manual_url = "https://floe.audio";
-const floe_download_url = "https://floe.audio";
-const floe_manual_install_instructions_url = "https://floe.audio"; // TODO: change to actual URL
-const floe_packages_info_url = "https://floe.audio"; // TODO: change to actual URL
-const floe_source_code_url = "https://github.com/Floe-Project/Floe"; // TODO: change to actual URL
+const floe_download_url = "https://floe.audio/installation/download-and-install-floe.html";
+const floe_source_code_url = "https://github.com/Floe-Project/Floe";
 const floe_au_factory_function = "FloeFactoryFunction";
 const min_macos_version = "11.0.0"; // use 3-part version for plist
 const min_windows_version = "win10";
@@ -1251,8 +1249,6 @@ pub fn build(b: *std.Build) void {
             .FLOE_HOMEPAGE_URL = floe_homepage_url,
             .FLOE_MANUAL_URL = floe_manual_url,
             .FLOE_DOWNLOAD_URL = floe_download_url,
-            .FLOE_MANUAL_INSTALL_INSTRUCTIONS_URL = floe_manual_install_instructions_url,
-            .FLOE_PACKAGES_INFO_URL = floe_packages_info_url,
             .FLOE_SOURCE_CODE_URL = floe_source_code_url,
             .FLOE_PROJECT_ROOT_PATH = rootdir,
             .FLOE_PROJECT_CACHE_PATH = b.pathJoin(&.{ rootdir, floe_cache_relative }),
@@ -2980,7 +2976,7 @@ pub fn build(b: *std.Build) void {
                 flags.append(
                     "-DCLAP_PLUGIN_PATH_RELATIVE_BUILD_ROOT=\"zig-out/x86_64-windows/Floe.clap\"",
                 ) catch unreachable;
-                // flags.append("-DVST3_PLUGIN_PATH_RELATIVE_BUILD_ROOT=\"zig-out/x86_64-windows/Floe.vst3\"") catch unreachable; // TODO: renable when we build VST3
+                flags.append("-DVST3_PLUGIN_PATH_RELATIVE_BUILD_ROOT=\"zig-out/x86_64-windows/Floe.vst3\"") catch unreachable;
                 win_installer.addWin32ResourceFile(.{
                     .file = b.path(installer_path ++ "/resources.rc"),
                     .flags = flags.items,

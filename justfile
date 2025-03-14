@@ -287,7 +287,7 @@ valgrind build="": (_build_if_requested build "native")
     --exit-on-first-error=no \
     {{native_binary_dir}}/tests
 
-# TODO: add vst3-val, pluginval and plugival-au (and wine variants) when we re-enable wrappers
+# TODO: add plugival-au (and wine variants) when we re-enable wrappers
 checks_level_0 := replace( 
   "
   check-reuse
@@ -296,6 +296,8 @@ checks_level_0 := replace(
   check-spelling
   test-units
   test-clap-val
+  test-pluginval
+  test-vst3-val
   " + 
   if os() == "linux" {
     "
@@ -312,11 +314,13 @@ checks_level_1 := checks_level_0 + replace(
   clang-tidy
   ", "\n", " ")
 
-# TODO: add vst3-val, pluginval and plugival-au when we re-enable wrappers
+# TODO: add plugival-au when we re-enable au
 checks_ci := replace(
   "
     test-units
     test-clap-val
+    test-pluginval
+    test-vst3-val
   " +
   if os() == "linux" {
     "
@@ -408,9 +412,9 @@ test-ci-windows:
     [[ $result -ne 0 ]] && num_failed=$((num_failed + 1))
   }
   
-  # test test-windows-pluginval # TODO: re-enable when wrappers are supported
+  test test-windows-pluginval 
   test test-windows-units
-  # test test-windows-vst3-val # TODO: re-enable when wrappers are supported
+  test test-windows-vst3-val 
   test test-windows-clap-val
 
   if [[ ! -v $GITHUB_ACTIONS ]]; then
@@ -520,8 +524,7 @@ windows-prepare-release:
   # zip the manual-install files
   just _create-manual-install-readme "Windows"
   final_manual_zip_name="Floe-Manual-Install-v$version-Windows.zip"
-  # TODO: add Floe.vst3 to zip when wrappers are supported
-  zip -r $final_manual_zip_name Floe.clap readme.txt
+  zip -r $final_manual_zip_name Floe.clap Floe.vst3 readme.txt
   rm readme.txt
   mv $final_manual_zip_name {{release_files_dir}}
 
@@ -592,8 +595,8 @@ macos-prepare-release-plugins:
     codesign --sign "$MACOS_DEV_ID_APP_NAME" --timestamp --options=runtime --deep --force --entitlements plugin.entitlements $1
   }
 
-  # TODO: add Floe.vst3 and Floe.component when wrappers are supported
-  plugin_list="Floe.clap"
+  # TODO: add Floe.component when au is supported
+  plugin_list="Floe.clap Floe.vst3"
 
   # we can do it in parallel for speed, but we need to be careful there's no conflicting use of the filesystem
   export -f codesign_plugin
@@ -693,8 +696,8 @@ macos-build-installer:
     add_package_to_distribution_xml "$identifier" "$title" "$description" "$package_root.pkg"
   }
 
-  # TODO: re-enable when wrappers are supported
-  # make_package vst3 VST3 "Floe VST3" "VST3 format of the Floe plugin"
+  make_package vst3 VST3 "Floe VST3" "VST3 format of the Floe plugin"
+  # TODO: re-enable when au is supported
   # make_package component Components "Floe AudioUnit (AUv2)" "AudioUnit (version 2) format of the Floe plugin"
   make_package clap CLAP "Floe CLAP" "CLAP format of the Floe plugin"
 

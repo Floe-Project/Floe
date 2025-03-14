@@ -70,16 +70,8 @@ SharedEngineSystems::SharedEngineSystems(Span<sentry::Tag const> tags)
 
     thread_pool.Init("global", {});
 
-    prefs::Init(prefs, paths.possible_preferences_paths);
-
-    if (auto const value = prefs::LookupValues(prefs, prefs::key::k_extra_libraries_folder)) {
-        DynamicArrayBounded<String, k_max_extra_scan_folders> extra_scan_folders;
-        for (auto v = &*value; v; v = v->next) {
-            if (extra_scan_folders.size == k_max_extra_scan_folders) break;
-            dyn::AppendIfNotAlreadyThere(extra_scan_folders, v->Get<String>());
-        }
-        sample_lib_server::SetExtraScanFolders(sample_library_server, extra_scan_folders);
-    }
+    sample_lib_server::SetExtraScanFolders(sample_library_server,
+                                           ExtraScanFolders(paths, prefs, ScanFolderType::Libraries));
 }
 
 SharedEngineSystems::~SharedEngineSystems() {

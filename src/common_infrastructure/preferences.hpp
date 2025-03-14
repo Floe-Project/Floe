@@ -250,7 +250,8 @@ struct Preferences : PreferencesTable {
 
 struct SetValueOptions {
     bool clone_key_string {};
-    bool dont_track_changes {};
+    bool dont_send_on_change_event {};
+    bool dont_mark_as_changed {};
     bool overwrite_only {}; // do nothing if the key doesn't exist already
 };
 
@@ -279,7 +280,8 @@ void AddValue(Preferences& preferences,
               SetValueOptions options = {});
 
 struct RemoveValueOptions {
-    bool dont_track_changes {};
+    bool dont_send_on_change_event {};
+    bool dont_mark_as_changed {};
 };
 
 // The value will be compared to all values for the given key, if it matches it will be removed.

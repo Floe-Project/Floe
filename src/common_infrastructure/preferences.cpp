@@ -688,9 +688,10 @@ MatchValues(Key const& key, Value const* value_list, Descriptor const& descripto
     return MatchValuesTemplate(key, value_list, descriptor, out);
 }
 
-static void MarkChanged(Preferences& prefs, Key const& key, Value const* value) {
-    prefs.write_to_file_needed = true;
-    if (prefs.on_change) prefs.on_change(key, value);
+static void MarkChanged(Preferences& prefs, Key const& key, Value const* value, auto const& options) {
+    if (!options.dont_mark_as_changed) prefs.write_to_file_needed = true;
+    if (!options.dont_send_on_change_event)
+        if (prefs.on_change) prefs.on_change(key, value);
 }
 
 static ValueUnion CloneValueUnion(ValueUnion const& v, PathPool& pool, ArenaAllocator& arena) {
@@ -789,7 +790,7 @@ void SetValue(Preferences& prefs, Key const& key, ValueUnion const& value, SetVa
         ASSERT(inserted);
     }
 
-    if (!options.dont_track_changes) MarkChanged(prefs, key, new_value);
+    MarkChanged(prefs, key, new_value, options);
 }
 
 void SetValue(Preferences& prefs,
@@ -832,7 +833,7 @@ bool AddValue(Preferences& prefs, Key const& key, ValueUnion const& value, SetVa
         ASSERT(inserted);
     }
 
-    if (!options.dont_track_changes) MarkChanged(prefs, key, first_node);
+    MarkChanged(prefs, key, first_node, options);
     return true;
 }
 
@@ -865,13 +866,13 @@ bool RemoveValue(Preferences& prefs, Key const& key, ValueUnion const& value, Re
             removed = true;
         });
 
-    if (removed && !options.dont_track_changes) {
+    if (removed) {
         if (existing_values == nullptr) {
             FreeKey(key, prefs.path_pool);
             prefs.DeleteElement(existing_element);
-            MarkChanged(prefs, key, nullptr);
+            MarkChanged(prefs, key, nullptr, options);
         } else {
-            MarkChanged(prefs, key, existing_values);
+            MarkChanged(prefs, key, existing_values, options);
         }
     }
 
@@ -895,7 +896,7 @@ void Remove(Preferences& prefs, Key const& key, RemoveValueOptions options) {
         prefs.Delete(key);
     }
 
-    if (!options.dont_track_changes) MarkChanged(prefs, key, nullptr);
+    MarkChanged(prefs, key, nullptr, options);
 }
 
 void Init(Preferences& prefs, Span<String const> possible_paths) {
@@ -945,12 +946,8 @@ void WriteIfNeeded(Preferences& prefs) {
 
 void ReplacePreferences(Preferences& prefs, PreferencesTable const& new_table, ReplaceOptions options) {
     if (options.remove_keys_not_in_new_table) {
-        for (auto const [key, value] : prefs) {
-            if (!new_table.Find(key)) {
-                Remove(prefs, key, {.dont_track_changes = true});
-                MarkChanged(prefs, key, nullptr);
-            }
-        }
+        for (auto const [key, value] : prefs)
+            if (!new_table.Find(key)) Remove(prefs, key);
     }
 
     for (auto const [key, new_value_list_ptr] : new_table) {
@@ -963,7 +960,10 @@ void ReplacePreferences(Preferences& prefs, PreferencesTable const& new_table, R
 
             // Add new values that don't already exist.
             for (auto new_v = new_value_list; new_v; new_v = new_v->next)
-                if (AddValue(prefs, key, *new_v, {.clone_key_string = true, .dont_track_changes = true}))
+                if (AddValue(prefs,
+                             key,
+                             *new_v,
+                             {.clone_key_string = true, .dont_send_on_change_event = true}))
                     changed = true;
 
             // Remove all old values that no longer exist.
@@ -979,17 +979,18 @@ void ReplacePreferences(Preferences& prefs, PreferencesTable const& new_table, R
                     }
                 }
                 if (!exists_in_new_values) {
-                    RemoveValue(prefs, key, *old_v, {.dont_track_changes = true});
+                    RemoveValue(prefs, key, *old_v, {.dont_send_on_change_event = true});
                     changed = true;
                 }
             }
         } else {
             for (auto v = new_value_list; v; v = v->next)
-                AddValue(prefs, key, *v, {.clone_key_string = true, .dont_track_changes = true});
+                AddValue(prefs, key, *v, {.clone_key_string = true, .dont_send_on_change_event = true});
             changed = true;
         }
 
-        if (changed) MarkChanged(prefs, key, *prefs.Find(key));
+        // To avoid sending a change event for every key-value pair, we only send one event per key.
+        if (changed) MarkChanged(prefs, key, *prefs.Find(key), SetValueOptions {});
     }
 }
 
@@ -1448,7 +1449,8 @@ TEST_CASE(TestPreferences) {
 
         Preferences prefs;
 
-        Init(prefs, Array {filepath});
+        auto const path_index_used = Init(prefs, Array {filepath});
+        REQUIRE(path_index_used == 0);
         DEFER { Deinit(prefs); };
 
         CHECK(!prefs.write_to_file_needed);

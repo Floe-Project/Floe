@@ -759,25 +759,32 @@ void SetValue(Preferences& prefs, Key const& key, ValueUnion const& value, SetVa
     auto const existing_values_ptr = prefs.Find(key);
     if (existing_values_ptr) {
         auto const existing_values = *existing_values_ptr;
-        if (existing_values->next == nullptr && *existing_values == value) return;
+        if (!existing_values) {
+            new_value = AllocateValue(prefs, CloneValueUnion(value, prefs.path_pool, prefs.arena));
+            *existing_values_ptr = new_value;
+        } else {
+            // If there's only one value and it's the same as the new value, we don't need to do anything.
+            if (existing_values->next == nullptr && *existing_values == value) return;
 
-        // Free the content of all existing values
-        for (auto node = existing_values; node;) {
-            FreeValueUnion(*node, prefs.path_pool);
+            // Free the content of all existing values
+            for (auto node = existing_values; node;) {
+                FreeValueUnion(*node, prefs.path_pool);
 
-            // We will reuse the first node, but for the others, we should add them to the free_values list.
-            if (node == existing_values) {
-                node = node->next;
-            } else {
-                auto next = node->next;
-                AddValueNodeToFreeList(prefs, node);
-                node = next;
+                // We will reuse the first node, but for the others, we should add them to the free_values
+                // list.
+                if (node == existing_values) {
+                    node = node->next;
+                } else {
+                    auto next = node->next;
+                    AddValueNodeToFreeList(prefs, node);
+                    node = next;
+                }
             }
-        }
 
-        // We can reuse the first node.
-        *existing_values = {CloneValueUnion(value, prefs.path_pool, prefs.arena)};
-        new_value = existing_values;
+            // We can reuse the first node.
+            *existing_values = {CloneValueUnion(value, prefs.path_pool, prefs.arena)};
+            new_value = existing_values;
+        }
     } else {
         if (options.overwrite_only) return;
 
@@ -813,15 +820,22 @@ bool AddValue(Preferences& prefs, Key const& key, ValueUnion const& value, SetVa
     auto existing_values_ptr = prefs.Find(key);
     if (existing_values_ptr) {
         auto const existing_values = *existing_values_ptr;
-        for (auto v = existing_values; v; v = v->next)
-            if (*v == value) return false;
-        auto last = existing_values;
-        for (; last->next; last = last->next)
-            if (*last == value) return false;
-        ASSERT(last->next == nullptr);
+        if (!existing_values) {
+            *existing_values_ptr = AllocateValue(prefs, CloneValueUnion(value, prefs.path_pool, prefs.arena));
+            first_node = *existing_values_ptr;
+        } else {
+            // Skip if the value already exists
+            for (auto v = existing_values; v; v = v->next)
+                if (*v == value) return false;
 
-        last->next = AllocateValue(prefs, CloneValueUnion(value, prefs.path_pool, prefs.arena));
-        first_node = existing_values;
+            auto last = existing_values;
+            for (; last->next; last = last->next)
+                if (*last == value) return false;
+            ASSERT(last->next == nullptr);
+
+            last->next = AllocateValue(prefs, CloneValueUnion(value, prefs.path_pool, prefs.arena));
+            first_node = existing_values;
+        }
     } else {
         if (options.overwrite_only) return false;
 

@@ -619,11 +619,11 @@ struct ParamDescriptor {
                module_parts[0] == ParameterModule::Layer3;
     }
 
-    DynamicArrayBounded<char, 128> ModuleString() const {
+    DynamicArrayBounded<char, 128> ModuleString(char separator = '/') const {
         DynamicArrayBounded<char, 128> result {};
         for (auto m : module_parts) {
             if (m == ParameterModule::None) break;
-            if (result.size != 0) dyn::Append(result, '/');
+            if (result.size != 0) dyn::Append(result, separator);
             dyn::AppendSpan(result, k_parameter_module_strings[int(m)]);
         }
         return result;

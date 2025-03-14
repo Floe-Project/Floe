@@ -736,7 +736,26 @@ static bool ClapParamsGetInfo(clap_plugin_t const* plugin, u32 param_index, clap
         param_info->default_value = (f64)desc.default_linear_value;
         param_info->max_value = (f64)desc.linear_range.max;
         param_info->min_value = (f64)desc.linear_range.min;
-        CopyStringIntoBufferWithNullTerm(param_info->name, desc.name);
+
+        // CLAP hosts do not show the module as well as the name - despite this being part of the spec. We
+        // have no option but to also put the module in the name.
+        if (auto const name_prefix = desc.ModuleString(' ');
+            name_prefix.size + 1 + desc.name.size + 1 > CLAP_NAME_SIZE) {
+            CopyStringIntoBufferWithNullTerm(param_info->name, desc.name);
+        } else {
+            usize pos = 0;
+
+            CopyMemory(param_info->name, name_prefix.data, name_prefix.size);
+            pos += name_prefix.size;
+
+            param_info->name[pos++] = ' ';
+
+            CopyMemory(param_info->name + pos, desc.name.data, desc.name.size);
+            pos += desc.name.size;
+
+            param_info->name[pos] = '\0';
+        }
+
         CopyStringIntoBufferWithNullTerm(param_info->module, desc.ModuleString());
         param_info->cookie = nullptr;
         param_info->flags = 0;

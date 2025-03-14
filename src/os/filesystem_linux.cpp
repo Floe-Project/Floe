@@ -250,6 +250,7 @@ MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirecto
         case KnownDirectoryType::MiragePreferencesAlternate: home_path = ""; break;
         case KnownDirectoryType::MirageGlobalPreferences:
         case KnownDirectoryType::MiragePreferences: home_path = ".config"; break;
+        case KnownDirectoryType::MirageGlobalData: home_path = ""; break;
 
         case KnownDirectoryType::Count: PanicIfReached();
     }

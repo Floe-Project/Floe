@@ -575,6 +575,10 @@ MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirecto
             config.folder_id = FOLDERID_RoamingAppData;
             config.fallback_user = "AppData\\Roaming";
             break;
+        case KnownDirectoryType::MirageGlobalData:
+            config.folder_id = FOLDERID_Public;
+            config.fallback_absolute = "C:\\Users\\Public";
+            break;
 
         case KnownDirectoryType::Count: PanicIfReached(); break;
     }

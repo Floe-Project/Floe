@@ -285,6 +285,7 @@ enum class KnownDirectoryType : u8 {
     MirageGlobalPreferences,
     MiragePreferences,
     MiragePreferencesAlternate,
+    MirageGlobalData,
 
     Count,
 };
@@ -307,7 +308,15 @@ MutableString KnownDirectoryWithSubdirectories(Allocator& a,
 
 // Returns a Floe-specific path. Might be a KnownDirectory with a 'Floe' subdirectory. Just a wrapper around
 // KnownDirectoryWithSubdirectories.
-enum class FloeKnownDirectoryType : u8 { Logs, Preferences, Libraries, Presets, Autosaves };
+enum class FloeKnownDirectoryType : u8 {
+    Logs,
+    Preferences,
+    Libraries,
+    Presets,
+    Autosaves,
+    MirageDefaultLibraries,
+    MirageDefaultPresets,
+};
 MutableString FloeKnownDirectory(Allocator& a,
                                  FloeKnownDirectoryType type,
                                  Optional<String> filename,

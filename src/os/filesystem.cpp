@@ -156,6 +156,18 @@ MutableString FloeKnownDirectory(Allocator& a,
             subdirectories = k_dirs;
             break;
         }
+        case FloeKnownDirectoryType::MirageDefaultLibraries: {
+            known_dir_type = KnownDirectoryType::MirageGlobalData;
+            static constexpr auto k_dirs = Array {"FrozenPlain"_s, "Mirage", "Libraries"};
+            subdirectories = k_dirs;
+            break;
+        }
+        case FloeKnownDirectoryType::MirageDefaultPresets: {
+            known_dir_type = KnownDirectoryType::MirageGlobalData;
+            static constexpr auto k_dirs = Array {"FrozenPlain"_s, "Mirage", "Presets"};
+            subdirectories = k_dirs;
+            break;
+        }
     }
     return KnownDirectoryWithSubdirectories(a, known_dir_type, subdirectories, filename, options);
 }

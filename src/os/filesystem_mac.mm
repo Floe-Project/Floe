@@ -321,6 +321,7 @@ MutableString KnownDirectory(Allocator& a, KnownDirectoryType type, KnownDirecto
             fallback = "Application Support";
             break;
         case KnownDirectoryType::MirageGlobalPreferences:
+        case KnownDirectoryType::MirageGlobalData:
             dir_type = NSApplicationSupportDirectory;
             domain = NSLocalDomainMask;
             fallback = "/Library/Application Support";

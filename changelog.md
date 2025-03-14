@@ -9,6 +9,10 @@ For instance: 0.0.1. Don't change the headings.
 
 # Changelog
 
+## 0.0.6-alpha
+- Fix peak meters dropping to zero unexpectedly
+- Fix not finding Mirage libraries/presets folders
+
 ## 0.0.5-alpha
 - Fix text being pasted into text field when just pressing 'V' rather than 'Ctrl+V' 
 - Windows: fix unable to use spacebar in text fields due to the host stealing the keypress

@@ -571,126 +571,140 @@ TEST_CASE(TestHostingClap) {
     auto const entry = (clap_plugin_entry const*)TRY(SymbolFromLibrary(*fixture.handle, "clap_entry"));
     REQUIRE(entry != nullptr);
 
-    REQUIRE(entry->init(fixture.clap_dso_or_bundle_path.data));
-    DEFER { entry->deinit(); };
+    SUBCASE("no init") { entry->deinit(); }
 
-    SUBCASE("double init") { REQUIRE(entry->init("plugin-path")); }
+    SUBCASE("reuse init/deinit") {
+        REQUIRE(entry->init(fixture.clap_dso_or_bundle_path.data));
+        entry->deinit();
+        REQUIRE(entry->init(fixture.clap_dso_or_bundle_path.data));
+        entry->deinit();
 
-    SUBCASE("double deinit") { entry->deinit(); }
+        SUBCASE("no double deinit") {}
+        SUBCASE("double deinit") { entry->deinit(); }
+    }
 
-    SUBCASE("plugin") {
-        TestHost test_host {};
+    SUBCASE("init") {
+        REQUIRE(entry->init(fixture.clap_dso_or_bundle_path.data));
+        DEFER { entry->deinit(); };
 
-        auto factory = (clap_plugin_factory const*)entry->get_factory(CLAP_PLUGIN_FACTORY_ID);
-        REQUIRE(factory);
-        CHECK_EQ(factory->get_plugin_count(factory), 1u);
-        auto const plugin_id = factory->get_plugin_descriptor(factory, 0)->id;
+        SUBCASE("double init") { REQUIRE(entry->init("plugin-path")); }
 
-        auto const plugin = factory->create_plugin(factory, &test_host.host, plugin_id);
-        REQUIRE(plugin);
-        test_host.plugin_created = true;
+        SUBCASE("double deinit") { entry->deinit(); }
 
-        DEFER { plugin->destroy(plugin); };
+        SUBCASE("plugin") {
+            TestHost test_host {};
 
-        SUBCASE("no init") {}
+            auto factory = (clap_plugin_factory const*)entry->get_factory(CLAP_PLUGIN_FACTORY_ID);
+            REQUIRE(factory);
+            CHECK_EQ(factory->get_plugin_count(factory), 1u);
+            auto const plugin_id = factory->get_plugin_descriptor(factory, 0)->id;
 
-        SUBCASE("init") {
-            REQUIRE(plugin->init(plugin));
+            auto const plugin = factory->create_plugin(factory, &test_host.host, plugin_id);
+            REQUIRE(plugin);
+            test_host.plugin_created = true;
 
-            SUBCASE("empty") {
-                ProcessWithState(tester,
-                                 plugin,
-                                 test_host,
-                                 {},
-                                 {
-                                     .seed = 0xca7,
-                                     .num_frames = 132,
-                                     .num_channels = 2,
-                                     .sample_rate = 44100,
-                                     .min_block_size = 1,
-                                     .max_block_size = 32,
-                                     .constant_block_size = 0,
-                                     .events = {},
-                                     .capture_output = false,
-                                 });
-            }
+            DEFER { plugin->destroy(plugin); };
 
-            SUBCASE("note on") {
-                EventQueue events {};
-                events.AppendMidiMessage(tester.scratch_arena, 0, MidiMessage::NoteOn(60, 100, 0));
+            SUBCASE("no init") {}
 
-                SUBCASE("sine") {
+            SUBCASE("init") {
+                REQUIRE(plugin->init(plugin));
+
+                SUBCASE("empty") {
                     ProcessWithState(tester,
                                      plugin,
                                      test_host,
-                                     StateProperties::Sine,
+                                     {},
                                      {
-                                         .seed = 0xbee,
-                                         .num_frames = 44100,
-                                         .num_channels = 2,
-                                         .sample_rate = 20000,
-                                         .min_block_size = 1,
-                                         .max_block_size = 1024,
-                                         .constant_block_size = 0,
-                                         .events = events,
-                                         .capture_output = true,
-                                     });
-                }
-
-                SUBCASE("white noise") {
-                    ProcessWithState(tester,
-                                     plugin,
-                                     test_host,
-                                     StateProperties::WhiteNoise,
-                                     {
-                                         .seed = 0xd09,
-                                         .num_frames = 44100,
-                                         .num_channels = 2,
-                                         .sample_rate = 96000,
-                                         .min_block_size = 1,
-                                         .max_block_size = 1024,
-                                         .constant_block_size = 0,
-                                         .events = events,
-                                         .capture_output = true,
-                                     });
-                }
-
-                SUBCASE("sample inst") {
-                    ProcessWithState(tester,
-                                     plugin,
-                                     test_host,
-                                     StateProperties::SampleInst,
-                                     {
-                                         .seed = 0x1ce,
-                                         .num_frames = 44100,
+                                         .seed = 0xca7,
+                                         .num_frames = 132,
                                          .num_channels = 2,
                                          .sample_rate = 44100,
                                          .min_block_size = 1,
-                                         .max_block_size = 1024,
+                                         .max_block_size = 32,
                                          .constant_block_size = 0,
-                                         .events = events,
-                                         .capture_output = true,
+                                         .events = {},
+                                         .capture_output = false,
                                      });
                 }
 
-                SUBCASE("everything on") {
-                    ProcessWithState(tester,
-                                     plugin,
-                                     test_host,
-                                     StateProperties::Ir | StateProperties::Sine |
-                                         StateProperties::WhiteNoise | StateProperties::SampleInst |
-                                         StateProperties::SoundShapersOn,
-                                     {
-                                         .seed = 0xba7,
-                                         .num_frames = 44100,
-                                         .num_channels = 2,
-                                         .sample_rate = 44100,
-                                         .min_block_size = 1,
-                                         .max_block_size = 1024,
-                                         .constant_block_size = 0,
-                                         .events = events,
-                                         .capture_output = true,
-                                     });
+                SUBCASE("note on") {
+                    EventQueue events {};
+                    events.AppendMidiMessage(tester.scratch_arena, 0, MidiMessage::NoteOn(60, 100, 0));
+
+                    SUBCASE("sine") {
+                        ProcessWithState(tester,
+                                         plugin,
+                                         test_host,
+                                         StateProperties::Sine,
+                                         {
+                                             .seed = 0xbee,
+                                             .num_frames = 44100,
+                                             .num_channels = 2,
+                                             .sample_rate = 20000,
+                                             .min_block_size = 1,
+                                             .max_block_size = 1024,
+                                             .constant_block_size = 0,
+                                             .events = events,
+                                             .capture_output = true,
+                                         });
+                    }
+
+                    SUBCASE("white noise") {
+                        ProcessWithState(tester,
+                                         plugin,
+                                         test_host,
+                                         StateProperties::WhiteNoise,
+                                         {
+                                             .seed = 0xd09,
+                                             .num_frames = 44100,
+                                             .num_channels = 2,
+                                             .sample_rate = 96000,
+                                             .min_block_size = 1,
+                                             .max_block_size = 1024,
+                                             .constant_block_size = 0,
+                                             .events = events,
+                                             .capture_output = true,
+                                         });
+                    }
+
+                    SUBCASE("sample inst") {
+                        ProcessWithState(tester,
+                                         plugin,
+                                         test_host,
+                                         StateProperties::SampleInst,
+                                         {
+                                             .seed = 0x1ce,
+                                             .num_frames = 44100,
+                                             .num_channels = 2,
+                                             .sample_rate = 44100,
+                                             .min_block_size = 1,
+                                             .max_block_size = 1024,
+                                             .constant_block_size = 0,
+                                             .events = events,
+                                             .capture_output = true,
+                                         });
+                    }
+
+                    SUBCASE("everything on") {
+                        ProcessWithState(tester,
+                                         plugin,
+                                         test_host,
+                                         StateProperties::Ir | StateProperties::Sine |
+                                             StateProperties::WhiteNoise | StateProperties::SampleInst |
+                                             StateProperties::SoundShapersOn,
+                                         {
+                                             .seed = 0xba7,
+                                             .num_frames = 44100,
+                                             .num_channels = 2,
+                                             .sample_rate = 44100,
+                                             .min_block_size = 1,
+                                             .max_block_size = 1024,
+                                             .constant_block_size = 0,
+                                             .events = events,
+                                             .capture_output = true,
+                                         });
+                    }
                 }
             }
         }

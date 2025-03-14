@@ -56,7 +56,8 @@ __attribute__((destructor)) void ZigBugWorkaround() { __cxa_finalize(__dso_handl
 
 static bool g_init = false;
 
-static Atomic<u32> g_inside_init {0};
+// We check the host conforms to CLAP spec: "it is forbidden to call ... simultaneously from multiple threads"
+static Atomic<u32> g_inside_call {0};
 
 // init and deinit are never called at the same time as any other clap function, including itself.
 // Might be called more than once. See the clap docs for full details.
@@ -64,11 +65,11 @@ static bool ClapEntryInit(char const* plugin_path_c_str) {
     if (PanicOccurred()) return false;
 
     try {
-        if (Exchange(g_init, true)) return true; // already initialised
-
-        auto const inside_init = g_inside_init.FetchAdd(1, RmwMemoryOrder::AcquireRelease);
-        DEFER { g_inside_init.FetchSub(1, RmwMemoryOrder::AcquireRelease); };
+        auto const inside_init = g_inside_call.FetchAdd(1, RmwMemoryOrder::AcquireRelease);
+        DEFER { g_inside_call.FetchSub(1, RmwMemoryOrder::AcquireRelease); };
         if (inside_init) return false; // The host is misbehaving
+
+        if (Exchange(g_init, true)) return true; // already initialised
 
         if (!plugin_path_c_str) return false;
         auto const plugin_path = FromNullTerminated(plugin_path_c_str);
@@ -109,17 +110,15 @@ static bool ClapEntryInit(char const* plugin_path_c_str) {
     }
 }
 
-static Atomic<u32> g_inside_deinit {0};
-
 static void ClapEntryDeinit() {
     if (PanicOccurred()) return;
 
     try {
-        if (!Exchange(g_init, false)) return; // already deinitialised
-
-        auto const inside_deinit = g_inside_deinit.FetchAdd(1, RmwMemoryOrder::AcquireRelease);
-        DEFER { g_inside_deinit.FetchSub(1, RmwMemoryOrder::AcquireRelease); };
+        auto const inside_deinit = g_inside_call.FetchAdd(1, RmwMemoryOrder::AcquireRelease);
+        DEFER { g_inside_call.FetchSub(1, RmwMemoryOrder::AcquireRelease); };
         if (inside_deinit) return; // The host is misbehaving
+
+        if (!Exchange(g_init, false)) return; // already deinitialised
 
         LogInfo(ModuleName::Clap, "entry.deinit");
 

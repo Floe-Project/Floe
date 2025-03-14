@@ -70,6 +70,38 @@ SharedEngineSystems::SharedEngineSystems(Span<sentry::Tag const> tags)
 
     thread_pool.Init("global", {});
 
+    if (auto const path_used = prefs::Init(prefs, paths.possible_preferences_paths);
+        !path_used || *path_used != 0) {
+        // If we reach here then we can assume this is the first time Floe is run.
+
+        if (path_used) {
+            // We're assuming path[0] is Floe's prefs, and all other paths are Mirage.
+            ASSERT_EQ(path::Extension(paths.possible_preferences_paths[0]), ".ini"_s);
+        }
+
+        // When Mirage opens, it scans it's libraries/presets folder and adds all the paths to it's
+        // preferences file. It's possible that Mirage hasn't been opened after libraries/presets were
+        // installed, so we need to recreate Mirage's behaviour here.
+        struct MiragePath {
+            ScanFolderType type;
+            FloeKnownDirectoryType known_dir_type;
+        };
+        for (auto const p : ArrayT<MiragePath>({
+                 {ScanFolderType::Libraries, FloeKnownDirectoryType::MirageDefaultLibraries},
+                 {ScanFolderType::Presets, FloeKnownDirectoryType::MirageDefaultPresets},
+             })) {
+            PathArena path_arena {PageAllocator::Instance()};
+            auto const dir = FloeKnownDirectory(path_arena, p.known_dir_type, k_nullopt, {.create = false});
+            if (auto const o = GetFileType(dir); o.HasValue() && o.Value() == FileType::Directory)
+                prefs::AddValue(prefs,
+                                ExtraScanFolderDescriptor(paths, p.type),
+                                (String)dir,
+                                {.dont_send_on_change_event = true});
+        }
+
+        prefs.write_to_file_needed = true;
+    }
+
     sample_lib_server::SetExtraScanFolders(sample_library_server,
                                            ExtraScanFolders(paths, prefs, ScanFolderType::Libraries));
 }

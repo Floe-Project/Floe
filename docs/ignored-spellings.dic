@@ -83,6 +83,7 @@ SSE2
 Steinberg
 Stivell
 Synthwave
+TODO
 TXT
 Telenn
 Utils
@@ -134,6 +135,7 @@ h1
 href
 html
 img
+installable
 ir
 json
 justfile
@@ -149,6 +151,7 @@ mdBook
 mdbook
 mirage64
 mkdocs
+mp4
 multisampled
 multisampling
 notarization

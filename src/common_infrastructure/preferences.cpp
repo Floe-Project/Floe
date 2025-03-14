@@ -747,7 +747,7 @@ static Value* AllocateValue(Preferences& prefs, ValueUnion const& value) {
     return prefs.arena.New<Value>(value);
 }
 
-static void AddValueToFreeList(Preferences& prefs, Value* value) {
+static void AddValueNodeToFreeList(Preferences& prefs, Value* value) {
     value->next = prefs.free_values;
     prefs.free_values = value;
 }
@@ -770,7 +770,7 @@ void SetValue(Preferences& prefs, Key const& key, ValueUnion const& value, SetVa
                 node = node->next;
             } else {
                 auto next = node->next;
-                AddValueToFreeList(prefs, node);
+                AddValueNodeToFreeList(prefs, node);
                 node = next;
             }
         }
@@ -862,7 +862,7 @@ bool RemoveValue(Preferences& prefs, Key const& key, ValueUnion const& value, Re
         [&](ValueUnion const& node) { return node == value; },
         [&](Value* node) {
             FreeValueUnion(*node, prefs.path_pool);
-            AddValueToFreeList(prefs, node);
+            AddValueNodeToFreeList(prefs, node);
             removed = true;
         });
 

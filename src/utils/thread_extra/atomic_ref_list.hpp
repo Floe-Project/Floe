@@ -3,6 +3,7 @@
 
 #pragma once
 #include "foundation/foundation.hpp"
+#include "os/misc.hpp"
 #include "os/threading.hpp"
 
 // Lock-free list. Multiple readers, single writer.

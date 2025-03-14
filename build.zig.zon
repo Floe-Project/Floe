@@ -32,8 +32,8 @@
             .hash = "1220c6534f5ec8d81d53df7f4e2c6e4274ba13b74bab56d296f34085e23fd7d243ba",
         },
         .clap_wrapper = .{
-            .url = "git+https://github.com/free-audio/clap-wrapper#705df2703fbb991b3609e1a5c91d92a5c2213925",
-            .hash = "1220e765cd8606f12506977596359eabd15079804f3f775c90b0cc83c03fd4d5d15d",
+            .url = "git+https://github.com/free-audio/clap-wrapper#a610e1a0821d54f2c64d1f13fd737ba2ccf314ab",
+            .hash = "12204637bc2290b24991297ba2d5c99b76474762b920715c948e4b057d80af480c72",
         },
         .dr_libs = .{
             .url = "git+https://github.com/mackron/dr_libs#da35f9d6c7374a95353fd1df1d394d44ab66cf01",

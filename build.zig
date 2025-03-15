@@ -2510,7 +2510,8 @@ pub fn build(b: *std.Build) void {
             }
             extra_flags.append("-fno-char8_t") catch unreachable;
             extra_flags.append("-DMACOS_USE_STD_FILESYSTEM=1") catch unreachable;
-            extra_flags.append("-DCLAP_WRAPPER_VERSION=\"0.9.1\"") catch unreachable;
+            extra_flags.append("-DCLAP_WRAPPER_VERSION=\"0.11.0\"") catch unreachable;
+            extra_flags.append("-DSTATICALLY_LINKED_CLAP_ENTRY=1") catch unreachable;
             const flags = cppFlags(b, universal_flags, extra_flags.items) catch unreachable;
 
             vst3.addCSourceFiles(.{
@@ -2690,7 +2691,7 @@ pub fn build(b: *std.Build) void {
                 }
                 flags.append("-fno-char8_t") catch unreachable;
                 flags.append("-DMACOS_USE_STD_FILESYSTEM=1") catch unreachable;
-                flags.append("-DCLAP_WRAPPER_VERSION=\"0.9.1\"") catch unreachable;
+                flags.append("-DCLAP_WRAPPER_VERSION=\"0.11.0\"") catch unreachable;
                 flags.append("-DSTATICALLY_LINKED_CLAP_ENTRY=1") catch unreachable;
                 flags.appendSlice(universal_flags) catch unreachable;
 

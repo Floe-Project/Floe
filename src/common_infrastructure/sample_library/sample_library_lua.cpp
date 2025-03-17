@@ -750,7 +750,7 @@ struct TableFields<Instrument> {
 
     enum class Field : u32 {
         Name,
-        Folders,
+        Folder,
         Description,
         Tags,
         WaveformFilepath,
@@ -775,16 +775,16 @@ struct TableFields<Instrument> {
                                            (int)k_max_instrument_name_size);
                         },
                 };
-            case Field::Folders:
+            case Field::Folder:
                 return {
-                    .name = "folders",
+                    .name = "folder",
                     .description_sentence =
-                        "Words separated by slashes used to hierarchically categorise the instrument.",
+                        "Specify a folder to group instruments under a common heading. It may contain slashes to represent a hierarchy. See https://floe.audio/develop/tags-and-folders.html for more information.",
                     .example = "Fences/Steel",
                     .default_value = "no folders",
                     .lua_type = LUA_TSTRING,
                     .required = false,
-                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.folders = StringFromTop(ctx); },
+                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.folder = StringFromTop(ctx); },
                 };
             case Field::Description:
                 return {
@@ -1988,7 +1988,7 @@ TEST_CASE(TestBasicFile) {
         REQUIRE(inst1_ptr);
         auto inst1 = *inst1_ptr;
         CHECK_EQ(inst1->name, "Inst1"_s);
-        CHECK_EQ(inst1->folders, "Folders/Sub"_s);
+        CHECK_EQ(inst1->folder, "Folders/Sub"_s);
         REQUIRE(inst1->tags.size == 1);
         CHECK_EQ(inst1->tags[0], "tag1"_s);
 

@@ -84,7 +84,7 @@ struct Instrument {
     Library const& library;
 
     String name {};
-    Optional<String> folders {};
+    Optional<String> folder {}; // may contain '/'
     Optional<String> description {};
     Span<String> tags {};
     LibraryPath audio_file_path_for_waveform {};

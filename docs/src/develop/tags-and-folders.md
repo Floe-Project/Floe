@@ -36,6 +36,8 @@ Tags are case-insensitive.
 ## Standard tags
 We take a pragmatic approach to defining this set of standard tags. Rather than try to be completely comprehensive and technically accurate, we instead aim to strike a balance between correctness and common usage within the music production space. The goal of tags is to help users find the item they need. You can suggest edits to this list via Github or other means.
 
+For best results setting tags, go over each of the following questions and add all tags that apply to the item.
+
 ### 1. Where did the sound come from?
 | Tag | Description |
 |:--|:--|

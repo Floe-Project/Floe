@@ -536,7 +536,9 @@ void LayerHandleNoteOff(LayerProcessor& layer,
     // if (!context.midi_note_state.sustain_pedal_down.Get(note.channel))
     // TODO(1.0): handle volume envelope off
 
-    NoteOff(voice_pool, layer.voice_controller, note);
+    if (!context.midi_note_state.sustain_pedal_on.Get(note.channel))
+        NoteOff(voice_pool, layer.voice_controller, note);
+
     TriggerVoicesIfNeeded(layer,
                           context,
                           voice_pool,

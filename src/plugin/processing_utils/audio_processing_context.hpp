@@ -12,19 +12,19 @@ struct MidiNoteState {
         ASSERT(velocity >= 0 && velocity <= 1);
         keys_held[note.channel].Set(note.note);
         velocities[note.channel][note.note] = velocity;
-        if (sustain_pedal_down.Get(note.channel)) sustain_keys[note.channel].Set(note.note);
+        if (sustain_pedal_on.Get(note.channel)) sustain_keys[note.channel].Set(note.note);
     }
 
     void NoteOff(MidiChannelNote note) { keys_held[note.channel].Clear(note.note); }
 
-    void SustainPedalDown(u4 channel) {
-        if (sustain_pedal_down.Get(channel)) return;
-        sustain_pedal_down.Set(channel);
+    void HandleSustainPedalOn(u4 channel) {
+        if (sustain_pedal_on.Get(channel)) return;
+        sustain_pedal_on.Set(channel);
         sustain_keys = keys_held;
     }
 
-    Bitset<128> SustainPedalUp(u4 channel) {
-        sustain_pedal_down.Clear(channel);
+    Bitset<128> HandleSustainPedalOff(u4 channel) {
+        sustain_pedal_on.Clear(channel);
         return Exchange(sustain_keys[channel], {});
     }
 
@@ -42,7 +42,7 @@ struct MidiNoteState {
     Array<Bitset<128>, 16> keys_held {};
     Array<Array<f32, 128>, 16> velocities {};
     Array<Bitset<128>, 16> sustain_keys {};
-    Bitset<16> sustain_pedal_down {};
+    Bitset<16> sustain_pedal_on {};
 };
 
 struct AudioProcessingContext {

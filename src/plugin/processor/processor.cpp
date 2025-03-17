@@ -972,14 +972,15 @@ static void ProcessClapNoteOrMidi(AudioProcessor& processor,
                     auto const channel = message.ChannelNum();
 
                     if (cc_num == 64) {
-                        if (cc_val >= 64) {
+                        if (cc_val < 64) {
                             auto const notes_to_end =
-                                processor.audio_processing_context.midi_note_state.SustainPedalUp(channel);
+                                processor.audio_processing_context.midi_note_state.HandleSustainPedalOff(
+                                    channel);
                             notes_to_end.ForEachSetBit([&processor, channel](usize note) {
                                 HandleNoteOff(processor, {CheckedCast<u7>(note), channel}, true);
                             });
                         } else {
-                            processor.audio_processing_context.midi_note_state.SustainPedalDown(channel);
+                            processor.audio_processing_context.midi_note_state.HandleSustainPedalOn(channel);
                         }
                     }
 

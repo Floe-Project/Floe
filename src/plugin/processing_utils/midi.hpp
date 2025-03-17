@@ -62,7 +62,7 @@ struct MidiMessage {
     }
     u4 ChannelNum() const { return 0xf & status; }
 
-    MidiChannelNote ChannelNote() const { return {NoteNum(), ChannelNum()}; }
+    MidiChannelNote ChannelNote() const { return {.note = NoteNum(), .channel = ChannelNum()}; }
 
     void SetNoteNum(u7 num) { data1 = num; }
     void SetVelocity(u7 velo) { data2 = velo; }

@@ -233,7 +233,7 @@ TEST_CASE(TestSentry) {
     }
 
     SUBCASE("Basics") {
-        auto& sentry = InitGlobalSentry(ParseDsnOrThrow("https://publickey@host.com/123"), {});
+        auto& sentry = InitGlobalSentry(ParseDsnOrThrow(k_dsn), {});
         CHECK(sentry.device_id);
 
         // build an envelope

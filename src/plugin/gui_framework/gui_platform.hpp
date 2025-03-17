@@ -776,6 +776,11 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
             // resized or moved
             case PUGL_CONFIGURE: {
                 auto const& configure = event->configure;
+                if constexpr (IS_LINUX) {
+                    // It seems that at this stage, our view might not have the same size as the configure
+                    // struct indicates. Not sure if this is a bug or not.
+                    puglSetSizeHint(view, PUGL_CURRENT_SIZE, configure.width, configure.height);
+                }
                 LogDebug(ModuleName::Gui, "configure {}", fmt::DumpStruct(configure));
                 auto const size = NearestAspectRatioSizeInsideSize({configure.width, configure.height},
                                                                    DesiredAspectRatio(platform.prefs));

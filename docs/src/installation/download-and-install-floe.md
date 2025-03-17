@@ -8,7 +8,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 <div class="warning">
 Please give Floe a try, but it's not ready for daily use yet.</br>
-It's CLAP only for now, and there's <a href="https://github.com/Floe-Project/Floe/issues?q=is%3Aissue%20state%3Aopen%20milestone%3Av1.0.0">known bugs</a>.
+It's CLAP only for now, and there's <a href="https://github.com/Floe-Project/Floe/issues?q=is%3Aissue%20state%3Aopen%20type%3ABug%20milestone%3Av1.0.0">known bugs</a>.
 </div>
 
 There's two ways to install Floe: use the installer, or manually move files. 

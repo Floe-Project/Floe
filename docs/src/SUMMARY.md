@@ -33,6 +33,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
   - [Library Lua Scripts](./develop/library-lua-scripts.md)
   - [Develop Preset Packs](./develop/develop-preset-packs.md)
   - [Packaging for Distribution](./develop/packaging.md)
+  - [Tags and Folders](./develop/tags-and-folders.md)
 
 - [About the Project]()
   - [Previously known as Mirage](./about-the-project/mirage.md)

@@ -799,8 +799,10 @@ struct TableFields<Instrument> {
             case Field::Tags:
                 return {
                     .name = "tags",
-                    .description_sentence = "An array of strings to denote properties of the instrument.",
-                    .example = "{ \"Pluck\", \"Metallic\", \"Organic\" }",
+                    .description_sentence =
+                        "An array of strings to denote properties of the instrument. See https://floe.audio/develop/tags-and-folders.html for more information.",
+                    .example =
+                        "{ \"found sounds\", \"tonal percussion\", \"metal\", \"keys\", \"cold\", \"ambient\", \"IDM\", \"cinematic\" }",
                     .default_value = "no tags",
                     .lua_type = LUA_TTABLE,
                     .required = false,

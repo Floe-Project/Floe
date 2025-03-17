@@ -53,7 +53,6 @@ enum class LayerParamIndex : u16 {
     VelocityMapping,
     Keytrack,
     Monophonic,
-    CC64Retrigger, // TODO: remove this?
     MidiTranspose,
 
     Count,
@@ -2087,14 +2086,6 @@ consteval auto CreateParams() {
             .name = "Monophonic On"_s,
             .gui_label = "Monophonic"_s,
             .tooltip = "Only allow one voice of each sound to play at a time"_s,
-        };
-        lp(CC64Retrigger) = Args {
-            .id = id(region, 47), // never change
-            .value_config = val_config_helpers::Bool({.default_state = true}),
-            .modules = {layer_module, ParameterModule::Midi},
-            .name = "Sustain Pedal Retrigger On"_s,
-            .gui_label = "CC64 Retrigger"_s,
-            .tooltip = "When the sustain pedal (CC64) is held, keys that are pressed again are retriggered"_s,
         };
         lp(MidiTranspose) = Args {
             .id = id(region, 48), // never change

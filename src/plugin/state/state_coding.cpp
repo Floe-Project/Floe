@@ -802,18 +802,6 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
     {
         auto const mirage_preset_version_hex = parser.mirage_version.ValueOr({}).Packed();
 
-        // Prior to 1.2.0 the behaviour was the same as if Param_CC64Retrigger was turned off. If we have
-        // gotten here, the state we are trying to load must be from pre-1.2.0.
-        constexpr auto k_version_that_added_cc64_retrig = PackVersionIntoU32(2, 0, 0);
-        if (mirage_preset_version_hex < k_version_that_added_cc64_retrig) {
-            static constexpr f32 k_value_for_backwards_compat = 0;
-            for (auto const lay : Range(k_num_layers)) {
-                state
-                    .param_values[ToInt(ParamIndexFromLayerParamIndex(lay, LayerParamIndex::CC64Retrigger))] =
-                    k_value_for_backwards_compat;
-            }
-        }
-
         auto layer_param_value = [&](u32 layer_index, LayerParamIndex param) -> f32& {
             return state.param_values[ToInt(ParamIndexFromLayerParamIndex(layer_index, param))];
         };
@@ -1118,7 +1106,7 @@ ErrorCodeOr<void> CodeState(StateSnapshot& state, CodeStateArguments const& args
         }
 
         if (num_params != (u32)k_num_parameters) {
-            static_assert(k_num_parameters == 209,
+            static_assert(k_num_parameters == 206,
                           "You have changed the number of parameters. You must now bump the "
                           "state version number and handle setting any new parameters to "
                           "backwards-compatible states. In other words, these new parameters "
@@ -1488,16 +1476,6 @@ TEST_CASE(TestNewSerialisation) {
 TEST_CASE(TestBackwardCompat) {
     auto& scratch_arena = tester.scratch_arena;
     StateSnapshot state {};
-
-    SUBCASE("old versions always turn off cc64 retrigger") {
-        auto const outcome = DecodeJsonState(state,
-                                             scratch_arena,
-                                             TRY(MakeJsonPreset(scratch_arena, {1, 0, 0}, "L0SusRe", 1.0f)));
-        REQUIRE(outcome.Succeeded());
-        CHECK_APPROX_EQ(ProjectedLayerValue(state, 0, LayerParamIndex::CC64Retrigger), 0.0f, 0.01f);
-        CHECK_APPROX_EQ(ProjectedLayerValue(state, 1, LayerParamIndex::CC64Retrigger), 0.0f, 0.01f);
-        CHECK_APPROX_EQ(ProjectedLayerValue(state, 2, LayerParamIndex::CC64Retrigger), 0.0f, 0.01f);
-    }
 
     SUBCASE("old versions always turn set ping pong crossfade to 0") {
         auto const outcome =

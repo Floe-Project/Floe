@@ -254,7 +254,6 @@ struct LayerProcessor {
     f32 tune_cents = 0;
     f32 sample_offset_01 = 0;
 
-    bool sustain_pedal_retrigger {};
     bool monophonic {};
 
     param_values::LfoRestartMode lfo_restart_mode {};

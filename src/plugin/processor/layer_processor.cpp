@@ -323,9 +323,6 @@ void OnParamChange(LayerProcessor& layer,
         }
     }
 
-    if (auto p = changed_params.Param(LayerParamIndex::CC64Retrigger))
-        layer.sustain_pedal_retrigger = p->ValueAsBool();
-
     if (auto p = changed_params.Param(LayerParamIndex::LfoRestart))
         layer.lfo_restart_mode = p->ValueAsInt<param_values::LfoRestartMode>();
 

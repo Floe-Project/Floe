@@ -317,7 +317,6 @@ constexpr auto k_layer_params = ArrayT<LayerParamId>({
     {"Vel", LayerParamIndex::VelocityMapping},
     {"KTr", LayerParamIndex::Keytrack},
     {"Mono", LayerParamIndex::Monophonic},
-    {"SusRe", LayerParamIndex::CC64Retrigger},
     {"Trn", LayerParamIndex::MidiTranspose},
 });
 

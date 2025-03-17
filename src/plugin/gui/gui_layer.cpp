@@ -1026,10 +1026,6 @@ void Draw(Gui* g,
                             layer->params[ToInt(LayerParamIndex::Monophonic)],
                             c.midi.mono,
                             buttons::MidiButton(g->imgui));
-            buttons::Toggle(g,
-                            layer->params[ToInt(LayerParamIndex::CC64Retrigger)],
-                            c.midi.retrig,
-                            buttons::MidiButton(g->imgui));
 
             {
                 static constexpr auto k_num_btns = ToInt(param_values::VelocityMappingMode::Count);

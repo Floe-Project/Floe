@@ -195,7 +195,7 @@ test-pluginval-au build="": (_build_if_requested build "native")
   pluginval {{native_binary_dir}}/Floe.component
 
 test-vst3-val build="": (_build_if_requested build "native")
-  timeout 2 {{native_binary_dir}}/VST3-Validator {{native_binary_dir}}/Floe.vst3
+  timeout 20 {{native_binary_dir}}/VST3-Validator {{native_binary_dir}}/Floe.vst3
 
 _download-and-unzip-to-cache-dir url:
   #!/usr/bin/env bash

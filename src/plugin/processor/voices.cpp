@@ -364,7 +364,7 @@ void StartVoice(VoicePool& pool,
 
     voice.is_active = true;
     voice.pool.num_active_voices.FetchAdd(1, RmwMemoryOrder::Relaxed);
-    voice.pool.voices_per_midi_note_for_gui[voice.midi_key_trigger.note].FetchAdd(1, RmwMemoryOrder::Relaxed);
+    voice.pool.voices_per_midi_note_for_gui[voice.note_num].FetchAdd(1, RmwMemoryOrder::Relaxed);
 }
 
 void EndVoice(Voice& voice) {

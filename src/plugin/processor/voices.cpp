@@ -935,6 +935,20 @@ void OnThreadPoolExec(VoicePool& pool, u32 task_index) {
         ProcessBuffer(voice, voice.pool.multithread_processing.num_frames, *pool.audio_processing_context);
 }
 
+void Reset(VoicePool& pool) {
+    auto& waveform_markers = pool.voice_waveform_markers_for_gui.Write();
+    auto& vol_env_markers = pool.voice_vol_env_markers_for_gui.Write();
+    auto& fil_env_markers = pool.voice_fil_env_markers_for_gui.Write();
+    for (auto const i : Range(k_num_voices)) {
+        waveform_markers[i] = {};
+        vol_env_markers[i] = {};
+        fil_env_markers[i] = {};
+    }
+    pool.voice_waveform_markers_for_gui.Publish();
+    pool.voice_vol_env_markers_for_gui.Publish();
+    pool.voice_fil_env_markers_for_gui.Publish();
+}
+
 Array<Span<f32>, k_num_layers>
 ProcessVoices(VoicePool& pool, u32 num_frames, AudioProcessingContext const& context) {
     ZoneScoped;

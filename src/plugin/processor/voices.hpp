@@ -280,3 +280,5 @@ Array<Span<f32>, k_num_layers>
 ProcessVoices(VoicePool& pool, u32 num_frames, AudioProcessingContext const& context);
 
 void OnThreadPoolExec(VoicePool& pool, u32 task_index);
+
+void Reset(VoicePool& pool);

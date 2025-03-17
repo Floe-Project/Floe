@@ -803,6 +803,8 @@ ResetProcessor(AudioProcessor& processor, Bitset<k_num_parameters> processing_ch
     // Reset layers
     for (auto& l : processor.layer_processors)
         ChangeInstrumentIfNeededAndReset(l, processor.voice_pool);
+
+    Reset(processor.voice_pool);
 }
 
 static bool Activate(AudioProcessor& processor, PluginActivateArgs args) {

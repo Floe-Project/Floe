@@ -296,6 +296,7 @@ checks_level_0 := replace(
   check-spelling
   test-units
   test-clap-val
+  test-vst3-val
   " + 
   if os() == "linux" {
     "
@@ -305,7 +306,6 @@ checks_level_0 := replace(
   } else {
     "
     test-pluginval
-    test-vst3-val
     "
   }, "\n", " ")
 
@@ -319,6 +319,7 @@ checks_ci := replace(
   "
     test-units
     test-clap-val
+    test-vst3-val
   " +
   if os() == "linux" {
     "
@@ -333,7 +334,6 @@ checks_ci := replace(
   } else {
     "
     test-pluginval
-    test-vst3-val
     "
   }, "\n", " ")
 

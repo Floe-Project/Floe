@@ -1952,7 +1952,7 @@ TEST_CASE(TestBasicFile) {
     local instrument = floe.new_instrument(library, {
         name = "Inst1",
         tags = {"tag1"},
-        folders = "Folders/Sub",
+        folder = "Folders/Sub",
     })
     local instrument2 = floe.new_instrument(library, {
         name = "Inst2",

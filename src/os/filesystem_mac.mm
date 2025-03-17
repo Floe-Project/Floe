@@ -431,15 +431,22 @@ ErrorCodeOr<DirectoryWatcher> CreateDirectoryWatcher(Allocator& a) {
     return result;
 }
 
+static void StopStream(MacWatcher& watcher) {
+    // We dispatch_sync to the queue to ensure that we stop the stream only after all events have been
+    // processed.
+    dispatch_sync(watcher.queue, ^{
+      FSEventStreamStop(watcher.stream);
+      FSEventStreamInvalidate(watcher.stream);
+      FSEventStreamRelease(watcher.stream);
+      watcher.stream = nullptr;
+    });
+}
+
 void DestoryDirectoryWatcher(DirectoryWatcher& watcher) {
     ZoneScoped;
 
     auto mac_w = (MacWatcher*)watcher.native_data.pointer;
-    if (mac_w->stream) {
-        FSEventStreamStop(mac_w->stream);
-        FSEventStreamInvalidate(mac_w->stream);
-        FSEventStreamRelease(mac_w->stream);
-    }
+    if (mac_w->stream) StopStream(*mac_w);
     watcher.watched_dirs.Clear();
     watcher.allocator.Delete(mac_w);
     watcher.native_data.pointer = nullptr;
@@ -513,9 +520,13 @@ void EventCallback([[maybe_unused]] ConstFSEventStreamRef stream_ref,
         watcher.event_mutex.Lock();
         DEFER { watcher.event_mutex.Unlock(); };
         for (size_t i = 0; i < num_events; i++) {
+            ASSERT(paths[i] != nullptr);
+            auto const path = FromNullTerminated(paths[i]);
+            ASSERT(path::IsAbsolute(path));
+            ASSERT(IsValidUtf8(path));
             watcher.events.Append(
                 {
-                    .path = watcher.event_arena.Clone(FromNullTerminated(paths[i])),
+                    .path = watcher.event_arena.Clone(path),
                     .flags = event_flags[i],
                 },
                 watcher.event_arena);
@@ -536,10 +547,7 @@ PollDirectoryChanges(DirectoryWatcher& watcher, PollDirectoryChangesArgs args) {
     if (any_states_changed) {
         if (mac_watcher.stream) {
             if constexpr (k_debug_fsevents) LogDebug(ModuleName::Filesystem, "stopping FSEventStream");
-            FSEventStreamStop(mac_watcher.stream);
-            FSEventStreamInvalidate(mac_watcher.stream);
-            FSEventStreamRelease(mac_watcher.stream);
-            mac_watcher.stream = {};
+            StopStream(mac_watcher);
         }
 
         // fsevents is batched, we don't need to individually stop watching each directory, so at this stage

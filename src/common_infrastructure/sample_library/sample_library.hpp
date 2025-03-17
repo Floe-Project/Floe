@@ -106,6 +106,7 @@ struct ImpulseResponse {
 
     String name {};
     LibraryPath path {};
+    Optional<String> folder {}; // may contain '/'
     Span<String> tags {};
 };
 

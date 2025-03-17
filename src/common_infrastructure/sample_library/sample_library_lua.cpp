@@ -236,7 +236,7 @@ static void IterateTableAtTop(LuaState& ctx, auto&& table_pair_callback) {
     }
 }
 
-static String StringFromTop(LuaState& ctx) {
+static MutableString StringFromTop(LuaState& ctx) {
     return ctx.result_arena.Clone(FromNullTerminated(luaL_checkstring(ctx.lua, -1)));
 }
 
@@ -282,7 +282,7 @@ static DynamicArrayBounded<long long, 4> ListOfInts(LuaState& ctx, usize num_exp
     return result;
 }
 
-static Span<String> SetArrayOfStrings(LuaState& ctx, FieldInfo field_info) {
+static Span<String> SetArrayOfStrings(LuaState& ctx, FieldInfo field_info, bool case_insentive) {
     DynamicArray<String> list {ctx.result_arena};
     {
         lua_len(ctx.lua, -1);
@@ -309,7 +309,11 @@ static Span<String> SetArrayOfStrings(LuaState& ctx, FieldInfo field_info) {
             lua_error(ctx.lua);
         }
 
-        dyn::Append(list, StringFromTop(ctx));
+        auto str = StringFromTop(ctx);
+        if (case_insentive)
+            for (auto& c : str)
+                c = ToLowercaseAscii(c);
+        dyn::Append(list, str);
     });
 
     return list.ToOwnedSpan();
@@ -695,6 +699,7 @@ struct TableFields<ImpulseResponse> {
     enum class Field : u32 {
         Name,
         Path,
+        Folder,
         Tags,
         Count,
     };
@@ -727,16 +732,28 @@ struct TableFields<ImpulseResponse> {
                     .required = true,
                     .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.path = PathFromTop(ctx); },
                 };
+            case Field::Folder:
+                return {
+                    .name = "folder",
+                    .description_sentence =
+                        "Specify a folder to group IRs under a common heading. It may contain slashes to represent a hierarchy. See https://floe.audio/develop/tags-and-folders.html for more information.",
+                    .example = "Cathedrals",
+                    .default_value = "no folders",
+                    .lua_type = LUA_TSTRING,
+                    .required = false,
+                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.folder = StringFromTop(ctx); },
+                };
             case Field::Tags:
                 return {
                     .name = "tags",
-                    .description_sentence = "An array of strings to denote properties of the IR.",
-                    .example = "{ \"Cathedral\", \"Bright\" }",
+                    .description_sentence =
+                        "An array of strings to denote properties of the IR. See https://floe.audio/develop/tags-and-folders.html for more information.",
+                    .example = "{ \"acoustic\", \"hall\" }",
                     .default_value = "no tags",
                     .lua_type = LUA_TTABLE,
                     .required = false,
                     .is_array = true,
-                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.tags = SetArrayOfStrings(ctx, info); },
+                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.tags = SetArrayOfStrings(ctx, info, true); },
                 };
             case Field::Count: break;
         }
@@ -807,7 +824,7 @@ struct TableFields<Instrument> {
                     .lua_type = LUA_TTABLE,
                     .required = false,
                     .is_array = true,
-                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.tags = SetArrayOfStrings(ctx, info); },
+                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.tags = SetArrayOfStrings(ctx, info, true); },
                 };
             case Field::WaveformFilepath:
                 return {

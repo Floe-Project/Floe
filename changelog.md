@@ -10,9 +10,12 @@ For instance: 0.0.1. Don't change the headings.
 # Changelog
 
 ## 0.0.6-alpha
+- Add VST3 support
+- Standardise how tags and folders will be used in instruments, presets and impulse responses: https://floe.audio/develop/tags-and-folders.html
+- Fix markers staying on ADSR envelope even when sound is silent
+- Fix MIDI transpose causing notes to never stop
 - Fix peak meters dropping to zero unexpectedly
 - Fix not finding Mirage libraries/presets folders
-- Standardise how tags and folders will be used in instruments, presets and impulse responses: https://floe.audio/develop/tags-and-folders.html
 
 ## 0.0.5-alpha
 - Fix text being pasted into text field when just pressing 'V' rather than 'Ctrl+V' 

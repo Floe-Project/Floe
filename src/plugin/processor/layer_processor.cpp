@@ -503,7 +503,7 @@ static void TriggerVoicesIfNeeded(LayerProcessor& layer,
     }
 
     p.initial_pitch = layer.voice_controller.tune;
-    p.midi_key_trigger = {.note = CheckedCast<u7>(note.note - layer.midi_transpose), .channel = note.channel};
+    p.midi_key_trigger = note;
     p.note_num = (u7)Clamp(note.note + layer.midi_transpose, 0, 127);
     p.note_vel = note_vel_float;
     p.lfo_start_phase = 0;

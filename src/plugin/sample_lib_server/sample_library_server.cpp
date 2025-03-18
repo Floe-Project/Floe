@@ -597,6 +597,15 @@ static bool UpdateLibraryJobs(Server& server,
             ++it;
     }
 
+    // remove libraries do not exist on the filesystem
+    for (auto it = server.libraries.begin(); it != server.libraries.end();) {
+        auto const& lib = *it->value.lib;
+        if (GetFileType(lib.path).HasError())
+            it = server.libraries.Remove(it);
+        else
+            ++it;
+    }
+
     // update libraries_by_id
     {
         ZoneNamedN(rebuild_htab, "rehash", true);

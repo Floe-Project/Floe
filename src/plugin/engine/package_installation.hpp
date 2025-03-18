@@ -350,6 +350,8 @@ static ErrorCodeOr<void> ReaderInstallComponent(PackageReader& package,
     bool const single_file =
         component.type == ComponentType::Library && path::Extension(component.path) == ".mdata";
 
+    TRY(CreateDirectory(destination_path, {.create_intermediate_directories = true}));
+
     // Try to get a folder on the same filesystem so that we can atomic-rename and therefore reduce the chance
     // of leaving partially extracted files and generating lots of filesystem-change events.
     auto const temp_path = ({

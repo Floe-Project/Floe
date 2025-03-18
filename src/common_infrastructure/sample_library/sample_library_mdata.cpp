@@ -223,10 +223,11 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
                         ASSERT_EQ(f.channels, 2);
                         ASSERT_EQ(f.audio_format, mdata::AudioFileTypeRaw16Pcm);
                         ASSERT_EQ(RoundPositiveFloat(f.sample_rate), 44100);
+
+                        // We sneakily change the extension inside the string so that we can identify this
+                        // file type later.
                         static_assert(".wav"_s.size == k_raw_16_bit_stereo_44100_format_ext.size);
-                        CopyStringIntoBufferWithNullTerm((char*)ext.data,
-                                                         ext.size,
-                                                         k_raw_16_bit_stereo_44100_format_ext);
+                        CopyMemory((void*)ext.data, k_raw_16_bit_stereo_44100_format_ext.data, ext.size);
                     }
                 }
 

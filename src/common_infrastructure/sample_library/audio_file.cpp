@@ -272,14 +272,17 @@ ErrorCodeOr<AudioData> DecodeAudioFile(Reader& reader, String filepath_for_id, A
             .num_frames = (u32)(num_samples / 2),
             .interleaved_samples = allocator.AllocateExactSizeUninitialised<f32>(num_samples),
         };
-        u32 const sample_pos = 0;
+        u32 sample_pos = 0;
         drwav_int16 buffer[2000];
         while (true) {
-            auto const num_read = TRY(reader.Read({(u8*)buffer, sizeof(buffer)}));
+            auto const bytes_read = TRY(reader.Read({(u8*)buffer, sizeof(buffer)}));
+            ASSERT((bytes_read % sizeof(u16)) == 0);
+            auto const sample_read = bytes_read / sizeof(u16);
             drwav_s16_to_f32((f32*)result.interleaved_samples.data + sample_pos,
                              (drwav_int16 const*)buffer,
-                             num_read);
-            if (num_read != sizeof(buffer)) break;
+                             sample_read);
+            sample_pos += sample_read;
+            if (bytes_read != sizeof(buffer)) break;
         }
         result.hash =
             XXH3_64bits(result.interleaved_samples.data, result.interleaved_samples.ToByteSpan().size);

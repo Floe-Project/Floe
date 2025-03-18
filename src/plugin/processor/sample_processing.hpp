@@ -75,7 +75,7 @@ inline Type ClampCrossfadeSize(Type crossfade, Type start, Type end, Type total,
 }
 
 inline BoundsCheckedLoop CreateBoundsCheckedLoop(sample_lib::Loop loop, usize utotal_frame_count) {
-    // This is a bit weird? but I think it's probably important to some already-existing patches
+    // This is a bit weird? But I think it's probably important to some already-existing patches.
     u32 const smallest_loop_size_allowed = Max((u32)((f64)utotal_frame_count * 0.001), 32u);
 
     auto const total_frame_count = CheckedCast<s64>(utotal_frame_count);
@@ -84,24 +84,25 @@ inline BoundsCheckedLoop CreateBoundsCheckedLoop(sample_lib::Loop loop, usize ut
     };
 
     result.start = ({
-        u32 s;
+        s64 s;
         if (loop.start_frame < 0)
-            s = (u32)Max<s64>(0, (total_frame_count + 1) + loop.start_frame);
+            s = Max<s64>(0, (total_frame_count - 1) + (loop.start_frame + 1));
         else
-            s = (u32)loop.start_frame;
-        s;
+            s = loop.start_frame;
+        CheckedCast<u32>(s);
     });
 
     result.end = ({
-        u32 e;
+        s64 e;
         if (loop.end_frame < 0)
-            e = (u32)Max<s64>(0, (total_frame_count + 1) + loop.end_frame);
-        else
-            e = (u32)Clamp<s64>(loop.end_frame, 0, total_frame_count);
+            e = Max<s64>(0, total_frame_count + (loop.end_frame + 1));
+        else {
+            e = Clamp<s64>(loop.end_frame,
+                           Min(loop.start_frame + smallest_loop_size_allowed, total_frame_count),
+                           total_frame_count);
+        }
 
-        if (loop.start_frame + smallest_loop_size_allowed > loop.end_frame)
-            e = (u32)Min(loop.end_frame + smallest_loop_size_allowed, total_frame_count);
-        e;
+        CheckedCast<u32>(e);
     });
 
     ASSERT(result.end >= result.start);

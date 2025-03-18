@@ -766,7 +766,7 @@ class ChunkwiseVoiceProcessor {
         DEFER { m_voice.vol_env = vol_env; };
 
         usize sample_pos = 0;
-        f32 env1 {};
+        f32 env1 = 0;
         for (u32 frame = 0; frame < num_frames; frame += 2) {
             env1 = vol_env.Process(vol_env_params);
             f32 env2 = 1;
@@ -781,7 +781,7 @@ class ChunkwiseVoiceProcessor {
             if (env_on && vol_env.IsIdle()) return frame;
         }
 
-        m_voice.current_gain *= env1;
+        m_voice.current_gain *= env_on ? env1 : 1;
 
         return num_frames;
     }

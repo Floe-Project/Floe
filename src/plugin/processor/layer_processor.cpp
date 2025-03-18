@@ -177,7 +177,12 @@ void OnParamChange(LayerProcessor& layer,
     constexpr f32 k_min_envelope_ms = 0.2f;
     // Volume envelope
     // =======================================================================================================
-    if (auto p = changed_params.Param(LayerParamIndex::VolEnvOn)) vmst.vol_env_on = p->ValueAsBool();
+    if (auto p = changed_params.Param(LayerParamIndex::VolEnvOn)) {
+        vmst.vol_env_on = p->ValueAsBool();
+        if (vmst.vol_env_on)
+            for (auto& v : voice_pool.EnumerateActiveLayerVoices(layer.voice_controller))
+                v.vol_env.Gate(false);
+    }
     if (auto p = changed_params.Param(LayerParamIndex::VolumeAttack))
         layer.voice_controller.vol_env.SetAttackSamples(Max(k_min_envelope_ms, p->ProjectedValue()) /
                                                             1000.0f * sample_rate,
@@ -389,24 +394,6 @@ static void TriggerVoicesIfNeeded(LayerProcessor& layer,
     ASSERT_HOT(note_vel_float >= 0 && note_vel_float <= 1);
     auto const note_vel = (u8)RoundPositiveFloat(note_vel_float * 99);
 
-    // TODO(1.0): handle sustain pedal
-    // if (auto i = layer.inst.GetNullable<const LoadedInstrument *>()) {
-    //     if (context.midi_note_state.sustain_keys[note.channel].Get(note.note) &&
-    //         !((*i)->instrument.flags & Floesample_lib::Instrument::TriggersOnKeyRelease)) {
-    //         if (!layer.sustain_pedal_retrigger)
-    //             return;
-    //         else
-    //             NoteOff(voice_pool, layer.voice_controller, note);
-    //     }
-    // }
-
-    // if there is no vol env, then check if this note is playing, if it is we
-    // don't want to stack it up again
-    if (!layer.voice_controller.vol_env_on) {
-        for (auto& v : voice_pool.EnumerateActiveLayerVoices(layer.voice_controller))
-            if (v.midi_key_trigger == note) return;
-    }
-
     auto const note_for_samples_unchecked = note.note + layer.midi_transpose + layer.multisample_transpose;
     if (note_for_samples_unchecked < 0 || note_for_samples_unchecked > 127) return;
     auto const note_for_samples = (u7)note_for_samples_unchecked;
@@ -528,26 +515,23 @@ void LayerHandleNoteOff(LayerProcessor& layer,
                         AudioProcessingContext const& context,
                         VoicePool& voice_pool,
                         MidiChannelNote note,
+                        f32 velocity,
                         bool triggered_by_cc64,
                         f32 dynamics_param_value_01,
                         f32 velocity_to_volume_01) {
-    (void)triggered_by_cc64;
-    // TODO(1.0): handle sustain pedal
-    // if (!context.midi_note_state.sustain_pedal_down.Get(note.channel))
-    // TODO(1.0): handle volume envelope off
-
-    if (!context.midi_note_state.sustain_pedal_on.Get(note.channel))
+    if (!context.midi_note_state.sustain_pedal_on.Get(note.channel) && layer.voice_controller.vol_env_on)
         NoteOff(voice_pool, layer.voice_controller, note);
 
-    TriggerVoicesIfNeeded(layer,
-                          context,
-                          voice_pool,
-                          sample_lib::TriggerEvent::NoteOff,
-                          note,
-                          1, // TODO(1.0): get the note-off velocity from the corresponding note-on
-                          0,
-                          dynamics_param_value_01,
-                          velocity_to_volume_01);
+    if (!triggered_by_cc64)
+        TriggerVoicesIfNeeded(layer,
+                              context,
+                              voice_pool,
+                              sample_lib::TriggerEvent::NoteOff,
+                              note,
+                              velocity,
+                              0,
+                              dynamics_param_value_01,
+                              velocity_to_volume_01);
 }
 
 void LayerHandleNoteOn(LayerProcessor& layer,

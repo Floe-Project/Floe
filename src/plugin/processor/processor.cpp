@@ -662,12 +662,14 @@ static void HandleNoteOn(AudioProcessor& processor, MidiChannelNote note, f32 no
     }
 }
 
-static void HandleNoteOff(AudioProcessor& processor, MidiChannelNote note, bool triggered_by_cc64) {
+static void
+HandleNoteOff(AudioProcessor& processor, MidiChannelNote note, f32 velocity, bool triggered_by_cc64) {
     for (auto& layer : processor.layer_processors) {
         LayerHandleNoteOff(layer,
                            processor.audio_processing_context,
                            processor.voice_pool,
                            note,
+                           velocity,
                            triggered_by_cc64,
                            processor.dynamics_value_01,
                            processor.velocity_to_volume_01);
@@ -878,7 +880,7 @@ static void ProcessClapNoteOrMidi(AudioProcessor& processor,
             MidiChannelNote const chan_note {.note = (u7)note.key, .channel = (u4)note.channel};
 
             processor.audio_processing_context.midi_note_state.NoteOff(chan_note);
-            HandleNoteOff(processor, chan_note, false);
+            HandleNoteOff(processor, chan_note, (f32)note.velocity, false);
             break;
         }
         case CLAP_EVENT_NOTE_CHOKE: {
@@ -948,7 +950,7 @@ static void ProcessClapNoteOrMidi(AudioProcessor& processor,
                 }
                 case MidiMessageType::NoteOff: {
                     processor.audio_processing_context.midi_note_state.NoteOff(message.ChannelNote());
-                    HandleNoteOff(processor, message.ChannelNote(), false);
+                    HandleNoteOff(processor, message.ChannelNote(), message.Velocity() / 127.0f, false);
                     break;
                 }
                 case MidiMessageType::PitchWheel: {
@@ -977,7 +979,7 @@ static void ProcessClapNoteOrMidi(AudioProcessor& processor,
                                 processor.audio_processing_context.midi_note_state.HandleSustainPedalOff(
                                     channel);
                             notes_to_end.ForEachSetBit([&processor, channel](usize note) {
-                                HandleNoteOff(processor, {CheckedCast<u7>(note), channel}, true);
+                                HandleNoteOff(processor, {CheckedCast<u7>(note), channel}, 1, true);
                             });
                         } else {
                             processor.audio_processing_context.midi_note_state.HandleSustainPedalOn(channel);

@@ -499,7 +499,6 @@ static void TriggerVoicesIfNeeded(LayerProcessor& layer,
         }
     }
 
-    // TODO(1.0): I don't think this works now given the changes to trigger_event
     if (layer.monophonic) {
         for (auto& v : voice_pool.EnumerateActiveLayerVoices(layer.voice_controller))
             if (!layer.voice_controller.vol_env_on)
@@ -542,7 +541,6 @@ void LayerHandleNoteOn(LayerProcessor& layer,
                        u32 offset,
                        f32 dynamics_param_value_01,
                        f32 velocity_to_volume_01) {
-    // TODO(1.0): handle sutain pedal
     TriggerVoicesIfNeeded(layer,
                           context,
                           voice_pool,

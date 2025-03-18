@@ -65,12 +65,15 @@ static Span<String> PossiblePrefFilePaths(ArenaAllocator& arena) {
 }
 
 static String AlwaysScannedFolder(ScanFolderType type, ArenaAllocator& allocator) {
-    FloeKnownDirectoryType dir_type {};
-    switch (type) {
-        case ScanFolderType::Libraries: dir_type = FloeKnownDirectoryType::Libraries; break;
-        case ScanFolderType::Presets: dir_type = FloeKnownDirectoryType::Presets; break;
-        case ScanFolderType::Count: PanicIfReached();
-    }
+    auto const dir_type = ({
+        FloeKnownDirectoryType d {};
+        switch (type) {
+            case ScanFolderType::Libraries: d = FloeKnownDirectoryType::Libraries; break;
+            case ScanFolderType::Presets: d = FloeKnownDirectoryType::Presets; break;
+            case ScanFolderType::Count: PanicIfReached();
+        }
+        d;
+    });
     DynamicArrayBounded<char, 500> error_log;
     auto error_writer = dyn::WriterFor(error_log);
     auto const result =

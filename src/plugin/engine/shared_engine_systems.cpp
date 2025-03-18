@@ -79,7 +79,7 @@ SharedEngineSystems::SharedEngineSystems(Span<sentry::Tag const> tags)
             ASSERT_EQ(path::Extension(paths.possible_preferences_paths[0]), ".ini"_s);
         }
 
-        // When Mirage opens, it scans it's libraries/presets folder and adds all the paths to it's
+        // When Mirage opens, it scans its libraries/presets folder and adds all the paths to its
         // preferences file. It's possible that Mirage hasn't been opened after libraries/presets were
         // installed, so we need to recreate Mirage's behaviour here.
         struct MiragePath {

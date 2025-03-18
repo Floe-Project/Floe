@@ -600,7 +600,7 @@ static bool UpdateLibraryJobs(Server& server,
     // remove libraries do not exist on the filesystem
     for (auto it = server.libraries.begin(); it != server.libraries.end();) {
         auto const& lib = *it->value.lib;
-        if (GetFileType(lib.path).HasError())
+        if (lib.Id() != sample_lib::k_builtin_library_id && GetFileType(lib.path).HasError())
             it = server.libraries.Remove(it);
         else
             ++it;

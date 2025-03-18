@@ -12,6 +12,9 @@ For instance: 0.0.1. Don't change the headings.
 ## 0.0.6-alpha
 - Add VST3 support
 - Standardise how tags and folders will be used in instruments, presets and impulse responses: https://floe.audio/develop/tags-and-folders.html
+- Fix sustain pedal
+- Remove 'retrig CC 64' parameter from layer MIDI. This was mostly a legacy workaround from Mirage. Instead, we just use the typical behaviour that when you play the same note multiple times while holding the sustain pedal, the note plays again - stacking up.
+- Fix package installation crash after removing folders
 - Fix markers staying on ADSR envelope even when sound is silent
 - Fix MIDI transpose causing notes to never stop
 - Fix peak meters dropping to zero unexpectedly

@@ -234,13 +234,15 @@ enum class SessionStatus {
                                                                    EnvelopeWriter& writer,
                                                                    SessionStatus status,
                                                                    Optional<u32> extra_num_errors = {}) {
+    // "A session can exist in two states: in progress or terminated. A terminated session must not
+    // receive further updates. exited, crashed and abnormal are all terminal states. When a session
+    // reaches this state the client must not report any more session updates or start a new session."
     switch (status) {
-        case SessionStatus::Ok: break;
+        case SessionStatus::Ok:
+            if (sentry.session_ended.Load(LoadMemoryOrder::Acquire)) return k_success;
+            break;
         case SessionStatus::EndedNormally:
         case SessionStatus::Crashed:
-            // "A session can exist in two states: in progress or terminated. A terminated session must not
-            // receive further updates. exited, crashed and abnormal are all terminal states. When a session
-            // reaches this state the client must not report any more session updates or start a new session."
             if (sentry.session_ended.Exchange(true, RmwMemoryOrder::AcquireRelease)) return k_success;
             break;
     }

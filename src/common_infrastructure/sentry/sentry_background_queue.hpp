@@ -60,7 +60,7 @@ static void BackgroundThread(BackgroundQueue& queue, Span<Tag const> tags) {
         DynamicArray<char> envelope {scratch_arena};
         EnvelopeWriter writer = {.writer = dyn::WriterFor(envelope)};
         auto _ = EnvelopeAddSessionUpdate(sentry, writer, SessionStatus::Ok);
-        auto _ = Submit(scratch_arena, sentry, envelope, writer);
+        if (envelope.size) auto _ = Submit(scratch_arena, sentry, envelope, writer);
     }
 
     while (true) {
@@ -117,7 +117,7 @@ static void BackgroundThread(BackgroundQueue& queue, Span<Tag const> tags) {
             DynamicArray<char> envelope {scratch_arena};
             EnvelopeWriter writer = {.writer = dyn::WriterFor(envelope)};
             auto _ = EnvelopeAddSessionUpdate(sentry, writer, SessionStatus::EndedNormally);
-            auto _ = Submit(scratch_arena, sentry, envelope, writer);
+            if (envelope.size) auto _ = Submit(scratch_arena, sentry, envelope, writer);
         }
 
         if (end) break;

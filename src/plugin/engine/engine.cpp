@@ -11,7 +11,6 @@
 #include "common_infrastructure/common_errors.hpp"
 #include "common_infrastructure/constants.hpp"
 #include "common_infrastructure/descriptors/param_descriptors.hpp"
-#include "common_infrastructure/error_reporting.hpp"
 #include "common_infrastructure/preferences.hpp"
 #include "common_infrastructure/sample_library/attribution_requirements.hpp"
 

@@ -695,7 +695,7 @@ fn performWindowsCodeSign(step: *std.Build.Step, prog_node: std.Progress.Node) !
             "-n",
             self.description,
             "-i",
-            "https://github.com/Floe-Project/Floe",
+            floe_homepage_url,
             "-t",
             "http://timestamp.sectigo.com",
             "-in",

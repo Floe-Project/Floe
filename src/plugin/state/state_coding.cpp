@@ -154,6 +154,7 @@ static Span<MenuNameMapping const> MenuNameMappingsForParam(ParamIndex index) {
 enum class ParamProjection {
     WasPercentNowFraction, // [-100, 100] to [-1, 1] or [0, 100] to [0, 1]
     WasDbNowAmp,
+    WasOldBoolNowNewBool, // old: >= 0.5 == true, new: !0 == true
 };
 
 static Optional<ParamProjection> ParamProjection(ParamIndex index) {
@@ -188,6 +189,10 @@ static Optional<ParamProjection> ParamProjection(ParamIndex index) {
                30); // it's unlikely to have an amp above 30
         return ParamProjection::WasDbNowAmp;
     }
+
+    if (k_param_descriptors[(u32)index].value_type == ParamValueType::Bool)
+        return ParamProjection::WasOldBoolNowNewBool;
+
     return k_nullopt;
 }
 
@@ -503,6 +508,9 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
                 switch (*legacy_projection) {
                     case legacy_mappings::ParamProjection::WasPercentNowFraction: v /= 100.0f; break;
                     case legacy_mappings::ParamProjection::WasDbNowAmp: v = DbToAmp(v); break;
+                    case legacy_mappings::ParamProjection::WasOldBoolNowNewBool:
+                        v = (v >= 0.5f) ? 1.0f : 0.0f;
+                        break;
                 }
             }
 
@@ -545,7 +553,7 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
     {
         auto const uses_freeverb = old_p(NoLongerExistingParam::ReverbUseFreeverbSwitch).ValueOr(1) > 0.5f;
 
-        auto const old_settings_on = old_p(NoLongerExistingParam::ReverbOnSwitch).ValueOr(0) != 0;
+        auto const old_settings_on = old_p(NoLongerExistingParam::ReverbOnSwitch).ValueOr(0) >= 0.5f;
         auto const old_settings_dry_01 = DbToAmp(old_p(NoLongerExistingParam::ReverbDryDb).ValueOr(0));
         auto const old_settings_wet_01 =
             uses_freeverb ? old_p(NoLongerExistingParam::ReverbFreeverbWetPercent).ValueOr(0) / 100.0f
@@ -599,7 +607,7 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
     // Set the phaser parameters based on the no-longer-existing params
     // ======================================================================================================
     {
-        auto const old_settings_on = old_p(NoLongerExistingParam::SvPhaserOn).ValueOr(0) != 0;
+        auto const old_settings_on = old_p(NoLongerExistingParam::SvPhaserOn).ValueOr(0) >= 0.5f;
         auto const old_setting_dry_01 = DbToAmp(old_p(NoLongerExistingParam::SvPhaserDry).ValueOr(0));
         auto const old_setting_wet_01 = DbToAmp(old_p(NoLongerExistingParam::SvPhaserWet).ValueOr(-90));
         auto const old_setting_centre_freq_hz = old_p(NoLongerExistingParam::SvPhaserFreqHz).ValueOr(3000);
@@ -625,16 +633,17 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
     // Set the delay parameters based on the no-longer-existing params
     // ======================================================================================================
     {
-        auto const uses_legacy = old_p(NoLongerExistingParam::DelayLegacyAlgorithm).ValueOr(1) > 0.5f;
+        auto const uses_legacy = old_p(NoLongerExistingParam::DelayLegacyAlgorithm).ValueOr(1) >= 0.5f;
 
-        auto const old_settings_on = old_p(NoLongerExistingParam::DelayOn).ValueOr(0) != 0;
+        auto const old_settings_on = old_p(NoLongerExistingParam::DelayOn).ValueOr(0) >= 0.5f;
         auto const old_settings_delay_time_ms_l =
             uses_legacy ? old_p(NoLongerExistingParam::DelayOldDelayTimeLMs).ValueOr(470)
                         : old_p(NoLongerExistingParam::DelaySinevibesDelayTimeLMs).ValueOr(470);
         auto const old_settings_delay_time_ms_r =
             uses_legacy ? old_p(NoLongerExistingParam::DelayOldDelayTimeRMs).ValueOr(490)
                         : old_p(NoLongerExistingParam::DelaySinevibesDelayTimeRMs).ValueOr(490);
-        auto const old_settings_is_synced = old_p(NoLongerExistingParam::DelayTimeSyncSwitch).ValueOr(0) != 0;
+        auto const old_settings_is_synced =
+            old_p(NoLongerExistingParam::DelayTimeSyncSwitch).ValueOr(0) >= 0.5f;
 
         auto const old_settings_bidirectional_filter_01 =
             uses_legacy ? (old_p(NoLongerExistingParam::DelayOldDamping).ValueOr(0) / 100.0f) / 3
@@ -725,8 +734,8 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
                   NoLongerExistingParam::Layer3LoopPingPongOnSwitch,
                   2},
              })) {
-            auto const old_layer1_loop_on = old_p(l.loop_on).ValueOr(0) != 0;
-            auto const old_layer1_ping_pong = old_p(l.ping_pong_on).ValueOr(0) != 0;
+            auto const old_layer1_loop_on = old_p(l.loop_on).ValueOr(0) >= 0.5f;
+            auto const old_layer1_ping_pong = old_p(l.ping_pong_on).ValueOr(0) >= 0.5f;
 
             param_values::LoopMode mode = param_values::LoopMode::InstrumentDefault;
             if (old_layer1_loop_on)
@@ -1568,6 +1577,7 @@ TEST_CASE(TestFuzzingJsonState) {
                     switch (*legacy_projection) {
                         case legacy_mappings::ParamProjection::WasPercentNowFraction: v *= 100.0f; break;
                         case legacy_mappings::ParamProjection::WasDbNowAmp: v = AmpToDb(v); break;
+                        case legacy_mappings::ParamProjection::WasOldBoolNowNewBool: break;
                     }
                 }
 
@@ -1669,6 +1679,28 @@ TEST_CASE(TestLoadingOldFiles) {
         CHECK_EQ(state.param_values[ToInt(ParamIndex::ReverbOn)], 1.0f);
         CHECK_APPROX_EQ(state.param_values[ToInt(ParamIndex::ReverbSize)], 0.6f, 0.01f);
         CHECK_APPROX_EQ(state.param_values[ToInt(ParamIndex::ReverbMix)], 0.25f, 0.2f);
+    }
+
+    SUBCASE("Abstract Chord.mirage-abstract") {
+        auto const state = TRY(decode_file("Abstract Chord.mirage-abstract"));
+
+        CHECK(state.inst_ids[0].tag == InstrumentType::None);
+        CHECK(state.inst_ids[1].tag == InstrumentType::None);
+        REQUIRE(state.inst_ids[2].tag == InstrumentType::Sampler);
+
+        {
+            auto const i = state.inst_ids[2].Get<sample_lib::InstrumentId>();
+            CHECK_EQ(i.library.name, "Abstract Energy"_s);
+            CHECK_EQ(i.library.author, sample_lib::k_mdata_library_author);
+            CHECK_EQ(i.inst_name, "Drone 2 Atmos"_s);
+        }
+
+        CHECK_EQ(state.param_values[ToInt(ParamIndex::BitCrushOn)], 0.0f);
+        CHECK_EQ(state.param_values[ToInt(ParamIndex::ReverbOn)], 0.0f);
+        CHECK_EQ(state.param_values[ToInt(ParamIndex::DelayOn)], 0.0f);
+        CHECK_EQ(state.param_values[ToInt(ParamIndex::PhaserOn)], 0.0f);
+
+        CHECK_APPROX_EQ(ProjectedLayerValue(state, 2, LayerParamIndex::LoopCrossfade), 0.54f, 0.01f);
     }
 
     // Pre-Sv effects

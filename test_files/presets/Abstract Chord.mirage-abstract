@@ -1,0 +1,930 @@
+{
+ "layers": [
+  {
+   "name": "None",
+   "path": ""
+  },
+  {
+   "name": "None",
+   "path": ""
+  },
+  {
+   "name": "Drone 2 Atmos",
+   "path": "sampler/Atmospheres/Drone 2 Atmos"
+  }
+ ],
+ "library": {
+  "id": 2481047267,
+  "name": "Abstract Energy",
+  "version": 1
+ },
+ "master": {
+  "last loaded preset": {
+   "changed": false,
+   "name": "Pulsing Atmos"
+  },
+  "version": 66048
+ },
+ "params": [
+  {
+   "ccs": null,
+   "name": "L0Vol",
+   "value": -16.683307647705078
+  },
+  {
+   "ccs": null,
+   "name": "L0Mute",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "L0Solo",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "L0Pan",
+   "value": 18.903648376464844
+  },
+  {
+   "ccs": null,
+   "name": "L0Detune",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "L0Pitch",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "L0Vel",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "L0VlEnOn",
+   "value": 1.0
+  },
+  {
+   "ccs": null,
+   "name": "L0Att",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "L0Dec",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "L0Sus",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "L0Rel",
+   "value": 935.6588134765625
+  },
+  {
+   "ccs": null,
+   "name": "L0FlOn",
+   "value": 0.23310896754264832
+  },
+  {
+   "ccs": null,
+   "name": "L0FlCut",
+   "value": 4744.8251953125
+  },
+  {
+   "ccs": null,
+   "name": "L0FfRes",
+   "value": 6.26908540725708
+  },
+  {
+   "ccs": null,
+   "name": "L0FlTy",
+   "value": "UnitGainBandpass"
+  },
+  {
+   "ccs": null,
+   "name": "L0LfoOn",
+   "value": 0.5489273071289063
+  },
+  {
+   "ccs": null,
+   "name": "L0LfoSh",
+   "value": "Sine"
+  },
+  {
+   "ccs": null,
+   "name": "L0LfoMd",
+   "value": "Retrigger"
+  },
+  {
+   "ccs": null,
+   "name": "L0LfoAm",
+   "value": -12.874908447265625
+  },
+  {
+   "ccs": null,
+   "name": "L0LfoTg",
+   "value": "Pitch"
+  },
+  {
+   "ccs": null,
+   "name": "L0LfoSyt",
+   "value": "1/64T"
+  },
+  {
+   "ccs": null,
+   "name": "L0LfoHZ",
+   "value": 5.959123134613037
+  },
+  {
+   "ccs": null,
+   "name": "L0LfoSyO",
+   "value": 0.37895628809928894
+  },
+  {
+   "ccs": null,
+   "name": "L0LpOn",
+   "value": 0.7763237953186035
+  },
+  {
+   "ccs": null,
+   "name": "L0LpStrt",
+   "value": 62.116065979003906
+  },
+  {
+   "ccs": null,
+   "name": "L0LpEnd",
+   "value": 86.83861541748047
+  },
+  {
+   "ccs": null,
+   "name": "L0LpXf",
+   "value": 8.705406188964844
+  },
+  {
+   "ccs": null,
+   "name": "L0LpPP",
+   "value": 0.598513126373291
+  },
+  {
+   "ccs": null,
+   "name": "L0Offs",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "L0Rev",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "L0EqOn",
+   "value": 0.9844853281974792
+  },
+  {
+   "ccs": null,
+   "name": "L0EqFr0",
+   "value": 808.2736206054688
+  },
+  {
+   "ccs": null,
+   "name": "L0EqRs0",
+   "value": 64.97277069091797
+  },
+  {
+   "ccs": null,
+   "name": "L0EqGn0",
+   "value": -1.1822967529296875
+  },
+  {
+   "ccs": null,
+   "name": "L0EqTy0",
+   "value": "Peaking"
+  },
+  {
+   "ccs": null,
+   "name": "L0EqFr1",
+   "value": 4977.36181640625
+  },
+  {
+   "ccs": null,
+   "name": "L0EqRs1",
+   "value": 30.942068099975586
+  },
+  {
+   "ccs": null,
+   "name": "L0EqGn1",
+   "value": -1.315995216369629
+  },
+  {
+   "ccs": null,
+   "name": "L0EqTy1",
+   "value": "Peaking"
+  },
+  {
+   "ccs": null,
+   "name": "L0KTr",
+   "value": 1.0
+  },
+  {
+   "ccs": null,
+   "name": "L0Mono",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "L0SusRe",
+   "value": 1.0
+  },
+  {
+   "ccs": null,
+   "name": "L0Trn",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "L1Vol",
+   "value": -16.142200469970703
+  },
+  {
+   "ccs": null,
+   "name": "L1Mute",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "L1Solo",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "L1Pan",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "L1Detune",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "L1Pitch",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "L1Vel",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "L1VlEnOn",
+   "value": 1.0
+  },
+  {
+   "ccs": null,
+   "name": "L1Att",
+   "value": 985.7625732421875
+  },
+  {
+   "ccs": null,
+   "name": "L1Dec",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "L1Sus",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "L1Rel",
+   "value": 1074.09814453125
+  },
+  {
+   "ccs": null,
+   "name": "L1FlOn",
+   "value": 0.7025171518325806
+  },
+  {
+   "ccs": null,
+   "name": "L1FlCut",
+   "value": 1149.9718017578125
+  },
+  {
+   "ccs": null,
+   "name": "L1FfRes",
+   "value": 22.821109771728516
+  },
+  {
+   "ccs": null,
+   "name": "L1FlTy",
+   "value": "UnitGainBandpass"
+  },
+  {
+   "ccs": null,
+   "name": "L1LfoOn",
+   "value": 0.022659149020910263
+  },
+  {
+   "ccs": null,
+   "name": "L1LfoSh",
+   "value": "Triangle"
+  },
+  {
+   "ccs": null,
+   "name": "L1LfoMd",
+   "value": "Free"
+  },
+  {
+   "ccs": null,
+   "name": "L1LfoAm",
+   "value": 0.773406982421875
+  },
+  {
+   "ccs": null,
+   "name": "L1LfoTg",
+   "value": "Pitch"
+  },
+  {
+   "ccs": null,
+   "name": "L1LfoSyt",
+   "value": "1/2T"
+  },
+  {
+   "ccs": null,
+   "name": "L1LfoHZ",
+   "value": 9.03399658203125
+  },
+  {
+   "ccs": null,
+   "name": "L1LfoSyO",
+   "value": 0.003855668241158128
+  },
+  {
+   "ccs": null,
+   "name": "L1LpOn",
+   "value": 0.8628965616226196
+  },
+  {
+   "ccs": null,
+   "name": "L1LpStrt",
+   "value": 86.54004669189453
+  },
+  {
+   "ccs": null,
+   "name": "L1LpEnd",
+   "value": 100.0
+  },
+  {
+   "ccs": null,
+   "name": "L1LpXf",
+   "value": 67.16657257080078
+  },
+  {
+   "ccs": null,
+   "name": "L1LpPP",
+   "value": 0.7359052300453186
+  },
+  {
+   "ccs": null,
+   "name": "L1Offs",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "L1Rev",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "L1EqOn",
+   "value": 0.3595811724662781
+  },
+  {
+   "ccs": null,
+   "name": "L1EqFr0",
+   "value": 13429.8095703125
+  },
+  {
+   "ccs": null,
+   "name": "L1EqRs0",
+   "value": 3.7345519065856934
+  },
+  {
+   "ccs": null,
+   "name": "L1EqGn0",
+   "value": 3.8090267181396484
+  },
+  {
+   "ccs": null,
+   "name": "L1EqTy0",
+   "value": "High Shelf"
+  },
+  {
+   "ccs": null,
+   "name": "L1EqFr1",
+   "value": 3793.5966796875
+  },
+  {
+   "ccs": null,
+   "name": "L1EqRs1",
+   "value": 23.69032859802246
+  },
+  {
+   "ccs": null,
+   "name": "L1EqGn1",
+   "value": 2.752531051635742
+  },
+  {
+   "ccs": null,
+   "name": "L1EqTy1",
+   "value": "High Shelf"
+  },
+  {
+   "ccs": null,
+   "name": "L1KTr",
+   "value": 1.0
+  },
+  {
+   "ccs": null,
+   "name": "L1Mono",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "L1SusRe",
+   "value": 1.0
+  },
+  {
+   "ccs": null,
+   "name": "L1Trn",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "L2Vol",
+   "value": -1.4161224365234375
+  },
+  {
+   "ccs": null,
+   "name": "L2Mute",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "L2Solo",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "L2Pan",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "L2Detune",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "L2Pitch",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "L2Vel",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "L2VlEnOn",
+   "value": 1.0
+  },
+  {
+   "ccs": null,
+   "name": "L2Att",
+   "value": 147.06491088867188
+  },
+  {
+   "ccs": null,
+   "name": "L2Dec",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "L2Sus",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "L2Rel",
+   "value": 828.3938598632813
+  },
+  {
+   "ccs": null,
+   "name": "L2FlOn",
+   "value": 0.8763444423675537
+  },
+  {
+   "ccs": null,
+   "name": "L2FlCut",
+   "value": 602.9461669921875
+  },
+  {
+   "ccs": null,
+   "name": "L2FfRes",
+   "value": 26.06429100036621
+  },
+  {
+   "ccs": null,
+   "name": "L2FlTy",
+   "value": "UnitGainBandpass"
+  },
+  {
+   "ccs": null,
+   "name": "L2LfoOn",
+   "value": 0.4940437972545624
+  },
+  {
+   "ccs": null,
+   "name": "L2LfoSh",
+   "value": "Triangle"
+  },
+  {
+   "ccs": null,
+   "name": "L2LfoMd",
+   "value": "Retrigger"
+  },
+  {
+   "ccs": null,
+   "name": "L2LfoAm",
+   "value": 69.68214416503906
+  },
+  {
+   "ccs": null,
+   "name": "L2LfoTg",
+   "value": "Filter"
+  },
+  {
+   "ccs": null,
+   "name": "L2LfoSyt",
+   "value": "1/2D"
+  },
+  {
+   "ccs": null,
+   "name": "L2LfoHZ",
+   "value": 13.18581485748291
+  },
+  {
+   "ccs": null,
+   "name": "L2LfoSyO",
+   "value": 0.10168050229549408
+  },
+  {
+   "ccs": null,
+   "name": "L2LpOn",
+   "value": 0.7346105575561523
+  },
+  {
+   "ccs": null,
+   "name": "L2LpStrt",
+   "value": 10.53875732421875
+  },
+  {
+   "ccs": null,
+   "name": "L2LpEnd",
+   "value": 83.40067291259766
+  },
+  {
+   "ccs": null,
+   "name": "L2LpXf",
+   "value": 54.313785552978516
+  },
+  {
+   "ccs": null,
+   "name": "L2LpPP",
+   "value": 0.06810739636421204
+  },
+  {
+   "ccs": null,
+   "name": "L2Offs",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "L2Rev",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "L2EqOn",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "L2EqFr0",
+   "value": 18396.59375
+  },
+  {
+   "ccs": null,
+   "name": "L2EqRs0",
+   "value": 20.87225914001465
+  },
+  {
+   "ccs": null,
+   "name": "L2EqGn0",
+   "value": 6.102397918701172
+  },
+  {
+   "ccs": null,
+   "name": "L2EqTy0",
+   "value": "Peaking"
+  },
+  {
+   "ccs": null,
+   "name": "L2EqFr1",
+   "value": 14364.2509765625
+  },
+  {
+   "ccs": null,
+   "name": "L2EqRs1",
+   "value": 20.632890701293945
+  },
+  {
+   "ccs": null,
+   "name": "L2EqGn1",
+   "value": -3.1960229873657227
+  },
+  {
+   "ccs": null,
+   "name": "L2EqTy1",
+   "value": "High Shelf"
+  },
+  {
+   "ccs": null,
+   "name": "L2KTr",
+   "value": 1.0
+  },
+  {
+   "ccs": null,
+   "name": "L2Mono",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "L2SusRe",
+   "value": 1.0
+  },
+  {
+   "ccs": null,
+   "name": "L2Trn",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "MastVol",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "MastVel",
+   "value": 76.99689483642578
+  },
+  {
+   "ccs": null,
+   "name": "DistType",
+   "value": "Tube Asym3"
+  },
+  {
+   "ccs": null,
+   "name": "DistDrive",
+   "value": 18.05573272705078
+  },
+  {
+   "ccs": null,
+   "name": "DistOn",
+   "value": 0.9597394466400146
+  },
+  {
+   "ccs": null,
+   "name": "BitcBits",
+   "value": 9.405540466308594
+  },
+  {
+   "ccs": null,
+   "name": "BitcRate",
+   "value": 586.4954833984375
+  },
+  {
+   "ccs": null,
+   "name": "BitcWet",
+   "value": -9.533622741699219
+  },
+  {
+   "ccs": null,
+   "name": "BitcDry",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "BitcOn",
+   "value": 0.1334492713212967
+  },
+  {
+   "ccs": null,
+   "name": "CompThr",
+   "value": -14.110607147216797
+  },
+  {
+   "ccs": null,
+   "name": "CompRt",
+   "value": 11.869306564331055
+  },
+  {
+   "ccs": null,
+   "name": "CompGain",
+   "value": 2.3079910278320313
+  },
+  {
+   "ccs": null,
+   "name": "CompAuto",
+   "value": 1.0
+  },
+  {
+   "ccs": null,
+   "name": "CompOn",
+   "value": 0.22255808115005493
+  },
+  {
+   "ccs": null,
+   "name": "FlOn",
+   "value": 0.568397045135498
+  },
+  {
+   "ccs": null,
+   "name": "FlCut",
+   "value": 5383.52490234375
+  },
+  {
+   "ccs": null,
+   "name": "FlRes",
+   "value": 69.7037353515625
+  },
+  {
+   "ccs": null,
+   "name": "FlGain",
+   "value": 8.636503219604492
+  },
+  {
+   "ccs": null,
+   "name": "FlType",
+   "value": "Low Pass"
+  },
+  {
+   "ccs": null,
+   "name": "SterWd",
+   "value": 21.71746826171875
+  },
+  {
+   "ccs": null,
+   "name": "SterOn",
+   "value": 0.9644536375999451
+  },
+  {
+   "ccs": null,
+   "name": "ChorRate",
+   "value": 2.4845404624938965
+  },
+  {
+   "ccs": null,
+   "name": "ChorHP",
+   "value": 1997.605224609375
+  },
+  {
+   "ccs": null,
+   "name": "ChorDpth",
+   "value": 0.1887625902891159
+  },
+  {
+   "ccs": null,
+   "name": "ChorWet",
+   "value": -4.47576904296875
+  },
+  {
+   "ccs": null,
+   "name": "ChorDry",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "ChorOn",
+   "value": 0.5434523224830627
+  },
+  {
+   "ccs": null,
+   "name": "RvSize",
+   "value": 52.7366943359375
+  },
+  {
+   "ccs": null,
+   "name": "RvDamp",
+   "value": 79.48377227783203
+  },
+  {
+   "ccs": null,
+   "name": "RvWidth",
+   "value": 7.694963455200195
+  },
+  {
+   "ccs": null,
+   "name": "RvDry",
+   "value": -9.425567626953125
+  },
+  {
+   "ccs": null,
+   "name": "RvWet",
+   "value": 11.526617050170898
+  },
+  {
+   "ccs": null,
+   "name": "RvOn",
+   "value": 0.4786219000816345
+  },
+  {
+   "ccs": null,
+   "name": "DlMsL",
+   "value": 92.44822692871094
+  },
+  {
+   "ccs": null,
+   "name": "DlMsR",
+   "value": 668.641845703125
+  },
+  {
+   "ccs": null,
+   "name": "DlSyncL",
+   "value": "1/2T"
+  },
+  {
+   "ccs": null,
+   "name": "DlSyncR",
+   "value": "1/4T"
+  },
+  {
+   "ccs": null,
+   "name": "DlSyncOn",
+   "value": 0.9305242896080017
+  },
+  {
+   "ccs": null,
+   "name": "DlFeed",
+   "value": 5.351770877838135
+  },
+  {
+   "ccs": null,
+   "name": "DlDamp",
+   "value": 51.13174819946289
+  },
+  {
+   "ccs": null,
+   "name": "DlWet",
+   "value": -73.79295349121094
+  },
+  {
+   "ccs": null,
+   "name": "DlOn",
+   "value": 0.42099466919898987
+  },
+  {
+   "ccs": null,
+   "name": "ConvIR",
+   "value": "4s Wind"
+  },
+  {
+   "ccs": null,
+   "name": "ConvHP",
+   "value": 2568.487060546875
+  },
+  {
+   "ccs": null,
+   "name": "ConvWet",
+   "value": -25.252666473388672
+  },
+  {
+   "ccs": null,
+   "name": "ConvDry",
+   "value": 0.0
+  },
+  {
+   "ccs": null,
+   "name": "ConvOn",
+   "value": 0.9708408713340759
+  }
+ ]
+}

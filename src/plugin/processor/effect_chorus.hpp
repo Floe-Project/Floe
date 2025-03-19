@@ -48,6 +48,7 @@ struct ChorusProcessor {
             chorus_lfo.Tick() * (1.f - depth) + depth; // range: [k_min_time_multiplier, 1]
 
         auto const dl_offset = time_multiplier * delay_line.size_float;
+        ASSERT_HOT(dl_offset >= 0.0f);
         auto const dl_offset_int = (u32)dl_offset;
 
         ASSERT_HOT(delay_line.current >= delay_line.buffer.data);
@@ -64,9 +65,10 @@ struct ChorusProcessor {
         ASSERT_HOT(ptr1 < End(delay_line.buffer));
         ASSERT_HOT(ptr2 < End(delay_line.buffer));
 
-        auto const frac = 1 - (dl_offset - (f32)dl_offset_int);
-        auto out = *ptr2 + *ptr1 * frac;
-        out -= frac * z1; // weird use of feedback?
+        auto const frac = dl_offset - (f32)dl_offset_int;
+        ASSERT_HOT(frac >= 0.0f);
+        ASSERT_HOT(frac <= 1.0f);
+        auto out = LinearInterpolate(frac, *ptr1, *ptr2) - (z1 * 0.1f);
         z1 = out;
 
         StereoAudioFrame out_frame {out[0], out[1]};
@@ -85,7 +87,8 @@ struct ChorusProcessor {
     void Reset() {
         highpass = {};
         lowpass = {};
-        ZeroMemory(delay_line.buffer.data, delay_line.buffer.size * sizeof(*delay_line.buffer.data));
+        for (auto& x : delay_line.buffer)
+            x = {};
         delay_line.current = delay_line.buffer.data;
         z1 = {};
     }

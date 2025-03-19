@@ -574,7 +574,7 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
         state.LinearParam(ParamIndex::ReverbMix) =
             old_settings_wet_01 / (old_settings_wet_01 + old_settings_dry_01);
         state.LinearParam(ParamIndex::ReverbSize) = old_settings_size_01;
-        state.LinearParam(ParamIndex::ReverbDecayTimeMs) = old_settings_size_01;
+        state.LinearParam(ParamIndex::ReverbDecayTimeMs) = old_settings_size_01 * 0.8f;
         state.LinearParam(ParamIndex::ReverbDelay) = ParamDescriptorAt(ParamIndex::ReverbDelay)
                                                          .LineariseValue(old_settings_pre_delay_ms, true)
                                                          .Value();
@@ -651,6 +651,8 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
 
         auto const old_settings_feedback = old_p(NoLongerExistingParam::DelayFeedback).ValueOr(0) / 100.0f;
 
+        auto const old_setting_wet_01 = DbToAmp(old_p(NoLongerExistingParam::DelayWet).ValueOr(-90));
+
         auto get_synced_delay_time = [&](NoLongerExistingParam p) -> Optional<f32> {
             auto old_param = parser.non_existent_params[ToInt(p)];
             if (old_param.tag == JsonStateParser::ParamValueType::String) {
@@ -711,7 +713,9 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
         state.LinearParam(ParamIndex::DelayFilterCutoffSemitones) =
             0.5f + (-old_settings_bidirectional_filter_01) / 2;
 
-        state.LinearParam(ParamIndex::DelayFeedback) = old_settings_feedback;
+        state.LinearParam(ParamIndex::DelayFeedback) =
+            uses_legacy ? old_settings_feedback : Pow(old_settings_feedback, 0.1f);
+        state.LinearParam(ParamIndex::DelayMix) = old_setting_wet_01 * 0.3f;
     }
 
     // Set the layer loop-on parameters based on the no-longer-existing params

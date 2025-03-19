@@ -9,6 +9,9 @@ For instance: 0.0.1. Don't change the headings.
 
 # Changelog
 
+## 0.0.7-alpha
+- Fix missing code signing on Windows installer resulting in 'Unknown Publisher' warning
+
 ## 0.0.6-alpha
 - Add VST3 support
 - Standardise how tags and folders will be used in instruments, presets and impulse responses: https://floe.audio/develop/tags-and-folders.html

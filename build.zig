@@ -2942,13 +2942,13 @@ pub fn build(b: *std.Build) void {
                 );
                 build_context.master_step.dependOn(&uninstall_artifact_step.step);
 
-                const sign_step = addWindowsCodeSignStep(
+                const uninstall_sign_step = addWindowsCodeSignStep(
                     &build_context,
                     target,
                     b.getInstallPath(install_dir, win_uninstaller.out_filename),
                     "Floe Uninstaller",
                 );
-                if (sign_step) |s| {
+                if (uninstall_sign_step) |s| {
                     s.dependOn(&uninstall_artifact_step.step);
                 }
 
@@ -3016,15 +3016,27 @@ pub fn build(b: *std.Build) void {
                 // plugins
                 win_installer.step.dependOn(vst3_final_step.?);
                 win_installer.step.dependOn(clap_final_step.?);
-                if (sign_step) |s| {
+                if (uninstall_sign_step) |s| {
                     win_installer.step.dependOn(s);
                 } else {
                     win_installer.step.dependOn(&uninstall_artifact_step.step);
                 }
 
                 const artifact_step = b.addInstallArtifact(win_installer, .{ .dest_dir = install_subfolder });
-                build_context.master_step.dependOn(&artifact_step.step);
                 join_compile_commands.step.dependOn(&win_installer.step);
+
+                const installer_sign_step = addWindowsCodeSignStep(
+                    &build_context,
+                    target,
+                    b.getInstallPath(install_dir, win_installer.out_filename),
+                    "Floe Installer",
+                );
+                if (installer_sign_step) |s| {
+                    s.dependOn(&artifact_step.step);
+                    build_context.master_step.dependOn(s);
+                } else {
+                    build_context.master_step.dependOn(&artifact_step.step);
+                }
             }
         }
 

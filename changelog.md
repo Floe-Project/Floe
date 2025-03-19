@@ -11,6 +11,7 @@ For instance: 0.0.1. Don't change the headings.
 
 ## 0.0.7-alpha
 - Fix missing code signing on Windows installer resulting in 'Unknown Publisher' warning
+- Fix layer filter type menu being the incorrect width
 
 ## 0.0.6-alpha
 - Add VST3 support

@@ -419,7 +419,7 @@ void Layout(Gui* g,
                     layout::CreateItem(g->layout,
                                        {
                                            .parent = filter_heading_container,
-                                           .size = {layout::k_fill_parent, page_heading_height},
+                                           .size = {LiveSize(g->imgui, Filter_OnWidth), page_heading_height},
                                            .margins = heading_margins,
                                            .anchor = layout::Anchor::Top,
                                        });
@@ -428,7 +428,7 @@ void Layout(Gui* g,
                                        {
                                            .parent = filter_heading_container,
                                            .size = {layout::k_fill_parent, param_popup_button_height},
-                                           .margins = {.l = page_heading_margin_l},
+                                           .margins = {.lr = page_heading_margin_l},
                                        });
 
                 auto filter_knobs_container =

@@ -238,8 +238,8 @@ static_assert(k_eq_type_strings.size == ToInt(EqType::Count));
 
 enum class LoopMode : u8 {
     InstrumentDefault,
-    BuiltInStandardLoop,
-    BuiltInPingPong,
+    BuiltInLoopStandard,
+    BuiltInLoopPingPong,
     None,
     Standard,
     PingPong,
@@ -247,11 +247,11 @@ enum class LoopMode : u8 {
 };
 constexpr auto k_loop_mode_strings = ArrayT<String>({
     "Default",
-    "Built-in Standard Loop",
-    "Built-in Standard Ping-Pong",
-    "None",
-    "Custom Standard Loop",
-    "Custom Ping-Pong Loop",
+    "Built-in Loop - Standard",
+    "Built-in Loop - Ping-pong",
+    "No Loop",
+    "Custom Loop - Standard",
+    "Custom Loop - Ping-pong",
 });
 static_assert(k_loop_mode_strings.size == ToInt(LoopMode::Count));
 
@@ -1784,7 +1784,7 @@ consteval auto CreateParams() {
             .name = "On"_s,
             .gui_label = "Volume Envelope"_s,
             .tooltip =
-                "Enable/disable the volume envelope; when disabled, each sound will play out entirely, or until the key is pressed again"_s,
+                "Enable/disable the volume envelope; when disabled, each sound will play out entirely"_s,
         };
         lp(VolumeAttack) = Args {
             .id = id(region, 14), // never change

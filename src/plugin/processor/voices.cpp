@@ -207,33 +207,51 @@ static f32 GetXFadeAmp(f32 xfade_position_01, int xfade_layer_index) {
 }
 
 static Optional<BoundsCheckedLoop> ConfigureLoop(param_values::LoopMode desired_mode,
-                                                 Optional<sample_lib::Loop> const& region_loop,
+                                                 sample_lib::Region::File const& region,
                                                  u32 num_frames,
                                                  VoiceProcessingController::Loop const& custom_loop) {
-    if (region_loop) {
-        auto result = CreateBoundsCheckedLoop(*region_loop, num_frames);
+    if (region.loop) {
+        auto result = CreateBoundsCheckedLoop(*region.loop, num_frames);
 
-        if (region_loop->disallow_disabling_loop || desired_mode == param_values::LoopMode::InstrumentDefault)
-            return result;
-
-        if (desired_mode == param_values::LoopMode::BuiltInStandardLoop) {
-            if (!region_loop->disallow_changing_ping_pong) result.ping_pong = false;
-            return result;
+        switch (desired_mode) {
+            case param_values::LoopMode::InstrumentDefault: return result;
+            case param_values::LoopMode::BuiltInLoopStandard:
+                if (!region.loop->lock_mode) result.mode = sample_lib::Loop::Mode::Standard;
+                return result;
+            case param_values::LoopMode::BuiltInLoopPingPong:
+                if (!region.loop->lock_mode) result.mode = sample_lib::Loop::Mode::PingPong;
+                return result;
+            case param_values::LoopMode::None:
+                if (region.always_loop) return result;
+                return k_nullopt;
+            case param_values::LoopMode::Standard:
+            case param_values::LoopMode::PingPong: {
+                if (region.loop->lock_loop_points) return result;
+                break;
+            }
+            case param_values::LoopMode::Count: PanicIfReached(); break;
         }
-
-        if (desired_mode == param_values::LoopMode::BuiltInPingPong) {
-            if (!region_loop->disallow_changing_ping_pong) result.ping_pong = true;
-            return result;
-        }
-
-        if (region_loop->disallow_changing_loop_points) return result;
     }
 
     switch (desired_mode) {
         case param_values::LoopMode::InstrumentDefault:
-        case param_values::LoopMode::BuiltInStandardLoop:
-        case param_values::LoopMode::BuiltInPingPong: return k_nullopt;
-        case param_values::LoopMode::None: return k_nullopt;
+        case param_values::LoopMode::BuiltInLoopStandard:
+        case param_values::LoopMode::BuiltInLoopPingPong:
+        case param_values::LoopMode::None: {
+            if (region.always_loop) {
+                // This is a legacy option: we have to enforce some kind of looping behaviour.
+                auto const n = (f32)num_frames;
+                return CreateBoundsCheckedLoop(
+                    {
+                        .start_frame = 0,
+                        .end_frame = (s64)(0.9f * n),
+                        .crossfade_frames = (u32)(0.1f * n),
+                        .mode = sample_lib::Loop::Mode::Standard,
+                    },
+                    num_frames);
+            }
+            return k_nullopt;
+        }
         case param_values::LoopMode::Standard:
         case param_values::LoopMode::PingPong: {
             auto const n = (f32)num_frames;
@@ -243,7 +261,9 @@ static Optional<BoundsCheckedLoop> ConfigureLoop(param_values::LoopMode desired_
                     .start_frame = (s64)(custom_loop.start * n),
                     .end_frame = (s64)(custom_loop.end * n),
                     .crossfade_frames = (u32)(custom_loop.crossfade_size * n),
-                    .ping_pong = (desired_mode == param_values::LoopMode::PingPong),
+                    .mode = (desired_mode == param_values::LoopMode::PingPong)
+                                ? sample_lib::Loop::Mode::PingPong
+                                : sample_lib::Loop::Mode::Standard,
                 },
                 num_frames);
 

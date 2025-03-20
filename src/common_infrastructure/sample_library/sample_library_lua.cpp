@@ -90,6 +90,7 @@ enum class InterpretedTypes : u32 {
     Instrument,
     ImpulseResponse,
     Region,
+    Loop,
     File,
     TriggerCriteria,
     RegionOptions,
@@ -320,6 +321,102 @@ static Span<String> SetArrayOfStrings(LuaState& ctx, FieldInfo field_info, bool 
 }
 
 template <>
+struct TableFields<Loop> {
+    using Type = Loop;
+
+    enum class Field : u32 {
+        Start,
+        End,
+        Crossfade,
+        Mode,
+        LockLoopPoints,
+        LockMode,
+        Count,
+    };
+
+    static constexpr char const* k_loop_mode_names[] = {"standard", "ping-pong", nullptr};
+    static_assert(ArraySize(k_loop_mode_names) == ToInt(Loop::Mode::Count) + 1);
+
+    static constexpr FieldInfo FieldInfo(Field f) {
+        switch (f) {
+            case Field::Start:
+                return {
+                    .name = "start",
+                    .description_sentence =
+                        "The start of the loop in frames. Inclusive. It can be negative meaning index the file from the end rather than the start. For example, -1 == number_frames_in_file, -2 == (number_frames_in_file - 1), etc.",
+                    .example = "24",
+                    .lua_type = LUA_TNUMBER,
+                    .required = true,
+                    .set =
+                        [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.start_frame = NumberFromTop<u32>(ctx, info); },
+                };
+            case Field::End:
+                return {
+                    .name = "end",
+                    .description_sentence =
+                        "The end of the loop in frames. Exclusive. It can be negative meaning index the file from the end rather than the start. For example, -1 == number_frames_in_file, -2 == (number_frames_in_file - 1), etc.",
+                    .example = "6600",
+                    .lua_type = LUA_TNUMBER,
+                    .required = true,
+                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.end_frame = NumberFromTop<u32>(ctx, info); },
+                };
+            case Field::Crossfade:
+                return {
+                    .name = "crossfade",
+                    .description_sentence = "The number of frames to crossfade.",
+                    .example = "100",
+                    .lua_type = LUA_TNUMBER,
+                    .required = true,
+                    .set =
+                        [](SET_FIELD_VALUE_ARGS) {
+                            FIELD_OBJ.crossfade_frames = NumberFromTop<u32>(ctx, info);
+                        },
+                };
+            case Field::Mode:
+                return {
+                    .name = "mode",
+                    .description_sentence = "The mode of the loop. Can be 'standard', 'ping_pong'.",
+                    .example = "forward",
+                    .lua_type = LUA_TSTRING,
+                    .required = false,
+                    .enum_options = k_loop_mode_names,
+                    .set =
+                        [](SET_FIELD_VALUE_ARGS) {
+                            FIELD_OBJ.mode =
+                                (Loop::Mode)luaL_checkoption(ctx.lua, -1, nullptr, k_loop_mode_names);
+                        },
+                };
+            case Field::LockLoopPoints:
+                return {
+                    .name = "lock_loop_points",
+                    .description_sentence =
+                        "If true, the start, end and crossfade values cannot be overriden by a custom loop from Floe's GUI.",
+                    .example = "false",
+                    .lua_type = LUA_TBOOLEAN,
+                    .required = false,
+                    .set =
+                        [](SET_FIELD_VALUE_ARGS) {
+                            FIELD_OBJ.lock_loop_points = lua_toboolean(ctx.lua, -1) != 0;
+                        },
+                };
+            case Field::LockMode:
+                return {
+                    .name = "lock_mode",
+                    .description_sentence =
+                        "If true, the loop mode value cannot be overriden by a custom mode from Floe's GUI.",
+                    .example = "false",
+                    .lua_type = LUA_TBOOLEAN,
+                    .required = false,
+                    .set =
+                        [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.lock_mode = lua_toboolean(ctx.lua, -1) != 0; },
+                };
+            case Field::Count: break;
+        }
+        return {};
+    }
+};
+
+template <>
 struct TableFields<Region::File> {
     using Type = Region::File;
 
@@ -350,39 +447,18 @@ struct TableFields<Region::File> {
             case Field::Loop:
                 return {
                     .name = "loop",
-                    .description_sentence =
-                        "The region of the file that can be looped. It should be an array: 3 integers and 1 boolean: { start, end, crossfade, is_ping_pong boolean }. Start is inclusive, end is exclusive. The start and end numbers can be negative meaning they index the file from the end rather than the start. For example, -1 == number_frames_in_file, -2 == (number_frames_in_file - 1), etc.",
-                    .example = "{ 24, 6600, 100, false }",
+                    .description_sentence = "The region of the file that can be looped.",
                     .default_value = "no loop",
                     .lua_type = LUA_TTABLE,
+                    .subtype = InterpretedTypes::Loop,
                     .required = false,
                     .set =
                         [](SET_FIELD_VALUE_ARGS) {
-                            auto& file = FIELD_OBJ;
-                            file.loop = Loop {};
-                            auto const vals = ListOfInts(ctx, 3, info);
-                            file.loop->start_frame = vals[0];
-                            file.loop->end_frame = vals[1];
-                            if (vals[2] < 0)
-                                luaL_error(ctx.lua,
-                                           "'%s'[3] (crossfade) should not be negative",
-                                           info.name.data);
-                            file.loop->crossfade_frames = (u32)vals[2];
-
-                            {
-                                bool is_bool = false;
-                                lua_geti(ctx.lua, -1, 4);
-                                if (lua_isboolean(ctx.lua, -1)) {
-                                    file.loop->ping_pong = lua_toboolean(ctx.lua, -1);
-                                    is_bool = true;
-                                }
-                                lua_pop(ctx.lua, 1);
-                                if (!is_bool)
-                                    luaL_error(ctx.lua,
-                                               "'%s'[4] (is_ping_pong) should be a boolean",
-                                               info.name.data);
-                            }
+                            Loop loop;
+                            InterpretTable(ctx, -1, loop);
+                            FIELD_OBJ.loop = loop;
                         },
+
                 };
 
             case Field::Count: break;
@@ -1462,6 +1538,8 @@ LibraryPtrOrError ReadLua(Reader& reader,
 
         library->files_requiring_attribution = ctx.files_requiring_attribution.ToOwnedTable();
 
+        detail::PostReadBookkeeping(*library);
+
         return library;
     } catch (OutOfMemory const& e) {
         return Error {LuaErrorCode::Memory, {}};
@@ -1545,6 +1623,7 @@ struct LuaCodePrinter {
                 case InterpretedTypes::ImpulseResponse:
                     struct_fields[i] = FieldInfosSpan<ImpulseResponse>();
                     break;
+                case InterpretedTypes::Loop: struct_fields[i] = FieldInfosSpan<Loop>(); break;
                 case InterpretedTypes::Region: struct_fields[i] = FieldInfosSpan<Region>(); break;
                 case InterpretedTypes::File: struct_fields[i] = FieldInfosSpan<Region::File>(); break;
                 case InterpretedTypes::TriggerCriteria:

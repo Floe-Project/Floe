@@ -7,6 +7,7 @@
 
 #include "common_infrastructure/descriptors/param_descriptors.hpp"
 
+#include "engine/loop_modes.hpp"
 #include "gui.hpp"
 #include "gui_drawing_helpers.hpp"
 #include "gui_framework/gui_live_edit.hpp"
@@ -29,11 +30,11 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
     using namespace loop_and_reverse_flags;
 
     auto const reverse = layer->params[ToInt(LayerParamIndex::Reverse)].ValueAsBool();
-    auto const loop_mode =
+    auto const desired_loop_mode =
         layer->params[ToInt(LayerParamIndex::LoopMode)].ValueAsInt<param_values::LoopMode>();
-    auto const ping_pong = loop_mode == param_values::LoopMode::PingPong;
-    bool const loop_points_editable =
-        loop_mode == param_values::LoopMode::Standard || loop_mode == param_values::LoopMode::PingPong;
+    auto const loop_mode = ActualLoopBehaviour(layer->instrument, desired_loop_mode);
+    auto const loop_mode_info = GetLoopBehaviourInfo(loop_mode);
+    bool const ping_pong = loop_mode.value == LoopBehaviour::Value::CustomLoopPingPong;
 
     auto const extra_grabbing_room_x = handle_width;
     auto const extra_grabbing_room_towards_centre = r.h / 3;
@@ -41,6 +42,27 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
 
     enum class HandleType { LoopStart, LoopEnd, Offset, Xfade };
     enum class HandleDirection { Left, Right };
+
+    // Loop points and xfade
+    Rect start_line;
+    Rect start_handle;
+    Rect end_line;
+    Rect end_handle;
+    Rect xfade_line;
+    Rect xfade_handle;
+    Rect loop_region_r;
+
+    Rect const& left_line = reverse ? end_line : start_line;
+    Rect const& right_line = reverse ? start_line : end_line;
+
+    bool draw_xfade = false;
+    bool draw_xfade_as_inactive = false;
+    f32 loop_xfade_size {};
+
+    auto const start_id = imgui.GetID("loop start");
+    auto const end_id = imgui.GetID("loop end");
+    auto const xfade_id = imgui.GetID("loop xfade");
+    auto const loop_region_id = imgui.GetID("region");
 
     auto draw_handle = [&](Rect r, imgui::Id id, HandleType type, bool inactive) {
         u32 back_col;
@@ -153,33 +175,15 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
         }
     };
 
-    // Loop points and xfade
-    Rect start_line;
-    Rect start_handle;
-    Rect end_line;
-    Rect end_handle;
-    Rect xfade_line;
-    Rect xfade_handle;
-    Rect loop_region_r;
+    if (loop_mode_info.editable) {
+        auto const region_loop_mode =
+            ping_pong ? sample_lib::Loop::Mode::PingPong : sample_lib::Loop::Mode::Standard;
 
-    Rect const& left_line = reverse ? end_line : start_line;
-    Rect const& right_line = reverse ? start_line : end_line;
-
-    bool draw_xfade = false;
-    bool draw_xfade_as_inactive = false;
-    f32 loop_xfade_size {};
-
-    auto const start_id = imgui.GetID("loop start");
-    auto const end_id = imgui.GetID("loop end");
-    auto const xfade_id = imgui.GetID("loop xfade");
-    auto const loop_region_id = imgui.GetID("region");
-
-    if (loop_points_editable) {
         auto const loop_start = layer->params[ToInt(LayerParamIndex::LoopStart)].LinearValue();
         auto const loop_end = Max(layer->params[ToInt(LayerParamIndex::LoopEnd)].LinearValue(), loop_start);
         auto const raw_crossfade_size = layer->params[ToInt(LayerParamIndex::LoopCrossfade)].LinearValue();
         loop_xfade_size =
-            ClampCrossfadeSize<f32>(raw_crossfade_size, loop_start, loop_end, 1.0f, ping_pong) * r.w;
+            ClampCrossfadeSize<f32>(raw_crossfade_size, loop_start, loop_end, 1.0f, region_loop_mode) * r.w;
         auto loop_start_pos = loop_start * r.w;
         auto loop_end_pos = loop_end * r.w;
         auto loop_xfade_line_pos = loop_end_pos - loop_xfade_size;
@@ -212,7 +216,7 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
                 loop_start,
                 Max(layer->params[ToInt(LayerParamIndex::LoopEnd)].LinearValue(), loop_start),
                 1.0f,
-                ping_pong);
+                region_loop_mode);
             if (xfade > clamped_xfade) {
                 SetParameterValue(engine.processor,
                                   xfade_param_id,
@@ -318,7 +322,7 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
         }
 
         // xfade
-        if (loop_points_editable) {
+        {
             auto const& param = engine.processor.params[ToInt(xfade_param_id)];
 
             xfade_line = waveform_r.WithXW(waveform_r.x + loop_xfade_line_pos, 1);
@@ -344,7 +348,7 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
                                                                      loop_start - epsilon,
                                                                      loop_end + epsilon,
                                                                      1.0f,
-                                                                     ping_pong);
+                                                                     region_loop_mode);
                                      SetParameterValue(engine.processor, xfade_param_id, value, {});
                                  });
             }
@@ -397,7 +401,7 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
     }
 
     // drawing
-    if (loop_points_editable) {
+    if (loop_mode_info.editable) {
         auto other_xfade_line = start_line.WithPos(start_line.TopRight() +
                                                    f32x2 {reverse ? loop_xfade_size : -loop_xfade_size, 0});
         if (ping_pong)
@@ -540,7 +544,7 @@ void GUIDoSampleWaveform(Gui* g, LayerProcessor* layer, Rect r) {
         auto const loop_mode =
             layer->params[ToInt(LayerParamIndex::LoopMode)].ValueAsInt<param_values::LoopMode>();
         bool const loop_points_editable =
-            loop_mode == param_values::LoopMode::Standard || loop_mode == param_values::LoopMode::PingPong;
+            GetLoopBehaviourInfo(ActualLoopBehaviour(layer->instrument, loop_mode)).editable;
 
         struct Range {
             f32x2 lo;

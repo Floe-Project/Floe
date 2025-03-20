@@ -144,8 +144,7 @@ static void DoScanFolderJob(PendingLibraryJobs::Job::ScanFolder& job,
             if (ContainsSpan(entry->subpath, k_temporary_directory_prefix)) continue;
             auto const full_path = dir_iterator::FullPath(it, *entry, scratch_arena);
             if (auto format = sample_lib::DetermineFileFormat(full_path))
-                if (ContainsSpan(full_path, "Deep Conjuring"_s))
-                    ReadLibraryAsync(pending_library_jobs, lib_list, String(full_path), *format);
+                ReadLibraryAsync(pending_library_jobs, lib_list, String(full_path), *format);
         }
         return k_success;
     };

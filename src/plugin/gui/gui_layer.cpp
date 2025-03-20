@@ -6,6 +6,7 @@
 #include <IconsFontAwesome5.h>
 
 #include "engine/engine.hpp"
+#include "engine/loop_modes.hpp"
 #include "gui.hpp"
 #include "gui_button_widgets.hpp"
 #include "gui_dragger_widgets.hpp"
@@ -114,7 +115,16 @@ static void DoInstSelectorGUI(Gui* g, Rect r, u32 layer) {
 static void DoLoopModeSelectorGui(Gui* g, Rect r, LayerProcessor& layer) {
     g->imgui.PushID("loop mode selector");
     DEFER { g->imgui.PopID(); };
-    auto& param = layer.params[ToInt(LayerParamIndex::LoopMode)];
+    auto const& param = layer.params[ToInt(LayerParamIndex::LoopMode)];
+    auto const desired_loop_mode = param.ValueAsInt<param_values::LoopMode>();
+
+    auto const actual_loop_behaviour = ActualLoopBehaviour(layer.instrument, desired_loop_mode);
+    auto const actual_loop_bahaviour_info = GetLoopBehaviourInfo(actual_loop_behaviour);
+    auto const default_loop_behaviour =
+        ActualLoopBehaviour(layer.instrument, param_values::LoopMode::InstrumentDefault);
+    auto const default_loop_behaviour_info = GetLoopBehaviourInfo(default_loop_behaviour);
+    DynamicArrayBounded<char, 64> default_mode_str {"Default: "};
+    dyn::AppendSpan(default_mode_str, default_loop_behaviour_info.name);
 
     auto const imgui_id = BeginParameterGUI(g, param, r);
 
@@ -125,32 +135,76 @@ static void DoLoopModeSelectorGui(Gui* g, Rect r, LayerProcessor& layer) {
                        imgui_id,
                        imgui_id + 1,
                        r,
-                       ParamMenuText(param.info.index, param.LinearValue()),
+                       actual_loop_bahaviour_info.name,
                        buttons::ParameterPopupButton(g->imgui, greyed_out))) {
         StartFloeMenu(g);
         DEFER { EndFloeMenu(g); };
         DEFER { g->imgui.EndWindow(); };
 
-        auto const current = param.ValueAsInt<u32>();
-        auto const items = param_values::k_loop_mode_strings;
+        auto items = param_values::k_loop_mode_strings;
+
+        items[ToInt(param_values::LoopMode::InstrumentDefault)] = default_mode_str;
 
         auto const w = MenuItemWidth(g, items);
         auto const h = LiveSize(g->imgui, UiSizeId::MenuItemHeight);
 
         for (auto const i : Range<u32>(items.size)) {
-            bool state = i == current;
+            bool state = i == ToInt(desired_loop_mode);
+            auto const validity = LoopModeIsValid((param_values::LoopMode)i, layer.instrument);
+            Rect const item_rect = {.xywh {0, h * (f32)i, w, h}};
+            auto const item_id = g->imgui.GetID((uintptr)i);
+
             if (buttons::Toggle(g,
-                                g->imgui.GetID((uintptr)i),
-                                {.xywh {0, h * (f32)i, w, h}},
+                                item_id,
+                                item_rect,
                                 state,
-                                items[(usize)i],
-                                buttons::MenuItem(g->imgui, true, true)) &&
-                i != current)
+                                items[i],
+                                buttons::MenuItem(g->imgui, true, !validity.valid)) &&
+                i != ToInt(desired_loop_mode))
                 val = (f32)i;
+
+            {
+                DynamicArray<char> tooltip {g->scratch_arena};
+
+                if (!validity.valid) {
+                    dyn::AppendSpan(tooltip, validity.invalid_reason);
+                    dyn::AppendSpan(tooltip, "\n\n");
+                }
+
+                dyn::AppendSpan(tooltip, LoopModeDescription((param_values::LoopMode)i));
+
+                if (i == ToInt(param_values::LoopMode::InstrumentDefault)) {
+                    fmt::Append(tooltip, "\n\n{}'s default behaviour: \n", layer.InstName());
+                    dyn::AppendSpan(tooltip, default_loop_behaviour_info.description);
+                    if (default_loop_behaviour.reason.size) {
+                        dyn::Append(tooltip, ' ');
+                        dyn::AppendSpan(tooltip, default_loop_behaviour.reason);
+                    }
+                }
+
+                Tooltip(g, item_id, item_rect, tooltip);
+            }
         }
     }
 
-    EndParameterGUI(g, imgui_id, param, r, val, ParamDisplayFlagsDefault);
+    EndParameterGUI(g,
+                    imgui_id,
+                    param,
+                    r,
+                    val,
+                    (ParamDisplayFlags)(ParamDisplayFlagsNoTooltip | ParamDisplayFlagsNoValuePopup));
+
+    Tooltip(
+        g,
+        imgui_id,
+        r,
+        fmt::Format(
+            g->scratch_arena,
+            "{}: {}\nSelect the desired looping mode for this layer's instrument.\n\nCurrent behaviour:\n{} {}",
+            param.info.name,
+            actual_loop_bahaviour_info.name,
+            actual_loop_bahaviour_info.description,
+            actual_loop_behaviour.reason));
 }
 
 static String GetPageTitle(PageType type) {

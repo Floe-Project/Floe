@@ -72,69 +72,104 @@ PUBLIC LoopModeValidResult LoopModeIsValid(param_values::LoopMode mode, Instrume
     return {};
 }
 
+enum class LoopBehaviourId : u8 {
+    NoLoop,
+    BuiltinLoopStandard,
+    BuiltinLoopPingPong,
+    CustomLoopStandard,
+    CustomLoopPingPong,
+    MixedLoops,
+    MixedNonLoopsAndLoops,
+};
+
+enum class BehaviourReason : u8 {
+    Desired,
+    WaveformsAlwaysUseBuiltInLoops,
+    ContainsMixedNonLoopsAndLoops,
+    ContainsNoLoops,
+    DefaultInstrumentBehaviour,
+    SomeRegionsCannotUseStandardLoops,
+    SomeRegionsCannotUsePingPongLoops,
+    ContainsRegionsThatRequireLooping,
+    BuiltinLoopsCannotBeCustomised,
+};
+
 struct LoopBehaviour {
-    enum class Value {
-        NoLoop,
-        BuiltinLoopStandard,
-        BuiltinLoopPingPong,
-        CustomLoopStandard,
-        CustomLoopPingPong,
-        MixedLoops,
-        MixedNonLoopsAndLoops,
-    };
-    Value value;
-    String reason;
+    LoopBehaviourId value;
+    BehaviourReason reason;
 };
 
 struct LoopBehaviourInfo {
     String name;
     String description;
+    String reason;
     bool editable;
 };
 
-PUBLIC LoopBehaviourInfo GetLoopBehaviourInfo(LoopBehaviour l) {
-    switch (l.value) {
-        case LoopBehaviour::Value::NoLoop:
+PUBLIC String BehaviourReasonString(BehaviourReason b) {
+    switch (b) {
+        case BehaviourReason::Desired: return "";
+        case BehaviourReason::WaveformsAlwaysUseBuiltInLoops:
+            return "Waveform instruments always use built-in loops.";
+        case BehaviourReason::ContainsMixedNonLoopsAndLoops:
+            return "Some regions have built-in loops, some don't.";
+        case BehaviourReason::ContainsNoLoops: return "It contains no built-in loops.";
+        case BehaviourReason::DefaultInstrumentBehaviour:
+            return "This is the default behaviour for this instrument.";
+        case BehaviourReason::SomeRegionsCannotUseStandardLoops:
+            return "Some regions cannot use standard wrap-around loops.";
+        case BehaviourReason::SomeRegionsCannotUsePingPongLoops:
+            return "Some regions cannot use ping-pong loops.";
+        case BehaviourReason::ContainsRegionsThatRequireLooping:
+            return "It contains regions that require looping.";
+        case BehaviourReason::BuiltinLoopsCannotBeCustomised:
+            return "Its built-in loops cannot be customised.";
+    }
+}
+
+PUBLIC LoopBehaviourInfo GetLoopBehaviourInfo(LoopBehaviourId l) {
+    switch (l) {
+        case LoopBehaviourId::NoLoop:
             return {
                 .name = "No Loop",
                 .description = "No looping will be applied to this instrument.",
                 .editable = false,
             };
-        case LoopBehaviour::Value::BuiltinLoopStandard:
+        case LoopBehaviourId::BuiltinLoopStandard:
             return {
                 .name = "Built-in Loop - Standard",
                 .description =
                     "Every region in this instrument will use built-in loops in standard wrap-around mode.",
                 .editable = false,
             };
-        case LoopBehaviour::Value::BuiltinLoopPingPong:
+        case LoopBehaviourId::BuiltinLoopPingPong:
             return {
                 .name = "Built-in Loop - Ping-pong",
                 .description = "Every region in this instrument will use built-in loops in ping-pong mode.",
                 .editable = false,
             };
-        case LoopBehaviour::Value::CustomLoopStandard:
+        case LoopBehaviourId::CustomLoopStandard:
             return {
                 .name = "Custom Loop - Standard",
                 .description =
-                    "Custom loop points will be applied to this instrument and use standard wrap-around behaviour.",
+                    "Custom loop points will be applied to this instrument and use standard wrap-around mode.",
                 .editable = true,
             };
-        case LoopBehaviour::Value::CustomLoopPingPong:
+        case LoopBehaviourId::CustomLoopPingPong:
             return {
                 .name = "Custom Loop - Ping-pong",
                 .description =
                     "Custom loop points will be applied to this instrument and use ping-pong mode.",
                 .editable = true,
             };
-        case LoopBehaviour::Value::MixedLoops:
+        case LoopBehaviourId::MixedLoops:
             return {
                 .name = "Mixed Loops",
                 .description =
                     "All regions use built-in loops, but some are standard and some are ping-pong.",
                 .editable = false,
             };
-        case LoopBehaviour::Value::MixedNonLoopsAndLoops:
+        case LoopBehaviourId::MixedNonLoopsAndLoops:
             return {
                 .name = "Mixed Loops and Non-Loops",
                 .description = "Some regions have built-in loops, some don't.",
@@ -144,21 +179,19 @@ PUBLIC LoopBehaviourInfo GetLoopBehaviourInfo(LoopBehaviour l) {
 }
 
 // TODO: lots of duplication in this function.
-// TODO: use enum for 'reason' string and have a lookup table for it.
-
 PUBLIC LoopBehaviour ActualLoopBehaviour(Instrument const& inst, param_values::LoopMode desired_loop_mode) {
     using namespace param_values;
 
     switch (inst.tag) {
         case InstrumentType::None:
             return {
-                LoopBehaviour::Value::NoLoop,
+                LoopBehaviourId::NoLoop,
             };
 
         case InstrumentType::WaveformSynth:
             return {
-                LoopBehaviour::Value::BuiltinLoopStandard,
-                "Waveform instruments always use built-in loops.",
+                LoopBehaviourId::BuiltinLoopStandard,
+                BehaviourReason::WaveformsAlwaysUseBuiltInLoops,
             };
 
         case InstrumentType::Sampler: {
@@ -169,14 +202,14 @@ PUBLIC LoopBehaviour ActualLoopBehaviour(Instrument const& inst, param_values::L
                 case LoopMode::InstrumentDefault: {
                     if (loop_overview.has_loops && loop_overview.has_non_loops)
                         return {
-                            LoopBehaviour::Value::MixedNonLoopsAndLoops,
-                            "Some regions have built-in loops, some don't.",
+                            LoopBehaviourId::MixedNonLoopsAndLoops,
+                            BehaviourReason::ContainsMixedNonLoopsAndLoops,
                         };
 
                     if (loop_overview.has_non_loops)
                         return {
-                            LoopBehaviour::Value::NoLoop,
-                            "It contains no built-in loops.",
+                            LoopBehaviourId::NoLoop,
+                            BehaviourReason::ContainsNoLoops,
                         };
 
                     ASSERT(loop_overview.has_loops);
@@ -185,58 +218,72 @@ PUBLIC LoopBehaviour ActualLoopBehaviour(Instrument const& inst, param_values::L
                         switch (*loop_overview.all_loops_mode) {
                             case sample_lib::Loop::Mode::Standard:
                                 return {
-                                    LoopBehaviour::Value::BuiltinLoopStandard,
-                                    "It contains built-in loops in standard wrap-around mode.",
+                                    LoopBehaviourId::BuiltinLoopStandard,
+                                    BehaviourReason::DefaultInstrumentBehaviour,
                                 };
 
                             case sample_lib::Loop::Mode::PingPong:
                                 return {
-                                    LoopBehaviour::Value::BuiltinLoopPingPong,
-                                    "It contains built-in loops in ping-pong mode.",
+                                    LoopBehaviourId::BuiltinLoopPingPong,
+                                    BehaviourReason::DefaultInstrumentBehaviour,
                                 };
 
                             case sample_lib::Loop::Mode::Count: PanicIfReached(); break;
                         }
                     }
 
-                    return {LoopBehaviour::Value::MixedLoops, "It contains built-in loops in mixed modes."};
+                    return {
+                        LoopBehaviourId::MixedLoops,
+                        BehaviourReason::DefaultInstrumentBehaviour,
+                    };
                 }
 
                 case LoopMode::BuiltInLoopStandard: {
                     if (loop_overview.has_loops && loop_overview.has_non_loops)
                         return {
-                            LoopBehaviour::Value::MixedNonLoopsAndLoops,
-                            "It some regions have built-in loops, some don't.",
+                            LoopBehaviourId::MixedNonLoopsAndLoops,
+                            BehaviourReason::ContainsMixedNonLoopsAndLoops,
                         };
 
                     if (loop_overview.has_non_loops)
-                        return {LoopBehaviour::Value::NoLoop, "It contains no built-in loops."};
+                        return {
+                            LoopBehaviourId::NoLoop,
+                            BehaviourReason::ContainsNoLoops,
+                        };
 
                     ASSERT(loop_overview.has_loops);
 
                     if (loop_overview.all_loops_convertible_to_mode[ToInt(sample_lib::Loop::Mode::Standard)])
-                        return {LoopBehaviour::Value::BuiltinLoopStandard};
+                        return {LoopBehaviourId::BuiltinLoopStandard};
 
-                    return {LoopBehaviour::Value::MixedLoops,
-                            "Some regions cannot use standard wrap-around loops."};
+                    return {
+                        LoopBehaviourId::MixedLoops,
+                        BehaviourReason::SomeRegionsCannotUseStandardLoops,
+                    };
                 }
 
                 case LoopMode::BuiltInLoopPingPong: {
                     if (loop_overview.has_loops && loop_overview.has_non_loops)
                         return {
-                            LoopBehaviour::Value::MixedNonLoopsAndLoops,
-                            "Some regions have built-in loops, some don't.",
+                            LoopBehaviourId::MixedNonLoopsAndLoops,
+                            BehaviourReason::ContainsMixedNonLoopsAndLoops,
                         };
 
                     if (loop_overview.has_non_loops)
-                        return {LoopBehaviour::Value::NoLoop, "It contains no built-in loops."};
+                        return {
+                            LoopBehaviourId::NoLoop,
+                            BehaviourReason::ContainsNoLoops,
+                        };
 
                     ASSERT(loop_overview.has_loops);
 
                     if (loop_overview.all_loops_convertible_to_mode[ToInt(sample_lib::Loop::Mode::PingPong)])
-                        return {LoopBehaviour::Value::BuiltinLoopPingPong};
+                        return {LoopBehaviourId::BuiltinLoopPingPong};
 
-                    return {LoopBehaviour::Value::MixedLoops, "Some regions cannot use ping-pong loops."};
+                    return {
+                        LoopBehaviourId::MixedLoops,
+                        BehaviourReason::SomeRegionsCannotUsePingPongLoops,
+                    };
                 }
 
                 case LoopMode::None: {
@@ -245,39 +292,41 @@ PUBLIC LoopBehaviour ActualLoopBehaviour(Instrument const& inst, param_values::L
                             switch (*loop_overview.all_loops_mode) {
                                 case sample_lib::Loop::Mode::Standard:
                                     return {
-                                        LoopBehaviour::Value::BuiltinLoopStandard,
-                                        "It contains regions that require looping.",
+                                        LoopBehaviourId::BuiltinLoopStandard,
+                                        BehaviourReason::ContainsRegionsThatRequireLooping,
                                     };
 
                                 case sample_lib::Loop::Mode::PingPong:
                                     return {
-                                        LoopBehaviour::Value::BuiltinLoopPingPong,
-                                        "It contains regions that require looping.",
+                                        LoopBehaviourId::BuiltinLoopPingPong,
+                                        BehaviourReason::ContainsRegionsThatRequireLooping,
                                     };
 
                                 case sample_lib::Loop::Mode::Count: PanicIfReached(); break;
                             }
                         }
 
-                        return {LoopBehaviour::Value::MixedLoops,
-                                "It contains regions that require looping."};
+                        return {
+                            LoopBehaviourId::MixedLoops,
+                            BehaviourReason::ContainsRegionsThatRequireLooping,
+                        };
                     }
 
-                    return {LoopBehaviour::Value::NoLoop};
+                    return {LoopBehaviourId::NoLoop};
                 }
 
                 case LoopMode::Standard: {
                     if (!loop_overview.user_defined_loops_allowed) {
                         if (loop_overview.has_loops && loop_overview.has_non_loops)
                             return {
-                                LoopBehaviour::Value::MixedNonLoopsAndLoops,
-                                "Its built-in loops cannot be customised.",
+                                LoopBehaviourId::MixedNonLoopsAndLoops,
+                                BehaviourReason::BuiltinLoopsCannotBeCustomised,
                             };
 
                         if (loop_overview.has_non_loops && !loop_overview.all_regions_require_looping)
                             return {
-                                LoopBehaviour::Value::NoLoop,
-                                "Its built-in loops cannot be customised, only disabled.",
+                                LoopBehaviourId::NoLoop,
+                                BehaviourReason::BuiltinLoopsCannotBeCustomised,
                             };
 
                         ASSERT(loop_overview.has_loops);
@@ -286,14 +335,14 @@ PUBLIC LoopBehaviour ActualLoopBehaviour(Instrument const& inst, param_values::L
                             switch (*loop_overview.all_loops_mode) {
                                 case sample_lib::Loop::Mode::Standard:
                                     return {
-                                        LoopBehaviour::Value::BuiltinLoopStandard,
-                                        "Its built-in loops cannot be customised.",
+                                        LoopBehaviourId::BuiltinLoopStandard,
+                                        BehaviourReason::BuiltinLoopsCannotBeCustomised,
                                     };
 
                                 case sample_lib::Loop::Mode::PingPong:
                                     return {
-                                        LoopBehaviour::Value::BuiltinLoopPingPong,
-                                        "Its built-in loops cannot be customised.",
+                                        LoopBehaviourId::BuiltinLoopPingPong,
+                                        BehaviourReason::BuiltinLoopsCannotBeCustomised,
                                     };
 
                                 case sample_lib::Loop::Mode::Count: PanicIfReached(); break;
@@ -301,25 +350,25 @@ PUBLIC LoopBehaviour ActualLoopBehaviour(Instrument const& inst, param_values::L
                         }
 
                         return {
-                            LoopBehaviour::Value::MixedLoops,
-                            "Its built-in loops cannot be customised.",
+                            LoopBehaviourId::MixedLoops,
+                            BehaviourReason::BuiltinLoopsCannotBeCustomised,
                         };
                     }
 
-                    return {LoopBehaviour::Value::CustomLoopStandard};
+                    return {LoopBehaviourId::CustomLoopStandard};
                 }
                 case LoopMode::PingPong: {
                     if (!loop_overview.user_defined_loops_allowed) {
                         if (loop_overview.has_loops && loop_overview.has_non_loops)
                             return {
-                                LoopBehaviour::Value::MixedNonLoopsAndLoops,
-                                "Its built-in loops cannot be customised.",
+                                LoopBehaviourId::MixedNonLoopsAndLoops,
+                                BehaviourReason::BuiltinLoopsCannotBeCustomised,
                             };
 
                         if (loop_overview.has_non_loops && !loop_overview.all_regions_require_looping)
                             return {
-                                LoopBehaviour::Value::NoLoop,
-                                "Its built-in loops cannot be customised, only disabled.",
+                                LoopBehaviourId::NoLoop,
+                                BehaviourReason::BuiltinLoopsCannotBeCustomised,
                             };
 
                         ASSERT(loop_overview.has_loops);
@@ -328,14 +377,14 @@ PUBLIC LoopBehaviour ActualLoopBehaviour(Instrument const& inst, param_values::L
                             switch (*loop_overview.all_loops_mode) {
                                 case sample_lib::Loop::Mode::Standard:
                                     return {
-                                        LoopBehaviour::Value::BuiltinLoopStandard,
-                                        "Its built-in loops cannot be customised.",
+                                        LoopBehaviourId::BuiltinLoopStandard,
+                                        BehaviourReason::BuiltinLoopsCannotBeCustomised,
                                     };
 
                                 case sample_lib::Loop::Mode::PingPong:
                                     return {
-                                        LoopBehaviour::Value::BuiltinLoopPingPong,
-                                        "Its built-in loops cannot be customised.",
+                                        LoopBehaviourId::BuiltinLoopPingPong,
+                                        BehaviourReason::BuiltinLoopsCannotBeCustomised,
                                     };
 
                                 case sample_lib::Loop::Mode::Count: PanicIfReached(); break;
@@ -343,12 +392,12 @@ PUBLIC LoopBehaviour ActualLoopBehaviour(Instrument const& inst, param_values::L
                         }
 
                         return {
-                            LoopBehaviour::Value::MixedLoops,
-                            "Its built-in loops cannot be customised.",
+                            LoopBehaviourId::MixedLoops,
+                            BehaviourReason::BuiltinLoopsCannotBeCustomised,
                         };
                     }
 
-                    return {LoopBehaviour::Value::CustomLoopPingPong};
+                    return {LoopBehaviourId::CustomLoopPingPong};
                 }
 
                 case LoopMode::Count: break;
@@ -370,7 +419,7 @@ PUBLIC String LoopModeDescription(param_values::LoopMode mode) {
             return "Let the instrument decide which regions loop, but request ping-pong looping mode where possible";
         case param_values::LoopMode::None: return "No looping will be applied to this instrument";
         case param_values::LoopMode::Standard:
-            return "Set custom loop points for the instrument, using standard wrap-around behaviour";
+            return "Set custom loop points for the instrument, using standard wrap-around mode";
         case param_values::LoopMode::PingPong:
             return "Set custom loop points for the instrument, using ping-pong mode";
         case param_values::LoopMode::Count: break;

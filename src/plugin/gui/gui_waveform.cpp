@@ -33,8 +33,8 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
     auto const desired_loop_mode =
         layer->params[ToInt(LayerParamIndex::LoopMode)].ValueAsInt<param_values::LoopMode>();
     auto const loop_mode = ActualLoopBehaviour(layer->instrument, desired_loop_mode);
-    auto const loop_mode_info = GetLoopBehaviourInfo(loop_mode);
-    bool const ping_pong = loop_mode.value == LoopBehaviour::Value::CustomLoopPingPong;
+    auto const loop_mode_info = GetLoopBehaviourInfo(loop_mode.value);
+    bool const ping_pong = loop_mode.value == LoopBehaviourId::CustomLoopPingPong;
 
     auto const extra_grabbing_room_x = handle_width;
     auto const extra_grabbing_room_towards_centre = r.h / 3;
@@ -544,7 +544,7 @@ void GUIDoSampleWaveform(Gui* g, LayerProcessor* layer, Rect r) {
         auto const loop_mode =
             layer->params[ToInt(LayerParamIndex::LoopMode)].ValueAsInt<param_values::LoopMode>();
         bool const loop_points_editable =
-            GetLoopBehaviourInfo(ActualLoopBehaviour(layer->instrument, loop_mode)).editable;
+            GetLoopBehaviourInfo(ActualLoopBehaviour(layer->instrument, loop_mode).value).editable;
 
         struct Range {
             f32x2 lo;

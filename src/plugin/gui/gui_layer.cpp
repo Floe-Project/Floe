@@ -119,10 +119,10 @@ static void DoLoopModeSelectorGui(Gui* g, Rect r, LayerProcessor& layer) {
     auto const desired_loop_mode = param.ValueAsInt<param_values::LoopMode>();
 
     auto const actual_loop_behaviour = ActualLoopBehaviour(layer.instrument, desired_loop_mode);
-    auto const actual_loop_bahaviour_info = GetLoopBehaviourInfo(actual_loop_behaviour);
+    auto const actual_loop_bahaviour_info = GetLoopBehaviourInfo(actual_loop_behaviour.value);
     auto const default_loop_behaviour =
         ActualLoopBehaviour(layer.instrument, param_values::LoopMode::InstrumentDefault);
-    auto const default_loop_behaviour_info = GetLoopBehaviourInfo(default_loop_behaviour);
+    auto const default_loop_behaviour_info = GetLoopBehaviourInfo(default_loop_behaviour.value);
     DynamicArrayBounded<char, 64> default_mode_str {"Default: "};
     dyn::AppendSpan(default_mode_str, default_loop_behaviour_info.name);
 
@@ -176,9 +176,10 @@ static void DoLoopModeSelectorGui(Gui* g, Rect r, LayerProcessor& layer) {
                 if (i == ToInt(param_values::LoopMode::InstrumentDefault)) {
                     fmt::Append(tooltip, "\n\n{}'s default behaviour: \n", layer.InstName());
                     dyn::AppendSpan(tooltip, default_loop_behaviour_info.description);
-                    if (default_loop_behaviour.reason.size) {
+                    if (auto const reason = BehaviourReasonString(default_loop_behaviour.reason);
+                        reason.size) {
                         dyn::Append(tooltip, ' ');
-                        dyn::AppendSpan(tooltip, default_loop_behaviour.reason);
+                        dyn::AppendSpan(tooltip, reason);
                     }
                 }
 
@@ -194,17 +195,15 @@ static void DoLoopModeSelectorGui(Gui* g, Rect r, LayerProcessor& layer) {
                     val,
                     (ParamDisplayFlags)(ParamDisplayFlagsNoTooltip | ParamDisplayFlagsNoValuePopup));
 
-    Tooltip(
-        g,
-        imgui_id,
-        r,
-        fmt::Format(
-            g->scratch_arena,
-            "{}: {}\nSelect the desired looping mode for this layer's instrument.\n\nCurrent behaviour:\n{} {}",
-            param.info.name,
-            actual_loop_bahaviour_info.name,
-            actual_loop_bahaviour_info.description,
-            actual_loop_behaviour.reason));
+    Tooltip(g,
+            imgui_id,
+            r,
+            fmt::Format(g->scratch_arena,
+                        "{}: {}\n\n{} {}",
+                        param.info.name,
+                        actual_loop_bahaviour_info.name,
+                        actual_loop_bahaviour_info.description,
+                        BehaviourReasonString(actual_loop_behaviour.reason)));
 }
 
 static String GetPageTitle(PageType type) {

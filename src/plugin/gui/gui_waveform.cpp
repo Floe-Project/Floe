@@ -33,7 +33,7 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
         layer->params[ToInt(LayerParamIndex::LoopMode)].ValueAsInt<param_values::LoopMode>();
     auto const ping_pong = loop_mode == param_values::LoopMode::PingPong;
     bool const loop_points_editable =
-        loop_mode == param_values::LoopMode::Regular || loop_mode == param_values::LoopMode::PingPong;
+        loop_mode == param_values::LoopMode::Standard || loop_mode == param_values::LoopMode::PingPong;
 
     auto const extra_grabbing_room_x = handle_width;
     auto const extra_grabbing_room_towards_centre = r.h / 3;
@@ -540,7 +540,7 @@ void GUIDoSampleWaveform(Gui* g, LayerProcessor* layer, Rect r) {
         auto const loop_mode =
             layer->params[ToInt(LayerParamIndex::LoopMode)].ValueAsInt<param_values::LoopMode>();
         bool const loop_points_editable =
-            loop_mode == param_values::LoopMode::Regular || loop_mode == param_values::LoopMode::PingPong;
+            loop_mode == param_values::LoopMode::Standard || loop_mode == param_values::LoopMode::PingPong;
 
         struct Range {
             f32x2 lo;

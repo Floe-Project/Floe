@@ -206,40 +206,65 @@ static f32 GetXFadeAmp(f32 xfade_position_01, int xfade_layer_index) {
     }
 }
 
+static Optional<BoundsCheckedLoop> ConfigureLoop(param_values::LoopMode desired_mode,
+                                                 Optional<sample_lib::Loop> const& region_loop,
+                                                 u32 num_frames,
+                                                 VoiceProcessingController::Loop const& custom_loop) {
+    if (region_loop) {
+        auto result = CreateBoundsCheckedLoop(*region_loop, num_frames);
+
+        if (region_loop->disallow_disabling_loop || desired_mode == param_values::LoopMode::InstrumentDefault)
+            return result;
+
+        if (desired_mode == param_values::LoopMode::BuiltInStandardLoop) {
+            if (!region_loop->disallow_changing_ping_pong) result.ping_pong = false;
+            return result;
+        }
+
+        if (desired_mode == param_values::LoopMode::BuiltInPingPong) {
+            if (!region_loop->disallow_changing_ping_pong) result.ping_pong = true;
+            return result;
+        }
+
+        if (region_loop->disallow_changing_loop_points) return result;
+    }
+
+    switch (desired_mode) {
+        case param_values::LoopMode::InstrumentDefault:
+        case param_values::LoopMode::BuiltInStandardLoop:
+        case param_values::LoopMode::BuiltInPingPong: return k_nullopt;
+        case param_values::LoopMode::None: return k_nullopt;
+        case param_values::LoopMode::Standard:
+        case param_values::LoopMode::PingPong: {
+            auto const n = (f32)num_frames;
+
+            return CreateBoundsCheckedLoop(
+                {
+                    .start_frame = (s64)(custom_loop.start * n),
+                    .end_frame = (s64)(custom_loop.end * n),
+                    .crossfade_frames = (u32)(custom_loop.crossfade_size * n),
+                    .ping_pong = (desired_mode == param_values::LoopMode::PingPong),
+                },
+                num_frames);
+
+            break;
+        }
+        case param_values::LoopMode::Count: break;
+    }
+
+    return k_nullopt;
+}
+
 void UpdateLoopInfo(Voice& v) {
     for (auto& s : v.voice_samples) {
         if (!s.is_active) continue;
         if (s.generator != InstrumentType::Sampler) continue;
         auto& sampler = s.sampler;
 
-        auto const mode = v.controller->loop_mode;
-        switch (mode) {
-            case param_values::LoopMode::InstrumentDefault: {
-                if (sampler.region->file.loop) {
-                    sampler.loop =
-                        CreateBoundsCheckedLoop(*sampler.region->file.loop, sampler.data->num_frames);
-                } else
-                    sampler.loop = k_nullopt;
-                break;
-            }
-            case param_values::LoopMode::None: sampler.loop = k_nullopt; break;
-            case param_values::LoopMode::Regular:
-            case param_values::LoopMode::PingPong: {
-                auto const n = (f32)sampler.data->num_frames;
-
-                sampler.loop = CreateBoundsCheckedLoop(
-                    {
-                        .start_frame = (s64)(v.controller->loop.start * n),
-                        .end_frame = (s64)(v.controller->loop.end * n),
-                        .crossfade_frames = (u32)(v.controller->loop.crossfade_size * n),
-                        .ping_pong = (mode == param_values::LoopMode::PingPong),
-                    },
-                    sampler.data->num_frames);
-
-                break;
-            }
-            case param_values::LoopMode::Count: break;
-        }
+        sampler.loop = ConfigureLoop(v.controller->loop_mode,
+                                     sampler.region->file.loop,
+                                     sampler.data->num_frames,
+                                     v.controller->loop);
 
         sampler.loop_and_reverse_flags = 0;
         if (v.controller->reverse) sampler.loop_and_reverse_flags = loop_and_reverse_flags::CurrentlyReversed;

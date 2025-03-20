@@ -238,16 +238,20 @@ static_assert(k_eq_type_strings.size == ToInt(EqType::Count));
 
 enum class LoopMode : u8 {
     InstrumentDefault,
+    BuiltInStandardLoop,
+    BuiltInPingPong,
     None,
-    Regular,
+    Standard,
     PingPong,
     Count,
 };
 constexpr auto k_loop_mode_strings = ArrayT<String>({
-    "Instrument Default",
+    "Default",
+    "Built-in Standard Loop",
+    "Built-in Standard Ping-Pong",
     "None",
-    "Loop",
-    "Ping-Pong",
+    "Custom Standard Loop",
+    "Custom Ping-Pong Loop",
 });
 static_assert(k_loop_mode_strings.size == ToInt(LoopMode::Count));
 

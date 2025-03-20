@@ -48,6 +48,9 @@ struct Loop {
     s64 end_frame {};
     u32 crossfade_frames {};
     bool ping_pong {};
+    bool disallow_changing_loop_points {};
+    bool disallow_changing_ping_pong {};
+    bool disallow_disabling_loop {};
 };
 
 struct Region {

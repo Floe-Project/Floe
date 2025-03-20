@@ -1,5 +1,5 @@
-// Copyright 2018-2024 Sam Windell
-// SPDX-License-Identifier: GPL-3.0-or-later
+// fCopyright 2018-2024 Sam Windell
+//  SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "sample_library_server.hpp"
 
@@ -144,7 +144,8 @@ static void DoScanFolderJob(PendingLibraryJobs::Job::ScanFolder& job,
             if (ContainsSpan(entry->subpath, k_temporary_directory_prefix)) continue;
             auto const full_path = dir_iterator::FullPath(it, *entry, scratch_arena);
             if (auto format = sample_lib::DetermineFileFormat(full_path))
-                ReadLibraryAsync(pending_library_jobs, lib_list, String(full_path), *format);
+                if (ContainsSpan(full_path, "Deep Conjuring"_s))
+                    ReadLibraryAsync(pending_library_jobs, lib_list, String(full_path), *format);
         }
         return k_success;
     };

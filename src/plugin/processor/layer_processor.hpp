@@ -124,11 +124,12 @@ struct VoiceProcessingController {
         f32 time_hz;
     } lfo {};
 
-    struct {
+    struct Loop {
         f32 start;
         f32 end;
         f32 crossfade_size;
-    } loop {};
+    };
+    Loop loop {};
 
     f32 tune = 1;
     FloeSmoothedValueSystem::FloatId const pan_pos_smoother_id; // -1 to 1

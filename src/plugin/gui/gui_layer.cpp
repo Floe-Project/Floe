@@ -31,9 +31,6 @@ static void LayerInstrumentMenuItems(Gui* g, LayerProcessor* layer) {
                                                         g->scratch_arena);
     DEFER { sample_lib_server::ReleaseAll(libs); };
 
-    StartFloeMenu(g);
-    DEFER { EndFloeMenu(g); };
-
     // TODO(1.0): this is not production-ready code. We need a new powerful database-like browser GUI
     int current = 0;
     DynamicArray<String> insts {g->scratch_arena};
@@ -112,6 +109,48 @@ static void DoInstSelectorGUI(Gui* g, Rect r, u32 layer) {
                             "Instrument: {}\nChange or remove the instrument for this layer",
                             inst_name));
     }
+}
+
+static void DoLoopModeSelectorGui(Gui* g, Rect r, LayerProcessor& layer) {
+    g->imgui.PushID("loop mode selector");
+    DEFER { g->imgui.PopID(); };
+    auto& param = layer.params[ToInt(LayerParamIndex::LoopMode)];
+
+    auto const imgui_id = BeginParameterGUI(g, param, r);
+
+    bool greyed_out = false;
+    Optional<f32> val {};
+
+    if (buttons::Popup(g,
+                       imgui_id,
+                       imgui_id + 1,
+                       r,
+                       ParamMenuText(param.info.index, param.LinearValue()),
+                       buttons::ParameterPopupButton(g->imgui, greyed_out))) {
+        StartFloeMenu(g);
+        DEFER { EndFloeMenu(g); };
+        DEFER { g->imgui.EndWindow(); };
+
+        auto const current = param.ValueAsInt<u32>();
+        auto const items = param_values::k_loop_mode_strings;
+
+        auto const w = MenuItemWidth(g, items);
+        auto const h = LiveSize(g->imgui, UiSizeId::MenuItemHeight);
+
+        for (auto const i : Range<u32>(items.size)) {
+            bool state = i == current;
+            if (buttons::Toggle(g,
+                                g->imgui.GetID((uintptr)i),
+                                {.xywh {0, h * (f32)i, w, h}},
+                                state,
+                                items[(usize)i],
+                                buttons::MenuItem(g->imgui, true, true)) &&
+                i != current)
+                val = (f32)i;
+        }
+    }
+
+    EndParameterGUI(g, imgui_id, param, r, val, ParamDisplayFlagsDefault);
 }
 
 static String GetPageTitle(PageType type) {
@@ -878,10 +917,7 @@ void Draw(Gui* g,
                                 c.main.reverse,
                                 buttons::ParameterToggleButton(g->imgui, {}, greyed_out));
 
-                buttons::PopupWithItems(g,
-                                        layer->params[ToInt(LayerParamIndex::LoopMode)],
-                                        c.main.loop_mode,
-                                        buttons::ParameterPopupButton(g->imgui, greyed_out));
+                DoLoopModeSelectorGui(g, layout::GetRect(g->layout, c.main.loop_mode), *layer);
             }
 
             draw_divider(c.main.divider);

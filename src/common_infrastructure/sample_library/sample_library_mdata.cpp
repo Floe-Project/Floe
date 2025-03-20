@@ -359,14 +359,28 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
                                 constexpr bool k_ping_pong = false; // MDATA didn't allow ping pong loops
                                 if (region_info.looping_mode == mdata::SampleLoopingModeAlwaysLoopAnyRegion ||
                                     region_info.looping_mode == mdata::SampleLoopingModeAlwaysLoopSetRegion) {
-                                    l = Loop {.start_frame = region_info.loop_start,
-                                              .end_frame = region_info.loop_end,
-                                              .crossfade_frames =
-                                                  CheckedCast<u32>(region_info.loop_crossfade),
-                                              .ping_pong = k_ping_pong};
+                                    l = Loop {
+                                        .start_frame = region_info.loop_start,
+                                        .end_frame = region_info.loop_end,
+                                        .crossfade_frames = CheckedCast<u32>(region_info.loop_crossfade),
+                                        .ping_pong = k_ping_pong,
+                                        .disallow_changing_loop_points =
+                                            region_info.looping_mode ==
+                                            mdata::SampleLoopingModeAlwaysLoopSetRegion,
+                                        .disallow_changing_ping_pong = false,
+                                        .disallow_disabling_loop = true,
+                                    };
                                 } else if (region_info.looping_mode ==
                                            mdata::SampleLoopingModeAlwaysLoopWholeRegion)
-                                    l = Loop {0, file_info.num_frames, 0, k_ping_pong};
+                                    l = Loop {
+                                        .start_frame = 0,
+                                        .end_frame = file_info.num_frames,
+                                        .crossfade_frames = 0,
+                                        .ping_pong = k_ping_pong,
+                                        .disallow_changing_loop_points = true,
+                                        .disallow_changing_ping_pong = false,
+                                        .disallow_disabling_loop = true,
+                                    };
                                 l;
                             }),
                         },

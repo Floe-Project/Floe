@@ -14,6 +14,8 @@ For instance: 0.0.1. Don't change the headings.
 - Fix layer filter type menu being the incorrect width
 - Fix incorrect loading of Mirage on/off switches - resulting in parameters being on when they should be off
 - Improve sound matching when loading Mirage presets
+- Fix failure loading some FrozenPlain Squeaky Gate instruments
+- Fix crash when loop points were very close together
 
 ## 0.0.6-alpha
 - Add VST3 support

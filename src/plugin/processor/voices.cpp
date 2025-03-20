@@ -281,10 +281,11 @@ void UpdateLoopInfo(Voice& v) {
         if (s.generator != InstrumentType::Sampler) continue;
         auto& sampler = s.sampler;
 
-        sampler.loop = ConfigureLoop(v.controller->loop_mode,
-                                     sampler.region->file.loop,
-                                     sampler.data->num_frames,
-                                     v.controller->loop);
+        sampler.loop = v.controller->vol_env_on ? ConfigureLoop(v.controller->loop_mode,
+                                                                sampler.region->file,
+                                                                sampler.data->num_frames,
+                                                                v.controller->loop)
+                                                : k_nullopt;
 
         sampler.loop_and_reverse_flags = 0;
         if (v.controller->reverse) sampler.loop_and_reverse_flags = loop_and_reverse_flags::CurrentlyReversed;
@@ -366,6 +367,7 @@ void StartVoice(VoicePool& pool,
                 s.amp = s_params.amp * (f32)DbToAmpApprox((f64)s_params.region.options.volume_db);
                 s.sampler.region = &s_params.region;
                 s.sampler.data = &s_params.audio_data;
+                s.sampler.loop = {};
                 ASSERT(s.sampler.data != nullptr);
 
                 voice.smoothing_system.HardSet(s.pitch_ratio_smoother_id,

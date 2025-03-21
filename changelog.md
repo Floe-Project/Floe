@@ -17,10 +17,12 @@ For instance: 0.0.1. Don't change the headings.
 - Improve sound matching when loading Mirage presets
 - Fix failure loading some FrozenPlain Squeaky Gate instruments
 - Fix crash when loop points were very close together
-- Lua: sample library region loops now are custom tables with `start_frame`, `end_frame`, `crossfade` and `mode` fields instead of an array.
-- Lua: add `always_loop` and `never_loop` fields to sample library regions allowing for more control over custom loop usage on Floe's GUI.
+- Library creation: re-organise the fields for add_region - grouping better into correct sections and allowing for easier expansion in the future.
+- Library creation: sample library region loops now are custom tables with `start_frame`, `end_frame`, `crossfade` and `mode` fields instead of an array.
+- Library creation: add `always_loop` and `never_loop` fields to sample library regions allowing for more control over custom loop usage on Floe's GUI.
+- Library creation: show an error if there's more than 2 velocity layers that are using 'feathering' mode. We don't support this yet.
 - Improve loop modes on GUI: it's obvious when a loop is built-in or custom, what modes are available for a given instrument, why loop modes are invalid.
-- Show the instrument type on the GUI: single sample, multisample, oscillator waveform
+- Show the instrument type on the GUI: single sample, multisample or oscillator waveform
 
 ## 0.0.6-alpha
 - Add VST3 support

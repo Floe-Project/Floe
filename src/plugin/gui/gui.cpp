@@ -578,7 +578,7 @@ GuiFrameResult GuiUpdate(Gui* g) {
         imgui.EndWindow();
     }
 
-    if (prefs::GetBool(g->prefs, SettingDescriptor(GuiSetting::ShowKeyboard))) {
+    if (prefs::GetBool(g->prefs, SettingDescriptor(GuiSetting::ShowKeyboard)) && bot_h > 1) {
         auto bot_settings = imgui::DefWindow();
         bot_settings.pad_top_left = {8, 8};
         bot_settings.pad_bottom_right = {8, 8};

@@ -13,7 +13,11 @@ For instance: 0.0.1. Don't change the headings.
 - Fix missing code signing on Windows installer resulting in 'Unknown Publisher' warning
 - Fix layer filter type menu being the incorrect width
 - Fix incorrect loading of Mirage on/off switches - resulting in parameters being on when they should be off
+- Fix incorrect handling of Mirage's 'always loop' instruments
 - Improve sound matching when loading Mirage presets
+- Lua: sample library region loops now are custom tables with `start_frame`, `end_frame`, `crossfade` and `mode` fields instead of an array.
+- Lua: add `always_loop` and `never_loop` fields to sample library regions allowing for more control over custom loop usage on Floe's GUI.
+- Improve loop modes on GUI: it's obvious when a loop is built-in or custom, what modes are available for a given instrument, why loop modes are invalid.
 
 ## 0.0.6-alpha
 - Add VST3 support

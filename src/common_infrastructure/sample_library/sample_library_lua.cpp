@@ -375,8 +375,9 @@ struct TableFields<Loop> {
             case Field::Mode:
                 return {
                     .name = "mode",
-                    .description_sentence = "The mode of the loop. Can be 'standard', 'ping_pong'.",
-                    .example = "forward",
+                    .description_sentence = "The mode of the loop.",
+                    .example = FromNullTerminated(k_loop_mode_names[ToInt(Loop::Mode::Standard)]),
+                    .default_value = FromNullTerminated(k_loop_mode_names[ToInt(Loop::Mode::Standard)]),
                     .lua_type = LUA_TSTRING,
                     .required = false,
                     .enum_options = k_loop_mode_names,
@@ -448,7 +449,6 @@ struct TableFields<Region::File> {
                 return {
                     .name = "loop",
                     .description_sentence = "The region of the file that can be looped.",
-                    .default_value = "no loop",
                     .lua_type = LUA_TTABLE,
                     .subtype = InterpretedTypes::Loop,
                     .required = false,
@@ -2074,7 +2074,12 @@ TEST_CASE(TestBasicFile) {
     local file = {
         path = "foo/file.flac",   -- path relative to this file
         root_key = 10,            -- MIDI note number
-        loop = { 3000, 9000, 2, false }, -- start, end, xfade, or can be nil
+        loop = { 
+            start_frame = 3000, 
+            end_frame = 9000, 
+            crossfade = 2, 
+            mode = 'standard',
+        },
     }
     local proto = {
         trigger_criteria = {},

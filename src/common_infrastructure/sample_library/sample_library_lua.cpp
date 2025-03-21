@@ -341,7 +341,7 @@ struct TableFields<Loop> {
         switch (f) {
             case Field::Start:
                 return {
-                    .name = "start",
+                    .name = "start_frame",
                     .description_sentence =
                         "The start of the loop in frames. Inclusive. It can be negative meaning index the file from the end rather than the start. For example, -1 == number_frames_in_file, -2 == (number_frames_in_file - 1), etc.",
                     .example = "24",
@@ -352,7 +352,7 @@ struct TableFields<Loop> {
                 };
             case Field::End:
                 return {
-                    .name = "end",
+                    .name = "end_frame",
                     .description_sentence =
                         "The end of the loop in frames. Exclusive. It can be negative meaning index the file from the end rather than the start. For example, -1 == number_frames_in_file, -2 == (number_frames_in_file - 1), etc.",
                     .example = "6600",

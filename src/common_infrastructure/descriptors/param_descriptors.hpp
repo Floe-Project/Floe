@@ -236,7 +236,7 @@ constexpr auto k_eq_type_strings = ArrayT<String>({
 });
 static_assert(k_eq_type_strings.size == ToInt(EqType::Count));
 
-enum class LoopMode : u8 {
+enum class LoopMode : u8 { // never reorder
     InstrumentDefault,
     BuiltInLoopStandard,
     BuiltInLoopPingPong,

@@ -354,6 +354,13 @@ PUBLIC constexpr bool ContainsOnly(ContiguousContainer auto const& data, auto&& 
     return true;
 }
 
+PUBLIC constexpr auto Sum(ContiguousContainer auto const& data) {
+    auto sum = data[0];
+    for (auto const i : Range<usize>(1, data.size))
+        sum += data[i];
+    return sum;
+}
+
 PUBLIC constexpr Optional<usize> FindLast(ContiguousContainer auto const& data, auto&& search_item) {
     for (usize i = data.size - 1; i != usize(-1); --i)
         if (data[i] == search_item) return i;

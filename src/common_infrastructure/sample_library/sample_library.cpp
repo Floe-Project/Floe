@@ -58,18 +58,16 @@ void PostReadBookkeeping(Library& lib) {
 
         inst.loop_overview.all_regions_require_looping = true;
 
-        for (auto const i : ::Range(ToInt(Loop::Mode::Count))) {
+        for (auto const i : ::Range(ToInt(Loop::Mode::Count)))
             inst.loop_overview.all_loops_convertible_to_mode[i] = true;
-            inst.loop_overview.has_loops_convertible_to_mode[i] = false;
-        }
 
-        usize num_loops_with_locked_loop_points = 0;
         Array<usize, ToInt(Loop::Mode::Count)> num_loops_per_mode {};
-        usize num_loops = 0;
+        Array<usize, ToInt(Loop::Mode::Count)> num_loops_per_mode_with_locked_points {};
+
+        bool all_regions_never_loop = true;
 
         for (auto& region : inst.regions) {
             if (auto const& l = region.file.loop) {
-                ++num_loops;
                 ++num_loops_per_mode[ToInt(l->mode)];
 
                 if (l->lock_mode) {
@@ -77,19 +75,19 @@ void PostReadBookkeeping(Library& lib) {
                     // all_loops_convertible_to_mode array should be false.
                     for (auto const i : ::Range(ToInt(Loop::Mode::Count)))
                         if (i != ToInt(l->mode)) inst.loop_overview.all_loops_convertible_to_mode[i] = false;
-                } else {
-                    // This loop mode is unlocked, therefore all other modes in the
-                    // has_loops_convertible_to_mode array should be true.
-                    for (auto const i : ::Range(ToInt(Loop::Mode::Count)))
-                        if (i != ToInt(l->mode)) inst.loop_overview.has_loops_convertible_to_mode[i] = true;
                 }
-                inst.loop_overview.has_loops_convertible_to_mode[ToInt(l->mode)] = true;
 
-                if (l->lock_loop_points) ++num_loops_with_locked_loop_points;
+                if (l->lock_loop_points) ++num_loops_per_mode_with_locked_points[ToInt(l->mode)];
             }
 
             if (!region.file.always_loop) inst.loop_overview.all_regions_require_looping = false;
+            if (!region.file.never_loop) all_regions_never_loop = false;
         }
+
+        auto const num_loops = Sum(num_loops_per_mode);
+
+        if (num_loops) inst.loop_overview.has_loops = true;
+        if (num_loops != inst.regions.size) inst.loop_overview.has_non_loops = true;
 
         inst.loop_overview.all_loops_mode = k_nullopt;
         for (auto const i : ::Range(ToInt(Loop::Mode::Count))) {
@@ -99,14 +97,17 @@ void PostReadBookkeeping(Library& lib) {
             }
         }
 
-        if (num_loops) inst.loop_overview.has_loops = true;
+        {
+            inst.loop_overview.user_defined_loops_allowed = true;
 
-        if (num_loops != inst.regions.size) inst.loop_overview.has_non_loops = true;
+            // If all regions have loops, and they all have locked loop points, then user-defined loops are
+            // not allowed.
+            if (num_loops && Sum(num_loops_per_mode_with_locked_points) == num_loops)
+                inst.loop_overview.user_defined_loops_allowed = false;
 
-        inst.loop_overview.user_defined_loops_allowed = true;
-        if (num_loops && num_loops_with_locked_loop_points == num_loops)
-            // If all the loops are locked, then user-defined loops won't be allowed.
-            inst.loop_overview.user_defined_loops_allowed = false;
+            // If all regions never loop, then user-defined loops are not allowed.
+            if (all_regions_never_loop) inst.loop_overview.user_defined_loops_allowed = false;
+        }
     }
 }
 

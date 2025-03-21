@@ -119,12 +119,10 @@ static void DoLoopModeSelectorGui(Gui* g, Rect r, LayerProcessor& layer) {
     auto const desired_loop_mode = param.ValueAsInt<param_values::LoopMode>();
 
     auto const actual_loop_behaviour = ActualLoopBehaviour(layer.instrument, desired_loop_mode);
-    auto const actual_loop_bahaviour_info = GetLoopBehaviourInfo(actual_loop_behaviour.value);
     auto const default_loop_behaviour =
         ActualLoopBehaviour(layer.instrument, param_values::LoopMode::InstrumentDefault);
-    auto const default_loop_behaviour_info = GetLoopBehaviourInfo(default_loop_behaviour.value);
     DynamicArrayBounded<char, 64> default_mode_str {"Default: "};
-    dyn::AppendSpan(default_mode_str, default_loop_behaviour_info.name);
+    dyn::AppendSpan(default_mode_str, default_loop_behaviour.value.name);
 
     auto const imgui_id = BeginParameterGUI(g, param, r);
 
@@ -135,7 +133,7 @@ static void DoLoopModeSelectorGui(Gui* g, Rect r, LayerProcessor& layer) {
                        imgui_id,
                        imgui_id + 1,
                        r,
-                       actual_loop_bahaviour_info.name,
+                       actual_loop_behaviour.value.name,
                        buttons::ParameterPopupButton(g->imgui, greyed_out))) {
         StartFloeMenu(g);
         DEFER { EndFloeMenu(g); };
@@ -150,7 +148,8 @@ static void DoLoopModeSelectorGui(Gui* g, Rect r, LayerProcessor& layer) {
 
         for (auto const i : Range<u32>(items.size)) {
             bool state = i == ToInt(desired_loop_mode);
-            auto const validity = LoopModeIsValid((param_values::LoopMode)i, layer.instrument);
+            auto const behaviour = ActualLoopBehaviour(layer.instrument, (param_values::LoopMode)i);
+            auto const valid = behaviour.is_desired;
             Rect const item_rect = {.xywh {0, h * (f32)i, w, h}};
             auto const item_id = g->imgui.GetID((uintptr)i);
 
@@ -159,25 +158,21 @@ static void DoLoopModeSelectorGui(Gui* g, Rect r, LayerProcessor& layer) {
                                 item_rect,
                                 state,
                                 items[i],
-                                buttons::MenuItem(g->imgui, true, !validity.valid)) &&
+                                buttons::MenuItem(g->imgui, true, !valid)) &&
                 i != ToInt(desired_loop_mode))
                 val = (f32)i;
 
             {
                 DynamicArray<char> tooltip {g->scratch_arena};
 
-                if (!validity.valid) {
-                    dyn::AppendSpan(tooltip, validity.invalid_reason);
-                    dyn::AppendSpan(tooltip, "\n\n");
-                }
+                if (!valid) fmt::Append(tooltip, "Not available: {}\n\n", behaviour.reason);
 
                 dyn::AppendSpan(tooltip, LoopModeDescription((param_values::LoopMode)i));
 
                 if (i == ToInt(param_values::LoopMode::InstrumentDefault)) {
                     fmt::Append(tooltip, "\n\n{}'s default behaviour: \n", layer.InstName());
-                    dyn::AppendSpan(tooltip, default_loop_behaviour_info.description);
-                    if (auto const reason = BehaviourReasonString(default_loop_behaviour.reason);
-                        reason.size) {
+                    dyn::AppendSpan(tooltip, default_loop_behaviour.value.description);
+                    if (auto const reason = default_loop_behaviour.reason; reason.size) {
                         dyn::Append(tooltip, ' ');
                         dyn::AppendSpan(tooltip, reason);
                     }
@@ -201,9 +196,9 @@ static void DoLoopModeSelectorGui(Gui* g, Rect r, LayerProcessor& layer) {
             fmt::Format(g->scratch_arena,
                         "{}: {}\n\n{} {}",
                         param.info.name,
-                        actual_loop_bahaviour_info.name,
-                        actual_loop_bahaviour_info.description,
-                        BehaviourReasonString(actual_loop_behaviour.reason)));
+                        actual_loop_behaviour.value.name,
+                        actual_loop_behaviour.value.description,
+                        actual_loop_behaviour.reason));
 }
 
 static String GetPageTitle(PageType type) {

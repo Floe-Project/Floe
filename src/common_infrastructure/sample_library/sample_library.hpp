@@ -55,6 +55,7 @@ struct Loop {
 };
 
 struct Region {
+    // TODO: I think remove these sub-structs
     struct File {
         LibraryPath path {};
         u8 root_key {};
@@ -88,7 +89,6 @@ struct Library;
 
 struct LoopOverview {
     Array<bool, ToInt(Loop::Mode::Count)> all_loops_convertible_to_mode {}; // Convertible or already in mode.
-    Array<bool, ToInt(Loop::Mode::Count)> has_loops_convertible_to_mode {};
     Optional<Loop::Mode> all_loops_mode {}; // If all loop modes are the same mode, this will be set.
     bool8 has_loops : 1 {};
     bool8 has_non_loops : 1 {};

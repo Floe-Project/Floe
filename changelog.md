@@ -18,6 +18,7 @@ For instance: 0.0.1. Don't change the headings.
 - Lua: sample library region loops now are custom tables with `start_frame`, `end_frame`, `crossfade` and `mode` fields instead of an array.
 - Lua: add `always_loop` and `never_loop` fields to sample library regions allowing for more control over custom loop usage on Floe's GUI.
 - Improve loop modes on GUI: it's obvious when a loop is built-in or custom, what modes are available for a given instrument, why loop modes are invalid.
+- Show the instrument type on the GUI: single sample, multisample, oscillator waveform
 
 ## 0.0.6-alpha
 - Add VST3 support

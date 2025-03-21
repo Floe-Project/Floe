@@ -190,6 +190,21 @@ struct LayerProcessor {
         return {};
     }
 
+    String InstTypeName() const {
+        ASSERT(IsMainThread(host));
+        switch (instrument.tag) {
+            case InstrumentType::WaveformSynth: return "Oscillator waveform"_s;
+            case InstrumentType::Sampler: {
+                auto const& s =
+                    instrument.Get<sample_lib_server::RefCounted<sample_lib::LoadedInstrument>>()->instrument;
+                if (s.regions.size == 0) return "Empty"_s;
+                if (s.regions.size == 1) return "Single sample"_s;
+                return "Multisample"_s;
+            }
+            case InstrumentType::None: return "None"_s;
+        }
+    }
+
     Optional<sample_lib::LibraryIdRef> LibId() const {
         ASSERT(IsMainThread(host));
         if (auto sampled_inst = instrument.TryGetFromTag<InstrumentType::Sampler>())

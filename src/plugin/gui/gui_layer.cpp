@@ -422,6 +422,7 @@ void Layout(Gui* g,
 
         switch (layer_gui->selected_page) {
             case PageType::Main: {
+                auto const waveform_margins_lr = LiveSize(g->imgui, Main_WaveformMarginLR);
                 c.main.waveform = layout::CreateItem(
                     g->layout,
                     {
@@ -429,9 +430,17 @@ void Layout(Gui* g,
                         .size = {layout::k_fill_parent, LiveSize(g->imgui, Main_WaveformH)},
                         .margins =
                             {
-                                .lr = LiveSize(g->imgui, Main_WaveformMarginLR),
+                                .lr = waveform_margins_lr,
                                 .tb = LiveSize(g->imgui, Main_WaveformMarginTB),
                             },
+                    });
+
+                c.main.waveform_label = layout::CreateItem(
+                    g->layout,
+                    {
+                        .parent = page_container,
+                        .size = {layout::k_fill_parent, LiveSize(g->imgui, Main_WaveformLabelH)},
+                        .margins = {.lr = waveform_margins_lr},
                     });
 
                 auto const main_item_margin_lr = LiveSize(g->imgui, Main_ItemMarginLR);
@@ -958,6 +967,11 @@ void Draw(Gui* g,
             // waveform
             {
                 GUIDoSampleWaveform(g, layer, layout::GetRect(g->layout, c.main.waveform));
+
+                labels::Label(g,
+                              layout::GetRect(g->layout, c.main.waveform_label),
+                              layer->InstTypeName(),
+                              labels::WaveformLabel(g->imgui));
 
                 bool const greyed_out = layer->inst.tag == InstrumentType::WaveformSynth;
                 buttons::Toggle(g,

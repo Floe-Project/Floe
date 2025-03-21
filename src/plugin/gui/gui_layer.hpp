@@ -48,6 +48,7 @@ struct LayerLayoutTempIDs {
 
     union {
         struct {
+            layout::Id waveform_label;
             layout::Id waveform;
             layout::Id loop_mode;
             layout::Id reverse;

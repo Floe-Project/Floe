@@ -420,7 +420,7 @@ template <>
 struct TableFields<Region::File> {
     using Type = Region::File;
 
-    enum class Field : u32 { Path, RootKey, Loop, Count };
+    enum class Field : u32 { Path, RootKey, Loop, NeverLoop, AlwaysLoop, Count };
 
     static constexpr FieldInfo FieldInfo(Field f) {
         switch (f) {
@@ -459,6 +459,40 @@ struct TableFields<Region::File> {
                             FIELD_OBJ.loop = loop;
                         },
 
+                };
+            case Field::NeverLoop:
+                return {
+                    .name = "never_loop",
+                    .description_sentence =
+                        "If true, this region will never loop even if there is a user-defined loop. Set all regions of an instrument to this to entirely disable looping for the instrument.",
+                    .example = "false",
+                    .default_value = "false",
+                    .lua_type = LUA_TBOOLEAN,
+                    .required = false,
+                    .set =
+                        [](SET_FIELD_VALUE_ARGS) {
+                            FIELD_OBJ.never_loop = lua_toboolean(ctx.lua, -1) != 0;
+                            // Mutually exclusive with always_loop
+                            if (FIELD_OBJ.never_loop && FIELD_OBJ.always_loop)
+                                luaL_error(ctx.lua, "never_loop and always_loop are mutually exclusive");
+                        },
+                };
+            case Field::AlwaysLoop:
+                return {
+                    .name = "always_loop",
+                    .description_sentence =
+                        "If true, this region will always loop - either using the built in loop, a user defined loop, or a default built-in loop.",
+                    .example = "false",
+                    .default_value = "false",
+                    .lua_type = LUA_TBOOLEAN,
+                    .required = false,
+                    .set =
+                        [](SET_FIELD_VALUE_ARGS) {
+                            FIELD_OBJ.always_loop = lua_toboolean(ctx.lua, -1) != 0;
+                            // Mutually exclusive with never_loop
+                            if (FIELD_OBJ.never_loop && FIELD_OBJ.always_loop)
+                                luaL_error(ctx.lua, "never_loop and always_loop are mutually exclusive");
+                        },
                 };
 
             case Field::Count: break;

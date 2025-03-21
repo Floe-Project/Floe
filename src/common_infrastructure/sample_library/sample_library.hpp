@@ -59,9 +59,7 @@ struct Region {
         LibraryPath path {};
         u8 root_key {};
         Optional<Loop> loop {};
-
-        // Legacy option. Regardless if there's a loop defined, there should always be some sort of looping
-        // behaviour.
+        bool8 never_loop : 1 {};
         bool8 always_loop : 1 {};
     };
 

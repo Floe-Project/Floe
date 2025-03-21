@@ -433,7 +433,7 @@ static void TriggerVoicesIfNeeded(LayerProcessor& layer,
             if (region.trigger.key_range.Contains(note_for_samples) &&
                 region.trigger.velocity_range.Contains(note_vel) &&
                 (!region.trigger.round_robin_index || *region.trigger.round_robin_index == rr_pos) &&
-                region.trigger.event == trigger_event) {
+                region.trigger.trigger_event == trigger_event) {
                 dyn::Append(sampler_params.voice_sample_params,
                             VoiceStartParams::SamplerParams::Region {
                                 .region = region,
@@ -451,7 +451,7 @@ static void TriggerVoicesIfNeeded(LayerProcessor& layer,
             VoiceStartParams::SamplerParams::Region* feather_region_1 = nullptr;
             VoiceStartParams::SamplerParams::Region* feather_region_2 = nullptr;
             for (auto& r : sampler_params.voice_sample_params) {
-                if (r.region.options.feather_overlapping_velocity_regions) {
+                if (r.region.trigger.feather_overlapping_velocity_layers) {
                     // NOTE, if there are more than 2 feather regions, then we only crossfade 2 of them.
                     // Any others will play at normal volume.
                     // IMPROVE: we could notify the user about this behaviour when we parse the library

@@ -17,10 +17,8 @@ local single_sample = floe.new_instrument(library, {
 })
 
 floe.add_region(single_sample, {
-    file = {
-        root_key = 60,
-        path = "Samples/a.flac",
-    },
+    root_key = 60,
+    path = "Samples/a.flac",
     trigger_criteria = {
         trigger_event = "note-on",
         key_range = { 0, 128 },
@@ -38,10 +36,8 @@ local same_sample_twice = floe.new_instrument(library, {
 })
 
 floe.add_region(same_sample_twice, {
-    file = {
-        root_key = 30,
-        path = "Samples/a.flac",
-    },
+    root_key = 30,
+    path = "Samples/a.flac",
     trigger_criteria = {
         trigger_event = "note-on",
         key_range = { 0, 60 },
@@ -49,10 +45,8 @@ floe.add_region(same_sample_twice, {
     },
 })
 floe.add_region(same_sample_twice, {
-    file = {
-        root_key = 60,
-        path = "Samples/a.flac",
-    },
+    root_key = 60,
+    path = "Samples/a.flac",
     trigger_criteria = {
         trigger_event = "note-on",
         key_range = { 60, 128 },
@@ -88,15 +82,11 @@ local auto_map_config = {
 }
 for _, config in pairs(auto_map_config) do
     floe.add_region(auto_mapped_samples, {
-        file = {
-            root_key = config.root,
-            path = "Samples/" .. config.file .. ".flac",
-        },
+        root_key = config.root,
+        path = "Samples/" .. config.file .. ".flac",
         trigger_criteria = {
             trigger_event = "note-on",
             velocity_range = { 0, 100 },
-        },
-        options = {
             auto_map_key_range_group = "group1",
         },
     })

@@ -93,7 +93,7 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
             }
             case HandleType::Xfade: {
                 text = ICON_FA_BURN;
-                handle_direction = mode.value.mode == sample_lib::Loop::Mode::Standard
+                handle_direction = mode.value.mode == sample_lib::LoopMode::Standard
                                        ? (reverse ? HandleDirection::Left : HandleDirection::Right)
                                        : HandleDirection::Right;
                 back_col = inactive ? LiveCol(imgui, UiColMap::Waveform_XfadeHandleInactive)
@@ -183,7 +183,7 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
         auto loop_start_pos = loop_start * r.w;
         auto loop_end_pos = loop_end * r.w;
         auto loop_xfade_line_pos = loop_end_pos - loop_xfade_size;
-        if (mode.value.mode == sample_lib::Loop::Mode::Standard) {
+        if (mode.value.mode == sample_lib::LoopMode::Standard) {
             if (reverse) {
                 loop_start_pos = r.w - loop_start_pos;
                 loop_end_pos = r.w - loop_end_pos;
@@ -323,16 +323,16 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
 
             xfade_line = waveform_r.WithXW(waveform_r.x + loop_xfade_line_pos, 1);
             xfade_handle = {.xywh {xfade_line.x, waveform_r.y + handle_height, handle_width, handle_height}};
-            if (reverse && mode.value.mode == sample_lib::Loop::Mode::Standard)
+            if (reverse && mode.value.mode == sample_lib::LoopMode::Standard)
                 xfade_handle.x -= handle_width - xfade_line.w;
 
             auto grabber = xfade_handle;
             grabber.w += extra_grabbing_room_x;
-            if (reverse && mode.value.mode == sample_lib::Loop::Mode::Standard)
+            if (reverse && mode.value.mode == sample_lib::LoopMode::Standard)
                 grabber.x -= extra_grabbing_room_x;
 
             if (xfade_active) {
-                bool const invert = mode.value.mode == sample_lib::Loop::Mode::Standard ? !reverse : false;
+                bool const invert = mode.value.mode == sample_lib::LoopMode::Standard ? !reverse : false;
 
                 do_handle_slider(xfade_id,
                                  {&xfade_param_id, 1},
@@ -402,11 +402,11 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
     if (mode.value.editable) {
         auto other_xfade_line = start_line.WithPos(start_line.TopRight() +
                                                    f32x2 {reverse ? loop_xfade_size : -loop_xfade_size, 0});
-        if (mode.value.mode == sample_lib::Loop::Mode::PingPong)
+        if (mode.value.mode == sample_lib::LoopMode::PingPong)
             other_xfade_line = left_line.WithPos(left_line.TopRight() - f32x2 {loop_xfade_size, 0});
 
         if (draw_xfade && loop_xfade_size > 0.01f) {
-            if (mode.value.mode == sample_lib::Loop::Mode::Standard) {
+            if (mode.value.mode == sample_lib::LoopMode::Standard) {
                 imgui.graphics->AddLine(xfade_line.Min(),
                                         end_line.BottomLeft(),
                                         LiveCol(imgui, UiColMap::Waveform_XFade));
@@ -425,7 +425,7 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
 
         auto const region_active = imgui.IsHot(loop_region_id) || imgui.IsActive(loop_region_id);
         if (!region_active && loop_xfade_size > 0.01f && draw_xfade) {
-            if (mode.value.mode == sample_lib::Loop::Mode::Standard) {
+            if (mode.value.mode == sample_lib::LoopMode::Standard) {
                 f32x2 const points[] = {start_line.TopLeft(),
                                         xfade_line.TopLeft(),
                                         end_line.BottomRight(),

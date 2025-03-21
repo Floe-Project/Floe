@@ -132,7 +132,7 @@ static void AddAttributionItems(AttributionRequirementsState& reqs,
 
         if (lib.files_requiring_attribution.size) {
             for (auto const& r : i->regions) {
-                if (auto const attr = attribution_for_path(lib, r.file.path.str)) {
+                if (auto const attr = attribution_for_path(lib, r.path.str)) {
                     add_if_not_already_there({
                         .instance_id = reqs.instance_id,
                         .time_seconds_since_epoch = timestamp,

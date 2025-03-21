@@ -35,61 +35,63 @@ struct Range {
         return end - start;
     }
     constexpr bool Contains(u8 v) const { return v >= start && v < end; }
+    constexpr bool Overlaps(Range const& other) const { return start < other.end && other.start < end; }
     u8 start;
     u8 end; // non-inclusive, A.K.A. one-past the last
 };
 
 enum class TriggerEvent { NoteOn, NoteOff, Count };
 
+enum class LoopMode : u8 { Standard, PingPong, Count };
+
 // start and end can be negative meaning they're indexed from the end of the sample.
 // e.g. -1 == num_frames, -2 == (num_frames - 1), etc.
-struct Loop {
-    enum class Mode : u8 { Standard, PingPong, Count };
+struct BuiltinLoop {
     s64 start_frame {};
     s64 end_frame {};
     u32 crossfade_frames {};
-    Mode mode {};
+    LoopMode mode {};
 
     bool8 lock_loop_points : 1 {}; // Don't allow start, end or crossfade to be overriden.
     bool8 lock_mode : 1 {}; // Don't allow mode to be changed.
 };
 
 struct Region {
-    // TODO: I think remove these sub-structs
-    struct File {
-        LibraryPath path {};
-        u8 root_key {};
-        Optional<Loop> loop {};
+    LibraryPath path {};
+    u8 root_key {};
+
+    struct Loop {
+        Optional<BuiltinLoop> builtin_loop {};
         bool8 never_loop : 1 {};
         bool8 always_loop : 1 {};
-    };
+    } loop;
 
     struct TriggerCriteria {
-        TriggerEvent event {TriggerEvent::NoteOn};
+        TriggerEvent trigger_event {TriggerEvent::NoteOn};
         Range key_range {0, 128};
         Range velocity_range {0, 100};
         Optional<u32> round_robin_index {};
-    };
-
-    struct Options {
-        Optional<Range> timbre_crossfade_region {};
-        bool feather_overlapping_velocity_regions {};
-        f32 volume_db {0};
+        bool feather_overlapping_velocity_layers {};
 
         // private
         Optional<String> auto_map_key_range_group {};
-    };
+    } trigger;
 
-    File file {};
-    TriggerCriteria trigger {};
-    Options options {};
+    struct AudioProperties {
+        f32 gain_db {0};
+        // IMPROVE: add pan, tune
+    } audio_props;
+
+    struct TimbreLayering {
+        Optional<Range> layer_range {};
+    } timbre_layering;
 };
 
 struct Library;
 
 struct LoopOverview {
-    Array<bool, ToInt(Loop::Mode::Count)> all_loops_convertible_to_mode {}; // Convertible or already in mode.
-    Optional<Loop::Mode> all_loops_mode {}; // If all loop modes are the same mode, this will be set.
+    Array<bool, ToInt(LoopMode::Count)> all_loops_convertible_to_mode {}; // Convertible or already in mode.
+    Optional<LoopMode> all_loops_mode {}; // If all loop modes are the same mode, this will be set.
     bool8 has_loops : 1 {};
     bool8 has_non_loops : 1 {};
     bool8 user_defined_loops_allowed : 1 {};

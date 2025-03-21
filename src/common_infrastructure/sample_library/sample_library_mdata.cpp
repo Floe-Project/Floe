@@ -350,30 +350,30 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
                     max_rr_pos = CheckedCast<u32>(group_info.round_robin_or_xfade_index);
 
                 inst->regions[regions_span_index++] = Region {
-                    .file =
+                    .path = {file_path},
+                    .root_key = CheckedCast<u8>(region_info.root_note),
+                    .loop =
                         {
-                            .path = {file_path},
-                            .root_key = CheckedCast<u8>(region_info.root_note),
-                            .loop = ({
-                                Optional<Loop> l {};
+                            .builtin_loop = ({
+                                Optional<BuiltinLoop> l {};
                                 if (region_info.looping_mode == mdata::SampleLoopingModeAlwaysLoopAnyRegion ||
                                     region_info.looping_mode == mdata::SampleLoopingModeAlwaysLoopSetRegion) {
-                                    l = Loop {
+                                    l = BuiltinLoop {
                                         .start_frame = region_info.loop_start,
                                         .end_frame = region_info.loop_end,
                                         .crossfade_frames = CheckedCast<u32>(region_info.loop_crossfade),
-                                        .mode = Loop::Mode::Standard,
+                                        .mode = LoopMode::Standard,
                                         .lock_loop_points = region_info.looping_mode ==
                                                             mdata::SampleLoopingModeAlwaysLoopSetRegion,
                                         .lock_mode = false,
                                     };
                                 } else if (region_info.looping_mode ==
                                            mdata::SampleLoopingModeAlwaysLoopWholeRegion)
-                                    l = Loop {
+                                    l = BuiltinLoop {
                                         .start_frame = 0,
                                         .end_frame = file_info.num_frames,
                                         .crossfade_frames = 0,
-                                        .mode = Loop::Mode::Standard,
+                                        .mode = LoopMode::Standard,
                                         .lock_loop_points = true,
                                         .lock_mode = false,
                                     };
@@ -383,7 +383,7 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
                         },
                     .trigger =
                         {
-                            .event = trigger_event,
+                            .trigger_event = trigger_event,
                             .key_range = {CheckedCast<u8>(region_info.low_note),
                                           CheckedCast<u8>((int)region_info.high_note + 1)},
                             .velocity_range = MapMidiVelocityRangeToNormalizedRange(region_info.low_velo,
@@ -395,10 +395,11 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
                                     rr = CheckedCast<u32>(group_info.round_robin_or_xfade_index);
                                 rr;
                             }),
+                            .feather_overlapping_velocity_layers = velocity_layers_are_feathered,
                         },
-                    .options =
+                    .timbre_layering =
                         {
-                            .timbre_crossfade_region = ({
+                            .layer_range = ({
                                 Optional<Range> r {};
                                 if (groups_are_xfade_layers) {
                                     switch (group_info.round_robin_or_xfade_index) {
@@ -409,7 +410,6 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
                                 }
                                 r;
                             }),
-                            .feather_overlapping_velocity_regions = velocity_layers_are_feathered,
                         },
                 };
 
@@ -426,10 +426,10 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
         {
             int closest_to_mid = 1000;
             for (auto const& region : inst->regions) {
-                auto const distance = Abs(region.file.root_key - 60);
+                auto const distance = Abs(region.root_key - 60);
                 if (distance < closest_to_mid) {
                     closest_to_mid = distance;
-                    inst->audio_file_path_for_waveform = region.file.path;
+                    inst->audio_file_path_for_waveform = region.path;
                 }
             }
         }
@@ -447,7 +447,7 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
 
         // with MDATA, the velocity feathering feature was instrument-wide rather then per-region so we can
         // just check the first
-        if (!inst->regions.size || !inst->regions[0].options.feather_overlapping_velocity_regions) continue;
+        if (!inst->regions.size || !inst->regions[0].trigger.feather_overlapping_velocity_layers) continue;
 
         Sort(inst->regions, [](Region const& a, Region const& b) {
             return a.trigger.velocity_range.start < b.trigger.velocity_range.start;

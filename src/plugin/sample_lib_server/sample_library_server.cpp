@@ -851,12 +851,12 @@ static ListedInstrument* FetchOrCreateInstrument(LibrariesList::Node& lib_node,
         auto& audio_data = new_inst->inst.audio_datas[region_index];
 
         auto ref_audio_data =
-            FetchOrCreateAudioData(lib_node, region_info.file.path, thread_pool_args, new_inst->debug_id);
+            FetchOrCreateAudioData(lib_node, region_info.path, thread_pool_args, new_inst->debug_id);
         audio_data = &ref_audio_data->audio_data;
 
         dyn::AppendIfNotAlreadyThere(audio_data_set, ref_audio_data);
 
-        if (inst.audio_file_path_for_waveform == region_info.file.path)
+        if (inst.audio_file_path_for_waveform == region_info.path)
             new_inst->inst.file_for_gui_waveform = &ref_audio_data->audio_data;
     }
 

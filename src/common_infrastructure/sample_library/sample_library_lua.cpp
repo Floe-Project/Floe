@@ -90,10 +90,11 @@ enum class InterpretedTypes : u32 {
     Instrument,
     ImpulseResponse,
     Region,
-    Loop,
-    File,
+    BuiltinLoop,
+    RegionLoop,
+    RegionAudioProps,
+    RegionTimbreLayering,
     TriggerCriteria,
-    RegionOptions,
     FileAttribution,
     Count,
 };
@@ -321,95 +322,25 @@ static Span<String> SetArrayOfStrings(LuaState& ctx, FieldInfo field_info, bool 
 }
 
 template <>
-struct TableFields<Loop> {
-    using Type = Loop;
+struct TableFields<Region::AudioProperties> {
+    using Type = Region::AudioProperties;
 
     enum class Field : u32 {
-        Start,
-        End,
-        Crossfade,
-        Mode,
-        LockLoopPoints,
-        LockMode,
+        GainDb,
         Count,
     };
-
-    static constexpr char const* k_loop_mode_names[] = {"standard", "ping-pong", nullptr};
-    static_assert(ArraySize(k_loop_mode_names) == ToInt(Loop::Mode::Count) + 1);
-
     static constexpr FieldInfo FieldInfo(Field f) {
         switch (f) {
-            case Field::Start:
+            case Field::GainDb:
                 return {
-                    .name = "start_frame",
-                    .description_sentence =
-                        "The start of the loop in frames. Inclusive. It can be negative meaning index the file from the end rather than the start. For example, -1 == number_frames_in_file, -2 == (number_frames_in_file - 1), etc.",
-                    .example = "24",
+                    .name = "gain_db",
+                    .description_sentence = "Apply a gain to the audio data in decibels.",
+                    .example = "-3",
+                    .default_value = "0",
                     .lua_type = LUA_TNUMBER,
-                    .required = true,
-                    .set =
-                        [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.start_frame = NumberFromTop<u32>(ctx, info); },
-                };
-            case Field::End:
-                return {
-                    .name = "end_frame",
-                    .description_sentence =
-                        "The end of the loop in frames. Exclusive. It can be negative meaning index the file from the end rather than the start. For example, -1 == number_frames_in_file, -2 == (number_frames_in_file - 1), etc.",
-                    .example = "6600",
-                    .lua_type = LUA_TNUMBER,
-                    .required = true,
-                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.end_frame = NumberFromTop<u32>(ctx, info); },
-                };
-            case Field::Crossfade:
-                return {
-                    .name = "crossfade",
-                    .description_sentence = "The number of frames to crossfade.",
-                    .example = "100",
-                    .lua_type = LUA_TNUMBER,
-                    .required = true,
-                    .set =
-                        [](SET_FIELD_VALUE_ARGS) {
-                            FIELD_OBJ.crossfade_frames = NumberFromTop<u32>(ctx, info);
-                        },
-                };
-            case Field::Mode:
-                return {
-                    .name = "mode",
-                    .description_sentence = "The mode of the loop.",
-                    .example = FromNullTerminated(k_loop_mode_names[ToInt(Loop::Mode::Standard)]),
-                    .default_value = FromNullTerminated(k_loop_mode_names[ToInt(Loop::Mode::Standard)]),
-                    .lua_type = LUA_TSTRING,
-                    .required = false,
-                    .enum_options = k_loop_mode_names,
-                    .set =
-                        [](SET_FIELD_VALUE_ARGS) {
-                            FIELD_OBJ.mode =
-                                (Loop::Mode)luaL_checkoption(ctx.lua, -1, nullptr, k_loop_mode_names);
-                        },
-                };
-            case Field::LockLoopPoints:
-                return {
-                    .name = "lock_loop_points",
-                    .description_sentence =
-                        "If true, the start, end and crossfade values cannot be overriden by a custom loop from Floe's GUI.",
-                    .example = "false",
-                    .lua_type = LUA_TBOOLEAN,
                     .required = false,
                     .set =
-                        [](SET_FIELD_VALUE_ARGS) {
-                            FIELD_OBJ.lock_loop_points = lua_toboolean(ctx.lua, -1) != 0;
-                        },
-                };
-            case Field::LockMode:
-                return {
-                    .name = "lock_mode",
-                    .description_sentence =
-                        "If true, the loop mode value cannot be overriden by a custom mode from Floe's GUI.",
-                    .example = "false",
-                    .lua_type = LUA_TBOOLEAN,
-                    .required = false,
-                    .set =
-                        [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.lock_mode = lua_toboolean(ctx.lua, -1) != 0; },
+                        [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.gain_db = (f32)luaL_checknumber(ctx.lua, -1); },
                 };
             case Field::Count: break;
         }
@@ -418,166 +349,39 @@ struct TableFields<Loop> {
 };
 
 template <>
-struct TableFields<Region::File> {
-    using Type = Region::File;
-
-    enum class Field : u32 { Path, RootKey, Loop, NeverLoop, AlwaysLoop, Count };
-
-    static constexpr FieldInfo FieldInfo(Field f) {
-        switch (f) {
-            case Field::Path:
-                return {
-                    .name = "path",
-                    .description_sentence = "A path to an audio file, relative to this current lua file.",
-                    .example = "Samples/One-shots/Resonating String.flac",
-                    .lua_type = LUA_TSTRING,
-                    .required = true,
-                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.path = PathFromTop(ctx); },
-                };
-            case Field::RootKey:
-                return {
-                    .name = "root_key",
-                    .description_sentence =
-                        "The pitch of the audio file as a number from 0 to 127 (a MIDI note number).",
-                    .example = "60",
-                    .lua_type = LUA_TNUMBER,
-                    .required = true,
-                    .range = {0, 127},
-                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.root_key = NumberFromTop<u8>(ctx, info); },
-                };
-            case Field::Loop:
-                return {
-                    .name = "loop",
-                    .description_sentence = "The region of the file that can be looped.",
-                    .lua_type = LUA_TTABLE,
-                    .subtype = InterpretedTypes::Loop,
-                    .required = false,
-                    .set =
-                        [](SET_FIELD_VALUE_ARGS) {
-                            Loop loop;
-                            InterpretTable(ctx, -1, loop);
-                            FIELD_OBJ.loop = loop;
-                        },
-
-                };
-            case Field::NeverLoop:
-                return {
-                    .name = "never_loop",
-                    .description_sentence =
-                        "If true, this region will never loop even if there is a user-defined loop. Set all regions of an instrument to this to entirely disable looping for the instrument.",
-                    .example = "false",
-                    .default_value = "false",
-                    .lua_type = LUA_TBOOLEAN,
-                    .required = false,
-                    .set =
-                        [](SET_FIELD_VALUE_ARGS) {
-                            FIELD_OBJ.never_loop = lua_toboolean(ctx.lua, -1) != 0;
-                            // Mutually exclusive with always_loop
-                            if (FIELD_OBJ.never_loop && FIELD_OBJ.always_loop)
-                                luaL_error(ctx.lua, "never_loop and always_loop are mutually exclusive");
-                        },
-                };
-            case Field::AlwaysLoop:
-                return {
-                    .name = "always_loop",
-                    .description_sentence =
-                        "If true, this region will always loop - either using the built in loop, a user defined loop, or a default built-in loop.",
-                    .example = "false",
-                    .default_value = "false",
-                    .lua_type = LUA_TBOOLEAN,
-                    .required = false,
-                    .set =
-                        [](SET_FIELD_VALUE_ARGS) {
-                            FIELD_OBJ.always_loop = lua_toboolean(ctx.lua, -1) != 0;
-                            // Mutually exclusive with never_loop
-                            if (FIELD_OBJ.never_loop && FIELD_OBJ.always_loop)
-                                luaL_error(ctx.lua, "never_loop and always_loop are mutually exclusive");
-                        },
-                };
-
-            case Field::Count: break;
-        }
-        return {};
-    }
-};
-
-template <>
-struct TableFields<Region::Options> {
-    using Type = Region::Options;
+struct TableFields<Region::TimbreLayering> {
+    using Type = Region::TimbreLayering;
 
     enum class Field : u32 {
-        TimbreCrossfadeRegion,
-        AutoMapKeyRangeGroup,
-        FeatherOverlappingVelocityRegions,
-        VolumeDb,
+        LayerRange,
         Count,
     };
-
     static constexpr FieldInfo FieldInfo(Field f) {
         switch (f) {
-            case Field::TimbreCrossfadeRegion:
+            case Field::LayerRange:
                 return {
-                    .name = "timbre_crossfade_region",
+                    .name = "layer_range",
                     .description_sentence =
-                        "The start and end point, from 0 to 100, of the Timbre knob on Floe's GUI that this region should be heard. You should overlay this range with other timbre_crossfade_regions. Floe will create an even crossfade of all overlapping sounds. The start number is inclusive, end is exclusive.",
+                        "The start and end point, from 0 to 100, of the Timbre knob on Floe's GUI that this region should be heard. You should overlap this range with other timbre layer ranges. Floe will create an even crossfade of all overlapping sounds. The start number is inclusive, end is exclusive. This region's velocity_range should be 0-100.",
                     .example = "{ 0, 50 }",
-                    .default_value = "no timbre-crossfade",
+                    .default_value = "no timbre layering",
                     .lua_type = LUA_TTABLE,
                     .required = false,
                     .set =
                         [](SET_FIELD_VALUE_ARGS) {
                             auto& region = FIELD_OBJ;
-                            region.timbre_crossfade_region = Range {};
+                            region.layer_range = Range {};
                             auto const vals = ListOfInts(ctx, 2, info);
                             if (vals[0] < 0 || vals[1] > 100 || vals[1] < 1 || vals[1] > 101)
                                 luaL_error(
                                     ctx.lua,
                                     "'%s' should be in the range [0, 99] the first number and [1, 100] for the second",
                                     info.name.data);
-                            region.timbre_crossfade_region->start = (u8)vals[0];
-                            region.timbre_crossfade_region->end = (u8)vals[1];
+                            region.layer_range->start = (u8)vals[0];
+                            region.layer_range->end = (u8)vals[1];
                         },
                 };
                 break;
-            case Field::AutoMapKeyRangeGroup:
-                return {
-                    .name = "auto_map_key_range_group",
-                    .description_sentence =
-                        "For every region that matches this group, automatically set the start and end values for each region's key range based on its root key. Only works if all region's velocity range are the same.",
-                    .example = "group1",
-                    .default_value = "no auto-map",
-                    .lua_type = LUA_TSTRING,
-                    .required = false,
-                    .set =
-                        [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.auto_map_key_range_group = StringFromTop(ctx); },
-                };
-            case Field::FeatherOverlappingVelocityRegions:
-                return {
-                    .name = "feather_overlapping_velocity_regions",
-                    .description_sentence =
-                        "If another region is triggered at the same time as this one and is overlapping this, then both regions will play crossfaded together. This smooths the transitions between velocity layers.",
-                    .example = "false",
-                    .default_value = "false",
-                    .lua_type = LUA_TBOOLEAN,
-                    .required = false,
-                    .set =
-                        [](SET_FIELD_VALUE_ARGS) {
-                            FIELD_OBJ.feather_overlapping_velocity_regions = lua_toboolean(ctx.lua, -1);
-                        },
-                };
-            case Field::VolumeDb:
-                return {
-                    .name = "volume_db",
-                    .description_sentence = "The volume of the region in decibels.",
-                    .example = "-3",
-                    .default_value = "0",
-                    .lua_type = LUA_TNUMBER,
-                    .required = false,
-                    .set =
-                        [](SET_FIELD_VALUE_ARGS) {
-                            FIELD_OBJ.volume_db = (f32)luaL_checknumber(ctx.lua, -1);
-                        },
-                };
             case Field::Count: break;
         }
         return {};
@@ -593,6 +397,8 @@ struct TableFields<Region::TriggerCriteria> {
         KeyRange,
         VelocityRange,
         RoundRobinIndex,
+        FeatherOverlappingVelocityLayers,
+        AutoMapKeyRangeGroup,
         Count,
     };
 
@@ -612,7 +418,7 @@ struct TableFields<Region::TriggerCriteria> {
                     .enum_options = k_trigger_event_names,
                     .set =
                         [](SET_FIELD_VALUE_ARGS) {
-                            FIELD_OBJ.event =
+                            FIELD_OBJ.trigger_event =
                                 (TriggerEvent)luaL_checkoption(ctx.lua, -1, nullptr, k_trigger_event_names);
                         },
                 };
@@ -681,6 +487,197 @@ struct TableFields<Region::TriggerCriteria> {
                             FIELD_OBJ.round_robin_index = (u32)val;
                         },
                 };
+            case Field::FeatherOverlappingVelocityLayers:
+                return {
+                    .name = "feather_overlapping_velocity_layers",
+                    .description_sentence =
+                        "If another region in this instrument is triggered at the same time as this one and is overlapping this, and also has this option enabled, then both regions will play crossfaded in a proportional amount for the overlapping area, creating a smooth transition between velocity layers. Only works if there's exactly 2 overlapping layers.",
+                    .example = "false",
+                    .default_value = "false",
+                    .lua_type = LUA_TBOOLEAN,
+                    .required = false,
+                    .set =
+                        [](SET_FIELD_VALUE_ARGS) {
+                            FIELD_OBJ.feather_overlapping_velocity_layers = lua_toboolean(ctx.lua, -1);
+                        },
+                };
+            case Field::AutoMapKeyRangeGroup:
+                return {
+                    .name = "auto_map_key_range_group",
+                    .description_sentence =
+                        "For every region that has this same string, automatically set the start and end values for each region's key range based on its root key. Only works if all region's velocity range are the same.",
+                    .example = "group1",
+                    .default_value = "no auto-map",
+                    .lua_type = LUA_TSTRING,
+                    .required = false,
+                    .set =
+                        [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.auto_map_key_range_group = StringFromTop(ctx); },
+                };
+            case Field::Count: break;
+        }
+        return {};
+    }
+};
+
+template <>
+struct TableFields<BuiltinLoop> {
+    using Type = BuiltinLoop;
+
+    enum class Field : u32 {
+        Start,
+        End,
+        Crossfade,
+        Mode,
+        LockLoopPoints,
+        LockMode,
+        Count,
+    };
+
+    static constexpr char const* k_loop_mode_names[] = {"standard", "ping-pong", nullptr};
+    static_assert(ArraySize(k_loop_mode_names) == ToInt(LoopMode::Count) + 1);
+
+    static constexpr FieldInfo FieldInfo(Field f) {
+        switch (f) {
+            case Field::Start:
+                return {
+                    .name = "start_frame",
+                    .description_sentence =
+                        "The start of the loop in frames. Inclusive. It can be negative meaning index the file from the end rather than the start. For example, -1 == number_frames_in_file, -2 == (number_frames_in_file - 1), etc.",
+                    .example = "24",
+                    .lua_type = LUA_TNUMBER,
+                    .required = true,
+                    .set =
+                        [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.start_frame = NumberFromTop<u32>(ctx, info); },
+                };
+            case Field::End:
+                return {
+                    .name = "end_frame",
+                    .description_sentence =
+                        "The end of the loop in frames. Exclusive. It can be negative meaning index the file from the end rather than the start. For example, -1 == number_frames_in_file, -2 == (number_frames_in_file - 1), etc.",
+                    .example = "6600",
+                    .lua_type = LUA_TNUMBER,
+                    .required = true,
+                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.end_frame = NumberFromTop<u32>(ctx, info); },
+                };
+            case Field::Crossfade:
+                return {
+                    .name = "crossfade",
+                    .description_sentence = "The number of frames to crossfade.",
+                    .example = "100",
+                    .lua_type = LUA_TNUMBER,
+                    .required = true,
+                    .set =
+                        [](SET_FIELD_VALUE_ARGS) {
+                            FIELD_OBJ.crossfade_frames = NumberFromTop<u32>(ctx, info);
+                        },
+                };
+            case Field::Mode:
+                return {
+                    .name = "mode",
+                    .description_sentence = "The mode of the loop.",
+                    .example = FromNullTerminated(k_loop_mode_names[ToInt(LoopMode::Standard)]),
+                    .default_value = FromNullTerminated(k_loop_mode_names[ToInt(LoopMode::Standard)]),
+                    .lua_type = LUA_TSTRING,
+                    .required = false,
+                    .enum_options = k_loop_mode_names,
+                    .set =
+                        [](SET_FIELD_VALUE_ARGS) {
+                            FIELD_OBJ.mode =
+                                (LoopMode)luaL_checkoption(ctx.lua, -1, nullptr, k_loop_mode_names);
+                        },
+                };
+            case Field::LockLoopPoints:
+                return {
+                    .name = "lock_loop_points",
+                    .description_sentence =
+                        "If true, the start, end and crossfade values cannot be overriden by a custom loop from Floe's GUI.",
+                    .example = "false",
+                    .lua_type = LUA_TBOOLEAN,
+                    .required = false,
+                    .set =
+                        [](SET_FIELD_VALUE_ARGS) {
+                            FIELD_OBJ.lock_loop_points = lua_toboolean(ctx.lua, -1) != 0;
+                        },
+                };
+            case Field::LockMode:
+                return {
+                    .name = "lock_mode",
+                    .description_sentence =
+                        "If true, the loop mode value cannot be overriden by a custom mode from Floe's GUI.",
+                    .example = "false",
+                    .lua_type = LUA_TBOOLEAN,
+                    .required = false,
+                    .set =
+                        [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.lock_mode = lua_toboolean(ctx.lua, -1) != 0; },
+                };
+            case Field::Count: break;
+        }
+        return {};
+    }
+};
+
+template <>
+struct TableFields<Region::Loop> {
+    using Type = Region::Loop;
+
+    enum class Field : u32 {
+        BuiltinLoop,
+        NeverLoop,
+        AlwaysLoop,
+        Count,
+    };
+
+    static constexpr FieldInfo FieldInfo(Field f) {
+        switch (f) {
+            case Field::BuiltinLoop:
+                return {
+                    .name = "builtin_loop",
+                    .description_sentence = "Define a built-in loop.",
+                    .default_value = "no built-in loop",
+                    .lua_type = LUA_TTABLE,
+                    .subtype = InterpretedTypes::BuiltinLoop,
+                    .required = false,
+                    .set =
+                        [](SET_FIELD_VALUE_ARGS) {
+                            BuiltinLoop loop;
+                            InterpretTable(ctx, -1, loop);
+                            FIELD_OBJ.builtin_loop = loop;
+                        },
+                };
+            case Field::NeverLoop:
+                return {
+                    .name = "never_loop",
+                    .description_sentence =
+                        "If true, this region will never loop even if there is a user-defined loop. Set all regions of an instrument to this to entirely disable looping for the instrument.",
+                    .example = "false",
+                    .default_value = "false",
+                    .lua_type = LUA_TBOOLEAN,
+                    .required = false,
+                    .set =
+                        [](SET_FIELD_VALUE_ARGS) {
+                            FIELD_OBJ.never_loop = lua_toboolean(ctx.lua, -1) != 0;
+                            // Mutually exclusive with always_loop
+                            if (FIELD_OBJ.never_loop && FIELD_OBJ.always_loop)
+                                luaL_error(ctx.lua, "never_loop and always_loop are mutually exclusive");
+                        },
+                };
+            case Field::AlwaysLoop:
+                return {
+                    .name = "always_loop",
+                    .description_sentence =
+                        "If true, this region will always loop - either using the built in loop, a user defined loop, or a default built-in loop.",
+                    .example = "false",
+                    .default_value = "false",
+                    .lua_type = LUA_TBOOLEAN,
+                    .required = false,
+                    .set =
+                        [](SET_FIELD_VALUE_ARGS) {
+                            FIELD_OBJ.always_loop = lua_toboolean(ctx.lua, -1) != 0;
+                            // Mutually exclusive with never_loop
+                            if (FIELD_OBJ.never_loop && FIELD_OBJ.always_loop)
+                                luaL_error(ctx.lua, "never_loop and always_loop are mutually exclusive");
+                        },
+                };
             case Field::Count: break;
         }
         return {};
@@ -691,25 +688,43 @@ template <>
 struct TableFields<Region> {
     using Type = Region;
 
+    static constexpr char const* k_trigger_event_names[] = {"note-on", "note-off", nullptr};
+    static_assert(ArraySize(k_trigger_event_names) == ToInt(TriggerEvent::Count) + 1);
+
     enum class Field : u32 {
-        File,
-        Trigger,
-        Options,
+        Path,
+        RootKey,
+        TriggerCriteria,
+        Loop,
+        TimbreLayering,
+        AudioProperties,
         Count,
     };
 
     static constexpr FieldInfo FieldInfo(Field f) {
         switch (f) {
-            case Field::File:
+            case Field::Path:
                 return {
-                    .name = "file",
-                    .description_sentence = "The file for this region.",
-                    .lua_type = LUA_TTABLE,
-                    .subtype = InterpretedTypes::File,
+                    .name = "path",
+                    .description_sentence = "A path to an audio file, relative to this current lua file.",
+                    .example = "Samples/One-shots/Resonating String.flac",
+                    .lua_type = LUA_TSTRING,
                     .required = true,
-                    .set = [](SET_FIELD_VALUE_ARGS) { InterpretTable(ctx, -1, FIELD_OBJ.file); },
+                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.path = PathFromTop(ctx); },
                 };
-            case Field::Trigger:
+            case Field::RootKey:
+                return {
+                    .name = "root_key",
+                    .description_sentence =
+                        "The pitch of the audio file as a number from 0 to 127 (a MIDI note number).",
+                    .example = "60",
+                    .lua_type = LUA_TNUMBER,
+                    .required = true,
+                    .range = {0, 127},
+                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.root_key = NumberFromTop<u8>(ctx, info); },
+                };
+
+            case Field::TriggerCriteria:
                 return {
                     .name = "trigger_criteria",
                     .description_sentence = "How this region should be triggered.",
@@ -719,15 +734,35 @@ struct TableFields<Region> {
                     .required = false,
                     .set = [](SET_FIELD_VALUE_ARGS) { InterpretTable(ctx, -1, FIELD_OBJ.trigger); },
                 };
-            case Field::Options:
+            case Field::Loop:
                 return {
-                    .name = "options",
-                    .description_sentence = "Additional options for this region.",
+                    .name = "loop",
+                    .description_sentence = "Loop configuration.",
                     .default_value = "defaults",
                     .lua_type = LUA_TTABLE,
-                    .subtype = InterpretedTypes::RegionOptions,
+                    .subtype = InterpretedTypes::RegionLoop,
                     .required = false,
-                    .set = [](SET_FIELD_VALUE_ARGS) { InterpretTable(ctx, -1, FIELD_OBJ.options); },
+                    .set = [](SET_FIELD_VALUE_ARGS) { InterpretTable(ctx, -1, FIELD_OBJ.loop); },
+                };
+            case Field::TimbreLayering:
+                return {
+                    .name = "timbre_layering",
+                    .description_sentence = "Timbre layering configuration.",
+                    .default_value = "no timbre layering",
+                    .lua_type = LUA_TTABLE,
+                    .subtype = InterpretedTypes::RegionTimbreLayering,
+                    .required = false,
+                    .set = [](SET_FIELD_VALUE_ARGS) { InterpretTable(ctx, -1, FIELD_OBJ.timbre_layering); },
+                };
+            case Field::AudioProperties:
+                return {
+                    .name = "audio_properties",
+                    .description_sentence = "Audio properties.",
+                    .default_value = "defaults",
+                    .lua_type = LUA_TTABLE,
+                    .subtype = InterpretedTypes::RegionAudioProps,
+                    .required = false,
+                    .set = [](SET_FIELD_VALUE_ARGS) { InterpretTable(ctx, -1, FIELD_OBJ.audio_props); },
                 };
             case Field::Count: break;
         }
@@ -1255,7 +1290,7 @@ static int AddRegion(lua_State* lua) {
     InterpretTable(ctx, 2, region);
 
     if (instrument->audio_file_path_for_waveform.str.size == 0)
-        instrument->audio_file_path_for_waveform = region.file.path;
+        instrument->audio_file_path_for_waveform = region.path;
 
     if (region.trigger.round_robin_index)
         instrument->max_rr_pos = Max(instrument->max_rr_pos, *region.trigger.round_robin_index);
@@ -1333,25 +1368,19 @@ local group1 = {
     trigger_criteria = {
         trigger_event = "note-on",
         velocity_range = { 0, 100 },
-    },
-    options = {
         auto_map_key_range_group = "group1",
         feather_overlapping_velocity_regions = false,
     },
 }
 
 floe.add_region(instrument, floe.extend_table(group1, {
-    file = {
-        path = "One-shots/Resonating String 2.flac",
-        root_key = 65,
-    },
+    path = "One-shots/Resonating String 2.flac",
+    root_key = 65,
 }))
 
 floe.add_region(instrument, floe.extend_table(group1, {
-    file = {
-        path = "One-shots/Resonating String 3.flac",
-        root_key = 68,
-    },
+    path = "One-shots/Resonating String 3.flac",
+    root_key = 68,
 }))
 )aaa";
 
@@ -1517,17 +1546,17 @@ LibraryPtrOrError ReadLua(Reader& reader,
             DynamicHashTable<String, RegionRef*> auto_map_groups {ctx.lua_arena};
 
             for (auto& region : inst->regions) {
-                if (!region.options.auto_map_key_range_group) continue;
+                if (!region.trigger.auto_map_key_range_group) continue;
 
                 auto new_ref = ctx.lua_arena.New<RegionRef>();
                 new_ref->data = &region;
-                if (auto e = auto_map_groups.Find(*region.options.auto_map_key_range_group)) {
+                if (auto e = auto_map_groups.Find(*region.trigger.auto_map_key_range_group)) {
                     auto& ref = *e;
                     new_ref->next = ref;
                     ref = new_ref;
                 } else {
                     new_ref->next = nullptr;
-                    auto_map_groups.Insert(*region.options.auto_map_key_range_group, new_ref);
+                    auto_map_groups.Insert(*region.trigger.auto_map_key_range_group, new_ref);
                 }
             }
 
@@ -1535,11 +1564,11 @@ LibraryPtrOrError ReadLua(Reader& reader,
                 SinglyLinkedListSort(
                     *item.value_ptr,
                     SinglyLinkedListLast(*item.value_ptr),
-                    [](Region const* a, Region const* b) { return a->file.root_key < b->file.root_key; });
+                    [](Region const* a, Region const* b) { return a->root_key < b->root_key; });
 
                 auto const map_sample = [](Region& region, u8 prev_end_before, u8 next_root) {
                     region.trigger.key_range.start = prev_end_before;
-                    auto const this_root = region.file.root_key;
+                    auto const this_root = region.root_key;
                     region.trigger.key_range.end = this_root + (next_root - this_root) / 2 + 1;
                     if (next_root == 128) region.trigger.key_range.end = 128;
                 };
@@ -1548,7 +1577,7 @@ LibraryPtrOrError ReadLua(Reader& reader,
                 for (auto ref = *item.value_ptr; ref != nullptr; ref = ref->next) {
                     map_sample(*ref->data,
                                previous ? previous->data->trigger.key_range.end : 0,
-                               ref->next ? ref->next->data->file.root_key : 128);
+                               ref->next ? ref->next->data->root_key : 128);
                     previous = ref;
                 }
             };
@@ -1565,7 +1594,7 @@ LibraryPtrOrError ReadLua(Reader& reader,
             for (auto [key, inst_ptr] : library->insts_by_name) {
                 auto const& inst = *inst_ptr;
                 for (auto& region : inst->regions)
-                    audio_paths.InsertWithoutGrowing(region.file.path.str);
+                    audio_paths.InsertWithoutGrowing(region.path.str);
             }
             library->num_instrument_samples = (u32)audio_paths.size;
         }
@@ -1657,15 +1686,18 @@ struct LuaCodePrinter {
                 case InterpretedTypes::ImpulseResponse:
                     struct_fields[i] = FieldInfosSpan<ImpulseResponse>();
                     break;
-                case InterpretedTypes::Loop: struct_fields[i] = FieldInfosSpan<Loop>(); break;
-                case InterpretedTypes::Region: struct_fields[i] = FieldInfosSpan<Region>(); break;
-                case InterpretedTypes::File: struct_fields[i] = FieldInfosSpan<Region::File>(); break;
+                case InterpretedTypes::BuiltinLoop: struct_fields[i] = FieldInfosSpan<BuiltinLoop>(); break;
+                case InterpretedTypes::RegionLoop: struct_fields[i] = FieldInfosSpan<Region::Loop>(); break;
+                case InterpretedTypes::RegionAudioProps:
+                    struct_fields[i] = FieldInfosSpan<Region::AudioProperties>();
+                    break;
+                case InterpretedTypes::RegionTimbreLayering:
+                    struct_fields[i] = FieldInfosSpan<Region::TimbreLayering>();
+                    break;
                 case InterpretedTypes::TriggerCriteria:
                     struct_fields[i] = FieldInfosSpan<Region::TriggerCriteria>();
                     break;
-                case InterpretedTypes::RegionOptions:
-                    struct_fields[i] = FieldInfosSpan<Region::Options>();
-                    break;
+                case InterpretedTypes::Region: struct_fields[i] = FieldInfosSpan<Region>(); break;
                 case InterpretedTypes::FileAttribution:
                     struct_fields[i] = FieldInfosSpan<FileAttribution>();
                     break;
@@ -1864,7 +1896,7 @@ bool CheckAllReferencedFilesExist(Library const& lib, Writer error_writer) {
     for (auto [key, inst_ptr] : lib.insts_by_name) {
         auto inst = *inst_ptr;
         for (auto& region : inst->regions)
-            check_file(region.file.path);
+            check_file(region.path);
     }
 
     for (auto [key, ir_ptr] : lib.irs_by_name) {
@@ -1946,8 +1978,8 @@ TEST_CASE(TestIncorrectParameters) {
                   ToInt(TableFields<Region::TriggerCriteria>::Field::KeyRange)},
                  {InterpretedTypes::TriggerCriteria,
                   ToInt(TableFields<Region::TriggerCriteria>::Field::VelocityRange)},
-                 {InterpretedTypes::RegionOptions,
-                  ToInt(TableFields<Region::Options>::Field::TimbreCrossfadeRegion)},
+                 {InterpretedTypes::RegionTimbreLayering,
+                  ToInt(TableFields<Region::TimbreLayering>::Field::LayerRange)},
              })) {
             DynamicArray<char> buf {arena};
             TRY(printer.PrintWholeLua(dyn::WriterFor(buf),
@@ -1984,17 +2016,15 @@ TEST_CASE(TestAutoMapKeyRange) {
             name = "Inst1",
         })
         local group = {
-            options = { auto_map_key_range_group = "group1", },
+            trigger_criteria = { auto_map_key_range_group = "group1" },
         }
         <REGION_DEFS>
         return library)aaa";
 
         String const region_def_pattern = R"aaa(
         floe.add_region(instrument, floe.extend_table(group, {
-            file = {
-                path = "f",
-                root_key = <ROOT_KEY>,
-            },
+            path = "f",
+            root_key = <ROOT_KEY>,
         })))aaa";
 
         DynamicArray<char> region_defs {arena};
@@ -2025,11 +2055,11 @@ TEST_CASE(TestAutoMapKeyRange) {
         auto inst = *(*library->insts_by_name.begin()).value_ptr;
         REQUIRE(inst->regions.size == 2);
 
-        CHECK_EQ(inst->regions[0].file.root_key, 10);
+        CHECK_EQ(inst->regions[0].root_key, 10);
         CHECK_EQ(inst->regions[0].trigger.key_range.start, 0);
         CHECK_EQ(inst->regions[0].trigger.key_range.end, 21);
 
-        CHECK_EQ(inst->regions[1].file.root_key, 30);
+        CHECK_EQ(inst->regions[1].root_key, 30);
         CHECK_EQ(inst->regions[1].trigger.key_range.start, 21);
         CHECK_EQ(inst->regions[1].trigger.key_range.end, 128);
     }
@@ -2071,24 +2101,20 @@ TEST_CASE(TestBasicFile) {
         name = "Inst2",
         tags = {"tag1", "tag2"},
     })
-    local file = {
+    local proto = {
+        trigger_criteria = { auto_map_key_range_group = "group1" },
+    }
+    floe.add_region(instrument, floe.extend_table(proto, {
         path = "foo/file.flac",   -- path relative to this file
         root_key = 10,            -- MIDI note number
         loop = { 
-            start_frame = 3000, 
-            end_frame = 9000, 
-            crossfade = 2, 
-            mode = 'standard',
+            builtin_loop = {
+                start_frame = 3000, 
+                end_frame = 9000, 
+                crossfade = 2, 
+                mode = 'standard',
+            },
         },
-    }
-    local proto = {
-        trigger_criteria = {},
-        options = {
-            auto_map_key_range_group = "group1",
-        },
-    }
-    floe.add_region(instrument, floe.extend_table(proto, {
-        file = file,
     }))
     floe.add_ir(library, {
         name = "IR1",
@@ -2133,12 +2159,12 @@ TEST_CASE(TestBasicFile) {
 
         REQUIRE(inst1->regions.size == 1);
         auto const& region = inst1->regions[0];
-        CHECK_EQ(region.options.auto_map_key_range_group, "group1"_s);
-        auto& file = region.file;
+        CHECK_EQ(region.trigger.auto_map_key_range_group, "group1"_s);
+        auto& file = region;
         CHECK_EQ(file.path, "foo/file.flac"_s);
         CHECK_EQ(file.root_key, 10);
-        REQUIRE(file.loop);
-        auto loop = file.loop.Value();
+        REQUIRE(file.loop.builtin_loop);
+        auto loop = file.loop.builtin_loop.Value();
         CHECK_EQ(loop.start_frame, 3000u);
         CHECK_EQ(loop.end_frame, 9000u);
         CHECK_EQ(loop.crossfade_frames, 2u);

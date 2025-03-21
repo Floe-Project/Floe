@@ -58,30 +58,30 @@ void PostReadBookkeeping(Library& lib) {
 
         inst.loop_overview.all_regions_require_looping = true;
 
-        for (auto const i : ::Range(ToInt(Loop::Mode::Count)))
+        for (auto const i : ::Range(ToInt(LoopMode::Count)))
             inst.loop_overview.all_loops_convertible_to_mode[i] = true;
 
-        Array<usize, ToInt(Loop::Mode::Count)> num_loops_per_mode {};
-        Array<usize, ToInt(Loop::Mode::Count)> num_loops_per_mode_with_locked_points {};
+        Array<usize, ToInt(LoopMode::Count)> num_loops_per_mode {};
+        Array<usize, ToInt(LoopMode::Count)> num_loops_per_mode_with_locked_points {};
 
         bool all_regions_never_loop = true;
 
         for (auto& region : inst.regions) {
-            if (auto const& l = region.file.loop) {
+            if (auto const& l = region.loop.builtin_loop) {
                 ++num_loops_per_mode[ToInt(l->mode)];
 
                 if (l->lock_mode) {
                     // This loop mode is locked, therefore all other modes in the
                     // all_loops_convertible_to_mode array should be false.
-                    for (auto const i : ::Range(ToInt(Loop::Mode::Count)))
+                    for (auto const i : ::Range(ToInt(LoopMode::Count)))
                         if (i != ToInt(l->mode)) inst.loop_overview.all_loops_convertible_to_mode[i] = false;
                 }
 
                 if (l->lock_loop_points) ++num_loops_per_mode_with_locked_points[ToInt(l->mode)];
             }
 
-            if (!region.file.always_loop) inst.loop_overview.all_regions_require_looping = false;
-            if (!region.file.never_loop) all_regions_never_loop = false;
+            if (!region.loop.always_loop) inst.loop_overview.all_regions_require_looping = false;
+            if (!region.loop.never_loop) all_regions_never_loop = false;
         }
 
         auto const num_loops = Sum(num_loops_per_mode);
@@ -90,9 +90,9 @@ void PostReadBookkeeping(Library& lib) {
         if (num_loops != inst.regions.size) inst.loop_overview.has_non_loops = true;
 
         inst.loop_overview.all_loops_mode = k_nullopt;
-        for (auto const i : ::Range(ToInt(Loop::Mode::Count))) {
+        for (auto const i : ::Range(ToInt(LoopMode::Count))) {
             if (num_loops_per_mode[i] == num_loops) {
-                inst.loop_overview.all_loops_mode = Loop::Mode(i);
+                inst.loop_overview.all_loops_mode = LoopMode(i);
                 break;
             }
         }

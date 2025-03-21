@@ -94,7 +94,7 @@ inline f64 CalculatePitchRatio(int note, VoiceSample const* s, f32 pitch, f32 sa
         }
         case InstrumentType::Sampler: {
             auto const& sampler = s->sampler;
-            auto const source_root_note = sampler.region->file.root_key;
+            auto const source_root_note = sampler.region->root_key;
             auto const source_sample_rate = (f64)sampler.data->sample_rate;
             auto const pitch_delta = (((f64)note + (f64)pitch) - source_root_note) / 12.0;
             auto const exp = Exp2(pitch_delta);
@@ -118,7 +118,7 @@ void SetVoicePitch(Voice& v, f32 pitch, f32 sample_rate) {
         v.smoothing_system.Set(
             s.pitch_ratio_smoother_id,
             CalculatePitchRatio((v.controller->no_key_tracking && s.generator == InstrumentType::Sampler)
-                                    ? s.sampler.region->file.root_key
+                                    ? s.sampler.region->root_key
                                     : v.note_num,
                                 &s,
                                 pitch,
@@ -172,9 +172,8 @@ static f32 GetXFadeAmp(f32 xfade_position_01, int xfade_layer_index) {
         if (s.generator != InstrumentType::Sampler) continue;
         auto& sampler = s.sampler;
 
-        if (sampler.region->options.timbre_crossfade_region) {
-            auto const& r = sampler.region->options.timbre_crossfade_region.Value();
-            if (knob_pos >= r.start && knob_pos < r.end) {
+        if (auto const r = sampler.region->timbre_layering.layer_range) {
+            if (knob_pos >= r->start && knob_pos < r->end) {
                 // NOTE: we don't handle the case if there is more than 2 overlapping regions. We should
                 // ensure we can't get this point of the code with that being the case.
                 if (!voice_sample_1)
@@ -192,8 +191,8 @@ static f32 GetXFadeAmp(f32 xfade_position_01, int xfade_layer_index) {
     if (voice_sample_1 && !voice_sample_2)
         set_xfade_smoother(*voice_sample_1, 1);
     else if (voice_sample_1 && voice_sample_2) {
-        auto const& r1 = *voice_sample_1->sampler.region->options.timbre_crossfade_region;
-        auto const& r2 = *voice_sample_2->sampler.region->options.timbre_crossfade_region;
+        auto const& r1 = *voice_sample_1->sampler.region->timbre_layering.layer_range;
+        auto const& r2 = *voice_sample_2->sampler.region->timbre_layering.layer_range;
         if (r2.start < r1.start) Swap(voice_sample_1, voice_sample_2);
         auto const overlap_low = r2.start;
         auto const overlap_high = r1.end;
@@ -207,26 +206,26 @@ static f32 GetXFadeAmp(f32 xfade_position_01, int xfade_layer_index) {
 }
 
 static Optional<BoundsCheckedLoop> ConfigureLoop(param_values::LoopMode desired_mode,
-                                                 sample_lib::Region::File const& region,
+                                                 sample_lib::Region::Loop const& region_loop,
                                                  u32 num_frames,
                                                  VoiceProcessingController::Loop const& custom_loop) {
-    if (region.loop) {
-        auto result = CreateBoundsCheckedLoop(*region.loop, num_frames);
+    if (region_loop.builtin_loop) {
+        auto result = CreateBoundsCheckedLoop(*region_loop.builtin_loop, num_frames);
 
         switch (desired_mode) {
             case param_values::LoopMode::InstrumentDefault: return result;
             case param_values::LoopMode::BuiltInLoopStandard:
-                if (!region.loop->lock_mode) result.mode = sample_lib::Loop::Mode::Standard;
+                if (!region_loop.builtin_loop->lock_mode) result.mode = sample_lib::LoopMode::Standard;
                 return result;
             case param_values::LoopMode::BuiltInLoopPingPong:
-                if (!region.loop->lock_mode) result.mode = sample_lib::Loop::Mode::PingPong;
+                if (!region_loop.builtin_loop->lock_mode) result.mode = sample_lib::LoopMode::PingPong;
                 return result;
             case param_values::LoopMode::None:
-                if (region.always_loop) return result;
+                if (region_loop.always_loop) return result;
                 return k_nullopt;
             case param_values::LoopMode::Standard:
             case param_values::LoopMode::PingPong: {
-                if (region.loop->lock_loop_points) return result;
+                if (region_loop.builtin_loop->lock_loop_points) return result;
                 break;
             }
             case param_values::LoopMode::Count: PanicIfReached(); break;
@@ -238,7 +237,7 @@ static Optional<BoundsCheckedLoop> ConfigureLoop(param_values::LoopMode desired_
         case param_values::LoopMode::BuiltInLoopStandard:
         case param_values::LoopMode::BuiltInLoopPingPong:
         case param_values::LoopMode::None: {
-            if (region.always_loop) {
+            if (region_loop.always_loop) {
                 // This is a legacy option: we have to enforce some kind of looping behaviour.
                 auto const n = (f32)num_frames;
                 return CreateBoundsCheckedLoop(
@@ -246,7 +245,7 @@ static Optional<BoundsCheckedLoop> ConfigureLoop(param_values::LoopMode desired_
                         .start_frame = 0,
                         .end_frame = (s64)(0.9f * n),
                         .crossfade_frames = (u32)(0.1f * n),
-                        .mode = sample_lib::Loop::Mode::Standard,
+                        .mode = sample_lib::LoopMode::Standard,
                     },
                     num_frames);
             }
@@ -262,8 +261,8 @@ static Optional<BoundsCheckedLoop> ConfigureLoop(param_values::LoopMode desired_
                     .end_frame = (s64)(custom_loop.end * n),
                     .crossfade_frames = (u32)(custom_loop.crossfade_size * n),
                     .mode = (desired_mode == param_values::LoopMode::PingPong)
-                                ? sample_lib::Loop::Mode::PingPong
-                                : sample_lib::Loop::Mode::Standard,
+                                ? sample_lib::LoopMode::PingPong
+                                : sample_lib::LoopMode::Standard,
                 },
                 num_frames);
 
@@ -282,7 +281,7 @@ void UpdateLoopInfo(Voice& v) {
         auto& sampler = s.sampler;
 
         sampler.loop = v.controller->vol_env_on ? ConfigureLoop(v.controller->loop_mode,
-                                                                sampler.region->file,
+                                                                sampler.region->loop,
                                                                 sampler.data->num_frames,
                                                                 v.controller->loop)
                                                 : k_nullopt;
@@ -364,7 +363,7 @@ void StartVoice(VoicePool& pool,
                 s.generator = InstrumentType::Sampler;
 
                 s.is_active = true;
-                s.amp = s_params.amp * (f32)DbToAmpApprox((f64)s_params.region.options.volume_db);
+                s.amp = s_params.amp * (f32)DbToAmpApprox((f64)s_params.region.audio_props.gain_db);
                 s.sampler.region = &s_params.region;
                 s.sampler.data = &s_params.audio_data;
                 s.sampler.loop = {};
@@ -372,7 +371,7 @@ void StartVoice(VoicePool& pool,
 
                 voice.smoothing_system.HardSet(s.pitch_ratio_smoother_id,
                                                CalculatePitchRatio(voice.controller->no_key_tracking
-                                                                       ? s.sampler.region->file.root_key
+                                                                       ? s.sampler.region->root_key
                                                                        : voice.note_num,
                                                                    &s,
                                                                    params.initial_pitch,
@@ -622,7 +621,7 @@ class ChunkwiseVoiceProcessor {
 
     bool SampleGetAndIncWithXFade(VoiceSample& w, u32 frame, f32& out_l, f32& out_r) {
         bool sample_still_going = false;
-        if (w.sampler.region->options.timbre_crossfade_region) {
+        if (w.sampler.region->timbre_layering.layer_range) {
             if (auto const v = m_voice.smoothing_system.Value(w.sampler.xfade_vol_smoother_id, frame);
                 v != 0) {
                 sample_still_going = SampleGetAndInc(w, frame, out_l, out_r);

@@ -20,7 +20,7 @@ enum class LoopBehaviourId : u8 {
 struct LoopBehaviour {
     struct Value {
         LoopBehaviourId id;
-        Optional<sample_lib::Loop::Mode> mode;
+        Optional<sample_lib::LoopMode> mode;
         String name;
         String description;
         bool editable;
@@ -44,7 +44,7 @@ static LoopBehaviour::Value Behaviour(LoopBehaviourId id) {
         case LoopBehaviourId::BuiltinLoopStandard:
             return {
                 .id = id,
-                .mode = sample_lib::Loop::Mode::Standard,
+                .mode = sample_lib::LoopMode::Standard,
                 .name = "Loop - Built-in Loop Standard",
                 .description =
                     "Every region in this instrument will use built-in loops in standard wrap-around mode.",
@@ -53,7 +53,7 @@ static LoopBehaviour::Value Behaviour(LoopBehaviourId id) {
         case LoopBehaviourId::BuiltinLoopPingPong:
             return {
                 .id = id,
-                .mode = sample_lib::Loop::Mode::PingPong,
+                .mode = sample_lib::LoopMode::PingPong,
                 .name = "Loop - Built-in Ping-pong",
                 .description = "Every region in this instrument will use built-in loops in ping-pong mode.",
                 .editable = false,
@@ -61,7 +61,7 @@ static LoopBehaviour::Value Behaviour(LoopBehaviourId id) {
         case LoopBehaviourId::CustomLoopStandard:
             return {
                 .id = id,
-                .mode = sample_lib::Loop::Mode::Standard,
+                .mode = sample_lib::LoopMode::Standard,
                 .name = "Loop - Standard",
                 .description =
                     "Custom loop points will be applied to this instrument and use standard wrap-around mode.",
@@ -70,7 +70,7 @@ static LoopBehaviour::Value Behaviour(LoopBehaviourId id) {
         case LoopBehaviourId::CustomLoopPingPong:
             return {
                 .id = id,
-                .mode = sample_lib::Loop::Mode::PingPong,
+                .mode = sample_lib::LoopMode::PingPong,
                 .name = "Loop - Ping-pong",
                 .description =
                     "Custom loop points will be applied to this instrument and use ping-pong mode.",
@@ -159,21 +159,21 @@ PUBLIC LoopBehaviour ActualLoopBehaviour(Instrument const& inst, param_values::L
 
                     if (loop_overview.all_loops_mode) {
                         switch (*loop_overview.all_loops_mode) {
-                            case sample_lib::Loop::Mode::Standard:
+                            case sample_lib::LoopMode::Standard:
                                 return {
                                     detail::Behaviour(LoopBehaviourId::BuiltinLoopStandard),
                                     k_default_behaviour,
                                     true,
                                 };
 
-                            case sample_lib::Loop::Mode::PingPong:
+                            case sample_lib::LoopMode::PingPong:
                                 return {
                                     detail::Behaviour(LoopBehaviourId::BuiltinLoopPingPong),
                                     k_default_behaviour,
                                     true,
                                 };
 
-                            case sample_lib::Loop::Mode::Count: PanicIfReached(); break;
+                            case sample_lib::LoopMode::Count: PanicIfReached(); break;
                         }
                     }
 
@@ -201,7 +201,7 @@ PUBLIC LoopBehaviour ActualLoopBehaviour(Instrument const& inst, param_values::L
 
                     ASSERT(!loop_overview.has_non_loops);
 
-                    if (!loop_overview.all_loops_convertible_to_mode[ToInt(sample_lib::Loop::Mode::Standard)])
+                    if (!loop_overview.all_loops_convertible_to_mode[ToInt(sample_lib::LoopMode::Standard)])
                         return {
                             detail::Behaviour(LoopBehaviourId::MixedLoops),
                             "Some regions cannot use standard wrap-around loops.",
@@ -232,7 +232,7 @@ PUBLIC LoopBehaviour ActualLoopBehaviour(Instrument const& inst, param_values::L
 
                     ASSERT(!loop_overview.has_non_loops);
 
-                    if (!loop_overview.all_loops_convertible_to_mode[ToInt(sample_lib::Loop::Mode::PingPong)])
+                    if (!loop_overview.all_loops_convertible_to_mode[ToInt(sample_lib::LoopMode::PingPong)])
                         return {
                             detail::Behaviour(LoopBehaviourId::MixedLoops),
                             "Some regions cannot use ping-pong loops.",
@@ -252,21 +252,21 @@ PUBLIC LoopBehaviour ActualLoopBehaviour(Instrument const& inst, param_values::L
                     if (loop_overview.all_regions_require_looping) {
                         if (loop_overview.all_loops_mode) {
                             switch (*loop_overview.all_loops_mode) {
-                                case sample_lib::Loop::Mode::Standard:
+                                case sample_lib::LoopMode::Standard:
                                     return {
                                         detail::Behaviour(LoopBehaviourId::BuiltinLoopStandard),
                                         k_all_require_loops,
                                         false,
                                     };
 
-                                case sample_lib::Loop::Mode::PingPong:
+                                case sample_lib::LoopMode::PingPong:
                                     return {
                                         detail::Behaviour(LoopBehaviourId::BuiltinLoopPingPong),
                                         k_all_require_loops,
                                         false,
                                     };
 
-                                case sample_lib::Loop::Mode::Count: PanicIfReached(); break;
+                                case sample_lib::LoopMode::Count: PanicIfReached(); break;
                             }
                         }
 
@@ -304,21 +304,21 @@ PUBLIC LoopBehaviour ActualLoopBehaviour(Instrument const& inst, param_values::L
 
                         if (loop_overview.all_loops_mode) {
                             switch (*loop_overview.all_loops_mode) {
-                                case sample_lib::Loop::Mode::Standard:
+                                case sample_lib::LoopMode::Standard:
                                     return {
                                         detail::Behaviour(LoopBehaviourId::BuiltinLoopStandard),
                                         k_all_non_customisable,
                                         false,
                                     };
 
-                                case sample_lib::Loop::Mode::PingPong:
+                                case sample_lib::LoopMode::PingPong:
                                     return {
                                         detail::Behaviour(LoopBehaviourId::BuiltinLoopPingPong),
                                         k_all_non_customisable,
                                         false,
                                     };
 
-                                case sample_lib::Loop::Mode::Count: PanicIfReached(); break;
+                                case sample_lib::LoopMode::Count: PanicIfReached(); break;
                             }
                         }
 
@@ -355,21 +355,21 @@ PUBLIC LoopBehaviour ActualLoopBehaviour(Instrument const& inst, param_values::L
 
                         if (loop_overview.all_loops_mode) {
                             switch (*loop_overview.all_loops_mode) {
-                                case sample_lib::Loop::Mode::Standard:
+                                case sample_lib::LoopMode::Standard:
                                     return {
                                         detail::Behaviour(LoopBehaviourId::BuiltinLoopStandard),
                                         k_all_non_customisable,
                                         false,
                                     };
 
-                                case sample_lib::Loop::Mode::PingPong:
+                                case sample_lib::LoopMode::PingPong:
                                     return {
                                         detail::Behaviour(LoopBehaviourId::BuiltinLoopPingPong),
                                         k_all_non_customisable,
                                         false,
                                     };
 
-                                case sample_lib::Loop::Mode::Count: PanicIfReached(); break;
+                                case sample_lib::LoopMode::Count: PanicIfReached(); break;
                             }
                         }
 

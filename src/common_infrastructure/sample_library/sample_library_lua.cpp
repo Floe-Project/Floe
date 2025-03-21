@@ -90,6 +90,7 @@ enum class InterpretedTypes : u32 {
     Instrument,
     ImpulseResponse,
     Region,
+    Loop,
     File,
     TriggerCriteria,
     RegionOptions,
@@ -320,10 +321,107 @@ static Span<String> SetArrayOfStrings(LuaState& ctx, FieldInfo field_info, bool 
 }
 
 template <>
+struct TableFields<Loop> {
+    using Type = Loop;
+
+    enum class Field : u32 {
+        Start,
+        End,
+        Crossfade,
+        Mode,
+        LockLoopPoints,
+        LockMode,
+        Count,
+    };
+
+    static constexpr char const* k_loop_mode_names[] = {"standard", "ping-pong", nullptr};
+    static_assert(ArraySize(k_loop_mode_names) == ToInt(Loop::Mode::Count) + 1);
+
+    static constexpr FieldInfo FieldInfo(Field f) {
+        switch (f) {
+            case Field::Start:
+                return {
+                    .name = "start_frame",
+                    .description_sentence =
+                        "The start of the loop in frames. Inclusive. It can be negative meaning index the file from the end rather than the start. For example, -1 == number_frames_in_file, -2 == (number_frames_in_file - 1), etc.",
+                    .example = "24",
+                    .lua_type = LUA_TNUMBER,
+                    .required = true,
+                    .set =
+                        [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.start_frame = NumberFromTop<u32>(ctx, info); },
+                };
+            case Field::End:
+                return {
+                    .name = "end_frame",
+                    .description_sentence =
+                        "The end of the loop in frames. Exclusive. It can be negative meaning index the file from the end rather than the start. For example, -1 == number_frames_in_file, -2 == (number_frames_in_file - 1), etc.",
+                    .example = "6600",
+                    .lua_type = LUA_TNUMBER,
+                    .required = true,
+                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.end_frame = NumberFromTop<u32>(ctx, info); },
+                };
+            case Field::Crossfade:
+                return {
+                    .name = "crossfade",
+                    .description_sentence = "The number of frames to crossfade.",
+                    .example = "100",
+                    .lua_type = LUA_TNUMBER,
+                    .required = true,
+                    .set =
+                        [](SET_FIELD_VALUE_ARGS) {
+                            FIELD_OBJ.crossfade_frames = NumberFromTop<u32>(ctx, info);
+                        },
+                };
+            case Field::Mode:
+                return {
+                    .name = "mode",
+                    .description_sentence = "The mode of the loop.",
+                    .example = FromNullTerminated(k_loop_mode_names[ToInt(Loop::Mode::Standard)]),
+                    .default_value = FromNullTerminated(k_loop_mode_names[ToInt(Loop::Mode::Standard)]),
+                    .lua_type = LUA_TSTRING,
+                    .required = false,
+                    .enum_options = k_loop_mode_names,
+                    .set =
+                        [](SET_FIELD_VALUE_ARGS) {
+                            FIELD_OBJ.mode =
+                                (Loop::Mode)luaL_checkoption(ctx.lua, -1, nullptr, k_loop_mode_names);
+                        },
+                };
+            case Field::LockLoopPoints:
+                return {
+                    .name = "lock_loop_points",
+                    .description_sentence =
+                        "If true, the start, end and crossfade values cannot be overriden by a custom loop from Floe's GUI.",
+                    .example = "false",
+                    .lua_type = LUA_TBOOLEAN,
+                    .required = false,
+                    .set =
+                        [](SET_FIELD_VALUE_ARGS) {
+                            FIELD_OBJ.lock_loop_points = lua_toboolean(ctx.lua, -1) != 0;
+                        },
+                };
+            case Field::LockMode:
+                return {
+                    .name = "lock_mode",
+                    .description_sentence =
+                        "If true, the loop mode value cannot be overriden by a custom mode from Floe's GUI.",
+                    .example = "false",
+                    .lua_type = LUA_TBOOLEAN,
+                    .required = false,
+                    .set =
+                        [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.lock_mode = lua_toboolean(ctx.lua, -1) != 0; },
+                };
+            case Field::Count: break;
+        }
+        return {};
+    }
+};
+
+template <>
 struct TableFields<Region::File> {
     using Type = Region::File;
 
-    enum class Field : u32 { Path, RootKey, Loop, Count };
+    enum class Field : u32 { Path, RootKey, Loop, NeverLoop, AlwaysLoop, Count };
 
     static constexpr FieldInfo FieldInfo(Field f) {
         switch (f) {
@@ -350,38 +448,50 @@ struct TableFields<Region::File> {
             case Field::Loop:
                 return {
                     .name = "loop",
-                    .description_sentence =
-                        "The region of the file that can be looped. It should be an array: 3 integers and 1 boolean: { start, end, crossfade, is_ping_pong boolean }. Start is inclusive, end is exclusive. The start and end numbers can be negative meaning they index the file from the end rather than the start. For example, -1 == number_frames_in_file, -2 == (number_frames_in_file - 1), etc.",
-                    .example = "{ 24, 6600, 100, false }",
-                    .default_value = "no loop",
+                    .description_sentence = "The region of the file that can be looped.",
                     .lua_type = LUA_TTABLE,
+                    .subtype = InterpretedTypes::Loop,
                     .required = false,
                     .set =
                         [](SET_FIELD_VALUE_ARGS) {
-                            auto& file = FIELD_OBJ;
-                            file.loop = Loop {};
-                            auto const vals = ListOfInts(ctx, 3, info);
-                            file.loop->start_frame = vals[0];
-                            file.loop->end_frame = vals[1];
-                            if (vals[2] < 0)
-                                luaL_error(ctx.lua,
-                                           "'%s'[3] (crossfade) should not be negative",
-                                           info.name.data);
-                            file.loop->crossfade_frames = (u32)vals[2];
+                            Loop loop;
+                            InterpretTable(ctx, -1, loop);
+                            FIELD_OBJ.loop = loop;
+                        },
 
-                            {
-                                bool is_bool = false;
-                                lua_geti(ctx.lua, -1, 4);
-                                if (lua_isboolean(ctx.lua, -1)) {
-                                    file.loop->ping_pong = lua_toboolean(ctx.lua, -1);
-                                    is_bool = true;
-                                }
-                                lua_pop(ctx.lua, 1);
-                                if (!is_bool)
-                                    luaL_error(ctx.lua,
-                                               "'%s'[4] (is_ping_pong) should be a boolean",
-                                               info.name.data);
-                            }
+                };
+            case Field::NeverLoop:
+                return {
+                    .name = "never_loop",
+                    .description_sentence =
+                        "If true, this region will never loop even if there is a user-defined loop. Set all regions of an instrument to this to entirely disable looping for the instrument.",
+                    .example = "false",
+                    .default_value = "false",
+                    .lua_type = LUA_TBOOLEAN,
+                    .required = false,
+                    .set =
+                        [](SET_FIELD_VALUE_ARGS) {
+                            FIELD_OBJ.never_loop = lua_toboolean(ctx.lua, -1) != 0;
+                            // Mutually exclusive with always_loop
+                            if (FIELD_OBJ.never_loop && FIELD_OBJ.always_loop)
+                                luaL_error(ctx.lua, "never_loop and always_loop are mutually exclusive");
+                        },
+                };
+            case Field::AlwaysLoop:
+                return {
+                    .name = "always_loop",
+                    .description_sentence =
+                        "If true, this region will always loop - either using the built in loop, a user defined loop, or a default built-in loop.",
+                    .example = "false",
+                    .default_value = "false",
+                    .lua_type = LUA_TBOOLEAN,
+                    .required = false,
+                    .set =
+                        [](SET_FIELD_VALUE_ARGS) {
+                            FIELD_OBJ.always_loop = lua_toboolean(ctx.lua, -1) != 0;
+                            // Mutually exclusive with never_loop
+                            if (FIELD_OBJ.never_loop && FIELD_OBJ.always_loop)
+                                luaL_error(ctx.lua, "never_loop and always_loop are mutually exclusive");
                         },
                 };
 
@@ -1462,6 +1572,8 @@ LibraryPtrOrError ReadLua(Reader& reader,
 
         library->files_requiring_attribution = ctx.files_requiring_attribution.ToOwnedTable();
 
+        detail::PostReadBookkeeping(*library);
+
         return library;
     } catch (OutOfMemory const& e) {
         return Error {LuaErrorCode::Memory, {}};
@@ -1545,6 +1657,7 @@ struct LuaCodePrinter {
                 case InterpretedTypes::ImpulseResponse:
                     struct_fields[i] = FieldInfosSpan<ImpulseResponse>();
                     break;
+                case InterpretedTypes::Loop: struct_fields[i] = FieldInfosSpan<Loop>(); break;
                 case InterpretedTypes::Region: struct_fields[i] = FieldInfosSpan<Region>(); break;
                 case InterpretedTypes::File: struct_fields[i] = FieldInfosSpan<Region::File>(); break;
                 case InterpretedTypes::TriggerCriteria:
@@ -1961,7 +2074,12 @@ TEST_CASE(TestBasicFile) {
     local file = {
         path = "foo/file.flac",   -- path relative to this file
         root_key = 10,            -- MIDI note number
-        loop = { 3000, 9000, 2, false }, -- start, end, xfade, or can be nil
+        loop = { 
+            start_frame = 3000, 
+            end_frame = 9000, 
+            crossfade = 2, 
+            mode = 'standard',
+        },
     }
     local proto = {
         trigger_criteria = {},

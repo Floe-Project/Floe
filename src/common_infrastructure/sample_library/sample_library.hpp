@@ -1,4 +1,4 @@
-// Copyright 2018-2024 Sam Windell
+// Copyright 2018-2025 Sam Windell
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #pragma once
@@ -44,17 +44,24 @@ enum class TriggerEvent { NoteOn, NoteOff, Count };
 // start and end can be negative meaning they're indexed from the end of the sample.
 // e.g. -1 == num_frames, -2 == (num_frames - 1), etc.
 struct Loop {
+    enum class Mode : u8 { Standard, PingPong, Count };
     s64 start_frame {};
     s64 end_frame {};
     u32 crossfade_frames {};
-    bool ping_pong {};
+    Mode mode {};
+
+    bool8 lock_loop_points : 1 {}; // Don't allow start, end or crossfade to be overriden.
+    bool8 lock_mode : 1 {}; // Don't allow mode to be changed.
 };
 
 struct Region {
+    // TODO: I think remove these sub-structs
     struct File {
         LibraryPath path {};
         u8 root_key {};
         Optional<Loop> loop {};
+        bool8 never_loop : 1 {};
+        bool8 always_loop : 1 {};
     };
 
     struct TriggerCriteria {
@@ -80,6 +87,15 @@ struct Region {
 
 struct Library;
 
+struct LoopOverview {
+    Array<bool, ToInt(Loop::Mode::Count)> all_loops_convertible_to_mode {}; // Convertible or already in mode.
+    Optional<Loop::Mode> all_loops_mode {}; // If all loop modes are the same mode, this will be set.
+    bool8 has_loops : 1 {};
+    bool8 has_non_loops : 1 {};
+    bool8 user_defined_loops_allowed : 1 {};
+    bool8 all_regions_require_looping : 1 {}; // Legacy option. If true, looping shouldn't be turned off.
+};
+
 struct Instrument {
     Library const& library;
 
@@ -91,6 +107,7 @@ struct Instrument {
     Span<Region> regions {};
     usize regions_allocated_capacity {}; // private
 
+    LoopOverview loop_overview {}; // Cached info about the loops in the regions.
     u32 max_rr_pos {};
 };
 
@@ -229,14 +246,7 @@ inline ErrorCodeCategory const& ErrorCategoryForEnum(LuaErrorCode) { return lua_
 
 ErrorCodeOr<u64> MdataHash(Reader& reader);
 ErrorCodeOr<u64> LuaHash(Reader& reader);
-inline ErrorCodeOr<u64> Hash(Reader& reader, FileFormat format) {
-    switch (format) {
-        case FileFormat::Mdata: return MdataHash(reader);
-        case FileFormat::Lua: return LuaHash(reader);
-    }
-    PanicIfReached();
-    return {};
-}
+ErrorCodeOr<u64> Hash(Reader& reader, FileFormat format);
 
 struct Error {
     ErrorCode code;
@@ -254,27 +264,19 @@ struct TryHelpersOutcomeToError {
 
 using LibraryPtrOrError = ValueOrError<Library*, Error>;
 
-inline bool FilenameIsFloeLuaFile(String filename) {
-    return IsEqualToCaseInsensitiveAscii(filename, "floe.lua") ||
-           EndsWithCaseInsensitiveAscii(filename, ".floe.lua"_s);
-}
-
-inline bool FilenameIsMdataFile(String filename) {
-    return EndsWithCaseInsensitiveAscii(filename, ".mdata"_s);
-}
-
-inline Optional<FileFormat> DetermineFileFormat(String path) {
-    auto const filename = path::Filename(path);
-    if (FilenameIsFloeLuaFile(filename)) return FileFormat::Lua;
-    if (FilenameIsMdataFile(filename)) return FileFormat::Mdata;
-    return k_nullopt;
-}
+bool FilenameIsFloeLuaFile(String filename);
+bool FilenameIsMdataFile(String filename);
+Optional<FileFormat> DetermineFileFormat(String path);
 
 // only honoured by the lua system
 struct Options {
     usize max_memory_allowed = Mb(128);
     f64 max_seconds_allowed = 20;
 };
+
+namespace detail {
+void PostReadBookkeeping(Library& lib);
+}
 
 LibraryPtrOrError ReadLua(Reader& reader,
                           String lua_filepath,
@@ -285,31 +287,17 @@ LibraryPtrOrError ReadLua(Reader& reader,
 LibraryPtrOrError
 ReadMdata(Reader& reader, String filepath, ArenaAllocator& result_arena, ArenaAllocator& scratch_arena);
 
-inline LibraryPtrOrError Read(Reader& reader,
-                              FileFormat format,
-                              String filepath,
-                              ArenaAllocator& result_arena,
-                              ArenaAllocator& scatch_arena,
-                              Options options = {}) {
-    switch (format) {
-        case FileFormat::Mdata: return ReadMdata(reader, filepath, result_arena, scatch_arena);
-        case FileFormat::Lua: return ReadLua(reader, filepath, result_arena, scatch_arena, options);
-    }
-    PanicIfReached();
-}
-
-ErrorCodeOr<void> WriteDocumentedLuaExample(Writer writer, bool include_comments = true);
+LibraryPtrOrError Read(Reader& reader,
+                       FileFormat format,
+                       String filepath,
+                       ArenaAllocator& result_arena,
+                       ArenaAllocator& scatch_arena,
+                       Options options = {});
 
 // Lua only
+ErrorCodeOr<void> WriteDocumentedLuaExample(Writer writer, bool include_comments = true);
 bool CheckAllReferencedFilesExist(Library const& lib, Writer error_writer);
 
 } // namespace sample_lib
 
-PUBLIC ErrorCodeOr<void>
-CustomValueToString(Writer writer, sample_lib::LibraryIdRef id, fmt::FormatOptions options) {
-    auto const sep = " - "_s;
-    TRY(PadToRequiredWidthIfNeeded(writer, options, id.author.size + sep.size + id.name.size));
-    TRY(writer.WriteChars(id.author));
-    TRY(writer.WriteChars(sep));
-    return writer.WriteChars(id.name);
-}
+ErrorCodeOr<void> CustomValueToString(Writer writer, sample_lib::LibraryIdRef id, fmt::FormatOptions options);

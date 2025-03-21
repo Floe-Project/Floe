@@ -124,11 +124,12 @@ struct VoiceProcessingController {
         f32 time_hz;
     } lfo {};
 
-    struct {
+    struct Loop {
         f32 start;
         f32 end;
         f32 crossfade_size;
-    } loop {};
+    };
+    Loop loop {};
 
     f32 tune = 1;
     FloeSmoothedValueSystem::FloatId const pan_pos_smoother_id; // -1 to 1
@@ -187,6 +188,21 @@ struct LayerProcessor {
             case InstrumentType::None: return "None"_s;
         }
         return {};
+    }
+
+    String InstTypeName() const {
+        ASSERT(IsMainThread(host));
+        switch (instrument.tag) {
+            case InstrumentType::WaveformSynth: return "Oscillator waveform"_s;
+            case InstrumentType::Sampler: {
+                auto const& s =
+                    instrument.Get<sample_lib_server::RefCounted<sample_lib::LoadedInstrument>>()->instrument;
+                if (s.regions.size == 0) return "Empty"_s;
+                if (s.regions.size == 1) return "Single sample"_s;
+                return "Multisample"_s;
+            }
+            case InstrumentType::None: return "None"_s;
+        }
     }
 
     Optional<sample_lib::LibraryIdRef> LibId() const {

@@ -744,7 +744,7 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
             param_values::LoopMode mode = param_values::LoopMode::InstrumentDefault;
             if (old_layer1_loop_on)
                 if (!old_layer1_ping_pong)
-                    mode = param_values::LoopMode::Regular;
+                    mode = param_values::LoopMode::Standard;
                 else
                     mode = param_values::LoopMode::PingPong;
             else
@@ -1665,7 +1665,7 @@ TEST_CASE(TestLoadingOldFiles) {
         CHECK_APPROX_EQ(ProjectedLayerValue(state, 2, LayerParamIndex::Volume), DbToAmp(-6.0f), 0.01f);
 
         CHECK_EQ(ProjectedLayerValue(state, 0, LayerParamIndex::LoopMode),
-                 (f32)param_values::LoopMode::Regular);
+                 (f32)param_values::LoopMode::Standard);
         CHECK_APPROX_EQ(ProjectedLayerValue(state, 0, LayerParamIndex::LoopStart), 0.07f, 0.01f);
         CHECK_APPROX_EQ(ProjectedLayerValue(state, 0, LayerParamIndex::LoopEnd), 0.20f, 0.01f);
         CHECK_APPROX_EQ(ProjectedLayerValue(state, 0, LayerParamIndex::LoopCrossfade), 0.27f, 0.01f);

@@ -356,19 +356,30 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
                             .root_key = CheckedCast<u8>(region_info.root_note),
                             .loop = ({
                                 Optional<Loop> l {};
-                                constexpr bool k_ping_pong = false; // MDATA didn't allow ping pong loops
                                 if (region_info.looping_mode == mdata::SampleLoopingModeAlwaysLoopAnyRegion ||
                                     region_info.looping_mode == mdata::SampleLoopingModeAlwaysLoopSetRegion) {
-                                    l = Loop {.start_frame = region_info.loop_start,
-                                              .end_frame = region_info.loop_end,
-                                              .crossfade_frames =
-                                                  CheckedCast<u32>(region_info.loop_crossfade),
-                                              .ping_pong = k_ping_pong};
+                                    l = Loop {
+                                        .start_frame = region_info.loop_start,
+                                        .end_frame = region_info.loop_end,
+                                        .crossfade_frames = CheckedCast<u32>(region_info.loop_crossfade),
+                                        .mode = Loop::Mode::Standard,
+                                        .lock_loop_points = region_info.looping_mode ==
+                                                            mdata::SampleLoopingModeAlwaysLoopSetRegion,
+                                        .lock_mode = false,
+                                    };
                                 } else if (region_info.looping_mode ==
                                            mdata::SampleLoopingModeAlwaysLoopWholeRegion)
-                                    l = Loop {0, file_info.num_frames, 0, k_ping_pong};
+                                    l = Loop {
+                                        .start_frame = 0,
+                                        .end_frame = file_info.num_frames,
+                                        .crossfade_frames = 0,
+                                        .mode = Loop::Mode::Standard,
+                                        .lock_loop_points = true,
+                                        .lock_mode = false,
+                                    };
                                 l;
                             }),
+                            .always_loop = region_info.looping_mode != mdata::SampleLoopingModeDefault,
                         },
                     .trigger =
                         {
@@ -549,6 +560,8 @@ ReadMdata(Reader& reader, String filepath, ArenaAllocator& result_arena, ArenaAl
     library->path = String(filepath.Clone(result_arena));
     if (reader.memory)
         library->file_format_specifics.Get<MdataSpecifics>().file_data = {reader.memory, reader.size};
+
+    detail::PostReadBookkeeping(*library);
 
     return library;
 }

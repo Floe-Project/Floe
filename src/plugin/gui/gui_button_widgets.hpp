@@ -332,17 +332,18 @@ PUBLIC Style PresetsBrowserPopupButton(imgui::Context const& imgui) {
     return s;
 }
 
-PUBLIC Style MenuItem(imgui::Context const& imgui, bool _closes_popups) {
+PUBLIC Style MenuItem(imgui::Context const& imgui, bool _closes_popups, bool greyed_out = false) {
     Style s {};
     s.type = LayoutAndSizeType::IconAndTextMenuItem;
     s.closes_popups = _closes_popups;
     s.back_cols.reg = 0;
-    s.back_cols.hot_on = LiveCol(imgui, UiColMap::PopupItemBackHover);
+    s.back_cols.hot_on =
+        LiveCol(imgui, !greyed_out ? UiColMap::PopupItemBackHover : UiColMap::PopupItemBackHoverGreyedOut);
     s.back_cols.hot_off = s.back_cols.hot_on;
-    s.back_cols.active_on = LiveCol(imgui, UiColMap::PopupItemBackHover);
+    s.back_cols.active_on = s.back_cols.hot_on;
     s.back_cols.active_off = s.back_cols.active_on;
-    s.back_cols.on = LiveCol(imgui, UiColMap::PopupItemBackHover);
-    s.text_cols.reg = LiveCol(imgui, UiColMap::PopupItemText);
+    s.back_cols.on = greyed_out ? 0 : LiveCol(imgui, UiColMap::PopupItemBackHover);
+    s.text_cols.reg = LiveCol(imgui, greyed_out ? UiColMap::PopupItemTextGreyedOut : UiColMap::PopupItemText);
     s.text_cols.hot_on = s.text_cols.reg;
     s.text_cols.hot_off = s.text_cols.reg;
     s.text_cols.active_on = s.text_cols.reg;

@@ -55,6 +55,16 @@ PUBLIC Style PresetSectionHeading(imgui::Context const& imgui) {
     return CentredLeft(imgui, LiveCol(imgui, UiColMap::BrowserSectionHeading));
 }
 
+PUBLIC Style WaveformLabel(imgui::Context const& imgui) {
+    Style s {};
+    s.type = buttons::LayoutAndSizeType::IconOrText;
+    s.icon_or_text.justification = TextJustification::Centred;
+    s.icon_or_text.add_margin_x = false;
+    s.icon_or_text.capitalise = false;
+    s.main_cols.reg = LiveCol(imgui, UiColMap::Waveform_Label);
+    return s;
+}
+
 PUBLIC Style Parameter(imgui::Context const& imgui, bool greyed_out = false) {
     Style s {};
     s.type = buttons::LayoutAndSizeType::IconOrText;

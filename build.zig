@@ -1865,6 +1865,7 @@ pub fn build(b: *std.Build) void {
                     path ++ "/paths.cpp",
                     path ++ "/preferences.cpp",
                     path ++ "/sample_library/audio_file.cpp",
+                    path ++ "/sample_library/sample_library.cpp",
                     path ++ "/sample_library/sample_library_lua.cpp",
                     path ++ "/sample_library/sample_library_mdata.cpp",
                     path ++ "/sentry/sentry.cpp",

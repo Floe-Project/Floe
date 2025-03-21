@@ -6,6 +6,7 @@
 #include <IconsFontAwesome5.h>
 
 #include "engine/engine.hpp"
+#include "engine/loop_modes.hpp"
 #include "gui.hpp"
 #include "gui_button_widgets.hpp"
 #include "gui_dragger_widgets.hpp"
@@ -30,9 +31,6 @@ static void LayerInstrumentMenuItems(Gui* g, LayerProcessor* layer) {
     auto libs = sample_lib_server::AllLibrariesRetained(g->shared_engine_systems.sample_library_server,
                                                         g->scratch_arena);
     DEFER { sample_lib_server::ReleaseAll(libs); };
-
-    StartFloeMenu(g);
-    DEFER { EndFloeMenu(g); };
 
     // TODO(1.0): this is not production-ready code. We need a new powerful database-like browser GUI
     int current = 0;
@@ -112,6 +110,95 @@ static void DoInstSelectorGUI(Gui* g, Rect r, u32 layer) {
                             "Instrument: {}\nChange or remove the instrument for this layer",
                             inst_name));
     }
+}
+
+static void DoLoopModeSelectorGui(Gui* g, Rect r, LayerProcessor& layer) {
+    g->imgui.PushID("loop mode selector");
+    DEFER { g->imgui.PopID(); };
+    auto const& param = layer.params[ToInt(LayerParamIndex::LoopMode)];
+    auto const desired_loop_mode = param.ValueAsInt<param_values::LoopMode>();
+
+    auto const actual_loop_behaviour = ActualLoopBehaviour(layer.instrument, desired_loop_mode);
+    auto const default_loop_behaviour =
+        ActualLoopBehaviour(layer.instrument, param_values::LoopMode::InstrumentDefault);
+    DynamicArrayBounded<char, 64> default_mode_str {"Default: "};
+    dyn::AppendSpan(default_mode_str, default_loop_behaviour.value.name);
+
+    auto const imgui_id = BeginParameterGUI(g, param, r);
+
+    bool greyed_out = false;
+    Optional<f32> val {};
+
+    if (buttons::Popup(g,
+                       imgui_id,
+                       imgui_id + 1,
+                       r,
+                       actual_loop_behaviour.value.name,
+                       buttons::ParameterPopupButton(g->imgui, greyed_out))) {
+        StartFloeMenu(g);
+        DEFER { EndFloeMenu(g); };
+        DEFER { g->imgui.EndWindow(); };
+
+        auto items = param_values::k_loop_mode_strings;
+
+        items[ToInt(param_values::LoopMode::InstrumentDefault)] = default_mode_str;
+
+        auto const w = MenuItemWidth(g, items);
+        auto const h = LiveSize(g->imgui, UiSizeId::MenuItemHeight);
+
+        for (auto const i : Range<u32>(items.size)) {
+            bool state = i == ToInt(desired_loop_mode);
+            auto const behaviour = ActualLoopBehaviour(layer.instrument, (param_values::LoopMode)i);
+            auto const valid = behaviour.is_desired;
+            Rect const item_rect = {.xywh {0, h * (f32)i, w, h}};
+            auto const item_id = g->imgui.GetID((uintptr)i);
+
+            if (buttons::Toggle(g,
+                                item_id,
+                                item_rect,
+                                state,
+                                items[i],
+                                buttons::MenuItem(g->imgui, true, !valid)) &&
+                i != ToInt(desired_loop_mode))
+                val = (f32)i;
+
+            {
+                DynamicArray<char> tooltip {g->scratch_arena};
+
+                if (!valid) fmt::Append(tooltip, "Not available: {}\n\n", behaviour.reason);
+
+                dyn::AppendSpan(tooltip, LoopModeDescription((param_values::LoopMode)i));
+
+                if (i == ToInt(param_values::LoopMode::InstrumentDefault)) {
+                    fmt::Append(tooltip, "\n\n{}'s default behaviour: \n", layer.InstName());
+                    dyn::AppendSpan(tooltip, default_loop_behaviour.value.description);
+                    if (auto const reason = default_loop_behaviour.reason; reason.size) {
+                        dyn::Append(tooltip, ' ');
+                        dyn::AppendSpan(tooltip, reason);
+                    }
+                }
+
+                Tooltip(g, item_id, item_rect, tooltip);
+            }
+        }
+    }
+
+    EndParameterGUI(g,
+                    imgui_id,
+                    param,
+                    r,
+                    val,
+                    (ParamDisplayFlags)(ParamDisplayFlagsNoTooltip | ParamDisplayFlagsNoValuePopup));
+
+    Tooltip(g,
+            imgui_id,
+            r,
+            fmt::Format(g->scratch_arena,
+                        "{}: {}\n\n{} {}",
+                        param.info.name,
+                        actual_loop_behaviour.value.name,
+                        actual_loop_behaviour.value.description,
+                        actual_loop_behaviour.reason));
 }
 
 static String GetPageTitle(PageType type) {
@@ -335,6 +422,7 @@ void Layout(Gui* g,
 
         switch (layer_gui->selected_page) {
             case PageType::Main: {
+                auto const waveform_margins_lr = LiveSize(g->imgui, Main_WaveformMarginLR);
                 c.main.waveform = layout::CreateItem(
                     g->layout,
                     {
@@ -342,9 +430,17 @@ void Layout(Gui* g,
                         .size = {layout::k_fill_parent, LiveSize(g->imgui, Main_WaveformH)},
                         .margins =
                             {
-                                .lr = LiveSize(g->imgui, Main_WaveformMarginLR),
+                                .lr = waveform_margins_lr,
                                 .tb = LiveSize(g->imgui, Main_WaveformMarginTB),
                             },
+                    });
+
+                c.main.waveform_label = layout::CreateItem(
+                    g->layout,
+                    {
+                        .parent = page_container,
+                        .size = {layout::k_fill_parent, LiveSize(g->imgui, Main_WaveformLabelH)},
+                        .margins = {.lr = waveform_margins_lr},
                     });
 
                 auto const main_item_margin_lr = LiveSize(g->imgui, Main_ItemMarginLR);
@@ -872,16 +968,18 @@ void Draw(Gui* g,
             {
                 GUIDoSampleWaveform(g, layer, layout::GetRect(g->layout, c.main.waveform));
 
+                labels::Label(g,
+                              layout::GetRect(g->layout, c.main.waveform_label),
+                              layer->InstTypeName(),
+                              labels::WaveformLabel(g->imgui));
+
                 bool const greyed_out = layer->inst.tag == InstrumentType::WaveformSynth;
                 buttons::Toggle(g,
                                 layer->params[ToInt(LayerParamIndex::Reverse)],
                                 c.main.reverse,
                                 buttons::ParameterToggleButton(g->imgui, {}, greyed_out));
 
-                buttons::PopupWithItems(g,
-                                        layer->params[ToInt(LayerParamIndex::LoopMode)],
-                                        c.main.loop_mode,
-                                        buttons::ParameterPopupButton(g->imgui, greyed_out));
+                DoLoopModeSelectorGui(g, layout::GetRect(g->layout, c.main.loop_mode), *layer);
             }
 
             draw_divider(c.main.divider);

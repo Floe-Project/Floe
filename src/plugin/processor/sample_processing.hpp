@@ -56,21 +56,25 @@ struct BoundsCheckedLoop {
     u32 start {};
     u32 end {};
     u32 crossfade {};
-    bool ping_pong {};
+    sample_lib::Loop::Mode mode {};
 };
 
 template <typename Type>
-inline Type ClampCrossfadeSize(Type crossfade, Type start, Type end, Type total, bool is_ping_pong) {
+inline Type
+ClampCrossfadeSize(Type crossfade, Type start, Type end, Type total, sample_lib::Loop::Mode mode) {
     ASSERT(crossfade >= 0);
     ASSERT(start >= 0);
     ASSERT(end >= 0);
     auto loop_size = end - start;
     ASSERT(loop_size >= 0);
     Type result;
-    if (!is_ping_pong)
-        result = Min(crossfade, loop_size, start);
-    else
-        result = Max<Type>(0, Min(crossfade, start, total - end, loop_size));
+    switch (mode) {
+        case sample_lib::Loop::Mode::Standard: result = Min(crossfade, loop_size, start); break;
+        case sample_lib::Loop::Mode::PingPong:
+            result = Max<Type>(0, Min(crossfade, start, total - end, loop_size));
+            break;
+        case sample_lib::Loop::Mode::Count: PanicIfReached(); break;
+    }
     return result;
 }
 
@@ -80,7 +84,7 @@ inline BoundsCheckedLoop CreateBoundsCheckedLoop(sample_lib::Loop loop, usize ut
 
     auto const total_frame_count = CheckedCast<s64>(utotal_frame_count);
     BoundsCheckedLoop result {
-        .ping_pong = loop.ping_pong,
+        .mode = loop.mode,
     };
 
     result.start = ({
@@ -111,7 +115,7 @@ inline BoundsCheckedLoop CreateBoundsCheckedLoop(sample_lib::Loop loop, usize ut
                                                     result.start,
                                                     result.end,
                                                     total_frame_count,
-                                                    loop.ping_pong);
+                                                    loop.mode);
 
     return result;
 }
@@ -164,11 +168,17 @@ inline bool IncrementSamplePlaybackPos(Optional<BoundsCheckedLoop> const& loop,
             if ((playback_mode & InLoopingRegion) && frame_pos >= end) {
                 playback_mode &= ~InFirstLoop;
                 playback_mode |= LoopedManyTimes;
-                if (!loop->ping_pong) {
-                    frame_pos = start + (frame_pos - end);
-                } else {
-                    frame_pos = end - Fmod(frame_pos - end, end);
-                    playback_mode ^= CurrentlyReversed;
+                switch (loop->mode) {
+                    case sample_lib::Loop::Mode::Standard: {
+                        frame_pos = start + (frame_pos - end);
+                        break;
+                    }
+                    case sample_lib::Loop::Mode::PingPong: {
+                        frame_pos = end - Fmod(frame_pos - end, end);
+                        playback_mode ^= CurrentlyReversed;
+                        break;
+                    }
+                    case sample_lib::Loop::Mode::Count: PanicIfReached(); break;
                 }
             }
         } else {
@@ -177,11 +187,17 @@ inline bool IncrementSamplePlaybackPos(Optional<BoundsCheckedLoop> const& loop,
             if ((playback_mode & InLoopingRegion) && frame_pos < start) {
                 playback_mode &= ~InFirstLoop;
                 playback_mode |= LoopedManyTimes;
-                if (!loop->ping_pong) {
-                    frame_pos = end - (start - frame_pos);
-                } else {
-                    frame_pos = start + (start - frame_pos);
-                    playback_mode ^= CurrentlyReversed;
+                switch (loop->mode) {
+                    case sample_lib::Loop::Mode::Standard: {
+                        frame_pos = end - (start - frame_pos);
+                        break;
+                    }
+                    case sample_lib::Loop::Mode::PingPong: {
+                        frame_pos = start + (start - frame_pos);
+                        playback_mode ^= CurrentlyReversed;
+                        break;
+                    }
+                    case sample_lib::Loop::Mode::Count: PanicIfReached(); break;
                 }
             }
         }
@@ -228,15 +244,16 @@ inline void SampleGetData(AudioData const& s,
         x1 = frame_index + 1;
         x2 = frame_index + 2;
 
-        if (loop && loop->ping_pong && (loop_and_reverse_flags & InLoopingRegion)) {
+        if (loop && loop->mode == sample_lib::Loop::Mode::PingPong &&
+            (loop_and_reverse_flags & InLoopingRegion)) {
             if (loop_and_reverse_flags & LoopedManyTimes && xm1 < loop->start)
                 xm1 = loop->start;
             else if (xm1 < 0)
                 xm1 = 0;
             if (x1 >= loop->end) x1 = loop->end - 1;
             if (x2 >= loop->end) x2 = (loop->end - 1) - (x2 - loop->end);
-        } else if (loop && !loop->ping_pong && (loop_and_reverse_flags & InLoopingRegion) &&
-                   loop->crossfade == 0) {
+        } else if (loop && loop->mode == sample_lib::Loop::Mode::Standard &&
+                   (loop_and_reverse_flags & InLoopingRegion) && loop->crossfade == 0) {
             if (xm1 < 0) xm1 = loop->end + xm1;
             if (x1 >= loop->end) x1 = loop->start + (x1 - loop->end);
             if (x2 >= loop->end) x2 = loop->start + (x2 - loop->end);
@@ -252,14 +269,15 @@ inline void SampleGetData(AudioData const& s,
         x1 = frame_index - 1;
         x2 = frame_index - 2;
 
-        if (loop && loop->ping_pong && (loop_and_reverse_flags & InLoopingRegion)) {
+        if (loop && loop->mode == sample_lib::Loop::Mode::PingPong &&
+            (loop_and_reverse_flags & InLoopingRegion)) {
             if (loop_and_reverse_flags & LoopedManyTimes) {
                 if (xm1 >= loop->end) xm1 = loop->end - 1;
             }
             if (x1 < loop->start) x1 = loop->start;
             if (x2 < loop->start) x2 = loop->start + ((loop->start - x2) - 1);
-        } else if (loop && !loop->ping_pong && (loop_and_reverse_flags & InLoopingRegion) &&
-                   loop->crossfade == 0) {
+        } else if (loop && loop->mode == sample_lib::Loop::Mode::Standard &&
+                   (loop_and_reverse_flags & InLoopingRegion) && loop->crossfade == 0) {
             if (xm1 >= loop->end) xm1 = loop->start;
             if (x1 < 0) x1 = loop->end + x1;
             if (x2 < 0) x2 = loop->end + x2;
@@ -292,7 +310,7 @@ inline void SampleGetData(AudioData const& s,
         bool is_crossfading = false;
         f32 xfade_r = 0;
         f32 xfade_l = 0;
-        if (!loop->ping_pong) {
+        if (loop->mode == sample_lib::Loop::Mode::Standard) {
             auto const xfade_fade_out_start =
                 loop->end - loop->crossfade; // the bit before the loop end point
             auto const xfade_fade_in_start =
@@ -317,7 +335,7 @@ inline void SampleGetData(AudioData const& s,
             }
         } else if (loop_and_reverse_flags & LoopedManyTimes) { // Ping-pong
             ASSERT(!recurse);
-            ASSERT(loop->ping_pong);
+            ASSERT(loop->mode == sample_lib::Loop::Mode::PingPong);
 
             if (forward && (frame_pos <= (loop->start + loop->crossfade)) && frame_pos >= loop->start) {
                 auto frames_into_fade = frame_pos - loop->start;

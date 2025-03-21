@@ -21,8 +21,8 @@
 
 constexpr bool k_debug_gui_platform = false;
 
-constexpr UiSize k_aspect_ratio_without_keyboard = {100, 61};
-constexpr UiSize k_aspect_ratio_with_keyboard = {100, 68};
+constexpr UiSize k_aspect_ratio_without_keyboard = {100, 63};
+constexpr UiSize k_aspect_ratio_with_keyboard = {100, 71};
 
 constexpr u16 k_min_gui_width = k_aspect_ratio_with_keyboard.width * 2;
 constexpr u16 k_max_gui_width = k_aspect_ratio_with_keyboard.width * 100;

@@ -445,7 +445,6 @@ static void TriggerVoicesIfNeeded(LayerProcessor& layer,
 
         if (!sampler_params.voice_sample_params.size) return;
 
-        // TODO(1.0): test this
         // do velocity feathering if needed
         {
             VoiceStartParams::SamplerParams::Region* feather_region_1 = nullptr;
@@ -454,8 +453,6 @@ static void TriggerVoicesIfNeeded(LayerProcessor& layer,
                 if (r.region.trigger.feather_overlapping_velocity_layers) {
                     // NOTE, if there are more than 2 feather regions, then we only crossfade 2 of them.
                     // Any others will play at normal volume.
-                    // IMPROVE: we could notify the user about this behaviour when we parse the library
-                    // configuration.
                     if (!feather_region_1)
                         feather_region_1 = &r;
                     else

@@ -1295,6 +1295,24 @@ static int AddRegion(lua_State* lua) {
     if (region.trigger.round_robin_index)
         instrument->max_rr_pos = Max(instrument->max_rr_pos, *region.trigger.round_robin_index);
 
+    if (region.trigger.feather_overlapping_velocity_layers) {
+        usize num_overlaps = 0;
+        for (auto const& r : instrument->regions) {
+            if (&r == &region) continue;
+            if (r.trigger.feather_overlapping_velocity_layers) {
+                if (region.trigger.key_range.Overlaps(r.trigger.key_range) &&
+                    region.trigger.velocity_range.Overlaps(r.trigger.velocity_range)) {
+                    num_overlaps++;
+                }
+            }
+        }
+
+        // IMPROVE: we could possibly support more than 2 but we'd need to implement a different kind of
+        // feathering algorithm
+        if (num_overlaps > 2)
+            luaL_error(ctx.lua, "Only 2 feathered velocity regions can overlap in velocity and key range.");
+    }
+
     return 0;
 }
 

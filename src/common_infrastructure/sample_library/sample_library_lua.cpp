@@ -1300,7 +1300,9 @@ static int AddRegion(lua_State* lua) {
         for (auto const& r : instrument->regions) {
             if (&r == &region) continue;
             if (r.trigger.feather_overlapping_velocity_layers) {
-                if (region.trigger.key_range.Overlaps(r.trigger.key_range) &&
+                if (region.trigger.trigger_event == r.trigger.trigger_event &&
+                    region.trigger.round_robin_index == r.trigger.round_robin_index &&
+                    region.trigger.key_range.Overlaps(r.trigger.key_range) &&
                     region.trigger.velocity_range.Overlaps(r.trigger.velocity_range)) {
                     num_overlaps++;
                 }

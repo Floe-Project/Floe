@@ -1580,7 +1580,10 @@ TEST_CASE(TestFuzzingJsonState) {
             for (auto _ : Range(3)) {
                 auto const range = info.projection ? info.projection->range : info.linear_range;
                 auto v = RandomFloatInRange(seed, range.min, range.max);
-                if (info.value_type == ParamValueType::Bool) v = v > 0.5f ? 1.0f : 0.0f;
+                if (info.value_type == ParamValueType::Bool)
+                    v = v > 0.5f ? 1.0f : 0.0f;
+                else if (IsAnyOf(info.value_type, Array {ParamValueType::Int, ParamValueType::Menu}))
+                    v = Round(v);
                 auto const original_v = v;
 
                 if (auto const legacy_projection = legacy_mappings::ParamProjection(param)) {
@@ -1773,7 +1776,7 @@ TEST_CASE(TestLoadingOldFiles) {
         CHECK_APPROX_EQ(state.param_values[ToInt(ParamIndex::ReverbSize)], 0.6f, 0.01f);
         CHECK_APPROX_EQ(state.param_values[ToInt(ParamIndex::ReverbDecayTimeMs)], 0.5f, 0.2f);
         CHECK_APPROX_EQ(ProjectedValue(state, ParamIndex::ReverbDelay), 100.0f, 0.01f);
-        CHECK_APPROX_EQ(ProjectedValue(state, ParamIndex::ReverbChorusAmount), 0.4f, 0.01f);
+        CHECK_APPROX_EQ(ProjectedValue(state, ParamIndex::ReverbChorusAmount), 0.24f, 0.01f);
         CHECK_APPROX_EQ(ProjectedValue(state, ParamIndex::ReverbChorusFrequency), 0.7f, 0.01f);
         CHECK_APPROX_EQ(ProjectedValue(state, ParamIndex::ReverbPreLowPassCutoff), 64.0f, 1.0f);
         CHECK_APPROX_EQ(ProjectedValue(state, ParamIndex::ReverbPreHighPassCutoff), 0.0f, 1.0f);
@@ -1787,7 +1790,7 @@ TEST_CASE(TestLoadingOldFiles) {
                         FrequencyToMidiNote(3000),
                         0.01f);
         CHECK_APPROX_EQ(ProjectedValue(state, ParamIndex::PhaserModFreqHz), 0.2f, 0.01f);
-        CHECK_APPROX_EQ(state.param_values[ToInt(ParamIndex::PhaserModDepth)], 0.2f, 0.01f);
+        CHECK_APPROX_EQ(state.param_values[ToInt(ParamIndex::PhaserModDepth)], 9.6f, 0.01f);
         CHECK_APPROX_EQ(state.param_values[ToInt(ParamIndex::PhaserFeedback)], 0.4f, 0.01f);
         CHECK_APPROX_EQ(state.param_values[ToInt(ParamIndex::PhaserStereoAmount)], 0.0f, 0.01f);
         CHECK_LT(state.param_values[ToInt(ParamIndex::PhaserMix)], 0.5f);

@@ -376,6 +376,18 @@ class JsonStateParser {
                                          "sampler/Oneshots/Ghost Voice Phrases/Male/Vocal We Can See You"_s)
                                     name = "Vocal We Can See You 2"_s;
 
+                                // MDATA libraries could mark instruments as one of the special types. It
+                                // wasn't widely used. In Floe we have more advanced oscillator types so we
+                                // want to use those instead. When loading MDATA files, we discard special
+                                // types.
+                                if (path == "sampler/Air/Noise - White"_s) {
+                                    m_state.inst_ids[m_inst_index] = WaveformType::WhiteNoiseStereo;
+                                    break;
+                                } else if (path == "sampler/Mid/Mid - Sine"_s) {
+                                    m_state.inst_ids[m_inst_index] = WaveformType::Sine;
+                                    break;
+                                }
+
                                 ASSERT(name.size <= k_max_instrument_name_size);
 
                                 m_state.inst_ids[m_inst_index] = sample_lib::InstrumentId {

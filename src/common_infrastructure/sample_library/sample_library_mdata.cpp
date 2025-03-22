@@ -331,6 +331,7 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
         }
 
         u32 max_rr_pos = 0;
+        bool discard_inst = false;
 
         inst->regions = arena.AllocateExactSizeUninitialised<Region>(CheckedCast<usize>(i.total_num_regions));
         usize regions_span_index = 0;
@@ -342,6 +343,17 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
                 if (region_info.group_index != group_info.index) continue;
 
                 auto const file_info = mdata_info.file_infos[CheckedCast<usize>(region_info.file_info_index)];
+
+                // Mirage had 'special' files that were used as markers for sine or white noise oscillators.
+                // This functionality wasn't widely used. Floe has more advanced oscillator types so we
+                // discard these special types. When loading Mirage presets we use Floe's new types instead.
+                if (file_info.file_type == mdata::FileTypeSpecialAudioData) {
+                    LogDebug(ModuleName::SampleLibrary, "Discarding special audio data '{}'", path);
+                    ASSERT(regions_span_index == 0, "expecting special audio data to be on their own");
+                    discard_inst = true;
+                    break;
+                }
+
                 ASSERT(region_info.loop_end <= (s32)file_info.num_frames);
 
                 auto const file_path = GetString(library, file_info.virtual_filepath);
@@ -424,7 +436,12 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
 
                 ++num_regions;
             }
+
+            if (discard_inst) break;
         }
+
+        if (discard_inst) continue;
+
         ASSERT_EQ((mdata::Index)inst->regions.size, i.total_num_regions);
 
         inst->max_rr_pos = max_rr_pos;

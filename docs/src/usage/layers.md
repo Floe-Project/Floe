@@ -11,9 +11,11 @@ Floe is built around an architecture of three layers. These are displayed in thr
 
 ## Instruments
 
-Each layer can contain an instrument. The instrument is the sound generator. It's like an oscillator in a traditional synthesizer. However, for Floe, instruments are sample-based. Sometimes an instrument is a realistic, complex multisampled real musical instrument, sometimes it's a single 'waveform' sample, it depends on the sample library that the instrument comes from.
+Each layer can contain an instrument. The instrument is the sound generator. It's like an oscillator in a traditional synthesizer. However, for Floe, instruments are sample-based. Sometimes an instrument is a realistic, complex multisampled real musical instrument, sometimes it's a single looping sample. Floe also has a couple of basic synth waveforms designed for layering with other instruments.
 
 To load an instrument, click the menu button at the top of the layer. Change it from 'None' to an instrument of your choice. You will be able to pick from any of the instruments that are available in the libraries that you have installed.
+
+How an instrument works is defined in the library that it comes from. Most instrument allow for adding or customising sample loops.
 
 ## Sound shaping
 

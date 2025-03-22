@@ -33,7 +33,7 @@ Floe's format is designed to be developer-friendly. It plays well into the tooli
 - Works with version control: libraries are just folders of files, they're portable across filesystems and operating systems.
 - Hot reloading: Floe automatically reloads the library whenever you change a file: Lua, audio, or images. It creates a very fast feedback loop.
 - Uses a full programming language: Lua is simple, powerful, and widely used. You can use variables, functions, loops, and conditionals to configure your library.
-- Floe's Lua API is simple and clear.
+- Floe's Lua API is simple and concise.
 
 
 ## The structure

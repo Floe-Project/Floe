@@ -23,6 +23,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
   - [Layers](./usage/layers.md)
   - [Effects](./usage/effects.md)
   - [MIDI](./usage/midi.md)
+  - [Looping](./usage/looping.md)
   - [Parameters](./usage/parameters.md)
   - [Autosave](./usage/autosave.md)
   - [Attribution](./usage/attribution.md)

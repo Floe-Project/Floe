@@ -55,14 +55,13 @@ These examples use bash syntax.
 If you're not using the packager tool, you need to know the structure of the Floe Package. It's very simple.
 
 Requirements of a floe package:
-- The filename must end with `.floe.zip`
 - The ZIP must contain a folder called `Libraries` and/or a folder called `Presets`. If present, these folders must contain the libraries and presets respectively.
 
 Be careful that your ZIP program is not adding an extra folder when you create the ZIP file. There should not be a top-level folder in the ZIP file, just the `Libraries` and/or `Presets` folders.
 
 #### Example: single library & factory presets
 ```
-📦FrozenPlain - Arctic Strings Package.floe.zip/
+📦FrozenPlain - Arctic Strings Package.zip/
 ├── 📁Libraries
 │   └── 📁Arctic Strings
 │       ├── 📄arctic-strings.floe.lua
@@ -84,7 +83,7 @@ Be careful that your ZIP program is not adding an extra folder when you create t
 
 #### Example: multiple libraries
 ```
-📦Audioata - Synthwave Bundle Package.floe.zip/
+📦Audioata - Synthwave Bundle Package.zip/
 ├── 📁Libraries
 │   ├── 📁Synthwave Bass
 │   │   ├── 📄synthwave-bass.floe.lua

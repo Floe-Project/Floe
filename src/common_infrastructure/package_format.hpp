@@ -26,11 +26,9 @@ namespace package {
 constexpr String k_libraries_subdir = "Libraries";
 constexpr String k_presets_subdir = "Presets";
 constexpr auto k_component_subdirs = Array {k_libraries_subdir, k_presets_subdir};
-constexpr String k_file_extension = ".floe.zip"_s;
+constexpr String k_file_extension = ".zip"_s;
 constexpr String k_checksums_file = "Floe-Details/checksums.crc32"_s;
 enum class ComponentType : u8 { Library, Presets, Count };
-
-PUBLIC bool IsPathPackageFile(String path) { return EndsWithSpan(path, k_file_extension); }
 
 PUBLIC String ComponentTypeString(ComponentType type) {
     switch (type) {

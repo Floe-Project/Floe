@@ -520,12 +520,9 @@ static void PackagesPreferencesPanel(GuiBoxSystem& box_system, PreferencesPanelC
         auto const row = PreferencesRow(box_system, root);
         PreferencesLhsTextWidget(box_system, row, "Install");
         auto const rhs = PreferencesRhsColumn(box_system, row, style::k_prefs_small_gap);
-        PreferencesRhsText(box_system, rhs, "Install libraries and presets from a '.floe.zip' file");
+        PreferencesRhsText(box_system, rhs, "Install libraries and presets from a ZIP file");
         if (!context.package_install_jobs.Full() &&
-            TextButton(box_system,
-                       rhs,
-                       "Install package",
-                       "Install libraries and presets from a '.floe.zip' file")) {
+            TextButton(box_system, rhs, "Install package", "Install libraries and presets from a ZIP file")) {
             OpenFilePickerInstallPackage(context.file_picker_state, box_system.imgui.frame_output);
         }
     }

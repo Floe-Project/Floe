@@ -47,7 +47,7 @@ auto constexpr k_packager_command_line_args_defs = MakeCommandLineArgDefs<Packag
 });
 
 constexpr String k_packager_description =
-    "Takes libraries and presets and turns them into a Floe package file (floe.zip).\n"
+    "Takes libraries and presets and turns them into a Floe package file (ZIP).\n"
     "You can specify multiple libraries and preset-folders. Additionally:\n"
     "- Validates any Lua files.\n"
     "- Ensures libraries have a License file.\n"

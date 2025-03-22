@@ -68,7 +68,7 @@ PUBLIC void OpenFilePickerInstallPackage(FilePickerState& state, GuiFrameResult&
     static constexpr auto k_filters = ArrayT<FilePickerDialogOptions::FileFilter>({
         {
             .description = "Floe Package"_s,
-            .wildcard_filter = "*.floe.zip"_s,
+            .wildcard_filter = "*.zip"_s,
         },
     });
 

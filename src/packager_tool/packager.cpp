@@ -139,8 +139,7 @@ static ErrorCodeOr<void> CheckNeededPackageCliArgs(Span<CommandLineArg const> ar
     }
 
     if (package_name_arg.was_provided) {
-        if (EndsWithSpan(package_name_arg.values[0], package::k_file_extension) ||
-            EndsWithSpan(package_name_arg.values[0], ".zip"_s)) {
+        if (path::Equal(path::Extension(package_name_arg.values[0]), package::k_file_extension)) {
             StdPrintF(StdStream::Err, "Error: don't include the file extension in the package name\n");
             return ErrorCode {CliError::InvalidArguments};
         }

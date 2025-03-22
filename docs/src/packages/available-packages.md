@@ -23,7 +23,7 @@ We made a Floe-compatible version of [Etherealwinds Harp 2: Community Edition](h
 | Cost | Free -  [attribution required](../usage/attribution.md) ([CC-BY](https://creativecommons.org/licenses/by/4.0/deed.en)) |
 | Repository | [Floe-Project/Harp](https://github.com/Floe-Project/Harp) |
 | Presets | 0 |
-| Download | [Download Versilian Studios - Etherealwinds Harp 2 CE Package.floe.zip](https://github.com/Floe-Project/Harp/releases/download/v1.1/Versilian.Studios.-.Etherealwinds.Harp.2.CE.Package.floe.zip) |
+| Download | [Download Versilian Studios - Etherealwinds Harp 2 CE Package.zip](https://github.com/Floe-Project/Harp/releases/download/v1.1/Versilian.Studios.-.Etherealwinds.Harp.2.CE.Package.floe.zip) |
 | Download Size | 93.4 MB |
 
 
@@ -40,7 +40,7 @@ This is a basic free multisampled xylophone from [FreePats](https://freepats.zen
 | Cost | Free - no attribution required (public domain) |
 | Repository | [Floe-Project/Xylophone](https://github.com/Floe-Project/Xylophone) |
 | Presets | 0 |
-| Download | [Download FreePats - Xylophone Package.floe.zip](https://github.com/Floe-Project/Xylophone/releases/download/v1.1/FreePats.-.Xylophone.Package.floe.zip) |
+| Download | [Download FreePats - Xylophone Package.zip](https://github.com/Floe-Project/Xylophone/releases/download/v1.1/FreePats.-.Xylophone.Package.floe.zip) |
 | Download Size | 2.6 MB |
 
 
@@ -55,7 +55,7 @@ This is a basic free ocarina from [FreePats](https://freepats.zenvoid.org/), con
 | Cost | Free - no attribution required (public domain) |
 | Repository | [Floe-Project/Ocarina](https://github.com/Floe-Project/Ocarina) |
 | Presets | 0 |
-| Download | [Download FreePats - Ocarina Package.floe.zip](https://github.com/Floe-Project/Ocarina/releases/download/v1.1/FreePats.-.Ocarina.Package.floe.zip) |
+| Download | [Download FreePats - Ocarina Package.zip](https://github.com/Floe-Project/Ocarina/releases/download/v1.1/FreePats.-.Ocarina.Package.floe.zip) |
 | Download Size | 4.3 MB |
 
 ## Mirage Compatibility
@@ -65,7 +65,7 @@ For Mirage libraries to fully work inside Floe, the Mirage Compatibility library
 | Mirage Compatibility | |
 |:--|:--|
 | Cost | Free - no attribution required (FrozenPlain's license) |
-| Download | [Download Mirage Compatibility Package.floe.zip](https://github.com/FrozenPlain/floe-mirage-compatibility/releases/download/v1.0/FrozenPlain.-.Mirage.Compatibility.Package.floe.zip) |
+| Download | [Download Mirage Compatibility Package.zip](https://github.com/FrozenPlain/floe-mirage-compatibility/releases/download/v1.0/FrozenPlain.-.Mirage.Compatibility.Package.floe.zip) |
 | Download Size | 8.9 MB |
 
 ## FrozenPlain

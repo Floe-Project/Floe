@@ -29,7 +29,7 @@ Floe handles the installation process intelligently. It will check existing inst
 
 Alternatively, you can manually install libraries and presets by extracting the ZIP file into the correct folders.
 
-1. Extract the package ZIP file (floe.zip).
+1. Extract the package ZIP file.
 1. Open Floe.
 1. Open the Preferences panel using the gear icon at the top.
 1. Open the Folders tab.

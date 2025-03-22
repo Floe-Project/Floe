@@ -155,6 +155,7 @@ enum class ParamProjection {
     WasPercentNowFraction, // [-100, 100] to [-1, 1] or [0, 100] to [0, 1]
     WasDbNowAmp,
     WasOldBoolNowNewBool, // old: >= 0.5 == true, new: !0 == true
+    WasOldIntNowNewInt, // old: used round() to convert, new: uses trunc()
 };
 
 static Optional<ParamProjection> ParamProjection(ParamIndex index) {
@@ -192,6 +193,10 @@ static Optional<ParamProjection> ParamProjection(ParamIndex index) {
 
     if (k_param_descriptors[(u32)index].value_type == ParamValueType::Bool)
         return ParamProjection::WasOldBoolNowNewBool;
+
+    if (IsAnyOf(k_param_descriptors[(u32)index].value_type,
+                Array {ParamValueType::Int, ParamValueType::Menu}))
+        return ParamProjection::WasOldIntNowNewInt;
 
     return k_nullopt;
 }
@@ -511,16 +516,12 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
                     case legacy_mappings::ParamProjection::WasOldBoolNowNewBool:
                         v = (v >= 0.5f) ? 1.0f : 0.0f;
                         break;
+                    case legacy_mappings::ParamProjection::WasOldIntNowNewInt: v = Round(v); break;
                 }
             }
 
             v = k_param_descriptors[index].LineariseValue(v, true).Value();
         } else {
-            // The loaded data might be from an older version of Floe that didn't
-            // have all of the parameters that this version has. Rather than just
-            // ignore the parameters not set - we want to set them to their default
-            // values. This ensures loaded presets always behave in a predictable way,
-            // rather than some parameters not changing.
             v = k_param_descriptors[index].default_linear_value;
         }
     }
@@ -582,7 +583,7 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
             ParamDescriptorAt(ParamIndex::ReverbChorusFrequency)
                 .LineariseValue(old_settings_mod_freq_hz, true)
                 .Value();
-        state.LinearParam(ParamIndex::ReverbChorusAmount) = old_settings_mod_depth_01;
+        state.LinearParam(ParamIndex::ReverbChorusAmount) = old_settings_mod_depth_01 * 0.6f;
         if (old_settings_filter_bidirectional > 0) {
             auto const p = ParamIndex::ReverbPreLowPassCutoff;
             auto const info = k_param_descriptors[ToInt(p)];
@@ -622,7 +623,11 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
             old_setting_wet_01 / (old_setting_wet_01 + old_setting_dry_01);
         state.LinearParam(ParamIndex::PhaserStereoAmount) = old_mod_stereo;
         state.LinearParam(ParamIndex::PhaserFeedback) = old_feedback_01;
-        state.LinearParam(ParamIndex::PhaserModDepth) = old_setting_mod_depth_01;
+        {
+            auto const& depth_info = k_param_descriptors[ToInt(ParamIndex::PhaserModDepth)];
+            state.LinearParam(ParamIndex::PhaserModDepth) =
+                MapFrom01(old_setting_mod_depth_01, depth_info.linear_range.min, depth_info.linear_range.max);
+        }
         state.LinearParam(ParamIndex::PhaserModFreqHz) = ParamDescriptorAt(ParamIndex::PhaserModFreqHz)
                                                              .LineariseValue(old_setting_mod_freq_hz, true)
                                                              .Value();
@@ -850,8 +855,8 @@ ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_
             }
         }
 
-        // Prior to 2.0.3, there was no such thing as a ping-pong crossfade - it was equivalent to being set
-        // to 0. We recreate that behaviour here so as to maintain backwards compatibility.
+        // Prior to Mirage 2.0.3, there was no such thing as a ping-pong crossfade - it was equivalent to
+        // being set to 0. We recreate that behaviour here so as to maintain backwards compatibility.
         constexpr auto k_version_that_added_ping_pong_xfade = PackVersionIntoU32(2, 0, 3);
         if (mirage_preset_version_hex < k_version_that_added_ping_pong_xfade) {
             for (auto const layer_index : Range(k_num_layers)) {
@@ -1583,6 +1588,7 @@ TEST_CASE(TestFuzzingJsonState) {
                         case legacy_mappings::ParamProjection::WasPercentNowFraction: v *= 100.0f; break;
                         case legacy_mappings::ParamProjection::WasDbNowAmp: v = AmpToDb(v); break;
                         case legacy_mappings::ParamProjection::WasOldBoolNowNewBool: break;
+                        case legacy_mappings::ParamProjection::WasOldIntNowNewInt: break;
                     }
                 }
 

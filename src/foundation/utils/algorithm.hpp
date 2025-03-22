@@ -62,6 +62,12 @@ inline void HashUpdate(u64& hash, Integral auto data) {
     HashUpdate(hash, Span {(u8 const*)&data, sizeof(data)});
 }
 
+PUBLIC bool IsAnyOf(auto const& value, auto const& values_span) {
+    for (auto const& v : values_span)
+        if (value == v) return true;
+    return false;
+}
+
 template <Fundamental T>
 PUBLIC constexpr u32 HashDbj(Span<T const> data) {
     // Dbj

@@ -515,7 +515,8 @@ void LayerHandleNoteOff(LayerProcessor& layer,
                         bool triggered_by_cc64,
                         f32 dynamics_param_value_01,
                         f32 velocity_to_volume_01) {
-    if (!context.midi_note_state.sustain_pedal_on.Get(note.channel) && layer.voice_controller.vol_env_on)
+    if (!context.midi_note_state.sustain_pedal_on.Get(note.channel) && layer.voice_controller.vol_env_on &&
+        !context.midi_note_state.keys_held[note.channel].Get(note.note))
         NoteOff(voice_pool, layer.voice_controller, note);
 
     if (!triggered_by_cc64)

@@ -1299,20 +1299,36 @@ static int AddRegion(lua_State* lua) {
         usize num_overlaps = 0;
         for (auto const& r : instrument->regions) {
             if (&r == &region) continue;
-            if (r.trigger.feather_overlapping_velocity_layers) {
-                if (region.trigger.trigger_event == r.trigger.trigger_event &&
-                    region.trigger.round_robin_index == r.trigger.round_robin_index &&
-                    region.trigger.key_range.Overlaps(r.trigger.key_range) &&
-                    region.trigger.velocity_range.Overlaps(r.trigger.velocity_range)) {
-                    num_overlaps++;
-                }
+            if (r.trigger.feather_overlapping_velocity_layers &&
+                region.trigger.trigger_event == r.trigger.trigger_event &&
+                region.trigger.round_robin_index == r.trigger.round_robin_index &&
+                region.trigger.key_range.Overlaps(r.trigger.key_range) &&
+                region.trigger.velocity_range.Overlaps(r.trigger.velocity_range)) {
+                num_overlaps++;
             }
         }
 
-        // IMPROVE: we could possibly support more than 2 but we'd need to implement a different kind of
-        // feathering algorithm
-        if (num_overlaps > 2)
-            luaL_error(ctx.lua, "Only 2 feathered velocity regions can overlap in velocity and key range.");
+        // IMPROVE: we could possibly support more than 1 but we'd need to implement a different kind of
+        // feathering algorithm.
+        if (num_overlaps > 1) luaL_error(ctx.lua, "Only 2 feathered velocity regions can overlap.");
+    }
+
+    if (region.timbre_layering.layer_range) {
+        usize num_overlaps = 0;
+        for (auto const& r : instrument->regions) {
+            if (&r == &region) continue;
+            if (r.timbre_layering.layer_range && region.trigger.trigger_event == r.trigger.trigger_event &&
+                region.trigger.round_robin_index == r.trigger.round_robin_index &&
+                region.trigger.key_range.Overlaps(r.trigger.key_range) &&
+                region.trigger.velocity_range.Overlaps(r.trigger.velocity_range) &&
+                region.timbre_layering.layer_range->Overlaps(*r.timbre_layering.layer_range)) {
+                num_overlaps++;
+            }
+        }
+
+        // IMPROVE: we could possibly support more than 1 but we'd need to implement a different kind of
+        // algorithm.
+        if (num_overlaps > 1) luaL_error(ctx.lua, "Only 2 timbre layer regions can overlap.");
     }
 
     return 0;

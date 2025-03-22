@@ -397,6 +397,15 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
                             }),
                             .feather_overlapping_velocity_layers = velocity_layers_are_feathered,
                         },
+                    .audio_props =
+                        {
+                            // In Mirage, we would always apply a 10dB gain taper to the timbre knob. We don't
+                            // do that in Floe. Since Mirage only ever had 2 xfade layers, we can recreate
+                            // this behaviour by reducing the volume of the lower layer by 10dB.
+                            .gain_db = (groups_are_xfade_layers && group_info.round_robin_or_xfade_index == 0)
+                                           ? -10.0f
+                                           : 0.0f,
+                        },
                     .timbre_layering =
                         {
                             .layer_range = ({

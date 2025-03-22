@@ -65,7 +65,7 @@ enum class ParamIndex : u16 {
 
     MasterVolume = FirstNonLayerParam,
     MasterVelocity,
-    MasterDynamics,
+    MasterTimbre,
 
     DistortionType,
     DistortionDrive,
@@ -1028,14 +1028,14 @@ consteval auto CreateParams() {
         .tooltip =
             "The amount that the MIDI velocity affects the volume of notes; 100% means notes will be silent when the velocity is very soft, and 0% means that notes will play full volume regardless of the velocity"_s,
     };
-    mp(MasterDynamics) = Args {
+    mp(MasterTimbre) = Args {
         .id = id(IdRegion::Master, 2), // never change
         .value_config = val_config_helpers::Percent({.default_percent = 80}),
         .modules = {ParameterModule::Master},
-        .name = "Dynamics"_s,
-        .gui_label = "Dyn"_s,
+        .name = "Timbre"_s,
+        .gui_label = "Timbre"_s,
         .tooltip =
-            "The intensity of the sound. Not every instrument contains dynamics information; instruments that do will be highlighted when you click on this knob."_s,
+            "The intstruments timbre. Not every instrument contains timbre information; instruments that do will be highlighted when you click on this knob."_s,
     };
 
     // =====================================================================================================

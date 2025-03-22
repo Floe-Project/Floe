@@ -39,7 +39,17 @@ static void DoDotsMenu(Gui* g) {
 }
 
 void TopPanel(Gui* g) {
-    bool const has_insts_with_dynamics = true; // TODO(1.0), get the value properly?
+    bool const has_insts_with_timbre_layers = ({
+        bool r = false;
+        for (auto const& layer : g->engine.processor.layer_processors) {
+            if (layer.UsesTimbreLayering()) {
+                r = true;
+                break;
+            }
+        }
+        r;
+    });
+
     auto title_font = g->mada_big;
 
     auto const preset_box_icon_width = LiveSize(g->imgui, UiSizeId::Top2PresetBoxIconWidth);
@@ -168,7 +178,7 @@ void TopPanel(Gui* g) {
     LayoutParameterComponent(g,
                              knob_container,
                              dyn,
-                             g->engine.processor.params[ToInt(ParamIndex::MasterDynamics)],
+                             g->engine.processor.params[ToInt(ParamIndex::MasterTimbre)],
                              UiSizeId::Top2KnobsGapX);
     LayIDPair velo;
     LayoutParameterComponent(g,
@@ -439,16 +449,16 @@ void TopPanel(Gui* g) {
                  knobs::DefaultKnob(g->imgui));
 
     {
-        g->dynamics_slider_is_held = false;
+        g->timbre_slider_is_held = false;
         auto const id =
-            g->imgui.GetID((u64)g->engine.processor.params[ToInt(ParamIndex::MasterDynamics)].info.id);
-        if (has_insts_with_dynamics) {
+            g->imgui.GetID((u64)g->engine.processor.params[ToInt(ParamIndex::MasterTimbre)].info.id);
+        if (has_insts_with_timbre_layers) {
             knobs::Knob(g,
                         id,
-                        g->engine.processor.params[ToInt(ParamIndex::MasterDynamics)],
+                        g->engine.processor.params[ToInt(ParamIndex::MasterTimbre)],
                         dyn.control,
                         knobs::DefaultKnob(g->imgui));
-            g->dynamics_slider_is_held = g->imgui.IsActive(id);
+            g->timbre_slider_is_held = g->imgui.IsActive(id);
             if (g->imgui.WasJustActivated(id))
                 g->imgui.frame_output.ElevateUpdateRequest(GuiFrameResult::UpdateRequest::ImmediatelyUpdate);
         } else {
@@ -461,12 +471,12 @@ void TopPanel(Gui* g) {
                 g,
                 id,
                 knob_r,
-                "Dynamics: no currently loaded instruments have dynamics information; this knob is inactive"_s);
+                "Timbre: no currently loaded instruments have timbre information; this knob is inactive"_s);
             if (g->imgui.IsHot(id)) g->imgui.frame_output.cursor_type = CursorType::Default;
         }
         labels::Label(g,
-                      g->engine.processor.params[ToInt(ParamIndex::MasterDynamics)],
+                      g->engine.processor.params[ToInt(ParamIndex::MasterTimbre)],
                       dyn.label,
-                      labels::ParameterCentred(g->imgui, !has_insts_with_dynamics));
+                      labels::ParameterCentred(g->imgui, !has_insts_with_timbre_layers));
     }
 }

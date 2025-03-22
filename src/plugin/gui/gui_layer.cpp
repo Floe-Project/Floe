@@ -803,17 +803,12 @@ void Draw(Gui* g,
         auto selector_left_r = layout::GetRect(g->layout, c.selector_l);
         auto selector_right_r = layout::GetRect(g->layout, c.selector_r);
 
-        bool const should_highlight = false;
-        // TODO(1.0): how are we going to handle the new dynamics knob changes
-#if 0
-        if (auto inst = layer->instrument.GetNullable<AssetReference<LoadedInstrument>>();
-            inst && (*inst) &&
-            (g->dynamics_slider_is_held ||
-             CcControllerMovedParamRecently(g->engine.processor, ParamIndex::MasterDynamics)) &&
-            ((*inst)->instrument.flags & FloeLibrary::Instrument::HasDynamicLayers)) {
+        bool should_highlight = false;
+        if (layer->UsesTimbreLayering() &&
+            (g->timbre_slider_is_held ||
+             CcControllerMovedParamRecently(g->engine.processor, ParamIndex::MasterTimbre))) {
             should_highlight = true;
         }
-#endif
 
         auto const registered_selector_box_r =
             g->imgui.GetRegisteredAndConvertedRect(layout::GetRect(g->layout, c.selector_box));

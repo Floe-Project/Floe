@@ -205,6 +205,19 @@ struct LayerProcessor {
         }
     }
 
+    bool UsesTimbreLayering() const {
+        ASSERT(IsMainThread(host));
+        switch (instrument.tag) {
+            case InstrumentType::WaveformSynth: return false;
+            case InstrumentType::Sampler: {
+                auto const& s =
+                    instrument.Get<sample_lib_server::RefCounted<sample_lib::LoadedInstrument>>()->instrument;
+                return s.uses_timbre_layering;
+            }
+            case InstrumentType::None: return false;
+        }
+    }
+
     Optional<sample_lib::LibraryIdRef> LibId() const {
         ASSERT(IsMainThread(host));
         if (auto sampled_inst = instrument.TryGetFromTag<InstrumentType::Sampler>())
@@ -305,7 +318,7 @@ void LayerHandleNoteOn(LayerProcessor& layer,
                        MidiChannelNote note,
                        f32 velocity,
                        u32 offset,
-                       f32 dynamics_param_value_01,
+                       f32 timbre_param_value_01,
                        f32 velocity_to_volume_01);
 void LayerHandleNoteOff(LayerProcessor& layer,
                         AudioProcessingContext const& context,
@@ -313,7 +326,7 @@ void LayerHandleNoteOff(LayerProcessor& layer,
                         MidiChannelNote note,
                         f32 velocity,
                         bool triggered_by_cc64,
-                        f32 dynamic_param_value_01,
+                        f32 timbre_param_value_01,
                         f32 velocity_to_volume_01);
 
 struct LayerProcessResult {

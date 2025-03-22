@@ -82,6 +82,8 @@ void PostReadBookkeeping(Library& lib) {
 
             if (!region.loop.always_loop) inst.loop_overview.all_regions_require_looping = false;
             if (!region.loop.never_loop) all_regions_never_loop = false;
+
+            if (region.timbre_layering.layer_range) inst.uses_timbre_layering = true;
         }
 
         auto const num_loops = Sum(num_loops_per_mode);

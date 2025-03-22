@@ -167,7 +167,7 @@ struct Gui {
 
     TimePoint redraw_counter = {};
 
-    bool dynamics_slider_is_held {};
+    bool timbre_slider_is_held {};
 
     ThreadsafeFunctionQueue main_thread_callbacks {.arena = {PageAllocator::Instance()}};
     sample_lib_server::AsyncCommsChannel& sample_lib_server_async_channel;

@@ -128,32 +128,6 @@ void SetVoicePitch(Voice& v, f32 pitch, f32 sample_rate) {
 }
 
 void UpdateXfade(Voice& v, f32 knob_pos_01, bool hard_set) {
-    // TODO(1.0): I think the dynamics knob should also apply a volume attenuation. How should we handle this?
-    // Previously, it was hardcoded in this code. We should probably take this into consideration because
-    // old Arctic Strings presets depend on this.
-#if 0
-static f32 GetXFadeAmp(f32 xfade_position_01, int xfade_layer_index) {
-    ASSERT(xfade_position_01 >= 0 && xfade_position_01 <= 1);
-    ASSERT(xfade_layer_index >= 0 && xfade_layer_index <= 1); // we currently only support 2 layers
-
-    // work out the amp for doing an xfade
-    f32 result;
-    if (xfade_position_01 <= 0.1f)
-        result = (xfade_layer_index == 0) ? 1.0f : 0.0f;
-    else if (xfade_position_01 >= 0.9f)
-        result = (xfade_layer_index == 0) ? 0.0f : 1.0f;
-    else {
-        const auto pos = MapTo01(xfade_position_01, 0.1f, 0.9f);
-        const auto v = Pow(pos, 0.8f);
-        result = (xfade_layer_index == 0) ? (1.0f - v) : v;
-    }
-
-    // add a volume arc as well as the xfade
-    result *= MapFrom01(trig_table_lookup::SinTurnsPositive(xfade_position_01 * 0.25f), 0.3f, 1.0f);
-    return result;
-}
-#endif
-
     auto set_xfade_smoother = [&](VoiceSample& s, f32 val) {
         ASSERT(val >= 0 && val <= 1);
         if (!hard_set)
@@ -377,7 +351,7 @@ void StartVoice(VoicePool& pool,
                                                                    params.initial_pitch,
                                                                    sample_rate));
                 auto const offs =
-                    (f64)(sampler.initial_sample_offset01 * ((f32)s.sampler.data->num_frames - 1));
+                    (f64)(sampler.initial_sample_offset_01 * ((f32)s.sampler.data->num_frames - 1));
                 s.pos = offs;
                 if (voice.controller->reverse) s.pos = (f64)(s.sampler.data->num_frames - Max(offs, 1.0));
             }
@@ -385,7 +359,7 @@ void StartVoice(VoicePool& pool,
                 voice.voice_samples[i].is_active = false;
 
             UpdateLoopInfo(voice);
-            UpdateXfade(voice, sampler.initial_dynamics_01, true);
+            UpdateXfade(voice, sampler.initial_timbre_param_value_01, true);
             break;
         }
         case InstrumentType::WaveformSynth: {

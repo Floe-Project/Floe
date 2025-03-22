@@ -511,10 +511,10 @@ static void ProcessorOnParamChange(AudioProcessor& processor, ChangedParams chan
                                                           1);
     }
 
-    if (auto param = changed_params.Param(ParamIndex::MasterDynamics)) {
-        processor.dynamics_value_01 = param->ProjectedValue();
+    if (auto param = changed_params.Param(ParamIndex::MasterTimbre)) {
+        processor.timbre_value_01 = param->ProjectedValue();
         for (auto& voice : processor.voice_pool.EnumerateActiveVoices())
-            UpdateXfade(voice, processor.dynamics_value_01, true);
+            UpdateXfade(voice, processor.timbre_value_01, true);
     }
 
     if (auto param = changed_params.Param(ParamIndex::MasterVelocity))
@@ -657,7 +657,7 @@ static void HandleNoteOn(AudioProcessor& processor, MidiChannelNote note, f32 no
                           note,
                           note_vel,
                           offset,
-                          processor.dynamics_value_01,
+                          processor.timbre_value_01,
                           processor.velocity_to_volume_01);
     }
 }
@@ -671,7 +671,7 @@ HandleNoteOff(AudioProcessor& processor, MidiChannelNote note, f32 velocity, boo
                            note,
                            velocity,
                            triggered_by_cc64,
-                           processor.dynamics_value_01,
+                           processor.timbre_value_01,
                            processor.velocity_to_volume_01);
     }
 }
@@ -1315,7 +1315,7 @@ clap_process_status Process(AudioProcessor& processor, clap_process const& proce
                                                   processor.audio_processing_context.midi_note_state
                                                       .velocities[chan][note_num],
                                                   0,
-                                                  processor.dynamics_value_01,
+                                                  processor.timbre_value_01,
                                                   processor.velocity_to_volume_01);
                             }
                         }

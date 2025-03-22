@@ -216,7 +216,7 @@ struct AudioProcessor {
 
     StereoPeakMeter peak_meter = {};
 
-    f32 dynamics_value_01 {};
+    f32 timbre_value_01 {};
     f32 velocity_to_volume_01 {};
     Bitset<k_num_layers> solo {};
     Bitset<k_num_layers> mute {};
@@ -303,7 +303,7 @@ struct MappedCcToParam {
 };
 
 constexpr auto const k_default_cc_to_param_mapping = Array {
-    MappedCcToParam {ParamIndex::MasterDynamics, 1},
+    MappedCcToParam {ParamIndex::MasterTimbre, 1},
     MappedCcToParam {ParamIndex::MasterVolume, 7},
 };
 

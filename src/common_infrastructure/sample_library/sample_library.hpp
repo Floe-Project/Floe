@@ -72,6 +72,7 @@ struct Region {
         Range velocity_range {0, 100};
         Optional<u32> round_robin_index {};
         bool feather_overlapping_velocity_layers {};
+        // IMPROVE: add curve shape option for velocity feather: currently we use quarter-sine.
 
         // private
         Optional<String> auto_map_key_range_group {};
@@ -110,6 +111,7 @@ struct Instrument {
     usize regions_allocated_capacity {}; // private
 
     LoopOverview loop_overview {}; // Cached info about the loops in the regions.
+    bool uses_timbre_layering {};
     u32 max_rr_pos {};
 };
 

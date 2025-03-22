@@ -328,7 +328,7 @@ struct NonLayerParamId {
 constexpr auto k_non_layer_params = ArrayT<NonLayerParamId>({
     {"MastVol", ParamIndex::MasterVolume},
     {"MastVel", ParamIndex::MasterVelocity},
-    {"MastDyn", ParamIndex::MasterDynamics},
+    {"MastDyn", ParamIndex::MasterTimbre},
     {"DistType", ParamIndex::DistortionType},
     {"DistDrive", ParamIndex::DistortionDrive},
     {"DistOn", ParamIndex::DistortionOn},

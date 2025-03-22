@@ -246,8 +246,8 @@ struct VoiceStartParams {
             f32 amp {};
         };
 
-        f32 initial_sample_offset01 {};
-        f32 initial_dynamics_01 {};
+        f32 initial_sample_offset_01 {};
+        f32 initial_timbre_param_value_01 {};
         DynamicArrayBounded<Region, k_max_num_voice_samples> voice_sample_params {};
     };
 

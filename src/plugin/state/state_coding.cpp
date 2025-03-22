@@ -169,7 +169,7 @@ static Optional<ParamProjection> ParamProjection(ParamIndex index) {
         IsLayerParamOfSpecificType(index, LayerParamIndex::EqResonance2) ||
         IsLayerParamOfSpecificType(index, LayerParamIndex::FilterSustain) ||
         IsLayerParamOfSpecificType(index, LayerParamIndex::Pan) || (index == ParamIndex::MasterVelocity) ||
-        (index == ParamIndex::MasterDynamics) || (index == ParamIndex::DistortionDrive) ||
+        (index == ParamIndex::MasterTimbre) || (index == ParamIndex::DistortionDrive) ||
         (index == ParamIndex::StereoWidenWidth) || (index == ParamIndex::FilterResonance)) {
         ASSERT(k_param_descriptors[(u32)index].linear_range.min == 0 ||
                k_param_descriptors[(u32)index].linear_range.min == -1);

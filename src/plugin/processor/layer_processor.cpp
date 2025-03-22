@@ -386,7 +386,7 @@ static void TriggerVoicesIfNeeded(LayerProcessor& layer,
                                   MidiChannelNote note,
                                   f32 note_vel_float,
                                   u32 offset,
-                                  f32 dynamics_param_value_01,
+                                  f32 timbre_param_value_01,
                                   f32 velocity_to_volume_01) {
     ZoneScoped;
     if (layer.inst.tag == InstrumentType::None) return;
@@ -404,8 +404,8 @@ static void TriggerVoicesIfNeeded(LayerProcessor& layer,
     if (auto i_ptr = layer.inst.TryGet<sample_lib::LoadedInstrument const*>()) {
         auto const& inst = **i_ptr;
         p.params = VoiceStartParams::SamplerParams {
-            .initial_sample_offset01 = layer.sample_offset_01,
-            .initial_dynamics_01 = dynamics_param_value_01,
+            .initial_sample_offset_01 = layer.sample_offset_01,
+            .initial_timbre_param_value_01 = timbre_param_value_01,
             .voice_sample_params = {},
         };
         auto& sampler_params = p.params.Get<VoiceStartParams::SamplerParams>();
@@ -513,7 +513,7 @@ void LayerHandleNoteOff(LayerProcessor& layer,
                         MidiChannelNote note,
                         f32 velocity,
                         bool triggered_by_cc64,
-                        f32 dynamics_param_value_01,
+                        f32 timbre_param_value_01,
                         f32 velocity_to_volume_01) {
     if (!context.midi_note_state.sustain_pedal_on.Get(note.channel) && layer.voice_controller.vol_env_on &&
         !context.midi_note_state.keys_held[note.channel].Get(note.note))
@@ -527,7 +527,7 @@ void LayerHandleNoteOff(LayerProcessor& layer,
                               note,
                               velocity,
                               0,
-                              dynamics_param_value_01,
+                              timbre_param_value_01,
                               velocity_to_volume_01);
 }
 
@@ -537,7 +537,7 @@ void LayerHandleNoteOn(LayerProcessor& layer,
                        MidiChannelNote note_num,
                        f32 note_vel,
                        u32 offset,
-                       f32 dynamics_param_value_01,
+                       f32 timbre_param_value_01,
                        f32 velocity_to_volume_01) {
     TriggerVoicesIfNeeded(layer,
                           context,
@@ -546,7 +546,7 @@ void LayerHandleNoteOn(LayerProcessor& layer,
                           note_num,
                           note_vel,
                           offset,
-                          dynamics_param_value_01,
+                          timbre_param_value_01,
                           velocity_to_volume_01);
 }
 

@@ -40,230 +40,12 @@ static f32 PixelsPerVw(Gui* g) {
     return (f32)g->frame_input.window_size.width / k_points_in_width;
 }
 
-enum class LibraryImageType { Icon, Background };
-
-static String FilenameForLibraryImageType(LibraryImageType type) {
-    switch (type) {
-        case LibraryImageType::Icon: return "icon.png";
-        case LibraryImageType::Background: return "background.jpg";
-    }
-    PanicIfReached();
-    return {};
-}
-
-static Optional<sample_lib::LibraryPath> PathInLibraryForImageType(sample_lib::Library const& lib,
-                                                                   LibraryImageType type) {
-    switch (type) {
-        case LibraryImageType::Icon: return lib.icon_image_path;
-        case LibraryImageType::Background: return lib.background_image_path;
-    }
-    PanicIfReached();
-    return {};
-}
-
-Optional<ImageBytesManaged>
-ImagePixelsFromLibrary(Gui* g, sample_lib::Library const& lib, LibraryImageType type) {
-    auto const filename = FilenameForLibraryImageType(type);
-
-    if (lib.file_format_specifics.tag == sample_lib::FileFormat::Mdata) {
-        // Back in the Mirage days, some libraries didn't embed their own images, but instead got them from a
-        // shared pool. We replicate that behaviour here.
-        auto mirage_compat_lib =
-            sample_lib_server::FindLibraryRetained(g->shared_engine_systems.sample_library_server,
-                                                   sample_lib::k_mirage_compat_library_id);
-        DEFER { mirage_compat_lib.Release(); };
-
-        if (mirage_compat_lib) {
-            if (auto const dir = path::Directory(mirage_compat_lib->path); dir) {
-                String const library_subdir = lib.name == "Wraith Demo" ? "Wraith" : lib.name;
-                auto const path =
-                    path::Join(g->scratch_arena, Array {*dir, "Images"_s, library_subdir, filename});
-                auto outcome = DecodeImageFromFile(path);
-                if (outcome.HasValue()) return outcome.ReleaseValue();
-            }
-        }
-    }
-
-    auto const path_in_lib = PathInLibraryForImageType(lib, type);
-
-    auto err = [&](String middle, LogLevel severity) {
-        Log(ModuleName::Gui, severity, "{} {} {}", lib.name, middle, filename);
-        return Optional<ImageBytesManaged> {};
-    };
-
-    if (!path_in_lib) return err("does not have", LogLevel::Debug);
-
-    auto open_outcome = lib.create_file_reader(lib, *path_in_lib);
-    if (open_outcome.HasError()) return err("error opening", LogLevel::Warning);
-
-    ArenaAllocator arena {PageAllocator::Instance()};
-    auto const file_outcome = open_outcome.Value().ReadOrFetchAll(arena);
-    if (file_outcome.HasError()) return err("error reading", LogLevel::Warning);
-
-    auto image_outcome = DecodeImage(file_outcome.Value());
-    if (image_outcome.HasError()) return err("error decoding", LogLevel::Warning);
-
-    return image_outcome.ReleaseValue();
-}
-
-static graphics::ImageID CopyPixelsToGpuLoadedImage(Gui* g, ImageBytesManaged const& px) {
-    ASSERT(px.rgba);
-    auto const outcome = g->frame_input.graphics_ctx->CreateImageID(px.rgba, px.size, 4);
-    if (outcome.HasError()) {
-        LogError(ModuleName::Gui,
-                 "Failed to create a texture (size {}x{}): {}",
-                 px.size.width,
-                 px.size.height,
-                 outcome.Error());
-        return {};
-    }
-    return outcome.Value();
-}
-
-static Optional<graphics::ImageID> TryCreateImageOnGpu(graphics::DrawContext& ctx, ImageBytes const image) {
-    return ctx.CreateImageID(image.rgba, image.size, k_rgba_channels).OrElse([](ErrorCode error) {
-        LogError(ModuleName::Gui, "Failed to create image texture: {}", error);
-        return graphics::ImageID {};
-    });
-}
-
-static void CreateLibraryBackgroundImageTextures(Gui* g,
-                                                 LibraryImages& imgs,
-                                                 ImageBytesManaged const& background_image,
-                                                 bool reload_background,
-                                                 bool reload_blurred_background) {
-    ArenaAllocator arena {PageAllocator::Instance()};
-
-    auto const scaled_width = CheckedCast<u16>(g->frame_input.window_size.width * 1.3f);
-    if (!scaled_width) return;
-
-    // If the image is quite a lot larger than we need, resize it down to avoid storing a huge image on the
-    // GPU
-    auto const scaled_background =
-        ShrinkImageIfNeeded(background_image, scaled_width, g->frame_input.window_size.width, arena, false);
-    if (reload_background)
-        imgs.background = TryCreateImageOnGpu(*g->frame_input.graphics_ctx, scaled_background);
-
-    if (reload_blurred_background) {
-        imgs.blurred_background = TryCreateImageOnGpu(
-            *g->frame_input.graphics_ctx,
-            CreateBlurredLibraryBackground(
-                scaled_background,
-                arena,
-                {
-                    .downscale_factor =
-                        Clamp01(LiveSize(g->imgui, UiSizeId::BackgroundBlurringDownscaleFactor) / 100.0f),
-                    .brightness_scaling_exponent =
-                        LiveSize(g->imgui, UiSizeId::BackgroundBlurringBrightnessExponent) / 100.0f,
-                    .overlay_value =
-                        Clamp01(LiveSize(g->imgui, UiSizeId::BackgroundBlurringOverlayColour) / 100.0f),
-                    .overlay_alpha =
-                        Clamp01(LiveSize(g->imgui, UiSizeId::BackgroundBlurringOverlayIntensity) / 100.0f),
-                    .blur1_radius_percent = LiveSize(g->imgui, UiSizeId::BackgroundBlurringBlur1Radius) / 100,
-                    .blur2_radius_percent = LiveSize(g->imgui, UiSizeId::BackgroundBlurringBlur2Radius) / 100,
-                    .blur2_alpha =
-                        Clamp01(LiveSize(g->imgui, UiSizeId::BackgroundBlurringBlur2Alpha) / 100.0f),
-                }));
-    }
-}
-
-static LibraryImages& FindOrCreateLibraryImages(Gui* g, sample_lib::LibraryIdRef library_id) {
-    auto opt_index =
-        FindIf(g->library_images, [&](LibraryImages const& l) { return l.library_id == library_id; });
-    if (opt_index) return g->library_images[*opt_index];
-
-    dyn::Append(g->library_images, {library_id});
-    return g->library_images[g->library_images.size - 1];
-}
-
-struct CheckLibraryImagesResult {
-    bool reload_icon = false;
-    bool reload_background = false;
-    bool reload_blurred_background = false;
-};
-
-static CheckLibraryImagesResult CheckLibraryImages(Gui* g, LibraryImages& images) {
-    auto& ctx = g->frame_input.graphics_ctx;
-    CheckLibraryImagesResult result {};
-
-    if (Exchange(images.reload, false)) {
-        if (images.icon) ctx->DestroyImageID(*images.icon);
-        if (images.background) ctx->DestroyImageID(*images.background);
-        if (images.blurred_background) ctx->DestroyImageID(*images.blurred_background);
-        result.reload_icon = true;
-        result.reload_background = true;
-        result.reload_blurred_background = true;
-        return result;
-    }
-
-    if (!ctx->ImageIdIsValid(images.icon) && !images.icon_missing) result.reload_icon = true;
-    if (!ctx->ImageIdIsValid(images.background) && !images.background_missing)
-        result.reload_background = true;
-    if (!ctx->ImageIdIsValid(images.blurred_background) && !images.background_missing)
-        result.reload_blurred_background = true;
-
-    return result;
-}
-
-static LibraryImages LoadDefaultLibraryImagesIfNeeded(Gui* g) {
-    auto& images = FindOrCreateLibraryImages(g, k_default_background_lib_id);
-    auto const reloads = CheckLibraryImages(g, images);
-
-    if (reloads.reload_background || reloads.reload_blurred_background) {
-        auto image_data = EmbeddedDefaultBackground();
-        auto outcome = DecodeImage({image_data.data, image_data.size});
-        ASSERT(!outcome.HasError());
-        auto const bg_pixels = outcome.ReleaseValue();
-        CreateLibraryBackgroundImageTextures(g,
-                                             images,
-                                             bg_pixels,
-                                             reloads.reload_background,
-                                             reloads.reload_blurred_background);
-    }
-
-    return images;
-}
-
-static LibraryImages LoadLibraryImagesIfNeeded(Gui* g, sample_lib::Library const& lib) {
-    auto& images = FindOrCreateLibraryImages(g, lib.Id());
-    auto const reloads = CheckLibraryImages(g, images);
-
-    if (reloads.reload_icon) {
-        if (auto icon_pixels = ImagePixelsFromLibrary(g, lib, LibraryImageType::Icon))
-            images.icon = CopyPixelsToGpuLoadedImage(g, icon_pixels.Value());
-        else
-            images.icon_missing = true;
-    }
-
-    if (reloads.reload_background || reloads.reload_blurred_background) {
-        ImageBytesManaged const bg_pixels = ({
-            Optional<ImageBytesManaged> opt = ImagePixelsFromLibrary(g, lib, LibraryImageType::Background);
-            if (!opt) {
-                images.background_missing = true;
-                return images;
-            }
-            opt.ReleaseValue();
-        });
-
-        CreateLibraryBackgroundImageTextures(g,
-                                             images,
-                                             bg_pixels,
-                                             reloads.reload_background,
-                                             reloads.reload_blurred_background);
-    }
-
-    return images;
-}
-
 Optional<LibraryImages> LibraryImagesFromLibraryId(Gui* g, sample_lib::LibraryIdRef library_id) {
-    if (library_id == k_default_background_lib_id) return LoadDefaultLibraryImagesIfNeeded(g);
-
-    auto background_lib =
-        sample_lib_server::FindLibraryRetained(g->shared_engine_systems.sample_library_server, library_id);
-    DEFER { background_lib.Release(); };
-    if (!background_lib) return k_nullopt;
-
-    return LoadLibraryImagesIfNeeded(g, *background_lib);
+    return LibraryImagesFromLibraryId(g->library_images,
+                                      g->imgui,
+                                      library_id,
+                                      g->shared_engine_systems.sample_library_server,
+                                      g->scratch_arena);
 }
 
 Optional<graphics::ImageID> LogoImage(Gui* g) {
@@ -273,7 +55,7 @@ Optional<graphics::ImageID> LogoImage(Gui* g) {
             auto outcome = DecodeImage({data.data, data.size});
             ASSERT(!outcome.HasError());
             auto const pixels = outcome.ReleaseValue();
-            g->floe_logo_image = CopyPixelsToGpuLoadedImage(g, pixels);
+            g->floe_logo_image = CreateImageIdChecked(*g->imgui.graphics->context, pixels);
         }
     }
     return g->floe_logo_image;
@@ -294,7 +76,6 @@ static void SampleLibraryChanged(Gui* g, sample_lib::LibraryIdRef library_id) {
 }
 
 static void CreateFontsIfNeeded(Gui* g) {
-
     //
     // Fonts
     //
@@ -486,6 +267,8 @@ GuiFrameResult GuiUpdate(Gui* g) {
     ASSERT(IsMainThread(g->engine.host));
     g->imgui.SetPixelsPerVw(PixelsPerVw(g));
 
+    g->box_system.show_tooltips = prefs::GetBool(g->prefs, SettingDescriptor(GuiSetting::ShowTooltips));
+
     g->frame_output = {};
 
     live_edit::g_high_contrast_gui =
@@ -609,13 +392,6 @@ GuiFrameResult GuiUpdate(Gui* g) {
 
     // GUI2 panels. This is the future.
     {
-        GuiBoxSystem box_system {
-            .arena = g->scratch_arena,
-            .imgui = g->imgui,
-            .fonts = g->fonts,
-            .layout = g->layout,
-        };
-        box_system.show_tooltips = prefs::GetBool(g->prefs, SettingDescriptor(GuiSetting::ShowTooltips));
 
         {
             PreferencesPanelContext context {
@@ -627,14 +403,14 @@ GuiFrameResult GuiUpdate(Gui* g) {
                 .file_picker_state = g->file_picker_state,
             };
 
-            DoPreferencesPanel(box_system, context, g->preferences_panel_state);
+            DoPreferencesPanel(g->box_system, context, g->preferences_panel_state);
         }
 
         {
             FeedbackPanelContext context {
                 .notifications = g->notifications,
             };
-            DoFeedbackPanel(box_system, context, g->feedback_panel_state);
+            DoFeedbackPanel(g->box_system, context, g->feedback_panel_state);
         }
 
         {
@@ -648,7 +424,7 @@ GuiFrameResult GuiUpdate(Gui* g) {
             };
             DEFER { sample_lib_server::ReleaseAll(context.libraries); };
 
-            DoInfoPanel(box_system, context, g->info_panel_state);
+            DoInfoPanel(g->box_system, context, g->info_panel_state);
         }
 
         {
@@ -656,12 +432,12 @@ GuiFrameResult GuiUpdate(Gui* g) {
                 .attribution_text = g->engine.attribution_requirements.formatted_text,
             };
 
-            DoAttributionPanel(box_system, context, g->attribution_panel_open);
+            DoAttributionPanel(g->box_system, context, g->attribution_panel_open);
         }
 
-        DoNotifications(box_system, g->notifications);
+        DoNotifications(g->box_system, g->notifications);
 
-        DoPackageInstallNotifications(box_system,
+        DoPackageInstallNotifications(g->box_system,
                                       g->engine.package_install_jobs,
                                       g->notifications,
                                       g->engine.error_notifications,

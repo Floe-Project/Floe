@@ -189,6 +189,7 @@ struct Library {
     Optional<LibraryPath> background_image_path {};
     Optional<LibraryPath> icon_image_path {};
     HashTable<String, Instrument*> insts_by_name {};
+    Span<Instrument*> sorted_instruments {};
     HashTable<String, ImpulseResponse*> irs_by_name {};
     HashTable<LibraryPath, FileAttribution, sample_lib::Hash> files_requiring_attribution {};
     u32 num_instrument_samples {};
@@ -281,7 +282,7 @@ struct Options {
 };
 
 namespace detail {
-void PostReadBookkeeping(Library& lib);
+void PostReadBookkeeping(Library& lib, ArenaAllocator& arena);
 }
 
 LibraryPtrOrError ReadLua(Reader& reader,

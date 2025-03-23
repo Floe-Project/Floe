@@ -1637,7 +1637,7 @@ LibraryPtrOrError ReadLua(Reader& reader,
 
         library->files_requiring_attribution = ctx.files_requiring_attribution.ToOwnedTable();
 
-        detail::PostReadBookkeeping(*library);
+        detail::PostReadBookkeeping(*library, ctx.result_arena);
 
         return library;
     } catch (OutOfMemory const& e) {

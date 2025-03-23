@@ -306,6 +306,8 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
         folders = TrimStartIfMatches(folders, "sampler"_s);
         while (EndsWith(folders, '/'))
             folders.RemoveSuffix(1);
+        while (StartsWith(folders, '/'))
+            folders.RemovePrefix(1);
         folders = arena.Clone(folders);
 
         auto inst = arena.NewUninitialised<Instrument>();
@@ -587,7 +589,7 @@ ReadMdata(Reader& reader, String filepath, ArenaAllocator& result_arena, ArenaAl
     if (reader.memory)
         library->file_format_specifics.Get<MdataSpecifics>().file_data = {reader.memory, reader.size};
 
-    detail::PostReadBookkeeping(*library);
+    detail::PostReadBookkeeping(*library, result_arena);
 
     return library;
 }

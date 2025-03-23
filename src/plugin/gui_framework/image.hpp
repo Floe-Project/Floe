@@ -1,5 +1,6 @@
 // Copyright 2018-2024 Sam Windell
 // SPDX-License-Identifier: GPL-3.0-or-later
+#pragma once
 
 #include <stb_image.h>
 #include <stb_image_resize2.h>
@@ -10,6 +11,8 @@
 #include "utils/logger/logger.hpp"
 
 #include "common_infrastructure/common_errors.hpp"
+
+#include "gui_framework/draw_list.hpp"
 
 constexpr u16 k_rgba_channels = 4;
 
@@ -359,4 +362,18 @@ PUBLIC ImageBytes CreateBlurredLibraryBackground(ImageBytes original,
     WriteImageF32AsBytesNoAlpha(pixels, result.rgba);
 
     return result;
+}
+
+PUBLIC graphics::ImageID CreateImageIdChecked(graphics::DrawContext& ctx, ImageBytesManaged const& px) {
+    ASSERT(px.rgba);
+    auto const outcome = ctx.CreateImageID(px.rgba, px.size, 4);
+    if (outcome.HasError()) {
+        LogError(ModuleName::Gui,
+                 "Failed to create a texture (size {}x{}): {}",
+                 px.size.width,
+                 px.size.height,
+                 outcome.Error());
+        return {};
+    }
+    return outcome.Value();
 }

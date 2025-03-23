@@ -554,7 +554,7 @@ Context::~Context() {
 
 bool Context::IsRectVisible(Rect r) {
     Rect const& c = current_scissor_rect;
-    return Rect::Intersection(r, c);
+    return Rect::DoRectsIntersect(r, c);
 }
 
 // Hot
@@ -688,7 +688,7 @@ void Context::End(ArenaAllocator& scratch_arena) {
     if (!active_text_input_shown) SetTextInputFocus(0, {}, false);
 
     if (debug_show_register_widget_overlay) {
-        for (auto& w : frame_output.mouse_tracked_rects) {
+        for (auto& w : mouse_tracked_rects) {
             auto col = 0xffff00ff;
             if (w.mouse_over) col = 0xff00ffff;
             overlay_graphics.AddRect(w.rect.Min(), w.rect.Max(), col);

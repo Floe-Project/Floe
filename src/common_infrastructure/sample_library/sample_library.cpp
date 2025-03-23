@@ -52,7 +52,24 @@ LibraryPtrOrError Read(Reader& reader,
 
 namespace detail {
 
-void PostReadBookkeeping(Library& lib) {
+void PostReadBookkeeping(Library& lib, ArenaAllocator& arena) {
+    {
+        lib.sorted_instruments = arena.AllocateExactSizeUninitialised<Instrument*>(lib.insts_by_name.size);
+        usize index = 0;
+        for (auto [key, value] : lib.insts_by_name) {
+            auto& inst = **value;
+            lib.sorted_instruments[index++] = &inst;
+        }
+
+        // Sort instrument by folder, then by name.
+        Sort(lib.sorted_instruments, [](Instrument* a, Instrument* b) {
+            auto const& a_folder = a->folder;
+            auto const& b_folder = b->folder;
+            if (a_folder && b_folder && *a_folder != *b_folder) return *a_folder < *b_folder;
+            return a->name < b->name;
+        });
+    }
+
     for (auto [key, value] : lib.insts_by_name) {
         auto& inst = **value;
 

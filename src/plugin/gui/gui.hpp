@@ -9,30 +9,23 @@
 #include "engine/engine.hpp"
 #include "gui/gui2_feedback_panel_state.hpp"
 #include "gui/gui2_info_panel_state.hpp"
+#include "gui/gui2_inst_picker_state.hpp"
 #include "gui/gui2_notifications.hpp"
 #include "gui/gui2_prefs_panel_state.hpp"
+#include "gui/gui_library_images.hpp"
 #include "gui/gui_modal_windows.hpp"
 #include "gui_editor_widgets.hpp"
 #include "gui_envelope.hpp"
 #include "gui_file_picker.hpp"
 #include "gui_framework/draw_list.hpp"
 #include "gui_framework/fonts.hpp"
+#include "gui_framework/gui_box_system.hpp"
 #include "gui_framework/gui_imgui.hpp"
 #include "gui_framework/layout.hpp"
 #include "gui_layer.hpp"
 #include "gui_preset_browser.hpp"
 
 struct GuiFrameInput;
-
-struct LibraryImages {
-    sample_lib::LibraryId library_id {};
-    Optional<graphics::ImageID> icon {};
-    Optional<graphics::ImageID> background {};
-    Optional<graphics::ImageID> blurred_background {};
-    bool icon_missing {};
-    bool background_missing {};
-    bool reload {};
-};
 
 struct DraggingFX {
     imgui::Id id {};
@@ -132,6 +125,7 @@ struct Gui {
     FeedbackPanelState feedback_panel_state {};
     Notifications notifications {};
     FilePickerState file_picker_state {.data = FilePickerStateType::None};
+    InstPickerState inst_picker_state {};
 
     GuiFrameInput& frame_input;
     GuiFrameResult frame_output;
@@ -148,13 +142,19 @@ struct Gui {
     graphics::Font* icons {};
     Fonts fonts {}; // new system
     PresetBrowserPersistentData preset_browser_data {};
+    GuiBoxSystem box_system {
+        .arena = scratch_arena,
+        .imgui = imgui,
+        .fonts = fonts,
+        .layout = layout,
+    };
 
     layer_gui::LayerLayout layer_gui[k_num_layers] = {};
 
     FloeWaveformImages waveforms {};
     Optional<graphics::ImageID> floe_logo_image {};
 
-    DynamicArray<LibraryImages> library_images {Malloc::Instance()};
+    LibraryImagesArray library_images {Malloc::Instance()};
 
     Optional<DraggingFX> dragging_fx_unit {};
     Optional<DraggingFX> dragging_fx_switch {};

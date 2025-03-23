@@ -8,6 +8,7 @@
 #include "engine/engine.hpp"
 #include "engine/loop_modes.hpp"
 #include "gui.hpp"
+#include "gui2_inst_picker.hpp"
 #include "gui_button_widgets.hpp"
 #include "gui_dragger_widgets.hpp"
 #include "gui_drawing_helpers.hpp"
@@ -24,60 +25,60 @@
 
 namespace layer_gui {
 
-static void LayerInstrumentMenuItems(Gui* g, LayerProcessor* layer) {
-    auto const scratch_cursor = g->scratch_arena.TotalUsed();
-    DEFER { g->scratch_arena.TryShrinkTotalUsed(scratch_cursor); };
-
-    auto libs = sample_lib_server::AllLibrariesRetained(g->shared_engine_systems.sample_library_server,
-                                                        g->scratch_arena);
-    DEFER { sample_lib_server::ReleaseAll(libs); };
-
-    // TODO(1.0): this is not production-ready code. We need a new powerful database-like browser GUI
-    int current = 0;
-    DynamicArray<String> insts {g->scratch_arena};
-    DynamicArray<sample_lib::InstrumentId> inst_ids {g->scratch_arena};
-    dyn::Append(insts, "None");
-    dyn::Append(inst_ids, {});
-
-    for (auto const i : Range(ToInt(WaveformType::Count))) {
-        dyn::Append(insts, k_waveform_type_names[i]);
-        dyn::Append(inst_ids, {});
-        if (auto current_id = layer->instrument_id.TryGet<WaveformType>()) {
-            if (*current_id == (WaveformType)i) current = (int)i + 1;
-        }
-    }
-
-    for (auto l : libs) {
-        for (auto [key, inst_ptr] : l->insts_by_name) {
-            auto const lib_id = l->Id();
-            auto const inst_name = key;
-            if (auto current_id = layer->instrument_id.TryGet<sample_lib::InstrumentId>()) {
-                if (current_id->library == l->Id() && current_id->inst_name == inst_name)
-                    current = (int)insts.size;
-            }
-            dyn::Append(insts, fmt::Format(g->scratch_arena, "{}: {}", lib_id, inst_name));
-            dyn::Append(inst_ids,
-                        sample_lib::InstrumentId {
-                            .library = lib_id,
-                            .inst_name = inst_name,
-                        });
-        }
-    }
-
-    if (DoMultipleMenuItems(g, insts, current)) {
-        if (current == 0)
-            LoadInstrument(g->engine, layer->index, InstrumentId {InstrumentType::None});
-        else if (current >= 1 && current <= (int)WaveformType::Count)
-            LoadInstrument(g->engine, layer->index, InstrumentId {(WaveformType)(current - 1)});
-        else
-            LoadInstrument(g->engine, layer->index, InstrumentId {inst_ids[(usize)current]});
-    }
-}
+// static void LayerInstrumentMenuItems(Gui* g, LayerProcessor* layer) {
+//     auto const scratch_cursor = g->scratch_arena.TotalUsed();
+//     DEFER { g->scratch_arena.TryShrinkTotalUsed(scratch_cursor); };
+//
+//     auto libs = sample_lib_server::AllLibrariesRetained(g->shared_engine_systems.sample_library_server,
+//                                                         g->scratch_arena);
+//     DEFER { sample_lib_server::ReleaseAll(libs); };
+//
+//     // TODO(1.0): this is not production-ready code. We need a new powerful database-like browser GUI
+//     int current = 0;
+//     DynamicArray<String> insts {g->scratch_arena};
+//     DynamicArray<sample_lib::InstrumentId> inst_ids {g->scratch_arena};
+//     dyn::Append(insts, "None");
+//     dyn::Append(inst_ids, {});
+//
+//     for (auto const i : Range(ToInt(WaveformType::Count))) {
+//         dyn::Append(insts, k_waveform_type_names[i]);
+//         dyn::Append(inst_ids, {});
+//         if (auto current_id = layer->instrument_id.TryGet<WaveformType>()) {
+//             if (*current_id == (WaveformType)i) current = (int)i + 1;
+//         }
+//     }
+//
+//     for (auto l : libs) {
+//         for (auto [key, inst_ptr] : l->insts_by_name) {
+//             auto const lib_id = l->Id();
+//             auto const inst_name = key;
+//             if (auto current_id = layer->instrument_id.TryGet<sample_lib::InstrumentId>()) {
+//                 if (current_id->library == l->Id() && current_id->inst_name == inst_name)
+//                     current = (int)insts.size;
+//             }
+//             dyn::Append(insts, fmt::Format(g->scratch_arena, "{}: {}", lib_id, inst_name));
+//             dyn::Append(inst_ids,
+//                         sample_lib::InstrumentId {
+//                             .library = lib_id,
+//                             .inst_name = inst_name,
+//                         });
+//         }
+//     }
+//
+//     if (DoMultipleMenuItems(g, insts, current)) {
+//         if (current == 0)
+//             LoadInstrument(g->engine, layer->index, InstrumentId {InstrumentType::None});
+//         else if (current >= 1 && current <= (int)WaveformType::Count)
+//             LoadInstrument(g->engine, layer->index, InstrumentId {(WaveformType)(current - 1)});
+//         else
+//             LoadInstrument(g->engine, layer->index, InstrumentId {inst_ids[(usize)current]});
+//     }
+// }
 
 static void DoInstSelectorGUI(Gui* g, Rect r, u32 layer) {
     g->imgui.PushID("inst selector");
     DEFER { g->imgui.PopID(); };
-    auto imgui_id = g->imgui.GetID((u64)layer);
+    auto const imgui_id = g->imgui.GetID((u64)layer);
 
     auto layer_obj = &g->engine.Layer(layer);
     auto const inst_name = layer_obj->InstName();
@@ -90,15 +91,23 @@ static void DoInstSelectorGUI(Gui* g, Rect r, u32 layer) {
             icon_tex = g->imgui.frame_input.graphics_ctx->GetTextureFromImage(*imgs->icon);
     }
 
-    if (buttons::Popup(g,
-                       imgui_id,
-                       imgui_id + 1,
-                       r,
-                       inst_name,
-                       buttons::InstSelectorPopupButton(g->imgui, icon_tex))) {
-        LayerInstrumentMenuItems(g, layer_obj);
-        g->imgui.EndWindow();
-    }
+    auto const popup_imgui_id = imgui_id + 1;
+
+    if (buttons::Button(g, imgui_id, r, inst_name, buttons::InstSelectorPopupButton(g->imgui, icon_tex)))
+        g->imgui.OpenPopup(popup_imgui_id, imgui_id);
+
+    InstPickerContext context {
+        .layer = *layer_obj,
+        .sample_library_server = g->shared_engine_systems.sample_library_server,
+        .library_images = g->library_images,
+        .engine = g->engine,
+    };
+
+    DoInstPickerPopup(g->box_system,
+                      popup_imgui_id,
+                      g->imgui.GetRegisteredAndConvertedRect(r),
+                      context,
+                      g->inst_picker_state);
 
     if (layer_obj->instrument_id.tag == InstrumentType::None) {
         Tooltip(g, imgui_id, r, "Select the instrument for this layer"_s);

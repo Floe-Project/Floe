@@ -4,7 +4,6 @@
 #pragma once
 #include "foundation/foundation.hpp"
 #include "utils/debug/tracy_wrapped.hpp"
-#include "utils/logger/logger.hpp"
 
 #include "fonts.hpp"
 #include "gui/gui_drawing_helpers.hpp"
@@ -54,6 +53,8 @@ enum class PanelType {
 struct Subpanel {
     layout::Id id;
     imgui::Id imgui_id;
+    imgui::WindowFlags flags;
+    String debug_name;
 };
 
 struct ModalPanel {
@@ -69,6 +70,7 @@ struct ModalPanel {
 
 struct PopupPanel {
     layout::Id creator_layout_id;
+    Optional<Rect> creator_absolute_rect; // instead of creator_layout_id
     imgui::Id popup_imgui_id;
 };
 
@@ -97,8 +99,9 @@ struct Box {
     SourceLocation source_location;
 };
 
-struct GuiBoxSystem {
-    enum class State {
+// Ephemeral
+struct BoxSystemPanelState {
+    enum class Pass {
         LayoutBoxes,
         HandleInputAndRender,
     };
@@ -110,23 +113,52 @@ struct GuiBoxSystem {
         f32 font_size;
     };
 
-    ArenaAllocator& arena;
-    imgui::Context& imgui;
-    Fonts& fonts;
-    layout::Context& layout;
-    bool show_tooltips;
-
     Panel* current_panel {};
     u32 box_counter {};
 
-    State state {State::LayoutBoxes};
-    DynamicArray<Box> boxes {arena};
-    DynamicArray<WordWrappedText> word_wrapped_texts {arena};
+    Pass pass {Pass::LayoutBoxes};
+    DynamicArray<Box> boxes;
+    DynamicArray<WordWrappedText> word_wrapped_texts;
     bool mouse_down_on_modal_background = false;
     imgui::TextInputResult last_text_input_result {};
+};
 
-    f32 const scrollbar_width = imgui.VwToPixels(8);
-    f32 const scrollbar_padding = imgui.VwToPixels(style::k_scrollbar_rhs_space);
+struct GuiBoxSystem {
+    ArenaAllocator& arena;
+    imgui::Context& imgui;
+    Fonts& fonts;
+    layout::Context layout;
+    bool show_tooltips;
+
+    BoxSystemPanelState* state; // Ephemeral
+};
+
+PUBLIC f32 HeightOfWrappedText(GuiBoxSystem& box_system, layout::Id id, f32 width) {
+    for (auto& t : box_system.state->word_wrapped_texts)
+        if (id == t.id) return t.font->CalcTextSizeA(t.font_size, FLT_MAX, width, t.text)[1];
+    return 0;
+}
+
+PUBLIC void AddPanel(GuiBoxSystem& box_system, Panel panel) {
+    if (box_system.state->pass == BoxSystemPanelState::Pass::HandleInputAndRender) {
+        auto p = box_system.arena.New<Panel>(panel);
+        if (box_system.state->current_panel->first_child) {
+            for (auto q = box_system.state->current_panel->first_child; q; q = q->next)
+                if (!q->next) {
+                    q->next = p;
+                    break;
+                }
+        } else
+            box_system.state->current_panel->first_child = p;
+    }
+}
+
+PUBLIC void Run(GuiBoxSystem& builder, Panel* panel) {
+    ZoneScoped;
+    if (!panel) return;
+
+    f32 const scrollbar_width = builder.imgui.VwToPixels(8);
+    f32 const scrollbar_padding = builder.imgui.VwToPixels(style::k_scrollbar_rhs_space);
     imgui::DrawWindowScrollbar* const draw_scrollbar = [](IMGUI_DRAW_WINDOW_SCROLLBAR_ARGS) {
         u32 handle_col = style::Col(style::Colour::Surface1);
         if (imgui.IsHotOrActive(id)) handle_col = style::Col(style::Colour::Surface2);
@@ -140,7 +172,7 @@ struct GuiBoxSystem {
         imgui.graphics->AddRectFilled(r, style::Col(style::Colour::Background0), rounding);
     };
 
-    imgui::WindowSettings const regular_window_settings {
+    imgui::WindowSettings regular_window_settings {
         .scrollbar_padding = scrollbar_padding,
         .scrollbar_width = scrollbar_width,
         .draw_routine_scrollbar = draw_scrollbar,
@@ -149,8 +181,8 @@ struct GuiBoxSystem {
     imgui::WindowSettings const popup_settings {
         .flags =
             imgui::WindowFlags_AutoWidth | imgui::WindowFlags_AutoHeight | imgui::WindowFlags_AutoPosition,
-        .pad_top_left = {1, imgui.VwToPixels(style::k_panel_rounding)},
-        .pad_bottom_right = {1, imgui.VwToPixels(style::k_panel_rounding)},
+        .pad_top_left = {1, builder.imgui.VwToPixels(style::k_panel_rounding)},
+        .pad_bottom_right = {1, builder.imgui.VwToPixels(style::k_panel_rounding)},
         .scrollbar_padding = scrollbar_padding,
         .scrollbar_padding_top = 0,
         .scrollbar_width = scrollbar_width,
@@ -165,34 +197,14 @@ struct GuiBoxSystem {
         .draw_routine_scrollbar = draw_scrollbar,
         .draw_routine_window_background = draw_window,
     };
-};
-
-PUBLIC f32 HeightOfWrappedText(GuiBoxSystem& box_system, layout::Id id, f32 width) {
-    for (auto& t : box_system.word_wrapped_texts)
-        if (id == t.id) return t.font->CalcTextSizeA(t.font_size, FLT_MAX, width, t.text)[1];
-    return 0;
-}
-
-PUBLIC void AddPanel(GuiBoxSystem& box_system, Panel panel) {
-    if (box_system.state == GuiBoxSystem::State::HandleInputAndRender) {
-        auto p = box_system.arena.New<Panel>(panel);
-        if (box_system.current_panel->first_child)
-            box_system.current_panel->first_child->next = p;
-        else
-            box_system.current_panel->first_child = p;
-    }
-}
-
-PUBLIC void Run(GuiBoxSystem& builder, Panel* panel) {
-    ZoneScoped;
-    if (!panel) return;
 
     switch (panel->data.tag) {
         case PanelType::Subpanel: {
             auto const& subpanel = panel->data.Get<Subpanel>();
             auto const size = panel->rect->size;
             ASSERT(All(size > 0));
-            builder.imgui.BeginWindow(builder.regular_window_settings, subpanel.imgui_id, *panel->rect);
+            regular_window_settings.flags = subpanel.flags;
+            builder.imgui.BeginWindow(regular_window_settings, subpanel.imgui_id, *panel->rect);
             break;
         }
         case PanelType::Modal: {
@@ -222,7 +234,7 @@ PUBLIC void Run(GuiBoxSystem& builder, Panel* panel) {
                 }
             }
 
-            auto settings = builder.modal_window_settings;
+            auto settings = modal_window_settings;
             if (modal.auto_height) settings.flags |= imgui::WindowFlags_AutoHeight;
             if (modal.transparent_panel) settings.draw_routine_window_background = {};
 
@@ -230,9 +242,11 @@ PUBLIC void Run(GuiBoxSystem& builder, Panel* panel) {
             break;
         }
         case PanelType::Popup: {
-            if (!builder.imgui.BeginWindowPopup(builder.popup_settings,
-                                                panel->data.Get<PopupPanel>().popup_imgui_id,
-                                                *panel->rect,
+            auto const popup_data = panel->data.Get<PopupPanel>();
+            if (!builder.imgui.BeginWindowPopup(popup_settings,
+                                                popup_data.popup_imgui_id,
+                                                panel->rect ? *panel->rect
+                                                            : *popup_data.creator_absolute_rect,
                                                 "popup")) {
                 return;
             }
@@ -241,14 +255,16 @@ PUBLIC void Run(GuiBoxSystem& builder, Panel* panel) {
     }
 
     {
-        builder.current_panel = panel;
-        dyn::Clear(builder.boxes);
-        dyn::Clear(builder.word_wrapped_texts);
+        BoxSystemPanelState state {
+            .current_panel = panel,
+            .boxes = {builder.arena},
+            .word_wrapped_texts = {builder.arena},
+        };
+        builder.state = &state;
+        DEFER { builder.state = nullptr; };
 
         {
             ZoneNamedN(prof1, "Box system: create layout", true);
-            builder.box_counter = 0;
-            builder.state = GuiBoxSystem::State::LayoutBoxes;
             panel->run(builder);
         }
 
@@ -263,8 +279,8 @@ PUBLIC void Run(GuiBoxSystem& builder, Panel* panel) {
 
         {
             ZoneNamedN(prof3, "Box system: handle input and render", true);
-            builder.box_counter = 0;
-            builder.state = GuiBoxSystem::State::HandleInputAndRender;
+            state.box_counter = 0;
+            state.pass = BoxSystemPanelState::Pass::HandleInputAndRender;
             panel->run(builder);
         }
     }
@@ -286,11 +302,15 @@ PUBLIC void Run(GuiBoxSystem& builder, Panel* panel) {
             }
             case PanelType::Popup: {
                 auto const data = p->data.Get<PopupPanel>();
-                p->rect = layout::GetRect(builder.layout, data.creator_layout_id);
-                // we now have a relative position of the creator of the popup (usually a button). We
-                // need to convert it to screen space. When we run the panel, the imgui system will
-                // take this button rect and find a place for the popup below/right of it.
-                p->rect->pos = builder.imgui.WindowPosToScreenPos(p->rect->pos);
+                if (data.creator_absolute_rect) {
+                    p->rect = *data.creator_absolute_rect;
+                } else {
+                    p->rect = layout::GetRect(builder.layout, data.creator_layout_id);
+                    // we now have a relative position of the creator of the popup (usually a button). We
+                    // need to convert it to screen space. When we run the panel, the imgui system will
+                    // take this button rect and find a place for the popup below/right of it.
+                    p->rect->pos = builder.imgui.WindowPosToScreenPos(p->rect->pos);
+                }
                 break;
             }
         }
@@ -350,12 +370,14 @@ struct BoxConfig {
     bool32 size_from_text : 1 = false; // sets layout.size for you
     TextAlignX text_align_x : NumBitsNeededToStore(ToInt(TextAlignX::Count)) = TextAlignX::Left;
     TextAlignY text_align_y : NumBitsNeededToStore(ToInt(TextAlignY::Count)) = TextAlignY::Top;
+    bool32 capitalize_text : 1 = false;
 
     style::Colour background_fill : style::k_colour_bits = style::Colour::None;
     style::Colour background_fill_hot : style::k_colour_bits = style::Colour::None;
     style::Colour background_fill_active : style::k_colour_bits = style::Colour::None;
     bool32 background_fill_auto_hot_active_overlay : 1 = false;
     bool32 drop_shadow : 1 = false;
+    Optional<graphics::TextureHandle> background_tex {};
 
     style::Colour border : style::k_colour_bits = style::Colour::None;
     style::Colour border_hot : style::k_colour_bits = style::Colour::None;
@@ -436,7 +458,7 @@ static bool Tooltip(GuiBoxSystem& builder, imgui::Id id, Rect r, String str) {
 PUBLIC Box DoBox(GuiBoxSystem& builder,
                  BoxConfig const& config,
                  SourceLocation source_location = SourceLocation::Current()) {
-    auto const box_index = builder.box_counter++;
+    auto const box_index = builder.state->box_counter++;
     auto const font = builder.fonts[ToInt(config.font)];
     auto const font_size =
         config.font_size != 0 ? builder.imgui.VwToPixels(config.font_size) : font->font_size;
@@ -449,8 +471,8 @@ PUBLIC Box DoBox(GuiBoxSystem& builder,
     // it's does skip rendering off-screen text.
     f32 const wrap_width = config.text.size < 10000 ? config.wrap_width : k_no_wrap;
 
-    switch (builder.state) {
-        case GuiBoxSystem::State::LayoutBoxes: {
+    switch (builder.state->pass) {
+        case BoxSystemPanelState::Pass::LayoutBoxes: {
             auto const box = Box {
                 .layout_id =
                     layout::CreateItem(builder.layout, ({
@@ -492,7 +514,7 @@ PUBLIC Box DoBox(GuiBoxSystem& builder,
             };
 
             if (config.size_from_text && wrap_width == k_wrap_to_parent) {
-                dyn::Append(builder.word_wrapped_texts,
+                dyn::Append(builder.state->word_wrapped_texts,
                             {
                                 .id = box.layout_id,
                                 .text = builder.arena.Clone(config.text),
@@ -501,14 +523,17 @@ PUBLIC Box DoBox(GuiBoxSystem& builder,
                             });
             }
 
-            dyn::Append(builder.boxes, box);
+            dyn::Append(builder.state->boxes, box);
 
             return box;
         }
-        case GuiBoxSystem::State::HandleInputAndRender: {
-            auto& box = builder.boxes[box_index];
+        case BoxSystemPanelState::Pass::HandleInputAndRender: {
+            auto& box = builder.state->boxes[box_index];
             auto const rect =
                 builder.imgui.GetRegisteredAndConvertedRect(layout::GetRect(builder.layout, box.layout_id));
+
+            if (!builder.imgui.IsRectVisible(rect)) return box;
+
             auto const mouse_rect =
                 rect.Expanded(builder.imgui.VwToPixels(config.extra_margin_for_mouse_events));
 
@@ -527,7 +552,7 @@ PUBLIC Box DoBox(GuiBoxSystem& builder,
             }
             if (config.text_input_box != TextInputBox::None) {
                 box.imgui_id = builder.imgui.GetID((usize)box_index);
-                builder.last_text_input_result = builder.imgui.TextInput(
+                builder.state->last_text_input_result = builder.imgui.TextInput(
                     mouse_rect,
                     box.imgui_id,
                     config.text,
@@ -538,8 +563,13 @@ PUBLIC Box DoBox(GuiBoxSystem& builder,
                     false);
                 box.is_active = builder.imgui.TextInputHasFocus(box.imgui_id);
                 box.is_hot = builder.imgui.IsHot(box.imgui_id);
-                box.text_input_result = &builder.last_text_input_result;
+                box.text_input_result = &builder.state->last_text_input_result;
             }
+
+            //
+            // Drawing
+            //
+
             bool32 const is_active =
                 config.parent_dictates_hot_and_active ? config.parent->is_active : box.is_active;
             bool32 const is_hot = config.parent_dictates_hot_and_active ? config.parent->is_hot : box.is_hot;
@@ -579,6 +609,9 @@ PUBLIC Box DoBox(GuiBoxSystem& builder,
                 if (config.drop_shadow) draw::DropShadow(builder.imgui, r, rounding);
                 builder.imgui.graphics->AddRectFilled(r, col_u32, rounding, config.round_background_corners);
             }
+
+            if (config.background_tex)
+                builder.imgui.graphics->AddImage(*config.background_tex, rect.Min(), rect.Max());
 
             if (auto const border = ({
                     style::Colour c {};

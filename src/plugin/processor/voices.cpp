@@ -312,7 +312,6 @@ void StartVoice(VoicePool& pool,
     voice.id = voice.pool.voice_id_counter++;
     voice.midi_key_trigger = params.midi_key_trigger;
     voice.note_num = params.note_num;
-    voice.note_off_count = 0;
     voice.frames_before_starting = params.num_frames_before_starting;
     voice.filter_changed = true;
     voice.filters = {};
@@ -391,8 +390,6 @@ void EndVoice(Voice& voice) {
     ASSERT(voice.is_active);
     voice.vol_env.Gate(false);
     voice.fil_env.Gate(false);
-    voice.note_off_count++;
-    if (!voice.controller->vol_env_on && voice.note_off_count == 2) EndVoiceInstantly(voice);
 }
 
 void VoicePool::EndAllVoicesInstantly() {

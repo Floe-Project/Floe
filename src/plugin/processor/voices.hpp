@@ -110,7 +110,6 @@ struct Voice {
     //
     u7 note_num = 0;
     MidiChannelNote midi_key_trigger = {};
-    u16 note_off_count = 0;
 
     LFO lfo = {};
     OnePoleLowPassFilter lfo_smoother {}; // TODO(1.0): does the lfo need to be smoothed?

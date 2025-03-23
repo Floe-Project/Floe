@@ -23,6 +23,22 @@ static void UpdateLoopPointsForVoices(LayerProcessor& layer, VoicePool& voice_po
         UpdateLoopInfo(v);
 }
 
+bool LayerProcessor::VolumeEnvelopeIsOn(bool is_audio_thread) {
+    auto const param_is_on = params[ToInt(LayerParamIndex::VolEnvOn)].ValueAsBool();
+    auto const is_waveform =
+        (is_audio_thread ? inst.tag : instrument_id.tag) == InstrumentType::WaveformSynth;
+    return param_is_on || is_waveform;
+}
+
+static void UpdateVolumeEnvelopeOn(LayerProcessor& layer, VoicePool& voice_pool) {
+    layer.voice_controller.vol_env_on = layer.VolumeEnvelopeIsOn(true);
+    if (layer.voice_controller.vol_env_on)
+        for (auto& v : voice_pool.EnumerateActiveLayerVoices(layer.voice_controller))
+            v.vol_env.Gate(false);
+    else
+        UpdateLoopPointsForVoices(layer, voice_pool);
+}
+
 struct VelocityRegion {
     u7 const point_most_intense;
     u7 const point_least_intense;
@@ -177,12 +193,7 @@ void OnParamChange(LayerProcessor& layer,
     constexpr f32 k_min_envelope_ms = 0.2f;
     // Volume envelope
     // =======================================================================================================
-    if (auto p = changed_params.Param(LayerParamIndex::VolEnvOn)) {
-        vmst.vol_env_on = p->ValueAsBool();
-        if (vmst.vol_env_on)
-            for (auto& v : voice_pool.EnumerateActiveLayerVoices(layer.voice_controller))
-                v.vol_env.Gate(false);
-    }
+    if (auto p = changed_params.Param(LayerParamIndex::VolEnvOn)) UpdateVolumeEnvelopeOn(layer, voice_pool);
     if (auto p = changed_params.Param(LayerParamIndex::VolumeAttack))
         layer.voice_controller.vol_env.SetAttackSamples(Max(k_min_envelope_ms, p->ProjectedValue()) /
                                                             1000.0f * sample_rate,
@@ -496,10 +507,10 @@ static void TriggerVoicesIfNeeded(LayerProcessor& layer,
         }
     }
 
-    if (layer.monophonic) {
+    if (layer.monophonic && trigger_event == sample_lib::TriggerEvent::NoteOn) {
         for (auto& v : voice_pool.EnumerateActiveLayerVoices(layer.voice_controller))
             if (!layer.voice_controller.vol_env_on)
-                EndVoiceInstantly(v);
+                v.volume_fade.SetAsFadeOutIfNotAlready(context.sample_rate, 5);
             else
                 EndVoice(v);
     }
@@ -568,6 +579,7 @@ bool ChangeInstrumentIfNeededAndReset(LayerProcessor& layer, VoicePool& voice_po
     // Swap instrument
     layer.inst = *desired_inst;
     UpdateLoopPointsForVoices(layer, voice_pool);
+    UpdateVolumeEnvelopeOn(layer, voice_pool);
 
     return true;
 }

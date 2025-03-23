@@ -32,7 +32,8 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
     auto const reverse = layer->params[ToInt(LayerParamIndex::Reverse)].ValueAsBool();
     auto const desired_loop_mode =
         layer->params[ToInt(LayerParamIndex::LoopMode)].ValueAsInt<param_values::LoopMode>();
-    auto const mode = ActualLoopBehaviour(layer->instrument, desired_loop_mode);
+    auto const mode =
+        ActualLoopBehaviour(layer->instrument, desired_loop_mode, layer->VolumeEnvelopeIsOn(false));
 
     auto const extra_grabbing_room_x = handle_width;
     auto const extra_grabbing_room_towards_centre = r.h / 3;
@@ -534,14 +535,18 @@ void GUIDoSampleWaveform(Gui* g, LayerProcessor* layer, Rect r) {
         labels::Label(g, r, "Loading...", labels::WaveformLoadingLabel(g->imgui));
         is_loading = true;
     } else if (layer->instrument_id.tag != InstrumentType::None) {
-        auto const offset = layer->params[ToInt(LayerParamIndex::SampleOffset)].LinearValue();
+        auto const offset = layer->instrument_id.tag == InstrumentType::Sampler
+                                ? layer->params[ToInt(LayerParamIndex::SampleOffset)].LinearValue()
+                                : 0;
         auto const loop_start = layer->params[ToInt(LayerParamIndex::LoopStart)].LinearValue();
         auto const reverse = layer->params[ToInt(LayerParamIndex::Reverse)].ValueAsBool();
         auto const loop_end = Max(layer->params[ToInt(LayerParamIndex::LoopEnd)].LinearValue(), loop_start);
         using namespace loop_and_reverse_flags;
         auto const loop_mode =
             layer->params[ToInt(LayerParamIndex::LoopMode)].ValueAsInt<param_values::LoopMode>();
-        bool const loop_points_editable = ActualLoopBehaviour(layer->instrument, loop_mode).value.editable;
+        bool const loop_points_editable =
+            ActualLoopBehaviour(layer->instrument, loop_mode, layer->VolumeEnvelopeIsOn(false))
+                .value.editable;
 
         struct Range {
             f32x2 lo;

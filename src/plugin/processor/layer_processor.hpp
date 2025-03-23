@@ -218,6 +218,8 @@ struct LayerProcessor {
         }
     }
 
+    bool VolumeEnvelopeIsOn(bool is_audio_thread);
+
     Optional<sample_lib::LibraryIdRef> LibId() const {
         ASSERT(IsMainThread(host));
         if (auto sampled_inst = instrument.TryGetFromTag<InstrumentType::Sampler>())

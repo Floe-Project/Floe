@@ -97,7 +97,9 @@ static LoopBehaviour::Value Behaviour(LoopBehaviourId id) {
 }
 } // namespace detail
 
-PUBLIC LoopBehaviour ActualLoopBehaviour(Instrument const& inst, param_values::LoopMode desired_loop_mode) {
+PUBLIC LoopBehaviour ActualLoopBehaviour(Instrument const& inst,
+                                         param_values::LoopMode desired_loop_mode,
+                                         bool volume_envelope_on) {
     using namespace param_values;
 
     static constexpr String k_mixed_loop_non_loop = "Some regions have built-in loops, some don't.";
@@ -122,6 +124,14 @@ PUBLIC LoopBehaviour ActualLoopBehaviour(Instrument const& inst, param_values::L
             };
 
         case InstrumentType::Sampler: {
+            if (!volume_envelope_on) {
+                return {
+                    detail::Behaviour(LoopBehaviourId::NoLoop),
+                    "The volume envelope is off.",
+                    false,
+                };
+            }
+
             auto const& sampled_inst = inst.GetFromTag<InstrumentType::Sampler>()->instrument;
             auto const loop_overview = sampled_inst.loop_overview;
 

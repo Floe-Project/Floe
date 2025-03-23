@@ -118,9 +118,10 @@ static void DoLoopModeSelectorGui(Gui* g, Rect r, LayerProcessor& layer) {
     auto const& param = layer.params[ToInt(LayerParamIndex::LoopMode)];
     auto const desired_loop_mode = param.ValueAsInt<param_values::LoopMode>();
 
-    auto const actual_loop_behaviour = ActualLoopBehaviour(layer.instrument, desired_loop_mode);
+    auto const vol_env_on = layer.VolumeEnvelopeIsOn(false);
+    auto const actual_loop_behaviour = ActualLoopBehaviour(layer.instrument, desired_loop_mode, vol_env_on);
     auto const default_loop_behaviour =
-        ActualLoopBehaviour(layer.instrument, param_values::LoopMode::InstrumentDefault);
+        ActualLoopBehaviour(layer.instrument, param_values::LoopMode::InstrumentDefault, vol_env_on);
     DynamicArrayBounded<char, 64> default_mode_str {"Default: "};
     dyn::AppendSpan(default_mode_str, default_loop_behaviour.value.name);
 
@@ -148,7 +149,8 @@ static void DoLoopModeSelectorGui(Gui* g, Rect r, LayerProcessor& layer) {
 
         for (auto const i : Range<u32>(items.size)) {
             bool state = i == ToInt(desired_loop_mode);
-            auto const behaviour = ActualLoopBehaviour(layer.instrument, (param_values::LoopMode)i);
+            auto const behaviour =
+                ActualLoopBehaviour(layer.instrument, (param_values::LoopMode)i, vol_env_on);
             auto const valid = behaviour.is_desired;
             Rect const item_rect = {.xywh {0, h * (f32)i, w, h}};
             auto const item_id = g->imgui.GetID((uintptr)i);
@@ -985,7 +987,8 @@ void Draw(Gui* g,
                                 layer->params[ToInt(LayerParamIndex::VolEnvOn)],
                                 c.main.env_on,
                                 buttons::LayerHeadingButton(g->imgui));
-                bool const env_on = layer->params[ToInt(LayerParamIndex::VolEnvOn)].ValueAsBool();
+                bool const env_on = layer->params[ToInt(LayerParamIndex::VolEnvOn)].ValueAsBool() ||
+                                    layer->instrument.tag == InstrumentType::WaveformSynth;
                 GUIDoEnvelope(g,
                               layer,
                               layout::GetRect(g->layout, c.main.envelope),

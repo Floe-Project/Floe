@@ -28,7 +28,7 @@ run_windows_program := if os() == 'windows' {
 # Logos: the logos represent Floe's quality-assurance and recognition and so we don't use a GPL licence for them. 
 # Therefore they're kept separate and they're optional.
 
-external_resources := join(cache_dir, "external_resources")
+external_resources := join("build_resources", "external")
 
 # IMPORTANT: these must be kept in sync with the build.zig file
 logos_abs_dir := join(justfile_directory(), external_resources, "Logos")

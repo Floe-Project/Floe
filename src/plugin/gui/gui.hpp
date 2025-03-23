@@ -144,7 +144,6 @@ struct Gui {
     EditorGUI editor = {};
     graphics::Font* fira_sans {};
     graphics::Font* roboto_small {};
-    graphics::Font* mada_big {};
     graphics::Font* mada {};
     graphics::Font* icons {};
     Fonts fonts {}; // new system
@@ -153,6 +152,7 @@ struct Gui {
     layer_gui::LayerLayout layer_gui[k_num_layers] = {};
 
     FloeWaveformImages waveforms {};
+    Optional<graphics::ImageID> floe_logo_image {};
 
     DynamicArray<LibraryImages> library_images {Malloc::Instance()};
 
@@ -178,6 +178,8 @@ struct Gui {
 //
 
 Optional<LibraryImages> LibraryImagesFromLibraryId(Gui* g, sample_lib::LibraryIdRef library_id);
+
+Optional<graphics::ImageID> LogoImage(Gui* g);
 
 void GUIPresetLoaded(Gui* g, Engine* a, bool is_first_preset);
 GuiFrameResult GuiUpdate(Gui* g);

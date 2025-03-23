@@ -38,6 +38,7 @@ BinaryData EmbeddedMada();
 BinaryData EmbeddedRoboto();
 BinaryData EmbeddedFiraSans();
 BinaryData EmbeddedDefaultBackground();
+BinaryData EmbeddedLogoImage();
 BinaryData EmbeddedAboutLibraryTemplateRtf();
 BinaryData EmbeddedPackageInstallationRtf();
 

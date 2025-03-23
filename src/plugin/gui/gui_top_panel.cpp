@@ -5,6 +5,7 @@
 
 #include "common_infrastructure/paths.hpp"
 
+#include "build_resources/embedded_files.h"
 #include "engine/engine.hpp"
 #include "gui_button_widgets.hpp"
 #include "gui_menu.hpp"
@@ -50,8 +51,6 @@ void TopPanel(Gui* g) {
         r;
     });
 
-    auto title_font = g->mada_big;
-
     auto const preset_box_icon_width = LiveSize(g->imgui, UiSizeId::Top2PresetBoxIconWidth);
     auto const icon_width = LiveSize(g->imgui, UiSizeId::Top2IconWidth);
     auto const icon_height = LiveSize(g->imgui, UiSizeId::Top2IconHeight);
@@ -75,14 +74,14 @@ void TopPanel(Gui* g) {
         layout::CreateItem(g->layout,
                            {
                                .parent = left_container,
-                               .size = {LiveSize(g->imgui, UiSizeId::Top2TitleWidth), title_font->font_size},
+                               .size = {LiveSize(g->imgui, UiSizeId::Top2TitleWidth), layout::k_fill_parent},
                                .margins = {.l = LiveSize(g->imgui, UiSizeId::Top2TitleMarginL),
                                            .r = LiveSize(g->imgui, UiSizeId::Top2TitleSubtitleGap)},
                            });
     auto subtitle = layout::CreateItem(g->layout,
                                        {
                                            .parent = left_container,
-                                           .size = {layout::k_fill_parent, title_font->font_size},
+                                           .size = {layout::k_fill_parent, layout::k_fill_parent},
                                        });
 
     auto right_container = layout::CreateItem(g->layout,
@@ -221,19 +220,27 @@ void TopPanel(Gui* g) {
     }
 
     {
-        if (title_font) g->imgui.graphics->context->PushFont(title_font);
+        auto const title_r = g->imgui.GetRegisteredAndConvertedRect(layout::GetRect(g->layout, title));
 
-        auto title_r = layout::GetRect(g->layout, title).Up(Round(-title_font->descent));
+        auto const logo = LogoImage(g);
+        if (logo) {
+            auto tex = g->frame_input.graphics_ctx->GetTextureFromImage(*logo);
+            if (tex) {
+                auto logo_size = f32x2 {(f32)logo->size.width, (f32)logo->size.height};
 
-        labels::Label(g,
-                      title_r,
-                      "Floe",
-                      labels::Title(g->imgui, LiveCol(g->imgui, UiColMap::TopPanelTitleText)));
-        if (title_font) g->imgui.graphics->context->PopFont();
+                logo_size *= title_r.size.y / logo_size.y;
+                if (logo_size.x > title_r.size.x) logo_size *= title_r.size.x / logo_size.x;
+
+                auto logo_pos = title_r.pos;
+                logo_pos.y += (title_r.size.y - logo_size.y) / 2;
+
+                g->imgui.graphics->AddImage(*tex, logo_pos, logo_pos + logo_size, {0, 0}, {1, 1});
+            }
+        }
     }
 
     {
-        auto subtitle_r = layout::GetRect(g->layout, subtitle).Up(Round(-title_font->descent + 1));
+        auto subtitle_r = layout::GetRect(g->layout, subtitle);
         auto const show_instance_name =
             prefs::GetBool(g->prefs, SettingDescriptor(GuiSetting::ShowInstanceName));
         labels::Label(g,

@@ -30,7 +30,7 @@ PUBLIC Style TopLeft(imgui::Context const& imgui, u32 col) {
 
 PUBLIC Style Title(imgui::Context const& imgui, u32 col) {
     auto s = TopLeft(imgui, col);
-    s.icon_or_text.justification = TextJustification::Baseline;
+    s.icon_or_text.justification = TextJustification::CentredLeft;
     return s;
 }
 

@@ -266,6 +266,19 @@ Optional<LibraryImages> LibraryImagesFromLibraryId(Gui* g, sample_lib::LibraryId
     return LoadLibraryImagesIfNeeded(g, *background_lib);
 }
 
+Optional<graphics::ImageID> LogoImage(Gui* g) {
+    if (!g->imgui.graphics->context->ImageIdIsValid(g->floe_logo_image)) {
+        auto const data = EmbeddedLogoImage();
+        if (data.size) {
+            auto outcome = DecodeImage({data.data, data.size});
+            ASSERT(!outcome.HasError());
+            auto const pixels = outcome.ReleaseValue();
+            g->floe_logo_image = CopyPixelsToGpuLoadedImage(g, pixels);
+        }
+    }
+    return g->floe_logo_image;
+}
+
 static void SampleLibraryChanged(Gui* g, sample_lib::LibraryIdRef library_id) {
     auto opt_index =
         FindIf(g->library_images, [&](LibraryImages const& l) { return l.library_id == library_id; });
@@ -294,7 +307,6 @@ static void CreateFontsIfNeeded(Gui* g) {
 
         auto const fira_sans_size = g->imgui.VwToPixels(16);
         auto const roboto_small_size = g->imgui.VwToPixels(16);
-        auto const mada_big_size = g->imgui.VwToPixels(23);
         auto const mada_size = g->imgui.VwToPixels(18);
 
         auto const def_ranges = graphics_ctx->fonts.GetGlyphRangesDefaultAudioPlugin();
@@ -334,7 +346,6 @@ static void CreateFontsIfNeeded(Gui* g) {
         {
             auto const data = EmbeddedMada();
             g->mada = load_font({data.data, data.size}, mada_size, def_ranges);
-            g->mada_big = load_font({data.data, data.size}, mada_big_size, def_ranges);
         }
 
         auto const outcome = graphics_ctx->CreateFontTexture();
@@ -498,6 +509,7 @@ GuiFrameResult GuiUpdate(Gui* g) {
                               });
 
     CreateFontsIfNeeded(g);
+
     auto& imgui = g->imgui;
 
     g->waveforms.StartFrame();

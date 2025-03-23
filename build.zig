@@ -1892,6 +1892,13 @@ pub fn build(b: *std.Build) void {
             .optimize = build_context.optimise,
             .pic = true,
         });
+        {
+            var embedded_files_options = b.addOptions();
+            const logo_resource = getExternalResource(&build_context, "Logos/rasterized/plugin-gui-logo.png");
+            const logo_path = if (logo_resource) |r| r.absolute_path else null;
+            embedded_files_options.addOption(?[]const u8, "logo_file", logo_path);
+            embedded_files.root_module.addOptions("build_options", embedded_files_options);
+        }
         embedded_files.linkLibC();
         embedded_files.addIncludePath(b.path("build_resources"));
 

@@ -7,6 +7,8 @@ const c = @cImport({
     @cInclude("embedded_files.h");
 });
 
+const build_options = @import("build_options");
+
 fn embeddedFile(comptime filename: []const u8) c.BinaryData {
     const data = @embedFile(filename);
     const name = std.fs.path.stem(filename);
@@ -33,6 +35,14 @@ export fn EmbeddedMada() c.BinaryData {
 
 export fn EmbeddedDefaultBackground() c.BinaryData {
     return embeddedFile("images/default-background.jpg");
+}
+
+export fn EmbeddedLogoImage() c.BinaryData {
+    if (build_options.logo_file) |p| {
+        return embeddedFile(p);
+    } else {
+        return .{};
+    }
 }
 
 export fn EmbeddedAboutLibraryTemplateRtf() c.BinaryData {

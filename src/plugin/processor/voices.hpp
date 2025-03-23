@@ -19,8 +19,8 @@
 #include "sample_processing.hpp"
 #include "state/instrument.hpp"
 
-constexpr u32 k_max_num_active_voices = 32;
-constexpr u32 k_num_voices = 64;
+constexpr u32 k_max_num_active_voices = 256;
+constexpr u32 k_num_voices = 280;
 constexpr u32 k_max_num_voice_samples = 4;
 constexpr f32 k_erroneous_sample_value = 1000.0f;
 
@@ -96,7 +96,7 @@ struct Voice {
 
     VoicePool& pool;
 
-    u8 index = 0;
+    u16 index = 0;
 
     bool filter_changed = false;
     sv_filter::CachedHelpers filter_coeffs = {};

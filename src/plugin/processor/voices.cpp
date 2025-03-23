@@ -411,9 +411,9 @@ void VoicePool::PrepareToPlay(ArenaAllocator& arena, AudioProcessingContext cons
         buf = Span<f32> {CheckedPointerCast<f32*>(alloc.data), alloc.size / sizeof(f32)};
     }
 
-    int index = 0;
+    decltype(Voice::index) index = 0;
     for (auto& v : voices) {
-        v.index = (u8)(index++);
+        v.index = index++;
         v.smoothing_system.PrepareToPlay(k_num_frames_in_voice_processing_chunk, context.sample_rate, arena);
     }
 }

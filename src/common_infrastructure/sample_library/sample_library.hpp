@@ -110,6 +110,8 @@ struct Instrument {
     Span<Region> regions {};
     usize regions_allocated_capacity {}; // private
 
+    // IMPROVE: add options to always or never use Floe's volume envelope
+
     LoopOverview loop_overview {}; // Cached info about the loops in the regions.
     bool uses_timbre_layering {};
     u32 max_rr_pos {};

@@ -220,10 +220,10 @@ static void DoErrorsModal(Gui* g) {
                     // desc
                     {
                         DynamicArray<char> error_text {g->scratch_arena};
-                        if (e.error_code) fmt::Append(error_text, "{u}.", *e.error_code);
-                        if (e.message.size) {
-                            dyn::Append(error_text, '\n');
-                            dyn::AppendSpan(error_text, e.message);
+                        if (e.message.size) dyn::AppendSpan(error_text, e.message);
+                        if (e.error_code) {
+                            if (error_text.size) dyn::Append(error_text, '\n');
+                            fmt::Append(error_text, "{u}.", *e.error_code);
                         }
 
                         auto const max_width = imgui.Width() * 0.95f;

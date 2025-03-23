@@ -10,7 +10,7 @@ For instance: 0.0.1. Don't change the headings.
 # Changelog
 
 ## 0.0.7-alpha
-The focus of this version has been bug fixes
+The focus of this version has been bug fixes; in particular around loading Mirage libraries and presets.
 - Max voice is increased from 32 to 256 allowing for more complex instruments
 - Show the instrument type on the GUI: single sample, multisample or oscillator waveform
 - Rename 'Dynamics' knob to 'Timbre' and fix its behaviour - for instruments such as Arctic Strings, it can be used to crossfade between different sets of samples.

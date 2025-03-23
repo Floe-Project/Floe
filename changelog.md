@@ -131,3 +131,29 @@ Technical changes:
 - New build system using Zig; cross-compilation, dependency management, etc.
 - Comprehensive CI/CD pipeline for testing and creating release builds.
 - New 'sample library server', our system for providing libraries and audio files to Floe in a fast, async way.
+
+<!--
+Notable changes from the last Mirage version to Floe v1.0.0:
+- CLAP and VST3
+- Load instruments from different libraries in same patch
+- New format for creating sample libraries - open to everyone
+- New settings GUI
+- New installer, offline and hassle-free
+- Ability to install libraries and presets (packages) with a button - handles all the details automatically
+- Voice count increased from 32 to 256
+- New comprehensive documentation: https://floe.audio
+- Add ability to have multiple library and preset folders
+- Show the type of instrument below the waveform: multisample, single sample or waveform oscillator
+- 'CC64 Retrigger' parameter removed - retrigger is the default now
+- Change behaviour when a volume envelope if off - it now plays the sample all the way through, without any loops, playing the same note again will stack the sound
+- Show the loop mode more clearly on the GUI - it's obvious when a loop is built-in or custom, what modes are available for a given instrument, why loop modes are invalid.
+- New format for saving presets and DAW state - smaller and faster than before and allows for more expandability
+- Improved default locations for saving libraries and presets to avoid permissions issues
+- New GUI for picking instruments, presets and convolution reverb impulse responses: filter by library, tags; search.
+- Floe is open source
+- Floe's codebase is vastly more maintainable and better designed - huge work was put into creating a solid foundation to build on.
+- Floe has systems in place for regularly releasing updates and new features
+- Fixed issue with FrozenPlain - Arctic Strings crossfade layers not working
+- Fixed issue where loop crossfade wouldn't be applied - resulting in pops
+- Fixed issue where Mirage would spend forever trying to open
+-->

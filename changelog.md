@@ -10,19 +10,29 @@ For instance: 0.0.1. Don't change the headings.
 # Changelog
 
 ## 0.0.7-alpha
+The focus of this version has been bug fixes
+- Max voice is increased from 32 to 256 allowing for more complex instruments
+- Show the instrument type on the GUI: single sample, multisample or oscillator waveform
+- Rename 'Dynamics' knob to 'Timbre' and fix its behaviour - for instruments such as Arctic Strings, it can be used to crossfade between different sets of samples.
 - Fix missing code signing on Windows installer resulting in 'Unknown Publisher' warning
 - Fix layer filter type menu being the incorrect width
+- Fix crash when loop points were very close together
+- Improve loop modes on GUI: it's obvious when a loop is built-in or custom, what modes are available for a given instrument, why loop modes are invalid.
+- Add docs about looping
+- Fix sustain pedal incorrectly ending notes
+
+Mirage loading:
 - Fix incorrect loading of Mirage on/off switches - resulting in parameters being on when they should be off
 - Fix incorrect handling of Mirage's 'always loop' instruments
+- Fix incorrect conversion from Mirage's effects to Floe's effects
 - Improve sound matching when loading Mirage presets
 - Fix failure loading some FrozenPlain Squeaky Gate instruments
-- Fix crash when loop points were very close together
-- Library creation: re-organise the fields for add_region - grouping better into correct sections and allowing for easier expansion in the future.
-- Library creation: sample library region loops now are custom tables with `start_frame`, `end_frame`, `crossfade` and `mode` fields instead of an array.
-- Library creation: add `always_loop` and `never_loop` fields to sample library regions allowing for more control over custom loop usage on Floe's GUI.
-- Library creation: show an error if there's more than 2 velocity layers that are using 'feathering' mode. We don't support this yet.
-- Improve loop modes on GUI: it's obvious when a loop is built-in or custom, what modes are available for a given instrument, why loop modes are invalid.
-- Show the instrument type on the GUI: single sample, multisample or oscillator waveform
+
+Library creation:
+- Re-organise the fields for add_region - grouping better into correct sections and allowing for easier expansion in the future.
+- Sample library region loops now are custom tables with `start_frame`, `end_frame`, `crossfade` and `mode` fields instead of an array.
+- Add `always_loop` and `never_loop` fields to sample library regions allowing for more control over custom loop usage on Floe's GUI.
+- Show an error if there's more than 2 velocity layers that are using 'feathering' mode. We don't support this yet. Same for timbre layers.
 
 ## 0.0.6-alpha
 - Add VST3 support

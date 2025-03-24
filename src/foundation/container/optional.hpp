@@ -124,6 +124,28 @@ class [[nodiscard]] Optional<Type> {
 
     constexpr Optional Clone(Allocator& a, CloneType clone_type = CloneType::Shallow) const;
 
+    constexpr auto Transform(auto&& f) const {
+        using U = RemoveCVReference<InvokeResult<decltype(f), Type>>;
+        if (HasValue())
+            return Optional<U> {f(Value())};
+        else
+            return Optional<U> {};
+    }
+
+    constexpr auto AndThen(auto&& f) const {
+        if (HasValue())
+            return f(Value());
+        else
+            return RemoveCVReference<InvokeResult<decltype(f), Type>> {};
+    }
+
+    constexpr auto OrElse(auto&& f) const {
+        if (HasValue())
+            return Value();
+        else
+            return f();
+    }
+
     union {
         Type value;
         u8 no_value;
@@ -224,10 +246,11 @@ class [[nodiscard]] Optional<Type> {
     }
 
     constexpr auto Transform(auto&& f) const {
+        using U = RemoveCVReference<InvokeResult<decltype(f), Type>>;
         if (HasValue())
-            return Optional {f(Value())};
+            return Optional<U> {f(Value())};
         else
-            return Optional {};
+            return Optional<U> {};
     }
 
     constexpr auto OrElse(auto&& f) const {

@@ -121,6 +121,14 @@ struct BoxSystemCurrentPanelState {
     DynamicArray<WordWrappedText> word_wrapped_texts;
     bool mouse_down_on_modal_background = false;
     imgui::TextInputResult last_text_input_result {};
+
+    // TODO: this is a hack. The issue is this: in our 2-pass system, if we change state partway through the
+    // second pass that causes a different GUI to be rendered - it crashses because it will be using
+    // layout/box data from the first pass, but the GUI is different from the first pass. This is a hack to
+    // prevent that. We should fix this by perhaps turning the boxes field into a hashmap and requiring each
+    // box to have a unique ID. This way, we lookup the box by ID and can know when something is missing and
+    // skip it.
+    DynamicArray<TrivialFixedSizeFunction<32, void()>> deferred_actions;
 };
 
 struct GuiBoxSystem {
@@ -259,6 +267,7 @@ PUBLIC void Run(GuiBoxSystem& builder, Panel* panel) {
             .current_panel = panel,
             .boxes = {builder.arena},
             .word_wrapped_texts = {builder.arena},
+            .deferred_actions = {builder.arena},
         };
         builder.state = &state;
         DEFER { builder.state = nullptr; };
@@ -283,6 +292,9 @@ PUBLIC void Run(GuiBoxSystem& builder, Panel* panel) {
             state.pass = BoxSystemCurrentPanelState::Pass::HandleInputAndRender;
             panel->run(builder);
         }
+
+        for (auto& action : state.deferred_actions)
+            action();
     }
 
     // Fill in the rect of new panels so we can reuse the layout system.
@@ -322,8 +334,6 @@ PUBLIC void Run(GuiBoxSystem& builder, Panel* panel) {
         Run(builder, p);
 
     builder.imgui.EndWindow();
-
-    // Run(builder, panel->next);
 }
 
 PUBLIC void RunPanel(GuiBoxSystem& builder, Panel initial_panel) {

@@ -796,7 +796,7 @@ static void InstPickerPopup(GuiBoxSystem& box_system, InstPickerContext& context
             if (IconButton(box_system,
                            instruments_top,
                            ICON_FA_CARET_LEFT,
-                           "Previous instrument.",
+                           "Load previous instrument",
                            style::k_font_heading2_size,
                            style::k_font_heading2_size)
                     .button_fired) {
@@ -808,7 +808,7 @@ static void InstPickerPopup(GuiBoxSystem& box_system, InstPickerContext& context
             if (IconButton(box_system,
                            instruments_top,
                            ICON_FA_CARET_RIGHT,
-                           "Next instrument.",
+                           "Load next instrument",
                            style::k_font_heading2_size,
                            style::k_font_heading2_size)
                     .button_fired) {
@@ -820,12 +820,25 @@ static void InstPickerPopup(GuiBoxSystem& box_system, InstPickerContext& context
             if (IconButton(box_system,
                            instruments_top,
                            ICON_FA_RANDOM,
-                           "Random instrument.",
+                           "Load random instrument",
                            style::k_font_heading2_size * 0.8f,
                            style::k_font_heading2_size)
                     .button_fired) {
                 dyn::Append(box_system.state->deferred_actions,
                             [&]() { LoadRandomInstrument(context, state, true); });
+            }
+
+            if (context.layer.instrument_id.tag != InstrumentType::None) {
+                if (IconButton(box_system,
+                               instruments_top,
+                               ICON_FA_LOCATION_ARROW,
+                               "Scroll to current instrument",
+                               style::k_font_heading2_size * 0.7f,
+                               style::k_font_heading2_size)
+                        .button_fired) {
+                    dyn::Append(box_system.state->deferred_actions,
+                                [&]() { state.scroll_to_show_selected = true; });
+                }
             }
         }
 

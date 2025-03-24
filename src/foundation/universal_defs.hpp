@@ -285,7 +285,7 @@ struct InvokeResultHelper<F, Args...> {
 };
 
 template <typename F, typename... Args>
-using InvokeResult = typename InvokeResultHelper<F, Args...>::type;
+using InvokeResult = typename InvokeResultHelper<F, Args...>::Type;
 
 template <typename T, template <typename...> typename U>
 inline constexpr bool IsSpecializationOf = false; // NOLINT(readability-identifier-naming)

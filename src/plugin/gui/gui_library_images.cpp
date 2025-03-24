@@ -223,9 +223,9 @@ Optional<LibraryImages> LibraryImagesFromLibraryId(LibraryImagesArray& array,
                                                    ArenaAllocator& scratch_arena) {
     if (library_id == k_default_background_lib_id) return LoadDefaultLibraryImagesIfNeeded(array, imgui);
 
-    auto background_lib = sample_lib_server::FindLibraryRetained(server, library_id);
-    DEFER { background_lib.Release(); };
-    if (!background_lib) return k_nullopt;
+    auto lib = sample_lib_server::FindLibraryRetained(server, library_id);
+    DEFER { lib.Release(); };
+    if (!lib) return k_nullopt;
 
-    return LoadLibraryImagesIfNeeded(array, imgui, *background_lib, server, scratch_arena);
+    return LoadLibraryImagesIfNeeded(array, imgui, *lib, server, scratch_arena);
 }

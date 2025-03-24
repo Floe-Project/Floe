@@ -25,56 +25,6 @@
 
 namespace layer_gui {
 
-// static void LayerInstrumentMenuItems(Gui* g, LayerProcessor* layer) {
-//     auto const scratch_cursor = g->scratch_arena.TotalUsed();
-//     DEFER { g->scratch_arena.TryShrinkTotalUsed(scratch_cursor); };
-//
-//     auto libs = sample_lib_server::AllLibrariesRetained(g->shared_engine_systems.sample_library_server,
-//                                                         g->scratch_arena);
-//     DEFER { sample_lib_server::ReleaseAll(libs); };
-//
-//     // TODO(1.0): this is not production-ready code. We need a new powerful database-like browser GUI
-//     int current = 0;
-//     DynamicArray<String> insts {g->scratch_arena};
-//     DynamicArray<sample_lib::InstrumentId> inst_ids {g->scratch_arena};
-//     dyn::Append(insts, "None");
-//     dyn::Append(inst_ids, {});
-//
-//     for (auto const i : Range(ToInt(WaveformType::Count))) {
-//         dyn::Append(insts, k_waveform_type_names[i]);
-//         dyn::Append(inst_ids, {});
-//         if (auto current_id = layer->instrument_id.TryGet<WaveformType>()) {
-//             if (*current_id == (WaveformType)i) current = (int)i + 1;
-//         }
-//     }
-//
-//     for (auto l : libs) {
-//         for (auto [key, inst_ptr] : l->insts_by_name) {
-//             auto const lib_id = l->Id();
-//             auto const inst_name = key;
-//             if (auto current_id = layer->instrument_id.TryGet<sample_lib::InstrumentId>()) {
-//                 if (current_id->library == l->Id() && current_id->inst_name == inst_name)
-//                     current = (int)insts.size;
-//             }
-//             dyn::Append(insts, fmt::Format(g->scratch_arena, "{}: {}", lib_id, inst_name));
-//             dyn::Append(inst_ids,
-//                         sample_lib::InstrumentId {
-//                             .library = lib_id,
-//                             .inst_name = inst_name,
-//                         });
-//         }
-//     }
-//
-//     if (DoMultipleMenuItems(g, insts, current)) {
-//         if (current == 0)
-//             LoadInstrument(g->engine, layer->index, InstrumentId {InstrumentType::None});
-//         else if (current >= 1 && current <= (int)WaveformType::Count)
-//             LoadInstrument(g->engine, layer->index, InstrumentId {(WaveformType)(current - 1)});
-//         else
-//             LoadInstrument(g->engine, layer->index, InstrumentId {inst_ids[(usize)current]});
-//     }
-// }
-
 static void DoInstSelectorGUI(Gui* g, Rect r, u32 layer) {
     g->imgui.PushID("inst selector");
     DEFER { g->imgui.PopID(); };
@@ -102,6 +52,8 @@ static void DoInstSelectorGUI(Gui* g, Rect r, u32 layer) {
         .library_images = g->library_images,
         .engine = g->engine,
     };
+    context.Init(g->scratch_arena);
+    DEFER { context.Deinit(); };
 
     DoInstPickerPopup(g->box_system,
                       popup_imgui_id,
@@ -847,14 +799,34 @@ void Draw(Gui* g,
                             selector_left_id,
                             selector_left_r,
                             ICON_FA_CARET_LEFT,
-                            buttons::IconButton(g->imgui)))
-            CycleInstrument(*engine, layer->index, CycleDirection::Backward);
+                            buttons::IconButton(g->imgui))) {
+            InstPickerContext context {
+                .layer = *layer,
+                .sample_library_server = g->shared_engine_systems.sample_library_server,
+                .library_images = g->library_images,
+                .engine = g->engine,
+            };
+            context.Init(g->scratch_arena);
+            DEFER { context.Deinit(); };
+            LoadAdjacentInstrument(context,
+                                   g->inst_picker_state,
+                                   IterateInstrumentDirection::Backward,
+                                   false);
+        }
         if (buttons::Button(g,
                             selector_right_id,
                             selector_right_r,
                             ICON_FA_CARET_RIGHT,
                             buttons::IconButton(g->imgui))) {
-            CycleInstrument(*engine, layer->index, CycleDirection::Forward);
+            InstPickerContext context {
+                .layer = *layer,
+                .sample_library_server = g->shared_engine_systems.sample_library_server,
+                .library_images = g->library_images,
+                .engine = g->engine,
+            };
+            context.Init(g->scratch_arena);
+            DEFER { context.Deinit(); };
+            LoadAdjacentInstrument(context, g->inst_picker_state, IterateInstrumentDirection::Forward, false);
         }
         {
             auto rand_id = g->imgui.GetID("Rand");
@@ -864,7 +836,15 @@ void Draw(Gui* g,
                                 rand_r,
                                 ICON_FA_RANDOM,
                                 buttons::IconButton(g->imgui).WithRandomiseIconScaling())) {
-                LoadRandomInstrument(*engine, layer->index, false);
+                InstPickerContext context {
+                    .layer = *layer,
+                    .sample_library_server = g->shared_engine_systems.sample_library_server,
+                    .library_images = g->library_images,
+                    .engine = g->engine,
+                };
+                context.Init(g->scratch_arena);
+                DEFER { context.Deinit(); };
+                LoadRandomInstrument(context, g->inst_picker_state, false);
             }
             Tooltip(g, rand_id, rand_r, "Load a random instrument"_s);
         }

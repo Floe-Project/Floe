@@ -6,8 +6,6 @@
 
 #include "common_infrastructure/sample_library/sample_library.hpp"
 
-#include "state/instrument.hpp"
-
 struct InstPickerState {
     enum class Tab : u8 {
         FloeLibaries,
@@ -26,9 +24,22 @@ struct InstPickerState {
         return sample_lib::FileFormat::Lua;
     }
 
+    void ClearAllFilters() {
+        dyn::Clear(selected_library_hashes);
+        dyn::Clear(selected_mirage_library_hashes);
+        dyn::Clear(selected_tags_hashes);
+        dyn::Clear(search);
+    }
+
+    bool HasFilters() const {
+        return selected_library_hashes.size || selected_mirage_library_hashes.size ||
+               selected_tags_hashes.size || search.size;
+    }
+
     Tab tab {Tab::FloeLibaries};
     DynamicArray<u64> selected_library_hashes {Malloc::Instance()};
     DynamicArray<u64> selected_mirage_library_hashes {Malloc::Instance()};
     DynamicArray<u64> selected_tags_hashes {Malloc::Instance()};
     DynamicArrayBounded<char, 100> search;
+    bool scroll_to_show_selected = false;
 };

@@ -11,15 +11,230 @@
 
 // Ephemeral
 struct InstPickerContext {
+    void Init(ArenaAllocator& arena) {
+        libraries = sample_lib_server::AllLibrariesRetained(sample_library_server, arena);
+        Sort(libraries, [](auto const& a, auto const& b) { return a->name < b->name; });
+
+        for (auto const& l : libraries) {
+            if (l->file_format_specifics.tag == sample_lib::FileFormat::Mdata) {
+                has_mirage_libraries = true;
+                break;
+            }
+        }
+    }
+    void Deinit() { sample_lib_server::ReleaseAll(libraries); }
+
     LayerProcessor& layer;
     sample_lib_server::Server& sample_library_server;
     LibraryImagesArray& library_images;
     Engine& engine;
+
     Span<sample_lib_server::RefCounted<sample_lib::Library>> libraries;
     sample_lib::Instrument const* hovering_inst {};
     sample_lib::Library const* hovering_lib {};
     Optional<WaveformType> waveform_type_hovering {};
+    bool has_mirage_libraries {};
 };
+
+struct InstrumentCursor {
+    bool operator==(InstrumentCursor const& o) const = default;
+    usize lib_index;
+    usize inst_index;
+};
+
+enum class IterateInstrumentDirection { Forward, Backward };
+
+static Optional<InstrumentCursor> CurrentCursor(InstPickerContext const& context,
+                                                sample_lib::InstrumentId const& inst_id) {
+    for (auto const [lib_index, l] : Enumerate(context.libraries)) {
+        if (l->Id() != inst_id.library) continue;
+        for (auto const [inst_index, i] : Enumerate(l->sorted_instruments))
+            if (i->name == inst_id.inst_name) return InstrumentCursor {lib_index, inst_index};
+    }
+
+    return k_nullopt;
+}
+
+static Optional<InstrumentCursor> IterateInstrument(InstPickerContext const& context,
+                                                    InstPickerState const& state,
+                                                    InstrumentCursor cursor,
+                                                    IterateInstrumentDirection direction,
+                                                    bool first,
+                                                    bool picker_gui_is_open) {
+    if (cursor.lib_index >= context.libraries.size) cursor.lib_index = 0;
+
+    if (!first) {
+        switch (direction) {
+            case IterateInstrumentDirection::Forward: ++cursor.inst_index; break;
+            case IterateInstrumentDirection::Backward:
+                static_assert(UnsignedInt<decltype(cursor.inst_index)>);
+                --cursor.inst_index;
+                break;
+        }
+    }
+
+    for (usize lib_step = 0; lib_step < context.libraries.size + 1; (
+             {
+                 ++lib_step;
+                 switch (direction) {
+                     case IterateInstrumentDirection::Forward:
+                         cursor.lib_index = (cursor.lib_index + 1) % context.libraries.size;
+                         cursor.inst_index = 0;
+                         break;
+                     case IterateInstrumentDirection::Backward:
+                         static_assert(UnsignedInt<decltype(cursor.lib_index)>);
+                         --cursor.lib_index;
+                         if (cursor.lib_index >= context.libraries.size) // check wraparound
+                             cursor.lib_index = context.libraries.size - 1;
+                         cursor.inst_index = context.libraries[cursor.lib_index]->sorted_instruments.size - 1;
+                         break;
+                 }
+             })) {
+        auto const& lib = *context.libraries[cursor.lib_index];
+
+        if (lib.sorted_instruments.size == 0) continue;
+        if (picker_gui_is_open && lib.file_format_specifics.tag != state.FileFormatForCurrentTab()) continue;
+
+        if (state.tab == InstPickerState::Tab::FloeLibaries && state.selected_library_hashes.size &&
+            !Contains(state.selected_library_hashes, lib.Id().Hash())) {
+            continue;
+        }
+
+        if (state.tab == InstPickerState::Tab::MirageLibraries && state.selected_mirage_library_hashes.size &&
+            !Contains(state.selected_mirage_library_hashes, lib.Id().Hash())) {
+            continue;
+        }
+
+        for (; cursor.inst_index < lib.sorted_instruments.size; (
+                 {
+                     switch (direction) {
+                         case IterateInstrumentDirection::Forward: ++cursor.inst_index; break;
+                         case IterateInstrumentDirection::Backward: --cursor.inst_index; break;
+                     }
+                 })) {
+            auto const& inst = *lib.sorted_instruments[cursor.inst_index];
+
+            if (state.search.size && (!ContainsCaseInsensitiveAscii(inst.name, state.search) &&
+                                      !ContainsCaseInsensitiveAscii(inst.folder.ValueOr({}), state.search)))
+                continue;
+
+            if (state.selected_tags_hashes.size) {
+                bool found = false;
+                for (auto const tag : inst.tags) {
+                    auto const tag_hash = Hash(tag);
+                    if (Contains(state.selected_tags_hashes, tag_hash)) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) continue;
+            }
+
+            return cursor;
+        }
+    }
+
+    return k_nullopt;
+}
+
+PUBLIC void LoadAdjacentInstrument(InstPickerContext const& context,
+                                   InstPickerState& state,
+                                   IterateInstrumentDirection direction,
+                                   bool picker_gui_is_open) {
+    switch (context.layer.instrument_id.tag) {
+        case InstrumentType::WaveformSynth: {
+            auto const waveform_type = context.layer.instrument_id.Get<WaveformType>();
+            auto prev = ToInt(waveform_type) - 1;
+            if (prev < 0) prev = ToInt(WaveformType::Count) - 1;
+            LoadInstrument(context.engine, context.layer.index, WaveformType(prev));
+            break;
+        }
+        case InstrumentType::None: {
+            if (auto const cursor =
+                    IterateInstrument(context, state, {0, 0}, direction, true, picker_gui_is_open)) {
+                auto const& lib = *context.libraries[cursor->lib_index];
+                auto const& inst = *lib.sorted_instruments[cursor->inst_index];
+                LoadInstrument(context.engine,
+                               context.layer.index,
+                               sample_lib::InstrumentId {
+                                   .library = lib.Id(),
+                                   .inst_name = inst.name,
+                               });
+                state.scroll_to_show_selected = true;
+            }
+            break;
+        }
+        case InstrumentType::Sampler: {
+            auto const inst_id = context.layer.instrument_id.Get<sample_lib::InstrumentId>();
+
+            if (auto const cursor = CurrentCursor(context, inst_id)) {
+                if (auto const prev =
+                        IterateInstrument(context, state, *cursor, direction, false, picker_gui_is_open)) {
+                    auto const& lib = *context.libraries[prev->lib_index];
+                    auto const& inst = *lib.sorted_instruments[prev->inst_index];
+                    LoadInstrument(context.engine,
+                                   context.layer.index,
+                                   sample_lib::InstrumentId {
+                                       .library = lib.Id(),
+                                       .inst_name = inst.name,
+                                   });
+                    state.scroll_to_show_selected = true;
+                }
+            }
+            break;
+        }
+    }
+}
+
+PUBLIC void
+LoadRandomInstrument(InstPickerContext const& context, InstPickerState& state, bool picker_gui_is_open) {
+    auto const first = IterateInstrument(context,
+                                         state,
+                                         {.lib_index = 0, .inst_index = 0},
+                                         IterateInstrumentDirection::Forward,
+                                         true,
+                                         picker_gui_is_open);
+    if (!first) return;
+
+    auto cursor = *first;
+
+    usize num_instruments = 0;
+    while (true) {
+        if (auto const next = IterateInstrument(context,
+                                                state,
+                                                cursor,
+                                                IterateInstrumentDirection::Forward,
+                                                false,
+                                                picker_gui_is_open)) {
+            cursor = *next;
+            if (cursor == *first) break;
+            ++num_instruments;
+        } else {
+            break;
+        }
+    }
+
+    auto const random_pos = RandomIntInRange<usize>(context.engine.random_seed, 0, num_instruments - 1);
+
+    cursor = *first;
+    for (usize i = 0; i < random_pos; ++i)
+        cursor = *IterateInstrument(context,
+                                    state,
+                                    cursor,
+                                    IterateInstrumentDirection::Forward,
+                                    false,
+                                    picker_gui_is_open);
+
+    auto const& lib = *context.libraries[cursor.lib_index];
+    auto const& inst = *lib.sorted_instruments[cursor.inst_index];
+    LoadInstrument(context.engine,
+                   context.layer.index,
+                   sample_lib::InstrumentId {
+                       .library = lib.Id(),
+                       .inst_name = inst.name,
+                   });
+    state.scroll_to_show_selected = true;
+}
 
 static void InstPickerStatusBar(GuiBoxSystem& box_system, InstPickerContext& context, InstPickerState&) {
     auto const root = DoBox(box_system,
@@ -149,136 +364,135 @@ static void InstPickerItems(GuiBoxSystem& box_system, InstPickerContext& context
 
     Optional<Optional<String>> previous_folder {};
     Box folder_box {};
-    for (auto const& l_ptr : context.libraries) {
-        auto const& lib = *l_ptr;
 
-        if (lib.sorted_instruments.size == 0) continue;
-        if (lib.file_format_specifics.tag != state.FileFormatForCurrentTab()) continue;
+    auto const first = IterateInstrument(context,
+                                         state,
+                                         {.lib_index = 0, .inst_index = 0},
+                                         IterateInstrumentDirection::Forward,
+                                         true,
+                                         true);
+    if (!first) return;
 
-        if (state.tab == InstPickerState::Tab::FloeLibaries && state.selected_library_hashes.size &&
-            !Contains(state.selected_library_hashes, lib.Id().Hash()))
-            continue;
+    sample_lib::Library const* previous_library {};
+    Optional<graphics::TextureHandle> lib_icon_tex {};
+    auto cursor = *first;
+    while (true) {
+        auto const& lib = *context.libraries[cursor.lib_index];
+        auto const& inst = *lib.sorted_instruments[cursor.inst_index];
+        auto const& folder = inst.folder;
 
-        if (state.tab == InstPickerState::Tab::MirageLibraries && state.selected_mirage_library_hashes.size &&
-            !Contains(state.selected_mirage_library_hashes, lib.Id().Hash()))
-            continue;
+        if (folder != previous_folder) {
+            folder_box = DoBox(box_system,
+                               {
+                                   .parent = root,
+                                   .layout =
+                                       {
+                                           .size = {layout::k_fill_parent, layout::k_hug_contents},
+                                           .contents_direction = layout::Direction::Column,
+                                           .contents_cross_axis_align = layout::CrossAxisAlign::Start,
+                                       },
+                               });
 
-        Optional<graphics::TextureHandle> lib_icon_tex {};
-        if (auto const imgs = LibraryImagesFromLibraryId(context.library_images,
-                                                         box_system.imgui,
-                                                         lib.Id(),
-                                                         context.sample_library_server,
-                                                         box_system.arena);
-            imgs && imgs->icon) {
-            lib_icon_tex = box_system.imgui.frame_input.graphics_ctx->GetTextureFromImage(imgs->icon);
+            previous_folder = folder;
+
+            if (folder) {
+                DynamicArrayBounded<char, 200> buf {*folder};
+                for (auto& c : buf)
+                    c = ToUppercaseAscii(c);
+                dyn::Replace(buf, "/"_s, ": "_s);
+
+                DoBox(box_system,
+                      {.parent = folder_box,
+                       .text = buf,
+                       .font = FontType::Heading3,
+                       .size_from_text = true,
+                       .layout = {
+                           .margins = {.b = k_inst_picker_spacing / 2},
+                       }});
+            }
         }
 
-        for (auto const inst_ptr : lib.sorted_instruments) {
-            auto const& inst = *inst_ptr;
-            auto const folder = inst.folder;
+        auto const inst_id = sample_lib::InstrumentId {lib.Id(), inst.name};
+        auto const is_current = context.layer.instrument_id == inst_id;
 
-            if (state.search.size && (!ContainsCaseInsensitiveAscii(inst.name, state.search) &&
-                                      !ContainsCaseInsensitiveAscii(inst.folder.ValueOr({}), state.search)))
-                continue;
-
-            if (state.selected_tags_hashes.size) {
-                bool found = false;
-                for (auto const tag : inst.tags) {
-                    auto const tag_hash = Hash(tag);
-                    if (Contains(state.selected_tags_hashes, tag_hash)) {
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found) continue;
-            }
-
-            if (folder != previous_folder) {
-                folder_box = DoBox(box_system,
-                                   {
-                                       .parent = root,
-                                       .layout =
-                                           {
-                                               .size = {layout::k_fill_parent, layout::k_hug_contents},
-                                               .contents_direction = layout::Direction::Column,
-                                               .contents_cross_axis_align = layout::CrossAxisAlign::Start,
-                                           },
-                                   });
-
-                previous_folder = folder;
-
-                if (folder) {
-                    DynamicArrayBounded<char, 200> buf {*folder};
-                    for (auto& c : buf)
-                        c = ToUppercaseAscii(c);
-                    dyn::Replace(buf, "/"_s, ": "_s);
-
-                    DoBox(box_system,
+        auto const item =
+            DoBox(box_system,
+                  {
+                      .parent = folder_box,
+                      .background_fill = is_current ? style::Colour::Highlight : style::Colour::None,
+                      .background_fill_auto_hot_active_overlay = true,
+                      .round_background_corners = 0b1111,
+                      .activate_on_click_button = MouseButton::Left,
+                      .activation_click_event = ActivationClickEvent::Up,
+                      .layout =
                           {
-                              .parent = folder_box,
-                              .text = buf,
-                              .font = FontType::Heading3,
-                              .size_from_text = true,
-                          });
-                }
-            }
-
-            auto const inst_id = sample_lib::InstrumentId {lib.Id(), inst.name};
-            auto const is_current = context.layer.instrument_id == inst_id;
-
-            auto const item =
-                DoBox(box_system,
-                      {
-                          .parent = folder_box,
-                          .background_fill = is_current ? style::Colour::Highlight : style::Colour::None,
-                          .background_fill_auto_hot_active_overlay = true,
-                          .round_background_corners = 0b1111,
-                          .activate_on_click_button = MouseButton::Left,
-                          .activation_click_event = ActivationClickEvent::Up,
-                          .layout =
-                              {
-                                  .size = {layout::k_fill_parent, k_inst_picker_item_height},
-                                  .contents_direction = layout::Direction::Row,
-                              },
-                      });
-
-            if (item.is_hot) context.hovering_inst = &inst;
-            if (item.button_fired) {
-                if (is_current) {
-                    LoadInstrument(context.engine, context.layer.index, InstrumentType::None);
-                } else {
-                    LoadInstrument(context.engine,
-                                   context.layer.index,
-                                   sample_lib::InstrumentId {
-                                       .library = lib.Id(),
-                                       .inst_name = inst.name,
-                                   });
-                    box_system.imgui.CloseCurrentPopup();
-                }
-            }
-
-            if (lib_icon_tex) {
-                DoBox(box_system,
-                      {
-                          .parent = item,
-                          .background_tex = *lib_icon_tex,
-                          .layout {
-                              .size = {k_inst_picker_item_height, k_inst_picker_item_height},
-                              .margins = {.r = k_inst_picker_spacing / 2},
+                              .size = {layout::k_fill_parent, k_inst_picker_item_height},
+                              .contents_direction = layout::Direction::Row,
                           },
-                      });
-            }
+                  });
 
+        if (is_current && box_system.state->pass == BoxSystemCurrentPanelState::Pass::HandleInputAndRender &&
+            Exchange(state.scroll_to_show_selected, false)) {
+            box_system.imgui.ScrollWindowToShowRectangle(layout::GetRect(box_system.layout, item.layout_id));
+        }
+
+        if (item.is_hot) context.hovering_inst = &inst;
+        if (item.button_fired) {
+            if (is_current) {
+                LoadInstrument(context.engine, context.layer.index, InstrumentType::None);
+            } else {
+                LoadInstrument(context.engine,
+                               context.layer.index,
+                               sample_lib::InstrumentId {
+                                   .library = lib.Id(),
+                                   .inst_name = inst.name,
+                               });
+                box_system.imgui.CloseCurrentPopup();
+            }
+        }
+
+        if (&lib != previous_library) {
+            lib_icon_tex = k_nullopt;
+            previous_library = &lib;
+            if (auto const imgs = LibraryImagesFromLibraryId(context.library_images,
+                                                             box_system.imgui,
+                                                             lib.Id(),
+                                                             context.sample_library_server,
+                                                             box_system.arena);
+                imgs && imgs->icon) {
+                lib_icon_tex = box_system.imgui.frame_input.graphics_ctx->GetTextureFromImage(imgs->icon);
+            }
+        }
+
+        if (lib_icon_tex) {
             DoBox(box_system,
                   {
                       .parent = item,
-                      .text = inst.name,
-                      .font = FontType::Body,
-                      .layout =
-                          {
-                              .size = layout::k_fill_parent,
-                          },
+                      .background_tex = *lib_icon_tex,
+                      .layout {
+                          .size = {k_inst_picker_item_height, k_inst_picker_item_height},
+                          .margins = {.r = k_inst_picker_spacing / 2},
+                      },
                   });
+        }
+
+        DoBox(box_system,
+              {
+                  .parent = item,
+                  .text = inst.name,
+                  .font = FontType::Body,
+                  .layout =
+                      {
+                          .size = layout::k_fill_parent,
+                      },
+              });
+
+        if (auto next =
+                IterateInstrument(context, state, cursor, IterateInstrumentDirection::Forward, false, true)) {
+            cursor = *next;
+            if (cursor == *first) break;
+        } else {
+            break;
         }
     }
 }
@@ -354,6 +568,10 @@ static Box FilterButtonSection(GuiBoxSystem& box_system, Box const& parent, Stri
               .text = text,
               .font = FontType::Heading3,
               .size_from_text = true,
+              .layout =
+                  {
+                      .margins = {.b = k_inst_picker_spacing / 2},
+                  },
           });
     return DoBox(box_system,
                  {
@@ -485,44 +703,48 @@ static void InstPickerPopup(GuiBoxSystem& box_system, InstPickerContext& context
                                        .background_fill = style::Colour::Background2,
                                        .layout {
                                            .size = {layout::k_fill_parent, layout::k_hug_contents},
+                                           .contents_padding = {.lr = 3, .t = 3},
                                            .contents_direction = layout::Direction::Row,
                                            .contents_align = layout::Alignment::Start,
                                            .contents_cross_axis_align = layout::CrossAxisAlign::Start,
                                        },
                                    });
 
-        for (auto const tab_index : Range(ToInt(InstPickerState::Tab::Count))) {
-            auto const tab =
-                DoBox(box_system,
-                      {
-                          .parent = tab_row,
-                          .background_fill = tab_index == ToInt(state.tab) ? style::Colour::Background0
-                                                                           : style::Colour::None,
-                          .background_fill_auto_hot_active_overlay = true,
-                          .round_background_corners = 0b1100,
-                          .activate_on_click_button = MouseButton::Left,
-                          .activation_click_event = ActivationClickEvent::Up,
-                          .layout =
-                              {
-                                  .size = layout::k_hug_contents,
-                              },
-                      });
+        for (auto const tab : EnumIterator<InstPickerState::Tab>()) {
+            if (tab == InstPickerState::Tab::MirageLibraries && !context.has_mirage_libraries) continue;
+
+            auto const tab_button = DoBox(
+                box_system,
+                {
+                    .parent = tab_row,
+                    .background_fill = tab == state.tab ? style::Colour::Background0 : style::Colour::None,
+                    .background_fill_auto_hot_active_overlay = true,
+                    .round_background_corners = 0b1100,
+                    .activate_on_click_button = MouseButton::Left,
+                    .activation_click_event =
+                        tab != state.tab ? ActivationClickEvent::Up : ActivationClickEvent::None,
+                    .layout =
+                        {
+                            .size = layout::k_hug_contents,
+                        },
+                });
 
             DoBox(box_system,
                   {
-                      .parent = tab,
+                      .parent = tab_button,
                       .text = ({
                           String s {};
-                          switch (InstPickerState::Tab(tab_index)) {
-                              case InstPickerState::Tab::FloeLibaries: s = "Floe Instruments"; break;
+                          switch (InstPickerState::Tab(tab)) {
+                              case InstPickerState::Tab::FloeLibaries:
+                                  s = context.has_mirage_libraries ? "Floe Instruments"_s : "Instruments";
+                                  break;
                               case InstPickerState::Tab::MirageLibraries: s = "Mirage Instruments"; break;
                               case InstPickerState::Tab::Waveforms: s = "Waveforms"; break;
                               case InstPickerState::Tab::Count: PanicIfReached(); break;
                           }
                           s;
                       }),
-                      .text_fill =
-                          tab_index == ToInt(state.tab) ? style::Colour::Text : style::Colour::Subtext0,
+                      .text_fill = tab == state.tab ? style::Colour::Text : style::Colour::Subtext0,
                       .size_from_text = true,
                       .layout =
                           {
@@ -530,7 +752,7 @@ static void InstPickerPopup(GuiBoxSystem& box_system, InstPickerContext& context
                           },
                   });
 
-            if (tab.button_fired) state.tab = InstPickerState::Tab(tab_index);
+            if (tab_button.button_fired) state.tab = tab;
         }
     }
 
@@ -548,18 +770,64 @@ static void InstPickerPopup(GuiBoxSystem& box_system, InstPickerContext& context
                                             },
                                         });
 
-        DoBox(box_system,
-              {
-                  .parent = headings_row,
-                  .text = "Instruments",
-                  .font = FontType::Heading2,
-                  .layout =
-                      {
-                          .size = {k_instrument_list_width - k_inst_picker_spacing,
-                                   style::k_font_heading2_size},
-                          .margins = {.l = k_inst_picker_spacing, .tb = k_inst_picker_spacing / 2},
+        {
+            auto const instruments_top = DoBox(
+                box_system,
+                {
+                    .parent = headings_row,
+                    .layout {
+                        .size = {k_instrument_list_width, layout::k_hug_contents},
+                        .contents_padding = {.lr = k_inst_picker_spacing, .tb = k_inst_picker_spacing / 2},
+                        .contents_align = layout::Alignment::Start,
+                        .contents_cross_axis_align = layout::CrossAxisAlign::Middle,
+                    },
+                });
+
+            DoBox(box_system,
+                  {
+                      .parent = instruments_top,
+                      .text = "Instruments",
+                      .font = FontType::Heading2,
+                      .layout {
+                          .size = {layout::k_fill_parent, style::k_font_heading2_size},
                       },
-              });
+                  });
+
+            if (IconButton(box_system,
+                           instruments_top,
+                           ICON_FA_CARET_LEFT,
+                           "Previous instrument.",
+                           style::k_font_heading2_size,
+                           style::k_font_heading2_size)
+                    .button_fired) {
+                dyn::Append(box_system.state->deferred_actions, [&]() {
+                    LoadAdjacentInstrument(context, state, IterateInstrumentDirection::Backward, true);
+                });
+            }
+
+            if (IconButton(box_system,
+                           instruments_top,
+                           ICON_FA_CARET_RIGHT,
+                           "Next instrument.",
+                           style::k_font_heading2_size,
+                           style::k_font_heading2_size)
+                    .button_fired) {
+                dyn::Append(box_system.state->deferred_actions, [&]() {
+                    LoadAdjacentInstrument(context, state, IterateInstrumentDirection::Forward, true);
+                });
+            }
+
+            if (IconButton(box_system,
+                           instruments_top,
+                           ICON_FA_RANDOM,
+                           "Random instrument.",
+                           style::k_font_heading2_size * 0.8f,
+                           style::k_font_heading2_size)
+                    .button_fired) {
+                dyn::Append(box_system.state->deferred_actions,
+                            [&]() { LoadRandomInstrument(context, state, true); });
+            }
+        }
 
         // divider
         DoBox(box_system,
@@ -571,17 +839,41 @@ static void InstPickerPopup(GuiBoxSystem& box_system, InstPickerContext& context
                   },
               });
 
-        DoBox(box_system,
-              {
-                  .parent = headings_row,
-                  .text = "Filters",
-                  .font = FontType::Heading2,
-                  .layout =
-                      {
-                          .size = {k_filter_list_width - k_inst_picker_spacing, style::k_font_heading2_size},
-                          .margins = {.l = k_inst_picker_spacing, .tb = k_inst_picker_spacing / 2},
+        {
+            auto const filters_top = DoBox(
+                box_system,
+                {
+                    .parent = headings_row,
+                    .layout {
+                        .size = {k_filter_list_width, layout::k_hug_contents},
+                        .contents_padding = {.lr = k_inst_picker_spacing, .tb = k_inst_picker_spacing / 2},
+                        .contents_align = layout::Alignment::Start,
+                        .contents_cross_axis_align = layout::CrossAxisAlign::Middle,
+                    },
+                });
+
+            DoBox(box_system,
+                  {
+                      .parent = filters_top,
+                      .text = "Filters",
+                      .font = FontType::Heading2,
+                      .layout {
+                          .size = {layout::k_fill_parent, style::k_font_heading2_size},
                       },
-              });
+                  });
+
+            if (state.HasFilters()) {
+                if (IconButton(box_system,
+                               filters_top,
+                               ICON_FA_TIMES,
+                               "Clear all filters.",
+                               style::k_font_heading2_size * 0.9f,
+                               style::k_font_heading2_size)
+                        .button_fired) {
+                    dyn::Append(box_system.state->deferred_actions, [&]() { state.ClearAllFilters(); });
+                }
+            }
+        }
     }
 
     // divider
@@ -799,23 +1091,8 @@ PUBLIC void DoInstPickerPopup(GuiBoxSystem& box_system,
                               InstPickerState& state) {
     RunPanel(box_system,
              Panel {
-                 .run =
-                     [&context, &state](GuiBoxSystem& box_system) {
-                         // Setup
-                         if (box_system.state->pass == BoxSystemCurrentPanelState::Pass::LayoutBoxes) {
-                             context.libraries =
-                                 sample_lib_server::AllLibrariesRetained(context.sample_library_server,
-                                                                         box_system.arena);
-                             Sort(context.libraries,
-                                  [](auto const& a, auto const& b) { return a->name < b->name; });
-                         }
-
-                         InstPickerPopup(box_system, context, state);
-
-                         // Shutdown
-                         if (box_system.state->pass == BoxSystemCurrentPanelState::Pass::HandleInputAndRender)
-                             sample_lib_server::ReleaseAll(context.libraries);
-                     },
+                 .run = [&context,
+                         &state](GuiBoxSystem& box_system) { InstPickerPopup(box_system, context, state); },
                  .data =
                      PopupPanel {
                          .creator_absolute_rect = absolute_button_rect,

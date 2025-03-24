@@ -413,31 +413,6 @@ void SaveCurrentStateToFile(Engine& engine, String path) {
     }
 }
 
-void LoadRandomInstrument(Engine& engine,
-                          u32 layer_index,
-                          bool allow_none_to_be_selected,
-                          bool disallow_previous_result,
-                          sample_lib_server::LoadRequest* add_to_existing_batch) {
-    // TODO
-    (void)engine;
-    (void)layer_index;
-    (void)allow_none_to_be_selected;
-    (void)disallow_previous_result;
-    (void)add_to_existing_batch;
-}
-
-void CycleInstrument(Engine& engine, u32 layer_index, CycleDirection direction) {
-    // TODO
-    (void)engine;
-    (void)layer_index;
-    (void)direction;
-}
-
-void RandomiseAllLayerInsts(Engine& engine) {
-    // TODO
-    (void)engine;
-}
-
 void RunFunctionOnMainThread(Engine& engine, ThreadsafeFunctionQueue::Function function) {
     if (auto thread_check =
             (clap_host_thread_check const*)engine.host.get_extension(&engine.host, CLAP_EXT_THREAD_CHECK)) {

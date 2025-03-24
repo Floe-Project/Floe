@@ -107,18 +107,7 @@ Optional<sample_lib::LibraryIdRef> LibraryForOverallBackground(Engine const& eng
 void LoadConvolutionIr(Engine& engine, Optional<sample_lib::IrId> ir);
 void LoadInstrument(Engine& engine, u32 layer_index, InstrumentId instrument_id);
 
-void LoadRandomInstrument(Engine& engine,
-                          u32 layer_index,
-                          bool allow_none_to_be_selected,
-                          bool disallow_previous_result = true,
-                          sample_lib_server::LoadRequest* add_to_existing_batch = nullptr);
-
-enum class CycleDirection { Forward, Backward };
-void CycleInstrument(Engine& engine, u32 layer_index, CycleDirection direction);
-
 usize MegabytesUsedBySamples(Engine const& engine);
-
-void RandomiseAllLayerInsts(Engine& engine);
 
 StateSnapshot CurrentStateSnapshot(Engine const& engine);
 bool StateChangedSinceLastSnapshot(Engine& engine);

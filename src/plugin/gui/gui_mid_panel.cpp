@@ -4,6 +4,7 @@
 #include <IconsFontAwesome5.h>
 
 #include "gui.hpp"
+#include "gui/gui2_inst_picker.hpp"
 #include "gui_effects.hpp"
 #include "gui_framework/colours.hpp"
 #include "gui_framework/gui_live_edit.hpp"
@@ -196,7 +197,19 @@ void MidPanel(Gui* g) {
         }
 
         // randomise button
-        if (do_randomise_button("Load random instruments for all 3 layers")) RandomiseAllLayerInsts(engine);
+        if (do_randomise_button("Load random instruments for all 3 layers")) {
+            for (auto& layer : engine.processor.layer_processors) {
+                InstPickerContext context {
+                    .layer = layer,
+                    .sample_library_server = g->shared_engine_systems.sample_library_server,
+                    .library_images = g->library_images,
+                    .engine = g->engine,
+                };
+                context.Init(g->scratch_arena);
+                DEFER { context.Deinit(); };
+                LoadRandomInstrument(context, g->inst_picker_state, false);
+            }
+        }
 
         // do the 3 panels
         auto const layer_width_minus_pad = imgui.Width() / 3;

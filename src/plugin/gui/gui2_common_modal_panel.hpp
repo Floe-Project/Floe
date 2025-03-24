@@ -241,10 +241,46 @@ PUBLIC bool TextButton(GuiBoxSystem& builder, Box parent, String text, String to
               .parent = button,
               .text = text,
               .font = FontType::Body,
-              .size_from_text = true,
+              .size_from_text = !fill_x,
+              .text_align_x = TextAlignX::Centre,
+              .text_align_y = TextAlignY::Centre,
+              .text_overflow = TextOverflowType::ShowDotsOnRight,
+              .layout {
+                  .size = {layout::k_fill_parent, style::k_font_body_size},
+              },
           });
 
     return button.button_fired;
+}
+
+PUBLIC Box
+IconButton(GuiBoxSystem& builder, Box parent, String icon, String tooltip, f32 font_size, f32x2 size) {
+    auto const button = DoBox(builder,
+                              {
+                                  .parent = parent,
+                                  .background_fill_auto_hot_active_overlay = true,
+                                  .round_background_corners = 0b1111,
+                                  .activate_on_click_button = MouseButton::Left,
+                                  .activation_click_event = ActivationClickEvent::Up,
+                                  .layout {
+                                      .size = size,
+                                      .contents_align = layout::Alignment::Middle,
+                                      .contents_cross_axis_align = layout::CrossAxisAlign::Middle,
+                                  },
+                                  .tooltip = tooltip,
+                              });
+
+    DoBox(builder,
+          {
+              .parent = button,
+              .text = icon,
+              .font_size = font_size,
+              .font = FontType::Icons,
+              .text_fill = style::Colour::Subtext0,
+              .size_from_text = true,
+          });
+
+    return button;
 }
 
 PUBLIC Optional<s64> IntField(GuiBoxSystem& builder,

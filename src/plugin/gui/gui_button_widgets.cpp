@@ -150,6 +150,7 @@ static void DrawIconAndTextButton(Gui* g, Style const& style, Rect r, imgui::Id 
 
     auto just = TextJustification::CentredLeft;
     auto text_offset = LiveSize(im, UiSizeId::Page_HeadingTextOffset);
+    auto overflow = TextOverflowType::AllowOverflow;
     if (style.type == LayoutAndSizeType::IconAndTextMidiButton) {
         text_offset = LiveSize(im, UiSizeId::MIDI_ItemWidth) + LiveSize(im, UiSizeId::MIDI_ItemMarginLR);
     } else if (style.type == LayoutAndSizeType::IconAndTextMenuItem ||
@@ -159,17 +160,13 @@ static void DrawIconAndTextButton(Gui* g, Style const& style, Rect r, imgui::Id 
         text_offset = 0;
         just = TextJustification::Centred;
     } else if (style.type == LayoutAndSizeType::IconAndTextInstSelector) {
+        overflow = TextOverflowType::ShowDotsOnRight;
         if (style.icon_and_text.icon_texture)
             text_offset = r.h + r.h / 5;
         else
             text_offset = LiveSize(im, UiSizeId::MenuButtonTextMarginL);
     }
-    im.graphics->AddTextJustified(r.CutLeft(text_offset),
-                                  str,
-                                  text_col,
-                                  just,
-                                  TextOverflowType::AllowOverflow,
-                                  style.text_scaling);
+    im.graphics->AddTextJustified(r.CutLeft(text_offset), str, text_col, just, overflow, style.text_scaling);
 }
 
 static bool ButtonInternal(Gui* g,

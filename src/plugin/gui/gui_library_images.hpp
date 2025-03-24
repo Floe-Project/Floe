@@ -13,7 +13,6 @@ struct LibraryImages {
     Optional<graphics::ImageID> blurred_background {};
     bool icon_missing {};
     bool background_missing {};
-    bool reload {};
 };
 
 using LibraryImagesArray = DynamicArray<LibraryImages>;
@@ -23,3 +22,7 @@ Optional<LibraryImages> LibraryImagesFromLibraryId(LibraryImagesArray& array,
                                                    sample_lib::LibraryIdRef const& library_id,
                                                    sample_lib_server::Server& server,
                                                    ArenaAllocator& scratch_arena);
+
+void InvalidateLibraryImages(LibraryImagesArray& array,
+                             sample_lib::LibraryIdRef library_id,
+                             graphics::DrawContext& ctx);

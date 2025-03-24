@@ -75,16 +75,6 @@ struct CheckLibraryImagesResult {
 static CheckLibraryImagesResult CheckLibraryImages(graphics::DrawContext& ctx, LibraryImages& images) {
     CheckLibraryImagesResult result {};
 
-    if (Exchange(images.reload, false)) {
-        if (images.icon) ctx.DestroyImageID(*images.icon);
-        if (images.background) ctx.DestroyImageID(*images.background);
-        if (images.blurred_background) ctx.DestroyImageID(*images.blurred_background);
-        result.reload_icon = true;
-        result.reload_background = true;
-        result.reload_blurred_background = true;
-        return result;
-    }
-
     if (!ctx.ImageIdIsValid(images.icon) && !images.icon_missing) result.reload_icon = true;
     if (!ctx.ImageIdIsValid(images.background) && !images.background_missing) result.reload_background = true;
     if (!ctx.ImageIdIsValid(images.blurred_background) && !images.background_missing)
@@ -228,4 +218,19 @@ Optional<LibraryImages> LibraryImagesFromLibraryId(LibraryImagesArray& array,
     if (!lib) return k_nullopt;
 
     return LoadLibraryImagesIfNeeded(array, imgui, *lib, server, scratch_arena);
+}
+
+void InvalidateLibraryImages(LibraryImagesArray& array,
+                             sample_lib::LibraryIdRef library_id,
+                             graphics::DrawContext& ctx) {
+    ASSERT(CheckThreadName("main"));
+    auto opt_index = FindIf(array, [&](LibraryImages const& l) { return l.library_id == library_id; });
+    if (opt_index) {
+        auto& imgs = array[*opt_index];
+        imgs.icon_missing = false;
+        imgs.background_missing = false;
+        if (imgs.icon) ctx.DestroyImageID(*imgs.icon);
+        if (imgs.background) ctx.DestroyImageID(*imgs.background);
+        if (imgs.blurred_background) ctx.DestroyImageID(*imgs.blurred_background);
+    }
 }

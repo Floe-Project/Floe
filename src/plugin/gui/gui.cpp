@@ -62,17 +62,7 @@ Optional<graphics::ImageID> LogoImage(Gui* g) {
 }
 
 static void SampleLibraryChanged(Gui* g, sample_lib::LibraryIdRef library_id) {
-    auto opt_index =
-        FindIf(g->library_images, [&](LibraryImages const& l) { return l.library_id == library_id; });
-    if (opt_index) {
-        auto& ctx = g->frame_input.graphics_ctx;
-        auto& imgs = g->library_images[*opt_index];
-        imgs.icon_missing = false;
-        imgs.background_missing = false;
-        if (imgs.icon) ctx->DestroyImageID(*imgs.icon);
-        if (imgs.background) ctx->DestroyImageID(*imgs.background);
-        if (imgs.blurred_background) ctx->DestroyImageID(*imgs.blurred_background);
-    }
+    InvalidateLibraryImages(g->library_images, library_id, *g->frame_input.graphics_ctx);
 }
 
 static void CreateFontsIfNeeded(Gui* g) {

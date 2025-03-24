@@ -177,13 +177,12 @@ struct LayerProcessor {
 
     String InstName() const {
         ASSERT(IsMainThread(host));
-        switch (instrument.tag) {
+        switch (instrument_id.tag) {
             case InstrumentType::WaveformSynth: {
-                return k_waveform_type_names[ToInt(instrument.Get<WaveformType>())];
+                return k_waveform_type_names[ToInt(instrument_id.Get<WaveformType>())];
             }
             case InstrumentType::Sampler: {
-                return instrument.Get<sample_lib_server::RefCounted<sample_lib::LoadedInstrument>>()
-                    ->instrument.name;
+                return instrument_id.Get<sample_lib::InstrumentId>().inst_name;
             }
             case InstrumentType::None: return "None"_s;
         }

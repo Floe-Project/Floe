@@ -157,7 +157,10 @@ static void DoImpulseResponseMenu(Gui* g, layout::Id lay_id) {
         ImpulseResponseMenuItems(g);
         g->imgui.EndWindow();
     }
-    Tooltip(g, id, r, fmt::Format(g->scratch_arena, "Impulse: {}\n{}", ir_name.size, "Impulse response"));
+    Tooltip(g,
+            id,
+            r,
+            fmt::Format(g->scratch_arena, "Impulse: {}\n{}", ir_name, "The impulse response to use"));
 }
 
 struct FXColours {

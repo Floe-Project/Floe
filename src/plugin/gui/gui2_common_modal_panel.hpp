@@ -219,22 +219,22 @@ CheckboxButton(GuiBoxSystem& box_system, Box parent, String text, bool state, St
     return button.button_fired;
 }
 
-PUBLIC bool TextButton(GuiBoxSystem& builder, Box parent, String text, String tooltip) {
-    auto const button =
-        DoBox(builder,
-              {
-                  .parent = parent,
-                  .background_fill = style::Colour::Background2,
-                  .background_fill_auto_hot_active_overlay = true,
-                  .round_background_corners = 0b1111,
-                  .activate_on_click_button = MouseButton::Left,
-                  .activation_click_event = ActivationClickEvent::Up,
-                  .layout {
-                      .size = layout::k_hug_contents,
-                      .contents_padding = {.lr = style::k_button_padding_x, .tb = style::k_button_padding_y},
-                  },
-                  .tooltip = tooltip,
-              });
+PUBLIC bool TextButton(GuiBoxSystem& builder, Box parent, String text, String tooltip, bool fill_x = false) {
+    auto const button = DoBox(
+        builder,
+        {
+            .parent = parent,
+            .background_fill = style::Colour::Background2,
+            .background_fill_auto_hot_active_overlay = true,
+            .round_background_corners = 0b1111,
+            .activate_on_click_button = MouseButton::Left,
+            .activation_click_event = ActivationClickEvent::Up,
+            .layout {
+                .size = {fill_x ? layout::k_fill_parent : layout::k_hug_contents, layout::k_hug_contents},
+                .contents_padding = {.lr = style::k_button_padding_x, .tb = style::k_button_padding_y},
+            },
+            .tooltip = tooltip,
+        });
 
     DoBox(builder,
           {

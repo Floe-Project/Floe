@@ -87,7 +87,7 @@ These are mostly relevant for acoustic or hybrid sounds, but can be used for syn
 `stone`,
 `ice`.
 
-Only typically relevant for `acoustic` or `found sounds` instruments.
+This is typically used for non-standard instruments in the `acoustic` or `found sounds` categories.
 
 ### 3. What reverb type is it?
 `small room`,
@@ -137,7 +137,7 @@ Thematic moods:
 `sci-fi`,
 `western`.
 
-It's usually recommended to specify moods for synthesised instruments and presets. Sometimes not applicable for acoustic sounds.
+It's usually recommended to specify moods for synthesised instruments and presets. Not typically used for well-known acoustic instruments.
 
 [^bright]: 'bright' as in: positive, uplifting, clear
 [^dark]: 'dark' as in: unhappy, dim, unpleasant
@@ -149,7 +149,7 @@ It's usually recommended to specify moods for synthesised instruments and preset
 | `non-pitched` | Lacks identifiable musical pitch |
 | `dissonant` | Contains harmonically clashing pitches |
 
-A sound is assumed to possess a musical pitch unless otherwise stated.
+Useful for non-typical sounds that have notable pitch characteristics. A sound is assumed to possess a musical pitch unless otherwise stated.
 
 ### 5. What type of sound is it?
 #### 5.1. Does it have a long duration?
@@ -274,3 +274,5 @@ Only use these if the sound isn't actually from that instrument, but has a simil
 `trap`,
 `vaporwave`,
 `world`
+
+Specifying at least one genre is recommended for all presets and instruments.

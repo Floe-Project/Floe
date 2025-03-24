@@ -224,7 +224,7 @@ struct LibraryId {
 struct InstrumentId {
     bool operator==(InstrumentId const& other) const = default;
     bool operator==(LoadedInstrument const& inst) const {
-        return library == inst.instrument.library.Id() && inst_name == inst.instrument.name;
+        return inst_name == inst.instrument.name && library == inst.instrument.library.Id();
     }
     u64 Hash() const { return library.Ref().HashWithExtra(inst_name); }
     LibraryId library;

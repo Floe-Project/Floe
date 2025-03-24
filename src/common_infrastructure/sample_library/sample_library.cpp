@@ -61,11 +61,15 @@ void PostReadBookkeeping(Library& lib, ArenaAllocator& arena) {
             lib.sorted_instruments[index++] = &inst;
         }
 
-        // Sort instrument by folder, then by name.
+        // Sort instrument into their folders, and by name within each folder.
         Sort(lib.sorted_instruments, [](Instrument* a, Instrument* b) {
             auto const& a_folder = a->folder;
             auto const& b_folder = b->folder;
-            if (a_folder && b_folder && *a_folder != *b_folder) return *a_folder < *b_folder;
+            if (!a_folder && b_folder) return true; // no-folder instruments first
+            if (a_folder && !b_folder) return false; // no-folder instruments first
+            if (!a_folder && !b_folder) return a->name < b->name; // no-folder instruments by name
+            // They both have folders
+            if (a_folder != b_folder) return *a_folder < *b_folder;
             return a->name < b->name;
         });
     }

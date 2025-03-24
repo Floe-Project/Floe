@@ -490,7 +490,8 @@ struct DrawList {
                  f32 rounding = 0.0f,
                  int rounding_corners_flags = ~0,
                  f32 thickness = 1.0f); // a: upper-left, b: lower-right, rounding_corners_flags: 4-bits
-                                        // corresponding to which corner to round
+                                        // corresponding to which corner to round: 0b0001 bottom-left, 0b0010
+                                        // bottom-right, 0b0100 top-right, 0b1000 top-left
 
     void
     AddRect(Rect r, u32 col, f32 rounding = 0.0f, int rounding_corners_flags = ~0, f32 thickness = 1.0f) {

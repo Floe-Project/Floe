@@ -951,7 +951,8 @@ struct TableFields<Instrument> {
             case Field::Description:
                 return {
                     .name = "description",
-                    .description_sentence = "A description of the instrument.",
+                    .description_sentence =
+                        "A description of the instrument. Start with a capital letter an end with a period.",
                     .example = "Tonal pluck metallic pluck made from striking a steel fence.",
                     .default_value = "no description",
                     .lua_type = LUA_TSTRING,

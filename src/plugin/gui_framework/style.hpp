@@ -133,7 +133,7 @@ constexpr auto k_colours = [] {
             case Colour::None: result[i] = 0; break;
             case Colour::Green: result[i] = ToAbgr(0x40A02B); break;
             case Colour::Red: result[i] = ToAbgr(0xD20F39); break;
-            case Colour::Highlight: result[i] = Hsla(k_highlight_hue, 70, 44, 100); break;
+            case Colour::Highlight: result[i] = Hsla(k_highlight_hue, 75, 69, 100); break;
 
             case Colour::Background0:
             case Colour::Background1:

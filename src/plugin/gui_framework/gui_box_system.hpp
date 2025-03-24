@@ -100,7 +100,7 @@ struct Box {
 };
 
 // Ephemeral
-struct BoxSystemPanelState {
+struct BoxSystemCurrentPanelState {
     enum class Pass {
         LayoutBoxes,
         HandleInputAndRender,
@@ -130,7 +130,7 @@ struct GuiBoxSystem {
     layout::Context layout;
     bool show_tooltips;
 
-    BoxSystemPanelState* state; // Ephemeral
+    BoxSystemCurrentPanelState* state; // Ephemeral
 };
 
 PUBLIC f32 HeightOfWrappedText(GuiBoxSystem& box_system, layout::Id id, f32 width) {
@@ -140,7 +140,7 @@ PUBLIC f32 HeightOfWrappedText(GuiBoxSystem& box_system, layout::Id id, f32 widt
 }
 
 PUBLIC void AddPanel(GuiBoxSystem& box_system, Panel panel) {
-    if (box_system.state->pass == BoxSystemPanelState::Pass::HandleInputAndRender) {
+    if (box_system.state->pass == BoxSystemCurrentPanelState::Pass::HandleInputAndRender) {
         auto p = box_system.arena.New<Panel>(panel);
         if (box_system.state->current_panel->first_child) {
             for (auto q = box_system.state->current_panel->first_child; q; q = q->next)
@@ -255,7 +255,7 @@ PUBLIC void Run(GuiBoxSystem& builder, Panel* panel) {
     }
 
     {
-        BoxSystemPanelState state {
+        BoxSystemCurrentPanelState state {
             .current_panel = panel,
             .boxes = {builder.arena},
             .word_wrapped_texts = {builder.arena},
@@ -280,7 +280,7 @@ PUBLIC void Run(GuiBoxSystem& builder, Panel* panel) {
         {
             ZoneNamedN(prof3, "Box system: handle input and render", true);
             state.box_counter = 0;
-            state.pass = BoxSystemPanelState::Pass::HandleInputAndRender;
+            state.pass = BoxSystemCurrentPanelState::Pass::HandleInputAndRender;
             panel->run(builder);
         }
     }
@@ -323,7 +323,7 @@ PUBLIC void Run(GuiBoxSystem& builder, Panel* panel) {
 
     builder.imgui.EndWindow();
 
-    Run(builder, panel->next);
+    // Run(builder, panel->next);
 }
 
 PUBLIC void RunPanel(GuiBoxSystem& builder, Panel initial_panel) {
@@ -472,7 +472,7 @@ PUBLIC Box DoBox(GuiBoxSystem& builder,
     f32 const wrap_width = config.text.size < 10000 ? config.wrap_width : k_no_wrap;
 
     switch (builder.state->pass) {
-        case BoxSystemPanelState::Pass::LayoutBoxes: {
+        case BoxSystemCurrentPanelState::Pass::LayoutBoxes: {
             auto const box = Box {
                 .layout_id =
                     layout::CreateItem(builder.layout, ({
@@ -527,7 +527,7 @@ PUBLIC Box DoBox(GuiBoxSystem& builder,
 
             return box;
         }
-        case BoxSystemPanelState::Pass::HandleInputAndRender: {
+        case BoxSystemCurrentPanelState::Pass::HandleInputAndRender: {
             auto& box = builder.state->boxes[box_index];
             auto const rect =
                 builder.imgui.GetRegisteredAndConvertedRect(layout::GetRect(builder.layout, box.layout_id));
@@ -607,7 +607,12 @@ PUBLIC Box DoBox(GuiBoxSystem& builder,
                 }
 
                 if (config.drop_shadow) draw::DropShadow(builder.imgui, r, rounding);
-                builder.imgui.graphics->AddRectFilled(r, col_u32, rounding, config.round_background_corners);
+
+                // IMPROVE: we shouldn't need to convert this - we should just use the same format throughout
+                // the system. The issue is that the drawing code works differently to this system.
+                auto const corner_flags = __builtin_bitreverse32(config.round_background_corners) >> 28;
+
+                builder.imgui.graphics->AddRectFilled(r, col_u32, rounding, (int)corner_flags);
             }
 
             if (config.background_tex)

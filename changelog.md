@@ -9,6 +9,10 @@ For instance: 0.0.1. Don't change the headings.
 
 # Changelog
 
+## 0.0.8-alpha
+- Brand new instrument browser supporting tags, search, and filtering by library
+- Fix instrument left/right and randomise buttons
+
 ## 0.0.7-alpha
 The focus of this version has been bug fixes; in particular around loading Mirage libraries and presets.
 - Max voice is increased from 32 to 256 allowing for more complex instruments

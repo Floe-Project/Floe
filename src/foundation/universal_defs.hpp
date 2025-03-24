@@ -108,6 +108,7 @@ struct SourceLocation {
                                   char const* function = __builtin_FUNCTION()) {
         return {function, file, line};
     }
+    constexpr bool operator==(SourceLocation const& other) const = default;
 
     char const* function;
     char const* file;

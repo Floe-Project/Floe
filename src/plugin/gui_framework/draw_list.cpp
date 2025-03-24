@@ -1243,30 +1243,20 @@ static f32x2 GetTextPosition(Font* font,
     return pos;
 }
 
-void DrawList::AddTextJustified(Rect r,
-                                String str,
-                                u32 col,
-                                TextJustification justification,
-                                TextOverflowType overflow_type,
-                                f32 font_scaling) {
-    auto font = context->CurrentFont();
-    auto font_size = context->CurrentFontSize() * font_scaling;
-
-    ArenaAllocatorWithInlineStorage<1000> temp_allocator {Malloc::Instance()};
-    DynamicArray<char> buffer(temp_allocator);
+String OverflowText(OverflowTextArgs const& args) {
     String const dots {".."};
 
-    f32x2 text_size {-1, -1};
-    auto text_pos = GetTextPosition(font, font_size, r.Min(), r.Max(), justification, str, &text_size);
-    if (overflow_type != TextOverflowType::AllowOverflow) {
-        if (text_size.x == -1) text_size = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, str);
-        if (text_size.x > r.w) {
-            f32 const dots_size = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, dots).x;
+    if (args.overflow_type != TextOverflowType::AllowOverflow) {
+        auto const text_width = args.text_size
+                                    ? args.text_size->x
+                                    : args.font->CalcTextSizeA(args.font_size, FLT_MAX, 0.0f, args.str).x;
+        if (text_width > args.r.w) {
+            f32 const dots_size = args.font->CalcTextSizeA(args.font_size, FLT_MAX, 0.0f, dots).x;
             f32 line_width = 0;
 
-            if (overflow_type == TextOverflowType::ShowDotsOnRight) {
-                char const* s = str.data;
-                auto const end = End(str);
+            if (args.overflow_type == TextOverflowType::ShowDotsOnRight) {
+                char const* s = args.str.data;
+                auto const end = End(args.str);
                 while (s < end) {
                     auto prev_s = s;
                     auto c = (u32)*s;
@@ -1282,20 +1272,21 @@ void DrawList::AddTextJustified(Rect r,
                     }
 
                     f32 const char_width =
-                        ((int)c < font->index_x_advance.size ? font->index_x_advance[(int)c]
-                                                             : font->fallback_x_advance) *
-                        font_scaling;
+                        ((int)c < args.font->index_x_advance.size ? args.font->index_x_advance[(int)c]
+                                                                  : args.font->fallback_x_advance) *
+                        args.font_scaling;
 
                     line_width += char_width;
 
-                    if ((line_width + dots_size) > r.w) {
-                        dyn::Assign(buffer, str.SubSpan(0, (usize)(prev_s - str.data)));
+                    if ((line_width + dots_size) > args.r.w) {
+                        DynamicArray<char> buffer(args.allocator);
+                        dyn::Assign(buffer, args.str.SubSpan(0, (usize)(prev_s - args.str.data)));
                         dyn::AppendSpan(buffer, dots);
-                        str = buffer;
-                        break;
+                        args.text_pos.x = args.r.x;
+                        return buffer.ToOwnedSpan();
                     }
                 }
-            } else if (overflow_type == TextOverflowType::ShowDotsOnLeft) {
+            } else if (args.overflow_type == TextOverflowType::ShowDotsOnLeft) {
                 auto get_char_previous_to_end = [](char const* start, char const* end) {
                     char const* prev_s = start;
                     for (auto s = start; s < end && *s != '\0';) {
@@ -1306,8 +1297,8 @@ void DrawList::AddTextJustified(Rect r,
                     return start;
                 };
 
-                char const* start = str.data;
-                char const* end = End(str);
+                char const* start = args.str.data;
+                char const* end = End(args.str);
                 char const* s = get_char_previous_to_end(start, end);
                 while (s > start) {
                     auto prev_s = s;
@@ -1323,18 +1314,18 @@ void DrawList::AddTextJustified(Rect r,
                     }
 
                     f32 const char_width =
-                        ((int)c < font->index_x_advance.size ? font->index_x_advance[(int)c]
-                                                             : font->fallback_x_advance) *
-                        font_scaling;
+                        ((int)c < args.font->index_x_advance.size ? args.font->index_x_advance[(int)c]
+                                                                  : args.font->fallback_x_advance) *
+                        args.font_scaling;
 
                     line_width += char_width;
 
-                    if ((line_width + dots_size) > r.w) {
+                    if ((line_width + dots_size) > args.r.w) {
+                        DynamicArray<char> buffer(args.allocator);
                         dyn::Assign(buffer, dots);
                         dyn::AppendSpan(buffer, String(prev_s, (usize)(end - prev_s)));
-                        str = buffer;
-                        text_pos.x = r.Right() - (line_width + dots_size);
-                        break;
+                        args.text_pos.x = args.r.Right() - (line_width + dots_size);
+                        return buffer.ToOwnedSpan();
                     }
 
                     s = get_char_previous_to_end(start, s);
@@ -1342,6 +1333,35 @@ void DrawList::AddTextJustified(Rect r,
             }
         }
     }
+
+    return args.str;
+}
+
+void DrawList::AddTextJustified(Rect r,
+                                String str,
+                                u32 col,
+                                TextJustification justification,
+                                TextOverflowType overflow_type,
+                                f32 font_scaling) {
+    auto font = context->CurrentFont();
+    auto font_size = context->CurrentFontSize() * font_scaling;
+
+    ArenaAllocatorWithInlineStorage<1000> temp_allocator {Malloc::Instance()};
+
+    f32x2 text_size {-1, -1};
+    auto text_pos = GetTextPosition(font, font_size, r.Min(), r.Max(), justification, str, &text_size);
+
+    str = OverflowText({
+        .font = font,
+        .font_size = font_size,
+        .r = r,
+        .str = str,
+        .overflow_type = overflow_type,
+        .font_scaling = font_scaling,
+        .text_size = (text_size.x != -1) ? Optional<f32x2> {text_size} : k_nullopt,
+        .allocator = temp_allocator,
+        .text_pos = text_pos,
+    });
 
     AddText(font, font_size, text_pos, col, str);
 }

@@ -380,6 +380,8 @@ struct BoxConfig {
     bool32 size_from_text : 1 = false; // sets layout.size for you
     TextAlignX text_align_x : NumBitsNeededToStore(ToInt(TextAlignX::Count)) = TextAlignX::Left;
     TextAlignY text_align_y : NumBitsNeededToStore(ToInt(TextAlignY::Count)) = TextAlignY::Top;
+    TextOverflowType text_overflow
+        : NumBitsNeededToStore(ToInt(TextOverflowType::Count)) = TextOverflowType::AllowOverflow;
     bool32 capitalize_text : 1 = false;
 
     style::Colour background_fill : style::k_colour_bits = style::Colour::None;
@@ -664,28 +666,36 @@ PUBLIC Box DoBox(GuiBoxSystem& builder,
             }
 
             if (config.text.size && config.text_input_box == TextInputBox::None) {
+                auto text_pos = rect.pos;
+                Optional<f32x2> text_size;
                 if (config.text_align_x != TextAlignX::Left || config.text_align_y != TextAlignY::Top) {
-                    auto const text_size = font->CalcTextSizeA(font_size, FLT_MAX, 0, config.text);
-                    auto const text_pos =
-                        AlignWithin(rect, text_size, config.text_align_x, config.text_align_y);
-                    builder.imgui.graphics->AddText(font,
-                                                    font_size,
-                                                    text_pos,
-                                                    style::Col(is_hot      ? config.text_fill_hot
-                                                               : is_active ? config.text_fill_active
-                                                                           : config.text_fill),
-                                                    config.text,
-                                                    wrap_width == k_wrap_to_parent ? rect.w : wrap_width);
-                } else {
-                    builder.imgui.graphics->AddText(font,
-                                                    font_size,
-                                                    rect.pos,
-                                                    style::Col(is_hot      ? config.text_fill_hot
-                                                               : is_active ? config.text_fill_active
-                                                                           : config.text_fill),
-                                                    config.text,
-                                                    wrap_width == k_wrap_to_parent ? rect.w : wrap_width);
+                    text_size = font->CalcTextSizeA(font_size, FLT_MAX, 0, config.text);
+                    text_pos = AlignWithin(rect, *text_size, config.text_align_x, config.text_align_y);
                 }
+
+                String text = config.text;
+                if (config.text_overflow != TextOverflowType::AllowOverflow) {
+                    text = graphics::OverflowText({
+                        .font = font,
+                        .font_size = font_size,
+                        .r = rect,
+                        .str = config.text,
+                        .overflow_type = config.text_overflow,
+                        .font_scaling = 1,
+                        .text_size = text_size,
+                        .allocator = builder.arena,
+                        .text_pos = text_pos,
+                    });
+                }
+
+                builder.imgui.graphics->AddText(font,
+                                                font_size,
+                                                text_pos,
+                                                style::Col(is_hot      ? config.text_fill_hot
+                                                           : is_active ? config.text_fill_active
+                                                                       : config.text_fill),
+                                                text,
+                                                wrap_width == k_wrap_to_parent ? rect.w : wrap_width);
             }
 
             if (config.text_input_box != TextInputBox::None) {

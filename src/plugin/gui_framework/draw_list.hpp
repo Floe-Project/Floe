@@ -11,7 +11,7 @@
 
 // TODO: replace corner_rounding_flags with a bitfield probably
 
-enum class TextOverflowType { AllowOverflow, ShowDotsOnRight, ShowDotsOnLeft };
+enum class TextOverflowType : u8 { AllowOverflow, ShowDotsOnRight, ShowDotsOnLeft, Count };
 
 // TODO: use bitfields, one for x, one for y
 enum class TextJustification {
@@ -450,6 +450,20 @@ struct DrawContext {
 
 // Defined ether draw_list_opengl or draw_list_directx, call delete on result
 DrawContext* CreateNewDrawContext();
+
+struct OverflowTextArgs {
+    Font* font;
+    f32 font_size;
+    Rect r;
+    String str;
+    TextOverflowType overflow_type;
+    f32 font_scaling;
+    Optional<f32x2> text_size;
+    Allocator& allocator;
+    f32x2& text_pos;
+};
+
+String OverflowText(OverflowTextArgs const& args);
 
 struct DrawList {
     DrawList() {

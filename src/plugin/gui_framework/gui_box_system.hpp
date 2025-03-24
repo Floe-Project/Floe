@@ -539,6 +539,8 @@ PUBLIC Box DoBox(GuiBoxSystem& builder,
         }
         case BoxSystemCurrentPanelState::Pass::HandleInputAndRender: {
             auto& box = builder.state->boxes[box_index];
+            ASSERT(box.source_location == source_location,
+                   "GUI has changed between layout and render, see deffered_actions");
             auto const rect =
                 builder.imgui.GetRegisteredAndConvertedRect(layout::GetRect(builder.layout, box.layout_id));
 

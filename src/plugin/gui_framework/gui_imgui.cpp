@@ -617,7 +617,7 @@ void Context::Begin(WindowSettings settings) {
         }
         if (final_window) {
             f32 const k_pixels_per_line =
-                VwToPixels(20); // IMPROVE: this should be a setting so, for example, popups
+                VwToPixels(60); // IMPROVE: this should be a setting so, for example, popups
                                 // can scroll in increments of each item
             f32 const lines = -frame_input.mouse_scroll_delta_in_lines;
             f32 const new_scroll = lines * k_pixels_per_line + final_window->scroll_offset.y;

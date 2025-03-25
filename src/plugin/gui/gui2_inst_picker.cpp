@@ -19,15 +19,15 @@ static Optional<InstrumentCursor> CurrentCursor(InstPickerContext const& context
 static Optional<InstrumentCursor> IterateInstrument(InstPickerContext const& context,
                                                     InstPickerState const& state,
                                                     InstrumentCursor cursor,
-                                                    IterateInstrumentDirection direction,
+                                                    SearchDirection direction,
                                                     bool first,
                                                     bool picker_gui_is_open) {
     if (cursor.lib_index >= context.libraries.size) cursor.lib_index = 0;
 
     if (!first) {
         switch (direction) {
-            case IterateInstrumentDirection::Forward: ++cursor.inst_index; break;
-            case IterateInstrumentDirection::Backward:
+            case SearchDirection::Forward: ++cursor.inst_index; break;
+            case SearchDirection::Backward:
                 static_assert(UnsignedInt<decltype(cursor.inst_index)>);
                 --cursor.inst_index;
                 break;
@@ -38,11 +38,11 @@ static Optional<InstrumentCursor> IterateInstrument(InstPickerContext const& con
              {
                  ++lib_step;
                  switch (direction) {
-                     case IterateInstrumentDirection::Forward:
+                     case SearchDirection::Forward:
                          cursor.lib_index = (cursor.lib_index + 1) % context.libraries.size;
                          cursor.inst_index = 0;
                          break;
-                     case IterateInstrumentDirection::Backward:
+                     case SearchDirection::Backward:
                          static_assert(UnsignedInt<decltype(cursor.lib_index)>);
                          --cursor.lib_index;
                          if (cursor.lib_index >= context.libraries.size) // check wraparound
@@ -69,8 +69,8 @@ static Optional<InstrumentCursor> IterateInstrument(InstPickerContext const& con
         for (; cursor.inst_index < lib.sorted_instruments.size; (
                  {
                      switch (direction) {
-                         case IterateInstrumentDirection::Forward: ++cursor.inst_index; break;
-                         case IterateInstrumentDirection::Backward: --cursor.inst_index; break;
+                         case SearchDirection::Forward: ++cursor.inst_index; break;
+                         case SearchDirection::Backward: --cursor.inst_index; break;
                      }
                  })) {
             auto const& inst = *lib.sorted_instruments[cursor.inst_index];
@@ -101,17 +101,34 @@ static Optional<InstrumentCursor> IterateInstrument(InstPickerContext const& con
 
 void LoadAdjacentInstrument(InstPickerContext const& context,
                             InstPickerState& state,
-                            IterateInstrumentDirection direction,
+                            SearchDirection direction,
                             bool picker_gui_is_open) {
     switch (context.layer.instrument_id.tag) {
         case InstrumentType::WaveformSynth: {
-            auto const waveform_type = context.layer.instrument_id.Get<WaveformType>();
-            auto prev = ToInt(waveform_type) - 1;
-            if (prev < 0) prev = ToInt(WaveformType::Count) - 1;
-            LoadInstrument(context.engine, context.layer.index, WaveformType(prev));
+            auto waveform_index = ToInt(context.layer.instrument_id.Get<WaveformType>());
+            switch (direction) {
+                case SearchDirection::Forward:
+                    if (waveform_index == ToInt(WaveformType::Count) - 1)
+                        waveform_index = 0;
+                    else
+                        ++waveform_index;
+                    break;
+                case SearchDirection::Backward:
+                    if (waveform_index == 0)
+                        waveform_index = ToInt(WaveformType::Count) - 1;
+                    else
+                        --waveform_index;
+                    break;
+            }
+            LoadInstrument(context.engine, context.layer.index, WaveformType(waveform_index));
             break;
         }
         case InstrumentType::None: {
+            if (picker_gui_is_open && state.tab == InstPickerState::Tab::Waveforms) {
+                LoadInstrument(context.engine, context.layer.index, WaveformType(0));
+                break;
+            }
+
             if (auto const cursor =
                     IterateInstrument(context, state, {0, 0}, direction, true, picker_gui_is_open)) {
                 auto const& lib = *context.libraries[cursor->lib_index];
@@ -149,10 +166,19 @@ void LoadAdjacentInstrument(InstPickerContext const& context,
 }
 
 void LoadRandomInstrument(InstPickerContext const& context, InstPickerState& state, bool picker_gui_is_open) {
+    if (picker_gui_is_open && state.tab == InstPickerState::Tab::Waveforms) {
+        LoadInstrument(
+            context.engine,
+            context.layer.index,
+            WaveformType(
+                RandomIntInRange<u32>(context.engine.random_seed, 0, ToInt(WaveformType::Count) - 1)));
+        return;
+    }
+
     auto const first = IterateInstrument(context,
                                          state,
                                          {.lib_index = 0, .inst_index = 0},
-                                         IterateInstrumentDirection::Forward,
+                                         SearchDirection::Forward,
                                          true,
                                          picker_gui_is_open);
     if (!first) return;
@@ -164,7 +190,7 @@ void LoadRandomInstrument(InstPickerContext const& context, InstPickerState& sta
         if (auto const next = IterateInstrument(context,
                                                 state,
                                                 cursor,
-                                                IterateInstrumentDirection::Forward,
+                                                SearchDirection::Forward,
                                                 false,
                                                 picker_gui_is_open)) {
             cursor = *next;
@@ -179,12 +205,8 @@ void LoadRandomInstrument(InstPickerContext const& context, InstPickerState& sta
 
     cursor = *first;
     for (usize i = 0; i < random_pos; ++i)
-        cursor = *IterateInstrument(context,
-                                    state,
-                                    cursor,
-                                    IterateInstrumentDirection::Forward,
-                                    false,
-                                    picker_gui_is_open);
+        cursor =
+            *IterateInstrument(context, state, cursor, SearchDirection::Forward, false, picker_gui_is_open);
 
     auto const& lib = *context.libraries[cursor.lib_index];
     auto const& inst = *lib.sorted_instruments[cursor.inst_index];
@@ -195,68 +217,6 @@ void LoadRandomInstrument(InstPickerContext const& context, InstPickerState& sta
                        .inst_name = inst.name,
                    });
     state.scroll_to_show_selected = true;
-}
-
-static void InstPickerStatusBar(GuiBoxSystem& box_system, InstPickerContext& context, InstPickerState&) {
-    auto const root = DoBox(box_system,
-                            {
-                                .layout {
-                                    .size = box_system.imgui.PixelsToVw(box_system.imgui.Size()),
-                                    .contents_direction = layout::Direction::Column,
-                                    .contents_align = layout::Alignment::Start,
-                                },
-                            });
-
-    if (auto const l = context.hovering_lib) {
-        DynamicArray<char> buf {box_system.arena};
-        fmt::Append(buf, "{} by {}.", l->name, l->author);
-        if (l->description) fmt::Append(buf, " {}", l->description);
-        DoBox(box_system,
-              {
-                  .parent = root,
-                  .text = buf,
-                  .wrap_width = k_wrap_to_parent,
-                  .font = FontType::Body,
-                  .size_from_text = true,
-              });
-    }
-
-    if (auto const i = context.hovering_inst) {
-        DynamicArray<char> buf {box_system.arena};
-        fmt::Append(buf, "{} from {} by {}.", i->name, i->library.name, i->library.author);
-
-        if (i->description) fmt::Append(buf, " {}", i->description);
-
-        fmt::Append(buf, "\nTags: ");
-        if (i->tags.size == 0)
-            fmt::Append(buf, "None");
-        else
-            for (auto const t : i->tags)
-                fmt::Append(buf, "{} ", t);
-
-        DoBox(box_system,
-              {
-                  .parent = root,
-                  .text = buf,
-                  .wrap_width = k_wrap_to_parent,
-                  .font = FontType::Body,
-                  .size_from_text = true,
-              });
-    }
-
-    if (auto const w = context.waveform_type_hovering) {
-        DoBox(box_system,
-              {
-                  .parent = root,
-                  .text = fmt::Format(
-                      box_system.arena,
-                      "{} waveform. A simple waveform useful for layering with sample instruments.",
-                      k_waveform_type_names[ToInt(*w)]),
-                  .wrap_width = k_wrap_to_parent,
-                  .font = FontType::Body,
-                  .size_from_text = true,
-              });
-    }
 }
 
 static void InstPickerWaveformItems(GuiBoxSystem& box_system,
@@ -310,7 +270,7 @@ static void InstPickerItems(GuiBoxSystem& box_system, InstPickerContext& context
     auto const first = IterateInstrument(context,
                                          state,
                                          {.lib_index = 0, .inst_index = 0},
-                                         IterateInstrumentDirection::Forward,
+                                         SearchDirection::Forward,
                                          true,
                                          true);
     if (!first) return;
@@ -380,8 +340,7 @@ static void InstPickerItems(GuiBoxSystem& box_system, InstPickerContext& context
             }
         }
 
-        if (auto next =
-                IterateInstrument(context, state, cursor, IterateInstrumentDirection::Forward, false, true)) {
+        if (auto next = IterateInstrument(context, state, cursor, SearchDirection::Forward, false, true)) {
             cursor = *next;
             if (cursor == *first) break;
         } else {
@@ -390,56 +349,17 @@ static void InstPickerItems(GuiBoxSystem& box_system, InstPickerContext& context
     }
 }
 
-// static void InstPickerFilters(GuiBoxSystem& box_system, InstPickerContext& context, InstPickerState& state)
-// {
-//     if (state.tab == InstPickerState::Tab::Waveforms) return;
-//
-//     auto const root = DoPickerItemsRoot(box_system);
-//
-//     DoPickerFilters(box_system,
-//                     {
-//                         .parent = root,
-//                         .libraries = context.libraries,
-//
-//                         .selected_library_hashes = state.tab == InstPickerState::Tab::FloeLibaries
-//                                                        ? state.selected_library_hashes
-//                                                        : state.selected_mirage_library_hashes,
-//                         .hovering_library = context.hovering_lib,
-//                         .library_images = context.library_images,
-//                         .sample_library_server = context.sample_library_server,
-//                         .skip_library =
-//                             [&](sample_lib::Library const& lib) {
-//                                 return lib.file_format_specifics.tag != state.FileFormatForCurrentTab();
-//                             },
-//
-//                         .tags_filters = ({
-//                             Optional<PickerFiltersOptions::TagsFilters> tags_filters {};
-//                             if (state.tab == InstPickerState::Tab::FloeLibaries) {
-//                                 tags_filters = PickerFiltersOptions::TagsFilters {
-//                                     .selected_tags_hashes = state.selected_tags_hashes,
-//                                     .tags_cache = context.all_tags,
-//                                 };
-//                             }
-//                             tags_filters;
-//                         }),
-//                     });
-// }
-
 void DoInstPickerPopup(GuiBoxSystem& box_system,
                        imgui::Id popup_id,
                        Rect absolute_button_rect,
                        InstPickerContext& context,
                        InstPickerState& state) {
-
-    if (!context.all_tags) {
-        DynamicSet<String> all_tags {box_system.arena};
-        for (auto const& l_ptr : context.libraries) {
-            auto const& lib = *l_ptr;
-            for (auto const& inst : lib.sorted_instruments)
-                for (auto const& tag : inst->tags)
-                    all_tags.Insert(tag);
-        }
-        context.all_tags = all_tags.ToOwnedSet();
+    DynamicSet<String> all_tags {box_system.arena};
+    for (auto const& l_ptr : context.libraries) {
+        auto const& lib = *l_ptr;
+        for (auto const& ir : lib.sorted_irs)
+            for (auto const& tag : ir->tags)
+                all_tags.Insert(tag);
     }
 
     // IMPORTANT: we create the options struct inside the call so that lambdas and values from
@@ -451,6 +371,10 @@ void DoInstPickerPopup(GuiBoxSystem& box_system,
         PickerPopupOptions {
             .title = fmt::Format(box_system.arena, "Layer {} Instrument", context.layer.index + 1),
             .height = box_system.imgui.PixelsToVw(box_system.imgui.frame_input.window_size.height * 0.9f),
+            .lhs_width = 200,
+            .filters_col_width = 200,
+            .item_type_name = "instrument",
+            .items_section_heading = "Instruments",
             .tab_config = ({
                 DynamicArrayBounded<ModalTabConfig, 3> tab_config {};
                 dyn::Append(tab_config,
@@ -461,78 +385,7 @@ void DoInstPickerPopup(GuiBoxSystem& box_system,
                 dyn::Append(tab_config, {.text = "Waveforms"});
                 tab_config;
             }),
-            .current_tab_index = ToIntRef(state.tab),
-            .lhs =
-                {
-                    .title = "Instruments",
-                    .width = 200,
-                    .icon_buttons = ({
-                        DynamicArrayBounded<PickerPopupOptions::Button, 4> icon_buttons;
-                        if (context.layer.instrument_id.tag != InstrumentType::None) {
-                            dyn::Append(icon_buttons,
-                                        {
-                                            .text = ICON_FA_LOCATION_ARROW,
-                                            .tooltip = "Scroll to current instrument",
-                                            .icon_scaling = 0.7f,
-                                            .on_fired = [&]() { state.scroll_to_show_selected = true; },
-                                        });
-                        }
-                        dyn::AppendSpan(
-                            icon_buttons,
-                            ArrayT<PickerPopupOptions::Button>(
-                                {{
-                                     .text = ICON_FA_CARET_LEFT,
-                                     .tooltip = "Load previous instrument",
-                                     .icon_scaling = 1.0f,
-                                     .on_fired =
-                                         [&]() {
-                                             LoadAdjacentInstrument(context,
-                                                                    state,
-                                                                    IterateInstrumentDirection::Backward,
-                                                                    true);
-                                         },
-                                 },
-                                 {
-                                     .text = ICON_FA_CARET_RIGHT,
-                                     .tooltip = "Load next instrument",
-                                     .icon_scaling = 1.0f,
-                                     .on_fired =
-                                         [&]() {
-                                             LoadAdjacentInstrument(context,
-                                                                    state,
-                                                                    IterateInstrumentDirection::Forward,
-                                                                    true);
-                                         },
-                                 },
-                                 {
-                                     .text = ICON_FA_RANDOM,
-                                     .tooltip = "Load random instrument",
-                                     .icon_scaling = 0.8f,
-                                     .on_fired = [&]() { LoadRandomInstrument(context, state, true); },
-                                 }
-
-                                }));
-                        icon_buttons;
-                    }),
-                },
-            .filters_col =
-                {
-                    .title = "Filters",
-                    .width = 200,
-                    .icon_buttons = ({
-                        DynamicArrayBounded<PickerPopupOptions::Button, 1> icon_buttons {};
-                        if (state.HasFilters()) {
-                            dyn::Append(icon_buttons,
-                                        {
-                                            .text = ICON_FA_TIMES,
-                                            .tooltip = "Clear all filters",
-                                            .icon_scaling = 0.9f,
-                                            .on_fired = [&]() { state.ClearAllFilters(); },
-                                        });
-                        }
-                        icon_buttons;
-                    }),
-                },
+            .current_tab_index = &ToIntRef(state.tab),
             .lhs_top_button = ({
                 Optional<PickerPopupOptions::Button> unload_button {};
                 if (context.layer.instrument_id.tag != InstrumentType::None) {
@@ -548,13 +401,13 @@ void DoInstPickerPopup(GuiBoxSystem& box_system,
                 }
                 unload_button;
             }),
-            .lhs_search =
-                PickerPopupOptions::SearchBar {
-                    .text = state.search,
-                    .on_change = [&](String str) { dyn::Assign(state.search, str); },
-                    .on_clear = [&]() { dyn::Clear(state.search); },
-                },
             .lhs_do_items = [&](GuiBoxSystem& box_system) { InstPickerItems(box_system, context, state); },
+            .search = state.tab != InstPickerState::Tab::Waveforms ? &state.search : nullptr,
+            .on_load_previous =
+                [&]() { LoadAdjacentInstrument(context, state, SearchDirection::Backward, true); },
+            .on_load_next = [&]() { LoadAdjacentInstrument(context, state, SearchDirection::Forward, true); },
+            .on_load_random = [&]() { LoadRandomInstrument(context, state, true); },
+            .on_scroll_to_show_selected = [&]() { state.scroll_to_show_selected = true; },
             .libraries = context.libraries,
             .library_filters = ({
                 Optional<LibraryFilters> f {};
@@ -563,7 +416,6 @@ void DoInstPickerPopup(GuiBoxSystem& box_system,
                         .selected_library_hashes = state.tab == InstPickerState::Tab::FloeLibaries
                                                        ? state.selected_library_hashes
                                                        : state.selected_mirage_library_hashes,
-                        .hovering_library = context.hovering_lib,
                         .library_images = context.library_images,
                         .sample_library_server = context.sample_library_server,
                         .skip_library =
@@ -581,13 +433,38 @@ void DoInstPickerPopup(GuiBoxSystem& box_system,
                 if (state.tab == InstPickerState::Tab::FloeLibaries) {
                     f = TagsFilters {
                         .selected_tags_hashes = state.selected_tags_hashes,
-                        .tags = *context.all_tags,
+                        .tags = (Set<String>)all_tags.table,
                     };
                 }
                 f;
             }),
+            .on_clear_all_filters = [&]() { state.ClearAllFilters(); },
             .status_bar_height = 50,
-            .on_status_bar =
-                [&](GuiBoxSystem& box_system) { InstPickerStatusBar(box_system, context, state); },
+            .status = [&]() -> Optional<String> {
+                Optional<String> status {};
+
+                if (auto const i = context.hovering_inst) {
+                    DynamicArray<char> buf {box_system.arena};
+                    fmt::Append(buf, "{} from {} by {}.", i->name, i->library.name, i->library.author);
+
+                    if (i->description) fmt::Append(buf, " {}", i->description);
+
+                    fmt::Append(buf, "\nTags: ");
+                    if (i->tags.size == 0)
+                        fmt::Append(buf, "None");
+                    else
+                        for (auto const t : i->tags)
+                            fmt::Append(buf, "{} ", t);
+
+                    status = buf.ToOwnedSpan();
+                } else if (auto const w = context.waveform_type_hovering) {
+                    status = fmt::Format(
+                        box_system.arena,
+                        "{} waveform. A simple waveform useful for layering with sample instruments.",
+                        k_waveform_type_names[ToInt(*w)]);
+                }
+
+                return status;
+            },
         });
 }

@@ -10,6 +10,7 @@
 #include "gui/gui2_feedback_panel_state.hpp"
 #include "gui/gui2_info_panel_state.hpp"
 #include "gui/gui2_inst_picker_state.hpp"
+#include "gui/gui2_ir_picker_state.hpp"
 #include "gui/gui2_notifications.hpp"
 #include "gui/gui2_prefs_panel_state.hpp"
 #include "gui/gui_library_images.hpp"
@@ -126,6 +127,7 @@ struct Gui {
     Notifications notifications {};
     FilePickerState file_picker_state {.data = FilePickerStateType::None};
     InstPickerState inst_picker_state {};
+    IrPickerState ir_picker_state {};
 
     GuiFrameInput& frame_input;
     GuiFrameResult frame_output;

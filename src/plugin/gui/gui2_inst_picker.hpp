@@ -3,7 +3,7 @@
 #pragma once
 
 #include "engine/engine.hpp"
-#include "gui/gui2_common_modal_panel.hpp"
+#include "gui/gui2_common_picker.hpp"
 #include "gui/gui2_inst_picker_state.hpp"
 #include "gui/gui_library_images.hpp"
 #include "gui_framework/gui_box_system.hpp"
@@ -31,10 +31,8 @@ struct InstPickerContext {
 
     Span<sample_lib_server::RefCounted<sample_lib::Library>> libraries;
     sample_lib::Instrument const* hovering_inst {};
-    sample_lib::Library const* hovering_lib {};
     Optional<WaveformType> waveform_type_hovering {};
     bool has_mirage_libraries {};
-    Optional<Set<String>> all_tags {};
 };
 
 struct InstrumentCursor {
@@ -43,11 +41,9 @@ struct InstrumentCursor {
     usize inst_index;
 };
 
-enum class IterateInstrumentDirection { Forward, Backward };
-
 void LoadAdjacentInstrument(InstPickerContext const& context,
                             InstPickerState& state,
-                            IterateInstrumentDirection direction,
+                            SearchDirection direction,
                             bool picker_gui_is_open);
 
 void LoadRandomInstrument(InstPickerContext const& context, InstPickerState& state, bool picker_gui_is_open);

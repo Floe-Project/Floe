@@ -11,6 +11,7 @@ For instance: 0.0.1. Don't change the headings.
 
 ## 0.0.8-alpha
 - Brand new instrument browser supporting tags, search, and filtering by library
+- Brand new impulse response browser featuring all the options of the instrument browser
 - Fix instrument left/right and randomise buttons
 
 ## 0.0.7-alpha

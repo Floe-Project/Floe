@@ -14,14 +14,14 @@ struct InstPickerState {
         Count,
     };
 
-    sample_lib::FileFormat FileFormatForCurrentTab() const {
+    Optional<sample_lib::FileFormat> FileFormatForCurrentTab() const {
         switch (tab) {
             case InstPickerState::Tab::FloeLibaries: return sample_lib::FileFormat::Lua;
             case InstPickerState::Tab::MirageLibraries: return sample_lib::FileFormat::Mdata;
-            case InstPickerState::Tab::Waveforms:
+            case InstPickerState::Tab::Waveforms: return k_nullopt;
             case InstPickerState::Tab::Count: PanicIfReached();
         }
-        return sample_lib::FileFormat::Lua;
+        return k_nullopt;
     }
 
     void ClearAllFilters() {

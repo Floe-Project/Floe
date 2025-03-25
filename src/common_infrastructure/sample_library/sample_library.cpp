@@ -53,6 +53,19 @@ LibraryPtrOrError Read(Reader& reader,
 namespace detail {
 
 void PostReadBookkeeping(Library& lib, ArenaAllocator& arena) {
+
+    // Sort items into their folders, and by name within each folder.
+    auto const sort_function = [](auto* a, auto* b) {
+        auto const& a_folder = a->folder;
+        auto const& b_folder = b->folder;
+        if (!a_folder && b_folder) return true; // no-folder items first
+        if (a_folder && !b_folder) return false; // no-folder items first
+        if (!a_folder && !b_folder) return a->name < b->name; // no-folder items by name
+        // They both have folders
+        if (a_folder != b_folder) return *a_folder < *b_folder;
+        return a->name < b->name;
+    };
+
     {
         lib.sorted_instruments = arena.AllocateExactSizeUninitialised<Instrument*>(lib.insts_by_name.size);
         usize index = 0;
@@ -61,17 +74,18 @@ void PostReadBookkeeping(Library& lib, ArenaAllocator& arena) {
             lib.sorted_instruments[index++] = &inst;
         }
 
-        // Sort instrument into their folders, and by name within each folder.
-        Sort(lib.sorted_instruments, [](Instrument* a, Instrument* b) {
-            auto const& a_folder = a->folder;
-            auto const& b_folder = b->folder;
-            if (!a_folder && b_folder) return true; // no-folder instruments first
-            if (a_folder && !b_folder) return false; // no-folder instruments first
-            if (!a_folder && !b_folder) return a->name < b->name; // no-folder instruments by name
-            // They both have folders
-            if (a_folder != b_folder) return *a_folder < *b_folder;
-            return a->name < b->name;
-        });
+        Sort(lib.sorted_instruments, sort_function);
+    }
+
+    {
+        lib.sorted_irs = arena.AllocateExactSizeUninitialised<ImpulseResponse*>(lib.irs_by_name.size);
+        usize index = 0;
+        for (auto [key, value] : lib.irs_by_name) {
+            auto& ir = **value;
+            lib.sorted_irs[index++] = &ir;
+        }
+
+        Sort(lib.sorted_irs, sort_function);
     }
 
     for (auto [key, value] : lib.insts_by_name) {

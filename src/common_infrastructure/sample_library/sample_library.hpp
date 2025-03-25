@@ -191,6 +191,7 @@ struct Library {
     HashTable<String, Instrument*> insts_by_name {};
     Span<Instrument*> sorted_instruments {};
     HashTable<String, ImpulseResponse*> irs_by_name {};
+    Span<ImpulseResponse*> sorted_irs {};
     HashTable<LibraryPath, FileAttribution, sample_lib::Hash> files_requiring_attribution {};
     u32 num_instrument_samples {};
     u32 num_regions {};

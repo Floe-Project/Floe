@@ -12,6 +12,7 @@
 
 #include "engine/engine.hpp"
 #include "gui.hpp"
+#include "gui/gui2_ir_picker.hpp"
 #include "gui/gui_dragger_widgets.hpp"
 #include "gui_framework/colours.hpp"
 #include "gui_framework/gui_imgui.hpp"
@@ -108,55 +109,32 @@ struct EffectIDs {
     };
 };
 
-static void ImpulseResponseMenuItems(Gui* g) {
-    auto const scratch_cursor = g->scratch_arena.TotalUsed();
-    DEFER { g->scratch_arena.TryShrinkTotalUsed(scratch_cursor); };
-
-    auto libs = sample_lib_server::AllLibrariesRetained(g->shared_engine_systems.sample_library_server,
-                                                        g->scratch_arena);
-    DEFER { sample_lib_server::ReleaseAll(libs); };
-
-    StartFloeMenu(g);
-    DEFER { EndFloeMenu(g); };
-
-    // TODO(1.0): this is not production-ready code. We need a new powerful database-like browser GUI
-    int current = 0;
-    DynamicArray<String> irs {g->scratch_arena};
-    DynamicArray<sample_lib::IrId> ir_ids {g->scratch_arena};
-    dyn::Append(irs, "None");
-    dyn::Append(ir_ids, {});
-
-    for (auto l : libs) {
-        for (auto const ir : l->irs_by_name) {
-            auto const ir_id = sample_lib::IrId {
-                .library = l->Id(),
-                .ir_name = ir.key,
-            };
-
-            if (g->engine.processor.convo.ir_id == ir_id) current = (int)irs.size;
-            dyn::Append(irs, fmt::Format(g->scratch_arena, "{}: {}", l->name, ir.key));
-            dyn::Append(ir_ids, ir_id);
-        }
-    }
-
-    if (DoMultipleMenuItems(g, irs, current)) {
-        if (current == 0)
-            LoadConvolutionIr(g->engine, k_nullopt);
-        else
-            LoadConvolutionIr(g->engine, ir_ids[(usize)current]);
-    }
-}
-
 static void DoImpulseResponseMenu(Gui* g, layout::Id lay_id) {
-    auto r = layout::GetRect(g->layout, lay_id);
+    auto const r = layout::GetRect(g->layout, lay_id);
 
-    auto id = g->imgui.GetID("Impulse");
     auto const ir_name =
         g->engine.processor.convo.ir_id ? String(g->engine.processor.convo.ir_id->ir_name) : "None"_s;
-    if (buttons::Popup(g, id, id + 1, r, ir_name, buttons::ParameterPopupButton(g->imgui))) {
-        ImpulseResponseMenuItems(g);
-        g->imgui.EndWindow();
-    }
+
+    auto const id = g->imgui.GetID("Impulse");
+    auto const popup_imgui_id = id + 1;
+
+    if (buttons::Button(g, id, r, ir_name, buttons::ParameterPopupButton(g->imgui)))
+        g->imgui.OpenPopup(popup_imgui_id, id);
+
+    IrPickerContext context {
+        .sample_library_server = g->shared_engine_systems.sample_library_server,
+        .library_images = g->library_images,
+        .engine = g->engine,
+    };
+    context.Init(g->scratch_arena);
+    DEFER { context.Deinit(); };
+
+    DoIrPickerPopup(g->box_system,
+                    popup_imgui_id,
+                    g->imgui.GetRegisteredAndConvertedRect(r),
+                    context,
+                    g->ir_picker_state);
+
     Tooltip(g,
             id,
             r,

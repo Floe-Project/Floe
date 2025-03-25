@@ -808,10 +808,7 @@ void Draw(Gui* g,
             };
             context.Init(g->scratch_arena);
             DEFER { context.Deinit(); };
-            LoadAdjacentInstrument(context,
-                                   g->inst_picker_state,
-                                   IterateInstrumentDirection::Backward,
-                                   false);
+            LoadAdjacentInstrument(context, g->inst_picker_state, SearchDirection::Backward, false);
         }
         if (buttons::Button(g,
                             selector_right_id,
@@ -826,7 +823,7 @@ void Draw(Gui* g,
             };
             context.Init(g->scratch_arena);
             DEFER { context.Deinit(); };
-            LoadAdjacentInstrument(context, g->inst_picker_state, IterateInstrumentDirection::Forward, false);
+            LoadAdjacentInstrument(context, g->inst_picker_state, SearchDirection::Forward, false);
         }
         {
             auto rand_id = g->imgui.GetID("Rand");

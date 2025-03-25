@@ -11,6 +11,8 @@
 constexpr auto k_picker_item_height = 20.0f;
 constexpr auto k_picker_spacing = 8.0f;
 
+enum class SearchDirection { Forward, Backward };
+
 struct PickerItemOptions {
     Box parent;
     String text;
@@ -193,7 +195,6 @@ struct TagsFilters {
 
 struct LibraryFilters {
     DynamicArray<u64>& selected_library_hashes;
-    sample_lib::Library const*& hovering_library;
     LibraryImagesArray& library_images;
     sample_lib_server::Server& sample_library_server;
     FunctionRef<bool(sample_lib::Library const&)> skip_library; // optional
@@ -202,7 +203,8 @@ struct LibraryFilters {
 PUBLIC void DoPickerLibraryFilters(GuiBoxSystem& box_system,
                                    Box const& parent,
                                    Span<sample_lib_server::RefCounted<sample_lib::Library>> libraries,
-                                   LibraryFilters const& library_filters) {
+                                   LibraryFilters const& library_filters,
+                                   sample_lib::Library const*& hovering_library) {
 
     auto const section = DoPickerItemsSectionContainer(box_system,
                                                        {
@@ -232,7 +234,7 @@ PUBLIC void DoPickerLibraryFilters(GuiBoxSystem& box_system,
                     return box_system.imgui.frame_input.graphics_ctx->GetTextureFromImage(imgs.icon);
                 }),
             lib.name);
-        if (button.is_hot) library_filters.hovering_library = &lib;
+        if (button.is_hot) hovering_library = &lib;
         if (button.button_fired) {
             if (is_selected)
                 dyn::RemoveValue(library_filters.selected_library_hashes, lib_id_hash);
@@ -266,6 +268,43 @@ DoPickerTagsFilters(GuiBoxSystem& box_system, Box const& parent, TagsFilters con
     }
 }
 
+PUBLIC void DoPickerStatusBar(GuiBoxSystem& box_system,
+                              FunctionRef<Optional<String>()> custom_status,
+                              sample_lib::Library const* hovering_lib) {
+    auto const root = DoBox(box_system,
+                            {
+                                .layout {
+                                    .size = box_system.imgui.PixelsToVw(box_system.imgui.Size()),
+                                    .contents_padding = {.lrtb = k_picker_spacing},
+                                    .contents_direction = layout::Direction::Column,
+                                    .contents_align = layout::Alignment::Start,
+                                },
+                            });
+
+    String text {};
+
+    if (custom_status) {
+        auto const status = custom_status();
+        if (status) text = *status;
+    }
+
+    if (auto const l = hovering_lib) {
+        DynamicArray<char> buf {box_system.arena};
+        fmt::Append(buf, "{} by {}.", l->name, l->author);
+        if (l->description) fmt::Append(buf, " {}", l->description);
+        text = buf.ToOwnedSpan();
+    }
+
+    DoBox(box_system,
+          {
+              .parent = root,
+              .text = text,
+              .wrap_width = k_wrap_to_parent,
+              .font = FontType::Body,
+              .size_from_text = true,
+          });
+}
+
 // IMPORTANT: we use FunctionRefs here, you need to make sure the lifetime of the functions outlives the
 // options.
 struct PickerPopupOptions {
@@ -276,40 +315,47 @@ struct PickerPopupOptions {
         FunctionRef<void()> on_fired {};
     };
 
-    struct SearchBar {
-        String text {};
-        FunctionRef<void(String)> on_change {};
-        FunctionRef<void()> on_clear {};
-    };
-
     struct Column {
         String title {};
         f32 width {};
-        Span<Button const> icon_buttons {};
     };
 
     String title {};
     f32 height {}; // VW
+    f32 lhs_width {}; // VW
+    f32 filters_col_width {}; // VW
+
+    String item_type_name {}; // "instrument", "preset", etc.
+    String items_section_heading {}; // "Instruments", "Presets", etc.
 
     Span<ModalTabConfig const> tab_config {};
-    u32& current_tab_index;
-
-    Column lhs {};
-    Column filters_col {};
+    u32* current_tab_index;
 
     Optional<Button> lhs_top_button {};
-    Optional<SearchBar> lhs_search {};
     FunctionRef<void(GuiBoxSystem&)> lhs_do_items {};
+    DynamicArrayBounded<char, 100>* search {};
+
+    FunctionRef<void()> on_load_previous {};
+    FunctionRef<void()> on_load_next {};
+    FunctionRef<void()> on_load_random {};
+    FunctionRef<void()> on_scroll_to_show_selected {};
 
     Span<sample_lib_server::RefCounted<sample_lib::Library>> libraries;
     Optional<LibraryFilters> library_filters;
     Optional<TagsFilters> tags_filters;
+    FunctionRef<void()> on_clear_all_filters {};
 
     f32 status_bar_height {};
-    FunctionRef<void(GuiBoxSystem&)> on_status_bar {};
+    FunctionRef<Optional<String>()> status {}; // Set if something is hovering
 };
 
-static void DoPickerPopup(GuiBoxSystem& box_system, PickerPopupOptions const& options) {
+// Ephemeral
+struct PickerPopupContext {
+    sample_lib::Library const* hovering_lib {};
+};
+
+static void
+DoPickerPopup(GuiBoxSystem& box_system, PickerPopupOptions const& options, PickerPopupContext& context) {
     auto const root = DoBox(box_system,
                             {
                                 .layout {
@@ -330,12 +376,13 @@ static void DoPickerPopup(GuiBoxSystem& box_system, PickerPopupOptions const& op
               },
           });
 
-    {
+    if (options.current_tab_index) {
+        ASSERT(options.tab_config.size > 0);
         DoModalTabBar(box_system,
                       {
                           .parent = root,
                           .tabs = options.tab_config,
-                          .current_tab_index = options.current_tab_index,
+                          .current_tab_index = *options.current_tab_index,
                       });
     }
 
@@ -356,7 +403,7 @@ static void DoPickerPopup(GuiBoxSystem& box_system, PickerPopupOptions const& op
                       {
                           .parent = headings_row,
                           .layout {
-                              .size = {options.lhs.width, layout::k_hug_contents},
+                              .size = {options.lhs_width, layout::k_hug_contents},
                               .contents_padding = {.lr = k_picker_spacing, .tb = k_picker_spacing / 2},
                               .contents_align = layout::Alignment::Start,
                               .contents_cross_axis_align = layout::CrossAxisAlign::Middle,
@@ -366,14 +413,41 @@ static void DoPickerPopup(GuiBoxSystem& box_system, PickerPopupOptions const& op
             DoBox(box_system,
                   {
                       .parent = lhs_top,
-                      .text = options.lhs.title,
+                      .text = options.items_section_heading,
                       .font = FontType::Heading2,
                       .layout {
                           .size = {layout::k_fill_parent, style::k_font_heading2_size},
                       },
                   });
 
-            for (auto const& btn : options.lhs.icon_buttons) {
+            for (auto const& btn : ArrayT<PickerPopupOptions::Button>({
+                     {
+                         .text = ICON_FA_CARET_LEFT,
+                         .tooltip = fmt::Format(box_system.arena, "Load previous {}", options.item_type_name),
+                         .icon_scaling = 1.0f,
+                         .on_fired = options.on_load_previous,
+                     },
+                     {
+                         .text = ICON_FA_CARET_RIGHT,
+                         .tooltip = fmt::Format(box_system.arena, "Load next {}", options.item_type_name),
+                         .icon_scaling = 1.0f,
+                         .on_fired = options.on_load_next,
+                     },
+                     {
+                         .text = ICON_FA_RANDOM,
+                         .tooltip = fmt::Format(box_system.arena, "Load random {}", options.item_type_name),
+                         .icon_scaling = 0.8f,
+                         .on_fired = options.on_load_random,
+                     },
+                     {
+                         .text = ICON_FA_LOCATION_ARROW,
+                         .tooltip =
+                             fmt::Format(box_system.arena, "Scroll to current {}", options.item_type_name),
+                         .icon_scaling = 0.7f,
+                         .on_fired = options.on_scroll_to_show_selected,
+                     },
+                 })) {
+                if (!btn.on_fired) continue;
                 if (IconButton(box_system,
                                lhs_top,
                                btn.text,
@@ -394,7 +468,7 @@ static void DoPickerPopup(GuiBoxSystem& box_system, PickerPopupOptions const& op
                       {
                           .parent = headings_row,
                           .layout {
-                              .size = {options.filters_col.width, layout::k_hug_contents},
+                              .size = {options.filters_col_width, layout::k_hug_contents},
                               .contents_padding = {.lr = k_picker_spacing, .tb = k_picker_spacing / 2},
                               .contents_align = layout::Alignment::Start,
                               .contents_cross_axis_align = layout::CrossAxisAlign::Middle,
@@ -404,22 +478,27 @@ static void DoPickerPopup(GuiBoxSystem& box_system, PickerPopupOptions const& op
             DoBox(box_system,
                   {
                       .parent = rhs_top,
-                      .text = options.filters_col.title,
+                      .text = "Filters",
                       .font = FontType::Heading2,
                       .layout {
                           .size = {layout::k_fill_parent, style::k_font_heading2_size},
                       },
                   });
 
-            for (auto const& btn : options.filters_col.icon_buttons) {
+            if (options.on_clear_all_filters && (options.library_filters.AndThen([](LibraryFilters const& f) {
+                    return f.selected_library_hashes.size;
+                }) || options.tags_filters.AndThen([](TagsFilters const& f) {
+                    return f.selected_tags_hashes.size;
+                }))) {
                 if (IconButton(box_system,
                                rhs_top,
-                               btn.text,
-                               btn.tooltip,
-                               style::k_font_heading2_size * btn.icon_scaling,
+                               ICON_FA_TIMES,
+                               "Clear all filters",
+                               style::k_font_heading2_size * 0.9f,
                                style::k_font_heading2_size)
                         .button_fired) {
-                    dyn::Append(box_system.state->deferred_actions, [&]() { btn.on_fired(); });
+                    dyn::Append(box_system.state->deferred_actions,
+                                [&]() { options.on_clear_all_filters(); });
                 }
             }
         }
@@ -442,7 +521,7 @@ static void DoPickerPopup(GuiBoxSystem& box_system, PickerPopupOptions const& op
                                {
                                    .parent = main_section,
                                    .layout {
-                                       .size = {options.lhs.width, layout::k_fill_parent},
+                                       .size = {options.lhs_width, layout::k_fill_parent},
                                        .contents_padding = {.lr = k_picker_spacing, .t = k_picker_spacing},
                                        .contents_gap = k_picker_spacing,
                                        .contents_direction = layout::Direction::Column,
@@ -457,7 +536,7 @@ static void DoPickerPopup(GuiBoxSystem& box_system, PickerPopupOptions const& op
                     dyn::Append(box_system.state->deferred_actions, [&]() { btn->on_fired(); });
             }
 
-            if (auto const& search = options.lhs_search) {
+            if (auto const& search = options.search) {
                 auto const search_box =
                     DoBox(box_system,
                           {
@@ -487,7 +566,7 @@ static void DoPickerPopup(GuiBoxSystem& box_system, PickerPopupOptions const& op
                         DoBox(box_system,
                               {
                                   .parent = search_box,
-                                  .text = search->text,
+                                  .text = *search,
                                   .text_input_box = TextInputBox::SingleLine,
                                   .text_input_cursor = style::Colour::Text,
                                   .text_input_selection = style::Colour::Highlight,
@@ -496,11 +575,12 @@ static void DoPickerPopup(GuiBoxSystem& box_system, PickerPopupOptions const& op
                                   },
                               });
                     text_input.text_input_result && text_input.text_input_result->buffer_changed) {
-                    dyn::Append(box_system.state->deferred_actions,
-                                [&]() { search->on_change(text_input.text_input_result->text); });
+                    dyn::Append(box_system.state->deferred_actions, [&]() {
+                        dyn::AssignFitInCapacity(*search, text_input.text_input_result->text);
+                    });
                 }
 
-                if (search->text.size) {
+                if (search->size) {
                     if (DoBox(box_system,
                               {
                                   .parent = search_box,
@@ -514,7 +594,7 @@ static void DoPickerPopup(GuiBoxSystem& box_system, PickerPopupOptions const& op
                                   .activation_click_event = ActivationClickEvent::Up,
                               })
                             .button_fired) {
-                        dyn::Append(box_system.state->deferred_actions, [&]() { search->on_clear(); });
+                        dyn::Append(box_system.state->deferred_actions, [&]() { dyn::Clear(*search); });
                     }
                 }
             }
@@ -546,7 +626,7 @@ static void DoPickerPopup(GuiBoxSystem& box_system, PickerPopupOptions const& op
                                {
                                    .parent = main_section,
                                    .layout {
-                                       .size = {options.filters_col.width, layout::k_fill_parent},
+                                       .size = {options.filters_col_width, layout::k_fill_parent},
                                        .contents_padding = {.lr = k_picker_spacing, .t = k_picker_spacing},
                                        .contents_direction = layout::Direction::Column,
                                        .contents_align = layout::Alignment::Start,
@@ -565,7 +645,8 @@ static void DoPickerPopup(GuiBoxSystem& box_system, PickerPopupOptions const& op
                                  DoPickerLibraryFilters(box_system,
                                                         root,
                                                         options.libraries,
-                                                        *options.library_filters);
+                                                        *options.library_filters,
+                                                        context.hovering_lib);
                              if (options.tags_filters)
                                  DoPickerTagsFilters(box_system, root, *options.tags_filters);
                          },
@@ -589,7 +670,10 @@ static void DoPickerPopup(GuiBoxSystem& box_system, PickerPopupOptions const& op
 
     AddPanel(box_system,
              {
-                 .run = [&](GuiBoxSystem& box_system) { options.on_status_bar(box_system); },
+                 .run =
+                     [&](GuiBoxSystem& box_system) {
+                         DoPickerStatusBar(box_system, options.status, context.hovering_lib);
+                     },
                  .data =
                      Subpanel {
                          .id = DoBox(box_system,
@@ -612,9 +696,10 @@ PUBLIC void DoPickerPopup(GuiBoxSystem& box_system,
                           imgui::Id popup_id,
                           Rect absolute_button_rect,
                           PickerPopupOptions const& options) {
+    PickerPopupContext context {};
     RunPanel(box_system,
              Panel {
-                 .run = [&](GuiBoxSystem& box_system) { DoPickerPopup(box_system, options); },
+                 .run = [&](GuiBoxSystem& box_system) { DoPickerPopup(box_system, options, context); },
                  .data =
                      PopupPanel {
                          .creator_absolute_rect = absolute_button_rect,

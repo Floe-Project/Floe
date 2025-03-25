@@ -366,7 +366,7 @@ struct DynamicSet : DynamicHashTable<KeyType, DummyValueType, k_hash_function> {
     Set ToOwnedSet() {
         auto result = this->table;
         this->table = {};
-        return result;
+        return (Set)result;
     }
 
     DummyValueType* Find(KeyType key) const = delete;

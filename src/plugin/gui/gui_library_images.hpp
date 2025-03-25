@@ -21,7 +21,8 @@ Optional<LibraryImages> LibraryImagesFromLibraryId(LibraryImagesArray& array,
                                                    imgui::Context& imgui,
                                                    sample_lib::LibraryIdRef const& library_id,
                                                    sample_lib_server::Server& server,
-                                                   ArenaAllocator& scratch_arena);
+                                                   ArenaAllocator& scratch_arena,
+                                                   bool only_icon_needed);
 
 void InvalidateLibraryImages(LibraryImagesArray& array,
                              sample_lib::LibraryIdRef library_id,

@@ -229,7 +229,8 @@ PUBLIC void DoPickerLibraryFilters(GuiBoxSystem& box_system,
                                        box_system.imgui,
                                        lib.Id(),
                                        library_filters.sample_library_server,
-                                       box_system.arena)
+                                       box_system.arena,
+                                       true)
                 .AndThen([&](LibraryImages const& imgs) {
                     return box_system.imgui.frame_input.graphics_ctx->GetTextureFromImage(imgs.icon);
                 }),

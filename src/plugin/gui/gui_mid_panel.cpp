@@ -23,7 +23,7 @@ static void DoBlurredBackground(Gui* g,
     auto& imgui = g->imgui;
     auto const panel_rounding = LiveSize(imgui, UiSizeId::BlurredPanelRounding);
 
-    auto imgs = LibraryImagesFromLibraryId(g, library_id);
+    auto imgs = LibraryImagesFromLibraryId(g, library_id, false);
 
     if (imgs && imgs->blurred_background) {
         if (auto tex = g->frame_input.graphics_ctx->GetTextureFromImage(imgs->blurred_background)) {

@@ -40,12 +40,14 @@ static f32 PixelsPerVw(Gui* g) {
     return (f32)g->frame_input.window_size.width / k_points_in_width;
 }
 
-Optional<LibraryImages> LibraryImagesFromLibraryId(Gui* g, sample_lib::LibraryIdRef library_id) {
+Optional<LibraryImages>
+LibraryImagesFromLibraryId(Gui* g, sample_lib::LibraryIdRef library_id, bool only_icon_needed) {
     return LibraryImagesFromLibraryId(g->library_images,
                                       g->imgui,
                                       library_id,
                                       g->shared_engine_systems.sample_library_server,
-                                      g->scratch_arena);
+                                      g->scratch_arena,
+                                      only_icon_needed);
 }
 
 Optional<graphics::ImageID> LogoImage(Gui* g) {
@@ -316,7 +318,7 @@ GuiFrameResult GuiUpdate(Gui* g) {
         if (!prefs::GetBool(g->prefs, SettingDescriptor(GuiSetting::HighContrastGui))) {
             auto overall_library = LibraryForOverallBackground(g->engine);
             if (overall_library) {
-                auto imgs = LibraryImagesFromLibraryId(g, *overall_library);
+                auto imgs = LibraryImagesFromLibraryId(g, *overall_library, false);
                 if (imgs && imgs->background) {
                     auto tex = g->frame_input.graphics_ctx->GetTextureFromImage(*imgs->background);
                     if (tex) {

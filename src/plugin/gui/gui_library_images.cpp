@@ -174,7 +174,8 @@ static LibraryImages LoadLibraryImagesIfNeeded(LibraryImagesArray& array,
                                                imgui::Context& imgui,
                                                sample_lib::Library const& lib,
                                                sample_lib_server::Server& server,
-                                               ArenaAllocator& scratch_arena) {
+                                               ArenaAllocator& scratch_arena,
+                                               bool only_icon_needed) {
     auto& images = FindOrCreateLibraryImages(array, lib.Id());
     auto const reloads = CheckLibraryImages(*imgui.frame_input.graphics_ctx, images);
 
@@ -185,7 +186,7 @@ static LibraryImages LoadLibraryImagesIfNeeded(LibraryImagesArray& array,
             images.icon_missing = true;
     }
 
-    if (reloads.reload_background || reloads.reload_blurred_background) {
+    if (!only_icon_needed && (reloads.reload_background || reloads.reload_blurred_background)) {
         ImageBytesManaged const bg_pixels = ({
             Optional<ImageBytesManaged> opt =
                 ImagePixelsFromLibrary(lib, LibraryImageType::Background, server, scratch_arena);
@@ -210,14 +211,16 @@ Optional<LibraryImages> LibraryImagesFromLibraryId(LibraryImagesArray& array,
                                                    imgui::Context& imgui,
                                                    sample_lib::LibraryIdRef const& library_id,
                                                    sample_lib_server::Server& server,
-                                                   ArenaAllocator& scratch_arena) {
-    if (library_id == k_default_background_lib_id) return LoadDefaultLibraryImagesIfNeeded(array, imgui);
+                                                   ArenaAllocator& scratch_arena,
+                                                   bool only_icon_needed) {
+    if (!only_icon_needed && library_id == k_default_background_lib_id)
+        return LoadDefaultLibraryImagesIfNeeded(array, imgui);
 
     auto lib = sample_lib_server::FindLibraryRetained(server, library_id);
     DEFER { lib.Release(); };
     if (!lib) return k_nullopt;
 
-    return LoadLibraryImagesIfNeeded(array, imgui, *lib, server, scratch_arena);
+    return LoadLibraryImagesIfNeeded(array, imgui, *lib, server, scratch_arena, only_icon_needed);
 }
 
 void InvalidateLibraryImages(LibraryImagesArray& array,

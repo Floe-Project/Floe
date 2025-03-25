@@ -310,7 +310,8 @@ static void InstPickerItems(GuiBoxSystem& box_system, InstPickerContext& context
                                                                          box_system.imgui,
                                                                          lib.Id(),
                                                                          context.sample_library_server,
-                                                                         box_system.arena);
+                                                                         box_system.arena,
+                                                                         true);
                             imgs && imgs->icon) {
                             lib_icon_tex =
                                 box_system.imgui.frame_input.graphics_ctx->GetTextureFromImage(imgs->icon);

@@ -1244,14 +1244,15 @@ static f32x2 GetTextPosition(Font* font,
 }
 
 String OverflowText(OverflowTextArgs const& args) {
-    String const dots {".."};
+    String constexpr k_dots {".."};
+    auto const epsilon = 0.01f;
 
     if (args.overflow_type != TextOverflowType::AllowOverflow) {
         auto const text_width = args.text_size
                                     ? args.text_size->x
                                     : args.font->CalcTextSizeA(args.font_size, FLT_MAX, 0.0f, args.str).x;
-        if (text_width > args.r.w) {
-            f32 const dots_size = args.font->CalcTextSizeA(args.font_size, FLT_MAX, 0.0f, dots).x;
+        if (text_width > (args.r.w + epsilon)) {
+            f32 const dots_size = args.font->CalcTextSizeA(args.font_size, FLT_MAX, 0.0f, k_dots).x;
             f32 line_width = 0;
 
             if (args.overflow_type == TextOverflowType::ShowDotsOnRight) {
@@ -1281,7 +1282,7 @@ String OverflowText(OverflowTextArgs const& args) {
                     if ((line_width + dots_size) > args.r.w) {
                         DynamicArray<char> buffer(args.allocator);
                         dyn::Assign(buffer, args.str.SubSpan(0, (usize)(prev_s - args.str.data)));
-                        dyn::AppendSpan(buffer, dots);
+                        dyn::AppendSpan(buffer, k_dots);
                         args.text_pos.x = args.r.x;
                         return buffer.ToOwnedSpan();
                     }
@@ -1322,7 +1323,7 @@ String OverflowText(OverflowTextArgs const& args) {
 
                     if ((line_width + dots_size) > args.r.w) {
                         DynamicArray<char> buffer(args.allocator);
-                        dyn::Assign(buffer, dots);
+                        dyn::Assign(buffer, k_dots);
                         dyn::AppendSpan(buffer, String(prev_s, (usize)(end - prev_s)));
                         args.text_pos.x = args.r.Right() - (line_width + dots_size);
                         return buffer.ToOwnedSpan();

@@ -150,10 +150,15 @@ Gui::Gui(GuiFrameInput& frame_input, Engine& engine)
     editor.imgui = &imgui;
     imgui.user_callback_data = this;
 
+    ASSERT(!engine.stated_changed_callback);
+    engine.stated_changed_callback = [this]() { OnEngineStateChange(save_preset_panel_state, this->engine); };
+
     layout::ReserveItemsCapacity(layout, 2048);
 }
 
 Gui::~Gui() {
+    engine.stated_changed_callback = {};
+
     layout::DestroyContext(layout);
     sample_lib_server::CloseAsyncCommsChannel(engine.shared_engine_systems.sample_library_server,
                                               sample_lib_server_async_channel);
@@ -403,6 +408,15 @@ GuiFrameResult GuiUpdate(Gui* g) {
                 .notifications = g->notifications,
             };
             DoFeedbackPanel(g->box_system, context, g->feedback_panel_state);
+        }
+
+        {
+            SavePresetPanelContext context {
+                .engine = g->engine,
+                .file_picker_state = g->file_picker_state,
+                .paths = g->shared_engine_systems.paths,
+            };
+            DoSavePresetPanel(g->box_system, context, g->save_preset_panel_state);
         }
 
         {

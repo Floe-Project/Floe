@@ -57,29 +57,12 @@ FeedbackPanel(GuiBoxSystem& box_system, FeedbackPanelContext& context, FeedbackP
               .size_from_text = true,
           });
 
-    auto field_config = BoxConfig {
-        .parent = panel,
-        .text = state.description,
-        .font = FontType::Body,
-        .text_fill = style::Colour::Text,
-        .text_fill_hot = style::Colour::Text,
-        .text_fill_active = style::Colour::Text,
-        .background_fill = style::Colour::Background2,
-        .background_fill_hot = style::Colour::Background2,
-        .background_fill_active = style::Colour::Background2,
-        .border = style::Colour::Overlay0,
-        .border_hot = style::Colour::Overlay1,
-        .border_active = style::Colour::Highlight,
-        .round_background_corners = 0b1111,
-        .text_input_box = TextInputBox::MultiLine,
-        .text_input_cursor = style::Colour::Text,
-        .text_input_selection = style::Colour::Highlight,
-        .layout {
-            .size = {layout::k_fill_parent, 90},
-        },
-    };
-
-    auto const description_field = DoBox(box_system, field_config);
+    auto const description_field = TextInput(box_system,
+                                             panel,
+                                             state.description,
+                                             "",
+                                             f32x2 {layout::k_fill_parent, 90},
+                                             TextInputBox::MultiLine);
     if (description_field.text_input_result && description_field.text_input_result->buffer_changed)
         dyn::Assign(state.description, description_field.text_input_result->text);
 
@@ -91,11 +74,12 @@ FeedbackPanel(GuiBoxSystem& box_system, FeedbackPanelContext& context, FeedbackP
               .size_from_text = true,
           });
 
-    field_config.text = state.email;
-    field_config.layout.size = {layout::k_fill_parent, 30};
-    field_config.text_input_box = TextInputBox::SingleLine;
-
-    auto const email_field = DoBox(box_system, field_config);
+    auto const email_field = TextInput(box_system,
+                                       panel,
+                                       state.email,
+                                       "",
+                                       f32x2 {layout::k_fill_parent, 30},
+                                       TextInputBox::SingleLine);
     if (email_field.text_input_result && email_field.text_input_result->buffer_changed)
         dyn::Assign(state.email, email_field.text_input_result->text);
 
@@ -163,7 +147,7 @@ DoFeedbackPanel(GuiBoxSystem& box_system, FeedbackPanelContext& context, Feedbac
                     .r = CentredRect({.pos = 0, .size = box_system.imgui.frame_input.window_size.ToFloat2()},
                                      f32x2 {box_system.imgui.VwToPixels(style::k_feedback_dialog_width),
                                             box_system.imgui.VwToPixels(style::k_feedback_dialog_height)}),
-                    .imgui_id = box_system.imgui.GetID("new info"),
+                    .imgui_id = box_system.imgui.GetID("feedback"),
                     .on_close = [&state]() { state.open = false; },
                     .close_on_click_outside = true,
                     .darken_background = true,

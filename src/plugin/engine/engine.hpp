@@ -25,26 +25,26 @@ struct Engine : ProcessorListener {
         ArenaAllocator arena {PageAllocator::Instance()};
         DynamicArrayBounded<sample_lib_server::RequestId, k_num_layers + 1> requests;
         DynamicArrayBounded<sample_lib_server::LoadResult, k_num_layers + 1> retained_results;
-        StateSnapshotWithMetadata snapshot;
+        StateSnapshotWithName snapshot;
         StateSource source;
     };
 
     struct LastSnapshot {
         LastSnapshot() { metadata.name_or_path = "Default"; }
 
-        void Set(StateSnapshotWithMetadata const& snapshot) {
+        void Set(StateSnapshotWithName const& snapshot) {
             state = snapshot.state;
-            metadata = snapshot.metadata.Clone(metadata_arena);
+            metadata = snapshot.name.Clone(metadata_arena);
         }
 
-        void SetMetadata(StateSnapshotMetadata const& m) {
+        void SetName(StateSnapshotName const& m) {
             metadata_arena.ResetCursorAndConsolidateRegions();
             metadata = m.Clone(metadata_arena);
         }
 
         ArenaAllocatorWithInlineStorage<1000> metadata_arena {Malloc::Instance()};
         StateSnapshot state {};
-        StateSnapshotMetadata metadata {};
+        StateSnapshotName metadata {};
     };
 
     Engine(clap_host const& host,
@@ -76,7 +76,7 @@ struct Engine : ProcessorListener {
     Optional<clap_id> timer_id {};
     TimePoint last_poll_thread_time {};
 
-    // IMPORTANT: debug-only, remove this
+    // TODO: debug-only, remove this
     DynamicArrayBounded<char, 200> state_change_description {};
 
     ThreadsafeFunctionQueue main_thread_callbacks {.arena = {PageAllocator::Instance()}};
@@ -84,9 +84,12 @@ struct Engine : ProcessorListener {
     Optional<PendingStateChange> pending_state_change {};
     LastSnapshot last_snapshot {};
 
+    StateMetadata state_metadata {};
+
+    // GUI can set this to get notified when the state changes.
+    TrivialFixedSizeFunction<8, void()> stated_changed_callback {};
+
     sample_lib_server::AsyncCommsChannel& sample_lib_server_async_channel;
-    // Presets
-    // ========================================================================
     PresetBrowserFilters preset_browser_filters;
     Optional<PresetSelectionCriteria> pending_preset_selection_criteria {};
     u64 presets_folder_listener_id {};

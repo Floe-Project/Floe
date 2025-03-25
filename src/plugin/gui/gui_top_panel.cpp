@@ -341,27 +341,8 @@ void TopPanel(Gui* g) {
 
     {
         auto const btn_id = g->imgui.GetID("save");
-        auto const pop_id = g->imgui.GetID("save_pop");
-        if (buttons::Popup(g, btn_id, pop_id, preset_save_r, ICON_FA_SAVE, large_icon_button_style)) {
-            auto save_over_text = fmt::Format(g->scratch_arena,
-                                              "Save (Overwrite \"{}\")",
-                                              g->engine.last_snapshot.metadata.Name());
-            auto const existing_path = g->engine.last_snapshot.metadata.Path();
-            auto ptr = existing_path ? String(save_over_text) : "Save Preset As"_s;
-
-            PopupMenuItems items(g, {&ptr, 1});
-            if (existing_path) {
-                if (items.DoButton(save_over_text)) SaveCurrentStateToFile(g->engine, *existing_path);
-            }
-
-            if (items.DoButton("Save Preset As")) {
-                OpenFilePickerSavePreset(g->file_picker_state,
-                                         g->imgui.frame_output,
-                                         g->shared_engine_systems.paths);
-            }
-
-            g->imgui.EndWindow();
-        }
+        if (buttons::Button(g, btn_id, preset_save_r, ICON_FA_SAVE, large_icon_button_style))
+            g->save_preset_panel_state.open = true;
         Tooltip(g, btn_id, preset_save_r, "Save the current state as a preset"_s);
     }
 

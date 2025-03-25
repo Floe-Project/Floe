@@ -705,9 +705,7 @@ PUBLIC Box DoBox(GuiBoxSystem& builder,
                 if (input_result->HasSelection()) {
                     imgui::TextInputResult::SelectionIterator it {*builder.imgui.graphics->context};
                     while (auto const r = input_result->NextSelectionRect(it))
-                        builder.imgui.graphics->AddRectFilled(
-                            *r,
-                            colours::WithAlpha(style::Col(config.text_input_selection), 100));
+                        builder.imgui.graphics->AddRectFilled(*r, style::Col(config.text_input_selection));
                 }
 
                 if (input_result->show_cursor) {

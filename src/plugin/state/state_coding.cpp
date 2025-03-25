@@ -1108,28 +1108,28 @@ ErrorCodeOr<void> CodeState(StateSnapshot& state, CodeStateArguments const& args
     // =======================================================================================================
     {
         u8 num_tags {};
-        if (coder.IsWriting()) num_tags = CheckedCast<u8>(state.tags.size);
+        if (coder.IsWriting()) num_tags = CheckedCast<u8>(state.metadata.tags.size);
         TRY(coder.CodeNumber(num_tags, StateVersion::Initial));
 
         for (auto const i : Range(num_tags)) {
             String tag {};
-            if (coder.IsWriting()) tag = state.tags[i];
+            if (coder.IsWriting()) tag = state.metadata.tags[i];
             TRY(coder.CodeString(tag, scratch_arena, StateVersion::Initial));
-            if (coder.IsReading()) dyn::Append(state.tags, tag);
+            if (coder.IsReading()) dyn::Append(state.metadata.tags, tag);
         }
     }
 
     // =======================================================================================================
     {
         String author {};
-        if (coder.IsWriting()) author = state.author;
+        if (coder.IsWriting()) author = state.metadata.author;
         TRY(coder.CodeString(author, scratch_arena, StateVersion::Initial));
-        if (coder.IsReading()) state.author = author;
+        if (coder.IsReading()) state.metadata.author = author;
 
         String description {};
-        if (coder.IsWriting()) description = state.description;
+        if (coder.IsWriting()) description = state.metadata.description;
         TRY(coder.CodeString(description, scratch_arena, StateVersion::Initial));
-        if (coder.IsReading()) state.description = description;
+        if (coder.IsReading()) state.metadata.description = description;
     }
 
     // =======================================================================================================

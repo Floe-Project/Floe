@@ -76,7 +76,7 @@ static void UpdateAttributionText(Engine& engine, ArenaAllocator& scratch_arena)
     // TODO: if the attributions have changed, we should update the GUI
 }
 
-static void SetLastSnapshot(Engine& engine, StateSnapshotWithMetadata const& state) {
+static void SetLastSnapshot(Engine& engine, StateSnapshotWithName const& state) {
     engine.last_snapshot.Set(state);
     engine.update_gui.Store(true, StoreMemoryOrder::Relaxed);
     engine.host.request_callback(&engine.host);
@@ -84,7 +84,7 @@ static void SetLastSnapshot(Engine& engine, StateSnapshotWithMetadata const& sta
     engine.pending_state_change.Clear();
 }
 
-static void LoadNewState(Engine& engine, StateSnapshotWithMetadata const& state, StateSource source) {
+static void LoadNewState(Engine& engine, StateSnapshotWithName const& state, StateSource source) {
     ZoneScoped;
     ASSERT(IsMainThread(engine.host));
 
@@ -120,8 +120,10 @@ static void LoadNewState(Engine& engine, StateSnapshotWithMetadata const& state,
         engine.processor.convo.ir_id = k_nullopt;
         SetConvolutionIrAudioData(engine.processor, nullptr);
 
+        engine.state_metadata = state.state.metadata;
         ApplyNewState(engine.processor, state.state, source);
         SetLastSnapshot(engine, state);
+        if (engine.stated_changed_callback) engine.stated_changed_callback();
 
         MarkNeedsAttributionTextUpdate(engine.attribution_requirements);
         engine.host.request_callback(&engine.host);
@@ -129,7 +131,7 @@ static void LoadNewState(Engine& engine, StateSnapshotWithMetadata const& state,
         engine.pending_state_change.Emplace();
         auto& pending = *engine.pending_state_change;
         pending.snapshot.state = state.state;
-        pending.snapshot.metadata = state.metadata.Clone(pending.arena);
+        pending.snapshot.name = state.name.Clone(pending.arena);
         pending.source = source;
 
         for (auto [layer_index, i] : Enumerate<u32>(state.state.inst_ids)) {
@@ -204,10 +206,13 @@ static void ApplyNewStateFromPending(Engine& engine) {
                       layer_index,
                       InstrumentFromPendingState(pending_state_change, layer_index));
     SetConvolutionIrAudioData(engine.processor, IrAudioDataFromPendingState(pending_state_change));
+    engine.state_metadata = pending_state_change.snapshot.state.metadata;
     ApplyNewState(engine.processor, pending_state_change.snapshot.state, pending_state_change.source);
 
     // do it last because it clears pending_state_change
     SetLastSnapshot(engine, pending_state_change.snapshot);
+
+    if (engine.stated_changed_callback) engine.stated_changed_callback();
 }
 
 static void SampleLibraryChanged(Engine& engine, sample_lib::LibraryIdRef library_id) {
@@ -298,7 +303,9 @@ static void SampleLibraryResourceLoaded(Engine& engine, sample_lib_server::LoadR
 
 StateSnapshot CurrentStateSnapshot(Engine const& engine) {
     if (engine.pending_state_change) return engine.pending_state_change->snapshot.state;
-    return MakeStateSnapshot(engine.processor);
+    auto snapshot = MakeStateSnapshot(engine.processor);
+    snapshot.metadata = engine.state_metadata;
+    return snapshot;
 }
 
 bool StateChangedSinceLastSnapshot(Engine& engine) {
@@ -383,7 +390,7 @@ void LoadPresetFromFile(Engine& engine, String path) {
         LoadNewState(engine,
                      {
                          .state = state_outcome.Value(),
-                         .metadata = {.name_or_path = path},
+                         .name = {.name_or_path = path},
                      },
                      StateSource::PresetFile);
     } else {
@@ -399,8 +406,9 @@ void LoadPresetFromFile(Engine& engine, String path) {
 }
 
 void SaveCurrentStateToFile(Engine& engine, String path) {
-    if (auto outcome = SavePresetFile(path, CurrentStateSnapshot(engine)); outcome.Succeeded()) {
-        engine.last_snapshot.SetMetadata(StateSnapshotMetadata {.name_or_path = path});
+    auto const current_state = CurrentStateSnapshot(engine);
+    if (auto outcome = SavePresetFile(path, current_state); outcome.Succeeded()) {
+        SetLastSnapshot(engine, {.state = current_state, .name = {.name_or_path = path}});
     } else {
         auto item = engine.error_notifications.NewError();
         item->value = {
@@ -623,7 +631,7 @@ static bool PluginLoadState(Engine& engine, clap_istream const& stream) {
         return false;
     }
 
-    LoadNewState(engine, {.state = state, .metadata = {.name_or_path = "DAW State"}}, StateSource::Daw);
+    LoadNewState(engine, {.state = state, .name = {.name_or_path = "DAW State"}}, StateSource::Daw);
     return true;
 }
 

@@ -290,6 +290,31 @@ IconButton(GuiBoxSystem& builder, Box parent, String icon, String tooltip, f32 f
     return button;
 }
 
+PUBLIC Box
+TextInput(GuiBoxSystem& builder, Box parent, String text, String tooltip, f32x2 size, TextInputBox type) {
+    return DoBox(builder,
+                 {
+                     .parent = parent,
+                     .text = text,
+                     .font = FontType::Body,
+                     .text_fill = style::Colour::Text,
+                     .text_fill_hot = style::Colour::Text,
+                     .text_fill_active = style::Colour::Text,
+                     .background_fill = style::Colour::Background2,
+                     .background_fill_hot = style::Colour::Background2,
+                     .background_fill_active = style::Colour::Background2,
+                     .border = style::Colour::Overlay0,
+                     .border_hot = style::Colour::Overlay1,
+                     .border_active = style::Colour::Blue,
+                     .round_background_corners = 0b1111,
+                     .text_input_box = type,
+                     .text_input_cursor = style::Colour::Text,
+                     .text_input_selection = style::Colour::Highlight,
+                     .layout {.size = size},
+                     .tooltip = tooltip,
+                 });
+}
+
 PUBLIC Optional<s64> IntField(GuiBoxSystem& builder,
                               Box parent,
                               String label,
@@ -328,29 +353,12 @@ PUBLIC Optional<s64> IntField(GuiBoxSystem& builder,
 
     {
         auto const text = fmt::IntToString(value);
-        auto const text_input = DoBox(builder,
-                                      {
-                                          .parent = container,
-                                          .text = text,
-                                          .font = FontType::Body,
-                                          .text_fill = style::Colour::Text,
-                                          .text_fill_hot = style::Colour::Text,
-                                          .text_fill_active = style::Colour::Text,
-                                          .background_fill = style::Colour::Background2,
-                                          .background_fill_hot = style::Colour::Background2,
-                                          .background_fill_active = style::Colour::Background2,
-                                          .border = style::Colour::Overlay0,
-                                          .border_hot = style::Colour::Overlay1,
-                                          .border_active = style::Colour::Highlight,
-                                          .round_background_corners = 0b1111,
-                                          .text_input_box = TextInputBox::MultiLine,
-                                          .text_input_cursor = style::Colour::Text,
-                                          .text_input_selection = style::Colour::Highlight,
-                                          .layout {
-                                              .size = {width, 20},
-                                          },
-                                          .tooltip = "Enter a new value"_s,
-                                      });
+        auto const text_input = TextInput(builder,
+                                          container,
+                                          text,
+                                          "Enter a new value"_s,
+                                          f32x2 {width, 20},
+                                          TextInputBox::SingleLine);
         if (text_input.text_input_result) {
             auto const new_value = ParseInt(text_input.text_input_result->text, ParseIntBase::Decimal);
             if (new_value.HasValue()) value = constrainer(new_value.Value());

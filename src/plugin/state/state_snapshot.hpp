@@ -9,6 +9,14 @@
 
 #include "instrument.hpp"
 
+struct StateMetadata {
+    bool operator==(StateMetadata const& other) const = default;
+    bool operator!=(StateMetadata const& other) const = default;
+    DynamicArrayBounded<DynamicArrayBounded<char, k_max_tag_size>, k_max_num_tags> tags {};
+    DynamicArrayBounded<char, k_max_preset_author_size> author {};
+    DynamicArrayBounded<char, k_max_preset_description_size> description {};
+};
+
 struct StateSnapshot {
     f32& LinearParam(ParamIndex index) { return param_values[ToInt(index)]; }
     f32 LinearParam(ParamIndex index) const { return param_values[ToInt(index)]; }
@@ -21,15 +29,13 @@ struct StateSnapshot {
     Array<f32, k_num_parameters> param_values {};
     Array<EffectType, k_num_effect_types> fx_order {};
     Array<Bitset<128>, k_num_parameters> param_learned_ccs {};
-    DynamicArrayBounded<DynamicArrayBounded<char, k_max_tag_size>, k_max_num_tags> tags {};
-    DynamicArrayBounded<char, k_max_preset_author_size> author {};
-    DynamicArrayBounded<char, k_max_preset_description_size> description {};
+    StateMetadata metadata {};
 };
 
 enum class StateSource { PresetFile, Daw };
 
-struct StateSnapshotMetadata {
-    StateSnapshotMetadata Clone(Allocator& a, CloneType clone_type = CloneType::Shallow) const {
+struct StateSnapshotName {
+    StateSnapshotName Clone(Allocator& a, CloneType clone_type = CloneType::Shallow) const {
         auto _ = clone_type;
         return {
             .name_or_path = name_or_path.Clone(a, CloneType::Shallow),
@@ -45,9 +51,9 @@ struct StateSnapshotMetadata {
     String name_or_path;
 };
 
-struct StateSnapshotWithMetadata {
+struct StateSnapshotWithName {
     StateSnapshot state;
-    StateSnapshotMetadata metadata;
+    StateSnapshotName name;
 };
 
 [[maybe_unused]] static auto PrintInstrumentId(InstrumentId id) {
@@ -116,5 +122,25 @@ PUBLIC void AssignDiffDescription(dyn::DynArray auto& diff_desc,
                             new_state.param_learned_ccs[param_index].Get(cc));
             }
         }
+    }
+
+    if (old_state.metadata.author != new_state.metadata.author)
+        fmt::Append(diff_desc,
+                    "Author changed: {} vs {}\n"_s,
+                    old_state.metadata.author,
+                    new_state.metadata.author);
+
+    if (old_state.metadata.description != new_state.metadata.description)
+        fmt::Append(diff_desc,
+                    "Description changed: {} vs {}\n"_s,
+                    old_state.metadata.description,
+                    new_state.metadata.description);
+
+    if (old_state.metadata.tags != new_state.metadata.tags) {
+        fmt::Append(diff_desc, "Tags changed:\n"_s);
+        for (auto const& tag : old_state.metadata.tags)
+            fmt::Append(diff_desc, "  - {}\n"_s, tag);
+        for (auto const& tag : new_state.metadata.tags)
+            fmt::Append(diff_desc, "  + {}\n"_s, tag);
     }
 }

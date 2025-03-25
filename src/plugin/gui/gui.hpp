@@ -13,6 +13,7 @@
 #include "gui/gui2_ir_picker_state.hpp"
 #include "gui/gui2_notifications.hpp"
 #include "gui/gui2_prefs_panel_state.hpp"
+#include "gui/gui2_save_preset_panel.hpp"
 #include "gui/gui_library_images.hpp"
 #include "gui/gui_modal_windows.hpp"
 #include "gui_editor_widgets.hpp"
@@ -128,6 +129,7 @@ struct Gui {
     FilePickerState file_picker_state {.data = FilePickerStateType::None};
     InstPickerState inst_picker_state {};
     IrPickerState ir_picker_state {};
+    SavePresetPanelState save_preset_panel_state {};
 
     GuiFrameInput& frame_input;
     GuiFrameResult frame_output;

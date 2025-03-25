@@ -34,6 +34,7 @@ struct InstPickerContext {
     sample_lib::Library const* hovering_lib {};
     Optional<WaveformType> waveform_type_hovering {};
     bool has_mirage_libraries {};
+    Optional<Set<String>> all_tags {};
 };
 
 struct InstrumentCursor {
@@ -640,23 +641,30 @@ static void InstPickerFilters(GuiBoxSystem& box_system, InstPickerContext& conte
     }
 
     if (state.tab == InstPickerState::Tab::FloeLibaries) {
+        if (!context.all_tags) {
+            DynamicSet<String> all_tags {box_system.arena};
+            for (auto const& l_ptr : context.libraries) {
+                auto const& lib = *l_ptr;
+                for (auto const& inst : lib.sorted_instruments)
+                    for (auto const& tag : inst->tags)
+                        all_tags.Insert(tag);
+            }
+            context.all_tags = all_tags.ToOwnedSet();
+        }
+
         auto const section = FilterButtonSection(box_system, root, "TAGS");
-        for (auto const& l_ptr : context.libraries) {
-            auto const& lib = *l_ptr;
+        for (auto const element : context.all_tags->Elements()) {
+            if (!element.active) continue;
 
-            if (lib.insts_by_name.size == 0) continue;
+            auto const tag = element.key;
+            auto const tag_hash = element.hash;
 
-            for (auto const& inst : lib.sorted_instruments) {
-                for (auto const& tag : inst->tags) {
-                    auto const tag_hash = Hash(tag);
-                    auto const is_selected = Contains(state.selected_tags_hashes, tag_hash);
-                    if (FilterButton(box_system, section, is_selected, {}, tag).button_fired) {
-                        if (is_selected)
-                            dyn::RemoveValue(state.selected_tags_hashes, tag_hash);
-                        else
-                            dyn::Append(state.selected_tags_hashes, tag_hash);
-                    }
-                }
+            auto const is_selected = Contains(state.selected_tags_hashes, tag_hash);
+            if (FilterButton(box_system, section, is_selected, {}, tag).button_fired) {
+                if (is_selected)
+                    dyn::RemoveValue(state.selected_tags_hashes, tag_hash);
+                else
+                    dyn::Append(state.selected_tags_hashes, tag_hash);
             }
         }
     }

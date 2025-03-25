@@ -18,7 +18,18 @@
             "program": "tests",
             "args": [
                 "--log-level=debug",
-                "--filter=*"
+                "--filter=*",
+                "--repeats=1"
+            ]
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "VST3 val",
+            "runInTerminal": true,
+            "program": "VST3-Validator",
+            "args": [
+                "zig-out/x86_64-linux/Floe.vst3"
             ]
         },
         {

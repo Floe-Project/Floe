@@ -23,17 +23,6 @@ struct ModalHeaderConfig {
     TrivialFunctionRef<void()> on_close;
 };
 
-struct ModalTabConfig {
-    String icon;
-    String text;
-};
-
-struct ModalTabBarConfig {
-    Box parent;
-    Span<ModalTabConfig const> tabs;
-    u32& current_tab_index;
-};
-
 // Creates a standard panel header with title and close button
 PUBLIC Box DoModalHeader(GuiBoxSystem& box_system, ModalHeaderConfig const& config) {
     ASSERT(config.title.size);
@@ -75,28 +64,44 @@ PUBLIC Box DoModalHeader(GuiBoxSystem& box_system, ModalHeaderConfig const& conf
     return title_container;
 }
 
-// Creates a horizontal divider line
-static Box DoModalDivider(GuiBoxSystem& box_system, Box parent) {
+enum class DividerType { Horizontal, Vertical };
+PUBLIC Box DoModalDivider(GuiBoxSystem& box_system, Box parent, DividerType type) {
+    auto const one_pixel = box_system.imgui.PixelsToVw(1);
     return DoBox(box_system,
                  {
                      .parent = parent,
                      .background_fill = style::Colour::Surface2,
                      .layout {
-                         .size = {layout::k_fill_parent, box_system.imgui.PixelsToVw(1)},
+                         .size = type == DividerType::Horizontal ? f32x2 {layout::k_fill_parent, one_pixel}
+                                                                 : f32x2 {one_pixel, layout::k_fill_parent},
                      },
                  });
 }
 
+struct ModalTabConfig {
+    Optional<String> icon;
+    String text;
+};
+
+struct ModalTabBarConfig {
+    Box parent;
+    Span<ModalTabConfig const> tabs;
+    u32& current_tab_index;
+};
+
 // Creates a tab bar with configurable tabs
 PUBLIC Box DoModalTabBar(GuiBoxSystem& box_system, ModalTabBarConfig const& config) {
+    constexpr auto k_tab_border = 4;
     auto const tab_container = DoBox(box_system,
                                      {
                                          .parent = config.parent,
                                          .background_fill = style::Colour::Background1,
                                          .layout {
                                              .size = {layout::k_fill_parent, layout::k_hug_contents},
+                                             .contents_padding = {.lr = k_tab_border, .t = k_tab_border},
                                              .contents_direction = layout::Direction::Row,
                                              .contents_align = layout::Alignment::Start,
+                                             .contents_cross_axis_align = layout::CrossAxisAlign::Start,
                                          },
                                      });
 
@@ -107,12 +112,13 @@ PUBLIC Box DoModalTabBar(GuiBoxSystem& box_system, ModalTabBarConfig const& conf
             box_system,
             {
                 .parent = tab_container,
+                .background_fill = is_current ? style::Colour::Background0 : style::Colour::None,
                 .background_fill_auto_hot_active_overlay = true,
-                .round_background_corners = 0b1111,
+                .round_background_corners = 0b1100,
                 .activate_on_click_button = MouseButton::Left,
                 .activation_click_event = !is_current ? ActivationClickEvent::Up : ActivationClickEvent::None,
                 .layout {
-                    .size = {layout::k_hug_contents, layout::k_hug_contents},
+                    .size = layout::k_hug_contents,
                     .contents_padding = {.lr = style::k_spacing, .tb = 4},
                     .contents_gap = 5,
                     .contents_direction = layout::Direction::Row,
@@ -121,14 +127,17 @@ PUBLIC Box DoModalTabBar(GuiBoxSystem& box_system, ModalTabBarConfig const& conf
 
         if (tab_box.button_fired) config.current_tab_index = i;
 
-        DoBox(box_system,
-              {
-                  .parent = tab_box,
-                  .text = tab.icon,
-                  .font = FontType::Icons,
-                  .text_fill = is_current ? style::Colour::Subtext0 : style::Colour::Surface2,
-                  .size_from_text = true,
-              });
+        if (tab.icon) {
+            DoBox(box_system,
+                  {
+                      .parent = tab_box,
+                      .text = *tab.icon,
+                      .font = FontType::Icons,
+                      .text_fill = is_current ? style::Colour::Subtext0 : style::Colour::Surface2,
+                      .size_from_text = true,
+                  });
+        }
+
         DoBox(box_system,
               {
                   .parent = tab_box,
@@ -159,16 +168,12 @@ PUBLIC Box DoModal(GuiBoxSystem& box_system, ModalConfig const& config) {
                       .on_close = config.on_close,
                   });
 
-    DoModalDivider(box_system, root);
-
     DoModalTabBar(box_system,
                   {
                       .parent = root,
                       .tabs = config.tabs,
                       .current_tab_index = config.current_tab_index,
                   });
-
-    DoModalDivider(box_system, root);
 
     return root;
 }

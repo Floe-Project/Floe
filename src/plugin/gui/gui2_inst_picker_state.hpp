@@ -7,7 +7,7 @@
 #include "common_infrastructure/sample_library/sample_library.hpp"
 
 struct InstPickerState {
-    enum class Tab : u8 {
+    enum class Tab : u32 {
         FloeLibaries,
         MirageLibraries,
         Waveforms,

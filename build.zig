@@ -1917,6 +1917,7 @@ pub fn build(b: *std.Build) void {
                     plugin_path ++ "/engine/package_installation.cpp",
                     plugin_path ++ "/engine/shared_engine_systems.cpp",
                     plugin_path ++ "/gui/gui.cpp",
+                    plugin_path ++ "/gui/gui2_inst_picker.cpp",
                     plugin_path ++ "/gui/gui_bot_panel.cpp",
                     plugin_path ++ "/gui/gui_button_widgets.cpp",
                     plugin_path ++ "/gui/gui_dragger_widgets.cpp",

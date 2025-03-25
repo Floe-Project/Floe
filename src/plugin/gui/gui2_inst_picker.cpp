@@ -79,7 +79,8 @@ static Optional<InstrumentCursor> IterateInstrument(InstPickerContext const& con
                                       !ContainsCaseInsensitiveAscii(inst.folder.ValueOr({}), state.search)))
                 continue;
 
-            if (state.selected_tags_hashes.size) {
+            if ((!picker_gui_is_open || state.tab == InstPickerState::Tab::FloeLibaries) &&
+                state.selected_tags_hashes.size) {
                 bool found = false;
                 for (auto const tag : inst.tags) {
                     auto const tag_hash = Hash(tag);
@@ -389,447 +390,204 @@ static void InstPickerItems(GuiBoxSystem& box_system, InstPickerContext& context
     }
 }
 
-static void InstPickerFilters(GuiBoxSystem& box_system, InstPickerContext& context, InstPickerState& state) {
-    if (state.tab == InstPickerState::Tab::Waveforms) return;
-
-    auto const root = DoPickerItemsRoot(box_system);
-
-    {
-        auto const section = DoPickerItemsSectionContainer(box_system,
-                                                           {
-                                                               .parent = root,
-                                                               .heading = "LIBRARIES"_s,
-                                                               .multiline_contents = true,
-                                                           });
-
-        for (auto const& l_ptr : context.libraries) {
-            auto const& lib = *l_ptr;
-
-            if (lib.insts_by_name.size == 0) continue;
-            if (lib.file_format_specifics.tag != state.FileFormatForCurrentTab()) continue;
-
-            auto const lib_id_hash = lib.Id().Hash();
-            auto& hashes = state.tab == InstPickerState::Tab::FloeLibaries
-                               ? state.selected_library_hashes
-                               : state.selected_mirage_library_hashes;
-            auto const is_selected = Contains(hashes, lib_id_hash);
-
-            auto const button = DoFilterButton(
-                box_system,
-                section,
-                is_selected,
-                LibraryImagesFromLibraryId(context.library_images,
-                                           box_system.imgui,
-                                           lib.Id(),
-                                           context.sample_library_server,
-                                           box_system.arena)
-                    .AndThen([&](LibraryImages const& imgs) {
-                        return box_system.imgui.frame_input.graphics_ctx->GetTextureFromImage(imgs.icon);
-                    }),
-                lib.name);
-            if (button.is_hot) context.hovering_lib = &lib;
-            if (button.button_fired) {
-                if (is_selected)
-                    dyn::RemoveValue(hashes, lib_id_hash);
-                else
-                    dyn::Append(hashes, lib_id_hash);
-            }
-        }
-    }
-
-    if (state.tab == InstPickerState::Tab::FloeLibaries) {
-        if (!context.all_tags) {
-            DynamicSet<String> all_tags {box_system.arena};
-            for (auto const& l_ptr : context.libraries) {
-                auto const& lib = *l_ptr;
-                for (auto const& inst : lib.sorted_instruments)
-                    for (auto const& tag : inst->tags)
-                        all_tags.Insert(tag);
-            }
-            context.all_tags = all_tags.ToOwnedSet();
-        }
-
-        auto const section = DoPickerItemsSectionContainer(box_system,
-                                                           {
-                                                               .parent = root,
-                                                               .heading = "TAGS",
-                                                               .multiline_contents = true,
-                                                           });
-        for (auto const element : context.all_tags->Elements()) {
-            if (!element.active) continue;
-
-            auto const tag = element.key;
-            auto const tag_hash = element.hash;
-
-            auto const is_selected = Contains(state.selected_tags_hashes, tag_hash);
-            if (DoFilterButton(box_system, section, is_selected, {}, tag).button_fired) {
-                if (is_selected)
-                    dyn::RemoveValue(state.selected_tags_hashes, tag_hash);
-                else
-                    dyn::Append(state.selected_tags_hashes, tag_hash);
-            }
-        }
-    }
-}
-
-static void InstPickerPopup(GuiBoxSystem& box_system, InstPickerContext& context, InstPickerState& state) {
-    auto const root = DoBox(
-        box_system,
-        {
-            .layout {
-                .size = {layout::k_hug_contents,
-                         box_system.imgui.PixelsToVw(box_system.imgui.frame_input.window_size.height * 0.9f)},
-                .contents_direction = layout::Direction::Column,
-                .contents_align = layout::Alignment::Start,
-            },
-        });
-
-    DoBox(box_system,
-          {
-              .parent = root,
-              .text = fmt::Format(box_system.arena, "Layer {} Instrument", context.layer.index + 1),
-              .font = FontType::Heading2,
-              .size_from_text = true,
-              .layout {
-                  .margins = {.lrtb = k_picker_spacing},
-              },
-          });
-
-    {
-        DynamicArrayBounded<ModalTabConfig, 3> tab_config {};
-        dyn::Append(tab_config,
-                    {
-                        .text = context.has_mirage_libraries ? "Floe Instruments"_s : "Instruments",
-                    });
-        if (context.has_mirage_libraries) dyn::Append(tab_config, {.text = "Mirage Instruments"});
-        dyn::Append(tab_config, {.text = "Waveforms"});
-
-        DoModalTabBar(box_system,
-                      {
-                          .parent = root,
-                          .tabs = tab_config,
-                          .current_tab_index = ToIntRef(state.tab),
-                      });
-    }
-
-    constexpr auto k_instrument_list_width = 200.0f;
-    constexpr auto k_filter_list_width = 200.0f;
-
-    {
-        auto const headings_row = DoBox(box_system,
-                                        {
-                                            .parent = root,
-                                            .layout {
-                                                .size = {layout::k_fill_parent, layout::k_hug_contents},
-                                                .contents_direction = layout::Direction::Row,
-                                                .contents_align = layout::Alignment::Start,
-                                            },
-                                        });
-
-        {
-            auto const instruments_top =
-                DoBox(box_system,
-                      {
-                          .parent = headings_row,
-                          .layout {
-                              .size = {k_instrument_list_width, layout::k_hug_contents},
-                              .contents_padding = {.lr = k_picker_spacing, .tb = k_picker_spacing / 2},
-                              .contents_align = layout::Alignment::Start,
-                              .contents_cross_axis_align = layout::CrossAxisAlign::Middle,
-                          },
-                      });
-
-            DoBox(box_system,
-                  {
-                      .parent = instruments_top,
-                      .text = "Instruments",
-                      .font = FontType::Heading2,
-                      .layout {
-                          .size = {layout::k_fill_parent, style::k_font_heading2_size},
-                      },
-                  });
-
-            if (IconButton(box_system,
-                           instruments_top,
-                           ICON_FA_CARET_LEFT,
-                           "Load previous instrument",
-                           style::k_font_heading2_size,
-                           style::k_font_heading2_size)
-                    .button_fired) {
-                dyn::Append(box_system.state->deferred_actions, [&]() {
-                    LoadAdjacentInstrument(context, state, IterateInstrumentDirection::Backward, true);
-                });
-            }
-
-            if (IconButton(box_system,
-                           instruments_top,
-                           ICON_FA_CARET_RIGHT,
-                           "Load next instrument",
-                           style::k_font_heading2_size,
-                           style::k_font_heading2_size)
-                    .button_fired) {
-                dyn::Append(box_system.state->deferred_actions, [&]() {
-                    LoadAdjacentInstrument(context, state, IterateInstrumentDirection::Forward, true);
-                });
-            }
-
-            if (IconButton(box_system,
-                           instruments_top,
-                           ICON_FA_RANDOM,
-                           "Load random instrument",
-                           style::k_font_heading2_size * 0.8f,
-                           style::k_font_heading2_size)
-                    .button_fired) {
-                dyn::Append(box_system.state->deferred_actions,
-                            [&]() { LoadRandomInstrument(context, state, true); });
-            }
-
-            if (context.layer.instrument_id.tag != InstrumentType::None) {
-                if (IconButton(box_system,
-                               instruments_top,
-                               ICON_FA_LOCATION_ARROW,
-                               "Scroll to current instrument",
-                               style::k_font_heading2_size * 0.7f,
-                               style::k_font_heading2_size)
-                        .button_fired) {
-                    dyn::Append(box_system.state->deferred_actions,
-                                [&]() { state.scroll_to_show_selected = true; });
-                }
-            }
-        }
-
-        DoModalDivider(box_system, headings_row, DividerType::Vertical);
-
-        {
-            auto const filters_top =
-                DoBox(box_system,
-                      {
-                          .parent = headings_row,
-                          .layout {
-                              .size = {k_filter_list_width, layout::k_hug_contents},
-                              .contents_padding = {.lr = k_picker_spacing, .tb = k_picker_spacing / 2},
-                              .contents_align = layout::Alignment::Start,
-                              .contents_cross_axis_align = layout::CrossAxisAlign::Middle,
-                          },
-                      });
-
-            DoBox(box_system,
-                  {
-                      .parent = filters_top,
-                      .text = "Filters",
-                      .font = FontType::Heading2,
-                      .layout {
-                          .size = {layout::k_fill_parent, style::k_font_heading2_size},
-                      },
-                  });
-
-            if (state.HasFilters()) {
-                if (IconButton(box_system,
-                               filters_top,
-                               ICON_FA_TIMES,
-                               "Clear all filters.",
-                               style::k_font_heading2_size * 0.9f,
-                               style::k_font_heading2_size)
-                        .button_fired) {
-                    dyn::Append(box_system.state->deferred_actions, [&]() { state.ClearAllFilters(); });
-                }
-            }
-        }
-    }
-
-    DoModalDivider(box_system, root, DividerType::Horizontal);
-
-    auto const main_section = DoBox(box_system,
-                                    {
-                                        .parent = root,
-                                        .layout {
-                                            .size = {layout::k_hug_contents, layout::k_fill_parent},
-                                            .contents_direction = layout::Direction::Row,
-                                            .contents_align = layout::Alignment::Start,
-                                        },
-                                    });
-
-    {
-        auto const lhs = DoBox(box_system,
-                               {
-                                   .parent = main_section,
-                                   .layout {
-                                       .size = {200, layout::k_fill_parent},
-                                       .contents_padding = {.lr = k_picker_spacing, .t = k_picker_spacing},
-                                       .contents_gap = k_picker_spacing,
-                                       .contents_direction = layout::Direction::Column,
-                                       .contents_align = layout::Alignment::Start,
-                                       .contents_cross_axis_align = layout::CrossAxisAlign::Start,
-                                   },
-                               });
-
-        {
-            if (context.layer.instrument_id.tag != InstrumentType::None) {
-                if (TextButton(box_system,
-                               lhs,
-                               fmt::Format(box_system.arena, "Unload {}", context.layer.InstName()),
-                               "Unload the current instrument.",
-                               true)) {
-                    LoadInstrument(context.engine, context.layer.index, InstrumentType::None);
-                    box_system.imgui.CloseCurrentPopup();
-                }
-            }
-
-            {
-                auto const search_box =
-                    DoBox(box_system,
-                          {
-                              .parent = lhs,
-                              .background_fill = style::Colour::Background2,
-                              .round_background_corners = 0b1111,
-                              .layout {
-                                  .size = {layout::k_fill_parent, layout::k_hug_contents},
-                                  .contents_padding = {.lr = k_picker_spacing / 2},
-                                  .contents_direction = layout::Direction::Row,
-                                  .contents_align = layout::Alignment::Start,
-                                  .contents_cross_axis_align = layout::CrossAxisAlign::Middle,
-                              },
-                          });
-
-                DoBox(box_system,
-                      {
-                          .parent = search_box,
-                          .text = ICON_FA_SEARCH,
-                          .font_size = k_picker_item_height * 0.9f,
-                          .font = FontType::Icons,
-                          .text_fill = style::Colour::Subtext0,
-                          .size_from_text = true,
-                      });
-
-                auto const initial_size = state.search.size;
-
-                if (auto const text_input =
-                        DoBox(box_system,
-                              {
-                                  .parent = search_box,
-                                  .text = state.search,
-                                  .text_input_box = TextInputBox::SingleLine,
-                                  .text_input_cursor = style::Colour::Text,
-                                  .text_input_selection = style::Colour::Highlight,
-                                  .layout {
-                                      .size = {layout::k_fill_parent, k_picker_item_height},
-                                  },
-                              });
-                    text_input.text_input_result && text_input.text_input_result->buffer_changed) {
-                    dyn::Assign(state.search, text_input.text_input_result->text);
-                }
-
-                if (initial_size) {
-                    if (DoBox(box_system,
-                              {
-                                  .parent = search_box,
-                                  .text = ICON_FA_TIMES,
-                                  .font_size = k_picker_item_height * 0.9f,
-                                  .font = FontType::Icons,
-                                  .text_fill = style::Colour::Subtext0,
-                                  .size_from_text = true,
-                                  .background_fill_auto_hot_active_overlay = true,
-                                  .activate_on_click_button = MouseButton::Left,
-                                  .activation_click_event = ActivationClickEvent::Up,
-                              })
-                            .button_fired) {
-                        dyn::Clear(state.search);
-                    }
-                }
-            }
-        }
-
-        AddPanel(box_system,
-                 {
-                     .run = [&context, &state](
-                                GuiBoxSystem& box_system) { InstPickerItems(box_system, context, state); },
-                     .data =
-                         Subpanel {
-                             .id = DoBox(box_system,
-                                         {
-                                             .parent = lhs,
-                                             .layout {
-                                                 .size = layout::k_fill_parent,
-                                             },
-                                         })
-                                       .layout_id,
-                             .imgui_id = (imgui::Id)SourceLocationHash(),
-                             .debug_name = "items",
-                         },
-                 });
-    }
-
-    DoModalDivider(box_system, main_section, DividerType::Vertical);
-
-    {
-        auto const rhs = DoBox(box_system,
-                               {
-                                   .parent = main_section,
-                                   .layout {
-                                       .size = {200, layout::k_fill_parent},
-                                       .contents_padding = {.lr = k_picker_spacing, .t = k_picker_spacing},
-                                       .contents_direction = layout::Direction::Column,
-                                       .contents_align = layout::Alignment::Start,
-                                   },
-                               });
-
-        AddPanel(box_system,
-                 {
-                     .run = [&context, &state](
-                                GuiBoxSystem& box_system) { InstPickerFilters(box_system, context, state); },
-                     .data =
-                         Subpanel {
-                             .id = DoBox(box_system,
-                                         {
-                                             .parent = rhs,
-                                             .layout {
-                                                 .size = layout::k_fill_parent,
-                                             },
-                                         })
-                                       .layout_id,
-                             .imgui_id = (imgui::Id)SourceLocationHash(),
-                             .debug_name = "filters",
-                         },
-                 });
-    }
-
-    DoModalDivider(box_system, root, DividerType::Horizontal);
-
-    AddPanel(box_system,
-             {
-                 .run = [&context, &state](
-                            GuiBoxSystem& box_system) { InstPickerStatusBar(box_system, context, state); },
-                 .data =
-                     Subpanel {
-                         .id = DoBox(box_system,
-                                     {
-                                         .parent = root,
-                                         .layout {
-                                             .size = {layout::k_fill_parent, 50},
-                                             .contents_direction = layout::Direction::Column,
-                                             .contents_align = layout::Alignment::Start,
-                                         },
-                                     })
-                                   .layout_id,
-                         .imgui_id = (imgui::Id)SourceLocationHash(),
-                         .debug_name = "status bar",
-                     },
-             });
-}
+// static void InstPickerFilters(GuiBoxSystem& box_system, InstPickerContext& context, InstPickerState& state)
+// {
+//     if (state.tab == InstPickerState::Tab::Waveforms) return;
+//
+//     auto const root = DoPickerItemsRoot(box_system);
+//
+//     DoPickerFilters(box_system,
+//                     {
+//                         .parent = root,
+//                         .libraries = context.libraries,
+//
+//                         .selected_library_hashes = state.tab == InstPickerState::Tab::FloeLibaries
+//                                                        ? state.selected_library_hashes
+//                                                        : state.selected_mirage_library_hashes,
+//                         .hovering_library = context.hovering_lib,
+//                         .library_images = context.library_images,
+//                         .sample_library_server = context.sample_library_server,
+//                         .skip_library =
+//                             [&](sample_lib::Library const& lib) {
+//                                 return lib.file_format_specifics.tag != state.FileFormatForCurrentTab();
+//                             },
+//
+//                         .tags_filters = ({
+//                             Optional<PickerFiltersOptions::TagsFilters> tags_filters {};
+//                             if (state.tab == InstPickerState::Tab::FloeLibaries) {
+//                                 tags_filters = PickerFiltersOptions::TagsFilters {
+//                                     .selected_tags_hashes = state.selected_tags_hashes,
+//                                     .tags_cache = context.all_tags,
+//                                 };
+//                             }
+//                             tags_filters;
+//                         }),
+//                     });
+// }
 
 void DoInstPickerPopup(GuiBoxSystem& box_system,
                        imgui::Id popup_id,
                        Rect absolute_button_rect,
                        InstPickerContext& context,
                        InstPickerState& state) {
-    RunPanel(box_system,
-             Panel {
-                 .run = [&context,
-                         &state](GuiBoxSystem& box_system) { InstPickerPopup(box_system, context, state); },
-                 .data =
-                     PopupPanel {
-                         .creator_absolute_rect = absolute_button_rect,
-                         .popup_imgui_id = popup_id,
-                     },
-             });
+
+    if (!context.all_tags) {
+        DynamicSet<String> all_tags {box_system.arena};
+        for (auto const& l_ptr : context.libraries) {
+            auto const& lib = *l_ptr;
+            for (auto const& inst : lib.sorted_instruments)
+                for (auto const& tag : inst->tags)
+                    all_tags.Insert(tag);
+        }
+        context.all_tags = all_tags.ToOwnedSet();
+    }
+
+    // IMPORTANT: we create the options struct inside the call so that lambdas and values from
+    // statement-expressions live long enough.
+    DoPickerPopup(
+        box_system,
+        popup_id,
+        absolute_button_rect,
+        PickerPopupOptions {
+            .title = fmt::Format(box_system.arena, "Layer {} Instrument", context.layer.index + 1),
+            .height = box_system.imgui.PixelsToVw(box_system.imgui.frame_input.window_size.height * 0.9f),
+            .tab_config = ({
+                DynamicArrayBounded<ModalTabConfig, 3> tab_config {};
+                dyn::Append(tab_config,
+                            {
+                                .text = context.has_mirage_libraries ? "Floe Instruments"_s : "Instruments",
+                            });
+                if (context.has_mirage_libraries) dyn::Append(tab_config, {.text = "Mirage Instruments"});
+                dyn::Append(tab_config, {.text = "Waveforms"});
+                tab_config;
+            }),
+            .current_tab_index = ToIntRef(state.tab),
+            .lhs =
+                {
+                    .title = "Instruments",
+                    .width = 200,
+                    .icon_buttons = ({
+                        DynamicArrayBounded<PickerPopupOptions::Button, 4> icon_buttons;
+                        if (context.layer.instrument_id.tag != InstrumentType::None) {
+                            dyn::Append(icon_buttons,
+                                        {
+                                            .text = ICON_FA_LOCATION_ARROW,
+                                            .tooltip = "Scroll to current instrument",
+                                            .icon_scaling = 0.7f,
+                                            .on_fired = [&]() { state.scroll_to_show_selected = true; },
+                                        });
+                        }
+                        dyn::AppendSpan(
+                            icon_buttons,
+                            ArrayT<PickerPopupOptions::Button>(
+                                {{
+                                     .text = ICON_FA_CARET_LEFT,
+                                     .tooltip = "Load previous instrument",
+                                     .icon_scaling = 1.0f,
+                                     .on_fired =
+                                         [&]() {
+                                             LoadAdjacentInstrument(context,
+                                                                    state,
+                                                                    IterateInstrumentDirection::Backward,
+                                                                    true);
+                                         },
+                                 },
+                                 {
+                                     .text = ICON_FA_CARET_RIGHT,
+                                     .tooltip = "Load next instrument",
+                                     .icon_scaling = 1.0f,
+                                     .on_fired =
+                                         [&]() {
+                                             LoadAdjacentInstrument(context,
+                                                                    state,
+                                                                    IterateInstrumentDirection::Forward,
+                                                                    true);
+                                         },
+                                 },
+                                 {
+                                     .text = ICON_FA_RANDOM,
+                                     .tooltip = "Load random instrument",
+                                     .icon_scaling = 0.8f,
+                                     .on_fired = [&]() { LoadRandomInstrument(context, state, true); },
+                                 }
+
+                                }));
+                        icon_buttons;
+                    }),
+                },
+            .filters_col =
+                {
+                    .title = "Filters",
+                    .width = 200,
+                    .icon_buttons = ({
+                        DynamicArrayBounded<PickerPopupOptions::Button, 1> icon_buttons {};
+                        if (state.HasFilters()) {
+                            dyn::Append(icon_buttons,
+                                        {
+                                            .text = ICON_FA_TIMES,
+                                            .tooltip = "Clear all filters",
+                                            .icon_scaling = 0.9f,
+                                            .on_fired = [&]() { state.ClearAllFilters(); },
+                                        });
+                        }
+                        icon_buttons;
+                    }),
+                },
+            .lhs_top_button = ({
+                Optional<PickerPopupOptions::Button> unload_button {};
+                if (context.layer.instrument_id.tag != InstrumentType::None) {
+                    unload_button = PickerPopupOptions::Button {
+                        .text = fmt::Format(box_system.arena, "Unload {}", context.layer.InstName()),
+                        .tooltip = "Unload the current instrument.",
+                        .on_fired =
+                            [&]() {
+                                LoadInstrument(context.engine, context.layer.index, InstrumentType::None);
+                                box_system.imgui.CloseCurrentPopup();
+                            },
+                    };
+                }
+                unload_button;
+            }),
+            .lhs_search =
+                PickerPopupOptions::SearchBar {
+                    .text = state.search,
+                    .on_change = [&](String str) { dyn::Assign(state.search, str); },
+                    .on_clear = [&]() { dyn::Clear(state.search); },
+                },
+            .lhs_do_items = [&](GuiBoxSystem& box_system) { InstPickerItems(box_system, context, state); },
+            .libraries = context.libraries,
+            .library_filters = ({
+                Optional<LibraryFilters> f {};
+                if (state.tab != InstPickerState::Tab::Waveforms) {
+                    f = LibraryFilters {
+                        .selected_library_hashes = state.tab == InstPickerState::Tab::FloeLibaries
+                                                       ? state.selected_library_hashes
+                                                       : state.selected_mirage_library_hashes,
+                        .hovering_library = context.hovering_lib,
+                        .library_images = context.library_images,
+                        .sample_library_server = context.sample_library_server,
+                        .skip_library =
+                            [&](sample_lib::Library const& lib) {
+                                if (lib.sorted_instruments.size == 0) return true;
+                                if (state.tab == InstPickerState::Tab::Waveforms) return true;
+                                return lib.file_format_specifics.tag != state.FileFormatForCurrentTab();
+                            },
+                    };
+                }
+                f;
+            }),
+            .tags_filters = ({
+                Optional<TagsFilters> f {};
+                if (state.tab == InstPickerState::Tab::FloeLibaries) {
+                    f = TagsFilters {
+                        .selected_tags_hashes = state.selected_tags_hashes,
+                        .tags = *context.all_tags,
+                    };
+                }
+                f;
+            }),
+            .status_bar_height = 50,
+            .on_status_bar =
+                [&](GuiBoxSystem& box_system) { InstPickerStatusBar(box_system, context, state); },
+        });
 }

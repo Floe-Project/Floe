@@ -125,7 +125,8 @@ PUBLIC Box DoModalTabBar(GuiBoxSystem& box_system, ModalTabBarConfig const& conf
                 },
             });
 
-        if (tab_box.button_fired) config.current_tab_index = i;
+        if (tab_box.button_fired)
+            dyn::Append(box_system.state->deferred_actions, [&config, i]() { config.current_tab_index = i; });
 
         if (tab.icon) {
             DoBox(box_system,

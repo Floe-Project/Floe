@@ -4,7 +4,9 @@
 #pragma once
 
 #include "gui/gui2_common_modal_panel.hpp"
+#include "gui/gui_library_images.hpp"
 #include "gui_framework/gui_box_system.hpp"
+#include "sample_lib_server/sample_library_server.hpp"
 
 constexpr auto k_picker_item_height = 20.0f;
 constexpr auto k_picker_spacing = 8.0f;
@@ -132,7 +134,7 @@ struct PickerItemsSectionOptions {
     bool multiline_contents;
 };
 
-PUBLIC Box DoPickerItemsSectionContainer(GuiBoxSystem& box_system, PickerItemsSectionOptions const& options) {
+static Box DoPickerItemsSectionContainer(GuiBoxSystem& box_system, PickerItemsSectionOptions const& options) {
     auto const container = DoBox(box_system,
                                  {
                                      .parent = options.parent,
@@ -184,6 +186,88 @@ PUBLIC Box DoPickerItemsSectionContainer(GuiBoxSystem& box_system, PickerItemsSe
                  });
 }
 
+struct TagsFilters {
+    DynamicArray<u64>& selected_tags_hashes;
+    Set<String> tags;
+};
+
+struct LibraryFilters {
+    DynamicArray<u64>& selected_library_hashes;
+    sample_lib::Library const*& hovering_library;
+    LibraryImagesArray& library_images;
+    sample_lib_server::Server& sample_library_server;
+    FunctionRef<bool(sample_lib::Library const&)> skip_library; // optional
+};
+
+PUBLIC void DoPickerLibraryFilters(GuiBoxSystem& box_system,
+                                   Box const& parent,
+                                   Span<sample_lib_server::RefCounted<sample_lib::Library>> libraries,
+                                   LibraryFilters const& library_filters) {
+
+    auto const section = DoPickerItemsSectionContainer(box_system,
+                                                       {
+                                                           .parent = parent,
+                                                           .heading = "LIBRARIES"_s,
+                                                           .multiline_contents = true,
+                                                       });
+
+    for (auto const& l_ptr : libraries) {
+        auto const& lib = *l_ptr;
+
+        if (library_filters.skip_library && library_filters.skip_library(lib)) continue;
+
+        auto const lib_id_hash = lib.Id().Hash();
+        auto const is_selected = Contains(library_filters.selected_library_hashes, lib_id_hash);
+
+        auto const button = DoFilterButton(
+            box_system,
+            section,
+            is_selected,
+            LibraryImagesFromLibraryId(library_filters.library_images,
+                                       box_system.imgui,
+                                       lib.Id(),
+                                       library_filters.sample_library_server,
+                                       box_system.arena)
+                .AndThen([&](LibraryImages const& imgs) {
+                    return box_system.imgui.frame_input.graphics_ctx->GetTextureFromImage(imgs.icon);
+                }),
+            lib.name);
+        if (button.is_hot) library_filters.hovering_library = &lib;
+        if (button.button_fired) {
+            if (is_selected)
+                dyn::RemoveValue(library_filters.selected_library_hashes, lib_id_hash);
+            else
+                dyn::Append(library_filters.selected_library_hashes, lib_id_hash);
+        }
+    }
+}
+
+PUBLIC void
+DoPickerTagsFilters(GuiBoxSystem& box_system, Box const& parent, TagsFilters const& tags_filters) {
+    auto const section = DoPickerItemsSectionContainer(box_system,
+                                                       {
+                                                           .parent = parent,
+                                                           .heading = "TAGS",
+                                                           .multiline_contents = true,
+                                                       });
+    for (auto const element : tags_filters.tags.Elements()) {
+        if (!element.active) continue;
+
+        auto const tag = element.key;
+        auto const tag_hash = element.hash;
+
+        auto const is_selected = Contains(tags_filters.selected_tags_hashes, tag_hash);
+        if (DoFilterButton(box_system, section, is_selected, {}, tag).button_fired) {
+            if (is_selected)
+                dyn::RemoveValue(tags_filters.selected_tags_hashes, tag_hash);
+            else
+                dyn::Append(tags_filters.selected_tags_hashes, tag_hash);
+        }
+    }
+}
+
+// IMPORTANT: we use FunctionRefs here, you need to make sure the lifetime of the functions outlives the
+// options.
 struct PickerPopupOptions {
     struct Button {
         String text {};
@@ -194,7 +278,7 @@ struct PickerPopupOptions {
 
     struct SearchBar {
         String text {};
-        FunctionRef<void(imgui::TextInputResult const&)> on_change {};
+        FunctionRef<void(String)> on_change {};
         FunctionRef<void()> on_clear {};
     };
 
@@ -202,7 +286,6 @@ struct PickerPopupOptions {
         String title {};
         f32 width {};
         Span<Button const> icon_buttons {};
-        FunctionRef<void(GuiBoxSystem&)> do_items {};
     };
 
     String title {};
@@ -212,10 +295,15 @@ struct PickerPopupOptions {
     u32& current_tab_index;
 
     Column lhs {};
-    Column rhs {};
+    Column filters_col {};
 
     Optional<Button> lhs_top_button {};
     Optional<SearchBar> lhs_search {};
+    FunctionRef<void(GuiBoxSystem&)> lhs_do_items {};
+
+    Span<sample_lib_server::RefCounted<sample_lib::Library>> libraries;
+    Optional<LibraryFilters> library_filters;
+    Optional<TagsFilters> tags_filters;
 
     f32 status_bar_height {};
     FunctionRef<void(GuiBoxSystem&)> on_status_bar {};
@@ -306,7 +394,7 @@ static void DoPickerPopup(GuiBoxSystem& box_system, PickerPopupOptions const& op
                       {
                           .parent = headings_row,
                           .layout {
-                              .size = {options.rhs.width, layout::k_hug_contents},
+                              .size = {options.filters_col.width, layout::k_hug_contents},
                               .contents_padding = {.lr = k_picker_spacing, .tb = k_picker_spacing / 2},
                               .contents_align = layout::Alignment::Start,
                               .contents_cross_axis_align = layout::CrossAxisAlign::Middle,
@@ -316,14 +404,14 @@ static void DoPickerPopup(GuiBoxSystem& box_system, PickerPopupOptions const& op
             DoBox(box_system,
                   {
                       .parent = rhs_top,
-                      .text = options.rhs.title,
+                      .text = options.filters_col.title,
                       .font = FontType::Heading2,
                       .layout {
                           .size = {layout::k_fill_parent, style::k_font_heading2_size},
                       },
                   });
 
-            for (auto const& btn : options.lhs.icon_buttons) {
+            for (auto const& btn : options.filters_col.icon_buttons) {
                 if (IconButton(box_system,
                                rhs_top,
                                btn.text,
@@ -409,7 +497,7 @@ static void DoPickerPopup(GuiBoxSystem& box_system, PickerPopupOptions const& op
                               });
                     text_input.text_input_result && text_input.text_input_result->buffer_changed) {
                     dyn::Append(box_system.state->deferred_actions,
-                                [&]() { search->on_change(*text_input.text_input_result); });
+                                [&]() { search->on_change(text_input.text_input_result->text); });
                 }
 
                 if (search->text.size) {
@@ -434,7 +522,7 @@ static void DoPickerPopup(GuiBoxSystem& box_system, PickerPopupOptions const& op
 
         AddPanel(box_system,
                  {
-                     .run = [&](GuiBoxSystem& box_system) { options.lhs.do_items(box_system); },
+                     .run = [&](GuiBoxSystem& box_system) { options.lhs_do_items(box_system); },
                      .data =
                          Subpanel {
                              .id = DoBox(box_system,
@@ -458,7 +546,7 @@ static void DoPickerPopup(GuiBoxSystem& box_system, PickerPopupOptions const& op
                                {
                                    .parent = main_section,
                                    .layout {
-                                       .size = {options.rhs.width, layout::k_fill_parent},
+                                       .size = {options.filters_col.width, layout::k_fill_parent},
                                        .contents_padding = {.lr = k_picker_spacing, .t = k_picker_spacing},
                                        .contents_direction = layout::Direction::Column,
                                        .contents_align = layout::Alignment::Start,
@@ -467,7 +555,20 @@ static void DoPickerPopup(GuiBoxSystem& box_system, PickerPopupOptions const& op
 
         AddPanel(box_system,
                  {
-                     .run = [&](GuiBoxSystem& box_system) { options.rhs.do_items(box_system); },
+                     .run =
+                         [&](GuiBoxSystem& box_system) {
+                             if (!options.library_filters && !options.tags_filters) return;
+
+                             auto const root = DoPickerItemsRoot(box_system);
+
+                             if (options.library_filters)
+                                 DoPickerLibraryFilters(box_system,
+                                                        root,
+                                                        options.libraries,
+                                                        *options.library_filters);
+                             if (options.tags_filters)
+                                 DoPickerTagsFilters(box_system, root, *options.tags_filters);
+                         },
                      .data =
                          Subpanel {
                              .id = DoBox(box_system,

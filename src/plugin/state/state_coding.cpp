@@ -1105,6 +1105,34 @@ ErrorCodeOr<void> CodeState(StateSnapshot& state, CodeStateArguments const& args
         }
     }
 
+    // =======================================================================================================
+    {
+        u8 num_tags {};
+        if (coder.IsWriting()) num_tags = CheckedCast<u8>(state.tags.size);
+        TRY(coder.CodeNumber(num_tags, StateVersion::Initial));
+
+        for (auto const i : Range(num_tags)) {
+            String tag {};
+            if (coder.IsWriting()) tag = state.tags[i];
+            TRY(coder.CodeString(tag, scratch_arena, StateVersion::Initial));
+            if (coder.IsReading()) dyn::Append(state.tags, tag);
+        }
+    }
+
+    // =======================================================================================================
+    {
+        String author {};
+        if (coder.IsWriting()) author = state.author;
+        TRY(coder.CodeString(author, scratch_arena, StateVersion::Initial));
+        if (coder.IsReading()) state.author = author;
+
+        String description {};
+        if (coder.IsWriting()) description = state.description;
+        TRY(coder.CodeString(description, scratch_arena, StateVersion::Initial));
+        if (coder.IsReading()) state.description = description;
+    }
+
+    // =======================================================================================================
     if (args.abbreviated_read) {
         ASSERT(coder.IsReading());
         return k_success;

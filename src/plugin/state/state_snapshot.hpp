@@ -21,6 +21,9 @@ struct StateSnapshot {
     Array<f32, k_num_parameters> param_values {};
     Array<EffectType, k_num_effect_types> fx_order {};
     Array<Bitset<128>, k_num_parameters> param_learned_ccs {};
+    DynamicArrayBounded<DynamicArrayBounded<char, k_max_tag_size>, k_max_num_tags> tags {};
+    DynamicArrayBounded<char, k_max_preset_author_size> author {};
+    DynamicArrayBounded<char, k_max_preset_description_size> description {};
 };
 
 enum class StateSource { PresetFile, Daw };

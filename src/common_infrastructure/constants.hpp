@@ -6,4 +6,8 @@
 
 constexpr u32 k_num_layers = 3;
 constexpr u16 k_max_num_floe_instances = 256;
+constexpr u8 k_max_tag_size = 30;
+constexpr u8 k_max_num_tags = 30;
+constexpr u8 k_max_preset_author_size = 64;
+constexpr u8 k_max_preset_description_size = 255;
 using FloeInstanceIndex = u16;

@@ -5,6 +5,7 @@
 
 #include "gui.hpp"
 #include "gui/gui2_inst_picker.hpp"
+#include "gui/gui2_ir_picker.hpp"
 #include "gui_effects.hpp"
 #include "gui_framework/colours.hpp"
 #include "gui_framework/gui_live_edit.hpp"
@@ -287,8 +288,19 @@ void MidPanel(Gui* g) {
         }
 
         // randomise button
-        if (do_randomise_button("Randomise all of the effects"))
+        if (do_randomise_button("Randomise all of the effects")) {
             RandomiseAllEffectParameterValues(engine.processor);
+            {
+                IrPickerContext ir_context {
+                    .sample_library_server = g->shared_engine_systems.sample_library_server,
+                    .library_images = g->library_images,
+                    .engine = g->engine,
+                };
+                ir_context.Init(g->scratch_arena);
+                DEFER { ir_context.Deinit(); };
+                LoadRandomIr(ir_context, g->ir_picker_state);
+            }
+        }
 
         DoEffectsWindow(
             g,

@@ -198,25 +198,23 @@ void SetAllParametersToDefaultValues(AudioProcessor& processor) {
 }
 
 static void ProcessorRandomiseAllParamsInternal(AudioProcessor& processor, bool only_effects) {
-    // TODO(1.0): this should create a new StateSnapshot and apply it, rather than change params/insts
-    // individually
-    (void)processor;
-    (void)only_effects;
-
-#if 0
     RandomIntGenerator<int> int_gen;
     RandomFloatGenerator<f32> float_gen;
     auto seed = (u64)NanosecondsSinceEpoch();
     RandomNormalDistribution normal_dist {0.5, 0.20};
     RandomNormalDistribution normal_dist_strong {0.5, 0.10};
 
-    auto SetParam = [&](Parameter &p, f32 v) {
-        if (p.info.flags & param_flags::Truncated) v = roundf(v);
+    StateSnapshot state {};
+    for (auto const i : Range(k_num_parameters))
+        state.param_values[i] = processor.params[i].LinearValue();
+
+    auto const set_param = [&](Parameter const& p, f32 v) {
+        if (IsAnyOf(p.info.value_type, Array {ParamValueType::Int, ParamValueType::Bool})) v = Round(v);
         ASSERT(v >= p.info.linear_range.min && v <= p.info.linear_range.max);
-        p.SetLinearValue(v);
+        state.param_values[ToInt(p.info.index)] = v;
     };
-    auto SetAnyRandom = [&](Parameter &p) {
-        SetParam(p, float_gen.GetRandomInRange(seed, p.info.linear_range.min, p.info.linear_range.max));
+    auto const set_any_random = [&](Parameter const& p) {
+        set_param(p, float_gen.GetRandomInRange(seed, p.info.linear_range.min, p.info.linear_range.max));
     };
 
     enum class BiasType {
@@ -224,7 +222,8 @@ static void ProcessorRandomiseAllParamsInternal(AudioProcessor& processor, bool 
         Strong,
     };
 
-    auto RandomiseNearToLinearValue = [&](Parameter &p, BiasType bias, f32 linear_value) {
+    auto const randomise_near_to_linear_value = [&](Parameter const& p, BiasType bias, f32 linear_value) {
+        (void)linear_value;
         f32 rand_v = 0;
         switch (bias) {
             case BiasType::Normal: {
@@ -238,74 +237,75 @@ static void ProcessorRandomiseAllParamsInternal(AudioProcessor& processor, bool 
             default: PanicIfReached();
         }
 
-        const auto v = Clamp(rand_v, 0.0f, 1.0f);
-        SetParam(p, MapFrom01(v, p.info.linear_range.min, p.info.linear_range.max));
+        auto const v = Clamp(rand_v, 0.0f, 1.0f);
+        set_param(p, MapFrom01(v, p.info.linear_range.min, p.info.linear_range.max));
     };
 
-    auto RandomiseNearToDefault = [&](Parameter &p, BiasType bias = BiasType::Normal) {
-        RandomiseNearToLinearValue(p, bias, p.DefaultLinearValue());
+    auto const randomise_near_to_default = [&](Parameter const& p, BiasType bias = BiasType::Normal) {
+        randomise_near_to_linear_value(p, bias, p.DefaultLinearValue());
     };
 
-    auto RandomiseButtonPrefferingDefault = [&](Parameter &p, BiasType bias = BiasType::Normal) {
+    auto const randomise_button_preffering_default = [&](Parameter const& p,
+                                                         BiasType bias = BiasType::Normal) {
         f32 new_param_val = p.DefaultLinearValue();
-        const auto v = int_gen.GetRandomInRange(seed, 1, 100, false);
+        auto const v = int_gen.GetRandomInRange(seed, 1, 100, false);
         if ((bias == BiasType::Normal && v <= 10) || (bias == BiasType::Strong && v <= 5))
             new_param_val = Abs(new_param_val - 1.0f);
-        SetParam(p, new_param_val);
+        set_param(p, new_param_val);
     };
 
-    auto RandomiseDetune = [&](Parameter &p) {
-        const bool should_detune = int_gen.GetRandomInRange(seed, 1, 10) <= 2;
+    auto const randomise_detune = [&](Parameter const& p) {
+        bool const should_detune = int_gen.GetRandomInRange(seed, 1, 10) <= 2;
         if (!should_detune) {
-            SetParam(p, 0);
+            set_param(p, 0);
             return;
         }
-        RandomiseNearToDefault(p);
+        randomise_near_to_default(p);
     };
 
-    auto RandomisePitch = [&](Parameter &p) {
-        const auto r = int_gen.GetRandomInRange(seed, 1, 10);
+    auto const randomise_pitch = [&](Parameter const& p) {
+        auto const r = int_gen.GetRandomInRange(seed, 1, 10);
         switch (r) {
             case 1:
             case 2:
             case 3:
             case 4:
             case 5: {
-                SetParam(p, 0);
+                set_param(p, 0);
                 break;
             }
             case 6:
             case 7:
             case 8:
             case 9: {
-                const f32 potential_vals[] = {-24, -12, -5, 7, 12, 19, 24, 12, -12};
-                SetParam(
+                f32 const potential_vals[] = {-24, -12, -5, 7, 12, 19, 24, 12, -12};
+                set_param(
                     p,
                     potential_vals[int_gen.GetRandomInRange(seed, 0, (int)ArraySize(potential_vals) - 1)]);
                 break;
             }
             case 10: {
-                RandomiseNearToDefault(p);
+                randomise_near_to_default(p);
                 break;
             }
             default: PanicIfReached();
         }
     };
 
-    auto RandomisePan = [&](Parameter &p) {
+    auto const randomise_pan = [&](Parameter const& p) {
         if (int_gen.GetRandomInRange(seed, 1, 10) < 4)
-            SetParam(p, 0);
+            set_param(p, 0);
         else
-            RandomiseNearToDefault(p, BiasType::Strong);
+            randomise_near_to_default(p, BiasType::Strong);
     };
 
-    auto RandomiseLoopStartAndEnd = [&](Parameter &start, Parameter &end) {
-        const auto mid = float_gen.GetRandomInRange(seed, 0, 1);
-        const auto min_half_size = 0.1f;
-        const auto max_half_size = Min(mid, 1 - mid);
-        const auto half_size = float_gen.GetRandomInRange(seed, min_half_size, max_half_size);
-        SetParam(start, Clamp(mid - half_size, 0.0f, 1.0f));
-        SetParam(end, Clamp(mid + half_size, 0.0f, 1.0f));
+    auto const randomise_loop_start_and_end = [&](Parameter const& start, Parameter& end) {
+        auto const mid = float_gen.GetRandomInRange(seed, 0, 1);
+        auto const min_half_size = 0.1f;
+        auto const max_half_size = Min(mid, 1 - mid);
+        auto const half_size = float_gen.GetRandomInRange(seed, min_half_size, max_half_size);
+        set_param(start, Clamp(mid - half_size, 0.0f, 1.0f));
+        set_param(end, Clamp(mid + half_size, 0.0f, 1.0f));
     };
 
     //
@@ -313,183 +313,140 @@ static void ProcessorRandomiseAllParamsInternal(AudioProcessor& processor, bool 
     //
 
     // Set all params to a random value
-    for (auto &p : plugin.processor.params)
-        if (!only_effects || (only_effects && p.info.IsEffectParam())) SetAnyRandom(p);
+    for (auto& p : processor.params)
+        if (!only_effects || (only_effects && p.info.IsEffectParam())) set_any_random(p);
 
     // Specialise the randomness of specific params for better results
-    RandomiseNearToDefault(plugin.processor.params[ToInt(ParamIndex::BitCrushWet)]);
-    RandomiseNearToDefault(plugin.processor.params[ToInt(ParamIndex::BitCrushDry)]);
-    RandomiseNearToDefault(plugin.processor.params[ToInt(ParamIndex::CompressorThreshold)], BiasType::Strong);
-    RandomiseNearToDefault(plugin.processor.params[ToInt(ParamIndex::CompressorRatio)]);
-    RandomiseNearToDefault(plugin.processor.params[ToInt(ParamIndex::CompressorGain)], BiasType::Strong);
-    SetParam(plugin.processor.params[ToInt(ParamIndex::CompressorAutoGain)], 1.0f);
-    RandomiseNearToDefault(plugin.processor.params[ToInt(ParamIndex::FilterCutoff)]);
-    RandomiseNearToDefault(plugin.processor.params[ToInt(ParamIndex::FilterResonance)]);
-    RandomiseNearToDefault(plugin.processor.params[ToInt(ParamIndex::ChorusWet)]);
-    RandomiseNearToDefault(plugin.processor.params[ToInt(ParamIndex::ChorusDry)], BiasType::Strong);
-    RandomiseNearToDefault(plugin.processor.params[ToInt(ParamIndex::ReverbFreeverbWet)]);
-    RandomiseNearToDefault(plugin.processor.params[ToInt(ParamIndex::ReverbSvWet)]);
-    RandomiseNearToDefault(plugin.processor.params[ToInt(ParamIndex::ReverbDry)]);
-    SetParam(plugin.processor.params[ToInt(ParamIndex::ReverbLegacyAlgorithm)], 0);
-    SetParam(plugin.processor.params[ToInt(ParamIndex::DelayLegacyAlgorithm)], 0);
-    RandomiseNearToDefault(plugin.processor.params[ToInt(ParamIndex::PhaserWet)]);
-    RandomiseNearToDefault(plugin.processor.params[ToInt(ParamIndex::PhaserDry)]);
-    RandomiseNearToLinearValue(plugin.processor.params[ToInt(ParamIndex::ConvolutionReverbWet)],
-                               BiasType::Strong,
-                               0.5f);
-    RandomiseNearToDefault(plugin.processor.params[ToInt(ParamIndex::ConvolutionReverbDry)], BiasType::Strong);
-    RandomiseNearToDefault(plugin.processor.params[ToInt(ParamIndex::ConvolutionReverbHighpass)]);
-    SetConvolutionIr(
-        plugin,
-        AssetLoadOptions::LoadIr {
-            .library_name = String(k_core_library_name),
-            .name =
-                k_core_version_1_irs[(usize)int_gen.GetRandomInRange(seed, 0, k_core_version_1_irs.size - 1)],
-        });
+    randomise_near_to_default(processor.params[ToInt(ParamIndex::BitCrushWet)]);
+    randomise_near_to_default(processor.params[ToInt(ParamIndex::BitCrushDry)]);
+    randomise_near_to_default(processor.params[ToInt(ParamIndex::CompressorThreshold)], BiasType::Strong);
+    randomise_near_to_default(processor.params[ToInt(ParamIndex::CompressorRatio)]);
+    randomise_near_to_default(processor.params[ToInt(ParamIndex::CompressorGain)], BiasType::Strong);
+    set_param(processor.params[ToInt(ParamIndex::CompressorAutoGain)], 1.0f);
+    randomise_near_to_default(processor.params[ToInt(ParamIndex::FilterCutoff)]);
+    randomise_near_to_default(processor.params[ToInt(ParamIndex::FilterResonance)]);
+    randomise_near_to_default(processor.params[ToInt(ParamIndex::ChorusWet)]);
+    randomise_near_to_default(processor.params[ToInt(ParamIndex::ChorusDry)], BiasType::Strong);
+    randomise_near_to_default(processor.params[ToInt(ParamIndex::ReverbMix)]);
+    randomise_near_to_default(processor.params[ToInt(ParamIndex::PhaserMix)]);
+    randomise_near_to_default(processor.params[ToInt(ParamIndex::DelayMix)]);
+    randomise_near_to_linear_value(processor.params[ToInt(ParamIndex::ConvolutionReverbWet)],
+                                   BiasType::Strong,
+                                   0.5f);
+    randomise_near_to_default(processor.params[ToInt(ParamIndex::ConvolutionReverbDry)], BiasType::Strong);
+    randomise_near_to_default(processor.params[ToInt(ParamIndex::ConvolutionReverbHighpass)]);
 
     {
-        auto fx = plugin.processor.effects_ordered_by_type;
+        auto fx = processor.effects_ordered_by_type;
         Shuffle(fx, seed);
-        plugin.processor.desired_effects_order.Store(EncodeEffectsArray(fx));
+        for (auto i : Range(fx.size))
+            state.fx_order[i] = fx[i]->type;
     }
 
     if (!only_effects) {
-        SetParam(plugin.processor.params[ToInt(ParamIndex::MasterVolume)],
-                 plugin.processor.params[ToInt(ParamIndex::MasterVolume)].DefaultLinearValue());
-        for (auto &l : plugin.layers) {
-            RandomiseNearToLinearValue(
-                plugin.processor
-                    .params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::Volume))],
+        set_param(processor.params[ToInt(ParamIndex::MasterVolume)],
+                  processor.params[ToInt(ParamIndex::MasterVolume)].DefaultLinearValue());
+        for (auto& l : processor.layer_processors) {
+            randomise_near_to_linear_value(
+                processor.params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::Volume))],
                 BiasType::Strong,
                 0.6f);
-            RandomiseButtonPrefferingDefault(
-                plugin.processor
-                    .params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::Mute))]);
-            RandomiseButtonPrefferingDefault(
-                plugin.processor
-                    .params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::Solo))]);
-            RandomisePan(
-                plugin.processor.params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::Pan))]);
-            RandomiseDetune(
-                plugin.processor
-                    .params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::TuneCents))]);
-            RandomisePitch(
-                plugin.processor
+            randomise_button_preffering_default(
+                processor.params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::Mute))]);
+            randomise_button_preffering_default(
+                processor.params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::Solo))]);
+            randomise_pan(
+                processor.params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::Pan))]);
+            randomise_detune(
+                processor.params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::TuneCents))]);
+            randomise_pitch(
+                processor
                     .params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::TuneSemitone))]);
-            SetParam(plugin.processor
-                         .params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::VolEnvOn))],
-                     1.0f);
+            set_param(
+                processor.params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::VolEnvOn))],
+                1.0f);
 
-            RandomiseNearToDefault(
-                plugin.processor
+            randomise_near_to_default(
+                processor
                     .params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::VolumeAttack))]);
-            RandomiseNearToDefault(
-                plugin.processor
+            randomise_near_to_default(
+                processor
                     .params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::VolumeDecay))]);
-            RandomiseNearToDefault(
-                plugin.processor
+            randomise_near_to_default(
+                processor
                     .params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::VolumeSustain))]);
-            RandomiseNearToDefault(
-                plugin.processor
+            randomise_near_to_default(
+                processor
                     .params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::VolumeRelease))]);
 
-            RandomiseNearToDefault(
-                plugin.processor
+            randomise_near_to_default(
+                processor
                     .params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::FilterEnvAmount))]);
-            RandomiseNearToDefault(
-                plugin.processor
+            randomise_near_to_default(
+                processor
                     .params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::FilterAttack))]);
-            RandomiseNearToDefault(
-                plugin.processor
+            randomise_near_to_default(
+                processor
                     .params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::FilterDecay))]);
-            RandomiseNearToDefault(
-                plugin.processor
+            randomise_near_to_default(
+                processor
                     .params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::FilterSustain))]);
-            RandomiseNearToDefault(
-                plugin.processor
+            randomise_near_to_default(
+                processor
                     .params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::FilterRelease))]);
 
-            RandomiseNearToDefault(
-                plugin.processor
+            randomise_near_to_default(
+                processor
                     .params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::FilterCutoff))]);
-            RandomiseNearToDefault(
-                plugin.processor
+            randomise_near_to_default(
+                processor
                     .params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::FilterResonance))]);
 
-            RandomiseLoopStartAndEnd(
-                plugin.processor
-                    .params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::LoopStart))],
-                plugin.processor
-                    .params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::LoopEnd))]);
+            randomise_loop_start_and_end(
+                processor.params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::LoopStart))],
+                processor.params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::LoopEnd))]);
 
-            RandomiseNearToDefault(
-                plugin.processor
-                    .params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::EqGain1))]);
-            RandomiseNearToDefault(
-                plugin.processor
-                    .params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::EqGain2))]);
+            randomise_near_to_default(
+                processor.params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::EqGain1))]);
+            randomise_near_to_default(
+                processor.params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::EqGain2))]);
 
             if (int_gen.GetRandomInRange(seed, 1, 10) < 4) {
-                SetParam(
-                    plugin.processor
+                set_param(
+                    processor
                         .params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::SampleOffset))],
                     0);
             } else {
-                RandomiseNearToDefault(
-                    plugin.processor
+                randomise_near_to_default(
+                    processor
                         .params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::SampleOffset))],
                     BiasType::Strong);
             }
-            RandomiseButtonPrefferingDefault(
-                plugin.processor
-                    .params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::Reverse))]);
+            randomise_button_preffering_default(
+                processor.params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::Reverse))]);
 
-            RandomiseButtonPrefferingDefault(
-                plugin.processor
-                    .params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::Keytrack))],
+            randomise_button_preffering_default(
+                processor.params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::Keytrack))],
                 BiasType::Strong);
-            RandomiseButtonPrefferingDefault(
-                plugin.processor
-                    .params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::Monophonic))],
+            randomise_button_preffering_default(
+                processor.params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::Monophonic))],
                 BiasType::Strong);
-            SetParam(
-                plugin.processor
+            set_param(
+                processor
                     .params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::MidiTranspose))],
                 0.0f);
-            SetParam(
-                plugin.processor
+            set_param(
+                processor
                     .params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::VelocityMapping))],
                 0.0f);
-            SetParam(
-                plugin.processor
-                    .params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::CC64Retrigger))],
-                1.0f);
-            SetParam(
-                plugin.processor.params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::Mute))],
-                0.0f);
-            SetParam(
-                plugin.processor.params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::Solo))],
-                0.0f);
-
-            if (l.processor.params[ToInt(LayerParamIndex::LfoOn)].ValueAsBool() &&
-                l.processor.params[ToInt(LayerParamIndex::LfoDestination)]
-                        .ValueAsInt<param_values::LfoDestination>() == param_values::LfoDestination::Filter &&
-                !l.processor.params[ToInt(LayerParamIndex::FilterOn)].ValueAsBool()) {
-                SetParam(l.processor.params[ToInt(LayerParamIndex::FilterOn)], 1.0f);
-            }
+            set_param(processor.params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::Mute))],
+                      0.0f);
+            set_param(processor.params[ToInt(ParamIndexFromLayerParamIndex(l.index, LayerParamIndex::Solo))],
+                      0.0f);
         }
-
-        // TODO: load random instruments
     }
 
-    // IMPROVE: if we have only randomised the effects, then we don't need to trigger an entire state reload
-    // including restarting voices.
-
-    const auto host = &plugin.host;
-    const auto host_params = (const clap_host_params *)host->get_extension(host, CLAP_EXT_PARAMS);
-    if (host_params) host_params->rescan(host, CLAP_PARAM_RESCAN_VALUES);
-    plugin.processor.events_for_audio_thread.Push(EventForAudioThreadType::ReloadAllAudioState);
-#endif
+    ApplyNewState(processor, state, StateSource::PresetFile);
 }
 
 void RandomiseAllEffectParameterValues(AudioProcessor& processor) {

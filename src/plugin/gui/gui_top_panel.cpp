@@ -6,6 +6,8 @@
 #include "common_infrastructure/paths.hpp"
 
 #include "engine/engine.hpp"
+#include "gui/gui2_inst_picker.hpp"
+#include "gui/gui2_ir_picker.hpp"
 #include "gui_button_widgets.hpp"
 #include "gui_menu.hpp"
 #include "gui_modal_windows.hpp"
@@ -45,7 +47,30 @@ static void DoDotsMenu(Gui* g) {
     PopupMenuItems top_menu(g, {&longest_string_in_menu, 1});
 
     if (top_menu.DoButton("Reset All Parameters")) SetAllParametersToDefaultValues(g->engine.processor);
-    if (top_menu.DoButton("Randomise All Parameters")) RandomiseAllParameterValues(g->engine.processor);
+    if (top_menu.DoButton("Randomise All Parameters")) {
+        RandomiseAllParameterValues(g->engine.processor);
+        for (auto& layer : g->engine.processor.layer_processors) {
+            InstPickerContext context {
+                .layer = layer,
+                .sample_library_server = g->shared_engine_systems.sample_library_server,
+                .library_images = g->library_images,
+                .engine = g->engine,
+            };
+            context.Init(g->scratch_arena);
+            DEFER { context.Deinit(); };
+            LoadRandomInstrument(context, g->inst_picker_state, false);
+        }
+        {
+            IrPickerContext ir_context {
+                .sample_library_server = g->shared_engine_systems.sample_library_server,
+                .library_images = g->library_images,
+                .engine = g->engine,
+            };
+            ir_context.Init(g->scratch_arena);
+            DEFER { ir_context.Deinit(); };
+            LoadRandomIr(ir_context, g->ir_picker_state);
+        }
+    }
     if (top_menu.DoButton("Share Feedback")) g->feedback_panel_state.open = true;
 }
 

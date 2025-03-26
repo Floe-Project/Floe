@@ -26,14 +26,3 @@ Floe automatically scans for presets in a set of folders - including subfolders.
 
 Presets are tiny files and so there's typically no need to move then to an external hard-drive.
 
-
-## Preset randomisation
-
-![Random preset](../images/random-preset.png)
-
-Floe has a multi-mode 'randomise preset' button. This button can be found in the top panel of Floe’s GUI. To the left of this button is a downwards arrow icon. By clicking on this arrow you can select the mode of the randomise button. These are the options:
-
-- Randomise Any: Loads any Floe preset in the presets folder (included any presets in subfolders). The preset could be for any library.
-- Randomise Library: Loads any Floe preset that is for the same library that is currently loaded. For example, if you have the Wraith library loaded, this button will load another Wraith preset.
-- Randomise Folder: Loads any Floe preset that is in the same folder as the current one. For example, if your current loaded preset is in a folder called 'Pads', another preset from 'Pads' will be loaded.
-- Randomise based on filter text: Loads a folder that matches the filtered folders and search text that you have typed into the preset browser. This button works the same as the randomise button that is adjacent to the search bar on the preset browser panel.

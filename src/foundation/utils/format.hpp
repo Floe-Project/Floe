@@ -631,6 +631,24 @@ PUBLIC MutableString Join(Allocator& a, Span<String const> strings, String separ
     return result;
 }
 
+[[nodiscard]] PUBLIC MutableString JoinAppendResizeAllocation(Allocator& a,
+                                                              MutableString allocated_path,
+                                                              Span<String const> strings,
+                                                              String separator = {}) {
+    if (!strings.size) return allocated_path;
+    auto result =
+        a.ResizeType(allocated_path,
+                     allocated_path.size,
+                     allocated_path.size + TotalSize(strings) + (separator.size * (strings.size - 1)));
+    usize pos = allocated_path.size;
+    for (auto const [i, part] : Enumerate(strings)) {
+        WriteAndIncrement(pos, result, part);
+        if (separator.size && i != strings.size - 1) WriteAndIncrement(pos, result, separator);
+    }
+
+    return result;
+}
+
 template <usize k_size>
 PUBLIC_INLINE DynamicArrayBounded<char, k_size> JoinInline(Span<String const> strings,
                                                            String separator = {}) {

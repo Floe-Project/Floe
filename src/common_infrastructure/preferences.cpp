@@ -314,10 +314,6 @@ PreferencesTable ParseLegacyPreferencesFile(String file_data, ArenaAllocator& ar
                 table.InsertGrowIfNeeded(arena, key::k_gui_keyboard_octave, arena.New<Value>(s64_value));
                 return true;
             }
-            if (SetIfMatching(event, "PresetRandomMode", s64_value)) {
-                table.InsertGrowIfNeeded(arena, key::k_presets_random_mode, arena.New<Value>(s64_value));
-                return true;
-            }
 
             bool bool_value {};
             if (SetIfMatching(event, "ShowKeyboard", bool_value)) {
@@ -1176,7 +1172,6 @@ TEST_CASE(TestPreferences) {
             {SectionedKey {.section = "section", .key = "key1"_s}, true},
             {SectionedKey {.section = "section", .key = "key2"_s}, false},
             {key::k_show_keyboard, true},
-            {key::k_presets_random_mode, (s64)3},
             {key::k_window_width, (s64)1200},
             {SectionedKey {.section = key::section::k_cc_to_param_id_map_section, .key = (s64)10}, (s64)1},
             {SectionedKey {.section = key::section::k_cc_to_param_id_map_section, .key = (s64)10}, (s64)3},

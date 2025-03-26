@@ -20,6 +20,8 @@ static Optional<IrCursor> IterateIr(IrPickerContext const& context,
                                     IrCursor cursor,
                                     SearchDirection direction,
                                     bool first) {
+    if (context.libraries.size == 0) return k_nullopt;
+
     if (cursor.lib_index >= context.libraries.size) cursor.lib_index = 0;
 
     if (!first) {
@@ -88,23 +90,23 @@ static Optional<IrCursor> IterateIr(IrPickerContext const& context,
     return k_nullopt;
 }
 
+static void LoadIr(IrPickerContext const& context, IrPickerState& state, IrCursor const& cursor) {
+    auto const& lib = *context.libraries[cursor.lib_index];
+    auto const& ir = *lib.sorted_irs[cursor.ir_index];
+    LoadConvolutionIr(context.engine, sample_lib::IrId {lib.Id(), ir.name});
+    state.scroll_to_show_selected = true;
+}
+
 void LoadAdjacentIr(IrPickerContext const& context, IrPickerState& state, SearchDirection direction) {
     auto const ir_id = context.engine.processor.convo.ir_id;
 
     if (ir_id) {
         if (auto const cursor = CurrentCursor(context, *ir_id)) {
-            if (auto const next = IterateIr(context, state, *cursor, direction, false)) {
-                auto const& lib = *context.libraries[next->lib_index];
-                auto const& ir = *lib.sorted_irs[next->ir_index];
-                LoadConvolutionIr(context.engine, sample_lib::IrId {lib.Id(), ir.name});
-                state.scroll_to_show_selected = true;
-            }
+            if (auto const next = IterateIr(context, state, *cursor, direction, false))
+                LoadIr(context, state, *next);
         }
     } else if (auto const first = IterateIr(context, state, {0, 0}, direction, true)) {
-        auto const& lib = *context.libraries[first->lib_index];
-        auto const& ir = *lib.sorted_irs[first->ir_index];
-        LoadConvolutionIr(context.engine, sample_lib::IrId {lib.Id(), ir.name});
-        state.scroll_to_show_selected = true;
+        LoadIr(context, state, *first);
     }
 }
 
@@ -132,14 +134,7 @@ void LoadRandomIr(IrPickerContext const& context, IrPickerState& state) {
     for (usize i = 0; i < random_pos; ++i)
         cursor = *IterateIr(context, state, cursor, SearchDirection::Forward, false);
 
-    auto const& lib = *context.libraries[cursor.lib_index];
-    auto const& ir = *lib.sorted_irs[cursor.ir_index];
-    LoadConvolutionIr(context.engine,
-                      sample_lib::IrId {
-                          .library = lib.Id(),
-                          .ir_name = ir.name,
-                      });
-    state.scroll_to_show_selected = true;
+    LoadIr(context, state, cursor);
 }
 
 void IrPickerItems(GuiBoxSystem& box_system, IrPickerContext& context, IrPickerState& state) {
@@ -294,6 +289,22 @@ void DoIrPickerPopup(GuiBoxSystem& box_system,
             .status_bar_height = 50,
             .status = [&]() -> Optional<String> {
                 Optional<String> status {};
+
+                if (context.hovering_ir) {
+                    DynamicArray<char> buffer {box_system.arena};
+
+                    fmt::Append(buffer, "{}. Tags: ", context.hovering_ir->name);
+                    if (context.hovering_ir->tags.size) {
+                        for (auto const& tag : context.hovering_ir->tags)
+                            fmt::Append(buffer, "{}, ", tag);
+                        dyn::Pop(buffer, 2);
+                    } else {
+                        dyn::AppendSpan(buffer, "none");
+                    }
+
+                    status = buffer.ToOwnedSpan();
+                }
+
                 return status;
             },
         });

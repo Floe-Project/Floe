@@ -13,6 +13,7 @@
 #include "gui/gui2_ir_picker_state.hpp"
 #include "gui/gui2_notifications.hpp"
 #include "gui/gui2_prefs_panel_state.hpp"
+#include "gui/gui2_preset_picker.hpp"
 #include "gui/gui2_save_preset_panel.hpp"
 #include "gui/gui_library_images.hpp"
 #include "gui/gui_modal_windows.hpp"
@@ -25,7 +26,6 @@
 #include "gui_framework/gui_imgui.hpp"
 #include "gui_framework/layout.hpp"
 #include "gui_layer.hpp"
-#include "gui_preset_browser.hpp"
 
 struct GuiFrameInput;
 
@@ -130,6 +130,7 @@ struct Gui {
     InstPickerState inst_picker_state {};
     IrPickerState ir_picker_state {};
     SavePresetPanelState save_preset_panel_state {};
+    PresetPickerState preset_picker_state {};
 
     GuiFrameInput& frame_input;
     GuiFrameResult frame_output;
@@ -145,7 +146,6 @@ struct Gui {
     graphics::Font* mada {};
     graphics::Font* icons {};
     Fonts fonts {}; // new system
-    PresetBrowserPersistentData preset_browser_data {};
     GuiBoxSystem box_system {
         .arena = scratch_arena,
         .imgui = imgui,

@@ -90,7 +90,7 @@ struct AtomicRefList {
         Node* operator->() const { return node; }
         Iterator& operator++() {
             prev = node;
-            node = node->next.Load(LoadMemoryOrder::Relaxed);
+            node = node->next.Load(LoadMemoryOrder::Acquire);
             return *this;
         }
         Node* node {};
@@ -101,7 +101,7 @@ struct AtomicRefList {
         // You should RemoveAll and DeleteRemovedAndUnreferenced before the object is destroyed. We don't want
         // to do that here because we want this object to be able to live on a reader thread instead of living
         // on a writer thread.
-        ASSERT(live_list.Load(LoadMemoryOrder::Relaxed) == nullptr);
+        ASSERT(live_list.Load(LoadMemoryOrder::Acquire) == nullptr);
         ASSERT(dead_list == nullptr);
     }
 

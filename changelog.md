@@ -12,6 +12,7 @@ For instance: 0.0.1. Don't change the headings.
 ## 0.0.8-alpha
 - Brand new instrument browser supporting tags, search, and filtering by library
 - Brand new impulse response browser featuring all the options of the instrument browser
+- Brand new preset browser with tags, search, and filtering by library. Preset metadata is tracked, library information is tracked, file changes are detected, duplicate presets are hidden.
 - New save preset dialog with author, description, and tags
 - Fix instrument left/right and randomise buttons
 

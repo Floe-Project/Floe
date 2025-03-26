@@ -329,7 +329,6 @@ constexpr String k_extra_libraries_folder = "extra-libraries-folder"_s;
 constexpr String k_extra_presets_folder = "extra-presets-folder"_s;
 constexpr String k_gui_keyboard_octave = "gui-keyboard-octave"_s;
 constexpr String k_high_contrast_gui = "high-contrast-gui"_s;
-constexpr String k_presets_random_mode = "presets-random-mode"_s;
 constexpr String k_show_keyboard = "show-keyboard"_s;
 constexpr String k_show_tooltips = "show-tooltips"_s;
 constexpr String k_window_width = "window-width"_s;

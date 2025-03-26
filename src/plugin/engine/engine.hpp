@@ -30,21 +30,21 @@ struct Engine : ProcessorListener {
     };
 
     struct LastSnapshot {
-        LastSnapshot() { metadata.name_or_path = "Default"; }
+        LastSnapshot() { name_or_path.name_or_path = "Default"; }
 
         void Set(StateSnapshotWithName const& snapshot) {
             state = snapshot.state;
-            metadata = snapshot.name.Clone(metadata_arena);
+            name_or_path = snapshot.name.Clone(name_arena);
         }
 
         void SetName(StateSnapshotName const& m) {
-            metadata_arena.ResetCursorAndConsolidateRegions();
-            metadata = m.Clone(metadata_arena);
+            name_arena.ResetCursorAndConsolidateRegions();
+            name_or_path = m.Clone(name_arena);
         }
 
-        ArenaAllocatorWithInlineStorage<1000> metadata_arena {Malloc::Instance()};
+        ArenaAllocatorWithInlineStorage<1000> name_arena {Malloc::Instance()};
         StateSnapshot state {};
-        StateSnapshotName metadata {};
+        StateSnapshotName name_or_path {};
     };
 
     Engine(clap_host const& host,
@@ -90,9 +90,6 @@ struct Engine : ProcessorListener {
     TrivialFixedSizeFunction<8, void()> stated_changed_callback {};
 
     sample_lib_server::AsyncCommsChannel& sample_lib_server_async_channel;
-    PresetBrowserFilters preset_browser_filters;
-    Optional<PresetSelectionCriteria> pending_preset_selection_criteria {};
-    u64 presets_folder_listener_id {};
 };
 
 PluginCallbacks<Engine> EngineCallbacks();
@@ -114,10 +111,6 @@ usize MegabytesUsedBySamples(Engine const& engine);
 
 StateSnapshot CurrentStateSnapshot(Engine const& engine);
 bool StateChangedSinceLastSnapshot(Engine& engine);
-
-void LoadPresetFromListing(Engine& engine,
-                           PresetSelectionCriteria const& selection_criteria,
-                           PresetsFolderScanResult const& listing);
 
 void LoadPresetFromFile(Engine& engine, String path);
 

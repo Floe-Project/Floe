@@ -1270,26 +1270,43 @@ ErrorCodeOr<void> CodeState(StateSnapshot& state, CodeStateArguments const& args
     return k_success;
 }
 
-ErrorCodeOr<StateSnapshot> LoadPresetFile(String const filepath, ArenaAllocator& scratch_arena) {
+PresetFormat PresetFormatFromPath(String path) {
+    if (path::Extension(path) == FLOE_PRESET_FILE_EXTENSION) return PresetFormat::Floe;
+    return PresetFormat::Mirage;
+}
+
+ErrorCodeOr<StateSnapshot>
+LoadPresetFile(PresetFormat format, Reader& reader, ArenaAllocator& scratch_arena, bool abbreviated_read) {
     StateSnapshot state;
-    if (path::Extension(filepath) == FLOE_PRESET_FILE_EXTENSION) {
-        auto file = TRY(OpenFile(filepath, FileMode::Read()));
-        TRY(CodeState(state,
-                      CodeStateArguments {
-                          .mode = CodeStateArguments::Mode::Decode,
-                          .read_or_write_data = [&file](void* data, usize bytes) -> ErrorCodeOr<void> {
-                              TRY(file.Read(data, bytes));
-                              return k_success;
-                          },
-                          .source = StateSource::PresetFile,
-                      }));
-        return state;
-    } else {
-        PageAllocator const page_allocator;
-        auto const file_data = TRY(ReadEntireFile(filepath, scratch_arena));
-        TRY(DecodeJsonState(state, scratch_arena, file_data));
+    switch (format) {
+        case PresetFormat::Floe: {
+            TRY(CodeState(state,
+                          CodeStateArguments {
+                              .mode = CodeStateArguments::Mode::Decode,
+                              .read_or_write_data = [&reader](void* data, usize bytes) -> ErrorCodeOr<void> {
+                                  TRY(reader.Read(data, bytes));
+                                  return k_success;
+                              },
+                              .source = StateSource::PresetFile,
+                              .abbreviated_read = abbreviated_read,
+                          }));
+            break;
+        }
+        case PresetFormat::Mirage: {
+            auto const file_data = TRY(reader.ReadOrFetchAll(scratch_arena));
+            TRY(DecodeJsonState(state, scratch_arena, {(char const*)file_data.data, file_data.size}));
+            break;
+        }
+        case PresetFormat::Count: PanicIfReached(); break;
     }
     return state;
+}
+
+ErrorCodeOr<StateSnapshot>
+LoadPresetFile(String const filepath, ArenaAllocator& scratch_arena, bool abbreviated_read) {
+    StateSnapshot state;
+    auto reader = TRY(Reader::FromFile(filepath));
+    return LoadPresetFile(PresetFormatFromPath(filepath), reader, scratch_arena, abbreviated_read);
 }
 
 ErrorCodeOr<void> SavePresetFile(String path, StateSnapshot const& state) {

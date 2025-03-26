@@ -169,6 +169,8 @@ struct LibraryIdRef {
     String name;
 };
 
+u64 Hash(LibraryIdRef const& id);
+
 struct FileAttribution {
     String title {}; // title of the work
     String license_name {};

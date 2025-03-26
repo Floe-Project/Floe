@@ -18,7 +18,6 @@
     X(RegisterAudioUtilsTests)                                                                               \
     X(RegisterAutosaveTests)                                                                                 \
     X(RegisterChecksumFileTests)                                                                             \
-    X(RegisterDirectoryListingTests)                                                                         \
     X(RegisterFoundationTests)                                                                               \
     X(RegisterHostingTests)                                                                                  \
     X(RegisterLayoutTests)                                                                                   \
@@ -30,7 +29,6 @@
     X(RegisterPackageInstallationTests)                                                                      \
     X(RegisterParamDescriptorTests)                                                                          \
     X(RegisterPreferencesTests)                                                                              \
-    X(RegisterPresetTests)                                                                                   \
     X(RegisterSampleLibraryLoaderTests)                                                                      \
     X(RegisterSentryTests)                                                                                   \
     X(RegisterStateCodingTests)                                                                              \

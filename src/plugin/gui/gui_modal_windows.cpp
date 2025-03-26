@@ -7,9 +7,6 @@
 
 #include "foundation/foundation.hpp"
 
-#include "common_infrastructure/paths.hpp"
-#include "common_infrastructure/preferences.hpp"
-
 #include "engine/engine.hpp"
 #include "gui.hpp"
 #include "gui/gui_button_widgets.hpp"
@@ -21,7 +18,6 @@
 #include "gui_label_widgets.hpp"
 #include "gui_widget_helpers.hpp"
 #include "gui_window.hpp"
-#include "presets/presets_folder.hpp"
 
 PUBLIC Rect ModalRect(imgui::Context const& imgui, f32 width, f32 height) {
     auto const size = f32x2 {width, height};
@@ -275,13 +271,7 @@ static void DoLoadingOverlay(Gui* g) {
     auto const r = ModalRect(imgui, UiSizeId::LoadingOverlayBoxWidth, UiSizeId::LoadingOverlayBoxHeight);
     auto const settings = ModalWindowSettings(g->imgui);
 
-    if (g->engine.pending_state_change ||
-        FetchOrRescanPresetsFolder(
-            g->shared_engine_systems.preset_listing,
-            RescanMode::DontRescan,
-            ExtraScanFolders(g->shared_engine_systems.paths, g->prefs, ScanFolderType::Presets),
-            nullptr)
-            .is_loading) {
+    if (g->engine.pending_state_change) {
         imgui.BeginWindow(settings, r, "LoadingModal");
         DEFER { imgui.EndWindow(); };
 

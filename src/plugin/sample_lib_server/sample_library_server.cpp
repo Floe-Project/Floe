@@ -1,5 +1,5 @@
-// fCopyright 2018-2024 Sam Windell
-//  SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2018-2024 Sam Windell
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "sample_library_server.hpp"
 

@@ -235,7 +235,7 @@ void DoSavePresetPanel(GuiBoxSystem& box_system,
                     if (TextButton(box_system, button_container, "Cancel"_s, "Cancel and close"_s))
                         state.open = false;
 
-                    if (auto const existing_path = context.engine.last_snapshot.metadata.Path()) {
+                    if (auto const existing_path = context.engine.last_snapshot.name_or_path.Path()) {
                         if (TextButton(box_system,
                                        button_container,
                                        "Overwrite"_s,

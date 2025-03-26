@@ -302,21 +302,27 @@ static void SampleLibraryResourceLoaded(Engine& engine, sample_lib_server::LoadR
 }
 
 StateSnapshot CurrentStateSnapshot(Engine const& engine) {
-    if (engine.pending_state_change) return engine.pending_state_change->snapshot.state;
-    auto snapshot = MakeStateSnapshot(engine.processor);
+    StateSnapshot snapshot;
+    if (engine.pending_state_change)
+        snapshot = engine.pending_state_change->snapshot.state;
+    else
+        snapshot = MakeStateSnapshot(engine.processor);
     snapshot.metadata = engine.state_metadata;
     return snapshot;
 }
 
 bool StateChangedSinceLastSnapshot(Engine& engine) {
     auto current = CurrentStateSnapshot(engine);
+
+    auto const& last = engine.pending_state_change ? engine.pending_state_change->snapshot.state
+                                                   : engine.last_snapshot.state;
     // we don't check the params ccs for changes
-    current.param_learned_ccs = engine.last_snapshot.state.param_learned_ccs;
-    bool const changed = engine.last_snapshot.state != current;
+    current.param_learned_ccs = last.param_learned_ccs;
+    bool const changed = last != current;
 
     if constexpr (!PRODUCTION_BUILD) {
         if (changed)
-            AssignDiffDescription(engine.state_change_description, engine.last_snapshot.state, current);
+            AssignDiffDescription(engine.state_change_description, last, current);
         else
             dyn::Clear(engine.state_change_description);
     }
@@ -366,25 +372,10 @@ void LoadInstrument(Engine& engine, u32 layer_index, InstrumentId inst_id) {
     }
 }
 
-void LoadPresetFromListing(Engine& engine,
-                           PresetSelectionCriteria const& selection_criteria,
-                           PresetsFolderScanResult const& listing) {
-    if (listing.is_loading) {
-        engine.pending_preset_selection_criteria = selection_criteria;
-    } else if (listing.listing) {
-        if (auto entry = SelectPresetFromListing(*listing.listing,
-                                                 selection_criteria,
-                                                 engine.last_snapshot.metadata.Path(),
-                                                 engine.random_seed)) {
-            LoadPresetFromFile(engine, entry->Path());
-        }
-    }
-}
-
 void LoadPresetFromFile(Engine& engine, String path) {
     PageAllocator page_allocator;
     ArenaAllocator scratch_arena {page_allocator, Kb(16)};
-    auto state_outcome = LoadPresetFile(path, scratch_arena);
+    auto state_outcome = LoadPresetFile(path, scratch_arena, false);
 
     if (state_outcome.HasValue()) {
         LoadNewState(engine,
@@ -482,26 +473,6 @@ Engine::Engine(clap_host const& host,
 
     InitAutosaveState(autosave_state, shared_engine_systems.prefs, random_seed, last_snapshot.state);
 
-    presets_folder_listener_id =
-        shared_engine_systems.preset_listing.scanned_folder.listeners.Add([&engine = *this]() {
-            RunFunctionOnMainThread(engine, [&engine]() {
-                auto listing = FetchOrRescanPresetsFolder(engine.shared_engine_systems.preset_listing,
-                                                          RescanMode::DontRescan,
-                                                          ExtraScanFolders(engine.shared_engine_systems.paths,
-                                                                           engine.shared_engine_systems.prefs,
-                                                                           ScanFolderType::Presets),
-                                                          nullptr);
-
-                if (engine.pending_preset_selection_criteria) {
-                    LoadPresetFromListing(engine, *engine.pending_preset_selection_criteria, listing);
-                    engine.pending_preset_selection_criteria = {};
-                }
-
-                PresetListingChanged(engine.preset_browser_filters,
-                                     listing.listing ? &*listing.listing : nullptr);
-            });
-        });
-
     {
         if (auto const timer_support =
                 (clap_host_timer_support const*)host.get_extension(&host, CLAP_EXT_TIMER_SUPPORT);
@@ -517,7 +488,6 @@ Engine::~Engine() {
     ArenaAllocatorWithInlineStorage<1000> scratch_arena {PageAllocator::Instance()};
     DeinitAttributionRequirements(attribution_requirements, scratch_arena);
     package::ShutdownJobs(package_install_jobs);
-    shared_engine_systems.preset_listing.scanned_folder.listeners.Remove(presets_folder_listener_id);
 
     sample_lib_server::CloseAsyncCommsChannel(shared_engine_systems.sample_library_server,
                                               sample_lib_server_async_channel);

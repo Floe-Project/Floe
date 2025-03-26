@@ -17,6 +17,12 @@ struct StateMetadata {
     DynamicArrayBounded<char, k_max_preset_description_size> description {};
 };
 
+struct StateMetadataRef {
+    Span<String> tags {};
+    String author {};
+    String description {};
+};
+
 struct StateSnapshot {
     f32& LinearParam(ParamIndex index) { return param_values[ToInt(index)]; }
     f32 LinearParam(ParamIndex index) const { return param_values[ToInt(index)]; }

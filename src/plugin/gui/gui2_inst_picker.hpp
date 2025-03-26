@@ -35,12 +35,6 @@ struct InstPickerContext {
     bool has_mirage_libraries {};
 };
 
-struct InstrumentCursor {
-    bool operator==(InstrumentCursor const& o) const = default;
-    usize lib_index;
-    usize inst_index;
-};
-
 void LoadAdjacentInstrument(InstPickerContext const& context,
                             InstPickerState& state,
                             SearchDirection direction,

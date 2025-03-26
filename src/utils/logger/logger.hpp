@@ -102,6 +102,7 @@ enum class ModuleName {
     SampleLibraryServer,
     Preferences,
     Standalone,
+    PresetServer,
 };
 
 constexpr String ModuleNameString(ModuleName module_name) {
@@ -117,6 +118,7 @@ constexpr String ModuleNameString(ModuleName module_name) {
         case ModuleName::SampleLibraryServer: return "📚smpl-srv";
         case ModuleName::Preferences: return "⚙️sett";
         case ModuleName::Standalone: return "🧍stand";
+        case ModuleName::PresetServer: return "📂prst-srv";
     }
 }
 

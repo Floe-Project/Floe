@@ -168,6 +168,7 @@ static Box DoPickerItemsSectionContainer(GuiBoxSystem& box_system, PickerItemsSe
                   .text = text,
                   .font = FontType::Heading3,
                   .size_from_text = true,
+                  .text_overflow = TextOverflowType::ShowDotsOnLeft,
                   .layout {
                       .margins = {.b = k_picker_spacing / 2},
                   },
@@ -247,6 +248,8 @@ PUBLIC void DoPickerLibraryFilters(GuiBoxSystem& box_system,
 
 PUBLIC void
 DoPickerTagsFilters(GuiBoxSystem& box_system, Box const& parent, TagsFilters const& tags_filters) {
+    if (!tags_filters.tags.size) return;
+
     auto const section = DoPickerItemsSectionContainer(box_system,
                                                        {
                                                            .parent = parent,
@@ -342,8 +345,9 @@ struct PickerPopupOptions {
     FunctionRef<void()> on_scroll_to_show_selected {};
 
     Span<sample_lib_server::RefCounted<sample_lib::Library>> libraries;
-    Optional<LibraryFilters> library_filters;
-    Optional<TagsFilters> tags_filters;
+    Optional<LibraryFilters> library_filters {};
+    Optional<TagsFilters> tags_filters {};
+    FunctionRef<void(GuiBoxSystem&, Box const& parent)> do_extra_filters {};
     FunctionRef<void()> on_clear_all_filters {};
 
     f32 status_bar_height {};
@@ -650,6 +654,8 @@ DoPickerPopup(GuiBoxSystem& box_system, PickerPopupOptions const& options, Picke
                                                         context.hovering_lib);
                              if (options.tags_filters)
                                  DoPickerTagsFilters(box_system, root, *options.tags_filters);
+
+                             if (options.do_extra_filters) options.do_extra_filters(box_system, root);
                          },
                      .data =
                          Subpanel {

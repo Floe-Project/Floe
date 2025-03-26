@@ -252,13 +252,23 @@ struct HashTable {
             auto& element = elems[index];
             if (element.active) {
                 item.key = element.key;
-                item.value_ptr = &element.data;
+                if constexpr (!Same<DummyValueType, ValueType>) item.value_ptr = &element.data;
                 break;
             }
         }
         return Iterator {*this, item, index};
     }
     Iterator end() const { return Iterator {*this, {}, mask + 1}; }
+
+    HashTable Clone(Allocator& allocator, CloneType type) const {
+        auto cloned_elements = allocator.Clone(Elements(), type);
+        return {
+            .elems = cloned_elements.data,
+            .mask = mask,
+            .size = size,
+            .num_dead = num_dead,
+        };
+    }
 
     Element* elems {};
     usize mask {};

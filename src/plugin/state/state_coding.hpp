@@ -20,8 +20,16 @@ struct CodeStateArguments {
 // "Code" as in decode/encode
 ErrorCodeOr<void> CodeState(StateSnapshot& state, CodeStateArguments const& args);
 
+enum class PresetFormat : u8 { Mirage, Floe, Count };
+
+PresetFormat PresetFormatFromPath(String path);
+
 ErrorCodeOr<void> DecodeJsonState(StateSnapshot& state, ArenaAllocator& scratch_arena, String json_data);
 
-ErrorCodeOr<StateSnapshot> LoadPresetFile(String filepath, ArenaAllocator& scratch_arena);
+ErrorCodeOr<StateSnapshot>
+LoadPresetFile(String filepath, ArenaAllocator& scratch_arena, bool abbreviated_read);
+
+ErrorCodeOr<StateSnapshot>
+LoadPresetFile(PresetFormat format, Reader& reader, ArenaAllocator& scratch_arena, bool abbreviated_read);
 
 ErrorCodeOr<void> SavePresetFile(String path, StateSnapshot const& state);

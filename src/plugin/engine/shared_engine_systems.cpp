@@ -44,7 +44,8 @@ SharedEngineSystems::SharedEngineSystems(Span<sentry::Tag const> tags)
     , prefs {.arena = PageAllocator::Instance()}
     , sample_library_server(thread_pool,
                             paths.always_scanned_folder[ToInt(ScanFolderType::Libraries)],
-                            error_notifications) {
+                            error_notifications)
+    , preset_server {.error_notifications = error_notifications} {
     InitBackgroundErrorReporting(tags);
 
     prefs.on_change = [this](prefs::Key const& key, prefs::Value const* value) {
@@ -58,7 +59,12 @@ SharedEngineSystems::SharedEngineSystems(Span<sentry::Tag const> tags)
             }
             sample_lib_server::SetExtraScanFolders(sample_library_server, extra_scan_folders);
         } else if (key == prefs::key::k_extra_presets_folder) {
-            preset_listing.scanned_folder.needs_rescan.Store(true, StoreMemoryOrder::Relaxed);
+            DynamicArrayBounded<String, k_max_extra_scan_folders> extra_scan_folders;
+            for (auto v = value; v; v = v->next) {
+                if (extra_scan_folders.size == k_max_extra_scan_folders) break;
+                dyn::AppendIfNotAlreadyThere(extra_scan_folders, v->Get<String>());
+            }
+            SetExtraScanFolders(preset_server, extra_scan_folders);
         }
         ErrorReportingOnPreferenceChanged(key, value);
 
@@ -104,6 +110,9 @@ SharedEngineSystems::SharedEngineSystems(Span<sentry::Tag const> tags)
 
     sample_lib_server::SetExtraScanFolders(sample_library_server,
                                            ExtraScanFolders(paths, prefs, ScanFolderType::Libraries));
+
+    InitPresetServer(preset_server, paths.always_scanned_folder[ToInt(ScanFolderType::Presets)]);
+    SetExtraScanFolders(preset_server, ExtraScanFolders(paths, prefs, ScanFolderType::Presets));
 }
 
 SharedEngineSystems::~SharedEngineSystems() {
@@ -112,6 +121,8 @@ SharedEngineSystems::~SharedEngineSystems() {
         WakeWaitingThreads(polling_running, NumWaitingThreads::All);
         polling_thread.Join();
     }
+
+    ShutdownPresetServer(preset_server);
 
     prefs::WriteIfNeeded(prefs);
     prefs::Deinit(prefs);

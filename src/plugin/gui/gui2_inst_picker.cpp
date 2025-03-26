@@ -5,6 +5,12 @@
 
 #include "gui2_common_picker.hpp"
 
+struct InstrumentCursor {
+    bool operator==(InstrumentCursor const& o) const = default;
+    usize lib_index;
+    usize inst_index;
+};
+
 static Optional<InstrumentCursor> CurrentCursor(InstPickerContext const& context,
                                                 sample_lib::InstrumentId const& inst_id) {
     for (auto const [lib_index, l] : Enumerate(context.libraries)) {
@@ -22,6 +28,8 @@ static Optional<InstrumentCursor> IterateInstrument(InstPickerContext const& con
                                                     SearchDirection direction,
                                                     bool first,
                                                     bool picker_gui_is_open) {
+    if (context.libraries.size == 0) return k_nullopt;
+
     if (cursor.lib_index >= context.libraries.size) cursor.lib_index = 0;
 
     if (!first) {
@@ -99,6 +107,21 @@ static Optional<InstrumentCursor> IterateInstrument(InstPickerContext const& con
     return k_nullopt;
 }
 
+static void LoadInstrument(InstPickerContext const& context,
+                           InstPickerState& state,
+                           InstrumentCursor const& cursor,
+                           bool scroll) {
+    auto const& lib = *context.libraries[cursor.lib_index];
+    auto const& inst = *lib.sorted_instruments[cursor.inst_index];
+    LoadInstrument(context.engine,
+                   context.layer.index,
+                   sample_lib::InstrumentId {
+                       .library = lib.Id(),
+                       .inst_name = inst.name,
+                   });
+    if (scroll) state.scroll_to_show_selected = true;
+}
+
 void LoadAdjacentInstrument(InstPickerContext const& context,
                             InstPickerState& state,
                             SearchDirection direction,
@@ -131,15 +154,7 @@ void LoadAdjacentInstrument(InstPickerContext const& context,
 
             if (auto const cursor =
                     IterateInstrument(context, state, {0, 0}, direction, true, picker_gui_is_open)) {
-                auto const& lib = *context.libraries[cursor->lib_index];
-                auto const& inst = *lib.sorted_instruments[cursor->inst_index];
-                LoadInstrument(context.engine,
-                               context.layer.index,
-                               sample_lib::InstrumentId {
-                                   .library = lib.Id(),
-                                   .inst_name = inst.name,
-                               });
-                state.scroll_to_show_selected = true;
+                LoadInstrument(context, state, *cursor, true);
             }
             break;
         }
@@ -149,15 +164,7 @@ void LoadAdjacentInstrument(InstPickerContext const& context,
             if (auto const cursor = CurrentCursor(context, inst_id)) {
                 if (auto const prev =
                         IterateInstrument(context, state, *cursor, direction, false, picker_gui_is_open)) {
-                    auto const& lib = *context.libraries[prev->lib_index];
-                    auto const& inst = *lib.sorted_instruments[prev->inst_index];
-                    LoadInstrument(context.engine,
-                                   context.layer.index,
-                                   sample_lib::InstrumentId {
-                                       .library = lib.Id(),
-                                       .inst_name = inst.name,
-                                   });
-                    state.scroll_to_show_selected = true;
+                    LoadInstrument(context, state, *prev, true);
                 }
             }
             break;
@@ -208,15 +215,7 @@ void LoadRandomInstrument(InstPickerContext const& context, InstPickerState& sta
         cursor =
             *IterateInstrument(context, state, cursor, SearchDirection::Forward, false, picker_gui_is_open);
 
-    auto const& lib = *context.libraries[cursor.lib_index];
-    auto const& inst = *lib.sorted_instruments[cursor.inst_index];
-    LoadInstrument(context.engine,
-                   context.layer.index,
-                   sample_lib::InstrumentId {
-                       .library = lib.Id(),
-                       .inst_name = inst.name,
-                   });
-    state.scroll_to_show_selected = true;
+    LoadInstrument(context, state, cursor, true);
 }
 
 static void InstPickerWaveformItems(GuiBoxSystem& box_system,
@@ -453,9 +452,11 @@ void DoInstPickerPopup(GuiBoxSystem& box_system,
                     fmt::Append(buf, "\nTags: ");
                     if (i->tags.size == 0)
                         fmt::Append(buf, "None");
-                    else
+                    else {
                         for (auto const t : i->tags)
-                            fmt::Append(buf, "{} ", t);
+                            fmt::Append(buf, "{}, ", t);
+                        dyn::Pop(buf, 2);
+                    }
 
                     status = buf.ToOwnedSpan();
                 } else if (auto const w = context.waveform_type_hovering) {

@@ -14,6 +14,8 @@ CustomValueToString(Writer writer, sample_lib::LibraryIdRef id, fmt::FormatOptio
 
 namespace sample_lib {
 
+u64 Hash(LibraryIdRef const& id) { return id.Hash(); }
+
 ErrorCodeOr<u64> Hash(Reader& reader, FileFormat format) {
     switch (format) {
         case FileFormat::Mdata: return MdataHash(reader);

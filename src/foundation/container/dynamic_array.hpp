@@ -564,12 +564,12 @@ struct DynamicArrayBounded {
     }
 
     constexpr DynamicArrayBounded& operator=(DynamicArrayBounded const& other) {
-        ASSERT_ALWAYS(dyn::Assign(*this, other.Items()));
+        ASSERT(dyn::Assign(*this, other.Items()));
         return *this;
     }
 
     constexpr DynamicArrayBounded& operator=(DynamicArrayBounded&& other) {
-        ASSERT_ALWAYS(dyn::MoveAssign(*this, other.Items()));
+        ASSERT(dyn::MoveAssign(*this, other.Items()));
         dyn::Clear(other);
         return *this;
     }

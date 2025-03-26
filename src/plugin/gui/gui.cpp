@@ -355,9 +355,6 @@ GuiFrameResult GuiUpdate(Gui* g) {
         imgui.BeginWindow(mid_settings, mid_panel_r, "MidPanel");
         MidPanel(g);
         imgui.EndWindow();
-
-        PresetBrowser preset_browser {g, g->preset_browser_data, false};
-        preset_browser.DoPresetBrowserPanel(mid_panel_r);
     }
 
     {

@@ -229,7 +229,7 @@ u64 HashLibraryRef(sample_lib::LibraryIdRef const& id);
 
 struct Server {
     Server(ThreadPool& pool,
-           String always_scanned_folders,
+           String always_scanned_folder,
            ThreadsafeErrorNotifications& connection_independent_error_notif);
     ~Server();
 

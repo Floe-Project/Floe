@@ -10,7 +10,7 @@
 #include "common_infrastructure/sentry/sentry.hpp"
 
 #include "clap/plugin.h"
-#include "presets/presets_folder.hpp"
+#include "preset_server/preset_server.hpp"
 #include "sample_lib_server/sample_library_server.hpp"
 
 // Shared across plugin instances of the engine. This usually happens when the plugin is loaded multiple times
@@ -34,10 +34,9 @@ struct SharedEngineSystems {
     FloePaths paths;
     prefs::Preferences prefs;
     ThreadPool thread_pool;
-    PresetsListing preset_listing {paths.always_scanned_folder[ToInt(ScanFolderType::Presets)],
-                                   error_notifications};
     sample_lib_server::Server sample_library_server;
     Optional<LockableSharedMemory> shared_attributions_store {};
+    PresetServer preset_server;
 
     Thread polling_thread {};
     Mutex polling_mutex {};

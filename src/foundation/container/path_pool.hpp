@@ -17,7 +17,7 @@ struct PathPool {
         Path* next {};
     };
 
-    String Clone(String p, ArenaAllocator& arena) {
+    String Clone(String p, ArenaAllocator& arena, usize min_size = 64) {
         for (auto i = used_list; i != nullptr; i = i->next) {
             if (StartsWithSpan(i->buffer, p)) {
                 ++i->buffer_refs;
@@ -42,7 +42,7 @@ struct PathPool {
         }
 
         auto new_path = arena.NewUninitialised<Path>();
-        new_path->buffer = arena.AllocateExactSizeUninitialised<char>(Max(p.size, 64uz));
+        new_path->buffer = arena.AllocateExactSizeUninitialised<char>(Max(p.size, min_size));
         new_path->buffer_refs = 1;
         CopyMemory(new_path->buffer.data, p.data, p.size);
         if (new_path->buffer.size != p.size)

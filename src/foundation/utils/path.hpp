@@ -339,6 +339,12 @@ PUBLIC_INLINE DynamicArrayBounded<char, k_size> JoinInline(Span<String const> pa
     return buffer;
 }
 
+PUBLIC bool Contains(Span<String const> paths, String path, Format format = Format::Native) {
+    for (auto p : paths)
+        if (Equal(p, path, format)) return true;
+    return false;
+}
+
 constexpr WString k_win32_long_path_prefix {L"\\\\?\\"};
 
 PUBLIC constexpr bool IsNetworkShare(WString path) {

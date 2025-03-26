@@ -309,7 +309,8 @@ TEST_CASE(TestAutosave) {
     prefs::Preferences preferences {};
 
     // We need to load some valid state to test autosave.
-    auto snapshot = TRY(LoadPresetFile(TestPresetPath(tester, "sine.floe-preset"), tester.scratch_arena));
+    auto snapshot =
+        TRY(LoadPresetFile(TestPresetPath(tester, "sine.floe-preset"), tester.scratch_arena, false));
 
     InitAutosaveState(state, preferences, tester.random_seed, snapshot);
 

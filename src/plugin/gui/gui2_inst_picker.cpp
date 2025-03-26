@@ -433,7 +433,7 @@ void DoInstPickerPopup(GuiBoxSystem& box_system,
                 if (state.tab == InstPickerState::Tab::FloeLibaries) {
                     f = TagsFilters {
                         .selected_tags_hashes = state.selected_tags_hashes,
-                        .tags = (Set<String>)all_tags.table,
+                        .tags = {all_tags.table},
                     };
                 }
                 f;

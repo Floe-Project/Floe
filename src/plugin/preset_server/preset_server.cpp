@@ -72,10 +72,9 @@ PresetsSnapshot BeginReadFolders(PresetServer& server, ArenaAllocator& arena) {
     auto result = arena.Clone(server.folders);
     return {
         .folders = {(PresetFolder const**)result.data, result.size},
-        .used_tags = (Set<String>)server.used_tags.table.Clone(arena, CloneType::Deep),
-        .used_libraries = (Set<sample_lib::LibraryIdRef, sample_lib::Hash>)
-                              server.used_libraries.table.Clone(arena, CloneType::Deep),
-        .authors = (Set<String>)server.authors.table.Clone(arena, CloneType::Deep),
+        .used_tags = {server.used_tags.table.Clone(arena, CloneType::Deep)},
+        .used_libraries = {server.used_libraries.table.Clone(arena, CloneType::Deep)},
+        .authors = {server.authors.table.Clone(arena, CloneType::Deep)},
         .has_preset_type = server.has_preset_type,
     };
 }

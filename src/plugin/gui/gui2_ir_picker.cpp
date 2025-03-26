@@ -283,7 +283,7 @@ void DoIrPickerPopup(GuiBoxSystem& box_system,
             .tags_filters =
                 TagsFilters {
                     .selected_tags_hashes = state.selected_tags_hashes,
-                    .tags = (Set<String>)all_tags.table,
+                    .tags = {all_tags.table},
                 },
             .on_clear_all_filters = [&]() { state.ClearAllFilters(); },
             .status_bar_height = 50,

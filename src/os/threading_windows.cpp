@@ -40,6 +40,11 @@ Mutex::~Mutex() { DeleteCriticalSection(&mutex.As<CRITICAL_SECTION>()); }
 void Mutex::Lock() { EnterCriticalSection(&mutex.As<CRITICAL_SECTION>()); }
 bool Mutex::TryLock() { return TryEnterCriticalSection(&mutex.As<CRITICAL_SECTION>()) != FALSE; }
 void Mutex::Unlock() { LeaveCriticalSection(&mutex.As<CRITICAL_SECTION>()); }
+RecursiveMutex::RecursiveMutex() { InitializeCriticalSection(&mutex.As<CRITICAL_SECTION>()); }
+RecursiveMutex::~RecursiveMutex() { DeleteCriticalSection(&mutex.As<CRITICAL_SECTION>()); }
+void RecursiveMutex::Lock() { EnterCriticalSection(&mutex.As<CRITICAL_SECTION>()); }
+bool RecursiveMutex::TryLock() { return TryEnterCriticalSection(&mutex.As<CRITICAL_SECTION>()) != FALSE; }
+void RecursiveMutex::Unlock() { LeaveCriticalSection(&mutex.As<CRITICAL_SECTION>()); }
 
 WaitResult WaitIfValueIsExpected(Atomic<u32>& value, u32 expected, Optional<u32> timeout_milliseconds) {
     auto const succeed = WaitOnAddress(&value.raw,

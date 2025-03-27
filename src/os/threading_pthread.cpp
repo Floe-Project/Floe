@@ -1,6 +1,7 @@
 // Copyright 2018-2024 Sam Windell
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <errno.h>
 #include <pthread.h>
 #include <unistd.h>
 
@@ -19,11 +20,36 @@ void SetCurrentThreadPriorityRealTime() {
     pthread_setschedparam(pthread_self(), SCHED_RR, &params);
 }
 
-Mutex::Mutex() { pthread_mutex_init(&mutex.As<pthread_mutex_t>(), nullptr); }
+Mutex::Mutex() {
+    pthread_mutexattr_t attr;
+    pthread_mutexattr_init(&attr);
+    pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK);
+    pthread_mutex_init(&mutex.As<pthread_mutex_t>(), &attr);
+    pthread_mutexattr_destroy(&attr);
+}
+
 Mutex::~Mutex() { pthread_mutex_destroy(&mutex.As<pthread_mutex_t>()); }
-void Mutex::Lock() { pthread_mutex_lock(&mutex.As<pthread_mutex_t>()); }
+
+void Mutex::Lock() {
+    int result = pthread_mutex_lock(&mutex.As<pthread_mutex_t>());
+    ASSERT(result != EDEADLK);
+}
+
 bool Mutex::TryLock() { return pthread_mutex_trylock(&mutex.As<pthread_mutex_t>()) == 0; }
 void Mutex::Unlock() { pthread_mutex_unlock(&mutex.As<pthread_mutex_t>()); }
+
+RecursiveMutex::RecursiveMutex() {
+    pthread_mutexattr_t attr;
+    pthread_mutexattr_init(&attr);
+    pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
+    pthread_mutex_init(&mutex.As<pthread_mutex_t>(), &attr);
+    pthread_mutexattr_destroy(&attr);
+}
+
+RecursiveMutex::~RecursiveMutex() { pthread_mutex_destroy(&mutex.As<pthread_mutex_t>()); }
+void RecursiveMutex::Lock() { pthread_mutex_lock(&mutex.As<pthread_mutex_t>()); }
+bool RecursiveMutex::TryLock() { return pthread_mutex_trylock(&mutex.As<pthread_mutex_t>()) == 0; }
+void RecursiveMutex::Unlock() { pthread_mutex_unlock(&mutex.As<pthread_mutex_t>()); }
 
 Thread::Thread() {}
 Thread::~Thread() { ASSERT(!Joinable()); }

@@ -474,6 +474,18 @@ struct Mutex {
     OpaqueHandle<NativeHandleSizes().mutex> mutex;
 };
 
+struct RecursiveMutex {
+    RecursiveMutex();
+    ~RecursiveMutex();
+    void Lock();
+    bool TryLock();
+    void Unlock();
+
+    NON_COPYABLE_AND_MOVEABLE(RecursiveMutex);
+
+    OpaqueHandle<NativeHandleSizes().mutex> mutex;
+};
+
 struct ScopedMutexLock {
     ScopedMutexLock(Mutex& l) : mutex(l) { l.Lock(); }
     ~ScopedMutexLock() { mutex.Unlock(); }

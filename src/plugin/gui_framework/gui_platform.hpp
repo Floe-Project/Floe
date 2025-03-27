@@ -265,7 +265,7 @@ PUBLIC ErrorCodeOr<void> SetParent(GuiPlatform& platform, clap_window_t const& w
     return k_success;
 }
 
-PUBLIC ErrorCodeOr<void> SetVisible(GuiPlatform& platform, bool visible, Engine& plugin) {
+PUBLIC ErrorCodeOr<void> SetVisible(GuiPlatform& platform, bool visible, Engine& engine) {
     ASSERT(platform.view);
     if (visible) {
         if (!platform.gui) {
@@ -286,7 +286,7 @@ PUBLIC ErrorCodeOr<void> SetVisible(GuiPlatform& platform, bool visible, Engine&
 
             detail::X11SetParent(platform.view, puglGetParent(platform.view));
 
-            platform.gui.Emplace(platform.frame_state, plugin);
+            platform.gui.Emplace(platform.frame_state, engine);
 
             if constexpr (IS_LINUX) {
                 // https://nakst.gitlab.io/tutorial/clap-part-3.html

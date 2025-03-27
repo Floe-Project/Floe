@@ -46,6 +46,7 @@ struct GuiPlatform {
     Optional<clap_id> clap_timer_id {};
     Optional<int> clap_posix_fd {};
     bool inside_update {};
+    bool first_update_made {};
     ArenaAllocator file_picker_result_arena {Malloc::Instance()};
     Optional<OpaqueHandle<IS_WINDOWS ? 160 : 16>> native_file_picker {};
     bool windows_keyboard_hook_added {};
@@ -220,6 +221,8 @@ PUBLIC void DestroyView(GuiPlatform& platform) {
     puglFreeView(platform.view);
     platform.view = nullptr;
 
+    platform.first_update_made = false;
+
     if (!detail::CustomFloeHost(platform.host)) {
         LogInfo(ModuleName::Gui, "freeing world");
         puglFreeWorld(platform.world);
@@ -350,6 +353,10 @@ static void LogIfSlow(Stopwatch& stopwatch, String message) {
 
 static bool IsUpdateNeeded(GuiPlatform& platform) {
     bool update_needed = false;
+
+    // Until the GUI has been run, we can't know about its requirements and whether we can be more idle or
+    // not.
+    if (!platform.first_update_made) update_needed = true;
 
     if (platform.frame_state.request_update.Exchange(false, RmwMemoryOrder::Relaxed)) update_needed = true;
 
@@ -766,6 +773,8 @@ static void UpdateAndRender(GuiPlatform& platform) {
         auto o = platform.graphics_ctx->Render(platform.last_result.draw_data, window_size);
         if (o.HasError()) LogError(ModuleName::Gui, "GUI render failed: {}", o.Error());
     }
+
+    platform.first_update_made = true;
 }
 
 static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {

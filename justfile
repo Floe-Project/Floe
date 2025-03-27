@@ -196,9 +196,16 @@ test-pluginval-au build="": (_build_if_requested build "native")
   pluginval {{native_binary_dir}}/Floe.component
 
 [macos]
-install-au:
-  rm -rf ~/Library/Audio/Plug-Ins/Components/Floe.component
-  cp -r {{native_binary_dir}}/Floe.component ~/Library/Audio/Plug-Ins/Components/
+install-au global='0':
+  #!/usr/bin/env bash
+  set -euxo pipefail
+  if [[ {{global}} -eq 1 ]]; then
+    sudo rm -rf /Library/Audio/Plug-Ins/Components/Floe.component
+    sudo cp -r {{native_binary_dir}}/Floe.component /Library/Audio/Plug-Ins/Components/
+  else
+    rm -rf ~/Library/Audio/Plug-Ins/Components/Floe.component
+    cp -r {{native_binary_dir}}/Floe.component ~/Library/Audio/Plug-Ins/Components/
+  fi
 
 [macos]
 test-auval:

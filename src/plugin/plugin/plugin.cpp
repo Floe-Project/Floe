@@ -526,14 +526,18 @@ static bool ClapGuiSetSize(clap_plugin_t const* plugin, u32 clap_width, u32 clap
         if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return false;
         if (!Check(floe, floe.gui_platform.HasValue(), k_func, "no gui created")) return false;
 
-        auto const size = ClapPixelsToPhysicalPixels(floe.gui_platform->view, clap_width, clap_height);
+        auto size = ClapPixelsToPhysicalPixels(floe.gui_platform->view, clap_width, clap_height);
 
         if (!Check(floe, size && size->width >= k_min_gui_width, k_func, "invalid size")) return false;
-        if (!Check(floe,
-                   IsAspectRatio(*size, DesiredAspectRatio(g_shared_engine_systems->prefs)),
-                   k_func,
-                   "invalid aspect ratio")) {
-            return false;
+
+        // Some hosts (AUv2 clap-wrapper in Logic, for example) will give us sizes in invalid aspect ratio. In
+        // this case, we do our best to conform to the size given but it won't be the exact size requested.
+        if (!IsAspectRatio(*size, DesiredAspectRatio(g_shared_engine_systems->prefs))) {
+            LogWarning(ModuleName::Gui,
+                       "invalid size given: {} x {}, we will adjust",
+                       size->width,
+                       size->height);
+            size = GetUsableSizeWithinDimensions(*floe.gui_platform, size->width, size->height);
         }
 
         return SetSize(*floe.gui_platform, *size);

@@ -17,6 +17,8 @@ constexpr UiSize SizeWithAspectRatio(u16 target_width, UiSize aspect_ratio) {
 }
 
 constexpr auto GreatestCommonDivisor(auto a, auto b) {
+    ASSERT(a >= 0);
+    ASSERT(b >= 0);
     while (b != 0) {
         auto const t = b;
         b = a % b;

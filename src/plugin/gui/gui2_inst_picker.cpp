@@ -371,7 +371,7 @@ void DoInstPickerPopup(GuiBoxSystem& box_system,
         PickerPopupOptions {
             .title = fmt::Format(box_system.arena, "Layer {} Instrument", context.layer.index + 1),
             .height = box_system.imgui.PixelsToVw(box_system.imgui.frame_input.window_size.height * 0.9f),
-            .lhs_width = 200,
+            .rhs_width = 200,
             .filters_col_width = 200,
             .item_type_name = "instrument",
             .items_section_heading = "Instruments",
@@ -386,7 +386,7 @@ void DoInstPickerPopup(GuiBoxSystem& box_system,
                 tab_config;
             }),
             .current_tab_index = &ToIntRef(state.tab),
-            .lhs_top_button = ({
+            .rhs_top_button = ({
                 Optional<PickerPopupOptions::Button> unload_button {};
                 if (context.layer.instrument_id.tag != InstrumentType::None) {
                     unload_button = PickerPopupOptions::Button {
@@ -401,7 +401,7 @@ void DoInstPickerPopup(GuiBoxSystem& box_system,
                 }
                 unload_button;
             }),
-            .lhs_do_items = [&](GuiBoxSystem& box_system) { InstPickerItems(box_system, context, state); },
+            .rhs_do_items = [&](GuiBoxSystem& box_system) { InstPickerItems(box_system, context, state); },
             .search = state.tab != InstPickerState::Tab::Waveforms ? &state.search : nullptr,
             .on_load_previous =
                 [&]() { LoadAdjacentInstrument(context, state, SearchDirection::Backward, true); },

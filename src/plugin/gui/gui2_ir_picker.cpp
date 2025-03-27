@@ -243,11 +243,11 @@ void DoIrPickerPopup(GuiBoxSystem& box_system,
         PickerPopupOptions {
             .title = "Select Impulse Response",
             .height = box_system.imgui.PixelsToVw(box_system.imgui.frame_input.window_size.height * 0.5f),
-            .lhs_width = 200,
+            .rhs_width = 200,
             .filters_col_width = 200,
             .item_type_name = "impulse response",
             .items_section_heading = "IRs",
-            .lhs_top_button = ({
+            .rhs_top_button = ({
                 Optional<PickerPopupOptions::Button> unload_button {};
                 if (ir_id) {
                     unload_button = PickerPopupOptions::Button {
@@ -262,7 +262,7 @@ void DoIrPickerPopup(GuiBoxSystem& box_system,
                 }
                 unload_button;
             }),
-            .lhs_do_items = [&](GuiBoxSystem& box_system) { IrPickerItems(box_system, context, state); },
+            .rhs_do_items = [&](GuiBoxSystem& box_system) { IrPickerItems(box_system, context, state); },
             .search = &state.search,
             .on_load_previous = [&]() { LoadAdjacentIr(context, state, SearchDirection::Backward); },
             .on_load_next = [&]() { LoadAdjacentIr(context, state, SearchDirection::Forward); },

@@ -326,7 +326,7 @@ struct PickerPopupOptions {
 
     String title {};
     f32 height {}; // VW
-    f32 lhs_width {}; // VW
+    f32 rhs_width {}; // VW
     f32 filters_col_width {}; // VW
 
     String item_type_name {}; // "instrument", "preset", etc.
@@ -335,8 +335,8 @@ struct PickerPopupOptions {
     Span<ModalTabConfig const> tab_config {};
     u32* current_tab_index;
 
-    Optional<Button> lhs_top_button {};
-    FunctionRef<void(GuiBoxSystem&)> lhs_do_items {};
+    Optional<Button> rhs_top_button {};
+    FunctionRef<void(GuiBoxSystem&)> rhs_do_items {};
     DynamicArrayBounded<char, 100>* search {};
 
     FunctionRef<void()> on_load_previous {};
@@ -408,7 +408,7 @@ DoPickerPopup(GuiBoxSystem& box_system, PickerPopupOptions const& options, Picke
                       {
                           .parent = headings_row,
                           .layout {
-                              .size = {options.lhs_width, layout::k_hug_contents},
+                              .size = {options.filters_col_width, layout::k_hug_contents},
                               .contents_padding = {.lr = k_picker_spacing, .tb = k_picker_spacing / 2},
                               .contents_align = layout::Alignment::Start,
                               .contents_cross_axis_align = layout::CrossAxisAlign::Middle,
@@ -418,6 +418,49 @@ DoPickerPopup(GuiBoxSystem& box_system, PickerPopupOptions const& options, Picke
             DoBox(box_system,
                   {
                       .parent = lhs_top,
+                      .text = "Filters",
+                      .font = FontType::Heading2,
+                      .layout {
+                          .size = {layout::k_fill_parent, style::k_font_heading2_size},
+                      },
+                  });
+
+            if (options.on_clear_all_filters && (options.library_filters.AndThen([](LibraryFilters const& f) {
+                    return f.selected_library_hashes.size;
+                }) || options.tags_filters.AndThen([](TagsFilters const& f) {
+                    return f.selected_tags_hashes.size;
+                }))) {
+                if (IconButton(box_system,
+                               lhs_top,
+                               ICON_FA_TIMES,
+                               "Clear all filters",
+                               style::k_font_heading2_size * 0.9f,
+                               style::k_font_heading2_size)
+                        .button_fired) {
+                    dyn::Append(box_system.state->deferred_actions,
+                                [&]() { options.on_clear_all_filters(); });
+                }
+            }
+        }
+
+        DoModalDivider(box_system, headings_row, DividerType::Vertical);
+
+        {
+            auto const rhs_top =
+                DoBox(box_system,
+                      {
+                          .parent = headings_row,
+                          .layout {
+                              .size = {options.rhs_width, layout::k_hug_contents},
+                              .contents_padding = {.lr = k_picker_spacing, .tb = k_picker_spacing / 2},
+                              .contents_align = layout::Alignment::Start,
+                              .contents_cross_axis_align = layout::CrossAxisAlign::Middle,
+                          },
+                      });
+
+            DoBox(box_system,
+                  {
+                      .parent = rhs_top,
                       .text = options.items_section_heading,
                       .font = FontType::Heading2,
                       .layout {
@@ -454,56 +497,13 @@ DoPickerPopup(GuiBoxSystem& box_system, PickerPopupOptions const& options, Picke
                  })) {
                 if (!btn.on_fired) continue;
                 if (IconButton(box_system,
-                               lhs_top,
+                               rhs_top,
                                btn.text,
                                btn.tooltip,
                                style::k_font_heading2_size * btn.icon_scaling,
                                style::k_font_heading2_size)
                         .button_fired) {
                     dyn::Append(box_system.state->deferred_actions, [&]() { btn.on_fired(); });
-                }
-            }
-        }
-
-        DoModalDivider(box_system, headings_row, DividerType::Vertical);
-
-        {
-            auto const rhs_top =
-                DoBox(box_system,
-                      {
-                          .parent = headings_row,
-                          .layout {
-                              .size = {options.filters_col_width, layout::k_hug_contents},
-                              .contents_padding = {.lr = k_picker_spacing, .tb = k_picker_spacing / 2},
-                              .contents_align = layout::Alignment::Start,
-                              .contents_cross_axis_align = layout::CrossAxisAlign::Middle,
-                          },
-                      });
-
-            DoBox(box_system,
-                  {
-                      .parent = rhs_top,
-                      .text = "Filters",
-                      .font = FontType::Heading2,
-                      .layout {
-                          .size = {layout::k_fill_parent, style::k_font_heading2_size},
-                      },
-                  });
-
-            if (options.on_clear_all_filters && (options.library_filters.AndThen([](LibraryFilters const& f) {
-                    return f.selected_library_hashes.size;
-                }) || options.tags_filters.AndThen([](TagsFilters const& f) {
-                    return f.selected_tags_hashes.size;
-                }))) {
-                if (IconButton(box_system,
-                               rhs_top,
-                               ICON_FA_TIMES,
-                               "Clear all filters",
-                               style::k_font_heading2_size * 0.9f,
-                               style::k_font_heading2_size)
-                        .button_fired) {
-                    dyn::Append(box_system.state->deferred_actions,
-                                [&]() { options.on_clear_all_filters(); });
                 }
             }
         }
@@ -526,7 +526,56 @@ DoPickerPopup(GuiBoxSystem& box_system, PickerPopupOptions const& options, Picke
                                {
                                    .parent = main_section,
                                    .layout {
-                                       .size = {options.lhs_width, layout::k_fill_parent},
+                                       .size = {options.filters_col_width, layout::k_fill_parent},
+                                       .contents_padding = {.lr = k_picker_spacing, .t = k_picker_spacing},
+                                       .contents_direction = layout::Direction::Column,
+                                       .contents_align = layout::Alignment::Start,
+                                   },
+                               });
+
+        AddPanel(box_system,
+                 {
+                     .run =
+                         [&](GuiBoxSystem& box_system) {
+                             if (!options.library_filters && !options.tags_filters) return;
+
+                             auto const root = DoPickerItemsRoot(box_system);
+
+                             if (options.library_filters)
+                                 DoPickerLibraryFilters(box_system,
+                                                        root,
+                                                        options.libraries,
+                                                        *options.library_filters,
+                                                        context.hovering_lib);
+                             if (options.tags_filters)
+                                 DoPickerTagsFilters(box_system, root, *options.tags_filters);
+
+                             if (options.do_extra_filters) options.do_extra_filters(box_system, root);
+                         },
+                     .data =
+                         Subpanel {
+                             .id = DoBox(box_system,
+                                         {
+                                             .parent = lhs,
+                                             .layout {
+                                                 .size = layout::k_fill_parent,
+                                             },
+                                         })
+                                       .layout_id,
+                             .imgui_id = (imgui::Id)SourceLocationHash(),
+                             .debug_name = "filters",
+                         },
+                 });
+    }
+
+    DoModalDivider(box_system, main_section, DividerType::Vertical);
+
+    {
+        auto const rhs = DoBox(box_system,
+                               {
+                                   .parent = main_section,
+                                   .layout {
+                                       .size = {options.rhs_width, layout::k_fill_parent},
                                        .contents_padding = {.lr = k_picker_spacing, .t = k_picker_spacing},
                                        .contents_gap = k_picker_spacing,
                                        .contents_direction = layout::Direction::Column,
@@ -536,8 +585,8 @@ DoPickerPopup(GuiBoxSystem& box_system, PickerPopupOptions const& options, Picke
                                });
 
         {
-            if (auto const& btn = options.lhs_top_button) {
-                if (TextButton(box_system, lhs, btn->text, btn->tooltip, true))
+            if (auto const& btn = options.rhs_top_button) {
+                if (TextButton(box_system, rhs, btn->text, btn->tooltip, true))
                     dyn::Append(box_system.state->deferred_actions, [&]() { btn->on_fired(); });
             }
 
@@ -545,7 +594,7 @@ DoPickerPopup(GuiBoxSystem& box_system, PickerPopupOptions const& options, Picke
                 auto const search_box =
                     DoBox(box_system,
                           {
-                              .parent = lhs,
+                              .parent = rhs,
                               .background_fill = style::Colour::Background2,
                               .round_background_corners = 0b1111,
                               .layout {
@@ -607,56 +656,7 @@ DoPickerPopup(GuiBoxSystem& box_system, PickerPopupOptions const& options, Picke
 
         AddPanel(box_system,
                  {
-                     .run = [&](GuiBoxSystem& box_system) { options.lhs_do_items(box_system); },
-                     .data =
-                         Subpanel {
-                             .id = DoBox(box_system,
-                                         {
-                                             .parent = lhs,
-                                             .layout {
-                                                 .size = layout::k_fill_parent,
-                                             },
-                                         })
-                                       .layout_id,
-                             .imgui_id = (imgui::Id)SourceLocationHash(),
-                             .debug_name = "lhs",
-                         },
-                 });
-    }
-
-    DoModalDivider(box_system, main_section, DividerType::Vertical);
-
-    {
-        auto const rhs = DoBox(box_system,
-                               {
-                                   .parent = main_section,
-                                   .layout {
-                                       .size = {options.filters_col_width, layout::k_fill_parent},
-                                       .contents_padding = {.lr = k_picker_spacing, .t = k_picker_spacing},
-                                       .contents_direction = layout::Direction::Column,
-                                       .contents_align = layout::Alignment::Start,
-                                   },
-                               });
-
-        AddPanel(box_system,
-                 {
-                     .run =
-                         [&](GuiBoxSystem& box_system) {
-                             if (!options.library_filters && !options.tags_filters) return;
-
-                             auto const root = DoPickerItemsRoot(box_system);
-
-                             if (options.library_filters)
-                                 DoPickerLibraryFilters(box_system,
-                                                        root,
-                                                        options.libraries,
-                                                        *options.library_filters,
-                                                        context.hovering_lib);
-                             if (options.tags_filters)
-                                 DoPickerTagsFilters(box_system, root, *options.tags_filters);
-
-                             if (options.do_extra_filters) options.do_extra_filters(box_system, root);
-                         },
+                     .run = [&](GuiBoxSystem& box_system) { options.rhs_do_items(box_system); },
                      .data =
                          Subpanel {
                              .id = DoBox(box_system,
@@ -668,7 +668,7 @@ DoPickerPopup(GuiBoxSystem& box_system, PickerPopupOptions const& options, Picke
                                          })
                                        .layout_id,
                              .imgui_id = (imgui::Id)SourceLocationHash(),
-                             .debug_name = "filters",
+                             .debug_name = "rhs",
                          },
                  });
     }

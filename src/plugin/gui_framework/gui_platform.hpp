@@ -241,6 +241,21 @@ PUBLIC void OnPosixFd(GuiPlatform& platform, int fd) {
 
 PUBLIC ErrorCodeOr<void> SetParent(GuiPlatform& platform, clap_window_t const& window) {
     ASSERT(platform.view);
+    ASSERT(window.ptr);
+
+    auto const parent = puglGetParent(platform.view);
+    LogDebug(ModuleName::Gui, "SetParent, current: {}, new: {}", parent, window.ptr);
+
+    if (window.ptr == (void*)parent) return k_success;
+
+    if (parent && window.ptr != (void*)parent) {
+        // Pluginval tries to re-parent us. I'm not sure if this is a quirk of pluginval or if it's more
+        // common than that. Either way, we try to support it.
+
+        DestroyView(platform);
+        TRY(CreateView(platform));
+    }
+
     ASSERT(!puglGetNativeView(platform.view), "SetParent called after window realised");
     // NOTE: "This must be called before puglRealize(), reparenting is not supported"
     TRY(Required(puglSetParent(platform.view, (uintptr)window.ptr)));

@@ -317,7 +317,8 @@ static bool ClapGuiCreate(clap_plugin_t const* plugin, char const* api, bool is_
             return false;
         if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return false;
         if (!Check(floe, floe.initialised, k_func, "not initialised")) return false;
-        if (!Check(floe, !floe.gui_platform, k_func, "already created gui")) return false;
+
+        if (floe.gui_platform) return true;
 
         floe.gui_platform.Emplace(floe.host, g_shared_engine_systems->prefs);
         return LogIfError(CreateView(*floe.gui_platform), "CreateView");
@@ -341,7 +342,8 @@ static void ClapGuiDestroy(clap_plugin const* plugin) {
         LogClapFunction(floe, ClapFunctionType::NonRecurring, k_func);
 
         if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return;
-        if (!Check(floe, floe.gui_platform.HasValue(), k_func, "no gui created")) return;
+
+        if (!floe.gui_platform) return;
 
         DestroyView(*floe.gui_platform);
         floe.gui_platform.Clear();

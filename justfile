@@ -373,7 +373,7 @@ test-ci:
   popd
 
   if [[ "{{os()}}" == "macos" ]]; then
-    just install-au
+    just install-au 1
   fi  
 
   just parallel "{{checks_ci}}"

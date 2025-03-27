@@ -25,12 +25,13 @@ const builtin = @import("builtin");
 
 const floe_description = "Sample library engine";
 const floe_copyright = "Sam Windell";
-const floe_vendor = "Floe";
+const floe_vendor = "Floe Audio";
+const floe_clap_id = "com.floe-audio.floe";
 const floe_homepage_url = "https://floe.audio";
 const floe_manual_url = "https://floe.audio";
 const floe_download_url = "https://floe.audio/installation/download-and-install-floe.html";
 const floe_source_code_url = "https://github.com/Floe-Project/Floe";
-const floe_au_factory_function = "FloeFactoryFunction";
+const floe_au_factory_function = "FloeAuV2";
 const min_macos_version = "11.0.0"; // use 3-part version for plist
 const min_windows_version = "win10";
 
@@ -272,6 +273,10 @@ fn postInstallMacosBinary(
         var dir = try std.fs.openDirAbsolute(working_dir, .{});
         defer dir.close();
 
+        var bundle_extension_no_dot = std.fs.path.extension(bundle_name);
+        std.debug.assert(bundle_extension_no_dot.len != 0);
+        bundle_extension_no_dot = bundle_extension_no_dot[1..bundle_extension_no_dot.len];
+
         try dir.deleteTree(bundle_name);
         try dir.makePath(b.pathJoin(&.{ bundle_name, "Contents", "MacOS" }));
 
@@ -299,12 +304,6 @@ fn postInstallMacosBinary(
             );
             defer pkg_info_file.close();
 
-            // TODO: include AU info
-            // \\ <?xml version="1.0" encoding="UTF-8"?>
-            // \\ <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-            // \\ <plist version="1.0">
-            // \\ </plist>
-
             try std.fmt.format(pkg_info_file.writer(),
                 \\<?xml version="1.0" encoding="UTF-8"?>
                 \\<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -312,20 +311,24 @@ fn postInstallMacosBinary(
                 \\    <dict>
                 \\        <key>CFBundleDevelopmentRegion</key>
                 \\        <string>English</string>
-                \\        <key>CFBundleDisplayName</key>
-                \\        <string>{[display_name]s}</string>
                 \\        <key>CFBundleExecutable</key>
                 \\        <string>{[executable_name]s}</string>
                 \\        <key>CFBundleIdentifier</key>
                 \\        <string>{[bundle_identifier]s}</string>
+                \\        <key>CFBundleInfoDictionaryVersion</key>
+                \\        <string>6.0</string>
                 \\        <key>CFBundleName</key>
                 \\        <string>{[bundle_name]s}</string>
+                \\        <key>CFBundleSignature</key>
+                \\        <string>????</string>
                 \\        <key>CFBundlePackageType</key>
                 \\        <string>BNDL</string>
                 \\        <key>CFBundleShortVersionString</key>
                 \\        <string>{[major]d}.{[minor]d}.{[patch]d}</string>
                 \\        <key>CFBundleVersion</key>
                 \\        <string>{[major]d}.{[minor]d}.{[patch]d}</string>
+                \\        <key>NSPrincipalClass</key>
+                \\        <string/>
                 \\        <key>CFBundleSupportedPlatforms</key>
                 \\        <array>
                 \\            <string>MacOSX</string>
@@ -340,34 +343,38 @@ fn postInstallMacosBinary(
                 \\    </dict>
                 \\</plist>
             , .{
-                .display_name = bundle_name,
                 .executable_name = exe_name,
-                .bundle_identifier = try std.fmt.allocPrint(b.allocator, "com.{s}.{s}", .{ floe_vendor, bundle_name }),
+                .bundle_identifier = b.fmt("{s}.{s}", .{ floe_clap_id, bundle_extension_no_dot }),
                 .bundle_name = bundle_name,
                 .major = if (version != null) version.?.major else 1,
                 .minor = if (version != null) version.?.minor else 0,
                 .patch = if (version != null) version.?.patch else 0,
                 .copyright = floe_copyright,
                 .min_macos_version = min_macos_version,
+
+                // factoryFunction has 'Factory' appended to it because that's what the AUSDK_COMPONENT_ENTRY macro adds.
+                // name uses the format Author: Name because otherwise Logic shows the developer as the 4-character manufacturer code.
                 .audio_unit_dict = if (std.mem.count(u8, bundle_name, ".component") == 1)
                     b.fmt(
                         \\        <key>AudioComponents</key>
                         \\        <array>
                         \\            <dict>
                         \\                <key>name</key>
-                        \\                <string>Floe</string>
+                        \\                <string>{[vendor]s}: Floe</string>
                         \\                <key>description</key>
                         \\                <string>{[description]s}</string>
                         \\                <key>factoryFunction</key>
-                        \\                <string>{[factory_function]s}</string>
+                        \\                <string>{[factory_function]s}Factory</string>
                         \\                <key>manufacturer</key>
-                        \\                <string>{[vendor]s}</string>
+                        \\                <string>floA</string>
                         \\                <key>subtype</key>
-                        \\                <string>smpl</string>
+                        \\                <string>FLOE</string>
                         \\                <key>type</key>
                         \\                <string>aumu</string>
                         \\                <key>version</key>
                         \\                <integer>{[version_packed]d}</integer>
+                        \\                <key>sandboxSafe</key>
+                        \\                <true/>
                         \\                <key>resourceUsage</key>
                         \\                <dict>
                         \\                    <key>network.client</key>
@@ -375,12 +382,18 @@ fn postInstallMacosBinary(
                         \\                    <key>temporary-exception.files.all.read-write</key>
                         \\                    <true/>
                         \\                </dict>
+                        \\                <key>tags</key>
+                        \\                <array>
+                        \\                  <string>Instrument</string>
+                        \\                  <string>Synthesizer</string>
+                        \\                  <string>Stereo</string>
+                        \\                </array>
                         \\            </dict>
                         \\        </array>
                     , .{
+                        .vendor = floe_vendor,
                         .description = floe_description,
                         .factory_function = floe_au_factory_function,
-                        .vendor = floe_vendor,
                         .version_packed = if (version != null) (version.?.major << 16) | (version.?.minor << 8) | version.?.patch else 0,
                     })
                 else
@@ -1253,6 +1266,7 @@ pub fn build(b: *std.Build) void {
             .FLOE_PROJECT_ROOT_PATH = rootdir,
             .FLOE_PROJECT_CACHE_PATH = b.pathJoin(&.{ rootdir, floe_cache_relative }),
             .FLOE_VENDOR = floe_vendor,
+            .FLOE_CLAP_ID = floe_clap_id,
             .IS_WINDOWS = target.result.os.tag == .windows,
             .IS_MACOS = target.result.os.tag == .macos,
             .IS_LINUX = target.result.os.tag == .linux,
@@ -2675,13 +2689,8 @@ pub fn build(b: *std.Build) void {
             }
 
             {
-                const au = b.addSharedLibrary(.{
-                    .name = "Floe.component",
-                    .target = target,
-                    .optimize = build_context.optimise,
-                    .version = floe_version,
-                    .pic = true,
-                });
+                const wrapper_src_path = build_context.dep_clap_wrapper.path("src");
+
                 var flags = std.ArrayList([]const u8).init(b.allocator);
                 switch (target.result.os.tag) {
                     .windows => {
@@ -2706,13 +2715,19 @@ pub fn build(b: *std.Build) void {
                 flags.append("-DSTATICALLY_LINKED_CLAP_ENTRY=1") catch unreachable;
                 flags.appendSlice(universal_flags) catch unreachable;
 
+                const au = b.addSharedLibrary(.{
+                    .name = "Floe.component",
+                    .target = target,
+                    .optimize = build_context.optimise,
+                    .version = floe_version,
+                    .pic = true,
+                });
                 au.addCSourceFiles(.{ .files = &.{
                     "src/plugin/plugin/plugin_entry.cpp",
                     "src/common_infrastructure/final_binary_type.cpp",
                 }, .flags = cpp_floe_flags });
                 au.defineCMacro("FINAL_BINARY_TYPE", "AuV2");
 
-                const wrapper_src_path = build_context.dep_clap_wrapper.path("src");
                 au.addCSourceFiles(.{
                     .root = wrapper_src_path,
                     .files = &.{
@@ -2742,11 +2757,18 @@ pub fn build(b: *std.Build) void {
                         \\
                         \\ struct {[factory_function]s} : free_audio::auv2_wrapper::WrapAsAUV2 {{
                         \\     {[factory_function]s}(AudioComponentInstance ci) : 
-                        \\         free_audio::auv2_wrapper::WrapAsAUV2(AUV2_Type::aumu_musicdevice, "Floe", "", 0, ci) {{}}
+                        \\         free_audio::auv2_wrapper::WrapAsAUV2(AUV2_Type::aumu_musicdevice, 
+                        \\                                              "{[clap_name]s}",
+                        \\                                              "{[clap_id]s}",
+                        \\                                              0,
+                        \\                                              ci) {{
+                        \\     }}
                         \\ }};
                         \\ AUSDK_COMPONENT_ENTRY(ausdk::AUMusicDeviceFactory, {[factory_function]s});
                     , .{
                         .factory_function = floe_au_factory_function,
+                        .clap_name = "Floe",
+                        .clap_id = floe_clap_id,
                     })) catch @panic("could not write to file");
                 }
 
@@ -2756,7 +2778,6 @@ pub fn build(b: *std.Build) void {
                         .{ .truncate = true },
                     ) catch @panic("could not create file");
                     defer file.close();
-                    // TODO: add version to "floeinst" string for better objc name collision prevention
                     file.writeAll(b.fmt(
                         \\ #pragma once
                         \\
@@ -2771,10 +2792,14 @@ pub fn build(b: *std.Build) void {
                         \\ #undef CLAP_WRAPPER_FILL_AUCV
                         \\
                         \\ bool fillAudioUnitCocoaView(AudioUnitCocoaViewInfo* viewInfo, std::shared_ptr<Clap::Plugin> _plugin) {{
-                        \\     return fillAUCV_{[name]s}(viewInfo);
+                        \\     if (strcmp(_plugin->_plugin->desc->id, "{[clap_id]s}") == 0) {{
+                        \\         if (!_plugin->_ext._gui) return false;
+                        \\         return fillAUCV_{[name]s}(viewInfo);
+                        \\     }}
                         \\ }}
                     , .{
                         .name = b.fmt("Floe{d}", .{floe_version_hash}),
+                        .clap_id = floe_clap_id,
                     })) catch @panic("could not write to file");
                 }
 
@@ -2849,7 +2874,7 @@ pub fn build(b: *std.Build) void {
                             \\ <assemblyIdentity
                             \\     version="1.0.0.0"
                             \\     processorArchitecture="amd64"
-                            \\     name="{[vendor]s}.Floe.{[name]s}"
+                            \\     name="{[id]s}.{[name]s}"
                             \\     type="win32"
                             \\ />
                             \\ <description>{[description]s}</description>
@@ -2893,10 +2918,10 @@ pub fn build(b: *std.Build) void {
                             \\ </asmv3:application>
                             \\ </assembly>
                         , .{
+                            .id = floe_clap_id,
                             .name = name,
                             .description = description,
                             .execution_level = if (require_admin) "requireAdministrator" else "asInvoker",
-                            .vendor = floe_vendor,
                         })) catch @panic("could not write to file");
                         return manifest_path;
                     }

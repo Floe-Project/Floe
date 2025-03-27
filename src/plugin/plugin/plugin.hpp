@@ -175,7 +175,7 @@ static constexpr char const* k_features[] = {CLAP_PLUGIN_FEATURE_INSTRUMENT,
 
 static constexpr clap_plugin_descriptor k_plugin_info {
     .clap_version = CLAP_VERSION,
-    .id = "com.Floe.Floe",
+    .id = FLOE_CLAP_ID,
     .name = "Floe",
     .vendor = FLOE_VENDOR,
     .url = FLOE_HOMEPAGE_URL,

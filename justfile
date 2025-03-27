@@ -191,8 +191,18 @@ test-units build="" +args="": (_build_if_requested build "native")
 test-pluginval build="": (_build_if_requested build "native")
   pluginval {{native_binary_dir}}/Floe.vst3
 
+[macos]
 test-pluginval-au build="": (_build_if_requested build "native")
   pluginval {{native_binary_dir}}/Floe.component
+
+[macos]
+install-au:
+  rm -rf ~/Library/Audio/Plug-Ins/Components/Floe.component
+  cp -r {{native_binary_dir}}/Floe.component ~/Library/Audio/Plug-Ins/Components/
+
+[macos]
+test-auval: (install-au)
+  auval -v aumu FLOE floA
 
 test-vst3-val build="": (_build_if_requested build "native")
   timeout 20 {{native_binary_dir}}/VST3-Validator {{native_binary_dir}}/Floe.vst3
@@ -287,7 +297,6 @@ valgrind build="": (_build_if_requested build "native")
     --exit-on-first-error=no \
     {{native_binary_dir}}/tests
 
-# TODO: add plugival-au (and wine variants) when we re-enable wrappers
 checks_level_0 := replace( 
   "
   check-reuse
@@ -314,7 +323,6 @@ checks_level_1 := checks_level_0 + replace(
   clang-tidy
   ", "\n", " ")
 
-# TODO: add plugival-au when we re-enable au
 checks_ci := replace(
   "
     test-units
@@ -330,6 +338,12 @@ checks_ci := replace(
     coverage
     clang-tidy-all
     valgrind
+    "
+  } else if os() == "macos" {
+    "
+    test-pluginval
+    test-pluginval-au
+    test-auval
     "
   } else {
     "
@@ -595,8 +609,7 @@ macos-prepare-release-plugins:
     codesign --sign "$MACOS_DEV_ID_APP_NAME" --timestamp --options=runtime --deep --force --entitlements plugin.entitlements $1
   }
 
-  # TODO: add Floe.component when au is supported
-  plugin_list="Floe.clap Floe.vst3"
+  plugin_list="Floe.clap Floe.vst3 Floe.component"
 
   # we can do it in parallel for speed, but we need to be careful there's no conflicting use of the filesystem
   export -f codesign_plugin
@@ -697,8 +710,7 @@ macos-build-installer:
   }
 
   make_package vst3 VST3 "Floe VST3" "VST3 format of the Floe plugin"
-  # TODO: re-enable when au is supported
-  # make_package component Components "Floe AudioUnit (AUv2)" "AudioUnit (version 2) format of the Floe plugin"
+  make_package component Components "Floe AudioUnit (AUv2)" "AudioUnit (v2) format of the Floe plugin"
   make_package clap CLAP "Floe CLAP" "CLAP format of the Floe plugin"
 
   # make the final installer combining all the packages
@@ -739,3 +751,4 @@ macos-build-installer:
 
 [macos]
 macos-prepare-release: (macos-prepare-packager) (macos-prepare-release-plugins) (macos-build-installer)
+

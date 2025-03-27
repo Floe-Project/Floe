@@ -361,7 +361,6 @@ struct DrawContext {
     virtual void DestroyTexture(TextureHandle& id) = 0;
 
     virtual ErrorCodeOr<void> Render(DrawData draw_data, UiSize window_size) = 0;
-    virtual void Resize(UiSize) {}
 
     void
     RequestScreenshotImage(TrivialFixedSizeFunction<8, void(u8 const*, int width, int height)>&& callback) {

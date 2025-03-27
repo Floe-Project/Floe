@@ -201,7 +201,7 @@ install-au:
   cp -r {{native_binary_dir}}/Floe.component ~/Library/Audio/Plug-Ins/Components/
 
 [macos]
-test-auval: (install-au)
+test-auval:
   auval -v aumu FLOE floA
 
 test-vst3-val build="": (_build_if_requested build "native")
@@ -364,6 +364,10 @@ test-ci:
   MDBOOK_PID=$!
   sleep 2 # Wait a moment for the server to fully start
   popd
+
+  if os() == "macos" {
+    just install-au
+  }
 
   just parallel "{{checks_ci}}"
   return_code=$?

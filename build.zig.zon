@@ -20,7 +20,7 @@
             .hash = "1220b43efb0e8a88a92ec54f9f85987ba2099739e69d6bb49b9b219c2c0731bbd934",
         },
         .audio_unit_sdk = .{
-            .url = "https://github.com/Floe-Project/AudioUnitSDK/archive/refs/tags/v1.1.0.tar.gz",
+            .url = "https://github.com/floe-audio/AudioUnitSDK/archive/refs/tags/v1.1.0.tar.gz",
             .hash = "12208f7bcf60ae38c05e372f98ac2d487a3ed1bc79ef413820661fd04311b496f1e5",
         },
         .miniaudio = .{
@@ -80,7 +80,7 @@
             .hash = "122022a478dccaed1309fb5d022f4041eec45d40c93a855ed24fad970774c2426d91",
         },
         .vst3_sdk = .{
-            .url = "https://github.com/Floe-Project/vst3sdk/archive/refs/tags/v3.7.9.tar.gz",
+            .url = "https://github.com/floe-audio/vst3sdk/archive/refs/tags/v3.7.9.tar.gz",
             .hash = "122082706afde70c8430ef4cc5d77331bf6b1a9c5feb22c11222046a72c66abd2f67",
         },
     },

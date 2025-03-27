@@ -15,7 +15,7 @@ description = "Floe is a free, open-source sample library engine. Available as a
 default-theme = "rust"
 preferred-dark-theme = "coal"
 smart-punctuation = true
-git-repository-url = "https://github.com/Floe-Project/Floe"
+git-repository-url = "https://github.com/floe-audio/Floe"
 cname = "floe.audio"
 additional-css = ["theme/floe-theme.css"]
 

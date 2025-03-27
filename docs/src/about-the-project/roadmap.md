@@ -23,4 +23,4 @@ Even further down the line, we're looking into:
 - Adding wavetable oscillators/granular synthesis as a option to layer with sampled instruments
 - Adding a more comprehensive modulation system
 
-Give us feedback on these using [Github's discussions](https://github.com/Floe-Project/Floe/discussions) section. FrozenPlain also have a Floe section on their [forum](https://forum.frozenplain.com/t/floe).
+Give us feedback on these using [Github's discussions](https://github.com/floe-audio/Floe/discussions) section. FrozenPlain also have a Floe section on their [forum](https://forum.frozenplain.com/t/floe).

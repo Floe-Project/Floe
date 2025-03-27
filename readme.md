@@ -5,9 +5,9 @@ SPDX-License-Identifier: CC0-1.0
 
 <a href="https://floe.audio">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Floe-Project/Floe-Logos/HEAD/horizontal_transparent.svg">
-    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Floe-Project/Floe-Logos/HEAD/horizontal_transparent_dark.svg">
-    <img alt="Floe" src="https://raw.githubusercontent.com/Floe-Project/Floe-Logos/HEAD/horizontal_background.svg" width="250" height="auto" style="max-width: 100%;">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/floe-audio/Floe-Logos/HEAD/horizontal_transparent.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/floe-audio/Floe-Logos/HEAD/horizontal_transparent_dark.svg">
+    <img alt="Floe" src="https://raw.githubusercontent.com/floe-audio/Floe-Logos/HEAD/horizontal_background.svg" width="250" height="auto" style="max-width: 100%;">
   </picture>
 </a>
 
@@ -19,7 +19,7 @@ ___IMPORTANT: alpha version — expect bugs until we reach v1.0.___
 Floe is a CLAP, VST3 and AU plugin for Windows, macOS, and (currently for development purposes only) Linux. It loads and plays sample libraries in the Floe format. Visit [floe.audio](https://floe.audio) for more information about the project. 
 
 ## Roadmap
-See our [roadmap](https://floe.audio/about-the-project/roadmap.html) section our our website. We also sometimes use GitHub issues to track [milestones](https://github.com/Floe-Project/Floe/milestones?direction=asc&sort=title&state=open) towards future releases. 
+See our [roadmap](https://floe.audio/about-the-project/roadmap.html) section our our website. We also sometimes use GitHub issues to track [milestones](https://github.com/floe-audio/Floe/milestones?direction=asc&sort=title&state=open) towards future releases. 
 
 ## License
 This project is licensed under GPL version 3 or later. See the LICENCES folder for the full licence text. We follow the [REUSE](https://reuse.software/) recommendations for this repository.
@@ -49,6 +49,6 @@ Some parts of the codebase need some love (I'm looking at you GUI and audio proc
 Feel free to use the discussions on GitHub for questions, feedback, and ideas. Report bugs to the Github issue tracker. Also, FrozenPlain has a Floe section on their [forum](https://forum.frozenplain.com).
 
 ### CI
-![CI](https://github.com/Floe-Project/Floe/actions/workflows/tests.yml/badge.svg)
-[![codecov](https://codecov.io/github/Floe-Project/Floe/graph/badge.svg?token=7HEJ7SF75K)](https://codecov.io/github/Floe-Project/Floe)
+![CI](https://github.com/floe-audio/Floe/actions/workflows/tests.yml/badge.svg)
+[![codecov](https://codecov.io/github/floe-audio/Floe/graph/badge.svg?token=7HEJ7SF75K)](https://codecov.io/github/floe-audio/Floe)
 [![CodeFactor](https://www.codefactor.io/repository/github/floe-project/floe/badge/main)](https://www.codefactor.io/repository/github/floe-project/floe/overview/main)

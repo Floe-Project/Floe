@@ -159,7 +159,7 @@ static ErrorCodeOr<String> PreprocessMarkdownBlob(String markdown_blob) {
             }
 
             DynamicArray<char> data {scratch};
-            TRY(HttpsGet("https://api.github.com/repos/Floe-Project/Floe/releases/latest",
+            TRY(HttpsGet("https://api.github.com/repos/floe-audio/Floe/releases/latest",
                          dyn::WriterFor(data),
                          {.headers = headers}));
             json_data = data.ToOwnedSpan();

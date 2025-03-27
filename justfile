@@ -503,7 +503,7 @@ _fetch-external-github-repo owner repo destination:
 
 # NOTE: the logos probably have reserved copyright
 [unix]
-fetch-logos: (_fetch-external-github-repo "Floe-Project" "Floe-Logos" logos_abs_dir)
+fetch-logos: (_fetch-external-github-repo "floe-audio" "Floe-Logos" logos_abs_dir)
 
 [unix, no-cd]
 _create-manual-install-readme os_name:

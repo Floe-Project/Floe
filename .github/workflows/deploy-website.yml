@@ -37,8 +37,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd docs
-          wget https://raw.githubusercontent.com/Floe-Project/Floe-Logos/main/rasterized/favicon.png -P theme
-          wget https://raw.githubusercontent.com/Floe-Project/Floe-Logos/main/rasterized/favicon.svg -P theme
+          wget https://raw.githubusercontent.com/floe-audio/Floe-Logos/main/rasterized/favicon.png -P theme
+          wget https://raw.githubusercontent.com/floe-audio/Floe-Logos/main/rasterized/favicon.svg -P theme
           mdbook build
           git worktree add gh-pages
           git config user.name github-actions[bot]

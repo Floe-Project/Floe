@@ -714,6 +714,11 @@ static void UpdateAndRender(GuiPlatform& platform) {
 
     auto const window_size = GetSize(platform);
     ASSERT(window_size.width >= k_min_gui_width && window_size.width <= k_max_gui_width);
+
+    // We delete our textures if the window size changes because we want to scale up all fonts/images to be
+    // more appropriate for the new window size. We could be smarter about this in the future.
+    if (platform.frame_state.window_size != window_size) platform.graphics_ctx->DestroyDeviceObjects();
+
     platform.frame_state.graphics_ctx = platform.graphics_ctx;
     platform.frame_state.native_window = (void*)puglGetNativeView(platform.view);
     platform.frame_state.window_size = window_size;
@@ -789,7 +794,6 @@ static PuglStatus EventHandler(PuglView* view, PuglEvent const* event) {
                     prefs::SetValue(platform.prefs,
                                     SettingDescriptor(GuiSetting::WindowWidth),
                                     (s64)size->width);
-                    if (platform.graphics_ctx) platform.graphics_ctx->Resize(*size);
                 } else {
                     LogWarning(ModuleName::Gui,
                                "resized to an invalid size: {} x {}",

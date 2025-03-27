@@ -129,8 +129,6 @@ struct OpenGLDrawContext : public DrawContext {
         }
     }
 
-    void Resize(UiSize) override { DestroyDeviceObjects(); }
-
     ErrorCodeOr<void> Render(DrawData draw_data, UiSize window_size) override {
         ZoneScoped;
         if (draw_data.draw_lists.size == 0) return k_success;

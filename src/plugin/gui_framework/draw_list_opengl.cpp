@@ -108,7 +108,7 @@ struct OpenGLDrawContext : public DrawContext {
         glBindTexture(GL_TEXTURE_2D, (GLuint)last_texture);
         fonts.ClearTexData();
 
-        if (auto gl_err = glGetError(); gl_err != GL_NO_ERROR) return ErrorCode(k_gl_error_category, gl_err);
+        TRY(CheckGLError("CreateFontTexture"));
 
         return k_success;
     }
@@ -120,6 +120,12 @@ struct OpenGLDrawContext : public DrawContext {
             glDeleteTextures(1, &font_texture);
             fonts.tex_id = nullptr;
             font_texture = 0;
+
+            for (auto const _ : Range(20)) {
+                auto const gl_err = glGetError();
+                if (gl_err == GL_NO_ERROR) break;
+                LogWarning(ModuleName::Gui, "GL Error: DestroyFontTexture: {}", gl_err);
+            }
         }
     }
 
@@ -222,6 +228,8 @@ struct OpenGLDrawContext : public DrawContext {
     ErrorCodeOr<TextureHandle> CreateTexture(u8 const* data, UiSize size, u16 bytes_per_pixel) override {
         ZoneScoped;
         Trace(ModuleName::Gui);
+        ASSERT(bytes_per_pixel == 3 || bytes_per_pixel == 4);
+        ASSERT(size.width && size.height);
         // Upload texture to graphics system
         GLint last_texture;
         glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture);
@@ -233,34 +241,12 @@ struct OpenGLDrawContext : public DrawContext {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         GLenum format = (bytes_per_pixel == 3) ? GL_RGB : GL_RGBA;
 
-        // unsigned char* data_result = data;
-        //
-        // // I have no idea why I have to do this... without doing this it seems to work 90% of the time but
-        // // then some images that have 3 channels do not show correctly...
-        // if (bytes_per_pixel == 3) {
-        //     data_result = new unsigned char[size.width * size.height * 4];
-        //     int in_i = 0;
-        //     for (int i = 0; i < size.width * size.height * 4; i += 4) {
-        //         data_result[i + 0] = data[in_i + 0];
-        //         data_result[i + 1] = data[in_i + 1];
-        //         data_result[i + 2] = data[in_i + 2];
-        //         data_result[i + 3] = 255;
-        //         in_i += 3;
-        //     }
-        //     format = GL_RGBA;
-        // }
-
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, size.width, size.height, 0, format, GL_UNSIGNED_BYTE, data);
-
-        // if (bytes_per_pixel == 3) delete[] data_result;
-
-        if (auto error = glGetError(); error != GL_NO_ERROR)
-            return ErrorCode(k_gl_error_category, (s64)error);
 
         // Restore state
         glBindTexture(GL_TEXTURE_2D, (GLuint)last_texture);
 
-        if (auto gl_err = glGetError(); gl_err != GL_NO_ERROR) return ErrorCode(k_gl_error_category, gl_err);
+        TRY(CheckGLError("CreateTexture"));
 
         return (void*)(intptr_t)texture;
     }
@@ -271,6 +257,12 @@ struct OpenGLDrawContext : public DrawContext {
             auto gluint_tex = (GLuint)(uintptr_t)texture;
             glDeleteTextures(1, &gluint_tex);
             texture = nullptr;
+
+            for (auto const _ : Range(20)) {
+                auto const gl_err = glGetError();
+                if (gl_err == GL_NO_ERROR) break;
+                LogWarning(ModuleName::Gui, "GL Error: DestroyTexture: {}", gl_err);
+            }
         }
     }
 

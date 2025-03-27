@@ -1539,6 +1539,10 @@ void OnPreferenceChanged(FloeInstanceIndex index, prefs::Key const& key, prefs::
                 auto const size =
                     PhysicalPixelsToClapPixels(floe.gui_platform->view,
                                                DesiredWindowSize(g_shared_engine_systems->prefs));
+                LogInfo(ModuleName::Gui,
+                        "Requesting resize (due to keyboard) to {}x{}",
+                        size.width,
+                        size.height);
                 host_gui->resize_hints_changed(&floe.host);
                 host_gui->request_resize(&floe.host, size.width, size.height);
             }

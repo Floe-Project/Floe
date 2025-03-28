@@ -156,6 +156,7 @@ static void SavePresetPanel(GuiBoxSystem& box_system, SavePresetPanelContext&, S
                                               .round_background_corners = 0b1100,
                                               .activate_on_click_button = MouseButton::Left,
                                               .activation_click_event = ActivationClickEvent::Up,
+                                              .tooltip = tag.description,
                                           });
 
                 if (button.button_fired) {

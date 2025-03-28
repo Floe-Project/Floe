@@ -9,12 +9,21 @@ For instance: 0.0.1. Don't change the headings.
 
 # Changelog
 
-## 0.0.8-alpha
+## 0.8.0-beta
+First beta release of Floe. This release is feature-complete. We are looking for feedback on the new features and any bugs you find.
+
 - Brand new instrument browser supporting tags, search, and filtering by library
 - Brand new impulse response browser featuring all the options of the instrument browser
 - Brand new preset browser with tags, search, and filtering by library. Preset metadata is tracked, library information is tracked, file changes are detected, duplicate presets are hidden.
 - New save preset dialog with author, description, and tags
 - Fix instrument left/right and randomise buttons
+- Add AU (Audio Unit v2) support
+- Fix instance ID not retaining
+- Fix freeze when trying to resize GUI
+- Fix GUI opening but only ever showing black
+- Fix randomise parameters
+
+Note we have jumped from 0.0.7 to 0.8.0. This is to signify the change from alpha to beta but also because it wasn't really right in the first place only incrementing by the patch number. To make the jump obvious we start the minor version at 0.8.0 rather than 0.1.0.
 
 ## 0.0.7-alpha
 The focus of this version has been bug fixes; in particular around loading Mirage libraries and presets.

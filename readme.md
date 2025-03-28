@@ -13,8 +13,6 @@ SPDX-License-Identifier: CC0-1.0
 
 ---
 
-___IMPORTANT: alpha version — expect bugs until we reach v1.0.___
-
 ### Streamlined sample-based instrument platform
 Floe is a CLAP, VST3 and AU plugin for Windows, macOS, and (currently for development purposes only) Linux. It loads and plays sample libraries in the Floe format. Visit [floe.audio](https://floe.audio) for more information about the project. 
 

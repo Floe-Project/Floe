@@ -82,8 +82,6 @@ Q1
 RMS
 Retrig
 Retrigger
-retrigger
-wouldn
 Roadmap
 SFZ
 SPDX
@@ -154,6 +152,7 @@ href
 html
 img
 impactful
+incrementing
 installable
 ir
 isn
@@ -191,6 +190,7 @@ preprocessor
 relicense
 resizable
 retrig
+retrigger
 retriggered
 rgba
 roadmap
@@ -222,8 +222,10 @@ validator
 vaporwave
 ve
 vst3
+wasn
 waveforms
 wavetable
+wouldn
 x86
 zig
 zon

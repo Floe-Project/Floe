@@ -39,6 +39,7 @@ jobs:
 
       - run: just build mac_ub
       - run: just install-docs-preprocessor
+      - run: just install-au 1
       - env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: just test-ci

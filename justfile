@@ -372,10 +372,6 @@ test-ci:
   sleep 2 # Wait a moment for the server to fully start
   popd
 
-  if [[ "{{os()}}" == "macos" ]]; then
-    just install-au 1
-  fi  
-
   just parallel "{{checks_ci}}"
   return_code=$?
 

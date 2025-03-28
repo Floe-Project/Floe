@@ -23,7 +23,7 @@ We made a Floe-compatible version of [Etherealwinds Harp 2: Community Edition](h
 | Cost | Free -  [attribution required](../usage/attribution.md) ([CC-BY](https://creativecommons.org/licenses/by/4.0/deed.en)) |
 | Repository | [floe-audio/Harp](https://github.com/floe-audio/Harp) |
 | Presets | 0 |
-| Download | [Download Versilian Studios - Etherealwinds Harp 2 CE Package.zip](https://github.com/floe-audio/Harp/releases/download/v1.1/Versilian.Studios.-.Etherealwinds.Harp.2.CE.Package.zip) |
+| Download | [Download Versilian Studios - Etherealwinds Harp 2 CE Package.zip](https://github.com/floe-audio/Harp/releases/download/v1.2/Versilian.Studios.-.Etherealwinds.Harp.2.CE.Package.zip) |
 | Download Size | 93.4 MB |
 
 
@@ -40,7 +40,7 @@ This is a basic free multisampled xylophone from [FreePats](https://freepats.zen
 | Cost | Free - no attribution required (public domain) |
 | Repository | [floe-audio/Xylophone](https://github.com/floe-audio/Xylophone) |
 | Presets | 0 |
-| Download | [Download FreePats - Xylophone Package.zip](https://github.com/floe-audio/Xylophone/releases/download/v1.1/FreePats.-.Xylophone.Package.zip) |
+| Download | [Download FreePats - Xylophone Package.zip](https://github.com/floe-audio/Xylophone/releases/download/v1.2/FreePats.-.Xylophone.Package.zip) |
 | Download Size | 2.6 MB |
 
 
@@ -55,7 +55,7 @@ This is a basic free ocarina from [FreePats](https://freepats.zenvoid.org/), con
 | Cost | Free - no attribution required (public domain) |
 | Repository | [floe-audio/Ocarina](https://github.com/floe-audio/Ocarina) |
 | Presets | 0 |
-| Download | [Download FreePats - Ocarina Package.zip](https://github.com/floe-audio/Ocarina/releases/download/v1.1/FreePats.-.Ocarina.Package.zip) |
+| Download | [Download FreePats - Ocarina Package.zip](https://github.com/floe-audio/Ocarina/releases/download/v1.2/FreePats.-.Ocarina.Package.zip) |
 | Download Size | 4.3 MB |
 
 ## Mirage Compatibility

@@ -56,6 +56,46 @@ jobs:
           if-no-files-found: ignore
           path: ~/Library/Logs/Floe/*
 
+  # IMPROVE: do this on all platforms
+  test-optimised:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/flakehub-cache-action@main
+      - uses: nicknovitski/nix-develop@v1.1.0
+      - uses: Hanaasagi/zig-action-cache@master
+        with:
+          cache-directories: |
+            .floe-cache
+
+      - if: '!cancelled()'
+        run: just build native performance_profiling
+
+      - if: '!cancelled()'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: just test-ci
+
+      - name: Upload errors
+        if: '!cancelled()'
+        run: just upload-errors
+
+      - name: Upload logs
+        if: '!cancelled()'
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-linux
+          if-no-files-found: ignore
+          path: ~/.local/state/Floe/Logs/*
+
   linux-compile-and-test:
     runs-on: ubuntu-latest
     permissions:

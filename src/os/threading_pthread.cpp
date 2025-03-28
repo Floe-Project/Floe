@@ -96,7 +96,7 @@ static void* ThreadStartProc(void* data) {
         SetThreadName(d->thread_name);
         d->StartThread();
         delete d;
-    } catch (char const*) {
+    } catch (PanicException) {
     }
     return nullptr;
 }

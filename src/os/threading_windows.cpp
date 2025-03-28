@@ -88,9 +88,12 @@ Thread& Thread::operator=(Thread&& other) {
 }
 
 static unsigned __stdcall ThreadProc(void* data) {
-    auto d = (Thread::ThreadStartData*)data;
-    d->StartThread();
-    delete d;
+    try {
+        auto d = (Thread::ThreadStartData*)data;
+        d->StartThread();
+        delete d;
+    } catch (PanicException) {
+    }
     return 0;
 }
 

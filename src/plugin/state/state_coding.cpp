@@ -1140,6 +1140,14 @@ ErrorCodeOr<void> CodeState(StateSnapshot& state, CodeStateArguments const& args
 
     // =======================================================================================================
     {
+        String instance_id {};
+        if (coder.IsWriting()) instance_id = state.instance_id;
+        TRY(coder.CodeString(instance_id, scratch_arena, StateVersion::Initial));
+        if (coder.IsReading()) state.instance_id = instance_id;
+    }
+
+    // =======================================================================================================
+    {
         u16 num_params {};
         if (coder.IsWriting()) num_params = CheckedCast<u16>(k_num_parameters);
         TRY(coder.CodeNumber(num_params, StateVersion::Initial));

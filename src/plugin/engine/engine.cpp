@@ -88,6 +88,8 @@ static void LoadNewState(Engine& engine, StateSnapshotWithName const& state, Sta
     ZoneScoped;
     ASSERT(IsMainThread(engine.host));
 
+    if (source == StateSource::Daw) SetInstanceId(engine.autosave_state, state.state.instance_id);
+
     auto const async = ({
         bool a = false;
         for (auto const& i : state.state.inst_ids) {
@@ -301,13 +303,11 @@ static void SampleLibraryResourceLoaded(Engine& engine, sample_lib_server::LoadR
     engine.host.request_callback(&engine.host);
 }
 
-StateSnapshot CurrentStateSnapshot(Engine const& engine) {
-    StateSnapshot snapshot;
-    if (engine.pending_state_change)
-        snapshot = engine.pending_state_change->snapshot.state;
-    else
-        snapshot = MakeStateSnapshot(engine.processor);
+static StateSnapshot CurrentStateSnapshot(Engine& engine) {
+    StateSnapshot snapshot = engine.pending_state_change ? engine.pending_state_change->snapshot.state
+                                                         : MakeStateSnapshot(engine.processor);
     snapshot.metadata = engine.state_metadata;
+    snapshot.instance_id = InstanceId(engine.autosave_state);
     return snapshot;
 }
 
@@ -535,6 +535,7 @@ usize MegabytesUsedBySamples(Engine const& engine) {
 
 static bool PluginSaveState(Engine& engine, clap_ostream const& stream) {
     auto state = CurrentStateSnapshot(engine);
+    ASSERT(state.instance_id.size);
     auto outcome = CodeState(state,
                              CodeStateArguments {
                                  .mode = CodeStateArguments::Mode::Encode,

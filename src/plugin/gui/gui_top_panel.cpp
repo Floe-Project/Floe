@@ -284,7 +284,7 @@ void TopPanel(Gui* g) {
                       subtitle_r,
                       fmt::Format(g->scratch_arena,
                                   "v" FLOE_VERSION_STRING "  {}",
-                                  show_instance_name ? String {g->engine.autosave_state.instance_id} : ""_s),
+                                  show_instance_name ? String {InstanceId(g->engine.autosave_state)} : ""_s),
                       labels::Title(g->imgui, LiveCol(g->imgui, UiColMap::TopPanelSubtitleText)));
     }
 

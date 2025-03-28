@@ -15,7 +15,8 @@ struct AutosaveState {
     enum class State { Idle, SaveRequested, Saved };
     Atomic<u16> max_autosaves_per_instance {};
     Atomic<u16> autosave_delete_after_days {};
-    DynamicArrayBounded<char, 16> instance_id;
+    Mutex instance_id_mutex {};
+    DynamicArrayBounded<char, k_max_instance_id_size> instance_id;
     TimePoint last_save_time {};
     Mutex mutex {};
     StateSnapshot snapshot {};
@@ -30,6 +31,10 @@ void InitAutosaveState(AutosaveState& state,
                        StateSnapshot const& initial_state);
 bool AutosaveNeeded(AutosaveState const& state, prefs::Preferences const& preferences);
 void QueueAutosave(AutosaveState& state, StateSnapshot const& snapshot);
+void SetInstanceId(AutosaveState& state, String instance_id);
+
+// threadsafe
+DynamicArrayBounded<char, k_max_instance_id_size> InstanceId(AutosaveState& state);
 
 enum class AutosaveSetting : u8 {
     AutosaveIntervalSeconds,

@@ -36,6 +36,7 @@ struct StateSnapshot {
     Array<EffectType, k_num_effect_types> fx_order {};
     Array<Bitset<128>, k_num_parameters> param_learned_ccs {};
     StateMetadata metadata {};
+    DynamicArrayBounded<char, k_max_instance_id_size> instance_id;
 };
 
 enum class StateSource { PresetFile, Daw };

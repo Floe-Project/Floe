@@ -109,7 +109,6 @@ void LoadInstrument(Engine& engine, u32 layer_index, InstrumentId instrument_id)
 
 usize MegabytesUsedBySamples(Engine const& engine);
 
-StateSnapshot CurrentStateSnapshot(Engine const& engine);
 bool StateChangedSinceLastSnapshot(Engine& engine);
 
 void LoadPresetFromFile(Engine& engine, String path);

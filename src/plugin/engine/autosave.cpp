@@ -11,11 +11,12 @@
 
 constexpr auto k_autosave_filename_prefix = "autosave"_ca;
 
-static ErrorCodeOr<void> CleanupExcessInstanceAutosaves(AutosaveState const& state,
-                                                        FloePaths const& paths,
-                                                        ArenaAllocator& scratch_arena) {
+// background thread
+static ErrorCodeOr<void>
+CleanupExcessInstanceAutosaves(AutosaveState& state, FloePaths const& paths, ArenaAllocator& scratch_arena) {
     ZoneScoped;
-    auto const wildcard = fmt::FormatInline<32>("*{}*", state.instance_id);
+
+    auto const wildcard = fmt::FormatInline<32>("*{}*", InstanceId(state));
 
     auto const entries = TRY(FindEntriesInFolder(scratch_arena,
                                                  paths.autosave_path,
@@ -58,6 +59,7 @@ static ErrorCodeOr<void> CleanupExcessInstanceAutosaves(AutosaveState const& sta
     return k_success;
 }
 
+// background thread
 static ErrorCodeOr<void>
 Autosave(AutosaveState& state, StateSnapshot const& snapshot, FloePaths const& paths) {
     ZoneScoped;
@@ -77,7 +79,7 @@ Autosave(AutosaveState& state, StateSnapshot const& snapshot, FloePaths const& p
                     date.day_of_month,
                     date.MonthName(),
                     date.year,
-                    state.instance_id,
+                    InstanceId(state),
                     RandomIntInRange<u32>(seed, 1000, 9999));
     }
 
@@ -87,6 +89,7 @@ Autosave(AutosaveState& state, StateSnapshot const& snapshot, FloePaths const& p
     return k_success;
 }
 
+// background thread
 static ErrorCodeOr<void> CleanupOldAutosavesIfNeeded(FloePaths const& paths,
                                                      ArenaAllocator& scratch_arena,
                                                      u16 k_autosave_max_age_days) {
@@ -133,6 +136,7 @@ void InitAutosaveState(AutosaveState& state,
                        prefs::PreferencesTable const& prefs,
                        u64& random_seed,
                        StateSnapshot const& initial_state) {
+    ASSERT(CheckThreadName("main"));
     constexpr auto k_instance_words = Array {
         "wave"_s, "pond",  "beam", "drift", "breeze", "flow",  "spark",  "glow",  "river",  "cloud",
         "stream", "rain",  "sun",  "moon",  "star",   "wind",  "storm",  "frost", "flame",  "mist",
@@ -156,6 +160,7 @@ void InitAutosaveState(AutosaveState& state,
         (u16)AutosaveSettingIntValue(AutosaveSetting::MaxAutosavesPerInstance, prefs);
 }
 
+// background thread
 void AutosaveToFileIfNeeded(AutosaveState& state, FloePaths const& paths) {
     ZoneScoped;
     Optional<StateSnapshot> snapshot {};
@@ -197,6 +202,7 @@ void AutosaveToFileIfNeeded(AutosaveState& state, FloePaths const& paths) {
 }
 
 prefs::Descriptor SettingDescriptor(AutosaveSetting setting) {
+    ASSERT(CheckThreadName("main"));
     switch (setting) {
         case AutosaveSetting::AutosaveIntervalSeconds:
             return {
@@ -246,6 +252,7 @@ prefs::Descriptor SettingDescriptor(AutosaveSetting setting) {
 }
 
 void OnPreferenceChanged(AutosaveState& state, prefs::Key const& key, prefs::Value const* value) {
+    ASSERT(CheckThreadName("main"));
     for (auto const setting : EnumIterator<AutosaveSetting>()) {
         if (auto const v = prefs::Match(key, value, SettingDescriptor(setting))) {
             switch (setting) {
@@ -265,13 +272,33 @@ void OnPreferenceChanged(AutosaveState& state, prefs::Key const& key, prefs::Val
     }
 }
 
+DynamicArrayBounded<char, k_max_instance_id_size> InstanceId(AutosaveState& state) {
+    DynamicArrayBounded<char, k_max_instance_id_size> result;
+    {
+        state.instance_id_mutex.Lock();
+        DEFER { state.instance_id_mutex.Unlock(); };
+        result = state.instance_id;
+    }
+    return result;
+}
+
+void SetInstanceId(AutosaveState& state, String instance_id) {
+    ASSERT(instance_id.size <= k_max_instance_id_size);
+    ASSERT(instance_id.size);
+    state.instance_id_mutex.Lock();
+    DEFER { state.instance_id_mutex.Unlock(); };
+    dyn::Assign(state.instance_id, instance_id);
+}
+
 bool AutosaveNeeded(AutosaveState const& state, prefs::Preferences const& preferences) {
+    ASSERT(CheckThreadName("main"));
     ZoneScoped;
     return state.last_save_time.SecondsFromNow() >=
            (f64)AutosaveSettingIntValue(AutosaveSetting::AutosaveIntervalSeconds, preferences);
 }
 
 void QueueAutosave(AutosaveState& state, StateSnapshot const& snapshot) {
+    ASSERT(CheckThreadName("main"));
     ZoneScoped;
     state.mutex.Lock();
     DEFER { state.mutex.Unlock(); };
@@ -297,6 +324,9 @@ void QueueAutosave(AutosaveState& state, StateSnapshot const& snapshot) {
     }
     state.last_save_time = TimePoint::Now();
 }
+
+// Tests
+// ============================================================
 
 static String TestPresetPath(tests::Tester& tester, String filename) {
     return path::Join(tester.scratch_arena,

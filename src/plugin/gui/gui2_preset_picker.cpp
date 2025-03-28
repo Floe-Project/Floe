@@ -346,7 +346,7 @@ void DoPresetPicker(GuiBoxSystem& box_system,
                     PresetPickerExtraFilters(box_system, context, state, parent);
                 },
             .on_clear_all_filters = [&]() { state.ClearAllFilters(); },
-            .status_bar_height = 50,
+            .status_bar_height = 58,
             .status = [&]() -> Optional<String> {
                 Optional<String> status {};
 

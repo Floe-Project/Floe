@@ -1620,6 +1620,15 @@ LibraryPtrOrError ReadLua(Reader& reader,
             };
         }
 
+        for (auto [key, inst_ptr] : library->insts_by_name) {
+            auto const& inst = *inst_ptr;
+            if (inst->regions.size == 0) {
+                return ErrorAndNotify(ctx, LuaErrorCode::Runtime, [&](DynamicArray<char>& message) {
+                    fmt::Append(message, "Instrument {} has no regions", inst->name);
+                });
+            }
+        }
+
         library->num_regions = 0;
         for (auto [key, inst_ptr] : library->insts_by_name) {
             auto const& inst = *inst_ptr;

@@ -198,14 +198,13 @@ struct LibraryFilters {
     DynamicArray<u64>& selected_library_hashes;
     LibraryImagesArray& library_images;
     sample_lib_server::Server& sample_library_server;
-    FunctionRef<bool(sample_lib::Library const&)> skip_library; // optional
 };
 
 PUBLIC void DoPickerLibraryFilters(GuiBoxSystem& box_system,
                                    Box const& parent,
-                                   Span<sample_lib_server::RefCounted<sample_lib::Library>> libraries,
+                                   Span<sample_lib::LibraryIdRef const> libraries,
                                    LibraryFilters const& library_filters,
-                                   sample_lib::Library const*& hovering_library) {
+                                   sample_lib::LibraryIdRef const*& hovering_library) {
 
     auto const section = DoPickerItemsSectionContainer(box_system,
                                                        {
@@ -214,12 +213,8 @@ PUBLIC void DoPickerLibraryFilters(GuiBoxSystem& box_system,
                                                            .multiline_contents = true,
                                                        });
 
-    for (auto const& l_ptr : libraries) {
-        auto const& lib = *l_ptr;
-
-        if (library_filters.skip_library && library_filters.skip_library(lib)) continue;
-
-        auto const lib_id_hash = lib.Id().Hash();
+    for (auto const& lib : libraries) {
+        auto const lib_id_hash = lib.Hash();
         auto const is_selected = Contains(library_filters.selected_library_hashes, lib_id_hash);
 
         auto const button = DoFilterButton(
@@ -228,7 +223,7 @@ PUBLIC void DoPickerLibraryFilters(GuiBoxSystem& box_system,
             is_selected,
             LibraryImagesFromLibraryId(library_filters.library_images,
                                        box_system.imgui,
-                                       lib.Id(),
+                                       lib,
                                        library_filters.sample_library_server,
                                        box_system.arena,
                                        true)
@@ -274,7 +269,8 @@ DoPickerTagsFilters(GuiBoxSystem& box_system, Box const& parent, TagsFilters con
 
 PUBLIC void DoPickerStatusBar(GuiBoxSystem& box_system,
                               FunctionRef<Optional<String>()> custom_status,
-                              sample_lib::Library const* hovering_lib) {
+                              sample_lib_server::Server& server,
+                              sample_lib::LibraryIdRef const* hovering_lib) {
     auto const root = DoBox(box_system,
                             {
                                 .layout {
@@ -292,10 +288,15 @@ PUBLIC void DoPickerStatusBar(GuiBoxSystem& box_system,
         if (status) text = *status;
     }
 
-    if (auto const l = hovering_lib) {
+    if (auto const lib_id = hovering_lib) {
+        auto lib = sample_lib_server::FindLibraryRetained(server, *lib_id);
+        DEFER { lib.Release(); };
+
         DynamicArray<char> buf {box_system.arena};
-        fmt::Append(buf, "{} by {}.", l->name, l->author);
-        if (l->description) fmt::Append(buf, " {}", l->description);
+        fmt::Append(buf, "{} by {}.", lib_id->name, lib_id->author);
+        if (lib) {
+            if (lib->description) fmt::Append(buf, " {}", lib->description);
+        }
         text = buf.ToOwnedSpan();
     }
 
@@ -324,6 +325,8 @@ struct PickerPopupOptions {
         f32 width {};
     };
 
+    sample_lib_server::Server& sample_library_server;
+
     String title {};
     f32 height {}; // VW
     f32 rhs_width {}; // VW
@@ -344,7 +347,7 @@ struct PickerPopupOptions {
     FunctionRef<void()> on_load_random {};
     FunctionRef<void()> on_scroll_to_show_selected {};
 
-    Span<sample_lib_server::RefCounted<sample_lib::Library>> libraries;
+    Span<sample_lib::LibraryIdRef const> libraries;
     Optional<LibraryFilters> library_filters {};
     Optional<TagsFilters> tags_filters {};
     FunctionRef<void(GuiBoxSystem&, Box const& parent)> do_extra_filters {};
@@ -356,7 +359,7 @@ struct PickerPopupOptions {
 
 // Ephemeral
 struct PickerPopupContext {
-    sample_lib::Library const* hovering_lib {};
+    sample_lib::LibraryIdRef const* hovering_lib {};
 };
 
 static void
@@ -679,7 +682,10 @@ DoPickerPopup(GuiBoxSystem& box_system, PickerPopupOptions const& options, Picke
              {
                  .run =
                      [&](GuiBoxSystem& box_system) {
-                         DoPickerStatusBar(box_system, options.status, context.hovering_lib);
+                         DoPickerStatusBar(box_system,
+                                           options.status,
+                                           options.sample_library_server,
+                                           context.hovering_lib);
                      },
                  .data =
                      Subpanel {

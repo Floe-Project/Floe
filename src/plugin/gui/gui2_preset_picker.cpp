@@ -311,6 +311,7 @@ void DoPresetPicker(GuiBoxSystem& box_system,
         popup_id,
         absolute_button_rect,
         PickerPopupOptions {
+            .sample_library_server = context.sample_library_server,
             .title = "Presets",
             .height = box_system.imgui.PixelsToVw(box_system.imgui.frame_input.window_size.height * 0.75f),
             .rhs_width = 320,
@@ -323,17 +324,17 @@ void DoPresetPicker(GuiBoxSystem& box_system,
             .on_load_next = [&]() { LoadAdjacentPreset(context, state, SearchDirection::Forward); },
             .on_load_random = [&]() { LoadRandomPreset(context, state); },
             .on_scroll_to_show_selected = [&]() { state.scroll_to_show_selected = true; },
-            .libraries = context.libraries,
+            .libraries = ({
+                DynamicArray<sample_lib::LibraryIdRef> libraries {box_system.arena};
+                for (auto const [lib, _] : context.presets_snapshot.used_libraries)
+                    dyn::Append(libraries, lib);
+                libraries.ToOwnedSpan();
+            }),
             .library_filters =
                 LibraryFilters {
                     .selected_library_hashes = state.selected_library_hashes,
                     .library_images = context.library_images,
                     .sample_library_server = context.sample_library_server,
-                    .skip_library =
-                        [&](sample_lib::Library const& lib) {
-                            if (!context.presets_snapshot.used_libraries.Contains(lib.Id())) return true;
-                            return false;
-                        },
                 },
             .tags_filters =
                 TagsFilters {

@@ -369,6 +369,7 @@ void DoInstPickerPopup(GuiBoxSystem& box_system,
         popup_id,
         absolute_button_rect,
         PickerPopupOptions {
+            .sample_library_server = context.sample_library_server,
             .title = fmt::Format(box_system.arena, "Layer {} Instrument", context.layer.index + 1),
             .height = box_system.imgui.PixelsToVw(box_system.imgui.frame_input.window_size.height * 0.9f),
             .rhs_width = 200,
@@ -408,7 +409,17 @@ void DoInstPickerPopup(GuiBoxSystem& box_system,
             .on_load_next = [&]() { LoadAdjacentInstrument(context, state, SearchDirection::Forward, true); },
             .on_load_random = [&]() { LoadRandomInstrument(context, state, true); },
             .on_scroll_to_show_selected = [&]() { state.scroll_to_show_selected = true; },
-            .libraries = context.libraries,
+            .libraries = ({
+                DynamicArray<sample_lib::LibraryIdRef> libraries {box_system.arena};
+                if (state.tab != InstPickerState::Tab::Waveforms) {
+                    for (auto const l : context.libraries) {
+                        if (l->sorted_instruments.size == 0) continue;
+                        if (l->file_format_specifics.tag != state.FileFormatForCurrentTab()) continue;
+                        dyn::Append(libraries, l->Id());
+                    }
+                }
+                libraries.ToOwnedSpan();
+            }),
             .library_filters = ({
                 Optional<LibraryFilters> f {};
                 if (state.tab != InstPickerState::Tab::Waveforms) {
@@ -418,12 +429,6 @@ void DoInstPickerPopup(GuiBoxSystem& box_system,
                                                        : state.selected_mirage_library_hashes,
                         .library_images = context.library_images,
                         .sample_library_server = context.sample_library_server,
-                        .skip_library =
-                            [&](sample_lib::Library const& lib) {
-                                if (lib.sorted_instruments.size == 0) return true;
-                                if (state.tab == InstPickerState::Tab::Waveforms) return true;
-                                return lib.file_format_specifics.tag != state.FileFormatForCurrentTab();
-                            },
                     };
                 }
                 f;

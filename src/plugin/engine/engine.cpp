@@ -316,8 +316,12 @@ bool StateChangedSinceLastSnapshot(Engine& engine) {
 
     auto const& last = engine.pending_state_change ? engine.pending_state_change->snapshot.state
                                                    : engine.last_snapshot.state;
+
     // we don't check the params ccs for changes
     current.param_learned_ccs = last.param_learned_ccs;
+    // we don't check the instance id for changes
+    current.instance_id = last.instance_id;
+
     bool const changed = last != current;
 
     if constexpr (!PRODUCTION_BUILD) {

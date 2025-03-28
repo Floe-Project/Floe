@@ -41,10 +41,10 @@ default:
     $DEFAULT_CMD
   fi
 
-alias pre-debug := build
+alias pre-debug := default
 
-build target_os='native':
-  zig build compile -Dtargets={{target_os}} -Dbuild-mode=development -Dexternal-resources="{{external_resources}}"
+build target_os='native' mode='development':
+  zig build compile -Dtargets={{target_os}} -Dbuild-mode={{mode}} -Dexternal-resources="{{external_resources}}"
   just patch-rpath
 
 

@@ -1110,8 +1110,7 @@ pub fn build(b: *std.Build) void {
     ) orelse (build_mode == .production);
     if (build_mode == .production) windows_installer_require_admin = true;
 
-    var enable_tracy = b.option(bool, "tracy", "Enable Tracy profiler") orelse false;
-    if (build_mode == .performance_profiling) enable_tracy = true;
+    const enable_tracy = b.option(bool, "tracy", "Enable Tracy profiler") orelse false;
 
     var build_context: BuildContext = .{
         .b = b,

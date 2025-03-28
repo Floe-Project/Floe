@@ -377,14 +377,14 @@ void DoInstPickerPopup(GuiBoxSystem& box_system,
             .item_type_name = "instrument",
             .items_section_heading = "Instruments",
             .tab_config = ({
-                DynamicArrayBounded<ModalTabConfig, 3> tab_config {};
+                DynamicArray<ModalTabConfig> tab_config {box_system.arena};
                 dyn::Append(tab_config,
                             {
                                 .text = context.has_mirage_libraries ? "Floe Instruments"_s : "Instruments",
                             });
                 if (context.has_mirage_libraries) dyn::Append(tab_config, {.text = "Mirage Instruments"});
                 dyn::Append(tab_config, {.text = "Waveforms"});
-                tab_config;
+                tab_config.ToOwnedSpan();
             }),
             .current_tab_index = &ToIntRef(state.tab),
             .rhs_top_button = ({
@@ -394,10 +394,10 @@ void DoInstPickerPopup(GuiBoxSystem& box_system,
                         .text = fmt::Format(box_system.arena, "Unload {}", context.layer.InstName()),
                         .tooltip = "Unload the current instrument.",
                         .on_fired =
-                            [&]() {
+                            TrivialFunctionRef<void()>([&]() {
                                 LoadInstrument(context.engine, context.layer.index, InstrumentType::None);
                                 box_system.imgui.CloseCurrentPopup();
-                            },
+                            }).CloneObject(box_system.arena),
                     };
                 }
                 unload_button;

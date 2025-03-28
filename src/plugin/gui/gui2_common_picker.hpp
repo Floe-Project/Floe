@@ -317,7 +317,7 @@ struct PickerPopupOptions {
         String text {};
         String tooltip {};
         f32 icon_scaling {};
-        FunctionRef<void()> on_fired {};
+        TrivialFunctionRef<void()> on_fired {};
     };
 
     struct Column {
@@ -339,22 +339,22 @@ struct PickerPopupOptions {
     u32* current_tab_index;
 
     Optional<Button> rhs_top_button {};
-    FunctionRef<void(GuiBoxSystem&)> rhs_do_items {};
+    TrivialFunctionRef<void(GuiBoxSystem&)> rhs_do_items {};
     DynamicArrayBounded<char, 100>* search {};
 
-    FunctionRef<void()> on_load_previous {};
-    FunctionRef<void()> on_load_next {};
-    FunctionRef<void()> on_load_random {};
-    FunctionRef<void()> on_scroll_to_show_selected {};
+    TrivialFunctionRef<void()> on_load_previous {};
+    TrivialFunctionRef<void()> on_load_next {};
+    TrivialFunctionRef<void()> on_load_random {};
+    TrivialFunctionRef<void()> on_scroll_to_show_selected {};
 
     Span<sample_lib::LibraryIdRef const> libraries;
     Optional<LibraryFilters> library_filters {};
     Optional<TagsFilters> tags_filters {};
-    FunctionRef<void(GuiBoxSystem&, Box const& parent)> do_extra_filters {};
-    FunctionRef<void()> on_clear_all_filters {};
+    TrivialFunctionRef<void(GuiBoxSystem&, Box const& parent)> do_extra_filters {};
+    TrivialFunctionRef<void()> on_clear_all_filters {};
 
     f32 status_bar_height {};
-    FunctionRef<Optional<String>()> status {}; // Set if something is hovering
+    TrivialFunctionRef<Optional<String>()> status {}; // Set if something is hovering
 };
 
 // Ephemeral

@@ -184,7 +184,8 @@ AppendFolderAndPublish(PresetServer& server, PresetFolder* new_preset_folder, Ar
     DynamicSet<sample_lib::LibraryIdRef, sample_lib::Hash> used_libraries {scratch_arena};
     DynamicSet<String> authors {scratch_arena};
     server.has_preset_type = {};
-    for (auto const& folder_set : Array {server.folders.Items(), Array {new_preset_folder}}) {
+    for (auto const& folder_set :
+         Array {server.folders.Items(), Span<PresetFolder*> {&new_preset_folder, 1}}) {
         for (auto const folder : folder_set) {
             for (auto const& preset : folder->presets) {
                 for (auto const& tag : preset.metadata.tags)

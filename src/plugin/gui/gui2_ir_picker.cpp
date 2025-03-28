@@ -254,11 +254,10 @@ void DoIrPickerPopup(GuiBoxSystem& box_system,
                     unload_button = PickerPopupOptions::Button {
                         .text = fmt::Format(box_system.arena, "Unload {}", ir_id->ir_name),
                         .tooltip = "Unload the current impulse response.",
-                        .on_fired =
-                            [&]() {
-                                LoadConvolutionIr(context.engine, k_nullopt);
-                                box_system.imgui.CloseCurrentPopup();
-                            },
+                        .on_fired = TrivialFunctionRef<void()>([&]() {
+                                        LoadConvolutionIr(context.engine, k_nullopt);
+                                        box_system.imgui.CloseCurrentPopup();
+                                    }).CloneObject(box_system.arena),
                     };
                 }
                 unload_button;

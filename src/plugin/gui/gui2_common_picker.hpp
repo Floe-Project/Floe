@@ -441,7 +441,7 @@ DoPickerPopup(GuiBoxSystem& box_system, PickerPopupOptions const& options, Picke
                                style::k_font_heading2_size)
                         .button_fired) {
                     dyn::Append(box_system.state->deferred_actions,
-                                [&]() { options.on_clear_all_filters(); });
+                                [clear = options.on_clear_all_filters]() { clear(); });
                 }
             }
         }
@@ -506,7 +506,7 @@ DoPickerPopup(GuiBoxSystem& box_system, PickerPopupOptions const& options, Picke
                                style::k_font_heading2_size * btn.icon_scaling,
                                style::k_font_heading2_size)
                         .button_fired) {
-                    dyn::Append(box_system.state->deferred_actions, [&]() { btn.on_fired(); });
+                    dyn::Append(box_system.state->deferred_actions, [fired = btn.on_fired]() { fired(); });
                 }
             }
         }
@@ -632,9 +632,10 @@ DoPickerPopup(GuiBoxSystem& box_system, PickerPopupOptions const& options, Picke
                                   },
                               });
                     text_input.text_input_result && text_input.text_input_result->buffer_changed) {
-                    dyn::Append(box_system.state->deferred_actions, [&]() {
-                        dyn::AssignFitInCapacity(*search, text_input.text_input_result->text);
-                    });
+                    dyn::Append(box_system.state->deferred_actions,
+                                [&s = *search, new_text = text_input.text_input_result->text]() {
+                                    dyn::AssignFitInCapacity(s, new_text);
+                                });
                 }
 
                 if (search->size) {
@@ -651,7 +652,7 @@ DoPickerPopup(GuiBoxSystem& box_system, PickerPopupOptions const& options, Picke
                                   .activation_click_event = ActivationClickEvent::Up,
                               })
                             .button_fired) {
-                        dyn::Append(box_system.state->deferred_actions, [&]() { dyn::Clear(*search); });
+                        dyn::Append(box_system.state->deferred_actions, [&s = *search]() { dyn::Clear(s); });
                     }
                 }
             }

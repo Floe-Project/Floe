@@ -231,8 +231,8 @@ void DoIrPickerPopup(GuiBoxSystem& box_system,
     DynamicSet<String> all_tags {box_system.arena};
     for (auto const& l_ptr : context.libraries) {
         auto const& lib = *l_ptr;
-        for (auto const& inst : lib.sorted_irs)
-            for (auto const& tag : inst->tags)
+        for (auto const& ir : lib.sorted_irs)
+            for (auto const& tag : ir->tags)
                 all_tags.Insert(tag);
     }
 

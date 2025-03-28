@@ -92,7 +92,7 @@ jobs:
         if: '!cancelled()'
         uses: actions/upload-artifact@v4
         with:
-          name: logs-linux
+          name: logs-linux-optimised
           if-no-files-found: ignore
           path: ~/.local/state/Floe/Logs/*
 

@@ -64,7 +64,7 @@ FeedbackPanel(GuiBoxSystem& box_system, FeedbackPanelContext& context, FeedbackP
                                              f32x2 {layout::k_fill_parent, 90},
                                              TextInputBox::MultiLine);
     if (description_field.text_input_result && description_field.text_input_result->buffer_changed)
-        dyn::Assign(state.description, description_field.text_input_result->text);
+        dyn::AssignFitInCapacity(state.description, description_field.text_input_result->text);
 
     DoBox(box_system,
           {
@@ -81,7 +81,7 @@ FeedbackPanel(GuiBoxSystem& box_system, FeedbackPanelContext& context, FeedbackP
                                        f32x2 {layout::k_fill_parent, 30},
                                        TextInputBox::SingleLine);
     if (email_field.text_input_result && email_field.text_input_result->buffer_changed)
-        dyn::Assign(state.email, email_field.text_input_result->text);
+        dyn::AssignFitInCapacity(state.email, email_field.text_input_result->text);
 
     if (CheckboxButton(box_system, panel, "Include anonymous diagnostic data"_s, state.send_diagnostic_data))
         state.send_diagnostic_data = !state.send_diagnostic_data;

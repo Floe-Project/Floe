@@ -180,7 +180,9 @@ format:
 # Clap Validator seems to have a bug that crashes the validator. 
 # https://github.com/free-audio/clap-validator/issues/21
 # We workaround this by skipping process and param tests.
-clap_val_args := "--test-filter '.*(process|param).*' --invert-filter"
+# Additionally, we disable this test because we have a good reason to behave in a different way. Each instance of our plugin as an ID - we store that in the state so that loading a DAW project retains the instance IDs. But if a new instance is created and only its parameters are set, then our state will differ in terms of the instance ID - and that's okay. We don't want to fail because of this.
+# state-reproducibility-flush: Randomizes a plugin's parameters, saves its state, recreates the plugin instance, sets the same parameters as before, saves the state again, and then asserts that the two states are identical. The parameter values are set updated using the process function to create the first state, and using the flush function to create the second state.
+clap_val_args := "--test-filter '.*(process|param|state-reproducibility-flush).*' --invert-filter"
 
 test-clap-val build="": (_build_if_requested build "native")
   clap-validator validate {{clap_val_args}} {{native_binary_dir}}/Floe.clap

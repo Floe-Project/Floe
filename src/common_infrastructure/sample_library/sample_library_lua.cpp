@@ -2162,6 +2162,10 @@ TEST_CASE(TestBasicFile) {
             },
         },
     }))
+    floe.add_region(instrument2, floe.extend_table(proto, {
+        path = "foo/file.flac",
+        root_key = 10,
+    }))
     floe.add_ir(library, {
         name = "IR1",
         path = "bar/bar.flac",

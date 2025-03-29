@@ -58,6 +58,10 @@ static Optional<IrCursor> IterateIr(IrPickerContext const& context,
         if (state.selected_library_hashes.size && !Contains(state.selected_library_hashes, lib.Id().Hash()))
             continue;
 
+        if (state.selected_library_author_hashes.size &&
+            !Contains(state.selected_library_author_hashes, Hash(lib.author)))
+            continue;
+
         for (; cursor.ir_index < lib.sorted_irs.size; (
                  {
                      switch (direction) {
@@ -279,6 +283,7 @@ void DoIrPickerPopup(GuiBoxSystem& box_system,
             .library_filters =
                 LibraryFilters {
                     .selected_library_hashes = state.selected_library_hashes,
+                    .selected_library_author_hashes = state.selected_library_author_hashes,
                     .library_images = context.library_images,
                     .sample_library_server = context.sample_library_server,
                 },

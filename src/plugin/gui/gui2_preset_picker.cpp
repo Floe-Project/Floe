@@ -95,6 +95,18 @@ static Optional<PresetCursor> IteratePreset(PresetPickerContext const& context,
                 if (!found) continue;
             }
 
+            if (state.selected_library_author_hashes.size) {
+                bool found = false;
+                for (auto const lib_id : preset.used_libraries) {
+                    auto const author_hash = Hash(lib_id.author);
+                    if (Contains(state.selected_library_author_hashes, author_hash)) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) continue;
+            }
+
             if (state.selected_author_hashes.size) {
                 auto const author_hash = Hash(preset.metadata.author);
                 if (!Contains(state.selected_author_hashes, author_hash)) continue;
@@ -333,6 +345,7 @@ void DoPresetPicker(GuiBoxSystem& box_system,
             .library_filters =
                 LibraryFilters {
                     .selected_library_hashes = state.selected_library_hashes,
+                    .selected_library_author_hashes = state.selected_library_author_hashes,
                     .library_images = context.library_images,
                     .sample_library_server = context.sample_library_server,
                 },

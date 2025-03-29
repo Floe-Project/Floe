@@ -64,14 +64,26 @@ static Optional<InstrumentCursor> IterateInstrument(InstPickerContext const& con
         if (lib.sorted_instruments.size == 0) continue;
         if (picker_gui_is_open && lib.file_format_specifics.tag != state.FileFormatForCurrentTab()) continue;
 
-        if (state.tab == InstPickerState::Tab::FloeLibaries && state.selected_library_hashes.size &&
-            !Contains(state.selected_library_hashes, lib.Id().Hash())) {
-            continue;
+        if (state.tab == InstPickerState::Tab::FloeLibaries) {
+            if (state.selected_library_hashes.size &&
+                !Contains(state.selected_library_hashes, lib.Id().Hash())) {
+                continue;
+            }
+            if (state.selected_library_author_hashes.size &&
+                !Contains(state.selected_library_author_hashes, Hash(lib.author))) {
+                continue;
+            }
         }
 
-        if (state.tab == InstPickerState::Tab::MirageLibraries && state.selected_mirage_library_hashes.size &&
-            !Contains(state.selected_mirage_library_hashes, lib.Id().Hash())) {
-            continue;
+        if (state.tab == InstPickerState::Tab::MirageLibraries) {
+            if (state.selected_mirage_library_hashes.size &&
+                !Contains(state.selected_mirage_library_hashes, lib.Id().Hash())) {
+                continue;
+            }
+            if (state.selected_mirage_library_author_hashes.size &&
+                !Contains(state.selected_mirage_library_author_hashes, Hash(lib.author))) {
+                continue;
+            }
         }
 
         for (; cursor.inst_index < lib.sorted_instruments.size; (
@@ -427,6 +439,9 @@ void DoInstPickerPopup(GuiBoxSystem& box_system,
                         .selected_library_hashes = state.tab == InstPickerState::Tab::FloeLibaries
                                                        ? state.selected_library_hashes
                                                        : state.selected_mirage_library_hashes,
+                        .selected_library_author_hashes = state.tab == InstPickerState::Tab::FloeLibaries
+                                                              ? state.selected_library_author_hashes
+                                                              : state.selected_mirage_library_author_hashes,
                         .library_images = context.library_images,
                         .sample_library_server = context.sample_library_server,
                     };

@@ -196,6 +196,7 @@ struct TagsFilters {
 
 struct LibraryFilters {
     DynamicArray<u64>& selected_library_hashes;
+    DynamicArray<u64>& selected_library_author_hashes;
     LibraryImagesArray& library_images;
     sample_lib_server::Server& sample_library_server;
 };
@@ -205,38 +206,62 @@ PUBLIC void DoPickerLibraryFilters(GuiBoxSystem& box_system,
                                    Span<sample_lib::LibraryIdRef const> libraries,
                                    LibraryFilters const& library_filters,
                                    sample_lib::LibraryIdRef const*& hovering_library) {
+    {
+        auto const section = DoPickerItemsSectionContainer(box_system,
+                                                           {
+                                                               .parent = parent,
+                                                               .heading = "LIBRARIES"_s,
+                                                               .multiline_contents = true,
+                                                           });
 
-    auto const section = DoPickerItemsSectionContainer(box_system,
-                                                       {
-                                                           .parent = parent,
-                                                           .heading = "LIBRARIES"_s,
-                                                           .multiline_contents = true,
-                                                       });
+        for (auto const& lib : libraries) {
+            auto const lib_id_hash = lib.Hash();
+            auto const is_selected = Contains(library_filters.selected_library_hashes, lib_id_hash);
 
-    for (auto const& lib : libraries) {
-        auto const lib_id_hash = lib.Hash();
-        auto const is_selected = Contains(library_filters.selected_library_hashes, lib_id_hash);
+            auto const button = DoFilterButton(
+                box_system,
+                section,
+                is_selected,
+                LibraryImagesFromLibraryId(library_filters.library_images,
+                                           box_system.imgui,
+                                           lib,
+                                           library_filters.sample_library_server,
+                                           box_system.arena,
+                                           true)
+                    .AndThen([&](LibraryImages const& imgs) {
+                        return box_system.imgui.frame_input.graphics_ctx->GetTextureFromImage(imgs.icon);
+                    }),
+                lib.name);
+            if (button.is_hot) hovering_library = &lib;
+            if (button.button_fired) {
+                if (is_selected)
+                    dyn::RemoveValue(library_filters.selected_library_hashes, lib_id_hash);
+                else
+                    dyn::Append(library_filters.selected_library_hashes, lib_id_hash);
+            }
+        }
+    }
 
-        auto const button = DoFilterButton(
-            box_system,
-            section,
-            is_selected,
-            LibraryImagesFromLibraryId(library_filters.library_images,
-                                       box_system.imgui,
-                                       lib,
-                                       library_filters.sample_library_server,
-                                       box_system.arena,
-                                       true)
-                .AndThen([&](LibraryImages const& imgs) {
-                    return box_system.imgui.frame_input.graphics_ctx->GetTextureFromImage(imgs.icon);
-                }),
-            lib.name);
-        if (button.is_hot) hovering_library = &lib;
-        if (button.button_fired) {
-            if (is_selected)
-                dyn::RemoveValue(library_filters.selected_library_hashes, lib_id_hash);
-            else
-                dyn::Append(library_filters.selected_library_hashes, lib_id_hash);
+    {
+        DynamicSet<String> library_authors {box_system.arena};
+        for (auto const& lib : libraries)
+            library_authors.Insert(lib.author);
+
+        auto const section = DoPickerItemsSectionContainer(box_system,
+                                                           {
+                                                               .parent = parent,
+                                                               .heading = "LIBRARY AUTHORS"_s,
+                                                               .multiline_contents = true,
+                                                           });
+        for (auto const& author : library_authors.Elements()) {
+            if (!author.active) continue;
+            auto const is_selected = Contains(library_filters.selected_library_author_hashes, author.hash);
+            if (DoFilterButton(box_system, section, is_selected, {}, author.key).button_fired) {
+                if (is_selected)
+                    dyn::RemoveValue(library_filters.selected_library_author_hashes, author.hash);
+                else
+                    dyn::Append(library_filters.selected_library_author_hashes, author.hash);
+            }
         }
     }
 }

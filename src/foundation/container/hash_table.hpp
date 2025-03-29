@@ -334,6 +334,8 @@ struct DynamicHashTable {
     void DeleteIndex(usize i) { table.DeleteIndex(i); }
     void DeleteAll() { table.DeleteAll(); }
 
+    Span<typename Table::Element const> Elements() const { return table.Elements(); }
+
     bool Insert(KeyType key, ValueType value) { return table.InsertGrowIfNeeded(allocator, key, value); }
 
     auto begin() const { return table.begin(); }

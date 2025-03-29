@@ -38,7 +38,9 @@ struct InstPickerState {
 
     Tab tab {Tab::FloeLibaries};
     DynamicArray<u64> selected_library_hashes {Malloc::Instance()};
+    DynamicArray<u64> selected_library_author_hashes {Malloc::Instance()};
     DynamicArray<u64> selected_mirage_library_hashes {Malloc::Instance()};
+    DynamicArray<u64> selected_mirage_library_author_hashes {Malloc::Instance()};
     DynamicArray<u64> selected_tags_hashes {Malloc::Instance()};
     DynamicArrayBounded<char, 100> search;
     bool scroll_to_show_selected = false;

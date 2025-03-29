@@ -204,7 +204,7 @@ struct Library {
     FileFormatSpecifics file_format_specifics;
 };
 
-constexpr LibraryIdRef k_builtin_library_id = {.author = "Floe"_s, .name = "Built-in"};
+constexpr LibraryIdRef k_builtin_library_id = {.author = FLOE_VENDOR, .name = "Built-in"};
 
 // MDATA libraries didn't have an author field, but they were all made by FrozenPlain.
 constexpr String k_mdata_library_author = "FrozenPlain"_s;

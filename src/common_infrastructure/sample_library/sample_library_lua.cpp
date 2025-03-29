@@ -846,6 +846,7 @@ struct TableFields<ImpulseResponse> {
         Path,
         Folder,
         Tags,
+        Description,
         Count,
     };
 
@@ -893,12 +894,23 @@ struct TableFields<ImpulseResponse> {
                     .name = "tags",
                     .description_sentence =
                         "An array of strings to denote properties of the IR. See https://floe.audio/develop/tags-and-folders.html for more information.",
-                    .example = "{ \"acoustic\", \"hall\" }",
+                    .example = "{ \"acoustic\", \"cathedral\" }",
                     .default_value = "no tags",
                     .lua_type = LUA_TTABLE,
                     .required = false,
                     .is_array = true,
                     .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.tags = SetArrayOfStrings(ctx, info, true); },
+                };
+            case Field::Description:
+                return {
+                    .name = "description",
+                    .description_sentence =
+                        "A description of the IR. Start with a capital letter an end with a period.",
+                    .example = "Sine sweep in St. Paul's Cathedral.",
+                    .default_value = "no description",
+                    .lua_type = LUA_TSTRING,
+                    .required = false,
+                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.description = StringFromTop(ctx); },
                 };
             case Field::Count: break;
         }

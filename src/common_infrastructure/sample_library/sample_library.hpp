@@ -131,6 +131,7 @@ struct ImpulseResponse {
     LibraryPath path {};
     Optional<String> folder {}; // may contain '/'
     Span<String> tags {};
+    Optional<String> description {};
 };
 
 // An impulse response that has its audio data loaded into memory.

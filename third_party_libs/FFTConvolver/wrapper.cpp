@@ -14,23 +14,28 @@ int NumFrames(StereoConvolver& convolver) { return convolver.num_frames; }
 
 void DestroyStereoConvolver(StereoConvolver* convolver) { delete convolver; }
 
-void Init(StereoConvolver& convolver, float const* interleaved_stereo, int num_frames) {
+void Init(StereoConvolver& convolver, float const* samples, int num_frames, int num_channels) {
     convolver.num_frames = num_frames;
 
-    auto samples = new float[(unsigned)num_frames];
+    auto channel_samples = new float[(unsigned)num_frames];
+
+    assert(num_channels == 1 || num_channels == 2);
+
+    // IMPROVE: probably more efficent ways to handle mono audio
 
     for (int chan = 0; chan < 2; ++chan) {
-        for (int frame = 0; frame < num_frames; ++frame)
-            samples[frame] = interleaved_stereo[frame * 2 + chan];
+        if (!(chan == 2 && num_channels == 1))
+            for (int frame = 0; frame < num_frames; ++frame)
+                channel_samples[frame] = samples[frame * num_channels + chan];
 
         // Just trial and error with these values; these seem to be most efficient
         constexpr size_t k_head_block_size = 512;
         constexpr size_t k_tail_block_size = 16384;
 
-        convolver.convolvers[chan].init(k_head_block_size, k_tail_block_size, samples, num_frames);
+        convolver.convolvers[chan].init(k_head_block_size, k_tail_block_size, channel_samples, num_frames);
     }
 
-    delete[] samples;
+    delete[] channel_samples;
 }
 
 void Process(StereoConvolver& convolver,

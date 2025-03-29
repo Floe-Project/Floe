@@ -138,15 +138,10 @@ class ConvolutionReverb final : public Effect {
         auto num_channels = audio_data.channels;
         auto num_frames = audio_data.num_frames;
 
-        // TODO: we need to ensure this is the case before calling this function - show an error message
-        ASSERT(num_channels && num_frames);
-        ASSERT_EQ(num_channels, 2);
-
-        DynamicArray<f32> channel_samples {PageAllocator::Instance()};
-        dyn::Resize(channel_samples, num_frames);
+        ASSERT(num_frames);
 
         auto result = CreateStereoConvolver();
-        Init(*result, audio_data.interleaved_samples.data, (int)num_frames);
+        Init(*result, audio_data.interleaved_samples.data, (int)num_frames, (int)num_channels);
 
         return result;
     }

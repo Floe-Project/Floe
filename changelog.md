@@ -9,6 +9,11 @@ For instance: 0.0.1. Don't change the headings.
 
 # Changelog
 
+## 0.8.1-beta
+See the [main release notes](https://github.com/floe-audio/Floe/releases/tag/v0.8.0-beta).
+
+- Fix issue where Mirage and Floe libraries with the same name would conflict
+
 ## 0.8.0-beta
 First beta release of Floe. This release is feature-complete. We are looking for feedback on the new features and any bugs you find.
 

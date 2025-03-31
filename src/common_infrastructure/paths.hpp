@@ -8,11 +8,14 @@
 
 enum class ScanFolderType : u8 { Presets, Libraries, Count };
 
+enum class PresetFilePickerMode : u8 { Load, Save, Count };
+
 struct FloePaths {
     String always_scanned_folder[ToInt(ScanFolderType::Count)];
     String preferences_path; // path to write to
     Span<String> possible_preferences_paths; // sorted. the first is recommended path to read
     String autosave_path;
+    Array<DynamicArray<char>, ToInt(PresetFilePickerMode::Count)> file_picker_last_path;
 };
 
 FloePaths CreateFloePaths(ArenaAllocator& arena);

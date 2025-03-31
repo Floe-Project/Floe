@@ -83,10 +83,17 @@ PUBLIC void OpenFilePickerInstallPackage(FilePickerState& state, GuiFrameResult&
     state.data = FilePickerStateType::InstallPackage;
 }
 
-static String PresetFileDefaultPath(ArenaAllocator& arena, FloePaths const& paths) {
-    auto const result = path::Join(arena,
-                                   Array {paths.always_scanned_folder[ToInt(ScanFolderType::Presets)],
-                                          "untitled" FLOE_PRESET_FILE_EXTENSION});
+static String
+PresetFileDefaultPath(ArenaAllocator& arena, FloePaths const& paths, PresetFilePickerMode mode) {
+    String folder = paths.always_scanned_folder[ToInt(ScanFolderType::Presets)];
+
+    if (auto const& last_path = paths.file_picker_last_path[ToInt(mode)]; last_path.size)
+        if (auto const dir = path::Directory(last_path)) folder = *dir;
+
+    auto const result = path::Join(arena, Array {folder, "untitled" FLOE_PRESET_FILE_EXTENSION});
+
+    ASSERT(path::IsAbsolute(result));
+
     return result;
 }
 
@@ -104,7 +111,7 @@ OpenFilePickerSavePreset(FilePickerState& state, GuiFrameResult& frame_result, F
     frame_result.file_picker_dialog = FilePickerDialogOptions {
         .type = FilePickerDialogOptions::Type::SaveFile,
         .title = "Save Floe Preset",
-        .default_path = PresetFileDefaultPath(state.arena, paths),
+        .default_path = PresetFileDefaultPath(state.arena, paths, PresetFilePickerMode::Save),
         .filters = k_filters,
         .allow_multiple_selection = false,
     };
@@ -129,7 +136,7 @@ OpenFilePickerLoadPreset(FilePickerState& state, GuiFrameResult& frame_result, F
     frame_result.file_picker_dialog = FilePickerDialogOptions {
         .type = FilePickerDialogOptions::Type::OpenFile,
         .title = "Load Floe Preset",
-        .default_path = PresetFileDefaultPath(state.arena, paths),
+        .default_path = PresetFileDefaultPath(state.arena, paths, PresetFilePickerMode::Load),
         .filters = k_filters,
         .allow_multiple_selection = false,
     };
@@ -140,7 +147,7 @@ OpenFilePickerLoadPreset(FilePickerState& state, GuiFrameResult& frame_result, F
 // Ephemeral
 struct FilePickerContext {
     prefs::Preferences& prefs;
-    FloePaths const& paths;
+    FloePaths& paths;
     package::InstallJobs& package_install_jobs;
     ThreadPool& thread_pool;
     ArenaAllocator& scratch_arena;
@@ -181,10 +188,14 @@ PUBLIC void CheckForFilePickerResults(GuiFrameInput const& frame_input,
             break;
         }
         case FilePickerStateType::SavePreset: {
+            dyn::Assign(context.paths.file_picker_last_path[ToInt(PresetFilePickerMode::Save)],
+                        frame_input.file_picker_results.first->data);
             SaveCurrentStateToFile(context.engine, frame_input.file_picker_results.first->data);
             break;
         }
         case FilePickerStateType::LoadPreset: {
+            dyn::Assign(context.paths.file_picker_last_path[ToInt(PresetFilePickerMode::Load)],
+                        frame_input.file_picker_results.first->data);
             LoadPresetFromFile(context.engine, frame_input.file_picker_results.first->data);
             break;
         }

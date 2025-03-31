@@ -9,6 +9,20 @@ Floe can [install libraries and presets](./install-packages.md) from ZIP files c
 
 Here are some available packages.
 
+## Music Box Suite Free - Free
+
+![MBSF GUI](../images/mbsf-gui.png)
+
+Free multisampled music box from [FrozenPlain](https://www.frozenplain.com/).
+
+| Music Box Suite Free | |
+|:--|:--|
+| Cost | Free - no attribution required (FrozenPlain’s license) |
+| Instruments | 1 |
+| Presets | 12 |
+| Impulse Responses | 0 |
+| Download | [Go to webpage](https://www.frozenplain.com/product/music-box-suite-free) |
+| Download Size | 5.0 MB |
 
 ## Celtic Harp - Free (attribution required)
 
@@ -98,5 +112,5 @@ For Mirage libraries to fully work inside Floe, the Mirage Compatibility library
 | Download | [Download FrozenPlain - Mirage Compatibility Package.zip](https://github.com/FrozenPlain/floe-mirage-compatibility/releases/download/v1.1/FrozenPlain.-.Mirage.Compatibility.Package.zip) |
 | Download Size | 8.9 MB |
 
-## FrozenPlain
-Floe fully supports FrozenPlain's Mirage libraries. [FrozenPlain](https://www.frozenplain.com/).
+## Mirage Libraries
+Floe fully supports all Mirage libraries: [FrozenPlain shop](https://www.frozenplain.com/products).

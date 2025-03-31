@@ -15,6 +15,7 @@ First beta release of Floe. This release is feature-complete. We are looking for
 - Brand new instrument browser supporting tags, search, and filtering by library
 - Brand new impulse response browser featuring all the options of the instrument browser
 - Brand new preset browser with tags, search, and filtering by library. Preset metadata is tracked, library information is tracked, file changes are detected, duplicate presets are hidden.
+- New built-in convolution reverb impulse library with 33 impulse responses
 - New save preset dialog with author, description, and tags
 - Fix instrument left/right and randomise buttons
 - Add AU (Audio Unit v2) support

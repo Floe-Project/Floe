@@ -1524,7 +1524,7 @@ inline String ToString(EmbeddedString s) { return {s.data, s.size}; }
 static sample_lib::Library* BuiltinLibrary() {
     static sample_lib::Library builtin_library {
         .name = sample_lib::k_builtin_library_id.name,
-        .tagline = "Built-in library",
+        .tagline = "Built-in IRs",
         .library_url = FLOE_HOMEPAGE_URL,
         .author = sample_lib::k_builtin_library_id.author,
         .minor_version = 1,
@@ -1536,9 +1536,10 @@ static sample_lib::Library* BuiltinLibrary() {
         .file_hash = 100,
         .create_file_reader = [](sample_lib::Library const&,
                                  sample_lib::LibraryPath path) -> ErrorCodeOr<Reader> {
-            auto const embedded_irs = EmbeddedIrs();
-            for (auto& ir : embedded_irs.irs)
-                if (ToString(ir.filename) == path.str) return Reader::FromMemory({ir.data, ir.size});
+            auto const embedded_irs = GetEmbeddedIrs();
+            for (auto& ir : Span<EmbeddedIr const> {embedded_irs.irs, embedded_irs.count})
+                if (ToString(ir.data.filename) == path.str)
+                    return Reader::FromMemory({ir.data.data, ir.data.size});
             return ErrorCode(FilesystemError::PathDoesNotExist);
         },
         .file_format_specifics = sample_lib::LuaSpecifics {}, // unused
@@ -1546,23 +1547,43 @@ static sample_lib::Library* BuiltinLibrary() {
 
     static bool init = false;
     if (!Exchange(init, true)) {
-        static UninitialisedArray<sample_lib::ImpulseResponse, EmbeddedIr_Count> irs;
-        for (auto const i : Range(ToInt(EmbeddedIr_Count))) {
-            auto const& embedded = EmbeddedIrs().irs[i];
-            PLACEMENT_NEW(&irs[i])
+        static FixedSizeAllocator<Kb(10)> alloc {nullptr};
+
+        auto const embedded_irs = GetEmbeddedIrs();
+
+        builtin_library.irs_by_name =
+            decltype(builtin_library.irs_by_name)::Create(alloc, embedded_irs.count);
+
+        for (auto const& embedded_ir : Span<EmbeddedIr const> {embedded_irs.irs, embedded_irs.count}) {
+            usize num_tags = 0;
+            if (embedded_ir.tag1.size) ++num_tags;
+            if (embedded_ir.tag2.size) ++num_tags;
+
+            auto tags = alloc.AllocateExactSizeUninitialised<String>(num_tags);
+            usize tag_index = 0;
+            if (embedded_ir.tag1.size) tags[tag_index++] = ToString(embedded_ir.tag1);
+            if (embedded_ir.tag2.size) tags[tag_index++] = ToString(embedded_ir.tag2);
+
+            auto const name = ToString(embedded_ir.name);
+
+            auto ir = alloc.NewUninitialised<sample_lib::ImpulseResponse>();
+            PLACEMENT_NEW(ir)
             sample_lib::ImpulseResponse {
                 .library = builtin_library,
-                .name = ToString(embedded.name),
-                .path = {ToString(embedded.filename)},
+                .name = name,
+                .path = {ToString(embedded_ir.data.filename)},
+                .folder = ToString(embedded_ir.folder),
+                .tags = tags,
+                .description = ToString(embedded_ir.description),
             };
+            builtin_library.irs_by_name.InsertWithoutGrowing(name, ir);
         }
 
-        static FixedSizeAllocator<1000> alloc {nullptr};
-        builtin_library.irs_by_name =
-            decltype(builtin_library.irs_by_name)::Create(alloc, ToInt(EmbeddedIr_Count));
+        sample_lib::detail::PostReadBookkeeping(builtin_library, alloc);
 
-        for (auto& ir : irs)
-            builtin_library.irs_by_name.InsertWithoutGrowing(ir.name, &ir);
+        LogDebug(ModuleName::SampleLibraryServer,
+                 "Built-in library loaded, used {} bytes",
+                 alloc.UsedStackData().size);
     }
 
     return &builtin_library;
@@ -1897,7 +1918,7 @@ TEST_CASE(TestSampleLibraryLoader) {
         DynamicArray<Request> requests {scratch_arena};
 
         SUBCASE("ir") {
-            auto const builtin_ir = EmbeddedIrs().irs[0];
+            auto const builtin_ir = GetEmbeddedIrs().irs[0];
             dyn::Append(
                 requests,
                 {
@@ -2206,7 +2227,7 @@ TEST_CASE(TestSampleLibraryLoader) {
                 .inst_name = "Auto Mapped Samples"_s,
             },
         };
-        auto const builtin_irs = EmbeddedIrs();
+        auto const builtin_irs = GetEmbeddedIrs();
 
         constexpr u32 k_num_calls = 200;
         auto random_seed = (u64)NanosecondsSinceEpoch();
@@ -2233,7 +2254,8 @@ TEST_CASE(TestSampleLibraryLoader) {
                     ? LoadRequest {sample_lib::IrId {.library = sample_lib::k_builtin_library_id,
                                                      .ir_name = ({
                                                          auto const ele = RandomElement(
-                                                             Span<BinaryData const> {builtin_irs.irs},
+                                                             Span<EmbeddedIr const> {builtin_irs.irs,
+                                                                                     builtin_irs.count},
                                                              random_seed);
                                                          String {ele.name.data, ele.name.size};
                                                      })}}

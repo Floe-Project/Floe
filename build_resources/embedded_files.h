@@ -17,21 +17,22 @@ typedef struct {
 typedef struct {
     uint8_t const* data;
     uint64_t size;
-    EmbeddedString name;
     EmbeddedString filename;
 } BinaryData;
 
-enum {
-    EmbeddedIr_Cold,
-    EmbeddedIr_Smooth,
-    EmbeddedIr_Cathedral,
-    EmbeddedIr_Subtle,
-    EmbeddedIr_Count,
-};
+typedef struct {
+    BinaryData data;
+    EmbeddedString name;
+    EmbeddedString folder;
+    EmbeddedString tag1;
+    EmbeddedString tag2;
+    EmbeddedString description;
+} EmbeddedIr;
 
 typedef struct {
-    BinaryData irs[EmbeddedIr_Count];
-} EmbeddedIrData;
+    EmbeddedIr const* irs;
+    uint32_t count;
+} EmbeddedIrs;
 
 BinaryData EmbeddedFontAwesome();
 BinaryData EmbeddedMada();
@@ -42,7 +43,7 @@ BinaryData EmbeddedLogoImage();
 BinaryData EmbeddedAboutLibraryTemplateRtf();
 BinaryData EmbeddedPackageInstallationRtf();
 
-EmbeddedIrData EmbeddedIrs();
+EmbeddedIrs GetEmbeddedIrs();
 
 #ifdef __cplusplus
 }

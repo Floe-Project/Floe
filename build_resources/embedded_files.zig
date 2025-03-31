@@ -9,14 +9,16 @@ const c = @cImport({
 
 const build_options = @import("build_options");
 
+fn embeddedString(comptime str: []const u8) c.EmbeddedString {
+    return .{ .data = str.ptr, .size = str.len };
+}
+
 fn embeddedFile(comptime filename: []const u8) c.BinaryData {
     const data = @embedFile(filename);
-    const name = std.fs.path.stem(filename);
     return .{
         .data = data,
         .size = data.len,
-        .name = .{ .data = name.ptr, .size = name.len },
-        .filename = .{ .data = filename.ptr, .size = filename.len },
+        .filename = embeddedString(filename),
     };
 }
 
@@ -53,19 +55,283 @@ export fn EmbeddedPackageInstallationRtf() c.BinaryData {
     return embeddedFile("package_installation.rtf");
 }
 
-export fn EmbeddedIrs() c.EmbeddedIrData {
-    var result: c.EmbeddedIrData = undefined;
-    result.irs[c.EmbeddedIr_Cold] = embeddedFile(
-        "reverb_irs/Cold.flac",
-    );
-    result.irs[c.EmbeddedIr_Smooth] = embeddedFile(
-        "reverb_irs/Smooth.flac",
-    );
-    result.irs[c.EmbeddedIr_Cathedral] = embeddedFile(
-        "reverb_irs/Cathedral.flac",
-    );
-    result.irs[c.EmbeddedIr_Subtle] = embeddedFile(
-        "reverb_irs/Subtle.flac",
-    );
-    return result;
+const embedded_irs = [_]c.EmbeddedIr{
+    // Bizarre FX
+    .{
+        .data = embeddedFile("reverb_irs/bizarre_fx/cyber-pulse.flac"),
+        .name = embeddedString("Cyber Pulse"),
+        .folder = embeddedString("Bizarre FX"),
+        .tag1 = embeddedString("synthesized"),
+        .tag2 = embeddedString("unusual"),
+        .description = embeddedString(""),
+    },
+    .{
+        .data = embeddedFile("reverb_irs/bizarre_fx/dropping-pitch.flac"),
+        .name = embeddedString("Dropping Pitch"),
+        .folder = embeddedString("Bizarre FX"),
+        .tag1 = embeddedString("synthesized"),
+        .tag2 = embeddedString("unusual"),
+        .description = embeddedString(""),
+    },
+    .{
+        .data = embeddedFile("reverb_irs/bizarre_fx/flickering.flac"),
+        .name = embeddedString("Flickering"),
+        .folder = embeddedString("Bizarre FX"),
+        .tag1 = embeddedString("synthesized"),
+        .tag2 = embeddedString("unusual"),
+        .description = embeddedString(""),
+    },
+    .{
+        .data = embeddedFile("reverb_irs/bizarre_fx/fm-flicker.flac"),
+        .name = embeddedString("FM Flicker"),
+        .folder = embeddedString("Bizarre FX"),
+        .tag1 = embeddedString("synthesized"),
+        .tag2 = embeddedString("unusual"),
+        .description = embeddedString(""),
+    },
+    .{
+        .data = embeddedFile("reverb_irs/bizarre_fx/low-vibration.flac"),
+        .name = embeddedString("Low Vibration"),
+        .folder = embeddedString("Bizarre FX"),
+        .tag1 = embeddedString("synthesized"),
+        .tag2 = embeddedString("unusual"),
+        .description = embeddedString(""),
+    },
+    .{
+        .data = embeddedFile("reverb_irs/bizarre_fx/passby.flac"),
+        .name = embeddedString("Passby"),
+        .folder = embeddedString("Bizarre FX"),
+        .tag1 = embeddedString("synthesized"),
+        .tag2 = embeddedString("unusual"),
+        .description = embeddedString(""),
+    },
+    .{
+        .data = embeddedFile("reverb_irs/bizarre_fx/synth-didgeridoo.flac"),
+        .name = embeddedString("Synth Didgeridoo"),
+        .folder = embeddedString("Bizarre FX"),
+        .tag1 = embeddedString("synthesized"),
+        .tag2 = embeddedString("unusual"),
+        .description = embeddedString(""),
+    },
+
+    // Found Sounds
+    .{
+        .data = embeddedFile("reverb_irs/found_sounds/creaky-door.flac"),
+        .name = embeddedString("Creaky Door"),
+        .folder = embeddedString("Found Sounds"),
+        .tag1 = embeddedString("found sounds"),
+        .tag2 = embeddedString("unusual"),
+        .description = embeddedString(""),
+    },
+    .{
+        .data = embeddedFile("reverb_irs/found_sounds/crunch-1.flac"),
+        .name = embeddedString("Crunch 1"),
+        .folder = embeddedString("Found Sounds"),
+        .tag1 = embeddedString("found sounds"),
+        .tag2 = embeddedString("unusual"),
+        .description = embeddedString(""),
+    },
+    .{
+        .data = embeddedFile("reverb_irs/found_sounds/crunch-2.flac"),
+        .name = embeddedString("Crunch 2"),
+        .folder = embeddedString("Found Sounds"),
+        .tag1 = embeddedString("found sounds"),
+        .tag2 = embeddedString("unusual"),
+        .description = embeddedString(""),
+    },
+    .{
+        .data = embeddedFile("reverb_irs/found_sounds/rain.flac"),
+        .name = embeddedString("Rain"),
+        .folder = embeddedString("Found Sounds"),
+        .tag1 = embeddedString("found sounds"),
+        .tag2 = embeddedString("unusual"),
+        .description = embeddedString(""),
+    },
+    .{
+        .data = embeddedFile("reverb_irs/found_sounds/rattle.flac"),
+        .name = embeddedString("Rattle"),
+        .folder = embeddedString("Found Sounds"),
+        .tag1 = embeddedString("found sounds"),
+        .tag2 = embeddedString("unusual"),
+        .description = embeddedString(""),
+    },
+    .{
+        .data = embeddedFile("reverb_irs/found_sounds/water-walkoff.flac"),
+        .name = embeddedString("Water Walkoff"),
+        .folder = embeddedString("Found Sounds"),
+        .tag1 = embeddedString("found sounds"),
+        .tag2 = embeddedString("unusual"),
+        .description = embeddedString(""),
+    },
+    .{
+        .data = embeddedFile("reverb_irs/found_sounds/water.flac"),
+        .name = embeddedString("Water"),
+        .folder = embeddedString("Found Sounds"),
+        .tag1 = embeddedString("found sounds"),
+        .tag2 = embeddedString("unusual"),
+        .description = embeddedString(""),
+    },
+    .{
+        .data = embeddedFile("reverb_irs/found_sounds/wind.flac"),
+        .name = embeddedString("Wind"),
+        .folder = embeddedString("Found Sounds"),
+        .tag1 = embeddedString("found sounds"),
+        .tag2 = embeddedString("unusual"),
+        .description = embeddedString(""),
+    },
+
+    // Simulated Space
+    .{
+        .data = embeddedFile("reverb_irs/simulated_space/chamber-like-1.flac"),
+        .name = embeddedString("Chamber-like 1"),
+        .folder = embeddedString("Simulated Space"),
+        .tag1 = embeddedString("synthesized"),
+        .tag2 = embeddedString("chamber"),
+        .description = embeddedString(""),
+    },
+    .{
+        .data = embeddedFile("reverb_irs/simulated_space/chamber-like-2.flac"),
+        .name = embeddedString("Chamber-like 2"),
+        .folder = embeddedString("Simulated Space"),
+        .tag1 = embeddedString("synthesized"),
+        .tag2 = embeddedString("chamber"),
+        .description = embeddedString(""),
+    },
+    .{
+        .data = embeddedFile("reverb_irs/simulated_space/chamber-like-3.flac"),
+        .name = embeddedString("Chamber-like 3"),
+        .folder = embeddedString("Simulated Space"),
+        .tag1 = embeddedString("synthesized"),
+        .tag2 = embeddedString("chamber"),
+        .description = embeddedString(""),
+    },
+    .{
+        .data = embeddedFile("reverb_irs/simulated_space/cathedral-like-1.flac"),
+        .name = embeddedString("Cathedral-like 1"),
+        .folder = embeddedString("Simulated Space"),
+        .tag1 = embeddedString("synthesized"),
+        .tag2 = embeddedString("cathedral"),
+        .description = embeddedString(""),
+    },
+    .{
+        .data = embeddedFile("reverb_irs/simulated_space/cathedral-like-2.flac"),
+        .name = embeddedString("Cathedral-like 2"),
+        .folder = embeddedString("Simulated Space"),
+        .tag1 = embeddedString("synthesized"),
+        .tag2 = embeddedString("cathedral"),
+        .description = embeddedString(""),
+    },
+
+    // Smooth
+    .{
+        .data = embeddedFile("reverb_irs/smooth/airy.flac"),
+        .name = embeddedString("Airy"),
+        .folder = embeddedString("Smooth"),
+        .tag1 = embeddedString("synthesized"),
+        .tag2 = embeddedString("smooth"),
+        .description = embeddedString(""),
+    },
+    .{
+        .data = embeddedFile("reverb_irs/smooth/formant.flac"),
+        .name = embeddedString("Formant"),
+        .folder = embeddedString("Smooth"),
+        .tag1 = embeddedString("synthesized"),
+        .tag2 = embeddedString("smooth"),
+        .description = embeddedString(""),
+    },
+    .{
+        .data = embeddedFile("reverb_irs/smooth/lush-modulated-1.flac"),
+        .name = embeddedString("Lush Modulated 1"),
+        .folder = embeddedString("Smooth"),
+        .tag1 = embeddedString("synthesized"),
+        .tag2 = embeddedString("smooth"),
+        .description = embeddedString(""),
+    },
+    .{
+        .data = embeddedFile("reverb_irs/smooth/lush-modulated-2.flac"),
+        .name = embeddedString("Lush Modulated 2"),
+        .folder = embeddedString("Smooth"),
+        .tag1 = embeddedString("synthesized"),
+        .tag2 = embeddedString("smooth"),
+        .description = embeddedString(""),
+    },
+    .{
+        .data = embeddedFile("reverb_irs/smooth/lush-modulated-3.flac"),
+        .name = embeddedString("Lush Modulated 3"),
+        .folder = embeddedString("Smooth"),
+        .tag1 = embeddedString("synthesized"),
+        .tag2 = embeddedString("smooth"),
+        .description = embeddedString(""),
+    },
+    .{
+        .data = embeddedFile("reverb_irs/smooth/lush-tail.flac"),
+        .name = embeddedString("Lush Tail"),
+        .folder = embeddedString("Smooth"),
+        .tag1 = embeddedString("synthesized"),
+        .tag2 = embeddedString("smooth"),
+        .description = embeddedString(""),
+    },
+    .{
+        .data = embeddedFile("reverb_irs/smooth/rough-crackle.flac"),
+        .name = embeddedString("Rough Crackle"),
+        .folder = embeddedString("Smooth"),
+        .tag1 = embeddedString("synthesized"),
+        .tag2 = embeddedString("smooth"),
+        .description = embeddedString(""),
+    },
+    .{
+        .data = embeddedFile("reverb_irs/smooth/white-noise-1.flac"),
+        .name = embeddedString("White Noise 1"),
+        .folder = embeddedString("Smooth"),
+        .tag1 = embeddedString("synthesized"),
+        .tag2 = embeddedString("smooth"),
+        .description = embeddedString(""),
+    },
+    .{
+        .data = embeddedFile("reverb_irs/smooth/white-noise-2.flac"),
+        .name = embeddedString("White Noise 2"),
+        .folder = embeddedString("Smooth"),
+        .tag1 = embeddedString("synthesized"),
+        .tag2 = embeddedString("smooth"),
+        .description = embeddedString(""),
+    },
+    .{
+        .data = embeddedFile("reverb_irs/smooth/white-noise-3.flac"),
+        .name = embeddedString("White Noise 3"),
+        .folder = embeddedString("Smooth"),
+        .tag1 = embeddedString("synthesized"),
+        .tag2 = embeddedString("smooth"),
+        .description = embeddedString(""),
+    },
+    .{
+        .data = embeddedFile("reverb_irs/smooth/white-noise-4.flac"),
+        .name = embeddedString("White Noise 4"),
+        .folder = embeddedString("Smooth"),
+        .tag1 = embeddedString("synthesized"),
+        .tag2 = embeddedString("smooth"),
+        .description = embeddedString(""),
+    },
+    .{
+        .data = embeddedFile("reverb_irs/smooth/white-noise-5.flac"),
+        .name = embeddedString("White Noise 5"),
+        .folder = embeddedString("Smooth"),
+        .tag1 = embeddedString("synthesized"),
+        .tag2 = embeddedString("smooth"),
+        .description = embeddedString(""),
+    },
+    .{
+        .data = embeddedFile("reverb_irs/smooth/white-noise-6.flac"),
+        .name = embeddedString("White Noise 6"),
+        .folder = embeddedString("Smooth"),
+        .tag1 = embeddedString("synthesized"),
+        .tag2 = embeddedString("smooth"),
+        .description = embeddedString(""),
+    },
+};
+
+export fn GetEmbeddedIrs() c.EmbeddedIrs {
+    return .{
+        .irs = &embedded_irs,
+        .count = embedded_irs.len,
+    };
 }

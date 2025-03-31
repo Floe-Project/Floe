@@ -54,7 +54,7 @@ LibraryPtrOrError Read(Reader& reader,
 
 namespace detail {
 
-void PostReadBookkeeping(Library& lib, ArenaAllocator& arena) {
+void PostReadBookkeeping(Library& lib, Allocator& arena) {
 
     // Sort items into their folders, and by name within each folder.
     auto const sort_function = [](auto* a, auto* b) {

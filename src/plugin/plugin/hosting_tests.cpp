@@ -378,7 +378,7 @@ static ErrorCodeOr<Span<u8 const>> MakeState(ArenaAllocator& arena, StatePropert
     }
 
     if (properties & StateProperties::Ir) {
-        auto const ir_name = EmbeddedIrs().irs[0].name;
+        auto const ir_name = GetEmbeddedIrs().irs[0].name;
         state.ir_id = sample_lib::IrId {
             .library = sample_lib::k_builtin_library_id,
             .ir_name = String {ir_name.data, ir_name.size},

@@ -286,7 +286,7 @@ struct Options {
 };
 
 namespace detail {
-void PostReadBookkeeping(Library& lib, ArenaAllocator& arena);
+void PostReadBookkeeping(Library& lib, Allocator& arena);
 }
 
 LibraryPtrOrError ReadLua(Reader& reader,

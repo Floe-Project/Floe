@@ -47,6 +47,14 @@ export fn EmbeddedLogoImage() c.BinaryData {
     }
 }
 
+export fn EmbeddedIconImage() c.BinaryData {
+    if (build_options.icon_file) |p| {
+        return embeddedFile(p);
+    } else {
+        return .{};
+    }
+}
+
 export fn EmbeddedAboutLibraryTemplateRtf() c.BinaryData {
     return embeddedFile("about_library_template.rtf");
 }

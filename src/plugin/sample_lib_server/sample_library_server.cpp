@@ -1522,6 +1522,7 @@ inline String ToString(EmbeddedString s) { return {s.data, s.size}; }
 
 // not threadsafe
 static sample_lib::Library* BuiltinLibrary() {
+    static constexpr String k_icon_path = "builtin-library-icon";
     static sample_lib::Library builtin_library {
         .name = sample_lib::k_builtin_library_id.name,
         .tagline = "Built-in IRs",
@@ -1529,17 +1530,23 @@ static sample_lib::Library* BuiltinLibrary() {
         .author = sample_lib::k_builtin_library_id.author,
         .minor_version = 1,
         .background_image_path = k_nullopt,
-        .icon_image_path = k_nullopt,
+        .icon_image_path = k_icon_path,
         .insts_by_name = {},
         .irs_by_name = {},
         .path = ":memory:",
         .file_hash = 100,
         .create_file_reader = [](sample_lib::Library const&,
                                  sample_lib::LibraryPath path) -> ErrorCodeOr<Reader> {
+            if (path == k_icon_path) {
+                auto data = EmbeddedIconImage();
+                return Reader::FromMemory({data.data, data.size});
+            }
+
             auto const embedded_irs = GetEmbeddedIrs();
             for (auto& ir : Span<EmbeddedIr const> {embedded_irs.irs, embedded_irs.count})
                 if (ToString(ir.data.filename) == path.str)
                     return Reader::FromMemory({ir.data.data, ir.data.size});
+
             return ErrorCode(FilesystemError::PathDoesNotExist);
         },
         .file_format_specifics = sample_lib::LuaSpecifics {}, // unused

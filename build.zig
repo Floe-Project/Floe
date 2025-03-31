@@ -1907,9 +1907,16 @@ pub fn build(b: *std.Build) void {
         });
         {
             var embedded_files_options = b.addOptions();
-            const logo_resource = getExternalResource(&build_context, "Logos/rasterized/plugin-gui-logo.png");
-            const logo_path = if (logo_resource) |r| r.absolute_path else null;
-            embedded_files_options.addOption(?[]const u8, "logo_file", logo_path);
+            {
+                const logo_resource = getExternalResource(&build_context, "Logos/rasterized/plugin-gui-logo.png");
+                const logo_path = if (logo_resource) |r| r.absolute_path else null;
+                embedded_files_options.addOption(?[]const u8, "logo_file", logo_path);
+            }
+            {
+                const icon_resource = getExternalResource(&build_context, "Logos/rasterized/icon-background-256px.png");
+                const icon_path = if (icon_resource) |r| r.absolute_path else null;
+                embedded_files_options.addOption(?[]const u8, "icon_file", icon_path);
+            }
             embedded_files.root_module.addOptions("build_options", embedded_files_options);
         }
         embedded_files.linkLibC();

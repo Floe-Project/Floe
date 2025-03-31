@@ -207,9 +207,8 @@ struct Library {
 constexpr LibraryIdRef k_builtin_library_id = {.author = FLOE_VENDOR, .name = "Built-in"};
 
 // MDATA libraries didn't have an author field, but they were all made by FrozenPlain.
-constexpr String k_mdata_library_author = "FrozenPlain"_s;
-constexpr LibraryIdRef k_mirage_compat_library_id = {.author = k_mdata_library_author,
-                                                     .name = "Mirage Compatibility"};
+constexpr String k_mdata_library_author = "FrozenPlain (Mirage)"_s;
+constexpr LibraryIdRef k_mirage_compat_library_id = {.author = "FrozenPlain", .name = "Mirage Compatibility"};
 
 struct LibraryId {
     LibraryId() = default;

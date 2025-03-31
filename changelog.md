@@ -155,6 +155,7 @@ Notable changes from the last Mirage version to Floe v1.0.0:
 - Load instruments from different libraries in same patch
 - New format for creating sample libraries - open to everyone
 - New settings GUI
+- Sample libraries can add impulse responses
 - New installer, offline and hassle-free
 - Ability to install libraries and presets (packages) with a button - handles all the details automatically
 - Voice count increased from 32 to 256

@@ -83,11 +83,11 @@ For now, we'll assume that you have a folder of audio samples and know what note
 1. Create a new folder in one of Floe's [sample library folders](../usage/sample-libraries.md). We recommend naming it 'Author Name - Library Name'.
 1. Create a file in that folder called `my-library.floe.lua`.
 1. Create a subfolder called `Samples` and put your audio files in there.
-1. Open the Lua file in your text editor. Sublime Text or Visual Studio Code are reasonable choices.
+1. Open the Lua file in your text editor. If you're not already familiar with a editor, then Sublime Text or Visual Studio Code are reasonable choices.
 1. Use the `floe.new_library()` function to create your library, filling in all the fields marked `[required]` in the [Floe's Lua reference](library-lua-scripts.md).
 1. Use `floe.new_instrument()` to create an instrument, and then add regions to it using `floe.add_region()`, again, filling in the fields that are documented.
-1. At the end of the file, return the library object you just created.
-1. Floe automatically detects when a file changes and will tell you if there's any errors.
+1. At the end of the file, return the library object you just created: `return library`.
+1. Floe automatically detects whenever any library file changes and will tell you if there's any errors. If a library is correctly configured, it will instantly appear in Floe.
 
 
 ## Creating high-quality samples
@@ -102,8 +102,8 @@ When changing the volume levels of a realistic multi-sampled instrument, you pro
 Here are some guidelines for levels:
 - Each samples's peak level should be less than -3 dB.
 - RMS levels for an instrument _as a whole_ should be around -18 dB. Play the instrument polyphonically and watch the RMS level. If the instrument is designed to be monophonic, then adjust for that.
-- Impulse responses should have an RMS level of around -16 dB.
 - The noise floor should be as low as possible: -60 dB is a good target. Use high-quality noise reduction tools to remove noise from your samples if you need to. Noise levels can quickly stack up with a multi-sampled instrument played polyphonically. Being too aggressive with algorithmic noise reduction can make your samples sound unnatural - so it's a balance.
+- Impulse responses should be normalised by their energy (power) levels: `signet my-impulses norm -100 --mode energy --independently && signet my-impulses norm 0`. Or if not using Signet, then adjust their levels so that they feel similar to the volume levels of Floe's built-in IRs.
 
 ### Sample rate, bit depth, and file format
 Floe only supports FLAC and WAV files. We recommend using FLAC for your samples. It's lossless and can reduce the file size by 50% to 70% compared to WAV. Floe loads FLAC files very quickly.

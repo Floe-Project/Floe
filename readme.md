@@ -49,4 +49,4 @@ Feel free to use the discussions on GitHub for questions, feedback, and ideas. R
 ### CI
 ![CI](https://github.com/floe-audio/Floe/actions/workflows/tests.yml/badge.svg)
 [![codecov](https://codecov.io/github/floe-audio/Floe/graph/badge.svg?token=7HEJ7SF75K)](https://codecov.io/github/floe-audio/Floe)
-[![CodeFactor](https://www.codefactor.io/repository/github/floe-project/floe/badge/main)](https://www.codefactor.io/repository/github/floe-project/floe/overview/main)
+[![CodeFactor](https://www.codefactor.io/repository/github/floe-audio/floe/badge/main)](https://www.codefactor.io/repository/github/floe-audio/floe/overview/main)

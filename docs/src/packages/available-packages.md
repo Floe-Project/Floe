@@ -10,7 +10,7 @@ Floe can [install libraries and presets](./install-packages.md) from ZIP files c
 Here are some available packages.
 
 
-## Celtic Harp
+## Celtic Harp - Free (attribution required)
 
 ![Celtic Harp GUI](../images/harp-gui.png)
 
@@ -22,12 +22,14 @@ We made a Floe-compatible version of [Etherealwinds Harp 2: Community Edition](h
 |:--|:--|
 | Cost | Free -  [attribution required](../usage/attribution.md) ([CC-BY](https://creativecommons.org/licenses/by/4.0/deed.en)) |
 | Repository | [floe-audio/Harp](https://github.com/floe-audio/Harp) |
+| Instruments | 1 |
 | Presets | 0 |
-| Download | [Download Versilian Studios - Etherealwinds Harp 2 CE Package.zip](https://github.com/floe-audio/Harp/releases/download/v1.2/Versilian.Studios.-.Etherealwinds.Harp.2.CE.Package.zip) |
-| Download Size | 93.4 MB |
+| Impulse Responses | 0 |
+| Download | [Download Floe Ports - Celtic Harp Package.zip](https://github.com/floe-audio/Harp/releases/download/v1.3/Floe.Ports.-.Celtic.Harp.Package.zip) |
+| Download Size | 120.4 MB |
 
 
-## Xylophone
+## Xylophone - Free
 
 ![Xylophone GUI](../images/xylophone-gui.png)
 
@@ -39,12 +41,14 @@ This is a basic free multisampled xylophone from [FreePats](https://freepats.zen
 |:--|:--|
 | Cost | Free - no attribution required (public domain) |
 | Repository | [floe-audio/Xylophone](https://github.com/floe-audio/Xylophone) |
+| Instruments | 1 |
 | Presets | 0 |
-| Download | [Download FreePats - Xylophone Package.zip](https://github.com/floe-audio/Xylophone/releases/download/v1.2/FreePats.-.Xylophone.Package.zip) |
+| Impulse Responses | 0 |
+| Download | [Download Floe Ports - Xylophone Package.zip](https://github.com/floe-audio/Xylophone/releases/download/v1.3/Floe.Ports.-.Xylophone.Package.zip) |
 | Download Size | 2.6 MB |
 
 
-## Ocarina
+## Ocarina - Free
 
 ![Ocarina GUI](../images/ocarina-gui.png)
 
@@ -54,19 +58,45 @@ This is a basic free ocarina from [FreePats](https://freepats.zenvoid.org/), con
 |:--|:--|
 | Cost | Free - no attribution required (public domain) |
 | Repository | [floe-audio/Ocarina](https://github.com/floe-audio/Ocarina) |
+| Instruments | 1 |
 | Presets | 0 |
-| Download | [Download FreePats - Ocarina Package.zip](https://github.com/floe-audio/Ocarina/releases/download/v1.2/FreePats.-.Ocarina.Package.zip) |
+| Impulse Responses | 0 |
+| Download | [Download Floe Ports - Ocarina Package.zip](https://github.com/floe-audio/Ocarina/releases/download/v1.3/Floe.Ports.-.Ocarina.Package.zip) |
 | Download Size | 4.3 MB |
 
-## Mirage Compatibility
+
+## Antique IRs - Free
+
+![Antique IRs GUI](../images/antique-irs-gui.png)
+
+Give your presets a vintage sound using this library of impulse responses that simulate old audio equipment.
+
+It's a Floe port of NoiseCollector's impulses response library; created with the use of public domain recordings of historical events. Vintage equipment like dicta-phones, old film reels, vintage vinyl, wax cylinders, and magnetic wire.
+
+Impulses can be used to simulate war reports, old radio broadcasts, space missions, and other vintage sounds with a convolution reverb.
+
+| Antique IRs | |
+|:--|:--|
+| Cost | Free - no attribution required (public domain) |
+| Repository | [floe-audio/Antique-IRs](https://github.com/floe-audio/Antique-IRs) |
+| Instruments | 0 |
+| Presets | 0 |
+| Impulse Responses | 27 |
+| Download | [Download Floe Ports - Antique IRs Package.zip](https://github.com/floe-audio/Antique-IRs/releases/download/v1.0/Floe.Ports.-.Antique.IRs.Package.zip) |
+| Download Size | 1.1 MB |
+
+
+## Mirage Compatibility - Free
+
+Compatibility files for working the FrozenPlain Mirage libraries inside Floe.
 
 For Mirage libraries to fully work inside Floe, the Mirage Compatibility library is needed. This library will normally be included alongside Mirage libraries, but it can also be installed separately.
 
 | Mirage Compatibility | |
 |:--|:--|
 | Cost | Free - no attribution required (FrozenPlain's license) |
-| Download | [Download Mirage Compatibility Package.zip](https://github.com/FrozenPlain/floe-mirage-compatibility/releases/download/v1.0/FrozenPlain.-.Mirage.Compatibility.Package.zip) |
+| Download | [Download FrozenPlain - Mirage Compatibility Package.zip](https://github.com/FrozenPlain/floe-mirage-compatibility/releases/download/v1.1/FrozenPlain.-.Mirage.Compatibility.Package.zip) |
 | Download Size | 8.9 MB |
 
 ## FrozenPlain
-[FrozenPlain](https://www.frozenplain.com) will be converting all of their libraries to the Floe format.
+Floe fully supports FrozenPlain's Mirage libraries. [FrozenPlain](https://www.frozenplain.com/).

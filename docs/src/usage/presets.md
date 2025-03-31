@@ -13,10 +13,7 @@ Presets are portable - you can copy them to other computers or operating systems
 
 ![Preset Browser GUI](../images/preset-browser.png)
 
-Floe features a browser for conveniently navigating and loading presets from your preset folders. This browser has two panels. The panel on the left is used to select the folder to browse. The panel on the right is used to load presets from within the selected folder and its subfolders. You can use the arrow keys on your keyboard to move to different presets on the right panel.
-
-You can also search for folders or files by typing into the search bar on this panel. Your search term is compared against each filepath of every preset in the currently shown folder.
-
+Floe features a browser for conveniently navigating and loading presets from your preset folders. Filter presets using the left-hand panel, and select presets from the right-hand panel. You can also search for presets using the search bar at the top.
 
 ## Preset folders
 

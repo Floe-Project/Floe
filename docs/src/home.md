@@ -4,7 +4,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
 <div class="warning">
-IMPORTANT: Floe is not finished yet.
+Floe is currently in beta — please give it a try today.
 </div>
 
 <div style="padding-bottom: 30px;"></div>
@@ -22,9 +22,6 @@ IMPORTANT: Floe is not finished yet.
 <p style="font-size: 2rem; margin-bottom: 4px;">Floe lets you find, perform and transform sounds from sample libraries — from realistic instruments to synthesised tones. Handmade with care, Floe is no-hassle, open-source and always free.</p>
 
 <div style="padding-bottom: 10px;"></div>
-
-![Floe's GUI](./images/floe-alpha-gui-full.png)
-Alpha version of Floe's GUI showing multiple libraries loaded.
 
 <p style="text-align: center; margin-top: 40px;">
 <a href="https://floe.audio/installation/download-and-install-floe.html" style="
@@ -47,12 +44,12 @@ Alpha version of Floe's GUI showing multiple libraries loaded.
 ## Find the right sound quickly
 Floe's intuitive browsing system works across all your [Floe sample libraries](./usage/sample-libraries.md), bringing together instruments and presets through categories, tags, and powerful search. The sound you need is always a few clicks away.
 
-<!-- TODO: screenshot/mp4 -->
+![Picker GUI](./images/inst-picker-gui.png)
 
 ## Transform sounds
 With three distinct layers, Floe lets you blend instruments across different libraries. Transform sounds with loop and crossfade controls that bridge the gap between multisampling and synthesis. Process your sounds further with a rack of ==effects-count== built-in effects.
 
-<!-- TODO: screenshot/mp4 -->
+![Transform sounds GUI](./images/transform-sounds.png)
 
 ## Focus on making music
 Available as a plugin for your DAW (CLAP, VST3, and AU) on Windows and macOS. No accounts, no subscriptions, no interruptions — just musical creation. Openness is at the core of Floe and its libraries.
@@ -60,10 +57,10 @@ Available as a plugin for your DAW (CLAP, VST3, and AU) on Windows and macOS. No
 ## Expanding library selection
 The list of [libraries available](./packages/available-packages.md) for Floe is growing. And they're installable in a few clicks. If you're a developer, you can make your own libraries for Floe and request adding them to the list.
 
-<!-- TODO: graphic/mp4 -->
+![Libraries list GUI](./images/expanding-libraries-list.png)
 
 ## Handmade software
-Handmade and detail-focused, Floe is a professional-grade tool available to everyone. It's made by Sam Windell, developer of [FrozenPlain](https://frozenplain.com) whose sample libraries will be updated to support the Floe format. 
+Handmade and detail-focused, Floe is a professional-grade tool available to everyone. It's made by Sam Windell, who also runs a sample library development company: [FrozenPlain](https://frozenplain.com). 
 
 Anyone can make libraries for Floe and contribute to the open source project. By consolidating our efforts into improving this engine, we improve the capabilities of all of its libraries for everyone.
 

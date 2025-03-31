@@ -12,6 +12,7 @@ Related pages:
 - [How to install libraries](../packages/install-packages.md)
 - [Develop your own libraries](../develop/develop-libraries.md) (programming required)
 
+_Floe also supports the legacy [Mirage](../about-the-project/mirage.md) library format_.
 
 ## Custom open format
 

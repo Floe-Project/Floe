@@ -44,7 +44,7 @@ These examples use bash syntax.
 
 # Creates a Floe Package containing multiple libraries and no presets
 ./floe-packager --library-folders "C:/Users/Sam/Floe-Dev/Strings" \
-                                "C:/Users/Sam/Floe-Dev/Common-IRs" \
+                                  "C:/Users/Sam/Floe-Dev/Common-IRs" \
                 --output-folder "C:/Users/Sam/Floe-Dev/Releases" \
                 --package-name "FrozenPlain - Strings"
 ```

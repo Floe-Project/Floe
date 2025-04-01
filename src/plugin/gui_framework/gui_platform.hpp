@@ -589,7 +589,6 @@ static void DestroyGraphicsContext(GuiPlatform& platform) {
     ZoneScoped;
     if (platform.graphics_ctx) {
         platform.graphics_ctx->DestroyDeviceObjects();
-        platform.graphics_ctx->fonts.Clear();
         delete platform.graphics_ctx;
         platform.graphics_ctx = nullptr;
     }

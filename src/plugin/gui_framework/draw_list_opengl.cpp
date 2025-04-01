@@ -128,6 +128,7 @@ struct OpenGLDrawContext : public DrawContext {
                 LogWarning(ModuleName::Gui, "GL Error: DestroyFontTexture: {}", gl_err);
             }
         }
+        fonts.Clear();
     }
 
     ErrorCodeOr<void> Render(DrawData draw_data, UiSize window_size) override {

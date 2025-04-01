@@ -668,7 +668,7 @@ PUBLIC ErrorCodeOr<void> WriteCrashToFile(Sentry& sentry,
                              .stacktrace = stacktrace,
                          },
                          {
-                             .signal_safe = true,
+                             .signal_safe = !IS_WINDOWS,
                              .diagnostics = true,
                          }));
     if constexpr (k_online_reporting) TRY(EnvelopeAddSessionUpdate(sentry, writer, SessionStatus::Crashed));

@@ -172,7 +172,7 @@ void LoadRandomPreset(PresetPickerContext const& context, PresetPickerState& sta
 
     auto cursor = *first;
 
-    usize num_presets = 0;
+    usize num_presets = 1;
     while (true) {
         if (auto const next = IteratePreset(context, state, cursor, SearchDirection::Forward, false)) {
             cursor = *next;

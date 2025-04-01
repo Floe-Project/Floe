@@ -204,7 +204,7 @@ void LoadRandomInstrument(InstPickerContext const& context, InstPickerState& sta
 
     auto cursor = *first;
 
-    usize num_instruments = 0;
+    usize num_instruments = 1;
     while (true) {
         if (auto const next = IterateInstrument(context,
                                                 state,

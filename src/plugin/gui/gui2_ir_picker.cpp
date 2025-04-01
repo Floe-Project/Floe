@@ -121,7 +121,7 @@ void LoadRandomIr(IrPickerContext const& context, IrPickerState& state) {
 
     auto cursor = *first;
 
-    usize num_irs = 0;
+    usize num_irs = 1;
     while (true) {
         if (auto const next = IterateIr(context, state, cursor, SearchDirection::Forward, false)) {
             cursor = *next;

@@ -21,11 +21,12 @@ PUBLIC inline u64 RandomU64(u64& seed) {
 constexpr u64 k_rand_max = u64(-1);
 
 template <Integral Type>
-PUBLIC inline Type RandomIntInRange(u64& seed, Type min, Type max) {
-    auto size = (max - min) + 1;
-    ASSERT(size >= 0);
+PUBLIC inline Type RandomIntInRange(u64& seed, Type inclusive_min, Type inclusive_max) {
+    auto const size = (inclusive_max - inclusive_min) + 1;
+    if (size == 1) return inclusive_min;
+    ASSERT(size > 0);
     auto const r = RandomU64(seed);
-    return min + Type(r % (u64)size);
+    return inclusive_min + Type(r % (u64)size);
 }
 
 template <FloatingPoint Type>

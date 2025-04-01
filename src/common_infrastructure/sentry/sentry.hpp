@@ -419,6 +419,11 @@ EnvelopeAddEvent(Sentry& sentry, EnvelopeWriter& writer, ErrorEvent event, AddEv
                     // NOTE: our own filepaths should be relative because we use -fmacro-prefix-map
                     // -fdebug-prefix-map and -ffile-prefix-map. We ignore absolute paths because they could
                     // contain usernames.
+                    //
+                    // NOTE: on Windows, there might be Linux paths in the stacktrace because the Windows
+                    // binary is built using Linux. These stacktraces are from the build machine and are
+                    // therefore harmless. They will not be detected by path::IsAbsolute() since that will be
+                    // checking for Windows filepaths.
                     if (frame.filename.size && !path::IsAbsolute(frame.filename)) {
                         TRY(json::WriteKeyValue(json_writer, "filename", frame.filename));
                         TRY(json::WriteKeyValue(json_writer, "in_app", true));

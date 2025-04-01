@@ -9,6 +9,10 @@ For instance: 0.0.1. Don't change the headings.
 
 # Changelog
 
+## 0.8.2-beta
+- Fix crash when trying to randomise instruments, presets or IRs when there's only one of them
+- Fix presets folder still showing tags after a folder is removed. #120
+
 ## 0.8.1-beta
 See the [main release notes](https://github.com/floe-audio/Floe/releases/tag/v0.8.0-beta).
 

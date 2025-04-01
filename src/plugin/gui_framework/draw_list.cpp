@@ -1573,7 +1573,10 @@ void FontAtlas::GetTexDataAsAlpha8(unsigned char** out_pixels,
                                    int* out_height,
                                    int* out_bytes_per_pixel) {
     // Build atlas on demand
-    if (tex_pixels_alpha8 == nullptr) Build();
+    if (tex_pixels_alpha8 == nullptr) {
+        auto const built = Build();
+        ASSERT(built);
+    }
 
     *out_pixels = tex_pixels_alpha8;
     if (out_width) *out_width = tex_width;

@@ -69,9 +69,9 @@ PresetsSnapshot BeginReadFolders(PresetServer& server, ArenaAllocator& arena) {
     // reading and we don't have to do locking or reference counting.
     server.mutex.Lock();
     DEFER { server.mutex.Unlock(); };
-    auto result = arena.Clone(server.folders);
+    auto const folders = arena.Clone(server.folders);
     return {
-        .folders = {(PresetFolder const**)result.data, result.size},
+        .folders = {(PresetFolder const**)folders.data, folders.size},
         .used_tags = {server.used_tags.table.Clone(arena, CloneType::Deep)},
         .used_libraries = {server.used_libraries.table.Clone(arena, CloneType::Deep)},
         .authors = {server.authors.table.Clone(arena, CloneType::Deep)},
@@ -176,29 +176,54 @@ static void AddPresetToFolder(PresetFolder& folder,
     folder.preset_array_capacity = cap;
 }
 
+struct FoldersAggregateInfo {
+    FoldersAggregateInfo(ArenaAllocator& arena)
+        : used_tags {arena}
+        , used_libraries {arena}
+        , authors {arena} {}
+
+    void AddPreset(PresetFolder::Preset const& preset) {
+        for (auto const& tag : preset.metadata.tags)
+            used_tags.Insert(tag);
+        for (auto const& library_id : preset.used_libraries)
+            used_libraries.Insert(library_id);
+        if (preset.metadata.author.size) authors.Insert(preset.metadata.author);
+        has_preset_type[ToInt(preset.file_format)] = true;
+    }
+
+    void CopyToServer(PresetServer& server) const {
+        server.used_tags.DeleteAll();
+        for (auto const [tag, _] : used_tags)
+            server.used_tags.Insert(tag);
+
+        server.used_libraries.DeleteAll();
+        for (auto const [lib_id, _] : used_libraries)
+            server.used_libraries.Insert(lib_id);
+
+        server.authors.DeleteAll();
+        for (auto const [author, _] : authors)
+            server.authors.Insert(author);
+
+        server.has_preset_type = has_preset_type;
+    }
+
+    DynamicSet<String> used_tags;
+    DynamicSet<sample_lib::LibraryIdRef, sample_lib::Hash> used_libraries;
+    DynamicSet<String> authors;
+    Array<bool, ToInt(PresetFormat::Count)> has_preset_type {};
+};
+
 static void
 AppendFolderAndPublish(PresetServer& server, PresetFolder* new_preset_folder, ArenaAllocator& scratch_arena) {
     // Tags and libraries point to memory within each folder, so they share the same versioning as the
     // folders.
-    DynamicSet<String> used_tags {scratch_arena};
-    DynamicSet<sample_lib::LibraryIdRef, sample_lib::Hash> used_libraries {scratch_arena};
-    DynamicSet<String> authors {scratch_arena};
-    server.has_preset_type = {};
+
+    FoldersAggregateInfo info {scratch_arena};
     for (auto const& folder_set :
          Array {server.folders.Items(), Span<PresetFolder*> {&new_preset_folder, 1}}) {
-        for (auto const folder : folder_set) {
-            for (auto const& preset : folder->presets) {
-                for (auto const& tag : preset.metadata.tags)
-                    used_tags.Insert(tag);
-
-                for (auto const& library_id : preset.used_libraries)
-                    used_libraries.Insert(library_id);
-
-                if (preset.metadata.author.size) authors.Insert(preset.metadata.author);
-
-                server.has_preset_type[ToInt(preset.file_format)] = true;
-            }
-        }
+        for (auto const folder : folder_set)
+            for (auto const& preset : folder->presets)
+                info.AddPreset(preset);
     }
 
     server.mutex.Lock();
@@ -207,17 +232,31 @@ AppendFolderAndPublish(PresetServer& server, PresetFolder* new_preset_folder, Ar
     dyn::Append(server.folders, new_preset_folder);
     Sort(server.folders, [](PresetFolder const* a, PresetFolder const* b) { return a->folder < b->folder; });
 
-    server.used_tags.DeleteAll();
-    for (auto const [tag, _] : used_tags)
-        server.used_tags.Insert(tag);
+    info.CopyToServer(server);
 
-    server.used_libraries.DeleteAll();
-    for (auto const [lib_id, _] : used_libraries)
-        server.used_libraries.Insert(lib_id);
+    server.published_version.FetchAdd(1, RmwMemoryOrder::AcquireRelease);
+}
 
-    server.authors.DeleteAll();
-    for (auto const [author, _] : authors)
-        server.authors.Insert(author);
+static void RemoveFolderAndPublish(PresetServer& server, usize index, ArenaAllocator& scratch_arena) {
+    auto& folder = *server.folders[index];
+    folder.delete_after_version = server.published_version.Load(LoadMemoryOrder::Relaxed);
+    for (auto const& preset : folder.presets)
+        server.preset_file_hashes.Delete(preset.file_hash);
+
+    FoldersAggregateInfo info {scratch_arena};
+    for (auto const& existing_folder : server.folders) {
+        if (existing_folder == &folder) continue;
+
+        for (auto const& preset : existing_folder->presets)
+            info.AddPreset(preset);
+    }
+
+    server.mutex.Lock();
+    DEFER { server.mutex.Unlock(); };
+
+    dyn::Remove(server.folders, index);
+
+    info.CopyToServer(server);
 
     server.published_version.FetchAdd(1, RmwMemoryOrder::AcquireRelease);
 }
@@ -311,14 +350,6 @@ ScanFolder(PresetServer& server, ArenaAllocator& scratch_arena, PresetServer::Sc
     return k_success;
 }
 
-static void RemoveFolder(PresetServer& server, usize index) {
-    auto& folder = *server.folders[index];
-    folder.delete_after_version = server.published_version.Load(LoadMemoryOrder::Relaxed);
-    for (auto const& preset : folder.presets)
-        server.preset_file_hashes.Delete(preset.file_hash);
-    dyn::Remove(server.folders, index);
-}
-
 static void ServerThread(PresetServer& server) {
     server.server_thread_id = CurrentThreadId();
 
@@ -362,7 +393,7 @@ static void ServerThread(PresetServer& server) {
                         for (usize i = 0; i < server.folders.size;) {
                             auto& preset_folder = *server.folders[i];
                             if (preset_folder.scan_folder == scan_folder.path)
-                                RemoveFolder(server, i);
+                                RemoveFolderAndPublish(server, i, scratch_arena);
                             else
                                 ++i;
                         }
@@ -463,7 +494,7 @@ static void ServerThread(PresetServer& server) {
                 for (usize i = 0; i < server.folders.size;) {
                     auto& preset_folder = *server.folders[i];
                     if (preset_folder.scan_folder == scan_folder->path)
-                        RemoveFolder(server, i);
+                        RemoveFolderAndPublish(server, i, scratch_arena);
                     else
                         ++i;
                 }

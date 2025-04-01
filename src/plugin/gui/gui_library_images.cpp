@@ -6,13 +6,7 @@
 #include "build_resources/embedded_files.h"
 #include "engine/engine.hpp"
 #include "gui_framework/image.hpp"
-
-static Optional<graphics::ImageID> TryCreateImageOnGpu(graphics::DrawContext& ctx, ImageBytes const image) {
-    return ctx.CreateImageID(image.rgba, image.size, k_rgba_channels).OrElse([](ErrorCode error) {
-        LogError(ModuleName::Gui, "Failed to create image texture: {}", error);
-        return graphics::ImageID {};
-    });
-}
+#include "gui_framework/style.hpp"
 
 static void CreateLibraryBackgroundImageTextures(imgui::Context const& imgui,
                                                  LibraryImages& imgs,
@@ -32,10 +26,10 @@ static void CreateLibraryBackgroundImageTextures(imgui::Context const& imgui,
                                                        arena,
                                                        false);
     if (reload_background)
-        imgs.background = TryCreateImageOnGpu(*imgui.frame_input.graphics_ctx, scaled_background);
+        imgs.background = CreateImageIdChecked(*imgui.frame_input.graphics_ctx, scaled_background);
 
     if (reload_blurred_background) {
-        imgs.blurred_background = TryCreateImageOnGpu(
+        imgs.blurred_background = CreateImageIdChecked(
             *imgui.frame_input.graphics_ctx,
             CreateBlurredLibraryBackground(
                 scaled_background,

@@ -200,7 +200,8 @@ CheckboxButton(GuiBoxSystem& box_system, Box parent, String text, bool state, St
           {
               .parent = button,
               .text = state ? ICON_FA_CHECK : ""_s,
-              .font = FontType::SmallIcons,
+              .font_size = style::k_font_icons_size * 0.7f,
+              .font = FontType::Icons,
               .text_fill = style::Colour::Text,
               .text_fill_hot = style::Colour::Text,
               .text_fill_active = style::Colour::Text,

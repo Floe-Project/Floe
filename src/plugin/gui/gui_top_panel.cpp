@@ -288,8 +288,6 @@ void TopPanel(Gui* g) {
                       labels::Title(g->imgui, LiveCol(g->imgui, UiColMap::TopPanelSubtitleText)));
     }
 
-    g->imgui.graphics->context->PushFont(g->mada);
-
     //
     auto large_icon_button_style = buttons::TopPanelIconButton(g->imgui).WithLargeIcon();
     {
@@ -324,47 +322,49 @@ void TopPanel(Gui* g) {
         }
         Tooltip(g, btn_id, preset_left_r, "Load next preset"_s);
     }
-    if (g->icons) g->frame_input.graphics_ctx->PushFont(g->icons);
 
     {
-        auto btn_id = g->imgui.GetID("rand_pre");
-        if (buttons::Button(g,
-                            btn_id,
-                            preset_rand_r,
-                            ICON_FA_RANDOM,
-                            large_icon_button_style.WithIconScaling(0.8f))) {
-            PresetPickerContext context {
-                .sample_library_server = g->shared_engine_systems.sample_library_server,
-                .preset_server = g->shared_engine_systems.preset_server,
-                .library_images = g->library_images,
-                .engine = g->engine,
-            };
-            context.Init(g->scratch_arena);
-            DEFER { context.Deinit(); };
-            LoadRandomPreset(context, g->preset_picker_state);
+        g->frame_input.graphics_ctx->PushFont(g->fonts[ToInt(FontType::Icons)]);
+        DEFER { g->frame_input.graphics_ctx->PopFont(); };
+
+        {
+            auto btn_id = g->imgui.GetID("rand_pre");
+            if (buttons::Button(g,
+                                btn_id,
+                                preset_rand_r,
+                                ICON_FA_RANDOM,
+                                large_icon_button_style.WithIconScaling(0.8f))) {
+                PresetPickerContext context {
+                    .sample_library_server = g->shared_engine_systems.sample_library_server,
+                    .preset_server = g->shared_engine_systems.preset_server,
+                    .library_images = g->library_images,
+                    .engine = g->engine,
+                };
+                context.Init(g->scratch_arena);
+                DEFER { context.Deinit(); };
+                LoadRandomPreset(context, g->preset_picker_state);
+            }
+
+            Tooltip(g, btn_id, preset_rand_r, "Load a random preset"_s);
         }
 
-        Tooltip(g, btn_id, preset_rand_r, "Load a random preset"_s);
+        {
+            auto const btn_id = g->imgui.GetID("save");
+            if (buttons::Button(g, btn_id, preset_save_r, ICON_FA_SAVE, large_icon_button_style))
+                g->save_preset_panel_state.open = true;
+            Tooltip(g, btn_id, preset_save_r, "Save the current state as a preset"_s);
+        }
+
+        {
+            auto const btn_id = g->imgui.GetID("load");
+            if (buttons::Button(g, btn_id, preset_load_r, ICON_FA_FILE_IMPORT, large_icon_button_style))
+                OpenFilePickerLoadPreset(g->file_picker_state,
+                                         g->imgui.frame_output,
+                                         g->shared_engine_systems.paths);
+
+            Tooltip(g, btn_id, preset_load_r, "Load a preset from a file"_s);
+        }
     }
-
-    {
-        auto const btn_id = g->imgui.GetID("save");
-        if (buttons::Button(g, btn_id, preset_save_r, ICON_FA_SAVE, large_icon_button_style))
-            g->save_preset_panel_state.open = true;
-        Tooltip(g, btn_id, preset_save_r, "Save the current state as a preset"_s);
-    }
-
-    {
-        auto const btn_id = g->imgui.GetID("load");
-        if (buttons::Button(g, btn_id, preset_load_r, ICON_FA_FILE_IMPORT, large_icon_button_style))
-            OpenFilePickerLoadPreset(g->file_picker_state,
-                                     g->imgui.frame_output,
-                                     g->shared_engine_systems.paths);
-
-        Tooltip(g, btn_id, preset_load_r, "Load a preset from a file"_s);
-    }
-
-    if (g->icons) g->frame_input.graphics_ctx->PopFont();
 
     {
         auto btn_id = g->imgui.GetID("sets");
@@ -410,7 +410,6 @@ void TopPanel(Gui* g) {
         Tooltip(g, additional_menu_id, additonal_menu_r, "Additional functions and information"_s);
     }
 
-    g->imgui.graphics->context->PopFont();
     PresetsWindowButton(g, &g->engine, preset_menu_r);
 
     //

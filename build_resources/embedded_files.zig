@@ -25,14 +25,8 @@ fn embeddedFile(comptime filename: []const u8) c.BinaryData {
 export fn EmbeddedFontAwesome() c.BinaryData {
     return embeddedFile("fonts/fa-solid-900.ttf");
 }
-export fn EmbeddedFiraSans() c.BinaryData {
-    return embeddedFile("fonts/FiraSans-Regular.ttf");
-}
 export fn EmbeddedRoboto() c.BinaryData {
     return embeddedFile("fonts/Roboto-Regular.ttf");
-}
-export fn EmbeddedMada() c.BinaryData {
-    return embeddedFile("fonts/Mada-SemiBold.ttf");
 }
 
 export fn EmbeddedDefaultBackground() c.BinaryData {

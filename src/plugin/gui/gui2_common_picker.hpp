@@ -43,7 +43,7 @@ PUBLIC Box DoPickerItem(GuiBoxSystem& box_system, PickerItemOptions const& optio
                   .parent = item,
                   .background_tex = *options.icon,
                   .layout {
-                      .size = {k_picker_item_height, k_picker_item_height},
+                      .size = style::k_library_icon_standard_size,
                       .margins = {.r = k_picker_spacing / 2},
                   },
               });
@@ -104,7 +104,7 @@ PUBLIC Box DoFilterButton(GuiBoxSystem& box_system,
                   .parent = button,
                   .background_tex = icon,
                   .layout {
-                      .size = {k_picker_item_height, k_picker_item_height},
+                      .size = style::k_library_icon_standard_size,
                       .margins = {.r = 3},
                   },
               });

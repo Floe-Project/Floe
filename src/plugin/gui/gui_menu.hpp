@@ -12,7 +12,6 @@ struct PopupMenuItems {
         m_items = _items;
         m_g = _g;
 
-        m_g->imgui.graphics->context->PushFont(m_g->roboto_small);
         m_h = LiveSize(m_g->imgui, UiSizeId::MenuItemHeight);
 
         m_div_gap_x = LiveSize(m_g->imgui, UiSizeId::MenuItemDividerGapX);
@@ -21,7 +20,6 @@ struct PopupMenuItems {
         m_w = MenuItemWidth(m_g, m_items);
         m_y_pos = 0;
     }
-    ~PopupMenuItems() { m_g->imgui.graphics->context->PopFont(); }
 
     void DoFakeButton(String text) {
         labels::Label(m_g, GetItemRect(), text, labels::FakeMenuItem(m_g->imgui));

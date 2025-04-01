@@ -122,14 +122,14 @@ static void GUIDoSampleWaveformOverlay(Gui* g, LayerProcessor* layer, Rect r, Re
                                       imgui.IsHotOrActive(id) ? back_hover_col : back_col,
                                       6,
                                       (int)rounding_corners);
-        if (g->icons) g->frame_input.graphics_ctx->PushFont(g->icons);
+        g->frame_input.graphics_ctx->PushFont(g->fonts[ToInt(FontType::Icons)]);
+        DEFER { g->frame_input.graphics_ctx->PopFont(); };
         imgui.graphics->AddTextJustified(r,
                                          text,
                                          text_col,
                                          TextJustification::Centred,
                                          TextOverflowType::AllowOverflow,
                                          0.5f);
-        if (g->icons) g->frame_input.graphics_ctx->PopFont();
     };
 
     auto do_handle_slider = [&](imgui::Id id,

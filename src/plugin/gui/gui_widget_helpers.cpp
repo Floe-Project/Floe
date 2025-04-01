@@ -14,7 +14,7 @@
 #include "gui_prefs.hpp"
 #include "gui_window.hpp"
 
-void StartFloeMenu(Gui* g) { g->imgui.graphics->context->PushFont(g->roboto_small); }
+void StartFloeMenu(Gui* g) { g->imgui.graphics->context->PushFont(g->fonts[ToInt(FontType::Body)]); }
 
 void EndFloeMenu(Gui* g) { g->imgui.graphics->context->PopFont(); }
 
@@ -36,7 +36,8 @@ f32 MenuItemWidth(Gui* g, Span<String const> strs) {
 //
 
 void DoTooltipText(Gui* g, String str, Rect r, bool rect_is_window_pos) {
-    g->imgui.graphics->context->PushFont(g->fira_sans);
+    g->imgui.graphics->context->PushFont(g->fonts[ToInt(FontType::Body)]);
+    DEFER { g->imgui.graphics->context->PopFont(); };
 
     auto& imgui = g->imgui;
     auto font = imgui.overlay_graphics.context->CurrentFont();
@@ -73,8 +74,6 @@ void DoTooltipText(Gui* g, String str, Rect r, bool rect_is_window_pos) {
                                          LiveSize(imgui, UiSizeId::CornerRounding));
     imgui.overlay_graphics
         .AddText(font, font->font_size, text_start, LiveCol(imgui, UiColMap::TooltipText), str, size + 1);
-
-    g->imgui.graphics->context->PopFont();
 }
 
 bool Tooltip(Gui* g, imgui::Id id, Rect r, String str, bool rect_is_window_pos) {

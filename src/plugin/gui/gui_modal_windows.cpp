@@ -50,16 +50,10 @@ struct DoButtonArgs {
     bool significant;
     bool insignificant;
     bool white_background;
-    bool big_font;
 };
 
 static bool DoButton(Gui* g, String button_text, DoButtonArgs args) {
     auto& imgui = g->imgui;
-
-    if (args.big_font) imgui.graphics->context->PushFont(g->mada);
-    DEFER {
-        if (args.big_font) imgui.graphics->context->PopFont();
-    };
 
     auto const line_height = imgui.graphics->context->CurrentFontSize();
     auto const rounding = LiveSize(g->imgui, UiSizeId::CornerRounding);
@@ -108,7 +102,7 @@ static bool DoButton(Gui* g, String button_text, DoButtonArgs args) {
     rect_cut::CutRight(button_r, required_padding);
 
     if (args.icon.size) {
-        imgui.graphics->context->PushFont(g->icons);
+        imgui.graphics->context->PushFont(g->fonts[ToInt(FontType::Icons)]);
         DEFER { imgui.graphics->context->PopFont(); };
 
         auto const icon_r = rect_cut::CutLeft(button_r, icon_size);
@@ -155,7 +149,7 @@ DoHeading(Gui* g, f32& y_pos, String str, TextJustification justification = Text
     auto const window_title_h = LiveSize(imgui, UiSizeId::ModalWindowTitleH);
     auto const window_title_gap_y = LiveSize(imgui, UiSizeId::ModalWindowTitleGapY);
 
-    imgui.graphics->context->PushFont(g->mada);
+    imgui.graphics->context->PushFont(g->fonts[ToInt(FontType::Heading1)]);
     DEFER { imgui.graphics->context->PopFont(); };
     auto const r = imgui.GetRegisteredAndConvertedRect({.xywh {0, y_pos, imgui.Width(), window_title_h}});
     g->imgui.graphics->AddTextJustified(r, str, LiveCol(imgui, UiColMap::PopupItemText), justification);
@@ -164,7 +158,7 @@ DoHeading(Gui* g, f32& y_pos, String str, TextJustification justification = Text
 }
 
 static void DoErrorsModal(Gui* g) {
-    g->frame_input.graphics_ctx->PushFont(g->roboto_small);
+    g->frame_input.graphics_ctx->PushFont(g->fonts[ToInt(FontType::Body)]);
     DEFER { g->frame_input.graphics_ctx->PopFont(); };
     auto& imgui = g->imgui;
 
@@ -202,7 +196,7 @@ static void DoErrorsModal(Gui* g) {
 
                     // title
                     {
-                        imgui.graphics->context->PushFont(g->mada);
+                        imgui.graphics->context->PushFont(g->fonts[ToInt(FontType::Heading2)]);
                         auto const error_window_item_h = LiveSize(imgui, UiSizeId::ErrorWindowItemH);
                         labels::Label(g,
                                       {.xywh {0, y_pos, imgui.Width(), (f32)error_window_item_h}},
@@ -264,7 +258,7 @@ static void DoErrorsModal(Gui* g) {
 }
 
 static void DoLoadingOverlay(Gui* g) {
-    g->frame_input.graphics_ctx->PushFont(g->roboto_small);
+    g->frame_input.graphics_ctx->PushFont(g->fonts[ToInt(FontType::Body)]);
     DEFER { g->frame_input.graphics_ctx->PopFont(); };
     auto& imgui = g->imgui;
 

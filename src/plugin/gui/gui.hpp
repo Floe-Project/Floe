@@ -141,11 +141,7 @@ struct Gui {
     layout::Context layout = {};
     imgui::Context imgui {frame_input, frame_output};
     EditorGUI editor = {};
-    graphics::Font* fira_sans {};
-    graphics::Font* roboto_small {};
-    graphics::Font* mada {};
-    graphics::Font* icons {};
-    Fonts fonts {}; // new system
+    Fonts fonts {};
     GuiBoxSystem box_system {
         .arena = scratch_arena,
         .imgui = imgui,

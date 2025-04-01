@@ -40,7 +40,7 @@ struct ColourSet {
 };
 
 struct Style {
-    static constexpr f32 k_regular_icon_scaling = 0.85f;
+    static constexpr f32 k_regular_icon_scaling = 1.0f;
     static constexpr f32 k_large_icon_scaling = 1.0f;
 
     Style& ClosesPopups(bool state) {
@@ -59,7 +59,7 @@ struct Style {
     }
 
     Style& WithRandomiseIconScaling() {
-        icon_scaling = 0.72f;
+        icon_scaling = 0.82f;
         return *this;
     }
 
@@ -183,7 +183,7 @@ PUBLIC Style LayerHeadingButton(imgui::Context const& imgui, u32 highlight_col =
     s.icon_and_text.on_icon = ICON_FA_CHECK_SQUARE;
     s.icon_and_text.off_icon = ICON_FA_SQUARE;
     s.icon_and_text.capitalise = false;
-    s.icon_scaling = 0.65f;
+    s.icon_scaling = 0.75f;
     return s;
 }
 
@@ -217,7 +217,7 @@ PUBLIC Style LayerTabButton(imgui::Context const& imgui, bool has_dot) {
     s.icon_or_text.justification = TextJustification::Centred;
     s.icon_and_text.on_icon = ICON_FA_CIRCLE;
     s.icon_and_text.off_icon = s.icon_and_text.on_icon;
-    s.icon_scaling = 0.20f;
+    s.icon_scaling = 0.30f;
     return s;
 }
 
@@ -355,7 +355,7 @@ PUBLIC Style MenuItem(imgui::Context const& imgui, bool _closes_popups, bool gre
     s.main_cols.active_on = s.main_cols.reg;
     s.main_cols.active_off = s.main_cols.active_on;
     s.main_cols.on = s.main_cols.reg;
-    s.icon_scaling = 0.7f;
+    s.icon_scaling = 0.8f;
     s.icon_and_text.on_icon = ICON_FA_CHECK;
     return s;
 }

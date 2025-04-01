@@ -87,6 +87,7 @@ struct OpenGLDrawContext : public DrawContext {
     ErrorCodeOr<void> CreateFontTexture() override {
         ZoneScoped;
         ASSERT(font_texture == 0);
+        ASSERT(fonts.fonts.size > 0);
         Trace(ModuleName::Gui);
         unsigned char* pixels;
         int width;
@@ -248,7 +249,7 @@ struct OpenGLDrawContext : public DrawContext {
 
         TRY(CheckGLError("CreateTexture"));
 
-        return (void*)(intptr_t)texture;
+        return (void*)(uintptr)texture;
     }
 
     void DestroyTexture(TextureHandle& texture) override {

@@ -208,4 +208,6 @@ constexpr f32 k_font_heading3_size = FontPoint(10);
 constexpr f32 k_font_icons_size = FontPoint(14);
 constexpr f32 k_font_small_icons_size = FontPoint(10);
 
+constexpr f32 k_library_icon_standard_size = 20;
+
 } // namespace style

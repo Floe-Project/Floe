@@ -8,7 +8,6 @@
 #include <stb_image_resize2.h>
 
 #include "foundation/foundation.hpp"
-#include "os/filesystem.hpp"
 #include "utils/logger/logger.hpp"
 
 #include "build_resources/embedded_files.h"
@@ -33,7 +32,6 @@
 #include "gui_widget_helpers.hpp"
 #include "plugin/plugin.hpp"
 #include "sample_lib_server/sample_library_server.hpp"
-#include "state/state_coding.hpp"
 
 static f32 PixelsPerVw(Gui* g) {
     constexpr auto k_points_in_width = 1000.0f; // 1000 just because it's easy to work with
@@ -76,51 +74,7 @@ static void CreateFontsIfNeeded(Gui* g) {
     if (graphics_ctx->fonts.tex_id == nullptr) {
         graphics_ctx->fonts.Clear();
 
-        // TODO: we are duplicating loading fonts here
-
         LoadFonts(*graphics_ctx, g->fonts, g->imgui.pixels_per_vw);
-
-        auto const fira_sans_size = g->imgui.VwToPixels(16);
-        auto const roboto_small_size = g->imgui.VwToPixels(16);
-        auto const mada_size = g->imgui.VwToPixels(18);
-
-        auto const def_ranges = graphics_ctx->fonts.GetGlyphRangesDefaultAudioPlugin();
-
-        auto const load_font = [&](Span<u8 const> data, f32 size, Span<graphics::GlyphRange const> ranges) {
-            graphics::FontConfig config {};
-            config.font_data_reference_only = true;
-            auto font = graphics_ctx->fonts.AddFontFromMemoryTTF((void*)data.data,
-                                                                 (int)data.size,
-                                                                 size,
-                                                                 &config,
-                                                                 ranges);
-            ASSERT(font != nullptr);
-
-            return font;
-        };
-
-        {
-            auto const data = EmbeddedFontAwesome();
-            // IMPROVE: don't load all icons
-            g->icons = load_font({data.data, data.size},
-                                 mada_size,
-                                 Array {graphics::GlyphRange {ICON_MIN_FA, ICON_MAX_FA}});
-        }
-
-        {
-            auto const data = EmbeddedFiraSans();
-            g->fira_sans = load_font({data.data, data.size}, fira_sans_size, def_ranges);
-        }
-
-        {
-            auto const data = EmbeddedRoboto();
-            g->roboto_small = load_font({data.data, data.size}, roboto_small_size, def_ranges);
-        }
-
-        {
-            auto const data = EmbeddedMada();
-            g->mada = load_font({data.data, data.size}, mada_size, def_ranges);
-        }
 
         auto const outcome = graphics_ctx->CreateFontTexture();
         if (outcome.HasError())
@@ -196,7 +150,7 @@ static void DoStandaloneErrorGUI(Gui* g) {
     auto const floe_ext = (FloeClapExtensionHost const*)host.get_extension(&host, k_floe_clap_extension_id);
     if (!floe_ext) return;
 
-    g->frame_input.graphics_ctx->PushFont(g->roboto_small);
+    g->frame_input.graphics_ctx->PushFont(g->fonts[ToInt(FontType::Body)]);
     DEFER { g->frame_input.graphics_ctx->PopFont(); };
     auto& imgui = g->imgui;
     auto platform = &g->frame_input;
@@ -300,7 +254,7 @@ GuiFrameResult GuiUpdate(Gui* g) {
     whole_window_sets.draw_routine_window_background = [&](IMGUI_DRAW_WINDOW_BG_ARGS_TYPES) {};
     imgui.Begin(whole_window_sets);
 
-    g->frame_input.graphics_ctx->PushFont(g->fira_sans);
+    g->frame_input.graphics_ctx->PushFont(g->fonts[ToInt(FontType::Body)]);
     DEFER { g->frame_input.graphics_ctx->PopFont(); };
 
     auto const top_and_mid_h =

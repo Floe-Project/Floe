@@ -282,14 +282,12 @@ void DoEffectsWindow(Gui* g, Rect r) {
                                                      .margins = {.b = fx_divider_margin_b},
                                                  });
 
-    auto heading_font = g->fira_sans;
-
     auto get_heading_size = [&](String name) {
-        auto size = heading_font->CalcTextSizeA(heading_font->font_size *
-                                                    buttons::EffectHeading(imgui, 0).text_scaling,
-                                                FLT_MAX,
-                                                0.0f,
-                                                name);
+        auto const font = g->fonts[ToInt(FontType::Heading2)];
+        auto size = font->CalcTextSizeA(font->font_size * buttons::EffectHeading(imgui, 0).text_scaling,
+                                        FLT_MAX,
+                                        0.0f,
+                                        name);
         f32 const epsilon = 2;
         return f32x2 {Round(size.x + epsilon) + LiveSize(imgui, FXHeadingExtraWidth),
                       LiveSize(imgui, FXHeadingH)};
@@ -757,7 +755,7 @@ void DoEffectsWindow(Gui* g, Rect r) {
                                     close_id,
                                     r,
                                     ICON_FA_TIMES,
-                                    buttons::IconButton(imgui).WithIconScaling(0.7f))) {
+                                    buttons::IconButton(imgui).WithIconScaling(0.9f))) {
                     SetParameterValue(engine.processor, k_effect_info[ToInt(fx.type)].on_param_index, 0, {});
                 }
                 Tooltip(g,

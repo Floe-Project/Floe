@@ -364,9 +364,9 @@ PUBLIC ImageBytes CreateBlurredLibraryBackground(ImageBytes original,
     return result;
 }
 
-PUBLIC graphics::ImageID CreateImageIdChecked(graphics::DrawContext& ctx, ImageBytesManaged const& px) {
+PUBLIC graphics::ImageID CreateImageIdChecked(graphics::DrawContext& ctx, ImageBytes const& px) {
     ASSERT(px.rgba);
-    auto const outcome = ctx.CreateImageID(px.rgba, px.size, 4);
+    auto const outcome = ctx.CreateImageID(px.rgba, px.size, k_rgba_channels);
     if (outcome.HasError()) {
         LogError(ModuleName::Gui,
                  "Failed to create a texture (size {}x{}): {}",

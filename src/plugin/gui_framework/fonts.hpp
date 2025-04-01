@@ -14,7 +14,6 @@ enum class FontType : u32 {
     Heading2,
     Heading3,
     Icons,
-    SmallIcons,
     Count,
 };
 
@@ -32,14 +31,13 @@ PUBLIC void LoadFonts(graphics::DrawContext& graphics, Fonts& fonts, f32 pixels_
     auto const roboto_ttf = EmbeddedRoboto();
 
     fonts[ToInt(FontType::Body)] = load_font(roboto_ttf, style::k_font_body_size, def_ranges);
-    // TODO: bold fonts
+    // IMPROVE: bold fonts
     fonts[ToInt(FontType::Heading1)] = load_font(roboto_ttf, style::k_font_heading1_size, def_ranges);
     fonts[ToInt(FontType::Heading2)] = load_font(roboto_ttf, style::k_font_heading2_size, def_ranges);
     fonts[ToInt(FontType::Heading3)] = load_font(roboto_ttf, style::k_font_heading3_size, def_ranges);
 
     auto const icons_ttf = EmbeddedFontAwesome();
-    auto const icon_ranges = Array {graphics::GlyphRange {ICON_MIN_FA, ICON_MAX_FA}};
+    auto constexpr k_icon_ranges = Array {graphics::GlyphRange {ICON_MIN_FA, ICON_MAX_FA}};
 
-    fonts[ToInt(FontType::Icons)] = load_font(icons_ttf, style::k_font_icons_size, icon_ranges);
-    fonts[ToInt(FontType::SmallIcons)] = load_font(icons_ttf, style::k_font_small_icons_size, icon_ranges);
+    fonts[ToInt(FontType::Icons)] = load_font(icons_ttf, style::k_font_icons_size, k_icon_ranges);
 }

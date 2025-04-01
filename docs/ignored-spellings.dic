@@ -71,6 +71,7 @@ LD
 LFO
 LFOs
 Lua
+MBSF
 MDATA
 MIDI2
 MPE
@@ -226,6 +227,7 @@ vst3
 wasn
 waveforms
 wavetable
+webpage
 wouldn
 x86
 zig

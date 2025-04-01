@@ -174,9 +174,14 @@ static LibraryImages LoadLibraryImagesIfNeeded(LibraryImagesArray& array,
     auto const reloads = CheckLibraryImages(*imgui.frame_input.graphics_ctx, images);
 
     if (reloads.reload_icon) {
-        if (auto icon_pixels = ImagePixelsFromLibrary(lib, LibraryImageType::Icon, server, scratch_arena))
-            images.icon = CreateImageIdChecked(*imgui.frame_input.graphics_ctx, icon_pixels.Value());
-        else
+        if (auto icon_pixels = ImagePixelsFromLibrary(lib, LibraryImageType::Icon, server, scratch_arena)) {
+            // Twice the desired size seems to produce the nicest looking results.
+            auto const desired_icon_size =
+                CheckedCast<u16>(Ceil(imgui.VwToPixels(style::k_library_icon_standard_size)) * 2);
+            auto const shrunk =
+                ShrinkImageIfNeeded(*icon_pixels, desired_icon_size, desired_icon_size, scratch_arena, false);
+            images.icon = CreateImageIdChecked(*imgui.frame_input.graphics_ctx, shrunk);
+        } else
             images.icon_missing = true;
     }
 

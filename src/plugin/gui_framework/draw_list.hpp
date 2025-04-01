@@ -182,7 +182,7 @@ struct FontConfig {
     bool font_data_reference_only = false;
     void* font_data = nullptr;
     int font_data_size = 0;
-    bool font_data_owned_by_atlas = true;
+    bool font_data_owned_by_atlas = false;
     int font_no = 0; // Index of font within TTF file
     f32 size_pixels = 0.0f; // Size in pixels for rasterizer
 

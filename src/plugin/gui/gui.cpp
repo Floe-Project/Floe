@@ -76,6 +76,8 @@ static void CreateFontsIfNeeded(Gui* g) {
     if (graphics_ctx->fonts.tex_id == nullptr) {
         graphics_ctx->fonts.Clear();
 
+        // TODO: we are duplicating loading fonts here
+
         LoadFonts(*graphics_ctx, g->fonts, g->imgui.pixels_per_vw);
 
         auto const fira_sans_size = g->imgui.VwToPixels(16);
@@ -103,7 +105,6 @@ static void CreateFontsIfNeeded(Gui* g) {
             g->icons = load_font({data.data, data.size},
                                  mada_size,
                                  Array {graphics::GlyphRange {ICON_MIN_FA, ICON_MAX_FA}});
-            ASSERT(g->icons != nullptr);
         }
 
         {

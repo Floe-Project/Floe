@@ -1231,6 +1231,8 @@ static bool ClapActivate(const struct clap_plugin* plugin,
 
         if (!Check(floe, floe.initialised, k_func, "not initialised")) return false;
         if (!Check(floe, IsMainThread(floe.host), k_func, "not main thread")) return false;
+        if (!Check(floe, sample_rate > 0, k_func, "sample rate is invalid")) return false;
+        if (!Check(floe, max_frames_count > 0, k_func, "max frames count is invalid")) return false;
 
         if (floe.active) return true;
 

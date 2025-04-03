@@ -9,6 +9,10 @@ For instance: 0.0.1. Don't change the headings.
 
 # Changelog
 
+## 0.8.3-beta
+- Fix crash when error occurs in the Windows native file picker
+- Fix crash when given invalid arguments to CLAP activate
+
 ## 0.8.2-beta
 - Fix crash when trying to randomise instruments, presets or IRs when there's only one of them
 - Fix presets folder still showing tags after a folder is removed. #120

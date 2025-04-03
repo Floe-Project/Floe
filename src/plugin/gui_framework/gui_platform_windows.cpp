@@ -274,13 +274,14 @@ ErrorCodeOr<void> detail::OpenNativeFilePicker(GuiPlatform& platform, FilePicker
             ASSERT(SUCCEEDED(hr), "new thread couldn't initialise COM");
             DEFER { CoUninitialize(); };
 
-            native_file_picker.result = TRY_OR(RunFilePicker(native_file_picker.args,
-                                                             native_file_picker.thread_arena,
-                                                             native_file_picker.parent),
-                                               ReportError(ErrorLevel::Error,
-                                                           SourceLocationHash(),
-                                                           "windows file picker failed: {}",
-                                                           error));
+            native_file_picker.result = TRY_OR(
+                RunFilePicker(native_file_picker.args,
+                              native_file_picker.thread_arena,
+                              native_file_picker.parent),
+                {
+                    ReportError(ErrorLevel::Error, SourceLocationHash(), "file picker failed: {}", error);
+                    return 0;
+                });
 
             // We have results, now we need to send them back to the main thread.
             PuglEvent const event {

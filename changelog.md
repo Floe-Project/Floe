@@ -12,6 +12,7 @@ For instance: 0.0.1. Don't change the headings.
 ## 0.8.3-beta
 - Fix crash when error occurs in the Windows native file picker
 - Fix crash when given invalid arguments to CLAP activate
+- Fix crash when opening VST3 in FL Studio on Windows
 
 ## 0.8.2-beta
 - Fix crash when trying to randomise instruments, presets or IRs when there's only one of them

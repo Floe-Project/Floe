@@ -168,23 +168,7 @@ inline IsAudioThreadResult IsAudioThread(clap_host const& host) {
     }
 }
 
-static constexpr char const* k_features[] = {CLAP_PLUGIN_FEATURE_INSTRUMENT,
-                                             CLAP_PLUGIN_FEATURE_SYNTHESIZER,
-                                             CLAP_PLUGIN_FEATURE_STEREO,
-                                             nullptr};
-
-static constexpr clap_plugin_descriptor k_plugin_info {
-    .clap_version = CLAP_VERSION,
-    .id = FLOE_CLAP_ID,
-    .name = "Floe",
-    .vendor = FLOE_VENDOR,
-    .url = FLOE_HOMEPAGE_URL,
-    .manual_url = FLOE_MANUAL_URL,
-    .support_url = FLOE_MANUAL_URL,
-    .version = FLOE_VERSION_STRING,
-    .description = FLOE_DESCRIPTION,
-    .features = (char const**)k_features,
-};
+extern clap_plugin_descriptor const g_plugin_info;
 
 // can return null
 clap_plugin const* CreateFloeInstance(clap_host const* clap_host);

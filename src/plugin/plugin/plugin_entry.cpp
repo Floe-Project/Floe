@@ -15,6 +15,24 @@ extern "C" {
 #include "clap/factory/plugin-factory.h"
 #include "plugin.hpp"
 
+static constexpr char const* k_features[] = {CLAP_PLUGIN_FEATURE_INSTRUMENT,
+                                             CLAP_PLUGIN_FEATURE_SYNTHESIZER,
+                                             CLAP_PLUGIN_FEATURE_STEREO,
+                                             nullptr};
+
+clap_plugin_descriptor const g_plugin_info {
+    .clap_version = CLAP_VERSION,
+    .id = FLOE_CLAP_ID,
+    .name = "Floe",
+    .vendor = FLOE_VENDOR,
+    .url = FLOE_HOMEPAGE_URL,
+    .manual_url = FLOE_MANUAL_URL,
+    .support_url = FLOE_MANUAL_URL,
+    .version = FLOE_VERSION_STRING,
+    .description = FLOE_DESCRIPTION,
+    .features = (char const**)k_features,
+};
+
 static u32 ClapFactoryGetPluginCount(clap_plugin_factory const* factory) {
     if (!factory) return 0;
     if (PanicOccurred()) return 0;
@@ -26,7 +44,7 @@ static clap_plugin_descriptor const* ClapFactoryGetPluginDescriptor(clap_plugin_
     if (!factory) return nullptr;
     if (PanicOccurred()) return nullptr;
     if (index != 0) return nullptr;
-    return &k_plugin_info;
+    return &g_plugin_info;
 }
 
 static clap_plugin const*
@@ -35,7 +53,7 @@ ClapFactoryCreatePlugin(clap_plugin_factory const* factory, clap_host_t const* h
     if (!factory || !host || !plugin_id) return nullptr;
 
     try {
-        if (NullTermStringsEqual(plugin_id, k_plugin_info.id)) return CreateFloeInstance(host);
+        if (NullTermStringsEqual(plugin_id, g_plugin_info.id)) return CreateFloeInstance(host);
     } catch (PanicException) {
     }
     return nullptr;

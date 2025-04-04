@@ -35,7 +35,7 @@ static UiSize DecodeUiSize(EncodedUiSize encoded) { return {(u16)(encoded & 0xFF
 inline auto Factory() { return (clap_plugin_factory const*)clap_entry.get_factory(CLAP_PLUGIN_FACTORY_ID); }
 
 struct Standalone {
-    Standalone() : plugin(*Factory()->create_plugin(Factory(), &host, k_plugin_info.id)) {
+    Standalone() : plugin(*Factory()->create_plugin(Factory(), &host, g_plugin_info.id)) {
         plugin_created = true;
     }
 

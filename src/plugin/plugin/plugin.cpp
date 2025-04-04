@@ -1473,8 +1473,8 @@ static void ClapOnMainThread(const struct clap_plugin* plugin) {
     }
 }
 
-clap_plugin const floe_plugin {
-    .desc = &k_plugin_info,
+static clap_plugin const floe_plugin {
+    .desc = &g_plugin_info,
     .plugin_data = nullptr,
     .init = ClapInit,
     .destroy = ClapDestroy,
@@ -1491,6 +1491,7 @@ clap_plugin const floe_plugin {
 clap_plugin const* CreateFloeInstance(clap_host const* host) {
     ZoneScoped;
     if (!Check(host, "create_plugin", "host is null")) return nullptr;
+
     Optional<FloeInstanceIndex> index {};
     for (auto [i, instance] : Enumerate<FloeInstanceIndex>(g_floe_instances)) {
         if (instance == nullptr) {
@@ -1499,8 +1500,10 @@ clap_plugin const* CreateFloeInstance(clap_host const* host) {
         }
     }
     if (!index) return nullptr;
+
     auto result = FloeInstanceAllocator().New<FloePluginInstance>(*host, *index, floe_plugin);
     if (!result) return nullptr;
+
     g_floe_instances[*index] = result;
     return &result->clap_plugin;
 }

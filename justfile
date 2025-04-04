@@ -194,6 +194,15 @@ test-pluginval build="": (_build_if_requested build "native")
   pluginval {{native_binary_dir}}/Floe.vst3
 
 [macos]
+check-au-installed:
+  #!/usr/bin/env bash
+  set -euxo pipefail
+  if [[ ! -f /Library/Audio/Plug-Ins/Components/Floe.component && ! -f ~/Library/Audio/Plug-Ins/Components/Floe.component ]]; then
+    echo "Floe.component not found in either /Library/Audio/Plug-Ins/Components or ~/Library/Audio/Plug-Ins/Components"
+    exit 1
+  fi
+
+[macos]
 install-au global='0':
   #!/usr/bin/env bash
   set -euxo pipefail
@@ -205,14 +214,7 @@ install-au global='0':
     cp -r {{native_binary_dir}}/Floe.component ~/Library/Audio/Plug-Ins/Components/
   fi
 
-[macos]
-check-au-installed:
-  #!/usr/bin/env bash
-  set -euxo pipefail
-  if [[ ! -f /Library/Audio/Plug-Ins/Components/Floe.component && ! -f ~/Library/Audio/Plug-Ins/Components/Floe.component ]]; then
-    echo "Floe.component not found in either /Library/Audio/Plug-Ins/Components or ~/Library/Audio/Plug-Ins/Components"
-    exit 1
-  fi
+  just check-au-installed
 
 [macos]
 test-pluginval-au build="": (_build_if_requested build "native")

@@ -777,6 +777,7 @@ fn universalFlags(
     context: *BuildContext,
     target: std.Build.ResolvedTarget,
     extra_flags: []const []const u8,
+    ubsan: bool,
 ) ![][]const u8 {
     var flags = std.ArrayList([]const u8).init(context.b.allocator);
     try flags.appendSlice(extra_flags);
@@ -846,26 +847,33 @@ fn universalFlags(
     // really good stack traces.
     try flags.append("-gdwarf");
 
-    if (context.optimise != .ReleaseFast) {
-        if (target.result.os.tag != .windows) {
-            // By default, zig enables UBSan (unless ReleaseFast mode) in trap mode. Meaning it will catch undefined
-            // behaviour and trigger a trap which can be caught by signal handlers. UBSan also has a mode where
-            // undefined behaviour will instead call various functions. This is called the UBSan runtime. It's
-            // really easy to implement the 'minimal' version of this runtime: we just have to declare a bunch of
-            // functions like __ubsan_handle_x. So that's what we do rather than trying to link with the system's
-            // version. https://github.com/ziglang/zig/issues/5163#issuecomment-811606110
-            try flags.append("-fno-sanitize-trap=undefined"); // undo zig's default behaviour (trap mode)
-            const minimal_runtime_mode = false; // I think it's better performance. Certainly less information.
-            if (minimal_runtime_mode) {
-                try flags.append("-fsanitize-runtime"); // set it to 'minimal' mode
+    if (ubsan) {
+        if (context.optimise != .ReleaseFast) {
+            if (target.result.os.tag != .windows) {
+                // By default, zig enables UBSan (unless ReleaseFast mode) in trap mode. Meaning it will catch undefined
+                // behaviour and trigger a trap which can be caught by signal handlers. UBSan also has a mode where
+                // undefined behaviour will instead call various functions. This is called the UBSan runtime. It's
+                // really easy to implement the 'minimal' version of this runtime: we just have to declare a bunch of
+                // functions like __ubsan_handle_x. So that's what we do rather than trying to link with the system's
+                // version. https://github.com/ziglang/zig/issues/5163#issuecomment-811606110
+                try flags.append("-fno-sanitize-trap=undefined"); // undo zig's default behaviour (trap mode)
+                try flags.append("-fno-sanitize=function");
+                const minimal_runtime_mode = false; // I think it's better performance. Certainly less information.
+                if (minimal_runtime_mode) {
+                    try flags.append("-fsanitize-runtime"); // set it to 'minimal' mode
+                }
+            } else {
+                // For some reason the same method of creating our own UBSan runtime doesn't work on windows. These are
+                // the link errors that we get:
+                // error: lld-link: could not open 'liblibclang_rt.ubsan_standalone-x86_64.a': No such file or directory
+                // error: lld-link: could not open 'liblibclang_rt.ubsan_standalone_cxx-x86_64.a': No such file or
+                // directory
+                // TODO: when we upgrade Zig, add this flag (or use Zig 0.14's ubsan runtime)
+                // try flags.append("-fno-rtlib-defaultlib");
             }
-        } else {
-            // For some reason the same method of creating our own UBSan runtime doesn't work on windows. These are
-            // the link errors that we get:
-            // error: lld-link: could not open 'liblibclang_rt.ubsan_standalone-x86_64.a': No such file or directory
-            // error: lld-link: could not open 'liblibclang_rt.ubsan_standalone_cxx-x86_64.a': No such file or
-            // directory
         }
+    } else {
+        try flags.append("-fno-sanitize=all");
     }
 
     if (target.result.os.tag == .windows) {
@@ -1201,7 +1209,7 @@ pub fn build(b: *std.Build) void {
         const floe_version = std.SemanticVersion.parse(floe_version_string.?) catch @panic("invalid version");
         const floe_version_hash = std.hash.Fnv1a_32.hash(floe_version_string.?);
 
-        const universal_flags = universalFlags(&build_context, target, &.{}) catch unreachable;
+        const universal_flags = universalFlags(&build_context, target, &.{}, true) catch unreachable;
         const universal_floe_flags = universalFlags(&build_context, target, &.{
             "-gen-cdb-fragment-path",
             // IMPROVE: will this error if the path contains a space?
@@ -1242,7 +1250,7 @@ pub fn build(b: *std.Build) void {
             "-DNOTEXTMETRIC",
             "-DSTRICT",
             "-DNOMINMAX",
-        }) catch unreachable;
+        }, true) catch unreachable;
         const cpp_flags = cppFlags(b, universal_flags, &.{}) catch unreachable;
         const cpp_floe_flags = cppFlags(b, universal_floe_flags, &.{}) catch unreachable;
         const objcpp_flags = objcppFlags(b, universal_flags, &.{}) catch unreachable;
@@ -1547,7 +1555,7 @@ pub fn build(b: *std.Build) void {
                             b.fmt("-DPuglWindowDelegate=PuglWindowDelegate{d}", .{pugl_version}),
                             b.fmt("-DPuglWrapperView=PuglWrapperView{d}", .{pugl_version}),
                             b.fmt("-DPuglOpenGLView=PuglOpenGLView{d}", .{pugl_version}),
-                        }) catch @panic("OOM"),
+                        }, true) catch @panic("OOM"),
                     });
                     pugl.linkFramework("OpenGL");
                     pugl.linkFramework("CoreVideo");
@@ -1677,11 +1685,7 @@ pub fn build(b: *std.Build) void {
         });
         stb_image.addCSourceFile(.{
             .file = b.path("third_party_libs/stb_image_impls.c"),
-            .flags = universalFlags(&build_context, target, &(.{
-                // stb_image_resize2 uses undefined behaviour and so we need to turn off zig's default-on
-                // UB sanitizer
-                "-fno-sanitize=undefined",
-            } ++ stb_image_config_flags)) catch unreachable,
+            .flags = universalFlags(&build_context, target, &stb_image_config_flags, false) catch unreachable,
         });
         stb_image.addIncludePath(build_context.dep_stb.path(""));
         stb_image.linkLibC();
@@ -1819,7 +1823,7 @@ pub fn build(b: *std.Build) void {
                 });
                 fft_flags = &.{"-DAUDIOFFT_PFFFT"};
             }
-            fft_flags = universalFlags(&build_context, target, fft_flags) catch unreachable;
+            fft_flags = universalFlags(&build_context, target, fft_flags, true) catch unreachable;
 
             fft_convolver.addCSourceFiles(.{
                 .files = &.{
@@ -2183,7 +2187,7 @@ pub fn build(b: *std.Build) void {
                 // disabling pulse audio because it was causing lots of stutters on my machine
                 miniaudio.addCSourceFile(.{
                     .file = b.path("third_party_libs/miniaudio.c"),
-                    .flags = universalFlags(&build_context, target, &.{"-DMA_NO_PULSEAUDIO"}) catch @panic("OOM"),
+                    .flags = universalFlags(&build_context, target, &.{"-DMA_NO_PULSEAUDIO"}, true) catch @panic("OOM"),
                 });
                 miniaudio.linkLibC();
                 miniaudio.addIncludePath(build_context.dep_miniaudio.path(""));
@@ -2257,7 +2261,7 @@ pub fn build(b: *std.Build) void {
                                 "pm_linux/pmlinuxalsa.c",
                                 "porttime/ptlinux.c",
                             },
-                            .flags = universalFlags(&build_context, target, &.{"-DPMALSA"}) catch @panic("OOM"),
+                            .flags = universalFlags(&build_context, target, &.{"-DPMALSA"}, true) catch @panic("OOM"),
                         });
                         portmidi.linkSystemLibrary2("alsa", .{ .use_pkg_config = use_pkg_config });
                     },
@@ -2336,7 +2340,7 @@ pub fn build(b: *std.Build) void {
             } else {
                 extra_flags.append("-DRELEASE=1") catch unreachable;
             }
-            const flags = universalFlags(&build_context, target, extra_flags.items) catch unreachable;
+            const flags = universalFlags(&build_context, target, extra_flags.items, false) catch unreachable;
 
             {
                 vst3_sdk.addCSourceFiles(.{
@@ -2544,7 +2548,11 @@ pub fn build(b: *std.Build) void {
             extra_flags.append("-DMACOS_USE_STD_FILESYSTEM=1") catch unreachable;
             extra_flags.append("-DCLAP_WRAPPER_VERSION=\"0.11.0\"") catch unreachable;
             extra_flags.append("-DSTATICALLY_LINKED_CLAP_ENTRY=1") catch unreachable;
-            const flags = cppFlags(b, universal_flags, extra_flags.items) catch unreachable;
+            const flags = cppFlags(
+                b,
+                universalFlags(&build_context, target, &.{}, false) catch unreachable,
+                extra_flags.items,
+            ) catch unreachable;
 
             vst3.addCSourceFiles(.{
                 .files = &.{

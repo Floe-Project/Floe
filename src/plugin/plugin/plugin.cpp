@@ -202,7 +202,7 @@ static bool ClapStateLoad(clap_plugin const* plugin, clap_istream const* stream)
     }
 }
 
-clap_plugin_state const floe_plugin_state {
+static clap_plugin_state const floe_plugin_state {
     .save = ClapStateSave,
     .load = ClapStateLoad,
 };
@@ -676,7 +676,7 @@ static bool ClapGuiHide(clap_plugin_t const* plugin) {
 
 // Size (width, height) is in pixels; the corresponding windowing system extension is
 // responsible for defining if it is physical pixels or logical pixels.
-clap_plugin_gui const floe_gui {
+static clap_plugin_gui const floe_gui {
     .is_api_supported = ClapGuiIsApiSupported,
     .get_preferred_api = ClapGuiGetPrefferedApi,
     .create = ClapGuiCreate,
@@ -918,7 +918,7 @@ ClapParamsFlush(clap_plugin_t const* plugin, clap_input_events_t const* in, clap
     }
 }
 
-clap_plugin_params const floe_params {
+static clap_plugin_params const floe_params {
     .count = ClapParamsCount,
     .get_info = ClapParamsGetInfo,
     .get_value = ClapParamsGetValue,
@@ -994,7 +994,7 @@ ClapAudioPortsGet(clap_plugin_t const* plugin, u32 index, bool is_input, clap_au
     }
 }
 
-clap_plugin_audio_ports const floe_audio_ports {
+static clap_plugin_audio_ports const floe_audio_ports {
     .count = ClapAudioPortsCount,
     .get = ClapAudioPortsGet,
 };
@@ -1051,7 +1051,7 @@ ClapNotePortsGet(clap_plugin_t const* plugin, u32 index, bool is_input, clap_not
 }
 
 // The note ports scan has to be done while the plugin is deactivated.
-clap_plugin_note_ports const floe_note_ports {
+static clap_plugin_note_ports const floe_note_ports {
     .count = ClapNotePortsCount,
     .get = ClapNotePortsGet,
 };
@@ -1072,7 +1072,7 @@ static void ClapThreadPoolExec(clap_plugin_t const* plugin, u32 task_index) {
     }
 }
 
-clap_plugin_thread_pool const floe_thread_pool {
+static clap_plugin_thread_pool const floe_thread_pool {
     .exec = ClapThreadPoolExec,
 };
 
@@ -1102,7 +1102,7 @@ static void ClapTimerSupportOnTimer(clap_plugin_t const* plugin, clap_id timer_i
     }
 }
 
-clap_plugin_timer_support const floe_timer {
+static clap_plugin_timer_support const floe_timer {
     .on_timer = ClapTimerSupportOnTimer,
 };
 
@@ -1128,11 +1128,11 @@ static void ClapFdSupportOnFd(clap_plugin_t const* plugin, int fd, clap_posix_fd
     }
 }
 
-clap_plugin_posix_fd_support const floe_posix_fd {
+static clap_plugin_posix_fd_support const floe_posix_fd {
     .on_fd = ClapFdSupportOnFd,
 };
 
-FloeClapTestingExtension const floe_custom_ext {
+static FloeClapTestingExtension const floe_custom_ext {
     .state_change_is_pending = [](clap_plugin_t const* plugin) -> bool {
         ZoneScoped;
         if (PanicOccurred()) return false;

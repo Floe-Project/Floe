@@ -197,7 +197,7 @@ test-pluginval build="": (_build_if_requested build "native")
 check-au-installed:
   #!/usr/bin/env bash
   set -euxo pipefail
-  if [[ ! -f /Library/Audio/Plug-Ins/Components/Floe.component && ! -f ~/Library/Audio/Plug-Ins/Components/Floe.component ]]; then
+  if [[ ! -d /Library/Audio/Plug-Ins/Components/Floe.component && ! -d ~/Library/Audio/Plug-Ins/Components/Floe.component ]]; then
     echo "Floe.component not found in either /Library/Audio/Plug-Ins/Components or ~/Library/Audio/Plug-Ins/Components"
     exit 1
   fi

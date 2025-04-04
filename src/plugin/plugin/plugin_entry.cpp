@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <clap/entry.h>
+#include <clap/plugin.h>
+extern "C" {
+#include <clapwrapper/vst3.h>
+}
 
-#include "utils/debug/debug.hpp"
-#include "utils/debug/tracy_wrapped.hpp"
 #include "utils/logger/logger.hpp"
 
 #include "common_infrastructure/final_binary_type.hpp"
@@ -43,6 +45,13 @@ static clap_plugin_factory const factory = {
     .get_plugin_count = ClapFactoryGetPluginCount,
     .get_plugin_descriptor = ClapFactoryGetPluginDescriptor,
     .create_plugin = ClapFactoryCreatePlugin,
+};
+
+static clap_plugin_factory_as_vst3 const floe_plugin_factory_as_vst3 {
+    .vendor = FLOE_VENDOR,
+    .vendor_url = FLOE_HOMEPAGE_URL,
+    .email_contact = "sam@frozenplain.com",
+    .get_vst3_info = nullptr,
 };
 
 #if __linux__
@@ -134,6 +143,7 @@ static void const* ClapEntryGetFactory(char const* factory_id) {
     if (PanicOccurred()) return nullptr;
     LogInfo(ModuleName::Clap, "entry.get_factory");
     if (NullTermStringsEqual(factory_id, CLAP_PLUGIN_FACTORY_ID)) return &factory;
+    if (NullTermStringsEqual(factory_id, CLAP_PLUGIN_FACTORY_INFO_VST3)) return &floe_plugin_factory_as_vst3;
     return nullptr;
 }
 

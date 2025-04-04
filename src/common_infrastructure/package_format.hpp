@@ -47,28 +47,8 @@ enum class PackageError {
     FilesystemError,
     NotEmpty,
 };
-PUBLIC ErrorCodeCategory const& PackageErrorCodeType() {
-    static constexpr ErrorCodeCategory const k_cat {
-        .category_id = "PK",
-        .message =
-            [](Writer const& writer, ErrorCode e) {
-                return writer.WriteChars(({
-                    String s {};
-                    switch ((PackageError)e.code) {
-                        case PackageError::FileCorrupted: s = "package file is corrupted"_s; break;
-                        case PackageError::NotFloePackage: s = "not a valid Floe package"_s; break;
-                        case PackageError::InvalidLibrary: s = "library is invalid"_s; break;
-                        case PackageError::AccessDenied: s = "access denied"_s; break;
-                        case PackageError::FilesystemError: s = "filesystem error"_s; break;
-                        case PackageError::NotEmpty: s = "directory not empty"_s; break;
-                    }
-                    s;
-                }));
-            },
-    };
-    return k_cat;
-}
-PUBLIC ErrorCodeCategory const& ErrorCategoryForEnum(PackageError) { return PackageErrorCodeType(); }
+extern ErrorCodeCategory const g_package_error_category;
+PUBLIC ErrorCodeCategory const& ErrorCategoryForEnum(PackageError) { return g_package_error_category; }
 
 PUBLIC mz_zip_archive WriterCreate(Writer& writer) {
     mz_zip_archive zip;

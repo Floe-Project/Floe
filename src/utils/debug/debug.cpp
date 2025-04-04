@@ -317,18 +317,16 @@ void DumpInfoAboutUBSan(StdStream stream) {
         auto _ = StdPrint(stream, check);
 }
 
-ErrorCodeCategory const& StacktraceErrorCodeType() {
-    static constexpr ErrorCodeCategory k_cat = {
-        .category_id = "ST",
-        .message = [](Writer const& writer, ErrorCode code) -> ErrorCodeOr<void> {
-            String str {};
-            switch ((StacktraceError)code.code) {
-                case StacktraceError::NotInitialised: str = "not initialised"; break;
-            }
-            return writer.WriteChars(str);
-        }};
-    return k_cat;
-}
+ErrorCodeCategory const g_stacktrace_error_category {
+    .category_id = "ST",
+    .message = [](Writer const& writer, ErrorCode code) -> ErrorCodeOr<void> {
+        String str {};
+        switch ((StacktraceError)code.code) {
+            case StacktraceError::NotInitialised: str = "not initialised"; break;
+        }
+        return writer.WriteChars(str);
+    },
+};
 
 struct BacktraceState {
     Optional<DynamicArrayBounded<char, 256>> failed_init_error {};

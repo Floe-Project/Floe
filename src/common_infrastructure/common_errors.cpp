@@ -5,18 +5,16 @@
 
 #include "foundation/foundation.hpp"
 
-ErrorCodeCategory const& CommonErrorCodeType() {
-    static constexpr ErrorCodeCategory k_cat = {
-        .category_id = "CM",
-        .message = [](Writer const& writer, ErrorCode code) -> ErrorCodeOr<void> {
-            String str {};
-            switch ((CommonError)code.code) {
-                case CommonError::InvalidFileFormat: str = "invalid file format"; break;
-                case CommonError::CurrentFloeVersionTooOld: str = "current Floe version too old"; break;
-                case CommonError::PluginHostError: str = "plugin host error"; break;
-                case CommonError::NotFound: str = "item not found"; break;
-            }
-            return writer.WriteChars(str);
-        }};
-    return k_cat;
-}
+ErrorCodeCategory const g_common_error_category = {
+    .category_id = "CM",
+    .message = [](Writer const& writer, ErrorCode code) -> ErrorCodeOr<void> {
+        String str {};
+        switch ((CommonError)code.code) {
+            case CommonError::InvalidFileFormat: str = "invalid file format"; break;
+            case CommonError::CurrentFloeVersionTooOld: str = "current Floe version too old"; break;
+            case CommonError::PluginHostError: str = "plugin host error"; break;
+            case CommonError::NotFound: str = "item not found"; break;
+        }
+        return writer.WriteChars(str);
+    },
+};

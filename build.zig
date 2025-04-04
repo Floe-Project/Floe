@@ -1591,12 +1591,14 @@ pub fn build(b: *std.Build) void {
 
             const common_source_files = .{
                 library_path ++ "/utils/debug/debug.cpp",
+                library_path ++ "/utils/cli_arg_parse.cpp",
                 library_path ++ "/utils/leak_detecting_allocator.cpp",
                 library_path ++ "/tests/framework.cpp",
                 library_path ++ "/utils/logger/logger.cpp",
                 library_path ++ "/foundation/utils/string.cpp",
                 library_path ++ "/os/filesystem.cpp",
                 library_path ++ "/os/misc.cpp",
+                library_path ++ "/os/web.cpp",
                 library_path ++ "/os/threading.cpp",
             };
 

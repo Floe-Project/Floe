@@ -11,5 +11,5 @@ enum class CommonError {
     NotFound,
 };
 
-ErrorCodeCategory const& CommonErrorCodeType();
-inline ErrorCodeCategory const& ErrorCategoryForEnum(CommonError) { return CommonErrorCodeType(); }
+extern ErrorCodeCategory const g_common_error_category;
+inline ErrorCodeCategory const& ErrorCategoryForEnum(CommonError) { return g_common_error_category; }

@@ -182,25 +182,8 @@ enum class CliError {
     HelpRequested,
     VersionRequested,
 };
-PUBLIC ErrorCodeCategory const& CliErrorCodeType() {
-    static constexpr ErrorCodeCategory const k_cat {
-        .category_id = "CL",
-        .message =
-            [](Writer const& writer, ErrorCode e) {
-                return writer.WriteChars(({
-                    String s {};
-                    switch ((CliError)e.code) {
-                        case CliError::InvalidArguments: s = "invalid arguments"; break;
-                        case CliError::HelpRequested: s = "help requested"; break;
-                        case CliError::VersionRequested: s = "version requested"; break;
-                    }
-                    s;
-                }));
-            },
-    };
-    return k_cat;
-}
-PUBLIC ErrorCodeCategory const& ErrorCategoryForEnum(CliError) { return CliErrorCodeType(); }
+extern ErrorCodeCategory const g_cli_error_code_category;
+PUBLIC ErrorCodeCategory const& ErrorCategoryForEnum(CliError) { return g_cli_error_code_category; }
 
 struct ParseCommandLineArgsOptions {
     bool handle_help_option = true;

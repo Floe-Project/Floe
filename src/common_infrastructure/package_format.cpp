@@ -4,7 +4,29 @@
 #include "package_format.hpp"
 
 #include "tests/framework.hpp"
-#include "utils/logger/logger.hpp"
+
+namespace package {
+
+ErrorCodeCategory const g_package_error_category = {
+    .category_id = "PK",
+    .message =
+        [](Writer const& writer, ErrorCode e) {
+            return writer.WriteChars(({
+                String s {};
+                switch ((PackageError)e.code) {
+                    case PackageError::FileCorrupted: s = "package file is corrupted"_s; break;
+                    case PackageError::NotFloePackage: s = "not a valid Floe package"_s; break;
+                    case PackageError::InvalidLibrary: s = "library is invalid"_s; break;
+                    case PackageError::AccessDenied: s = "access denied"_s; break;
+                    case PackageError::FilesystemError: s = "filesystem error"_s; break;
+                    case PackageError::NotEmpty: s = "directory not empty"_s; break;
+                }
+                s;
+            }));
+        },
+};
+
+} // namespace package
 
 static String TestLibFolder(tests::Tester& tester) {
     return path::Join(

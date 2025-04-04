@@ -11,8 +11,8 @@ enum class StacktraceError {
     NotInitialised,
 };
 
-ErrorCodeCategory const& StacktraceErrorCodeType();
-inline ErrorCodeCategory const& ErrorCategoryForEnum(StacktraceError) { return StacktraceErrorCodeType(); }
+extern ErrorCodeCategory const g_stacktrace_error_category;
+inline ErrorCodeCategory const& ErrorCategoryForEnum(StacktraceError) { return g_stacktrace_error_category; }
 
 struct StacktracePrintOptions {
     bool ansi_colours = false;

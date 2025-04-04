@@ -108,8 +108,8 @@ static String FilenameForLibraryImageType(LibraryImageType type) {
     return {};
 }
 
-static Optional<sample_lib::LibraryPath> PathInLibraryForImageType(sample_lib::Library const& lib,
-                                                                   LibraryImageType type) {
+static Optional<sample_lib::LibraryPath> LibraryImagePath(sample_lib::Library const& lib,
+                                                          LibraryImageType type) {
     switch (type) {
         case LibraryImageType::Icon: return lib.icon_image_path;
         case LibraryImageType::Background: return lib.background_image_path;
@@ -142,26 +142,25 @@ Optional<ImageBytesManaged> ImagePixelsFromLibrary(sample_lib::Library const& li
         }
     }
 
-    auto const path_in_lib = PathInLibraryForImageType(lib, type);
+    auto const path_in_lib = LibraryImagePath(lib, type);
 
-    auto err = [&](String middle, LogLevel severity) {
-        Log(ModuleName::Gui, severity, "{} {} {}", lib.name, middle, filename);
+    auto const err = [&](String middle, Optional<ErrorCode> error) {
+        Log(ModuleName::Gui, LogLevel::Warning, "{} {} {}, code: {}", lib.name, middle, filename, error);
         return Optional<ImageBytesManaged> {};
     };
 
-    if (!path_in_lib) return err("does not have", LogLevel::Debug);
+    if (!path_in_lib) return err("does not have", k_nullopt);
 
-    auto open_outcome = lib.create_file_reader(lib, *path_in_lib);
-    if (open_outcome.HasError()) return err("error opening", LogLevel::Warning);
+    auto reader = TRY_OR(lib.create_file_reader(lib, *path_in_lib), return err("error opening", error));
 
     ArenaAllocator arena {PageAllocator::Instance()};
-    auto const file_outcome = open_outcome.Value().ReadOrFetchAll(arena);
-    if (file_outcome.HasError()) return err("error reading", LogLevel::Warning);
+    auto const file_data = TRY_OR(reader.ReadOrFetchAll(arena), return err("error reading", error));
 
-    auto image_outcome = DecodeImage(file_outcome.Value());
-    if (image_outcome.HasError()) return err("error decoding", LogLevel::Warning);
+    auto pixels = TRY_OR(DecodeImage(file_data), return err("error decoding", error));
 
-    return image_outcome.ReleaseValue();
+    if (!pixels.size.width || !pixels.size.height) return err("image is empty", k_nullopt);
+
+    return pixels;
 }
 
 static LibraryImages LoadLibraryImagesIfNeeded(LibraryImagesArray& array,

@@ -1473,21 +1473,6 @@ static void ClapOnMainThread(const struct clap_plugin* plugin) {
     }
 }
 
-static clap_plugin const floe_plugin {
-    .desc = &g_plugin_info,
-    .plugin_data = nullptr,
-    .init = ClapInit,
-    .destroy = ClapDestroy,
-    .activate = ClapActivate,
-    .deactivate = ClapDeactivate,
-    .start_processing = ClapStartProcessing,
-    .stop_processing = ClapStopProcessing,
-    .reset = ClapReset,
-    .process = ClapProcess,
-    .get_extension = ClapGetExtension,
-    .on_main_thread = ClapOnMainThread,
-};
-
 clap_plugin const* CreateFloeInstance(clap_host const* host) {
     ZoneScoped;
     if (!Check(host, "create_plugin", "host is null")) return nullptr;
@@ -1500,6 +1485,21 @@ clap_plugin const* CreateFloeInstance(clap_host const* host) {
         }
     }
     if (!index) return nullptr;
+
+    static clap_plugin const floe_plugin {
+        .desc = &g_plugin_info,
+        .plugin_data = nullptr,
+        .init = ClapInit,
+        .destroy = ClapDestroy,
+        .activate = ClapActivate,
+        .deactivate = ClapDeactivate,
+        .start_processing = ClapStartProcessing,
+        .stop_processing = ClapStopProcessing,
+        .reset = ClapReset,
+        .process = ClapProcess,
+        .get_extension = ClapGetExtension,
+        .on_main_thread = ClapOnMainThread,
+    };
 
     auto result = FloeInstanceAllocator().New<FloePluginInstance>(*host, *index, floe_plugin);
     if (!result) return nullptr;

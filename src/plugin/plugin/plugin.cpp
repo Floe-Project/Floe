@@ -528,7 +528,7 @@ static bool ClapGuiSetSize(clap_plugin_t const* plugin, u32 clap_width, u32 clap
 
         auto size = ClapPixelsToPhysicalPixels(floe.gui_platform->view, clap_width, clap_height);
 
-        if (!Check(floe, size && size->width >= k_min_gui_width, k_func, "invalid size")) return false;
+        if (!size || size->width < k_min_gui_width) return false;
 
         // Some hosts (AUv2 clap-wrapper in Logic, for example) will give us sizes in an aspect ratio we don't
         // support. In this case, we do our best to conform to the size given but it won't be the exact size

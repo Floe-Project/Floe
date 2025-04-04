@@ -107,6 +107,30 @@ SystemStats GetSystemStats() {
     return result;
 }
 
+bool IsRunningUnderDebugger() {
+    auto fd = open("/proc/self/status", O_RDONLY);
+    if (fd == -1) return false;
+    DEFER { close(fd); };
+
+    constexpr usize k_max_file_size = Kb(4);
+    DynamicArrayBounded<char, k_max_file_size> file_data {};
+    auto const num_read = read(fd, file_data.data, k_max_file_size);
+    if (num_read == -1) return false;
+    file_data.size = (usize)num_read;
+
+    for (auto const line : SplitIterator {file_data, '\n'}) {
+        auto const colon_pos = Find(line, ':');
+        if (!colon_pos) continue;
+
+        auto const key = WhitespaceStripped(line.SubSpan(0, *colon_pos));
+        auto value = WhitespaceStripped(line.SubSpan(*colon_pos + 1));
+
+        if (key == "TracerPid") return value[0] != '0';
+    }
+
+    return false;
+}
+
 u64 RandomSeed() {
     u64 seed = 0;
     auto _ = getrandom(&seed, sizeof(seed), 0);

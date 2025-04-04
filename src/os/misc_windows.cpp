@@ -526,6 +526,8 @@ static void WindowsShellExecute(String arg) {
 void OpenFolderInFileBrowser(String path) { WindowsShellExecute(path); }
 void OpenUrlInBrowser(String url) { WindowsShellExecute(url); }
 
+bool IsRunningUnderDebugger() { return IsDebuggerPresent(); }
+
 static constexpr ErrorCodeCategory k_error_category {
     .category_id = "WIN",
     .message = [](Writer const& writer, ErrorCode code) -> ErrorCodeOr<void> {

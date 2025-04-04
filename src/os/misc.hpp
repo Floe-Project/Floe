@@ -83,6 +83,9 @@ void UnloadLibrary(LibraryHandle library);
 
 bool IsRunningUnderWine();
 
+// We can also use __builtin_debugtrap().
+bool IsRunningUnderDebugger();
+
 class Malloc final : public Allocator {
   public:
     Span<u8> DoCommand(AllocatorCommandUnion const& command) override {

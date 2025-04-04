@@ -10,6 +10,8 @@
 #pragma clang diagnostic ignored "-Wcast-align"
 #include <AppKit/AppKit.h>
 #include <CoreServices/CoreServices.h>
+#include <mach/mach_init.h>
+#include <mach/task.h>
 #include <sys/sysctl.h>
 #include <sys/utsname.h>
 #pragma clang diagnostic pop
@@ -138,4 +140,28 @@ u64 RandomSeed() {
     u64 result;
     arc4random_buf(&result, sizeof(result));
     return result;
+}
+
+// https://github.com/grafikrobot/debugging/blob/main/src/macos.cxx
+// MIT License
+// Copyright (c) 2021-2022 René Ferdinand Rivera Morell
+// Copyright (c) 2018 Isabella Muerte
+bool IsRunningUnderDebugger() {
+    mach_msg_type_number_t count {};
+    Array<exception_mask_t, EXC_TYPES_COUNT> masks {};
+    Array<mach_port_t, EXC_TYPES_COUNT> ports {};
+    Array<exception_behavior_t, EXC_TYPES_COUNT> behaviors {};
+    Array<thread_state_flavor_t, EXC_TYPES_COUNT> flavors {};
+    exception_mask_t mask = EXC_MASK_ALL & ~(EXC_MASK_RESOURCE | EXC_MASK_GUARD);
+    kern_return_t result = task_get_exception_ports(mach_task_self(),
+                                                    mask,
+                                                    masks.data,
+                                                    &count,
+                                                    ports.data,
+                                                    behaviors.data,
+                                                    flavors.data);
+    if (result != KERN_SUCCESS) return false;
+    for (unsigned i = 0; i < count; ++i)
+        if (MACH_PORT_VALID(ports[i])) return true;
+    return false;
 }

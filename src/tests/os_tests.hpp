@@ -1285,6 +1285,12 @@ TEST_CASE(TestGetEnvVar) {
     return k_success;
 }
 
+TEST_CASE(TestIsRunningUnderDebugger) {
+    auto const r = IsRunningUnderDebugger();
+    tester.log.Debug("Is running under debugger: {}", r);
+    return k_success;
+}
+
 TEST_REGISTRATION(RegisterOsTests) {
     REGISTER_TEST(TestCallOnce);
     REGISTER_TEST(TestDirectoryWatcher);
@@ -1296,6 +1302,7 @@ TEST_REGISTRATION(RegisterOsTests) {
     REGISTER_TEST(TestFutex);
     REGISTER_TEST(TestGetEnvVar);
     REGISTER_TEST(TestGetInfo);
+    REGISTER_TEST(TestIsRunningUnderDebugger);
     REGISTER_TEST(TestLockableSharedMemory);
     REGISTER_TEST(TestMutex);
     REGISTER_TEST(TestOsRandom);

@@ -27,6 +27,8 @@ void GlobalInit(GlobalInitOptions options) {
     SetPanicHook([](char const* message_c_str, SourceLocation loc, uintptr loc_pc) {
         // We don't have to be signal-safe here.
 
+        if (!PRODUCTION_BUILD && IsRunningUnderDebugger()) __builtin_debugtrap();
+
         ArenaAllocatorWithInlineStorage<2000> arena {PageAllocator::Instance()};
 
         auto const stacktrace = CurrentStacktrace(ProgramCounter {loc_pc});
@@ -105,6 +107,8 @@ void GlobalInit(GlobalInitOptions options) {
     // after tracy
     BeginCrashDetection([](String crash_message, Optional<StacktraceStack> stacktrace) {
         // This function is async-signal-safe.
+
+        if (!PRODUCTION_BUILD && IsRunningUnderDebugger()) __builtin_debugtrap();
 
         FixedSizeAllocator<4000> allocator {nullptr};
 

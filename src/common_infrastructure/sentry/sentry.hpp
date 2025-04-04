@@ -693,7 +693,7 @@ PUBLIC ErrorCodeOr<void> SubmitCrash(Sentry& sentry,
                              .stacktrace = stacktrace,
                          },
                          {
-                             .signal_safe = !IS_WINDOWS,
+                             .signal_safe = false,
                              .diagnostics = true,
                          }));
     if constexpr (k_online_reporting) TRY(EnvelopeAddSessionUpdate(sentry, writer, SessionStatus::Crashed));

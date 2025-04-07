@@ -9,7 +9,7 @@ on:
     branches:
       - main
   release:
-    types: [published] # our website needs to update its download links
+    types: [released] # our website needs to update its download links
 
 jobs:
   generate-docs:

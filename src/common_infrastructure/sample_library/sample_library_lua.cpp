@@ -542,22 +542,22 @@ struct TableFields<BuiltinLoop> {
                 return {
                     .name = "start_frame",
                     .description_sentence =
-                        "The start of the loop in frames. Inclusive. It can be negative meaning index the file from the end rather than the start. For example, -1 == number_frames_in_file, -2 == (number_frames_in_file - 1), etc.",
+                        "The start of the loop in frames. Inclusive. It can be negative meaning index the file from the end rather than the start.",
                     .example = "24",
                     .lua_type = LUA_TNUMBER,
                     .required = true,
                     .set =
-                        [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.start_frame = NumberFromTop<u32>(ctx, info); },
+                        [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.start_frame = NumberFromTop<s64>(ctx, info); },
                 };
             case Field::End:
                 return {
                     .name = "end_frame",
                     .description_sentence =
-                        "The end of the loop in frames. Exclusive. It can be negative meaning index the file from the end rather than the start. For example, -1 == number_frames_in_file, -2 == (number_frames_in_file - 1), etc.",
+                        "The end of the loop in frames. Exclusive. It can be negative meaning index the file from the end rather than the start. 0 means the end of the file.",
                     .example = "6600",
                     .lua_type = LUA_TNUMBER,
                     .required = true,
-                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.end_frame = NumberFromTop<u32>(ctx, info); },
+                    .set = [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.end_frame = NumberFromTop<s64>(ctx, info); },
                 };
             case Field::Crossfade:
                 return {

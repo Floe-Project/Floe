@@ -89,7 +89,7 @@ inline BoundsCheckedLoop CreateBoundsCheckedLoop(sample_lib::BuiltinLoop loop, u
     result.start = ({
         s64 s;
         if (loop.start_frame < 0)
-            s = Max<s64>(0, (total_frame_count - 1) + (loop.start_frame + 1));
+            s = Max<s64>(0, total_frame_count + loop.start_frame);
         else
             s = loop.start_frame;
         CheckedCast<u32>(s);
@@ -97,8 +97,8 @@ inline BoundsCheckedLoop CreateBoundsCheckedLoop(sample_lib::BuiltinLoop loop, u
 
     result.end = ({
         s64 e;
-        if (loop.end_frame < 0)
-            e = Max<s64>(0, total_frame_count + (loop.end_frame + 1));
+        if (loop.end_frame <= 0)
+            e = Max<s64>(0, total_frame_count + loop.end_frame);
         else {
             e = Clamp<s64>(loop.end_frame,
                            Min(loop.start_frame + smallest_loop_size_allowed, total_frame_count),

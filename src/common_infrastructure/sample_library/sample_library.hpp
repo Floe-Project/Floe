@@ -45,7 +45,6 @@ enum class TriggerEvent { NoteOn, NoteOff, Count };
 enum class LoopMode : u8 { Standard, PingPong, Count };
 
 // start and end can be negative meaning they're indexed from the end of the sample.
-// e.g. -1 == num_frames, -2 == (num_frames - 1), etc.
 struct BuiltinLoop {
     s64 start_frame {};
     s64 end_frame {};

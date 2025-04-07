@@ -9,6 +9,9 @@ For instance: 0.0.1. Don't change the headings.
 
 # Changelog
 
+## 0.9.0-beta
+- Library creation: fix specifying loop end points relative to the end of the file.
+
 ## 0.8.3-beta
 - Fix crash when error occurs in the Windows native file picker
 - Fix crash when given invalid arguments to CLAP activate

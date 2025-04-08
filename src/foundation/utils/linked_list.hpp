@@ -44,6 +44,14 @@ PUBLIC void SinglyLinkedListPrepend(NodeType*& head, NodeType* new_node) {
 }
 
 template <typename NodeType>
+PUBLIC NodeType* SinglyLinkedListPop(NodeType*& head) {
+    ASSERT(head);
+    auto node = head;
+    head = head->next;
+    return node;
+}
+
+template <typename NodeType>
 PUBLIC NodeType* SinglyLinkedListLast(NodeType* head) {
     auto temp = head;
     while (temp != nullptr && temp->next != nullptr)

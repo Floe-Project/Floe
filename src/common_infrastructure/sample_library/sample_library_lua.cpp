@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <lauxlib.h>
+#include <lobject.h>
 #include <lua.h>
 #include <lualib.h>
 #include <xxhash.h>
@@ -70,10 +71,92 @@ static MutableString LuaValueToString(lua_State* lua, int stack_index, ArenaAllo
     return result.ToOwnedSpan();
 }
 
+struct LuaAllocator {
+    // When an allocation has been freed, we can use the contents of the bucket as a FreeBucket, allowing us
+    // to make a linked list of free buckets.
+    struct FreeBucket {
+        FreeBucket* next;
+    };
+
+    constexpr static usize BucketSizeIndex(usize size) {
+        for (auto const i : ::Range(k_bucket_sizes.size))
+            if (size <= k_bucket_sizes[i]) return i;
+        return k_invalid_bucket;
+    }
+
+    void* Allocate(ArenaAllocator& arena, usize size) {
+        max_allocation_size = Max(max_allocation_size, size);
+        auto const bucket_index = BucketSizeIndex(size);
+
+        if (bucket_index == k_invalid_bucket) {
+            return arena
+                .Allocate({
+                    .size = size,
+                    .alignment = k_max_alignment,
+                    .allow_oversized_result = false,
+                })
+                .data;
+        }
+
+        auto& free_list = free_lists[bucket_index];
+        if (free_list != nullptr) {
+            auto result = SinglyLinkedListPop(free_list);
+            ASSERT_HOT(result != nullptr);
+            return result;
+        }
+
+        return arena
+            .Allocate({
+                .size = k_bucket_sizes[bucket_index],
+                .alignment = k_max_alignment,
+                .allow_oversized_result = false,
+            })
+            .data;
+    }
+
+    void Free(ArenaAllocator& arena, void* ptr, usize size) {
+        ASSERT_HOT(ptr != nullptr);
+
+        auto const bucket_index = BucketSizeIndex(size);
+        if (bucket_index == k_invalid_bucket) {
+            arena.Free(Span {(u8*)ptr, size});
+            return;
+        }
+
+        SinglyLinkedListPrepend(free_lists[bucket_index], (FreeBucket*)ptr);
+    }
+
+    void* Reallocate(ArenaAllocator& arena, void* ptr, usize old_size, usize new_size) {
+        max_allocation_size = Max(max_allocation_size, new_size);
+        ASSERT_HOT(ptr != nullptr);
+
+        auto const old_bucket = BucketSizeIndex(old_size);
+        auto const new_bucket = BucketSizeIndex(new_size);
+
+        if (old_bucket == k_invalid_bucket)
+            return arena.Reallocate<u8>(new_size, {(u8*)ptr, old_size}, old_size, false).data;
+
+        if (old_bucket == new_bucket) return ptr;
+
+        auto new_ptr = Allocate(arena, new_size);
+        CopyMemory(new_ptr, ptr, Min(old_size, new_size));
+        Free(arena, ptr, old_size);
+        return new_ptr;
+    }
+
+    static constexpr auto k_bucket_sizes =
+        Array {32uz, 48, sizeof(Table), 96, 128, 256, 512, 1024, 4096, Kb(32)};
+    static constexpr usize k_invalid_bucket = (usize)-1;
+
+    usize max_allocation_size {};
+    Array<FreeBucket*, k_bucket_sizes.size> free_lists {};
+};
+
 struct LuaState {
     lua_State* lua;
     ArenaAllocator& result_arena;
     ArenaAllocator& lua_arena;
+    LuaAllocator lua_allocator;
     usize initial_lua_arena_size;
     Options const& options;
     TimePoint const start_time;
@@ -1345,7 +1428,9 @@ static VoidOrError<Error> TryRunLuaCode(LuaState& ctx, int r) {
                     dyn::AppendSpan(message, "\nUnknown error");
             });
         }
-        case LUA_ERRMEM: return Error {LuaErrorCode::Memory, {}};
+        case LUA_ERRMEM: {
+            return Error {LuaErrorCode::Memory, {}};
+        }
         case LUA_ERRERR:
             LogError(ModuleName::SampleLibrary, "error while running the Lua error handler function");
             return Error {LuaErrorCode::Unexpected, {}};
@@ -1433,6 +1518,12 @@ LibraryPtrOrError ReadLua(Reader& reader,
                           ArenaAllocator& result_arena,
                           ArenaAllocator& scratch_arena,
                           Options options) {
+    auto const lua_source_code = ({
+        auto o = reader.ReadOrFetchAll(scratch_arena);
+        if (o.HasError()) return Error {o.Error(), {}};
+        o.Value();
+    });
+
     ASSERT(path::IsAbsolute(lua_filepath));
     LuaState ctx {
         .result_arena = result_arena,
@@ -1449,7 +1540,7 @@ LibraryPtrOrError ReadLua(Reader& reader,
         if (new_size == 0) {
             if (ptr) {
                 ASSERT(original_size != 0);
-                ctx.lua_arena.Free({(u8*)ptr, original_size});
+                ctx.lua_allocator.Free(ctx.lua_arena, ptr, original_size);
             }
             return nullptr;
         }
@@ -1457,20 +1548,13 @@ LibraryPtrOrError ReadLua(Reader& reader,
         if ((ctx.lua_arena.TotalUsed() - ctx.initial_lua_arena_size) > ctx.options.max_memory_allowed)
             return nullptr;
 
-        if (ptr == nullptr) {
-            // NOTE: When ptr is NULL, original_size encodes the kind of object that Lua is allocating.
-            // original_size is any of LUA_TSTRING, LUA_TTABLE, LUA_TFUNCTION, LUA_TUSERDATA, or LUA_TTHREAD
-            // when (and only when) Lua is creating a new object of that type. When original_size is some
-            // other value, Lua is allocating memory for something else.
-            auto result = ctx.lua_arena.Allocate({
-                .size = new_size,
-                .alignment = k_max_alignment,
-                .allow_oversized_result = false,
-            });
-            return result.data;
-        }
+        // NOTE: When ptr is NULL, original_size encodes the kind of object that Lua is allocating.
+        // original_size is any of LUA_TSTRING, LUA_TTABLE, LUA_TFUNCTION, LUA_TUSERDATA, or LUA_TTHREAD
+        // when (and only when) Lua is creating a new object of that type. When original_size is some
+        // other value, Lua is allocating memory for something else.
+        if (ptr == nullptr) return ctx.lua_allocator.Allocate(ctx.lua_arena, new_size);
 
-        return ctx.lua_arena.Reallocate<u8>(new_size, {(u8*)ptr, original_size}, original_size, false).data;
+        return ctx.lua_allocator.Reallocate(ctx.lua_arena, ptr, original_size, new_size);
     };
 
     // We don't need a lua_close() because we use lua in a very short-lived environment and we do our memory
@@ -1515,12 +1599,7 @@ LibraryPtrOrError ReadLua(Reader& reader,
         lua_pushcfunction(ctx.lua, ErrorHandler);
         int const traceback_index = lua_gettop(ctx.lua);
 
-        DynamicArray<char> chunkname {path::Filename(lua_filepath), ctx.lua_arena};
-        auto const lua_source_code = ({
-            auto o = reader.ReadOrFetchAll(ctx.lua_arena);
-            if (o.HasError()) return Error {o.Error(), {}};
-            o.Value();
-        });
+        DynamicArray<char> chunkname {path::Filename(lua_filepath), scratch_arena};
         if (auto const r = luaL_loadbuffer(ctx.lua,
                                            (char const*)lua_source_code.data,
                                            lua_source_code.size,

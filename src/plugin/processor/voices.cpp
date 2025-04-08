@@ -195,7 +195,7 @@ static Optional<BoundsCheckedLoop> ConfigureLoop(param_values::LoopMode desired_
                 if (!region_loop.builtin_loop->lock_mode) result.mode = sample_lib::LoopMode::PingPong;
                 return result;
             case param_values::LoopMode::None:
-                if (region_loop.always_loop) return result;
+                if (region_loop.loop_requirement == sample_lib::LoopRequirement::AlwaysLoop) return result;
                 return k_nullopt;
             case param_values::LoopMode::Standard:
             case param_values::LoopMode::PingPong: {
@@ -211,7 +211,7 @@ static Optional<BoundsCheckedLoop> ConfigureLoop(param_values::LoopMode desired_
         case param_values::LoopMode::BuiltInLoopStandard:
         case param_values::LoopMode::BuiltInLoopPingPong:
         case param_values::LoopMode::None: {
-            if (region_loop.always_loop) {
+            if (region_loop.loop_requirement == sample_lib::LoopRequirement::AlwaysLoop) {
                 // This is a legacy option: we have to enforce some kind of looping behaviour.
                 auto const n = (f32)num_frames;
                 return CreateBoundsCheckedLoop(

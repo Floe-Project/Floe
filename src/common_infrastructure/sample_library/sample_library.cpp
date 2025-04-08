@@ -117,8 +117,9 @@ void PostReadBookkeeping(Library& lib, Allocator& arena) {
                 if (l->lock_loop_points) ++num_loops_per_mode_with_locked_points[ToInt(l->mode)];
             }
 
-            if (!region.loop.always_loop) inst.loop_overview.all_regions_require_looping = false;
-            if (!region.loop.never_loop) all_regions_never_loop = false;
+            if (region.loop.loop_requirement != LoopRequirement::AlwaysLoop)
+                inst.loop_overview.all_regions_require_looping = false;
+            if (region.loop.loop_requirement != LoopRequirement::NeverLoop) all_regions_never_loop = false;
 
             if (region.timbre_layering.layer_range) inst.uses_timbre_layering = true;
         }

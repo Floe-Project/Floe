@@ -622,10 +622,22 @@ struct TableFields<Region::Loop> {
 
     enum class Field : u32 {
         BuiltinLoop,
-        NeverLoop,
-        AlwaysLoop,
+        LoopRequirement,
         Count,
     };
+
+    static constexpr char const* k_loop_requirement_names[] = {"default",
+                                                               "always-loop",
+                                                               "never-loop",
+                                                               nullptr};
+    static constexpr char const* k_loop_requirement_descriptions[] = {
+        "Default looping behaviour.",
+        "This region will always loop - either using the built in loop, a user defined loop, or a default built-in loop.",
+        "This region will never loop even if there is a user-defined loop. Set all regions of an instrument to this to entirely disable looping for the instrument.",
+        nullptr,
+    };
+    static_assert(ArraySize(k_loop_requirement_names) == ToInt(LoopRequirement::Count) + 1);
+    static_assert(ArraySize(k_loop_requirement_descriptions) == ToInt(LoopRequirement::Count) + 1);
 
     static constexpr FieldInfo FieldInfo(Field f) {
         switch (f) {
@@ -644,38 +656,20 @@ struct TableFields<Region::Loop> {
                             FIELD_OBJ.builtin_loop = loop;
                         },
                 };
-            case Field::NeverLoop:
+            case Field::LoopRequirement:
                 return {
-                    .name = "never_loop",
-                    .description_sentence =
-                        "If true, this region will never loop even if there is a user-defined loop. Set all regions of an instrument to this to entirely disable looping for the instrument.",
-                    .example = "false",
-                    .default_value = "false",
-                    .lua_type = LUA_TBOOLEAN,
+                    .name = "loop_requirement",
+                    .description_sentence = "The requirement for this region to loop.",
+                    .example = FromNullTerminated(k_loop_requirement_names[1]),
+                    .default_value = FromNullTerminated(k_loop_requirement_names[0]),
+                    .lua_type = LUA_TSTRING,
                     .required = false,
+                    .enum_options = k_loop_requirement_names,
+                    .enum_descriptions = k_loop_requirement_descriptions,
                     .set =
                         [](SET_FIELD_VALUE_ARGS) {
-                            FIELD_OBJ.never_loop = lua_toboolean(ctx.lua, -1) != 0;
-                            // Mutually exclusive with always_loop
-                            if (FIELD_OBJ.never_loop && FIELD_OBJ.always_loop)
-                                luaL_error(ctx.lua, "never_loop and always_loop are mutually exclusive");
-                        },
-                };
-            case Field::AlwaysLoop:
-                return {
-                    .name = "always_loop",
-                    .description_sentence =
-                        "If true, this region will always loop - either using the built in loop, a user defined loop, or a default built-in loop.",
-                    .example = "false",
-                    .default_value = "false",
-                    .lua_type = LUA_TBOOLEAN,
-                    .required = false,
-                    .set =
-                        [](SET_FIELD_VALUE_ARGS) {
-                            FIELD_OBJ.always_loop = lua_toboolean(ctx.lua, -1) != 0;
-                            // Mutually exclusive with never_loop
-                            if (FIELD_OBJ.never_loop && FIELD_OBJ.always_loop)
-                                luaL_error(ctx.lua, "never_loop and always_loop are mutually exclusive");
+                            FIELD_OBJ.loop_requirement = (LoopRequirement)
+                                luaL_checkoption(ctx.lua, -1, nullptr, k_loop_requirement_names);
                         },
                 };
             case Field::Count: break;

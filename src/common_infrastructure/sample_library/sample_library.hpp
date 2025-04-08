@@ -44,6 +44,8 @@ enum class TriggerEvent { NoteOn, NoteOff, Count };
 
 enum class LoopMode : u8 { Standard, PingPong, Count };
 
+enum class LoopRequirement : u8 { Default, AlwaysLoop, NeverLoop, Count };
+
 // start and end can be negative meaning they're indexed from the end of the sample.
 struct BuiltinLoop {
     s64 start_frame {};
@@ -61,8 +63,7 @@ struct Region {
 
     struct Loop {
         Optional<BuiltinLoop> builtin_loop {};
-        bool8 never_loop : 1 {};
-        bool8 always_loop : 1 {};
+        LoopRequirement loop_requirement {LoopRequirement::Default};
     } loop;
 
     struct TriggerCriteria {

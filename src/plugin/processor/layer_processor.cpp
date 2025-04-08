@@ -421,29 +421,31 @@ static void TriggerVoicesIfNeeded(LayerProcessor& layer,
         };
         auto& sampler_params = p.params.Get<VoiceStartParams::SamplerParams>();
 
-        auto layer_rr = ({
-            Atomic<u32>* rr {};
+        auto& layer_rr = *({
+            Array<u8, sample_lib::k_max_round_robin_groups>* rr {};
             switch (trigger_event) {
                 case sample_lib::TriggerEvent::NoteOn: rr = &layer.note_on_rr_pos; break;
                 case sample_lib::TriggerEvent::NoteOff: rr = &layer.note_off_rr_pos; break;
-                case sample_lib::TriggerEvent::Count: break;
+                case sample_lib::TriggerEvent::Count: PanicIfReached(); break;
             }
             rr;
         });
 
-        auto const rr_pos = ({
-            auto r = layer_rr->Load(LoadMemoryOrder::Relaxed);
-            if (r > inst.instrument.max_rr_pos) r = 0;
-            r;
-        });
-        DEFER { layer_rr->Store(rr_pos + 1, StoreMemoryOrder::Relaxed); };
+        for (auto [group_index, group] : Enumerate(inst.instrument.round_robin_groups))
+            if (layer_rr[group_index] > group.max_rr_pos) layer_rr[group_index] = 0;
+
+        DEFER {
+            for (auto const group_index : Range(inst.instrument.round_robin_groups.size))
+                ++layer_rr[group_index];
+        };
 
         for (auto i : Range(inst.instrument.regions.size)) {
             auto const& region = inst.instrument.regions[i];
             auto const& audio_data = inst.audio_datas[i];
             if (region.trigger.key_range.Contains(note_for_samples) &&
                 region.trigger.velocity_range.Contains(note_vel) &&
-                (!region.trigger.round_robin_index || *region.trigger.round_robin_index == rr_pos) &&
+                (!region.trigger.round_robin_index ||
+                 *region.trigger.round_robin_index == layer_rr[region.trigger.round_robin_group]) &&
                 region.trigger.trigger_event == trigger_event) {
                 dyn::Append(sampler_params.voice_sample_params,
                             VoiceStartParams::SamplerParams::Region {

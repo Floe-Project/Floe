@@ -54,7 +54,7 @@ LibraryPtrOrError Read(Reader& reader,
 
 namespace detail {
 
-void PostReadBookkeeping(Library& lib, Allocator& arena) {
+VoidOrError<String> PostReadBookkeeping(Library& lib, Allocator& arena, ArenaAllocator& scratch_arena) {
 
     // Sort items into their folders, and by name within each folder.
     auto const sort_function = [](auto* a, auto* b) {
@@ -149,6 +149,154 @@ void PostReadBookkeeping(Library& lib, Allocator& arena) {
             if (all_regions_never_loop) inst.loop_overview.user_defined_loops_allowed = false;
         }
     }
+
+    for (auto [key, inst_ptr] : lib.insts_by_name) {
+        auto& inst = *inst_ptr;
+        struct RoundRobinGroupInfo {
+            u8 max_rr_pos;
+            u8 round_robin_group_index;
+        };
+        HashTable<String, RoundRobinGroupInfo> round_robin_group_infos {};
+
+        u8 round_robin_group_counter = 0;
+
+        for (auto& region : inst->regions) {
+            if (!region.trigger.round_robin_index) continue;
+            if (auto const e =
+                    round_robin_group_infos.FindOrInsertGrowIfNeeded(scratch_arena,
+                                                                     region.trigger.round_robin_group_string,
+                                                                     {});
+                !e.inserted) {
+                // This group already exists, so we need to update the max_rr_pos.
+
+                auto& existing = e.element->data;
+                existing.max_rr_pos = Max(existing.max_rr_pos, *region.trigger.round_robin_index);
+            } else {
+                // We've inserted it, so we need to set the actual values.
+
+                if (round_robin_group_counter == k_max_round_robin_groups) {
+                    return (String)fmt::Format(arena,
+                                               "More than {} round robin groups in instrument {}",
+                                               k_max_round_robin_groups,
+                                               inst->name);
+                }
+
+                auto& new_group = e.element->data;
+                new_group = {
+                    .max_rr_pos = *region.trigger.round_robin_index,
+                    .round_robin_group_index = round_robin_group_counter++,
+                };
+            }
+        }
+
+        inst->round_robin_groups = arena.NewMultiple<RoundRobinGroup>(round_robin_group_counter);
+        for (auto const& [_, group_info] : round_robin_group_infos) {
+            auto& group = inst->round_robin_groups[group_info->round_robin_group_index];
+            group = {
+                .max_rr_pos = group_info->max_rr_pos,
+            };
+        }
+    }
+
+    for (auto [key, inst_ptr] : lib.insts_by_name) {
+        auto const& inst = *inst_ptr;
+        for (auto const& region : inst->regions) {
+            if (!region.trigger.feather_overlapping_velocity_layers) continue;
+            usize num_overlaps = 0;
+            Region const* first_overlap {};
+            Region const* second_overlap {};
+            for (auto const& other_region : inst->regions) {
+                if (&region == &other_region) continue;
+                if (!other_region.trigger.feather_overlapping_velocity_layers) continue;
+                if (region.trigger.trigger_event == other_region.trigger.trigger_event &&
+                    region.trigger.round_robin_index == other_region.trigger.round_robin_index &&
+                    region.trigger.round_robin_group == other_region.trigger.round_robin_group &&
+                    region.trigger.key_range.Overlaps(other_region.trigger.key_range) &&
+                    region.trigger.velocity_range.Overlaps(other_region.trigger.velocity_range)) {
+                    if (num_overlaps == 0)
+                        first_overlap = &other_region;
+                    else if (num_overlaps == 1)
+                        second_overlap = &other_region;
+                    num_overlaps++;
+
+                    // IMPROVE: we could possibly support more than 1 but we'd need to implement a
+                    // different kind of feathering algorithm.
+                    if (num_overlaps > 2) {
+                        return (String)fmt::Format(
+                            arena,
+                            "Only 2 feathered velocity regions can be present on a given velocity value.\n"
+                            "{} ({}, {}) overlaps:\n"
+                            "{} ({}, {}) and:\n"
+                            "{} ({}, {}) and:\n"
+                            "{} ({}, {})",
+                            path::Filename(region.path.str),
+                            region.trigger.velocity_range.start,
+                            region.trigger.velocity_range.end,
+                            path::Filename(first_overlap->path.str),
+                            first_overlap->trigger.velocity_range.start,
+                            first_overlap->trigger.velocity_range.end,
+                            path::Filename(second_overlap->path.str),
+                            second_overlap->trigger.velocity_range.start,
+                            second_overlap->trigger.velocity_range.end,
+                            path::Filename(other_region.path.str),
+                            other_region.trigger.velocity_range.start,
+                            other_region.trigger.velocity_range.end);
+                    }
+                }
+            }
+        }
+    }
+    for (auto [key, inst_ptr] : lib.insts_by_name) {
+        auto const& inst = *inst_ptr;
+        for (auto const& region : inst->regions) {
+            if (!region.timbre_layering.layer_range) continue;
+            usize num_overlaps = 0;
+            Region const* first_overlap {};
+            Region const* second_overlap {};
+            for (auto const& other_region : inst->regions) {
+                if (&region == &other_region) continue;
+                if (!other_region.timbre_layering.layer_range) continue;
+                if (region.trigger.trigger_event == other_region.trigger.trigger_event &&
+                    region.trigger.round_robin_index == other_region.trigger.round_robin_index &&
+                    region.trigger.round_robin_group == other_region.trigger.round_robin_group &&
+                    region.trigger.key_range.Overlaps(other_region.trigger.key_range) &&
+                    region.trigger.velocity_range.Overlaps(other_region.trigger.velocity_range) &&
+                    region.timbre_layering.layer_range->Overlaps(*other_region.timbre_layering.layer_range)) {
+                    if (num_overlaps == 0)
+                        first_overlap = &other_region;
+                    else if (num_overlaps == 1)
+                        second_overlap = &other_region;
+                    num_overlaps++;
+
+                    // IMPROVE: we could possibly support more than 1 but we'd need to implement a
+                    // different kind of algorithm.
+                    if (num_overlaps > 2) {
+                        return (String)fmt::Format(
+                            arena,
+                            "Only 2 timbre layers can be present on a given timbre value.\n"
+                            "{} ({}, {}) overlaps:\n"
+                            "{} ({}, {}) and:\n"
+                            "{} ({}, {}) and:\n"
+                            "{} ({}, {})",
+                            path::Filename(region.path.str),
+                            region.timbre_layering.layer_range->start,
+                            region.timbre_layering.layer_range->end,
+                            path::Filename(first_overlap->path.str),
+                            first_overlap->timbre_layering.layer_range->start,
+                            first_overlap->timbre_layering.layer_range->end,
+                            path::Filename(second_overlap->path.str),
+                            second_overlap->timbre_layering.layer_range->start,
+                            second_overlap->timbre_layering.layer_range->end,
+                            path::Filename(other_region.path.str),
+                            other_region.timbre_layering.layer_range->start,
+                            other_region.timbre_layering.layer_range->end);
+                    }
+                }
+            }
+        }
+    }
+
+    return k_success;
 }
 
 } // namespace detail

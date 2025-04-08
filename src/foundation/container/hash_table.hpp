@@ -244,6 +244,51 @@ struct HashTable {
         return true;
     }
 
+    struct FindOrInsertResult {
+        Element* element;
+        bool inserted;
+    };
+
+    FindOrInsertResult FindOrInsertWithoutGrowing(KeyType key, ValueType value) {
+        auto const hash = Hash(key);
+        Element* element = Lookup(key, hash, k_tombstone);
+        if (element->active) return {.element = element, .inserted = false};
+
+        if (size + num_dead > mask - mask / 4) {
+            PanicIfReached();
+            return {}; // too full
+        }
+
+        if (element->hash == k_tombstone) --num_dead;
+        ++size;
+        element->key = key;
+        element->active = true;
+        element->data = value;
+        element->hash = hash;
+        return {.element = element, .inserted = true};
+    }
+
+    FindOrInsertResult FindOrInsertGrowIfNeeded(Allocator& allocator, KeyType key, ValueType value) {
+        if (!elems) IncreaseCapacity(allocator, k_min_size);
+        auto const hash = Hash(key);
+        Element* element = Lookup(key, hash, k_tombstone);
+        if (element->active) return {.element = element, .inserted = false};
+
+        auto const old_hash = element->hash; // save old hash in case it's tombstone marker
+        element->active = true;
+        element->key = key;
+        element->data = value;
+        element->hash = hash;
+        if (++size + num_dead > mask - mask / 4) {
+            IncreaseCapacity(allocator, 2 * size);
+            num_dead = 0;
+        } else if (old_hash == k_tombstone) {
+            // re-used tomb
+            --num_dead;
+        }
+        return {.element = element, .inserted = true};
+    }
+
     Iterator begin() const {
         if (!elems) return end();
         typename Iterator::Item item {};
@@ -337,6 +382,9 @@ struct DynamicHashTable {
     Span<typename Table::Element const> Elements() const { return table.Elements(); }
 
     bool Insert(KeyType key, ValueType value) { return table.InsertGrowIfNeeded(allocator, key, value); }
+    Table::FindOrInsertResult FindOrInsert(KeyType key, ValueType value) {
+        return table.FindOrInsertGrowIfNeeded(allocator, key, value);
+    }
 
     auto begin() const { return table.begin(); }
     auto end() const { return table.end(); }

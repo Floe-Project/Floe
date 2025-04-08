@@ -1586,7 +1586,9 @@ static sample_lib::Library* BuiltinLibrary() {
             builtin_library.irs_by_name.InsertWithoutGrowing(name, ir);
         }
 
-        sample_lib::detail::PostReadBookkeeping(builtin_library, alloc);
+        ArenaAllocatorWithInlineStorage<100> scratch_arena {PageAllocator::Instance()};
+        if (sample_lib::detail::PostReadBookkeeping(builtin_library, alloc, scratch_arena).HasError())
+            Panic("Failed to load builtin library");
 
         LogDebug(ModuleName::SampleLibraryServer,
                  "Built-in library loaded, used {} bytes",

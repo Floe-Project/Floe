@@ -397,6 +397,7 @@ struct TableFields<Region::TriggerCriteria> {
         KeyRange,
         VelocityRange,
         RoundRobinIndex,
+        RoundRobinGroup,
         FeatherOverlappingVelocityLayers,
         AutoMapKeyRangeGroup,
         Count,
@@ -474,7 +475,7 @@ struct TableFields<Region::TriggerCriteria> {
                 return {
                     .name = "round_robin_index",
                     .description_sentence =
-                        "Trigger this region only on this round-robin index. For example, if this index is 0 and there are 2 other groups with round-robin indices of 1 and 2, then this region will trigger on every third press of a key only.",
+                        "Trigger this region only on this round-robin index. For example, if this index is 0 and there are 2 other groups with round-robin indices of 1 and 2 with the same round_robin_group, then this region will trigger on every third press of a key only.",
                     .example = "0",
                     .default_value = "no round-robin",
                     .lua_type = LUA_TNUMBER,
@@ -482,10 +483,26 @@ struct TableFields<Region::TriggerCriteria> {
                     .set =
                         [](SET_FIELD_VALUE_ARGS) {
                             auto const val = luaL_checkinteger(ctx.lua, -1);
+                            constexpr auto k_max =
+                                LargestRepresentableValue<decltype(FIELD_OBJ.round_robin_index.value)>();
                             if (val < 0)
                                 luaL_error(ctx.lua, "'%s' should be a positive integer", info.name.data);
-                            FIELD_OBJ.round_robin_index = (u32)val;
+                            else if (val > k_max)
+                                luaL_error(ctx.lua, "'%s' should be <= %d", info.name.data, k_max);
+                            FIELD_OBJ.round_robin_index = (u8)val;
                         },
+                };
+            case Field::RoundRobinGroup:
+                return {
+                    .name = "round_robin_group",
+                    .description_sentence =
+                        "The group of round-robin indices that this region belongs to. This allows for multiple sets of regions with different numbers of variations within an instrument.",
+                    .example = "group1",
+                    .default_value = "instrument-wide group",
+                    .lua_type = LUA_TSTRING,
+                    .required = false,
+                    .set =
+                        [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.round_robin_group_string = StringFromTop(ctx); },
                 };
             case Field::FeatherOverlappingVelocityLayers:
                 return {
@@ -1299,9 +1316,6 @@ static int AddRegion(lua_State* lua) {
     if (instrument->audio_file_path_for_waveform.str.size == 0)
         instrument->audio_file_path_for_waveform = region.path;
 
-    if (region.trigger.round_robin_index)
-        instrument->max_rr_pos = Max(instrument->max_rr_pos, *region.trigger.round_robin_index);
-
     return 0;
 }
 
@@ -1599,50 +1613,6 @@ LibraryPtrOrError ReadLua(Reader& reader,
             }
         }
 
-        for (auto [key, inst_ptr] : library->insts_by_name) {
-            auto const& inst = *inst_ptr;
-            for (auto const& region : inst->regions) {
-                if (!region.trigger.feather_overlapping_velocity_layers) continue;
-                usize num_overlaps = 0;
-                for (auto const& other_region : inst->regions) {
-                    if (&region == &other_region) continue;
-                    if (other_region.trigger.feather_overlapping_velocity_layers &&
-                        region.trigger.trigger_event == other_region.trigger.trigger_event &&
-                        region.trigger.round_robin_index == other_region.trigger.round_robin_index &&
-                        region.trigger.key_range.Overlaps(other_region.trigger.key_range) &&
-                        region.trigger.velocity_range.Overlaps(other_region.trigger.velocity_range)) {
-                        num_overlaps++;
-                    }
-                }
-                // IMPROVE: we could possibly support more than 1 but we'd need to implement a
-                // different kind of feathering algorithm.
-                if (num_overlaps > 1) luaL_error(ctx.lua, "Only 2 feathered velocity regions can overlap.");
-            }
-        }
-        for (auto [key, inst_ptr] : library->insts_by_name) {
-            auto const& inst = *inst_ptr;
-            for (auto const& region : inst->regions) {
-                if (!region.timbre_layering.layer_range) continue;
-                usize num_overlaps = 0;
-                for (auto const& other_region : inst->regions) {
-                    if (&region == &other_region) continue;
-                    if (other_region.timbre_layering.layer_range &&
-                        region.trigger.trigger_event == other_region.trigger.trigger_event &&
-                        region.trigger.round_robin_index == other_region.trigger.round_robin_index &&
-                        region.trigger.key_range.Overlaps(other_region.trigger.key_range) &&
-                        region.trigger.velocity_range.Overlaps(other_region.trigger.velocity_range) &&
-                        region.timbre_layering.layer_range->Overlaps(
-                            *other_region.timbre_layering.layer_range)) {
-                        num_overlaps++;
-                    }
-                }
-
-                // IMPROVE: we could possibly support more than 1 but we'd need to implement a different kind
-                // of algorithm.
-                if (num_overlaps > 1) luaL_error(ctx.lua, "Only 2 timbre layer regions can overlap.");
-            }
-        }
-
         library->num_regions = 0;
         for (auto [key, inst_ptr] : library->insts_by_name) {
             auto const& inst = *inst_ptr;
@@ -1661,7 +1631,12 @@ LibraryPtrOrError ReadLua(Reader& reader,
 
         library->files_requiring_attribution = ctx.files_requiring_attribution.ToOwnedTable();
 
-        detail::PostReadBookkeeping(*library, ctx.result_arena);
+        if (auto const o = detail::PostReadBookkeeping(*library, ctx.result_arena, scratch_arena);
+            o.HasError()) {
+            return ErrorAndNotify(ctx, LuaErrorCode::Runtime, [&](DynamicArray<char>& message) {
+                dyn::AppendSpan(message, o.Error());
+            });
+        }
 
         return library;
     } catch (OutOfMemory const& e) {

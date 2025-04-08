@@ -239,8 +239,8 @@ struct LayerProcessor {
     u8 const index;
     VoiceProcessingController voice_controller;
 
-    Atomic<u32> note_on_rr_pos = 0;
-    Atomic<u32> note_off_rr_pos = 0;
+    Array<u8, sample_lib::k_max_round_robin_groups> note_on_rr_pos = {};
+    Array<u8, sample_lib::k_max_round_robin_groups> note_off_rr_pos = {};
 
     Instrument instrument {InstrumentType::None};
     InstrumentId instrument_id {InstrumentType::None};

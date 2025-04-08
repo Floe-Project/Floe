@@ -405,10 +405,10 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
                             .velocity_range = MapMidiVelocityRangeToNormalizedRange(region_info.low_velo,
                                                                                     region_info.high_velo),
                             .round_robin_index = ({
-                                Optional<u32> rr {};
+                                Optional<u8> rr {};
                                 if (!groups_are_xfade_layers &&
                                     group_info.round_robin_or_xfade_index != mdata::k_no_round_robin_or_xfade)
-                                    rr = CheckedCast<u32>(group_info.round_robin_or_xfade_index);
+                                    rr = CheckedCast<u8>(group_info.round_robin_or_xfade_index);
                                 rr;
                             }),
                             .feather_overlapping_velocity_layers = velocity_layers_are_feathered,
@@ -448,8 +448,6 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
 
         ASSERT_EQ((mdata::Index)inst->regions.size, i.total_num_regions);
 
-        inst->max_rr_pos = max_rr_pos;
-
         // The MDATA format does have a value to tell us what audio file to use for the GUI waveform but for
         // whatever reason I can't extract the value correctly. It's really not important though, just taking
         // the region closest to the middle of the keyboard works great.
@@ -467,99 +465,6 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
         ASSERT(name.size <= k_max_instrument_name_size);
         auto const inserted = library.insts_by_name.InsertWithoutGrowing(name, inst);
         ASSERT(inserted);
-    }
-
-    // In the MDATA format when velocity-feathering was enabled for an instrument, adjacent velocity layers
-    // were automatically made to overlap. We recreate that old behaviour here, taking into account that now
-    // velocity feathering is a per-region setting.
-    for (auto [key, inst_ptr_ptr] : library.insts_by_name) {
-        auto inst = *inst_ptr_ptr;
-
-        // with MDATA, the velocity feathering feature was instrument-wide rather then per-region so we can
-        // just check the first
-        if (!inst->regions.size || !inst->regions[0].trigger.feather_overlapping_velocity_layers) continue;
-
-        Sort(inst->regions, [](Region const& a, Region const& b) {
-            return a.trigger.velocity_range.start < b.trigger.velocity_range.start;
-        });
-
-        for (auto const rr_group : ::Range(inst->max_rr_pos + 1)) {
-            DynamicArray<Region*> group {scratch_arena};
-            for (auto& region : inst->regions)
-                if (!region.trigger.round_robin_index || region.trigger.round_robin_index.Value() == rr_group)
-                    dyn::Append(group, &region);
-
-            DynamicArray<DynamicArray<Region*>> key_range_bins {scratch_arena};
-            for (auto& region : group) {
-                bool put_in_bin = false;
-                for (auto& bin : key_range_bins) {
-                    if (region->trigger.key_range == bin[0]->trigger.key_range) {
-                        dyn::Append(bin, region);
-                        put_in_bin = true;
-                        break;
-                    }
-                }
-                if (!put_in_bin) {
-                    DynamicArray<Region*> bin {scratch_arena};
-                    dyn::Append(bin, region);
-                    dyn::Emplace(key_range_bins, Move(bin));
-                }
-            }
-
-            constexpr f32 k_overlap_percent = 0.35f;
-            for (auto& regions : key_range_bins) {
-                if (regions.size == 1) continue;
-
-                // I don't know why this is the case, but some in-development MDATAs have this region range,
-                // let's just skip it for now because library development will transition to the Lua format
-                // anyways.
-                if (regions[0]->trigger.key_range == Range {1, 2}) continue;
-
-                DynamicArray<Range> new_ranges {scratch_arena};
-
-                for (auto const i : ::Range(regions.size)) {
-                    auto& region = regions[i];
-
-                    Range new_range {region->trigger.velocity_range.start,
-                                     region->trigger.velocity_range.end};
-
-                    if (i != 0) {
-                        auto const& prev_region = regions[i - 1];
-                        if (prev_region->trigger.velocity_range.end == region->trigger.velocity_range.start) {
-                            auto const delta =
-                                (u8)(prev_region->trigger.velocity_range.Size() * k_overlap_percent);
-                            ASSERT(new_range.start > delta);
-                            new_range.start -= delta;
-                        }
-                    }
-
-                    if (i != (regions.size - 1)) {
-                        auto const& next_region = regions[i + 1];
-                        if (next_region->trigger.velocity_range.start == region->trigger.velocity_range.end) {
-                            auto const delta =
-                                (s8)(next_region->trigger.velocity_range.Size() * k_overlap_percent);
-                            ASSERT(new_range.end < 100);
-                            new_range.end += delta;
-                        }
-                    }
-
-                    dyn::Append(new_ranges, new_range);
-                }
-
-                auto regions_it = regions.begin();
-                auto new_ranges_it = new_ranges.begin();
-                for (; regions_it != regions.end() && new_ranges_it != new_ranges.end();
-                     ++regions_it, ++new_ranges_it)
-                    (*regions_it)->trigger.velocity_range = *new_ranges_it;
-
-                for (auto const vel : ::Range((u8)100)) {
-                    int num = 0;
-                    for (auto region : regions)
-                        if (region->trigger.velocity_range.Contains(vel)) ++num;
-                    ASSERT(num <= 2);
-                }
-            }
-        }
     }
 
     library_ptr->num_regions = num_regions;
@@ -591,7 +496,106 @@ ReadMdata(Reader& reader, String filepath, ArenaAllocator& result_arena, ArenaAl
     if (reader.memory)
         library->file_format_specifics.Get<MdataSpecifics>().file_data = {reader.memory, reader.size};
 
-    detail::PostReadBookkeeping(*library, result_arena);
+    if (auto const o = detail::PostReadBookkeeping(*library, result_arena, scratch_arena); o.HasError())
+        PanicIfReached();
+
+    // In the MDATA format when velocity-feathering was enabled for an instrument, adjacent velocity layers
+    // were automatically made to overlap. We recreate that old behaviour here, taking into account that now
+    // velocity feathering is a per-region setting.
+    for (auto [key, inst_ptr_ptr] : library->insts_by_name) {
+        auto inst = *inst_ptr_ptr;
+
+        // With MDATA, the velocity feathering feature was instrument-wide rather then per-region so we can
+        // just check that first.
+        if (!inst->regions.size || !inst->regions[0].trigger.feather_overlapping_velocity_layers) continue;
+
+        Sort(inst->regions, [](Region const& a, Region const& b) {
+            return a.trigger.velocity_range.start < b.trigger.velocity_range.start;
+        });
+
+        for (auto const rr_group : inst->round_robin_groups) {
+            for (auto const rr_index : ::Range(rr_group.max_rr_pos + 1)) {
+                DynamicArray<Region*> group {scratch_arena};
+                for (auto& region : inst->regions)
+                    if (!region.trigger.round_robin_index ||
+                        region.trigger.round_robin_index.Value() == rr_index)
+                        dyn::Append(group, &region);
+
+                DynamicArray<DynamicArray<Region*>> key_range_bins {scratch_arena};
+                for (auto& region : group) {
+                    bool was_put_in_bin = false;
+                    for (auto& bin : key_range_bins) {
+                        if (region->trigger.key_range == bin[0]->trigger.key_range) {
+                            dyn::Append(bin, region);
+                            was_put_in_bin = true;
+                            break;
+                        }
+                    }
+                    if (!was_put_in_bin) {
+                        DynamicArray<Region*> bin {scratch_arena};
+                        dyn::Append(bin, region);
+                        dyn::Emplace(key_range_bins, Move(bin));
+                    }
+                }
+
+                constexpr f32 k_overlap_percent = 0.35f;
+                for (auto& regions : key_range_bins) {
+                    if (regions.size == 1) continue;
+
+                    // I don't know why this is the case, but some in-development MDATAs have this region
+                    // range, let's just skip it for now because library development will transition to the
+                    // Lua format anyways.
+                    if (regions[0]->trigger.key_range == Range {1, 2}) continue;
+
+                    DynamicArray<Range> new_ranges {scratch_arena};
+
+                    for (auto const i : ::Range(regions.size)) {
+                        auto& region = regions[i];
+
+                        Range new_range {region->trigger.velocity_range.start,
+                                         region->trigger.velocity_range.end};
+
+                        if (i != 0) {
+                            auto const& prev_region = regions[i - 1];
+                            if (prev_region->trigger.velocity_range.end ==
+                                region->trigger.velocity_range.start) {
+                                auto const delta =
+                                    (u8)(prev_region->trigger.velocity_range.Size() * k_overlap_percent);
+                                ASSERT(new_range.start > delta);
+                                new_range.start -= delta;
+                            }
+                        }
+
+                        if (i != (regions.size - 1)) {
+                            auto const& next_region = regions[i + 1];
+                            if (next_region->trigger.velocity_range.start ==
+                                region->trigger.velocity_range.end) {
+                                auto const delta =
+                                    (s8)(next_region->trigger.velocity_range.Size() * k_overlap_percent);
+                                ASSERT(new_range.end < 100);
+                                new_range.end += delta;
+                            }
+                        }
+
+                        dyn::Append(new_ranges, new_range);
+                    }
+
+                    auto regions_it = regions.begin();
+                    auto new_ranges_it = new_ranges.begin();
+                    for (; regions_it != regions.end() && new_ranges_it != new_ranges.end();
+                         ++regions_it, ++new_ranges_it)
+                        (*regions_it)->trigger.velocity_range = *new_ranges_it;
+
+                    for (auto const vel : ::Range((u8)100)) {
+                        int num = 0;
+                        for (auto region : regions)
+                            if (region->trigger.velocity_range.Contains(vel)) ++num;
+                        ASSERT(num <= 2);
+                    }
+                }
+            }
+        }
+    }
 
     return library;
 }

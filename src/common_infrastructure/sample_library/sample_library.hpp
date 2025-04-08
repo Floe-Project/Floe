@@ -70,11 +70,13 @@ struct Region {
         TriggerEvent trigger_event {TriggerEvent::NoteOn};
         Range key_range {0, 128};
         Range velocity_range {0, 100};
-        Optional<u32> round_robin_index {};
+        Optional<u8> round_robin_index {};
+        u8 round_robin_group {}; // Index into Instrument::round_robin_groups.
         bool feather_overlapping_velocity_layers {};
         // IMPROVE: add curve shape option for velocity feather: currently we use quarter-sine.
 
         // private
+        String round_robin_group_string {"default-rr-group"};
         Optional<String> auto_map_key_range_group {};
     } trigger;
 
@@ -82,6 +84,9 @@ struct Region {
         f32 gain_db {0};
         // IMPROVE: add pan, tune
     } audio_props;
+
+    // IMPROVE: add keytrack_requirement
+    // IMPROVE: add monophonic_requirement
 
     struct TimbreLayering {
         Optional<Range> layer_range {};
@@ -99,6 +104,12 @@ struct LoopOverview {
     bool8 all_regions_require_looping : 1 {}; // Legacy option. If true, looping shouldn't be turned off.
 };
 
+struct RoundRobinGroup {
+    u8 max_rr_pos {};
+};
+
+constexpr auto k_max_round_robin_groups = 128;
+
 struct Instrument {
     Library const& library;
 
@@ -114,7 +125,7 @@ struct Instrument {
 
     LoopOverview loop_overview {}; // Cached info about the loops in the regions.
     bool uses_timbre_layering {};
-    u32 max_rr_pos {};
+    Span<RoundRobinGroup> round_robin_groups {};
 };
 
 // An instrument that has all its audio data loaded into memory.
@@ -285,7 +296,7 @@ struct Options {
 };
 
 namespace detail {
-void PostReadBookkeeping(Library& lib, Allocator& arena);
+VoidOrError<String> PostReadBookkeeping(Library& lib, Allocator& arena, ArenaAllocator& scratch_arena);
 }
 
 LibraryPtrOrError ReadLua(Reader& reader,

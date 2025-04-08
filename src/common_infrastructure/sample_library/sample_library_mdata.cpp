@@ -393,7 +393,9 @@ ReadMdataFile(ArenaAllocator& arena, ArenaAllocator& scratch_arena, Reader& read
                                     };
                                 l;
                             }),
-                            .always_loop = region_info.looping_mode != mdata::SampleLoopingModeDefault,
+                            .loop_requirement = (region_info.looping_mode != mdata::SampleLoopingModeDefault)
+                                                    ? LoopRequirement::AlwaysLoop
+                                                    : LoopRequirement::Default,
                         },
                     .trigger =
                         {

@@ -1558,33 +1558,33 @@ LibraryPtrOrError ReadLua(Reader& reader,
             });
         }
 
-        for (auto [key, inst_ptr] : library->insts_by_name) {
-            auto& inst = *inst_ptr;
+        for (auto const [key, inst_ptr] : library->insts_by_name) {
+            auto const& inst = *inst_ptr;
             struct RegionRef {
                 Region* data;
                 RegionRef* next;
             };
-            DynamicHashTable<String, RegionRef*> auto_map_groups {ctx.lua_arena};
+            HashTable<String, RegionRef*> auto_map_groups {};
 
             for (auto& region : inst->regions) {
                 if (!region.trigger.auto_map_key_range_group) continue;
 
-                auto new_ref = ctx.lua_arena.New<RegionRef>();
-                new_ref->data = &region;
-                if (auto e = auto_map_groups.Find(*region.trigger.auto_map_key_range_group)) {
-                    auto& ref = *e;
-                    new_ref->next = ref;
-                    ref = new_ref;
-                } else {
-                    new_ref->next = nullptr;
-                    auto_map_groups.Insert(*region.trigger.auto_map_key_range_group, new_ref);
+                auto new_ref = scratch_arena.New<RegionRef>(RegionRef {.data = &region});
+                if (auto const e =
+                        auto_map_groups.FindOrInsertGrowIfNeeded(scratch_arena,
+                                                                 *region.trigger.auto_map_key_range_group,
+                                                                 new_ref);
+                    !e.inserted) {
+                    SinglyLinkedListPrepend(e.element->data, new_ref);
                 }
             }
 
-            for (auto item : auto_map_groups) {
+            for (auto const [_, regions_ptr] : auto_map_groups) {
+                auto const regions = *regions_ptr;
+
                 SinglyLinkedListSort(
-                    *item.value_ptr,
-                    SinglyLinkedListLast(*item.value_ptr),
+                    regions,
+                    SinglyLinkedListLast(regions),
                     [](Region const* a, Region const* b) { return a->root_key < b->root_key; });
 
                 auto const map_sample = [](Region& region, u8 prev_end_before, u8 next_root) {
@@ -1595,7 +1595,7 @@ LibraryPtrOrError ReadLua(Reader& reader,
                 };
 
                 RegionRef* previous {};
-                for (auto ref = *item.value_ptr; ref != nullptr; ref = ref->next) {
+                for (auto ref = regions; ref != nullptr; ref = ref->next) {
                     map_sample(*ref->data,
                                previous ? previous->data->trigger.key_range.end : 0,
                                ref->next ? ref->next->data->root_key : 128);

@@ -186,7 +186,6 @@ PUBLIC void DoWholeEditor(Gui* g) {
             "Sizes",
             "GUI Dbg",
             "Profile",
-            "Sampler",
         };
         static auto const num_tabs = (int)ArraySize(tab_text);
         static int selected_tab = 0;

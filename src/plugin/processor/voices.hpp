@@ -119,6 +119,7 @@ struct Voice {
     adsr::Processor fil_env = {};
     f32 amp_l = 1, amp_r = 1;
     f32 aftertouch_multiplier = 1;
+    bool disable_vol_env = false;
 };
 
 struct VoiceEnvelopeMarkerForGui {
@@ -266,6 +267,7 @@ struct VoiceStartParams {
     unsigned int lfo_start_phase;
     u32 num_frames_before_starting;
     Params params;
+    bool disable_vol_env;
 };
 
 void StartVoice(VoicePool& pool,

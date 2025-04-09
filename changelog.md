@@ -12,6 +12,7 @@ For instance: 0.0.1. Don't change the headings.
 ## 0.9.0-beta
 - Library creation: fix specifying loop end points relative to the end of the file.
 - Library creation: *breaking change*: replace always_loop, never_loop field with enum `loop_requirement`.
+- Library creation: disable volume envelope for note-off regions
 
 ## 0.8.3-beta
 - Fix crash when error occurs in the Windows native file picker

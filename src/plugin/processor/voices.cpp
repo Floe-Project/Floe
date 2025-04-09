@@ -306,6 +306,7 @@ void StartVoice(VoicePool& pool,
                                                          params.num_frames_before_starting));
     voice.vol_env.Reset();
     voice.vol_env.Gate(true);
+    voice.disable_vol_env = params.disable_vol_env;
     voice.fil_env.Reset();
     voice.fil_env.Gate(true);
     voice.age = voice.pool.voice_age_counter++;
@@ -489,7 +490,7 @@ class ChunkwiseVoiceProcessor {
                 .intensity = (u16)(Clamp01(m_voice.current_gain) * (f32)UINT16_MAX),
             };
             m_voice.pool.voice_vol_env_markers_for_gui.Write()[m_voice.index] = {
-                .on = m_voice.controller->vol_env_on && !m_voice.vol_env.IsIdle(),
+                .on = m_voice.controller->vol_env_on && !m_voice.disable_vol_env && !m_voice.vol_env.IsIdle(),
                 .layer_index = (u8)m_voice.controller->layer_index,
                 .state = (u8)m_voice.vol_env.state,
                 .pos = (u16)(Clamp01(m_voice.vol_env.output) * (f32)UINT16_MAX),
@@ -778,7 +779,7 @@ class ChunkwiseVoiceProcessor {
     u32 ApplyVolumeEnvelope(u32 num_frames) {
         ZoneScoped;
         auto vol_env = m_voice.vol_env;
-        auto env_on = m_voice.controller->vol_env_on;
+        auto env_on = m_voice.controller->vol_env_on && !m_voice.disable_vol_env;
         auto vol_env_params = m_voice.controller->vol_env;
         DEFER { m_voice.vol_env = vol_env; };
 

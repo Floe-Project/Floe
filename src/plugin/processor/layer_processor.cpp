@@ -491,6 +491,7 @@ static void TriggerVoicesIfNeeded(LayerProcessor& layer,
         waveform.type = *w;
     }
 
+    p.disable_vol_env = trigger_event == sample_lib::TriggerEvent::NoteOff;
     p.initial_pitch = layer.voice_controller.tune;
     p.midi_key_trigger = note;
     p.note_num = (u7)Clamp(note.note + layer.midi_transpose, 0, 127);
@@ -620,8 +621,8 @@ LayerProcessResult ProcessLayer(LayerProcessor& layer,
             if (fade.state_changed == VolumeFade::State::Silent)
                 result.instrument_swapped = ChangeInstrumentIfNeededAndReset(layer, voice_pool);
         } else {
-            // If we have swapped we want to be silent for the remainder of this block - we will use the new
-            // instrument next block
+            // If we have swapped we want to be silent for the remainder of this block - we will use the
+            // new instrument next block
             frame = {};
         }
 

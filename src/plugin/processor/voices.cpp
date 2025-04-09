@@ -111,19 +111,28 @@ inline f64 CalculatePitchRatio(int note, VoiceSample const* s, f32 pitch, f32 sa
     return 1;
 }
 
+static int RootKey(Voice const& v, VoiceSample const& s) {
+    int k = v.note_num;
+    if (s.generator == InstrumentType::Sampler) {
+        switch (s.sampler.region->playback.keytrack_requirement) {
+            case sample_lib::KeytrackRequirement::Default:
+                if (v.controller->no_key_tracking) k = s.sampler.region->root_key;
+                break;
+            case sample_lib::KeytrackRequirement::Always: break;
+            case sample_lib::KeytrackRequirement::Never: k = s.sampler.region->root_key; break;
+            case sample_lib::KeytrackRequirement::Count: PanicIfReached(); break;
+        }
+    }
+    return k;
+}
+
 void SetVoicePitch(Voice& v, f32 pitch, f32 sample_rate) {
     for (auto& s : v.voice_samples) {
         if (!s.is_active) continue;
 
-        v.smoothing_system.Set(
-            s.pitch_ratio_smoother_id,
-            CalculatePitchRatio((v.controller->no_key_tracking && s.generator == InstrumentType::Sampler)
-                                    ? s.sampler.region->root_key
-                                    : v.note_num,
-                                &s,
-                                pitch,
-                                sample_rate),
-            10);
+        v.smoothing_system.Set(s.pitch_ratio_smoother_id,
+                               CalculatePitchRatio(RootKey(v, s), &s, pitch, sample_rate),
+                               10);
     }
 }
 
@@ -343,13 +352,9 @@ void StartVoice(VoicePool& pool,
                 s.sampler.loop = {};
                 ASSERT(s.sampler.data != nullptr);
 
-                voice.smoothing_system.HardSet(s.pitch_ratio_smoother_id,
-                                               CalculatePitchRatio(voice.controller->no_key_tracking
-                                                                       ? s.sampler.region->root_key
-                                                                       : voice.note_num,
-                                                                   &s,
-                                                                   params.initial_pitch,
-                                                                   sample_rate));
+                voice.smoothing_system.HardSet(
+                    s.pitch_ratio_smoother_id,
+                    CalculatePitchRatio(RootKey(voice, s), &s, params.initial_pitch, sample_rate));
                 auto const offs =
                     (f64)(sampler.initial_sample_offset_01 * ((f32)s.sampler.data->num_frames - 1));
                 s.pos = offs;

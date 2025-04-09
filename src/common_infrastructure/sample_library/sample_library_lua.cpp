@@ -177,6 +177,7 @@ enum class InterpretedTypes : u32 {
     RegionLoop,
     RegionAudioProps,
     RegionTimbreLayering,
+    RegionPlayback,
     TriggerCriteria,
     FileAttribution,
     Count,
@@ -432,6 +433,41 @@ struct TableFields<Region::AudioProperties> {
 };
 
 template <>
+struct TableFields<Region::Playback> {
+    using Type = Region::Playback;
+
+    enum class Field : u32 {
+        KeytrackRequirement,
+        Count,
+    };
+
+    static constexpr char const* k_keytrack_requirement_names[] = {"default", "always", "never", nullptr};
+    static_assert(ArraySize(k_keytrack_requirement_names) == ToInt(KeytrackRequirement::Count) + 1);
+
+    static constexpr FieldInfo FieldInfo(Field f) {
+        switch (f) {
+            case Field::KeytrackRequirement:
+                return {
+                    .name = "keytrack_requirement",
+                    .description_sentence = "The requirement for keytracking.",
+                    .example = FromNullTerminated(k_keytrack_requirement_names[0]),
+                    .default_value = FromNullTerminated(k_keytrack_requirement_names[0]),
+                    .lua_type = LUA_TSTRING,
+                    .required = false,
+                    .enum_options = k_keytrack_requirement_names,
+                    .set =
+                        [](SET_FIELD_VALUE_ARGS) {
+                            FIELD_OBJ.keytrack_requirement = (KeytrackRequirement)
+                                luaL_checkoption(ctx.lua, -1, nullptr, k_keytrack_requirement_names);
+                        },
+                };
+            case Field::Count: break;
+        }
+        return {};
+    }
+};
+
+template <>
 struct TableFields<Region::TimbreLayering> {
     using Type = Region::TimbreLayering;
 
@@ -558,7 +594,7 @@ struct TableFields<Region::TriggerCriteria> {
                 return {
                     .name = "round_robin_index",
                     .description_sentence =
-                        "Trigger this region only on this round-robin index. For example, if this index is 0 and there are 2 other groups with round-robin indices of 1 and 2 with the same round_robin_sequencing_group, then this region will trigger on every third press of a key only.",
+                        "Trigger this region only on this round-robin index. For example, if this index is 0 and there are 2 other groups with round-robin indices of 1 and 2 with the same round_robin_sequencing_group and trigger_event, then this region will trigger on every third press of a key only. round_robin_index should begin at 0 and be consecutive. The total number of round-robins is calculated automatically.",
                     .example = "0",
                     .default_value = "no round-robin",
                     .lua_type = LUA_TNUMBER,
@@ -579,7 +615,7 @@ struct TableFields<Region::TriggerCriteria> {
                 return {
                     .name = "round_robin_sequencing_group",
                     .description_sentence =
-                        "The group of round-robin indices that this region belongs to. This allows for multiple sets of regions with different numbers of variations within an instrument.",
+                        "Group together regions that have this same string, so that their round_robin_index is part of a separate sequence to other round_robin_sequencing_groups. Use this when you have multiple sets of regions that have a different number of round-robins with the same trigger_event.",
                     .example = "group1",
                     .default_value = "instrument-wide group",
                     .lua_type = LUA_TSTRING,
@@ -607,7 +643,7 @@ struct TableFields<Region::TriggerCriteria> {
                 return {
                     .name = "auto_map_key_range_group",
                     .description_sentence =
-                        "For every region that has this same string, automatically set the start and end values for each region's key range based on its root key. Only works if all region's velocity range are the same.",
+                        "For every region that has this same string, automatically set the start and end values for each region's key range based on its root key.",
                     .example = "group1",
                     .default_value = "no auto-map",
                     .lua_type = LUA_TSTRING,
@@ -785,7 +821,12 @@ struct TableFields<Region> {
     using Type = Region;
 
     static constexpr char const* k_trigger_event_names[] = {"note-on", "note-off", nullptr};
+    static constexpr char const* k_trigger_event_descriptions[] = {
+        "key is pressed down",
+        "key is released - note-off regions have no volume envelope and play out entirely",
+        nullptr};
     static_assert(ArraySize(k_trigger_event_names) == ToInt(TriggerEvent::Count) + 1);
+    static_assert(ArraySize(k_trigger_event_descriptions) == ToInt(TriggerEvent::Count) + 1);
 
     enum class Field : u32 {
         Path,
@@ -794,6 +835,7 @@ struct TableFields<Region> {
         Loop,
         TimbreLayering,
         AudioProperties,
+        Playback,
         Count,
     };
 
@@ -859,6 +901,16 @@ struct TableFields<Region> {
                     .subtype = InterpretedTypes::RegionAudioProps,
                     .required = false,
                     .set = [](SET_FIELD_VALUE_ARGS) { InterpretTable(ctx, -1, FIELD_OBJ.audio_props); },
+                };
+            case Field::Playback:
+                return {
+                    .name = "playback",
+                    .description_sentence = "Playback configuration.",
+                    .default_value = "defaults",
+                    .lua_type = LUA_TTABLE,
+                    .subtype = InterpretedTypes::RegionPlayback,
+                    .required = false,
+                    .set = [](SET_FIELD_VALUE_ARGS) { InterpretTable(ctx, -1, FIELD_OBJ.playback); },
                 };
             case Field::Count: break;
         }
@@ -1806,6 +1858,9 @@ struct LuaCodePrinter {
                 case InterpretedTypes::RegionLoop: struct_fields[i] = FieldInfosSpan<Region::Loop>(); break;
                 case InterpretedTypes::RegionAudioProps:
                     struct_fields[i] = FieldInfosSpan<Region::AudioProperties>();
+                    break;
+                case InterpretedTypes::RegionPlayback:
+                    struct_fields[i] = FieldInfosSpan<Region::Playback>();
                     break;
                 case InterpretedTypes::RegionTimbreLayering:
                     struct_fields[i] = FieldInfosSpan<Region::TimbreLayering>();

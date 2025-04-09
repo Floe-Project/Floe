@@ -45,6 +45,7 @@ enum class TriggerEvent : u8 { NoteOn, NoteOff, Count };
 enum class LoopMode : u8 { Standard, PingPong, Count };
 
 enum class LoopRequirement : u8 { Default, AlwaysLoop, NeverLoop, Count };
+enum class KeytrackRequirement : u8 { Default, Always, Never, Count };
 
 // start and end can be negative meaning they're indexed from the end of the sample.
 struct BuiltinLoop {
@@ -70,10 +71,15 @@ struct Region {
         TriggerEvent trigger_event {TriggerEvent::NoteOn};
         Range key_range {0, 128};
         Range velocity_range {0, 100};
+
         Optional<u8> round_robin_index {};
         u8 round_robin_sequencing_group {}; // Index into Instrument::round_robin_sequence_groups.
+
         bool feather_overlapping_velocity_layers {};
-        // IMPROVE: add curve shape option for velocity feather: currently we use quarter-sine.
+        // IMPROVE: add feather_overlapping_velocity_layers_curve: enum: equal-power, quarter-sine, linear
+
+        // IMPROVE: add feather_overlapping_key_ranges
+        // IMPROVE: add feather_overlapping_key_ranges_curve: enum: equal-power, quarter-sine, linear
 
         // private
         String round_robin_sequencing_group_name {"default-rr-group"};
@@ -82,14 +88,27 @@ struct Region {
 
     struct AudioProperties {
         f32 gain_db {0};
-        // IMPROVE: add pan, tune
+
+        // IMPROVE: add pan
+        // IMPROVE: add tune
+        // struct Fade {
+        //    Duration duration {}; // either samples, ms or %
+        //    Curve curve {}; // enum: linear, exponential, quarter-sine, etc.
+        // };
+        // IMPROVE: add optional fade-in
+        // IMPROVE: add optional fade-out
     } audio_props;
 
-    // IMPROVE: add keytrack_requirement
-    // IMPROVE: add monophonic_requirement
+    struct Playback {
+        KeytrackRequirement keytrack_requirement {KeytrackRequirement::Default};
+        // IMPROVE: add keytrack_requirement: enum: default, always, never
+        // IMPROVE: add monophonic_requirement: enum: default, always, never
+        // IMPROVE: add volume_envelope_requirement?
+    } playback;
 
     struct TimbreLayering {
         Optional<Range> layer_range {};
+        // IMPROVE: add layer_range_curve: enum: equal-power, quarter-sine, linear
     } timbre_layering;
 };
 

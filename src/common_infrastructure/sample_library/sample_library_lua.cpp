@@ -212,7 +212,7 @@ struct FieldInfo {
                 }
                 TRY(fmt::FormatToWriter(writer, "\"{}\"", option));
                 if (multiline) {
-                    ASSERT_EQ(enum_options.size, enum_descriptions.size + 1);
+                    ASSERT_EQ(enum_options.size, enum_descriptions.size);
                     TRY(fmt::FormatToWriter(writer, " => {}", enum_descriptions[enum_index]));
                     if (&option != (End(enum_options) - 2)) TRY(writer.WriteChar('\n'));
                 }

@@ -558,7 +558,7 @@ struct TableFields<Region::TriggerCriteria> {
                 return {
                     .name = "round_robin_index",
                     .description_sentence =
-                        "Trigger this region only on this round-robin index. For example, if this index is 0 and there are 2 other groups with round-robin indices of 1 and 2 with the same round_robin_group, then this region will trigger on every third press of a key only.",
+                        "Trigger this region only on this round-robin index. For example, if this index is 0 and there are 2 other groups with round-robin indices of 1 and 2 with the same round_robin_sequencing_group, then this region will trigger on every third press of a key only.",
                     .example = "0",
                     .default_value = "no round-robin",
                     .lua_type = LUA_TNUMBER,
@@ -577,7 +577,7 @@ struct TableFields<Region::TriggerCriteria> {
                 };
             case Field::RoundRobinGroup:
                 return {
-                    .name = "round_robin_group",
+                    .name = "round_robin_sequencing_group",
                     .description_sentence =
                         "The group of round-robin indices that this region belongs to. This allows for multiple sets of regions with different numbers of variations within an instrument.",
                     .example = "group1",
@@ -585,7 +585,9 @@ struct TableFields<Region::TriggerCriteria> {
                     .lua_type = LUA_TSTRING,
                     .required = false,
                     .set =
-                        [](SET_FIELD_VALUE_ARGS) { FIELD_OBJ.round_robin_group_string = StringFromTop(ctx); },
+                        [](SET_FIELD_VALUE_ARGS) {
+                            FIELD_OBJ.round_robin_sequencing_group_name = StringFromTop(ctx);
+                        },
                 };
             case Field::FeatherOverlappingVelocityLayers:
                 return {

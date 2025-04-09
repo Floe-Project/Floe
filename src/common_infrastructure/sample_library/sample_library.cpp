@@ -162,10 +162,10 @@ VoidOrError<String> PostReadBookkeeping(Library& lib, Allocator& arena, ArenaAll
 
         for (auto& region : inst->regions) {
             if (!region.trigger.round_robin_index) continue;
-            if (auto const e =
-                    round_robin_group_infos.FindOrInsertGrowIfNeeded(scratch_arena,
-                                                                     region.trigger.round_robin_group_string,
-                                                                     {});
+            if (auto const e = round_robin_group_infos.FindOrInsertGrowIfNeeded(
+                    scratch_arena,
+                    region.trigger.round_robin_sequencing_group_name,
+                    {});
                 !e.inserted) {
                 // This group already exists, so we need to update the max_rr_pos.
 
@@ -189,9 +189,9 @@ VoidOrError<String> PostReadBookkeeping(Library& lib, Allocator& arena, ArenaAll
             }
         }
 
-        inst->round_robin_groups = arena.NewMultiple<RoundRobinGroup>(round_robin_group_counter);
+        inst->round_robin_sequence_groups = arena.NewMultiple<RoundRobinGroup>(round_robin_group_counter);
         for (auto const& [_, group_info] : round_robin_group_infos) {
-            auto& group = inst->round_robin_groups[group_info->round_robin_group_index];
+            auto& group = inst->round_robin_sequence_groups[group_info->round_robin_group_index];
             group = {
                 .max_rr_pos = group_info->max_rr_pos,
             };
@@ -210,7 +210,8 @@ VoidOrError<String> PostReadBookkeeping(Library& lib, Allocator& arena, ArenaAll
                 if (!other_region.trigger.feather_overlapping_velocity_layers) continue;
                 if (region.trigger.trigger_event == other_region.trigger.trigger_event &&
                     region.trigger.round_robin_index == other_region.trigger.round_robin_index &&
-                    region.trigger.round_robin_group == other_region.trigger.round_robin_group &&
+                    region.trigger.round_robin_sequencing_group ==
+                        other_region.trigger.round_robin_sequencing_group &&
                     region.trigger.key_range.Overlaps(other_region.trigger.key_range) &&
                     region.trigger.velocity_range.Overlaps(other_region.trigger.velocity_range)) {
                     if (num_overlaps == 0)
@@ -258,7 +259,8 @@ VoidOrError<String> PostReadBookkeeping(Library& lib, Allocator& arena, ArenaAll
                 if (!other_region.timbre_layering.layer_range) continue;
                 if (region.trigger.trigger_event == other_region.trigger.trigger_event &&
                     region.trigger.round_robin_index == other_region.trigger.round_robin_index &&
-                    region.trigger.round_robin_group == other_region.trigger.round_robin_group &&
+                    region.trigger.round_robin_sequencing_group ==
+                        other_region.trigger.round_robin_sequencing_group &&
                     region.trigger.key_range.Overlaps(other_region.trigger.key_range) &&
                     region.trigger.velocity_range.Overlaps(other_region.trigger.velocity_range) &&
                     region.timbre_layering.layer_range->Overlaps(*other_region.timbre_layering.layer_range)) {

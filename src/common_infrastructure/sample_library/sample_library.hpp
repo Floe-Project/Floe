@@ -71,12 +71,12 @@ struct Region {
         Range key_range {0, 128};
         Range velocity_range {0, 100};
         Optional<u8> round_robin_index {};
-        u8 round_robin_group {}; // Index into Instrument::round_robin_groups.
+        u8 round_robin_sequencing_group {}; // Index into Instrument::round_robin_sequence_groups.
         bool feather_overlapping_velocity_layers {};
         // IMPROVE: add curve shape option for velocity feather: currently we use quarter-sine.
 
         // private
-        String round_robin_group_string {"default-rr-group"};
+        String round_robin_sequencing_group_name {"default-rr-group"};
         Optional<String> auto_map_key_range_group {};
     } trigger;
 
@@ -125,7 +125,7 @@ struct Instrument {
 
     LoopOverview loop_overview {}; // Cached info about the loops in the regions.
     bool uses_timbre_layering {};
-    Span<RoundRobinGroup> round_robin_groups {};
+    Span<RoundRobinGroup> round_robin_sequence_groups {};
 };
 
 // An instrument that has all its audio data loaded into memory.

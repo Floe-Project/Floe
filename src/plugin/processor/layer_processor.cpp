@@ -431,11 +431,11 @@ static void TriggerVoicesIfNeeded(LayerProcessor& layer,
             rr;
         });
 
-        for (auto [group_index, group] : Enumerate(inst.instrument.round_robin_groups))
+        for (auto [group_index, group] : Enumerate(inst.instrument.round_robin_sequence_groups))
             if (layer_rr[group_index] > group.max_rr_pos) layer_rr[group_index] = 0;
 
         DEFER {
-            for (auto const group_index : Range(inst.instrument.round_robin_groups.size))
+            for (auto const group_index : Range(inst.instrument.round_robin_sequence_groups.size))
                 ++layer_rr[group_index];
         };
 
@@ -445,7 +445,8 @@ static void TriggerVoicesIfNeeded(LayerProcessor& layer,
             if (region.trigger.key_range.Contains(note_for_samples) &&
                 region.trigger.velocity_range.Contains(note_vel) &&
                 (!region.trigger.round_robin_index ||
-                 *region.trigger.round_robin_index == layer_rr[region.trigger.round_robin_group]) &&
+                 *region.trigger.round_robin_index ==
+                     layer_rr[region.trigger.round_robin_sequencing_group]) &&
                 region.trigger.trigger_event == trigger_event) {
                 dyn::Append(sampler_params.voice_sample_params,
                             VoiceStartParams::SamplerParams::Region {

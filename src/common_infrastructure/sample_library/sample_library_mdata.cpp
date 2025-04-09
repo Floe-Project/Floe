@@ -513,7 +513,7 @@ ReadMdata(Reader& reader, String filepath, ArenaAllocator& result_arena, ArenaAl
             return a.trigger.velocity_range.start < b.trigger.velocity_range.start;
         });
 
-        for (auto const rr_group : inst->round_robin_groups) {
+        for (auto const rr_group : inst->round_robin_sequence_groups) {
             for (auto const rr_index : ::Range(rr_group.max_rr_pos + 1)) {
                 DynamicArray<Region*> group {scratch_arena};
                 for (auto& region : inst->regions)

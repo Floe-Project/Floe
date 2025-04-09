@@ -39,7 +39,9 @@ jobs:
 
       - run: just build mac_ub
       - run: just install-docs-preprocessor
-      - run: just install-au 1
+      - run: |
+          just install-au 0
+          killall -9 AudioComponentRegistrar || true
       - env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: just test-ci

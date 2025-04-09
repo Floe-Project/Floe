@@ -214,8 +214,6 @@ install-au global='0':
     cp -r {{native_binary_dir}}/Floe.component ~/Library/Audio/Plug-Ins/Components/
   fi
 
-  just check-au-installed
-
 [macos]
 test-pluginval-au build="": (_build_if_requested build "native")
   #!/usr/bin/env bash

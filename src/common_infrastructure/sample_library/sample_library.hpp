@@ -40,7 +40,7 @@ struct Range {
     u8 end; // non-inclusive, A.K.A. one-past the last
 };
 
-enum class TriggerEvent { NoteOn, NoteOff, Count };
+enum class TriggerEvent : u8 { NoteOn, NoteOff, Count };
 
 enum class LoopMode : u8 { Standard, PingPong, Count };
 
@@ -108,7 +108,7 @@ struct RoundRobinGroup {
     u8 max_rr_pos {};
 };
 
-constexpr auto k_max_round_robin_groups = 128;
+constexpr auto k_max_round_robin_sequence_groups = 64;
 
 struct Instrument {
     Library const& library;
@@ -125,7 +125,7 @@ struct Instrument {
 
     LoopOverview loop_overview {}; // Cached info about the loops in the regions.
     bool uses_timbre_layering {};
-    Span<RoundRobinGroup> round_robin_sequence_groups {};
+    Array<Span<RoundRobinGroup>, ToInt(TriggerEvent::Count)> round_robin_sequence_groups {};
 };
 
 // An instrument that has all its audio data loaded into memory.

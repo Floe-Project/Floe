@@ -421,22 +421,17 @@ static void TriggerVoicesIfNeeded(LayerProcessor& layer,
         };
         auto& sampler_params = p.params.Get<VoiceStartParams::SamplerParams>();
 
-        auto& layer_rr = *({
-            Array<u8, sample_lib::k_max_round_robin_groups>* rr {};
-            switch (trigger_event) {
-                case sample_lib::TriggerEvent::NoteOn: rr = &layer.note_on_rr_pos; break;
-                case sample_lib::TriggerEvent::NoteOff: rr = &layer.note_off_rr_pos; break;
-                case sample_lib::TriggerEvent::Count: PanicIfReached(); break;
-            }
-            rr;
-        });
+        auto& rr_pos = layer.rr_pos[ToInt(trigger_event)];
 
-        for (auto [group_index, group] : Enumerate(inst.instrument.round_robin_sequence_groups))
-            if (layer_rr[group_index] > group.max_rr_pos) layer_rr[group_index] = 0;
+        for (auto [group_index, group] :
+             Enumerate(inst.instrument.round_robin_sequence_groups[ToInt(trigger_event)])) {
+            if (rr_pos[group_index] > group.max_rr_pos) rr_pos[group_index] = 0;
+        }
 
         DEFER {
-            for (auto const group_index : Range(inst.instrument.round_robin_sequence_groups.size))
-                ++layer_rr[group_index];
+            for (auto const group_index :
+                 Range(inst.instrument.round_robin_sequence_groups[ToInt(trigger_event)].size))
+                ++rr_pos[group_index];
         };
 
         for (auto i : Range(inst.instrument.regions.size)) {
@@ -445,8 +440,7 @@ static void TriggerVoicesIfNeeded(LayerProcessor& layer,
             if (region.trigger.key_range.Contains(note_for_samples) &&
                 region.trigger.velocity_range.Contains(note_vel) &&
                 (!region.trigger.round_robin_index ||
-                 *region.trigger.round_robin_index ==
-                     layer_rr[region.trigger.round_robin_sequencing_group]) &&
+                 *region.trigger.round_robin_index == rr_pos[region.trigger.round_robin_sequencing_group]) &&
                 region.trigger.trigger_event == trigger_event) {
                 dyn::Append(sampler_params.voice_sample_params,
                             VoiceStartParams::SamplerParams::Region {

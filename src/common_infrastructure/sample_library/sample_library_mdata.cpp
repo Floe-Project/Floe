@@ -513,84 +513,86 @@ ReadMdata(Reader& reader, String filepath, ArenaAllocator& result_arena, ArenaAl
             return a.trigger.velocity_range.start < b.trigger.velocity_range.start;
         });
 
-        for (auto const rr_group : inst->round_robin_sequence_groups) {
-            for (auto const rr_index : ::Range(rr_group.max_rr_pos + 1)) {
-                DynamicArray<Region*> group {scratch_arena};
-                for (auto& region : inst->regions)
-                    if (!region.trigger.round_robin_index ||
-                        region.trigger.round_robin_index.Value() == rr_index)
-                        dyn::Append(group, &region);
+        for (auto const trigger_event_index : ::Range(ToInt(TriggerEvent::Count))) {
+            for (auto const rr_group : inst->round_robin_sequence_groups[trigger_event_index]) {
+                for (auto const rr_index : ::Range(rr_group.max_rr_pos + 1)) {
+                    DynamicArray<Region*> group {scratch_arena};
+                    for (auto& region : inst->regions)
+                        if (!region.trigger.round_robin_index ||
+                            region.trigger.round_robin_index.Value() == rr_index)
+                            dyn::Append(group, &region);
 
-                DynamicArray<DynamicArray<Region*>> key_range_bins {scratch_arena};
-                for (auto& region : group) {
-                    bool was_put_in_bin = false;
-                    for (auto& bin : key_range_bins) {
-                        if (region->trigger.key_range == bin[0]->trigger.key_range) {
+                    DynamicArray<DynamicArray<Region*>> key_range_bins {scratch_arena};
+                    for (auto& region : group) {
+                        bool was_put_in_bin = false;
+                        for (auto& bin : key_range_bins) {
+                            if (region->trigger.key_range == bin[0]->trigger.key_range) {
+                                dyn::Append(bin, region);
+                                was_put_in_bin = true;
+                                break;
+                            }
+                        }
+                        if (!was_put_in_bin) {
+                            DynamicArray<Region*> bin {scratch_arena};
                             dyn::Append(bin, region);
-                            was_put_in_bin = true;
-                            break;
+                            dyn::Emplace(key_range_bins, Move(bin));
                         }
                     }
-                    if (!was_put_in_bin) {
-                        DynamicArray<Region*> bin {scratch_arena};
-                        dyn::Append(bin, region);
-                        dyn::Emplace(key_range_bins, Move(bin));
-                    }
-                }
 
-                constexpr f32 k_overlap_percent = 0.35f;
-                for (auto& regions : key_range_bins) {
-                    if (regions.size == 1) continue;
+                    constexpr f32 k_overlap_percent = 0.35f;
+                    for (auto& regions : key_range_bins) {
+                        if (regions.size == 1) continue;
 
-                    // I don't know why this is the case, but some in-development MDATAs have this region
-                    // range, let's just skip it for now because library development will transition to the
-                    // Lua format anyways.
-                    if (regions[0]->trigger.key_range == Range {1, 2}) continue;
+                        // I don't know why this is the case, but some in-development MDATAs have this region
+                        // range, let's just skip it for now because library development will transition to
+                        // the Lua format anyways.
+                        if (regions[0]->trigger.key_range == Range {1, 2}) continue;
 
-                    DynamicArray<Range> new_ranges {scratch_arena};
+                        DynamicArray<Range> new_ranges {scratch_arena};
 
-                    for (auto const i : ::Range(regions.size)) {
-                        auto& region = regions[i];
+                        for (auto const i : ::Range(regions.size)) {
+                            auto& region = regions[i];
 
-                        Range new_range {region->trigger.velocity_range.start,
-                                         region->trigger.velocity_range.end};
+                            Range new_range {region->trigger.velocity_range.start,
+                                             region->trigger.velocity_range.end};
 
-                        if (i != 0) {
-                            auto const& prev_region = regions[i - 1];
-                            if (prev_region->trigger.velocity_range.end ==
-                                region->trigger.velocity_range.start) {
-                                auto const delta =
-                                    (u8)(prev_region->trigger.velocity_range.Size() * k_overlap_percent);
-                                ASSERT(new_range.start > delta);
-                                new_range.start -= delta;
+                            if (i != 0) {
+                                auto const& prev_region = regions[i - 1];
+                                if (prev_region->trigger.velocity_range.end ==
+                                    region->trigger.velocity_range.start) {
+                                    auto const delta =
+                                        (u8)(prev_region->trigger.velocity_range.Size() * k_overlap_percent);
+                                    ASSERT(new_range.start > delta);
+                                    new_range.start -= delta;
+                                }
                             }
-                        }
 
-                        if (i != (regions.size - 1)) {
-                            auto const& next_region = regions[i + 1];
-                            if (next_region->trigger.velocity_range.start ==
-                                region->trigger.velocity_range.end) {
-                                auto const delta =
-                                    (s8)(next_region->trigger.velocity_range.Size() * k_overlap_percent);
-                                ASSERT(new_range.end < 100);
-                                new_range.end += delta;
+                            if (i != (regions.size - 1)) {
+                                auto const& next_region = regions[i + 1];
+                                if (next_region->trigger.velocity_range.start ==
+                                    region->trigger.velocity_range.end) {
+                                    auto const delta =
+                                        (s8)(next_region->trigger.velocity_range.Size() * k_overlap_percent);
+                                    ASSERT(new_range.end < 100);
+                                    new_range.end += delta;
+                                }
                             }
+
+                            dyn::Append(new_ranges, new_range);
                         }
 
-                        dyn::Append(new_ranges, new_range);
-                    }
+                        auto regions_it = regions.begin();
+                        auto new_ranges_it = new_ranges.begin();
+                        for (; regions_it != regions.end() && new_ranges_it != new_ranges.end();
+                             ++regions_it, ++new_ranges_it)
+                            (*regions_it)->trigger.velocity_range = *new_ranges_it;
 
-                    auto regions_it = regions.begin();
-                    auto new_ranges_it = new_ranges.begin();
-                    for (; regions_it != regions.end() && new_ranges_it != new_ranges.end();
-                         ++regions_it, ++new_ranges_it)
-                        (*regions_it)->trigger.velocity_range = *new_ranges_it;
-
-                    for (auto const vel : ::Range((u8)100)) {
-                        int num = 0;
-                        for (auto region : regions)
-                            if (region->trigger.velocity_range.Contains(vel)) ++num;
-                        ASSERT(num <= 2);
+                        for (auto const vel : ::Range((u8)100)) {
+                            int num = 0;
+                            for (auto region : regions)
+                                if (region->trigger.velocity_range.Contains(vel)) ++num;
+                            ASSERT(num <= 2);
+                        }
                     }
                 }
             }

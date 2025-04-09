@@ -156,16 +156,17 @@ VoidOrError<String> PostReadBookkeeping(Library& lib, Allocator& arena, ArenaAll
             u8 max_rr_pos;
             u8 round_robin_group_index;
         };
-        HashTable<String, RoundRobinGroupInfo> round_robin_group_infos {};
+        Array<HashTable<String, RoundRobinGroupInfo>, ToInt(TriggerEvent::Count)> round_robin_group_infos {};
 
         u8 round_robin_group_counter = 0;
 
         for (auto& region : inst->regions) {
             if (!region.trigger.round_robin_index) continue;
-            if (auto const e = round_robin_group_infos.FindOrInsertGrowIfNeeded(
-                    scratch_arena,
-                    region.trigger.round_robin_sequencing_group_name,
-                    {});
+            if (auto const e =
+                    round_robin_group_infos[ToInt(region.trigger.trigger_event)].FindOrInsertGrowIfNeeded(
+                        scratch_arena,
+                        region.trigger.round_robin_sequencing_group_name,
+                        {});
                 !e.inserted) {
                 // This group already exists, so we need to update the max_rr_pos.
 
@@ -174,10 +175,10 @@ VoidOrError<String> PostReadBookkeeping(Library& lib, Allocator& arena, ArenaAll
             } else {
                 // We've inserted it, so we need to set the actual values.
 
-                if (round_robin_group_counter == k_max_round_robin_groups) {
+                if (round_robin_group_counter == k_max_round_robin_sequence_groups) {
                     return (String)fmt::Format(arena,
                                                "More than {} round robin groups in instrument {}",
-                                               k_max_round_robin_groups,
+                                               k_max_round_robin_sequence_groups,
                                                inst->name);
                 }
 
@@ -189,12 +190,15 @@ VoidOrError<String> PostReadBookkeeping(Library& lib, Allocator& arena, ArenaAll
             }
         }
 
-        inst->round_robin_sequence_groups = arena.NewMultiple<RoundRobinGroup>(round_robin_group_counter);
-        for (auto const& [_, group_info] : round_robin_group_infos) {
-            auto& group = inst->round_robin_sequence_groups[group_info->round_robin_group_index];
-            group = {
-                .max_rr_pos = group_info->max_rr_pos,
-            };
+        for (auto const i : ::Range(ToInt(TriggerEvent::Count))) {
+            inst->round_robin_sequence_groups[i] =
+                arena.NewMultiple<RoundRobinGroup>(round_robin_group_counter);
+            for (auto const& [_, group_info] : round_robin_group_infos[i]) {
+                auto& group = inst->round_robin_sequence_groups[i][group_info->round_robin_group_index];
+                group = {
+                    .max_rr_pos = group_info->max_rr_pos,
+                };
+            }
         }
     }
 

@@ -615,7 +615,7 @@ static void DoMixerRow(GuiState& g, u8 layer_index, Box root) {
         if (auto const r = BoxRect(g.builder, meter_box))
             DrawPeakMeter(g.imgui,
                           g.imgui.ViewportRectToWindowRect(*r),
-                          layer_processor.peak_meter,
+                          &layer_processor.peak_meter,
                           {.flash_when_clipping = false});
 
         // Volume slider

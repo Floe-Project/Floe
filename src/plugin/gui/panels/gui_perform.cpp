@@ -421,7 +421,7 @@ static void DoLayersColumn(GuiBuilder& builder, GuiState& g, Box parent) {
                 if (auto const r = BoxRect(builder, meter_box))
                     DrawPeakMeter(g.imgui,
                                   g.imgui.ViewportRectToWindowRect(*r),
-                                  layer.peak_meter,
+                                  &layer.peak_meter,
                                   {
                                       .flash_when_clipping = false,
                                       .show_db_markers = false,

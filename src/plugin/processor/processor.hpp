@@ -24,6 +24,7 @@
 #include "effect_distortion.hpp"
 #include "effect_eq.hpp"
 #include "effect_filter_iir.hpp"
+#include "effect_limiter.hpp"
 #include "effect_phaser.hpp"
 #include "effect_reverb.hpp"
 #include "effect_stereo_widen.hpp"
@@ -286,6 +287,7 @@ struct AudioProcessor {
     Phaser phaser;
     Eq eq;
     ConvolutionReverb convo;
+    Limiter limiter;
 
     // The effects indexable by EffectType
     EffectsArray const effects_ordered_by_type;

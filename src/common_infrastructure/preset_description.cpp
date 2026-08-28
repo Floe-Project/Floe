@@ -507,7 +507,9 @@ String WriteAutoDescription(Allocator& allocator,
         {ParamIndex::ConvolutionReverbOn, PhraseKind::FxConvolutionReverb, false},
     };
     // clang-format on
-    static_assert(ArraySize(fx_entries) == ToInt(EffectType::Count));
+    // Limiter is excluded: it's typically used as a safety/mastering tool rather than a defining sonic
+    // character, so it shouldn't be mentioned in auto-generated descriptions.
+    static_assert(ArraySize(fx_entries) == ToInt(EffectType::Count) - 1);
 
     u32 num_fx = 0;
     for (auto& e : fx_entries)

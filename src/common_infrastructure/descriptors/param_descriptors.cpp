@@ -481,7 +481,8 @@ bool IsParamCurrentlyRelevant(ParamIndex index, StaticSpan<f32 const, k_num_para
         case ParamIndex::PhaserOn:
         case ParamIndex::EqOn:
         case ParamIndex::ConvolutionReverbOn:
-        case ParamIndex::ReverbOn: return true;
+        case ParamIndex::ReverbOn:
+        case ParamIndex::LimiterOn: return true;
 
         case ParamIndex::DistortionType:
         case ParamIndex::DistortionDrive:
@@ -594,6 +595,10 @@ bool IsParamCurrentlyRelevant(ParamIndex index, StaticSpan<f32 const, k_num_para
         case ParamIndex::ReverbHighShelfGain:
         case ParamIndex::ReverbChorusFrequency:
         case ParamIndex::ReverbChorusAmount: return is_on(ParamIndex::ReverbOn);
+
+        case ParamIndex::LimiterMix:
+        case ParamIndex::LimiterGain:
+        case ParamIndex::LimiterCeiling: return is_on(ParamIndex::LimiterOn);
 
         case ParamIndex::LegacyMasterVelocity:
         case ParamIndex::LegacyBitCrushWet:

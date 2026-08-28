@@ -244,6 +244,11 @@ enum class ParamIndex : u16 {
     ReverbChorusAmount,
     ReverbOn,
 
+    LimiterOn,
+    LimiterMix,
+    LimiterGain,
+    LimiterCeiling,
+
     // Reverse-ordered successors of the tempo-synced delay time params (higher value = faster). The legacy
     // originals are kept for DAW automation backwards compatibility.
     DelayTimeSyncedL,
@@ -322,6 +327,7 @@ enum class ParameterModule : u8 {
     ConvolutionReverb,
     Bitcrush,
     Compressor,
+    Limiter,
 
     Band1,
     Band2,
@@ -367,6 +373,7 @@ constexpr ModuleNames k_parameter_module_strings[] = {
     {"Convolution Reverb", "Conv"},
     {"Bitcrush", "Bitc"},
     {"Compressor", "Comp"},
+    {"Limiter", "Lmtr"},
 
     {"Band 1", "B1"},
     {"Band 2", "B2"},
@@ -3152,6 +3159,53 @@ consteval auto CreateParams() {
         .name = "On"_s,
         .gui_label = "Reverb"_s,
         .tooltip = "Enable/disable the reverb effect"_s,
+    };
+
+    mp(LimiterOn) = Args {
+        .id = id(IdRegion::Master, 140), // never change
+        .id_string = "fx.limiter.on"_s,
+        .added_in_generation = 4,
+        .value_config = val_config_helpers::Bool({.default_state = false}),
+        .modules = {ParameterModule::Effect, ParameterModule::Limiter},
+        .name = "On"_s,
+        .gui_label = "Limiter"_s,
+        .tooltip = "Enable/disable the limiter effect"_s,
+    };
+    mp(LimiterMix) = Args {
+        .id = id(IdRegion::Master, 141), // never change
+        .id_string = "fx.limiter.mix"_s,
+        .added_in_generation = 4,
+        .value_config = val_config_helpers::Percent({.default_percent = 100}),
+        .modules = {ParameterModule::Effect, ParameterModule::Limiter},
+        .name = "Mix"_s,
+        .gui_label = "Mix"_s,
+        .tooltip = "Blend between the dry input and the limited signal"_s,
+    };
+    mp(LimiterGain) = Args {
+        .id = id(IdRegion::Master, 142), // never change
+        .id_string = "fx.limiter.gain"_s,
+        .added_in_generation = 4,
+        .value_config = val_config_helpers::Gain({.default_db = 0}),
+        .modules = {ParameterModule::Effect, ParameterModule::Limiter},
+        .name = "Gain"_s,
+        .gui_label = "Gain"_s,
+        .tooltip = "Drive the signal into the limiter before it is limited"_s,
+    };
+    mp(LimiterCeiling) = Args {
+        .id = id(IdRegion::Master, 143), // never change
+        .id_string = "fx.limiter.ceiling"_s,
+        .added_in_generation = 4,
+        .value_config =
+            ParamDescriptor::ConstructorArgs::ValueConfig {
+                .linear_range = {-12, 0},
+                .projection = k_nullopt,
+                .default_linear_value = -1.0f,
+                .display_format = ParamDisplayFormat::VolumeDbRange,
+            },
+        .modules = {ParameterModule::Effect, ParameterModule::Limiter},
+        .name = "Ceiling"_s,
+        .gui_label = "Ceiling"_s,
+        .tooltip = "The maximum output level. A small safety margin below 0dB is recommended"_s,
     };
 
     // =====================================================================================================

@@ -617,6 +617,10 @@ enum class StateVersion : u16 {
     // Distortion effect reworked
     DistortionRework,
 
+    // Added a lookahead true-peak limiter effect. Older states default it to off so the sound is
+    // unchanged.
+    AddedLimiterEffect,
+
     LatestPlusOne,
     Latest = LatestPlusOne - 1,
 };
@@ -631,7 +635,7 @@ static void AdaptNewerParams(StateSnapshot& state, StateVersion version, StateSo
     // Experimental params don't need a state version bump or adaptation code here. They
     // are automatically defaulted on load if not present in the file (see CodeState).
     // Non-experimental params DO require a version bump and adaptation code.
-    static_assert(k_num_non_experimental_parameters == 407,
+    static_assert(k_num_non_experimental_parameters == 411,
                   "You have changed the number of non-experimental parameters. You "
                   "must bump the state version number and handle setting the new "
                   "parameters to backwards-compatible states so old presets don't "
@@ -829,6 +833,16 @@ static void AdaptNewerParams(StateSnapshot& state, StateVersion version, StateSo
         state.param_values[ToInt(ParamIndex::DistortionTilt)] = 0.0f;
         state.param_values[ToInt(ParamIndex::DistortionAutoGain)] = 0.0f;
         ModerniseLegacyParam(state, ParamIndex::LegacyDistortionType, source);
+    }
+
+    if (version < StateVersion::AddedLimiterEffect) {
+        state.param_values[ToInt(ParamIndex::LimiterOn)] = 0;
+        for (auto const pi : Array {
+                 ParamIndex::LimiterCeiling,
+                 ParamIndex::LimiterGain,
+                 ParamIndex::LimiterMix,
+             })
+            state.param_values[ToInt(pi)] = k_param_descriptors[ToInt(pi)].default_linear_value;
     }
 
     // When sustain is at max, decay has no audible effect but a short value causes the GUI's

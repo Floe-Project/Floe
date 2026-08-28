@@ -19,6 +19,7 @@ enum class EffectType : u8 {
     ConvolutionReverb,
     Phaser,
     Eq,
+    Limiter,
     Count,
 };
 
@@ -145,6 +146,16 @@ constexpr auto k_effect_info = []() {
                     .mix_param_index = ParamIndex::EqMix,
                 };
                 break;
+            case EffectType::Limiter:
+                info = {
+                    .description =
+                        "A feedforward lookahead true-peak limiter for controlling stray dynamics and peaks. Typically placed at the end of the effects chain.",
+                    .name = "Limiter",
+                    .id = 12, // never change
+                    .on_param_index = ParamIndex::LimiterOn,
+                    .mix_param_index = ParamIndex::LimiterMix,
+                };
+                break;
 
             case EffectType::Count: break;
         }
@@ -170,6 +181,7 @@ constexpr ParameterModule EffectTypeToParameterModule(EffectType type) {
         case EffectType::ConvolutionReverb: return ParameterModule::ConvolutionReverb;
         case EffectType::Phaser: return ParameterModule::Phaser;
         case EffectType::Eq: return ParameterModule::Eq;
+        case EffectType::Limiter: return ParameterModule::Limiter;
         case EffectType::Count: break;
     }
     return ParameterModule::None;

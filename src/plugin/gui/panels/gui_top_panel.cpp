@@ -691,7 +691,7 @@ static void DoTopPanel(GuiBuilder& builder, GuiState& g, GuiFrameContext const& 
                                               })))
         DrawPeakMeter(g.imgui,
                       builder.imgui.RegisterAndConvertRect(*viewport_r),
-                      g.engine.processor.peak_meter,
+                      &g.engine.processor.peak_meter,
                       {.flash_when_clipping = true});
 }
 

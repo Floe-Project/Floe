@@ -391,21 +391,18 @@ void DrawVerticalSlider(imgui::Context& imgui,
 
 void DrawPeakMeter(imgui::Context& imgui,
                    Rect r,
-                   StereoPeakMeter const& level,
+                   StereoPeakMeter const* level,
                    DrawPeakMeterOptions const& options) {
+    ASSERT(level);
+
     // Snap origin to pixel boundary. All positions below are origin + integer offset.
     auto const origin_x = Round(r.x);
     auto const origin_y = Round(r.y);
     auto const total_w = (s32)Round(r.w);
     auto const total_h = (s32)Round(r.h);
 
-    auto const snapshot = level.GetSnapshot();
-    auto const v = snapshot.levels;
-    auto const did_clip = options.flash_when_clipping && level.DidClipRecently();
-
-    constexpr f32 k_max_db = 10;
-    constexpr f32 k_min_db = -60;
-    constexpr f32 k_min_amp = constexpr_math::Powf(10, k_min_db / 20);
+    constexpr f32 k_max_db = 10.0f;
+    constexpr f32 k_min_db = -60.0f;
 
     // All layout values as integer pixel offsets.
     auto const marker_w = (s32)WwToPixels(5.7f);
@@ -414,9 +411,10 @@ void DrawPeakMeter(imgui::Context& imgui,
     auto const pad_right = options.show_db_markers ? marker_w : 0;
     auto const meter_w = total_w - pad_left - pad_right;
     auto const gap = options.gap_px;
+    constexpr auto k_num_channels = 2;
+
     auto const chan_w = (meter_w - gap) / 2;
-    auto const l_chan_x = pad_left;
-    auto const r_chan_x = pad_left + chan_w + gap;
+    s32 const chan_xs[2] = {pad_left, pad_left + chan_w + gap};
 
     auto const rounding_full = WwToPixels(k_corner_rounding);
     auto const small = chan_w < (s32)(rounding_full * 2);
@@ -426,14 +424,13 @@ void DrawPeakMeter(imgui::Context& imgui,
     DEFER { imgui.draw_list->renderer.anti_aliased_shapes = saved_aa; };
 
     // Background channels.
-    imgui.draw_list->AddRectFilled(f32x2 {origin_x + (f32)l_chan_x, origin_y},
-                                   f32x2 {origin_x + (f32)(l_chan_x + chan_w), origin_y + (f32)total_h},
-                                   LiveCol(UiColMap::PeakMeterBack),
-                                   rounding);
-    imgui.draw_list->AddRectFilled(f32x2 {origin_x + (f32)r_chan_x, origin_y},
-                                   f32x2 {origin_x + (f32)(r_chan_x + chan_w), origin_y + (f32)total_h},
-                                   LiveCol(UiColMap::PeakMeterBack),
-                                   rounding);
+    for (auto const chan_index : Range(k_num_channels)) {
+        auto const cx = chan_xs[chan_index];
+        imgui.draw_list->AddRectFilled(f32x2 {origin_x + (f32)cx, origin_y},
+                                       f32x2 {origin_x + (f32)(cx + chan_w), origin_y + (f32)total_h},
+                                       LiveCol(UiColMap::PeakMeterBack),
+                                       rounding);
+    }
 
     // dB markers.
     if (options.show_db_markers) {
@@ -456,6 +453,13 @@ void DrawPeakMeter(imgui::Context& imgui,
         draw_marker(-48, false);
     }
 
+    auto const snapshot = level->GetSnapshot();
+    auto const v = snapshot.levels;
+    auto const did_clip = options.flash_when_clipping && level->DidClipRecently();
+
+    constexpr f32 k_peak_min_db = -60;
+    constexpr f32 k_min_amp = constexpr_math::Powf(10, k_peak_min_db / 20);
+
     // Level positions as integer y-offsets from origin.
     auto const clamped_v = Max(v, f32x2(k_min_amp));
     auto const v_db = 20 * Log10(clamped_v);
@@ -468,7 +472,6 @@ void DrawPeakMeter(imgui::Context& imgui,
     auto const mid_seg_y = (s32)((1 - MapTo01(-12.0f, k_min_db, k_max_db)) * (f32)total_h);
 
     // Draw level segments for each channel.
-    s32 const chan_xs[] = {l_chan_x, r_chan_x};
     s32 const level_ys[] = {level_y_l, level_y_r};
     for (s32 i = 0; i < 2; i++) {
         s32 const cx = chan_xs[i];
@@ -507,6 +510,68 @@ void DrawPeakMeter(imgui::Context& imgui,
                                            0b0011);
         }
     }
+
+    if (options.marker_db) {
+        auto const marker_y =
+            (s32)((1 - MapTo01(Clamp(*options.marker_db, k_min_db, k_max_db), k_min_db, k_max_db)) *
+                  (f32)total_h);
+        auto const col =
+            options.marker_col ? options.marker_col : LiveCol(UiColMap::PeakMeterHighlightMiddle);
+        imgui.draw_list->AddLine(f32x2 {origin_x + (f32)chan_xs[0], origin_y + (f32)marker_y},
+                                 f32x2 {origin_x + (f32)(chan_xs[1] + chan_w), origin_y + (f32)marker_y},
+                                 col,
+                                 WwToPixels(1.0f));
+    }
+}
+
+void DrawGainReductionMeter(imgui::Context& imgui, Rect r, f32 gain_reduction_db, u32 col) {
+    auto const origin_x = Round(r.x);
+    auto const origin_y = Round(r.y);
+    auto const total_w = (s32)Round(r.w);
+    auto const total_h = (s32)Round(r.h);
+
+    constexpr f32 k_max_reduction_db = 24.0f;
+
+    auto const marker_w = (s32)WwToPixels(5.7f);
+    auto const marker_pad = (s32)WwToPixels(1.8f);
+    auto const bar_x0 = origin_x + (f32)marker_w;
+    auto const bar_x1 = origin_x + (f32)(total_w - marker_w);
+
+    auto const rounding_full = WwToPixels(k_corner_rounding);
+    auto const small = (total_w - (2 * marker_w)) < (s32)(rounding_full * 2);
+    auto const rounding = small ? 0.0f : rounding_full;
+    auto const saved_aa = imgui.draw_list->renderer.anti_aliased_shapes;
+    if (small) imgui.draw_list->renderer.anti_aliased_shapes = false;
+    DEFER { imgui.draw_list->renderer.anti_aliased_shapes = saved_aa; };
+
+    imgui.draw_list->AddRectFilled(f32x2 {bar_x0, origin_y},
+                                   f32x2 {bar_x1, origin_y + (f32)total_h},
+                                   LiveCol(UiColMap::PeakMeterBack),
+                                   rounding);
+
+    auto draw_marker = [&](f32 reduction_db, bool bold) {
+        auto const y = (s32)((reduction_db / k_max_reduction_db) * (f32)total_h);
+        auto const marker_col =
+            bold ? LiveCol(UiColMap::PeakMeterMarkersBold) : LiveCol(UiColMap::PeakMeterMarkers);
+        imgui.draw_list->AddLine(f32x2 {origin_x, origin_y + y},
+                                 f32x2 {origin_x + (marker_w - marker_pad), origin_y + y},
+                                 marker_col);
+        imgui.draw_list->AddLine(f32x2 {origin_x + total_w - (marker_w - marker_pad), origin_y + y},
+                                 f32x2 {origin_x + total_w, origin_y + y},
+                                 marker_col);
+    };
+    draw_marker(0, true);
+    draw_marker(6, false);
+    draw_marker(12, false);
+    draw_marker(18, false);
+
+    auto const reduction_y = (s32)(Clamp(gain_reduction_db / k_max_reduction_db, 0.0f, 1.0f) * (f32)total_h);
+    if (reduction_y > 0)
+        imgui.draw_list->AddRectFilled(f32x2 {bar_x0, origin_y},
+                                       f32x2 {bar_x1, origin_y + (f32)reduction_y},
+                                       col,
+                                       rounding,
+                                       0b1100);
 }
 
 void DrawMidPanelScrollbars(imgui::Context const& imgui, imgui::ViewportScrollbars const& bars) {

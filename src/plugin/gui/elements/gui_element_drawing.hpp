@@ -64,7 +64,14 @@ struct DrawPeakMeterOptions {
     bool flash_when_clipping;
     bool show_db_markers = true;
     int gap_px = 2;
+
+    // Draws a horizontal line across the channels at this level, e.g. a limiter threshold or ceiling.
+    Optional<f32> marker_db {};
+    u32 marker_col = 0; // 0 uses the default peak colour.
 };
+
+// Single downward bar from 0dB showing how much a limiter is currently attenuating.
+void DrawGainReductionMeter(imgui::Context& imgui, Rect r, f32 gain_reduction_db, u32 col);
 
 struct DrawVerticalSliderOptions {
     u32 highlight_col;
@@ -84,7 +91,7 @@ void DrawVerticalSlider(imgui::Context& imgui,
 
 void DrawPeakMeter(imgui::Context& imgui,
                    Rect r,
-                   StereoPeakMeter const& level,
+                   StereoPeakMeter const* level,
                    DrawPeakMeterOptions const& options);
 
 void DrawOverlayTooltipForRect(imgui::Context const& imgui,

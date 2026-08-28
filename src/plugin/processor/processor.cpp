@@ -1762,6 +1762,7 @@ AudioProcessor::AudioProcessor(clap_host const& host,
           &phaser,
           &eq,
           &convo,
+          &limiter,
       })) {
 
     voice_pool.master_random_seed = &master_random_seed;

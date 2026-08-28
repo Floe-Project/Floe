@@ -51,6 +51,7 @@
     X(RegisterLicenseTests)                                                                                  \
     X(RegisterLibraryLuaTests)                                                                               \
     X(RegisterLibraryMdataTests)                                                                             \
+    X(RegisterLimiterTests)                                                                                  \
     X(RegisterLinkedListTests)                                                                               \
     X(RegisterLogRingBufferTests)                                                                            \
     X(RegisterMathsTests)                                                                                    \
@@ -81,6 +82,7 @@
     X(RegisterTaggedUnionTests)                                                                              \
     X(RegisterThreadPoolTests)                                                                               \
     X(RegisterThreadingTests)                                                                                \
+    X(RegisterTruePeakDetectorTests)                                                                         \
     X(RegisterVersionTests)                                                                                  \
     X(RegisterVoiceTests)                                                                                    \
     X(RegisterVolumeFadeTests)                                                                               \

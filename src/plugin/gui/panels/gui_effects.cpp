@@ -25,6 +25,7 @@
 #include "gui_framework/gui_imgui.hpp"
 #include "gui_framework/gui_live_edit.hpp"
 #include "processor/effect.hpp"
+#include "processor/effect_limiter.hpp"
 
 constexpr f32 k_fx_controls_gap_x = 28;
 constexpr f32 k_fx_controls_gap_y = 8;
@@ -225,6 +226,7 @@ static FXColours GetFxColMap(EffectType type) {
         case EffectType::ConvolutionReverb: return {ConvolutionBack, ConvolutionHighlight, ConvolutionButton};
         case EffectType::Phaser: return {PhaserBack, PhaserHighlight, PhaserButton};
         case EffectType::Eq: return {FxEqBack, FxEqHighlight, FxEqButton};
+        case EffectType::Limiter: return {LimiterBack, LimiterHighlight, LimiterButton};
         case EffectType::Count: PanicIfReached();
     }
     return {};
@@ -1300,6 +1302,99 @@ static void DoEffectParams(GuiState& g,
                                     .bidirectional = true,
                                 });
             }
+            break;
+        }
+
+        case EffectType::Limiter: {
+            DoKnobParameter(g,
+                            param_container,
+                            params.DescribedValue(ParamIndex::LimiterGain),
+                            {
+                                .width = k_knob_w,
+                                .knob_highlight_col = highlight_col,
+                                .greyed_out = greyed_out,
+                                .bidirectional = true,
+                            });
+            DoKnobParameter(
+                g,
+                param_container,
+                params.DescribedValue(ParamIndex::LimiterCeiling),
+                {.width = k_knob_w, .knob_highlight_col = highlight_col, .greyed_out = greyed_out});
+
+            auto& limiter = static_cast<Limiter&>(fx);
+            auto const ceiling_db = params.DescribedValue(ParamIndex::LimiterCeiling).ProjectedValue();
+            auto const gain_db = params.DescribedValue(ParamIndex::LimiterGain).ProjectedValue();
+
+            auto const meters_row = DoBox(g.builder,
+                                          {
+                                              .parent = param_container,
+                                              .layout {
+                                                  .size = layout::k_hug_contents,
+                                                  .contents_gap = 12,
+                                                  .contents_direction = layout::Direction::Row,
+                                              },
+                                          });
+
+            auto const do_meter_column = [&](u64 index, String label, auto draw) {
+                auto const column =
+                    DoBox(g.builder,
+                          {
+                              .parent = meters_row,
+                              .id_extra = index,
+                              .layout {
+                                  .size = {k_peak_meter_standard_width, layout::k_hug_contents},
+                                  .contents_direction = layout::Direction::Column,
+                              },
+                          });
+                auto const meter_box = DoBox(g.builder,
+                                             {
+                                                 .parent = column,
+                                                 .layout {
+                                                     .size = {layout::k_fill_parent, 40},
+                                                 },
+                                             });
+                if (auto const r = BoxRect(g.builder, meter_box)) draw(g.imgui.ViewportRectToWindowRect(*r));
+                DoBox(g.builder,
+                      {
+                          .parent = column,
+                          .text = label,
+                          .text_colours = greyed_out ? Colours {LiveColStruct(UiColMap::MidTextDimmed)}
+                                                     : Colours {LiveColStruct(UiColMap::MidText)},
+                          .text_justification = TextJustification::Centred,
+                          .layout {
+                              .size = {layout::k_fill_parent, k_font_body_size},
+                          },
+                      });
+            };
+
+            // The input level at which limiting starts: whatever the Gain param pushes up to the ceiling.
+            do_meter_column(0, "In"_s, [&](Rect r) {
+                DrawPeakMeter(g.imgui,
+                              r,
+                              &limiter.limiter_dsp.input_peak_meter,
+                              {
+                                  .flash_when_clipping = false,
+                                  .marker_db = ceiling_db - gain_db,
+                                  .marker_col = ToU32(highlight_col),
+                              });
+            });
+            do_meter_column(1, "GR"_s, [&](Rect r) {
+                DrawGainReductionMeter(g.imgui,
+                                       r,
+                                       limiter.limiter_dsp.GainReductionDb(),
+                                       ToU32(highlight_col));
+            });
+            do_meter_column(2, "Out"_s, [&](Rect r) {
+                DrawPeakMeter(g.imgui,
+                              r,
+                              &limiter.limiter_dsp.output_peak_meter,
+                              {
+                                  .flash_when_clipping = true,
+                                  .marker_db = ceiling_db,
+                                  .marker_col = ToU32(highlight_col),
+                              });
+            });
+
             break;
         }
 

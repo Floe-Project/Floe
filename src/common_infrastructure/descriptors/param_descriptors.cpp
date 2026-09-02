@@ -485,6 +485,10 @@ bool IsParamCurrentlyRelevant(ParamIndex index, StaticSpan<f32 const, k_num_para
 
         case ParamIndex::DistortionType:
         case ParamIndex::DistortionDrive:
+        case ParamIndex::DistortionPunish:
+        case ParamIndex::DistortionTilt:
+        case ParamIndex::DistortionGain:
+        case ParamIndex::DistortionAutoGain:
         case ParamIndex::DistortionMix: return is_on(ParamIndex::DistortionOn);
 
         case ParamIndex::BitCrushBits:
@@ -600,6 +604,7 @@ bool IsParamCurrentlyRelevant(ParamIndex index, StaticSpan<f32 const, k_num_para
         case ParamIndex::LegacyFilterResonance:
         case ParamIndex::LegacyFilterGain:
         case ParamIndex::LegacyFilterType:
+        case ParamIndex::LegacyDistortionType:
         case ParamIndex::LegacyChorusHighpass:
         case ParamIndex::LegacyChorusWet:
         case ParamIndex::LegacyChorusDry:
@@ -693,7 +698,7 @@ constexpr auto k_non_layer_params = ArrayT<NonLayerParamId>({
     {"MastVol", ParamIndex::MasterVolume},
     {"MastVel", ParamIndex::LegacyMasterVelocity},
     {"MastDyn", ParamIndex::MasterTimbre},
-    {"DistType", ParamIndex::DistortionType},
+    {"DistType", ParamIndex::LegacyDistortionType},
     {"DistDrive", ParamIndex::DistortionDrive},
     {"DistOn", ParamIndex::DistortionOn},
     {"BitcBits", ParamIndex::BitCrushBits},
@@ -881,9 +886,25 @@ TEST_CASE(TestParamIdStringsUnique) {
     return k_success;
 }
 
+TEST_CASE(TestDistortionTypeCategoriesComplete) {
+    using namespace param_values;
+
+    Array<u8, ToInt(DistortionType::Count)> num_appearances {};
+
+    for (auto const& category : k_distortion_type_categories)
+        for (auto const type : category.members)
+            ++num_appearances[ToInt(type)];
+
+    for (auto const i : Range(ToInt(DistortionType::Count)))
+        CHECK_EQ(num_appearances[i], 1u);
+
+    return k_success;
+}
+
 TEST_REGISTRATION(RegisterParamDescriptorTests) {
     REGISTER_TEST(TestNumberStartsWithNegativeZero);
     REGISTER_TEST(TestLegacyConversion);
     REGISTER_TEST(TestParamStringConversion);
     REGISTER_TEST(TestParamIdStringsUnique);
+    REGISTER_TEST(TestDistortionTypeCategoriesComplete);
 }

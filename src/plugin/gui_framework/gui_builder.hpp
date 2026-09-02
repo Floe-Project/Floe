@@ -255,6 +255,9 @@ struct BoxConfig {
 
     bool parent_dictates_hot_and_active = false;
 
+    // Draw in the hot style regardless of the cursor, e.g. a menu item whose submenu is open.
+    bool show_as_hot = false;
+
     // Corners and rounding effect both fill and border.
     Corners round_background_corners = 0b0000;
     f32 corner_rounding = 3.0f;

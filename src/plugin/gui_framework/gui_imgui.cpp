@@ -19,13 +19,49 @@ constexpr Id k_no_op_id = 1;
 // Viewport ID of the full size root viewport created when the IMGUI system begins.
 constexpr Id k_root_viewport_id = 4;
 
-constexpr f64 k_popup_open_and_close_delay_sec {0.2};
+constexpr f64 k_popup_open_and_close_delay_sec {0.1};
 static constexpr f64 k_text_cursor_blink_rate {0.5};
 static constexpr f64 k_button_repeat_rate {0.5};
 
-static bool IsBlockedByExclusiveFocus(Viewport const* exclusive_focus_viewport, Viewport const* v) {
-    return exclusive_focus_viewport && v->root_viewport != exclusive_focus_viewport &&
-           !v->root_viewport->cfg.ignore_exclusive_focus;
+bool Context::IsBlockedByExclusiveFocus(Viewport const* v) const {
+    if (!exclusive_focus_viewport) return false;
+    auto const root = v->root_viewport;
+    if (root == exclusive_focus_viewport || root->cfg.ignore_exclusive_focus) return false;
+
+    // A submenu and the menus it was opened from form one menu: the parents stay interactable so the cursor
+    // can move back and pick a different item.
+    if (exclusive_focus_viewport->cfg.mode == ViewportMode::PopupMenu)
+        for (auto level = open_popups.size; level-- > 1 && open_popups[level]->is_submenu;)
+            if (open_popups[level - 1] == root) return false;
+
+    return true;
+}
+
+static bool TriangleContainsPoint(f32x2 a, f32x2 b, f32x2 c, f32x2 p) {
+    auto const cross = [](f32x2 u, f32x2 v) { return (u.x * v.y) - (u.y * v.x); };
+    auto const s1 = cross(b - a, p - a);
+    auto const s2 = cross(c - b, p - b);
+    auto const s3 = cross(a - c, p - c);
+    return (s1 >= 0 && s2 >= 0 && s3 >= 0) || (s1 <= 0 && s2 <= 0 && s3 <= 0);
+}
+
+// True if the cursor is heading from the parent menu towards the given submenu. While this holds, hovering
+// sibling items on the way shouldn't close the submenu. Uses the triangle between the cursor's position
+// before its last move and the submenu's near edge (with some slack), as popularised by Amazon's mega
+// dropdown. Once the cursor has been still for the open/close delay it's no longer considered moving.
+static bool
+CursorIsMovingTowardsSubmenu(Context const& imgui, Viewport const* parent, Viewport const* submenu) {
+    auto const& in = GuiIo().in;
+    if (in.current_time - imgui.time_of_last_cursor_move >= k_popup_open_and_close_delay_sec) return false;
+
+    auto const submenu_r = submenu->unpadded_bounds;
+    auto const slack = WwToPixels(8.0f);
+    bool const submenu_is_to_the_right = submenu_r.CentreX() > parent->unpadded_bounds.CentreX();
+    auto const near_edge_x = submenu_is_to_the_right ? submenu_r.x + slack : submenu_r.Right() - slack;
+    f32x2 const top_corner {near_edge_x, submenu_r.y - slack};
+    f32x2 const bottom_corner {near_edge_x, submenu_r.Bottom() + slack};
+
+    return TriangleContainsPoint(imgui.cursor_pos_before_last_move, top_corner, bottom_corner, in.cursor_pos);
 }
 
 static bool WantsCloseOnEscape(ViewportConfig const& cfg) {
@@ -665,6 +701,11 @@ void Context::BeginFrame(ViewportConfig cfg, Fonts& fonts) {
 
     auto const& frame_input = GuiIo().in;
 
+    if (Any(frame_input.cursor_delta != 0)) {
+        cursor_pos_before_last_move = frame_input.cursor_pos_prev;
+        time_of_last_cursor_move = frame_input.current_time;
+    }
+
     for (usize i = sorted_viewports.size; i-- > 0;) {
         auto viewport = sorted_viewports[i];
         if (viewport->visible_bounds.Contains(frame_input.cursor_pos)) {
@@ -898,7 +939,10 @@ void Context::EndFrame() {
             if (popup_clicked != nullptr) {
                 for (auto const i : Range(open_popups.size)) {
                     if (popup_clicked == open_popups[i]) {
-                        if (i != open_popups.size - 1) ClosePopupToLevel(i + 1);
+                        // Close the children, unless the click was on the item that opened the child.
+                        if (i != open_popups.size - 1 &&
+                            open_popups[i + 1]->creator_of_this_popup_menu != active_item.id)
+                            ClosePopupToLevel(i + 1);
                         break;
                     }
                 }
@@ -908,8 +952,7 @@ void Context::EndFrame() {
         } else if (open_modals.size && modal_just_opened == k_null_id) {
             if (exclusive_focus_viewport && exclusive_focus_viewport->cfg.mode == ViewportMode::Modal &&
                 exclusive_focus_viewport->cfg.close_on_click_outside &&
-                (!hovered_viewport ||
-                 IsBlockedByExclusiveFocus(exclusive_focus_viewport, hovered_viewport))) {
+                (!hovered_viewport || IsBlockedByExclusiveFocus(hovered_viewport))) {
                 CloseTopModal();
             }
         }
@@ -1066,7 +1109,7 @@ Rect Context::RegisterAndConvertRect(Rect r) {
 }
 
 bool Context::RegisterRectForMouseTracking(Rect r_in_window_coords, bool check_intersection) {
-    if (IsBlockedByExclusiveFocus(exclusive_focus_viewport, curr_viewport)) return false;
+    if (IsBlockedByExclusiveFocus(curr_viewport)) return false;
     if (check_intersection && !Rect::DoRectsIntersect(r_in_window_coords, GetCurrentClipRect())) return false;
 
     dyn::Append(GuiIo().out.mouse_tracked_rects,
@@ -1081,8 +1124,7 @@ bool Context::RegisterRectForMouseTracking(Rect r_in_window_coords, bool check_i
 }
 
 bool Context::RequestKeyboardFocus(Id id) {
-    auto const inside_exclusive_focus_viewport =
-        !IsBlockedByExclusiveFocus(exclusive_focus_viewport, curr_viewport);
+    auto const inside_exclusive_focus_viewport = !IsBlockedByExclusiveFocus(curr_viewport);
 
     if (!inside_exclusive_focus_viewport && temp_keyboard_focus_item_is_popup) {
         // We can never have focus because there's a popup open and that always has priority.
@@ -1095,8 +1137,9 @@ bool Context::RequestKeyboardFocus(Id id) {
     return IsKeyboardFocus(id);
 }
 
-// When we're in a popup viewport, we want to close children viewports when we hover for a while on an
-// item in a parent viewport. This is common GUI behaviour for something like a menu with sub-menus.
+// When we're in a popup menu that has a submenu open, hovering for a while on an item other than the one that
+// opened the submenu closes it. This is common GUI behaviour for a menu with submenus. Passing over items on
+// the way to the submenu is tolerated.
 static void HandleHoverPopupMenuClosing(Context& imgui, Id id) {
     ASSERT(imgui.exclusive_focus_viewport != nullptr);
     auto const curr = imgui.curr_viewport;
@@ -1104,23 +1147,29 @@ static void HandleHoverPopupMenuClosing(Context& imgui, Id id) {
 
     if (imgui.IsHot(id) && curr_is_popup && imgui.exclusive_focus_viewport != imgui.hovered_viewport &&
         imgui.current_popup_stack.size < imgui.open_popups.size) {
-        auto const next_viewport = imgui.open_popups[imgui.current_popup_stack.size];
-        auto const creator_of_next = next_viewport->creator_of_this_popup_menu;
+        auto const submenu = imgui.open_popups[imgui.current_popup_stack.size];
+        if (!submenu->is_submenu || id == submenu->creator_of_this_popup_menu) return;
 
-        if (id != creator_of_next) {
-            if (imgui.WasJustMadeHot(id))
-                GuiIo().out.SetTimedWakeup(SourceLocationHash(),
-                                           GuiIo().in.current_time + k_popup_open_and_close_delay_sec);
-            if (imgui.SecondsSpentHot() >= k_popup_open_and_close_delay_sec)
-                imgui.ClosePopupToLevel(imgui.current_popup_stack.size);
+        if (imgui.WasJustMadeHot(id))
+            GuiIo().out.SetTimedWakeup(SourceLocationHash(),
+                                       GuiIo().in.current_time + k_popup_open_and_close_delay_sec);
+        if (imgui.SecondsSpentHot() < k_popup_open_and_close_delay_sec) return;
+
+        if (CursorIsMovingTowardsSubmenu(imgui, curr->root_viewport, submenu)) {
+            // Re-check once the cursor has been still for a while.
+            GuiIo().out.SetTimedWakeup(SourceLocationHash(),
+                                       imgui.time_of_last_cursor_move + k_popup_open_and_close_delay_sec);
+            return;
         }
+
+        imgui.ClosePopupToLevel(imgui.current_popup_stack.size);
     }
 }
 
 void Context::SetHot(Rect r, Id id, bool32 is_not_viewport_content) {
     if (temp_hovered_item == id) return; // Already called SetHot this frame for this ID.
 
-    if (IsBlockedByExclusiveFocus(exclusive_focus_viewport, curr_viewport)) return;
+    if (IsBlockedByExclusiveFocus(curr_viewport)) return;
 
     if (curr_viewport != (is_not_viewport_content ? hovered_viewport : hovered_viewport_content)) return;
 
@@ -1664,10 +1713,17 @@ Context::PopupMenuButtonBehaviour(Rect r, Id button_id, Id popup_id, ButtonConfi
         if (WasJustMadeHot(button_id))
             GuiIo().out.SetTimedWakeup(SourceLocationHash(),
                                        GuiIo().in.current_time + k_popup_open_and_close_delay_sec);
-        if ((button_fired || (IsHot(button_id) && SecondsSpentHot() >= k_popup_open_and_close_delay_sec)) &&
-            !IsPopupMenuOpen(popup_id)) {
+
+        // A sibling's submenu that is still open after ButtonBehaviour's hover handling is one the cursor is
+        // heading towards - don't replace it by hovering.
+        bool const a_child_is_open = current_popup_stack.size < open_popups.size;
+        bool const open_by_hover =
+            IsHot(button_id) && SecondsSpentHot() >= k_popup_open_and_close_delay_sec && !a_child_is_open;
+
+        if ((button_fired || open_by_hover) && !IsPopupMenuOpen(popup_id)) {
             ClosePopupToLevel(current_popup_stack.size);
             OpenPopupMenu(popup_id, button_id);
+            Last(open_popups)->is_submenu = true;
         }
     }
 
@@ -2313,6 +2369,7 @@ void Context::OpenPopupMenu(Id id, Id creator_of_this_popup) {
     popup->prev_content_size = f32x2 {0, 0};
     popup->size_resolution = Viewport::SizeResolutionState::PendingSizeResolution;
     popup->creator_of_this_popup_menu = is_first_popup ? k_null_id : creator_of_this_popup;
+    popup->is_submenu = false;
 
     popup_menu_just_opened = id;
     dyn::Append(open_popups, popup);
@@ -2339,19 +2396,15 @@ void Context::CloseTopPopupOnly() {
     ClosePopupToLevel(open_popups.size - 1);
 }
 
-// Close the popup we have begin-ed into.
-void Context::CloseAllPopups() {
-    // int popup_index = (int)current_popup_stack.size - 1;
-    // if (popup_index < 0 || popup_index > (int)open_popups.size ||
-    //     current_popup_stack[(usize)popup_index]->id != open_popups[(usize)popup_index]->id) {
-    //     return;
-    // }
-    // while (popup_index > 0 && open_popups[(usize)popup_index] &&
-    //        open_popups[(usize)popup_index]->cfg.child_popup) {
-    //     popup_index--;
-    // }
-    ClosePopupToLevel(0);
+void Context::CloseTopMenu() {
+    ASSERT(open_popups.size != 0);
+    auto level = open_popups.size - 1;
+    while (level > 0 && open_popups[level]->is_submenu)
+        --level;
+    ClosePopupToLevel(level);
 }
+
+void Context::CloseAllPopups() { ClosePopupToLevel(0); }
 
 void Context::OpenModalViewport(Id id) {
     if (IsModalOpen(id)) return;

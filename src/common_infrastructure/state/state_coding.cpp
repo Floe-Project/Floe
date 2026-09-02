@@ -137,15 +137,15 @@ static Span<MenuNameMapping const> MenuNameMappingsForParam(ParamIndex index) {
         });
         return k_types.Items();
 
-    } else if (index == ParamIndex::DistortionType) {
+    } else if (index == ParamIndex::LegacyDistortionType) {
         static constexpr auto k_types = ArrayT<legacy_mappings::MenuNameMapping>({
-            {(f32)param_values::DistortionType::TubeLog, {"Tube Log"}},
-            {(f32)param_values::DistortionType::TubeAsym3, {"Tube Asym3"}},
-            {(f32)param_values::DistortionType::Sine, {"Sine"}},
-            {(f32)param_values::DistortionType::Raph1, {"Raph1"}},
-            {(f32)param_values::DistortionType::Decimate, {"Decimate"}},
-            {(f32)param_values::DistortionType::Atan, {"Atan"}},
-            {(f32)param_values::DistortionType::Clip, {"Clip"}},
+            {(f32)param_values::LegacyDistortionType::TubeLog, {"Tube Log"}},
+            {(f32)param_values::LegacyDistortionType::TubeAsym3, {"Tube Asym3"}},
+            {(f32)param_values::LegacyDistortionType::Sine, {"Sine"}},
+            {(f32)param_values::LegacyDistortionType::Raph1, {"Raph1"}},
+            {(f32)param_values::LegacyDistortionType::Decimate, {"Decimate"}},
+            {(f32)param_values::LegacyDistortionType::Atan, {"Atan"}},
+            {(f32)param_values::LegacyDistortionType::Clip, {"Clip"}},
         });
         return k_types.Items();
     }
@@ -614,6 +614,9 @@ enum class StateVersion : u16 {
     // backwards compatibility.
     ReversedTempoSyncedRateOrdering,
 
+    // Distortion effect reworked
+    DistortionRework,
+
     LatestPlusOne,
     Latest = LatestPlusOne - 1,
 };
@@ -628,7 +631,7 @@ static void AdaptNewerParams(StateSnapshot& state, StateVersion version, StateSo
     // Experimental params don't need a state version bump or adaptation code here. They
     // are automatically defaulted on load if not present in the file (see CodeState).
     // Non-experimental params DO require a version bump and adaptation code.
-    static_assert(k_num_non_experimental_parameters == 402,
+    static_assert(k_num_non_experimental_parameters == 407,
                   "You have changed the number of non-experimental parameters. You "
                   "must bump the state version number and handle setting the new "
                   "parameters to backwards-compatible states so old presets don't "
@@ -815,6 +818,17 @@ static void AdaptNewerParams(StateSnapshot& state, StateVersion version, StateSo
         ModerniseLegacyParam(state, LayerParamIndex::LegacyArpRate, source);
         ModerniseLegacyParam(state, ParamIndex::LegacyDelayTimeSyncedL, source);
         ModerniseLegacyParam(state, ParamIndex::LegacyDelayTimeSyncedR, source);
+    }
+
+    if (version < StateVersion::DistortionRework) {
+        // Preserve the original behaviour for existing presets and DAW automation. The legacy type maps to
+        // an uncompensated Legacy type, so the level behaves as it did. Auto Gain defaults on for new
+        // presets, but old presets could only ever have used a Legacy type, which never had this
+        // compensation, so it must default off here to keep their level unchanged.
+        state.param_values[ToInt(ParamIndex::DistortionPunish)] = 0.0f;
+        state.param_values[ToInt(ParamIndex::DistortionTilt)] = 0.0f;
+        state.param_values[ToInt(ParamIndex::DistortionAutoGain)] = 0.0f;
+        ModerniseLegacyParam(state, ParamIndex::LegacyDistortionType, source);
     }
 
     // When sustain is at max, decay has no audible effect but a short value causes the GUI's
@@ -2812,7 +2826,7 @@ TEST_CASE(TestLoadingOldFiles) {
         CHECK_APPROX_EQ(state.param_values[ToInt(ParamIndex::ReverbSize)], 0.6f, 0.001f);
 
         CHECK_EQ(ParamToInt<param_values::DistortionType>(ProjectedValue(state, ParamIndex::DistortionType)),
-                 param_values::DistortionType::TubeLog);
+                 param_values::DistortionType::LegacyTubeLog);
     }
 
     // Has Sv effects

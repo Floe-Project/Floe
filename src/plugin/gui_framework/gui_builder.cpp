@@ -367,7 +367,9 @@ NO_UBSAN Box DoBox(GuiBuilder& builder, BoxConfig const& config, u64 loc_hash) {
 
             bool32 const is_active =
                 config.parent_dictates_hot_and_active ? config.parent->is_active : box.is_active;
-            bool32 const is_hot = config.parent_dictates_hot_and_active ? config.parent->is_hot : box.is_hot;
+            bool32 const is_hot =
+                config.show_as_hot ||
+                (config.parent_dictates_hot_and_active ? config.parent->is_hot : box.is_hot);
 
             if (auto const background_fill = ({
                     Col c {};

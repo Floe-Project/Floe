@@ -93,7 +93,7 @@ Box MenuItem(GuiBuilder& builder, Box parent, MenuItemOptions const& options, u6
                                                : Optional<imgui::ButtonConfig> {imgui::ButtonConfig {}},
               });
 
-    if (item.button_fired && options.close_on_click) builder.imgui.CloseTopPopupOnly();
+    if (item.button_fired && options.close_on_click) builder.imgui.CloseTopMenu();
 
     if (!options.no_icon_gap)
         DoBox(builder,
@@ -137,6 +137,98 @@ Box MenuItem(GuiBuilder& builder, Box parent, MenuItemOptions const& options, u6
                   .size_from_text = true,
                   .text_colours = Col {.c = Col::Subtext0},
               });
+    }
+
+    return item;
+}
+
+Box MenuSubmenuItem(GuiBuilder& builder, Box parent, MenuSubmenuItemOptions const& options, u64 id_extra) {
+    auto const submenu_popup_id = builder.imgui.MakeId(id_extra ^ SourceLocationHash());
+    auto const submenu_is_open = builder.imgui.IsPopupMenuOpen(submenu_popup_id);
+
+    auto const item = DoBox(builder,
+                            {
+                                .parent = parent,
+                                .id_extra = id_extra,
+                                .background_fill_auto_hot_active_overlay = true,
+                                .show_as_hot = submenu_is_open,
+                                .layout {
+                                    .size = {layout::k_fill_parent, layout::k_hug_contents},
+                                    .contents_direction = layout::Direction::Row,
+                                },
+                                .button_behaviour = imgui::ButtonConfig {},
+                            });
+
+    DoBox(builder,
+          {
+              .parent = item,
+              .text = options.is_selected ? String(ICON_FA_CHECK) : "",
+              .font = FontType::Icons,
+              .text_colours = Col {.c = Col::Subtext0},
+              .layout {
+                  .size = k_icon_button_size,
+                  .margins {.l = k_menu_item_padding_x},
+              },
+          });
+
+    auto const label_row =
+        DoBox(builder,
+              {
+                  .parent = item,
+                  .layout {
+                      .size = {layout::k_fill_parent, layout::k_hug_contents},
+                      .contents_padding = {.lr = k_menu_item_padding_x, .tb = k_menu_item_padding_y},
+                      .contents_direction = layout::Direction::Row,
+                      .contents_align = layout::Alignment::Justify,
+                  },
+              });
+
+    DoBox(builder,
+          {
+              .parent = label_row,
+              .text = options.text,
+              .size_from_text = true,
+              .font = FontType::Body,
+          });
+
+    DoBox(builder,
+          {
+              .parent = label_row,
+              .text = ICON_FA_CARET_RIGHT,
+              .size_from_text = true,
+              .font = FontType::Icons,
+              .text_colours = Col {.c = Col::Subtext0},
+          });
+
+    if (auto const item_r = BoxRect(builder, item)) {
+        auto const window_r = builder.imgui.RegisterAndConvertRect(*item_r);
+        builder.imgui.PopupMenuButtonBehaviour(window_r,
+                                               item.imgui_id,
+                                               submenu_popup_id,
+                                               imgui::ButtonConfig {.dont_set_hot = true});
+    }
+
+    if (submenu_is_open) {
+        DoBoxViewport(builder,
+                      {
+                          .run =
+                              [do_submenu_items = options.do_submenu_items.CloneObject(builder.arena)](
+                                  GuiBuilder& viewport_builder) {
+                                  auto const submenu_root =
+                                      DoBox(viewport_builder,
+                                            {
+                                                .layout {
+                                                    .size = layout::k_hug_contents,
+                                                    .contents_direction = layout::Direction::Column,
+                                                    .contents_align = layout::Alignment::Start,
+                                                },
+                                            });
+                                  do_submenu_items(submenu_root);
+                              },
+                          .bounds = item,
+                          .imgui_id = submenu_popup_id,
+                          .viewport_config = k_default_popup_menu_viewport,
+                      });
     }
 
     return item;

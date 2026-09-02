@@ -48,6 +48,20 @@ Box MenuItem(GuiBuilder& builder,
              MenuItemOptions const& options,
              u64 id_extra = SourceLocationHash());
 
+struct MenuSubmenuItemOptions {
+    String text;
+    bool is_selected; // Shows the check icon, e.g. when the current value lives inside this submenu.
+    TrivialFunctionRef<void(Box submenu_root)> do_submenu_items;
+};
+
+// A menu item that opens a nested flyout menu. The item shows as hot while its submenu is open.
+// do_submenu_items is cloned into the frame arena: the submenu viewport runs after the current viewport's
+// run function completes, so it must not capture by reference anything local to that function.
+Box MenuSubmenuItem(GuiBuilder& builder,
+                    Box parent,
+                    MenuSubmenuItemOptions const& options,
+                    u64 id_extra = SourceLocationHash());
+
 // Horizontal divider sized for popup menus (with a small gap above and below).
 Box MenuDivider(GuiBuilder& builder, Box parent, u64 id_extra = SourceLocationHash());
 

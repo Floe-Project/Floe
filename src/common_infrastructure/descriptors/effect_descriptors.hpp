@@ -40,7 +40,8 @@ constexpr auto k_effect_info = []() {
         switch ((EffectType)i) {
             case EffectType::Distortion:
                 info = {
-                    .description = "Distort the audio using various algorithms.",
+                    .description =
+                        "Oversampled waveshaping distortion with a choice of algorithms, a punish control that cascades extra biased stages, and a tilt tone control.",
                     .name = "Distortion",
                     .id = 1, // never change
                     .on_param_index = ParamIndex::DistortionOn,

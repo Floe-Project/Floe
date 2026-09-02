@@ -70,6 +70,28 @@ constexpr auto k_legacy_effect_filter_type_to_current = ArrayT<param_values::Eff
 static_assert(k_legacy_effect_filter_type_to_current.size ==
               ToInt(param_values::LegacyEffectFilterType::Count));
 
+// Every legacy option maps to its Legacy twin in the modern enum: the same algorithm (bugs and all) with no
+// level compensation, so old presets and automation sound as they did. The modern enum's non-legacy options
+// are all level-compensated and some are fixed-up or replacement algorithms, so none of them is a match.
+constexpr auto k_legacy_distortion_type_to_current = ArrayT<param_values::DistortionType>({
+    param_values::DistortionType::LegacyTubeLog,
+    param_values::DistortionType::LegacyTubeAsym3,
+    param_values::DistortionType::LegacySine,
+    param_values::DistortionType::LegacyRaph1,
+    param_values::DistortionType::LegacyDecimate,
+    param_values::DistortionType::LegacyAtan,
+    param_values::DistortionType::LegacyClip,
+    param_values::DistortionType::LegacyFoldback,
+    param_values::DistortionType::LegacyRectifier,
+    param_values::DistortionType::LegacyRingMod,
+});
+static_assert(k_legacy_distortion_type_to_current.size == ToInt(param_values::LegacyDistortionType::Count));
+static_assert([] {
+    for (auto const type : k_legacy_distortion_type_to_current)
+        if (!param_values::IsLegacyDistortionType(type)) return false;
+    return true;
+}());
+
 // The tempo-synced rate/time menus were reordered so a higher parameter value is a faster rate. The modern
 // enum is the legacy enum reversed; these tables map each legacy value to the modern value of the same note
 // (listed by member name in legacy order, so the modern enum's numeric ordering handles the reversal).
@@ -154,6 +176,7 @@ constexpr Optional<ParamIndex> SuccessorOfLegacyParamIndex(ParamIndex legacy) {
         case ParamIndex::LegacyFilterResonance: return ParamIndex::FilterResonance;
         case ParamIndex::LegacyFilterGain: return ParamIndex::FilterGain;
         case ParamIndex::LegacyFilterType: return ParamIndex::FilterType;
+        case ParamIndex::LegacyDistortionType: return ParamIndex::DistortionType;
         case ParamIndex::LegacyChorusHighpass: return ParamIndex::ChorusHighpass;
         case ParamIndex::LegacyConvolutionReverbHighpass: return ParamIndex::ConvolutionReverbHighpass;
         case ParamIndex::LegacyCompressorThreshold: return ParamIndex::CompressorThreshold;
@@ -279,6 +302,8 @@ static f32 RemapLegacyValue(ParamIndex legacy, f32 legacy_linear) {
             return FilterGainRemap(legacy, ParamIndex::FilterGain, legacy_linear);
         case ParamIndex::LegacyFilterType:
             return EnumLookup(k_legacy_effect_filter_type_to_current, legacy_linear, successor_default);
+        case ParamIndex::LegacyDistortionType:
+            return EnumLookup(k_legacy_distortion_type_to_current, legacy_linear, successor_default);
         case ParamIndex::LegacyChorusHighpass:
             return FrequencyRemap(legacy, ParamIndex::ChorusHighpass, legacy_linear);
         case ParamIndex::LegacyConvolutionReverbHighpass:

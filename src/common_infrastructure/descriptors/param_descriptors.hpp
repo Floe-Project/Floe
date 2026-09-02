@@ -129,10 +129,15 @@ enum class ParamIndex : u16 {
     Macro3,
     Macro4,
 
+    LegacyDistortionType,
     DistortionType,
     DistortionDrive,
     DistortionMix,
     DistortionOn,
+    DistortionPunish,
+    DistortionTilt,
+    DistortionGain,
+    DistortionAutoGain,
 
     BitCrushBits,
     BitCrushBitRate,
@@ -748,7 +753,7 @@ constexpr bool EffectFilterTypeUsesGain(EffectFilterType t) {
     return t == EffectFilterType::Peak || t == EffectFilterType::LowShelf || t == EffectFilterType::HighShelf;
 }
 
-enum class DistortionType : u8 { // never reorder
+enum class LegacyDistortionType : u8 { // never reorder
     TubeLog,
     TubeAsym3,
     Sine,
@@ -761,19 +766,121 @@ enum class DistortionType : u8 { // never reorder
     RingMod,
     Count,
 };
+constexpr auto k_legacy_distortion_type_strings = ArrayT<String>({
+    "Tube Log (Legacy)",
+    "Tube Asym3 (Legacy)",
+    "Sine (Legacy)",
+    "Raph1 (Legacy)",
+    "Decimate (Legacy)",
+    "Atan (Legacy)",
+    "Clip (Legacy)",
+    "Foldback (Legacy)",
+    "Rectifier (Legacy)",
+    "Ring Mod (Legacy)",
+});
+static_assert(k_legacy_distortion_type_strings.size == ToInt(LegacyDistortionType::Count));
+
+enum class DistortionType : u8 { // never reorder
+    Tape,
+    Valve,
+
+    Overdrive,
+    HardClip,
+    Octave,
+
+    Bitcrush,
+    RingMod,
+    SineFold,
+    Warp,
+    Wavefolder,
+
+    LegacyTubeLog,
+    LegacyTubeAsym3,
+    LegacySine,
+    LegacyRaph1,
+    LegacyDecimate,
+    LegacyAtan,
+    LegacyClip,
+    LegacyFoldback,
+    LegacyRectifier,
+    LegacyRingMod,
+
+    Count,
+};
+// clang-format off
 constexpr auto k_distortion_type_strings = ArrayT<String>({
+    "Tape",
+    "Valve",
+
+    "Overdrive",
+    "Hard Clip",
+    "Octave",
+
+    "Bitcrush",
+    "Ring Mod",
+    "Sine Fold",
+    "Warp",
+    "Wavefolder",
+
     "Tube Log",
     "Tube Asym3",
     "Sine",
     "Raph1",
-    "Decimate",
+    "Tanh (Decimate)",
     "Atan",
     "Clip",
     "Foldback",
     "Rectifier",
-    "Ring Mod",
+    "Ring Mod (44.1k)",
 });
+// clang-format on
 static_assert(k_distortion_type_strings.size == ToInt(DistortionType::Count));
+
+struct DistortionTypeCategory {
+    String name;
+    Span<DistortionType const> members;
+    bool is_legacy;
+};
+constexpr DistortionType k_bite_distortion_types[] = {
+    DistortionType::Tape,
+    DistortionType::Valve,
+    DistortionType::Overdrive,
+    DistortionType::HardClip,
+    DistortionType::Octave,
+};
+constexpr DistortionType k_mangle_distortion_types[] = {
+    DistortionType::Bitcrush,
+    DistortionType::RingMod,
+    DistortionType::SineFold,
+    DistortionType::Warp,
+    DistortionType::Wavefolder,
+};
+constexpr DistortionType k_legacy_distortion_types[] = {
+    DistortionType::LegacyTubeLog,
+    DistortionType::LegacyTubeAsym3,
+    DistortionType::LegacySine,
+    DistortionType::LegacyRaph1,
+    DistortionType::LegacyDecimate,
+    DistortionType::LegacyAtan,
+    DistortionType::LegacyClip,
+    DistortionType::LegacyFoldback,
+    DistortionType::LegacyRectifier,
+    DistortionType::LegacyRingMod,
+};
+constexpr DistortionTypeCategory k_distortion_type_categories[] = {
+    {"Bite"_s, k_bite_distortion_types, false},
+    {"Mangle"_s, k_mangle_distortion_types, false},
+    {"Legacy"_s, k_legacy_distortion_types, true},
+};
+
+// Legacy types are the original algorithms, kept so older presets sound the same. They have no level
+// compensation, so their loudness rises with the drive; the modern types are held steady.
+constexpr bool IsLegacyDistortionType(DistortionType type) {
+    for (auto const& category : k_distortion_type_categories)
+        for (auto const member : category.members)
+            if (member == type) return category.is_legacy;
+    return false;
+}
 
 enum class CompressorType : u8 { // never reorder
     Vintage,
@@ -1137,6 +1244,7 @@ struct ParamDescriptor {
         LayerFilterType,
         LegacyEffectFilterType,
         EffectFilterType,
+        LegacyDistortionType,
         DistortionType,
         CompressorType,
         LegacyDelaySyncedTime,
@@ -1489,6 +1597,7 @@ constexpr Span<String const> MenuItems(ParamDescriptor::MenuType type) {
         case ParamDescriptor::MenuType::LayerFilterType: return k_layer_filter_type_strings;
         case ParamDescriptor::MenuType::LegacyEffectFilterType: return k_legacy_effect_filter_type_strings;
         case ParamDescriptor::MenuType::EffectFilterType: return k_effect_filter_type_strings;
+        case ParamDescriptor::MenuType::LegacyDistortionType: return k_legacy_distortion_type_strings;
         case ParamDescriptor::MenuType::DistortionType: return k_distortion_type_strings;
         case ParamDescriptor::MenuType::CompressorType: return k_compressor_type_strings;
         case ParamDescriptor::MenuType::LegacyDelaySyncedTime: return k_legacy_delay_synced_time_strings;
@@ -1871,17 +1980,32 @@ consteval auto CreateParams() {
     };
 
     // =====================================================================================================
-    mp(DistortionType) = Args {
+    mp(LegacyDistortionType) = Args {
         .id = id(IdRegion::Master, 3), // never change
+        .id_string = "fx.distortion.legacy_type"_s,
+        .value_config = val_config_helpers::Menu({
+            .type = ParamDescriptor::MenuType::LegacyDistortionType,
+            .default_val = (u32)LegacyDistortionType::TubeLog,
+        }),
+        .modules = {ParameterModule::Effect, ParameterModule::Distortion},
+        .name = "Legacy Type"_s,
+        .gui_label = "Type"_s,
+        .tooltip = "Legacy type parameter. Kept for backwards-compatibility with DAW automation"_s,
+        .flags = {.legacy = true},
+    };
+    mp(DistortionType) = Args {
+        .id = id(IdRegion::Master, 151), // never change
         .id_string = "fx.distortion.type"_s,
+        .added_in_generation = 6,
         .value_config = val_config_helpers::Menu({
             .type = ParamDescriptor::MenuType::DistortionType,
-            .default_val = (u32)DistortionType::TubeLog,
+            .default_val = (u32)DistortionType::Tape,
         }),
         .modules = {ParameterModule::Effect, ParameterModule::Distortion},
         .name = "Type"_s,
         .gui_label = "Type"_s,
-        .tooltip = "Distortion algorithm type"_s,
+        .tooltip =
+            "Distortion algorithm type. The modern types keep their loudness steady as the drive is increased; the Legacy types are the original algorithms without that compensation"_s,
     };
     mp(DistortionDrive) = Args {
         .id = id(IdRegion::Master, 4), // never change
@@ -1910,6 +2034,52 @@ consteval auto CreateParams() {
         .name = "On"_s,
         .gui_label = "Distortion"_s,
         .tooltip = "Enable/disable the distortion effect"_s,
+    };
+    mp(DistortionPunish) = Args {
+        .id = id(IdRegion::Master, 149), // never change
+        .id_string = "fx.distortion.punish"_s,
+        .added_in_generation = 6,
+        .value_config = val_config_helpers::Percent({.default_percent = 0}),
+        .modules = {ParameterModule::Effect, ParameterModule::Distortion},
+        .name = "Punish"_s,
+        .gui_label = "Punish"_s,
+        .tooltip =
+            "Cascade extra distortion stages after the first, like the gain stages of an amplifier. Each added stage is driven harder and biased off-centre, giving a denser, more compressed drive with a warmer, even-harmonic edge and a tighter low end. Drive sets how hard the signal hits the first stage; Punish sets how much is stacked on top"_s,
+    };
+    mp(DistortionTilt) = Args {
+        .id = id(IdRegion::Master, 150), // never change
+        .id_string = "fx.distortion.tilt"_s,
+        .added_in_generation = 6,
+        .value_config = val_config_helpers::BidirectionalPercent({
+            .default_percent = 0,
+            .display_format = ParamDisplayFormat::Percent,
+        }),
+        .modules = {ParameterModule::Effect, ParameterModule::Distortion},
+        .name = "Tilt EQ"_s,
+        .gui_label = "Tilt EQ"_s,
+        .tooltip =
+            "Tilt the tone going into the distortion. Positive pushes the highs so they saturate more for a brighter result; negative pushes the lows for a warmer, fatter drive"_s,
+    };
+    mp(DistortionGain) = Args {
+        .id = id(IdRegion::Master, 152), // never change
+        .id_string = "fx.distortion.gain"_s,
+        .added_in_generation = 6,
+        .value_config = val_config_helpers::Gain({.default_db = 0}),
+        .modules = {ParameterModule::Effect, ParameterModule::Distortion},
+        .name = "Gain"_s,
+        .gui_label = "Gain"_s,
+        .tooltip = "Change the level of the distorted signal - applied after all distortion has happened."_s,
+    };
+    mp(DistortionAutoGain) = Args {
+        .id = id(IdRegion::Master, 148), // never change
+        .id_string = "fx.distortion.auto_gain"_s,
+        .added_in_generation = 6,
+        .value_config = val_config_helpers::Bool({.default_state = true}),
+        .modules = {ParameterModule::Effect, ParameterModule::Distortion},
+        .name = "Auto Gain"_s,
+        .gui_label = "Auto Gain"_s,
+        .tooltip =
+            "Keep the output loudness steady as Drive is increased, as the non-Legacy types always do. Older presets load with it off so they sound the same"_s,
     };
 
     // =====================================================================================================

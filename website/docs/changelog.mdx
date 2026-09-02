@@ -14,7 +14,16 @@ For instance: 0.0.1. Don't change the headings.
 */}
 
 # Changelog
-## 2.0.3
+## 2.0.4-beta.1
+- Huge improvements to the distortion effect:
+  - 10 new/upgraded distortion types: more musical and balanced with smooth gain compensation
+  - Cleaner sound with 4x oversampling, anti-aliasing and DC offset removal
+  - Punish parameter added to push the distortion even further
+  - Tilt EQ parameter added to musically shape the tone (deep through to bright)
+  - Auto-gain parameter added to legacy distortion types to opt in to better gain compensation as you turn the drive up
+  - Fully backwards compatible with existing presets and DAW projects
+
+## 2.0.4
 - Replace the Instance Config and MIDI CC Assignments panels with a unified Performance Controls panel (top panel, sliders icon): make the current instance settings and MIDI CC mappings the ones new instances start with, and optionally save named profiles bundling them for switching between setups
 - Add a dialog after installing a package offering to send the now-redundant package file to the trash
 - Add MPE (MIDI Polyphonic Expression) support: enable it in the Performance Controls panel for per-note pitch bend, press (channel pressure) and slide (CC74), and choose what press and slide control on each layer's Config tab. CLAP per-note expressions (pitch, pressure, brightness) are also supported

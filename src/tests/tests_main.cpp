@@ -27,6 +27,7 @@
     X(RegisterCircularBufferTests)                                                                           \
     X(RegisterCliArgParseTests)                                                                              \
     X(RegisterDebugTests)                                                                                    \
+    X(RegisterDistortionTests)                                                                               \
     X(RegisterDynamicArrayTests)                                                                             \
     X(RegisterUndoHistoryTests)                                                                              \
     X(RegisterEncryptedPackageTests)                                                                         \

@@ -673,6 +673,39 @@ static void DoEffectParams(GuiState& g,
                 param_container,
                 params.DescribedValue(ParamIndex::DistortionDrive),
                 {.width = k_knob_w, .knob_highlight_col = highlight_col, .greyed_out = greyed_out});
+            DoKnobParameter(
+                g,
+                param_container,
+                params.DescribedValue(ParamIndex::DistortionPunish),
+                {.width = k_knob_w, .knob_highlight_col = highlight_col, .greyed_out = greyed_out});
+            DoKnobParameter(g,
+                            param_container,
+                            params.DescribedValue(ParamIndex::DistortionTilt),
+                            {
+                                .width = k_knob_w,
+                                .knob_highlight_col = highlight_col,
+                                .greyed_out = greyed_out,
+                                .bidirectional = true,
+                            });
+            DoKnobParameter(g,
+                            param_container,
+                            params.DescribedValue(ParamIndex::DistortionGain),
+                            {
+                                .width = k_knob_w,
+                                .knob_highlight_col = highlight_col,
+                                .greyed_out = greyed_out,
+                                .bidirectional = true,
+                            });
+            if (param_values::IsLegacyDistortionType(
+                    params.IntValue<param_values::DistortionType>(ParamIndex::DistortionType))) {
+                DoButtonParameter(g,
+                                  param_container,
+                                  params.DescribedValue(ParamIndex::DistortionAutoGain),
+                                  {.width = layout::k_hug_contents,
+                                   .height = k_fx_heading_h,
+                                   .greyed_out = greyed_out,
+                                   .on_colour = highlight_col});
+            }
             break;
         }
 

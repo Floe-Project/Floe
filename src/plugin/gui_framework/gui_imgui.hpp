@@ -300,6 +300,10 @@ struct Viewport {
 
     Id creator_of_this_popup_menu = k_null_id;
 
+    // [PopupMenu]. Opened from an item in a parent popup menu via PopupMenuButtonBehaviour. The parent menu
+    // stays interactable while this is open, and the two close together when an item is chosen.
+    bool is_submenu = false;
+
     u16 nested_level = k_null_id;
     u16 child_nesting_counter = k_null_id;
 
@@ -514,6 +518,11 @@ struct Context {
     // If clicked, opens a popup menu which appears in an appropriate place relative to the rectangle passed
     // here. Remember, opening a popup does not mean the popup is actually run: you must check IsPopupOpen and
     // call BeginViewport on the popup_id after calling this.
+    //
+    // When called from inside a popup menu, the popup is a submenu: it also opens after hovering the button
+    // for a moment, sibling items in the parent menu remain interactable while it's open (hovering one for a
+    // moment closes/replaces the submenu, unless the cursor is heading towards the submenu), and choosing an
+    // item with CloseTopMenu closes the whole chain.
     PopupMenuButtonBehaviourResult
     PopupMenuButtonBehaviour(Rect rect_in_window_coords, Id button_id, Id popup_id, ButtonConfig cfg);
 
@@ -693,6 +702,8 @@ struct Context {
     void ClosePopupToLevel(usize level);
     void CloseAllPopups();
     void CloseTopPopupOnly();
+    // Closes the top popup menu and, if it's a submenu, the parent menus it was opened from too.
+    void CloseTopMenu();
     bool DidPopupMenuJustOpen(Id id);
 
     // Tell the framework that if the cursor is in this rect next frame, it should not apply the
@@ -775,6 +786,7 @@ struct Context {
 
     // Internal.
     void UpdateExclusiveFocusViewport();
+    bool IsBlockedByExclusiveFocus(Viewport const* v) const;
     Viewport* FindOrCreateViewport(Id id);
     void OnScissorChanged() const;
 
@@ -837,6 +849,11 @@ struct Context {
     DynamicArray<Viewport*> open_popups {Malloc::Instance()};
     DynamicArray<Viewport*> current_popup_stack {Malloc::Instance()};
     Id popup_menu_just_opened = k_null_id;
+
+    // Where the cursor was just before it last moved, and when. Frames can run without the cursor moving
+    // (animations, timed wakeups), so the per-frame cursor delta alone can't tell us the direction of travel.
+    f32x2 cursor_pos_before_last_move = {};
+    TimePoint time_of_last_cursor_move = {};
 
     DynamicArray<Viewport*> open_modals {Malloc::Instance()};
     Id modal_just_opened = k_null_id;

@@ -558,6 +558,7 @@ pub fn build(b: *std.Build) void {
         .update_copyright_years = b.step("script:update-copyright-years", "Update copyright years in source files based on git history"),
         .gen_doc_screenshots = b.step(gen_doc_screenshots_step_name, "Regenerate website screenshot PNGs by running floe-standalone for each known GUI area"),
         .zon2nix = b.step("script:zon2nix", "Regenerate build.zig.zon.nix from build.zig.zon"),
+        .gen_distortion_table = b.step("script:gen-distortion-table", "Regenerate distortion_norm_table.hpp"),
     };
 
     top_level_steps.install_all.dependOn(top_level_steps.install_bin);
@@ -720,6 +721,33 @@ pub fn build(b: *std.Build) void {
             const copy = b.addUpdateSourceFiles();
             copy.addCopyFileToSource(run.captureStdOut(), "website/static/generated-data.json");
             top_level_steps.website_gen.dependOn(&copy.step);
+        }
+
+        // Distortion norm table generator
+        {
+            const native_target_cfg = TargetConfig.create(&ctx, b.graph.host, &options);
+            const distortion_table_generator = buildDistortionTableGenerator(&ctx, &native_target_cfg, .{
+                .common_infrastructure = buildCommonInfrastructure(&ctx, &native_target_cfg, .{
+                    .dr_wav = buildDrWav(&ctx, &native_target_cfg),
+                    .flac = buildFlac(&ctx, &native_target_cfg),
+                    .xxhash = buildXxhash(&ctx, &native_target_cfg),
+                    .library = buildFloeLibrary(&ctx, &native_target_cfg, .{
+                        .stb_sprintf = buildStbSprintf(&ctx, &native_target_cfg),
+                        .debug_info_lib = buildDebugInfo(&ctx, &native_target_cfg),
+                        .zig_std = buildZigStd(&ctx, &native_target_cfg),
+                        .tracy = buildTracy(&ctx, &native_target_cfg),
+                    }),
+                    .miniz = buildMiniz(&ctx, &native_target_cfg),
+                }),
+            });
+
+            // Run the generator. It takes no args but outputs the header source to stdout.
+            const run = std.Build.Step.Run.create(b, b.fmt("run {s}", .{distortion_table_generator.name}));
+            run.addFileArg(distortion_table_generator.getEmittedBin());
+
+            const copy = b.addUpdateSourceFiles();
+            copy.addCopyFileToSource(run.captureStdOut(), "src/plugin/processing_utils/distortion_norm_table.hpp");
+            top_level_steps.gen_distortion_table.dependOn(&copy.step);
         }
 
         // Build the site for production
@@ -1688,6 +1716,7 @@ fn buildPluginLib(ctx: *const BuildContext, cfg: *const TargetConfig, deps: stru
             "preset_server/preset_server.cpp",
             "processing_utils/arpeggiator.cpp",
             "processing_utils/audio_processing_context.cpp",
+            "processing_utils/distortion.cpp",
             "processing_utils/lfo.cpp",
             "processing_utils/midi.cpp",
             "processing_utils/mpe.cpp",
@@ -1837,6 +1866,40 @@ fn buildDocsGenerator(ctx: *const BuildContext, cfg: *const TargetConfig, deps: 
     exe.root_module.addCMacro("FINAL_BINARY_TYPE", "DocsGenerator");
     exe.linkLibrary(deps.common_infrastructure);
     exe.addIncludePath(ctx.b.path("src"));
+    exe.addConfigHeader(cfg.floe_config_h);
+    applyUniversalSettings(ctx, exe);
+
+    return exe;
+}
+
+fn buildDistortionTableGenerator(ctx: *const BuildContext, cfg: *const TargetConfig, deps: struct {
+    common_infrastructure: *std.Build.Step.Compile,
+}) *std.Build.Step.Compile {
+    // This tool is a batch of offline DSP measurements, not shipped code, so it always compiles optimised
+    // regardless of the top-level build mode: unoptimised it takes minutes to run.
+    var fast_module_options = cfg.module_options;
+    fast_module_options.optimize = .ReleaseFast;
+
+    const exe = ctx.b.addExecutable(.{
+        .name = "distortion_table_generator",
+        .root_module = ctx.b.createModule(fast_module_options),
+    });
+    exe.addCSourceFiles(.{
+        .files = &.{
+            "src/plugin/processing_utils/distortion_table_generator.cpp",
+            "src/common_infrastructure/final_binary_type.cpp",
+        },
+        .flags = FlagsBuilder.init(ctx, cfg, .{
+            .all_warnings = true,
+            .ubsan = false,
+            .cpp = true,
+            .gen_cdb_fragments = true,
+        }).flags.items,
+    });
+    exe.root_module.addCMacro("FINAL_BINARY_TYPE", "DistortionTableGenerator");
+    exe.linkLibrary(deps.common_infrastructure);
+    exe.addIncludePath(ctx.b.path("src"));
+    exe.addIncludePath(ctx.b.path("src/plugin"));
     exe.addConfigHeader(cfg.floe_config_h);
     applyUniversalSettings(ctx, exe);
 

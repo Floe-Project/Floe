@@ -367,6 +367,58 @@ String ParamTooltipText(DescribedParamValue const& param, ArenaAllocator& arena,
     return buf.ToOwnedSpan();
 }
 
+// Distortion's Type menu is grouped into the categories from k_distortion_type_categories, each rendered as a
+// nested flyout submenu, with a divider before the Legacy category to set it apart. Every other Menu-type
+// param keeps using the generic, flat DoParamMenuItems below.
+static void DoDistortionTypeMenuItems(GuiState& g, ParamIndex param_index) {
+    auto const menu_root = DoBox(g.builder,
+                                 {
+                                     .layout {
+                                         .size = layout::k_hug_contents,
+                                         .contents_direction = layout::Direction::Column,
+                                         .contents_align = layout::Alignment::Start,
+                                     },
+                                 });
+    auto const current = g.engine.processor.main_params.IntValue<int>(param_index);
+
+    for (auto const category_index : Range(ArraySize(param_values::k_distortion_type_categories))) {
+        auto const& category = param_values::k_distortion_type_categories[category_index];
+
+        if (category.is_legacy) MenuDivider(g.builder, menu_root);
+
+        g.builder.imgui.PushId(category_index);
+        DEFER { g.builder.imgui.PopId(); };
+
+        bool category_is_current = false;
+        for (auto const member : category.members)
+            if (ToInt(member) == current) category_is_current = true;
+
+        MenuSubmenuItem(
+            g.builder,
+            menu_root,
+            {
+                .text = category.name,
+                .is_selected = category_is_current,
+                .do_submenu_items =
+                    [&g, members = category.members, current, param_index](Box submenu_root) {
+                        for (auto const member : members) {
+                            g.builder.imgui.PushId((uintptr)ToInt(member));
+                            DEFER { g.builder.imgui.PopId(); };
+                            if (MenuItem(g.builder,
+                                         submenu_root,
+                                         {
+                                             .text = param_values::k_distortion_type_strings[ToInt(member)],
+                                             .is_selected = (ToInt(member) == current),
+                                         })
+                                    .button_fired) {
+                                SetParameterValue(g.engine.processor, param_index, (f32)ToInt(member), {});
+                            }
+                        }
+                    },
+            });
+    }
+}
+
 static void DoParamMenuItems(GuiState& g, ParamIndex param_index) {
     auto const menu_root = DoBox(g.builder,
                                  {
@@ -511,8 +563,13 @@ Box DoMenuParameter(GuiState& g,
     if (g.builder.imgui.IsPopupMenuOpen(popup_id))
         DoBoxViewport(g.builder,
                       {
-                          .run = [param_index = param.info.index,
-                                  &g](GuiBuilder&) { DoParamMenuItems(g, param_index); },
+                          .run =
+                              [param_index = param.info.index, &g](GuiBuilder&) {
+                                  if (param_index == ParamIndex::DistortionType)
+                                      DoDistortionTypeMenuItems(g, param_index);
+                                  else
+                                      DoParamMenuItems(g, param_index);
+                              },
                           .bounds = menu_btn,
                           .imgui_id = popup_id,
                           .viewport_config = k_default_popup_menu_viewport,

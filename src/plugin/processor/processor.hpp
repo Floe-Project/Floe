@@ -32,6 +32,7 @@
 #include "param.hpp"
 #include "plugin/plugin.hpp"
 #include "processing_utils/audio_processing_context.hpp"
+#include "processing_utils/loudness_meter.hpp"
 #include "processing_utils/volume_fade.hpp"
 #include "voices.hpp"
 
@@ -223,6 +224,7 @@ struct AudioProcessor {
     u32 previous_block_size = 0;
 
     StereoPeakMeter peak_meter = {};
+    LufsMeter lufs_meter = {};
 
     SharedLayerParams shared_layer_params {};
     Bitset<k_num_layers> solo {};

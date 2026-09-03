@@ -638,6 +638,8 @@ static bool Activate(AudioProcessor& processor, PluginActivateArgs args) {
     for (auto& fx : processor.effects_ordered_by_type)
         fx->PrepareToPlay(processor.audio_processing_context);
 
+    processor.lufs_meter.PrepareToPlay(processor.audio_processing_context.sample_rate);
+
     if (Exchange(processor.previous_block_size, processor.audio_processing_context.process_block_size_max) <
         processor.audio_processing_context.process_block_size_max) {
 
@@ -1636,10 +1638,18 @@ static clap_process_status ProcessSubBlock(AudioProcessor& processor,
             frame *= processor.whole_engine_volume_fade.GetFade();
         }
         processor.peak_meter.AddBuffer(output);
+        processor.lufs_meter.AddBuffer(output);
     } else {
         processor.peak_meter.Zero();
         for (auto& l : processor.layer_processors)
             l.peak_meter.Zero();
+
+        // Keep feeding the loudness windows so they slide down as silence goes by, but publish silence
+        // straight away: we're about to tell the host it can stop calling us, and a reading frozen at the
+        // last loud value would sit on the GUI until playing resumes.
+        processor.lufs_meter.AddBuffer(output);
+        processor.lufs_meter.Zero();
+
         result = CLAP_PROCESS_SLEEP;
     }
 

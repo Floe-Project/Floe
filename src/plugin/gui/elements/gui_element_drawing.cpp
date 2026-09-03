@@ -568,6 +568,87 @@ void DrawGainReductionMeter(imgui::Context& imgui, Rect r, f32 gain_reduction_db
                                        0b1100);
 }
 
+void DrawLoudnessMeter(imgui::Context& imgui, Rect r, DrawLoudnessMeterOptions const& options) {
+    auto const origin_x = Round(r.x);
+    auto const origin_y = Round(r.y);
+    auto const total_w = (s32)Round(r.w);
+    auto const total_h = (s32)Round(r.h);
+
+    constexpr auto k_channel_gap = 2; // matches DrawPeakMeterOptions::gap_px default
+    auto const bar_w = (total_w - k_channel_gap) / 2;
+    auto const bar_x0 = origin_x + (f32)((total_w - bar_w) / 2);
+    auto const bar_x1 = bar_x0 + (f32)bar_w;
+
+    auto const rounding_full = WwToPixels(k_corner_rounding);
+    auto const small = bar_w < (s32)(rounding_full * 2);
+    auto const rounding = small ? 0.0f : rounding_full;
+    auto const saved_aa = imgui.draw_list->renderer.anti_aliased_shapes;
+    if (small) imgui.draw_list->renderer.anti_aliased_shapes = false;
+    DEFER { imgui.draw_list->renderer.anti_aliased_shapes = saved_aa; };
+
+    auto const clamp_lufs = [&](f32 lufs) { return Clamp(lufs, options.min_lufs, options.max_lufs); };
+    auto const y_for_lufs = [&](f32 lufs) {
+        return origin_y +
+               (f32)(s32)((1 - MapTo01(clamp_lufs(lufs), options.min_lufs, options.max_lufs)) * (f32)total_h);
+    };
+    auto const col_for_lufs = [&](f32 lufs) {
+        if (lufs < options.target_min_lufs)
+            return LerpColours(options.good_col,
+                               options.quiet_col,
+                               Clamp01((options.target_min_lufs - lufs) / options.fade_lu));
+        if (lufs > options.target_max_lufs)
+            return LerpColours(options.good_col,
+                               options.hot_col,
+                               Clamp01((lufs - options.target_max_lufs) / options.fade_lu));
+        return options.good_col;
+    };
+
+    imgui.draw_list->AddRectFilled(f32x2 {bar_x0, origin_y},
+                                   f32x2 {bar_x1, origin_y + (f32)total_h},
+                                   LiveCol(UiColMap::PeakMeterBack),
+                                   rounding);
+
+    // The fill colour is piecewise-linear in LUFS, so a vertical gradient between each pair of breakpoints
+    // reproduces it exactly.
+    auto const fill_top_lufs = clamp_lufs(options.short_term_lufs);
+    f32 const breakpoints_lufs[] = {
+        options.min_lufs,
+        clamp_lufs(options.target_min_lufs - options.fade_lu),
+        clamp_lufs(options.target_min_lufs),
+        clamp_lufs(options.target_max_lufs),
+        clamp_lufs(options.target_max_lufs + options.fade_lu),
+        options.max_lufs,
+    };
+    for (auto const segment_index : Range(ArraySize(breakpoints_lufs) - 1)) {
+        auto const lo_lufs = breakpoints_lufs[segment_index];
+        auto const hi_lufs = Min(breakpoints_lufs[segment_index + 1], fill_top_lufs);
+        if (hi_lufs <= lo_lufs) break;
+        auto const lo_y = y_for_lufs(lo_lufs);
+        auto const hi_y = y_for_lufs(hi_lufs);
+        if (hi_y >= lo_y) continue;
+        auto const lo_col = col_for_lufs(lo_lufs);
+        auto const hi_col = col_for_lufs(hi_lufs);
+        imgui.draw_list->AddRectFilledMultiColor(f32x2 {bar_x0, hi_y},
+                                                 f32x2 {bar_x1, lo_y},
+                                                 hi_col,
+                                                 hi_col,
+                                                 lo_col,
+                                                 lo_col);
+    }
+
+    imgui.draw_list->AddRectFilled(f32x2 {bar_x0, y_for_lufs(options.target_max_lufs)},
+                                   f32x2 {bar_x1, y_for_lufs(options.target_min_lufs)},
+                                   options.band_col);
+
+    if (options.momentary_lufs > options.min_lufs) {
+        auto const marker_y = y_for_lufs(options.momentary_lufs);
+        imgui.draw_list->AddLine(f32x2 {bar_x0, marker_y},
+                                 f32x2 {bar_x1, marker_y},
+                                 options.momentary_col,
+                                 WwToPixels(1.0f));
+    }
+}
+
 void DrawMidPanelScrollbars(imgui::Context const& imgui, imgui::ViewportScrollbars const& bars) {
     for (auto const b : bars) {
         if (!b) continue;

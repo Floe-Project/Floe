@@ -23,6 +23,7 @@
 #include "gui/panels/gui_ir_browser.hpp"
 #include "gui/panels/gui_legacy_params_panel.hpp"
 #include "gui_framework/gui_builder.hpp"
+#include "gui_framework/layout.hpp"
 
 static Optional<ImageID> LogoImage(GuiState& g) {
     if (!g.imgui.draw_list->renderer.ImageIdIsValid(g.floe_logo_image)) {
@@ -680,15 +681,27 @@ static void DoTopPanel(GuiBuilder& builder, GuiState& g, GuiFrameContext const& 
                         .width = k_small_knob_width,
                     });
 
+    auto const meter_box = DoBox(builder,
+                                 {
+                                     .parent = root,
+                                     .layout {
+                                         .size = {layout::k_hug_contents, 37},
+                                         .contents_gap = 8,
+                                         .contents_direction = layout::Direction::Row,
+                                         .contents_align = layout::Alignment::Start,
+                                     },
+                                 });
+
     // peak meter
-    if (auto const viewport_r = BoxRect(builder,
-                                        DoBox(builder,
-                                              {
-                                                  .parent = root,
-                                                  .layout {
-                                                      .size = {k_peak_meter_standard_width, 37.06f},
-                                                  },
-                                              })))
+    if (auto const viewport_r =
+            BoxRect(builder,
+                    DoBox(builder,
+                          {
+                              .parent = meter_box,
+                              .layout {
+                                  .size = {k_peak_meter_standard_width, layout::k_fill_parent},
+                              },
+                          })))
         DrawPeakMeter(g.imgui,
                       builder.imgui.RegisterAndConvertRect(*viewport_r),
                       &g.engine.processor.peak_meter,
@@ -700,6 +713,130 @@ static void DoTopPanel(GuiBuilder& builder, GuiState& g, GuiFrameContext const& 
                           .marker_interval_db = 6,
                           .low_signal_threshold_db = -60.0f,
                       });
+
+    // loudness meter
+    {
+        constexpr f32 k_loudness_target_lufs = -22.0f;
+        constexpr f32 k_loudness_target_tolerance_lu = 1.0f;
+        constexpr f32 k_loudness_readout_width = 40;
+
+        auto const snapshot = g.engine.processor.lufs_meter.GetSnapshot();
+        constexpr String k_tooltip =
+            "Loudness of the master output in LUFS: M is momentary (400ms), S is short-term (3s). The shaded band on the meter is a target to aim for so that your presets are of a similar loudness."_s;
+
+        auto const container = DoBox(builder,
+                                     {
+                                         .parent = meter_box,
+                                         .layout {
+                                             .size = {layout::k_hug_contents, layout::k_fill_parent},
+                                             .contents_gap = 4,
+                                             .contents_direction = layout::Direction::Row,
+                                         },
+                                         .tooltip = k_tooltip,
+                                     });
+
+        if (auto const viewport_r = BoxRect(builder,
+                                            DoBox(builder,
+                                                  {
+                                                      .parent = container,
+                                                      .layout {
+                                                          .size = {11, layout::k_fill_parent},
+                                                      },
+                                                  })))
+            DrawLoudnessMeter(g.imgui,
+                              builder.imgui.RegisterAndConvertRect(*viewport_r),
+                              {
+                                  .short_term_lufs = snapshot.short_term_lufs,
+                                  .momentary_lufs = snapshot.momentary_lufs,
+                                  .target_min_lufs = k_loudness_target_lufs - k_loudness_target_tolerance_lu,
+                                  .target_max_lufs = k_loudness_target_lufs + k_loudness_target_tolerance_lu,
+                                  .quiet_col = LiveCol(UiColMap::LoudnessMeterQuiet),
+                                  .good_col = LiveCol(UiColMap::LoudnessMeterGood),
+                                  .hot_col = LiveCol(UiColMap::LoudnessMeterHot),
+                                  .band_col = LiveCol(UiColMap::LoudnessMeterTargetBand),
+                                  .momentary_col = LiveCol(UiColMap::LoudnessMeterMomentaryMarker),
+                              });
+
+        constexpr f32 k_readout_font_size = k_font_body_size * 0.81f;
+
+        // Fixed width: the readouts change every frame while playing and a hugging column would jitter the
+        // whole row.
+        auto const readout_box = DoBox(builder,
+                                       {
+                                           .parent = container,
+                                           .layout {
+                                               .size = {k_loudness_readout_width, layout::k_fill_parent},
+                                               .contents_direction = layout::Direction::Column,
+                                               .contents_align = layout::Alignment::Middle,
+                                           },
+                                       });
+
+        DoBox(builder,
+              {
+                  .parent = readout_box,
+                  .text = "LUFS"_s,
+                  .font_size = k_readout_font_size,
+                  .text_colours = Col {.c = Col::Overlay2, .dark_mode = true},
+                  .text_justification = TextJustification::CentredLeft,
+                  .layout {.size = {layout::k_fill_parent, k_readout_font_size}},
+              });
+
+        auto const readout_row = DoBox(builder,
+                                       {
+                                           .parent = readout_box,
+                                           .layout {
+                                               .size = {layout::k_fill_parent, layout::k_hug_contents},
+                                               .contents_direction = layout::Direction::Row,
+                                               .contents_align = layout::Alignment::Middle,
+                                           },
+                                       });
+
+        auto const prefix_column = DoBox(builder,
+                                         {
+                                             .parent = readout_row,
+                                             .layout {
+                                                 .size = {layout::k_hug_contents, layout::k_hug_contents},
+                                                 .contents_direction = layout::Direction::Column,
+                                                 .contents_align = layout::Alignment::Middle,
+                                             },
+                                         });
+
+        auto const value_column = DoBox(builder,
+                                        {
+                                            .parent = readout_row,
+                                            .layout {
+                                                .size = {layout::k_fill_parent, layout::k_hug_contents},
+                                                .contents_direction = layout::Direction::Column,
+                                                .contents_align = layout::Alignment::Middle,
+                                            },
+                                        });
+
+        auto const do_readout = [&](u64 index, String prefix, f32 lufs) {
+            DoBox(builder,
+                  {
+                      .parent = prefix_column,
+                      .id_extra = index,
+                      .text = prefix,
+                      .font_size = k_readout_font_size,
+                      .text_colours = Col {.c = Col::Overlay2, .dark_mode = true},
+                      .layout {.size = {k_readout_font_size, k_readout_font_size}},
+                  });
+            DoBox(builder,
+                  {
+                      .parent = value_column,
+                      .id_extra = index,
+                      .text = lufs <= LufsMeter::k_silence_floor_lufs
+                                  ? String {"-∞"}
+                                  : String {fmt::Format(builder.arena, "{.1}", lufs)},
+                      .font_size = k_readout_font_size,
+                      .text_colours = Col {.c = Col::Subtext0, .dark_mode = true},
+                      .text_justification = TextJustification::CentredLeft,
+                      .layout {.size = {layout::k_fill_parent, k_readout_font_size}},
+                  });
+        };
+        do_readout(0, "M"_s, snapshot.momentary_lufs);
+        do_readout(1, "S"_s, snapshot.short_term_lufs);
+    }
 }
 
 void TopPanel(GuiState& g, Rect bounds, GuiFrameContext const& frame_context) {

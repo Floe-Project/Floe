@@ -89,6 +89,18 @@ constexpr u32 BlendColours(u32 bg_abgr, u32 fg_abgr) {
     return ToU32(ColChannels {.a = a, .b = b, .g = g, .r = r});
 }
 
+constexpr u32 LerpColours(u32 from_abgr, u32 to_abgr, f32 mix_01) {
+    auto const from = FromU32(from_abgr);
+    auto const to = FromU32(to_abgr);
+    auto const lerp_channel = [mix_01](u8 a, u8 b) { return (u8)((f32)a + (((f32)b - (f32)a) * mix_01)); };
+    return ToU32(ColChannels {
+        .a = lerp_channel(from.a, to.a),
+        .b = lerp_channel(from.b, to.b),
+        .g = lerp_channel(from.g, to.g),
+        .r = lerp_channel(from.r, to.r),
+    });
+}
+
 constexpr f32 RelativeLuminance(u32 abgr) {
     auto const col = FromU32(abgr);
     f32 rgb[3] {};
